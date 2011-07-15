@@ -1,0 +1,455 @@
+#! /bin/sh
+#
+# cvmfsd        start/stop/pause/continue/configure cvmfsd
+#
+# chkconfig: 345 95 89
+# description: Background daemon that writes the cvmfs character device into a log file. Requires setuid bit.
+# processname: cvmfsd
+
+. /etc/init.d/functions
+
+RETVAL=0
+PID_FILE=/var/run/cvmfsd.pid
+SUBSYS_FILE=/var/lock/subsys/cvmfsd
+
+. /etc/cvmfs/server.conf
+if [ -f /etc/cvmfs/server.local ]; then
+  . /etc/cvmfs/server.local
+fi
+
+for reqvar in SHADOW_DIR PUB_DIR LOG_FILE
+do
+   eval value=\$$reqvar
+   if [ -z "$value" ]; then
+      echo "Set a value for $reqvar in /etc/cvmfs/server.local"
+      exit 1
+   fi
+done
+
+
+# Returns: 0 (stopped), 1 (running), 2 (paused)
+status() {
+   if [ -f $PID_FILE ]
+   then
+      lockdown=`cat /sys/fs/redirfs/filters/cvmfsflt/lockdown`
+      if [ $lockdown -eq 1 ]
+      then
+         return 2
+      fi
+      return 1
+   else
+      return 0
+   fi
+}
+
+listen() {
+   nohup cat /dev/cvmfs >> "$LOG_FILE" 2>/dev/null </dev/null &
+   if [ $? -ne 0 ]
+   then
+      return 1
+   else
+      echo $! > $PID_FILE
+   fi
+   return 0
+}
+
+
+unlisten() {
+   pid=`cat $PID_FILE`
+   kill $pid
+   killed=0
+   retries=0
+   while [ $killed -eq 0 ]
+   do
+      sleep 1
+      kill -0 $pid 2>/dev/null
+      killed=$?
+      retries=$[$retries+1]
+      if [ $retries -eq 3 ]
+      then
+         kill -9 $pid
+      fi
+   done
+}
+
+
+start() {   
+   status
+   if [ $? -ne 0 ]
+   then
+      echo "CernVM-FS daemon is running"
+      return 2
+   fi
+   
+   echo -n "Looking for $SHADOW_DIR"
+   if [ -d "$SHADOW_DIR" ]
+   then
+      echo_success
+   else
+      return 1
+   fi
+   echo
+   
+   echo -n "Creating file system journal in $LOG_FILE"
+   log_file_dir=`echo "$LOG_FILE" | grep -o '\([^\/]*\/\)*'`
+   if [ ! -d "$log_file_dir" ]
+   then
+      mkdir -p "$log_file_dir"
+      if [ $? -eq 0 ]
+      then
+         echo_success
+      else
+         return 1
+      fi
+   else
+      echo_success
+   fi
+   echo
+
+   echo -n "Loading redirfs kernel module"
+   modprobe redirfs > /dev/null 2>&1
+   if [ $? -eq 0 ]
+   then
+      echo_success
+   else
+      return 1
+   fi
+   echo
+   
+   echo -n "Loading cvmfsflt kernel module"
+   modprobe cvmfsflt > /dev/null 2>&1
+   if [ $? -eq 0 ]
+   then
+      echo_success
+   else
+      return 1
+   fi
+   echo
+   
+   echo -n "Linking to character devive"
+   rm -f /dev/cvmfs 
+   major=`grep cvmfs /proc/devices | awk '{print $1}'`
+   mknod /dev/cvmfs c $major 0 > /dev/null 2>&1 && chmod 0600 /dev/cvmfs
+   if [ $? -eq 0 ]
+   then
+      echo_success
+   else
+      return 1
+   fi
+   echo
+   
+   echo -n "Setting filter path to $SHADOW_DIR" 
+   echo -n "a:i:$SHADOW_DIR" > /sys/fs/redirfs/filters/cvmfsflt/paths
+   if [ $? -eq 0 ]
+   then
+      echo_success
+   else
+      return 1
+   fi
+   echo
+
+   echo -n "Starting journal writer"
+   listen
+   if [ $? -eq 0 ]
+   then
+      echo_success
+   else
+      return 1
+   fi
+   echo
+   
+   echo -n "Starting CernVM-FS daemon"
+   touch $SUBSYS_FILE
+   
+   return 0
+}
+
+
+pause() {
+   status
+   retval=$?
+   if [ $retval -eq 0 ];
+   then
+      echo "CernVM-FS daemon is stopped"
+      return 1
+   fi
+   if [ $retval -eq 2 ];
+   then
+      echo "CernVM-FS daemon is paused"
+      return 1
+   fi
+   
+   echo -n "Locking down $SHADOW_DIR"
+   echo -n "1" > /sys/fs/redirfs/filters/cvmfsflt/lockdown
+   if [ $? -ne 0 ]
+   then
+      echo_failure
+      return 1
+   else
+      echo_success
+   fi
+   echo
+   
+   echo -n "Waiting for pending operations on $SHADOW_DIR"
+   while true
+   do
+      nowops=`cat /sys/fs/redirfs/filters/cvmfsflt/nowops`
+      if [ $? -ne 0 ]
+      then
+         echo_failure
+         return 1
+      fi
+      
+      if  [ $nowops -eq 0 ]
+      then
+         break
+      fi
+      
+      sleep 1
+   done
+   echo_success
+   echo
+   
+   echo -n "Waiting for pending messages in call buffer"
+   while true
+   do
+      noll=`cat /sys/fs/redirfs/filters/cvmfsflt/noll`
+      if [ $? -ne 0 ]
+      then
+         echo_failure
+         return 1
+      fi
+      
+      if  [ $noll -eq 0 ]
+      then
+         break
+      fi
+      
+      sleep 1
+   done
+   echo_success
+   echo
+   
+   echo -n $"Stopping journal writer"
+   unlisten
+   if [ $RETVAL -ne 0 ]
+   then
+      echo_failure
+      return 1
+   else
+      echo_success
+   fi
+   echo
+   
+   return 0
+}
+
+
+resume() {
+   status
+   retval=$?
+   if [ $retval -eq 0 ];
+   then
+      echo "CernVM-FS daemon is stopped"
+      return 1
+   fi
+   if [ $retval -eq 1 ];
+   then
+      echo "CernVM-FS daemon is running"
+      return 1
+   fi
+   
+   echo -n "Resuming journal writer"
+   listen
+   retval=$?
+   if [ $retval -ne 0 ]
+   then
+      echo_failure
+      return 1
+   else
+      echo_success
+   fi
+   echo
+   
+   echo -n "Open up $SHADOW_DIR"
+   echo -n "0" > /sys/fs/redirfs/filters/cvmfsflt/lockdown
+   if [ $? -ne 0 ]
+   then
+      echo_failure
+      return 1
+   else
+      echo_success
+   fi
+   echo
+   
+   return 0
+}
+
+
+# Returns: 0 (OK), 1 (Failure), 2 (Stopped)
+stop() {
+   status
+   retval=$?
+   if [ $retval -eq 0 ]
+   then
+      echo "CernVM-FS daemon is stopped"
+      return 2
+   fi
+   
+   if [ $retval -eq 1 ]
+   then
+      pause
+      retval=$?
+      if [ $retval -ne 0 ]
+      then
+         return $retval
+      fi
+   fi
+   
+   echo -n "Unloading cvmfsflt kernel module"
+   echo -n "c\0" > /sys/fs/redirfs/filters/cvmfsflt/paths
+   if [ $? -ne 0 ]
+   then
+      return 1
+   fi
+   echo -n "1\0" > /sys/fs/redirfs/filters/cvmfsflt/unregister
+   if [ $? -ne 0 ]
+   then
+      return 1
+   fi
+   rmmod cvmfsflt
+   if [ $? -ne 0 ]
+   then
+      return 1
+   fi
+   echo_success
+   echo
+   
+   echo -n "Shutting down CernVM-FS daemon"
+   rm -f $PID_FILE
+   rm -f $SUBSYS_FILE
+   
+   return 0
+}
+
+flush() {
+   echo -n "Flushing file system change log"
+   cat /dev/null > "$LOG_FILE"
+   if [ $? -eq 0 ]
+   then
+      echo_success
+   else
+      echo_failure
+   fi
+   echo
+}
+
+
+ 
+case "$1" in
+   start)
+      shift 1
+      start
+      RETVAL=$?
+      case $RETVAL in
+         0)
+            echo_success
+            echo
+            ;;
+         1)
+            echo_failure
+            echo
+            ;;
+      esac
+      ;;
+   stop)
+      shift 1
+      stop 
+      RETVAL=$?
+      case $RETVAL in
+         0)
+            echo_success
+            echo
+            ;;
+         1)
+            echo_failure
+            echo
+            ;;
+      esac
+      ;;
+   pause)
+      shift 1
+      pause
+      RETVAL=$?
+      if [ $RETVAL -ne 0 ]
+      then
+         echo
+      fi
+      ;;
+   resume)
+      shift 1
+      resume
+      RETVAL=$?
+      if [ $RETVAL -ne 0 ]
+      then
+         echo
+      fi
+      ;;
+   restart|reload)
+      shift 1
+      stop  $*
+      RETVAL=$?
+      case $RETVAL in
+         0)
+            echo_success
+            echo
+            start $*
+            RETVAL=$?
+            if [ $RETVAL -eq 0 ]
+            then
+               echo_success
+            else
+               echo_failure
+            fi
+            echo
+            ;;
+         1)
+            echo_failure
+            echo
+            ;;
+      esac
+      ;;
+   flush)
+      shift 1
+      flush
+      ;;
+   status)
+      shift 1
+      status
+      retval=$?
+      case $retval in
+         0) 
+            echo "CernVM-FS daemon stopped"
+            RETVAL=1
+            ;;
+         1)
+            echo "CernVM-FS daemon runnning as pid `cat $PID_FILE`"
+            RETVAL=0
+            ;;
+         2)
+            echo "CernVM-FS daemon paused"
+            RETVAL=2
+            ;;
+         *) 
+            echo "Internal error"
+            RETVAL=1
+            ;;
+      esac
+      ;;
+   *)
+      echo $"Usage: $0 {start|stop|restart|pause|resume|flush|status}"
+      exit 1
+esac
+
+exit $RETVAL
+

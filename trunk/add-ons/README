@@ -1,0 +1,17 @@
+This directory contains some useful bits and pieces related to cvmfs.
+
+cvmfs.spec
+The spec file we use to create an RPM containing the cvmfs client part.
+
+cvmfs-server.spec
+The spec files for packaging the server tools (without kernel module)
+
+cvmfs-lvmrotate
+A wrapper script for LVM to deal with repository snapshots.  This script is part of the example release manager machine for small VOs as descripbed in the cvmfs technical report.
+
+webfs.conf
+Example configuration for Apache to publish a repository.  This script is part of the example release manager machine for small VOs as descripbed in the
+cvmfs technical report.
+
+cernvm_rsa.pub
+Master public key for verifying file catalogs 

@@ -1,0 +1,68 @@
+Parallel kernel compile:
+  download linux 2.16.13 into repository
+  make defconfig, safe .config
+  make mrproper
+  publish
+
+  rm -rf /tmp/kbuild/; mkdir /tmp/kbuild/; cp ../.config /tmp/kbuild/.config
+  make O=/tmp/kbuild/ -j8 2>/tmp/kbuild/log
+
+Procedure:
+  configure CMVFS_REPOSITORIES for atlas,lhcb and check service cvmfs restart
+  reboot + ls /opt
+  stat /opt/lhcb/lib/lhcb/PANORAMIX/PANORAMIX_v18r1/Makefile
+  stat /opt/lhcb/lib/lhcb/PANORAMIX/PANORAMIX_v18r10/Makefile
+  . /opt/lhcb/etc/login.sh
+  SetupProject Davinci
+  echo 3 > /proc/sys/vm/drop_caches
+  SetupProject Davinci
+  cvmfs-talk -i lhcb open catalogs | sort (+ check memory)
+
+  build kernel
+  build again (cached)
+  cvmfs-talk cleanup 0
+  build again
+
+  kernel cached and uncached valgrind watched: CVMFS2="/opt/valgrind/bin/valgrind -q --log-file=/tmp/valgrind/cvmfs2.log --leak-check=full /usr/local/bin/cvmfs2"
+  callgrind: CVMFS2="/opt/valgrind/bin/valgrind --tool=callgrind --callgrind-out-file="/tmp/valgrind/cvmfs2.%p" /usr/local/bin/cvmfs2"
+  USE UMOUNT!! 
+
+  TCMalloc: env HEAP_PROFILE_ALLOCATION_INTERVAL=104857600 HEAPPROFILE=/tmp/cvmfs2.hprof env LD_PRELOAD=/usr/local/lib/libtcmalloc.so cvmfs2 -f -o ...
+  pprof --text /usr/local/bin/cvmfs2 /tmp/cvmfs2.hprof...
+  CPUProf: env CPUPROFILE=/tmp/cvmfs.prof env LD_PRELOAD=/usr/lib/libunwind.so.7:/usr/local/lib/libprofiler.so cvmfs2 -f ...
+ 
+
+  tar cvfz atlas-release (check for mem leaks): tar cf atlas-15.6.1.tar /cvmfs/cern.ch/software/15.6.1
+  tar again (cached)
+  sha1sum compare
+  cvmfs-talk cache list / size
+
+  ATLAS asetup:
+  ATL_LOCAL_ROOT=/opt/atlas
+  export ATLAS_LOCAL_ROOT_BASE=$ATL_LOCAL_ROOT/software/manageTier3SW/ATLASLocalRootBase
+  export ATLAS_LOCAL_ROOT_BASE=$ATL_LOCAL_ROOT/software/manageTier3SW/ATLASLocalRootBase 
+  source ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh
+  #export FRONTIER_SERVER="(serverurl=http://squid-frontier.usatlas.bnl.gov:23128/frontieratbnl)(proxyurl=http://cernvm.lbl.gov:3128)"
+  asetup 16.0.1.3
+  (LXPlus: export AtlasSetup=/afs/cern.ch/atlas/software/dist/AtlasSetup
+           alias asetup='source $AtlasSetup/scripts/asetup.sh)
+
+  LHCb SetupProject:
+  . /opt/lhcb/etc/login.sh
+  SetupProject DaVinci
+  SetupProject Panoramix
+  (LXPlus: . /afs/cern.ch/lhcb/software/releases/LBSCRIPTS/prod/InstallArea/scripts/LbLogin.sh)
+
+  LHCb Event Viewer:
+  . /opt/lhcb/etc/login.sh
+  SetupProject Panoramix
+  python $myPanoramix
+  (on LXPLus: . /afs/cern.ch/lhcb/software/releases/LBSCRIPTS/prod/InstallArea/scripts/LbLogin.sh)
+  
+Catalog loading:
+  fresh cache, root catalog + nested catalog
+  fresh cache, deep mount with wrong mount point + deep mount + nested catalog
+  warm cache, root catalog + nested catalog + fresh nested catalog
+  warm cache, updated catalog + updated nested catalog
+  2 loaded catalogs, ttl
+  2 loaded catalogs, newer catalog in cache    

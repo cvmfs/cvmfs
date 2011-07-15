@@ -1,0 +1,16 @@
+#!/bin/sh
+
+if [ -z $1 ] || [ -z $2 ]; then
+  echo 'Usage: sign-whitelist <whitelist> <private key>'
+  exit 1
+fi
+
+echo `date "+%Y%m%d%H%M%S"` > $1.signed
+cat $1 >> $1.signed
+SHA1=`sha1sum $1.signed`
+echo "--" >> $1.signed
+echo $SHA1 >> $1.signed
+echo $SHA1 | head -c40 | openssl rsautl -inkey $2 -sign >> $1.signed 
+#cvmfs_zpipe < $1.signed > $1.signed.compressed
+#mv $1.signed.compressed $1.signed
+

@@ -1,0 +1,144 @@
+#!/usr/bin/perl
+#
+# cvmfs-talk talks to a running cvmfs instance.
+# This is a simple query-response mechanism.
+#
+# SYNOPSIS
+# cvmfs-talk <command>
+#
+# AUTHOR
+# Jakob Blomer, jakob.blomer@cern.ch
+#
+# CREATED
+# June 2010
+
+use strict;
+use warnings;
+use Socket;
+use Getopt::Long;
+
+sub usage {
+    print "Usage: cvmfs-talk [-c cache_base] [-i instance] <command>       \n";
+    print "   Instance referrs to the subdirectory in \$CVMFS_CACHE_BASE   \n";
+    print "   resp. in cache_base.                                         \n";
+    print "   By default, iteratate through all instances.                 \n";
+    print "\n";
+    print "Example:                                                        \n";
+    print "  cvmfs-talk -i atlas.cern.ch pid                               \n";
+    print "\n";
+    print "Commands:                                                       \n";
+    print "  flush                  flushes the trace buffer to disk       \n";
+    print "  cache size             gets current size of file cache        \n";
+    print "  cache list             gets files in cache                    \n";
+    print "  cache list pinned      gets pinned file catalogs in cache     \n";
+    print "  cache list catalogs    gets all file catalogs in cache        \n";
+    print "  cleanup <MB>           cleans file cache until size <= <MB>   \n";
+    print "  clear file <path>      removes <path> from local cache        \n";
+    print "  mountpoint             returns the mount point                \n";
+    print "  remount                look for new catalogs                  \n";
+    print "  revision               gets the repository revision           \n";
+    print "  max ttl info           gets the maximum ttl                   \n";
+    print "  max ttl set <minutes>  sets the maximum ttl                   \n";
+    print "  host info              get host chain and their rtt,          \n";
+    print "                         if already probed                      \n";
+    print "  host probe             orders the host chain according to rtt \n";
+    print "  host switch            switches to the next host in the chain \n";
+    print "  host set <host list>   sets a new host chain                  \n";
+    print "  proxy info             gets the currently active proxy server \n";
+    print "  proxy rebalance        randomly selects a new proxy server    \n";
+    print "                         from the current load-balance group    \n";
+    print "  proxy group switch     switches to the next load-balance      \n";
+    print "                         proxy group in the chain               \n";
+    print "  proxy set <proxy list> sets a new chain of load-balance proxy \n";
+    print "                         groups                                 \n";
+    print "  timeout info           gets the network timeouts              \n";
+    print "  timeout set                                                   \n";
+    print "       <proxy> <direct>  sets the network timeouts in seconds   \n";
+    print "  pid                    gets the pid                           \n";
+    print "  version                gets cvmfs version                     \n";
+    print "  version patchlevel     gets cvmfs patchlevel                  \n";
+    print "  open catalogs          shows information about currently      \n";
+    print "                         loaded catalogs (_not_ all cached ones)\n";
+    print "\n";
+    
+    exit 1;
+}
+
+my $instance;
+my $cache_base;
+GetOptions("i:s" => \$instance,
+           "c:s" => \$cache_base);
+my $command = join(' ', @ARGV) or usage;
+$command .= "\0";
+
+sub talk {
+   my $instance_current = shift; 
+   my $cache_dir;
+   if (!$cache_base) {
+      my @config_line = grep(/^CVMFS_CACHE_DIR=/, `cvmfs_config showconfig $instance_current`);
+      my @config;
+      @config = split(' ', $config_line[0]) unless (!defined($config_line[0]));
+      if (!defined($config[0]) || !$config[0]) {
+         print "Could not figure out cache directory\n";
+         return 1;
+      }
+      (my $trash, $cache_dir) = split(/=/, $config[0]);
+      chomp($cache_dir);
+   } else {
+      $cache_dir="$cache_base/$instance_current";
+   }
+   
+   if (! -d $cache_dir) {
+      print "Cache directory $cache_dir not accessible\n";
+      return 1;
+   }
+
+   if (! -d "$cache_dir") {
+      print "Seems like there is no CernVM-FS instance in $cache_dir\n";
+      return 1;
+   }
+   if (! -S "$cache_dir/cvmfs_io") {
+      print "Seems like CernVM-FS is not running in $cache_dir\n";
+      return 1;
+   }
+   if (! -w "$cache_dir/cvmfs_io") {
+      print "You don't have permissions to talk to instance in $cache_dir\n";
+      return 1;
+   }
+   
+   my $socket_name = sockaddr_un("$cache_dir/cvmfs_io");
+
+   socket(SOCKET, PF_UNIX, SOCK_STREAM, 0);
+   if (!connect(SOCKET, $socket_name)) {
+      print "Can't connect to socket: $!\n";
+      return 1;
+   }
+
+   send(SOCKET, $command, 0);
+
+   my $response;
+   my $length = 256;
+   while (recv(SOCKET, $response, $length, 0) && $length) {
+      print $response;
+   }
+   
+   return 0;
+}
+
+if ($instance) {
+   exit talk($instance);
+} else {
+   my @config_line = grep(/^CVMFS_REPOSITORIES=/, `cvmfs_config showconfig`);
+   my @config = split(' ', $config_line[0]);
+   (my $trash, my $repo_list) = split(/=/, $config[0]);
+   chomp($repo_list);
+   my @repos = split(/,/, $repo_list);
+   
+   my $retval = 0;
+   foreach my $i (@repos) {
+      print "$i:\n";
+      $retval += talk($i);
+      print "\n";
+   }
+   exit $retval;
+}

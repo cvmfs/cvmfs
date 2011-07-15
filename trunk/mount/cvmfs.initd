@@ -1,0 +1,446 @@
+#!/bin/bash
+#
+# cvmfs        start/stop cvmfs
+#
+# chkconfig: 345 17 87
+# description: cvmfs
+
+LSB_INIT=0
+if [ -f /etc/init.d/functions ]; then
+   . /etc/init.d/functions
+else
+   . /lib/lsb/init-functions || exit 1
+   LSB_INIT=1
+fi
+
+if [ -x /sbin/service ]; then
+  service="/sbin/service"
+else
+  # Ubuntu
+  service="/usr/sbin/service"
+fi
+
+RETVAL=0
+
+portable_success() {
+   if [ $LSB_INIT -eq 1 ]; then
+      log_success_msg
+   else
+      echo_success
+      echo
+   fi
+}
+
+portable_failure() {
+   if [ $LSB_INIT -eq 1 ]; then
+      log_failure_msg
+   else
+      echo_failure
+      echo
+   fi
+}
+
+
+start_or_stop() {
+  action=$1 
+  local org
+  local list
+
+  list=""
+
+  if [ "x$CVMFS_REPOSITORIES" != "x" ]
+  then
+     list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+  fi 
+
+  for org in $list
+  do
+     case $org in
+        none)
+             ;;
+           *)
+             . /etc/cvmfs/config.sh # start with fresh repository_... functions
+             cvmfs_readconfig
+             fqrn=`cvmfs_mkfqrn $org`
+             cvmfs_readconfig $fqrn
+             [ x`type -t repository_${action}` = x"function" ] && repository_${action} $fqrn
+             ;;
+     esac 
+  done
+  
+  return 0
+}
+
+
+start() {
+  echo -n "Starting CernVM-FS: "
+
+  # Check for fuse
+  if [ ! -c /dev/fuse ]; then
+    /sbin/modprobe fuse > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      echo "Failed to load Fuse"
+      RETVAL=1
+      portable_failure
+      return $RETVAL
+    fi
+  fi
+
+  start_or_stop start
+  RETVAL=$?
+ 
+  if [ $RETVAL -eq 0 ]; then
+    portable_success
+  else
+    portable_failure
+  fi
+  
+  return $RETVAL
+}
+
+
+stop() {
+   local mount_list
+   mount_list=`mount -t cvmfs | awk '{print $3}'`
+  
+   RETVAL=0
+  
+   local m
+   for m in $mount_list
+   do
+      echo -n "Unmounting ${m}:"
+      umount $m 2>/dev/null
+      if [ $? -ne 0 ]; then
+         RETVAL=1
+         portable_failure
+         fuser -m -a -v $m
+      else
+         portable_success
+      fi
+   done
+
+   if [ $RETVAL -eq 0 ]; then
+      echo -n "Shutting down CernVM-FS: "
+      start_or_stop stop
+      portable_success
+   fi
+   return $RETVAL
+}
+
+
+status() {
+   local list
+   list=""
+
+   if [ "x$CVMFS_REPOSITORIES" != "x" ]
+   then
+      list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+   fi
+  
+   local org
+   for org in $list
+   do
+      case $org in
+         none)
+            ;;
+         *)
+            . /etc/cvmfs/config.sh # start with fresh repository_... functions
+            cvmfs_readconfig
+            fqrn=`cvmfs_mkfqrn $org`
+            cvmfs_readconfig $fqrn
+            mount -t cvmfs | grep $CVMFS_MOUNT_DIR/$fqrn > /dev/null
+            if [ $? -eq 0 ]; then
+               local pid
+               pid=`/usr/bin/cvmfs-talk -c "$CVMFS_CACHE_BASE" -i "$fqrn" pid`
+               echo $pid | grep ^[0-9]*$ > /dev/null
+               if [ $? -eq 0 ]; then
+                  echo "CernVM-FS mounted on $CVMFS_MOUNT_DIR/$fqrn with pid $pid"
+               else
+                  RETVAL=1
+                  echo $pid
+               fi
+            else
+               echo "CernVM-FS not mounted on $CVMFS_MOUNT_DIR/$fqrn"
+            fi
+            ;;
+      esac 
+   done
+  
+   return $RETVAL
+}
+
+flush() {
+   RETVAL=0
+   
+   local list
+   list=""
+
+   if [ "x$CVMFS_REPOSITORIES" != "x" ]
+   then
+      list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+   fi
+  
+   local org
+   for org in $list
+   do
+      case $org in
+         none)
+            ;;
+         *)
+            . /etc/cvmfs/config.sh # start with fresh repository_... functions
+            cvmfs_readconfig
+            fqrn=`cvmfs_mkfqrn $org`
+            cvmfs_readconfig $fqrn
+            echo -n "Flushing $fqrn:"
+            stat $CVMFS_MOUNT_DIR/$fqrn/. > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+               /usr/bin/cvmfs-talk -c "$CVMFS_CACHE_BASE" -i "$fqrn" cleanup 0 > /dev/null
+               if [ $? -ne 0 ]; then
+                  portable_failure
+                  RETVAL=1
+               else
+                  portable_success
+               fi
+            else
+               portable_failure
+               RETVAL=1
+            fi
+            ;;
+      esac 
+   done
+  
+   return $RETVAL
+}
+
+
+reload() {
+   RETVAL=0
+   
+   local list
+   list=""
+
+   if [ "x$CVMFS_REPOSITORIES" != "x" ]
+   then
+      list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+   fi
+  
+   local org
+   for org in $list
+   do
+      case $org in
+         none)
+            ;;
+         *)
+            . /etc/cvmfs/config.sh # start with fresh repository_... functions
+            cvmfs_readconfig
+            fqrn=`cvmfs_mkfqrn $org`
+            org=`cvmfs_getorg $fqrn`
+            cvmfs_readconfig $fqrn
+            
+            echo -n "Reloading $fqrn:"
+            cvmfs-talk -i $fqrn pid > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+               retstr=`cvmfs-talk -i $fqrn timeout set $CVMFS_TIMEOUT $CVMFS_TIMEOUT_DIRECT 2>&1`
+               if [ "$retstr" != "OK" ]; then
+                  RETVAL=1
+               fi
+               retstr=`cvmfs-talk -i $fqrn proxy set $CVMFS_HTTP_PROXY 2>&1`
+               if [ "$retstr" != "OK" ]; then
+                  RETVAL=1
+               fi
+               hosts=`echo $CVMFS_SERVER_URL | sed s/@org@/$org/g | sed s/@fqrn@/$fqrn/g`
+               retstr=`cvmfs-talk -i $fqrn host set $hosts 2>&1`
+               if [ "$retstr" != "OK" ]; then
+                  RETVAL=1
+               fi
+               if [ "x$CVMFS_MAX_TTL" == "x" ]; then
+                  max_ttl="0"
+               else
+                  max_ttl="$CVMFS_MAX_TTL"
+               fi
+               retstr=`cvmfs-talk -i $fqrn max ttl set $max_ttl 2>&1`
+               if [ "$retstr" != "OK" ]; then
+                  RETVAL=1
+               fi
+               
+               if [ $RETVAL -ne 0 ]; then
+                  portable_failure
+               else
+                  portable_success
+               fi
+            else
+               echo -n " not mounted"
+               portable_success
+            fi
+            ;;
+      esac 
+   done
+  
+   return $RETVAL
+}
+
+
+restart_clean() {
+   stop
+   RETVAL=$?
+   if [ $RETVAL -eq 0 ]; then
+      local list
+      list=""
+
+      if [ "x$CVMFS_REPOSITORIES" != "x" ]
+      then
+         list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+      fi
+  
+      local org
+      for org in $list
+      do
+         case $org in
+            none)
+               ;;
+            *)
+               . /etc/cvmfs/config.sh # start with fresh repository_... functions
+               cvmfs_readconfig
+               fqrn=`cvmfs_mkfqrn $org`
+               cvmfs_readconfig $fqrn
+               echo -n "Wiping out $CVMFS_CACHE_BASE/$fqrn"
+               [ ! -d "$CVMFS_CACHE_BASE/$fqrn" ] || rm -rf "$CVMFS_CACHE_BASE/$fqrn"
+               if [ $? -ne 0 ]; then
+                  portable_failure
+                  RETVAL=1
+               else
+                  portable_success
+               fi
+               ;;
+         esac 
+      done
+      
+      if [ $RETVAL -eq 0 ]; then
+         start
+         RETVAL=$?
+      fi
+   fi
+   
+   return $RETVAL
+}
+
+restart_autofs() {
+   RETVAL=0
+   stop
+   RETVAL=$[$RETVAL+$?]
+   $service autofs stop
+   RETVAL=$[$RETVAL+$?]
+   $service autofs start
+   RETVAL=$[$RETVAL+$?]
+   start
+   RETVAL=$[$RETVAL+$?]
+}
+
+probe() {
+   RETVAL=0
+   local list
+   list=""
+
+   if [ "x$CVMFS_REPOSITORIES" != "x" ]
+   then
+      list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+   fi
+  
+   local org
+   for org in $list
+   do
+      case $org in
+         none)
+            ;;
+         *)
+            . /etc/cvmfs/config.sh # start with fresh repository_... functions
+            cvmfs_readconfig
+            fqrn=`cvmfs_mkfqrn $org`
+            cvmfs_readconfig $fqrn
+            echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn"
+            df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
+            if [ $? -ne 0 ]; then
+               portable_failure
+               RETVAL=1
+            else
+               portable_success
+            fi
+            ;;
+      esac 
+   done
+   
+   return $RETVAL
+}
+
+# Initialization, read config
+[ -x /etc/cernvm/config ] && /etc/cernvm/config
+  
+if [ -f /etc/cvmfs/config.sh ]
+then
+  . /etc/cvmfs/config.sh
+else
+  exit 1
+fi
+
+cvmfs_readconfig
+
+[ -f /etc/cernvm/repositories.sh ] && . /etc/cernvm/repositories.sh
+
+export LANG=C
+export LC_ALL=C
+
+[ -f /etc/cernvm/custom/init.sh ] && . /etc/cernvm/custom/init.sh
+
+
+
+case "$1" in
+   start)
+      shift 1
+      start
+   ;;
+   stop)
+      shift 1
+      stop 
+   ;;
+   restart)
+      shift 1
+      stop
+      if [ $RETVAL -eq 0 ]; then
+         start
+      fi
+   ;;
+   status)
+      shift 1
+      $service autofs status
+      status
+      RETVAL=$?
+   ;;
+   flush)
+      flush
+      RETVAL=$?
+      ;;
+   reload)
+      reload
+      RETVAL=$?
+      ;;
+   restartclean)
+      restart_clean
+      RETVAL=$?
+      ;;
+   restartautofs)
+      restart_autofs
+      RETVAL=$?
+      ;;   
+   probe)
+      probe
+      RETVAL=$?
+      ;;
+   *)
+      echo $"Usage: $0 {start|stop|restart|restartclean|restartautofs|probe|flush|status}"
+      exit 1
+   ;;
+esac
+
+exit $RETVAL
+
+

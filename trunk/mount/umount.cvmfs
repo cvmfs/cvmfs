@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ -x /usr/bin/fusermount ]; then
+  fusermount="/usr/bin/fusermount"
+else
+  # Ubuntu
+  fusermount="/bin/fusermount"
+fi
+fusermount_option=
+mountpoint=$1; shift 1
+
+while getopts "lv" OPTION
+do
+  case $OPTION in
+    l)
+      fusermount_option="-z"
+    ;;
+    v)
+    ;;
+    ?)
+      echo "Invalid option"
+      exit 1
+    ;;
+  esac
+done
+
+sed -i "s|^cvmfs2 $mountpoint cvmfs \(.*\)|cvmfs2 $mountpoint fuse \1|" /etc/mtab
+$fusermount -u $fusermount_option $mountpoint
+retval=$?
+
+if [ $retval -ne 0 ]; then
+  sed -i "s|^cvmfs2 $mountpoint fuse \(.*\)|cvmfs2 $mountpoint cvmfs \1|" /etc/mtab
+fi
+
+exit $retval
+
