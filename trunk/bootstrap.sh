@@ -41,5 +41,5 @@ mv zlib-${ZLIB_VERSION}/* src/
 rm -rf zlib-${ZLIB_VERSION}
 cd ..
 
-autoreconf -v
+#autoreconf -v
 
