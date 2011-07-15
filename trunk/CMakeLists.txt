@@ -27,8 +27,8 @@ endif ()
 #
 # provide some options to the user
 #
-option (DISABLE_CVMFS "Don't build the CernVM-FS FUSE module" OFF)
-option (DISABLE_SERVER "Don't build writer's end programs" OFF)
+option (BUILD_CVMFS "Build the CernVM-FS FUSE module" ON)
+option (BUILD_SERVER "Build writer's end programs" ON)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (LIBFUSE_BUILTIN "Don't use system libfuse" OFF)
