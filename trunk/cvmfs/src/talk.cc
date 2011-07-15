@@ -18,6 +18,8 @@
 #include "config.h"
 #include "talk.h"
 
+#include "compat.h"
+
 #include <string>
 #include <sstream>
 #include <vector>
@@ -469,8 +471,12 @@ namespace talk {
       if ((socket_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
          return false;
          
+#ifndef __APPLE__
+	  // fchmod on a socket is not allowed under Mac OS X
+	  // using default here... (0770 in this case)
       if (fchmod(socket_fd, 0660) != 0)
          return false;
+#endif
       
       sock_addr.sun_family = AF_UNIX;
       strncpy(sock_addr.sun_path, socket_path.c_str(), sizeof(sock_addr.sun_path));

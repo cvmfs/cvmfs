@@ -57,7 +57,11 @@
 # endif*/
 
 #include <sys/stat.h>
-#include <linux/limits.h>
+#ifdef __APPLE__
+	#include <limits.h>
+#else
+	#include <linux/limits.h>
+#endif
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/dir.h>
@@ -70,6 +74,8 @@
 #include "hash.h"
 #include "util.h"
 #include "monitor.h"
+
+#include "compat.h"
 
 extern "C" {
    #include "compression.h"
@@ -163,8 +169,8 @@ static void print_set(const set<string> &s) {
 
 
 static file_type_t get_file_type(const string &path) {
-   struct stat64 info;
-   if (lstat64(path.c_str(), &info) != 0)
+   PortableStat64 info;
+   if (portableLinkStat64(path.c_str(), &info) != 0)
       return FT_ERR;
       
    if (S_ISDIR(info.st_mode)) return FT_DIR;
@@ -175,8 +181,8 @@ static file_type_t get_file_type(const string &path) {
 }
 
 
-static bool get_file_info(const string &path, struct stat64 *info) {
-   if (lstat64(path.c_str(), info) != 0) {
+static bool get_file_info(const string &path, PortableStat64 *info) {
+   if (portableLinkStat64(path.c_str(), info) != 0) {
       cerr << "Warning: could not stat " << path << endl;
       return false;
    }
@@ -201,8 +207,8 @@ static void hieve_add(const string &path)
    
    dir_add.insert(path);
    
-   struct dirent64 *d;
-   while ((d = readdir64(dir)) != NULL) {
+   PortableDirent *d;
+   while ((d = portableReaddir(dir)) != NULL) {
       const string name = string(d->d_name);
       if ((name == ".") || (name == ".."))
          continue;
@@ -328,7 +334,7 @@ static bool init_catalogs(const string &dir_catalogs, const string &dir_shadow,
    if (!catalog::lookup(rhash, d)) {
       cout << "creating root entry" << endl;
 
-      struct stat64 info;
+      PortableStat64 info;
       if (!get_file_info(dir_shadow, &info))
          return false;
       
@@ -444,15 +450,15 @@ static void clg_snapshot(const string &path,
    const string backlink_data = backlink + get_file_name(dir_data);
    const string backlink_whitelist = backlink + get_file_name(dir_catalogs) + "/.cvmfswhitelist";
    
-   struct stat64 info;
-   if (lstat64(lnk_path_data.c_str(), &info) != 0) 
+   PortableStat64 info;
+   if (portableLinkStat64(lnk_path_data.c_str(), &info) != 0) 
    {
       if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
          cerr << "Warning: cannot create catalog store -> data store symlink" << endl;
       }
    }
    /* Don't make the symlink for the root catalog */
-   if ((lstat64(lnk_path_whitelist.c_str(), &info) != 0) && 
+   if ((portableLinkStat64(lnk_path_whitelist.c_str(), &info) != 0) && 
        (get_parent_path(cat_path) != get_parent_path(dir_data)))
    {
       if (symlink(backlink_whitelist.c_str(), lnk_path_whitelist.c_str()) != 0) {
@@ -1275,7 +1281,7 @@ catalogs_attached:
    if (!dry_run) {
       long count = 0;
       catalog::t_dirent d;
-      struct stat64 info;
+      PortableStat64 info;
       prels.insert("");
    
       /* Merge obsolete catalogs */

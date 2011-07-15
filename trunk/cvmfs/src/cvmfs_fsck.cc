@@ -11,6 +11,8 @@
 #include "hash.h"
 #include "atomic.h"
 
+#include "compat.h"
+
 extern "C" {
    #include "compression.h"
    #include "smalloc.h"
@@ -70,7 +72,7 @@ pthread_mutex_t mutex_force_rebuild = PTHREAD_MUTEX_INITIALIZER;
 
 
 static bool next_file(string &rel_path, string &hash_name) {
-   dirent64 *d;
+   PortableDirent *d;
    
    pthread_mutex_lock(&mutex_traverse);
    if (!DIRP_current) {
@@ -79,7 +81,7 @@ static bool next_file(string &rel_path, string &hash_name) {
    }
 
 next_file_again:
-   while ((d = readdir64(DIRP_current)) != NULL) {
+   while ((d = portableReaddir(DIRP_current)) != NULL) {
       const string name = d->d_name;
       if ((name == ".") || (name == "..")) continue;
       
@@ -240,8 +242,8 @@ int main(int argc, char **argv) {
       cerr << "invalid cache directory, " << cache_dir << "/txn does not exist" << endl;
       return ERROR_OPERATIONAL;
    }
-   struct dirent64 *d;
-   while ((d = readdir64(dirp_txn)) != NULL) {
+   PortableDirent *d;
+   while ((d = portableReaddir(dirp_txn)) != NULL) {
       const string name = d->d_name;
       if ((name == ".") || (name == "..")) continue;
       

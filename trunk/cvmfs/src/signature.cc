@@ -19,6 +19,8 @@
 
 #include "hash.h"
 
+#include "compat.h"
+
 #include <string>
 
 #include <cstdio>

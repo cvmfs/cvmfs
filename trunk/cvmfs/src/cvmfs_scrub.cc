@@ -11,6 +11,8 @@
 #include "hash.h"
 #include "atomic.h"
 
+#include "compat.h"
+
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -73,8 +75,8 @@ int main(int argc, char **argv) {
          cerr << "Error: cannot access " << data_dir << "/" << hex << endl;
          continue;
       }
-      struct dirent64 *d;
-      while ((d = readdir64(dirp)) != NULL) {            
+      PortableDirent *d;
+      while ((d = portableReaddir(dirp)) != NULL) {            
          const string name = d->d_name;
          if ((name == ".") || (name == ".."))
             continue;

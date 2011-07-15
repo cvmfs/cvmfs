@@ -13,6 +13,8 @@
 #include "config.h"
 #include "monitor.h"
 
+#include "compat.h"
+
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -24,7 +26,11 @@
 #include <signal.h>
 #include <sys/resource.h>
 #include <execinfo.h>
-#include <ucontext.h>
+#ifdef __APPLE__
+	#include <sys/ucontext.h>
+#else
+	#include <ucontext.h>
+#endif
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -47,8 +53,31 @@ namespace monitor {
    const unsigned MIN_OPEN_FILES = 8192;
    const unsigned MAX_BACKTRACE = 64;
    int pipe_wd[2];
-   pthread_spinlock_t lock_handler;
+   PortableSpinlock lock_handler;
    bool spawned = false;
+
+	/**
+	 *  get the instruction pointer in a platform independant fashion
+	 */
+	void* getInstructionPointer(ucontext_t *uc) {
+		void *result;
+		
+		#ifdef __APPLE__
+			#ifdef __x86_64__
+			 	result = (void *)uc->uc_mcontext->__ss.__rip;
+			#else
+				result = (void *)uc-uc_mcontext->__ss.__eip;
+			#endif
+		#else
+			#ifdef __x86_64__
+			    result = (void *)uc->uc_mcontext.gregs[REG_RIP]; 
+			#else
+			    result = (void *)uc->uc_mcontext.gregs[REG_EIP];
+			#endif
+		#endif
+		
+		return result;
+	}
 
 
    /**
@@ -59,7 +88,7 @@ namespace monitor {
                           void *context) 
    {
       int send_errno = errno;
-      if (pthread_spin_trylock(&lock_handler) != 0) {
+      if (portableSpinlockTrylock(&lock_handler) != 0) {
          /* concurrent call, wait for the first one to exit the process */
          while (true) {}
       }
@@ -76,11 +105,7 @@ namespace monitor {
       if (stack_size > 1) {
          ucontext_t *uc;
          uc = (ucontext_t *)context;
-#ifdef __x86_64__
-         adr_buf[1] = (void *)uc->uc_mcontext.gregs[REG_RIP]; 
-#else
-         adr_buf[1] = (void *)uc->uc_mcontext.gregs[REG_EIP];
-#endif
+         adr_buf[1] = getInstructionPointer(uc); 
       }
       if (write(pipe_wd[1], &stack_size, sizeof(int)) != sizeof(int)) _exit(1);
       backtrace_symbols_fd(adr_buf, stack_size, pipe_wd[1]);
@@ -186,7 +211,7 @@ namespace monitor {
    
    bool init(const string cache_dir, const bool check_nofiles) {
       monitor::cache_dir = cache_dir;
-      if (pthread_spin_init(&lock_handler, 0) != 0) return false;
+      if (portableSpinlockInit(&lock_handler, 0) != 0) return false;
    
       /* check number of open files */
       if (check_nofiles) {
@@ -219,7 +244,7 @@ namespace monitor {
          (void)write(pipe_wd[1], &quit, 1);
          close(pipe_wd[1]);
       }
-      pthread_spin_destroy(&lock_handler);
+      portableSpinlockDestroy(&lock_handler);
    }
    
    /* fork watchdog */

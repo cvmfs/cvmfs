@@ -18,6 +18,8 @@
 #include "signature.h"
 #include "hash.h"
 
+#include "compat.h"
+
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -671,8 +673,8 @@ static bool recursive_pull(const string &path)
    const string lnk_path_data = dir_catalogs + path + "/data";
    const string backlink_data = backlink + get_file_name(dir_data);
    
-   struct stat64 info;
-   if (lstat64(lnk_path_data.c_str(), &info) != 0)  {
+   PortableStat64 info;
+   if (portableLinkStat64(lnk_path_data.c_str(), &info) != 0)  {
       if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
          cerr << "Warning: cannot create catalog store -> data store symlink" << endl;
          if (exit_on_error) return false;

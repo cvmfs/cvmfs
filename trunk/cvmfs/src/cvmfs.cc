@@ -31,6 +31,8 @@
 
 #include "fuse-duplex.h"
 
+#include "compat.h"
+
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -797,8 +799,8 @@ namespace cvmfs {
       if (((result == 0) && !cached_copy) ||
           ((existing_cat_id < 0) && ((result == 0) || cached_copy)))
       {
-         struct stat64 info;
-         if (stat64(cat_file.c_str(), &info) != 0) {
+         PortableStat64 info;
+         if (portableFileStat64(cat_file.c_str(), &info) != 0) {
             /* should never happen */
             lru::remove(sha1_cat);
             cached_copy = false;

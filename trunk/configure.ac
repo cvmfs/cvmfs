@@ -84,7 +84,7 @@ else
   AC_SUBST(OPENSSL_LIBS)
 fi
 
-AC_CHECK_LIB([rt], [sched_yield], ,[AC_MSG_ERROR(librt (Posix real time extensions) required)])
+#AC_CHECK_LIB([rt], [sched_yield], ,[AC_MSG_ERROR(librt (Posix real time extensions) required)])
 
 if test x$HAVE_CVMFS != xno; then
 dnl   if test x$USE_BUILTIN_LIBFUSE != xyes; then
@@ -118,8 +118,8 @@ dnl AC_HEADER_STDC++
 dnl AC_HEADER_SYS_WAIT
 AC_HEADER_STDC
 AC_CHECK_HEADERS([zlib.h netinet/in.h arpa/inet.h sys/socket.h sys/un.h sys/time.h sys/uio.h sys/stat.h sys/types.h \
-                  sys/wait.h sys/select.h sys/statfs.h pthread.h termios.h utime.h signal.h errno.h dirent.h unistd.h \
-                  fcntl.h netdb.h syslog.h sys/resource.h execinfo.h ucontext.h poll.h],,
+                  sys/wait.h sys/select.h pthread.h termios.h utime.h signal.h errno.h dirent.h unistd.h \
+                  fcntl.h netdb.h syslog.h sys/resource.h execinfo.h sys/ucontext.h poll.h],,
                  [AC_MSG_ERROR(missing header)])
 
 dnl  Checks for typedefs, structures, and compiler characteristics.

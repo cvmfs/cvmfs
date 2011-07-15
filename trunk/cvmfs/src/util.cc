@@ -11,8 +11,9 @@
 
 #include "config.h"
 #include "util.h"
-
 #include "hash.h"
+
+#include "compat.h"
 
 #include <string>
 #include <sstream>
@@ -70,8 +71,8 @@ bool is_empty_dir(const string &path) {
    if (!dir)
       return true;
       
-   struct dirent64 *d;
-   while ((d = readdir64(dir)) != NULL) {
+   PortableDirent *d;
+   while ((d = portableReaddir(dir)) != NULL) {
       if ((string(d->d_name) == ".") || (string(d->d_name) == "..")) continue;
       closedir(dir);
       return false;
@@ -81,8 +82,8 @@ bool is_empty_dir(const string &path) {
 }
 
 bool file_exists(const string &path) {
-   struct stat64 info;
-   return ((stat64(path.c_str(), &info) == 0) && S_ISREG(info.st_mode));
+   PortableStat64 info;
+   return ((portableFileStat64(path.c_str(), &info) == 0) && S_ISREG(info.st_mode));
 }
 
 bool mkdir_deep(const std::string &path, mode_t mode) {
@@ -92,8 +93,8 @@ bool mkdir_deep(const std::string &path, mode_t mode) {
    if (res == 0) return true;
    
    if (errno == EEXIST) {
-      struct stat64 info;
-      if ((stat64(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode))
+      PortableStat64 info;
+      if ((portableFileStat64(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode))
          return true;
       return false;
    }
@@ -141,8 +142,8 @@ string expand_env(const string &path) {
 bool make_cache_dir(const string &path, const mode_t mode) {
    const string cpath = canonical_path(path);
    string lpath = cpath + "/ff";
-   struct stat64 buf;
-   if (stat64(lpath.c_str(), &buf) != 0) {
+   PortableStat64 buf;
+   if (portableFileStat64(lpath.c_str(), &buf) != 0) {
       if (mkdir(lpath.c_str(), mode) != 0) return false;
       lpath = cpath + "/txn";
       if (mkdir(lpath.c_str(), mode) != 0) return false;

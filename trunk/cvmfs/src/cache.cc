@@ -36,6 +36,8 @@
 #include "util.h"
 #include "hash.h"
 
+#include "compat.h"
+
 #include <string>
 #include <sstream>
 #include <queue>
@@ -418,8 +420,8 @@ namespace cache {
       if (fd < 0)
          return false;
       
-      struct stat64 info;
-      if (fstat64(fd, &info) != 0) {
+      PortableStat64 info;
+      if (portableFileDescriptorStat64(fd, &info) != 0) {
          close(fd);
          return false;
       }

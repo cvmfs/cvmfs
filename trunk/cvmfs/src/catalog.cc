@@ -25,6 +25,8 @@
 #include "cvmfs.h"
 #endif
 
+#include "compat.h"
+
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -79,8 +81,62 @@ namespace catalog {
    vector<string> catalog_urls;
    vector<string> catalog_files;
    /* __thread This is actually necessary... but not allowed until C++0x */string sqlError;
-   pthread_key_t pkey_sqlitemem;
-   __thread bool sqlite_mem_enforced = false;
+
+	// thread local storage for both Mac OS X and Linux wrapped in a small simple abstraction API
+	#ifdef __APPLE__
+	    pthread_key_t pkey_sqlitemem;
+	#else
+		__thread bool sqlite_mem_enforced = false;
+	#endif
+
+	inline bool initTLS() {
+		#ifdef __APPLE__
+			// creating a pthread-key and setting its value to TRUE
+			if (pthread_key_create(&pkey_sqlitemem, NULL) != 0) return false;
+			bool *value = (bool *)malloc(sizeof(bool));
+			*value = false;
+			return (pthread_setspecific(pkey_sqlitemem, (void *)value) == 0);
+		#else
+			// nothing to do here
+			return true;
+		#endif
+	}
+	
+	inline void teardownTLS() {
+		#ifdef __APPLE__
+			// retrieve the value from pthread-key, free it and delete the key
+			void *value = pthread_getspecific(pkey_sqlitemem);
+			pthread_setspecific(pkey_sqlitemem, NULL);
+			free(value);
+			pthread_key_delete(pkey_sqlitemem);
+		#else
+			// nothing to do here
+			return
+		#endif
+	}
+	
+	inline bool getMemoryEnforcedFlag() {
+		#ifdef __APPLE__
+			// retrieve the value from the pthread-key and return it
+			bool *value = (bool *)pthread_getspecific(pkey_sqlitemem);
+			if (value == NULL) return false;
+			return *value;
+		#else
+			// simply return the thread specific variable
+			return sqlite_mem_enforced;
+		#endif
+	}
+	
+	inline void setMemoryEnforcedFlag(bool flag) {
+		#ifdef __APPLE__
+			// retrieve the value from the pthread-key and reset it
+			bool *value = (bool *)pthread_getspecific(pkey_sqlitemem);
+			if (value != NULL) *value = flag;
+		#else
+			// simply reset the thread specific variable
+			sqlite_mem_enforced = flag
+		#endif
+	}
    
    
    /**
@@ -89,9 +145,9 @@ namespace catalog {
     * the hard way (via TLS).
     */
    static void enforce_mem_limit() {
-      if (!sqlite_mem_enforced) {
+      if (!getMemoryEnforcedFlag()) {
          sqlite3_soft_heap_limit(SQLITE_THREAD_MEM*1024*1024);
-         sqlite_mem_enforced = true;
+         setMemoryEnforcedFlag(true);
       }
    }
    
@@ -738,7 +794,7 @@ namespace catalog {
       gid = pgid;
       root_prefix = "";
       num_catalogs = current_catalog = 0;
-      return (pthread_key_create(&pkey_sqlitemem, NULL) == 0);
+      return initTLS();
    }
 
 
@@ -765,7 +821,7 @@ namespace catalog {
       root_prefix = "";
       uid = gid = 0;
       num_catalogs = current_catalog = 0;
-      pthread_key_delete(pkey_sqlitemem);
+      teardownTLS();
    }
 
    
@@ -1662,9 +1718,9 @@ namespace catalog {
          } else {
             string compat_files[] = {".growfsdir", ".growfsdir.zgfs", ".growfschecksum"};
             for (int i = 0; i < 3; ++i) {
-               struct stat64 info;
-               struct stat64 cinfo;
-               if (stat64((growfsdir + "/" + compat_files[i]).c_str(), &info) != 0) {
+               PortableStat64 info;
+               PortableStat64 cinfo;
+			   if (portableFileStat64((growfsdir + "/" + compat_files[i]).c_str(), &info) != 0) {
                   result = false;
                   break;
                }
@@ -1685,7 +1741,7 @@ namespace catalog {
                   break;
                }
                
-               if (stat64((growfsdir + "/" + compat_files[i]).c_str(), &cinfo) != 0) {
+               if (portableFileStat64((growfsdir + "/" + compat_files[i]).c_str(), &cinfo) != 0) {
                   result = false;
                   break;
                }
