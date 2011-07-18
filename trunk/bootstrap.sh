@@ -17,7 +17,7 @@ cd libfuse
 tar xfz fuse-${FUSE_VERSION}.tar.gz
 mv fuse-${FUSE_VERSION}/* src/
 rm -rf fuse-${FUSE_VERSION}
-cp ../m4/* src/m4/
+#cp ../m4/* src/m4/
 patch -N -p0 < fuse-drainout.patch
 cd ..
 
@@ -25,8 +25,7 @@ cd libfuse4x
 tar xfz fuse4x-${FUSE4X_VERSION}.tar.gz
 mv fuse4x-${FUSE4X_VERSION}/* src/
 rm -rf fuse4x-${FUSE4X_VERSION}
-#cp ../m4/* src/m4/
-#patch -N -p0 < fuse-drainout.patch
+patch -N -p0 < fuse4x-drainout.patch
 cd ..
 
 cd kernel/redirfs
