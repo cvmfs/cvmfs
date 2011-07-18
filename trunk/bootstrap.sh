@@ -2,6 +2,7 @@
 
 CURL_VERSION=7.21.3
 FUSE_VERSION=2.8.4
+FUSE4X_VERSION=2.8.5
 REDIRFS_VERSION=SVN-671
 JEMALLOC_VERSION=2.2.1
 ZLIB_VERSION=1.2.5
@@ -18,6 +19,14 @@ mv fuse-${FUSE_VERSION}/* src/
 rm -rf fuse-${FUSE_VERSION}
 cp ../m4/* src/m4/
 patch -N -p0 < fuse-drainout.patch
+cd ..
+
+cd libfuse4x
+tar xfz fuse4x-${FUSE4X_VERSION}.tar.gz
+mv fuse4x-${FUSE4X_VERSION}/* src/
+rm -rf fuse4x-${FUSE4X_VERSION}
+#cp ../m4/* src/m4/
+#patch -N -p0 < fuse-drainout.patch
 cd ..
 
 cd kernel/redirfs
@@ -40,6 +49,3 @@ tar xfz zlib-${ZLIB_VERSION}.tar.gz
 mv zlib-${ZLIB_VERSION}/* src/
 rm -rf zlib-${ZLIB_VERSION}
 cd ..
-
-#autoreconf -v
-
