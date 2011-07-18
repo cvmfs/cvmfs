@@ -1,4 +1,4 @@
-#include "config.h"
+#include "cvmfs_config.h"
 
 #include <iostream>
 #include <sstream>

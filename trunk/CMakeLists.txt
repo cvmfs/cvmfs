@@ -31,7 +31,7 @@ option (BUILD_CVMFS "Build the CernVM-FS FUSE module" ON)
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
-option (LIBFUSE_BUILTIN "Don't use system libfuse" OFF)
+option (LIBFUSE_BUILTIN "Don't use system libfuse" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (USE_JEMALLOC "Using jemalloc instead of ordinary malloc implementation" ON)
 option (BUILD_KERNEL_MODULE "Build the kernel module for the server part" ON)
@@ -51,26 +51,12 @@ set (SQLITE3_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/sqlite3/src")
 set (LIBCURL_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/libcurl/src")
 set (ZLIB_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/zlib/src")
 set (LIBFUSE_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/libfuse/src")
+set (LIBFUSE4X_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/libfuse4x/src")
 set (JEMALLOC_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/jemalloc/src")
 
 #
 # configure usage of some libraries
 #
-
-#if (LIBFUSE_BUILTIN)
-#	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAS_FUSE -D_BUILT_IN_LIBFUSE")
-#	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAS_FUSE -D_BUILT_IN_LIBFUSE")
-#else (LIBFUSE_BUILTIN)
-	if (MACOSX)
-		find_package (Fuse4x REQUIRED)
-		set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
-		set (PORTABLE_FUSE_LIBRARIES ${FUSE4X_LIBRARIES})
-	else (MACOSX)
-		find_package (FUSE REQUIRED)
-		set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
-		set (PORTABLE_FUSE_LIBRARIES ${FUSE_LIBRARIES})
-	endif (MACOSX)
-#endif (LIBFUSE_BUILTIN)
 
 if (NOT MACOSX)
 	include (CheckLibraryExists)
@@ -126,7 +112,7 @@ endif ()
 #
 configure_file (
 	"${CMAKE_SOURCE_DIR}/config_cmake.h.in"
-	"${CMAKE_BINARY_DIR}/config.h"
+	"${CMAKE_BINARY_DIR}/cvmfs_config.h"
 )
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 

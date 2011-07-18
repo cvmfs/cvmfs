@@ -1,7 +1,7 @@
 #ifndef CVMFS_UTIL_H
 #define CVMFS_UTIL_H 1
 
-#include "config.h"
+#include "cvmfs_config.h"
 
 #include "hash.h"
 

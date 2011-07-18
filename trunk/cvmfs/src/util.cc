@@ -9,7 +9,7 @@
  
 #define _FILE_OFFSET_BITS 64
 
-#include "config.h"
+#include "cvmfs_config.h"
 #include "util.h"
 #include "hash.h"
 

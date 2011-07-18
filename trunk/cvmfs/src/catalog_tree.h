@@ -1,7 +1,7 @@
 #ifndef CATALOG_TREE_H
 #define CATALOG_TREE_H 1
 
-#include "config.h"
+#include "cvmfs_config.h"
 
 #include <string>
 #include <ctime>

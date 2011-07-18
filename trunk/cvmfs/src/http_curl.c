@@ -21,7 +21,7 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#include "config.h"
+#include "cvmfs_config.h"
 #include "http_curl.h"
 
 #include <stdlib.h>

@@ -1,7 +1,7 @@
 #ifndef REPOSITORY_H
 #define REPOSITORY_H 1
 
-#include "config.h"
+#include "cvmfs_config.h"
 
 #include <string>
 #include <vector>

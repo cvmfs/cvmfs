@@ -10,7 +10,7 @@
  * jakob.blomer@cern.ch
  */
  
-#include "config.h"
+#include "cvmfs_config.h"
 #include "monitor.h"
 
 #include "compat.h"

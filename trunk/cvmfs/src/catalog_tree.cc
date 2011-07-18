@@ -12,7 +12,7 @@
  */
 
 
-#include "config.h"
+#include "cvmfs_config.h"
 #include "catalog_tree.h"
 
 #include <string>

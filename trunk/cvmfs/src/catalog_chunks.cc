@@ -18,7 +18,7 @@
 #define _FILE_OFFSET_BITS 64
 #define __STDC_FORMAT_MACROS
 
-#include "config.h"
+#include "cvmfs_config.h"
 #include "catalog.h"
 
 #ifdef CVMFS_CLIENT

@@ -1,7 +1,7 @@
 #ifndef CATALOG_H
 #define CATALOG_H 1
 
-#include "config.h"
+#include "cvmfs_config.h"
 
 #include "hash.h"
 

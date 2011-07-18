@@ -27,7 +27,7 @@
 #define _FILE_OFFSET_BITS 64
 #define ENOATTR ENODATA /* instead including attr/xattr.h */
 
-#include "config.h"
+#include "cvmfs_config.h"
 
 #include "fuse-duplex.h"
 

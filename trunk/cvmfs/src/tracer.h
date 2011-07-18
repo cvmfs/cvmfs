@@ -27,7 +27,7 @@
 #define _TRACER_H 1
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include "cvmfs_config.h"
 #endif
 
 #include "atomic.h"

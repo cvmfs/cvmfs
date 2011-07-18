@@ -15,7 +15,7 @@
  * jakob.blomer@cern.ch
  */
  
-#include "config.h"
+#include "cvmfs_config.h"
 #include "talk.h"
 
 #include "compat.h"
