@@ -122,25 +122,12 @@ if (USE_JEMALLOC)
 	include (${JEMALLOC_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
 endif (USE_JEMALLOC)
 
-if (LIBFUSE_BUILTIN)
-	if (MACOSX)
-		include (${LIBFUSE4X_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-	else (MACOSX)
-		include (${LIBFUSE_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-	endif (MACOSX)
-	
-	set (PORTABLE_FUSE_LIBRARIES "")
-else (LIBFUSE_BUILTIN)
-	if (MACOSX)
-		find_package (Fuse4x REQUIRED)
-		set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
-		set (PORTABLE_FUSE_LIBRARIES ${FUSE4X_LIBRARIES})
-	else (MACOSX)
-		find_package (FUSE REQUIRED)
-		set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
-		set (PORTABLE_FUSE_LIBRARIES ${FUSE_LIBRARIES})
-	endif (MACOSX)
-endif (LIBFUSE_BUILTIN)
+# libfuse has to be builtin because it is patched
+if (MACOSX)
+	include (${LIBFUSE4X_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+else (MACOSX)
+	include (${LIBFUSE_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+endif (MACOSX)
 
 if (LIBCURL_BUILTIN)
 	include (${LIBCURL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
@@ -166,6 +153,9 @@ else (ZLIB_BUILTIN)
 	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 endif (ZLIB_BUILTIN)
 
+#
+# set some include and linking stuff
+#
 set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
 include_directories (${INCLUDE_DIRECTORIES})
 
@@ -232,8 +222,8 @@ if (BUILD_SERVER)
 endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)
-	target_link_libraries (cvmfs2_debug		${CVMFS2_DEBUG_LIBS} ${PORTABLE_FUSE_LIBRARIES} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs2			${CVMFS2_LIBS} ${PORTABLE_FUSE_LIBRARIES} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
+	target_link_libraries (cvmfs2_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
+	target_link_libraries (cvmfs2			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
 	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
 	target_link_libraries (cvmfs_proxy_rtt	${CVMFS_PROXY_RTT_LIBS} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES})
 	target_link_libraries (testtracer		${TESTTRACER_LIBS})
