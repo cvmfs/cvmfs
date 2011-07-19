@@ -1,6 +1,6 @@
 #!/bin/sh
 
-sh ./configure LDFLAGS="$LDFLAGS -rdynamic" CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls" \
+sh configure LDFLAGS="$LDFLAGS -rdynamic" CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls" \
   $CVMFS_ZLIB --enable-warnings \
   --disable-ares \
   --disable-shared \
@@ -34,6 +34,3 @@ sh ./configure LDFLAGS="$LDFLAGS -rdynamic" CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=
   --without-ca-path \
   --without-libssh2 \
   --without-libidn
-
-make clean
-make

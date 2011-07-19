@@ -1,0 +1,18 @@
+set (ZLIB_ARCHIVE "${ZLIB_BUILTIN_LOCATION}/libz.a")
+
+add_custom_command (
+	OUTPUT				${ZLIB_ARCHIVE}
+	COMMAND				sh
+	ARGS				"${ZLIB_BUILTIN_LOCATION}/makeHook.sh"
+	WORKING_DIRECTORY	${ZLIB_BUILTIN_LOCATION}
+	COMMENT				"Building zlib..."
+)
+
+message (STATUS "configuring 3rd party library: zlib ...")
+execute_process (
+	COMMAND				sh ${ZLIB_BUILTIN_LOCATION}/configureHook.sh
+	WORKING_DIRECTORY	${ZLIB_BUILTIN_LOCATION}
+)
+
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${ZLIB_BUILTIN_LOCATION} -D_BUILT_IN_ZLIB")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${ZLIB_BUILTIN_LOCATION} -D_BUILT_IN_ZLIB")

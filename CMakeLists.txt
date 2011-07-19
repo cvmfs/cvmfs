@@ -38,6 +38,16 @@ option (BUILD_KERNEL_MODULE "Build the kernel module for the server part" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
+# run the bootstrap shellscript
+#
+
+message (STATUS "running bootstrap.sh ...")
+execute_process (
+	COMMAND				sh ${CMAKE_SOURCE_DIR}/bootstrap.sh
+	WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}
+)
+
+#
 # set some default flags
 #
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
@@ -47,12 +57,13 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwi
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 set (PREBUILD_SCRIPT_LOCATION "${CMAKE_SOURCE_DIR}/prebuildscripts")
 
-set (SQLITE3_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/sqlite3/src")
-set (LIBCURL_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/libcurl/src")
-set (ZLIB_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/zlib/src")
-set (LIBFUSE_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/libfuse/src")
-set (LIBFUSE4X_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/libfuse4x/src")
-set (JEMALLOC_BUILTIN_LOCATION "${CMAKE_SOURCE_DIR}/jemalloc/src")
+set (THIRD_PARTY_LIB_LOCATION	"${CMAKE_SOURCE_DIR}/3rdParty")
+set (SQLITE3_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/sqlite3/src")
+set (LIBCURL_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libcurl/src")
+set (ZLIB_BUILTIN_LOCATION		"${THIRD_PARTY_LIB_LOCATION}/zlib/src")
+set (LIBFUSE_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libfuse/src")
+set (LIBFUSE4X_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libfuse4x/src")
+set (JEMALLOC_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/jemalloc/src")
 
 #
 # configure usage of some libraries

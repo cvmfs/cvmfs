@@ -7,26 +7,25 @@ REDIRFS_VERSION=SVN-671
 JEMALLOC_VERSION=2.2.1
 ZLIB_VERSION=1.2.5
 
-cd libcurl
+cd 3rdParty/libcurl
 tar xfz curl-${CURL_VERSION}.tar.gz 
 mv curl-${CURL_VERSION}/* src/
 rm -rf curl-${CURL_VERSION}
-cd ..
+cd ../..
 
-cd libfuse
+cd 3rdParty/libfuse
 tar xfz fuse-${FUSE_VERSION}.tar.gz
 mv fuse-${FUSE_VERSION}/* src/
 rm -rf fuse-${FUSE_VERSION}
-#cp ../m4/* src/m4/
 patch -N -p0 < fuse-drainout.patch
-cd ..
+cd ../..
 
-cd libfuse4x
+cd 3rdParty/libfuse4x
 tar xfz fuse4x-${FUSE4X_VERSION}.tar.gz
 mv fuse4x-${FUSE4X_VERSION}/* src/
 rm -rf fuse4x-${FUSE4X_VERSION}
 patch -N -p0 < fuse4x-drainout.patch
-cd ..
+cd ../..
 
 cd kernel/redirfs
 tar xfz redirfs-${REDIRFS_VERSION}.tar.gz
@@ -34,17 +33,17 @@ mv redirfs-${REDIRFS_VERSION}/* src/
 rm -rf redirfs-${REDIRFS_VERSION}
 cd ../..
 
-cd jemalloc
+cd 3rdParty/jemalloc
 tar xfj jemalloc-${JEMALLOC_VERSION}.tar.bz2
 mv jemalloc-${JEMALLOC_VERSION}/* src/
 mv src/configure.ac src/configure.ac.vanilla
 touch src/configure.ac
 patch -N -p0 < jemalloc-2.2.1-64bit_literals.patch
 rm -rf jemalloc-${JEMALLOC_VERSION} 
-cd ..
+cd ../..
 
-cd zlib
+cd 3rdParty/zlib
 tar xfz zlib-${ZLIB_VERSION}.tar.gz
 mv zlib-${ZLIB_VERSION}/* src/
 rm -rf zlib-${ZLIB_VERSION}
-cd ..
+cd ../..

@@ -1,0 +1,19 @@
+set (LIBFUSE_ARCHIVE "${LIBFUSE_BUILTIN_LOCATION}/lib/.libs/libfuse.a")
+
+add_custom_command (
+	OUTPUT				${LIBFUSE_ARCHIVE}
+	COMMAND				sh
+	ARGS				"${LIBFUSE_BUILTIN_LOCATION}/makeHook.sh"
+	WORKING_DIRECTORY	${LIBFUSE_BUILTIN_LOCATION}
+	COMMENT				"Building libfuse..."
+)
+
+message (STATUS "configuring 3rd party library: libfuse ...")
+execute_process (
+	COMMAND				sh ${LIBFUSE_BUILTIN_LOCATION}/configureHook.sh
+	WORKING_DIRECTORY	${LIBFUSE_BUILTIN_LOCATION}
+)
+
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${LIBFUSE_BUILTIN_LOCATION} -D_BUILT_IN_LIBFUSE")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${LIBFUSE_BUILTIN_LOCATION} -D_BUILT_IN_LIBFUSE")
+endif (MACOSX)

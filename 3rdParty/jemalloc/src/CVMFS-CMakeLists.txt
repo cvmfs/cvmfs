@@ -1,0 +1,15 @@
+set (JEMALLOC_ARCHIVE "${JEMALLOC_BUILTIN_LOCATION}/lib/libjemalloc.a")
+
+add_custom_command (
+	OUTPUT				${JEMALLOC_ARCHIVE}
+	COMMAND				sh
+	ARGS				"${JEMALLOC_BUILTIN_LOCATION}/makeHook.sh"
+	WORKING_DIRECTORY	${JEMALLOC_BUILTIN_LOCATION}
+	COMMENT				"Building jemalloc..."
+)
+
+message (STATUS "configuring 3rd party library: jemalloc ...")
+execute_process (
+	COMMAND				sh ${JEMALLOC_BUILTIN_LOCATION}/configureHook.sh
+	WORKING_DIRECTORY	${JEMALLOC_BUILTIN_LOCATION}
+)
