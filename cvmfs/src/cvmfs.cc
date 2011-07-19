@@ -51,7 +51,9 @@
 #include <stddef.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/statfs.h>
+#ifndef __APPLE__
+	#include <sys/statfs.h>
+#endif
 #include <sys/wait.h>
 #include <sys/errno.h>
 #include <sys/mount.h>
