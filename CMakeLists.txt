@@ -30,21 +30,23 @@ endif ()
 option (BUILD_CVMFS "Build the CernVM-FS FUSE module" ON)
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
-option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
+option (LIBCURL_BUILTIN "Don't use system libcurl" OFF)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (USE_JEMALLOC "Using jemalloc instead of ordinary malloc implementation" ON)
 option (BUILD_KERNEL_MODULE "Build the kernel module for the server part" OFF)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
-# run the bootstrap shellscript
+# run the bootstrap shellscript (not needed in the distributed version of the source)
 #
 
-message (STATUS "running bootstrap.sh ...")
-execute_process (
-	COMMAND				sh ${CMAKE_SOURCE_DIR}/bootstrap.sh
-	WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}
-)
+if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+	message (STATUS "running bootstrap.sh ...")
+	execute_process (
+		COMMAND				sh ${CMAKE_SOURCE_DIR}/bootstrap.sh
+		WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}
+	)
+endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
 #
 # set some default flags
@@ -140,4 +142,9 @@ endif (INSTALL_MOUNT_SCRIPTS)
 
 if (NOT MACOSX AND BUILD_KERNEL_MODULE)
 	add_subdirectory (kernel)
-endif (BUILD_KERNEL_MODULE)
+endif (NOT MACOSX AND BUILD_KERNEL_MODULE)
+
+#
+# configure the packageing stuff
+#
+include (CPackLists.txt)

@@ -5,5 +5,5 @@ add_custom_target (
 )
 
 install (
-	CODE "execute_process (COMMAND make install)"
+	CODE "execute_process (COMMAND ${CMAKE_MAKE_PROGRAM} install)"
 )
