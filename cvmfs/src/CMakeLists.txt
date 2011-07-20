@@ -117,12 +117,20 @@ set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT -DNDEBUGMSG")
 #
 # set properties for configurable libraries
 #
+# some libraries are statically linked and has to be compiled from source
+# therefore we have to include the specific CVMFS-CMakeLists.txt from the
+# different 3rd-party locations.
+# If dynamic linking is desired we have to look for the presence of the libs
+# in the system and set the LIBRARY and INCLUDE variables properly
+#
+# either ***_LIBRARIES or ***_ARCHIVE has to be defined for all externals
+# in order to successfully link the targets.
+#
 
 if (USE_JEMALLOC)
 	include (${JEMALLOC_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
 endif (USE_JEMALLOC)
 
-# libfuse has to be builtin because it is patched
 if (MACOSX)
 	include (${LIBFUSE4X_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
 else (MACOSX)
@@ -153,6 +161,19 @@ else (ZLIB_BUILTIN)
 	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 endif (ZLIB_BUILTIN)
 
+if (NOT MACOSX)
+	set (HAVE_LIB_RT TRUE)
+	set (RT_LIBRARY "rt")
+else (NOT MACOSX)
+	set (HAVE_LIB_RT FALSE)
+	set (RT_LIBRARY "")
+endif (NOT MACOSX)
+
+find_package (OpenSSL REQUIRED)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
+
+find_package (OpenMP REQUIRED)
+
 #
 # set some include and linking stuff
 #
@@ -161,6 +182,9 @@ include_directories (${INCLUDE_DIRECTORIES})
 
 #
 # do the job!
+#
+# for every target you can define a <targetname>_CFLAGS and <targetname>_LD_FLAGS
+# variable to pass some target specific build options.
 #
 
 if (BUILD_CVMFS)
@@ -181,44 +205,20 @@ if (BUILD_SERVER)
 endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)
-	set_target_properties (cvmfs2_debug PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS2_DEBUG_CFLAGS}"
-								LINK_FLAGS		"${CVMFS2_DEBUG_LD_FLAGS}")
-	set_target_properties (cvmfs2 PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS2_CFLAGS}"
-								LINK_FLAGS		"${CVMFS2_LD_FLAGS}")
-	set_target_properties (cvmfs_fsck PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS_FSCK_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_FSCK_LD_FLAGS}")
-	set_target_properties (cvmfs_proxy_rtt PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS_PROXY_RTT_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_PROXY_RTT_LD_FLAGS}")
-	set_target_properties (testtracer PROPERTIES 
-								COMPILE_FLAGS	"${TESTTRACER_CFLAGS}"
-								LINK_FLAGS		"${TESTTRACER_LD_FLAGS}")
+	set_target_properties (cvmfs2_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_DEBUG_LD_FLAGS}")
+	set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS}")
+	set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}" LINK_FLAGS "${CVMFS_FSCK_LD_FLAGS}")
+	set_target_properties (cvmfs_proxy_rtt PROPERTIES COMPILE_FLAGS "${CVMFS_PROXY_RTT_CFLAGS}" LINK_FLAGS "${CVMFS_PROXY_RTT_LD_FLAGS}")
+	set_target_properties (testtracer PROPERTIES COMPILE_FLAGS "${TESTTRACER_CFLAGS}" LINK_FLAGS "${TESTTRACER_LD_FLAGS}")
 endif (BUILD_CVMFS)					
 if (BUILD_SERVER)
-	set_target_properties (cvmfs_clgcmp PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS_CLGCMP_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_CLGCMP_LD_FLAGS}")
-	set_target_properties (cvmfs_lscat PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS_LSCAT_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_LSCAT_LD_FLAGS}")
-	set_target_properties (cvmfs_pull PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS_PULL_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_PULL_LD_FLAGS}")
-	set_target_properties (cvmfs_scrub PROPERTIES
-								COMPILE_FLAGS	"${CVMFS_SCRUB_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_SCRUB_LD_FLAGS}")
-	set_target_properties (cvmfs_sign PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS_SIGN_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_SIGN_LD_FLAGS}")
-	set_target_properties (cvmfs_zpipe PROPERTIES 
-								COMPILE_FLAGS	"${CVMFS_ZPIPE_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_ZPIPE_LD_FLAGS}")
-	#set_target_properties (cvmfs_sync.bin PROPERTIES
-	#							COMPILE_FLAGS	"${CVMFS_SYNC_BIN_CFLAGS}"
-	#							LINK_FLAGS		"${CVMFS_SYNC_BIN_LD_FLAGS}") ??
+	set_target_properties (cvmfs_clgcmp PROPERTIES COMPILE_FLAGS "${CVMFS_CLGCMP_CFLAGS}" LINK_FLAGS "${CVMFS_CLGCMP_LD_FLAGS}")
+	set_target_properties (cvmfs_lscat PROPERTIES COMPILE_FLAGS "${CVMFS_LSCAT_CFLAGS}" LINK_FLAGS "${CVMFS_LSCAT_LD_FLAGS}")
+	set_target_properties (cvmfs_pull PROPERTIES COMPILE_FLAGS "${CVMFS_PULL_CFLAGS}" LINK_FLAGS "${CVMFS_PULL_LD_FLAGS}")
+	set_target_properties (cvmfs_scrub PROPERTIES COMPILE_FLAGS "${CVMFS_SCRUB_CFLAGS}" LINK_FLAGS "${CVMFS_SCRUB_LD_FLAGS}")
+	set_target_properties (cvmfs_sign PROPERTIES COMPILE_FLAGS "${CVMFS_SIGN_CFLAGS}" LINK_FLAGS "${CVMFS_SIGN_LD_FLAGS}")
+	set_target_properties (cvmfs_zpipe PROPERTIES COMPILE_FLAGS "${CVMFS_ZPIPE_CFLAGS}" LINK_FLAGS "${CVMFS_ZPIPE_LD_FLAGS}")
+	#set_target_properties (cvmfs_sync.bin PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}") ??
 endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)

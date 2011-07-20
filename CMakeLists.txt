@@ -51,13 +51,20 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 #
 # set some default flags
 #
+# flags in CMAKE_C**_FLAGS are allways passed to the compiler
+#
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 #set (CVMFS_LIBS "${LDFLAGS} -ldl -lm") ??
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
-set (PREBUILD_SCRIPT_LOCATION "${CMAKE_SOURCE_DIR}/prebuildscripts")
 
+#
+# define where to find the external dependencies
+#
+# for the 3rd-party libraries there should be a CVMFS-CMakeLists.txt file provided
+# in the given directory, in order to configure and compile them properly
+#
 set (THIRD_PARTY_LIB_LOCATION	"${CMAKE_SOURCE_DIR}/3rdParty")
 set (SQLITE3_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/sqlite3/src")
 set (LIBCURL_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libcurl/src")
@@ -65,23 +72,6 @@ set (ZLIB_BUILTIN_LOCATION		"${THIRD_PARTY_LIB_LOCATION}/zlib/src")
 set (LIBFUSE_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libfuse/src")
 set (LIBFUSE4X_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libfuse4x/src")
 set (JEMALLOC_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/jemalloc/src")
-
-#
-# configure usage of some libraries
-#
-
-if (NOT MACOSX)
-	set (HAVE_LIB_RT TRUE)
-	set (RT_LIBRARY "rt")
-else (NOT MACOSX)
-	set (HAVE_LIB_RT FALSE)
-	set (RT_LIBRARY "")
-endif (NOT MACOSX)
-
-find_package (OpenSSL REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
-
-find_package (OpenMP REQUIRED)
 
 #
 # check existence of include files
@@ -145,6 +135,6 @@ if (NOT MACOSX AND BUILD_KERNEL_MODULE)
 endif (NOT MACOSX AND BUILD_KERNEL_MODULE)
 
 #
-# configure the packageing stuff
+# configure the packaging stuff
 #
 include (CPackLists.txt)
