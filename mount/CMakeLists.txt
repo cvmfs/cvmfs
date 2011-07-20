@@ -20,18 +20,18 @@ else (MACOSX)
 	install (
 		FILES 			config.sh default.sh
 		DESTINATION		"${CMAKE_INSTALL_PREFIX}/etc/cvmfs"
-		PERMISSIONS		0644
+		PERMISSIONS		OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 	)
 	
 	install (
 		FILES			domain.d/cern.ch.conf
 		DESTINATION		"${CMAKE_INSTALL_PREFIX}/etc/cvmfs/domain.d"
-		PERMISSIONS		0644
+		PERMISSIONS		OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 	)
 	
 	install (
 		FILES			keys/cern.ch.pub
 		DESTINATION		"${CMAKE_INSTALL_PREFIX}/etc/cvmfs/keys"
-		PERMISSIONS		0444
+		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
 	)
 endif (MACOSX)

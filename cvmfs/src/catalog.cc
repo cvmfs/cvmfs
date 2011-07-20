@@ -111,7 +111,7 @@ namespace catalog {
 			pthread_key_delete(pkey_sqlitemem);
 		#else
 			// nothing to do here
-			return
+			return;
 		#endif
 	}
 	
@@ -134,7 +134,7 @@ namespace catalog {
 			if (value != NULL) *value = flag;
 		#else
 			// simply reset the thread specific variable
-			sqlite_mem_enforced = flag
+			sqlite_mem_enforced = flag;
 		#endif
 	}
    

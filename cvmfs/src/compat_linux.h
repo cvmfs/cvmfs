@@ -3,7 +3,7 @@
 
 #include <pthread.h>
 typedef pthread_spinlock_t PortableSpinlock;
-inline int portableSpinlockInit(PortableSpinlock *lock, int pshared) { pthread_spin_init(lock, pshared); }
+inline int portableSpinlockInit(PortableSpinlock *lock, int pshared) { return pthread_spin_init(lock, pshared); }
 inline int portableSpinlockDestroy(PortableSpinlock *lock) { return pthread_spin_destroy(lock); }
 inline int portableSpinlockTrylock(PortableSpinlock *lock) { return pthread_spin_trylock(lock); }
 

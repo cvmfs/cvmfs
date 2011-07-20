@@ -183,16 +183,16 @@ endif (BUILD_SERVER)
 if (BUILD_CVMFS)
 	set_target_properties (cvmfs2_debug PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS2_DEBUG_CFLAGS}"
-								LINK_FLAGS		"${CVMFS2_DEBUG_LD_FLAGS} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS2_DEBUG_LD_FLAGS}")
 	set_target_properties (cvmfs2 PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS2_CFLAGS}"
-								LINK_FLAGS		"${CVMFS2_LD_FLAGS} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS2_LD_FLAGS}")
 	set_target_properties (cvmfs_fsck PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS_FSCK_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_FSCK_LD_FLAGS} ${ZLIB_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS_FSCK_LD_FLAGS}")
 	set_target_properties (cvmfs_proxy_rtt PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS_PROXY_RTT_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_PROXY_RTT_LD_FLAGS} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS_PROXY_RTT_LD_FLAGS}")
 	set_target_properties (testtracer PROPERTIES 
 								COMPILE_FLAGS	"${TESTTRACER_CFLAGS}"
 								LINK_FLAGS		"${TESTTRACER_LD_FLAGS}")
@@ -200,42 +200,42 @@ endif (BUILD_CVMFS)
 if (BUILD_SERVER)
 	set_target_properties (cvmfs_clgcmp PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS_CLGCMP_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_CLGCMP_LD_FLAGS} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS_CLGCMP_LD_FLAGS}")
 	set_target_properties (cvmfs_lscat PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS_LSCAT_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_LSCAT_LD_FLAGS} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS_LSCAT_LD_FLAGS}")
 	set_target_properties (cvmfs_pull PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS_PULL_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_PULL_LD_FLAGS} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS_PULL_LD_FLAGS}")
 	set_target_properties (cvmfs_scrub PROPERTIES
 								COMPILE_FLAGS	"${CVMFS_SCRUB_CFLAGS}"
 								LINK_FLAGS		"${CVMFS_SCRUB_LD_FLAGS}")
 	set_target_properties (cvmfs_sign PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS_SIGN_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_SIGN_LD_FLAGS} ${ZLIB_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS_SIGN_LD_FLAGS}")
 	set_target_properties (cvmfs_zpipe PROPERTIES 
 								COMPILE_FLAGS	"${CVMFS_ZPIPE_CFLAGS}"
-								LINK_FLAGS		"${CVMFS_ZPIPE_LD_FLAGS} ${ZLIB_ARCHIVE}")
+								LINK_FLAGS		"${CVMFS_ZPIPE_LD_FLAGS}")
 	#set_target_properties (cvmfs_sync.bin PROPERTIES
 	#							COMPILE_FLAGS	"${CVMFS_SYNC_BIN_CFLAGS}"
-	#							LINK_FLAGS		"${CVMFS_SYNC_BIN_LD_FLAGS} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}") ??
+	#							LINK_FLAGS		"${CVMFS_SYNC_BIN_LD_FLAGS}") ??
 endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)
-	target_link_libraries (cvmfs2_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs2			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs_proxy_rtt	${CVMFS_PROXY_RTT_LIBS} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES})
-	target_link_libraries (testtracer		${TESTTRACER_LIBS})
+	target_link_libraries (cvmfs2_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE} pthread)
+	target_link_libraries (cvmfs2			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE} pthread)
+	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
+	target_link_libraries (cvmfs_proxy_rtt	${CVMFS_PROXY_RTT_LIBS} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE})
+	target_link_libraries (testtracer		${TESTTRACER_LIBS} pthread)
 endif (BUILD_CVMFS)
 if (BUILD_SERVER)
-	target_link_libraries (cvmfs_clgcmp		${CVMFS_CLGCMP_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs_lscat		${CVMFS_LSCAT_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs_pull		${CVMFS_PULL_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
+	target_link_libraries (cvmfs_clgcmp		${CVMFS_CLGCMP_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
+	target_link_libraries (cvmfs_lscat		${CVMFS_LSCAT_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
+	target_link_libraries (cvmfs_pull		${CVMFS_PULL_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
 	target_link_libraries (cvmfs_scrub		${CVMFS_SCRUB_LIBS} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs_sign		${CVMFS_SIGN_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-	target_link_libraries (cvmfs_zpipe		${CVMFS_ZPIPE_LIBS} ${ZLIB_LIBRARIES})
-	#target_link_libraries (cvmfs_sync.bin	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES}) ??
+	target_link_libraries (cvmfs_sign		${CVMFS_SIGN_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE})
+	target_link_libraries (cvmfs_zpipe		${CVMFS_ZPIPE_LIBS} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE})
+	#target_link_libraries (cvmfs_sync.bin	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}) ??
 endif (BUILD_SERVER)
 
 #

@@ -71,11 +71,11 @@ set (JEMALLOC_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/jemalloc/src")
 #
 
 if (NOT MACOSX)
-	include (CheckLibraryExists)
-	check_library_exists (rt pthread_spinlock_create "" HAVE_LIB_RT) # currently untested
-	find_package(rt REQUIRED)
+	set (HAVE_LIB_RT TRUE)
+	set (RT_LIBRARY "rt")
 else (NOT MACOSX)
 	set (HAVE_LIB_RT FALSE)
+	set (RT_LIBRARY "")
 endif (NOT MACOSX)
 
 find_package (OpenSSL REQUIRED)

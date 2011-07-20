@@ -127,10 +127,10 @@
 #undef PACKAGE_BUGREPORT
 
 /* Define to the full name of this package. */
-#undef PACKAGE_NAME "${PROJECT_NAME}"
+#cmakedefine PACKAGE_NAME "${PROJECT_NAME}"
 
 /* Define to the full name and version of this package. */
-#undef PACKAGE_STRING "${PROJECT_NAME}"
+#cmakedefine PACKAGE_STRING "${PROJECT_NAME}"
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
