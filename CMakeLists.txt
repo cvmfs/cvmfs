@@ -74,6 +74,11 @@ set (LIBFUSE4X_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libfuse4x/src")
 set (JEMALLOC_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/jemalloc/src")
 
 #
+# set the location of the kernel module sources
+#
+set (KERNEL_MODULE_LOCATION "${CMAKE_SOURCE_DIR}/kernel")
+
+#
 # check existence of include files
 #
 include (CheckIncludeFile)
