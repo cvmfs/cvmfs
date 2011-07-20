@@ -8,6 +8,9 @@ set (CPACK_PACKAGE_VERSION_PATCH ${CernVM-FS_VERSION_PATCH})
 set (CPACK_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
 set (CPACK_PACKAGE_VENDOR "CERN")
 
+#
+# configure the source .tar.gz
+#
 
 set (CPACK_SOURCE_GENERATOR "TGZ")
 set (CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CernVM-FS_VERSION_STRING}")
@@ -18,6 +21,9 @@ set (CPACK_SOURCE_IGNORE_FILES
 		"untaint\\\\.sh$"
 		"\\\\.svn"
 		"bootstrap\\\\.sh$"
+		".*\\\\.a$"
+		".*\\\\.dylib"
+		".*\\\\.o"
 )
 
 include (CPack)

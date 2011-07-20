@@ -237,3 +237,23 @@ if (BUILD_SERVER)
 	target_link_libraries (cvmfs_zpipe		${CVMFS_ZPIPE_LIBS} ${ZLIB_LIBRARIES})
 	#target_link_libraries (cvmfs_sync.bin	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES}) ??
 endif (BUILD_SERVER)
+
+#
+# installation
+#
+
+if (BUILD_CVMFS)
+	install (
+		TARGETS			cvmfs2_debug cvmfs2 cvmfs_fsck cvmfs_proxy_rtt
+		RUNTIME
+		DESTINATION		bin
+	)
+endif (BUILD_CVMFS)
+	install (
+		TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_clgcmp cvmfs_lscat cvmfs_pull cvmfs_scrub #cvmfs_sync.bin
+		RUNTIME
+		DESTINATION		bin
+	)
+if (BUILD_SERVER)
+
+endif (BUILD_SERVER)
