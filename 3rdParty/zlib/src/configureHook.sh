@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./configure --static
+env -i sh configure --static
