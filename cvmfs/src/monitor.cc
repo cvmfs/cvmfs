@@ -210,22 +210,36 @@ namespace monitor {
    
    
    bool init(const string cache_dir, const bool check_nofiles) {
+	  int maxNoOfFiles = 0;
+      unsigned int currMaxNoOfFiles = 0;
       monitor::cache_dir = cache_dir;
       if (portableSpinlockInit(&lock_handler, 0) != 0) return false;
    
       /* check number of open files */
       if (check_nofiles) {
-         struct rlimit rpl;
-         memset(&rpl, 0, sizeof(rpl));
-         getrlimit(RLIMIT_NOFILE, &rpl);
-         if (rpl.rlim_cur < MIN_OPEN_FILES) {
+
+        struct rlimit rpl;
+        memset(&rpl, 0, sizeof(rpl));
+        getrlimit(RLIMIT_NOFILE, &rpl);
+		currMaxNoOfFiles = rpl.rlim_cur;
+
+	#ifdef __APPLE__
+		maxNoOfFiles = sysconf(_SC_OPEN_MAX);
+		if (maxNoOfFiles < 0) {
+			cout << "Warning: could not retrieve maximal allowed number of open files" << endl;
+		}
+	#else
+				maxNoOfFiles = rpl.rlim_max;	
+	#endif
+
+         if (currMaxNoOfFiles < MIN_OPEN_FILES) {
             cout << "Warning: current limits for number of open files are " << 
-                     rpl.rlim_cur << "/" << rpl.rlim_max << endl;
+                     currMaxNoOfFiles << "/" << maxNoOfFiles << endl;
             cout << "CernVM-FS is likely to run out of file descriptors, set ulimit -n to at least " << 
                     MIN_OPEN_FILES << endl;
-            logmsg("Low maximum number of open files (%lu/%lu)", rpl.rlim_cur, rpl.rlim_max);
+            logmsg("Low maximum number of open files (%lu/%lu)", currMaxNoOfFiles, maxNoOfFiles);
          }
-         nofiles = rpl.rlim_cur;
+         nofiles = currMaxNoOfFiles;
       } else {
          nofiles = 0;
       }
