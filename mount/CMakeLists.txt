@@ -19,11 +19,12 @@ if (MACOSX)
 #		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 #	)
 
-	install (
-		FILES			cvmfs.initd
-		DESTINATION		"/etc/init.d"
-		RENAME			cvmfs
-	)
+#	This is probably not needed or has to be treated differently under Mac OS X
+#	install (
+#		FILES			cvmfs.initd
+#		DESTINATION		"/etc/init.d"
+#		RENAME			cvmfs
+#	)
 
 	install (
 		FILES 			config.sh default.conf

@@ -123,6 +123,7 @@ cvmfs_setup() {
 
 
 cvmfs_chksetup() {
+   local unamestr=`uname`
    local num_warnings
    local num_errors
    num_warnings=0
@@ -146,8 +147,14 @@ cvmfs_chksetup() {
    done
    
    # Check /sbin/mount.cvmfs /sbin/umount.cvmfs /etc/auto.cvmfs, service 
+   local tools
+   if [ $unamestr == 'Darwin' ]; then
+	  tools="/sbin/mount_cvmfs"
+   elif [$unamestr == 'Linux' ]; then
+	  tools="/sbin/mount.cvmfs /sbin/umount.cvmfs /etc/init.d/cvmfs"
+   fi
    local tool
-   for tool in /sbin/mount.cvmfs /sbin/umount.cvmfs /etc/init.d/cvmfs $service
+   for tool in $tools $service
    do
       if [ ! -x $tool ]; then
          echo "Warning: failed to locate $tool"
@@ -155,11 +162,13 @@ cvmfs_chksetup() {
       fi
    done
 
-   # Fusermount
-   if [ ! -x /usr/bin/fusermount -a ! -x /bin/fusermount ]; then
-     echo "Warning: failed to locate fusermount"
-     num_errors=$[$num_errors+1]
-   fi   
+   # Fusermount (not necessary user under Mac OS X)
+   if [ $unamestr == 'Linux' ]; then
+	   if [ ! -x /usr/bin/fusermount -a ! -x /bin/fusermount ]; then
+	     echo "Warning: failed to locate fusermount"
+	     num_errors=$[$num_errors+1]
+	   fi
+   fi
 
    # Check that /etc/auto.cvmfs is referenced in /etc/auto.master
    local global_mount_dir 
@@ -177,35 +186,53 @@ cvmfs_chksetup() {
    fi
    
    # Check that cvmfs user exists
-   getent passwd $CVMFS_USER > /dev/null
+   if [ $unamestr == 'Linux' ]; then
+      getent passwd $CVMFS_USER > /dev/null
+   elif [ $unamestr == 'Darwin' ]; then
+	  dsmemberutil getuuid -U rene > /dev/null 2> /dev/null
+   fi
    if [ $? -ne 0 ]; then
       echo "Error, user $CVMFS_USER does not exist"
       num_errors=$[$num_errors+1]
    else
       # Check that cvmfs user is in fuse group (if the group exists)
       local fuse_group
-      fuse_group=`getent group fuse`
+      if [[ "$unamestr" == 'Linux' ]]; then
+         fuse_group=`getent group fuse`
+      elif [[ "$unamestr" == 'Darwin' ]]; then
+         dseditgroup -o read fuse > /dev/null 2> /dev/null
+      fi
       if [ $? -eq 0 ]; then
-         echo $fuse_group | grep -q "[^A-Za-z0-9]$CVMFS_USER\([^A-Za-z0-9]\|$\)"
-         if [ $? -ne 0 ]; then
-            echo "Warning: user $CVMFS_USER is not member of fuse group"
-            num_warnings=$[$num_warnings+1]
+         if [ "$unamestr" == 'Linux' ]; then
+	         echo $fuse_group | grep -q "[^A-Za-z0-9]$CVMFS_USER\([^A-Za-z0-9]\|$\)"
+         elif [ "$unamestr" == 'Darwin' ]; then
+             dseditgroup -o checkmember -m $CVMFS_USER fuse > /dev/null 2> /dev/null
+         fi
+	     if [ $? -ne 0 ]; then
+	         echo "Warning: user $CVMFS_USER is not member of fuse group"
+             num_warnings=$[$num_warnings+1]
          fi
       fi
       
       # Check that /dev/fuse is read/writable from CVMFS_USER
-      if [ ! -c /dev/fuse ]; then
-         echo "Error: character device /dev/fuse does not exist"
-         num_errors=$[$num_errors+1]
+      local charDevice
+      if [ "$unamestr" == 'Linux' ]; then
+         charDevice=/dev/fuse
+      elif [ "$unamestr" == 'Darwin' ]; then
+         charDevice=/dev/fuse4x0
+      fi
+      if [ ! -c $charDevice ]; then
+            echo "Error: character device $charDevice does not exist"
+            num_errors=$[$num_errors+1]
       else
-         sudo -u $CVMFS_USER test -r /dev/fuse
+         sudo -u $CVMFS_USER test -r $charDevice
          if [ $? -ne 0 ]; then
-            echo "Error: /dev/fuse is not readable by $CVMFS_USER"
+            echo "Error: $charDevice is not readable by user $CVMFS_USER"
             num_errors=$[$num_errors+1]
          fi
-         sudo -u $CVMFS_USER test -w /dev/fuse
+         sudo -u $CVMFS_USER test -w $charDevice
          if [ $? -ne 0 ]; then
-            echo "Error: /dev/fuse is not writable by $CVMFS_USER"
+            echo "Error: $charDevice is not writable by user $CVMFS_USER"
             num_errors=$[$num_errors+1]
          fi
       fi
