@@ -248,11 +248,23 @@ if (BUILD_CVMFS)
 		RUNTIME
 		DESTINATION		bin
 	)
+	
+	install (	
+		FILES			cvmfs-talk cvmfs_config
+		DESTINATION		bin
+		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+	)
 endif (BUILD_CVMFS)
 if (BUILD_SERVER)
-install (
-	TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_clgcmp cvmfs_lscat cvmfs_pull cvmfs_scrub #cvmfs_sync.bin
-	RUNTIME
-	DESTINATION		bin
-)
+	install (
+		TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_clgcmp cvmfs_lscat cvmfs_pull cvmfs_scrub #cvmfs_sync.bin
+		RUNTIME
+		DESTINATION		bin
+	)
+
+	install (	
+		FILES			cvmfs_mkkey cvmfs_decrypt cvmfs_unsign cvmfs_server
+		DESTINATION		bin
+		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+	)
 endif (BUILD_SERVER)

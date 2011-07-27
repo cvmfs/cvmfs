@@ -74,6 +74,7 @@ $command .= "\0";
 sub talk {
    my $instance_current = shift; 
    my $cache_dir;
+
    if (!$cache_base) {
       my @config_line = grep(/^CVMFS_CACHE_DIR=/, `cvmfs_config showconfig $instance_current`);
       my @config;
@@ -118,9 +119,10 @@ sub talk {
 
    my $response;
    my $length = 256;
-   while (recv(SOCKET, $response, $length, 0) && $length) {
-      print $response;
-   }
+
+   # read the response from cvmfs-instance (maximal $length bytes)
+   recv(SOCKET, $response, $length, 0);
+   print $response;
    
    return 0;
 }
