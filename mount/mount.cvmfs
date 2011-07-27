@@ -19,8 +19,10 @@ org=`cvmfs_getorg $fqrn`
 
 # Check for fuse
 if [ ! -c /dev/fuse ]; then
-  echo "Fuse not loaded"
-  exit 1
+	if [ ! -c /dev/fuse4x0 ]; then
+  		echo "Fuse not loaded"
+  		exit 1
+	fi
 fi
 
 mountpoint=$2 
@@ -56,9 +58,18 @@ then
 fi
 name=$fqrn
 
-ulimit -n $CVMFS_NFILES
+uid=`id -u $CVMFS_USER 2> /dev/null` && gid=`id -g $CVMFS_USER 2> /dev/null`
+
+if [ $? -eq 0 ]
+then
+   CVMFS_ID=",uid=$uid,gid=$gid"
+else
+   echo "Error: user $CVMFS_USER does not exist." 
+   exit 1
+fi
+
 mkdir -p $CVMFS_CACHE_DIR
-chown $CVMFS_USER:$CVMFS_USER $CVMFS_CACHE_DIR
+chown $CVMFS_USER $CVMFS_CACHE_DIR
 dryrun=
 
 QUOTA="quota_limit=$CVMFS_QUOTA_LIMIT"
@@ -67,18 +78,22 @@ then
   QUOTA="$QUOTA,quota_threshold="$[$CVMFS_QUOTA_LIMIT/2]
 fi
 
-uid=`id -u $CVMFS_USER 2> /dev/null` && gid=`id -g $CVMFS_USER 2> /dev/null`
-
-if [ $? -eq 0 ]
-then
-   CVMFS_ID=",uid=$uid,gid=$gid"
-else
-   echo "Error: $CVMFS_USER does not exist." 
-   exit 1
-fi
-
-mount_options="-o fsname=cvmfs2,ro,nodev,grab_mountpoint,kernel_cache,auto_cache"
+mount_options="-o fsname=cvmfs2,nodev,grab_mountpoint,kernel_cache,auto_cache"
 mount_options="${mount_options}${CVMFS_ID},cachedir=$CVMFS_CACHE_DIR,$QUOTA,$CVMFS_OPTIONS,proxies='$CVMFS_HTTP_PROXY',repo_name=$name"
+
+# set the number of open file handles per process
+unamestr=`uname`
+if [[ "$unamestr" == 'Darwin' ]]; then
+	if [ `id -u` -ne 0 ]; then
+		echo "Error: you will need root previliges to increase maximal number of open file descriptors"
+		exit 1
+	fi
+	
+	MAXFILES_OVERALL=$[$CVMFS_NFILES + 512]
+	sysctl -w kern.maxfilesperproc=$CVMFS_NFILES kern.maxfiles=$MAXFILES_OVERALL > /dev/null
+fi	
+ulimit -n $CVMFS_NFILES
+mount_options="$mount_options,nofiles=$CVMFS_NFILES"
 
 if [ ! -z $CVMFS_TIMEOUT ]; then
    mount_options="$mount_options,timeout=$CVMFS_TIMEOUT"
@@ -130,12 +145,18 @@ fi
 
 cmd="$cvmfs_exe ${mount_options} $mountpoint '$repository'"
 
-getent group fuse > /dev/null
+#check if group fuse exists
+if [[ "$unamestr" == 'Linux' ]]; then
+	getent group fuse > /dev/null
+elif [[ "$unamestr" == 'Darwin' ]]; then
+	dseditgroup -o read fuse > /dev/null 2> /dev/null
+fi	
 if [ $? -eq 0 ]; then
   jump_group=y
 else
   jump_group=n
 fi
+
 
 if [ "x$dryrun" == "xtrue" ]; then
   if [ $jump_group == "y" ]; then
@@ -157,13 +178,16 @@ else
   retval=$?
 fi
 
-if [ $retval -eq 0 ]; then
-  grep -q "^cvmfs2 $mountpoint fuse " /etc/mtab
-  if [ $? -eq 0 ]; then
-    sed -i "s|^cvmfs2 $mountpoint fuse \(.*\)|cvmfs2 $mountpoint cvmfs \1|" /etc/mtab 
-  else
-    grep "^cvmfs2 $mountpoint fuse " /proc/mounts | sed "s|^cvmfs2 $mountpoint fuse \(.*\)|cvmfs2 $mountpoint cvmfs \1|" >> /etc/mtab
-  fi
+# Mac OS X uses its ordinary umount command... we don't need to keep the record here
+if [ $unamestr != 'Darwin' ]; then
+	if [ $retval -eq 0 ]; then
+	  grep -q "^cvmfs2 $mountpoint fuse " /etc/mtab
+	  if [ $? -eq 0 ]; then
+	    sed -i "s|^cvmfs2 $mountpoint fuse \(.*\)|cvmfs2 $mountpoint cvmfs \1|" /etc/mtab 
+	  else
+	    grep "^cvmfs2 $mountpoint fuse " /proc/mounts | sed "s|^cvmfs2 $mountpoint fuse \(.*\)|cvmfs2 $mountpoint cvmfs \1|" >> /etc/mtab
+	  fi
+	fi
 fi
 
 exit $retval
