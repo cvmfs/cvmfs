@@ -7,6 +7,7 @@ set (CPACK_PACKAGE_VERSION_MINOR ${CernVM-FS_VERSION_MINOR})
 set (CPACK_PACKAGE_VERSION_PATCH ${CernVM-FS_VERSION_PATCH})
 set (CPACK_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
 set (CPACK_PACKAGE_VENDOR "CERN")
+set (CPACK_PACKAGE_CONTACT "cernvm.support@cern.ch")
 
 #
 # configure the source .tar.gz
@@ -25,6 +26,28 @@ set (CPACK_SOURCE_IGNORE_FILES
 		".*\\\\.dylib"
 		".*\\\\.o"
 )
+
+#
+# configure binary distributions
+#
+
+set (CPACK_GENERATOR TGZ)
+
+if (MACOSX)
+	set (CPACK_GENERATOR ${CPACK_GENERATOR} PackageMaker) # Mac OS X pkg-package
+else (MACOSX)
+	set (CPACK_GENERATOR ${CPACK_GENERATOR} DEB)          # Debian .deb-package
+endif (MACOSX)
+
+set (CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_SOURCE_DIR}/InstallerResources/Readme.txt)
+set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "CernVM-FS is a read only distributed file system.")
+set (CPACK_RESOURCE_FILE_LICENSE ${CMAKE_SOURCE_DIR}/InstallerResources/License.txt)
+set (CPACK_RESOURCE_FILE_README ${CMAKE_SOURCE_DIR}/InstallerResources/Readme.txt)
+set (CPACK_RESOURCE_FILE_WELCOME ${CMAKE_SOURCE_DIR}/InstallerResources/Welcome.txt)
+
+set (CPACK_OSX_PACKAGE_VERSION 10.5) # fuse4x needs at least Leopard
+
+set (CPACK_SET_DESTDIR "ON") 
 
 include (CPack)
 

@@ -1,0 +1,1 @@
+Welcome to the installation process of CernVM-FS.
