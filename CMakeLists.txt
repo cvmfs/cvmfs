@@ -37,13 +37,31 @@ option (BUILD_KERNEL_MODULE "Build the kernel module for the server part" OFF)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
+# define where to find the external dependencies
+#
+# for the 3rd-party libraries there should be a CVMFS-CMakeLists.txt file provided
+# in the given directory, in order to configure and compile them properly
+#
+set (THIRD_PARTY_LIB_LOCATION	"${CMAKE_SOURCE_DIR}/3rdParty")
+set (THIRD_PARTY_BUILD_LOCATION	"${CMAKE_BINARY_DIR}/3rdPartyBuild")
+set (SQLITE3_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/sqlite3/src")
+set (LIBCURL_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/libcurl/src")
+set (ZLIB_BUILTIN_LOCATION		"${THIRD_PARTY_BUILD_LOCATION}/zlib/src")
+set (LIBFUSE_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/libfuse/src")
+set (LIBFUSE4X_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/libfuse4x/src")
+set (JEMALLOC_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/jemalloc/src")
+
+# create the directory for controlled out of source building of 3rd party stuff
+file (MAKE_DIRECTORY ${THIRD_PARTY_BUILD_LOCATION})
+
+#
 # run the bootstrap shellscript (not needed in the distributed version of the source)
 #
 
 if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 	message (STATUS "running bootstrap.sh ...")
 	execute_process (
-		COMMAND				sh ${CMAKE_SOURCE_DIR}/bootstrap.sh
+		COMMAND				sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${THIRD_PARTY_BUILD_LOCATION}
 		WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}
 	)
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
@@ -58,20 +76,6 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwi
 #set (CVMFS_LIBS "${LDFLAGS} -ldl -lm") ??
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
-
-#
-# define where to find the external dependencies
-#
-# for the 3rd-party libraries there should be a CVMFS-CMakeLists.txt file provided
-# in the given directory, in order to configure and compile them properly
-#
-set (THIRD_PARTY_LIB_LOCATION	"${CMAKE_SOURCE_DIR}/3rdParty")
-set (SQLITE3_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/sqlite3/src")
-set (LIBCURL_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libcurl/src")
-set (ZLIB_BUILTIN_LOCATION		"${THIRD_PARTY_LIB_LOCATION}/zlib/src")
-set (LIBFUSE_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libfuse/src")
-set (LIBFUSE4X_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/libfuse4x/src")
-set (JEMALLOC_BUILTIN_LOCATION	"${THIRD_PARTY_LIB_LOCATION}/jemalloc/src")
 
 #
 # set the location of the kernel module sources

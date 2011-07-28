@@ -16,12 +16,9 @@ set (CPACK_PACKAGE_CONTACT "cernvm.support@cern.ch")
 set (CPACK_SOURCE_GENERATOR "TGZ")
 set (CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CernVM-FS_VERSION_STRING}")
 set (CPACK_SOURCE_IGNORE_FILES
-		".*\\\\.tar\\\\.gz$"
-		".*\\\\.tar\\\\.bz2$"
 		"taint\\\\.sh$"
 		"untaint\\\\.sh$"
 		"\\\\.svn"
-		"bootstrap\\\\.sh$"
 		".*\\\\.a$"
 		".*\\\\.dylib"
 		".*\\\\.o"
