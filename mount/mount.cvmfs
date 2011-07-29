@@ -17,9 +17,12 @@ fi
 fqrn=`cvmfs_mkfqrn $1`
 org=`cvmfs_getorg $fqrn`
 
+# check the operating system
+unamestr=`uname`
+
 # Check for fuse
 if [ ! -c /dev/fuse ]; then
-	if [ ! -c /dev/fuse4x0 ]; then
+	if [ $unamestr != 'Darwin' ]; then     # if fuse is installed on Mac OS it will be loaded just in time
   		echo "Fuse not loaded"
   		exit 1
 	fi
@@ -82,7 +85,6 @@ mount_options="-o fsname=cvmfs2,nodev,grab_mountpoint,kernel_cache,auto_cache"
 mount_options="${mount_options}${CVMFS_ID},cachedir=$CVMFS_CACHE_DIR,$QUOTA,$CVMFS_OPTIONS,proxies='$CVMFS_HTTP_PROXY',repo_name=$name"
 
 # set the number of open file handles per process
-unamestr=`uname`
 if [[ "$unamestr" == 'Darwin' ]]; then
 	if [ `id -u` -ne 0 ]; then
 		echo "Error: you will need root previliges to increase maximal number of open file descriptors"
