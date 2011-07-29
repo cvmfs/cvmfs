@@ -23,3 +23,7 @@ dscl . -create /Users/$username UserShell /bin/sh
 dscl . -passwd /Users/$username \*
 dscl . -create /Users/$username UniqueID $userID
 dscl . -create /Users/$username PrimaryGroupID 20
+
+# hide the user from the login prompt
+defaults write /Library/Preferences/com.apple.loginwindow Hide500Users -bool TRUE
+defaults write /Library/Preferences/com.apple.loginwindow HiddenUsersList -array $username
