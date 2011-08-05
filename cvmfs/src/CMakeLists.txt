@@ -201,7 +201,7 @@ if (BUILD_SERVER)
 	add_executable (cvmfs_scrub		${CVMFS_SCRUB_SOURCES})
 	add_executable (cvmfs_sign		${CVMFS_SIGN_SOURCES} ${ZLIB_ARCHIVE})
 	add_executable (cvmfs_zpipe		${CVMFS_ZPIPE_SOURCES} ${ZLIB_ARCHIVE})
-	#add_SOMETHING (cvmfs_sync.bin	${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}) ??
+	add_executable (cvmfs_sync.bin	${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE})
 endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)
@@ -218,7 +218,7 @@ if (BUILD_SERVER)
 	set_target_properties (cvmfs_scrub PROPERTIES COMPILE_FLAGS "${CVMFS_SCRUB_CFLAGS}" LINK_FLAGS "${CVMFS_SCRUB_LD_FLAGS}")
 	set_target_properties (cvmfs_sign PROPERTIES COMPILE_FLAGS "${CVMFS_SIGN_CFLAGS}" LINK_FLAGS "${CVMFS_SIGN_LD_FLAGS}")
 	set_target_properties (cvmfs_zpipe PROPERTIES COMPILE_FLAGS "${CVMFS_ZPIPE_CFLAGS}" LINK_FLAGS "${CVMFS_ZPIPE_LD_FLAGS}")
-	#set_target_properties (cvmfs_sync.bin PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}") ??
+	set_target_properties (cvmfs_sync.bin PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}")
 endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)
@@ -235,7 +235,7 @@ if (BUILD_SERVER)
 	target_link_libraries (cvmfs_scrub		${CVMFS_SCRUB_LIBS} ${OPENSSL_LIBRARIES})
 	target_link_libraries (cvmfs_sign		${CVMFS_SIGN_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE})
 	target_link_libraries (cvmfs_zpipe		${CVMFS_ZPIPE_LIBS} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE})
-	#target_link_libraries (cvmfs_sync.bin	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}) ??
+	target_link_libraries (cvmfs_sync.bin	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SQLITE3_ARCHIVE} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
 endif (BUILD_SERVER)
 
 # 
@@ -257,7 +257,7 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 if (BUILD_SERVER)
 	install (
-		TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_clgcmp cvmfs_lscat cvmfs_pull cvmfs_scrub #cvmfs_sync.bin
+		TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_clgcmp cvmfs_lscat cvmfs_pull cvmfs_scrub cvmfs_sync.bin
 		RUNTIME
 		DESTINATION		bin
 	)
