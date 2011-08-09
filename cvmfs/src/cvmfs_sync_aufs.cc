@@ -3,7 +3,7 @@
 #include "util.h"
 #include "compat.h"
 
-#include <iostream>
+#include <iostream> // remove later
 #include <dirent.h>
 #include <errno.h>
 #include <assert.h>
@@ -11,7 +11,8 @@
 using namespace cvmfs;
 using namespace std;
 
-SyncAufs1::SyncAufs1(const std::string &aufsPath, const string &repositoryPath) {
+SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &aufsPath) :
+	UnionFilesystemSync(repositoryPath, aufsPath){
 	// init ignored filenames
 	mIgnoredFilenames.insert(".wh..wh..tmp");
 	mIgnoredFilenames.insert(".wh..wh.plnk");
@@ -19,10 +20,6 @@ SyncAufs1::SyncAufs1(const std::string &aufsPath, const string &repositoryPath) 
 	
 	// set the whiteout prefix AUFS preceeds for every whiteout file
 	mWhiteoutPrefix = ".wh.";
-	
-	// set internal state
-	mRepositoryPath = canonical_path(repositoryPath);
-	mOverlayPath = aufsPath;
 }
 
 SyncAufs1::~SyncAufs1() {
@@ -30,8 +27,6 @@ SyncAufs1::~SyncAufs1() {
 }
 
 bool SyncAufs1::goGetIt() {
-	cout << "Traversing copy on write overlay directory... " << endl;
-	
 	RecursionEngine<SyncAufs1> recursion(this, mOverlayPath);
 	
 	recursion.foundRegularFile = &SyncAufs1::processFoundRegularFile;
@@ -44,19 +39,6 @@ bool SyncAufs1::goGetIt() {
 	return true;
 }
 
-void SyncAufs1::processFoundRegularFile(const string &dirPath, const string &filename) {
-	string relativePath;
-
-	// process whiteout prefix
-	if (isWhiteoutFilename(filename)) {
-		processWhiteoutEntry(dirPath, filename);
-	} else if (isNewItem(dirPath, filename)) {
-		addRegularFile(relativePath, filename);
-	} else {
-		touchRegularFile(relativePath, filename);
-	}
-}
-
 bool SyncAufs1::processFoundDirectory(const string &dirPath, const string &filename) {
 	if (isNewItem(dirPath, filename)) {
 		// everything in a new directory is supposed to be new and can be added without
@@ -65,13 +47,29 @@ bool SyncAufs1::processFoundDirectory(const string &dirPath, const string &filen
 		addDirectoryRecursively(dirPath, filename);
 		return false;
 	} else {
-		// directory exists... nothing to do here
+		// directory already exists... was just touched, go on with recursion -> return true
+		touchDirectory(dirPath, filename);
 		return true;
 	}
 }
 
+void SyncAufs1::processFoundRegularFile(const string &dirPath, const string &filename) {
+	// process whiteout prefix
+	if (isWhiteoutFilename(filename)) {
+		processWhiteoutEntry(dirPath, filename);
+	} else if (isNewItem(dirPath, filename)) {
+		addRegularFile(dirPath, filename);
+	} else {
+		touchRegularFile(dirPath, filename);
+	}
+}
+
 void SyncAufs1::processFoundLink(const string &dirPath, const string &filename) {
-	// do something
+	if (isNewItem(dirPath, filename)) {
+		addLink(dirPath, filename);
+	} else {
+		touchRegularFile(dirPath, filename);
+	}
 }
 
 void SyncAufs1::processWhiteoutEntry(const string &dirPath, const string &filename) {
@@ -81,20 +79,24 @@ void SyncAufs1::processWhiteoutEntry(const string &dirPath, const string &filena
 	
 	switch (filetype) {
 		case FT_DIR:
-			deleteDirectoryRecursively(dirPath, filename);
+			deleteDirectoryRecursively(dirPath, actualFilename);
 			break;
 		case FT_SYM:
-			deleteLink(dirPath, filename);
+			deleteLink(dirPath, actualFilename);
 			break;
 		case FT_REG:
-			deleteRegularFile(dirPath, filename);
+			deleteRegularFile(dirPath, actualFilename);
 			break;
 		default:
 			printError("cannot process whiteout entry in AUFS overlay volume");
 	}
 }
 
-UnionFilesystemSync::UnionFilesystemSync() {}
+UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const string &overlayPath) {
+	mRepositoryPath = canonical_path(repositoryPath);
+	mOverlayPath = canonical_path(overlayPath);
+}
+
 UnionFilesystemSync::~UnionFilesystemSync() {}
 
 bool UnionFilesystemSync::isNewItem(const string &dirPath, const string &filename) const {
@@ -117,16 +119,16 @@ void UnionFilesystemSync::deleteDirectoryRecursively(const string &dirPath, cons
 }
 
 bool UnionFilesystemSync::deleteDirectory(const string &dirPath, const string &filename) {
-	printWarning("deleting directory");
+	mChangeset.dir_rem.insert(getPathToOverlayFile(dirPath, filename));
 	return true;
 }
 
 void UnionFilesystemSync::deleteRegularFile(const string &dirPath, const string &filename) {
-	printWarning("deleting file");
+	mChangeset.fil_rem.insert(getPathToOverlayFile(dirPath, filename));
 }
 
 void UnionFilesystemSync::deleteLink(const string &dirPath, const string &filename) {
-	
+	deleteRegularFile(dirPath, filename); // indistinguishable
 }
 
 void UnionFilesystemSync::addDirectoryRecursively(const string &dirPath, const string &filename) {
@@ -143,20 +145,25 @@ void UnionFilesystemSync::addDirectoryRecursively(const string &dirPath, const s
 }
 
 bool UnionFilesystemSync::addDirectory(const string &dirPath, const string &filename) {
-	printWarning("adding directory");
+	mChangeset.dir_add.insert(getPathToOverlayFile(dirPath, filename));
 	return true;
 }
 
+void UnionFilesystemSync::touchDirectory(const std::string &dirPath, const std::string &filename) {
+	mChangeset.dir_touch.insert(getPathToOverlayFile(dirPath, filename));
+}
+
 void UnionFilesystemSync::addRegularFile(const string &dirPath, const string &filename) {
-	printWarning("adding regular file");
+	mChangeset.reg_add.insert(getPathToOverlayFile(dirPath, filename));
 }
 
 void UnionFilesystemSync::touchRegularFile(const string &dirPath, const string &filename) {
-	printWarning("touching regular file");
+	mChangeset.reg_touch.insert(getPathToOverlayFile(dirPath, filename));
 }
 
 void UnionFilesystemSync::addLink(const string &dirPath, const string &filename) {
-	printWarning("add link");
+	mChangeset.sym_add.insert(getPathToOverlayFile(dirPath, filename));
+	cout << "link added" << endl;
 }
 
 string UnionFilesystemSync::getPathToRepositoryFile(const string &dirPath, const string &filename) const { 
@@ -171,7 +178,6 @@ FileType UnionFilesystemSync::getFiletypeInRepository(const string &dirPath, con
 	// find the file in the mounted repository and get its file type
 	// TODO: replace this file system stat by a catalog lookup
 	string path = getPathToRepositoryFile(dirPath, filename);
-	
 	return getFileType(path);
 }
 
@@ -198,7 +204,7 @@ void UnionFilesystemSync::printWarning(const string &warningMessage) {
 template <class T>
 RecursionEngine<T>::RecursionEngine(T *delegate, const string &relativeToDirectory) {
 	mDelegate = delegate;
-	mRelativeToDirectory = relativeToDirectory;
+	mRelativeToDirectory = canonical_path(relativeToDirectory);
 	
 	enteringDirectory = NULL;
 	leavingDirectory = NULL;
@@ -223,7 +229,7 @@ void RecursionEngine<T>::doRecursion(const string &dirPath) const {
 	string filename, relativePath;
 	
 	// obtain the relative path by cutting away the absolute part
-	relativePath = dirPath.substr(mRelativeToDirectory.length());
+	relativePath = getRelativePath(dirPath);
 	
 	// get into directory and notify the user
 	if ((dip = opendir(dirPath.c_str())) == NULL) {
@@ -248,7 +254,7 @@ void RecursionEngine<T>::doRecursion(const string &dirPath) const {
 		switch (dit->d_type) {
 			case DT_DIR: // recursion takes place either if "foundDirectory" is NULL or returns true
 				if (foundDirectory == NULL || (mDelegate->*foundDirectory)(relativePath, filename))
-					recurse(dirPath + "/" + filename);
+					doRecursion(dirPath + "/" + filename);
 				break;
 			case DT_REG:
 				if (foundRegularFile != NULL) (mDelegate->*foundRegularFile)(relativePath, filename);
@@ -264,4 +270,10 @@ void RecursionEngine<T>::doRecursion(const string &dirPath) const {
 		return;
 	}
 	if (leavingDirectory != NULL) (mDelegate->*leavingDirectory)(relativePath);
+}
+
+template <class T>
+string RecursionEngine<T>::getRelativePath(const string &absolutePath) const {
+	// be careful of trailing '/' --> ( +1 if needed)
+	return (absolutePath.length() == mRelativeToDirectory.length()) ? "" : absolutePath.substr(mRelativeToDirectory.length() + 1);
 }

@@ -9,12 +9,16 @@
 namespace cvmfs {
 	enum FileType {FT_DIR, FT_REG, FT_SYM, FT_ERR};
 	
-	class UnionFilesystemSync;
-	
-	/**
-	 *  callback definition for directory recursion
-	 */
-	typedef bool (*RecursionCallback)(void *object, const std::string&, const std::string&);
+	typedef struct {
+		std::set<std::string> dir_add;
+		std::set<std::string> dir_touch;
+		std::set<std::string> dir_rem;
+		std::set<std::string> reg_add;
+		std::set<std::string> reg_touch;
+		std::set<std::string> sym_add;
+		std::set<std::string> fil_add; ///< We don't know if this is hard link to regular file or hard link to symlink
+		std::set<std::string> fil_rem; ///< We don't know if this is regular file or symlink
+	} Changeset;
 	
 	/**
 	 *  abstract class for interface definition of repository sync based on
@@ -23,15 +27,18 @@ namespace cvmfs {
 	class UnionFilesystemSync {
 	protected:	
 		std::set<std::string> mIgnoredFilenames;
-		std::string mWhiteoutPrefix;
 		std::string mRepositoryPath;
 		std::string mOverlayPath;
 		
+		Changeset mChangeset;
+		
 	public:
-		UnionFilesystemSync();
+		UnionFilesystemSync(const std::string &repositoryPath, const std::string &overlayPath);
 		virtual ~UnionFilesystemSync();
 		
 		virtual bool goGetIt() = 0;
+		
+		Changeset getChangeset() const { return mChangeset; }
 		
 	protected:
 		/**
@@ -48,14 +55,14 @@ namespace cvmfs {
 		 *  @param filename the filename to check
 		 *  @return true if filename seems to be whiteout otherwise false
 		 */
-		inline bool isWhiteoutFilename(const std::string &filename) const { return (filename.substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
+		virtual bool isWhiteoutFilename(const std::string &filename) const = 0;
 		
 		/**
 		 *  retrieves the filename of the marked deleted file in the repository
 		 *  @param filename the filename of the whiteout file
 		 *  @return the filename of the 'deleted' file
 		 */
-		inline std::string getFilenameFromWhiteout(const std::string &filename) const { return filename.substr(mWhiteoutPrefix.length()); }
+		virtual std::string getFilenameFromWhiteout(const std::string &filename) const = 0;
 		
 		/**
 		 *  get the absolute path to a repository file
@@ -115,6 +122,7 @@ namespace cvmfs {
 		 */
 		void addDirectoryRecursively(const std::string &dirPath, const std::string &filename);
 		bool addDirectory(const std::string &dirPath, const std::string &filename);
+		void touchDirectory(const std::string &dirPath, const std::string &filename);
 		void addRegularFile(const std::string &dirPath, const std::string &filename);
 		void touchRegularFile(const std::string &dirPath, const std::string &filename);
 		void addLink(const std::string &dirPath, const std::string &filename);
@@ -129,8 +137,11 @@ namespace cvmfs {
 	class SyncAufs1 :
 	 	public UnionFilesystemSync 
 	{
+		private:	
+		std::string mWhiteoutPrefix;
+		
 		public:
-			SyncAufs1(const std::string &aufsPath, const std::string &repositoryPath);
+			SyncAufs1(const std::string &repositoryPath, const std::string &aufsPath);
 			virtual ~SyncAufs1();
 			
 			bool goGetIt();
@@ -139,6 +150,9 @@ namespace cvmfs {
 			void processFoundRegularFile(const std::string &dirPath, const std::string &filename);
 			bool processFoundDirectory(const std::string &dirPath, const std::string &filename);
 			void processFoundLink(const std::string &dirPath, const std::string &filename);
+			
+			inline bool isWhiteoutFilename(const std::string &filename) const { return (filename.substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
+			inline std::string getFilenameFromWhiteout(const std::string &filename) const { return filename.substr(mWhiteoutPrefix.length()); }
 			
 		private:
 			/**
@@ -198,6 +212,8 @@ namespace cvmfs {
 		
 	private:
 		void doRecursion(const std::string &dirPath) const;
+		
+		std::string getRelativePath(const std::string &absolutePath) const;
 	};
 }
 

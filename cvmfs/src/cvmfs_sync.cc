@@ -843,10 +843,26 @@ void createChangesetFromChangelog(ifstream &fjournal) {
 }
 
 void createChangesetFromOverlayDirectory(string dir_overlay) {
-	cvmfs::SyncAufs1 worker(dir_overlay, "/cvmfs");
-	if (not worker.goGetIt()) {
+	cvmfs::UnionFilesystemSync *worker = new cvmfs::SyncAufs1("/cvmfs", dir_overlay);
+	
+	cout << "Traversing copy on write overlay directory... " << endl;
+
+	if (not worker->goGetIt()) {
 		cerr << "something went wrong while creating changeset" << endl;
 	}
+	
+	cvmfs::Changeset myChangeset = worker->getChangeset();
+	
+	dir_add   = myChangeset.dir_add;
+	dir_touch = myChangeset.dir_touch;
+	dir_rem   = myChangeset.dir_rem;
+	reg_add   = myChangeset.reg_add;
+	reg_touch = myChangeset.reg_touch;
+	sym_add   = myChangeset.sym_add;
+	fil_add   = myChangeset.fil_add;
+	fil_rem   = myChangeset.fil_rem;
+	
+	delete worker;
 }
 
 static void usage() {
@@ -1189,6 +1205,7 @@ catalogs_attached:
    for (set<string>::iterator i = reg_touch.begin();
         i != reg_touch.end(); )
    {
+	
       if (get_file_name(*i) == ".cvmfscatalog") {
          /* Separate new catalog from touched ones (force dirty) */
          const string p = get_parent_path(*i);
@@ -1204,6 +1221,7 @@ catalogs_attached:
       
       hash::t_md5 md5(catalog::mangled_path(abs2clg_path(*i, dir_shadow)));
       catalog::t_dirent d;
+		
       if (!catalog::lookup_unprotected(md5, d)) {
          reg_add.insert(*i);
          reg_touch.erase(i++);
