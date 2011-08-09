@@ -25,6 +25,8 @@
 
 #include "cvmfs_config.h"
 
+#include "cvmfs_sync_aufs.h"
+
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -657,148 +659,7 @@ static bool move_to_datastore(const string &source, const string &suffix,
    return result;
 }
                
-
-
-static void usage() {
-   cout << "CernVM-FS sync shadow tree with repository" << endl;
-   cout << "Usage: cvmfs_sync -s <shadow dir> -r <repository store> -l <file system change log file>" << endl
-        << "                  [-p(rint change set)] [-d(ry run)] [-i <immutable dir(,dir)*>] [-c(ompat catalog)]" << endl 
-        << "                  [-k(ey file)] [-z (lazy attach of catalogs)] [-b(ookkeeping of dirty catalogs)]" << endl
-        << "                  [-t <threads>] [-m(ucatalogs)]" << endl << endl
-        << "Make sure that a 'data' and a 'catalogs' subdirectory exist in your repository store." << endl
-        << "Also, your webserver must be able to follow symlinks in the catalogs subdirectory." << endl
-        << "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file." 
-        << endl << endl;
-}
-
-int main(int argc, char **argv) {
-   if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help") ||
-       (string(argv[1]) == "-v") || (string(argv[1]) == "--version"))
-   {
-      usage();
-      return 0;
-   }
-   
-   string dir_shadow;
-   string dir_data;
-   string dir_catalogs;
-   string keyfile;
-   ifstream fjournal;
-   ofstream fbookkeeping;
-   set<string> bookkeeping;
-   bool print_cs = false;
-   bool dry_run = false;
-   bool compat_catalog = false;
-   bool lazy_attach = false;
-   int sync_threads = 0;
-   bool mucatalogs = false;
-   
-   umask(022);
-   
-   if (!monitor::init(".", false)) {
-      cerr << "Failed to init watchdog" << cerr;
-   }
-   monitor::spawn();
-   
-   char c;
-   while ((c = getopt(argc, argv, "s:r:l:pdi:ck:zb:t:m")) != -1) {
-      switch (c) {
-         case 's':
-            dir_shadow = canonical_path(optarg);
-            break;
-         case 'r': {
-            const string path = canonical_path(optarg);
-            dir_data = path + "/data";
-            dir_catalogs = path + "/catalogs";
-            break;
-         }
-         case 'l':
-            fjournal.open(optarg);
-            break;
-         case 'p':
-            print_cs = true;
-            break;
-         case 'd':
-            dry_run = true;
-            break;
-         case 'i': {
-            char *token = strtok(optarg, ",");
-            while (token != NULL) {
-               immutables.insert(canonical_path(token));
-               token = strtok(NULL, ",");
-            }
-            break;
-         }
-         case 'c':
-            compat_catalog = true;
-            break;
-         case 'k':
-            keyfile = optarg;
-            break;
-         case 'z':
-            lazy_attach = true;
-            break;
-         case 'b': {
-            ifstream input_dirty_clg;
-            input_dirty_clg.open(optarg, ios_base::in);
-            if (!input_dirty_clg.is_open()) {
-               cerr << "failed to open bookkeeping file for reading " << optarg << 
-                       " (" << errno << ")" << endl;
-               return 2;
-            }
-            string line;
-            while (getline(input_dirty_clg, line))
-               bookkeeping.insert(line);
-            input_dirty_clg.close();
-            fbookkeeping.open(optarg, ios_base::out | ios_base::app);
-            if (!fbookkeeping.is_open()) {
-               cerr << "failed to open bookkeeping file for appending " << optarg << 
-                       " (" << errno << ")" << endl;
-               return 2;
-            }
-            break;
-         }
-         case 't':
-            sync_threads = atoi(optarg);
-            break;
-         case 'm':
-            mucatalogs = true;
-            break;
-         case '?':
-         default:
-            usage();
-            return 1;
-      }
-   }
-   
-   /* Sanity checks */
-   if (!fjournal.is_open()) {
-      cerr << "no log file specified" << endl;
-      return 2;
-   }
-   if (get_file_type(dir_shadow) != FT_DIR) {
-      cerr << "shadow directory does not exist" << endl;
-      return 2;
-   }
-   if (get_file_type(dir_data) != FT_DIR) {
-      cerr << "data store directory does not exist" << endl;
-      return 2;
-   }
-   if (get_file_type(dir_catalogs) != FT_DIR) {
-      cerr << "catalog store directory does not exist" << endl;
-      return 2;
-   }
-      
-   /* Init stuff */
-   if (!make_cache_dir(dir_data, 0755)) {
-      cerr << "could not initialize data store" << endl;
-      return 3;
-   }
-   if (!init_catalogs(dir_catalogs, dir_shadow, !lazy_attach)) {
-      cerr << "could not initialize catalog store" << endl;
-      return 3;
-   }
-   
+void createChangesetFromChangelog(ifstream &fjournal) {
    /* Main loop, walk through journal lines and build change sets */
    cout << "Parsing file system change log... " << flush;
    string line;
@@ -811,18 +672,18 @@ int main(int argc, char **argv) {
          cerr << "Warning: parse error in line " << no_lines << endl;
          continue;
       }
-      
+
       char object;
       char operation;
       char result;
       string path1;
       string path2;
-      
+
       object = line[0];
       operation = line[1];
       result = line[2];
       if (result == 'F') continue; ///< We process only sucessful calls
-      
+
       unsigned i;
       for (i = 3; i < line.length(); ++i) {
          if (line[i] == '\0') break;
@@ -847,7 +708,7 @@ int main(int argc, char **argv) {
          }
       }
       if (skip) continue;
-      
+
       /* Fill change sets, walk through all possible events */
       switch (operation) {
          case 'C':
@@ -956,7 +817,7 @@ int main(int argc, char **argv) {
                default:
                   if (!rem_path(path1, move_in))
                      move_out.insert(path1);
-                  
+
                   /* Remove all previous operations on that path */
                   set<string> *s[] = {&move_in, &dir_add, &dir_touch, &dir_rem, &reg_add, &reg_touch,
                                       &sym_add, &fil_add, &fil_rem};
@@ -979,6 +840,176 @@ int main(int argc, char **argv) {
       }
    }
    cout << no_lines << " lines" << endl;
+}
+
+void createChangesetFromOverlayDirectory(string dir_overlay) {
+	cvmfs::SyncAufs1 worker(dir_overlay, "/cvmfs");
+	if (not worker.goGetIt()) {
+		cerr << "something went wrong while creating changeset" << endl;
+	}
+}
+
+static void usage() {
+   cout << "CernVM-FS sync shadow tree with repository" << endl;
+   cout << "Usage: cvmfs_sync -s <shadow dir> -r <repository store> -l <file system change log file>" << endl
+        << "                  [-p(rint change set)] [-d(ry run)] [-i <immutable dir(,dir)*>] [-c(ompat catalog)]" << endl 
+        << "                  [-k(ey file)] [-z (lazy attach of catalogs)] [-b(ookkeeping of dirty catalogs)]" << endl
+        << "                  [-t <threads>] [-m(ucatalogs)]" << endl << endl
+        << "Make sure that a 'data' and a 'catalogs' subdirectory exist in your repository store." << endl
+        << "Also, your webserver must be able to follow symlinks in the catalogs subdirectory." << endl
+        << "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file." 
+        << endl << endl;
+}
+
+int main(int argc, char **argv) {
+   if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help") ||
+       (string(argv[1]) == "-v") || (string(argv[1]) == "--version"))
+   {
+      usage();
+      return 0;
+   }
+   
+   string dir_shadow;
+   string dir_data;
+   string dir_catalogs;
+   string dir_overlay; // << path to a union file system overlay directory (copy on write)
+   string keyfile;
+   ifstream fjournal;
+   ofstream fbookkeeping;
+   set<string> bookkeeping;
+   bool useJournal = false;
+   bool useOverlay = false;
+   bool print_cs = false;
+   bool dry_run = false;
+   bool compat_catalog = false;
+   bool lazy_attach = false;
+   int sync_threads = 0;
+   bool mucatalogs = false;
+   
+   umask(022);
+   
+   if (!monitor::init(".", false)) {
+      cerr << "Failed to init watchdog" << cerr;
+   }
+   monitor::spawn();
+   
+   char c;
+   while ((c = getopt(argc, argv, "s:r:l:o:pdi:ck:zb:t:m")) != -1) {
+      switch (c) {
+         case 's':
+            dir_shadow = canonical_path(optarg);
+            break;
+         case 'r': {
+            const string path = canonical_path(optarg);
+            dir_data = path + "/data";
+            dir_catalogs = path + "/catalogs";
+            break;
+         }
+         case 'l':
+            fjournal.open(optarg);
+			useJournal = true;
+            break;
+         case 'o':
+            dir_overlay = canonical_path(optarg);
+			useOverlay = true;
+			break;
+         case 'p':
+            print_cs = true;
+            break;
+         case 'd':
+            dry_run = true;
+            break;
+         case 'i': {
+            char *token = strtok(optarg, ",");
+            while (token != NULL) {
+               immutables.insert(canonical_path(token));
+               token = strtok(NULL, ",");
+            }
+            break;
+         }
+         case 'c':
+            compat_catalog = true;
+            break;
+         case 'k':
+            keyfile = optarg;
+            break;
+         case 'z':
+            lazy_attach = true;
+            break;
+         case 'b': {
+            ifstream input_dirty_clg;
+            input_dirty_clg.open(optarg, ios_base::in);
+            if (!input_dirty_clg.is_open()) {
+               cerr << "failed to open bookkeeping file for reading " << optarg << 
+                       " (" << errno << ")" << endl;
+               return 2;
+            }
+            string line;
+            while (getline(input_dirty_clg, line))
+               bookkeeping.insert(line);
+            input_dirty_clg.close();
+            fbookkeeping.open(optarg, ios_base::out | ios_base::app);
+            if (!fbookkeeping.is_open()) {
+               cerr << "failed to open bookkeeping file for appending " << optarg << 
+                       " (" << errno << ")" << endl;
+               return 2;
+            }
+            break;
+         }
+         case 't':
+            sync_threads = atoi(optarg);
+            break;
+         case 'm':
+            mucatalogs = true;
+            break;
+         case '?':
+         default:
+            usage();
+            return 1;
+      }
+   }
+   
+   /* Sanity checks */
+   if (useJournal && !fjournal.is_open()) {
+      cerr << "specified change log file not found" << endl;
+      return 2;
+   }
+   if (useOverlay && get_file_type(dir_overlay) != FT_DIR) {
+      cerr << "overlay (copy on write) directory does not exist" << endl;
+      return 2;
+   }
+   if (get_file_type(dir_shadow) != FT_DIR) {
+      cerr << "shadow directory does not exist" << endl;
+      return 2;
+   }
+   if (get_file_type(dir_data) != FT_DIR) {
+      cerr << "data store directory does not exist" << endl;
+      return 2;
+   }
+   if (get_file_type(dir_catalogs) != FT_DIR) {
+      cerr << "catalog store directory does not exist" << endl;
+      return 2;
+   }
+      
+   /* Init stuff */
+   if (!make_cache_dir(dir_data, 0755)) {
+      cerr << "could not initialize data store" << endl;
+      return 3;
+   }
+   if (!init_catalogs(dir_catalogs, dir_shadow, !lazy_attach)) {
+      cerr << "could not initialize catalog store" << endl;
+      return 3;
+   }
+   
+   /* build up a change set */
+   if (useJournal) {
+		createChangesetFromChangelog(fjournal);
+   } else if (useOverlay) {
+		createChangesetFromOverlayDirectory(dir_overlay);
+   } else {
+		cerr << "no changes in filesystem provided" << endl;
+		return 1;
+   } 
    
    /* Lazy attach of catalogs, just load the subtree where things happen.
       Careful, breaks cross-catalog links! */

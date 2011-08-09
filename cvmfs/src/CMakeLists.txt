@@ -50,7 +50,8 @@ set (CVMFS_SYNC_BIN_SOURCES
 	util.cc util.h 
 	log.c log.h 
 	monitor.cc monitor.h 
-	cvmfs_sync.cc)
+	cvmfs_sync.cc
+	cvmfs_sync_aufs.h cvmfs_sync_aufs.cc)
 
 set (CVMFS_CLGCMP_SOURCES
 	smalloc.h smalloc.c 
