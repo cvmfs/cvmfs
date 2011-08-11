@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <stdio.h>
+#include <unistd.h>
 
 using namespace cvmfs;
 using namespace std;
@@ -42,46 +43,48 @@ bool SyncAufs1::goGetIt() {
 
 bool SyncAufs1::isEditedItem(const string &dirPath, const string &filename) const {
 	return true;
+
+	// to be implemented...
 	
-	// this is a very creepy approach, but just for testing purposes...
-	string overlayPath = getPathToOverlayFile(dirPath, filename);
-	string unionPath = getPathToUnionFile(dirPath, filename);
-	
-	// read the inode 
-	PortableStat64 info;
-	if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
-		return false; // file seems to be inaccessible and therefore not editable
-	}
-	ino_t inode_before = info.st_ino;
-	
-	cout << "inode before: " << inode_before << endl;
-	
-	// rename the file, so that AUFS gives us the underlying file
-	// from the repository
-	rename(overlayPath.c_str(), (overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str());
-	
-	// read the inode again to see if it changed
-	if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
-		cout << errno << endl;
-		return false; // file seems to be inaccessible now and was therefore newly created (even if this should be impossible here)
-	}
-	ino_t inode_after = info.st_ino;
-	
-	cout << "inode after: " << inode_after << endl;
-	
-	// rename back the file to reset the state to the normal one
-	// from the repository
-	rename((overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str(), overlayPath.c_str());
-	
-	if (inode_before == inode_after) cout << "file was edited" << endl; else cout << "file was replaced" << endl;
-	
-	return (inode_before == inode_after);
+	// // this is a very creepy approach, but just for testing purposes...
+	// string overlayPath = getPathToOverlayFile(dirPath, filename);
+	// string unionPath = getPathToUnionFile(dirPath, filename);
+	// 
+	// // read the inode 
+	// PortableStat64 info;
+	// if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
+	// 	return false; // file seems to be inaccessible and therefore not editable
+	// }
+	// ino_t inode_before = info.st_ino;
+	// 
+	// cout << "inode before: " << inode_before << endl;
+	// 
+	// // rename the file, so that AUFS gives us the underlying file
+	// // from the repository
+	// rename(overlayPath.c_str(), (overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str());
+	// 
+	// // read the inode again to see if it changed
+	// if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
+	// 	cout << errno << endl;
+	// 	return false; // file seems to be inaccessible now and was therefore newly created (even if this should be impossible here)
+	// }
+	// ino_t inode_after = info.st_ino;
+	// 
+	// cout << "inode after: " << inode_after << endl;
+	// 
+	// // rename back the file to reset the state to the normal one
+	// // from the repository
+	// rename((overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str(), overlayPath.c_str());
+	// 
+	// if (inode_before == inode_after) cout << "file was edited" << endl; else cout << "file was replaced" << endl;
+	// 
+	// return (inode_before == inode_after);
 }
 
 UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath) {
 	mRepositoryPath = canonical_path(repositoryPath);
-	mOverlayPath = canonical_path(overlayPath);
 	mUnionPath = canonical_path(unionPath);
+	mOverlayPath = canonical_path(overlayPath);
 }
 
 UnionFilesystemSync::~UnionFilesystemSync() {}
@@ -119,6 +122,11 @@ void UnionFilesystemSync::processFoundRegularFile(const string &dirPath, const s
 }
 
 void UnionFilesystemSync::processFoundLink(const string &dirPath, const string &filename) {
+	if (not checkSymlink(dirPath, filename)) {
+		printWarning("found symbolic link pointing outside of repository... skipping that");
+		return;
+	}
+	
 	if (isNewItem(dirPath, filename)) {
 		addLink(dirPath, filename);
 	} else {
@@ -192,25 +200,24 @@ void UnionFilesystemSync::addDirectoryRecursively(const string &dirPath, const s
 }
 
 bool UnionFilesystemSync::addDirectory(const string &dirPath, const string &filename) {
-	mChangeset.dir_add.insert(getPathToOverlayFile(dirPath, filename));
+	mChangeset.dir_add.insert(getPathToUnionFile(dirPath, filename));
 	return true;
 }
 
 void UnionFilesystemSync::touchDirectory(const std::string &dirPath, const std::string &filename) {
-	mChangeset.dir_touch.insert(getPathToOverlayFile(dirPath, filename));
+	mChangeset.dir_touch.insert(getPathToUnionFile(dirPath, filename));
 }
 
 void UnionFilesystemSync::addRegularFile(const string &dirPath, const string &filename) {
-	mChangeset.reg_add.insert(getPathToOverlayFile(dirPath, filename));
+	mChangeset.reg_add.insert(getPathToUnionFile(dirPath, filename));
 }
 
 void UnionFilesystemSync::touchRegularFile(const string &dirPath, const string &filename) {
-	mChangeset.reg_touch.insert(getPathToOverlayFile(dirPath, filename));
+	mChangeset.reg_touch.insert(getPathToUnionFile(dirPath, filename));
 }
 
 void UnionFilesystemSync::addLink(const string &dirPath, const string &filename) {
-	mChangeset.sym_add.insert(getPathToOverlayFile(dirPath, filename));
-	cout << "link added" << endl;
+	mChangeset.sym_add.insert(getPathToUnionFile(dirPath, filename));
 }
 
 string UnionFilesystemSync::getPathToRepositoryFile(const string &dirPath, const string &filename) const { 
@@ -242,6 +249,39 @@ FileType UnionFilesystemSync::getFileType(const string &path) const {
 	else if (S_ISLNK(info.st_mode)) return FT_SYM;
 
 	return FT_ERR;
+}
+
+bool UnionFilesystemSync::checkSymlink(const string &dirPath, const string &filename) {
+	string path = getPathToUnionFile(dirPath, filename);
+	string basePath = getPathToUnionFile(dirPath, "");
+	char buf1[255] = {0};
+	char buf2[255] = {0};
+	string absPath;
+	
+	// check if link points to something...
+	PortableStat64 info;
+	if (portableLinkStat64(path.c_str(), &info) != 0) {
+		return false;
+	}
+	
+	// find out if link points inside the repository
+	readlink(path.c_str(), buf1, sizeof(buf1));
+	rel2abs(buf1, basePath.c_str(), buf2, sizeof(buf2));
+	absPath = buf2;
+	if (absPath.substr(0, mUnionPath.length()) != mUnionPath) {
+		return false;
+	}
+	
+	// if symlink is absolute, make it relative...
+	if (*buf1 == '/') {
+		memset(buf2, 0, sizeof(buf2));
+		abs2rel(absPath.c_str(), basePath.c_str(), buf2, sizeof(buf2));
+		
+		unlink(path.c_str());
+		symlink(buf2, path.c_str());
+	}
+	
+	return true;
 }
 
 void UnionFilesystemSync::printError(const string &errorMessage) {

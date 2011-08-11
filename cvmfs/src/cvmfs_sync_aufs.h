@@ -70,6 +70,16 @@ namespace cvmfs {
 		virtual std::string getFilenameFromWhiteout(const std::string &filename) const = 0;
 		
 		/**
+		 *  checks if the given symbolic link points outside of the repository
+		 *  if the link is an absolute path to the repository it will be transformed to
+		 *  a relative path
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename
+		 *  @return true if link points to the repository otherwise false
+		 */
+		bool checkSymlink(const std::string &dirPath, const std::string &filename);
+		
+		/**
 		 *  get the absolute path to a repository file
 		 *  @param dirPath the relative directory path
 		 *  @param filename the filename

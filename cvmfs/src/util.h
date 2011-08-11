@@ -33,6 +33,28 @@ bool read_sig_tail(const void *buf, const unsigned buf_size, const unsigned skip
 bool write_memchunk(const std::string &patch, const void *chunk, const int &size);
 FILE *temp_file(const std::string &path_prefix, const int mode, const char *open_flags,
                 std::string &final_path);
+/*
+ * abs2rel: convert an absolute path name into relative.
+ *
+ *	i)	path	absolute path
+ *	i)	base	base directory (must be absolute path)
+ *	o)	result	result buffer
+ *	i)	size	size of result buffer
+ *	r)		!= NULL: relative path
+ *			== NULL: error
+ */
+char *abs2rel(const char *path, const char *base, char *result, const size_t size);
 
+/*
+ * rel2abs: convert an relative path name into absolute.
+ *
+ *	i)	path	relative path
+ *	i)	base	base directory (must be absolute path)
+ *	o)	result	result buffer
+ *	i)	size	size of result buffer
+ *	r)		!= NULL: absolute path
+ *			== NULL: error
+ */
+char *rel2abs(const char *path, const char *base, char *result, const size_t size);
 
 #endif
