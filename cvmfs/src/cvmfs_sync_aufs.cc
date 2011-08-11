@@ -7,12 +7,13 @@
 #include <dirent.h>
 #include <errno.h>
 #include <assert.h>
+#include <stdio.h>
 
 using namespace cvmfs;
 using namespace std;
 
-SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &aufsPath) :
-	UnionFilesystemSync(repositoryPath, aufsPath){
+SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &unionPath, const std::string &aufsPath) :
+	UnionFilesystemSync(repositoryPath, unionPath, aufsPath){
 	// init ignored filenames
 	mIgnoredFilenames.insert(".wh..wh..tmp");
 	mIgnoredFilenames.insert(".wh..wh.plnk");
@@ -39,7 +40,53 @@ bool SyncAufs1::goGetIt() {
 	return true;
 }
 
-bool SyncAufs1::processFoundDirectory(const string &dirPath, const string &filename) {
+bool SyncAufs1::isEditedItem(const string &dirPath, const string &filename) const {
+	return true;
+	
+	// this is a very creepy approach, but just for testing purposes...
+	string overlayPath = getPathToOverlayFile(dirPath, filename);
+	string unionPath = getPathToUnionFile(dirPath, filename);
+	
+	// read the inode 
+	PortableStat64 info;
+	if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
+		return false; // file seems to be inaccessible and therefore not editable
+	}
+	ino_t inode_before = info.st_ino;
+	
+	cout << "inode before: " << inode_before << endl;
+	
+	// rename the file, so that AUFS gives us the underlying file
+	// from the repository
+	rename(overlayPath.c_str(), (overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str());
+	
+	// read the inode again to see if it changed
+	if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
+		cout << errno << endl;
+		return false; // file seems to be inaccessible now and was therefore newly created (even if this should be impossible here)
+	}
+	ino_t inode_after = info.st_ino;
+	
+	cout << "inode after: " << inode_after << endl;
+	
+	// rename back the file to reset the state to the normal one
+	// from the repository
+	rename((overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str(), overlayPath.c_str());
+	
+	if (inode_before == inode_after) cout << "file was edited" << endl; else cout << "file was replaced" << endl;
+	
+	return (inode_before == inode_after);
+}
+
+UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath) {
+	mRepositoryPath = canonical_path(repositoryPath);
+	mOverlayPath = canonical_path(overlayPath);
+	mUnionPath = canonical_path(unionPath);
+}
+
+UnionFilesystemSync::~UnionFilesystemSync() {}
+
+bool UnionFilesystemSync::processFoundDirectory(const string &dirPath, const string &filename) {
 	if (isNewItem(dirPath, filename)) {
 		// everything in a new directory is supposed to be new and can be added without
 		// lots of lookups in the repository --> return false to stop seeking recursion
@@ -53,18 +100,25 @@ bool SyncAufs1::processFoundDirectory(const string &dirPath, const string &filen
 	}
 }
 
-void SyncAufs1::processFoundRegularFile(const string &dirPath, const string &filename) {
+void UnionFilesystemSync::processFoundRegularFile(const string &dirPath, const string &filename) {
 	// process whiteout prefix
 	if (isWhiteoutFilename(filename)) {
 		processWhiteoutEntry(dirPath, filename);
 	} else if (isNewItem(dirPath, filename)) {
 		addRegularFile(dirPath, filename);
 	} else {
-		touchRegularFile(dirPath, filename);
-	}
+		// if a file is overwritten by another file it's inodes will change
+		// on the other hand the an edited file just changes it's contents
+		if (isEditedItem(dirPath, filename)) {
+			touchRegularFile(dirPath, filename);
+		} else {
+			deleteRegularFile(dirPath, filename);
+			addRegularFile(dirPath, filename);
+		}
+	} 
 }
 
-void SyncAufs1::processFoundLink(const string &dirPath, const string &filename) {
+void UnionFilesystemSync::processFoundLink(const string &dirPath, const string &filename) {
 	if (isNewItem(dirPath, filename)) {
 		addLink(dirPath, filename);
 	} else {
@@ -72,11 +126,11 @@ void SyncAufs1::processFoundLink(const string &dirPath, const string &filename) 
 	}
 }
 
-void SyncAufs1::processWhiteoutEntry(const string &dirPath, const string &filename) {
+void UnionFilesystemSync::processWhiteoutEntry(const string &dirPath, const string &filename) {
 	// get the name of the file to be deleted and check its state in the repository
 	string actualFilename = getFilenameFromWhiteout(filename);
 	FileType filetype = getFiletypeInRepository(dirPath, actualFilename);
-	
+
 	switch (filetype) {
 		case FT_DIR:
 			deleteDirectoryRecursively(dirPath, actualFilename);
@@ -92,13 +146,6 @@ void SyncAufs1::processWhiteoutEntry(const string &dirPath, const string &filena
 	}
 }
 
-UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const string &overlayPath) {
-	mRepositoryPath = canonical_path(repositoryPath);
-	mOverlayPath = canonical_path(overlayPath);
-}
-
-UnionFilesystemSync::~UnionFilesystemSync() {}
-
 bool UnionFilesystemSync::isNewItem(const string &dirPath, const string &filename) const {
 	string fullPath = getPathToRepositoryFile(dirPath, filename);
 	PortableStat64 info;
@@ -106,8 +153,6 @@ bool UnionFilesystemSync::isNewItem(const string &dirPath, const string &filenam
 }
 
 void UnionFilesystemSync::deleteDirectoryRecursively(const string &dirPath, const string &filename) {
-	deleteDirectory(dirPath, filename);
-	
 	RecursionEngine<UnionFilesystemSync> recursion(this, mRepositoryPath);
 	
 	recursion.foundRegularFile = &UnionFilesystemSync::deleteRegularFile;
@@ -116,6 +161,8 @@ void UnionFilesystemSync::deleteDirectoryRecursively(const string &dirPath, cons
 	recursion.caresAbout = &UnionFilesystemSync::isInterestingFilename;
 	
 	recursion.recurse(getPathToRepositoryFile(dirPath, filename));
+	
+	deleteDirectory(dirPath, filename);
 }
 
 bool UnionFilesystemSync::deleteDirectory(const string &dirPath, const string &filename) {
@@ -174,6 +221,10 @@ string UnionFilesystemSync::getPathToOverlayFile(const string &dirPath, const st
 	return (dirPath.empty()) ? mOverlayPath + "/" + filename : mOverlayPath + "/" + dirPath + "/" + filename;
 }
 
+string UnionFilesystemSync::getPathToUnionFile(const string &dirPath, const string &filename) const {
+	return (dirPath.empty()) ? mUnionPath + "/" + filename : mUnionPath + "/" + dirPath + "/" + filename;
+}
+
 FileType UnionFilesystemSync::getFiletypeInRepository(const string &dirPath, const string &filename) const {
 	// find the file in the mounted repository and get its file type
 	// TODO: replace this file system stat by a catalog lookup
@@ -183,14 +234,14 @@ FileType UnionFilesystemSync::getFiletypeInRepository(const string &dirPath, con
 
 FileType UnionFilesystemSync::getFileType(const string &path) const {
 	PortableStat64 info;
-   if (portableLinkStat64(path.c_str(), &info) != 0)
-      return FT_ERR;
+	if (portableLinkStat64(path.c_str(), &info) != 0)
+		return FT_ERR;
 
-   if (S_ISDIR(info.st_mode)) return FT_DIR;
-   else if (S_ISREG(info.st_mode)) return FT_REG;
-   else if (S_ISLNK(info.st_mode)) return FT_SYM;
+	if (S_ISDIR(info.st_mode)) return FT_DIR;
+	else if (S_ISREG(info.st_mode)) return FT_REG;
+	else if (S_ISLNK(info.st_mode)) return FT_SYM;
 
-   return FT_ERR;
+	return FT_ERR;
 }
 
 void UnionFilesystemSync::printError(const string &errorMessage) {
@@ -225,7 +276,7 @@ void RecursionEngine<T>::recurse(const string &dirPath) const {
 template <class T>
 void RecursionEngine<T>::doRecursion(const string &dirPath) const {
 	DIR *dip;
-	struct dirent *dit;
+	PortableDirent *dit;
 	string filename, relativePath;
 	
 	// obtain the relative path by cutting away the absolute part
@@ -237,7 +288,7 @@ void RecursionEngine<T>::doRecursion(const string &dirPath) const {
 	}
 	if (enteringDirectory != NULL) (mDelegate->*enteringDirectory)(relativePath);
 
-	while ((dit = readdir(dip)) != NULL) {
+	while ((dit = portableReaddir(dip)) != NULL) {
 		// skip "virtual" directories
 		if (strcmp(dit->d_name, ".") == 0 || strcmp(dit->d_name, "..") == 0) {
 			continue;

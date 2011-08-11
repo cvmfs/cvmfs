@@ -842,8 +842,8 @@ void createChangesetFromChangelog(ifstream &fjournal) {
    cout << no_lines << " lines" << endl;
 }
 
-void createChangesetFromOverlayDirectory(string dir_overlay) {
-	cvmfs::UnionFilesystemSync *worker = new cvmfs::SyncAufs1("/cvmfs", dir_overlay);
+void createChangesetFromOverlayDirectory(string dir_overlay, string dir_shadow) {
+	cvmfs::UnionFilesystemSync *worker = new cvmfs::SyncAufs1("/cvmfs", dir_shadow, dir_overlay);
 	
 	cout << "Traversing copy on write overlay directory... " << endl;
 
@@ -859,7 +859,6 @@ void createChangesetFromOverlayDirectory(string dir_overlay) {
 	reg_add   = myChangeset.reg_add;
 	reg_touch = myChangeset.reg_touch;
 	sym_add   = myChangeset.sym_add;
-	fil_add   = myChangeset.fil_add;
 	fil_rem   = myChangeset.fil_rem;
 	
 	delete worker;
@@ -1021,7 +1020,7 @@ int main(int argc, char **argv) {
    if (useJournal) {
 		createChangesetFromChangelog(fjournal);
    } else if (useOverlay) {
-		createChangesetFromOverlayDirectory(dir_overlay);
+		createChangesetFromOverlayDirectory(dir_overlay, dir_shadow);
    } else {
 		cerr << "no changes in filesystem provided" << endl;
 		return 1;
@@ -1149,6 +1148,7 @@ catalogs_attached:
    cout << "Post-processing file system change log..." << endl;
 
    /* Squeeze out move out paths */
+/* done by AufsSync
    for (set<string>::const_iterator i = move_out.begin(), iEnd = move_out.end();
         i != iEnd; ++i)
    {
@@ -1166,9 +1166,11 @@ catalogs_attached:
       }
    }
    move_out.clear();
+*/
 
          
    /* Process move in paths */
+/* done by AufsSync
    for (set<string>::const_iterator i = move_in.begin(), iEnd = move_in.end();
         i != iEnd; ++i)
    {
@@ -1188,8 +1190,10 @@ catalogs_attached:
       }
    }
    move_in.clear();
+*/
    
    /* Figure out replaced files */
+/* (hopefully) done by AufsSync
    for (set<string>::iterator i = replace_candidate.begin(), iEnd = replace_candidate.end();
         i != iEnd; ++i)
    {
@@ -1200,14 +1204,16 @@ catalogs_attached:
       }
    }
    replace_candidate.clear();
+*/
    
    /* Separate touched new files from touched existing files */
+/* will be done by AufsSync
    for (set<string>::iterator i = reg_touch.begin();
         i != reg_touch.end(); )
    {
 	
       if (get_file_name(*i) == ".cvmfscatalog") {
-         /* Separate new catalog from touched ones (force dirty) */
+         /* Separate new catalog from touched ones (force dirty) 
          const string p = get_parent_path(*i);
          map<string, t_catalog_info>::iterator s = open_catalogs.find(p);
          if (s == open_catalogs.end())
@@ -1229,6 +1235,7 @@ catalogs_attached:
          ++i;
       }
    }
+*/
    
    /* Separate hard links to symlinks from hard links to regular files */
    for (set<string>::const_iterator i = fil_add.begin(), iEnd = fil_add.end();

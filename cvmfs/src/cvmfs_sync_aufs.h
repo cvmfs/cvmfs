@@ -16,7 +16,6 @@ namespace cvmfs {
 		std::set<std::string> reg_add;
 		std::set<std::string> reg_touch;
 		std::set<std::string> sym_add;
-		std::set<std::string> fil_add; ///< We don't know if this is hard link to regular file or hard link to symlink
 		std::set<std::string> fil_rem; ///< We don't know if this is regular file or symlink
 	} Changeset;
 	
@@ -25,15 +24,15 @@ namespace cvmfs {
 	 *  a union filesystem overlay over a mounted CVMFS volume.
 	 */
 	class UnionFilesystemSync {
-	protected:	
-		std::set<std::string> mIgnoredFilenames;
+	protected:
 		std::string mRepositoryPath;
 		std::string mOverlayPath;
+		std::string mUnionPath;
 		
 		Changeset mChangeset;
 		
 	public:
-		UnionFilesystemSync(const std::string &repositoryPath, const std::string &overlayPath);
+		UnionFilesystemSync(const std::string &repositoryPath, const std::string &unionPath, const std::string &overlayPath);
 		virtual ~UnionFilesystemSync();
 		
 		virtual bool goGetIt() = 0;
@@ -47,7 +46,13 @@ namespace cvmfs {
 		 *  @return true if interesting otherwise false
 		 */
 		inline bool isInterestingFilename(const std::string &filename) { return not isIgnoredFilename(filename); }
-		inline bool isIgnoredFilename(const std::string &filename) const { return (mIgnoredFilenames.find(filename) != mIgnoredFilenames.end()); }
+		
+		/**
+		 *  checks if a filename can be ignored while reading out the overlay directory
+		 *  @param filename the filename to check
+		 *  @return true if the file should be ignored otherwise false
+		 */ 
+		virtual bool isIgnoredFilename(const std::string &filename) const = 0;
 		
 		/**
 		 *  checks if given filename (without path) is supposed to be whiteout
@@ -81,6 +86,14 @@ namespace cvmfs {
 		std::string getPathToOverlayFile(const std::string &dirPath, const std::string &filename) const;
 		
 		/**
+		 *  get the absolute path to a file in the union filesystem volume
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename
+		 *  @return the absolute path to the given file in the union filesystem volume
+		 */
+		std::string getPathToUnionFile(const std::string &dirPath, const std::string &filename) const;
+		
+		/**
 		 *  retrieve the file type of a given file
 		 *  @param path the path to the file to check
 		 *  @return the file type of the file
@@ -101,7 +114,47 @@ namespace cvmfs {
 		 *  @param filename the filename
 		 *  @return true if the file is not present in the repository otherwise false
 		 */
-		bool isNewItem(const std::string &dirPath, const std::string &filename) const;
+		virtual bool isNewItem(const std::string &dirPath, const std::string &filename) const;
+		
+		/**
+		 *  checks the inodes of the given file to figure out, if the item was edited
+		 *  or overwritten by another file
+		 *  (virtual, because this may look differently in different union file systems)
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename
+		 *  @return true if the item was edited and false if it appears to be overwritten
+		 */
+		virtual bool isEditedItem(const std::string &dirPath, const std::string &filename) const = 0;
+
+		/**
+		 *  callback method for the main recursion when a regular file is found
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename
+		 */
+		virtual void processFoundRegularFile(const std::string &dirPath, const std::string &filename);
+		
+		/**
+		 *  callback method for the main recursion when a directory is found
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename
+		 *  @return true if recursion should dig into the given directory, false otherwise
+		 */
+		virtual bool processFoundDirectory(const std::string &dirPath, const std::string &filename);
+		
+		/**
+		 *  callback method for the main recursion when a symlink is found
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename
+		 */
+		virtual void processFoundLink(const std::string &dirPath, const std::string &filename);
+		
+		/**
+		 *  union file systems create files indicating, that a specific file of the read only volume
+		 *  should appear as deleted. These files are called whiteout entries and are processed here
+		 *  @param dirPath relative path to directory
+		 *  @param filename name of the whiteout entry file
+		 */
+		virtual void processWhiteoutEntry(const std::string &dirPath, const std::string &filename);
 
 		/**
 		 *  recursively traverses the content of the given directory in the REPOSITORY (!)
@@ -135,34 +188,25 @@ namespace cvmfs {
 	 *  syncing a CVMFS repository by the help of an overlayed AUFS 1.x read-write volume
 	 */
 	class SyncAufs1 :
-	 	public UnionFilesystemSync 
-	{
-		private:	
+	 	public UnionFilesystemSync {
+	private:
+		std::set<std::string> mIgnoredFilenames;
 		std::string mWhiteoutPrefix;
+	
+	public:
+		SyncAufs1(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath);
+		virtual ~SyncAufs1();
 		
-		public:
-			SyncAufs1(const std::string &repositoryPath, const std::string &aufsPath);
-			virtual ~SyncAufs1();
-			
-			bool goGetIt();
-			
-		protected:
-			void processFoundRegularFile(const std::string &dirPath, const std::string &filename);
-			bool processFoundDirectory(const std::string &dirPath, const std::string &filename);
-			void processFoundLink(const std::string &dirPath, const std::string &filename);
-			
-			inline bool isWhiteoutFilename(const std::string &filename) const { return (filename.substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
-			inline std::string getFilenameFromWhiteout(const std::string &filename) const { return filename.substr(mWhiteoutPrefix.length()); }
-			
-		private:
-			/**
-			 *  AUFS creates files indicating, that a specific file of the read only volume
-			 *  should appear as deleted. These files are called whiteout entries
-			 *  @param dirPath relative path to directory
-			 *  @param filename name of the whiteout entry file
-			 *  @return true on success
-			 */
-			void processWhiteoutEntry(const std::string &dirPath, const std::string &filename);
+		bool goGetIt();
+		
+	protected:
+		inline bool isWhiteoutFilename(const std::string &filename) const { return (filename.substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
+		inline std::string getFilenameFromWhiteout(const std::string &filename) const { return filename.substr(mWhiteoutPrefix.length()); }
+		
+		inline bool isIgnoredFilename(const std::string &filename) const { return (mIgnoredFilenames.find(filename) != mIgnoredFilenames.end()); }
+		virtual bool isEditedItem(const std::string &dirPath, const std::string &filename) const;
+		
+	private:
 	};
 	
 	/**
