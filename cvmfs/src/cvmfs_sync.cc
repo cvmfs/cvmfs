@@ -1213,7 +1213,7 @@ catalogs_attached:
    {
 	
       if (get_file_name(*i) == ".cvmfscatalog") {
-         /* Separate new catalog from touched ones (force dirty) 
+         // Separate new catalog from touched ones (force dirty) 
          const string p = get_parent_path(*i);
          map<string, t_catalog_info>::iterator s = open_catalogs.find(p);
          if (s == open_catalogs.end())
@@ -1598,9 +1598,6 @@ catalogs_attached:
       cout << endl;
       
       cout << "Step 5 - Compressing and calculating content hashes ";
-/*
-
-TODO: something wrong here!
 
 #ifdef _OPENMP
       if (sync_threads == 0) {
@@ -1611,20 +1608,18 @@ TODO: something wrong here!
          }
       }
       cout << "using " << sync_threads << " threads ";
-#elif
-
-*/
+#else
       sync_threads = 1;
-//#endif
+#endif
       cout << "(" << file_list.size() << " files): " << flush;
-//#pragma omp parallel for num_threads(sync_threads)
+#pragma omp parallel for num_threads(sync_threads)
       for (int i = 0; i < (int)file_list.size(); ++i) {
          hash::t_sha1 sha1;
          if (move_to_datastore(file_list[i].path, "", dir_data, sha1))
             file_list[i].dirent.checksum = sha1;
          
          if ((i % 1000) == 0) {
-//#pragma omp critical
+#pragma omp critical
             cout << "." << flush;
          }
       }
