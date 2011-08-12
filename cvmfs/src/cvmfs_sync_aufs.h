@@ -175,7 +175,7 @@ namespace cvmfs {
 		void deleteDirectoryRecursively(const std::string &dirPath, const std::string &filename);
 		bool deleteDirectory(const std::string &dirPath, const std::string &filename);
 		void deleteRegularFile(const std::string &dirPath, const std::string &filename);
-		void deleteLink(const std::string &dirPath, const std::string &filename);
+		void deleteSymlink(const std::string &dirPath, const std::string &filename);
 
 		/**
 		 *  recursively traverses the content of the given directory and adds all

@@ -144,7 +144,7 @@ void UnionFilesystemSync::processWhiteoutEntry(const string &dirPath, const stri
 			deleteDirectoryRecursively(dirPath, actualFilename);
 			break;
 		case FT_SYM:
-			deleteLink(dirPath, actualFilename);
+			deleteSymlink(dirPath, actualFilename);
 			break;
 		case FT_REG:
 			deleteRegularFile(dirPath, actualFilename);
@@ -165,7 +165,7 @@ void UnionFilesystemSync::deleteDirectoryRecursively(const string &dirPath, cons
 	
 	recursion.foundRegularFile = &UnionFilesystemSync::deleteRegularFile;
 	recursion.foundDirectory = &UnionFilesystemSync::deleteDirectory;
-	recursion.foundLink = &UnionFilesystemSync::deleteLink;
+	recursion.foundLink = &UnionFilesystemSync::deleteSymlink;
 	recursion.caresAbout = &UnionFilesystemSync::isInterestingFilename;
 	
 	recursion.recurse(getPathToRepositoryFile(dirPath, filename));
@@ -174,15 +174,15 @@ void UnionFilesystemSync::deleteDirectoryRecursively(const string &dirPath, cons
 }
 
 bool UnionFilesystemSync::deleteDirectory(const string &dirPath, const string &filename) {
-	mChangeset.dir_rem.insert(getPathToOverlayFile(dirPath, filename));
+	mChangeset.dir_rem.insert(getPathToUnionFile(dirPath, filename));
 	return true;
 }
 
 void UnionFilesystemSync::deleteRegularFile(const string &dirPath, const string &filename) {
-	mChangeset.fil_rem.insert(getPathToOverlayFile(dirPath, filename));
+	mChangeset.fil_rem.insert(getPathToUnionFile(dirPath, filename));
 }
 
-void UnionFilesystemSync::deleteLink(const string &dirPath, const string &filename) {
+void UnionFilesystemSync::deleteSymlink(const string &dirPath, const string &filename) {
 	deleteRegularFile(dirPath, filename); // indistinguishable
 }
 
