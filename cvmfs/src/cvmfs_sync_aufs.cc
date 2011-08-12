@@ -85,6 +85,7 @@ UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std
 	mRepositoryPath = canonical_path(repositoryPath);
 	mUnionPath = canonical_path(unionPath);
 	mOverlayPath = canonical_path(overlayPath);
+	mCheckSymlinks = false;
 }
 
 UnionFilesystemSync::~UnionFilesystemSync() {}
@@ -256,6 +257,11 @@ FileType UnionFilesystemSync::getFileType(const string &path) const {
 }
 
 bool UnionFilesystemSync::checkSymlink(const string &dirPath, const string &filename) {
+	if (not mCheckSymlinks) {
+		return true;
+	}
+	
+	// checking...
 	string path = getPathToUnionFile(dirPath, filename);
 	string basePath = getPathToUnionFile(dirPath, "");
 	char buf1[255] = {0};

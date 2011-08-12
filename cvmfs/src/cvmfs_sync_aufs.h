@@ -30,6 +30,7 @@ namespace cvmfs {
 		std::string mUnionPath;
 		
 		Changeset mChangeset;
+		bool mCheckSymlinks;
 		
 	public:
 		UnionFilesystemSync(const std::string &repositoryPath, const std::string &unionPath, const std::string &overlayPath);
@@ -72,7 +73,7 @@ namespace cvmfs {
 		/**
 		 *  checks if the given symbolic link points outside of the repository
 		 *  if the link is an absolute path to the repository it will be transformed to
-		 *  a relative path
+		 *  a relative path (only takes place if mCheckSymlinks = true)
 		 *  @param dirPath the relative directory path
 		 *  @param filename the filename
 		 *  @return true if link points to the repository otherwise false
