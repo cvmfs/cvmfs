@@ -156,7 +156,7 @@ namespace cvmfs {
 		 *  @param dirPath the relative directory path
 		 *  @param filename the filename
 		 */
-		virtual void processFoundLink(const std::string &dirPath, const std::string &filename);
+		virtual void processFoundSymlink(const std::string &dirPath, const std::string &filename);
 		
 		/**
 		 *  union file systems create files indicating, that a specific file of the read only volume
@@ -188,7 +188,8 @@ namespace cvmfs {
 		void touchDirectory(const std::string &dirPath, const std::string &filename);
 		void addRegularFile(const std::string &dirPath, const std::string &filename);
 		void touchRegularFile(const std::string &dirPath, const std::string &filename);
-		void addLink(const std::string &dirPath, const std::string &filename);
+		void addSymlink(const std::string &dirPath, const std::string &filename);
+		void touchSymlink(const std::string &dirPath, const std::string &filename);
 		
 		void printWarning(const std::string &warningMessage);
 		void printError(const std::string &errorMessage);
@@ -254,7 +255,7 @@ namespace cvmfs {
 		bool (T::*foundDirectory)(const std::string &dirPath, const std::string &filename);
 		
 		/** message if a link was found */
-		void (T::*foundLink)(const std::string &dirPath, const std::string &filename);
+		void (T::*foundSymlink)(const std::string &dirPath, const std::string &filename);
 		
 	public:
 		RecursionEngine(T *delegate, const std::string &relativeToDirectory);

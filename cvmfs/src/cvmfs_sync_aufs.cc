@@ -33,7 +33,7 @@ bool SyncAufs1::goGetIt() {
 	
 	recursion.foundRegularFile = &SyncAufs1::processFoundRegularFile;
 	recursion.foundDirectory = &SyncAufs1::processFoundDirectory;
-	recursion.foundLink = &SyncAufs1::processFoundLink;
+	recursion.foundSymlink = &SyncAufs1::processFoundSymlink;
 	recursion.caresAbout = &SyncAufs1::isInterestingFilename;
 	
 	recursion.recurse(mOverlayPath);
@@ -121,14 +121,14 @@ void UnionFilesystemSync::processFoundRegularFile(const string &dirPath, const s
 	} 
 }
 
-void UnionFilesystemSync::processFoundLink(const string &dirPath, const string &filename) {
+void UnionFilesystemSync::processFoundSymlink(const string &dirPath, const string &filename) {
 	if (not checkSymlink(dirPath, filename)) {
 		printWarning("found symbolic link pointing outside of repository... skipping that");
 		return;
 	}
 	
 	if (isNewItem(dirPath, filename)) {
-		addLink(dirPath, filename);
+		addSymlink(dirPath, filename);
 	} else {
 		touchRegularFile(dirPath, filename);
 	}
@@ -165,7 +165,7 @@ void UnionFilesystemSync::deleteDirectoryRecursively(const string &dirPath, cons
 	
 	recursion.foundRegularFile = &UnionFilesystemSync::deleteRegularFile;
 	recursion.foundDirectory = &UnionFilesystemSync::deleteDirectory;
-	recursion.foundLink = &UnionFilesystemSync::deleteSymlink;
+	recursion.foundSymlink = &UnionFilesystemSync::deleteSymlink;
 	recursion.caresAbout = &UnionFilesystemSync::isInterestingFilename;
 	
 	recursion.recurse(getPathToRepositoryFile(dirPath, filename));
@@ -193,7 +193,7 @@ void UnionFilesystemSync::addDirectoryRecursively(const string &dirPath, const s
 	
 	recursion.foundRegularFile = &UnionFilesystemSync::addRegularFile;
 	recursion.foundDirectory = &UnionFilesystemSync::addDirectory;
-	recursion.foundLink = &UnionFilesystemSync::addLink;
+	recursion.foundSymlink = &UnionFilesystemSync::addSymlink;
 	recursion.caresAbout = &UnionFilesystemSync::isInterestingFilename;
 	
 	recursion.recurse(getPathToOverlayFile(dirPath, filename));
@@ -216,8 +216,12 @@ void UnionFilesystemSync::touchRegularFile(const string &dirPath, const string &
 	mChangeset.reg_touch.insert(getPathToUnionFile(dirPath, filename));
 }
 
-void UnionFilesystemSync::addLink(const string &dirPath, const string &filename) {
+void UnionFilesystemSync::addSymlink(const string &dirPath, const string &filename) {
 	mChangeset.sym_add.insert(getPathToUnionFile(dirPath, filename));
+}
+
+void UnionFilesystemSync::touchSymlink(const string &dirPath, const string &filename) {
+	touchRegularFile(dirPath, filename); // indistinguishable
 }
 
 string UnionFilesystemSync::getPathToRepositoryFile(const string &dirPath, const string &filename) const { 
@@ -302,12 +306,12 @@ RecursionEngine<T>::RecursionEngine(T *delegate, const string &relativeToDirecto
 	caresAbout = NULL;
 	foundRegularFile = NULL;
 	foundDirectory = NULL;
-	foundLink = NULL;
+	foundSymlink = NULL;
 }
 
 template <class T>
 void RecursionEngine<T>::recurse(const string &dirPath) const {
-	assert(enteringDirectory != NULL || leavingDirectory != NULL || caresAbout != NULL || foundRegularFile != NULL || foundDirectory != NULL || foundLink != NULL);
+	assert(enteringDirectory != NULL || leavingDirectory != NULL || caresAbout != NULL || foundRegularFile != NULL || foundDirectory != NULL || foundSymlink != NULL);
 	assert(mRelativeToDirectory.length() == 0 || dirPath.substr(0, mRelativeToDirectory.length()) == mRelativeToDirectory);
 	
 	doRecursion(dirPath);
@@ -351,7 +355,7 @@ void RecursionEngine<T>::doRecursion(const string &dirPath) const {
 				if (foundRegularFile != NULL) (mDelegate->*foundRegularFile)(relativePath, filename);
 				break;
 			case DT_LNK:
-				if (foundLink != NULL) (mDelegate->*foundLink)(relativePath, filename);
+				if (foundSymlink != NULL) (mDelegate->*foundSymlink)(relativePath, filename);
 				break;
 		}
 	}
