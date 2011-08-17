@@ -1,7 +1,6 @@
 #include "cvmfs_sync_aufs.h"
 
 #include "util.h"
-#include "compat.h"
 
 #include <iostream> // remove later
 #include <dirent.h>
@@ -9,6 +8,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sstream>
 
 using namespace cvmfs;
 using namespace std;
@@ -42,43 +42,47 @@ bool SyncAufs1::goGetIt() {
 }
 
 bool SyncAufs1::isEditedItem(const string &dirPath, const string &filename) const {
-	return true;
+	return false; // at the moment there is no way to distinguish between overwritten
+	              // and edited files... we are assuming every file to be overwritten
+	              // this breaks inode persistency, but we have to live with that atm
+}
 
-	// to be implemented...
+void SyncAufs1::copyUpHardlinks(const std::string &dirPath, const std::string &filename) {
+	// get inode of file
+	unsigned int inode = statFileInUnionVolume(dirPath, filename).st_ino;
 	
-	// // this is a very creepy approach, but just for testing purposes...
-	// string overlayPath = getPathToOverlayFile(dirPath, filename);
-	// string unionPath = getPathToUnionFile(dirPath, filename);
-	// 
-	// // read the inode 
-	// PortableStat64 info;
-	// if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
-	// 	return false; // file seems to be inaccessible and therefore not editable
-	// }
-	// ino_t inode_before = info.st_ino;
-	// 
-	// cout << "inode before: " << inode_before << endl;
-	// 
-	// // rename the file, so that AUFS gives us the underlying file
-	// // from the repository
-	// rename(overlayPath.c_str(), (overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str());
-	// 
-	// // read the inode again to see if it changed
-	// if (portableLinkStat64(unionPath.c_str(), &info) != 0) {
-	// 	cout << errno << endl;
-	// 	return false; // file seems to be inaccessible now and was therefore newly created (even if this should be impossible here)
-	// }
-	// ino_t inode_after = info.st_ino;
-	// 
-	// cout << "inode after: " << inode_after << endl;
-	// 
-	// // rename back the file to reset the state to the normal one
-	// // from the repository
-	// rename((overlayPath + ".tmp.aufs.trick.hastenichtgesehn").c_str(), overlayPath.c_str());
-	// 
-	// if (inode_before == inode_after) cout << "file was edited" << endl; else cout << "file was replaced" << endl;
-	// 
-	// return (inode_before == inode_after);
+	// go through directory and search for the same inode
+	string pathToDirectory = getPathToUnionFile(dirPath, "");
+	DIR *dip;
+	PortableDirent *dit;
+	string filenameInDirectory;
+	unsigned int inodeInDirectory;
+	if ((dip = opendir(pathToDirectory.c_str())) == NULL) {
+		return;
+	}
+	
+	// create a hardlink group which is created at once in the end
+	HardlinkGroup hardlinks;
+	hardlinks.masterFile = getPathToUnionFile(dirPath, filename);
+	
+	while ((dit = portableReaddir(dip)) != NULL) {
+		filenameInDirectory = dit->d_name;
+		inodeInDirectory = statFileInUnionVolume(dirPath, filenameInDirectory).st_ino;
+		
+		if (inodeInDirectory == inode) {
+			// the complete group of hardlinks will be replaced
+			// old ones are deleted and afterwards the complete group is recreated
+			if (not isNewItem(dirPath, filenameInDirectory)) {
+				deleteRegularFile(dirPath, filenameInDirectory);
+			}
+			hardlinks.hardlinks.push_back(getPathToUnionFile(dirPath, filenameInDirectory));
+		}
+	}
+	
+	closedir(dip);
+	
+	// the hardlink group is built up and will be recreated
+	addHardlinkGroup(hardlinks);
 }
 
 UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath) {
@@ -108,16 +112,26 @@ void UnionFilesystemSync::processFoundRegularFile(const string &dirPath, const s
 	// process whiteout prefix
 	if (isWhiteoutFilename(filename)) {
 		processWhiteoutEntry(dirPath, filename);
-	} else if (isNewItem(dirPath, filename)) {
-		addRegularFile(dirPath, filename);
+		
+	// process hardlink
+	} else if (statFileInUnionVolume(dirPath, filename).st_nlink > 1) {
+		// there must be hard links which has to be updated as well
+		// (currently hardlinks are only supported in the same directory)
+		copyUpHardlinks(dirPath, filename);
+		
+	// process normal file
 	} else {
-		// if a file is overwritten by another file it's inodes will change
-		// on the other hand the an edited file just changes it's contents
-		if (isEditedItem(dirPath, filename)) {
-			touchRegularFile(dirPath, filename);
-		} else {
-			deleteRegularFile(dirPath, filename);
+		if (isNewItem(dirPath, filename)) {
 			addRegularFile(dirPath, filename);
+		} else {
+			// if a file is overwritten by another file it's inodes will change
+			// on the other hand an edited file just changes it's contents
+			if (isEditedItem(dirPath, filename)) {
+				touchRegularFile(dirPath, filename);
+			} else {
+				deleteRegularFile(dirPath, filename);
+				addRegularFile(dirPath, filename);
+			}
 		}
 	} 
 }
@@ -153,6 +167,20 @@ void UnionFilesystemSync::processWhiteoutEntry(const string &dirPath, const stri
 		default:
 			printError("cannot process whiteout entry in AUFS overlay volume");
 	}
+}
+
+PortableStat64 UnionFilesystemSync::statFileInUnionVolume(const std::string &dirPath, const std::string filename) const {
+	string path = getPathToUnionFile(dirPath, filename);
+
+	PortableStat64 info;
+	if (portableFileStat64(path.c_str(), &info) != 0) {
+		stringstream ss;
+		ss << "could not stat file " << path;
+		printWarning(ss.str());
+		return info;
+	}
+
+	return info;
 }
 
 bool UnionFilesystemSync::isNewItem(const string &dirPath, const string &filename) const {
@@ -225,6 +253,21 @@ void UnionFilesystemSync::touchSymlink(const string &dirPath, const string &file
 	touchRegularFile(dirPath, filename); // indistinguishable
 }
 
+void UnionFilesystemSync::addHardlinkGroup(const HardlinkGroup hardlinks) {
+	cout << "Hardlink Group added" << endl;
+	cout << "master file: " << hardlinks.masterFile << endl;
+	cout << "hardlinks: " << endl;
+	
+	list<string>::const_iterator begin, end;
+	begin = hardlinks.hardlinks.begin();
+	end = hardlinks.hardlinks.end();
+	for (; begin != end; begin++) {
+		cout << *begin << endl;
+	}
+	
+	mChangeset.hardlink_add.push_back(hardlinks);
+}
+
 string UnionFilesystemSync::getPathToRepositoryFile(const string &dirPath, const string &filename) const { 
 	return (dirPath.empty()) ? mRepositoryPath + "/" + filename : mRepositoryPath + "/" + dirPath + "/" + filename;
 }
@@ -294,11 +337,11 @@ bool UnionFilesystemSync::checkSymlink(const string &dirPath, const string &file
 	return true;
 }
 
-void UnionFilesystemSync::printError(const string &errorMessage) {
+void UnionFilesystemSync::printError(const string &errorMessage) const {
 	cerr << "ERROR: " << errorMessage << endl;
 }
 
-void UnionFilesystemSync::printWarning(const string &warningMessage) {
+void UnionFilesystemSync::printWarning(const string &warningMessage) const {
 	cerr << "Warning: " << warningMessage << endl;
 }
 

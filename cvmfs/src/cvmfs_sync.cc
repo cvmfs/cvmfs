@@ -32,6 +32,7 @@
 #include <iostream>
 #include <sstream>
 #include <set>
+#include <list>
 #include <vector>
 #include <map>
 #include <cstdio>
@@ -96,6 +97,7 @@ struct t_catalog_info {
 
 struct t_cas_file {
    string path;
+   string hardlinkMaster;
    hash::t_md5 md5_path;
    hash::t_md5 md5_parent;
    catalog::t_dirent dirent;
@@ -110,6 +112,7 @@ set<string> move_out;
 set<string> dir_add;
 set<string> dir_touch;
 set<string> dir_rem;
+list<cvmfs::HardlinkGroup> hardlink_add;
 set<string> reg_add;
 set<string> reg_touch; ///< might be add if file is opened with O_CREAT
 set<string> sym_add;
@@ -340,7 +343,7 @@ static bool init_catalogs(const string &dir_catalogs, const string &dir_shadow,
       if (!get_file_info(dir_shadow, &info))
          return false;
       
-      d = catalog::t_dirent(0, "", "", catalog::DIR, info.st_ino, info.st_mode, info.st_size, 
+      d = catalog::t_dirent(0, "", "", catalog::DIR, catalog::get_next_free_inode(), info.st_mode, info.st_size, 
                             info.st_mtime, hash::t_sha1());
       if (!catalog::insert(rhash, hash::t_md5(), d)) {
          cerr << "could not insert root hash" << endl;
@@ -853,13 +856,14 @@ void createChangesetFromOverlayDirectory(string dir_overlay, string dir_shadow) 
 	
 	cvmfs::Changeset myChangeset = worker->getChangeset();
 	
-	dir_add   = myChangeset.dir_add;
-	dir_touch = myChangeset.dir_touch;
-	dir_rem   = myChangeset.dir_rem;
-	reg_add   = myChangeset.reg_add;
-	reg_touch = myChangeset.reg_touch;
-	sym_add   = myChangeset.sym_add;
-	fil_rem   = myChangeset.fil_rem;
+	dir_add        = myChangeset.dir_add;
+	dir_touch      = myChangeset.dir_touch;
+	dir_rem        = myChangeset.dir_rem;
+	reg_add        = myChangeset.reg_add;
+	reg_touch      = myChangeset.reg_touch;
+	hardlink_add   = myChangeset.hardlink_add;
+	sym_add        = myChangeset.sym_add;
+	fil_rem        = myChangeset.fil_rem;
 	
 	delete worker;
 }
@@ -1400,7 +1404,7 @@ catalogs_attached:
             hash::t_md5 p_md5(catalog::mangled_path(get_parent_path(clg_path)));
             if (!catalog::lookup_unprotected(md5, d)) {
                if (catalog::lookup_unprotected(p_md5, d)) {
-                  catalog::t_dirent new_d(d.catalog_id, get_file_name(clg_path), "", catalog::DIR, info.st_ino, info.st_mode, 
+                  catalog::t_dirent new_d(d.catalog_id, get_file_name(clg_path), "", catalog::DIR, catalog::get_next_free_inode(), info.st_mode, 
                                           info.st_size, info.st_mtime, hash::t_sha1());
                   if (S_ISLNK(info.st_mode)) {
                      new_d.flags = catalog::FILE | catalog::FILE_LINK;
@@ -1452,7 +1456,7 @@ catalogs_attached:
          if (get_file_info(*i, &info)) {
             hash::t_md5 md5(catalog::mangled_path(clg_path));
             if (catalog::lookup_unprotected(md5, d)) {
-               d.inode = info.st_ino;
+//               d.inode = info.st_ino; // should not be updated to something coming from the file system!
                d.mode = info.st_mode;
                d.size = info.st_size;
                d.mtime = info.st_mtime;
@@ -1561,10 +1565,21 @@ catalogs_attached:
       cout << "Step 4 - Building file list " 
            << "(" << reg_add.size() + reg_touch.size() << " entries): " << flush;
       count = 0;
-      set<string>::const_iterator iZip = reg_add.empty() ? reg_touch.begin() : reg_add.begin();
+
+      bool touching = false;
+      set<string>::const_iterator iZip;
+		if (reg_add.empty()) {
+			iZip = reg_touch.begin();
+			touching = true;
+		} else {
+			iZip = reg_add.begin();
+			touching = false;
+		}
       const set<string>::const_iterator iEndRegAdd = reg_add.end();
       const set<string>::const_iterator iEndRegTouch = reg_touch.end();
       vector<t_cas_file> file_list;
+      uint64_t inode;
+
       while (iZip != iEndRegTouch) {
          const string clg_path = abs2clg_path(*iZip, dir_shadow);
          hash::t_md5 p_md5(catalog::mangled_path(get_parent_path(clg_path)));
@@ -1577,8 +1592,9 @@ catalogs_attached:
                file.path = *iZip;
                file.md5_path = hash::t_md5(catalog::mangled_path(clg_path));
                file.md5_parent = p_md5;
+               inode = (touching) ? d_parent.inode : catalog::get_next_free_inode();
                file.dirent = catalog::t_dirent(d_parent.catalog_id, get_file_name(*iZip), "", catalog::FILE,
-                                               info.st_ino, info.st_mode, info.st_size, info.st_mtime, hash::t_sha1());
+                                               inode, info.st_mode, info.st_size, info.st_mtime, hash::t_sha1());
                file_list.push_back(file);
             } else {
                cerr << "Warning: could not stat " << *iZip << endl;
@@ -1589,15 +1605,56 @@ catalogs_attached:
          
          if ((count % 1000) == 0) cout << "." << flush;
          ++count;
-         if (++iZip == iEndRegAdd) iZip = reg_touch.begin();
+         if (++iZip == iEndRegAdd) {
+			iZip = reg_touch.begin();
+			touching = true;
+		}
          
          add_path_with_parent(get_parent_path(clg_path), prels);
       }
       reg_add.clear();
       reg_touch.clear();
       cout << endl;
+
+		cout << "Step 5 - Maintaining hardlink groups" << endl;
+		list<cvmfs::HardlinkGroup>::const_iterator iHLG = hardlink_add.begin();
+		const list<cvmfs::HardlinkGroup>::const_iterator endHLG = hardlink_add.end();
+		for (; iHLG != endHLG; ++iHLG) {
+			const cvmfs::HardlinkGroup *currentGroup = &(*iHLG);
+			
+			// get unique inode for a hardlink group
+			uint64_t inode = catalog::get_next_free_inode();
+			
+			// go through the hardlink group
+			list<string>::const_iterator iHL = currentGroup->hardlinks.begin();
+			const list<string>::const_iterator endHL = currentGroup->hardlinks.end();
+			for (; iHL != endHL; ++iHL) {
+				const string clg_path = abs2clg_path(*iHL, dir_shadow);
+		         hash::t_md5 p_md5(catalog::mangled_path(get_parent_path(clg_path)));
+		         catalog::t_dirent d_parent;
+
+		         /* Find parent entry */
+		         if (catalog::lookup_unprotected(p_md5, d_parent)) {
+		            if (get_file_info(*iHL, &info)) {
+		               t_cas_file file;
+		               file.path = *iHL;
+						file.hardlinkMaster = currentGroup->masterFile;
+		               file.md5_path = hash::t_md5(catalog::mangled_path(clg_path));
+		               file.md5_parent = p_md5;
+		               file.dirent = catalog::t_dirent(d_parent.catalog_id, get_file_name(*iHL), "", catalog::FILE,
+		                                               inode, info.st_mode, info.st_size, info.st_mtime, hash::t_sha1());
+		               file_list.push_back(file);
+		            } else {
+		               cerr << "Warning: could not stat " << *iHL << endl;
+		            }
+		         } else {
+		            cerr << "Warning: dangling file entry " << *iHL << endl;
+		         }
+			}
+		}
+			
       
-      cout << "Step 5 - Compressing and calculating content hashes ";
+      cout << "Step 6 - Compressing and calculating content hashes ";
 
 #ifdef _OPENMP
       if (sync_threads == 0) {
@@ -1615,7 +1672,9 @@ catalogs_attached:
 #pragma omp parallel for num_threads(sync_threads)
       for (int i = 0; i < (int)file_list.size(); ++i) {
          hash::t_sha1 sha1;
-         if (move_to_datastore(file_list[i].path, "", dir_data, sha1))
+		string path;
+		path = (file_list[i].hardlinkMaster.empty()) ? file_list[i].path : file_list[i].hardlinkMaster;
+         if (move_to_datastore(path, "", dir_data, sha1))
             file_list[i].dirent.checksum = sha1;
          
          if ((i % 1000) == 0) {
@@ -1625,7 +1684,7 @@ catalogs_attached:
       }
       cout << endl;
       
-      cout << "Step 6 - Updating file catalogs " 
+      cout << "Step 7 - Updating file catalogs " 
            << "(" << file_list.size() << " files): " << flush;
       for (unsigned i = 0; i < file_list.size(); ++i) {
          if ((i % 1000) == 0) cout << "." << flush;
@@ -1661,7 +1720,7 @@ catalogs_attached:
       
       /* Pre-calculate direcotry listings */
       if (mucatalogs) {
-         cout << "Step 7 - Updating pre-calculated directory listings "
+         cout << "Step 8 - Updating pre-calculated directory listings "
               << "(" << prels.size() << " directories): " << flush;
          /* Sorted from child to parent directories */
          count = 0;

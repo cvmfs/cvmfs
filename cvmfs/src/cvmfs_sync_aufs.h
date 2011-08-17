@@ -3,11 +3,17 @@
 
 #include <string>
 #include <set>
+#include <list>
 
-
+#include "compat.h"
 
 namespace cvmfs {
 	enum FileType {FT_DIR, FT_REG, FT_SYM, FT_ERR};
+	
+	typedef struct {
+		std::string masterFile;
+		std::list<std::string> hardlinks;
+	} HardlinkGroup;
 	
 	typedef struct {
 		std::set<std::string> dir_add;
@@ -15,6 +21,7 @@ namespace cvmfs {
 		std::set<std::string> dir_rem;
 		std::set<std::string> reg_add;
 		std::set<std::string> reg_touch;
+		std::list<HardlinkGroup> hardlink_add;
 		std::set<std::string> sym_add;
 		std::set<std::string> fil_rem; ///< We don't know if this is regular file or symlink
 	} Changeset;
@@ -62,6 +69,14 @@ namespace cvmfs {
 		 *  @return true if filename seems to be whiteout otherwise false
 		 */
 		virtual bool isWhiteoutFilename(const std::string &filename) const = 0;
+		
+		/**
+		 *  get the hardlink count of a file
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename to check
+		 *  @return the number of hardlinks to the inode of the given file
+		 */
+		PortableStat64 statFileInUnionVolume(const std::string &dirPath, const std::string filename) const;
 		
 		/**
 		 *  retrieves the filename of the marked deleted file in the repository
@@ -168,6 +183,15 @@ namespace cvmfs {
 		virtual void processWhiteoutEntry(const std::string &dirPath, const std::string &filename);
 
 		/**
+		 *  goes through the current directory and searches for hardlinks of the given file
+		 *  found entries are added to a hardlink group and will be updated together
+		 *  this keeps hardlink semantic after synching but may change the inode number of the group
+		 *  @param dirPath the relative directory path
+		 *  @param filename the filename which defines the new inode 'content'
+		 */
+		virtual void copyUpHardlinks(const std::string &dirPath, const std::string &filename) = 0;
+
+		/**
 		 *  recursively traverses the content of the given directory in the REPOSITORY (!)
 		 *  for every found entry the according deletion method is called
 		 *  @param dirPath the relative directory path
@@ -191,9 +215,10 @@ namespace cvmfs {
 		void touchRegularFile(const std::string &dirPath, const std::string &filename);
 		void addSymlink(const std::string &dirPath, const std::string &filename);
 		void touchSymlink(const std::string &dirPath, const std::string &filename);
+		void addHardlinkGroup(const HardlinkGroup hardlinks);
 		
-		void printWarning(const std::string &warningMessage);
-		void printError(const std::string &errorMessage);
+		void printWarning(const std::string &warningMessage) const;
+		void printError(const std::string &errorMessage) const;
 	};
 	
 	/**
@@ -214,9 +239,12 @@ namespace cvmfs {
 	protected:
 		inline bool isWhiteoutFilename(const std::string &filename) const { return (filename.substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
 		inline std::string getFilenameFromWhiteout(const std::string &filename) const { return filename.substr(mWhiteoutPrefix.length()); }
+		int getHardlinkCount(const std::string &dirPath, const std::string filename) const;
 		
 		inline bool isIgnoredFilename(const std::string &filename) const { return (mIgnoredFilenames.find(filename) != mIgnoredFilenames.end()); }
 		virtual bool isEditedItem(const std::string &dirPath, const std::string &filename) const;
+		
+		void copyUpHardlinks(const std::string &dirPath, const std::string &filename);
 		
 	private:
 	};

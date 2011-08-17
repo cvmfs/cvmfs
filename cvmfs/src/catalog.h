@@ -70,6 +70,7 @@ namespace catalog {
    bool set_root_prefix(const std::string &r_prefix, const unsigned cat_id);
    std::string get_root_prefix();
    std::string get_root_prefix_specific(const unsigned cat_id);
+   uint64_t get_next_free_inode();
    std::string mangled_path(const std::string &path);
    uint64_t get_revision(); /* Lock this manually */
    bool inc_revision(const int cat_id); /* Lock this manually */

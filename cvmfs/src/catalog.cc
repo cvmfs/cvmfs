@@ -215,6 +215,9 @@ namespace catalog {
          const string sql_schema = "INSERT OR REPLACE INTO properties (key, value) VALUES ('schema', '1.2');";
          if (!sql_exec(db[cat_id], sql_schema))
             return false;   
+         const string sql_nextInode = "INSERT OR REPLACE INTO properties (key, value) VALUES ('next_inode', 1);";
+         if (!sql_exec(db[cat_id], sql_nextInode))
+            return false;
       }
    
       return true;
@@ -268,6 +271,46 @@ namespace catalog {
       
       return result;
    }
+
+	/**
+	 *  Gets the next inode to use for inserted file
+	 *
+	 *  \return next free inode number
+	 */
+	uint64_t get_next_free_inode() {
+		enforce_mem_limit();
+		
+		char *strResult;
+		uint64_t result;
+		const string sqlRead = "SELECT value FROM properties WHERE key='next_inode';";
+		sqlite3_stmt *stmt;
+		sqlite3_prepare_v2(db[0], sqlRead.c_str(), -1, &stmt, NULL);
+		int err = sqlite3_step(stmt);
+		if (err == SQLITE_ROW) {
+			strResult = (char *)sqlite3_column_text(stmt, 0);
+			result = strtoll(strResult, NULL, 10);
+		} else {
+			cout << "no entry" << endl;
+			
+			result = 1; // there was non... start at beginnning	and create an entry
+			const string sqlInsert = "INSERT OR REPLACE INTO properties (key, value) VALUES ('next_inode', '1');";
+			if (not sql_exec(db[0], sqlInsert)) {
+		         pmesg(D_CATALOG, "Cannot create next_inode property in root catalog");
+			}
+		}
+		
+		sqlite3_finalize(stmt);
+		
+		stringstream sqlUpdate;
+		sqlUpdate << "UPDATE properties SET value='" << (result + 1) << "' WHERE key='next_inode';";
+		if(not sql_exec(db[0], sqlUpdate.str())) {
+	         pmesg(D_CATALOG, "Cannot update next_inode property in root catalog");
+		}
+		
+		cout << "Free inode: " << result << endl;
+		
+		return result;
+	}
    
    
    /**
