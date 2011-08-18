@@ -25,9 +25,39 @@ namespace catalog {
    const int FILE_LINK = 8;
    const int FILE_STAT = 16;
    const int FILE_CHUNK = 64;
-   
+   const int NLINK_COUNT_0 = 128; // 8 bit for link count of file
+   const int NLINK_COUNT_1 = 256;
+   const int NLINK_COUNT_2 = 512;
+   const int NLINK_COUNT_3 = 1024;
+   const int NLINK_COUNT_4 = 2048;
+   const int NLINK_COUNT_5 = 4096;
+   const int NLINK_COUNT_6 = 8192;
+   const int NLINK_COUNT_7 = 16384;
+   const int NLINK_COUNT = NLINK_COUNT_0 | NLINK_COUNT_1 | NLINK_COUNT_2 | NLINK_COUNT_3 | NLINK_COUNT_4 | NLINK_COUNT_5 | NLINK_COUNT_6 | NLINK_COUNT_7;
+
+	/**
+	 *  saves the linkcount into the reserved 8-Bit area of the flags bitmap
+	 *  !! the flags bitmap is not changed, but a new bitmap is returned !!
+	 *  @param flags a pointer to the flags bitmap
+	 *  @param linkcount the linkcount to be saved
+	 *  @return the bitmap
+	 */
+	inline unsigned int setLinkcountInFlags(const unsigned int flags, const unsigned char linkcount) {
+		unsigned int cleanFlags = (flags & catalog::NLINK_COUNT) ^ flags; // zero the designated area
+		return cleanFlags | ((linkcount * catalog::NLINK_COUNT_0) & NLINK_COUNT);
+	}
+
+	/**
+	 *  retrieves the linkcount from the 8-Bit area of the flags bitmap
+	 *  @param flags a pointer to the flags bitmap
+	 *  @return the linkcount of the file belonging to the given flags
+	 */
+	inline unsigned char getLinkcountInFlags(const unsigned int flags) {
+		return (flags & NLINK_COUNT) / NLINK_COUNT_0;
+	}
+	
    struct t_dirent {
-      t_dirent() : catalog_id(0), flags(0), inode(0), mode(0), size(0), mtime(0) {}
+      t_dirent() : catalog_id(0), flags(setLinkcountInFlags(0, 1)), inode(0), mode(0), size(0), mtime(0) {}
       t_dirent(const int cat_id,
                const std::string &n, 
                const std::string &sym, 
@@ -37,7 +67,13 @@ namespace catalog {
                const uint64_t s, 
                const time_t t, 
                const hash::t_sha1 &c) : 
-                   catalog_id(cat_id), flags(f), inode(ino), mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {}
+                   catalog_id(cat_id), flags(f), inode(ino),  mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {
+	
+						// the linkcount defaults to 1 !!
+						if (getLinkcountInFlags(f) == 0) {
+							flags = setLinkcountInFlags(f, 1);
+						}
+				}
 
       int catalog_id;
       int flags;

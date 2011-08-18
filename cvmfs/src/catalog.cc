@@ -1903,7 +1903,7 @@ namespace catalog {
       s->st_dev = 1;
       s->st_ino = inode;
       s->st_mode = mode;
-      s->st_nlink = 1;
+      s->st_nlink = getLinkcountInFlags(flags);
       s->st_uid = uid;
       s->st_gid = gid;
       s->st_rdev = 1;

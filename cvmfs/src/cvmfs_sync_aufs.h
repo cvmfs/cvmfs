@@ -4,6 +4,7 @@
 #include <string>
 #include <set>
 #include <list>
+#include <map>
 
 #include "compat.h"
 
@@ -21,7 +22,7 @@ namespace cvmfs {
 		std::set<std::string> dir_rem;
 		std::set<std::string> reg_add;
 		std::set<std::string> reg_touch;
-		std::list<HardlinkGroup> hardlink_add;
+		std::map<uint64_t, HardlinkGroup> hardlink_add;
 		std::set<std::string> sym_add;
 		std::set<std::string> fil_rem; ///< We don't know if this is regular file or symlink
 	} Changeset;
@@ -190,6 +191,13 @@ namespace cvmfs {
 		 *  @param filename the filename which defines the new inode 'content'
 		 */
 		virtual void copyUpHardlinks(const std::string &dirPath, const std::string &filename) = 0;
+		
+		/**
+		 *  find the hardlink group describing the given union volume inode hardlinks
+		 *  @inode union volume inode to look for
+		 *  @return true if hardlink group exists, false otherwise
+		 */
+		inline bool hardlinkGroupWithUnionInodeExists(uint64_t inode) const { return mChangeset.hardlink_add.find(inode) != mChangeset.hardlink_add.end(); }
 
 		/**
 		 *  recursively traverses the content of the given directory in the REPOSITORY (!)
@@ -215,7 +223,7 @@ namespace cvmfs {
 		void touchRegularFile(const std::string &dirPath, const std::string &filename);
 		void addSymlink(const std::string &dirPath, const std::string &filename);
 		void touchSymlink(const std::string &dirPath, const std::string &filename);
-		void addHardlinkGroup(const HardlinkGroup hardlinks);
+		void addHardlinkGroup(const HardlinkGroup hardlinks, uint64_t unionInode);
 		
 		void printWarning(const std::string &warningMessage) const;
 		void printError(const std::string &errorMessage) const;

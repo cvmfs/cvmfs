@@ -861,11 +861,30 @@ void createChangesetFromOverlayDirectory(string dir_overlay, string dir_shadow) 
 	dir_rem        = myChangeset.dir_rem;
 	reg_add        = myChangeset.reg_add;
 	reg_touch      = myChangeset.reg_touch;
-	hardlink_add   = myChangeset.hardlink_add;
+	map<uint64_t, cvmfs::HardlinkGroup>::const_iterator i,end;
+	for (i = myChangeset.hardlink_add.begin(), end = myChangeset.hardlink_add.end(); i != end; ++i) {
+		hardlink_add.push_back(i->second);
+	}
 	sym_add        = myChangeset.sym_add;
 	fil_rem        = myChangeset.fil_rem;
 	
 	delete worker;
+}
+
+/**
+ *  just a debugging function
+ *  simply prints the given bitmap as bitmap to stdout
+ *  @param bitmap a pointer to the bitmap to print
+ */
+static void printBitmap(const unsigned int *bitmap) {
+	unsigned int mask = 1 << (sizeof(int) * 8 - 1);
+	
+	for (int i = sizeof(int) * 8 - 1; i >= 0; --i) {
+		int bit = 0;
+		if ((*bitmap & mask) != 0) bit = 1;
+		mask = mask >> 1;
+		cout << bit;
+	}
 }
 
 static void usage() {
@@ -1240,6 +1259,7 @@ catalogs_attached:
       }
    }
 */
+
    
    /* Separate hard links to symlinks from hard links to regular files */
    for (set<string>::const_iterator i = fil_add.begin(), iEnd = fil_add.end();
@@ -1300,6 +1320,18 @@ catalogs_attached:
             set_dirty(*j);
          }
       }
+
+		list<cvmfs::HardlinkGroup>::const_iterator iHLG = hardlink_add.begin();
+		const list<cvmfs::HardlinkGroup>::const_iterator endHLG = hardlink_add.end();
+		for (; iHLG != endHLG; ++iHLG) {
+			const cvmfs::HardlinkGroup *currentGroup = &(*iHLG);
+			
+			list<string>::const_iterator iHL = currentGroup->hardlinks.begin();
+			const list<string>::const_iterator endHL = currentGroup->hardlinks.end();
+			for (; iHL != endHL; ++iHL) {
+				set_dirty(*iHL);
+			}
+		}
    }
 
    /* Everything collected, print change sets */
@@ -1623,7 +1655,19 @@ catalogs_attached:
 			const cvmfs::HardlinkGroup *currentGroup = &(*iHLG);
 			
 			// get unique inode for a hardlink group
+			// JUST FOR TESTING we save the link count in the upper 8 bit of the inode
 			uint64_t inode = catalog::get_next_free_inode();
+			
+			// save the linkcount (we only have 8 bit for that!)
+			int linkcount = currentGroup->hardlinks.size();
+			if (linkcount > 255) {
+				cerr << "Warning: linkcount of a hardlink group is greater than 255 (" << linkcount << ") " << currentGroup->masterFile << endl;
+			}
+			unsigned int flags = catalog::FILE;
+			flags = catalog::setLinkcountInFlags(flags, (char)linkcount);
+			
+			printBitmap(&flags);
+			cout << endl << catalog::getLinkcountInFlags(flags) << endl;
 			
 			// go through the hardlink group
 			list<string>::const_iterator iHL = currentGroup->hardlinks.begin();
@@ -1641,7 +1685,7 @@ catalogs_attached:
 						file.hardlinkMaster = currentGroup->masterFile;
 		               file.md5_path = hash::t_md5(catalog::mangled_path(clg_path));
 		               file.md5_parent = p_md5;
-		               file.dirent = catalog::t_dirent(d_parent.catalog_id, get_file_name(*iHL), "", catalog::FILE,
+		               file.dirent = catalog::t_dirent(d_parent.catalog_id, get_file_name(*iHL), "", flags,
 		                                               inode, info.st_mode, info.st_size, info.st_mtime, hash::t_sha1());
 		               file_list.push_back(file);
 		            } else {

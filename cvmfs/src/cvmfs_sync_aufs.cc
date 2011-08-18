@@ -49,14 +49,19 @@ bool SyncAufs1::isEditedItem(const string &dirPath, const string &filename) cons
 
 void SyncAufs1::copyUpHardlinks(const std::string &dirPath, const std::string &filename) {
 	// get inode of file
-	unsigned int inode = statFileInUnionVolume(dirPath, filename).st_ino;
+	uint64_t inode = statFileInUnionVolume(dirPath, filename).st_ino;
+	
+	// if inode already exists, we don't have to do this hassle again
+	if (hardlinkGroupWithUnionInodeExists(inode)) {
+		return;
+	}
 	
 	// go through directory and search for the same inode
 	string pathToDirectory = getPathToUnionFile(dirPath, "");
 	DIR *dip;
 	PortableDirent *dit;
 	string filenameInDirectory;
-	unsigned int inodeInDirectory;
+	uint64_t inodeInDirectory;
 	if ((dip = opendir(pathToDirectory.c_str())) == NULL) {
 		return;
 	}
@@ -82,7 +87,7 @@ void SyncAufs1::copyUpHardlinks(const std::string &dirPath, const std::string &f
 	closedir(dip);
 	
 	// the hardlink group is built up and will be recreated
-	addHardlinkGroup(hardlinks);
+	addHardlinkGroup(hardlinks, inode);
 }
 
 UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath) {
@@ -253,7 +258,7 @@ void UnionFilesystemSync::touchSymlink(const string &dirPath, const string &file
 	touchRegularFile(dirPath, filename); // indistinguishable
 }
 
-void UnionFilesystemSync::addHardlinkGroup(const HardlinkGroup hardlinks) {
+void UnionFilesystemSync::addHardlinkGroup(const HardlinkGroup hardlinks, uint64_t unionInode) {
 	cout << "Hardlink Group added" << endl;
 	cout << "master file: " << hardlinks.masterFile << endl;
 	cout << "hardlinks: " << endl;
@@ -265,7 +270,7 @@ void UnionFilesystemSync::addHardlinkGroup(const HardlinkGroup hardlinks) {
 		cout << *begin << endl;
 	}
 	
-	mChangeset.hardlink_add.push_back(hardlinks);
+	mChangeset.hardlink_add[unionInode] = hardlinks;
 }
 
 string UnionFilesystemSync::getPathToRepositoryFile(const string &dirPath, const string &filename) const { 
