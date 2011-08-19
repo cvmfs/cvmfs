@@ -118,25 +118,13 @@ void UnionFilesystemSync::processFoundRegularFile(const string &dirPath, const s
 	if (isWhiteoutFilename(filename)) {
 		processWhiteoutEntry(dirPath, filename);
 		
-	// process hardlink
-	} else if (statFileInUnionVolume(dirPath, filename).st_nlink > 1) {
-		// there must be hard links which has to be updated as well
-		// (currently hardlinks are only supported in the same directory)
-		copyUpHardlinks(dirPath, filename);
-		
 	// process normal file
 	} else {
 		if (isNewItem(dirPath, filename)) {
 			addRegularFile(dirPath, filename);
 		} else {
-			// if a file is overwritten by another file it's inodes will change
-			// on the other hand an edited file just changes it's contents
-			if (isEditedItem(dirPath, filename)) {
-				touchRegularFile(dirPath, filename);
-			} else {
-				deleteRegularFile(dirPath, filename);
-				addRegularFile(dirPath, filename);
-			}
+			deleteRegularFile(dirPath, filename);
+			addRegularFile(dirPath, filename);
 		}
 	} 
 }
@@ -150,7 +138,8 @@ void UnionFilesystemSync::processFoundSymlink(const string &dirPath, const strin
 	if (isNewItem(dirPath, filename)) {
 		addSymlink(dirPath, filename);
 	} else {
-		touchRegularFile(dirPath, filename);
+		deleteRegularFile(dirPath, filename);
+		addRegularFile(dirPath, filename);
 	}
 }
 
@@ -243,7 +232,15 @@ void UnionFilesystemSync::touchDirectory(const std::string &dirPath, const std::
 }
 
 void UnionFilesystemSync::addRegularFile(const string &dirPath, const string &filename) {
-	mChangeset.reg_add.insert(getPathToUnionFile(dirPath, filename));
+	// process hardlinks
+	if (statFileInUnionVolume(dirPath, filename).st_nlink > 1) {
+		// there must be hard links which has to be updated as well
+		// (currently hardlinks are only supported in the same directory)
+		copyUpHardlinks(dirPath, filename);
+	} else {
+		// normal files are simply added to the file add list
+		mChangeset.reg_add.insert(getPathToUnionFile(dirPath, filename));
+	}
 }
 
 void UnionFilesystemSync::touchRegularFile(const string &dirPath, const string &filename) {

@@ -899,6 +899,37 @@ static void usage() {
         << endl << endl;
 }
 
+static unsigned int getLinkCountOfDirectory(const string &path) {
+	DIR *dip;
+	PortableDirent *dit;
+	string filename, relativePath;
+	unsigned int linkCount = 0;
+	
+	dip = opendir(path.c_str());
+	
+	// count directories in the given path
+	while ((dit = portableReaddir(dip)) != NULL) {
+		// skip "virtual" directories
+		if (strcmp(dit->d_name, ".") == 0 || strcmp(dit->d_name, "..") == 0) {
+			continue;
+		}
+		
+		if (dit->d_type == DT_DIR) {
+			linkCount++;
+		}
+	}
+	
+	// the actual directory entry is one link count more
+	linkCount++;
+	
+	// the "current directory" entry (.) is another link
+	linkCount++;
+	
+	closedir(dip);
+	
+	return linkCount;
+}
+
 int main(int argc, char **argv) {
    if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help") ||
        (string(argv[1]) == "-v") || (string(argv[1]) == "--version"))
@@ -1450,7 +1481,10 @@ catalogs_attached:
                         cerr << "Warning: could not read link " << *iAdd << endl;
                         continue;
                      }
-                  }
+                  } else {
+					new_d.flags = catalog::setLinkcountInFlags(new_d.flags, getLinkCountOfDirectory(*iAdd));
+					}
+
                   if (!catalog::insert_unprotected(md5, p_md5, new_d)) {
                      cerr << "Warning: could not insert directory " << *iAdd << endl;
                   }
@@ -1488,10 +1522,11 @@ catalogs_attached:
          if (get_file_info(*i, &info)) {
             hash::t_md5 md5(catalog::mangled_path(clg_path));
             if (catalog::lookup_unprotected(md5, d)) {
-//               d.inode = info.st_ino; // should not be updated to something coming from the file system!
+    //           d.inode = info.st_ino; // should not be updated to something coming from the file system!
                d.mode = info.st_mode;
                d.size = info.st_size;
                d.mtime = info.st_mtime;
+			d.flags = catalog::setLinkcountInFlags(d.flags, getLinkCountOfDirectory(*iAdd));
                if (!catalog::update_unprotected(md5, d)) { 
                   cerr << "Warning: could not update directory " << *i << endl;
                }
@@ -1624,7 +1659,7 @@ catalogs_attached:
                file.path = *iZip;
                file.md5_path = hash::t_md5(catalog::mangled_path(clg_path));
                file.md5_parent = p_md5;
-               inode = (touching) ? d_parent.inode : catalog::get_next_free_inode();
+               inode = (touching) ? d_parent.inode : catalog::get_next_free_inode(); // TODO: check this
                file.dirent = catalog::t_dirent(d_parent.catalog_id, get_file_name(*iZip), "", catalog::FILE,
                                                inode, info.st_mode, info.st_size, info.st_mtime, hash::t_sha1());
                file_list.push_back(file);

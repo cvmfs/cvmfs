@@ -307,6 +307,8 @@ namespace catalog {
 	         pmesg(D_CATALOG, "Cannot update next_inode property in root catalog");
 		}
 		
+		result += 10;
+		
 		cout << "Free inode: " << result << endl;
 		
 		return result;
