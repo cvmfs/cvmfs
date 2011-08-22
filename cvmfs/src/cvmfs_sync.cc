@@ -846,7 +846,8 @@ void createChangesetFromChangelog(ifstream &fjournal) {
 }
 
 void createChangesetFromOverlayDirectory(string dir_overlay, string dir_shadow) {
-	cvmfs::UnionFilesystemSync *worker = new cvmfs::SyncAufs1("/cvmfs", dir_shadow, dir_overlay);
+	cvmfs::SyncAufs1::initialize("/cvmfs", dir_shadow, dir_overlay);
+	cvmfs::UnionFilesystemSync *worker = cvmfs::UnionFilesystemSync::sharedInstance();
 	
 	cout << "Traversing copy on write overlay directory... " << endl;
 
@@ -1293,6 +1294,7 @@ catalogs_attached:
 
    
    /* Separate hard links to symlinks from hard links to regular files */
+/*
    for (set<string>::const_iterator i = fil_add.begin(), iEnd = fil_add.end();
         i != iEnd; ++i)
    {
@@ -1308,6 +1310,7 @@ catalogs_attached:
       }
    }
    fil_add.clear();
+*/
    
    /* Find out about new/removed/dirty catalogs */
    for (set<string>::iterator i = reg_add.begin();
@@ -1352,6 +1355,7 @@ catalogs_attached:
          }
       }
 
+/*
 		list<cvmfs::HardlinkGroup>::const_iterator iHLG = hardlink_add.begin();
 		const list<cvmfs::HardlinkGroup>::const_iterator endHLG = hardlink_add.end();
 		for (; iHLG != endHLG; ++iHLG) {
@@ -1363,6 +1367,7 @@ catalogs_attached:
 				set_dirty(*iHL);
 			}
 		}
+		*/
    }
 
    /* Everything collected, print change sets */
@@ -1703,7 +1708,7 @@ catalogs_attached:
 			
 			printBitmap(&flags);
 			cout << endl << catalog::getLinkcountInFlags(flags) << endl;
-			
+/*			
 			// go through the hardlink group
 			list<string>::const_iterator iHL = currentGroup->hardlinks.begin();
 			const list<string>::const_iterator endHL = currentGroup->hardlinks.end();
@@ -1712,7 +1717,7 @@ catalogs_attached:
 		         hash::t_md5 p_md5(catalog::mangled_path(get_parent_path(clg_path)));
 		         catalog::t_dirent d_parent;
 
-		         /* Find parent entry */
+		         // Find parent entry 
 		         if (catalog::lookup_unprotected(p_md5, d_parent)) {
 		            if (get_file_info(*iHL, &info)) {
 		               t_cas_file file;
@@ -1730,6 +1735,8 @@ catalogs_attached:
 		            cerr << "Warning: dangling file entry " << *iHL << endl;
 		         }
 			}
+			
+			*/
 		}
 			
       
