@@ -17,17 +17,6 @@ namespace cvmfs {
 	
 	enum FileType {FT_DIR, FT_REG, FT_SYM, FT_ERR};
 	
-	typedef struct {
-		std::set<std::string> dir_add;
-		std::set<std::string> dir_touch;
-		std::set<std::string> dir_rem;
-		std::set<std::string> reg_add;
-		std::set<std::string> reg_touch;
-		std::map<uint64_t, HardlinkGroup> hardlink_add;
-		std::set<std::string> sym_add;
-		std::set<std::string> fil_rem; ///< We don't know if this is regular file or symlink
-	} Changeset;
-	
 	/**
 	 *  abstract class for interface definition of repository sync based on
 	 *  a union filesystem overlay over a mounted CVMFS volume.
@@ -38,7 +27,6 @@ namespace cvmfs {
 		std::string mOverlayPath;
 		std::string mUnionPath;
 		
-		Changeset mChangeset;
 		bool mCheckSymlinks;
 		
 		SyncMediator *mMediator;
@@ -50,7 +38,7 @@ namespace cvmfs {
 		virtual ~UnionFilesystemSync();
 		
 		virtual bool goGetIt() = 0;
-		Changeset getChangeset() const { return mChangeset; }
+		Changeset getChangeset() const { return mMediator->getChangeset(); }
 		
 		static UnionFilesystemSync *sharedInstance();
 		

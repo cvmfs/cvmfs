@@ -107,6 +107,8 @@ map<string, t_catalog_info> open_catalogs; ///< bool is a dirty flag that shows 
 
 /* path sets (absolute) */
 set<string> immutables;
+
+/*
 set<string> move_in;
 set<string> move_out;
 set<string> dir_add;
@@ -123,6 +125,9 @@ set<string> clg_add;
 set<string> clg_rem;
 
 set<string> prels; ///< Modified directories we need new mucro catalogs for
+*/
+
+cvmfs::Changeset myChangeset;
 
 
 static bool rem_path(const string &path, set<string> &from) {
@@ -198,123 +203,11 @@ static bool get_file_info(const string &path, PortableStat64 *info) {
 
 
 static string abs2clg_path(const string &path, const string &dir_shadow) {
-   return path.substr(dir_shadow.length());
+   return path.substr(UnionFilesystemSync::sharedInstance()->getUnionPath().length());
 }
 
 
-static void hieve_add(const string &path) 
-{
-   DIR *dir = opendir(path.c_str());
-   if (!dir) {
-      cerr << "Warning: could not open directory " << path << endl;
-      return;
-   }
-   
-   dir_add.insert(path);
-   
-   PortableDirent *d;
-   while ((d = portableReaddir(dir)) != NULL) {
-      const string name = string(d->d_name);
-      if ((name == ".") || (name == ".."))
-         continue;
-         
-      const string itr = path + "/" + name;
-            
-      switch (get_file_type(itr)) {
-         case FT_REG:
-            reg_add.insert(itr);
-            break;
-         case FT_SYM:
-            sym_add.insert(itr);
-            break;
-         case FT_DIR:
-            hieve_add(itr);
-            break;
-         default:
-            cerr << "Warning: unexpected file type of " << itr << endl;
-      }
-   }
-   
-   closedir(dir);
-}
 
-
-static void squeeze_out(const string &path, const string &dir_shadow) {
-   hash::t_md5 md5(catalog::mangled_path(abs2clg_path(path, dir_shadow)));
-   catalog::t_dirent d;
-   if (!catalog::lookup(md5, d)) {
-      cerr << "Warning: could not find directory " << path << " to delete it" << endl;
-      return;
-   }
-   
-   dir_rem.insert(path);
-   if (d.flags & catalog::DIR_NESTED_ROOT)
-      clg_rem.insert(path);
-   
-   vector<catalog::t_dirent> lsdir = catalog::ls(md5);
-   for (vector<catalog::t_dirent>::const_iterator i = lsdir.begin(), iEnd = lsdir.end();
-        i != iEnd; ++i)
-   {
-      const string name = path + "/" + i->name;
-      if (i->flags & catalog::FILE) {
-         /* Regular files and symlinks */
-         fil_rem.insert(name);
-      } else if (i->flags & catalog::DIR) {
-         squeeze_out(name, dir_shadow);
-      } else {
-         cerr << "Warning: unexpected catalog flags of " << name << endl;
-      }
-   }
-}
-
-
-bool attach_nested(const string &dir_catalogs, const string &dir_shadow,
-                   const unsigned cat_id, const bool dirty) 
-{
-   vector<string> ls;
-   
-   if (catalog::ls_nested(cat_id, ls)) {
-      vector<string>::iterator i;
-      for (i = ls.begin(); i != ls.end(); ++i) {
-         bool skip = false;
-         for (set<string>::const_iterator j = immutables.begin(), jEnd = immutables.end(); 
-              j != jEnd; ++j) 
-         {
-            size_t cut = dir_shadow.length();
-            if ((j->length() >= cut) && (i->find(j->substr(cut), 0) == 0)) {
-               skip = true;
-               break;
-            }
-         }
-         if (skip) {
-            cout << "Skipping catalog in immutable directory " << *i << endl;
-            continue;
-         }
-         
-         const string clg_path = dir_catalogs + 
-                                 i->substr(catalog::get_root_prefix().length()) + 
-                                 "/.cvmfscatalog.working";
-         t_catalog_info ci;
-         ci.dirty = dirty;
-         ci.id = catalog::get_num_catalogs();
-         ci.parent_id = cat_id;
-         open_catalogs.insert(make_pair(dir_shadow + i->substr(catalog::get_root_prefix().length()), ci));
-         
-         cout << "Attaching " << clg_path << endl;
-         if (!catalog::attach(clg_path, "", false, false))
-         {
-            cerr << "unable to attach nested catalog " << (*i) << endl;
-            return false;
-         }
-
-         if (!attach_nested(dir_catalogs, dir_shadow, catalog::get_num_catalogs() - 1, dirty))
-            return false;
-      }
-      return true;
-   } else {
-      return false;
-   }
-}
 
 
 static bool init_catalogs(const string &dir_catalogs, const string &dir_shadow,
@@ -661,189 +554,6 @@ static bool move_to_datastore(const string &source, const string &suffix,
    
    return result;
 }
-               
-void createChangesetFromChangelog(ifstream &fjournal) {
-   /* Main loop, walk through journal lines and build change sets */
-   cout << "Parsing file system change log... " << flush;
-   string line;
-   int no_lines = 0;
-   while (getline(fjournal, line)) {
-      no_lines++;
-
-      /* Parse line */
-      if (line.length() < 4) {
-         cerr << "Warning: parse error in line " << no_lines << endl;
-         continue;
-      }
-
-      char object;
-      char operation;
-      char result;
-      string path1;
-      string path2;
-
-      object = line[0];
-      operation = line[1];
-      result = line[2];
-      if (result == 'F') continue; ///< We process only sucessful calls
-
-      unsigned i;
-      for (i = 3; i < line.length(); ++i) {
-         if (line[i] == '\0') break;
-      }
-      if ((i == 3) || (i > line.length()-2)) {
-         cerr << "Warning: parse error in line " << no_lines << endl;
-         continue;
-      }
-      path1 = line.substr(3, i-3);
-      path2 = line.substr(i+1, line.length()-(i+2));
-
-      /* skip operations inside moved-in directories */
-      bool skip = false;
-      for (set<string>::const_iterator i = move_in.begin(), iEnd=move_in.end();
-           i != iEnd; ++i)
-      {
-         if ( ((operation == 'I') && (in_subtree(*i, path2))) ||
-              ((operation != 'I') && (in_subtree(*i, path1))) )
-         {
-            skip = true;
-            break;
-         }
-      }
-      if (skip) continue;
-
-      /* Fill change sets, walk through all possible events */
-      switch (operation) {
-         case 'C':
-            switch (object) {
-               case 'D':
-                  dir_add.insert(path1);
-                  break;
-               case 'R':
-                  reg_add.insert(path1);
-                  break;
-               case 'L':
-                  sym_add.insert(path1);
-                  break;
-               case 'U':
-                  fil_add.insert(path1);
-                  break;
-               default:
-                  cerr << "Warning: unsupported file type in line " << no_lines << endl;
-            }
-            break;
-         case 'D':
-            switch (object) {
-               case 'D':
-                  rem_path(path1, dir_touch);
-                  if (!rem_path(path1, dir_add) && !rem_path(path1, move_in))
-                     dir_rem.insert(path1);
-                  break;
-               case 'R':
-               case 'L':
-               case 'U':
-                  rem_path(path1, reg_touch);
-                  if (!rem_path(path1, reg_add) && !rem_path(path1, sym_add) && 
-                      !rem_path(path1, fil_add) && !rem_path(path1, move_in))
-                  {
-                     fil_rem.insert(path1);
-                  }
-                  break;
-               default:
-                  cerr << "Warning: unsupported file type in line " << no_lines << endl;
-            }
-            break;
-         case 'A':
-         case 'T':
-            switch (object) {
-               case 'D':
-                  if ((dir_add.find(path1) == dir_add.end()) && 
-                      (move_in.find(path1) == move_in.end()))
-                  {
-                     dir_touch.insert(path1);
-                  }
-                  break;
-               case 'R':
-                  if ((reg_add.find(path1) == reg_add.end()) && 
-                      (fil_add.find(path1) == fil_add.end()) &&
-                      (move_in.find(path1) == move_in.end()))
-                  {
-                     reg_touch.insert(path1);
-                  }
-                  break;
-               case 'L':
-                  /* remove and add */
-                  if ((sym_add.find(path1) == sym_add.end()) && 
-                      (fil_add.find(path1) == fil_add.end()) &&
-                      (move_in.find(path1) == move_in.end()))
-                  {
-                     fil_rem.insert(path1);
-                     sym_add.insert(path1);
-                  }
-                  break;
-               default:
-                  cerr << "Warning: unsupported file type in line " << no_lines << endl;
-            }
-            break;
-         case 'I':
-            switch (object) {
-               case 'R':
-                  reg_add.insert(path2);
-                  replace_candidate.insert(path2);
-                  break;
-               case 'L':
-                  sym_add.insert(path2);
-                  replace_candidate.insert(path2);
-                  break;
-               default:
-                  move_in.insert(path2);
-                  break;
-            }
-            break;
-         case 'O': {
-            switch (object) {
-               case 'R':
-                  rem_path(path1, reg_touch);
-                  if (!rem_path(path1, reg_add) && !rem_path(path1, fil_add) &&
-                      !rem_path(path1, move_in)) 
-                  {
-                     fil_rem.insert(path1);
-                  }
-                  break;
-               case 'L':
-                  if (!rem_path(path1, sym_add) && !rem_path(path1, fil_add) &&
-                      !rem_path(path1, move_in)) 
-                  {
-                     fil_rem.insert(path1);
-                  }
-                  break;
-               default:
-                  if (!rem_path(path1, move_in))
-                     move_out.insert(path1);
-
-                  /* Remove all previous operations on that path */
-                  set<string> *s[] = {&move_in, &dir_add, &dir_touch, &dir_rem, &reg_add, &reg_touch,
-                                      &sym_add, &fil_add, &fil_rem};
-                  for (unsigned j = 0; j < sizeof(s)/sizeof(s[0]); ++j) {
-                     for (set<string>::iterator k = s[j]->begin();
-                          k != s[j]->end(); )
-                     {
-                        if ((path1 == *k) || (in_subtree(path1, *k)))
-                           s[j]->erase(k++);
-                        else
-                           ++k;
-                     }
-                  }
-                  break;
-            }
-            break;
-         }
-         default:
-            cerr << "Warning: unsupported operation in line " << no_lines << endl;
-      }
-   }
-   cout << no_lines << " lines" << endl;
-}
 
 void createChangesetFromOverlayDirectory(string dir_overlay, string dir_shadow) {
 	cvmfs::SyncAufs1::initialize("/cvmfs", dir_shadow, dir_overlay);
@@ -855,8 +565,9 @@ void createChangesetFromOverlayDirectory(string dir_overlay, string dir_shadow) 
 		cerr << "something went wrong while creating changeset" << endl;
 	}
 	
-	cvmfs::Changeset myChangeset = worker->getChangeset();
+	myChangeset = worker->getChangeset();
 	
+	/*
 	dir_add        = myChangeset.dir_add;
 	dir_touch      = myChangeset.dir_touch;
 	dir_rem        = myChangeset.dir_rem;
@@ -868,6 +579,7 @@ void createChangesetFromOverlayDirectory(string dir_overlay, string dir_shadow) 
 	}
 	sym_add        = myChangeset.sym_add;
 	fil_rem        = myChangeset.fil_rem;
+	*/
 	
 	delete worker;
 }
@@ -1073,7 +785,7 @@ int main(int argc, char **argv) {
    
    /* build up a change set */
    if (useJournal) {
-		createChangesetFromChangelog(fjournal);
+//		createChangesetFromChangelog(fjournal);
    } else if (useOverlay) {
 		createChangesetFromOverlayDirectory(dir_overlay, dir_shadow);
    } else {
@@ -1083,337 +795,196 @@ int main(int argc, char **argv) {
    
    /* Lazy attach of catalogs, just load the subtree where things happen.
       Careful, breaks cross-catalog links! */
-   if (lazy_attach) {
-      /* Initially: nested paths of root catalog */
-      cout << "Loading required file catalogs..." << endl;
-      open_catalogs[dir_shadow].dirty = true;
-      map<string, int> all_nested_paths; /* This map is path, parent id */
-      vector<string> current_nested_paths;
-      if (!catalog::ls_nested(0, current_nested_paths)) {
-         cerr << "Error: failed to list nested catalogs" << endl;
-         return 3;
-      }
-      for (vector<string>::const_iterator i = current_nested_paths.begin(), iEnd = current_nested_paths.end();
-           i != iEnd; ++i)
-      {
-         all_nested_paths[*i] = 0;
-      }
-      
-      if (all_nested_paths.empty())
-         goto catalogs_attached;
-
-      set<string> *s[] = {&move_out, &move_in, &dir_add, &dir_touch, &dir_rem, &reg_add, 
-                          &reg_touch, &sym_add, &fil_add, &fil_rem};
-      for (unsigned i = 0; i < sizeof(s)/sizeof(s[0]); ++i) {
-         for (set<string>::const_iterator j = s[i]->begin(), jEnd = s[i]->end();
-              j != jEnd; ++j)
-         {
-            /* Strip shadow dir */
-            const string spot_path = j->substr(dir_shadow.length()) + "/";
-            
-            /* Is the path on a nested subtree? */
-            pair<string, int> on_nested; /* This map is path, parent id */
-            do {
-               on_nested.first = "";
-               on_nested.second = -1;
-               
-               for (map<string, int>::const_iterator k = all_nested_paths.begin(), kEnd = all_nested_paths.end();
-                    k != kEnd; ++k)
-               {
-                  //cout << "Checking path " << spot_path << " on nested path " << k->first << endl;
-                  if (spot_path.find(k->first + "/", 0) == 0) {
-                     on_nested = *k;
-                     break;
-                  }
-               }
-               
-               if (on_nested.first != "") {
-                  /* Attach nested catalog */
-                  const string nested_path =  dir_catalogs + on_nested.first + "/.cvmfscatalog.working";
-                  cout << "Attaching " << nested_path << endl;
-                  if (!catalog::attach(nested_path, "", false, false)) {
-                     cerr << "Error: failed to load nested catalog at " << nested_path << endl;
-                     return false;
-                  }
-                  t_catalog_info ci;
-                  ci.dirty = true;
-                  ci.id = catalog::get_num_catalogs()-1;
-                  ci.parent_id = on_nested.second;
-                  open_catalogs[dir_shadow + on_nested.first] = ci;
-                  
-                  /* Re-organize all_nested_paths */
-                  all_nested_paths.erase(on_nested.first);
-                  current_nested_paths.clear();
-                  if (!catalog::ls_nested(catalog::get_num_catalogs()-1, current_nested_paths)) {
-                     cerr << "Error: failed to list nested catalogs" << endl;
-                     return 3;
-                  }
-                  for (vector<string>::const_iterator i = current_nested_paths.begin(), iEnd = current_nested_paths.end();
-                       i != iEnd; ++i)
-                  {
-                     all_nested_paths[*i] = catalog::get_num_catalogs()-1;
-                  }
-                  
-                  /* Short way out, all catalogs attached */
-                  if (all_nested_paths.empty())
-                     goto catalogs_attached;
-               }
-            } while (on_nested.first != "");
-            
-            /* For move-out paths: load all remaining nested catalogs on this subtree */
-            if (i == 0) {
-               map<string, int> remaining; /* This maps path, catalog id */
-               for (map<string, int>::const_iterator k = all_nested_paths.begin(), kEnd = all_nested_paths.end();
-                    k != kEnd; ++k)
-               {
-                  if (k->first.find(spot_path, 0) == 0) {
-                     const string nested_path = dir_catalogs + k->first + "/.cvmfscatalog.working";
-                     cout << "Attaching " << nested_path << endl;
-                     if (!catalog::attach(nested_path, "", false, false)) {
-                        cerr << "Error: failed to load nested catalog at " << nested_path << endl;
-                        return false;
-                     }
-                     t_catalog_info ci;
-                     ci.dirty = true;
-                     ci.id = catalog::get_num_catalogs()-1;
-                     ci.parent_id = k->second;
-                     open_catalogs[dir_shadow + k->first] = ci;
-                     
-                     remaining[k->first] = catalog::get_num_catalogs()-1;
-                  }
-               }
-               
-               for (map<string, int>::const_iterator k = remaining.begin(), kEnd = remaining.end();
-                    k != kEnd; ++k)
-               {
-                  all_nested_paths.erase(k->first);
-                  if (!attach_nested(dir_catalogs, dir_shadow, 
-                                     k->second, true))
-                  {
-                     cerr << "Failed to attach nested catalogs" << endl;
-                     return 3;
-                  }
-               }
-            }
-         }
-      }
-   }
-catalogs_attached:
+//    if (lazy_attach) {
+//       /* Initially: nested paths of root catalog */
+//       cout << "Loading required file catalogs..." << endl;
+//       open_catalogs[dir_shadow].dirty = true;
+//       map<string, int> all_nested_paths; /* This map is path, parent id */
+//       vector<string> current_nested_paths;
+//       if (!catalog::ls_nested(0, current_nested_paths)) {
+//          cerr << "Error: failed to list nested catalogs" << endl;
+//          return 3;
+//       }
+//       for (vector<string>::const_iterator i = current_nested_paths.begin(), iEnd = current_nested_paths.end();
+//            i != iEnd; ++i)
+//       {
+//          all_nested_paths[*i] = 0;
+//       }
+//       
+//       if (all_nested_paths.empty())
+//          goto catalogs_attached;
+// 
+//       set<string> *s[] = {&move_out, &move_in, &dir_add, &dir_touch, &dir_rem, &reg_add, 
+//                           &reg_touch, &sym_add, &fil_add, &fil_rem};
+//       for (unsigned i = 0; i < sizeof(s)/sizeof(s[0]); ++i) {
+//          for (set<string>::const_iterator j = s[i]->begin(), jEnd = s[i]->end();
+//               j != jEnd; ++j)
+//          {
+//             /* Strip shadow dir */
+//             const string spot_path = j->substr(dir_shadow.length()) + "/";
+//             
+//             /* Is the path on a nested subtree? */
+//             pair<string, int> on_nested; /* This map is path, parent id */
+//             do {
+//                on_nested.first = "";
+//                on_nested.second = -1;
+//                
+//                for (map<string, int>::const_iterator k = all_nested_paths.begin(), kEnd = all_nested_paths.end();
+//                     k != kEnd; ++k)
+//                {
+//                   //cout << "Checking path " << spot_path << " on nested path " << k->first << endl;
+//                   if (spot_path.find(k->first + "/", 0) == 0) {
+//                      on_nested = *k;
+//                      break;
+//                   }
+//                }
+//                
+//                if (on_nested.first != "") {
+//                   /* Attach nested catalog */
+//                   const string nested_path =  dir_catalogs + on_nested.first + "/.cvmfscatalog.working";
+//                   cout << "Attaching " << nested_path << endl;
+//                   if (!catalog::attach(nested_path, "", false, false)) {
+//                      cerr << "Error: failed to load nested catalog at " << nested_path << endl;
+//                      return false;
+//                   }
+//                   t_catalog_info ci;
+//                   ci.dirty = true;
+//                   ci.id = catalog::get_num_catalogs()-1;
+//                   ci.parent_id = on_nested.second;
+//                   open_catalogs[dir_shadow + on_nested.first] = ci;
+//                   
+//                   /* Re-organize all_nested_paths */
+//                   all_nested_paths.erase(on_nested.first);
+//                   current_nested_paths.clear();
+//                   if (!catalog::ls_nested(catalog::get_num_catalogs()-1, current_nested_paths)) {
+//                      cerr << "Error: failed to list nested catalogs" << endl;
+//                      return 3;
+//                   }
+//                   for (vector<string>::const_iterator i = current_nested_paths.begin(), iEnd = current_nested_paths.end();
+//                        i != iEnd; ++i)
+//                   {
+//                      all_nested_paths[*i] = catalog::get_num_catalogs()-1;
+//                   }
+//                   
+//                   /* Short way out, all catalogs attached */
+//                   if (all_nested_paths.empty())
+//                      goto catalogs_attached;
+//                }
+//             } while (on_nested.first != "");
+//             
+//             /* For move-out paths: load all remaining nested catalogs on this subtree */
+//             if (i == 0) {
+//                map<string, int> remaining; /* This maps path, catalog id */
+//                for (map<string, int>::const_iterator k = all_nested_paths.begin(), kEnd = all_nested_paths.end();
+//                     k != kEnd; ++k)
+//                {
+//                   if (k->first.find(spot_path, 0) == 0) {
+//                      const string nested_path = dir_catalogs + k->first + "/.cvmfscatalog.working";
+//                      cout << "Attaching " << nested_path << endl;
+//                      if (!catalog::attach(nested_path, "", false, false)) {
+//                         cerr << "Error: failed to load nested catalog at " << nested_path << endl;
+//                         return false;
+//                      }
+//                      t_catalog_info ci;
+//                      ci.dirty = true;
+//                      ci.id = catalog::get_num_catalogs()-1;
+//                      ci.parent_id = k->second;
+//                      open_catalogs[dir_shadow + k->first] = ci;
+//                      
+//                      remaining[k->first] = catalog::get_num_catalogs()-1;
+//                   }
+//                }
+//                
+//                for (map<string, int>::const_iterator k = remaining.begin(), kEnd = remaining.end();
+//                     k != kEnd; ++k)
+//                {
+//                   all_nested_paths.erase(k->first);
+//                   if (!attach_nested(dir_catalogs, dir_shadow, 
+//                                      k->second, true))
+//                   {
+//                      cerr << "Failed to attach nested catalogs" << endl;
+//                      return 3;
+//                   }
+//                }
+//             }
+//          }
+//       }
+//    }
+// catalogs_attached:
 
    cout << "Post-processing file system change log..." << endl;
-
-   /* Squeeze out move out paths */
-/* done by AufsSync
-   for (set<string>::const_iterator i = move_out.begin(), iEnd = move_out.end();
-        i != iEnd; ++i)
-   {
-      hash::t_md5 md5(catalog::mangled_path(abs2clg_path(*i, dir_shadow)));
-      catalog::t_dirent d;
-      if (catalog::lookup_unprotected(md5, d)) {
-         if (d.flags & catalog::DIR) {
-            cout << "Collecting file system entries from move-out path " << *i << endl;
-            squeeze_out(*i, dir_shadow);
-         } else if (d.flags & catalog::FILE) {
-            fil_rem.insert(*i);
-         } else {
-            cerr << "Warning: unexpected file type of " << (*i) << endl;
-         }
-      }
-   }
-   move_out.clear();
-*/
-
-         
-   /* Process move in paths */
-/* done by AufsSync
-   for (set<string>::const_iterator i = move_in.begin(), iEnd = move_in.end();
-        i != iEnd; ++i)
-   {
-      switch (get_file_type(*i)) {
-         case FT_DIR:
-            cout << "Inspecting move-in path " << *i << endl;
-            hieve_add(*i);
-            break;
-         case FT_REG:
-            reg_add.insert(*i);
-            break;
-         case FT_SYM:
-            sym_add.insert(*i);
-            break;
-         default:
-            cerr << "Warning: unexpected file type of " << (*i) << endl;
-      }
-   }
-   move_in.clear();
-*/
    
-   /* Figure out replaced files */
-/* (hopefully) done by AufsSync
-   for (set<string>::iterator i = replace_candidate.begin(), iEnd = replace_candidate.end();
-        i != iEnd; ++i)
-   {
-      hash::t_md5 md5(catalog::mangled_path(abs2clg_path(*i, dir_shadow)));
-      catalog::t_dirent d;
-      if (catalog::lookup_unprotected(md5, d)) {
-         fil_rem.insert(*i);
-      }
-   }
-   replace_candidate.clear();
-*/
-   
-   /* Separate touched new files from touched existing files */
-/* will be done by AufsSync
-   for (set<string>::iterator i = reg_touch.begin();
-        i != reg_touch.end(); )
-   {
-	
-      if (get_file_name(*i) == ".cvmfscatalog") {
-         // Separate new catalog from touched ones (force dirty) 
-         const string p = get_parent_path(*i);
-         map<string, t_catalog_info>::iterator s = open_catalogs.find(p);
-         if (s == open_catalogs.end())
-            clg_add.insert(p);
-         else
-            s->second.dirty = true;
-         
-         reg_touch.erase(i++);
-         continue;
-      }
-      
-      hash::t_md5 md5(catalog::mangled_path(abs2clg_path(*i, dir_shadow)));
-      catalog::t_dirent d;
-		
-      if (!catalog::lookup_unprotected(md5, d)) {
-         reg_add.insert(*i);
-         reg_touch.erase(i++);
-      } else {
-         ++i;
-      }
-   }
-*/
-
-   
-   /* Separate hard links to symlinks from hard links to regular files */
-/*
-   for (set<string>::const_iterator i = fil_add.begin(), iEnd = fil_add.end();
-        i != iEnd; ++i)
-   {
-      switch (get_file_type(*i)) {
-         case FT_REG:
-            reg_add.insert(*i);
-            break;
-         case FT_SYM:
-            sym_add.insert(*i);
-            break;
-         default:
-            cerr << "Warning: unexpected file type of " << (*i) << endl;
-      }
-   }
-   fil_add.clear();
-*/
-   
-   /* Find out about new/removed/dirty catalogs */
-   for (set<string>::iterator i = reg_add.begin();
-        i != reg_add.end(); )
-   {
-      if (get_file_name(*i) == ".cvmfscatalog") {
-         const string p = get_parent_path(*i);
-         if (p != dir_shadow) {
-            clg_add.insert(p);
-            set_dirty(get_parent_path(p));
-         }
-         reg_add.erase(i++);
-      } else {
-         ++i;
-      }
-   }
-   for (set<string>::iterator i = fil_rem.begin();
-        i != fil_rem.end(); )
-   {
-      if (get_file_name(*i) == ".cvmfscatalog") {
-         const string p = get_parent_path(*i);
-         if (p != dir_shadow) {
-            clg_rem.insert(p);
-            set_dirty(get_parent_path(p));
-         } else {
-            cerr << "Warning: will not delete root catalog" << endl;
-         }
-         fil_rem.erase(i++);
-      } else {
-         ++i;
-      }
-   }
    /* For lazy attach, this is already done */
-   if (!lazy_attach) {
-      set<string> *s[] = {&move_in, &move_out, &dir_add, &dir_touch, &dir_rem, &reg_add, 
-                          &reg_touch, &sym_add, &fil_rem};
-      for (unsigned i = 0; i < sizeof(s)/sizeof(s[0]); ++i) {
-         for (set<string>::const_iterator j = s[i]->begin(), jEnd = s[i]->end();
-              j != jEnd; ++j)
-         {
-            set_dirty(*j);
-         }
-      }
-
-/*
-		list<cvmfs::HardlinkGroup>::const_iterator iHLG = hardlink_add.begin();
-		const list<cvmfs::HardlinkGroup>::const_iterator endHLG = hardlink_add.end();
-		for (; iHLG != endHLG; ++iHLG) {
-			const cvmfs::HardlinkGroup *currentGroup = &(*iHLG);
-			
-			list<string>::const_iterator iHL = currentGroup->hardlinks.begin();
-			const list<string>::const_iterator endHL = currentGroup->hardlinks.end();
-			for (; iHL != endHL; ++iHL) {
-				set_dirty(*iHL);
-			}
-		}
-		*/
-   }
+//    if (!lazy_attach) {
+//       set<string> *s[] = {&move_in, &move_out, &dir_add, &dir_touch, &dir_rem, &reg_add, 
+//                           &reg_touch, &sym_add, &fil_rem};
+//       for (unsigned i = 0; i < sizeof(s)/sizeof(s[0]); ++i) {
+//          for (set<string>::const_iterator j = s[i]->begin(), jEnd = s[i]->end();
+//               j != jEnd; ++j)
+//          {
+//             set_dirty(*j);
+//          }
+//       }
+// 
+// /*
+// 		list<cvmfs::HardlinkGroup>::const_iterator iHLG = hardlink_add.begin();
+// 		const list<cvmfs::HardlinkGroup>::const_iterator endHLG = hardlink_add.end();
+// 		for (; iHLG != endHLG; ++iHLG) {
+// 			const cvmfs::HardlinkGroup *currentGroup = &(*iHLG);
+// 			
+// 			list<string>::const_iterator iHL = currentGroup->hardlinks.begin();
+// 			const list<string>::const_iterator endHL = currentGroup->hardlinks.end();
+// 			for (; iHL != endHL; ++iHL) {
+// 				set_dirty(*iHL);
+// 			}
+// 		}
+// 		*/
+//    }
 
    /* Everything collected, print change sets */
    if (print_cs) {
-      cout << endl; 
-      cout << "New directories: " << endl;
-      print_set(dir_add);
-      cout << "New regular files: " << endl;
-      print_set(reg_add);
-      cout << "New symlinks: " << endl;
-      print_set(sym_add);
-      
-      cout << "Touched directories: " << endl;
-      print_set(dir_touch);
-      cout << "Touched regular files: " << endl;
-      print_set(reg_touch);
-      
-      cout << "Removed directories: " << endl;
-      print_set(dir_rem);
-      cout << "Removed files: " << endl;
-      print_set(fil_rem);
-      
-      cout << "New catalogs: " << endl;
-      print_set(clg_add);
-      cout << "Removed catalogs: " << endl;
-      print_set(clg_rem);
-      cout << "Dirty catalogs: " << endl;
+      // cout << endl; 
+      // cout << "New directories: " << endl;
+      // print_set(dir_add);
+      // cout << "New regular files: " << endl;
+      // print_set(reg_add);
+      // cout << "New symlinks: " << endl;
+      // print_set(sym_add);
+      // 
+      // cout << "Touched directories: " << endl;
+      // print_set(dir_touch);
+      // cout << "Touched regular files: " << endl;
+      // print_set(reg_touch);
+      // 
+      // cout << "Removed directories: " << endl;
+      // print_set(dir_rem);
+      // cout << "Removed files: " << endl;
+      // print_set(fil_rem);
+      // 
+      // cout << "New catalogs: " << endl;
+      // print_set(clg_add);
+      // cout << "Removed catalogs: " << endl;
+      // print_set(clg_rem);
+       cout << "Dirty catalogs: " << endl;
       for (map<string, t_catalog_info>::const_iterator i = open_catalogs.begin(), iEnd = open_catalogs.end();
-           i != iEnd; ++i)
-      {
-         if (i->second.dirty) {
-            cout << i->first << endl;
-         }
-      }
-      cout << endl;
-   }
+                 i != iEnd; ++i)
+            {
+               if (i->second.dirty) {
+                  cout << i->first << endl;
+               }
+            }
+            cout << endl;
+  //       }
    
    /* Real work: make changes to the catalog, compress files */
    if (!dry_run) {
       long count = 0;
       catalog::t_dirent d;
       PortableStat64 info;
-      prels.insert("");
+ //     prels.insert("");
    
       /* Merge obsolete catalogs */
-      for (set<string>::const_iterator i = clg_rem.begin(), iEnd = clg_rem.end();
+      for (list<string>::const_iterator i = myChangeset.removedCatalogs.begin(), iEnd = myChangeset.removedCatalogs.end();
            i != iEnd; ++i)
       {
          cout << "Merging catalogs at " << *i << endl;
@@ -1425,8 +996,8 @@ catalogs_attached:
       
       
       /* Delete obsolete entries */
-      cout << "Step 1 - Deleting obsolete file and directory entries " 
-           << "(" << (dir_rem.size()+fil_rem.size()) << " entries): " << flush;
+      cout << "Step 1 - Deleting obsolete file and directory entries "
+           << "(" << (myChangeset.removedDirectories.size()+myChangeset.removedFiles.size()) << " entries): " << flush;
       set<string>::const_iterator iRem = dir_rem.empty() ? fil_rem.begin() : dir_rem.begin();
       const set<string>::const_iterator iEndDirRem = dir_rem.end();
       const set<string>::const_iterator iEndFilRem = fil_rem.end();
@@ -1444,7 +1015,8 @@ catalogs_attached:
          ++count;
          if (++iRem == iEndDirRem) iRem = fil_rem.begin();
          
-         add_path_with_parent(get_parent_path(clg_path), prels);
+         add_path_with_parent(get_parent_path(clg_path), prels);	
+         set_dirty(get_parent_path(p));
       }
       fil_rem.clear();
       /* Correct LS precalculation list, removed directories shouldn't be in there */
@@ -1628,6 +1200,7 @@ catalogs_attached:
             }
          }
          open_catalogs.insert(make_pair(*i, ci));
+			set_dirty(get_parent_path(p));
       }
       clg_add.clear();
       

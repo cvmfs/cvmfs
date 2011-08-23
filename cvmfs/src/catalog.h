@@ -26,13 +26,13 @@ namespace catalog {
    const int FILE_STAT = 16;
    const int FILE_CHUNK = 64;
    const int NLINK_COUNT_0 = 128; // 8 bit for link count of file
-   const int NLINK_COUNT_1 = 256;
-   const int NLINK_COUNT_2 = 512;
-   const int NLINK_COUNT_3 = 1024;
-   const int NLINK_COUNT_4 = 2048;
-   const int NLINK_COUNT_5 = 4096;
-   const int NLINK_COUNT_6 = 8192;
-   const int NLINK_COUNT_7 = 16384;
+   const int NLINK_COUNT_1 = NLINK_COUNT_0 * 2;
+   const int NLINK_COUNT_2 = NLINK_COUNT_1 * 2;
+   const int NLINK_COUNT_3 = NLINK_COUNT_2 * 2;
+   const int NLINK_COUNT_4 = NLINK_COUNT_3 * 2;
+   const int NLINK_COUNT_5 = NLINK_COUNT_4 * 2;
+   const int NLINK_COUNT_6 = NLINK_COUNT_5 * 2;
+   const int NLINK_COUNT_7 = NLINK_COUNT_6 * 2;
    const int NLINK_COUNT = NLINK_COUNT_0 | NLINK_COUNT_1 | NLINK_COUNT_2 | NLINK_COUNT_3 | NLINK_COUNT_4 | NLINK_COUNT_5 | NLINK_COUNT_6 | NLINK_COUNT_7;
 
 	/**

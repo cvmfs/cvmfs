@@ -36,7 +36,7 @@ private:
 	
 	bool mWhiteout;
 
-	std::string mRelativePath;
+	std::string mRelativeParentPath;
 	std::string mFilename;
 
 public:
@@ -47,10 +47,12 @@ public:
 	inline bool isRegularFile() const { return mType == DE_FILE; }
 	inline bool isSymlink() const { return mType == DE_SYMLINK; }
 	inline bool isWhiteout() const { return mWhiteout; }
+	inline bool isCatalogRequestFile() const { return mFilename == ".cvmfscatalog"; }
 	
 	inline std::string getFilename() const { return mFilename; }
+	inline std::string getParentPath() const { return mRelativeParentPath; }
 
-	inline std::string getRelativePath() const { return (mRelativePath.empty()) ? mFilename : mRelativePath + "/" + mFilename; }
+	inline std::string getRelativePath() const { return (mRelativeParentPath.empty()) ? mFilename : mRelativeParentPath + "/" + mFilename; }
 	inline std::string getRepositoryPath() const { return UnionFilesystemSync::sharedInstance()->getRepositoryPath() + "/" + getRelativePath(); }
 	inline std::string getUnionPath() const { return UnionFilesystemSync::sharedInstance()->getUnionPath() + "/" + getRelativePath(); }
 	inline std::string getOverlayPath() const { return UnionFilesystemSync::sharedInstance()->getOverlayPath() + "/" + getRelativePath(); }
@@ -60,6 +62,8 @@ public:
 	unsigned int getUnionLinkcount();
 	uint64_t getUnionInode();
 	bool isNew();
+	
+	inline bool isEqualTo(const DirEntry *otherEntry) const { return (getRelativePath() == otherEntry->getRelativePath()); }
 
 private:
 	// lazy evaluation and caching of results of file stats
@@ -107,6 +111,9 @@ public:
 	 *  otherwise it will skip it and continue with the next entry in the current director
 	 */
 	bool (T::*foundDirectory)(DirEntry *entry);
+	
+	/** message for a found directory after it was already recursed */
+	void (T::*foundDirectoryAfterRecursion)(DirEntry *entry);
 
 	/** message if a link was found */
 	void (T::*foundSymlink)(DirEntry *entry);
@@ -124,6 +131,7 @@ private:
 	void doRecursion(DirEntry *entry) const;
 
 	bool notifyForDirectory(DirEntry *entry) const;
+	void notifyForDirectoryAfterRecursion(DirEntry *entry) const;
 	void notifyForRegularFile(const std::string &dirPath, const std::string &filename) const;
 	void notifyForSymlink(const std::string &dirPath, const std::string &filename) const;
 	
@@ -158,6 +166,7 @@ void RecursionEngine<T>::init(T *delegate, const std::string &relativeToDirector
 	caresAbout = NULL;
 	foundRegularFile = NULL;
 	foundDirectory = NULL;
+	foundDirectoryAfterRecursion = NULL;
 	foundSymlink = NULL;
 }
 
@@ -177,8 +186,6 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 	DIR *dip;
 	PortableDirent *dit;
 	std::string filename, absolutePath;
-	
-	std::cout << "start recursion... " << entry->getUnionPath() << std::endl;
 
 	// obtain the absolute path by adding the relative portion
 	absolutePath = mRelativeToDirectory + "/" + entry->getRelativePath();
@@ -199,7 +206,6 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 
 		// check if user cares about knowing something more
 		if (caresAbout != NULL && not (mDelegate->*caresAbout)(filename)) {
-			std::cout << "!!! ignored - " << filename << std::endl;
 			continue;
 		}
 
@@ -211,9 +217,9 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 				if (foundDirectory != NULL || mRecurse) {
 					DirEntry *newEntry = new DirEntry(entry->getRelativePath(), filename, DE_DIR);
 					if (notifyForDirectory(newEntry)) {
-						std::cout << "???? recursing into " << newEntry->getRelativePath() << std::endl;
 						doRecursion(newEntry); // user can decide to skip directories from recursion
 					}
+					notifyForDirectoryAfterRecursion(newEntry);
 				}
 				break;
 			case DT_REG:
@@ -231,9 +237,7 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 	}
 	if (leavingDirectory != NULL) (mDelegate->*leavingDirectory)(entry);
 	
-	std::cout << "end recursion... " << entry->getUnionPath() << std::endl;
-	
-	if (foundDirectory == NULL && enteringDirectory == NULL && leavingDirectory == NULL) {
+	if (foundDirectory == NULL && foundDirectoryAfterRecursion == NULL && enteringDirectory == NULL && leavingDirectory == NULL) {
 		delete entry; // the entry for this directory never left the scope and is finished now...
 	}
 }
@@ -247,6 +251,13 @@ bool RecursionEngine<T>::notifyForDirectory(DirEntry *entry) const {
 	
 	// we are only recursing, if it is generally enabeld (mRecurse) and if the user wants us to
 	return recurse && mRecurse;
+}
+
+template <class T>
+void RecursionEngine<T>::notifyForDirectoryAfterRecursion(DirEntry *entry) const {
+	if (foundDirectoryAfterRecursion != NULL) {
+		(mDelegate->*foundDirectoryAfterRecursion)(entry);
+	}
 }
 
 template <class T>

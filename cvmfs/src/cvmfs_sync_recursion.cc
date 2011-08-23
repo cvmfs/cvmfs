@@ -10,7 +10,7 @@ using namespace std;
 using namespace cvmfs;
 
 DirEntry::DirEntry(const string &dirPath, const string &filename, const DirEntryType entryType) {
-	mRelativePath = dirPath;
+	mRelativeParentPath = dirPath;
 	mFilename = filename;
 	mType = entryType;
 	mWhiteout = false;
@@ -62,10 +62,8 @@ uint64_t DirEntry::getUnionInode() {
 }
 
 void DirEntry::statGeneric(const string &path, EntryStat *statStructure) {
-	if (portableFileStat64(path.c_str(), &statStructure->stat) != 0) {
+	if (portableLinkStat64(path.c_str(), &statStructure->stat) != 0) {
 		statStructure->errorCode = errno;
 	}
 	statStructure->obtained = true;
-	
-	cout << "stating " << path << endl;
 }

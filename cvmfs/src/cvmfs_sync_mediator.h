@@ -7,24 +7,39 @@
 #include <stack>
 
 #include "compat.h"
-
-//#include "cvmfs_sync_mediator"
+#include "cvmfs_sync_catalog.h"
 
 namespace cvmfs {
 
 class DirEntry;
-	
+typedef std::list<DirEntry*> DirEntryList;
+
 typedef struct {
 	DirEntry *masterFile;
-	std::list<DirEntry*> hardlinks;
+	DirEntryList hardlinks;
 } HardlinkGroup;
 
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
-typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
+
+// typedef struct {
+// 	std::list<std::list<std::string> > addedFiles;
+// 	std::list<std::string> removedFiles;
+// 	
+// 	std::list<std::string> addedDirectories;
+// 	std::list<std::string> touchedDirectories;
+// 	std::list<std::string> removedDirectories;
+// 	
+// 	std::list<std::string> addedNestedCatalogs;
+// 	std::list<std::string> removedNestedCatalogs;
+// } Changeset;
 
 class SyncMediator {
 private:
+	typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
+	
+private:
 	HardlinkGroupMapStack mHardlinkStack;
+	CatalogHandler *mCatalogs;
 	
 public:
 	SyncMediator();
@@ -38,13 +53,12 @@ public:
 	void enterDirectory(DirEntry *entry);
 	void leaveDirectory(DirEntry *entry);
 	
-	void commit();
+	inline Changeset getChangeset() const { return mChangeset; }
 	
 private:
 	void addDirectoryRecursively(DirEntry *entry);
 	void removeDirectoryRecursively(DirEntry *entry);
 	bool addDirectoryCallback(DirEntry *entry);
-	bool removeDirectoryCallback(DirEntry *entry);
 	
 	void insertHardlink(DirEntry *entry);
 	void insertExistingHardlink(DirEntry *entry);
@@ -57,6 +71,13 @@ private:
 	void addDirectory(DirEntry *entry);
 	void removeDirectory(DirEntry *entry);
 	void touchDirectory(DirEntry *entry);
+	
+	void createNestedCatalog(DirEntry *requestFile);
+	void removeNestedCatalog(DirEntry *requestFile);
+	
+	void leaveAddedDirectory(DirEntry *entry);
+	
+	inline HardlinkGroupMap& getHardlinkMap() { return mHardlinkStack.top(); }
 	
 	void addHardlinkGroup(const HardlinkGroupMap &hardlinks);
 };
