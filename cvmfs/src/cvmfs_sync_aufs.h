@@ -47,6 +47,8 @@ namespace cvmfs {
 		inline std::string getOverlayPath() const { return mOverlayPath; }
 		
 		virtual std::string getWhiteoutPrefix() const = 0;
+		virtual std::string getOpaqueDirectoryFilename() const = 0;
+		virtual std::set<std::string> getIgnoredFilenames() const = 0;
 		
 	protected:
 		UnionFilesystemSync(const std::string &repositoryPath, const std::string &unionPath, const std::string &overlayPath, SyncMediator *mediator);
@@ -115,6 +117,8 @@ namespace cvmfs {
 		static void initialize(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator);
 		
 		inline std::string getWhiteoutPrefix() const { return mWhiteoutPrefix; }
+		inline std::string getOpaqueDirectoryFilename() const { return ".wh..wh..opq"; };
+		inline std::set<std::string> getIgnoredFilenames() const { return mIgnoredFilenames; };
 		
 	protected:
 		SyncAufs1(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator);

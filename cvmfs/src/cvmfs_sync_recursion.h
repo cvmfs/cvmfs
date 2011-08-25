@@ -4,6 +4,7 @@
 #include <string>
 #include <assert.h>
 #include <list>
+#include <set>
 
 #include <iostream> // TODO: remove me
 
@@ -50,6 +51,7 @@ public:
 	inline bool isSymlink() const { return mType == DE_SYMLINK; }
 	inline bool isWhiteout() const { return mWhiteout; }
 	inline bool isCatalogRequestFile() const { return mFilename == ".cvmfscatalog"; }
+	bool isOpaqueDirectory() const;
 	
 	inline hash::t_sha1 getContentHash() const { return mHash; }
 	inline void setContentHash(hash::t_sha1 &hash) { mHash = hash; }
@@ -100,6 +102,9 @@ private:
 	/** dirPath in callbacks will be relative to this directory */
 	std::string mRelativeToDirectory;
 	bool mRecurse;
+	
+	/** if these files are found somewhere they are completely ignored */
+	std::set<std::string> mIgnoredFiles;
 
 public:
 	/** message if a directory is entered by the recursion */
@@ -107,9 +112,6 @@ public:
 
 	/** message if a directory is left by the recursion */
 	void (T::*leavingDirectory)(DirEntry *entry);
-
-	/** invoked to see if the delegate is interested in a found directory entry */
-	bool (T::*caresAbout)(const std::string &filename);
 
 	/** message if a file was found */
 	void (T::*foundRegularFile)(DirEntry *entry);
@@ -128,8 +130,8 @@ public:
 	void (T::*foundSymlink)(DirEntry *entry);
 
 public:
-	RecursionEngine(T *delegate, const std::string &relativeToDirectory);
-	RecursionEngine(T *delegate, const std::string &relativeToDirectory, bool recurse);
+	RecursionEngine(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles);
+	RecursionEngine(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles, bool recurse);
 
 	/**
 	 *  start the recursion at the given directory
@@ -144,7 +146,7 @@ private:
 	void notifyForRegularFile(const std::string &dirPath, const std::string &filename) const;
 	void notifyForSymlink(const std::string &dirPath, const std::string &filename) const;
 	
-	void init(T *delegate, const std::string &relativeToDirectory);
+	void init(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles, bool recurse);
 
 	std::string getRelativePath(const std::string &absolutePath) const;
 };
@@ -154,25 +156,29 @@ private:
  **********************************/
 
 template <class T>
-RecursionEngine<T>::RecursionEngine(T *delegate, const std::string &relativeToDirectory) {
-	init(delegate, relativeToDirectory);
-	mRecurse = true;
+RecursionEngine<T>::RecursionEngine(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles) {
+	init(delegate, relativeToDirectory, ignoredFiles, true);
 }
 
 template <class T>
-RecursionEngine<T>::RecursionEngine(T *delegate, const std::string &relativeToDirectory, bool recurse) {
-	init(delegate, relativeToDirectory);
-	mRecurse = recurse;
+RecursionEngine<T>::RecursionEngine(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles, bool recurse) {
+	init(delegate, relativeToDirectory, ignoredFiles, recurse);
 }
 
 template <class T>
-void RecursionEngine<T>::init(T *delegate, const std::string &relativeToDirectory) {
+void RecursionEngine<T>::init(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles, bool recurse) {
 	mDelegate = delegate;
 	mRelativeToDirectory = canonical_path(relativeToDirectory);
+	mRecurse = recurse;
+	mIgnoredFiles = ignoredFiles;
+	
+	// we definitely don't care about these "virtual" directories
+	mIgnoredFiles.insert(".");
+	mIgnoredFiles.insert("..");
 
+	// default values for callback methods
 	enteringDirectory = NULL;
 	leavingDirectory = NULL;
-	caresAbout = NULL;
 	foundRegularFile = NULL;
 	foundDirectory = NULL;
 	foundDirectoryAfterRecursion = NULL;
@@ -181,7 +187,7 @@ void RecursionEngine<T>::init(T *delegate, const std::string &relativeToDirector
 
 template <class T>
 void RecursionEngine<T>::recurse(const std::string &dirPath) const {
-	assert(enteringDirectory != NULL || leavingDirectory != NULL || caresAbout != NULL || foundRegularFile != NULL || foundDirectory != NULL || foundSymlink != NULL);
+	assert(enteringDirectory != NULL || leavingDirectory != NULL || foundRegularFile != NULL || foundDirectory != NULL || foundSymlink != NULL);
 	assert(mRelativeToDirectory.length() == 0 || dirPath.substr(0, mRelativeToDirectory.length()) == mRelativeToDirectory);
 
 	std::string relativePath = getRelativePath(dirPath);
@@ -205,15 +211,10 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 	if (enteringDirectory != NULL) (mDelegate->*enteringDirectory)(entry);
 
 	while ((dit = portableReaddir(dip)) != NULL) {
-		// skip "virtual" directories
-		if (strcmp(dit->d_name, ".") == 0 || strcmp(dit->d_name, "..") == 0) {
-			continue;
-		}
-
 		filename = dit->d_name;
-
-		// check if user cares about knowing something more
-		if (caresAbout != NULL && not (mDelegate->*caresAbout)(filename)) {
+		
+		// check if filename is included in the ignored files list
+		if (mIgnoredFiles.find(filename) != mIgnoredFiles.end()) {
 			continue;
 		}
 

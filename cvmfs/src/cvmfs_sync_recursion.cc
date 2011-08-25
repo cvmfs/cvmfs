@@ -81,3 +81,11 @@ string DirEntry::getUnionPath() const {
 string DirEntry::getOverlayPath() const {
 	return UnionFilesystemSync::sharedInstance()->getOverlayPath() + "/" + getRelativePath();
 }
+
+bool DirEntry::isOpaqueDirectory() const {
+	if (!isDirectory()) {
+		return false;
+	}
+	
+	return file_exists(getOverlayPath() + "/" + UnionFilesystemSync::sharedInstance()->getOpaqueDirectoryFilename());
+}

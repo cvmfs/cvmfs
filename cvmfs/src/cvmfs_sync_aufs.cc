@@ -38,6 +38,7 @@ SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &unionPath,
 	mIgnoredFilenames.insert(".wh..wh..tmp");
 	mIgnoredFilenames.insert(".wh..wh.plnk");
 	mIgnoredFilenames.insert(".wh..wh.aufs");
+	mIgnoredFilenames.insert(".wh..wh..opq");
 	
 	// set the whiteout prefix AUFS preceeds for every whiteout file
 	mWhiteoutPrefix = ".wh.";
@@ -48,12 +49,11 @@ SyncAufs1::~SyncAufs1() {
 }
 
 bool SyncAufs1::goGetIt() {
-	RecursionEngine<SyncAufs1> recursion(this, mOverlayPath);
+	RecursionEngine<SyncAufs1> recursion(this, mOverlayPath, mIgnoredFilenames);
 	
 	recursion.foundRegularFile = &SyncAufs1::processFoundRegularFile;
 	recursion.foundDirectory = &SyncAufs1::processFoundDirectory;
 	recursion.foundSymlink = &SyncAufs1::processFoundSymlink;
-	recursion.caresAbout = &SyncAufs1::isInterestingFilename;
 	recursion.enteringDirectory = &SyncAufs1::enteringDirectory;
 	recursion.leavingDirectory = &SyncAufs1::leavingDirectory;
 	
@@ -96,9 +96,14 @@ bool UnionFilesystemSync::processFoundDirectory(DirEntry *entry) {
 		mMediator->add(entry);
 		return false;
 	} else {
-		// directory already exists... was just touched, go on with recursion -> return true
-		mMediator->touch(entry);
-		return true;
+		// directory already exists... 
+		if (entry->isOpaqueDirectory()) { // was directory completely overwritten?
+			mMediator->replace(entry);
+			return false;
+		} else {                          // no, all okay... just touch it and recurse into it
+			mMediator->touch(entry);
+			return true;
+		}
 	}
 }
 

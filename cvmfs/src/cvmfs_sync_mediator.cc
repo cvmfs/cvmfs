@@ -257,7 +257,7 @@ void SyncMediator::completeHardlinks(DirEntry *entry) {
 		return;
 	}
 	
-	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getUnionPath(), false);
+	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getUnionPath(), UnionFilesystemSync::sharedInstance()->getIgnoredFilenames(), false);
 	recursion.foundRegularFile = &SyncMediator::insertExistingHardlink;
 	recursion.foundSymlink = &SyncMediator::insertExistingHardlink;
 	recursion.recurse(entry->getUnionPath());
@@ -266,7 +266,7 @@ void SyncMediator::completeHardlinks(DirEntry *entry) {
 void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
 	addDirectory(entry);
 	
-	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getOverlayPath());
+	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getOverlayPath(), UnionFilesystemSync::sharedInstance()->getIgnoredFilenames());
 	recursion.enteringDirectory = &SyncMediator::enterDirectory;
 	recursion.leavingDirectory = &SyncMediator::leaveAddedDirectory;
 	recursion.foundRegularFile = &SyncMediator::add;
@@ -276,9 +276,10 @@ void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
 }
 
 void SyncMediator::removeDirectoryRecursively(DirEntry *entry) {
-	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getRepositoryPath());
+	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getRepositoryPath(), UnionFilesystemSync::sharedInstance()->getIgnoredFilenames());
 	recursion.foundRegularFile = &SyncMediator::remove;
-	recursion.foundDirectoryAfterRecursion = &SyncMediator::removeDirectory; // delete a directory AFTER it was emptied
+	 // delete a directory AFTER it was emptied ( we cannot use the generic remove here, because it would start up another recursion)
+	recursion.foundDirectoryAfterRecursion = &SyncMediator::removeDirectory;
 	recursion.foundSymlink = &SyncMediator::remove;
 	recursion.recurse(entry->getRepositoryPath());
 	
