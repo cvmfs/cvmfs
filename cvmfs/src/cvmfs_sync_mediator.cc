@@ -221,16 +221,15 @@ void SyncMediator::insertHardlink(DirEntry *entry) {
 }
 
 void SyncMediator::insertExistingHardlink(DirEntry *entry) {
-	// check if found file has hardlinks (nlink > 2)
+	// check if found file has hardlinks (nlink > 1)
 	// as we are looking through all files in one directory here, there might be
 	// completely untouched hardlink groups, which we can safely skip
 	// finally we have to see, if the hardlink is already part of this group
 	HardlinkGroupMap::iterator hlGroup;
-	if (entry->getUnionLinkcount() > 2) { // has hardlinks?
+	if (entry->getUnionLinkcount() > 1) { // has hardlinks?
 		hlGroup = getHardlinkMap().find(entry->getUnionInode());
-		
+
 		if (hlGroup != getHardlinkMap().end()) { // touched hardlinks in this group?
-			
 			DirEntryList::const_iterator i,end;
 			bool alreadyThere = false;
 			for (i = hlGroup->second.hardlinks.begin(), end = hlGroup->second.hardlinks.end(); i != end; ++i) {
