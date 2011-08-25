@@ -31,7 +31,6 @@ void SyncMediator::add(DirEntry *entry) {
 	
 	else if (entry->isRegularFile() || entry->isSymlink()) {
 		if (entry->isCatalogRequestFile() && entry->isNew()) {
-			cout << "found nested catalog request file" << endl;
 			createNestedCatalog(entry);
 		}
 		
@@ -242,8 +241,9 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 			}
 			
 			if (not alreadyThere) { // hardlink already in the group?
+				// if one element of a hardlink group is edited, all elements must be replaced
+				remove(entry);
 				hlGroup->second.hardlinks.push_back(entry);
-				cout << "inserting existing hardlink... " << entry->getFilename() << endl;
 			}
 		}
 	}
