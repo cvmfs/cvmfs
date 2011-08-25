@@ -3,12 +3,13 @@
 
 #include <string>
 #include <assert.h>
+#include <list>
 
 #include <iostream> // TODO: remove me
 
 #include "compat.h"
 #include "util.h"
-#include "cvmfs_sync_aufs.h"
+#include "hash.h"
 
 namespace cvmfs {
 
@@ -38,6 +39,7 @@ private:
 
 	std::string mRelativeParentPath;
 	std::string mFilename;
+	hash::t_sha1 mHash;
 
 public:
 	DirEntry(const std::string &dirPath, const std::string &filename, const DirEntryType entryType);
@@ -49,18 +51,23 @@ public:
 	inline bool isWhiteout() const { return mWhiteout; }
 	inline bool isCatalogRequestFile() const { return mFilename == ".cvmfscatalog"; }
 	
+	inline hash::t_sha1 getContentHash() const { return mHash; }
+	inline void setContentHash(hash::t_sha1 &hash) { mHash = hash; }
+	inline bool hasContentHash() { return mHash != hash::t_sha1(); }
+	
 	inline std::string getFilename() const { return mFilename; }
 	inline std::string getParentPath() const { return mRelativeParentPath; }
 
 	inline std::string getRelativePath() const { return (mRelativeParentPath.empty()) ? mFilename : mRelativeParentPath + "/" + mFilename; }
-	inline std::string getRepositoryPath() const { return UnionFilesystemSync::sharedInstance()->getRepositoryPath() + "/" + getRelativePath(); }
-	inline std::string getUnionPath() const { return UnionFilesystemSync::sharedInstance()->getUnionPath() + "/" + getRelativePath(); }
-	inline std::string getOverlayPath() const { return UnionFilesystemSync::sharedInstance()->getOverlayPath() + "/" + getRelativePath(); }
+	std::string getRepositoryPath() const;
+	std::string getUnionPath() const;
+	std::string getOverlayPath() const;
 
 	void markAsWhiteout();
 
 	unsigned int getUnionLinkcount();
 	uint64_t getUnionInode();
+	inline PortableStat64 getUnionStat() { statUnion(); return mUnionStat.stat; };
 	bool isNew();
 	
 	inline bool isEqualTo(const DirEntry *otherEntry) const { return (getRelativePath() == otherEntry->getRelativePath()); }
@@ -72,6 +79,8 @@ private:
 	inline void statOverlay() { if (mOverlayStat.obtained) return; statGeneric(getOverlayPath(), &mOverlayStat); } 
 	void statGeneric(const std::string &path, EntryStat *statStructure);
 };
+
+typedef std::list<DirEntry*> DirEntryList;
 
 /**
  *  @brief a simple recursion engine to abstract the recursion of directories.
@@ -277,7 +286,7 @@ void RecursionEngine<T>::notifyForSymlink(const std::string &dirPath, const std:
 	}
 
 	DirEntry *entry = new DirEntry(dirPath, filename, DE_SYMLINK);
-	(mDelegate->*foundRegularFile)(entry);
+	(mDelegate->*foundSymlink)(entry);
 }
 
 template <class T>

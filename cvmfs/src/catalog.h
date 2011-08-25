@@ -56,6 +56,8 @@ namespace catalog {
 		return (flags & NLINK_COUNT) / NLINK_COUNT_0;
 	}
 	
+	bool getMaximalHardlinkGroupId(const unsigned cat_id, unsigned int &maxId);
+	
    struct t_dirent {
       t_dirent() : catalog_id(0), flags(setLinkcountInFlags(0, 1)), inode(0), mode(0), size(0), mtime(0) {}
       t_dirent(const int cat_id,
@@ -74,8 +76,20 @@ namespace catalog {
 							flags = setLinkcountInFlags(f, 1);
 						}
 				}
+    t_dirent(const int cat_id,
+            const std::string &n, 
+            const std::string &sym, 
+            const int f, 
+            const uint64_t ino,
+            const unsigned m, 
+            const uint64_t s, 
+            const time_t t, 
+            const hash::t_sha1 &c,
+			const unsigned int rowId) : 
+                catalog_id(cat_id), catalog_row_id(rowId), flags(f), inode(ino),  mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {}
 
       int catalog_id;
+      unsigned int catalog_row_id;
       int flags;
       uint64_t inode;
       unsigned mode;
@@ -106,7 +120,6 @@ namespace catalog {
    bool set_root_prefix(const std::string &r_prefix, const unsigned cat_id);
    std::string get_root_prefix();
    std::string get_root_prefix_specific(const unsigned cat_id);
-   uint64_t get_next_free_inode();
    std::string mangled_path(const std::string &path);
    uint64_t get_revision(); /* Lock this manually */
    bool inc_revision(const int cat_id); /* Lock this manually */
@@ -127,17 +140,23 @@ namespace catalog {
    bool insert(const hash::t_md5 &name, const hash::t_md5 &parent, const t_dirent &entry); /* Locked */
    bool update_unprotected(const hash::t_md5 &name, const t_dirent &entry);
    bool update(const hash::t_md5 &name, const t_dirent &entry); /* Locked */
-   bool update_inode(const uint64_t inode, const unsigned mode, 
-                     const uint64_t size, const time_t mtime, const hash::t_sha1 &checksum); /* Locked */
-   bool update_inode(const uint64_t inode, const uint64_t size, 
-                     const time_t mtime, const hash::t_sha1 &checksum); /* Locked */
+
+   // bool update_inode(const uint64_t inode, const unsigned mode, 
+   //                   const uint64_t size, const time_t mtime, const hash::t_sha1 &checksum); /* Locked */
+   // 
+   // bool update_inode(const uint64_t inode, const uint64_t size, 
+   //                   const time_t mtime, const hash::t_sha1 &checksum); /* Locked */
+   // not supported anymore
+
    bool unlink_unprotected(const hash::t_md5 &name, const unsigned cat_id);
    bool unlink(const hash::t_md5 &name, const unsigned cat_id); /* Locked */
    bool lookup_unprotected(const hash::t_md5 &key, t_dirent &result);
 	bool lookup_informed_unprotected(const hash::t_md5 &key, const int catalog_id, t_dirent &result);
    int lookup_catalogid_unprotected(const hash::t_md5 &key);
    bool lookup(const hash::t_md5 &key, t_dirent &result);  /* Locked */
-   bool lookup_inode_unprotected(const uint64_t inode);
+//   bool lookup_inode_unprotected(const uint64_t inode);
+// not supported anymore
+
    bool parent(const hash::t_md5 &key, t_dirent &result);  /* Locked */
    bool parent_unprotected(const hash::t_md5 &key, t_dirent &result);
    std::vector<t_dirent> ls_unprotected(const hash::t_md5 &parent);

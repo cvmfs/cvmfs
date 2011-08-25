@@ -65,6 +65,8 @@ namespace catalog {
    gid_t gid; ///< Required for converting a catalog entry into struct stat
    int num_catalogs = 0; ///< We support nested catalogs.  There are loaded by SQLite's ATTACH.  In the end, we operate on a set of multiple catalogs
    int current_catalog = 0; ///< We query the catalogs one after another until success.  We use a lazy approach, meaning after success we ask that catalog next time again.
+	vector<unsigned int> inodeOffsets; ///< inodes are assigned at runtime... the number of entries in a catalog is the offset for the beginning of the next catalog
+	map<unsigned int, map<uint64_t, uint64_t> > hardlinkInodeMap; /// < mapping from catalog_id, hardlinkGroupId to inodeNumber (must be shifted by offset afterwards)
 
    vector<sqlite3 *> db;
    vector<sqlite3_stmt *> stmts_insert;
@@ -271,48 +273,6 @@ namespace catalog {
       
       return result;
    }
-
-	/**
-	 *  Gets the next inode to use for inserted file
-	 *
-	 *  \return next free inode number
-	 */
-	uint64_t get_next_free_inode() {
-		enforce_mem_limit();
-		
-		char *strResult;
-		uint64_t result;
-		const string sqlRead = "SELECT value FROM properties WHERE key='next_inode';";
-		sqlite3_stmt *stmt;
-		sqlite3_prepare_v2(db[0], sqlRead.c_str(), -1, &stmt, NULL);
-		int err = sqlite3_step(stmt);
-		if (err == SQLITE_ROW) {
-			strResult = (char *)sqlite3_column_text(stmt, 0);
-			result = strtoll(strResult, NULL, 10);
-		} else {
-			cout << "no entry" << endl;
-			
-			result = 1; // there was non... start at beginnning	and create an entry
-			const string sqlInsert = "INSERT OR REPLACE INTO properties (key, value) VALUES ('next_inode', '1');";
-			if (not sql_exec(db[0], sqlInsert)) {
-		         pmesg(D_CATALOG, "Cannot create next_inode property in root catalog");
-			}
-		}
-		
-		sqlite3_finalize(stmt);
-		
-		stringstream sqlUpdate;
-		sqlUpdate << "UPDATE properties SET value='" << (result + 1) << "' WHERE key='next_inode';";
-		if(not sql_exec(db[0], sqlUpdate.str())) {
-	         pmesg(D_CATALOG, "Cannot update next_inode property in root catalog");
-		}
-		
-		result += 10;
-		
-		cout << "Free inode: " << result << endl;
-		
-		return result;
-	}
    
    
    /**
@@ -475,7 +435,7 @@ namespace catalog {
       /* SELECT LS */
       sqlite3_stmt *ls;
       ostringstream sql_ls;
-      sql_ls << "SELECT " << cat_id << ", hash, inode, size, mode, mtime, flags, name, symlink "
+      sql_ls << "SELECT " << cat_id << ", hash, inode, size, mode, mtime, flags, name, symlink, rowid "
          "FROM catalog WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
       pmesg(D_CATALOG, "Prepared statement catalog %u: %s", cat_id, sql_ls.str().c_str());
       err = sqlite3_prepare_v2(db[cat_id], sql_ls.str().c_str(), -1, &ls, NULL);
@@ -487,7 +447,7 @@ namespace catalog {
       /* SELECT LOOKUP */
       sqlite3_stmt *lookup;
       ostringstream sql_lookup;
-      sql_lookup << "SELECT " << cat_id << ", hash, inode, size, mode, mtime, flags, name, symlink "
+      sql_lookup << "SELECT " << cat_id << ", hash, inode, size, mode, mtime, flags, name, symlink, rowid "
          "FROM catalog "
          "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
       pmesg(D_CATALOG, "Prepared statement catalog %u: %s", cat_id, sql_lookup.str().c_str());
@@ -703,7 +663,28 @@ namespace catalog {
       return result;
    }
 
-   
+	/**
+	 *  gets the number of entries in the catalog loaded before this one (cat_id - 1) and 
+	 *  uses this as inode offset for it's own inode assignments
+	 */
+	void setInodeOffsetForCatalog(const unsigned cat_id) {
+		unsigned int offset = 0;
+		
+		if (cat_id == 0) {
+			// root catalog...
+			offset = 0;
+		} else {
+			offset = get_num_dirent(cat_id - 1);
+		}
+		
+		if (inodeOffsets.size() < cat_id - 1) {
+			inodeOffsets.push_back(offset);
+		} else {
+			inodeOffsets[cat_id] = offset;	
+		}
+	}
+
+
    /**
     * Adds an SQLite file to the set of active catalogs.
     * If necessary, the database schema is created, i.e. 
@@ -771,6 +752,8 @@ namespace catalog {
    
       current_catalog = num_catalogs;
       num_catalogs++;
+
+	  setInodeOffsetForCatalog(current_catalog);
       
       if (open_transaction) transaction(num_catalogs-1);
       
@@ -1198,7 +1181,8 @@ namespace catalog {
                                       sqlite3_column_int64(stmt_ls, 5),
                                       ((sqlite3_column_bytes(stmt_ls, 1) > 0) ? 
                                         hash::t_sha1(sqlite3_column_blob(stmt_ls, 1), sqlite3_column_bytes(stmt_ls, 1)) :
-                                        hash::t_sha1())));
+                                        hash::t_sha1()),
+                                      sqlite3_column_int64(stmt_ls, 9)));
          }
          sqlite3_reset(stmt_ls);
          if (!result.empty()) {
@@ -1402,7 +1386,8 @@ namespace catalog {
          int flags = catalog::DIR_NESTED;
          if (sqlite3_step(stmt_lookup) == SQLITE_ROW) {
             flags = sqlite3_column_int(stmt_lookup, 6);
-            result.catalog_id = sqlite3_column_int(stmt_lookup, 0); 
+            result.catalog_id = sqlite3_column_int(stmt_lookup, 0);
+			result.catalog_row_id = sqlite3_column_int64(stmt_lookup, 9);
             result.name = string((char *)sqlite3_column_text(stmt_lookup, 7));
             result.symlink = string((char *)sqlite3_column_text(stmt_lookup, 8));
             result.flags = flags;
@@ -1439,6 +1424,7 @@ namespace catalog {
 			int flags = sqlite3_column_int(stmt_lookup, 6);
          //pmesg(D_CATALOG, "Found flags %d in catalog %d for path %s", flags, fid, path.c_str());
 			result.catalog_id = catalog_id; 
+			result.catalog_row_id = sqlite3_column_int64(stmt_lookup, 9);
 			result.name = string((char *)sqlite3_column_text(stmt_lookup, 7));
 			result.symlink = string((char *)sqlite3_column_text(stmt_lookup, 8));
 			result.flags = flags;
@@ -1519,6 +1505,7 @@ namespace catalog {
             /* If we hit the nested catalog entry, we are in the wrong catalog. Too bad. */
             if (!(flags & catalog::DIR_NESTED)) { 
                result.catalog_id = sqlite3_column_int(stmt_parent, 0); 
+
                result.name = string((char *)sqlite3_column_text(stmt_parent, 7));
                result.symlink = string((char *)sqlite3_column_text(stmt_parent, 8));
                result.flags = flags;
@@ -1898,12 +1885,58 @@ namespace catalog {
       return result.str();
    }
 #endif
+
+	bool getMaximalHardlinkGroupId(const unsigned cat_id, unsigned int &maxId) {
+		enforce_mem_limit();
+
+		bool result;
+		const string sql = "SELECT max(inode) FROM catalog;";
+		sqlite3_stmt *stmt;
+		sqlite3_prepare_v2(db[cat_id], sql.c_str(), -1, &stmt, NULL);
+		int err = sqlite3_step(stmt);
+		if (err == SQLITE_ROW) {
+			maxId = (unsigned int)atoi((char *)sqlite3_column_text(stmt, 0));
+			result = true;
+		} else {
+			maxId = 0; // returning default value
+			result = false;
+		}
+		sqlite3_finalize(stmt);
+
+		return result;
+	}
    
+	uint64_t getInode(unsigned int rowid, uint64_t hardlinkGroupId, unsigned int catalog_id) {
+		uint64_t inode;
+		if (hardlinkGroupId == 0) { // no hardlinks present
+			inode = rowid;
+		} else {
+			map<unsigned int, map<uint64_t, uint64_t> >::iterator catalogSpecificHardlinkMap = hardlinkInodeMap.find(catalog_id);
+			if (catalogSpecificHardlinkMap == hardlinkInodeMap.end()) { // no mapping found... create one
+				map<uint64_t, uint64_t> newMapping;
+				newMapping[hardlinkGroupId] = rowid;
+				hardlinkInodeMap[catalog_id] = newMapping;
+				inode = rowid;
+			} else { // found a mapping... check if the hardlinkGroupId already showed up
+				map<uint64_t, uint64_t>::iterator hardlinkGroupSpecificMap = catalogSpecificHardlinkMap->second.find(hardlinkGroupId);
+				if (hardlinkGroupSpecificMap == catalogSpecificHardlinkMap->second.end()) { // hardlink group didn't show up before... create a mapping for it
+					catalogSpecificHardlinkMap->second[hardlinkGroupId] = rowid;
+					inode = rowid;
+				} else {
+					inode = catalogSpecificHardlinkMap->second[hardlinkGroupId];
+				}
+			}
+		}
+		
+		cout << rowid << " " << hardlinkGroupId << " " << catalog_id << endl;
+		
+		return inode + inodeOffsets[catalog_id];
+	}
    
    void t_dirent::to_stat(struct stat *s) const {
       memset(s, 0, sizeof(*s));
       s->st_dev = 1;
-      s->st_ino = inode;
+      s->st_ino = getInode(catalog_row_id, inode, catalog_id);
       s->st_mode = mode;
       s->st_nlink = getLinkcountInFlags(flags);
       s->st_uid = uid;

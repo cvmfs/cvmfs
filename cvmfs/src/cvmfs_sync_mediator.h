@@ -12,7 +12,6 @@
 namespace cvmfs {
 
 class DirEntry;
-typedef std::list<DirEntry*> DirEntryList;
 
 typedef struct {
 	DirEntry *masterFile;
@@ -21,28 +20,22 @@ typedef struct {
 
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
 
-// typedef struct {
-// 	std::list<std::list<std::string> > addedFiles;
-// 	std::list<std::string> removedFiles;
-// 	
-// 	std::list<std::string> addedDirectories;
-// 	std::list<std::string> touchedDirectories;
-// 	std::list<std::string> removedDirectories;
-// 	
-// 	std::list<std::string> addedNestedCatalogs;
-// 	std::list<std::string> removedNestedCatalogs;
-// } Changeset;
-
 class SyncMediator {
 private:
 	typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
+	typedef std::list<HardlinkGroup> HardlinkGroupList;
 	
 private:
+	std::string mDataDirectory;
+	
 	HardlinkGroupMapStack mHardlinkStack;
-	CatalogHandler *mCatalogs;
+	CatalogHandler *mCatalogHandler;
+	
+	DirEntryList mFileQueue;
+	HardlinkGroupList mHardlinkQueue;
 	
 public:
-	SyncMediator();
+	SyncMediator(CatalogHandler *catalogHandler, std::string dataDirectory);
 	virtual ~SyncMediator();
 	
 	void add(DirEntry *entry);
@@ -53,7 +46,7 @@ public:
 	void enterDirectory(DirEntry *entry);
 	void leaveDirectory(DirEntry *entry);
 	
-	inline Changeset getChangeset() const { return mChangeset; }
+	void commit();
 	
 private:
 	void addDirectoryRecursively(DirEntry *entry);
@@ -76,6 +69,12 @@ private:
 	void removeNestedCatalog(DirEntry *requestFile);
 	
 	void leaveAddedDirectory(DirEntry *entry);
+	
+	void compressAndHashFileQueue();
+	void addFileQueueToCatalogs();
+	
+	inline bool addFileToDatastore(DirEntry *entry, hash::t_sha1 &hash) { return addFileToDatastore(entry, "", hash); }
+	bool addFileToDatastore(DirEntry *entry, const std::string &suffix, hash::t_sha1 &hash);
 	
 	inline HardlinkGroupMap& getHardlinkMap() { return mHardlinkStack.top(); }
 	

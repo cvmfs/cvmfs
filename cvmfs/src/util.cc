@@ -30,6 +30,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <iostream>
+#include <sstream>
 
 extern "C" {
    #include "smalloc.h"
@@ -463,4 +465,22 @@ finish:
 erange:
 	errno = ERANGE;
 	return (NULL);
+}
+
+bool get_file_info(const string &path, PortableStat64 *info) {
+	if (portableLinkStat64(path.c_str(), info) != 0) {
+		stringstream ss;
+		ss << "could not stat " << path;
+		printWarning(ss.str());
+		return false;
+	}
+
+	return true;
+}
+
+void printError(const string &message) {
+	cerr << "[ERROR] " << message << endl;
+}
+void printWarning(const string &message) {
+	cerr << "[WARNING] " << message << endl;
 }

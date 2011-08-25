@@ -16,24 +16,24 @@ UnionFilesystemSync* UnionFilesystemSync::mInstance = NULL;
 
 UnionFilesystemSync* UnionFilesystemSync::sharedInstance() {
 	if (mInstance == NULL) {
-		UnionFilesystemSync::printError("Sync framework not initialized");
+		printError("Sync framework not initialized");
 		exit(1);
 	}
 	
 	return mInstance;
 }
 
-void SyncAufs1::initialize(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath) {
+void SyncAufs1::initialize(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator) {
 	if (mInstance != NULL) {
-		UnionFilesystemSync::printError("Sync framework initialized twice");
+		printError("Sync framework initialized twice");
 		exit(1);
 	}
 	
-	mInstance = new SyncAufs1(repositoryPath, unionPath, aufsPath);
+	mInstance = new SyncAufs1(repositoryPath, unionPath, aufsPath, mediator);
 }
 
-SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &unionPath, const std::string &aufsPath) :
-	UnionFilesystemSync(repositoryPath, unionPath, aufsPath){
+SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator) :
+	UnionFilesystemSync(repositoryPath, unionPath, aufsPath, mediator) {
 	// init ignored filenames
 	mIgnoredFilenames.insert(".wh..wh..tmp");
 	mIgnoredFilenames.insert(".wh..wh.plnk");
@@ -59,6 +59,8 @@ bool SyncAufs1::goGetIt() {
 	
 	recursion.recurse(mOverlayPath);
 	
+	mMediator->commit();
+	
 	return true;
 }
 
@@ -67,66 +69,26 @@ bool SyncAufs1::isEditedItem(const string &dirPath, const string &filename) cons
 	              // and edited files... we are assuming every file to be overwritten
 	              // this breaks inode persistency, but we have to live with that atm
 }
-/*
-void SyncAufs1::copyUpHardlinks(const std::string &dirPath, const std::string &filename) {
-	// get inode of file
-	uint64_t inode = statFileInUnionVolume(dirPath, filename).st_ino;
-	
-	// if inode already exists, we don't have to do this hassle again
-	if (hardlinkGroupWithUnionInodeExists(inode)) {
-		return;
-	}
-	
-	// go through directory and search for the same inode
-	string pathToDirectory = getPathToUnionFile(dirPath, "");
-	DIR *dip;
-	PortableDirent *dit;
-	string filenameInDirectory;
-	uint64_t inodeInDirectory;
-	if ((dip = opendir(pathToDirectory.c_str())) == NULL) {
-		return;
-	}
-	
-	// create a hardlink group which is created at once in the end
-	HardlinkGroup hardlinks;
-	hardlinks.masterFile = getPathToUnionFile(dirPath, filename);
-	
-	while ((dit = portableReaddir(dip)) != NULL) {
-		filenameInDirectory = dit->d_name;
-		inodeInDirectory = statFileInUnionVolume(dirPath, filenameInDirectory).st_ino;
-		
-		if (inodeInDirectory == inode) {
-			// the complete group of hardlinks will be replaced
-			// old ones are deleted and afterwards the complete group is recreated
-			if (not isNewItem(dirPath, filenameInDirectory)) {
-				mMediator->deleteRegularFile(dirPath, filenameInDirectory);
-			}
-			hardlinks.hardlinks.push_back(getPathToUnionFile(dirPath, filenameInDirectory));
-		}
-	}
-	
-	closedir(dip);
-	
-	// the hardlink group is built up and will be recreated
-	addHardlinkGroup(hardlinks, inode);
-}
-*/
 
 bool SyncAufs1::isWhiteoutEntry(const DirEntry *entry) const {
 	return (entry->getFilename().substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix);
 }
 
-UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath) {
+UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath, SyncMediator *mediator) {
 	mRepositoryPath = canonical_path(repositoryPath);
 	mUnionPath = canonical_path(unionPath);
 	mOverlayPath = canonical_path(overlayPath);
 	mCheckSymlinks = false;
 	
-	mMediator = new SyncMediator();
+	mMediator = mediator;
 }
 
 UnionFilesystemSync::~UnionFilesystemSync() {
-	delete mMediator;
+}
+
+void UnionFilesystemSync::fini() {
+	delete UnionFilesystemSync::sharedInstance();
+	mInstance = NULL;
 }
 
 bool UnionFilesystemSync::processFoundDirectory(DirEntry *entry) {
@@ -167,12 +129,4 @@ void UnionFilesystemSync::enteringDirectory(DirEntry *entry) {
 
 void UnionFilesystemSync::leavingDirectory(DirEntry *entry) {
 	mMediator->leaveDirectory(entry);
-}
-
-void UnionFilesystemSync::printError(const string &errorMessage) {
-	cerr << "ERROR: " << errorMessage << endl;
-}
-
-void UnionFilesystemSync::printWarning(const string &warningMessage) {
-	cerr << "Warning: " << warningMessage << endl;
 }

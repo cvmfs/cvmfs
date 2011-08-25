@@ -54,7 +54,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	cvmfs_sync_recursion.h cvmfs_sync_recursion.cc
 	cvmfs_sync_aufs.h cvmfs_sync_aufs.cc
 	cvmfs_sync_mediator.h cvmfs_sync_mediator.cc
-	cvmfs_sync_catalog_handler.h cvmfs_sync_catalog_handler.cc)
+	cvmfs_sync_catalog.h cvmfs_sync_catalog.cc)
 
 set (CVMFS_CLGCMP_SOURCES
 	smalloc.h smalloc.c 

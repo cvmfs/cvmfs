@@ -1,5 +1,12 @@
 #include "cvmfs_sync_mediator.h"
 
+extern "C" {
+   #include "compression.h"
+   #include "smalloc.h"
+}
+
+#include "hash.h"
+#include "cvmfs_sync_aufs.h"
 #include "cvmfs_sync_recursion.h"
 
 #include <sstream>
@@ -8,8 +15,9 @@
 using namespace cvmfs;
 using namespace std;
 
-SyncMediator::SyncMediator() {
-	mCatalogs = new CatalogHandler();
+SyncMediator::SyncMediator(CatalogHandler *catalogHandler, string dataDirectory) {
+	mCatalogHandler = catalogHandler;
+	mDataDirectory = dataDirectory;
 }
 
 SyncMediator::~SyncMediator() {
@@ -21,11 +29,12 @@ void SyncMediator::add(DirEntry *entry) {
 		addDirectoryRecursively(entry);
 	}
 	
-	else if (entry->isCatalogRequestFile()) {
-		createNestedCatalog(entry);
-	}
-	
 	else if (entry->isRegularFile() || entry->isSymlink()) {
+		if (entry->isCatalogRequestFile() && entry->isNew()) {
+			cout << "found nested catalog request file" << endl;
+			createNestedCatalog(entry);
+		}
+		
 		if (entry->getUnionLinkcount() > 1) {
 			insertHardlink(entry);
 		} else {
@@ -36,7 +45,7 @@ void SyncMediator::add(DirEntry *entry) {
 	else {
 		stringstream ss;
 		ss << "'" << entry->getRelativePath() << "' cannot be added. Unregcognized file format.";
-		UnionFilesystemSync::sharedInstance()->printWarning(ss.str());
+		printWarning(ss.str());
 	}
 }
 
@@ -52,7 +61,7 @@ void SyncMediator::touch(DirEntry *entry) {
 	else {
 		stringstream ss;
 		ss << "'" << entry->getRelativePath() << "' cannot be touched. Unregcognized file format.";
-		UnionFilesystemSync::sharedInstance()->printWarning(ss.str());
+		printWarning(ss.str());
 	}
 }
 
@@ -60,19 +69,21 @@ void SyncMediator::remove(DirEntry *entry) {
 	if (entry->isDirectory()) {
 		removeDirectoryRecursively(entry);
 	}
-
-	else if (entry->isCatalogRequestFile()) {
-		removeNestedCatalog(entry);
-	}
 	
 	else if (entry->isRegularFile() || entry->isSymlink()) {
+		// first remove the file...
 		removeFile(entry);
+		
+		// ... then the nested catalog (if needed)
+		if (entry->isCatalogRequestFile()) {
+			removeNestedCatalog(entry);
+		}
 	}
 
 	else {
 		stringstream ss;
 		ss << "'" << entry->getRelativePath() << "' cannot be deleted. Unregcognized file format.";
-		UnionFilesystemSync::sharedInstance()->printWarning(ss.str());
+		printWarning(ss.str());
 	}
 }
 
@@ -84,45 +95,129 @@ void SyncMediator::replace(DirEntry *entry) {
 }
 
 void SyncMediator::enterDirectory(DirEntry *entry) {
-	cout << "-> enter directory " << entry->getRepositoryPath() << endl;
-	
 	HardlinkGroupMap newMap;
 	mHardlinkStack.push(newMap);
 }
 
 void SyncMediator::leaveDirectory(DirEntry *entry) {
-	cout << "<- leave directory " << entry->getRepositoryPath() << endl;
-	
 	completeHardlinks(entry);
 	addHardlinkGroup(getHardlinkMap());
 	mHardlinkStack.pop();
 }
 
 void SyncMediator::leaveAddedDirectory(DirEntry *entry) {
-	cout << "<- leave directory " << entry->getRepositoryPath() << endl;
 	addHardlinkGroup(getHardlinkMap());
 	mHardlinkStack.pop();
+}
+
+void SyncMediator::commit() {
+	compressAndHashFileQueue();
+	addFileQueueToCatalogs();
+	mCatalogHandler->precalculateListings();
+	mCatalogHandler->commit();
+}
+
+void SyncMediator::compressAndHashFileQueue() {
+	DirEntryList::iterator i;
+	DirEntryList::const_iterator iend;
+	
+	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
+		hash::t_sha1 hash;
+		addFileToDatastore(*i, hash);
+		(*i)->setContentHash(hash);
+	}
+
+	HardlinkGroupList::iterator j;
+	HardlinkGroupList::const_iterator jend;
+	DirEntryList::iterator k;
+	DirEntryList::const_iterator kend;
+	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
+		if (not j->masterFile->isRegularFile()) {
+			continue;
+		}
+		
+		hash::t_sha1 hash;
+		addFileToDatastore(j->masterFile, hash);
+		
+		for (k = j->hardlinks.begin(), kend = j->hardlinks.end(); k != kend; ++k) {
+			(*k)->setContentHash(hash);
+		}
+	}
+}
+
+void SyncMediator::addFileQueueToCatalogs() {
+	DirEntryList::iterator i;
+	DirEntryList::const_iterator iend;
+	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
+		mCatalogHandler->addFile(*i);
+	}
+	
+	HardlinkGroupList::iterator j;
+	HardlinkGroupList::const_iterator jend;
+	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
+		mCatalogHandler->addHardlinkGroup(j->hardlinks);
+	}
+}
+
+bool SyncMediator::addFileToDatastore(DirEntry *entry, const std::string &suffix, hash::t_sha1 &hash) {
+	bool result = false;
+
+	/* Create temporary file */
+	const string templ = mDataDirectory + "/txn/compressing.XXXXXX";
+	char *tmp_path = (char *)smalloc(templ.length() + 1);
+	strncpy(tmp_path, templ.c_str(), templ.length() + 1);
+	int fd_dst = mkstemp(tmp_path);
+
+	if ((fd_dst >= 0) && (fchmod(fd_dst, plain_file_mode) == 0)) {
+		/* Compress and calculate SHA1 */
+		FILE *fsrc = NULL, *fdst = NULL;
+		if ( (fsrc = fopen(entry->getOverlayPath().c_str(), "r")) && 
+		     (fdst = fdopen(fd_dst, "w")) && 
+		     (compress_file_fp_sha1(fsrc, fdst, hash.digest) == 0) )
+		{
+			const string sha1str = hash.to_string();
+			const string cache_path = mDataDirectory + "/" + sha1str.substr(0, 2) + "/" + 
+			sha1str.substr(2) + suffix;
+			fflush(fdst);
+			if (rename(tmp_path, cache_path.c_str()) == 0) {
+				result = true;
+			} else {	
+				unlink(tmp_path);
+				stringstream ss;
+				ss << "could not rename " << tmp_path << " to " << cache_path;
+				printWarning(ss.str());
+			}
+		} else {	
+			stringstream ss;
+			ss << "could not compress " << entry->getOverlayPath();
+			printWarning(ss.str());
+		}
+		if (fsrc) fclose(fsrc);
+		if (fdst) fclose(fdst);
+	} else {
+		stringstream ss;
+		ss << "could not create temporary file " << templ;
+		printWarning(ss.str());
+		result = false;
+	}
+	free(tmp_path);
+
+	return result;
 }
 
 void SyncMediator::insertHardlink(DirEntry *entry) {
 	uint64_t inode = entry->getUnionInode();
 	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(inode);
 
-	cout << "inserting hardlink... " << entry->getFilename();
-	
 	if (hardlinkGroup == getHardlinkMap().end()) {
 		// create a new hardlink group
 		HardlinkGroup newGroup;
 		newGroup.masterFile = entry;
 		newGroup.hardlinks.push_back(entry);
 		getHardlinkMap()[inode] = newGroup;
-		
-		cout << "... new" << endl;
 	} else {
 		// append the file to the appropriate hardlink group
 		hardlinkGroup->second.hardlinks.push_back(entry);
-		
-		cout << "... appended (" << hardlinkGroup->second.hardlinks.size() << ")" << endl;
 	}
 }
 
@@ -162,15 +257,11 @@ void SyncMediator::completeHardlinks(DirEntry *entry) {
 	if (getHardlinkMap().size() == 0) {
 		return;
 	}
-
-	cout << "--> start looking for existing hardlinks in " << entry->getRelativePath() << endl;
 	
 	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getUnionPath(), false);
 	recursion.foundRegularFile = &SyncMediator::insertExistingHardlink;
 	recursion.foundSymlink = &SyncMediator::insertExistingHardlink;
 	recursion.recurse(entry->getUnionPath());
-	
-	cout << "--> ready " << endl;
 }
 
 void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
@@ -202,24 +293,27 @@ bool SyncMediator::addDirectoryCallback(DirEntry *entry) {
 
 void SyncMediator::createNestedCatalog(DirEntry *requestFile) {
 	cout << "[add] NESTED CATALOG" << endl;
-//	mChangeset.addedNestedCatalogs.push_back(requestFile->getParentPath());
+	mCatalogHandler->createNestedCatalog(requestFile->getParentPath());
 }
 
 void SyncMediator::removeNestedCatalog(DirEntry *requestFile) {
 	cout << "[rem] NESTED CATALOG" << endl;
-//	mChangeset.removedNestedCatalogs.push_back(requestFile->getParentPath());
+	mCatalogHandler->removeNestedCatalog(requestFile->getParentPath());
 }
 
 void SyncMediator::addFile(DirEntry *entry) {
 	cout << "[add] " << entry->getRepositoryPath() << endl;
-	list<string> filename;
-	filename.push_back(entry->getRelativePath());
-	mChangeset.addedFiles.push_back(filename);
+	
+	if (entry->isSymlink()) {
+		mCatalogHandler->addFile(entry);
+	} else {
+		mFileQueue.push_back(entry);
+	}
 }
 
 void SyncMediator::removeFile(DirEntry *entry) {
 	cout << "[rem] " << entry->getRepositoryPath() << endl;
-	mChangeset.removedFiles.push_back(entry->getRelativePath());
+	mCatalogHandler->removeFile(entry);
 }
 
 void SyncMediator::touchFile(DirEntry *entry) {
@@ -229,31 +323,26 @@ void SyncMediator::touchFile(DirEntry *entry) {
 
 void SyncMediator::addDirectory(DirEntry *entry) {
 	cout << "[add] " << entry->getRepositoryPath() << endl;
-	mChangeset.addedDirectories.push_back(entry->getRelativePath());
+	mCatalogHandler->addDirectory(entry);
 }
 
 void SyncMediator::removeDirectory(DirEntry *entry) {
 	cout << "[rem] " << entry->getRepositoryPath() << endl;
-	mChangeset.removedDirectories.push_back(entry->getRelativePath());
+	mCatalogHandler->removeDirectory(entry);
 }
 
 void SyncMediator::touchDirectory(DirEntry *entry) {
 	cout << "[tou] " << entry->getRepositoryPath() << endl;
-	mChangeset.touchedDirectories.push_back(entry->getRelativePath());
 }
 
 void SyncMediator::addHardlinkGroup(const HardlinkGroupMap &hardlinks) {
-	cout << "adding hardlink groups... " << endl;
-	
 	HardlinkGroupMap::const_iterator i,end;
 	for (i = hardlinks.begin(), end = hardlinks.end(); i != end; ++i) {
-		cout << "master file: " << i->second.masterFile->getRepositoryPath() << endl;
-		
-		list<string> filenames;
-		DirEntryList::const_iterator j, send;
-		for (j = i->second.hardlinks.begin(), send = i->second.hardlinks.end(); j != send; ++j) {
-			filenames.push_back((*i)->getRelativePath());
-		}
-		mChangeset.addedFiles.push_back(filenames);
+		cout << "[add] hardlink group around: " << i->second.masterFile->getRepositoryPath() << endl;
+		if (i->second.masterFile->isSymlink()) {
+			mCatalogHandler->addHardlinkGroup(i->second.hardlinks);
+		} else {
+			mHardlinkQueue.push_back(i->second);				
+		}		
 	}
 }

@@ -1,4 +1,5 @@
 #include "cvmfs_sync_recursion.h"
+#include "cvmfs_sync_aufs.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -14,6 +15,7 @@ DirEntry::DirEntry(const string &dirPath, const string &filename, const DirEntry
 	mFilename = filename;
 	mType = entryType;
 	mWhiteout = false;
+	mHash = hash::t_sha1();
 
 	// init stat structures
 	mRepositoryStat.obtained = false;
@@ -41,7 +43,7 @@ void DirEntry::markAsWhiteout() {
 	if (mRepositoryStat.errorCode != 0) {
 		stringstream ss;
 		ss << "'" << getRelativePath() << "' should be deleted, but was not found in repository.";
-		UnionFilesystemSync::sharedInstance()->printWarning(ss.str());
+		printWarning(ss.str());
 		return;
 	}
 
@@ -66,4 +68,16 @@ void DirEntry::statGeneric(const string &path, EntryStat *statStructure) {
 		statStructure->errorCode = errno;
 	}
 	statStructure->obtained = true;
+}
+
+string DirEntry::getRepositoryPath() const {
+	return UnionFilesystemSync::sharedInstance()->getRepositoryPath() + "/" + getRelativePath();
+}
+
+string DirEntry::getUnionPath() const {
+	return UnionFilesystemSync::sharedInstance()->getUnionPath() + "/" + getRelativePath();
+}
+
+string DirEntry::getOverlayPath() const {
+	return UnionFilesystemSync::sharedInstance()->getOverlayPath() + "/" + getRelativePath();
 }

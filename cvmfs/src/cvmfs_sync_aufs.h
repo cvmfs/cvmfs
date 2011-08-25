@@ -38,9 +38,9 @@ namespace cvmfs {
 		virtual ~UnionFilesystemSync();
 		
 		virtual bool goGetIt() = 0;
-		Changeset getChangeset() const { return mMediator->getChangeset(); }
 		
 		static UnionFilesystemSync *sharedInstance();
+		static void fini();
 		
 		inline std::string getRepositoryPath() const { return mRepositoryPath; }
 		inline std::string getUnionPath() const { return mUnionPath; }
@@ -48,11 +48,8 @@ namespace cvmfs {
 		
 		virtual std::string getWhiteoutPrefix() const = 0;
 		
-		static void printWarning(const std::string &warningMessage);
-		static void printError(const std::string &errorMessage);
-		
 	protected:
-		UnionFilesystemSync(const std::string &repositoryPath, const std::string &unionPath, const std::string &overlayPath);
+		UnionFilesystemSync(const std::string &repositoryPath, const std::string &unionPath, const std::string &overlayPath, SyncMediator *mediator);
 		
 		/**
 		 *  checks if the given filename (without path) is interesting for sync
@@ -115,12 +112,12 @@ namespace cvmfs {
 		virtual ~SyncAufs1();
 		
 		bool goGetIt();
-		static void initialize(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath);
+		static void initialize(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator);
 		
 		inline std::string getWhiteoutPrefix() const { return mWhiteoutPrefix; }
 		
 	protected:
-		SyncAufs1(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath);
+		SyncAufs1(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator);
 		
 		bool isWhiteoutEntry(const DirEntry *entry) const;
 		int getHardlinkCount(const std::string &dirPath, const std::string filename) const;

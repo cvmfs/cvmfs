@@ -4,6 +4,7 @@
 #include "cvmfs_config.h"
 
 #include "hash.h"
+#include "compat.h"
 
 #include <string>
 #include <map>
@@ -33,6 +34,11 @@ bool read_sig_tail(const void *buf, const unsigned buf_size, const unsigned skip
 bool write_memchunk(const std::string &patch, const void *chunk, const int &size);
 FILE *temp_file(const std::string &path_prefix, const int mode, const char *open_flags,
                 std::string &final_path);
+bool get_file_info(const std::string &path, PortableStat64 *info);
+
+void printError(const std::string &message);
+void printWarning(const std::string &message);
+
 /*
  * abs2rel: convert an absolute path name into relative.
  *
