@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <stdlib.h>
 
 #include "cvmfs_sync_aufs.h"
 

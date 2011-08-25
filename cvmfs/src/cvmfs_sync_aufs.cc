@@ -6,6 +6,7 @@
 #include <iostream> // remove later
 #include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sstream>
 

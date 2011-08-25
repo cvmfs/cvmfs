@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <list>
 #include <set>
+#include <stdint.h>
 
 #include <iostream> // TODO: remove me
 
