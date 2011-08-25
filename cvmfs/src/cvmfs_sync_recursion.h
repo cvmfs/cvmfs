@@ -198,7 +198,6 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 
 	// obtain the absolute path by adding the relative portion
 	absolutePath = mRelativeToDirectory + "/" + entry->getRelativePath();
-
 	// get into directory and notify the user
 	if ((dip = opendir(absolutePath.c_str())) == NULL) {
 		return;

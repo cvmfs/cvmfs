@@ -276,11 +276,11 @@ void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
 }
 
 void SyncMediator::removeDirectoryRecursively(DirEntry *entry) {
-	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getOverlayPath());
+	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getRepositoryPath());
 	recursion.foundRegularFile = &SyncMediator::remove;
 	recursion.foundDirectoryAfterRecursion = &SyncMediator::removeDirectory; // delete a directory AFTER it was emptied
 	recursion.foundSymlink = &SyncMediator::remove;
-	recursion.recurse(entry->getOverlayPath());
+	recursion.recurse(entry->getRepositoryPath());
 	
 	removeDirectory(entry);
 }
