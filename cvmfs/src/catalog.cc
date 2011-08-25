@@ -472,7 +472,7 @@ namespace catalog {
       /* SELECT PARENT */
       sqlite3_stmt *parent;
       ostringstream sql_parent;
-      sql_parent << "SELECT " << cat_id << ", a.hash, a.inode, a.size, a.mode, a.mtime, a.flags, a.name, a.symlink "
+      sql_parent << "SELECT " << cat_id << ", a.hash, a.inode, a.size, a.mode, a.mtime, a.flags, a.name, a.symlink, a.rowid "
          "FROM catalog a, catalog b "
          "WHERE (b.md5path_1 = :md5_1) AND (b.md5path_2 = :md5_2) AND (a.md5path_1 = b.parent_1) AND (a.md5path_2 = b.parent_2);";
       pmesg(D_CATALOG, "Prepared statement catalog %u: %s", cat_id, sql_parent.str().c_str());
@@ -1505,7 +1505,7 @@ namespace catalog {
             /* If we hit the nested catalog entry, we are in the wrong catalog. Too bad. */
             if (!(flags & catalog::DIR_NESTED)) { 
                result.catalog_id = sqlite3_column_int(stmt_parent, 0); 
-
+               result.catalog_row_id = sqlite3_column_int64(stmt_parent, 9);
                result.name = string((char *)sqlite3_column_text(stmt_parent, 7));
                result.symlink = string((char *)sqlite3_column_text(stmt_parent, 8));
                result.flags = flags;
