@@ -15,7 +15,7 @@
 
 namespace cvmfs {
 
-class UnionFilesystemSync;
+class UnionSync;
 
 enum DirEntryType {
 	DE_DIR,
@@ -23,10 +23,24 @@ enum DirEntryType {
 	DE_SYMLINK
 };
 
+/**
+ *  any directory entry emitted by the RecursionEngine is wrapped in a convenient DirEntry structure
+ *  This class represents potentially three concrete files:
+ *    - <repository path>/<filename>
+ *    - <read-write branch>/<filename>
+ *    - <union volume path>/<filename>
+ *  The main purpose of this class is to cache stat calls to the underlying files in the different locations
+ */
 class DirEntry {
 private:
 	DirEntryType mType;
 
+	/**
+	 *  structure to cache stat calls to the different file locations
+	 *  obtained: false at the beginning, after first stat call it is true
+	 *  errorCode: the errno value after the stat call responded != 0
+	 *  stat: the actual stat structure
+	 */
 	typedef struct {
 		bool obtained;
 		int errorCode;
@@ -41,9 +55,17 @@ private:
 
 	std::string mRelativeParentPath;
 	std::string mFilename;
-	hash::t_sha1 mHash;
+	
+	/** the hash of the file's content (computed by the SyncMediator) */
+	hash::t_sha1 mContentHash;
 
 public:
+	/**
+	 *  create a new DirEntry (is is normally not required for normal usage)
+	 *  @param dirPath the RELATIVE path to the file
+	 *  @param filename the name of the file ;-)
+	 *  @param entryType well...
+	 */
 	DirEntry(const std::string &dirPath, const std::string &filename, const DirEntryType entryType);
 	virtual ~DirEntry();
 
@@ -54,9 +76,9 @@ public:
 	inline bool isCatalogRequestFile() const { return mFilename == ".cvmfscatalog"; }
 	bool isOpaqueDirectory() const;
 	
-	inline hash::t_sha1 getContentHash() const { return mHash; }
-	inline void setContentHash(hash::t_sha1 &hash) { mHash = hash; }
-	inline bool hasContentHash() { return mHash != hash::t_sha1(); }
+	inline hash::t_sha1 getContentHash() const { return mContentHash; }
+	inline void setContentHash(hash::t_sha1 &hash) { mContentHash = hash; }
+	inline bool hasContentHash() { return mContentHash != hash::t_sha1(); }
 	
 	inline std::string getFilename() const { return mFilename; }
 	inline std::string getParentPath() const { return mRelativeParentPath; }
@@ -67,7 +89,7 @@ public:
 	std::string getOverlayPath() const;
 
 	void markAsWhiteout();
-
+	
 	unsigned int getUnionLinkcount();
 	uint64_t getUnionInode();
 	inline PortableStat64 getUnionStat() { statUnion(); return mUnionStat.stat; };
@@ -84,6 +106,16 @@ private:
 };
 
 typedef std::list<DirEntry*> DirEntryList;
+
+/**
+ *  the foundDirectory-Callback can decide if the recursion engine should recurse into
+ *  the recently found directory. It has to communicate its decision by returning one
+ *  of these enum elements
+ */
+enum RecursionPolicy {
+	RP_RECURSE,
+	RP_DONT_RECURSE
+};
 
 /**
  *  @brief a simple recursion engine to abstract the recursion of directories.
@@ -119,10 +151,10 @@ public:
 
 	/**
 	 *  message if a directory was found
-	 *  if the callback returns true, the recursion will continue in the found directory
-	 *  otherwise it will skip it and continue with the next entry in the current director
+	 *  depending on the response of the callback, the recursion will continue in the found directory
+	 *  if this callback is not specified, it will recurse by default!
 	 */
-	bool (T::*foundDirectory)(DirEntry *entry);
+	RecursionPolicy (T::*foundDirectory)(DirEntry *entry);
 	
 	/** message for a found directory after it was already recursed */
 	void (T::*foundDirectoryAfterRecursion)(DirEntry *entry);
@@ -131,11 +163,26 @@ public:
 	void (T::*foundSymlink)(DirEntry *entry);
 
 public:
+	/**
+	 *  create a new recursion engine
+	 *  @param delegate the object which will receive the callbacks
+	 *  @param relativeToDirectory the DirEntries will be created relative to this directory
+	 *  @param ignoredFiles a list of files which the delegate DOES NOT care about (no callback calls or recursion for them)
+	 */
 	RecursionEngine(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles);
+	
+	/**
+	 *  create a new recursion engine
+	 *  @param delegate the object which will receive the callbacks
+	 *  @param relativeToDirectory the DirEntries will be created relative to this directory
+	 *  @param ignoredFiles a list of files which the delegate DOES NOT care about (no callback calls or recursion for them)
+	 *  @param recurse should the recursion engine recurse at all? (if not, it basically just traverses the given directory)
+	 */
 	RecursionEngine(T *delegate, const std::string &relativeToDirectory, std::set<std::string> ignoredFiles, bool recurse);
 
 	/**
-	 *  start the recursion at the given directory
+	 *  start the recursion
+	 *  @param dirPath the directory to start the recursion at
 	 */
 	void recurse(const std::string &dirPath) const;
 
@@ -260,7 +307,7 @@ bool RecursionEngine<T>::notifyForDirectory(DirEntry *entry) const {
 	}
 	
 	// we are only recursing, if it is generally enabeld (mRecurse) and if the user wants us to
-	return recurse && mRecurse;
+	return ((recurse == RP_RECURSE) && mRecurse);
 }
 
 template <class T>

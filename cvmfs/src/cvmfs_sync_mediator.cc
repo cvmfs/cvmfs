@@ -117,27 +117,32 @@ void SyncMediator::commit() {
 }
 
 void SyncMediator::compressAndHashFileQueue() {
+	// compressing and hashing files
 	DirEntryList::iterator i;
 	DirEntryList::const_iterator iend;
-	
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
 		hash::t_sha1 hash;
 		addFileToDatastore(*i, hash);
 		(*i)->setContentHash(hash);
 	}
 
+	// compressing and hashing files in hardlink groups
+	// (hardlinks point to the same "data", therefore we only have to compress it once)
 	HardlinkGroupList::iterator j;
 	HardlinkGroupList::const_iterator jend;
 	DirEntryList::iterator k;
 	DirEntryList::const_iterator kend;
 	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
+		// hardlinks to anything else (mostly symlinks) do not have to be compressed
 		if (not j->masterFile->isRegularFile()) {
 			continue;
 		}
 		
+		// compress the master file
 		hash::t_sha1 hash;
 		addFileToDatastore(j->masterFile, hash);
 		
+		// distribute the obtained hash for every hardlink
 		for (k = j->hardlinks.begin(), kend = j->hardlinks.end(); k != kend; ++k) {
 			(*k)->setContentHash(hash);
 		}
@@ -145,12 +150,14 @@ void SyncMediator::compressAndHashFileQueue() {
 }
 
 void SyncMediator::addFileQueueToCatalogs() {
+	// add singular files
 	DirEntryList::iterator i;
 	DirEntryList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
 		mCatalogHandler->addFile(*i);
 	}
 	
+	// add hardlink groups
 	HardlinkGroupList::iterator j;
 	HardlinkGroupList::const_iterator jend;
 	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
@@ -252,12 +259,12 @@ void SyncMediator::completeHardlinks(DirEntry *entry) {
 	// create a recursion engine which DOES NOT recurse into directories by default.
 	// it basically goes through the current directory (in the union volume) and
 	// searches for already existing hardlinks which has to be connected to the new ones
-	// if there is no hardlink in the current change set, we can skip this
+	// if there was no changed hardlink found, we can skip this
 	if (getHardlinkMap().size() == 0) {
 		return;
 	}
 	
-	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getUnionPath(), UnionFilesystemSync::sharedInstance()->getIgnoredFilenames(), false);
+	RecursionEngine<SyncMediator> recursion(this, UnionSync::sharedInstance()->getUnionPath(), UnionSync::sharedInstance()->getIgnoredFilenames(), false);
 	recursion.foundRegularFile = &SyncMediator::insertExistingHardlink;
 	recursion.foundSymlink = &SyncMediator::insertExistingHardlink;
 	recursion.recurse(entry->getUnionPath());
@@ -266,7 +273,7 @@ void SyncMediator::completeHardlinks(DirEntry *entry) {
 void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
 	addDirectory(entry);
 	
-	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getOverlayPath(), UnionFilesystemSync::sharedInstance()->getIgnoredFilenames());
+	RecursionEngine<SyncMediator> recursion(this, UnionSync::sharedInstance()->getOverlayPath(), UnionSync::sharedInstance()->getIgnoredFilenames());
 	recursion.enteringDirectory = &SyncMediator::enterDirectory;
 	recursion.leavingDirectory = &SyncMediator::leaveAddedDirectory;
 	recursion.foundRegularFile = &SyncMediator::add;
@@ -276,9 +283,9 @@ void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
 }
 
 void SyncMediator::removeDirectoryRecursively(DirEntry *entry) {
-	RecursionEngine<SyncMediator> recursion(this, UnionFilesystemSync::sharedInstance()->getRepositoryPath(), UnionFilesystemSync::sharedInstance()->getIgnoredFilenames());
+	RecursionEngine<SyncMediator> recursion(this, UnionSync::sharedInstance()->getRepositoryPath(), UnionSync::sharedInstance()->getIgnoredFilenames());
 	recursion.foundRegularFile = &SyncMediator::remove;
-	 // delete a directory AFTER it was emptied ( we cannot use the generic remove here, because it would start up another recursion)
+	// delete a directory AFTER it was emptied (we cannot use the generic SyncMediator::remove() here, because it would start up another recursion)
 	recursion.foundDirectoryAfterRecursion = &SyncMediator::removeDirectory;
 	recursion.foundSymlink = &SyncMediator::remove;
 	recursion.recurse(entry->getRepositoryPath());
@@ -286,9 +293,9 @@ void SyncMediator::removeDirectoryRecursively(DirEntry *entry) {
 	removeDirectory(entry);
 }
 
-bool SyncMediator::addDirectoryCallback(DirEntry *entry) {
+RecursionPolicy SyncMediator::addDirectoryCallback(DirEntry *entry) {
 	addDirectory(entry);
-	return true; // <-- tells the recursion engine to recurse further into this directory
+	return RP_RECURSE; // <-- tells the recursion engine to recurse further into this directory
 }
 
 void SyncMediator::createNestedCatalog(DirEntry *requestFile) {

@@ -15,7 +15,7 @@ DirEntry::DirEntry(const string &dirPath, const string &filename, const DirEntry
 	mFilename = filename;
 	mType = entryType;
 	mWhiteout = false;
-	mHash = hash::t_sha1();
+	mContentHash = hash::t_sha1();
 
 	// init stat structures
 	mRepositoryStat.obtained = false;
@@ -36,7 +36,7 @@ bool DirEntry::isNew() {
 void DirEntry::markAsWhiteout() {
 	// mark the file as whiteout entry and strip the whiteout prefix
 	mWhiteout = true;
-	mFilename = mFilename.substr(UnionFilesystemSync::sharedInstance()->getWhiteoutPrefix().length());
+	mFilename = UnionSync::sharedInstance()->unwindWhiteoutFilename(getFilename());
 
 	// find the entry in the repository
 	statRepository();
@@ -71,15 +71,15 @@ void DirEntry::statGeneric(const string &path, EntryStat *statStructure) {
 }
 
 string DirEntry::getRepositoryPath() const {
-	return UnionFilesystemSync::sharedInstance()->getRepositoryPath() + "/" + getRelativePath();
+	return UnionSync::sharedInstance()->getRepositoryPath() + "/" + getRelativePath();
 }
 
 string DirEntry::getUnionPath() const {
-	return UnionFilesystemSync::sharedInstance()->getUnionPath() + "/" + getRelativePath();
+	return UnionSync::sharedInstance()->getUnionPath() + "/" + getRelativePath();
 }
 
 string DirEntry::getOverlayPath() const {
-	return UnionFilesystemSync::sharedInstance()->getOverlayPath() + "/" + getRelativePath();
+	return UnionSync::sharedInstance()->getOverlayPath() + "/" + getRelativePath();
 }
 
 bool DirEntry::isOpaqueDirectory() const {
@@ -87,5 +87,5 @@ bool DirEntry::isOpaqueDirectory() const {
 		return false;
 	}
 	
-	return file_exists(getOverlayPath() + "/" + UnionFilesystemSync::sharedInstance()->getOpaqueDirectoryFilename());
+	return UnionSync::sharedInstance()->isOpaqueDirectory(this);
 }

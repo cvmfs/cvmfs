@@ -434,18 +434,17 @@ int main(int argc, char **argv) {
       return 3;
    }
 
-
 	cvmfs::CatalogHandler *catalogHandler = new cvmfs::CatalogHandler(dir_catalogs, dir_shadow, dir_data, !lazy_attach, immutables, keyfile);
 	cvmfs::SyncMediator *mediator = new cvmfs::SyncMediator(catalogHandler, dir_data);
 	cvmfs::SyncAufs1::initialize("/cvmfs", dir_shadow, dir_overlay, mediator);
 	
 	cout << "Traversing copy on write overlay directory... " << endl;
 	
-	if (not cvmfs::UnionFilesystemSync::sharedInstance()->goGetIt()) {
+	if (not cvmfs::UnionSync::sharedInstance()->doYourMagic()) {
 		cerr << "something went wrong while creating changeset" << endl;
 	}
 	
-	cvmfs::UnionFilesystemSync::fini();
+	cvmfs::UnionSync::sharedInstance()->fini();
 	delete mediator;
 	delete catalogHandler;
    

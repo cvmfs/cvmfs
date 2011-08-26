@@ -13,9 +13,9 @@
 using namespace cvmfs;
 using namespace std;
 
-UnionFilesystemSync* UnionFilesystemSync::mInstance = NULL;
+UnionSync* UnionSync::mInstance = NULL;
 
-UnionFilesystemSync* UnionFilesystemSync::sharedInstance() {
+UnionSync* UnionSync::sharedInstance() {
 	if (mInstance == NULL) {
 		printError("Sync framework not initialized");
 		exit(1);
@@ -34,7 +34,8 @@ void SyncAufs1::initialize(const std::string &repositoryPath, const std::string 
 }
 
 SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator) :
-	UnionFilesystemSync(repositoryPath, unionPath, aufsPath, mediator) {
+	UnionSync(repositoryPath, unionPath, aufsPath, mediator) {
+		
 	// init ignored filenames
 	mIgnoredFilenames.insert(".wh..wh..tmp");
 	mIgnoredFilenames.insert(".wh..wh.plnk");
@@ -49,7 +50,7 @@ SyncAufs1::~SyncAufs1() {
 	
 }
 
-bool SyncAufs1::goGetIt() {
+bool SyncAufs1::doYourMagic() {
 	RecursionEngine<SyncAufs1> recursion(this, mOverlayPath, mIgnoredFilenames);
 	
 	recursion.foundRegularFile = &SyncAufs1::processFoundRegularFile;
@@ -65,50 +66,39 @@ bool SyncAufs1::goGetIt() {
 	return true;
 }
 
-bool SyncAufs1::isEditedItem(const string &dirPath, const string &filename) const {
-	return false; // at the moment there is no way to distinguish between overwritten
-	              // and edited files... we are assuming every file to be overwritten
-	              // this breaks inode persistency, but we have to live with that atm
-}
-
-bool SyncAufs1::isWhiteoutEntry(const DirEntry *entry) const {
-	return (entry->getFilename().substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix);
-}
-
-UnionFilesystemSync::UnionFilesystemSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath, SyncMediator *mediator) {
+UnionSync::UnionSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath, SyncMediator *mediator) {
 	mRepositoryPath = canonical_path(repositoryPath);
 	mUnionPath = canonical_path(unionPath);
 	mOverlayPath = canonical_path(overlayPath);
-	mCheckSymlinks = false;
 	
 	mMediator = mediator;
 }
 
-UnionFilesystemSync::~UnionFilesystemSync() {
+UnionSync::~UnionSync() {
 }
 
-void UnionFilesystemSync::fini() {
-	delete UnionFilesystemSync::sharedInstance();
+void UnionSync::fini() {
+	delete UnionSync::sharedInstance();
 	mInstance = NULL;
 }
 
-bool UnionFilesystemSync::processFoundDirectory(DirEntry *entry) {
+RecursionPolicy UnionSync::processFoundDirectory(DirEntry *entry) {
 	if (entry->isNew()) {
 		mMediator->add(entry);
-		return false;
+		return RP_DONT_RECURSE;
 	} else {
 		// directory already exists... 
 		if (entry->isOpaqueDirectory()) { // was directory completely overwritten?
 			mMediator->replace(entry);
-			return false;
+			return RP_DONT_RECURSE;
 		} else {                          // no, all okay... just touch it and recurse into it
 			mMediator->touch(entry);
-			return true;
+			return RP_RECURSE;
 		}
 	}
 }
 
-void UnionFilesystemSync::processFoundRegularFile(DirEntry *entry) {
+void UnionSync::processFoundRegularFile(DirEntry *entry) {
 	// process whiteout prefix
 	if (isWhiteoutEntry(entry)) {
 		entry->markAsWhiteout();
@@ -124,15 +114,15 @@ void UnionFilesystemSync::processFoundRegularFile(DirEntry *entry) {
 	} 
 }
 
-void UnionFilesystemSync::processFoundSymlink(DirEntry *entry) {
-	// normally symlinks are just files:
+void UnionSync::processFoundSymlink(DirEntry *entry) {
+	// symlinks are just files in this sense:
 	processFoundRegularFile(entry);
 }
 
-void UnionFilesystemSync::enteringDirectory(DirEntry *entry) {
+void UnionSync::enteringDirectory(DirEntry *entry) {
 	mMediator->enterDirectory(entry);
 }
 
-void UnionFilesystemSync::leavingDirectory(DirEntry *entry) {
+void UnionSync::leavingDirectory(DirEntry *entry) {
 	mMediator->leaveDirectory(entry);
 }
