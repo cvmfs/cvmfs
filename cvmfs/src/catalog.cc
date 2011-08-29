@@ -63,6 +63,7 @@ namespace catalog {
    string root_prefix; ///< If we mount deep into a nested catalog, we need the full preceeding path to calculate the correct MD5 hash
    uid_t uid; ///< Required for converting a catalog entry into struct stat
    gid_t gid; ///< Required for converting a catalog entry into struct stat
+   bool hide_hardlinks; ///< if true, hardlinks do not get the same hardlink but appear as normal files with the same content (important for synchronisation with AUFS (hack!!))
    int num_catalogs = 0; ///< We support nested catalogs.  There are loaded by SQLite's ATTACH.  In the end, we operate on a set of multiple catalogs
    int current_catalog = 0; ///< We query the catalogs one after another until success.  We use a lazy approach, meaning after success we ask that catalog next time again.
 	vector<unsigned int> inodeOffsets; ///< inodes are assigned at runtime... the number of entries in a catalog is the offset for the beginning of the next catalog
@@ -817,9 +818,10 @@ namespace catalog {
     *
     * \return True on success, false otherwise
     */
-   bool init(const uid_t puid, const gid_t pgid) {
+   bool init(const uid_t puid, const gid_t pgid, const bool hide_hardlinks) {
       uid = puid;
       gid = pgid;
+      catalog::hide_hardlinks = hide_hardlinks;
       root_prefix = "";
       num_catalogs = current_catalog = 0;
       return initTLS();
@@ -1908,7 +1910,8 @@ namespace catalog {
    
 	uint64_t getInode(unsigned int rowid, uint64_t hardlinkGroupId, unsigned int catalog_id) {
 		uint64_t inode;
-		if (hardlinkGroupId == 0) { // no hardlinks present
+		
+		if (hardlinkGroupId == 0 || hide_hardlinks) { // no hardlinks present
 			inode = rowid;
 		} else {
 			map<unsigned int, map<uint64_t, uint64_t> >::iterator catalogSpecificHardlinkMap = hardlinkInodeMap.find(catalog_id);
@@ -1938,7 +1941,7 @@ namespace catalog {
       s->st_dev = 1;
       s->st_ino = getInode(catalog_row_id, inode, catalog_id);
       s->st_mode = mode;
-      s->st_nlink = getLinkcountInFlags(flags);
+      s->st_nlink = (hide_hardlinks) ? 1 : getLinkcountInFlags(flags);
       s->st_uid = uid;
       s->st_gid = gid;
       s->st_rdev = 1;

@@ -24,7 +24,7 @@ CatalogHandler::CatalogHandler(const string &catalogDirectory, const string &uni
 	mKeyfile = keyfile;
 	
 	// init the database
-	if (!catalog::init(getuid(), getgid())) {
+	if (!catalog::init(getuid(), getgid(), false)) {
 		printError("could not init SQLite");
 		exit(1);
 	}

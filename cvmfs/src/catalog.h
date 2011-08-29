@@ -25,14 +25,14 @@ namespace catalog {
    const int FILE_LINK = 8;
    const int FILE_STAT = 16;
    const int FILE_CHUNK = 64;
-   const int NLINK_COUNT_0 = 128; // 8 bit for link count of file
-   const int NLINK_COUNT_1 = NLINK_COUNT_0 * 2;
-   const int NLINK_COUNT_2 = NLINK_COUNT_1 * 2;
-   const int NLINK_COUNT_3 = NLINK_COUNT_2 * 2;
-   const int NLINK_COUNT_4 = NLINK_COUNT_3 * 2;
-   const int NLINK_COUNT_5 = NLINK_COUNT_4 * 2;
-   const int NLINK_COUNT_6 = NLINK_COUNT_5 * 2;
-   const int NLINK_COUNT_7 = NLINK_COUNT_6 * 2;
+   const int NLINK_COUNT_0 = 256; // 8 bit for link count of file
+   const int NLINK_COUNT_1 = NLINK_COUNT_0 << 1;
+   const int NLINK_COUNT_2 = NLINK_COUNT_1 << 1;
+   const int NLINK_COUNT_3 = NLINK_COUNT_2 << 1;
+   const int NLINK_COUNT_4 = NLINK_COUNT_3 << 1;
+   const int NLINK_COUNT_5 = NLINK_COUNT_4 << 1;
+   const int NLINK_COUNT_6 = NLINK_COUNT_5 << 1;
+   const int NLINK_COUNT_7 = NLINK_COUNT_6 << 1;
    const int NLINK_COUNT = NLINK_COUNT_0 | NLINK_COUNT_1 | NLINK_COUNT_2 | NLINK_COUNT_3 | NLINK_COUNT_4 | NLINK_COUNT_5 | NLINK_COUNT_6 | NLINK_COUNT_7;
 
 	/**
@@ -105,7 +105,7 @@ namespace catalog {
       }
    };
 
-   bool init(const uid_t puid, const gid_t pgid);
+   bool init(const uid_t puid, const gid_t pgid, const bool hide_hardlinks);
    void fini();
    
    bool attach(const std::string &db_file, const std::string &url, 

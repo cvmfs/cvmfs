@@ -100,7 +100,8 @@ namespace cvmfs {
    string whitelist = "";
    string blacklist = "/etc/cvmfs/blacklist"; /* blacklist for compromised certificates */
    string deep_mount = "";
-   string repo_name = ""; ///< Expected reposiotry name, e.g. atlas.cern.ch
+   string repo_name = ""; ///< Expected repository name, e.g. atlas.cern.ch
+   bool hide_hardlinks = false; ///< controls if hardlink groups are represented by the same hardlink (turn on for aufs!!)
    const double whitelist_lifetime = 3600.0*24.0*30.0; ///< 30 days in seconds
    const int short_term_ttl = 240; /* in offline mode, check every 4 minutes */
    string pubkey = "/etc/cvmfs/keys/cern.ch.pub";
@@ -1891,6 +1892,7 @@ struct cvmfs_opts {
    int      nofiles;
    int      grab_mountpoint;
    int      syslog_level;
+   int      hide_hardlinks;
    int64_t  quota_limit;
    int64_t  quota_threshold;
 };
@@ -1923,6 +1925,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
    CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
    CVMFS_OPT("deep_mount=%s",       deep_mount, 0),
    CVMFS_OPT("repo_name=%s",        repo_name, 0),
+   CVMFS_SWITCH("hide_hardlinks",   hide_hardlinks),
    CVMFS_OPT("blacklist=%s",        blacklist, 0),
    CVMFS_OPT("syslog_level=%d",     syslog_level, 3),
    
@@ -2213,6 +2216,8 @@ int main(int argc, char *argv[])
    if (cvmfs_opts.deep_mount) cvmfs::deep_mount = canonical_path(cvmfs_opts.deep_mount);
    if (cvmfs_opts.blacklist) cvmfs::blacklist = cvmfs_opts.blacklist;
    if (cvmfs_opts.repo_name) cvmfs::repo_name = cvmfs_opts.repo_name;
+   if (cvmfs_opts.hide_hardlinks) cvmfs::hide_hardlinks = cvmfs_opts.hide_hardlinks;
+
    /* seperate first host from hostlist */
    unsigned iter_hostname;
    for (iter_hostname = 0; iter_hostname < strlen(cvmfs_opts.hostname); ++iter_hostname) {
@@ -2347,7 +2352,7 @@ int main(int argc, char *argv[])
    }
       
    /* Create the file catalog from the web server */
-   if (!catalog::init(cvmfs::uid, cvmfs::gid)) {
+   if (!catalog::init(cvmfs::uid, cvmfs::gid, hide_hardlinks)) {
       cerr << "Failed to initialize catalog" << endl;
       goto cvmfs_cleanup;
    }
