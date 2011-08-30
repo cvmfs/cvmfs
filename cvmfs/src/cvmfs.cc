@@ -1984,6 +1984,7 @@ static void usage(const char *progname) {
       " -o deep_mount=prefix       Path prefix if a repository is mounted on a nested catalog,\n"
       "                            i.e. deep_mount=/software/15.0.1\n"
       " -o repo_name=<repository>  Unique name of the mounted repository, e.g. atlas.cern.ch\n"
+      " -o hide_hardlinks          hard links appear as normal files\n"
       " -o blacklist=FILE          Local blacklist for invalid certificates.  Has precedence over the whitelist.\n"
       "                            (Default is /etc/cvmfs/blacklist)\n"
       " -o syslog_level=NUMBER     Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"

@@ -88,6 +88,11 @@ bool file_exists(const string &path) {
    return ((portableFileStat64(path.c_str(), &info) == 0) && S_ISREG(info.st_mode));
 }
 
+bool directory_exists(const std::string &path) {
+	PortableStat64 info;
+	return ((portableFileStat64(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode));
+}
+
 bool mkdir_deep(const std::string &path, mode_t mode) {
    if (path == "") return false;
    
@@ -483,4 +488,20 @@ void printError(const string &message) {
 }
 void printWarning(const string &message) {
 	cerr << "[WARNING] " << message << endl;
+}
+
+/**
+ *  just a debugging function
+ *  simply prints the given bitmap as bitmap to stdout
+ *  @param bitmap a pointer to the bitmap to print
+ */
+void printBitmap(const unsigned int *bitmap) {
+	unsigned int mask = 1 << (sizeof(int) * 8 - 1);
+	
+	for (int i = sizeof(int) * 8 - 1; i >= 0; --i) {
+		int bit = 0;
+		if ((*bitmap & mask) != 0) bit = 1;
+		mask = mask >> 1;
+		cout << bit;
+	}
 }

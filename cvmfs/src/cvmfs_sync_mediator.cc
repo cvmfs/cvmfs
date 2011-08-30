@@ -15,9 +15,12 @@ extern "C" {
 using namespace cvmfs;
 using namespace std;
 
-SyncMediator::SyncMediator(CatalogHandler *catalogHandler, string dataDirectory) {
+SyncMediator::SyncMediator(CatalogHandler *catalogHandler, const SyncParameters *parameters) {
 	mCatalogHandler = catalogHandler;
-	mDataDirectory = dataDirectory;
+	mDataDirectory = canonical_path(parameters->dir_data);
+	mDryRun = parameters->dry_run;
+	mPrintChangeset = parameters->print_changeset;
+	mGuessHardlinks = true;
 }
 
 SyncMediator::~SyncMediator() {
@@ -30,11 +33,14 @@ void SyncMediator::add(DirEntry *entry) {
 	}
 	
 	else if (entry->isRegularFile() || entry->isSymlink()) {
+
+		// create a nested catalog if we find a NEW request file
 		if (entry->isCatalogRequestFile() && entry->isNew()) {
 			createNestedCatalog(entry);
 		}
 		
-		if (entry->getUnionLinkcount() > 1) {
+		// a file is a hard link if the link count is greater than 1 OR if the file has an associated hard link group in the catalog
+		if (entry->getUnionLinkcount() > 1 || (mGuessHardlinks && not entry->isNew() && mCatalogHandler->isPartOfHardlinkGroup(entry))) {
 			insertHardlink(entry);
 		} else {
 			addFile(entry);
@@ -74,7 +80,7 @@ void SyncMediator::remove(DirEntry *entry) {
 		removeFile(entry);
 		
 		// ... then the nested catalog (if needed)
-		if (entry->isCatalogRequestFile()) {
+		if (entry->isCatalogRequestFile() && not entry->isNew()) {
 			removeNestedCatalog(entry);
 		}
 	}
@@ -150,6 +156,11 @@ void SyncMediator::compressAndHashFileQueue() {
 }
 
 void SyncMediator::addFileQueueToCatalogs() {
+	// don't do things you could regret later on
+	if (mDryRun) {
+		return;
+	}
+	
 	// add singular files
 	DirEntryList::iterator i;
 	DirEntryList::const_iterator iend;
@@ -166,8 +177,12 @@ void SyncMediator::addFileQueueToCatalogs() {
 }
 
 bool SyncMediator::addFileToDatastore(DirEntry *entry, const std::string &suffix, hash::t_sha1 &hash) {
+	// don't do that, would change something!
+	if (mDryRun) {
+		return true;
+	}
+	
 	bool result = false;
-
 	/* Create temporary file */
 	const string templ = mDataDirectory + "/txn/compressing.XXXXXX";
 	char *tmp_path = (char *)smalloc(templ.length() + 1);
@@ -211,16 +226,41 @@ bool SyncMediator::addFileToDatastore(DirEntry *entry, const std::string &suffix
 	return result;
 }
 
+uint64_t SyncMediator::getTemporaryHardlinkGroupNumber(DirEntry *entry) const {
+	uint64_t hardlinkGroupNumber = 0;
+	
+	if (mGuessHardlinks) {
+		// if we have to guess the hard link relations there is some more stuff to do here:
+		// we are asserting, that the repository was mounted with -o hide_hardlinks otherwise this will fail
+		if (entry->getUnionLinkcount() > 1) {
+			// if the union linkcount is bigger than one
+			// there must have been a new hard link created --> we need to recreate this mapping later on
+			// until now we only collect this 'subgroup'
+			hardlinkGroupNumber = entry->getUnionInode();
+			hardlinkGroupNumber = hardlinkGroupNumber << 10; // this is a hack to avoid collisions (hopefully nobody will have more than 2^10 hard link groups in one catalog context and hopefully the inode numbers don't get bigger than 56 bit)
+		} else {
+			// if we have a link count of one 
+			hardlinkGroupNumber = mCatalogHandler->getHardlinkGroup(entry);
+		}
+	} else {
+		hardlinkGroupNumber = entry->getUnionInode();
+	}
+	
+	return hardlinkGroupNumber;
+}
+
 void SyncMediator::insertHardlink(DirEntry *entry) {
-	uint64_t inode = entry->getUnionInode();
-	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(inode);
+	uint64_t hardlinkGroupNumber = getTemporaryHardlinkGroupNumber(entry);
+	
+	// find the hard link group in the lists
+	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(hardlinkGroupNumber);
 
 	if (hardlinkGroup == getHardlinkMap().end()) {
 		// create a new hardlink group
 		HardlinkGroup newGroup;
 		newGroup.masterFile = entry;
 		newGroup.hardlinks.push_back(entry);
-		getHardlinkMap()[inode] = newGroup;
+		getHardlinkMap()[hardlinkGroupNumber] = newGroup;
 	} else {
 		// append the file to the appropriate hardlink group
 		hardlinkGroup->second.hardlinks.push_back(entry);
@@ -232,25 +272,29 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 	// as we are looking through all files in one directory here, there might be
 	// completely untouched hardlink groups, which we can safely skip
 	// finally we have to see, if the hardlink is already part of this group
+	
+	// check if we have a hard link here
+	if (entry->getUnionLinkcount() <= 1 && (mGuessHardlinks && not mCatalogHandler->isPartOfHardlinkGroup(entry))) {
+		return;
+	}
 	HardlinkGroupMap::iterator hlGroup;
-	if (entry->getUnionLinkcount() > 1) { // has hardlinks?
-		hlGroup = getHardlinkMap().find(entry->getUnionInode());
+	uint64_t hardlinkGroupNumber = getTemporaryHardlinkGroupNumber(entry);
+	hlGroup = getHardlinkMap().find(hardlinkGroupNumber);
 
-		if (hlGroup != getHardlinkMap().end()) { // touched hardlinks in this group?
-			DirEntryList::const_iterator i,end;
-			bool alreadyThere = false;
-			for (i = hlGroup->second.hardlinks.begin(), end = hlGroup->second.hardlinks.end(); i != end; ++i) {
-				if ((*i)->isEqualTo(entry)) {
-					alreadyThere = true;
-					break;
-				}
+	if (hlGroup != getHardlinkMap().end()) { // touched hardlinks in this group?
+		DirEntryList::const_iterator i,end;
+		bool alreadyThere = false;
+		for (i = hlGroup->second.hardlinks.begin(), end = hlGroup->second.hardlinks.end(); i != end; ++i) {
+			if ((*i)->isEqualTo(entry)) {
+				alreadyThere = true;
+				break;
 			}
-			
-			if (not alreadyThere) { // hardlink already in the group?
-				// if one element of a hardlink group is edited, all elements must be replaced
-				remove(entry);
-				hlGroup->second.hardlinks.push_back(entry);
-			}
+		}
+		
+		if (not alreadyThere) { // hardlink already in the group?
+			// if one element of a hardlink group is edited, all elements must be replaced
+			remove(entry);
+			hlGroup->second.hardlinks.push_back(entry);
 		}
 	}
 }
@@ -299,19 +343,19 @@ RecursionPolicy SyncMediator::addDirectoryCallback(DirEntry *entry) {
 }
 
 void SyncMediator::createNestedCatalog(DirEntry *requestFile) {
-	cout << "[add] NESTED CATALOG" << endl;
-	mCatalogHandler->createNestedCatalog(requestFile->getParentPath());
+	if (mPrintChangeset) cout << "[add] NESTED CATALOG" << endl;
+	if (not mDryRun)     mCatalogHandler->createNestedCatalog(requestFile->getParentPath());
 }
 
 void SyncMediator::removeNestedCatalog(DirEntry *requestFile) {
-	cout << "[rem] NESTED CATALOG" << endl;
-	mCatalogHandler->removeNestedCatalog(requestFile->getParentPath());
+	if (mPrintChangeset) cout << "[rem] NESTED CATALOG" << endl;
+	if (not mDryRun)     mCatalogHandler->removeNestedCatalog(requestFile->getParentPath());
 }
 
 void SyncMediator::addFile(DirEntry *entry) {
-	cout << "[add] " << entry->getRepositoryPath() << endl;
+	if (mPrintChangeset) cout << "[add] " << entry->getRepositoryPath() << endl;
 	
-	if (entry->isSymlink()) {
+	if (entry->isSymlink() && not mDryRun) {
 		mCatalogHandler->addFile(entry);
 	} else {
 		mFileQueue.push_back(entry);
@@ -319,34 +363,43 @@ void SyncMediator::addFile(DirEntry *entry) {
 }
 
 void SyncMediator::removeFile(DirEntry *entry) {
-	cout << "[rem] " << entry->getRepositoryPath() << endl;
-	mCatalogHandler->removeFile(entry);
+	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
+	if (not mDryRun)     mCatalogHandler->removeFile(entry);
 }
 
 void SyncMediator::touchFile(DirEntry *entry) {
-	cout << "[tou] " << entry->getRepositoryPath() << endl;
-	// nothing... will never happen
+	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
+	if (not mDryRun)     mCatalogHandler->touchFile(entry);
 }
 
 void SyncMediator::addDirectory(DirEntry *entry) {
-	cout << "[add] " << entry->getRepositoryPath() << endl;
-	mCatalogHandler->addDirectory(entry);
+	if (mPrintChangeset) cout << "[add] " << entry->getRepositoryPath() << endl;
+	if (not mDryRun)     mCatalogHandler->addDirectory(entry);
 }
 
 void SyncMediator::removeDirectory(DirEntry *entry) {
-	cout << "[rem] " << entry->getRepositoryPath() << endl;
-	mCatalogHandler->removeDirectory(entry);
+	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
+	if (not mDryRun)     mCatalogHandler->removeDirectory(entry);
 }
 
 void SyncMediator::touchDirectory(DirEntry *entry) {
-	cout << "[tou] " << entry->getRepositoryPath() << endl;
+	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
+	if (not mDryRun)     mCatalogHandler->touchDirectory(entry);
 }
 
 void SyncMediator::addHardlinkGroup(const HardlinkGroupMap &hardlinks) {
 	HardlinkGroupMap::const_iterator i,end;
 	for (i = hardlinks.begin(), end = hardlinks.end(); i != end; ++i) {
-		cout << "[add] hardlink group around: " << i->second.masterFile->getRepositoryPath() << endl;
-		if (i->second.masterFile->isSymlink()) {
+		if (mPrintChangeset) {
+			cout << "[add] hardlink group around: " << i->second.masterFile->getRepositoryPath() << "( ";	
+			DirEntryList::const_iterator j,jend;
+			for (j = i->second.hardlinks.begin(), jend = i->second.hardlinks.end(); j != jend; ++j) {
+				cout << (*j)->getFilename() << " ";
+			}
+			cout << ")" << endl;
+		}
+		
+		if (i->second.masterFile->isSymlink() && not mDryRun) {
 			mCatalogHandler->addHardlinkGroup(i->second.hardlinks);
 		} else {
 			mHardlinkQueue.push_back(i->second);				

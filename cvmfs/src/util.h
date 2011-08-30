@@ -22,6 +22,7 @@ std::string get_parent_path(const std::string &path);
 std::string get_file_name(const std::string &path);
 bool is_empty_dir(const std::string &path);
 bool file_exists(const std::string &path);
+bool directory_exists(const std::string &path);
 bool mkdir_deep(const std::string &path, mode_t mode);
 std::string expand_env(const std::string &path);
 bool make_cache_dir(const std::string &path, const mode_t mode);
@@ -38,6 +39,7 @@ bool get_file_info(const std::string &path, PortableStat64 *info);
 
 void printError(const std::string &message);
 void printWarning(const std::string &message);
+void printBitmap(const unsigned int *bitmap);
 
 /*
  * abs2rel: convert an absolute path name into relative.

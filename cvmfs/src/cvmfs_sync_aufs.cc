@@ -24,17 +24,17 @@ UnionSync* UnionSync::sharedInstance() {
 	return mInstance;
 }
 
-void SyncAufs1::initialize(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator) {
+void SyncAufs1::initialize(SyncMediator *mediator, const SyncParameters *parameters) {
 	if (mInstance != NULL) {
 		printError("Sync framework initialized twice");
 		exit(1);
 	}
 	
-	mInstance = new SyncAufs1(repositoryPath, unionPath, aufsPath, mediator);
+	mInstance = new SyncAufs1(mediator, parameters);
 }
 
-SyncAufs1::SyncAufs1(const string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator) :
-	UnionSync(repositoryPath, unionPath, aufsPath, mediator) {
+SyncAufs1::SyncAufs1(SyncMediator *mediator, const SyncParameters *parameters) :
+	UnionSync(mediator, parameters) {
 		
 	// init ignored filenames
 	mIgnoredFilenames.insert(".wh..wh..tmp");
@@ -66,10 +66,10 @@ bool SyncAufs1::doYourMagic() {
 	return true;
 }
 
-UnionSync::UnionSync(const string &repositoryPath, const std::string &unionPath, const string &overlayPath, SyncMediator *mediator) {
-	mRepositoryPath = canonical_path(repositoryPath);
-	mUnionPath = canonical_path(unionPath);
-	mOverlayPath = canonical_path(overlayPath);
+UnionSync::UnionSync(SyncMediator *mediator, const SyncParameters *parameters) {
+	mRepositoryPath = canonical_path(parameters->dir_cvmfs);
+	mUnionPath      = canonical_path(parameters->dir_shadow);
+	mOverlayPath    = canonical_path(parameters->dir_overlay);
 	
 	mMediator = mediator;
 }

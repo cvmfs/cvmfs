@@ -16,33 +16,35 @@ extern "C" {
 using namespace std;
 using namespace cvmfs;
 
-CatalogHandler::CatalogHandler(const string &catalogDirectory, const string &unionDirectory, const string &dataDirectory, bool attachAll, std::set<std::string> immutables, const string &keyfile) {
-	mCatalogDirectory = catalogDirectory;
-	mUnionDirectory = unionDirectory;
-	mDataDirectory = dataDirectory;
-	mImmutables = immutables;
-	mKeyfile = keyfile;
-	
-	// init the database
-	if (!catalog::init(getuid(), getgid(), false)) {
-		printError("could not init SQLite");
-		exit(1);
-	}
+CatalogHandler::CatalogHandler(const SyncParameters *parameters) {
+	mCatalogDirectory = canonical_path(parameters->dir_catalogs);
+	mUnionDirectory   = canonical_path(parameters->dir_shadow);
+	mDataDirectory    = canonical_path(parameters->dir_data);
+	mImmutables       = parameters->immutables;
+	mKeyfile          = parameters->keyfile;
+	mLazyAttach       = parameters->lazy_attach;
+	mDryRun           = parameters->dry_run;
 	
 	// initialize the preListing bookkeeping set
 	mPrelistingUpdates.insert("");
 	
 	// load catalogs
-	initCatalogs(attachAll);
+	initCatalogs();
 }
 
 CatalogHandler::~CatalogHandler() {
 	catalog::fini();
 }
 
-bool CatalogHandler::initCatalogs(bool attach_all) {
+bool CatalogHandler::initCatalogs() {
 
 	const string clg_path = "";
+	
+	// init the database
+	if (!catalog::init(getuid(), getgid(), false)) {
+		printError("could not init SQLite");
+		exit(1);
+	}
 	
 	// attach root catalog (no parent [-1])
 	attachCatalog(clg_path, -1);
@@ -66,7 +68,7 @@ bool CatalogHandler::initCatalogs(bool attach_all) {
 		}
 	}
 
-	if (attach_all) {
+	if (not mLazyAttach) {
 		if (!attachNestedCatalogsRecursively(0, false)) {
 			printError("could not init all nested catalogs");
 			return false;
@@ -81,7 +83,7 @@ bool CatalogHandler::attachCatalog(const string &relativePath, int parentCatalog
 	std::string unionPath = getAbsolutePath(relativePath);
 	
 	cout << "Attaching " << catalogPath << endl;
-	if (!catalog::attach(catalogPath, "", false, false))
+	if (!catalog::attach(catalogPath, "", mDryRun, false))
 	{
 		stringstream ss;
 		ss << "unable to attach catalog " << catalogPath;
@@ -388,6 +390,16 @@ bool CatalogHandler::addHardlinkGroup(DirEntryList group) {
 	return true;
 }
 
+bool CatalogHandler::touchFile(DirEntry *entry) {
+	// TODO: implement this (should not be called at the momemt)
+	return true;
+}
+
+bool CatalogHandler::touchDirectory(DirEntry *entry) {
+	// TODO: implement this (has no real effect at the moment)
+	return true;
+}
+
 unsigned int CatalogHandler::getNextFreeHardlinkGroupId(DirEntry *entry) {
 	hash::t_md5 p_md5(catalog::mangled_path(relativeToCatalogPath(entry->getParentPath())));
 	
@@ -408,6 +420,34 @@ unsigned int CatalogHandler::getNextFreeHardlinkGroupId(DirEntry *entry) {
 	}
 	
 	return maxGroupId + 1;
+}
+
+bool CatalogHandler::isPartOfHardlinkGroup(const DirEntry *entry) const {
+	catalog::t_dirent d;
+	lookup(entry, d);
+	// check if file is part of hard link group
+	return (d.inode != 0);
+}
+
+uint64_t CatalogHandler::getHardlinkGroup(const DirEntry *entry) const {
+	catalog::t_dirent d;
+	lookup(entry, d);
+	
+	// check if file is part of hard link group
+	return d.inode != 0;
+}
+
+bool CatalogHandler::lookup(const DirEntry *entry, catalog::t_dirent &cdirent) const {
+	hash::t_md5 md5(catalog::mangled_path(relativeToCatalogPath(entry->getRelativePath())));
+	
+	if (not catalog::lookup_unprotected(md5, cdirent)) {
+		stringstream ss;
+		ss << "failed to lookup " << entry->getRelativePath() << " in catalogs";
+		printWarning(ss.str());
+		return false;
+	}
+	
+	return true;
 }
 
 bool CatalogHandler::addEntry(DirEntry *entry) {

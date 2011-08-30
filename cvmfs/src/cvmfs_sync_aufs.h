@@ -9,6 +9,7 @@
 #include "compat.h"
 
 #include "cvmfs_sync_mediator.h"
+#include "cvmfs_sync.h"
 
 namespace cvmfs {
 	
@@ -90,7 +91,7 @@ namespace cvmfs {
 		 *  @param overlayPath the absolute path to the read write branch attached to the union file system
 		 *  @param mediator a reference to a SyncMediator object used as bridge to the actual sync process
 		 */
-		UnionSync(const std::string &repositoryPath, const std::string &unionPath, const std::string &overlayPath, SyncMediator *mediator);
+		UnionSync(SyncMediator *mediator, const SyncParameters *parameters);
 		
 		/**
 		 *  callback method for the main recursion when a regular file is found
@@ -140,7 +141,7 @@ namespace cvmfs {
 		virtual ~SyncAufs1();
 		
 		bool doYourMagic();
-		static void initialize(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator);
+		static void initialize(SyncMediator *mediator, const SyncParameters *parameters);
 		
 		inline bool isWhiteoutEntry(const DirEntry *entry) const { return (entry->getFilename().substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
 		inline bool isOpaqueDirectory(const DirEntry *directory) const { return file_exists(directory->getOverlayPath() + "/.wh..wh..opq"); }
@@ -149,7 +150,7 @@ namespace cvmfs {
 		inline std::set<std::string> getIgnoredFilenames() const { return mIgnoredFilenames; };
 		
 	protected:
-		SyncAufs1(const std::string &repositoryPath, const std::string &unionPath, const std::string &aufsPath, SyncMediator *mediator);
+		SyncAufs1(SyncMediator *mediator, const SyncParameters *parameters);
 	};
 }
 

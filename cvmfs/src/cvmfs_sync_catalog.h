@@ -3,6 +3,7 @@
 
 #include "catalog.h"
 #include "cvmfs_sync_recursion.h"
+#include "cvmfs_sync.h"
 
 #include <string>
 #include <map>
@@ -25,11 +26,13 @@ namespace cvmfs {
 		std::set<std::string> mImmutables;
 		
 		std::string mKeyfile;
+		bool mLazyAttach;
+		bool mDryRun;
 		
 		std::set<std::string> mPrelistingUpdates;
 		
 	public:
-		CatalogHandler(const std::string &catalogDirectory, const std::string &unionDirectory, const std::string &dataDirectory, bool attachAll, std::set<std::string> immutables, const std::string &keyfile);
+		CatalogHandler(const SyncParameters *parameters);
 		virtual ~CatalogHandler();
 		
 		void mergeCatalog(const std::string &path);
@@ -46,13 +49,19 @@ namespace cvmfs {
 		bool addFile(DirEntry *entry);
 		bool addHardlinkGroup(DirEntryList group);
 		
+		bool touchFile(DirEntry *entry);
+		bool touchDirectory(DirEntry *entry);
+		
 		bool precalculateListings();
 		void commit();
 		
 		void setDirty(const std::string &path);
 		
+		bool isPartOfHardlinkGroup(const DirEntry *entry) const;
+		uint64_t getHardlinkGroup(const DirEntry *entry) const;
+		
 	private:
-		bool initCatalogs(bool attach_all);
+		bool initCatalogs();
 		
 		bool attachCatalog(const std::string &path, int parentCatalogId);
 		bool attachNestedCatalogsRecursively(const unsigned cat_id, const bool dirty);
@@ -70,6 +79,8 @@ namespace cvmfs {
 		bool addEntry(DirEntry *entry, unsigned int hardlinkGroupId);
 		
 		unsigned int getNextFreeHardlinkGroupId(DirEntry *entry);
+		
+		bool lookup(const DirEntry *entry, catalog::t_dirent &cdirent) const;
 		
 		inline std::string relativeToCatalogPath(const std::string &relativePath) const { return "/" + relativePath; }
 		inline std::string getCatalogPathFromAbsolutePath(const std::string &absolutePath) const { return absolutePath.substr(mUnionDirectory.length()); }

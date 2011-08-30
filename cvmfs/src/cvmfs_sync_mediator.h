@@ -8,6 +8,7 @@
 
 #include "compat.h"
 #include "cvmfs_sync_catalog.h"
+#include "cvmfs_sync.h"
 
 namespace cvmfs {
 
@@ -61,8 +62,21 @@ private:
 	DirEntryList mFileQueue;
 	HardlinkGroupList mHardlinkQueue;
 	
+	/**
+	 *  with the high level interface of FUSE it is not possible to create proper hard links
+	 *  therefore we need a small hack to guess hard link relations from data of the catalogs
+	 *  this guessing can be disabled with this variable
+	 */
+	bool mGuessHardlinks;
+	
+	/** if dry run is set no changes to the repository will be made */
+	bool mDryRun;
+	
+	/** if print changeset option is set it will print all changes to the repository to stdout */
+	bool mPrintChangeset;
+	
 public:
-	SyncMediator(CatalogHandler *catalogHandler, std::string dataDirectory);
+	SyncMediator(CatalogHandler *catalogHandler, const SyncParameters *parameters);
 	virtual ~SyncMediator();
 	
 	/**
@@ -116,6 +130,7 @@ private:
 	void removeDirectoryRecursively(DirEntry *entry);
 	RecursionPolicy addDirectoryCallback(DirEntry *entry);
 	
+	uint64_t getTemporaryHardlinkGroupNumber(DirEntry *entry) const;
 	void insertHardlink(DirEntry *entry);
 	void insertExistingHardlink(DirEntry *entry);
 	void completeHardlinks(DirEntry *entry);
