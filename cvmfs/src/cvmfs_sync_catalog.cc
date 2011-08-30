@@ -425,6 +425,7 @@ unsigned int CatalogHandler::getNextFreeHardlinkGroupId(DirEntry *entry) {
 bool CatalogHandler::isPartOfHardlinkGroup(const DirEntry *entry) const {
 	catalog::t_dirent d;
 	lookup(entry, d);
+	
 	// check if file is part of hard link group
 	return (d.inode != 0);
 }

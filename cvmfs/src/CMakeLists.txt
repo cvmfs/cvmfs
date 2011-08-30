@@ -50,7 +50,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	util.cc util.h 
 	log.c log.h 
 	monitor.cc monitor.h 
-	cvmfs_sync.cc
+	cvmfs_sync.h cvmfs_sync.cc
 	cvmfs_sync_recursion.h cvmfs_sync_recursion.cc
 	cvmfs_sync_aufs.h cvmfs_sync_aufs.cc
 	cvmfs_sync_mediator.h cvmfs_sync_mediator.cc

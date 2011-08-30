@@ -402,7 +402,7 @@ void SyncMediator::addHardlinkGroup(const HardlinkGroupMap &hardlinks) {
 		if (i->second.masterFile->isSymlink() && not mDryRun) {
 			mCatalogHandler->addHardlinkGroup(i->second.hardlinks);
 		} else {
-			mHardlinkQueue.push_back(i->second);				
-		}		
+			mHardlinkQueue.push_back(i->second);
+		}
 	}
 }
