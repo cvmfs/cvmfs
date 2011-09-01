@@ -2155,9 +2155,15 @@ static void libcrypto_mt_cleanup(void) {
 //
 
 
-static const char *hello_str = "Hello World!\n";
-static const char *hello_name = "hello";
-static const char *hello_hardlink = "hardlink";
+// cvmfs_operations->getattr	= cvmfs_getattr;
+// cvmfs_operations->readlink	= cvmfs_readlink;
+// cvmfs_operations->readdir	= cvmfs_readdir;
+// cvmfs_operations->open	   = cvmfs_open;
+// cvmfs_operations->read	   = cvmfs_read;
+// cvmfs_operations->release 	= cvmfs_release;
+// cvmfs_operations->chmod    = cvmfs_chmod;
+// cvmfs_operations->statfs   = cvmfs_statfs;
+// cvmfs_operations->getxattr = cvmfs_getxattr;
 
 typedef std::map<fuse_ino_t, std::string> InodeCache;
 InodeCache inode_cache;
@@ -2172,12 +2178,12 @@ bool lookup_inode_cache(fuse_ino_t inode, string &result) {
 	return true;
 }
 
-
-
 static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			     struct fuse_file_info *fi)
 {
 	struct stat stbuf;
+	
+	fprintf(stdout, "... getattr ino: %d \n", ino);
 	
 	string path;
 	if (not lookup_inode_cache(ino, path)) {
@@ -2185,40 +2191,58 @@ static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 	
-	hash::t_md5 md5(catalog::mangled_path(path));
-
-	catalog::t_dirent d;
-	if (not catalog::lookup_unprotected(md5, d)) {
-		fuse_reply_err(req, ENOENT);
+	int result;
+	result = cvmfs_getattr(path.c_str(), &stbuf);
+	
+	if (result != 0) {
+		fuse_reply_err(req, result);
 		return;
 	}
 	
-	struct stat s;
-	d.to_stat(&s);
-	
-	fuse_reply_attr(req, &s, 1.0);
+	fuse_reply_attr(req, &stbuf, 1.0);
 }
 
 static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
-	struct fuse_entry_param e;
-	
 	fprintf(stdout, "... lookup parent_ino: %d name: %s\n", parent, name);
 	
+	// get path of directory (parent)
 	string parentPath;
 	if (not lookup_inode_cache(parent, parentPath)) {
 		fuse_reply_err(req, ENOENT);
 		return;
 	}
 	
+	// get information about file
 	string filename = parentPath + "/" + name;
 	hash::t_md5 md5(catalog::mangled_path(filename));
-
 	catalog::t_dirent d;
-	if (not catalog::lookup_unprotected(md5, d)) {
+	if (not catalog::lookup(md5, d)) {
 		fuse_reply_err(req, ENOENT);
 		return;
 	}
+	
+	// load nested catalog
+	if (d.flags & catalog::DIR_NESTED) {
+		fprintf(stdout, "... lookup | found nested catalog \n");
+		
+		pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", filename.c_str());
+		hash::t_sha1 expected_clg;
+		if (!catalog::lookup_nested_unprotected(d.catalog_id, catalog::mangled_path(filename), expected_clg))
+		{
+			catalog::unlock();
+			logmsg("Nested catalog at %s not found (ls)", filename.c_str());
+			fuse_reply_err(req, ENOENT);
+			return;
+		}
+		
+		int result = load_and_attach_catalog(filename, hash::t_md5(catalog::mangled_path(filename)), filename, -1, false, expected_clg);
+		if (result != 0) {
+			catalog::unlock();
+			atomic_inc(&nioerr);
+			return;
+		}
+     }
 	
 	struct stat s;
 	d.to_stat(&s);
@@ -2226,6 +2250,8 @@ static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 	// insert into cache
 	inode_cache[s.st_ino] = filename;
 	
+	// reply
+	struct fuse_entry_param e;
 	memset(&e, 0, sizeof(e));
 	e.ino = s.st_ino;
 	e.attr = s;
@@ -2260,19 +2286,10 @@ static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name,
 
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
-char* substring(const char* str, size_t begin, size_t len) 
-{ 
-  if (str == 0 || strlen(str) == 0 || strlen(str) < begin || strlen(str) < (begin+len)) 
-    return 0; 
-
-  return strndup(str + begin, len); 
-}
-
 static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize, off_t off, size_t maxsize)
 {
 	if (off < bufsize) {
 		fprintf(stdout, "... reply buf | offset: %d bufsize: %d maxsize: %d \n", off, bufsize, maxsize);
-		fprintf(stdout, "... reply buf | buffer: ' %s ' returning: ' %s '\n", buf, substring(buf, off, min(bufsize - off, maxsize)));
 		return fuse_reply_buf(req, buf + off, min(bufsize - off, maxsize));
 	}
 	else {
@@ -2297,30 +2314,52 @@ static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name, struc
 static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			     off_t off, struct fuse_file_info *fi)
 {
-	(void) fi;
-	
 	fprintf(stdout, "... readdir | ino: %d \n", ino);
 
 	string path, name;
 	if (not lookup_inode_cache(ino, path)) {
 		fuse_reply_err(req, ENOENT);
-		fprintf(stdout, "... readdir | reply error\n");
 		return;
 	}
 	
 	hash::t_md5 md5(catalog::mangled_path(path));
 	
+      struct catalog::t_dirent d;
+      catalog::lock();
+      if (lookup_cache(md5, d)) {
+         pmesg(D_CVMFS, "catalog cache HIT");
+         if (d.catalog_id < 0) {
+            catalog::unlock();
+			fuse_reply_err(req, ENOENT);
+			return;
+         }
+      } else {
+         if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
+            catalog::unlock();
+			fuse_reply_err(req, ENOENT);
+            return;
+         }
+      }
+	
+	// build dir listing
 	struct dirbuf b;
 	memset(&b, 0, sizeof(b));
 	
 	struct stat info;
 	memset(&info, 0, sizeof(info));
-	info.st_ino = 1;
+
+	d.to_stat(&info);
 
 	dirbuf_add(req, &b, ".", &info);
-	dirbuf_add(req, &b, "..", &info);
 	
+	struct catalog::t_dirent p;
+	if (catalog::parent_unprotected(md5, p)) {
+		p.to_stat(&info);
+		dirbuf_add(req, &b, "..", &info);
+	}
+
 	vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
+	catalog::unlock();
 	for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); i != iEnd; ++i) 
 	{
 		i->to_stat(&info);
@@ -2334,8 +2373,7 @@ static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	free(b.p);
 }
 
-static void hello_ll_open(fuse_req_t req, fuse_ino_t ino,
-			  struct fuse_file_info *fi)
+static void hello_ll_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 {
 	fprintf(stdout, "... open ino: %d\n", ino);
 	
@@ -2345,54 +2383,38 @@ static void hello_ll_open(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 	
-	hash::t_md5 md5(catalog::mangled_path(path));
-
-	catalog::t_dirent d;
-	if (not catalog::lookup_unprotected(md5, d)) {
-		fuse_reply_err(req, ENOENT);
+	if ((fi->flags & 3) != O_RDONLY) {
+		fuse_reply_err(req, EACCES);
 		return;
 	}
 	
-	if ((fi->flags & 3) != O_RDONLY) {
-		fuse_reply_err(req, EACCES);
-	} else {
+	int result = cvmfs_open(path.c_str(), fi);
+	
+	if (result == 0) {
 		fuse_reply_open(req, fi);
+	} else {
+		fuse_reply_err(req, result);
 	}
 }
 
 static void hello_ll_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
 {
-	(void) fi;
-	
 	fprintf(stdout, "... read | ino: %d maxsize: %d offset: %d \n", ino, size, off);
 	
-	string path;
-	if (not lookup_inode_cache(ino, path)) {
-		fuse_reply_err(req, ENOENT);
-		return;
+	char *data = (char *)malloc(size);
+	int result = cvmfs_read("/no/path/given", data, size, off, fi);
+	
+	if (result >= 0) {
+		fuse_reply_buf(req, data, result);
+	} else {
+		fuse_reply_err(req, errno);
 	}
-	
-	hash::t_md5 md5(catalog::mangled_path(path));
-
-	catalog::t_dirent d;
-	if (not catalog::lookup_unprotected(md5, d)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	int filesize = d.size;
-	int sizeOfFakeBuffer = min(size, filesize - off);
-
-	char *testbuf = (char *)malloc(sizeOfFakeBuffer);
-	memset(testbuf, 'a', sizeOfFakeBuffer);
-	
-	fprintf(stdout, "... read | fake buffer size: %d \n", sizeOfFakeBuffer);
-	
-	fuse_reply_buf(req, testbuf, sizeOfFakeBuffer);
 }
 
 static void hello_ll_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	fprintf(stdout, "... release ino: %d \n", ino);
+	
+	cvmfs_release("/no/path/given", fi);
 }
 
 static void hello_ll_readlink(fuse_req_t req, fuse_ino_t ino) {
@@ -2404,15 +2426,16 @@ static void hello_ll_readlink(fuse_req_t req, fuse_ino_t ino) {
 		return;
 	}
 	
-	hash::t_md5 md5(catalog::mangled_path(path));
-
-	catalog::t_dirent d;
-	if (not catalog::lookup_unprotected(md5, d)) {
-		fuse_reply_err(req, ENOENT);
-		return;
+	char *symlink = (char *)malloc(4096);
+	int result = cvmfs_readlink(path.c_str(), symlink, 4096);
+	
+	if (result == 0) {
+		fuse_reply_readlink(req, symlink);
+	} else {
+		fuse_reply_err(req, result);
 	}
 	
-	fuse_reply_readlink(req, d.symlink.c_str());
+	free(symlink);
 }
 
 
