@@ -20,7 +20,6 @@ SyncMediator::SyncMediator(CatalogHandler *catalogHandler, const SyncParameters 
 	mDataDirectory = canonical_path(parameters->dir_data);
 	mDryRun = parameters->dry_run;
 	mPrintChangeset = parameters->print_changeset;
-	mGuessHardlinks = true;
 }
 
 SyncMediator::~SyncMediator() {
@@ -39,8 +38,8 @@ void SyncMediator::add(DirEntry *entry) {
 			createNestedCatalog(entry);
 		}
 		
-		// a file is a hard link if the link count is greater than 1 OR if the file has an associated hard link group in the catalog
-		if (entry->getUnionLinkcount() > 1 || (mGuessHardlinks && not entry->isNew() && mCatalogHandler->isPartOfHardlinkGroup(entry))) {
+		// a file is a hard link if the link count is greater than 1
+		if (entry->getUnionLinkcount() > 1) {
 			insertHardlink(entry);
 		} else {
 			addFile(entry);
@@ -226,41 +225,18 @@ bool SyncMediator::addFileToDatastore(DirEntry *entry, const std::string &suffix
 	return result;
 }
 
-uint64_t SyncMediator::getTemporaryHardlinkGroupNumber(DirEntry *entry) const {
-	uint64_t hardlinkGroupNumber = 0;
-	
-	if (mGuessHardlinks) {
-		// if we have to guess the hard link relations there is some more stuff to do here:
-		// we are asserting, that the repository was mounted with -o hide_hardlinks otherwise this will fail
-		if (entry->getUnionLinkcount() > 1) {
-			// if the union linkcount is bigger than one
-			// there must have been a new hard link created --> we need to recreate this mapping later on
-			// until now we only collect this 'subgroup'
-			hardlinkGroupNumber = entry->getUnionInode();
-			hardlinkGroupNumber = hardlinkGroupNumber << 10; // this is a hack to avoid collisions (hopefully nobody will have more than 2^10 hard link groups in one catalog context and hopefully the inode numbers don't get bigger than 56 bit)
-		} else {
-			// if we have a link count of one 
-			hardlinkGroupNumber = mCatalogHandler->getHardlinkGroup(entry);
-		}
-	} else {
-		hardlinkGroupNumber = entry->getUnionInode();
-	}
-	
-	return hardlinkGroupNumber;
-}
-
 void SyncMediator::insertHardlink(DirEntry *entry) {
-	uint64_t hardlinkGroupNumber = getTemporaryHardlinkGroupNumber(entry);
+	uint64_t inode = entry->getUnionInode();
 	
 	// find the hard link group in the lists
-	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(hardlinkGroupNumber);
+	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(inode);
 
 	if (hardlinkGroup == getHardlinkMap().end()) {
 		// create a new hardlink group
 		HardlinkGroup newGroup;
 		newGroup.masterFile = entry;
 		newGroup.hardlinks.push_back(entry);
-		getHardlinkMap()[hardlinkGroupNumber] = newGroup;
+		getHardlinkMap()[inode] = newGroup;
 	} else {
 		// append the file to the appropriate hardlink group
 		hardlinkGroup->second.hardlinks.push_back(entry);
@@ -274,16 +250,19 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 	// finally we have to see, if the hardlink is already part of this group
 	
 	// check if we have a hard link here
-	if (entry->getUnionLinkcount() <= 1 && (mGuessHardlinks && not mCatalogHandler->isPartOfHardlinkGroup(entry))) {
+	if (entry->getUnionLinkcount() <= 1) {
 		return;
 	}
+	
+	uint64_t inode = entry->getUnionInode();
 	HardlinkGroupMap::iterator hlGroup;
-	uint64_t hardlinkGroupNumber = getTemporaryHardlinkGroupNumber(entry);
-	hlGroup = getHardlinkMap().find(hardlinkGroupNumber);
+	hlGroup = getHardlinkMap().find(inode);
 
 	if (hlGroup != getHardlinkMap().end()) { // touched hardlinks in this group?
 		DirEntryList::const_iterator i,end;
 		bool alreadyThere = false;
+		
+		// search for the entry in this group
 		for (i = hlGroup->second.hardlinks.begin(), end = hlGroup->second.hardlinks.end(); i != end; ++i) {
 			if ((*i)->isEqualTo(entry)) {
 				alreadyThere = true;
@@ -293,6 +272,7 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 		
 		if (not alreadyThere) { // hardlink already in the group?
 			// if one element of a hardlink group is edited, all elements must be replaced
+			// here we remove an untouched hardlink and add it to its hardlink group for re-adding later
 			remove(entry);
 			hlGroup->second.hardlinks.push_back(entry);
 		}

@@ -1931,8 +1931,6 @@ namespace catalog {
 			}
 		}
 		
-		cout << rowid << " " << hardlinkGroupId << " " << catalog_id << endl;
-		
 		return inode + inodeOffsets[catalog_id];
 	}
    

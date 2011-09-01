@@ -154,8 +154,7 @@ namespace catalog {
 	bool lookup_informed_unprotected(const hash::t_md5 &key, const int catalog_id, t_dirent &result);
    int lookup_catalogid_unprotected(const hash::t_md5 &key);
    bool lookup(const hash::t_md5 &key, t_dirent &result);  /* Locked */
-//   bool lookup_inode_unprotected(const uint64_t inode);
-// not supported anymore
+   bool lookup_inode_unprotected(const uint64_t inode);
 
    bool parent(const hash::t_md5 &key, t_dirent &result);  /* Locked */
    bool parent_unprotected(const hash::t_md5 &key, t_dirent &result);

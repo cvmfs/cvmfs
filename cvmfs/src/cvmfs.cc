@@ -23,7 +23,7 @@
  * jakob.blomer@cern.ch
  */
  
-#define FUSE_USE_VERSION 25
+#define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 #define ENOATTR ENODATA /* instead including attr/xattr.h */
 
@@ -1087,7 +1087,7 @@ namespace cvmfs {
                                  catalog_tree::get_catalog(0)->path, new_catalog);
       pmesg(D_CVMFS, "Check for new catalog returned %d", result);
       if (result == 1) {
-         fuse_set_cache_drainout();
+//         fuse_set_cache_drainout();
          drainout_deadline = time(NULL) + max_cache_timeout;
          next_root = new_catalog;
       }
@@ -1131,7 +1131,7 @@ namespace cvmfs {
          int result = load_and_attach_catalog(catalog::get_catalog_url(0),
                                               hash::t_md5(catalog::get_root_prefix_specific(0)),
                                               catalog_tree::get_catalog(0)->path, 0, false, next_root);
-         fuse_unset_cache_drainout();
+//         fuse_unset_cache_drainout();
          drainout_deadline = 0;
          
          if (result != 0) {
@@ -1164,7 +1164,7 @@ namespace cvmfs {
          }
          
          if (result == 1) {
-            fuse_set_cache_drainout();
+//            fuse_set_cache_drainout();
             drainout_deadline = time(NULL) + max_cache_timeout;
             next_root = new_catalog;
          }
@@ -1294,82 +1294,82 @@ namespace cvmfs {
    /**
     * The ls-callback. If we hit a nested catalog, we load it.
     */
-   static int cvmfs_readdir(const char *path, 
-                            void *buf, 
-                            fuse_fill_dir_t filler, 
-                            off_t offset __attribute__((unused)),
-                            struct fuse_file_info *fi __attribute__((unused)))
-   {
-      /* Read a directory structure, this is enough to be able to navigate through
-         a filesystem */
-      struct stat info;
-      const hash::t_md5 md5 = hash::t_md5(catalog::mangled_path(path));
-      
-      pmesg(D_CVMFS, "readdir %s", path);
-      
-      Tracer::trace(Tracer::FUSE_LS, path, "ls() call");
-      
-      struct catalog::t_dirent d;
-      catalog::lock();
-      if (lookup_cache(md5, d)) {
-         pmesg(D_CVMFS, "catalog cache HIT");
-         if (d.catalog_id < 0) {
-            catalog::unlock();
-            return -ENOENT;
-         }
-      } else {
-         if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-            catalog::unlock();
-            return -ENOENT;
-         }
-      }
-      /* Maybe we have to load the nested catalog */
-      if (d.flags & catalog::DIR_NESTED) {
-         pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path);
-         hash::t_sha1 expected_clg;
-         if (!catalog::lookup_nested_unprotected(
-             d.catalog_id, catalog::mangled_path(path), expected_clg))
-         {
-            catalog::unlock();
-            logmsg("Nested catalog at %s not found (ls)", path);
-            return -ENOENT;
-         }
-         
-         int result = load_and_attach_catalog(path, 
-            hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
-         if (result != 0) {
-            catalog::unlock();
-            atomic_inc(&nioerr);
-            return result;
-         }
-      }
-      
-      pmesg(D_CVMFS, "Found entry %s in catalog %d, check if directory", d.name.c_str(), d.catalog_id);
-      if(!S_ISDIR(d.mode)) {
-         catalog::unlock();
-         return -ENOTDIR;
-      }
-      
-      d.to_stat(&info);
-      filler(buf, ".", &info, 0);
-      
-      struct catalog::t_dirent p;
-      if (catalog::parent_unprotected(md5, p)) {
-         p.to_stat(&info);
-         filler(buf, "..", &info, 0);
-      }
-      
-      vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
-      catalog::unlock();
-      for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); 
-           i != iEnd; ++i) 
-      {
-         i->to_stat(&info);
-         filler(buf, i->name.c_str(), &info, 0); 
-      }
-      
-      return 0;
-   }
+   // static int cvmfs_readdir(const char *path, 
+   //                          void *buf, 
+   //                          fuse_fill_dir_t filler, 
+   //                          off_t offset __attribute__((unused)),
+   //                          struct fuse_file_info *fi __attribute__((unused)))
+   // {
+   //    /* Read a directory structure, this is enough to be able to navigate through
+   //       a filesystem */
+   //    struct stat info;
+   //    const hash::t_md5 md5 = hash::t_md5(catalog::mangled_path(path));
+   //    
+   //    pmesg(D_CVMFS, "readdir %s", path);
+   //    
+   //    Tracer::trace(Tracer::FUSE_LS, path, "ls() call");
+   //    
+   //    struct catalog::t_dirent d;
+   //    catalog::lock();
+   //    if (lookup_cache(md5, d)) {
+   //       pmesg(D_CVMFS, "catalog cache HIT");
+   //       if (d.catalog_id < 0) {
+   //          catalog::unlock();
+   //          return -ENOENT;
+   //       }
+   //    } else {
+   //       if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
+   //          catalog::unlock();
+   //          return -ENOENT;
+   //       }
+   //    }
+   //    /* Maybe we have to load the nested catalog */
+   //    if (d.flags & catalog::DIR_NESTED) {
+   //       pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path);
+   //       hash::t_sha1 expected_clg;
+   //       if (!catalog::lookup_nested_unprotected(
+   //           d.catalog_id, catalog::mangled_path(path), expected_clg))
+   //       {
+   //          catalog::unlock();
+   //          logmsg("Nested catalog at %s not found (ls)", path);
+   //          return -ENOENT;
+   //       }
+   //       
+   //       int result = load_and_attach_catalog(path, 
+   //          hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
+   //       if (result != 0) {
+   //          catalog::unlock();
+   //          atomic_inc(&nioerr);
+   //          return result;
+   //       }
+   //    }
+   //    
+   //    pmesg(D_CVMFS, "Found entry %s in catalog %d, check if directory", d.name.c_str(), d.catalog_id);
+   //    if(!S_ISDIR(d.mode)) {
+   //       catalog::unlock();
+   //       return -ENOTDIR;
+   //    }
+   //    
+   //    d.to_stat(&info);
+   //    filler(buf, ".", &info, 0);
+   //    
+   //    struct catalog::t_dirent p;
+   //    if (catalog::parent_unprotected(md5, p)) {
+   //       p.to_stat(&info);
+   //       filler(buf, "..", &info, 0);
+   //    }
+   //    
+   //    vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
+   //    catalog::unlock();
+   //    for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); 
+   //         i != iEnd; ++i) 
+   //    {
+   //       i->to_stat(&info);
+   //       filler(buf, i->name.c_str(), &info, 0); 
+   //    }
+   //    
+   //    return 0;
+   // }
    
 
    /**
@@ -1820,7 +1820,7 @@ namespace cvmfs {
       lru::spawn();
       talk::spawn();
       
-      max_cache_timeout = fuse_get_max_cache_timeout();
+//      max_cache_timeout = fuse_get_max_cache_timeout();
       
       return NULL;
    }
@@ -1833,34 +1833,34 @@ namespace cvmfs {
     * Puts the callback functions in one single structure
     */
    static void set_cvmfs_ops(struct fuse_operations *cvmfs_operations) {
-      /* Implemented */
-      cvmfs_operations->getattr	= cvmfs_getattr;
-      cvmfs_operations->readlink	= cvmfs_readlink;
-      cvmfs_operations->readdir	= cvmfs_readdir;
-      cvmfs_operations->open	   = cvmfs_open;
-      cvmfs_operations->read	   = cvmfs_read;
-      cvmfs_operations->release 	= cvmfs_release;
-      cvmfs_operations->chmod    = cvmfs_chmod;
-      cvmfs_operations->statfs   = cvmfs_statfs;
-      cvmfs_operations->getxattr = cvmfs_getxattr;
-      
-      /* Return EROFS (read-only filesystem) */
-      cvmfs_operations->mkdir    = cvmfs_mkdir;
-      cvmfs_operations->unlink   = cvmfs_unlink;
-      cvmfs_operations->rmdir    = cvmfs_rmdir;
-      cvmfs_operations->symlink	= cvmfs_symlink;
-      cvmfs_operations->rename   = cvmfs_rename;
-      cvmfs_operations->chown    = cvmfs_chown;
-      cvmfs_operations->link	   = cvmfs_link;
-      cvmfs_operations->truncate	= cvmfs_truncate;
-      cvmfs_operations->utime    = cvmfs_utime;
-      cvmfs_operations->write    = cvmfs_write;
-      cvmfs_operations->mknod    = cvmfs_mknod;
-      cvmfs_operations->chmod    = cvmfs_chmod;
-      
-      /* Init/Fini */
-      cvmfs_operations->init     = cvmfs_init;
-      cvmfs_operations->destroy  = cvmfs_destroy;
+      // /* Implemented */
+      // cvmfs_operations->getattr	= cvmfs_getattr;
+      // cvmfs_operations->readlink	= cvmfs_readlink;
+      // cvmfs_operations->readdir	= cvmfs_readdir;
+      // cvmfs_operations->open	   = cvmfs_open;
+      // cvmfs_operations->read	   = cvmfs_read;
+      // cvmfs_operations->release 	= cvmfs_release;
+      // cvmfs_operations->chmod    = cvmfs_chmod;
+      // cvmfs_operations->statfs   = cvmfs_statfs;
+      // cvmfs_operations->getxattr = cvmfs_getxattr;
+      // 
+      // /* Return EROFS (read-only filesystem) */
+      // cvmfs_operations->mkdir    = cvmfs_mkdir;
+      // cvmfs_operations->unlink   = cvmfs_unlink;
+      // cvmfs_operations->rmdir    = cvmfs_rmdir;
+      // cvmfs_operations->symlink	= cvmfs_symlink;
+      // cvmfs_operations->rename   = cvmfs_rename;
+      // cvmfs_operations->chown    = cvmfs_chown;
+      // cvmfs_operations->link	   = cvmfs_link;
+      // cvmfs_operations->truncate	= cvmfs_truncate;
+      // cvmfs_operations->utime    = cvmfs_utime;
+      // cvmfs_operations->write    = cvmfs_write;
+      // cvmfs_operations->mknod    = cvmfs_mknod;
+      // cvmfs_operations->chmod    = cvmfs_chmod;
+      // 
+      // /* Init/Fini */
+      // cvmfs_operations->init     = cvmfs_init;
+      // cvmfs_operations->destroy  = cvmfs_destroy;
    }
    
 } /* namespace cvmfs */
@@ -1943,7 +1943,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
 
 struct cvmfs_opts cvmfs_opts;
 struct fuse_args fuse_args;
-static struct fuse_operations cvmfs_operations;
+//static struct fuse_operations cvmfs_operations;
 
 
 /** 
@@ -1995,8 +1995,8 @@ static void usage(const char *progname) {
 
    /* Print the help from FUSE */
    const char *args[] = {progname, "-h"};
-   static struct fuse_operations op;
-   fuse_main(2, (char**)args, &op);
+//   static struct fuse_operations op;
+//   fuse_main(2, (char**)args, &op);
 }
 
 
@@ -2145,6 +2145,276 @@ static void libcrypto_mt_cleanup(void) {
    OPENSSL_free(libcrypto_locks);
 }
 
+//
+//
+// ###########################
+// ######################################################################################
+// ########################################################
+//
+//
+//
+
+
+static const char *hello_str = "Hello World!\n";
+static const char *hello_name = "hello";
+static const char *hello_hardlink = "hardlink";
+
+typedef std::map<fuse_ino_t, std::string> InodeCache;
+InodeCache inode_cache;
+
+bool lookup_inode_cache(fuse_ino_t inode, string &result) {
+	InodeCache::const_iterator path = inode_cache.find(inode);
+	if (path == inode_cache.end()) {
+		return false;
+	}
+	
+	result = path->second;
+	return true;
+}
+
+
+
+static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
+			     struct fuse_file_info *fi)
+{
+	struct stat stbuf;
+	
+	string path;
+	if (not lookup_inode_cache(ino, path)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	hash::t_md5 md5(catalog::mangled_path(path));
+
+	catalog::t_dirent d;
+	if (not catalog::lookup_unprotected(md5, d)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	struct stat s;
+	d.to_stat(&s);
+	
+	fuse_reply_attr(req, &s, 1.0);
+}
+
+static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+{
+	struct fuse_entry_param e;
+	
+	fprintf(stdout, "... lookup parent_ino: %d name: %s\n", parent, name);
+	
+	string parentPath;
+	if (not lookup_inode_cache(parent, parentPath)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	string filename = parentPath + "/" + name;
+	hash::t_md5 md5(catalog::mangled_path(filename));
+
+	catalog::t_dirent d;
+	if (not catalog::lookup_unprotected(md5, d)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	struct stat s;
+	d.to_stat(&s);
+	
+	// insert into cache
+	inode_cache[s.st_ino] = filename;
+	
+	memset(&e, 0, sizeof(e));
+	e.ino = s.st_ino;
+	e.attr = s;
+	e.attr_timeout = 1.0;
+	e.entry_timeout = 1.0;
+	
+	fuse_reply_entry(req, &e);
+}
+
+struct dirbuf {
+	char *p;
+	size_t size;
+};
+
+static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name,
+		       fuse_ino_t ino)
+{
+	struct stat stbuf;
+	size_t oldsize = b->size;
+	b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
+        char *newp = (char *)realloc(b->p, b->size);
+        if (!newp) {
+            fprintf(stderr, "*** fatal error: cannot allocate memory\n");
+            abort();
+        }
+	b->p = newp;
+	memset(&stbuf, 0, sizeof(stbuf));
+	stbuf.st_ino = ino;
+	fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, &stbuf,
+			  b->size);
+}
+
+#define min(x, y) ((x) < (y) ? (x) : (y))
+
+char* substring(const char* str, size_t begin, size_t len) 
+{ 
+  if (str == 0 || strlen(str) == 0 || strlen(str) < begin || strlen(str) < (begin+len)) 
+    return 0; 
+
+  return strndup(str + begin, len); 
+}
+
+static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize, off_t off, size_t maxsize)
+{
+	if (off < bufsize) {
+		fprintf(stdout, "... reply buf | offset: %d bufsize: %d maxsize: %d \n", off, bufsize, maxsize);
+		fprintf(stdout, "... reply buf | buffer: ' %s ' returning: ' %s '\n", buf, substring(buf, off, min(bufsize - off, maxsize)));
+		return fuse_reply_buf(req, buf + off, min(bufsize - off, maxsize));
+	}
+	else {
+		fprintf(stdout, "... reply buf | empty buffer\n");
+		return fuse_reply_buf(req, NULL, 0);
+	}
+}
+
+static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name, struct stat *s)
+{
+	size_t oldsize = b->size;
+	b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
+    char *newp = (char *)realloc(b->p, b->size);
+	if (!newp) {
+	    fprintf(stderr, "*** fatal error: cannot allocate memory\n");
+	    abort();
+	}
+	b->p = newp;
+	fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, s, b->size);
+}
+
+static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+			     off_t off, struct fuse_file_info *fi)
+{
+	(void) fi;
+	
+	fprintf(stdout, "... readdir | ino: %d \n", ino);
+
+	string path, name;
+	if (not lookup_inode_cache(ino, path)) {
+		fuse_reply_err(req, ENOENT);
+		fprintf(stdout, "... readdir | reply error\n");
+		return;
+	}
+	
+	hash::t_md5 md5(catalog::mangled_path(path));
+	
+	struct dirbuf b;
+	memset(&b, 0, sizeof(b));
+	
+	struct stat info;
+	memset(&info, 0, sizeof(info));
+	info.st_ino = 1;
+
+	dirbuf_add(req, &b, ".", &info);
+	dirbuf_add(req, &b, "..", &info);
+	
+	vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
+	for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); i != iEnd; ++i) 
+	{
+		i->to_stat(&info);
+		name = i->name;
+		
+		// should be improved :D
+		dirbuf_add(req, &b, name.c_str(), &info);
+	}
+	
+	reply_buf_limited(req, b.p, b.size, off, size);
+	free(b.p);
+}
+
+static void hello_ll_open(fuse_req_t req, fuse_ino_t ino,
+			  struct fuse_file_info *fi)
+{
+	fprintf(stdout, "... open ino: %d\n", ino);
+	
+	string path;
+	if (not lookup_inode_cache(ino, path)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	hash::t_md5 md5(catalog::mangled_path(path));
+
+	catalog::t_dirent d;
+	if (not catalog::lookup_unprotected(md5, d)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	if ((fi->flags & 3) != O_RDONLY) {
+		fuse_reply_err(req, EACCES);
+	} else {
+		fuse_reply_open(req, fi);
+	}
+}
+
+static void hello_ll_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
+{
+	(void) fi;
+	
+	fprintf(stdout, "... read | ino: %d maxsize: %d offset: %d \n", ino, size, off);
+	
+	string path;
+	if (not lookup_inode_cache(ino, path)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	hash::t_md5 md5(catalog::mangled_path(path));
+
+	catalog::t_dirent d;
+	if (not catalog::lookup_unprotected(md5, d)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	int filesize = d.size;
+	int sizeOfFakeBuffer = min(size, filesize - off);
+
+	char *testbuf = (char *)malloc(sizeOfFakeBuffer);
+	memset(testbuf, 'a', sizeOfFakeBuffer);
+	
+	fprintf(stdout, "... read | fake buffer size: %d \n", sizeOfFakeBuffer);
+	
+	fuse_reply_buf(req, testbuf, sizeOfFakeBuffer);
+}
+
+static void hello_ll_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
+	fprintf(stdout, "... release ino: %d \n", ino);
+}
+
+static void hello_ll_readlink(fuse_req_t req, fuse_ino_t ino) {
+	fprintf(stdout, "... readlink | ino: %d \n", ino);
+	
+	string path;
+	if (not lookup_inode_cache(ino, path)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	hash::t_md5 md5(catalog::mangled_path(path));
+
+	catalog::t_dirent d;
+	if (not catalog::lookup_unprotected(md5, d)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	fuse_reply_readlink(req, d.symlink.c_str());
+}
+
 
 /**
  * Boot the beast up!
@@ -2197,9 +2467,23 @@ int main(int argc, char *argv[])
        !cvmfs_opts.hostname) 
    {
       usage(argv[0]);
-      goto cvmfs_cleanup;
+     // goto cvmfs_cleanup;
+	return 1;
    }
+
    
+
+	char* fakeArgv[2];
+	char* mpnt = (char*)malloc(mountpoint.length()+1);
+	
+	strncpy(mpnt, cvmfs::mountpoint.c_str(), mountpoint.length()+1);
+	fakeArgv[0] = argv[0];
+	fakeArgv[1] = mpnt;
+
+	struct fuse_args args = FUSE_ARGS_INIT(2, fakeArgv);
+	struct fuse_chan *ch;
+	char *mountpoint;
+	int err = -1;
    
    
    /* Fill cvmfs option variables from Fuse options */
@@ -2218,6 +2502,8 @@ int main(int argc, char *argv[])
    if (cvmfs_opts.blacklist) cvmfs::blacklist = cvmfs_opts.blacklist;
    if (cvmfs_opts.repo_name) cvmfs::repo_name = cvmfs_opts.repo_name;
    if (cvmfs_opts.hide_hardlinks) cvmfs::hide_hardlinks = cvmfs_opts.hide_hardlinks;
+
+
 
    /* seperate first host from hostlist */
    unsigned iter_hostname;
@@ -2387,8 +2673,41 @@ int main(int argc, char *argv[])
    cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
    cout << "CernVM-FS: linking to remote directoy " << cvmfs::root_url << endl;
    logmsg("CernVM-FS: linking %s to remote directoy %s", cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
-   set_cvmfs_ops(&cvmfs_operations);
-   result = fuse_main(fuse_args.argc, fuse_args.argv, &cvmfs_operations);
+//   set_cvmfs_ops(&cvmfs_operations);
+//   result = fuse_main(fuse_args.argc, fuse_args.argv, &cvmfs_operations);
+
+// initializing low level fuse API
+
+	static struct fuse_lowlevel_ops hello_ll_oper;
+	hello_ll_oper.lookup	= hello_ll_lookup;
+	hello_ll_oper.getattr	= hello_ll_getattr;
+	hello_ll_oper.readdir	= hello_ll_readdir;
+	hello_ll_oper.open		= hello_ll_open;
+	hello_ll_oper.read		= hello_ll_read;
+	hello_ll_oper.release   = hello_ll_release;
+	hello_ll_oper.readlink  = hello_ll_readlink;
+	
+	inode_cache[1] = ""; // root
+
+	if (fuse_parse_cmdline(&args, &mountpoint, NULL, NULL) != -1 &&
+	    (ch = fuse_mount(mountpoint, &args)) != NULL) {
+		struct fuse_session *se;
+
+		se = fuse_lowlevel_new(&args, &hello_ll_oper,
+				       sizeof(hello_ll_oper), NULL);
+		if (se != NULL) {
+			if (fuse_set_signal_handlers(se) != -1) {
+				fuse_session_add_chan(se, ch);
+				err = fuse_session_loop(se);
+				fuse_remove_signal_handlers(se);
+				fuse_session_remove_chan(ch);
+			}
+			fuse_session_destroy(se);
+		}
+		fuse_unmount(mountpoint, ch);
+	}
+	fuse_opt_free_args(&args);
+
    
    pmesg(D_CVMFS, "Fuse loop terminated (%d)", result);
    logmsg("CernVM-FS: unmounted %s (%s)", cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
