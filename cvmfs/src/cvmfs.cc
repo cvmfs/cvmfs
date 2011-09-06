@@ -1385,12 +1385,16 @@ namespace cvmfs {
       
       int fd = -1;
       const hash::t_md5 md5(catalog::mangled_path(path));
+
+		
+		cout << "path: " << c_path << endl;
       
       /* Look for it in the catalog. If it's not there, it doesn't exist. */
       struct catalog::t_dirent d;
       catalog::lock();
       if (lookup_cache(md5, d)) {
          pmesg(D_CVMFS, "catalog cache HIT");
+			cout << "cache hit" << endl;
          if (d.catalog_id < 0) {
             catalog::unlock();
             Tracer::trace(Tracer::FUSE_OPEN, path, "memcache n-hit");
@@ -1398,13 +1402,16 @@ namespace cvmfs {
          } else {
             Tracer::trace(Tracer::FUSE_OPEN, path, "memcache hit");
          }
-      } else {
+      } else {	
+			cout << "cache miss" << endl;
          if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
+				cout << "insert cache negative" << endl;
             insert_cache_negative(md5);
             catalog::unlock();
             Tracer::trace(Tracer::FUSE_OPEN, path, "ENOENT");
             return -ENOENT;
          } else {
+				cout << "insert cache" << endl;
             insert_cache(md5, d);
          }
       }
@@ -1413,20 +1420,24 @@ namespace cvmfs {
       
       fd = cache::open_or_lock(d);
       if (fd < 0) {
+			cout << "disk cache miss" << endl;
          Tracer::trace(Tracer::FUSE_OPEN, path, "disk cache miss");
          fd = cache::fetch(d, path);
          pthread_mutex_unlock(&mutex_download);
       }
       
       if (fd >= 0) {
+			cout << "disk cache hit" << endl;
          if (atomic_xadd(&open_files, 1) < ((int)nofiles)-NUM_RESERVED_FD) {
             fi->fh = fd;
             return 0;
          } else {
+				cout << "cannot open (nofiles)" << endl;
             if (close(fd) == 0) atomic_dec(&open_files);
             return -EMFILE;
          }
       } else {
+			cout << "??" << endl;
          if (errno == EMFILE) return -EMFILE;
       }
       
@@ -1513,39 +1524,43 @@ namespace cvmfs {
    }
 
 
-   static int cvmfs_statfs(const char *path __attribute__((unused)), struct statvfs *info)
+   static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino/*const char *path __attribute__((unused)), struct statvfs *info*/)
    {
       /* If we return 0 it will cause the fs 
          to be ignored in "df" */
-      memset(info, 0, sizeof(*info));
+				struct statvfs info ;
+      memset(&info, 0, sizeof(info));
       
       /* Unmanaged cache */
-      if (lru::capacity() == 0)
-         return 0;
+      if (lru::capacity() == 0) {
+			fuse_reply_statfs(req, &info);
+			return;
+		}
       
       uint64_t available = 0;
       uint64_t size = lru::size();
       
-      info->f_bsize = 1;
+      info.f_bsize = 1;
       
       if (lru::capacity() == (uint64_t)(-1)) {
          /* Unrestricted cache, look at free space on cache dir fs */
          struct statfs cache_buf;
          if (statfs(".", &cache_buf) == 0) {
             available = cache_buf.f_bavail * cache_buf.f_bsize;
-            info->f_blocks = size + available;
+            info.f_blocks = size + available;
          } else {
-            info->f_blocks = size;
+            info.f_blocks = size;
          }
       } else {
          /* Take values from LRU module */
-         info->f_blocks = lru::capacity();
+         info.f_blocks = lru::capacity();
          available = lru::capacity() - size;
       }
       
-      info->f_bfree = info->f_bavail = available;
+      info.f_bfree = info.f_bavail = available;
       
-      return 0;
+		fuse_reply_statfs(req, &info);
+//      return 0;
    }
    
    
@@ -1678,132 +1693,134 @@ namespace cvmfs {
    }
    
 
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_chmod(const char *path __attribute__((unused)), 
-                          mode_t mode __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_mkdir(const char *path __attribute__((unused)), 
-                          mode_t mode __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_unlink(const char *path __attribute__((unused))) {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_rmdir(const char *path __attribute__((unused))) {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_symlink(const char *from __attribute__((unused)), 
-                            const char *to __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_rename(const char *from __attribute__((unused)), 
-                           const char *to __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_link(const char *from __attribute__((unused)), 
-                         const char *to __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_chown(const char *path __attribute__((unused)), 
-                          uid_t uid __attribute__((unused)), 
-                          gid_t gid __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_truncate(const char *path __attribute__((unused)), 
-                             off_t size __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_utime(const char *path __attribute__((unused)), 
-                          struct utimbuf *buf __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_write(const char *path __attribute__((unused)),
-                          const char *buf __attribute__((unused)), 
-                          size_t size __attribute__((unused)), 
-                          off_t offset __attribute__((unused)), 
-                          struct fuse_file_info *fi __attribute__((unused)))
-   {
-      return -EROFS;
-   }
-   
-   
-   /**
-    * \return -EROFS
-    */
-   static int cvmfs_mknod(const char *path __attribute__((unused)), 
-                          mode_t mode __attribute__((unused)), 
-                          dev_t rdev __attribute__((unused)))
-   {
-      return -EROFS;
-   }
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_chmod(const char *path __attribute__((unused)), 
+   //                        mode_t mode __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_mkdir(const char *path __attribute__((unused)), 
+   //                        mode_t mode __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_unlink(const char *path __attribute__((unused))) {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_rmdir(const char *path __attribute__((unused))) {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_symlink(const char *from __attribute__((unused)), 
+   //                          const char *to __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_rename(const char *from __attribute__((unused)), 
+   //                         const char *to __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_link(const char *from __attribute__((unused)), 
+   //                       const char *to __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_chown(const char *path __attribute__((unused)), 
+   //                        uid_t uid __attribute__((unused)), 
+   //                        gid_t gid __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_truncate(const char *path __attribute__((unused)), 
+   //                           off_t size __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_utime(const char *path __attribute__((unused)), 
+   //                        struct utimbuf *buf __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_write(const char *path __attribute__((unused)),
+   //                        const char *buf __attribute__((unused)), 
+   //                        size_t size __attribute__((unused)), 
+   //                        off_t offset __attribute__((unused)), 
+   //                        struct fuse_file_info *fi __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
+   // 
+   // 
+   // /**
+   //  * \return -EROFS
+   //  */
+   // static int cvmfs_mknod(const char *path __attribute__((unused)), 
+   //                        mode_t mode __attribute__((unused)), 
+   //                        dev_t rdev __attribute__((unused)))
+   // {
+   //    return -EROFS;
+   // }
    
 
    /**
     * Do after-daemon() initialization
     */
-   static void *cvmfs_init() {
+   static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
       int retval;
+		
+	//	daemon(0,0);
 
       pid = getpid();
 
@@ -1821,8 +1838,6 @@ namespace cvmfs {
       talk::spawn();
       
 //      max_cache_timeout = fuse_get_max_cache_timeout();
-      
-      return NULL;
    }
    
    static void cvmfs_destroy(void *unused __attribute__((unused))) {
@@ -1893,6 +1908,13 @@ struct cvmfs_opts {
    int      grab_mountpoint;
    int      syslog_level;
    int      hide_hardlinks;
+	int      kernel_cache;
+	int      auto_cache;
+	int      entry_timeout;
+	int      attr_timeout;
+	int      negative_timeout;
+	int      use_ino;
+	
    int64_t  quota_limit;
    int64_t  quota_threshold;
 };
@@ -1928,6 +1950,12 @@ static struct fuse_opt cvmfs_array_opts[] = {
    CVMFS_SWITCH("hide_hardlinks",   hide_hardlinks),
    CVMFS_OPT("blacklist=%s",        blacklist, 0),
    CVMFS_OPT("syslog_level=%d",     syslog_level, 3),
+	CVMFS_OPT("entry_timeout=%d",    entry_timeout, 60),
+	CVMFS_OPT("attr_timeout=%d",     attr_timeout, 60),
+	CVMFS_OPT("negative_timeout=%d", negative_timeout, 60),
+	CVMFS_SWITCH("use_ino",          entry_timeout),
+   CVMFS_SWITCH("kernel_cache",     kernel_cache),
+   CVMFS_SWITCH("auto_cache",       auto_cache),
    
    FUSE_OPT_KEY("-V",            KEY_VERSION),
    FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -2044,63 +2072,68 @@ static int is_cvmfs_opt(const char *arg) {
  */
 static int cvmfs_opt_proc(void *data __attribute__((unused)), const char *arg, int key,
                           struct fuse_args *outargs)
-{   
-   switch (key) {
-      case FUSE_OPT_KEY_OPT:
-         if (is_cvmfs_opt(arg)) {
-            /* If this is a "-o" option and is not one of ours, we assume that this must
-               be used when mounting fuse not when instanciating the file system...            
-               It can't be one of our option if it doesnt match the template */
-            return 0;
-         }
-         if (strstr(arg, "uid=")) {
-            cvmfs::uid = atoi(arg+4);
-         }
-         if (strstr(arg, "gid=")) {
-            cvmfs::gid = atoi(arg+4);
-         }
-         return 1;
-         
-      case FUSE_OPT_KEY_NONOPT:
-         if (!cvmfs_opts.hostname && strstr(arg, "http://")) {
-            /* If we receive a parameter that contains "http://" 
-               we know for sure that it's our remote server */
-            cvmfs_opts.hostname = strdup(arg);
-         } else {
-            /* If we receive any other string, we take it as the mount point. */
-            fuse_opt_add_arg(outargs, arg);
-            cvmfs::mountpoint = arg;
-         }
-         return 0;
-         
-      case KEY_HELP:
-         usage(outargs->argv[0]);
-         fuse_opt_add_arg(outargs, "-ho");
-         exit(0);
-         
-      case KEY_VERSION:
-         fprintf(stderr, "CernVM-FS version %s\n", PACKAGE_VERSION);
-#if FUSE_VERSION >= 25
-         fuse_opt_add_arg(outargs, "--version");
-#endif
-         exit(0);
-         
-      case KEY_FOREGROUND:
-         fuse_opt_add_arg(outargs, "-f");
-         return 0;
-      
-      case KEY_SINGLETHREAD:
-         fuse_opt_add_arg(outargs, "-s");
-         return 0;
-         
-      case KEY_DEBUG:
-         fuse_opt_add_arg(outargs, "-d");
-         return 0;
-         
-      default:
-         fprintf(stderr, "internal error\n");
-         abort();
-   }
+{  
+
+	switch (key) {
+	      case FUSE_OPT_KEY_OPT:
+	         if (is_cvmfs_opt(arg)) {
+	            /* If this is a "-o" option and is not one of ours, we assume that this must
+	               be used when mounting fuse not when instanciating the file system...            
+	               It can't be one of our option if it doesnt match the template */
+	            return 0;
+	         }
+	         if (strstr(arg, "uid=")) {
+	            cvmfs::uid = atoi(arg+4);
+					return 0;
+	         }
+	         if (strstr(arg, "gid=")) {
+	            cvmfs::gid = atoi(arg+4);
+					return 0;
+	         }
+	         return 1;
+
+	      case FUSE_OPT_KEY_NONOPT:
+	         if (!cvmfs_opts.hostname && 
+	             ((strstr(arg, "http://") == arg) || (strstr(arg, "file://") == arg))) 
+	         {
+	            /* If we receive a parameter that contains "http://" 
+	               we know for sure that it's our remote server */
+	            cvmfs_opts.hostname = strdup(arg);
+	         } else {
+	            /* If we receive any other string, we take it as the mount point. */
+	            //fuse_opt_add_arg(outargs, arg);
+	            cvmfs::mountpoint = arg;
+	         }
+	         return 0;
+
+	      case KEY_HELP:
+	         usage(outargs->argv[0]);
+	         fuse_opt_add_arg(outargs, "-ho");
+	         exit(0);
+
+	      case KEY_VERSION:
+	         fprintf(stderr, "CernVM-FS version %s\n", PACKAGE_VERSION);
+	#if FUSE_VERSION >= 25
+	         fuse_opt_add_arg(outargs, "--version");
+	#endif
+	         exit(0);
+
+	      case KEY_FOREGROUND:
+	         fuse_opt_add_arg(outargs, "-f");
+	         return 0;
+
+	      case KEY_SINGLETHREAD:
+	         fuse_opt_add_arg(outargs, "-s");
+	         return 0;
+
+	      case KEY_DEBUG:
+	         fuse_opt_add_arg(outargs, "-d");
+	         return 0;
+
+	      default:
+	         fprintf(stderr, "internal error\n");
+	         abort();
+	   }
 }
 
 
@@ -2169,12 +2202,15 @@ typedef std::map<fuse_ino_t, std::string> InodeCache;
 InodeCache inode_cache;
 
 bool lookup_inode_cache(fuse_ino_t inode, string &result) {
+	pmesg(D_CVMFS, "lookup_inode_cache(inode: %d)", inode);
+	
 	InodeCache::const_iterator path = inode_cache.find(inode);
 	if (path == inode_cache.end()) {
 		return false;
 	}
 	
 	result = path->second;
+	pmesg(D_CVMFS, "lookup_inode_cache(inode: %d, %s)", inode, result.c_str());
 	return true;
 }
 
@@ -2182,7 +2218,7 @@ static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			     struct fuse_file_info *fi)
 {
 	struct stat stbuf;
-	
+	pmesg(D_CVMFS, "hello_ll_getattr(inode: %d)", ino);
 	fprintf(stdout, "... getattr ino: %d \n", ino);
 	
 	string path;
@@ -2203,7 +2239,8 @@ static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 }
 
 static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
-{
+{	
+	pmesg(D_CVMFS, "hello_ll_lookup(name: %s)", name);
 	fprintf(stdout, "... lookup parent_ino: %d name: %s\n", parent, name);
 	
 	// get path of directory (parent)
@@ -2226,6 +2263,7 @@ static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 	if (d.flags & catalog::DIR_NESTED) {
 		fprintf(stdout, "... lookup | found nested catalog \n");
 		
+		catalog::lock();
 		pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", filename.c_str());
 		hash::t_sha1 expected_clg;
 		if (!catalog::lookup_nested_unprotected(d.catalog_id, catalog::mangled_path(filename), expected_clg))
@@ -2242,7 +2280,9 @@ static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 			atomic_inc(&nioerr);
 			return;
 		}
-     }
+		
+		catalog::unlock();
+   }
 	
 	struct stat s;
 	d.to_stat(&s);
@@ -2269,6 +2309,7 @@ struct dirbuf {
 static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name,
 		       fuse_ino_t ino)
 {
+	pmesg(D_CVMFS, "dirbuf_add(name: %s)", name);
 	struct stat stbuf;
 	size_t oldsize = b->size;
 	b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
@@ -2315,6 +2356,7 @@ static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			     off_t off, struct fuse_file_info *fi)
 {
 	fprintf(stdout, "... readdir | ino: %d \n", ino);
+	pmesg(D_CVMFS, "hello_ll_readdir(ino: %d)", ino);
 
 	string path, name;
 	if (not lookup_inode_cache(ino, path)) {
@@ -2327,13 +2369,13 @@ static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
       struct catalog::t_dirent d;
       catalog::lock();
       if (lookup_cache(md5, d)) {
-         pmesg(D_CVMFS, "catalog cache HIT");
-         if (d.catalog_id < 0) {
-            catalog::unlock();
-			fuse_reply_err(req, ENOENT);
-			return;
-         }
-      } else {
+               pmesg(D_CVMFS, "catalog cache HIT");
+               if (d.catalog_id < 0) {
+                  catalog::unlock();
+      			fuse_reply_err(req, ENOENT);
+      			return;
+               }
+            } else {
          if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
             catalog::unlock();
 			fuse_reply_err(req, ENOENT);
@@ -2376,6 +2418,7 @@ static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 static void hello_ll_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 {
 	fprintf(stdout, "... open ino: %d\n", ino);
+	pmesg(D_CVMFS, "hello_ll_open(ino: %d)", ino);
 	
 	string path;
 	if (not lookup_inode_cache(ino, path)) {
@@ -2393,13 +2436,14 @@ static void hello_ll_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info 
 	if (result == 0) {
 		fuse_reply_open(req, fi);
 	} else {
-		fuse_reply_err(req, result);
+		fuse_reply_err(req, -result);
 	}
 }
 
 static void hello_ll_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
 {
 	fprintf(stdout, "... read | ino: %d maxsize: %d offset: %d \n", ino, size, off);
+	pmesg(D_CVMFS, "hello_ll_read(ino: %d)", ino);
 	
 	char *data = (char *)malloc(size);
 	int result = cvmfs_read("/no/path/given", data, size, off, fi);
@@ -2409,16 +2453,27 @@ static void hello_ll_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off
 	} else {
 		fuse_reply_err(req, errno);
 	}
+	free (data);
 }
 
 static void hello_ll_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	fprintf(stdout, "... release ino: %d \n", ino);
+	pmesg(D_CVMFS, "hello_ll_release(ino: %d)", ino);
 	
-	cvmfs_release("/no/path/given", fi);
+	string path;
+	if (not lookup_inode_cache(ino, path)) {
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+	
+	cvmfs_release(path.c_str(), fi);
+	
+	fuse_reply_err(req, 0);
 }
 
 static void hello_ll_readlink(fuse_req_t req, fuse_ino_t ino) {
 	fprintf(stdout, "... readlink | ino: %d \n", ino);
+	pmesg(D_CVMFS, "hello_ll_readlink(ino: %d)", ino);
 	
 	string path;
 	if (not lookup_inode_cache(ino, path)) {
@@ -2482,6 +2537,10 @@ int main(int argc, char *argv[])
    atomic_init(&certificate_hits);
    atomic_init(&certificate_misses);
 
+	struct fuse_chan *ch;
+	int err = -1;
+
+
    /* Parse options */
    fuse_args.argc = argc;
    fuse_args.argv = argv;
@@ -2490,24 +2549,10 @@ int main(int argc, char *argv[])
        !cvmfs_opts.hostname) 
    {
       usage(argv[0]);
-     // goto cvmfs_cleanup;
+      goto cvmfs_cleanup;
 	return 1;
    }
-
-   
-
-	char* fakeArgv[2];
-	char* mpnt = (char*)malloc(mountpoint.length()+1);
 	
-	strncpy(mpnt, cvmfs::mountpoint.c_str(), mountpoint.length()+1);
-	fakeArgv[0] = argv[0];
-	fakeArgv[1] = mpnt;
-
-	struct fuse_args args = FUSE_ARGS_INIT(2, fakeArgv);
-	struct fuse_chan *ch;
-	char *mountpoint;
-	int err = -1;
-   
    
    /* Fill cvmfs option variables from Fuse options */
    if (!cvmfs::uid) cvmfs::uid = getuid();
@@ -2525,8 +2570,8 @@ int main(int argc, char *argv[])
    if (cvmfs_opts.blacklist) cvmfs::blacklist = cvmfs_opts.blacklist;
    if (cvmfs_opts.repo_name) cvmfs::repo_name = cvmfs_opts.repo_name;
    if (cvmfs_opts.hide_hardlinks) cvmfs::hide_hardlinks = cvmfs_opts.hide_hardlinks;
-
-
+	if (cvmfs_opts.kernel_cache) printWarning("using deprecated mount option 'kernel_cache' - ignoring...");
+	if (cvmfs_opts.auto_cache) printWarning("using deprecated mount option 'auto_cache' - ignoring...");
 
    /* seperate first host from hostlist */
    unsigned iter_hostname;
@@ -2535,7 +2580,7 @@ int main(int argc, char *argv[])
    }
    if (iter_hostname == 0) cvmfs::root_url = "";
    else cvmfs::root_url = string(cvmfs_opts.hostname, iter_hostname);
-      
+
    if (cvmfs_opts.whitelist) cvmfs::whitelist = cvmfs_opts.whitelist;
    else cvmfs::whitelist = "/.cvmfswhitelist";
    options_ready = true;
@@ -2576,22 +2621,18 @@ int main(int argc, char *argv[])
       debug_set_log(cvmfs_opts.logfile);
    }
    
-   /* Drop rights */
-   if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
-      cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
-      if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
-         cerr << "Failed to drop credentials" << endl;
-         goto cvmfs_cleanup;
-      }
-   }
-   
    /* CVMFS has its own proxy environment, chain of proxies */
    num_hosts = curl_set_host_chain(cvmfs_opts.hostname);
    curl_set_proxy_chain(cvmfs::proxies.c_str());
    curl_set_timeout(cvmfs_opts.timeout, cvmfs_opts.timeout_direct);
                     
    /* Try to jump to cache directory.  This tests, if it is accassible.  Also, it brings speed later on. */
-   if (!mkdir_deep(cvmfs::cachedir, 0700) || (chdir(cvmfs::cachedir.c_str()) != 0)) {
+   if (!mkdir_deep(cvmfs::cachedir, 0700)) {
+		cerr << "Failure: cannot create cache directory " << cvmfs::cachedir << endl;
+		goto cvmfs_cleanup;
+	}
+	
+	if (chdir(cvmfs::cachedir.c_str()) != 0) {
       cerr << "Failure: cache directory " << cvmfs::cachedir << " is unavailable" << endl;
       goto cvmfs_cleanup;
    }
@@ -2693,7 +2734,6 @@ int main(int argc, char *argv[])
    talk_ready = true;
       
    /* Set fuse callbacks, remove url from arguments */
-   cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
    cout << "CernVM-FS: linking to remote directoy " << cvmfs::root_url << endl;
    logmsg("CernVM-FS: linking %s to remote directoy %s", cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
 //   set_cvmfs_ops(&cvmfs_operations);
@@ -2709,14 +2749,28 @@ int main(int argc, char *argv[])
 	hello_ll_oper.read		= hello_ll_read;
 	hello_ll_oper.release   = hello_ll_release;
 	hello_ll_oper.readlink  = hello_ll_readlink;
+	hello_ll_oper.init      = cvmfs_init;
+	hello_ll_oper.statfs    = cvmfs_statfs;
 	
 	inode_cache[1] = ""; // root
 
-	if (fuse_parse_cmdline(&args, &mountpoint, NULL, NULL) != -1 &&
-	    (ch = fuse_mount(mountpoint, &args)) != NULL) {
+
+	if ((ch = fuse_mount(cvmfs::mountpoint.c_str(), &fuse_args)) != NULL) {
 		struct fuse_session *se;
 
-		se = fuse_lowlevel_new(&args, &hello_ll_oper,
+	   /* Drop rights */
+/*	   if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
+	      cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
+	      if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
+	         cerr << "Failed to drop credentials" << endl;
+	         goto cvmfs_cleanup;
+	      }
+	   }*/
+			
+		cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
+		daemon(0,0);
+
+		se = fuse_lowlevel_new(&fuse_args, &hello_ll_oper,
 				       sizeof(hello_ll_oper), NULL);
 		if (se != NULL) {
 			if (fuse_set_signal_handlers(se) != -1) {
@@ -2727,9 +2781,9 @@ int main(int argc, char *argv[])
 			}
 			fuse_session_destroy(se);
 		}
-		fuse_unmount(mountpoint, ch);
+		fuse_unmount(cvmfs::mountpoint.c_str(), ch);
 	}
-	fuse_opt_free_args(&args);
+	fuse_opt_free_args(&fuse_args);
 
    
    pmesg(D_CVMFS, "Fuse loop terminated (%d)", result);

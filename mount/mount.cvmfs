@@ -159,7 +159,6 @@ else
   jump_group=n
 fi
 
-
 if [ "x$dryrun" == "xtrue" ]; then
   if [ $jump_group == "y" ]; then
     echo -e -n sg fuse -c \"

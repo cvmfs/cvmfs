@@ -121,7 +121,16 @@ namespace lru {
       uint64_t size;
       unsigned char buf[20+sizeof(size)];
       
-      while (read(pipe_insert[0], buf, 20+sizeof(size)) == 20+sizeof(size)) {
+      while (true) {
+	
+         pmesg(D_LRU, "... 0 ...");
+
+			if (read(pipe_insert[0], buf, 20+sizeof(size)) == 20+sizeof(size) == false) {
+				break;
+			}
+
+	      pmesg(D_LRU, "... 1 ...");
+	
          memcpy(sha1.digest, buf, 20);
          memcpy(&size, buf+20, sizeof(size));
          const string sha1_str = sha1.to_string();
@@ -129,13 +138,14 @@ namespace lru {
          string path = "(UNKNOWN)";
          
          pthread_mutex_lock(&mutex_key2paths);
+
          map<string, string>::iterator i = key2paths.find(sha1_str);
          if (i != key2paths.end()) {
             path = i->second;
             key2paths.erase(i);
          }
          pthread_mutex_unlock(&mutex_key2paths);
-         
+
          pthread_mutex_lock(&mutex);
       
          /* cleanup, move to trash and unlink when unlocked */
@@ -162,8 +172,9 @@ namespace lru {
 
          pthread_mutex_unlock(&mutex);
       }
-      
+
       close(pipe_insert[0]);
+
       pmesg(D_LRU, "ending insert thread");
       return NULL;
    }
