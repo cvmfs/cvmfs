@@ -10,6 +10,17 @@ setup_atlaslhcb() {
   return 0
 }
 
+setup_atlascondb() {
+  echo "CVMFS_REPOSITORIES=atlas-condb" > /etc/cvmfs/default.local || return 1
+  echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local || return 1
+  echo "CVMFS_QUOTA_LIMIT=1000" >>  /etc/cvmfs/default.local || return 1
+  service cvmfs restartclean > /dev/null 2>&1  || return 2
+  service autofs restart > /dev/null || return 2
+  service cvmfs probe > /dev/null 2>&1 || return 3
+
+  return 0
+}
+
 setup_sft() {
   echo "CVMFS_REPOSITORIES=sft" > /etc/cvmfs/default.local || return 1
   echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local || return 1
