@@ -85,10 +85,21 @@ next_file_again:
       const string name = d->d_name;
       if ((name == ".") || (name == "..")) continue;
       
-      if (d->d_type != DT_REG) {
+      /* Does not work with XFS if (d->d_type != DT_REG) {
          pthread_mutex_lock(&mutex_output);
          cout << "Warning: " << cache_dir << "/" << ndir_current << "/" << name 
               << " is not a regular file" << endl;
+         pthread_mutex_unlock(&mutex_output);
+         continue;
+      }*/
+      const string path = cache_dir + "/" + ndir_current + "/" + name;
+      struct stat64 info;
+      if (lstat64(path.c_str(), &info) != 0)
+         continue;
+      
+      if (!S_ISREG(info.st_mode)) {
+         pthread_mutex_lock(&mutex_output);
+         cout << "Warning: " << path << " is not a regular file" << endl;
          pthread_mutex_unlock(&mutex_output);
          continue;
       }
@@ -145,6 +156,19 @@ static void *checker(void *data __attribute__((unused))) {
       if (rel_path[rel_path.length()-1] == 'T') {
          cout << "Warning: temporary file catalog found " << path << endl;
          atomic_inc(&num_tmp_catalog);
+         if (fix_errors) {
+            if (unlink(rel_path.c_str()) == 0) {
+               pthread_mutex_lock(&mutex_output);
+               cout << "Fix: " << path << " unlinked" << endl;
+               pthread_mutex_unlock(&mutex_output);
+               atomic_inc(&num_err_fixed);
+            } else {
+               pthread_mutex_lock(&mutex_output);
+               cout << "Error: failed to unlink " << path << endl;
+               pthread_mutex_unlock(&mutex_output);
+               atomic_inc(&num_err_unfixed);
+            }
+         }
          continue;
       }      
       
@@ -167,20 +191,38 @@ static void *checker(void *data __attribute__((unused))) {
       } else {
          if (sha1.to_string() != hash_name) {
             if (fix_errors) {
-               if (unlink(rel_path.c_str()) == 0) {
+               const string quarantaine_path = "./quarantaine/" + hash_name;
+               bool fixed = false;
+               if (rename(rel_path.c_str(), quarantaine_path.c_str()) == 0) {
                   pthread_mutex_lock(&mutex_output);
-                  cout << "Fix: " << path << " is corrupted, file unlinked" << endl;
+                  cout << "Fix: " << path << " is corrupted, moved to quarantaine folder" << endl;
                   pthread_mutex_unlock(&mutex_output);
-                  atomic_inc(&num_err_fixed);
+                  fixed = true;
+               } else {
+                  pthread_mutex_lock(&mutex_output);
+                  cout << "Warning: failed to move " << path << " into quarantaine folder" << endl;
+                  pthread_mutex_unlock(&mutex_output);
                   
+                  if (unlink(rel_path.c_str()) == 0) {
+                     pthread_mutex_lock(&mutex_output);
+                     cout << "Fix: " << path << " is corrupted, file unlinked" << endl;
+                     pthread_mutex_unlock(&mutex_output);
+                     fixed = true;
+                  } else {
+                     pthread_mutex_lock(&mutex_output);
+                     cout << "Error: " << path << " is corrupted, could not unlink" << endl;
+                     pthread_mutex_unlock(&mutex_output);
+                  }
+               }
+               
+               if (fixed) {
+                  atomic_inc(&num_err_fixed);
+                     
                   /* Changes made, we have to rebuild the managed cache db */
                   pthread_mutex_lock(&mutex_force_rebuild);
                   force_rebuild = modified_cache = true;
                   pthread_mutex_unlock(&mutex_force_rebuild);
                } else {
-                  pthread_mutex_lock(&mutex_output);
-                  cout << "Error: " << path << " is corrupted, could not unlink" << endl;
-                  pthread_mutex_unlock(&mutex_output);
                   atomic_inc(&num_err_unfixed);
                }
             } else {
@@ -281,9 +323,6 @@ int main(int argc, char **argv) {
    
    if (atomic_read(&num_tmp_catalog) > 0) {
       cout << "Temorary file catalogs were found." << endl;
-      cout << "If this is a currently mounted repository, this is probably all right." << endl;
-      cout << "Otherwise, or if you see lots of them, it is probably not." << endl;
-      cout << "In that case, please unmount and remove the temporary catalogs." << endl;
    }
    
    if (force_rebuild) {

@@ -6,8 +6,8 @@ cvmfs_run_test() {
 
   setup_atlaslhcb || return 6
   
-  export ATL_LOCAL_ROOT=/opt/atlas
-  export ATLAS_LOCAL_ROOT_BASE=$ATL_LOCAL_ROOT/software/manageTier3SW/ATLASLocalRootBase
+  export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
+  export ATLAS_LOCAL_ROOT_BASE=$ATL_LOCAL_ROOT/ATLASLocalRootBase
   echo "asetup cold cache" >> $logfile
   . ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh >> $logfile 2>&1 || return 1
   ( source $ATLAS_LOCAL_ROOT_BASE/packageSetups/asetupWrapper.sh 17.0.0 ) >> $logfile 2>&1 || return 2

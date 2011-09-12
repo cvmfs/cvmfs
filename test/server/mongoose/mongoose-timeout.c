@@ -2444,7 +2444,6 @@ static void send_file_data(struct mg_connection *conn, FILE *fp, int64_t len) {
     conn->num_bytes_sent += num_written;
     len -= num_written;
     all_written += num_written; 
-     printf("FUCK YOU %d\n", all_written); 
     if (all_written >= 1024)
       usleep(1000000*100);  
   }

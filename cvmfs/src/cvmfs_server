@@ -89,6 +89,17 @@ publish() {
 mkfs() {
    local name; name=$1
    
+   echo -n "Checking for cvmfs user... "
+   /usr/bin/getent group cvmfs >/dev/null
+   if [ $? -ne 0 ]; then
+      /usr/sbin/groupadd -r cvmfs
+   fi
+   /usr/bin/getent passwd cvmfs >/dev/null
+   if [ $? -ne 0 ]; then
+      /usr/sbin/useradd -r -g cvmfs -d /srv/cvmfs/$name -s /bin/bash -c "CernVM-FS service account" cvmfs
+   fi
+   echo "done"
+   
    echo -n "Creating configuration files... "
    cat > /etc/cvmfs/server.local << EOF
 # Created by cvmfs_server.  Don't touch.

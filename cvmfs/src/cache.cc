@@ -42,6 +42,7 @@
 #include <sstream>
 #include <queue>
 
+#include <cassert>
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -290,6 +291,15 @@ namespace cache {
       return -1;
    }
    
+   static bool freset(FILE *f) {
+      if (fflush(f) != 0)
+         return false;
+      if (ftruncate(fileno(f), 0) != 0)
+         return false;
+      rewind(f);
+      return true;
+   }
+   
    
    /**
     * Returns a read-only file descriptor for a specific catalog entry.
@@ -314,6 +324,8 @@ namespace cache {
       hash::t_sha1 sha1;
       int fd, fd_return;
       int result = -EIO;
+      int retval;
+      char strmbuf[4096];
           
       /* Not in cache, we are holding the mutex and download */
       int curl_result;
@@ -343,27 +355,48 @@ namespace cache {
          pmesg(D_CACHE, "could not fdopen %s", lpath.c_str());
          goto fetch_abort;
       }
+      retval = setvbuf(f, strmbuf, _IOFBF, 4096);
+      assert(retval == 0);
       
       curl_result = curl_download_stream(url.c_str(), f, sha1.digest, 1, 1);
    
    download_retry:
       if ((curl_result == CURLE_OK) || (curl_result == Z_DATA_ERROR)) {
          pmesg(D_CACHE, "curl finished downloading of %s, checksum: %s", url.c_str(), sha1.to_string().c_str());
-      
+         
          /* Check checksum, if doesn't match, skip proxy
             if proxy already skipped, reload catalog
             if catalog is fresh: error */
-         if (d.checksum != sha1) {
+         if ((d.checksum != sha1) || (curl_result == Z_DATA_ERROR)) {
             if (!nocache) {
                pmesg(D_CACHE, "Checksums do not match, should be %s. I'll retry download with no-cache", d.checksum.to_string().c_str());
                logmsg("Checksum does not match for %s (SHA1: %s). I'll retry download with no-cache", path.c_str(), d.checksum.to_string().c_str());
-               ftruncate(fd, 0);
-               rewind(f);
+               if (!freset(f))
+                  goto fetch_abort;
                nocache = true;
                curl_result = curl_download_stream_nocache(url.c_str(), f, sha1.digest, 1, 1);
                goto download_retry;
             }
             pmesg(D_CACHE, "no-cache didn't help, aborting now");
+            goto fetch_abort;
+         }
+         
+         /* Check decompressed size */
+         struct stat64 info;
+         info.st_size = -1;
+         if ((fstat64(fileno(f), &info) != 0) || (info.st_size != (signed)d.size)) {
+            logmsg("size check failure for %s, expected %lu, got %ld", 
+                   url.c_str(), d.size, info.st_size);
+            if (file_copy(txn.c_str(), (cache_path + "/quarantaine/" + d.checksum.to_string()).c_str()) != 0)
+               logmsg("failed to move %s to quarantaine", txn.c_str());
+            if (!nocache) {
+               logmsg("Re-trying %s with no-cache", path.c_str());
+               if (!freset(f))
+                  goto fetch_abort;
+               nocache = true;
+               curl_result = curl_download_stream_nocache(url.c_str(), f, sha1.digest, 1, 1);
+               goto download_retry;
+            }
             goto fetch_abort;
          }
       
@@ -403,6 +436,7 @@ namespace cache {
          return false;
       
       ssize_t retval = write(fd, buffer, size);
+      close(fd);
       if ((retval < 0) || ((size_t)retval != size)) {
          abort(txn);
          return false;

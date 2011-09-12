@@ -14,7 +14,8 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-fqrn=`cvmfs_mkfqrn $1`
+device=`echo $1 | sed 's/\/cvmfs\///'` # sed is for Ubuntu 8.04 automounter
+fqrn=`cvmfs_mkfqrn $device`
 org=`cvmfs_getorg $fqrn`
 
 # check the operating system
@@ -47,7 +48,7 @@ if [ -z $CVMFS_HTTP_PROXY ]; then
   echo "CVMFS_HTTP_PROXY required"
   exit 1
 fi
-existing_mountpoint=`cvmfs-talk -i $fqrn mountpoint 2>&1`
+existing_mountpoint=`cvmfs-talk -c $CVMFS_CACHE_BASE -i $fqrn mountpoint 2>&1`
 if [ $? -eq 0 ]; then
   echo "Repository $fqrn is already mounted on $existing_mountpoint"
   exit 1

@@ -1,8 +1,8 @@
 #!/bin/sh
 #
 # Wrapper script for cvmfs_pull. Create /etc/cvmfs/replica.conf and/or
-# /etc/cvmfs/replica.local to set the parameters.  This script is triggered
-# by the CernVM-FS replica cgi script.
+# /etc/cvmfs/replica.local to set the parameters.  Define repositories
+# in /etc/cvmfs/replica.repositories
 #
 
 

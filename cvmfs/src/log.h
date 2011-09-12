@@ -4,6 +4,7 @@
 #include <stdarg.h>
 
 void syslog_setlevel(const int level);
+void syslog_setprefix(const char *prefix);
 void logmsg(const char *msg, ...);
 
 #endif

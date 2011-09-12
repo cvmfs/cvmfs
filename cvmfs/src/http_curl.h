@@ -4,6 +4,7 @@
 
 #include "curl-duplex.h"
 #include "sha1.h"
+#include <stdint.h>
 
 struct mem_url {
    int error_code;
@@ -37,6 +38,8 @@ void curl_switch_host_locked();
 void curl_set_proxy_chain(const char *proxy_list); /* Locked */
 void curl_set_timeout(unsigned seconds, unsigned seconds_direct); /* Locked */
 void curl_get_timeout(unsigned *seconds, unsigned *seconds_direct); /* Locked */
+int64_t curl_get_allbytes(); /* Locked */
+int64_t curl_get_alltime(); /* Locked */
 void curl_rebalance();
 
 #endif

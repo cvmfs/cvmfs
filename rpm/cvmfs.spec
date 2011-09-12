@@ -1,11 +1,20 @@
 Summary: CernVM File System
 Name: cvmfs
-Version: 0.2.78
+Version: 2.0.4
 Release: 1
 Source0: https://cernvm.cern.ch/project/trac/downloads/cernvm/%{name}-%{version}.tar.gz
 Group: System/Filesystems
-License: Copyright (c) 2009, CERN.  Distributed unter the BSD License.
-Requires: bash coreutils grep gawk sed which perl glibc-common sudo initscripts shadow-utils psmisc autofs fuse curl cvmfs-keys >= 1.1
+License: Copyright (c) 2.0.4, CERN.  Distributed unter the BSD License.
+
+%if 0%{?suse_version}
+  Substitute: chkconfig aaa_base
+  Substitute: glibc-common glibc
+  Substitute: initscripts insserv
+  Substitute: which util-linux
+  Substitute: shadow-utils pwdutils
+%endif
+
+Requires: bash coreutils grep gawk sed which perl glibc-common sudo initscripts shadow-utils psmisc autofs fuse curl cvmfs-keys >= 1.1 attr
 Requires(preun): chkconfig initscripts
 %description
 HTTP File System for Distributing Software to CernVM.
@@ -18,14 +27,25 @@ See http://cernvm.cern.ch
 make
 
 %pre
-/usr/bin/getent passwd cvmfs >/dev/null
-if [ $? -ne 0 ]; then
-   /usr/sbin/useradd -r -d /var/cache/cvmfs2 -s /sbin/nologin -c "CernVM-FS service account" cvmfs
-fi
-
+%if 0%{?suse_version}
+  /usr/bin/getent group cvmfs >/dev/null
+  if [ $? -ne 0 ]; then
+    /usr/sbin/groupadd -r cvmfs
+  fi
+  /usr/bin/getent passwd cvmfs >/dev/null
+  if [ $? -ne 0 ]; then
+    /usr/sbin/useradd -r -g cvmfs -d /var/cache/cvmfs2 -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+  fi
+%else 
+  /usr/bin/getent passwd cvmfs >/dev/null
+  if [ $? -ne 0 ]; then
+     /usr/sbin/useradd -r -d /var/cache/cvmfs2 -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+  fi
+%endif
+  
 /usr/bin/getent group fuse | grep -q cvmfs
 if [ $? -ne 0 ]; then
-   /usr/sbin/usermod -aG fuse cvmfs
+  /usr/sbin/usermod -aG fuse cvmfs
 fi
 
 %install

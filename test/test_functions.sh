@@ -1,9 +1,10 @@
 
 setup_atlaslhcb() {
   echo "CVMFS_REPOSITORIES=atlas,lhcb" > /etc/cvmfs/default.local || return 1
-  #echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local || return 1
+  echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local || return 1
   #echo "CVMFS_DEBUGLOG=/tmp/cvmfs_test.log" >> /etc/cvmfs/default.local || return 1
   service cvmfs restartclean > /dev/null 2>&1  || return 2
+  service autofs restart > /dev/null || return 2
   service cvmfs probe > /dev/null 2>&1 || return 3
   
   return 0

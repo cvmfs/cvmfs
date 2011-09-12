@@ -30,7 +30,13 @@ var_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_MOUNT_DIR CVMFS_QUOTA_L
 
 cvmfs_config_usage() {
    echo "Common configuration tasks for CernVM-FS"
-   echo "Usage: $0 {setup [nouser] [nocfgmod] [noservice] [nostart]|chksetup|showconfig [<repository>]}"
+   echo "Usage: $0 <command>"
+   echo "Commands are"
+   echo "  setup [nouser] [nocfgmod] [noservice] [nostart]"
+   echo "  chksetup"
+   echo "  showconfig [<repository>]"
+   echo "  stat [-v] [<repository>]"
+   echo "  bugreport"
 }
 
 
@@ -263,7 +269,7 @@ cvmfs_chksetup() {
       local fqrn; fqrn=`cvmfs_mkfqrn $repo`
       for var in $var_list
       do
-         eval $var=
+         unset $var 2>/dev/null || true
       done
       cvmfs_readconfig $fqrn
       
@@ -322,6 +328,9 @@ cvmfs_chksetup() {
                echo "Warning: cache limit for $fqrn is very low (below 1GB)"
                num_warnings=$[$num_warnings+1]
             fi
+         else
+            echo "Warning: no cache quota set for $fqrn.  Cvmfs will abort() if the cache partition is full."
+            num_warnings=$[$num_warnings+1]
          fi
          
          # Syntax check for switches
@@ -461,14 +470,168 @@ cvmfs_showconfig() {
    done
 }
 
+get_attr() {
+   attr_name=$1
+   
+   attr_value=`attr -q -g $attr_name . 2>/dev/null` || exit 33
+}
+
+cvmfs_stat() {
+   local fqrn
+   local org
+   local retval
+   local verbose; verbose=0
+   if [ "x$1" = "x-v" ]; then
+      verbose=1
+      shift
+   fi
+   org=$1
+   
+   cvmfs_readconfig
+   if [ -z "$org" ]; then
+      list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+      for entry in $list
+      do
+         echo
+         echo "Running $0 stat $entry:"
+         if [ $verbose -eq 1 ]; then
+            cvmfs_stat -v $entry
+         else
+            cvmfs_stat $entry
+         fi
+      done
+      return 0
+   fi
+   
+   fqrn=`cvmfs_mkfqrn $org`
+   org=`cvmfs_getorg $fqrn`
+   cvmfs_readconfig $fqrn
+   retval=$?
+   if [ $retval -ne 0 ]; then
+      return $retval
+   fi
+   
+   cd /cvmfs/$fqrn 2>/dev/null || exit 32
+
+   get_attr version; version=$attr_value
+   get_attr pid; pid=$attr_value
+   get_attr uptime; uptime=$attr_value
+   memory=`ps -p $pid -o rss= | sed 's/ //g'` || exit 3
+   get_attr revision; revision=$attr_value
+   get_attr expires; expires=$attr_value
+   get_attr nclg; nclg=$attr_value
+   cache_use=`df -P . | tail -n 1 | awk '{print int($3)}'` || exit 34
+   cache_avail=`df -P . | tail -n 1 | awk '{print int($4)}'` || exit 34
+   cache_max=$[$cache_use+$cache_avail]
+   get_attr usedfd; usedfd=$attr_value
+   get_attr maxfd; maxfd=$attr_value
+   get_attr nioerr; nioerr=$attr_value
+   get_attr host; host=$attr_value
+   get_attr proxy; proxy=$attr_value
+   get_attr timeout; timeout=$attr_value
+   get_attr timeout_direct; timeout_direct=$attr_value
+   timeout_effective=$timeout
+   proxy_effective=$proxy
+   if [ $proxy == "DIRECT" ]; then
+      proxy_effective=
+      timeout_effective=$timeout_direct
+   fi
+   env http_proxy=$proxy_effective curl -f --connect-timeout $timeout_effective ${host}/.cvmfspublished >/dev/null 2>&1
+   if [ $? -eq 0 ]; then
+      online=1
+   else
+      online=0
+   fi
+   get_attr nopen; nopen=$attr_value
+   get_attr ndownload; ndownload=$attr_value
+   hitrate=`echo "$nopen $ndownload" | awk '{if ($1 == 0) print "n/a"; else print 100.0-($2*100.0/$1)}'` || exit 35
+   get_attr rx; rx=$attr_value
+   get_attr speed; speed=$attr_value
+   
+   if [ $verbose -eq 1 ]; then
+      echo "Version: $version"
+      echo "PID: $pid"
+      echo "Uptime: $uptime minutes"
+      echo "Memory Usage: ${memory}k"
+      echo "File Catalog Revision: $revision (expires in ${expires} minutes)"
+      echo "No. Active File Catalogs: $nclg"
+      echo "Cache Usage: ${cache_use}k / ${cache_max}k"
+      echo "File Descriptor Usage: $usedfd / $maxfd"
+      echo "No. IO Errors: $nioerr"
+      echo -n "Connection: $host through proxy $proxy"
+      if [ $online -eq 1 ]; then
+         echo " (online)"
+      else
+         echo " (offline)"
+      fi
+      echo "Usage: $nopen open() calls, hitrate ${hitrate}%"
+      echo "Transfer Statistics: ${rx}k read, avg. speed: ${speed}k/s"
+   else
+      echo "VERSION PID UPTIME(M) MEM(K) REVISION EXPIRES(M) NOCATALOGS CACHEUSE(K) CACHEMAX(K) NOFDUSE NOFDMAX NOIOERR NOOPEN HITRATE(%) RX(K) SPEED(K/S) HOST PROXY ONLINE"
+      echo "$version $pid $uptime $memory $revision $expires $nclg $cache_use $cache_max $usedfd $maxfd $nioerr $nopen $hitrate $rx $speed $host $proxy $online"      
+   fi
+}
+
+
+cvmfs_bugreport() {
+   tmpdir=`mktemp -d -t cvmfs-bugreport.XXXXXX` || exit 1
+   cd $tmpdir
+      
+   [ -f /etc/cvmfs/default.conf ] && . /etc/cvmfs/default.conf
+   [ -f /etc/cvmfs/default.local ] && . /etc/cvmfs/default.local
+   
+   echo "Gathering /etc/cvmfs"
+   mkdir etc
+   cp -r /etc/cvmfs etc/
+
+   echo "Gathering files in quarantaine"
+   for repo in `ls "$CVMFS_CACHE_BASE"`
+   do
+      qdir="${CVMFS_CACHE_BASE}/${repo}/quarantaine"
+      if [ -d "$qdir" ]; then
+         tar cfz quarantaine-${repo}.tar.gz "$qdir" 2>/dev/null
+      fi
+   done
+   
+   for cmd in 'uname -a' 'cat /etc/issue' 'hostname -f' 'ifconfig -a' 'cvmfs2 --version' \
+              'grep cvmfs2 /var/log/messages' 'grep cvmfs2 /var/log/syslog' \
+              "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
+              'service cvmfs probe' 'mount' 'df -h' 'ps -ef' \
+              'service cvmfs status' 'cvmfs_config showconfig' \
+              'cvmfs_config chksetup' 'cvmfs_config stat -v'
+   do  
+      out="`echo $cmd | tr -Cd [:alnum:]`.stdout"
+      err="`echo $cmd | tr -Cd [:alnum:]`.stderr"
+      echo "Gathering $cmd"
+      echo "$cmd" > $out
+      $cmd >> $out 2>$err
+   done
+   
+   tar cfz bugreport.tar.gz *
+   rm -rf etc *.stdout *.stderr quarantaine-*
+
+   echo
+   echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
+   echo "Please attach this file to your problem describtion and send it as a"
+   echo "Savannah bug report to https://savannah.cern.ch/projects/cernvm"
+}
+
 
 case "$1" in
    setup)
+      if [ `id -u` -ne 0 ]; then
+         echo "root privileges required"
+         exit 1
+      fi
       shift 1
       cvmfs_setup $@
       RETVAL=$?
    ;;
    chksetup)
+      if [ `id -u` -ne 0 ]; then
+         echo "root privileges required"
+         exit 1
+      fi
       shift 1
       cvmfs_chksetup
       RETVAL=$?
@@ -476,6 +639,20 @@ case "$1" in
    showconfig)
       shift 1
       cvmfs_showconfig $@
+      RETVAL=$?
+   ;;
+   stat)
+      shift 1
+      cvmfs_stat $@
+      RETVAL=$?
+   ;;
+   bugreport)
+      if [ `id -u` -ne 0 ]; then
+         echo "root privileges required"
+         exit 1
+      fi
+      shift 1
+      cvmfs_bugreport $@
       RETVAL=$?
    ;;
    *)

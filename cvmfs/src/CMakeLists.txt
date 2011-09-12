@@ -87,7 +87,8 @@ set (CVMFS_SIGN_SOURCES
 
 set (CVMFS_PULL_SOURCES
 	smalloc.h smalloc.c 
-	debug.h debug.c 
+	debug.h debug.c
+	log.h log.c 
 	zlib-duplex.h compression.h compression.c 
 	curl-duplex.h http_curl.h http_curl.c 
 	md5.h sha1.h sha1.c 

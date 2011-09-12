@@ -41,6 +41,7 @@
 #include "compression.h"
 #include "debug.h"
 #include "smalloc.h"
+#include "log.h"
 
 #define HEADER_ERROR_UNSPECIFIED 1
 #define HEADER_ERROR_PROXY 2
@@ -105,6 +106,9 @@ const uint64_t CURL_PROBE_FREQ = 1000; ///< probe hosts every now and then
 
 static pthread_mutex_t mutex_curl;
 static pthread_attr_t pthread_probe_attr;
+
+static double allbytes = 0.0;
+static double alltime = 0.0;
 
 
 /* Helper functions */
@@ -296,7 +300,6 @@ static void curl_switch_proxy()
       curl_easy_setopt(curl_pool[i], CURLOPT_PROXY, proxy);
       curl_easy_setopt(curl_pool[i], CURLOPT_CONNECTTIMEOUT, active_timeout);
       curl_easy_setopt(curl_pool[i], CURLOPT_LOW_SPEED_TIME, active_timeout);
-
    }
 }
 
@@ -626,6 +629,15 @@ static void inc_downloads() {
    }
 }
 
+static void inc_counters(CURL *handle) {
+   double val;
+   
+   if (curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val) == CURLE_OK)
+      allbytes += val;
+   if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &val) == CURLE_OK)
+      alltime += val;
+}
+
 
 
 /**
@@ -652,30 +664,38 @@ static int curl_download_stream_unprotected(const char *url, FILE *f, unsigned c
    
    int retries = 0;
    int result = curl_easy_perform(curl_default);
+   inc_counters(curl_default);
    while (curl_proxy_error(result, progress.header_error) && (retries < curl_proxy_num)) 
    {
       pmesg(D_CURL, "download error %d, switching proxy", result);
+      logmsg("switch proxy / retry on %s", url_escaped);
       curl_switch_proxy();
       retries++;
       sha1_init(&progress.sha1_context);
       if (progress.decompress) {
+         decompress_strm_fini(&progress.strm);
          if ((progress.z_ret = decompress_strm_init(&progress.strm)) != Z_OK)
             break;
       }
       if (!freset(f))
          break;
       result = curl_easy_perform(curl_default);
+      inc_counters(curl_default);
    }
    curl_reset_lbgroup();
    
    free(url_escaped);
-   fflush(f);
+   
    if (progress.decompress) {
       decompress_strm_fini(&progress.strm);
       /* Z_STREAM_END */
       if (progress.z_ret != 1)
          return Z_DATA_ERROR;
    }
+   
+   if (fflush(f) != 0)
+      return errno;
+   
    sha1_final(digest, &progress.sha1_context);
    return result;
 }
@@ -772,11 +792,19 @@ static int curl_download_mem_unprotected(const char *url, struct mem_url *p_mem_
    char *url_escaped = escape(url);
    curl_easy_setopt(curl_mem, CURLOPT_URL, url_escaped);
    
+   /* File protocol */
+   if (strstr(url, "file://") == url) {
+      p_mem_url->data = smalloc(64*1024);
+      p_mem_url->size = 64*1024;
+   }
+   
    int retries = 0;
    int result = curl_easy_perform(curl_mem);
+   inc_counters(curl_mem);
    while (curl_proxy_error(result, p_mem_url->error_code) && (retries < curl_proxy_num)) 
    {
       pmesg(D_CURL, "download error %d, switching proxy", result);
+      logmsg("switch proxy / retry on %s", url_escaped);
       curl_switch_proxy();
       retries++;
       if (p_mem_url->data) {
@@ -787,8 +815,14 @@ static int curl_download_mem_unprotected(const char *url, struct mem_url *p_mem_
          p_mem_url->data = NULL;
       }
       result = curl_easy_perform(curl_mem);
+      inc_counters(curl_mem);
    }
    curl_reset_lbgroup();
+   
+   /* File protocol, adjust size */
+   if (strstr(url, "file://") == url) {
+      p_mem_url->size = p_mem_url->pos;
+   }
    
    free(url_escaped);
    if ((result != CURLE_OK) && p_mem_url->data)
@@ -956,6 +990,7 @@ int curl_download_tee(const char *url, FILE *f, unsigned char digest[SHA1_DIGEST
           (retries < curl_proxy_num)) 
    {
       pmesg(D_CURL, "download error %d, switching proxy", result);
+      logmsg("switch proxy / retry on %s", url_escaped);
       curl_switch_proxy();
       retries++;
       sha1_init(&tee_progress.progress.sha1_context);
@@ -1498,6 +1533,22 @@ void curl_rebalance() {
    curl_proxy_lb_burned = 0;
    curl_switch_proxy();
    pthread_mutex_unlock(&mutex_curl);
+}
+
+int64_t curl_get_allbytes() {
+   double result;
+   pthread_mutex_lock(&mutex_curl);
+   result = allbytes;
+   pthread_mutex_unlock(&mutex_curl);
+   return (int64_t) result;
+}
+
+int64_t curl_get_alltime() {
+   double result;
+   pthread_mutex_lock(&mutex_curl);
+   result = alltime;
+   pthread_mutex_unlock(&mutex_curl);
+   return (int64_t) result;
 }
 
 

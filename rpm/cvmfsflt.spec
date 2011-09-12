@@ -6,7 +6,7 @@
 Name:           cvmfsflt
 License:        BSD/GPL dual
 Summary:        CernVM-FS change log filter for redirfs
-Version:        0.2.78
+Version:        2.0.4
 Release:        1
 # The source for this package was extracted from 
 # https://cernvm.cern.ch/project/trac/downloads/cernvm/%{name}-%{version}.tar.gz

@@ -148,7 +148,12 @@ string expand_env(const string &path) {
  */
 bool make_cache_dir(const string &path, const mode_t mode) {
    const string cpath = canonical_path(path);
-   string lpath = cpath + "/ff";
+      
+   string lpath = cpath + "/quarantaine";
+   if (!mkdir_deep(lpath, mode)) return false;
+
+   lpath = cpath + "/ff";
+
    PortableStat64 buf;
    if (portableFileStat64(lpath.c_str(), &buf) != 0) {
       if (mkdir(lpath.c_str(), mode) != 0) return false;

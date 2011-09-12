@@ -103,24 +103,22 @@ cvmfs_getorigin() {
    local key; key=$2
    
    local domain; domain=`cvmfs_getdomain $fqrn`
-   for file in /etc/cvmfs/config.d/$fqrn.local \
-               /etc/cvmfs/config.d/$fqrn.conf \
-               /etc/cvmfs/domain.d/$domain.local \
-               /etc/cvmfs/domain.d/$domain.conf \
-               /etc/cvmfs/default.local \
-               /etc/cernvm/site.conf \
-               /etc/cvmfs/site.conf \
-               /etc/cernvm/default.conf \
-               /etc/cvmfs/default.conf
-   do
-      if [ -f $file ]; then
-         grep -q "^${key}=" $file
-         if [ $? -eq 0 ]; then
-            echo $file
-            return 0
-         fi
-      fi 
-   done
+   
+   source=`grep -H "^[ ]*\(readonly\)\{0,1\}[ ]*${key}=" \
+      /etc/cvmfs/config.d/$fqrn.local \
+      /etc/cvmfs/config.d/$fqrn.conf \
+      /etc/cvmfs/domain.d/$domain.local \
+      /etc/cvmfs/domain.d/$domain.conf \
+      /etc/cvmfs/default.local \
+      /etc/cernvm/site.conf \
+      /etc/cvmfs/site.conf \
+      /etc/cernvm/default.conf \
+      /etc/cvmfs/default.conf \
+      2>/dev/null | head -n1 | cut -d":" -f1`
+   if [ "x$source" != "x" ]; then
+      echo $source
+      return 0
+   fi
    
    return 1
 }

@@ -225,7 +225,9 @@ namespace lru {
       if (err != SQLITE_OK) {
          if (!retry) {
             retry = true;
+            sqlite3_close(db);
             unlink(db_file.c_str());
+            unlink((db_file + "-journal").c_str());
             logmsg("LRU database corrupted, re-building");
             goto init_recover;
          }
@@ -540,9 +542,11 @@ namespace lru {
    bool cleanup_unprotected(const uint64_t leave_size) {
       if ((limit == 0) || (gauge <= leave_size))
          return true;
-         
+      
+      logmsg("cleanup cache until %lu KB are free", leave_size/1024);
+      
       bool result;
-      stack<string> trash;
+      //stack<string> trash;
       string sha1;
       
       do {
@@ -553,9 +557,11 @@ namespace lru {
          }
          
          sha1 = string((char *)sqlite3_column_text(stmt_lru, 0));
-         trash.push(cache_dir + "/" + sha1.substr(0, 2) + "/" +
-            sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2)));
          
+         //trash.push(cache_dir + "/" + sha1.substr(0, 2) + "/" +
+         //   sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2)));
+         unlink((cache_dir + "/" + sha1.substr(0, 2) + "/" +
+            sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2))).c_str());
          gauge -= sqlite3_column_int64(stmt_lru, 1);
          pmesg(D_LRU, "lru cleanup %s", sha1.c_str());
    
@@ -570,7 +576,7 @@ namespace lru {
       } while (gauge > leave_size);
       
       /* Double fork avoids zombie */
-      if (!trash.empty()) {
+      /*if (!trash.empty()) {
          pid_t pid;
          int statloc;
          if ((pid = fork()) == 0) {
@@ -587,7 +593,7 @@ namespace lru {
             if (pid > 0) waitpid(pid, &statloc, 0);
             else return false;
          }
-      }
+      }*/
       
       return gauge <= leave_size;
    }

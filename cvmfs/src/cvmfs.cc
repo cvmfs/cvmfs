@@ -115,6 +115,16 @@ namespace cvmfs {
    int max_cache_timeout = 0;
    time_t drainout_deadline = 0;
    hash::t_sha1 next_root;
+   time_t boot_time;
+   
+   /* Prevent DoS attacks on the Squid server */
+   static struct {
+      time_t timestamp;
+      int delay;
+   } prev_io_error;
+   const int MAX_INIT_IO_DELAY = 32; // Maximum start value for exponential backoff
+   const int MAX_IO_DELAY = 2000; // Maximum 2 seconds
+   const int FORGET_DOS = 10000; // Clear DoS memory after 10 seconds
 
    pthread_mutex_t mutex_download = PTHREAD_MUTEX_INITIALIZER; ///< avoids downloading the same file twice
    
@@ -137,6 +147,9 @@ namespace cvmfs {
    
    atomic_int certificate_hits;
    atomic_int certificate_misses;
+   
+   atomic_int64 nopen;
+   atomic_int64 ndownload;
    
    atomic_int open_files; ///< number of currently open files by Fuse calls
    unsigned nofiles; ///< maximum allowed number of open files
@@ -623,17 +636,21 @@ namespace cvmfs {
          unlink(tmp_file);
          return -EIO;
       }
+      int retval;
+      char strmbuf[4096];
+      retval = setvbuf(tmp_fp, strmbuf, _IOFBF, 4096);
+      assert(retval == 0);
       
       const string sha1_clg_str = sha1_download.to_string();
       const string url_clg = "/data/" + sha1_clg_str.substr(0, 2) + "/" +
                              sha1_clg_str.substr(2) + "C";
       if (no_proxy) curl_result = curl_download_stream_nocache(url_clg.c_str(), tmp_fp, sha1_local.digest, 1, 1);
       else curl_result = curl_download_stream(url_clg.c_str(), tmp_fp, sha1_local.digest, 1, 1);
+      fclose(tmp_fp);
       if ((curl_result != CURLE_OK) || (sha1_local != sha1_download)) {
          pmesg(D_CVMFS, "unable to load catalog from %s, going to offline mode (%d)", url_clg.c_str(), curl_result);
          logmsg("unable to load catalog from %s, going to offline mode", url_clg.c_str());
          unlink(tmp_file);
-         fclose(tmp_fp);
          return -EAGAIN;
       }
       
@@ -1139,6 +1156,8 @@ namespace cvmfs {
             atomic_inc(&nioerr);
             return result;
          }
+         
+         logmsg("switched to catalog revision %d", catalog::get_revision());
       }
       
       /* Check catalog TTL, goto drainout mode if necessary */
@@ -1245,6 +1264,9 @@ namespace cvmfs {
       
       /* The actual getattr-work */
       d.to_stat(info);
+      //if (path == "/") {
+      //   info->st_mode &= ~7;
+      //}
       if (d.flags & catalog::FILE_LINK) {
          info->st_size = expand_env(d.symlink).length();
          pmesg(D_CVMFS, "stat %s expanded to %s", c_path, expand_env(d.symlink).c_str());
@@ -1417,29 +1439,41 @@ namespace cvmfs {
       }
       catalog::unlock();
       
-      
       fd = cache::open_or_lock(d);
+		atomic_inc64(&nopen);
       if (fd < 0) {
-			cout << "disk cache miss" << endl;
          Tracer::trace(Tracer::FUSE_OPEN, path, "disk cache miss");
          fd = cache::fetch(d, path);
          pthread_mutex_unlock(&mutex_download);
+         atomic_inc64(&ndownload);
       }
       
       if (fd >= 0) {
-			cout << "disk cache hit" << endl;
          if (atomic_xadd(&open_files, 1) < ((int)nofiles)-NUM_RESERVED_FD) {
             fi->fh = fd;
             return 0;
          } else {
-				cout << "cannot open (nofiles)" << endl;
             if (close(fd) == 0) atomic_dec(&open_files);
+            logmsg("open file descriptor limit exceeded");
             return -EMFILE;
          }
       } else {
-			cout << "??" << endl;
+			logmsg("failed to open %s, CAS key %s, error code %d",
+                c_path, d.checksum.to_string().c_str(), errno);
          if (errno == EMFILE) return -EMFILE;
       }
+
+      /* Prevent Squid DoS */
+      time_t now = time(NULL);
+      if (now-prev_io_error.timestamp < FORGET_DOS) {
+         usleep(prev_io_error.delay*1000);
+         if (prev_io_error.delay < MAX_IO_DELAY)
+            prev_io_error.delay *= 2;
+      } else {
+         /* Init delay */
+         prev_io_error.delay = (random() % (MAX_INIT_IO_DELAY-1)) + 2;
+      }
+      prev_io_error.timestamp = now;
       
       atomic_inc(&nioerr);
       return -EIO;
@@ -1596,7 +1630,7 @@ namespace cvmfs {
          result << cvmfs::pid;
          return fill_xattr(result.str(), value, vlen);
       } else if (attr == "user.version") {
-         const string result = string(VERSION) + " (patch level " + string(CVMFS_PATCH_LEVEL) + ")";
+         const string result = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
          return fill_xattr(result, value, vlen);
       } else if (attr == "user.hash") {
          if (d.checksum != hash::t_sha1()) {
@@ -1640,7 +1674,7 @@ namespace cvmfs {
          
          time_t now = time(NULL);
          ostringstream result;
-         result << (expires-now)/60 << " minutes";
+         result << (expires-now)/60;
          return fill_xattr(result.str(), value, vlen);
       } else if (attr == "user.maxfd") {
          ostringstream result;
@@ -1687,8 +1721,72 @@ namespace cvmfs {
          free(all_hosts);
          
          return fill_xattr(host, value, vlen);
+      } else if (attr == "user.uptime") {
+         time_t now = time(NULL);
+         uint64_t uptime = now - boot_time;
+         ostringstream result;
+         /*if (uptime / 60) {
+            if (uptime / 3600) {
+               if (uptime / 84600) {
+                  result << uptime/84600 << " days, ";
+               }
+               result << (uptime / 3600)%24 << " hours, ";
+            }
+            result << (uptime / 60)%60 << " minutes, ";
+         }*/
+         result << uptime / 60;
+         
+         return fill_xattr(result.str(), value, vlen);
+      } else if (attr == "user.nclg") {
+         catalog::lock();
+         int num = catalog::get_num_catalogs();
+         catalog::unlock();
+         ostringstream result;
+         result << num;
+         
+         return fill_xattr(result.str(), value, vlen);
+      } else if (attr == "user.nopen") {
+         ostringstream result;
+         result << atomic_read64(&nopen);
+         
+         return fill_xattr(result.str(), value, vlen);
+      } else if (attr == "user.ndownload") {
+         ostringstream result;
+         result << atomic_read64(&ndownload);
+         
+         return fill_xattr(result.str(), value, vlen);
+      } else if (attr == "user.timeout") {
+         unsigned seconds, seconds_direct;
+         curl_get_timeout(&seconds, &seconds_direct);
+         ostringstream result;
+         result << seconds;
+         
+         return fill_xattr(result.str(), value, vlen);
+      } else if (attr == "user.timeout_direct") {
+         unsigned seconds, seconds_direct;
+         curl_get_timeout(&seconds, &seconds_direct);
+         ostringstream result;
+         result << seconds_direct;
+         
+         return fill_xattr(result.str(), value, vlen);
+      } else if (attr == "user.rx") {
+         int64_t rx = curl_get_allbytes();
+         ostringstream result;
+         result << rx/1024;
+         
+         return fill_xattr(result.str(), value, vlen);
+      } else if (attr == "user.speed") {
+         int64_t rx = curl_get_allbytes();
+         int64_t time = curl_get_alltime();
+         ostringstream result;
+         if (time == 0)
+            result << "n/a"; 
+         else
+            result << (rx/1024)/time;
+         
+         return fill_xattr(result.str(), value, vlen);
       }
-      
+   
       return -ENOATTR;
    }
    
@@ -2515,6 +2613,10 @@ int main(int argc, char *argv[])
       We want to allow group write access for the talk-socket. */
    umask(007);
    
+   boot_time = time(NULL);
+   prev_io_error.timestamp = 0;
+   prev_io_error.delay = 0;
+   
    libcrypto_mt_setup();
    
    /* Tune SQlite3 memory */
@@ -2536,10 +2638,12 @@ int main(int argc, char *argv[])
    
    atomic_init(&certificate_hits);
    atomic_init(&certificate_misses);
+   
+   atomic_init64(&nopen);
+   atomic_init64(&ndownload);
 
 	struct fuse_chan *ch;
 	int err = -1;
-
 
    /* Parse options */
    fuse_args.argc = argc;
@@ -2587,6 +2691,8 @@ int main(int argc, char *argv[])
    
    /* Syslog level */
    syslog_setlevel(cvmfs_opts.syslog_level);
+   if (cvmfs::repo_name != "")
+      syslog_setprefix(cvmfs::repo_name.c_str());
    
    /* Maximum number of open files */
    if (cvmfs_opts.nofiles) {

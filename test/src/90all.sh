@@ -47,7 +47,7 @@ cvmfs_run_test() {
   rm -rf /etc/cvmfs/local.d/* || return 7
 
   service cvmfs start >> $logfile 2>&1 || return 9
-  for r in alien atlas atlas-condb boss cms grid hepsoft hone lcd lhcb na61 sft
+  for r in alien atlas-condb grid hepsoft hone lcd 
   do
     ls /opt/$r >> $logfile 2>&1
     if [ $? -eq 0 ]; then

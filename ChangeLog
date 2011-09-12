@@ -1,4 +1,48 @@
-0.2.78:
+2.0.5:
+  * Warn in cvmfs_config chksetup if no cache quota is set
+  * Create cvmfs user in cvmfs_server if necessary
+  * Fixed cvmfs_fsck on xfs
+  * Fixed get_origin in config.sh
+  * Speed up searach for existing mount point in mount helper
+  * Log to syslog when new repository snapshot is applied
+  * Fixed presentation error in cvmfs_stat
+  * Added repository prefix to syslog messages
+  * Fixed reporting of maximum cache size in cvmfs_config stat
+
+2.0.4:
+  * Re-opened the CVMFS_NFILES parameter for overwrites
+ 
+2.0.3:
+  * Fixed a typo in cvmfs_config stat that makes the Nagios 
+    check believe there is no network connectivity
+
+2.0.2:
+  * Write cache cleanup to syslog
+  * Fixed a big stinking bug when cleaning up the cache while 
+    downloading
+
+2.0.1:
+  * Fixed build system error for 32bit builds on 64bit systems
+
+2.0.0:
+  * Declared immutable parameters in default.conf as read-only
+  * Fix for Ubuntu 8.04 automounter
+  * Experimental support for file backend added
+  * Verify decompressed size on download
+  * Unlink left-over temporary file catalogs in cvmfs_fsck
+  * Fixed a file descriptor leak on loading certificates
+  * Move dodgy files into a quarantaine folder in the cache
+  * Log proxy switches to syslog
+  * Use stack buffer for streamed file I/O
+  * Fixed a file descriptor leak in the catalog load code
+  * Exponential backoff for download errors to prevent
+    Squid request storms
+  * Log all file open errors except for ENOENT
+  * Added bugreport command to cvmfs_config
+  * More reliable cache db rebuild on corruption
+  * Added stat command to cvmfs_config
+  * Added extended attributes uptime, nclg, nopen, ndownload, 
+    timeout, timeout_direct, rx, speed
   * Added snapshot retention to replica tools
   * Removed redhat-isms from cvmfs_config setup and in
     cvmfs service
@@ -10,8 +54,8 @@
     nested catalogs
   * Fixed lazy-load issue in cvmfs_sync with two paths sharing
     the same prefix
-  * Forced bash for cvmfs_config and mount/umount helpers
-  * Changed bug report URL to Savannah
+  * /bin/bash for cvmfs_config and mount/umount helpers
+  * Changed bug report URL to cernvm.support@cern.ch
   * Fixed wrong mtab after failed umount
 
 0.2.77:
