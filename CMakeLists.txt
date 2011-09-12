@@ -33,7 +33,6 @@ option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (USE_JEMALLOC "Using jemalloc instead of ordinary malloc implementation" ON)
-option (BUILD_KERNEL_MODULE "Build the kernel module for the server part" OFF)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
@@ -76,11 +75,6 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwi
 #set (CVMFS_LIBS "${LDFLAGS} -ldl -lm") ??
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
-
-#
-# set the location of the kernel module sources
-#
-set (KERNEL_MODULE_LOCATION "${CMAKE_SOURCE_DIR}/kernel")
 
 #
 # check existence of include files
@@ -138,10 +132,6 @@ add_subdirectory (cvmfsd)
 if (INSTALL_MOUNT_SCRIPTS)
 	add_subdirectory (mount)
 endif (INSTALL_MOUNT_SCRIPTS)
-
-if (NOT MACOSX AND BUILD_KERNEL_MODULE)
-	add_subdirectory (kernel)
-endif (NOT MACOSX AND BUILD_KERNEL_MODULE)
 
 #
 # configure the packaging stuff

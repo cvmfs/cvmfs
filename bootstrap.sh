@@ -3,7 +3,6 @@
 CURL_VERSION=7.21.3
 FUSE_VERSION=2.8.4
 FUSE4X_VERSION=2.8.5
-REDIRFS_VERSION=SVN-671
 JEMALLOC_VERSION=2.2.1
 ZLIB_VERSION=1.2.5
 
@@ -42,13 +41,6 @@ mv fuse4x-${FUSE4X_VERSION}/* "$outOfSource/libfuse4x/src"
 patch -d "$outOfSource/libfuse4x" -N -p0 < fuse4x-drainout.patch
 cp src/* "$outOfSource/libfuse4x/src"
 rm -rf fuse4x-${FUSE4X_VERSION}
-cd ../..
-
-# RedirFS
-cd kernel/redirfs
-tar xfz redirfs-${REDIRFS_VERSION}.tar.gz
-mv redirfs-${REDIRFS_VERSION}/* src/
-rm -rf redirfs-${REDIRFS_VERSION}
 cd ../..
 
 # Jemalloc
