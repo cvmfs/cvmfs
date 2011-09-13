@@ -50,6 +50,7 @@ extern "C" {
    #include "md5.h"
    #include "debug.h"
    #include "compression.h"
+   //#include "log.h"
 }
 
 using namespace std;
@@ -218,10 +219,26 @@ namespace catalog {
             return false;
          const string sql_schema = "INSERT OR REPLACE INTO properties (key, value) VALUES ('schema', '1.2');";
          if (!sql_exec(db[cat_id], sql_schema))
-            return false;   
-         const string sql_nextInode = "INSERT OR REPLACE INTO properties (key, value) VALUES ('next_inode', 1);";
-         if (!sql_exec(db[cat_id], sql_nextInode))
             return false;
+		} else {
+         /* Check Schema */
+         bool result = true;
+         
+         const string sql = "SELECT value FROM properties WHERE key='schema';";
+         sqlite3_stmt *stmt;
+         sqlite3_prepare_v2(db[cat_id], sql.c_str(), -1, &stmt, NULL);
+         int err = sqlite3_step(stmt);
+         if (err == SQLITE_ROW) {
+            const string schema = string((char *)sqlite3_column_text(stmt, 0));
+            if (schema.find("1.", 0) != 0)
+               result = false;
+         } else {
+            //logmsg("No schema version in catalog");
+            result = false;
+         }
+         sqlite3_finalize(stmt);
+         
+         return result;
       }
    
       return true;

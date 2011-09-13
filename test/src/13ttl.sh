@@ -124,6 +124,7 @@ do_tests() {
   # Reload on changed catalog
   resign_local
   cvmfs-talk -i 127.0.0.1 remount >> $logfile 2>&1 || return 9
+  sleep 2
   ls /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 9
   main_cat_new=`cvmfs-talk -i 127.0.0.1 open catalogs | head -2 | tail -1 | cut -d\| -f2`
   echo "$main_cat" >> $logfile

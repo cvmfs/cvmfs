@@ -6,6 +6,7 @@ cvmfs_run_test() {
 
   echo "CVMFS_REPOSITORIES=alice,atlas,atlas-condb,atlas-nightlies,boss,cms,geant4,grid,hepsoft,hone,lcd,lhcb,na61,sft" > /etc/cvmfs/default.local || return 1
   echo "CVMFS_SERVER_URL=http://cernvm-webfs.cern.ch/opt/@org@" > /etc/cvmfs/domain.d/cern.ch.local
+  echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local
   service cvmfs restartclean >> $logfile 2>&1 || return 2
   service cvmfs probe >> $logfile 2>&1 || return 3
 

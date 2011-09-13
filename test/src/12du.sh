@@ -11,7 +11,7 @@ cvmfs_run_test() {
   echo 2 > /proc/sys/vm/drop_caches
   sleep 10
   ps aux | grep cvmfs2 | grep sft.cern.ch >> $logfile
-  check_memory sft 50000 || return 3
+  check_memory sft 60000 || return 3
   
   return 0
 }
