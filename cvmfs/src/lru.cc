@@ -122,14 +122,10 @@ namespace lru {
       unsigned char buf[20+sizeof(size)];
       
       while (true) {
-	
-         pmesg(D_LRU, "... 0 ...");
 
 			if (read(pipe_insert[0], buf, 20+sizeof(size)) == 20+sizeof(size) == false) {
 				break;
 			}
-
-	      pmesg(D_LRU, "... 1 ...");
 	
          memcpy(sha1.digest, buf, 20);
          memcpy(&size, buf+20, sizeof(size));

@@ -2300,15 +2300,13 @@ typedef std::map<fuse_ino_t, std::string> InodeCache;
 InodeCache inode_cache;
 
 bool lookup_inode_cache(fuse_ino_t inode, string &result) {
-	pmesg(D_CVMFS, "lookup_inode_cache(inode: %d)", inode);
-	
 	InodeCache::const_iterator path = inode_cache.find(inode);
 	if (path == inode_cache.end()) {
 		return false;
 	}
 	
 	result = path->second;
-	pmesg(D_CVMFS, "lookup_inode_cache(inode: %d, %s)", inode, result.c_str());
+	pmesg(D_CVMFS, "lookup_inode_cache(inode: %d) --> %s", inode, result.c_str());
 	return true;
 }
 
@@ -2317,7 +2315,6 @@ static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 {
 	struct stat stbuf;
 	pmesg(D_CVMFS, "hello_ll_getattr(inode: %d)", ino);
-	fprintf(stdout, "... getattr ino: %d \n", ino);
 	
 	string path;
 	if (not lookup_inode_cache(ino, path)) {
@@ -2338,8 +2335,7 @@ static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 
 static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 {	
-	pmesg(D_CVMFS, "hello_ll_lookup(name: %s)", name);
-	fprintf(stdout, "... lookup parent_ino: %d name: %s\n", parent, name);
+	pmesg(D_CVMFS, "hello_ll_lookup(parent_ino: %d name: %s)", parent, name);
 	
 	// get path of directory (parent)
 	string parentPath;
@@ -2350,40 +2346,15 @@ static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 	
 	// get information about file
 	string filename = parentPath + "/" + name;
-	hash::t_md5 md5(catalog::mangled_path(filename));
-	catalog::t_dirent d;
-	if (not catalog::lookup(md5, d)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	// load nested catalog
-	if (d.flags & catalog::DIR_NESTED) {
-		fprintf(stdout, "... lookup | found nested catalog \n");
-		
-		catalog::lock();
-		pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", filename.c_str());
-		hash::t_sha1 expected_clg;
-		if (!catalog::lookup_nested_unprotected(d.catalog_id, catalog::mangled_path(filename), expected_clg))
-		{
-			catalog::unlock();
-			logmsg("Nested catalog at %s not found (ls)", filename.c_str());
-			fuse_reply_err(req, ENOENT);
-			return;
-		}
-		
-		int result = load_and_attach_catalog(filename, hash::t_md5(catalog::mangled_path(filename)), filename, -1, false, expected_clg);
-		if (result != 0) {
-			catalog::unlock();
-			atomic_inc(&nioerr);
-			return;
-		}
-		
-		catalog::unlock();
-   }
-	
 	struct stat s;
-	d.to_stat(&s);
+	cvmfs_getattr(filename.c_str(), &s);
+	
+	// hash::t_md5 md5(catalog::mangled_path(filename));
+	// catalog::t_dirent d;
+	// if (not catalog::lookup(md5, d)) {
+	// 	fuse_reply_err(req, ENOENT);
+	// 	return;
+	// }
 	
 	// insert into cache
 	inode_cache[s.st_ino] = filename;
@@ -2404,35 +2375,35 @@ struct dirbuf {
 	size_t size;
 };
 
-static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name,
-		       fuse_ino_t ino)
-{
-	pmesg(D_CVMFS, "dirbuf_add(name: %s)", name);
-	struct stat stbuf;
-	size_t oldsize = b->size;
-	b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
-        char *newp = (char *)realloc(b->p, b->size);
-        if (!newp) {
-            fprintf(stderr, "*** fatal error: cannot allocate memory\n");
-            abort();
-        }
-	b->p = newp;
-	memset(&stbuf, 0, sizeof(stbuf));
-	stbuf.st_ino = ino;
-	fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, &stbuf,
-			  b->size);
-}
+// static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name,
+// 		       fuse_ino_t ino)
+// {
+// 	pmesg(D_CVMFS, "dirbuf_add(name: %s)", name);
+// 	struct stat stbuf;
+// 	size_t oldsize = b->size;
+// 	b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
+//         char *newp = (char *)realloc(b->p, b->size);
+//         if (!newp) {
+//             fprintf(stderr, "*** fatal error: cannot allocate memory\n");
+//             abort();
+//         }
+// 	b->p = newp;
+// 	memset(&stbuf, 0, sizeof(stbuf));
+// 	stbuf.st_ino = ino;
+// 	fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, &stbuf,
+// 			  b->size);
+// }
 
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
 static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize, off_t off, size_t maxsize)
 {
 	if (off < bufsize) {
-		fprintf(stdout, "... reply buf | offset: %d bufsize: %d maxsize: %d \n", off, bufsize, maxsize);
+//		fprintf(stdout, "... reply buf | offset: %d bufsize: %d maxsize: %d \n", off, bufsize, maxsize);
 		return fuse_reply_buf(req, buf + off, min(bufsize - off, maxsize));
 	}
 	else {
-		fprintf(stdout, "... reply buf | empty buffer\n");
+//		fprintf(stdout, "... reply buf | empty buffer\n");
 		return fuse_reply_buf(req, NULL, 0);
 	}
 }
@@ -2453,7 +2424,6 @@ static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name, struc
 static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			     off_t off, struct fuse_file_info *fi)
 {
-	fprintf(stdout, "... readdir | ino: %d \n", ino);
 	pmesg(D_CVMFS, "hello_ll_readdir(ino: %d)", ino);
 
 	string path, name;
@@ -2464,23 +2434,44 @@ static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	
 	hash::t_md5 md5(catalog::mangled_path(path));
 	
-      struct catalog::t_dirent d;
-      catalog::lock();
-      if (lookup_cache(md5, d)) {
-               pmesg(D_CVMFS, "catalog cache HIT");
-               if (d.catalog_id < 0) {
-                  catalog::unlock();
-      			fuse_reply_err(req, ENOENT);
-      			return;
-               }
-            } else {
-         if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-            catalog::unlock();
+	struct catalog::t_dirent d;
+	catalog::lock();
+	if (lookup_cache(md5, d)) {
+		pmesg(D_CVMFS, "catalog cache HIT");
+		if (d.catalog_id < 0) {
+			catalog::unlock();
 			fuse_reply_err(req, ENOENT);
-            return;
-         }
-      }
+			return;
+		}
+	} else {
+		if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
+			catalog::unlock();
+			fuse_reply_err(req, ENOENT);
+			return;
+		}
+	}
 	
+	// load nested catalog
+	if (d.flags & catalog::DIR_NESTED) {
+		pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path.c_str());
+		hash::t_sha1 expected_clg;
+		if (!catalog::lookup_nested_unprotected(d.catalog_id, catalog::mangled_path(path), expected_clg))
+		{
+			catalog::unlock();
+			logmsg("Nested catalog at %s not found (ls)", path.c_str());
+			fuse_reply_err(req, ENOENT);
+			return;
+		}
+		
+		int result = load_and_attach_catalog(path, hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
+		if (result != 0) {
+			catalog::unlock();
+			atomic_inc(&nioerr);
+			fuse_reply_err(req, result);
+			return;
+		}
+	}
+
 	// build dir listing
 	struct dirbuf b;
 	memset(&b, 0, sizeof(b));
@@ -2515,7 +2506,6 @@ static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 static void hello_ll_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 {
-	fprintf(stdout, "... open ino: %d\n", ino);
 	pmesg(D_CVMFS, "hello_ll_open(ino: %d)", ino);
 	
 	string path;
@@ -2540,8 +2530,7 @@ static void hello_ll_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info 
 
 static void hello_ll_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
 {
-	fprintf(stdout, "... read | ino: %d maxsize: %d offset: %d \n", ino, size, off);
-	pmesg(D_CVMFS, "hello_ll_read(ino: %d)", ino);
+	pmesg(D_CVMFS, "hello_ll_read(ino: %d maxsize: %d offset: %d)", ino, size, off);
 	
 	char *data = (char *)malloc(size);
 	int result = cvmfs_read("/no/path/given", data, size, off, fi);
@@ -2555,7 +2544,6 @@ static void hello_ll_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off
 }
 
 static void hello_ll_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
-	fprintf(stdout, "... release ino: %d \n", ino);
 	pmesg(D_CVMFS, "hello_ll_release(ino: %d)", ino);
 	
 	string path;
@@ -2570,7 +2558,6 @@ static void hello_ll_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_in
 }
 
 static void hello_ll_readlink(fuse_req_t req, fuse_ino_t ino) {
-	fprintf(stdout, "... readlink | ino: %d \n", ino);
 	pmesg(D_CVMFS, "hello_ll_readlink(ino: %d)", ino);
 	
 	string path;
@@ -2616,6 +2603,10 @@ int main(int argc, char *argv[])
    boot_time = time(NULL);
    prev_io_error.timestamp = 0;
    prev_io_error.delay = 0;
+
+	/* enable the catalog tree by switching it's switch
+	   (hopefully I do not end up in hell for this hack) */
+	catalog_tree::enable();
    
    libcrypto_mt_setup();
    
@@ -2881,7 +2872,7 @@ int main(int argc, char *argv[])
 		if (se != NULL) {
 			if (fuse_set_signal_handlers(se) != -1) {
 				fuse_session_add_chan(se, ch);
-				err = fuse_session_loop(se);
+				err = fuse_session_loop_mt(se);
 				fuse_remove_signal_handlers(se);
 				fuse_session_remove_chan(ch);
 			}

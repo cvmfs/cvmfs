@@ -36,9 +36,13 @@ namespace catalog_tree {
    catalog_tree_t *root = NULL;
    
    map<int, catalog_tree_t *> index_id;
+	bool enabled = false;
    
-   
+	void enable() { enabled = true; }
+	bool isEnabled() { return enabled; }
+
    static catalog_tree_t *find_hosting(const string &path) {
+		assert(enabled);
       catalog_tree_t *iterator = root;
       string path_postfix = path.substr(1);
       
@@ -66,6 +70,7 @@ namespace catalog_tree {
    
    
    void insert(catalog_meta_t *data) {
+		assert(enabled);
       assert(data);
       const string path = data->path + "/";
       assert(path[0] == '/');
@@ -90,6 +95,7 @@ namespace catalog_tree {
    
    
    catalog_meta_t *get_hosting(const std::string &path) {
+		assert(enabled);
       if (!root) return NULL;
       
       assert((path.length() > 0) && (path[0] == '/'));
@@ -101,6 +107,7 @@ namespace catalog_tree {
    
    
    catalog_meta_t *get_parent(const int catalog_id) {
+		assert(enabled);
       map<int, catalog_tree_t *>::const_iterator i = index_id.find(catalog_id);
       assert(i != index_id.end());
       
@@ -111,6 +118,7 @@ namespace catalog_tree {
    }
    
    catalog_meta_t *get_catalog(const int catalog_id) {
+		assert(enabled);
       map<int, catalog_tree_t *>::const_iterator i = index_id.find(catalog_id);
       
       assert(i != index_id.end());
@@ -119,6 +127,7 @@ namespace catalog_tree {
    
    
    static void visit_recursive(catalog_tree_t *node, void (visitor)(catalog_meta_t *info)) {
+		assert(enabled);
       visitor(node->data);
       for (unsigned i = 0; i < node->children.size(); ++i) {
          visit_recursive(node->children[i], visitor);
@@ -126,6 +135,7 @@ namespace catalog_tree {
    }
    
    void visit_children(const int catalog_id, void (visitor)(catalog_meta_t *info)) {
+		assert(enabled);
       map<int, catalog_tree_t *>::const_iterator node = index_id.find(catalog_id);
       assert(node != index_id.end());
       
@@ -136,6 +146,7 @@ namespace catalog_tree {
    
    
    static string show_tree_recursive(int level, catalog_tree_t *node) {
+		assert(enabled);
       string result;
       for (int i = 0; i < level; ++i)
          result += "   ";
@@ -151,6 +162,7 @@ namespace catalog_tree {
    }
    
    string show_tree() {
+		assert(enabled);
       assert(root);
       
       return show_tree_recursive(0, root);

@@ -58,38 +58,42 @@ namespace catalog {
 	
 	bool getMaximalHardlinkGroupId(const unsigned cat_id, unsigned int &maxId);
 	
+	uint64_t getInode(unsigned int rowid, uint64_t hardlinkGroupId, unsigned int catalog_id);
+	
    struct t_dirent {
       t_dirent() : catalog_id(0), flags(setLinkcountInFlags(0, 1)), inode(0), mode(0), size(0), mtime(0) {}
       t_dirent(const int cat_id,
                const std::string &n, 
                const std::string &sym, 
                const int f, 
-               const uint64_t ino,
+               const uint64_t hardlinkGroup,
                const unsigned m, 
                const uint64_t s, 
                const time_t t, 
                const hash::t_sha1 &c) : 
-                   catalog_id(cat_id), flags(f), inode(ino),  mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {
-	
-						// the linkcount defaults to 1 !!
-						if (getLinkcountInFlags(f) == 0) {
-							flags = setLinkcountInFlags(f, 1);
+						catalog_id(cat_id), flags(f), inode(hardlinkGroup),  mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {
+
+							// the linkcount defaults to 1 !!
+							if (getLinkcountInFlags(f) == 0) {
+								flags = setLinkcountInFlags(f, 1);
+							}
 						}
-				}
-    t_dirent(const int cat_id,
-            const std::string &n, 
-            const std::string &sym, 
-            const int f, 
-            const uint64_t ino,
-            const unsigned m, 
-            const uint64_t s, 
-            const time_t t, 
-            const hash::t_sha1 &c,
-			const unsigned int rowId) : 
-                catalog_id(cat_id), catalog_row_id(rowId), flags(f), inode(ino),  mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {}
+
+	    t_dirent(const int cat_id,
+	            const std::string &n, 
+	            const std::string &sym, 
+	            const int f, 
+	            const uint64_t ino,
+	            const unsigned m, 
+	            const uint64_t s, 
+	            const time_t t, 
+	            const hash::t_sha1 &c,
+					const unsigned int rowId) : 
+						catalog_id(cat_id), flags(f), mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {
+							inode = getInode(rowId, ino, cat_id);
+						}
 
       int catalog_id;
-      unsigned int catalog_row_id;
       int flags;
       uint64_t inode;
       unsigned mode;

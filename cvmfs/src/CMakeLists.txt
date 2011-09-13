@@ -46,6 +46,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	debug.h debug.c 
 	zlib-duplex.h compression.h compression.c 
 	md5.h sha1.h sha1.c hash.h hash.cc 
+	catalog_tree.h catalog_tree.cc
 	sqlite3-duplex.h catalog.h catalog.cc 
 	util.cc util.h 
 	log.c log.h 
@@ -60,6 +61,7 @@ set (CVMFS_CLGCMP_SOURCES
 	smalloc.h smalloc.c 
 	debug.c debug.h 
 	zlib-duplex.h compression.c compression.h 
+	catalog_tree.h catalog_tree.cc
 	catalog.cc catalog.h 
 	md5.h 
 	sha1.c sha1.h 
@@ -70,6 +72,7 @@ set (CVMFS_LSCAT_SOURCES
 	smalloc.h smalloc.c 
 	debug.c debug.h 
 	zlib-duplex.h compression.c compression.h 
+	catalog_tree.h catalog_tree.cc
 	sqlite3-duplex.h catalog.cc catalog.h 
 	md5.h sha1.c sha1.h 
 	hash.cc hash.h 
@@ -94,6 +97,7 @@ set (CVMFS_PULL_SOURCES
 	md5.h sha1.h sha1.c 
 	hash.h hash.cc 
 	util.h util.cc 
+	catalog_tree.h catalog_tree.cc
 	sqlite3-duplex.h catalog.h catalog.cc 
 	signature.h signature.cc 
 	cvmfs_pull.cc)

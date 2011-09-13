@@ -26,6 +26,9 @@ namespace catalog_tree {
    catalog_meta_t *get_hosting(const std::string &path);
    catalog_meta_t *get_parent(const int catalog_id);
    catalog_meta_t *get_catalog(const int catalog_id);
+
+	void enable();
+	bool isEnabled();
    
    void visit_children(const int catalog_id, void (visitor)(catalog_meta_t *info));
    
