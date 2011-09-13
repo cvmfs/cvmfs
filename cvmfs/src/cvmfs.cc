@@ -2326,7 +2326,7 @@ static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	result = cvmfs_getattr(path.c_str(), &stbuf);
 	
 	if (result != 0) {
-		fuse_reply_err(req, result);
+		fuse_reply_err(req, -result);
 		return;
 	}
 	
@@ -2347,7 +2347,11 @@ static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 	// get information about file
 	string filename = parentPath + "/" + name;
 	struct stat s;
-	cvmfs_getattr(filename.c_str(), &s);
+	int result = cvmfs_getattr(filename.c_str(), &s);
+	if (result != 0) {
+		fuse_reply_err(req, -result);
+		return;
+	}
 	
 	// hash::t_md5 md5(catalog::mangled_path(filename));
 	// catalog::t_dirent d;
