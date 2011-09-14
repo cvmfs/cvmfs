@@ -9,7 +9,7 @@ cvmfs_run_test() {
 
   numBefore=`grep "LRU database corrupted" /var/log/messages | grep cvmfs2 | wc -l`
 
-  umount /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 3
+  umount -l /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 3
   echo bla > /var/cache/cvmfs2/atlas.cern.ch/cvmfscatalog.cache || return 4
   
   ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 5   
