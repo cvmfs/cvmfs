@@ -41,7 +41,7 @@ bool CatalogHandler::initCatalogs() {
 	const string clg_path = "";
 	
 	// init the database
-	if (!catalog::init(getuid(), getgid(), false)) {
+	if (!catalog::init(getuid(), getgid())) {
 		printError("could not init SQLite");
 		exit(1);
 	}

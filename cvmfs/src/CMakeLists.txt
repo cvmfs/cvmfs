@@ -24,6 +24,9 @@ set (CVMFS2_DEBUG_SOURCES
 	md5.h 
 	debug.h debug.c 
 	http_curl.h http_curl.c 
+	lru_cache.h
+	inode_cache.h inode_cache.cc
+	path_cache.h path_cache.cc
 	cvmfs.h cvmfs.cc)
 
 set (CVMFS2_SOURCES ${CVMFS2_DEBUG_SOURCES})

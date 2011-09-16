@@ -23,8 +23,6 @@
  * jakob.blomer@cern.ch
  */
  
-#define FUSE_USE_VERSION 26
-#define _FILE_OFFSET_BITS 64
 #define ENOATTR ENODATA /* instead including attr/xattr.h */
 
 #include "cvmfs_config.h"
@@ -77,6 +75,10 @@
 #include "lru.h"
 #include "util.h"
 #include "atomic.h"
+#include "fuse_op_stubs.h"
+#include "inode_cache.h"
+#include "path_cache.h"
+
 
 extern "C" {
    #include "debug.h"
@@ -101,7 +103,6 @@ namespace cvmfs {
    string blacklist = "/etc/cvmfs/blacklist"; /* blacklist for compromised certificates */
    string deep_mount = "";
    string repo_name = ""; ///< Expected repository name, e.g. atlas.cern.ch
-   bool hide_hardlinks = false; ///< controls if hardlink groups are represented by the same hardlink (turn on for aufs!!)
    const double whitelist_lifetime = 3600.0*24.0*30.0; ///< 30 days in seconds
    const int short_term_ttl = 240; /* in offline mode, check every 4 minutes */
    string pubkey = "/etc/cvmfs/keys/cern.ch.pub";
@@ -116,6 +117,13 @@ namespace cvmfs {
    time_t drainout_deadline = 0;
    hash::t_sha1 next_root;
    time_t boot_time;
+	struct fuse_lowlevel_ops fuseCallbacks;
+	
+   unsigned int inode_cache_size = 20000;
+   InodeCache *inode_cache;
+   
+   unsigned int path_cache_size = 1000;
+   PathCache *path_cache;
    
    /* Prevent DoS attacks on the Squid server */
    static struct {
@@ -1113,7 +1121,128 @@ namespace cvmfs {
       return result;
    }
    
+   static bool get_dirent_for_inode(const fuse_ino_t ino, struct catalog::t_dirent &dirent) {
+      // TODO: check if this hack is valid
+      fuse_ino_t inode = (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::ROOT_INODE : ino;
+      
+      // check the inode cache for speed up
+      if (inode_cache->lookup(inode, dirent)) {
+         pmesg(D_INO_CACHE, "HIT %d -> %s", inode, dirent.name.c_str());
+         return true;
+         
+      } else {
+         pmesg(D_INO_CACHE, "MISS %d", inode);
+         
+         if (catalog::lookup_inode_unprotected(inode, dirent, true)) {
+            inode_cache->insert(inode, dirent);
+            return true;
+            
+         } else {
+            pmesg(D_CVMFS, "no entry --> maybe data corruption?");
+            return false;
+         }
+      }
+      
+      // should be unreachable... just to be sure
+      return false;
+   }
    
+   static bool get_path_for_inode(const fuse_ino_t ino, string &path) {
+      // TODO: check if this hack is valid
+      fuse_ino_t inode = (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::ROOT_INODE : ino;
+      
+      // check the path cache first
+      // this is not really needed because the following loop will do this
+      // anyway... but we hope to have a lot of cache hits... so save 
+      // some time and check this first
+      if (path_cache->lookup(inode, path)) {
+         pmesg(D_PATH_CACHE, "HIT %d -> %s", inode, path.c_str());
+         
+         // this was easy!
+         return true;
+      }
+      
+      pmesg(D_PATH_CACHE, "MISS %d", inode);
+      
+      // here the interesting thing happens
+      string resultPath, iPath;
+      struct catalog::t_dirent iDirent;
+      fuse_ino_t iInode = inode;
+      
+      resultPath = "";
+      
+      // go through the path backwards to rebuild it
+      while (iInode != catalog::ROOT_INODE) {
+         assert (iInode != catalog::INVALID_INODE);
+         
+         // check path cache,  maybe the sub path is in there
+         // and we can have some free time instead of looping ;-)
+         if (path_cache->lookup(iInode, iPath)) {
+            // we are building the path backwards... 
+            resultPath = iPath + resultPath;
+            return true;
+            
+         } else {
+            // no luck with path cache... get the dir entry and go to next upper path level
+            if (not get_dirent_for_inode(iInode, iDirent)) {
+               return false;
+            }
+         }
+         
+         resultPath = "/" + iDirent.name + resultPath;
+         iInode = iDirent.parentInode;
+      }
+      
+      path_cache->insert(inode, resultPath);
+      path = resultPath; // return value
+      
+      return true;
+   }
+   
+   /**
+    * Do a lookup to find out the inode number of a file name
+    */
+   static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+   {
+		pmesg(D_CVMFS, "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
+
+      string parentPath;
+      if(not get_path_for_inode(parent, parentPath)) {
+         pmesg(D_CVMFS, "no path for inode found... data corrupt?");
+         
+         fuse_reply_err(req, ENOENT);
+         return;
+      }
+      
+      // get information about file out of catalog
+      string path = parentPath + "/" + name;
+      hash::t_md5 md5(catalog::mangled_path(path));
+      catalog::t_dirent dirent;
+      if (not catalog::lookup(md5, dirent)) {
+         fuse_reply_err(req, ENOENT);
+         return;
+      }
+      
+      // we got the parent inode from FUSE... save it
+      dirent.parentInode = parent;
+      
+      // maintain caches
+      inode_cache->insert(dirent.inode, dirent);
+      path_cache->insert(dirent.inode, path);
+      
+		// reply
+      struct stat s;
+      dirent.to_stat(&s);
+		
+		struct fuse_entry_param result;
+		memset(&result, 0, sizeof(result));
+		result.ino = dirent.inode;
+		result.attr = s;
+		result.attr_timeout = 1.0; // TODO: replace these magic numbers
+		result.entry_timeout = 1.0;
+
+		fuse_reply_entry(req, &result);
+   }
    
    /**
     * Gets called as kind of prerequisit to every operation.
@@ -1124,192 +1253,197 @@ namespace cvmfs {
     * all the inserts here, even though stat will be called before anything else;
     * they might be cached by the kernel.
     */
-   static int cvmfs_getattr(const char *c_path, struct stat *info) {
-      /* use the cache only, don't contact the server */
-      pmesg(D_CVMFS, "stat %s", c_path);
-      const string path = string(c_path);
-      Tracer::trace(Tracer::FUSE_STAT, path, "stat() call");
-      const hash::t_md5 md5(catalog::mangled_path(path));
-      struct catalog::t_dirent d;
-      
-      catalog::lock();
-      int catalog_id = find_catalog_id(path);
-      time_t now = time(NULL);
+   static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
+      pmesg(D_CVMFS, "cvmfs_getattr (stat) for inode: %d", ino);
 
-      /* Check for drainout timestamp, reload and reset if larger then max_cache_timeout */
-      if (drainout_deadline && (now > drainout_deadline)) {
-         /* Reload root catalog */
-         pmesg(D_CVMFS, "Catalog %d: TTL expired, kernel cache drainout complete, reloading...", catalog_id);
-         
-         /* Don't load very old stuff */
-         if (now > drainout_deadline + max_cache_timeout)
-            next_root = hash::t_sha1();
-         
-         int result = load_and_attach_catalog(catalog::get_catalog_url(0),
-                                              hash::t_md5(catalog::get_root_prefix_specific(0)),
-                                              catalog_tree::get_catalog(0)->path, 0, false, next_root);
-//         fuse_unset_cache_drainout();
-         drainout_deadline = 0;
-         
-         if (result != 0) {
-            catalog::unlock();
-            atomic_inc(&nioerr);
-            return result;
-         }
-         
-         logmsg("switched to catalog revision %d", catalog::get_revision());
-      }
+      struct stat s;
+      struct catalog::t_dirent dirent;
       
-      /* Check catalog TTL, goto drainout mode if necessary */
-      pmesg(D_CVMFS, "current time %lu, deadline %lu", time(NULL), catalog_tree::get_catalog(catalog_id)->expires);      
-      if ((!drainout_deadline) && (now > catalog_tree::get_catalog(catalog_id)->expires)) {
-         /* Reload root catalog */
-         pmesg(D_CVMFS, "Catalog %d: TTL expired, draining out caches...", catalog_id);
-         
-         hash::t_sha1 new_catalog;
-         catalog_tree::catalog_meta_t *clginfo = catalog_tree::get_catalog(0);
-         int result = check_catalog(catalog::get_catalog_url(0),
-                                    hash::t_md5(catalog::get_root_prefix_specific(0)),
-                                    clginfo->path, new_catalog);
-         
-         if (result < 0) {
-            clginfo->expires = time(NULL) + effective_ttl(short_term_ttl);
-            catalog_tree::visit_children(0, update_ttl_shortterm);
-         }
-         
-         if (result == 0) {
-            clginfo->expires = now + effective_ttl(catalog::get_ttl(0));
-            catalog_tree::visit_children(0, update_ttl);
-         }
-         
-         if (result == 1) {
-//            fuse_set_cache_drainout();
-            drainout_deadline = time(NULL) + max_cache_timeout;
-            next_root = new_catalog;
-         }
-      }
-      
-      /* Hopefully in mem-cache */
-      if (lookup_cache(md5, d)) {
-         pmesg(D_CVMFS, "catalog cache HIT (getattr)");
-         if (d.catalog_id < 0) {
-            catalog::unlock();
-            Tracer::trace(Tracer::FUSE_STAT, path, "memcache n-hit");
-            return -ENOENT;
-         } else {
-            Tracer::trace(Tracer::FUSE_STAT, path, "memcache hit");
-         }
+      if (get_dirent_for_inode(ino, dirent)) {
+         // cache hit
+         dirent.to_stat(&s);
+         fuse_reply_attr(req, &s, 1.0); // TODO:: replace magic number
+         return;
       } else {
-         /* Otherwise, look in the catalog */
-         pmesg(D_CVMFS, "catalog cache MISS (getattr)");
-         int catalog_id = find_catalog_id(path);
-         
-         /* Check if this catalog is dirty, reload if necessary 
-            Can only happen for nested catalogs. */
-         int result = refresh_catalog(catalog_id);
-         if (result != 0) {
-            catalog::unlock();
-            atomic_inc(&nioerr);
-            return result;
-         }
-         
-         /* Now lookup */
-         if (!catalog::lookup_informed_unprotected(md5, catalog_id, d)) {
-            pmesg(D_CVMFS, "getattr: file %s not existant, maybe we are in a nested catalog?", c_path);
-            
-            /* Look for nested catalog in a parent path */
-            const string p_path = get_parent_path(path);
-            const hash::t_md5 p_md5(catalog::mangled_path(p_path));
-            catalog::t_dirent p;
-            if ((lookup_cache(p_md5, p) || catalog::lookup_informed_unprotected(p_md5, find_catalog_id(p_path), p)) && 
-                (p.flags & catalog::DIR_NESTED) && (p_path != "")) 
-            {
-               /* Load nested catalog */
-               pmesg(D_CVMFS, "first time access to nested path %s, loading catalog at %s", c_path, p_path.c_str());
-               hash::t_sha1 expected_clg;
-               if (!catalog::lookup_nested_unprotected(
-                   p.catalog_id, catalog::mangled_path(p_path), expected_clg))
-               {
-                  catalog::unlock();
-                  logmsg("Nested catalog at %s not found (getattr)", c_path);
-                  return -ENOENT;
-               }
-               
-               int result = load_and_attach_catalog(p_path, 
-                  hash::t_md5(catalog::mangled_path(p_path)), p_path, -1, false, expected_clg);
-               if (result != 0) {
-                  catalog::unlock();
-                  atomic_inc(&nioerr);
-                  return result;
-               }
-               
-               /* and again, maybe we find it in the nested catalog */
-               if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-                  insert_cache_negative(md5);
-                  catalog::unlock();
-                  return -ENOENT;
-               }
-            } else {
-               insert_cache_negative(md5);
-               catalog::unlock();
-               Tracer::trace(Tracer::FUSE_STAT, path, "ENOENT");
-               return -ENOENT;
-            }
-         }
-         /* OK, we have d from the catalog */
+         fuse_reply_err(req, ENOENT);
+         return;
       }
+
+//       string path;
+//       if (not get_path_for_inode(ino, path)) {
+//          fuse_reply_err(req, ENOENT);
+//          return;
+//       }
+//       
+//       Tracer::trace(Tracer::FUSE_STAT, path, "stat() call");
+//       const hash::t_md5 md5(catalog::mangled_path(path));
+//       
+//       catalog::lock();
+//       int catalog_id = find_catalog_id(path);
+//       time_t now = time(NULL);
+// 
+//       /* Check for drainout timestamp, reload and reset if larger then max_cache_timeout */
+//       if (drainout_deadline && (now > drainout_deadline)) {
+//          /* Reload root catalog */
+//          pmesg(D_CVMFS, "Catalog %d: TTL expired, kernel cache drainout complete, reloading...", catalog_id);
+//          
+//          /* Don't load very old stuff */
+//          if (now > drainout_deadline + max_cache_timeout)
+//             next_root = hash::t_sha1();
+//          
+//          int result = load_and_attach_catalog(catalog::get_catalog_url(0),
+//                                               hash::t_md5(catalog::get_root_prefix_specific(0)),
+//                                               catalog_tree::get_catalog(0)->path, 0, false, next_root);
+// //         fuse_unset_cache_drainout();
+//          drainout_deadline = 0;
+//          
+//          if (result != 0) {
+//             catalog::unlock();
+//             atomic_inc(&nioerr);
+//             fuse_reply_err(req, result);
+//             return;
+//          }
+//          
+//          logmsg("switched to catalog revision %d", catalog::get_revision());
+//       }
+//       
+//       /* Check catalog TTL, goto drainout mode if necessary */
+//       pmesg(D_CVMFS, "current time %lu, deadline %lu", time(NULL), catalog_tree::get_catalog(catalog_id)->expires);      
+//       if ((!drainout_deadline) && (now > catalog_tree::get_catalog(catalog_id)->expires)) {
+//          /* Reload root catalog */
+//          pmesg(D_CVMFS, "Catalog %d: TTL expired, draining out caches...", catalog_id);
+//          
+//          hash::t_sha1 new_catalog;
+//          catalog_tree::catalog_meta_t *clginfo = catalog_tree::get_catalog(0);
+//          int result = check_catalog(catalog::get_catalog_url(0),
+//                                     hash::t_md5(catalog::get_root_prefix_specific(0)),
+//                                     clginfo->path, new_catalog);
+//          
+//          if (result < 0) {
+//             clginfo->expires = time(NULL) + effective_ttl(short_term_ttl);
+//             catalog_tree::visit_children(0, update_ttl_shortterm);
+//          }
+//          
+//          if (result == 0) {
+//             clginfo->expires = now + effective_ttl(catalog::get_ttl(0));
+//             catalog_tree::visit_children(0, update_ttl);
+//          }
+//          
+//          if (result == 1) {
+// //            fuse_set_cache_drainout();
+//             drainout_deadline = time(NULL) + max_cache_timeout;
+//             next_root = new_catalog;
+//          }
+//       }
+//       
+//       /* Hopefully in mem-cache */
+//       if (lookup_cache(md5, d)) {
+//          pmesg(D_CVMFS, "catalog cache HIT (getattr)");
+//          if (d.catalog_id < 0) {
+//             catalog::unlock();
+//             Tracer::trace(Tracer::FUSE_STAT, path, "memcache n-hit");
+//             return -ENOENT;
+//          } else {
+//             Tracer::trace(Tracer::FUSE_STAT, path, "memcache hit");
+//          }
+//       } else {
+//          /* Otherwise, look in the catalog */
+//          pmesg(D_CVMFS, "catalog cache MISS (getattr)");
+//          int catalog_id = find_catalog_id(path);
+//          
+//          /* Check if this catalog is dirty, reload if necessary 
+//             Can only happen for nested catalogs. */
+//          int result = refresh_catalog(catalog_id);
+//          if (result != 0) {
+//             catalog::unlock();
+//             atomic_inc(&nioerr);
+//             return result;
+//          }
+//          
+//          /* Now lookup */
+//          if (!catalog::lookup_informed_unprotected(md5, catalog_id, d)) {
+//             pmesg(D_CVMFS, "getattr: file %s not existant, maybe we are in a nested catalog?", c_path);
+//             
+//             /* Look for nested catalog in a parent path */
+//             const string p_path = get_parent_path(path);
+//             const hash::t_md5 p_md5(catalog::mangled_path(p_path));
+//             catalog::t_dirent p;
+//             if ((lookup_cache(p_md5, p) || catalog::lookup_informed_unprotected(p_md5, find_catalog_id(p_path), p)) && 
+//                 (p.flags & catalog::DIR_NESTED) && (p_path != "")) 
+//             {
+//                /* Load nested catalog */
+//                pmesg(D_CVMFS, "first time access to nested path %s, loading catalog at %s", c_path, p_path.c_str());
+//                hash::t_sha1 expected_clg;
+//                if (!catalog::lookup_nested_unprotected(
+//                    p.catalog_id, catalog::mangled_path(p_path), expected_clg))
+//                {
+//                   catalog::unlock();
+//                   logmsg("Nested catalog at %s not found (getattr)", c_path);
+//                   return -ENOENT;
+//                }
+//                
+//                int result = load_and_attach_catalog(p_path, 
+//                   hash::t_md5(catalog::mangled_path(p_path)), p_path, -1, false, expected_clg);
+//                if (result != 0) {
+//                   catalog::unlock();
+//                   atomic_inc(&nioerr);
+//                   return result;
+//                }
+//                
+//                /* and again, maybe we find it in the nested catalog */
+//                if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
+//                   insert_cache_negative(md5);
+//                   catalog::unlock();
+//                   return -ENOENT;
+//                }
+//             } else {
+//                insert_cache_negative(md5);
+//                catalog::unlock();
+//                Tracer::trace(Tracer::FUSE_STAT, path, "ENOENT");
+//                return -ENOENT;
+//             }
+//          }
+//          /* OK, we have d from the catalog */
+//       }
+//       
+//       insert_cache(md5, d);
+//       catalog::unlock();
+//       
+//       /* The actual getattr-work */
+//       d.to_stat(info);
+//       //if (path == "/") {
+//       //   info->st_mode &= ~7;
+//       //}
+//       if (d.flags & catalog::FILE_LINK) {
+//          info->st_size = expand_env(d.symlink).length();
+//          pmesg(D_CVMFS, "stat %s expanded to %s", c_path, expand_env(d.symlink).c_str());
+//       }
       
-      insert_cache(md5, d);
-      catalog::unlock();
-      
-      /* The actual getattr-work */
-      d.to_stat(info);
-      //if (path == "/") {
-      //   info->st_mode &= ~7;
-      //}
-      if (d.flags & catalog::FILE_LINK) {
-         info->st_size = expand_env(d.symlink).length();
-         pmesg(D_CVMFS, "stat %s expanded to %s", c_path, expand_env(d.symlink).c_str());
-      }
-      
-      return 0;
+//      fuse_reply_err(req, EROFS);
    }
 
 
    /**
     * Reads a symlink from the catalog.  Environment variables are expanded.
     */
-   static int cvmfs_readlink(const char *path, char *buf, size_t size) {
-      const hash::t_md5 md5(catalog::mangled_path(path));
-      Tracer::trace(Tracer::FUSE_READLINK, path, "readlink() call");
-      
-      struct catalog::t_dirent d;  
-      catalog::lock();
-      if (lookup_cache(md5, d)) {
-         pmesg(D_CVMFS, "catalog cache HIT");
-         if (d.catalog_id < 0) {
-            catalog::unlock();
-            return -ENOENT;
-         }
-      } else {
-         if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-            catalog::unlock();
-            return -ENOENT;
-         }
+   static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
+      pmesg(D_CVMFS, "cvmfs_readlink on inode: %d", ino);
+      Tracer::trace(Tracer::FUSE_READLINK, "no path provided", "readlink() call");
+   
+      struct catalog::t_dirent d;
+      if (not get_dirent_for_inode(ino, d)) {
+         fuse_reply_err(req, ENOENT);
+         return;
       }
-      catalog::unlock();
-      
-      
-      if(!S_ISLNK(d.mode))
-         return -ENOLINK;
-      
+   
+      if(not S_ISLNK(d.mode)) {
+         fuse_reply_err(req, ENOENT);
+         return;
+      }
+   
       const string lnk_exp = expand_env(d.symlink);
-      unsigned len = (lnk_exp.length() >= size) ? size : lnk_exp.length()+1;
-      
-      strncpy(buf, &lnk_exp[0], len-1);
-      buf[len-1] = '\0';
-      
-      return 0;
+   
+      fuse_reply_readlink(req, lnk_exp.c_str());
    }
    
 
@@ -1400,67 +1534,54 @@ namespace cvmfs {
     *
     * \return Read-only file descriptor in fi->fh
     */
-   static int cvmfs_open(const char *c_path, struct fuse_file_info *fi)
+   static void cvmfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
    { 
-      const string path = c_path;
-      Tracer::trace(Tracer::FUSE_OPEN, path, "open() call");
-      
-      int fd = -1;
-      const hash::t_md5 md5(catalog::mangled_path(path));
+      pmesg(D_CVMFS, "cvmfs_open on inode: %d", ino);
+      Tracer::trace(Tracer::FUSE_OPEN, "no path provided", "open() call");
 
-		
-		cout << "path: " << c_path << endl;
-      
+      int fd = -1;
+
       /* Look for it in the catalog. If it's not there, it doesn't exist. */
       struct catalog::t_dirent d;
-      catalog::lock();
-      if (lookup_cache(md5, d)) {
-         pmesg(D_CVMFS, "catalog cache HIT");
-			cout << "cache hit" << endl;
-         if (d.catalog_id < 0) {
-            catalog::unlock();
-            Tracer::trace(Tracer::FUSE_OPEN, path, "memcache n-hit");
-            return -ENOENT;
-         } else {
-            Tracer::trace(Tracer::FUSE_OPEN, path, "memcache hit");
-         }
-      } else {	
-			cout << "cache miss" << endl;
-         if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-				cout << "insert cache negative" << endl;
-            insert_cache_negative(md5);
-            catalog::unlock();
-            Tracer::trace(Tracer::FUSE_OPEN, path, "ENOENT");
-            return -ENOENT;
-         } else {
-				cout << "insert cache" << endl;
-            insert_cache(md5, d);
-         }
+      string path;
+      if (not get_dirent_for_inode(ino, d) || not get_path_for_inode(ino, path)) {
+         fuse_reply_err(req, ENOENT);
+         return;
       }
-      catalog::unlock();
       
+      if ((fi->flags & 3) != O_RDONLY) {
+         fuse_reply_err(req, EACCES);
+         return;
+      }
+
       fd = cache::open_or_lock(d);
-		atomic_inc64(&nopen);
+      atomic_inc64(&nopen);
       if (fd < 0) {
-         Tracer::trace(Tracer::FUSE_OPEN, path, "disk cache miss");
+         Tracer::trace(Tracer::FUSE_OPEN, "path", "disk cache miss");
          fd = cache::fetch(d, path);
          pthread_mutex_unlock(&mutex_download);
          atomic_inc64(&ndownload);
       }
-      
+
       if (fd >= 0) {
          if (atomic_xadd(&open_files, 1) < ((int)nofiles)-NUM_RESERVED_FD) {
+            pmesg(D_CVMFS, "file %s opened", path.c_str());
             fi->fh = fd;
-            return 0;
+            fuse_reply_open(req, fi);
+            return;
          } else {
             if (close(fd) == 0) atomic_dec(&open_files);
             logmsg("open file descriptor limit exceeded");
-            return -EMFILE;
+            fuse_reply_err(req, EMFILE);
+            return;
          }
       } else {
-			logmsg("failed to open %s, CAS key %s, error code %d",
-                c_path, d.checksum.to_string().c_str(), errno);
-         if (errno == EMFILE) return -EMFILE;
+         logmsg("failed to open inode: %d, CAS key %s, error code %d", ino, d.checksum.to_string().c_str(), errno);
+         pmesg(D_CVMFS, "failed to open inode: %d, CAS key %s, error code %d", ino, d.checksum.to_string().c_str(), errno);
+         if (errno == EMFILE) {
+            fuse_reply_err(req, EMFILE);
+            return;
+         }
       }
 
       /* Prevent Squid DoS */
@@ -1474,54 +1595,190 @@ namespace cvmfs {
          prev_io_error.delay = (random() % (MAX_INIT_IO_DELAY-1)) + 2;
       }
       prev_io_error.timestamp = now;
-      
-      atomic_inc(&nioerr);
-      return -EIO;
-   }
 
+      atomic_inc(&nioerr);
+      fuse_reply_err(req, EIO);
+   }
 
    /**
     * Redirected to pread into cache.
     */
-   static int cvmfs_read(const char *path, 
-                         char *buf, 
-                         size_t size, 
-                         off_t offset, 
-                         struct fuse_file_info *fi)
-   {     
-      Tracer::trace(Tracer::FUSE_READ, path, "read() call");
+   static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
+   {
+      pmesg(D_CVMFS, "cvmfs_read on inode: %d reading %d bytes from offset %d", ino, size, off);
+      Tracer::trace(Tracer::FUSE_READ, "path", "read() call");
       
+      // get data chunk
+      char *data = (char *)alloca(size);
       const int64_t fd = fi->fh;
-      return pread(fd, buf, size, offset);
+      int result = pread(fd, data, size, off);
+      
+      // push it to user
+      if (result >= 0) {
+         fuse_reply_buf(req, data, result);
+      } else {
+         fuse_reply_err(req, errno);
+      }
    }
 
 
    /**
     * File close operation. Redirected into cache.
     */
-   static int cvmfs_release(const char *path __attribute__((unused)), struct fuse_file_info *fi)
+   static void cvmfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
    {
-      pmesg(D_CVMFS, "closeing file number %d", fi->fh);
-      
+      pmesg(D_CVMFS, "cvmfs_release on inode: %d", ino);
+            
       const int64_t fd = fi->fh;
       if (close(fd) == 0) atomic_dec(&open_files);
       
-      return 0;
+      fuse_reply_err(req, 0);
    }
+	
+   struct dirbuf {
+      char *p;
+      size_t size;
+   };
+
+   #define min(x, y) ((x) < (y) ? (x) : (y))
+	
+   static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize, off_t off, size_t maxsize)
+   {
+      if (off < bufsize) {
+         return fuse_reply_buf(req, buf + off, min(bufsize - off, maxsize));
+      }
+      else {
+         return fuse_reply_buf(req, NULL, 0);
+      }
+   }
+
+   static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name, struct stat *s)
+   {
+      size_t oldsize = b->size;
+      b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
+       char *newp = (char *)realloc(b->p, b->size);
+      if (!newp) {
+          fprintf(stderr, "*** fatal error: cannot allocate memory\n");
+          abort();
+      }
+      b->p = newp;
+      fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, s, b->size);
+   }
+
+   /**
+    * Open a directory for listing
+    */
+   static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+	{
+      pmesg(D_CVMFS, "cvmfs_opendir on inode: %d", ino);
+      fuse_reply_open(req, fi);
+	}
+
+	/**
+	 * Release a directory (probably called after reading it)
+	 */
+	static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+	{
+      pmesg(D_CVMFS, "cvmfs_releasedir on inode: %d", ino);
+      fuse_reply_err(req, 0);
+	}
+	
+	/**
+    * Read the directory listing
+    */
+   static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
+	{
+      pmesg(D_CVMFS, "cvmfs_readdir on inode %d reading %d bytes from offset %d", ino, size, off);
+
+      string path, name;
+      if (not get_path_for_inode(ino, path)) {
+         fuse_reply_err(req, ENOENT);
+         return;
+      }
    
+      hash::t_md5 md5(catalog::mangled_path(path));
    
+      struct catalog::t_dirent d;
+      catalog::lock();
+      if (lookup_cache(md5, d)) {
+         pmesg(D_CVMFS, "catalog cache HIT");
+         if (d.catalog_id < 0) {
+            catalog::unlock();
+            fuse_reply_err(req, ENOENT);
+            return;
+         }
+      } else {
+         if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
+            catalog::unlock();
+            fuse_reply_err(req, ENOENT);
+            return;
+         }
+      }
+   
+      // load nested catalog
+      if (d.flags & catalog::DIR_NESTED) {
+         pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path.c_str());
+         hash::t_sha1 expected_clg;
+         if (!catalog::lookup_nested_unprotected(d.catalog_id, catalog::mangled_path(path), expected_clg))
+         {
+            catalog::unlock();
+            logmsg("Nested catalog at %s not found (ls)", path.c_str());
+            fuse_reply_err(req, ENOENT);
+            return;
+         }
+      
+         int result = load_and_attach_catalog(path, hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
+         if (result != 0) {
+            catalog::unlock();
+            atomic_inc(&nioerr);
+            fuse_reply_err(req, result);
+            return;
+         }
+      }
+
+      // build dir listing
+      struct dirbuf b;
+      memset(&b, 0, sizeof(b));
+   
+      struct stat info;
+      memset(&info, 0, sizeof(info));
+
+      d.to_stat(&info);
+
+      dirbuf_add(req, &b, ".", &info);
+   
+      struct catalog::t_dirent p;
+      if (catalog::parent_unprotected(md5, p)) {
+         p.to_stat(&info);
+         dirbuf_add(req, &b, "..", &info);
+      }
+
+      vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
+      catalog::unlock();
+      for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); i != iEnd; ++i) 
+      {
+         i->to_stat(&info);
+         name = i->name;
+      
+         // should be improved :D
+         dirbuf_add(req, &b, name.c_str(), &info);
+      }
+   
+      reply_buf_limited(req, b.p, b.size, off, size);
+      free(b.p);
+	}
    
    /**
     * Emulates the getattr walk done by Fuse
     */
    static int walk_path(const string &path) {
       struct stat info;
-      if ((path == "") || (path == "/")) 
-         return cvmfs_getattr("/", &info);
+      // if ((path == "") || (path == "/")) 
+      //    return cvmfs_getattr("/", &info);
 
       int attr_result = walk_path(get_parent_path(path));
-      if (attr_result == 0)
-         return cvmfs_getattr(path.c_str(), &info);
+      // if (attr_result == 0)
+      //    return cvmfs_getattr(path.c_str(), &info);
       
       return attr_result;
    }
@@ -1558,8 +1815,10 @@ namespace cvmfs {
    }
 
 
-   static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino/*const char *path __attribute__((unused)), struct statvfs *info*/)
+   static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino)
    {
+      pmesg(D_CVMFS, "cvmfs_statfs on inode: %d", ino);
+      
       /* If we return 0 it will cause the fs 
          to be ignored in "df" */
 				struct statvfs info ;
@@ -1611,311 +1870,212 @@ namespace cvmfs {
       return lsrc;
    }
    
-   static int cvmfs_getxattr(const char *path, const char *name, char *value, size_t vlen) {
-      const string attr = name;
-      catalog::t_dirent d;
-      hash::t_md5 md5(catalog::mangled_path(path));
-      
-      pmesg(D_CVMFS, "getxattr %s on %s", name, path);
-      
-      catalog::lock();      
-      if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-         catalog::unlock();
-         return -ENOENT;
-      }
-      catalog::unlock();
-      
-      if (attr == "user.pid") {
-         ostringstream result;
-         result << cvmfs::pid;
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.version") {
-         const string result = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
-         return fill_xattr(result, value, vlen);
-      } else if (attr == "user.hash") {
-         if (d.checksum != hash::t_sha1()) {
-            const string result = d.checksum.to_string() + " (SHA-1)";
-            return fill_xattr(result, value, vlen);
-         }
-         return -ENOATTR;
-      } else if (attr == "user.lhash") {
-         if (d.checksum != hash::t_sha1()) {
-            string result;
-            int fd = cache::open(d.checksum);
-            if (fd < 0)
-               return fill_xattr("Not in cache", value, vlen);
-            
-            hash::t_sha1 hash;
-            FILE *f = fdopen(fd, "r");
-            if (!f)
-               return -EIO;
-            
-            if (compress_file_sha1_only(f, hash.digest) != 0) {
-               fclose(f);
-               return -EIO;
-            }
-            fclose(f);
-            return fill_xattr(hash.to_string() + " (SHA-1)", value, vlen);
-         }
-         return -ENOATTR;
-      } else if (attr == "user.revision") {
-         catalog::lock();
-         const uint64_t revision = catalog::get_revision();
-         catalog::unlock();
-         
-         ostringstream result;
-         result << revision;
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.expires") {
-         catalog::lock();
-         int catalog_id = find_catalog_id(path);
-         time_t expires = catalog_tree::get_catalog(catalog_id)->expires;
-         catalog::unlock();
-         
-         time_t now = time(NULL);
-         ostringstream result;
-         result << (expires-now)/60;
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.maxfd") {
-         ostringstream result;
-         result << nofiles-NUM_RESERVED_FD;
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.usedfd") {
-         ostringstream result;
-         result << atomic_read(&open_files);
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.nioerr") {
-         ostringstream result;
-         result << atomic_read(&nioerr);
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.proxy") {
-         int num;
-         int num_lb;
-         char *current;
-         int current_lb;
-         char **proxies;
-         int *lb_starts;
-         curl_get_proxy_info(&num, &current, &current_lb, &proxies, &num_lb, &lb_starts);
-         string proxy;
-         if (num) {
-            proxy = string(current);
-            for (int i = 0; i < num; ++i) {
-               free(proxies[i]);
-            }
-            free(lb_starts);
-            free(proxies);
-            free(current);
-         } else {
-            proxy = "DIRECT";
-         }
-         
-         return fill_xattr(proxy, value, vlen);
-      } else if (attr == "user.host") {
-         int num;
-         int current;
-         char **all_hosts;
-         int *rtt;
-         curl_get_host_info(&num, &current, &all_hosts, &rtt);
-         const string host = string(all_hosts[current]);
-         free(rtt);
-         free(all_hosts);
-         
-         return fill_xattr(host, value, vlen);
-      } else if (attr == "user.uptime") {
-         time_t now = time(NULL);
-         uint64_t uptime = now - boot_time;
-         ostringstream result;
-         /*if (uptime / 60) {
-            if (uptime / 3600) {
-               if (uptime / 84600) {
-                  result << uptime/84600 << " days, ";
-               }
-               result << (uptime / 3600)%24 << " hours, ";
-            }
-            result << (uptime / 60)%60 << " minutes, ";
-         }*/
-         result << uptime / 60;
-         
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.nclg") {
-         catalog::lock();
-         int num = catalog::get_num_catalogs();
-         catalog::unlock();
-         ostringstream result;
-         result << num;
-         
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.nopen") {
-         ostringstream result;
-         result << atomic_read64(&nopen);
-         
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.ndownload") {
-         ostringstream result;
-         result << atomic_read64(&ndownload);
-         
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.timeout") {
-         unsigned seconds, seconds_direct;
-         curl_get_timeout(&seconds, &seconds_direct);
-         ostringstream result;
-         result << seconds;
-         
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.timeout_direct") {
-         unsigned seconds, seconds_direct;
-         curl_get_timeout(&seconds, &seconds_direct);
-         ostringstream result;
-         result << seconds_direct;
-         
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.rx") {
-         int64_t rx = curl_get_allbytes();
-         ostringstream result;
-         result << rx/1024;
-         
-         return fill_xattr(result.str(), value, vlen);
-      } else if (attr == "user.speed") {
-         int64_t rx = curl_get_allbytes();
-         int64_t time = curl_get_alltime();
-         ostringstream result;
-         if (time == 0)
-            result << "n/a"; 
-         else
-            result << (rx/1024)/time;
-         
-         return fill_xattr(result.str(), value, vlen);
-      }
+   static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size) {
+      pmesg(D_CVMFS, "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
+      // const string attr = name;
+      //       catalog::t_dirent d;
+      //       hash::t_md5 md5(catalog::mangled_path(path));
+      //       
+      //       pmesg(D_CVMFS, "getxattr %s on %s", name, path);
+      //       
+      //       catalog::lock();      
+      //       if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
+      //          catalog::unlock();
+      //          return -ENOENT;
+      //       }
+      //       catalog::unlock();
+      //       
+      //       if (attr == "user.pid") {
+      //          ostringstream result;
+      //          result << cvmfs::pid;
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.version") {
+      //          const string result = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
+      //          return fill_xattr(result, value, vlen);
+      //       } else if (attr == "user.hash") {
+      //          if (d.checksum != hash::t_sha1()) {
+      //             const string result = d.checksum.to_string() + " (SHA-1)";
+      //             return fill_xattr(result, value, vlen);
+      //          }
+      //          return -ENOATTR;
+      //       } else if (attr == "user.lhash") {
+      //          if (d.checksum != hash::t_sha1()) {
+      //             string result;
+      //             int fd = cache::open(d.checksum);
+      //             if (fd < 0)
+      //                return fill_xattr("Not in cache", value, vlen);
+      //             
+      //             hash::t_sha1 hash;
+      //             FILE *f = fdopen(fd, "r");
+      //             if (!f)
+      //                return -EIO;
+      //             
+      //             if (compress_file_sha1_only(f, hash.digest) != 0) {
+      //                fclose(f);
+      //                return -EIO;
+      //             }
+      //             fclose(f);
+      //             return fill_xattr(hash.to_string() + " (SHA-1)", value, vlen);
+      //          }
+      //          return -ENOATTR;
+      //       } else if (attr == "user.revision") {
+      //          catalog::lock();
+      //          const uint64_t revision = catalog::get_revision();
+      //          catalog::unlock();
+      //          
+      //          ostringstream result;
+      //          result << revision;
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.expires") {
+      //          catalog::lock();
+      //          int catalog_id = find_catalog_id(path);
+      //          time_t expires = catalog_tree::get_catalog(catalog_id)->expires;
+      //          catalog::unlock();
+      //          
+      //          time_t now = time(NULL);
+      //          ostringstream result;
+      //          result << (expires-now)/60;
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.maxfd") {
+      //          ostringstream result;
+      //          result << nofiles-NUM_RESERVED_FD;
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.usedfd") {
+      //          ostringstream result;
+      //          result << atomic_read(&open_files);
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.nioerr") {
+      //          ostringstream result;
+      //          result << atomic_read(&nioerr);
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.proxy") {
+      //          int num;
+      //          int num_lb;
+      //          char *current;
+      //          int current_lb;
+      //          char **proxies;
+      //          int *lb_starts;
+      //          curl_get_proxy_info(&num, &current, &current_lb, &proxies, &num_lb, &lb_starts);
+      //          string proxy;
+      //          if (num) {
+      //             proxy = string(current);
+      //             for (int i = 0; i < num; ++i) {
+      //                free(proxies[i]);
+      //             }
+      //             free(lb_starts);
+      //             free(proxies);
+      //             free(current);
+      //          } else {
+      //             proxy = "DIRECT";
+      //          }
+      //          
+      //          return fill_xattr(proxy, value, vlen);
+      //       } else if (attr == "user.host") {
+      //          int num;
+      //          int current;
+      //          char **all_hosts;
+      //          int *rtt;
+      //          curl_get_host_info(&num, &current, &all_hosts, &rtt);
+      //          const string host = string(all_hosts[current]);
+      //          free(rtt);
+      //          free(all_hosts);
+      //          
+      //          return fill_xattr(host, value, vlen);
+      //       } else if (attr == "user.uptime") {
+      //          time_t now = time(NULL);
+      //          uint64_t uptime = now - boot_time;
+      //          ostringstream result;
+      //          /*if (uptime / 60) {
+      //             if (uptime / 3600) {
+      //                if (uptime / 84600) {
+      //                   result << uptime/84600 << " days, ";
+      //                }
+      //                result << (uptime / 3600)%24 << " hours, ";
+      //             }
+      //             result << (uptime / 60)%60 << " minutes, ";
+      //          }*/
+      //          result << uptime / 60;
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.nclg") {
+      //          catalog::lock();
+      //          int num = catalog::get_num_catalogs();
+      //          catalog::unlock();
+      //          ostringstream result;
+      //          result << num;
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.nopen") {
+      //          ostringstream result;
+      //          result << atomic_read64(&nopen);
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.ndownload") {
+      //          ostringstream result;
+      //          result << atomic_read64(&ndownload);
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.timeout") {
+      //          unsigned seconds, seconds_direct;
+      //          curl_get_timeout(&seconds, &seconds_direct);
+      //          ostringstream result;
+      //          result << seconds;
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.timeout_direct") {
+      //          unsigned seconds, seconds_direct;
+      //          curl_get_timeout(&seconds, &seconds_direct);
+      //          ostringstream result;
+      //          result << seconds_direct;
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.rx") {
+      //          int64_t rx = curl_get_allbytes();
+      //          ostringstream result;
+      //          result << rx/1024;
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       } else if (attr == "user.speed") {
+      //          int64_t rx = curl_get_allbytes();
+      //          int64_t time = curl_get_alltime();
+      //          ostringstream result;
+      //          if (time == 0)
+      //             result << "n/a"; 
+      //          else
+      //             result << (rx/1024)/time;
+      //          
+      //          return fill_xattr(result.str(), value, vlen);
+      //       }
    
-      return -ENOATTR;
+      fuse_reply_err(req, ENOATTR);
+   }
+
+   static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+      pmesg(D_CVMFS, "cvmfs_listxattr on inode: %d", ino);
+      fuse_reply_err(req, EROFS);
    }
    
+   static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+      pmesg(D_CVMFS, "cvmfs_forget on inode: %d", ino);
+      fuse_reply_err(req, EROFS);
+   }
 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_chmod(const char *path __attribute__((unused)), 
-   //                        mode_t mode __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_mkdir(const char *path __attribute__((unused)), 
-   //                        mode_t mode __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_unlink(const char *path __attribute__((unused))) {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_rmdir(const char *path __attribute__((unused))) {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_symlink(const char *from __attribute__((unused)), 
-   //                          const char *to __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_rename(const char *from __attribute__((unused)), 
-   //                         const char *to __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_link(const char *from __attribute__((unused)), 
-   //                       const char *to __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_chown(const char *path __attribute__((unused)), 
-   //                        uid_t uid __attribute__((unused)), 
-   //                        gid_t gid __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_truncate(const char *path __attribute__((unused)), 
-   //                           off_t size __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_utime(const char *path __attribute__((unused)), 
-   //                        struct utimbuf *buf __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_write(const char *path __attribute__((unused)),
-   //                        const char *buf __attribute__((unused)), 
-   //                        size_t size __attribute__((unused)), 
-   //                        off_t offset __attribute__((unused)), 
-   //                        struct fuse_file_info *fi __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   // 
-   // 
-   // /**
-   //  * \return -EROFS
-   //  */
-   // static int cvmfs_mknod(const char *path __attribute__((unused)), 
-   //                        mode_t mode __attribute__((unused)), 
-   //                        dev_t rdev __attribute__((unused)))
-   // {
-   //    return -EROFS;
-   // }
-   
+   static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
+      // TODO: implement this properly
+      
+   	pmesg(D_CVMFS, "cvmfs_access on inode: %d with mask %s", ino, humanizeBitmap(mask).c_str());
+      if (mask != 1) {
+         fuse_reply_err(req, EACCES);
+         return;
+      }
+   	fuse_reply_err(req, 0);
+   }
 
    /**
     * Do after-daemon() initialization
     */
    static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
+      pmesg(D_CVMFS, "cvmfs_init");
       int retval;
 		
 	//	daemon(0,0);
@@ -1939,41 +2099,55 @@ namespace cvmfs {
    }
    
    static void cvmfs_destroy(void *unused __attribute__((unused))) {
+      pmesg(D_CVMFS, "cvmfs_destroy");
       Tracer::fini();
    }
    
    /** 
     * Puts the callback functions in one single structure
     */
-   static void set_cvmfs_ops(struct fuse_operations *cvmfs_operations) {
-      // /* Implemented */
-      // cvmfs_operations->getattr	= cvmfs_getattr;
-      // cvmfs_operations->readlink	= cvmfs_readlink;
-      // cvmfs_operations->readdir	= cvmfs_readdir;
-      // cvmfs_operations->open	   = cvmfs_open;
-      // cvmfs_operations->read	   = cvmfs_read;
-      // cvmfs_operations->release 	= cvmfs_release;
-      // cvmfs_operations->chmod    = cvmfs_chmod;
-      // cvmfs_operations->statfs   = cvmfs_statfs;
-      // cvmfs_operations->getxattr = cvmfs_getxattr;
-      // 
-      // /* Return EROFS (read-only filesystem) */
-      // cvmfs_operations->mkdir    = cvmfs_mkdir;
-      // cvmfs_operations->unlink   = cvmfs_unlink;
-      // cvmfs_operations->rmdir    = cvmfs_rmdir;
-      // cvmfs_operations->symlink	= cvmfs_symlink;
-      // cvmfs_operations->rename   = cvmfs_rename;
-      // cvmfs_operations->chown    = cvmfs_chown;
-      // cvmfs_operations->link	   = cvmfs_link;
-      // cvmfs_operations->truncate	= cvmfs_truncate;
-      // cvmfs_operations->utime    = cvmfs_utime;
-      // cvmfs_operations->write    = cvmfs_write;
-      // cvmfs_operations->mknod    = cvmfs_mknod;
-      // cvmfs_operations->chmod    = cvmfs_chmod;
-      // 
-      // /* Init/Fini */
-      // cvmfs_operations->init     = cvmfs_init;
-      // cvmfs_operations->destroy  = cvmfs_destroy;
+   static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
+      /* Init/Fini */
+      cvmfs_operations->init     = cvmfs_init;
+      cvmfs_operations->destroy  = cvmfs_destroy;
+
+      /* Implemented */
+		cvmfs_operations->lookup      = cvmfs_lookup;
+		cvmfs_operations->forget      = cvmfs_forget;
+		cvmfs_operations->getattr     = cvmfs_getattr;
+		cvmfs_operations->readlink    = cvmfs_readlink;
+		cvmfs_operations->open        = cvmfs_open;
+		cvmfs_operations->read        = cvmfs_read;
+		cvmfs_operations->release     = cvmfs_release;
+		cvmfs_operations->opendir     = cvmfs_opendir;
+		cvmfs_operations->readdir     = cvmfs_readdir;
+		cvmfs_operations->releasedir  = cvmfs_releasedir;
+		cvmfs_operations->statfs      = cvmfs_statfs;
+		cvmfs_operations->getxattr    = cvmfs_getxattr;
+		cvmfs_operations->listxattr   = cvmfs_listxattr;
+		cvmfs_operations->access      = cvmfs_access;
+		
+      /* Not implemented... just stubs */
+		cvmfs_operations->setattr     = cvmfs_setattr;
+      cvmfs_operations->mknod       = cvmfs_mknod;
+		cvmfs_operations->mkdir       = cvmfs_mkdir;
+      cvmfs_operations->unlink      = cvmfs_unlink;
+      cvmfs_operations->rmdir       = cvmfs_rmdir;
+      cvmfs_operations->symlink	   = cvmfs_symlink;
+      cvmfs_operations->rename      = cvmfs_rename;
+      cvmfs_operations->link	      = cvmfs_link;
+	   cvmfs_operations->write       = cvmfs_write;
+		cvmfs_operations->flush       = cvmfs_flush;
+		cvmfs_operations->fsync       = cvmfs_fsync;
+		cvmfs_operations->fsyncdir    = cvmfs_fsyncdir;
+		cvmfs_operations->setxattr    = cvmfs_setxattr;
+		cvmfs_operations->removexattr = cvmfs_removexattr;
+		cvmfs_operations->create      = cvmfs_create;
+		cvmfs_operations->getlk       = cvmfs_getlk;
+		cvmfs_operations->setlk       = cvmfs_setlk;
+		cvmfs_operations->bmap        = cvmfs_bmap;
+		cvmfs_operations->ioctl       = cvmfs_ioctl;
+		cvmfs_operations->poll        = cvmfs_poll;
    }
    
 } /* namespace cvmfs */
@@ -2005,7 +2179,6 @@ struct cvmfs_opts {
    int      nofiles;
    int      grab_mountpoint;
    int      syslog_level;
-   int      hide_hardlinks;
 	int      kernel_cache;
 	int      auto_cache;
 	int      entry_timeout;
@@ -2045,7 +2218,6 @@ static struct fuse_opt cvmfs_array_opts[] = {
    CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
    CVMFS_OPT("deep_mount=%s",       deep_mount, 0),
    CVMFS_OPT("repo_name=%s",        repo_name, 0),
-   CVMFS_SWITCH("hide_hardlinks",   hide_hardlinks),
    CVMFS_OPT("blacklist=%s",        blacklist, 0),
    CVMFS_OPT("syslog_level=%d",     syslog_level, 3),
 	CVMFS_OPT("entry_timeout=%d",    entry_timeout, 60),
@@ -2110,7 +2282,6 @@ static void usage(const char *progname) {
       " -o deep_mount=prefix       Path prefix if a repository is mounted on a nested catalog,\n"
       "                            i.e. deep_mount=/software/15.0.1\n"
       " -o repo_name=<repository>  Unique name of the mounted repository, e.g. atlas.cern.ch\n"
-      " -o hide_hardlinks          hard links appear as normal files\n"
       " -o blacklist=FILE          Local blacklist for invalid certificates.  Has precedence over the whitelist.\n"
       "                            (Default is /etc/cvmfs/blacklist)\n"
       " -o syslog_level=NUMBER     Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
@@ -2276,313 +2447,6 @@ static void libcrypto_mt_cleanup(void) {
    OPENSSL_free(libcrypto_locks);
 }
 
-//
-//
-// ###########################
-// ######################################################################################
-// ########################################################
-//
-//
-//
-
-
-// cvmfs_operations->getattr	= cvmfs_getattr;
-// cvmfs_operations->readlink	= cvmfs_readlink;
-// cvmfs_operations->readdir	= cvmfs_readdir;
-// cvmfs_operations->open	   = cvmfs_open;
-// cvmfs_operations->read	   = cvmfs_read;
-// cvmfs_operations->release 	= cvmfs_release;
-// cvmfs_operations->chmod    = cvmfs_chmod;
-// cvmfs_operations->statfs   = cvmfs_statfs;
-// cvmfs_operations->getxattr = cvmfs_getxattr;
-
-typedef std::map<fuse_ino_t, std::string> InodeCache;
-InodeCache inode_cache;
-
-bool lookup_inode_cache(fuse_ino_t inode, string &result) {
-	InodeCache::const_iterator path = inode_cache.find(inode);
-	if (path == inode_cache.end()) {
-		return false;
-	}
-	
-	result = path->second;
-	pmesg(D_CVMFS, "lookup_inode_cache(inode: %d) --> %s", inode, result.c_str());
-	return true;
-}
-
-static void hello_ll_getattr(fuse_req_t req, fuse_ino_t ino,
-			     struct fuse_file_info *fi)
-{
-	struct stat stbuf;
-	pmesg(D_CVMFS, "hello_ll_getattr(inode: %d)", ino);
-	
-	string path;
-	if (not lookup_inode_cache(ino, path)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	int result;
-	result = cvmfs_getattr(path.c_str(), &stbuf);
-	
-	if (result != 0) {
-		fuse_reply_err(req, -result);
-		return;
-	}
-	
-	fuse_reply_attr(req, &stbuf, 1.0);
-}
-
-static void hello_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
-{	
-	pmesg(D_CVMFS, "hello_ll_lookup(parent_ino: %d name: %s)", parent, name);
-	
-	// get path of directory (parent)
-	string parentPath;
-	if (not lookup_inode_cache(parent, parentPath)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	// get information about file
-	string filename = parentPath + "/" + name;
-	struct stat s;
-	int result = cvmfs_getattr(filename.c_str(), &s);
-	if (result != 0) {
-		fuse_reply_err(req, -result);
-		return;
-	}
-	
-	// hash::t_md5 md5(catalog::mangled_path(filename));
-	// catalog::t_dirent d;
-	// if (not catalog::lookup(md5, d)) {
-	// 	fuse_reply_err(req, ENOENT);
-	// 	return;
-	// }
-	
-	// insert into cache
-	inode_cache[s.st_ino] = filename;
-	
-	// reply
-	struct fuse_entry_param e;
-	memset(&e, 0, sizeof(e));
-	e.ino = s.st_ino;
-	e.attr = s;
-	e.attr_timeout = 1.0;
-	e.entry_timeout = 1.0;
-	
-	fuse_reply_entry(req, &e);
-}
-
-struct dirbuf {
-	char *p;
-	size_t size;
-};
-
-// static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name,
-// 		       fuse_ino_t ino)
-// {
-// 	pmesg(D_CVMFS, "dirbuf_add(name: %s)", name);
-// 	struct stat stbuf;
-// 	size_t oldsize = b->size;
-// 	b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
-//         char *newp = (char *)realloc(b->p, b->size);
-//         if (!newp) {
-//             fprintf(stderr, "*** fatal error: cannot allocate memory\n");
-//             abort();
-//         }
-// 	b->p = newp;
-// 	memset(&stbuf, 0, sizeof(stbuf));
-// 	stbuf.st_ino = ino;
-// 	fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, &stbuf,
-// 			  b->size);
-// }
-
-#define min(x, y) ((x) < (y) ? (x) : (y))
-
-static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize, off_t off, size_t maxsize)
-{
-	if (off < bufsize) {
-//		fprintf(stdout, "... reply buf | offset: %d bufsize: %d maxsize: %d \n", off, bufsize, maxsize);
-		return fuse_reply_buf(req, buf + off, min(bufsize - off, maxsize));
-	}
-	else {
-//		fprintf(stdout, "... reply buf | empty buffer\n");
-		return fuse_reply_buf(req, NULL, 0);
-	}
-}
-
-static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name, struct stat *s)
-{
-	size_t oldsize = b->size;
-	b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
-    char *newp = (char *)realloc(b->p, b->size);
-	if (!newp) {
-	    fprintf(stderr, "*** fatal error: cannot allocate memory\n");
-	    abort();
-	}
-	b->p = newp;
-	fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, s, b->size);
-}
-
-static void hello_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
-			     off_t off, struct fuse_file_info *fi)
-{
-	pmesg(D_CVMFS, "hello_ll_readdir(ino: %d)", ino);
-
-	string path, name;
-	if (not lookup_inode_cache(ino, path)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	hash::t_md5 md5(catalog::mangled_path(path));
-	
-	struct catalog::t_dirent d;
-	catalog::lock();
-	if (lookup_cache(md5, d)) {
-		pmesg(D_CVMFS, "catalog cache HIT");
-		if (d.catalog_id < 0) {
-			catalog::unlock();
-			fuse_reply_err(req, ENOENT);
-			return;
-		}
-	} else {
-		if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-			catalog::unlock();
-			fuse_reply_err(req, ENOENT);
-			return;
-		}
-	}
-	
-	// load nested catalog
-	if (d.flags & catalog::DIR_NESTED) {
-		pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path.c_str());
-		hash::t_sha1 expected_clg;
-		if (!catalog::lookup_nested_unprotected(d.catalog_id, catalog::mangled_path(path), expected_clg))
-		{
-			catalog::unlock();
-			logmsg("Nested catalog at %s not found (ls)", path.c_str());
-			fuse_reply_err(req, ENOENT);
-			return;
-		}
-		
-		int result = load_and_attach_catalog(path, hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
-		if (result != 0) {
-			catalog::unlock();
-			atomic_inc(&nioerr);
-			fuse_reply_err(req, result);
-			return;
-		}
-	}
-
-	// build dir listing
-	struct dirbuf b;
-	memset(&b, 0, sizeof(b));
-	
-	struct stat info;
-	memset(&info, 0, sizeof(info));
-
-	d.to_stat(&info);
-
-	dirbuf_add(req, &b, ".", &info);
-	
-	struct catalog::t_dirent p;
-	if (catalog::parent_unprotected(md5, p)) {
-		p.to_stat(&info);
-		dirbuf_add(req, &b, "..", &info);
-	}
-
-	vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
-	catalog::unlock();
-	for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); i != iEnd; ++i) 
-	{
-		i->to_stat(&info);
-		name = i->name;
-		
-		// should be improved :D
-		dirbuf_add(req, &b, name.c_str(), &info);
-	}
-	
-	reply_buf_limited(req, b.p, b.size, off, size);
-	free(b.p);
-}
-
-static void hello_ll_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-{
-	pmesg(D_CVMFS, "hello_ll_open(ino: %d)", ino);
-	
-	string path;
-	if (not lookup_inode_cache(ino, path)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	if ((fi->flags & 3) != O_RDONLY) {
-		fuse_reply_err(req, EACCES);
-		return;
-	}
-	
-	int result = cvmfs_open(path.c_str(), fi);
-	
-	if (result == 0) {
-		fuse_reply_open(req, fi);
-	} else {
-		fuse_reply_err(req, -result);
-	}
-}
-
-static void hello_ll_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
-{
-	pmesg(D_CVMFS, "hello_ll_read(ino: %d maxsize: %d offset: %d)", ino, size, off);
-	
-	char *data = (char *)malloc(size);
-	int result = cvmfs_read("/no/path/given", data, size, off, fi);
-	
-	if (result >= 0) {
-		fuse_reply_buf(req, data, result);
-	} else {
-		fuse_reply_err(req, errno);
-	}
-	free (data);
-}
-
-static void hello_ll_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
-	pmesg(D_CVMFS, "hello_ll_release(ino: %d)", ino);
-	
-	string path;
-	if (not lookup_inode_cache(ino, path)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	cvmfs_release(path.c_str(), fi);
-	
-	fuse_reply_err(req, 0);
-}
-
-static void hello_ll_readlink(fuse_req_t req, fuse_ino_t ino) {
-	pmesg(D_CVMFS, "hello_ll_readlink(ino: %d)", ino);
-	
-	string path;
-	if (not lookup_inode_cache(ino, path)) {
-		fuse_reply_err(req, ENOENT);
-		return;
-	}
-	
-	char *symlink = (char *)malloc(4096);
-	int result = cvmfs_readlink(path.c_str(), symlink, 4096);
-	
-	if (result == 0) {
-		fuse_reply_readlink(req, symlink);
-	} else {
-		fuse_reply_err(req, result);
-	}
-	
-	free(symlink);
-}
-
-
 /**
  * Boot the beast up!
  */
@@ -2668,7 +2532,6 @@ int main(int argc, char *argv[])
    if (cvmfs_opts.deep_mount) cvmfs::deep_mount = canonical_path(cvmfs_opts.deep_mount);
    if (cvmfs_opts.blacklist) cvmfs::blacklist = cvmfs_opts.blacklist;
    if (cvmfs_opts.repo_name) cvmfs::repo_name = cvmfs_opts.repo_name;
-   if (cvmfs_opts.hide_hardlinks) cvmfs::hide_hardlinks = cvmfs_opts.hide_hardlinks;
 	if (cvmfs_opts.kernel_cache) printWarning("using deprecated mount option 'kernel_cache' - ignoring...");
 	if (cvmfs_opts.auto_cache) printWarning("using deprecated mount option 'auto_cache' - ignoring...");
 
@@ -2804,7 +2667,7 @@ int main(int argc, char *argv[])
    }
       
    /* Create the file catalog from the web server */
-   if (!catalog::init(cvmfs::uid, cvmfs::gid, hide_hardlinks)) {
+   if (!catalog::init(cvmfs::uid, cvmfs::gid)) {
       cerr << "Failed to initialize catalog" << endl;
       goto cvmfs_cleanup;
    }
@@ -2835,44 +2698,29 @@ int main(int argc, char *argv[])
    talk_ready = true;
       
    /* Set fuse callbacks, remove url from arguments */
-   cout << "CernVM-FS: linking to remote directoy " << cvmfs::root_url << endl;
    logmsg("CernVM-FS: linking %s to remote directoy %s", cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
-//   set_cvmfs_ops(&cvmfs_operations);
-//   result = fuse_main(fuse_args.argc, fuse_args.argv, &cvmfs_operations);
+   struct fuse_lowlevel_ops cvmfs_operations;
+   set_cvmfs_ops(&cvmfs_operations);
 
-// initializing low level fuse API
-
-	static struct fuse_lowlevel_ops hello_ll_oper;
-	hello_ll_oper.lookup	= hello_ll_lookup;
-	hello_ll_oper.getattr	= hello_ll_getattr;
-	hello_ll_oper.readdir	= hello_ll_readdir;
-	hello_ll_oper.open		= hello_ll_open;
-	hello_ll_oper.read		= hello_ll_read;
-	hello_ll_oper.release   = hello_ll_release;
-	hello_ll_oper.readlink  = hello_ll_readlink;
-	hello_ll_oper.init      = cvmfs_init;
-	hello_ll_oper.statfs    = cvmfs_statfs;
-	
-	inode_cache[1] = ""; // root
-
+   inode_cache = new InodeCache(inode_cache_size);
+   path_cache = new PathCache(path_cache_size, inode_cache);
 
 	if ((ch = fuse_mount(cvmfs::mountpoint.c_str(), &fuse_args)) != NULL) {
 		struct fuse_session *se;
 
-	   /* Drop rights */
-/*	   if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
-	      cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
-	      if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
-	         cerr << "Failed to drop credentials" << endl;
-	         goto cvmfs_cleanup;
-	      }
-	   }*/
+			   /* Drop rights */
+		/*	   if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
+			      cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
+			      if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
+			         cerr << "Failed to drop credentials" << endl;
+			         goto cvmfs_cleanup;
+			      }
+			   }*/
 			
 		cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
 		daemon(0,0);
 
-		se = fuse_lowlevel_new(&fuse_args, &hello_ll_oper,
-				       sizeof(hello_ll_oper), NULL);
+		se = fuse_lowlevel_new(&fuse_args, &cvmfs_operations, sizeof(cvmfs_operations), NULL);
 		if (se != NULL) {
 			if (fuse_set_signal_handlers(se) != -1) {
 				fuse_session_add_chan(se, ch);
@@ -2885,7 +2733,9 @@ int main(int argc, char *argv[])
 		fuse_unmount(cvmfs::mountpoint.c_str(), ch);
 	}
 	fuse_opt_free_args(&fuse_args);
-
+	
+   delete path_cache;
+   delete inode_cache;
    
    pmesg(D_CVMFS, "Fuse loop terminated (%d)", result);
    logmsg("CernVM-FS: unmounted %s (%s)", cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());

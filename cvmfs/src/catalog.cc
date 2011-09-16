@@ -65,10 +65,9 @@ namespace catalog {
    string root_prefix; ///< If we mount deep into a nested catalog, we need the full preceeding path to calculate the correct MD5 hash
    uid_t uid; ///< Required for converting a catalog entry into struct stat
    gid_t gid; ///< Required for converting a catalog entry into struct stat
-   bool hide_hardlinks; ///< if true, hardlinks do not get the same hardlink but appear as normal files with the same content (important for synchronisation with AUFS (hack!!))
    int num_catalogs = 0; ///< We support nested catalogs.  There are loaded by SQLite's ATTACH.  In the end, we operate on a set of multiple catalogs
    int current_catalog = 0; ///< We query the catalogs one after another until success.  We use a lazy approach, meaning after success we ask that catalog next time again.
-	vector<unsigned int> inodeOffsets; ///< inodes are assigned at runtime... the number of entries in a catalog is the offset for the beginning of the next catalog
+	vector<unsigned int> inodeOffsets; ///< inodes are assigned at runtime... the number of entries of all catalog is the offset for the beginning of the next catalog
 	map<unsigned int, map<uint64_t, uint64_t> > hardlinkInodeMap; /// < mapping from catalog_id, hardlinkGroupId to inodeNumber (must be shifted by offset afterwards)
 
    vector<sqlite3 *> db;
@@ -479,8 +478,9 @@ namespace catalog {
       /* SELECT LOOKUP INODE */
       sqlite3_stmt *lookup_inode;
       ostringstream sql_lookup_inode;
-      sql_lookup_inode << "SELECT " << cat_id << " FROM catalog "
-         "WHERE (inode = :ino);";
+      sql_lookup_inode << "SELECT " << cat_id << ", hash, inode, size, mode, mtime, flags, name, symlink, md5path_1, md5path_2, parent_1, parent_2 "
+         "FROM catalog "
+         "WHERE rowid = :rowid";
       pmesg(D_CATALOG, "Prepared statement catalog %u: %s", cat_id, sql_lookup_inode.str().c_str());
       err = sqlite3_prepare_v2(db[cat_id], sql_lookup_inode.str().c_str(), -1, &lookup_inode, NULL);
       if (err != SQLITE_OK) {
@@ -690,8 +690,8 @@ namespace catalog {
 		unsigned int offset = 0;
 		
 		if (cat_id == 0) {
-			// root catalog... no offset
-			offset = 10;
+			// root catalog...
+			offset = INITIAL_INODE_OFFSET;
 		} else {
 			// offset is number of dir entries of all predecessing catalogs
 			offset = get_num_dirent(cat_id - 1) + inodeOffsets[cat_id - 1];
@@ -833,10 +833,9 @@ namespace catalog {
     *
     * \return True on success, false otherwise
     */
-   bool init(const uid_t puid, const gid_t pgid, const bool hide_hardlinks) {
+   bool init(const uid_t puid, const gid_t pgid) {
       uid = puid;
       gid = pgid;
-      catalog::hide_hardlinks = hide_hardlinks;
       root_prefix = "";
       num_catalogs = current_catalog = 0;
       return initTLS();
@@ -1183,6 +1182,10 @@ namespace catalog {
 			return;
 		}
 		
+		if (dirent.catalog_id == 0) {
+			return;
+		}
+		
 		int parentCatalogId = catalog_tree::get_parent(dirent.catalog_id)->catalog_id;
 		struct t_dirent nestedLinkInParent;
 		lookup_informed_unprotected(key, parentCatalogId, nestedLinkInParent);
@@ -1423,7 +1426,7 @@ namespace catalog {
 	uint64_t getInode(unsigned int rowid, uint64_t hardlinkGroupId, unsigned int catalog_id) {
 		uint64_t inode;
 		
-		if (hardlinkGroupId == 0 || hide_hardlinks) { // no hardlinks present
+		if (hardlinkGroupId == 0) { // no hardlinks present
 			inode = rowid;
 		} else {
 			map<unsigned int, map<uint64_t, uint64_t> >::iterator catalogSpecificHardlinkMap = hardlinkInodeMap.find(catalog_id);
@@ -1538,29 +1541,98 @@ namespace catalog {
       return found;
    }
    
-   bool lookup_inode_unprotected(const uint64_t inode) {
-      enforce_mem_limit();
+   int find_catalog_id_from_inode(const uint64_t inode) {
+      vector<unsigned int>::const_iterator i = inodeOffsets.begin();
+      vector<unsigned int>::const_iterator iend = inodeOffsets.end();
+      int cat_id = -1; // not found
       
-      bool found = false;
-      
-      int i;
-      for (i = 0; i < num_catalogs; ++i) {
-         sqlite3_stmt *stmt_lookup_inode = stmts_lookup_inode[(current_catalog + i) % num_catalogs];
-      
-         sqlite3_bind_int64(stmt_lookup_inode, 1, inode);
-         if (sqlite3_step(stmt_lookup_inode) == SQLITE_ROW) {
-            found = true;
-         }
-         sqlite3_reset(stmt_lookup_inode);
-      
-         if (found) break;
+      // loop through the offset vector to find the catalog according to this offset
+      while (i != iend && *i < inode) {
+         i++;
+         cat_id++;
       }
       
-      if (found)
-         current_catalog = (current_catalog + i) % num_catalogs;
+      return cat_id;
+   }
+   
+   bool lookup_inode_unprotected(const uint64_t inode, t_dirent &result, const bool lookup_parent) {
+      enforce_mem_limit();
+      
+      int catalog_id = find_catalog_id_from_inode(inode);
+      if (catalog_id < 0) {
+         // inode not found
+         return false;
+      }
+      
+      sqlite3_stmt *stmt_lookup_inode = stmts_lookup_inode[catalog_id];
+      int rowid = inode - inodeOffsets[catalog_id];
+   
+      bool found = false;
+   
+      sqlite3_bind_int64(stmt_lookup_inode, 1, rowid);
+      if (sqlite3_step(stmt_lookup_inode) == SQLITE_ROW) {
+         int flags = sqlite3_column_int(stmt_lookup_inode, 6);
+         //pmesg(D_CATALOG, "Found flags %d in catalog %d for path %s", flags, fid, path.c_str());
+         result.catalog_id = catalog_id; 
+         result.name = string((char *)sqlite3_column_text(stmt_lookup_inode, 7));
+         result.symlink = string((char *)sqlite3_column_text(stmt_lookup_inode, 8));
+         result.flags = flags;
+         result.inode = inode;
+         result.mode = sqlite3_column_int(stmt_lookup_inode, 4);
+         result.size = sqlite3_column_int64(stmt_lookup_inode, 3);
+         result.mtime = sqlite3_column_int64(stmt_lookup_inode, 5);
+         result.checksum = (sqlite3_column_bytes(stmt_lookup_inode, 1) > 0) ?
+            hash::t_sha1(sqlite3_column_blob(stmt_lookup_inode, 1), sqlite3_column_bytes(stmt_lookup_inode, 1)) :
+            hash::t_sha1();
+         
+         // if we encounter a root directory of a nested catalog we have to take a look
+         // for its actual inode number in it's parent catalog (only possible with catalog_tree)
+         if (result.flags & DIR_NESTED_ROOT) {
+            // retrieve md5 hash for path
+            int64_t md5_1 = sqlite3_column_int64(stmt_lookup_inode, 9);
+            int64_t md5_2 = sqlite3_column_int64(stmt_lookup_inode, 10);
+            hash::t_md5 md5path(md5_1, md5_2);
+      
+         	get_inode_of_nested_catalog_mountpoint(result, md5path);
+         }
+         
+         found = true;
+         
+         // if the user needs to know the inode of the parent entry, we have to retrieve it
+         if (lookup_parent) {
+            // retrieve md5 hash for parent
+            int64_t md5_1 = sqlite3_column_int64(stmt_lookup_inode, 11);
+            int64_t md5_2 = sqlite3_column_int64(stmt_lookup_inode, 12);
+            
+            // check if we are dealing with the absolute root entry
+            if (md5_1 == 0 && md5_2 == 0) {
+               result.parentInode = INVALID_INODE; // there is nothing above root!
+            } else {
+               hash::t_md5 md5parent(md5_1, md5_2);
+
+               struct t_dirent parentDirent;
+               if (lookup_unprotected(md5parent, parentDirent)) {
+                  result.parentInode = parentDirent.inode;
+               } else {
+                  found = false;
+               }
+            }
+         }
+      }
+      sqlite3_reset(stmt_lookup_inode);
                
       return found;
    }
+
+	bool lookup_inode(const uint64_t inode, t_dirent &result, const bool lookup_parent) {
+		bool found;
+      
+      pthread_mutex_lock(&mutex);
+      found = lookup_inode_unprotected(inode, result, lookup_parent);      
+      pthread_mutex_unlock(&mutex);
+      
+      return found;
+	}
    
    /**
     * Looks for a specific names in active set of catalogs.
@@ -2005,7 +2077,7 @@ namespace catalog {
       s->st_dev = 1;
       s->st_ino = inode;
       s->st_mode = mode;
-      s->st_nlink = (hide_hardlinks) ? 1 : getLinkcountInFlags(flags);
+      s->st_nlink = getLinkcountInFlags(flags);
       s->st_uid = uid;
       s->st_gid = gid;
       s->st_rdev = 1;

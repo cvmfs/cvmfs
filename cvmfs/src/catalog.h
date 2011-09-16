@@ -35,6 +35,11 @@ namespace catalog {
    const int NLINK_COUNT_7 = NLINK_COUNT_6 << 1;
    const int NLINK_COUNT = NLINK_COUNT_0 | NLINK_COUNT_1 | NLINK_COUNT_2 | NLINK_COUNT_3 | NLINK_COUNT_4 | NLINK_COUNT_5 | NLINK_COUNT_6 | NLINK_COUNT_7;
 
+   const unsigned int INITIAL_INODE_OFFSET = 255;
+
+   const unsigned int INVALID_INODE = 0;
+   const unsigned int ROOT_INODE = 256;
+
 	/**
 	 *  saves the linkcount into the reserved 8-Bit area of the flags bitmap
 	 *  !! the flags bitmap is not changed, but a new bitmap is returned !!
@@ -61,7 +66,9 @@ namespace catalog {
 	uint64_t getInode(unsigned int rowid, uint64_t hardlinkGroupId, unsigned int catalog_id);
 	
    struct t_dirent {
-      t_dirent() : catalog_id(0), flags(setLinkcountInFlags(0, 1)), inode(0), mode(0), size(0), mtime(0) {}
+      t_dirent() : catalog_id(0), flags(setLinkcountInFlags(0, 1)), inode(0), mode(0), size(0), mtime(0) {
+         parentInode = INVALID_INODE;
+      }
       t_dirent(const int cat_id,
                const std::string &n, 
                const std::string &sym, 
@@ -77,6 +84,8 @@ namespace catalog {
 							if (getLinkcountInFlags(f) == 0) {
 								flags = setLinkcountInFlags(f, 1);
 							}
+							
+                     parentInode = INVALID_INODE;
 						}
 
 	    t_dirent(const int cat_id,
@@ -91,11 +100,13 @@ namespace catalog {
 					const unsigned int rowId) : 
 						catalog_id(cat_id), flags(f), mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {
 							inode = getInode(rowId, ino, cat_id);
+                     parentInode = INVALID_INODE;
 						}
 
       int catalog_id;
       int flags;
       uint64_t inode;
+      uint64_t parentInode; // will be set on demand
       unsigned mode;
       uint64_t size;
       time_t mtime;
@@ -109,7 +120,7 @@ namespace catalog {
       }
    };
 
-   bool init(const uid_t puid, const gid_t pgid, const bool hide_hardlinks);
+   bool init(const uid_t puid, const gid_t pgid);
    void fini();
    
    bool attach(const std::string &db_file, const std::string &url, 
@@ -158,7 +169,8 @@ namespace catalog {
 	bool lookup_informed_unprotected(const hash::t_md5 &key, const int catalog_id, t_dirent &result);
    int lookup_catalogid_unprotected(const hash::t_md5 &key);
    bool lookup(const hash::t_md5 &key, t_dirent &result);  /* Locked */
-   bool lookup_inode_unprotected(const uint64_t inode);
+   bool lookup_inode_unprotected(const uint64_t inode, t_dirent &result, const bool lookup_parent);
+	bool lookup_inode(const uint64_t inode, t_dirent &result, const bool lookup_parent); /* Locked */
 
    bool parent(const hash::t_md5 &key, t_dirent &result);  /* Locked */
    bool parent_unprotected(const hash::t_md5 &key, t_dirent &result);

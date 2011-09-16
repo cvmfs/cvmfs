@@ -495,18 +495,16 @@ void printWarning(const string &message) {
 	cerr << "[WARNING] " << message << endl;
 }
 
-/**
- *  just a debugging function
- *  simply prints the given bitmap as bitmap to stdout
- *  @param bitmap a pointer to the bitmap to print
- */
-void printBitmap(const unsigned int *bitmap) {
-	unsigned int mask = 1 << (sizeof(int) * 8 - 1);
+string humanizeBitmap(const unsigned int bitmap) {
+   stringstream outp;
+   unsigned int mask = 1 << (sizeof(int) * 8 - 1);
 	
 	for (int i = sizeof(int) * 8 - 1; i >= 0; --i) {
 		int bit = 0;
-		if ((*bitmap & mask) != 0) bit = 1;
+		if ((bitmap & mask) != 0) bit = 1;
 		mask = mask >> 1;
-		cout << bit;
+		outp << bit;
 	}
+	
+   return outp.str();
 }

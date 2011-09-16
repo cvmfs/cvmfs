@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
       return 1;
    }
    
-   if (!catalog::init(0, 0, false) || !catalog::attach(argv[1], "", true, false)) {
+   if (!catalog::init(0, 0) || !catalog::attach(argv[1], "", true, false)) {
       cerr << "could not load catalog" << endl;
       return 1;
    }

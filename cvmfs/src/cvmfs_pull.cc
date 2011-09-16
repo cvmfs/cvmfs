@@ -939,7 +939,7 @@ int main(int argc, char **argv) {
    }
    signature_ready = true;
    
-   if (!catalog::init(getuid(), getgid(), false)) {
+   if (!catalog::init(getuid(), getgid())) {
       cerr << "Failed to initialize catalog" << endl;
       goto pull_cleanup;
    }

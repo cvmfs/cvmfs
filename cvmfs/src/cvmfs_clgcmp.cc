@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
    
    const string cwd = string(getcwd(NULL, 0));
    
-   if (!catalog::init(0, 0, false) || !catalog::attach(argv[1], "", true, false)) {
+   if (!catalog::init(0, 0) || !catalog::attach(argv[1], "", true, false)) {
       cerr << "could not load catalog" << endl;
       return 1;
    }

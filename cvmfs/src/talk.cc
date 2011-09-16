@@ -62,6 +62,8 @@ namespace talk {
    bool spawned = false;
 
    static void answer(const int con_fd, const string &msg) {
+		pmesg(D_TALK, "message length: %d", msg.length());
+	
       (void)send(con_fd, &msg[0], msg.length(), MSG_NOSIGNAL);
    }
    

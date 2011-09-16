@@ -39,7 +39,7 @@ bool get_file_info(const std::string &path, PortableStat64 *info);
 
 void printError(const std::string &message);
 void printWarning(const std::string &message);
-void printBitmap(const unsigned int *bitmap);
+std::string humanizeBitmap(const unsigned int bitmap);
 
 /*
  * abs2rel: convert an absolute path name into relative.

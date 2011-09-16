@@ -7,21 +7,24 @@
 
 #include <stdarg.h>
 
-#define  D_MARK      1
-#define  D_CACHE     2
-#define  D_CATALOG   4
-#define  D_CVMFS     8
-#define  D_HASH      16
-#define  D_PREFETCH  32
-#define  D_CURL      64
-#define  D_SCVMFS    128
-#define  D_COMPRESS  256
-#define  D_LRU       512
-#define  D_CROWD     1024
-#define  D_TALK      2048
-#define  D_MONIT     4096
-#define  D_MEMCACHED 8192
-#define  D_BITMAX    14
+#define  D_MARK       1
+#define  D_CACHE      2
+#define  D_CATALOG    4
+#define  D_CVMFS      8
+#define  D_HASH       16
+#define  D_PREFETCH   32
+#define  D_CURL       64
+#define  D_SCVMFS     128
+#define  D_COMPRESS   256
+#define  D_LRU        512
+#define  D_CROWD      1024
+#define  D_TALK       2048
+#define  D_MONIT      4096
+#define  D_MEMCACHED  8192
+#define  D_FUSE_STUB  16384
+#define  D_INO_CACHE  32768
+#define  D_PATH_CACHE 65536
+#define  D_BITMAX     17
 
 extern char *pmesg_cat[];
 extern unsigned verbosity_mask;

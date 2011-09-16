@@ -14,7 +14,7 @@
 
 unsigned verbosity_mask = 0xffffffff;
 char *pmesg_cat[] = { "unknown", "mark", "cache", "catalog", "cvmfs", "hash", "prefetch",
-                      "curl", "scvmfs", "compress", "lru", "crowd", "talk", "monitor", "memcached" };
+                      "curl", "scvmfs", "compress", "lru", "crowd", "talk", "monitor", "memcached", "fuse stub", "inode cache", "path cache" };
 pthread_mutex_t pmesg_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static FILE *file_dbg = NULL;
