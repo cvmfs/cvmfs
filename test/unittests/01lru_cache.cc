@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
 
 #include "lru_cache.h"
 
@@ -70,36 +71,11 @@ int main(int argc, char **argv) {
 	resp = lookup(1, cache); // should be pushed out by insert(5)
 	if (resp != "") return 22;
 	
-	cout << "--> testing resize cache" << endl;
-	cache.resize(10);
-	if (cache.isFull()) return 23;
-	if (cache.isEmpty()) return 24;
-	if (cache.getNumberOfEntries() != 4) return 25;
-	
-	cout << "--> testing insert into now bigger cache" << endl;
-	if (not insert(6, "sechs", cache)) return 26;
-	if (cache.getNumberOfEntries() != 5) return 27;
-	if (cache.isFull()) return 28;
-	
 	cout << "--> testing insert/update" << endl;
 	if (not insert(3, "three", cache)) return 29;
-	if (cache.getNumberOfEntries() != 5) return 30;
+	if (cache.getNumberOfEntries() != 4) return 30;
 	resp = lookup(3, cache);
 	if (resp != "three") return 31;
-	
-	cout << "--> testing resize cache with truncation" << endl;
-	cache.resize(3);
-	if (not cache.isFull()) return 32;
-	if (cache.isEmpty()) return 33;
-	if (cache.getNumberOfEntries() != 3) return 34;
-	resp = lookup(5, cache);
-	if (resp != "fünf") return 35;
-	
-	cout << "--> testing LRU again" << endl;
-	if (not insert(7, "sieben", cache)) return 36;
-	if (cache.getNumberOfEntries() != 3) return 37;
-	resp = lookup(6, cache); // should be dropped by last insert
-	if (resp != "") return 38;
 	
 	cout << "--> testing cache dropping" << endl;
 	cache.drop();
@@ -109,7 +85,42 @@ int main(int argc, char **argv) {
 	cout << "--> testing reinsert" << endl;
 	if (not insert(8, "acht", cache)) return 41;
 	if (cache.getNumberOfEntries() != 1) return 42;
+
+	cout << "--> testing big cache" << endl;
 	
+	const unsigned int bigCacheSize = 1290;
+	Cache bigCache(bigCacheSize);
+	
+	// filling big cache
+	for (int i = 0; i < bigCacheSize; ++i) {
+		stringstream ss;
+		ss << (i+1);
+		if (not insert(i, ss.str(), bigCache)) return 43;
+	}
+
+	// looking up every second element (sort even numbered keys up)
+	for (int i = 0; i < bigCacheSize; i+=2) {
+		stringstream ss;
+		ss << (i+1);
+		resp = lookup(i, bigCache);
+		if (resp != ss.str()) return 44;
+	}
+
+	// refill cache, overwriting odd numbered keys
+	for (int i = 0; i < bigCacheSize; i+=2) {
+		stringstream ss;
+		ss << (i+bigCacheSize+1);
+		if (not insert(i+bigCacheSize, ss.str(), bigCache)) return 45;
+	}
+
+	// check an odd number
+	resp = lookup(1, bigCache);
+	if (resp != "") return 46;
+
+	// check an even number
+	resp = lookup(2, bigCache);
+	if (resp != "3") return 47;
+
 	cout << "!!! all done - LRU cache seems to work" << endl;
 	return 0;
 }

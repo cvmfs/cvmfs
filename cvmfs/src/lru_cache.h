@@ -6,6 +6,7 @@
  * It stores Key-Value pairs of arbitrary data types in a fast hash which automatically
  * deletes the entries which are least touched in the last time to maintain a given
  * maximal cache size.
+ * The cache uses a hand crafted memory allocator to use memory efficiently
  *
  * usage:
  *   LruCache<int, string> cache(100);  // cache mapping ints to strings with maximal size of 100
@@ -24,7 +25,6 @@
  *   }
  *
  *   // maintaining the cache
- *   cache.resize(2);  // changing maximal size to '2' dropping entries to fit new max size
  *   cache.drop();     // empty the cache
  *
  * Developed by René Meusel 2011 at CERN
@@ -37,6 +37,9 @@
 #include <assert.h>
 #include <map>
 #include <iostream>
+
+#include <string>
+#include <sstream>
 
 namespace cvmfs {
 
@@ -53,17 +56,27 @@ namespace cvmfs {
 		template<class T> class ListEntry;
 		template<class T> class ListEntryHead;
 		template<class T> class ListEntryContent;
-	
+		template<class M> class MemoryAllocator;
+		
+		// helpers to get the template magic right
+      typedef ListEntryContent<Key> ConcreteListEntryContent;
+      typedef MemoryAllocator<ConcreteListEntryContent> ConcreteMemoryAllocator;
+
+      /**
+       *  this structure wraps the user data and relates it to the LRU list entry
+       */
 		typedef struct {
 			ListEntryContent<Key> *listEntry;
 			Value value;
 		} CacheEntry;
 	
+	   // the actual map data structure (TODO: replace this by a hashmap)
 		typedef std::map<Key, CacheEntry> Cache;
 
 		// internal data fields
 		unsigned int mCurrentCacheSize;
 		unsigned int mMaxCacheSize;
+      static ConcreteMemoryAllocator *allocator;
 		
 		/**
 		 *  a double linked list to keep track of the least recently
@@ -80,6 +93,150 @@ namespace cvmfs {
 		 *  it has to be a map of some kind... lookup performance is crucial
 		 */
 		Cache mCache;
+	
+	   /**
+	    *  This MemoryAllocator optimizes the usage of memory for the cache entries.
+	    *  It allocates enough memory for the maximal number of cache entries at startup,
+	    *  and assigns new ListEntryContent objects a free spot in this memory pool.
+	    *  This is done by overriding the 'new' and 'delete' operators of ListEntryContent.
+	    *  As the cache is meant to be completely filled at all times it is no problem to
+	    *  allocate all memory already at startup.
+	    *  @param M the type of object to be allocated by this MemoryAllocator
+	    */
+      template<class M>
+      class MemoryAllocator {
+      private:
+         unsigned int mNumberOfSlots; // <-- overall number of slots in the memory pool
+         unsigned int mFreeSlots;     // <-- number of free slots left
+         unsigned int mNextFreeSlot;  // <-- position of next free slot in the pool
+         char *mBlocks; // <-- a bitmap to mark slots as allocated
+         M *mMemory;    // <-- the actual memory pool
+      
+      public:
+         /**
+          *  creates a MemoryAllocator to handle a memory pool
+          *  @param numberOfSlots the number of slots to be allocated for the given datatype M
+          */
+         MemoryAllocator(const unsigned int numberOfSlots) {
+            // how many bitmap chunks (chars) do we need?
+            unsigned int bytesNeededForBitmap = numberOfSlots / sizeof(char);
+            if (bytesNeededForBitmap * sizeof(char) < numberOfSlots) bytesNeededForBitmap++;
+            
+            // how much actual memory do we need?
+            const unsigned int bytesOfMemoryNeeded = sizeof(M) * numberOfSlots;
+         
+            // allocate memory
+            mBlocks = (char *)malloc(bytesNeededForBitmap);
+            mMemory = (M *)malloc(bytesOfMemoryNeeded);
+         
+            // check for successfully allocated memory
+            if (mBlocks == NULL || mMemory == NULL) {
+               std::cerr << "memory allocation for LRU cache failed" << std::endl;
+               abort();
+            }
+            
+            // zero memory
+            memset(mBlocks, 0, bytesNeededForBitmap);
+            memset(mMemory, 0, bytesOfMemoryNeeded);
+         
+            // create initial state
+            mNumberOfSlots = numberOfSlots;
+            mFreeSlots = numberOfSlots;
+            mNextFreeSlot = 0;
+         }
+      
+         /**
+          *  free all data
+          *  if the MemoryAllocator is gone, all data is gone too!
+          */
+         virtual ~MemoryAllocator() {
+            free(mBlocks);
+            free(mMemory);
+         }
+
+         /**
+          *  check if the memory pool is full
+          *  @return true if all slots are occupied, otherwise false
+          */
+         inline bool isFull() const { return mFreeSlots == 0; }
+      
+         /**
+          *  allocates a slot and returns a pointer to the memory
+          *  @return a pointer to a chunk of the memory pool
+          */
+         M* allocate() {
+            // check if memory is left
+            if (this->isFull()) {
+               return NULL;
+            } else {
+               // allocate a slot
+               this->setBit(mNextFreeSlot);
+               --mFreeSlots;
+               M *slot = mMemory + mNextFreeSlot;
+               
+               // find a new free slot if there are some left
+               if (not this->isFull()) {
+                  while (this->getBit(mNextFreeSlot)) {
+                     mNextFreeSlot = (mNextFreeSlot + 1) % mNumberOfSlots;
+                  }
+               }
+               
+               // done
+               return slot;
+            }
+         }
+      
+         /**
+          *  free a given slot in the memory pool
+          *  @param slot a pointer to the slot be freed
+          */
+         void deallocate(M* slot) {
+            // check if given slot is in bounds
+            if (slot < mMemory || slot > mMemory + mNumberOfSlots) {
+               return;
+            }
+            
+            // get position of slot
+            const unsigned int position = slot - mMemory;
+         
+            // check if slot was already freed
+            assert (this->getBit(position));
+         
+            // free slot
+            this->unsetBit(position);
+            mNextFreeSlot = position; // <-- save the position of this slot as free (faster reallocation)
+            ++mFreeSlots;
+         }
+      
+      private:
+         /**
+          *  check a bit in the internal allocation bitmap
+          *  @param position the position to check
+          *  @return true if bit is set, otherwise false
+          */
+         inline bool getBit(const unsigned int position) {
+            assert (position < mNumberOfSlots);
+            return ((mBlocks[position / 8] & (1 << (position % 8))) != 0);
+         }
+      
+         /**
+          *  set a bit in the internal allocation bitmap
+          *  @param position the number of the bit to be set
+          */
+         inline void setBit(const unsigned int position) {
+            assert (position < mNumberOfSlots);
+            mBlocks[position / 8] |= 1 << (position % 8);
+         }
+      
+         /**
+          *  clear a bit in the internal allocation bitmap
+          *  @param position the number of the bit to be cleared
+          */
+         inline void unsetBit(const unsigned int position) {
+            assert (position < mNumberOfSlots);
+            mBlocks[position / 8] &= ~(1 << (position % 8));
+         }
+      };
 	
 		/**
 		 *  INTERNAL DATA STRUCTURE
@@ -174,6 +331,25 @@ namespace cvmfs {
 			ListEntryContent(Key content) {
 				mContent = content;
 			};
+			
+			/**
+			 *  overwritten the new operator of this class to redirect it to our own
+			 *  memory allocator. This ensures that heap is not fragmented by loads of
+			 *  malloc and free calls
+			 */
+			static void* operator new (size_t size) {
+            assert(LruCache::allocator != NULL);
+            return (void *)LruCache::allocator->allocate();
+			}
+			
+			/**
+			 *  overwritten delete operator to redirect deallocation to our own memory
+			 *  allocator
+			 */
+         static void operator delete (void *p) {
+            assert(LruCache::allocator != NULL);
+            LruCache::allocator->deallocate(static_cast<ListEntryContent<T> *>(p));
+         }
 
 			/**
 			 *  see ListEntry base class
@@ -359,6 +535,10 @@ namespace cvmfs {
 		 */
 		LruCache(const unsigned int maxCacheSize) {
 			assert (maxCacheSize > 0);
+			
+			// create memory allocator
+			ConcreteMemoryAllocator *allocator = new ConcreteMemoryAllocator(maxCacheSize);
+         LruCache<Key, Value>::allocator = allocator;
 		
 			mCurrentCacheSize = 0;
 			mMaxCacheSize = maxCacheSize;
@@ -449,22 +629,6 @@ namespace cvmfs {
 			mCache.clear();
 		}
 	
-		/**
-		 *  change the size of the cache at runtime
-		 *  if the new cache size is smaller than the current amount of entries
-		 *  the least recently used ones are deleted until the cache is on the desired size
-		 *  @param newSize the desired size of the cache
-		 */
-		void resize(const unsigned int newSize) {
-			assert (newSize > 0);
-		
-			while (mCurrentCacheSize > newSize) {
-				this->deleteOldestEntry();
-			}
-		
-			mMaxCacheSize = newSize;
-		}
-	
 	private:
 		/**
 		 *  this just performs a lookup in the cache
@@ -536,6 +700,11 @@ namespace cvmfs {
 			mCurrentCacheSize--;
 		}
 	};
+	
+	// initialize the static allocator field
+	template<class Key, class Value>
+   typename LruCache<Key, Value>::ConcreteMemoryAllocator *LruCache<Key, Value>::allocator = NULL;
+	
 } // namespace cvmfs
 
 #endif
