@@ -17,6 +17,7 @@ namespace cvmfs {
          
          bool insert(const fuse_ino_t inode, const struct catalog::t_dirent &dirEntry);
          bool lookup(const fuse_ino_t inode, struct  catalog::t_dirent &dirEntry);
+         void drop();
    };
 
 } // namespace cvmfs

@@ -24,6 +24,34 @@ enum DirEntryType {
 };
 
 /**
+ *  this base class implements a reference counting scheme
+ *  inspired by NSObjects in Objective-C by Apple.
+ *  after object creation, these objects have a reference count of 1
+ *  retain() increments release() decrements this counter.
+ *  if the reference counter hits 0 the object will be deleted.
+ *
+ *  This class ONLY works for objects created by 'new' and therefore reside on the heap!!
+ *
+ *  BE CAREFUL: This is not thread safe at the moment!
+ *
+ *  Best practices: If you save an RefCntObject in your class, retain it.
+ *                  When the object is just passed through don't retain it.
+ *                  Everytime you loose the reference to the object release it.
+ *                  Take special care of setters, they have to release the old object and retain the new one
+ */
+class RefCntObject {
+private:
+   unsigned int mReferenceCount;
+
+public:
+   inline RefCntObject() { mReferenceCount = 1; }
+   virtual ~RefCntObject() {};
+   
+   inline void retain() { ++mReferenceCount; }
+   inline void release() { --mReferenceCount; if (mReferenceCount == 0) delete this; }
+};
+
+/**
  *  any directory entry emitted by the RecursionEngine is wrapped in a convenient DirEntry structure
  *  This class represents potentially three concrete files:
  *    - <repository path>/<filename>
@@ -31,7 +59,8 @@ enum DirEntryType {
  *    - <union volume path>/<filename>
  *  The main purpose of this class is to cache stat calls to the underlying files in the different locations
  */
-class DirEntry {
+class DirEntry :
+   public RefCntObject {
 private:
 	DirEntryType mType;
 
@@ -240,8 +269,8 @@ void RecursionEngine<T>::recurse(const std::string &dirPath) const {
 
 	std::string relativePath = getRelativePath(dirPath);
 	DirEntry *directory = new DirEntry(get_parent_path(relativePath), get_file_name(relativePath), DE_DIR);
-
 	doRecursion(directory);
+   directory->release();
 }
 
 template <class T>
@@ -277,6 +306,7 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 						doRecursion(newEntry); // user can decide to skip directories from recursion
 					}
 					notifyForDirectoryAfterRecursion(newEntry);
+               newEntry->release();
 				}
 				break;
 			case DT_REG:
@@ -293,10 +323,6 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 		return;
 	}
 	if (leavingDirectory != NULL) (mDelegate->*leavingDirectory)(entry);
-	
-	if (foundDirectory == NULL && foundDirectoryAfterRecursion == NULL && enteringDirectory == NULL && leavingDirectory == NULL) {
-		delete entry; // the entry for this directory never left the scope and is finished now...
-	}
 }
 
 template <class T>
@@ -325,6 +351,7 @@ void RecursionEngine<T>::notifyForRegularFile(const std::string &dirPath, const 
 
 	DirEntry *entry = new DirEntry(dirPath, filename, DE_FILE);
 	(mDelegate->*foundRegularFile)(entry);
+   entry->release();
 }
 
 template <class T>
@@ -335,6 +362,7 @@ void RecursionEngine<T>::notifyForSymlink(const std::string &dirPath, const std:
 
 	DirEntry *entry = new DirEntry(dirPath, filename, DE_SYMLINK);
 	(mDelegate->*foundSymlink)(entry);
+   entry->release();
 }
 
 template <class T>

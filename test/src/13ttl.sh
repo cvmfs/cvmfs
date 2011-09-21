@@ -34,9 +34,9 @@ do_tests() {
 
   # New TTL on Expiry
   date -s next-week >> $logfile || return 23
-  stat /cvmfs/127.0.0.1 >> $logfile  || return 25
+  ls -l /cvmfs/127.0.0.1 >> $logfile  || return 25 # using ls -l to trigger a lookup
   sleep 62
-  stat /cvmfs/127.0.0.1 >> $logfile || return 26
+  ls -l /cvmfs/127.0.0.1 >> $logfile || return 26
   new_expiry=`cvmfs-talk -i 127.0.0.1 open catalogs | head -2 | tail -1 | cut -d\| -f3`
   date -s last-week >> $logfile || return 27 
   if [ "$new_expiry" == "$main_expiry" ]; then
@@ -49,7 +49,7 @@ do_tests() {
   nested_expiry=`cvmfs-talk -i 127.0.0.1 open catalogs | tail -1 | cut -d\| -f3`
   cvmfs-talk -i 127.0.0.1 host set http://foo >> $logfile || return 31
   date -s next-week >> $logfile || return 32
-  stat /cvmfs/127.0.0.1 >> $logfile  || return 33
+  ls -l /cvmfs/127.0.0.1 >> $logfile  || return 33
   new_expiry=`cvmfs-talk -i 127.0.0.1 open catalogs | tail -1 | cut -d\| -f3`
   date -s last-week >> $logfile || return 32
   if [ "$nested_expiry" == "$main_expiry" ]; then
@@ -63,11 +63,11 @@ do_tests() {
   extract_local_repo ttl-new || return 37
   resign_local
   date -s next-week >> $logfile || return 38
-  stat /cvmfs/127.0.0.1 >> $logfile || return 40
+  ls -l /cvmfs/127.0.0.1 >> $logfile || return 40
   cvmfs-talk -i 127.0.0.1 remount | grep -qi already 
   concurrent_remount=$?
   sleep 62
-  stat /cvmfs/127.0.0.1 >> $logfile  
+  ls -l /cvmfs/127.0.0.1 >> $logfile  
   date -s last-week >> $logfile || return 39  
   if [ $concurrent_remount -ne 0 ]; then
     return 41
@@ -75,7 +75,7 @@ do_tests() {
   num_dirty=`cvmfs-talk -i 127.0.0.1 open catalogs | grep ! | wc -l`
   new_expiry=`cvmfs-talk -i 127.0.0.1 open catalogs | tail -1 | cut -d\| -f3`
   new_cat=`cvmfs-talk -i 127.0.0.1 open catalogs | head -2 | tail -1 | cut -d\| -f2`
-  if [ $num_dirty -ne 3 ]; then
+  if [ $num_dirty -ne 1 ]; then
     return 42
   fi
   if [ "$nested_expiry" == "$main_expiry" ]; then
@@ -89,13 +89,13 @@ do_tests() {
   extract_local_repo ttl || return 44
   resign_local
   service cvmfs restartclean >> $logfile 2>&1 || return 44
-  ls /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 44
-  ls /cvmfs/127.0.0.1/dir2/bla >> $logfile 2>&1 || return 44
-  ls /cvmfs/127.0.0.1//dir1/dir1-1/bla >> $logfile 2>&1
+  ls -l /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 44
+  ls -l /cvmfs/127.0.0.1/dir2/bla >> $logfile 2>&1 || return 44
+  ls -l /cvmfs/127.0.0.1//dir1/dir1-1/bla >> $logfile 2>&1
   if [ $? -eq 0 ]; then
     return 44
   fi
-  stat /cvmfs/127.0.0.1/dir1/dir1-1/dir1-1-1/bla >> $logfile 2>&1
+  ls -l /cvmfs/127.0.0.1/dir1/dir1-1/dir1-1-1/bla >> $logfile 2>&1
   if [ $? -eq 0 ]; then
     return 44
   fi
@@ -112,7 +112,7 @@ do_tests() {
 
   # Reload crap, stay local
   extract_local_repo ttl-new || return 5
-  ls /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 6
+  ls -l /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 6
   main_cat_new=`cvmfs-talk -i 127.0.0.1 open catalogs | head -2 | tail -1 | cut -d\| -f2`
   echo "$main_cat" >> $logfile
   echo "$main_cat_new" >> $logfile
@@ -125,7 +125,7 @@ do_tests() {
   resign_local
   cvmfs-talk -i 127.0.0.1 remount >> $logfile 2>&1 || return 9
   sleep 2
-  ls /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 9
+  ls -l /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 9
   main_cat_new=`cvmfs-talk -i 127.0.0.1 open catalogs | head -2 | tail -1 | cut -d\| -f2`
   echo "$main_cat" >> $logfile
   echo "$main_cat_new" >> $logfile
@@ -136,19 +136,20 @@ do_tests() {
   # Check for dirty catalogs
   cvmfs-talk -i 127.0.0.1 open catalogs >> $logfile 2>&1
   num_dirty=`cvmfs-talk -i 127.0.0.1 open catalogs | grep ! | wc -l`
+  echo $num_dirty
   if [ $num_dirty -ne 3 ]; then
     return 11
   fi
 
   # Hit a valid one
-  ls /cvmfs/127.0.0.1/dir3 >> $logfile 2>&1 || return 12
+  ls -l /cvmfs/127.0.0.1/dir3 >> $logfile 2>&1 || return 12
   num_dirty=`cvmfs-talk -i 127.0.0.1 open catalogs | grep ! | wc -l`
   if [ $num_dirty -ne 3 ]; then
     return 13
   fi
 
   # Hit a dirty one
-  ls /cvmfs/127.0.0.1/dir2/bla >> $logfile 2>&1 || return 14
+  ls -l /cvmfs/127.0.0.1/dir2/bla >> $logfile 2>&1 || return 14
   num_dirty=`cvmfs-talk -i 127.0.0.1 open catalogs | grep ! | wc -l`
   cvmfs-talk -i 127.0.0.1 open catalogs >> $logfile 2>&1
   if [ $num_dirty -ne 2 ]; then
@@ -157,9 +158,9 @@ do_tests() {
 
   # Remount and hit a dirty one
   service cvmfs restart >> $logfile 2>&1 || return 16
-  ls /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 17
-  stat /cvmfs/127.0.0.1/dir3 >> $logfile 2>&1 || return 18
-  stat /cvmfs/127.0.0.1/dir1/dir1-1/dir1-1-1/bla >> $logfile 2>&1 || return 19  
+  ls -l /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 17
+  ls -l /cvmfs/127.0.0.1/dir3 >> $logfile 2>&1 || return 18
+  ls -l /cvmfs/127.0.0.1/dir1/dir1-1/dir1-1-1/bla >> $logfile 2>&1 || return 19  
 
   # Remount fail
   cvmfs-talk -i 127.0.0.1 proxy set DIRECT >> $logfile 2>&1 || return 20

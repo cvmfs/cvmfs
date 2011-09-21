@@ -105,18 +105,21 @@ void SyncMediator::enterDirectory(DirEntry *entry) {
 
 void SyncMediator::leaveDirectory(DirEntry *entry) {
 	completeHardlinks(entry);
-	addHardlinkGroup(getHardlinkMap());
+	addHardlinkGroups(getHardlinkMap());
+   cleanupHardlinkGroups(getHardlinkMap());
 	mHardlinkStack.pop();
 }
 
 void SyncMediator::leaveAddedDirectory(DirEntry *entry) {
-	addHardlinkGroup(getHardlinkMap());
+	addHardlinkGroups(getHardlinkMap());
+   cleanupHardlinkGroups(getHardlinkMap());
 	mHardlinkStack.pop();
 }
 
 void SyncMediator::commit() {
 	compressAndHashFileQueue();
 	addFileQueueToCatalogs();
+   releaseFileQueue();
 	mCatalogHandler->precalculateListings();
 	mCatalogHandler->commit();
 }
@@ -172,6 +175,24 @@ void SyncMediator::addFileQueueToCatalogs() {
 	HardlinkGroupList::const_iterator jend;
 	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
 		mCatalogHandler->addHardlinkGroup(j->hardlinks);
+	}
+}
+
+void SyncMediator::releaseFileQueue() {
+   // release DirEntries from file queue
+	DirEntryList::iterator i;
+	DirEntryList::const_iterator iend;
+	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
+		(*i)->release();
+	}
+	
+	// release DirEntries from hardlink groups (hardlinks to symlinks are already wiped at this place)
+	HardlinkGroupList::iterator j;
+	HardlinkGroupList::const_iterator jend;
+	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
+      for (i = j->hardlinks.begin(), iend = j->hardlinks.end(); i != iend; ++i) {
+         (*i)->release();
+      }
 	}
 }
 
@@ -231,6 +252,9 @@ void SyncMediator::insertHardlink(DirEntry *entry) {
 	// find the hard link group in the lists
 	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(inode);
 
+   // this DirEntry will stay for some time... increment reference counter
+   entry->retain();
+
 	if (hardlinkGroup == getHardlinkMap().end()) {
 		// create a new hardlink group
 		HardlinkGroup newGroup;
@@ -273,7 +297,9 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 		if (not alreadyThere) { // hardlink already in the group?
 			// if one element of a hardlink group is edited, all elements must be replaced
 			// here we remove an untouched hardlink and add it to its hardlink group for re-adding later
+			// (don't forget to increase the reference count for this)
 			remove(entry);
+         entry->retain();
 			hlGroup->second.hardlinks.push_back(entry);
 		}
 	}
@@ -282,12 +308,14 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 void SyncMediator::completeHardlinks(DirEntry *entry) {
 	// create a recursion engine which DOES NOT recurse into directories by default.
 	// it basically goes through the current directory (in the union volume) and
-	// searches for already existing hardlinks which has to be connected to the new ones
-	// if there was no changed hardlink found, we can skip this
+	// searches for legacy hardlinks which has to be connected to the new (edited) ones
+	
+	// if no hardlink in this directory was changed, we can skip this
 	if (getHardlinkMap().size() == 0) {
 		return;
 	}
 	
+	// look for legacy hardlinks
 	RecursionEngine<SyncMediator> recursion(this, UnionSync::sharedInstance()->getUnionPath(), UnionSync::sharedInstance()->getIgnoredFilenames(), false);
 	recursion.foundRegularFile = &SyncMediator::insertExistingHardlink;
 	recursion.foundSymlink = &SyncMediator::insertExistingHardlink;
@@ -297,6 +325,7 @@ void SyncMediator::completeHardlinks(DirEntry *entry) {
 void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
 	addDirectory(entry);
 	
+	// create a recursion engine, which recursively adds all entries in a newly created directory
 	RecursionEngine<SyncMediator> recursion(this, UnionSync::sharedInstance()->getOverlayPath(), UnionSync::sharedInstance()->getIgnoredFilenames());
 	recursion.enteringDirectory = &SyncMediator::enterDirectory;
 	recursion.leavingDirectory = &SyncMediator::leaveAddedDirectory;
@@ -336,8 +365,12 @@ void SyncMediator::addFile(DirEntry *entry) {
 	if (mPrintChangeset) cout << "[add] " << entry->getRepositoryPath() << endl;
 	
 	if (entry->isSymlink() && not mDryRun) {
+	   // symlinks have no 'actual' file content, which would have to be compressed...
 		mCatalogHandler->addFile(entry);
 	} else {
+	   // a normal file has content, that has to be compressed later in the commit-stage
+	   // keep the entry in memory!
+      entry->retain();
 		mFileQueue.push_back(entry);
 	}
 }
@@ -367,9 +400,11 @@ void SyncMediator::touchDirectory(DirEntry *entry) {
 	if (not mDryRun)     mCatalogHandler->touchDirectory(entry);
 }
 
-void SyncMediator::addHardlinkGroup(const HardlinkGroupMap &hardlinks) {
-	HardlinkGroupMap::const_iterator i,end;
+void SyncMediator::addHardlinkGroups(const HardlinkGroupMap &hardlinks) {
+   HardlinkGroupMap::const_iterator i,end;
 	for (i = hardlinks.begin(), end = hardlinks.end(); i != end; ++i) {
+	   // currentHardlinkGroup = i->second; --> just to remind you
+	   
 		if (mPrintChangeset) {
 			cout << "[add] hardlink group around: " << i->second.masterFile->getRepositoryPath() << "( ";	
 			DirEntryList::const_iterator j,jend;
@@ -380,9 +415,29 @@ void SyncMediator::addHardlinkGroup(const HardlinkGroupMap &hardlinks) {
 		}
 		
 		if (i->second.masterFile->isSymlink() && not mDryRun) {
+		   // symlink hardlinks just end up in the database (see SyncMediator::addFile() same semantics here)
 			mCatalogHandler->addHardlinkGroup(i->second.hardlinks);
+         
 		} else {
+		   // yeah... just see SyncMediator::addFile()
 			mHardlinkQueue.push_back(i->second);
+		}
+	}
+}
+
+void SyncMediator::cleanupHardlinkGroups(HardlinkGroupMap &hardlinks) {
+   HardlinkGroupMap::iterator i;
+   HardlinkGroupMap::const_iterator iend;
+   DirEntryList::const_iterator j;
+   DirEntryList::const_iterator jend;
+	for (i = hardlinks.begin(), iend = hardlinks.end(); i != iend; ++i) {
+	   // currentHardlinkGroup = i->second; --> just to remind you
+		
+		if (i->second.masterFile->isSymlink()) {
+			// symlinks were just added to the database, their DirEntries can die afterwards (see SyncMediator::addHardlinkGroups)
+         for (j = i->second.hardlinks.begin(), jend = i->second.hardlinks.end(); j != jend; ++j) {
+            (*j)->release();
+         }
 		}
 	}
 }

@@ -26,7 +26,8 @@ DirEntry::DirEntry(const string &dirPath, const string &filename, const DirEntry
 	mOverlayStat.errorCode = 0;
 }
 
-DirEntry::~DirEntry() {}
+DirEntry::~DirEntry() {
+}
 
 bool DirEntry::isNew() {
 	statRepository();

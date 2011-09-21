@@ -84,7 +84,20 @@ int main(int argc, char **argv) {
 	
 	cout << "--> testing reinsert" << endl;
 	if (not insert(8, "acht", cache)) return 41;
-	if (cache.getNumberOfEntries() != 1) return 42;
+	if (not insert(9, "neun", cache)) return 42;
+	if (not insert(10, "zehn", cache)) return 43;
+	if (not insert(11, "elf", cache)) return 44;
+	if (cache.getNumberOfEntries() != 4) return 45;
+	if (not cache.isFull()) return 46;
+
+	cout << "--> testing forget of entries" << endl;
+	if (cache.forget(12)) return 47; // not present... should return false
+	if (not cache.forget(9)) return 48;
+	if (cache.isFull()) return 49;
+	resp = lookup(9, cache);
+	if (resp != "") return 50;
+	if (not insert(13, "dreizehn", cache)) return 51;
+	if (not cache.isFull()) return 52;
 
 	cout << "--> testing big cache" << endl;
 	
@@ -95,7 +108,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < bigCacheSize; ++i) {
 		stringstream ss;
 		ss << (i+1);
-		if (not insert(i, ss.str(), bigCache)) return 43;
+		if (not insert(i, ss.str(), bigCache)) return 53;
 	}
 
 	// looking up every second element (sort even numbered keys up)
@@ -103,23 +116,23 @@ int main(int argc, char **argv) {
 		stringstream ss;
 		ss << (i+1);
 		resp = lookup(i, bigCache);
-		if (resp != ss.str()) return 44;
+		if (resp != ss.str()) return 54;
 	}
 
 	// refill cache, overwriting odd numbered keys
 	for (int i = 0; i < bigCacheSize; i+=2) {
 		stringstream ss;
 		ss << (i+bigCacheSize+1);
-		if (not insert(i+bigCacheSize, ss.str(), bigCache)) return 45;
+		if (not insert(i+bigCacheSize, ss.str(), bigCache)) return 55;
 	}
 
 	// check an odd number
 	resp = lookup(1, bigCache);
-	if (resp != "") return 46;
+	if (resp != "") return 56;
 
 	// check an even number
 	resp = lookup(2, bigCache);
-	if (resp != "3") return 47;
+	if (resp != "3") return 57;
 
 	cout << "!!! all done - LRU cache seems to work" << endl;
 	return 0;

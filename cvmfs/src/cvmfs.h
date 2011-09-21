@@ -18,7 +18,7 @@ namespace cvmfs {
                                      int &inserts, int &replaces, int &cleans, int &hits, int &misses,
                                      int &cert_hits, int &cert_misses);
    void info_loaded_catalogs(std::vector<std::string> &prefix, std::vector<time_t> &last_modified, 
-                             std::vector<time_t> &expires);
+                             std::vector<time_t> &expires, std::vector<unsigned int> &inode_offsets);
    int clear_file(const std::string &path);
    int remount();
    unsigned get_max_ttl(); /* in minutes */

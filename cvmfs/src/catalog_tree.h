@@ -17,9 +17,10 @@ namespace catalog_tree {
       time_t last_checked;
       time_t last_changed;
       bool dirty;
+      unsigned int inode_offset;
       
-      catalog_meta_t(const std::string &p, const int id, const hash::t_sha1 &s) :
-         path(p), catalog_id(id), snapshot(s), expires(0), last_checked(0), last_changed(0), dirty(false) {}
+      catalog_meta_t(const std::string &p, const int id, const hash::t_sha1 &s, const int ino_offset) :
+         path(p), catalog_id(id), snapshot(s), expires(0), last_checked(0), last_changed(0), dirty(false), inode_offset(ino_offset) {}
    };
    
    void insert(catalog_meta_t *data);

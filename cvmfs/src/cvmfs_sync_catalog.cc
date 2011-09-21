@@ -548,6 +548,7 @@ void CatalogHandler::updatePrelistingBookkeeping(const string &path) {
 }
 
 bool CatalogHandler::precalculateListings() {
+   // TODO: implement me
 	return true;
 }
 

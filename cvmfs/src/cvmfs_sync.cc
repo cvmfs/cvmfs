@@ -207,6 +207,6 @@ int main(int argc, char **argv) {
 	delete mediator;
 	delete catalogHandler;
 	monitor::fini();
-
+   
 	return 0;
 }

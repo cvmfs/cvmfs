@@ -41,6 +41,8 @@
 #include <string>
 #include <sstream>
 
+#include "compat.h"
+
 namespace cvmfs {
 
 	/**
@@ -77,7 +79,7 @@ namespace cvmfs {
 		unsigned int mCurrentCacheSize;
 		unsigned int mMaxCacheSize;
       static ConcreteMemoryAllocator *allocator;
-		
+      
 		/**
 		 *  a double linked list to keep track of the least recently
 		 *  used data entries.
@@ -93,6 +95,11 @@ namespace cvmfs {
 		 *  it has to be a map of some kind... lookup performance is crucial
 		 */
 		Cache mCache;
+		
+		/**
+		 *  mutex to make cache thread safe
+		 */
+      pthread_mutex_t mLock;
 	
 	   /**
 	    *  This MemoryAllocator optimizes the usage of memory for the cache entries.
@@ -540,13 +547,18 @@ namespace cvmfs {
 			ConcreteMemoryAllocator *allocator = new ConcreteMemoryAllocator(maxCacheSize);
          LruCache<Key, Value>::allocator = allocator;
 		
+		   // internal state
 			mCurrentCacheSize = 0;
 			mMaxCacheSize = maxCacheSize;
 			mLruList = new ListEntryHead<Key>();
+			
+			// thread safety
+         pthread_mutex_init(&mLock, NULL);
 		}
 	
 		virtual ~LruCache() {
 			delete mLruList;
+         pthread_mutex_destroy(&mLock);
 		}
 	
 		/**
@@ -560,22 +572,25 @@ namespace cvmfs {
 		 *  @return true on successful insertion otherwise false
 		 */
 		virtual bool insert(const Key key, const Value value) {
+         this->lock();
+          
 			// check if we have to update an existent entry
 			CacheEntry entry;
 			if (this->lookupCache(key, entry)) {
 				entry.value = value;
 				this->updateExistingEntry(key, entry);
 				this->touchEntry(entry);
-				return true;
+			} else {
+   			// check if we have to make some space in the cache
+   			if (this->isFull()) {
+   				this->deleteOldestEntry();
+   			}
+
+   			// insert a new entry
+   			this->insertNewEntry(key, value);
 			}
 			
-			// check if we have to make some space in the cache
-			if (this->isFull()) {
-				this->deleteOldestEntry();
-			}
-
-			// insert a new entry
-			this->insertNewEntry(key, value);
+         this->unlock();
 			return true;
 		}
 	
@@ -586,17 +601,43 @@ namespace cvmfs {
 		 *  @param value (out) here the result is saved (in case of cache miss this is not altered)
 		 *  @return true on successful lookup, false if key was not found
 		 */
-		virtual bool lookup(const Key key, Value &value) {
+		virtual bool lookup(const Key key, Value &value) { 
+         bool found = false;
+         this->lock();
+		   
 			CacheEntry entry;
 			if (this->lookupCache(key, entry)) {
 				// cache hit
 				this->touchEntry(entry);
 				value = entry.value;
-				return true;
+				found = true;
 			}
 			
-			// cache miss
-			return false;
+         this->unlock();
+			return found;
+		}
+		
+		/**
+		 *  forgets about a specific cache entry
+		 *  @param key the key to delete from the cache
+		 *  @return true if key was deleted, false if key was not in the cache
+		 */
+		virtual bool forget(const Key key) {
+         bool found = false;
+         this->lock();
+         
+         CacheEntry entry;
+         if (this->lookupCache(key, entry)) {
+            found = true;
+            
+            entry.listEntry->removeFromList();
+            delete entry.listEntry;
+   			mCache.erase(key);
+            --mCurrentCacheSize;
+         }
+         
+         this->unlock();
+         return found;
 		}
 	
 		/**
@@ -623,7 +664,7 @@ namespace cvmfs {
 		 *  all memory of internal data structures will be freed but data of cache entries
 		 *  may stay in use, we do not call delete on any user data
 		 */
-		void drop() {
+		virtual void drop() {
 			mCurrentCacheSize = 0;
 			mLruList->clear();
 			mCache.clear();
@@ -697,7 +738,21 @@ namespace cvmfs {
 			Key keyToDelete = mLruList->pop_front();
 			mCache.erase(keyToDelete);
 			
-			mCurrentCacheSize--;
+			--mCurrentCacheSize;
+		}
+		
+		/**
+		 *  locks the cache (thread safety)
+		 */
+		inline void lock() {
+         pthread_mutex_lock(&mLock);
+		}
+		
+		/**
+		 *  unlocks the cache (thread safety)
+		 */
+		inline void unlock() {
+         pthread_mutex_unlock(&mLock);
 		}
 	};
 	

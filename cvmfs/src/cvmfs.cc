@@ -120,10 +120,9 @@ namespace cvmfs {
 	struct fuse_lowlevel_ops fuseCallbacks;
 	
    unsigned int inode_cache_size = 20000;
-   InodeCache *inode_cache;
-   
+   InodeCache *inode_cache = NULL;
    unsigned int path_cache_size = 1000;
-   PathCache *path_cache;
+   PathCache *path_cache = NULL;
    
    /* Prevent DoS attacks on the Squid server */
    static struct {
@@ -191,7 +190,7 @@ namespace cvmfs {
    }
    
    void info_loaded_catalogs(vector<string> &prefix, vector<time_t> &last_modified, 
-                             vector<time_t> &expires)
+                             vector<time_t> &expires, vector<unsigned int> &inode_offsets)
    {
       catalog::lock();
       for (int i = 0; i < catalog::get_num_catalogs(); ++i) {
@@ -202,6 +201,7 @@ namespace cvmfs {
          prefix.push_back(path);
          last_modified.push_back(catalog::get_lastmodified(i));
          expires.push_back(info->expires);
+         inode_offsets.push_back(info->inode_offset);
       }
       catalog::unlock();
    }
@@ -706,15 +706,19 @@ namespace cvmfs {
     * Carefully invalidate memory cache 
     */
    static void invalidate_cache(const int catalog_id) {
-      hash::t_md5 md5_null;
-      for (int i = 0; i < CATALOG_CACHE_SIZE; ++i) {
-         if (!(catalog_cache[i].md5 == md5_null) &&
-             (((catalog_id >= 0) && (catalog_cache[i].d.catalog_id == catalog_id)) ||
-              catalog_cache[i].d.flags & catalog::DIR_NESTED))
-         {
-            catalog_cache[i].md5 = hash::t_md5();
-            atomic_inc(&cache_cleans);
-         }
+      if (path_cache != NULL && inode_cache != NULL && catalog_id >= 0) {
+         pmesg(D_CVMFS, "dropping caches for catalog: %d", catalog_id);
+
+         // int minInode = catalog::get_inode_offset_for_catalog_id(catalog_id) + 1;
+         // int maxInode = minInode + catalog::get_num_dirent(catalog_id);
+         // 
+         // for (int i = minInode; i < maxInode; ++i) {
+         //    path_cache->forget(i);
+         //    inode_cache->forget(i);
+         // }
+         
+         path_cache->drop();
+         inode_cache->drop();
       }
    }
    
@@ -873,7 +877,7 @@ namespace cvmfs {
             /* Insert new catalog into the tree */
             catalog_tree::catalog_meta_t *info = 
                new catalog_tree::catalog_meta_t(canonical_path(mount_path), 
-                                                catalog::get_num_catalogs()-1, sha1_cat);
+                                                catalog::get_num_catalogs()-1, sha1_cat, 0); // TODO: maybe later
             if (cached_copy)
                info->last_changed = 0;
             else 
@@ -1061,7 +1065,7 @@ namespace cvmfs {
    }
    
    
-   static int refresh_catalog(const int catalog_id) {
+   static int refresh_dirty_catalog(const int catalog_id) {
       catalog_tree::catalog_meta_t *catalog = catalog_tree::get_catalog(catalog_id);
          
       if (catalog->dirty) {
@@ -1069,7 +1073,7 @@ namespace cvmfs {
          int parent_id = catalog_tree::get_parent(catalog_id)->catalog_id;
          
          /* Refresh parent catalog */
-         int result = refresh_catalog(parent_id);
+         int result = refresh_dirty_catalog(parent_id);
          if (result != 0) {
             logmsg("Nested catalog at %s not refreshed because of parent", (catalog->path).c_str());
             return result;
@@ -1091,6 +1095,64 @@ namespace cvmfs {
          return result;
       }
       
+      return 0;
+   }
+
+   int refresh_catalogs(int catalog_id) {
+      time_t now = time(NULL);
+
+      /* Check for drainout timestamp, reload and reset if larger then max_cache_timeout */
+      if (drainout_deadline && (now > drainout_deadline)) {
+         /* Reload root catalog */
+         pmesg(D_CVMFS, "Catalog %d: TTL expired, kernel cache drainout complete, reloading...", catalog_id);
+
+         /* Don't load very old stuff */
+         if (now > drainout_deadline + max_cache_timeout)
+            next_root = hash::t_sha1();
+
+         int result = load_and_attach_catalog(catalog::get_catalog_url(0),
+                                              hash::t_md5(catalog::get_root_prefix_specific(0)),
+                                              catalog_tree::get_catalog(0)->path, 0, false, next_root);
+         drainout_deadline = 0;
+
+         if (result != 0) {
+            catalog::unlock();
+            atomic_inc(&nioerr);
+            pmesg(D_CVMFS, "reloading catalog failed");
+            return result;
+         }
+
+         logmsg("switched to catalog revision %d", catalog::get_revision());
+      }
+
+      /* Check catalog TTL, goto drainout mode if necessary */
+      pmesg(D_CVMFS, "current time %lu, deadline %lu", time(NULL), catalog_tree::get_catalog(catalog_id)->expires);      
+      if ((!drainout_deadline) && (now > catalog_tree::get_catalog(catalog_id)->expires)) {
+         /* Reload root catalog */
+         pmesg(D_CVMFS, "Catalog %d: TTL expired, draining out caches...", catalog_id);
+
+         hash::t_sha1 new_catalog;
+         catalog_tree::catalog_meta_t *clginfo = catalog_tree::get_catalog(0);
+         int result = check_catalog(catalog::get_catalog_url(0),
+                                    hash::t_md5(catalog::get_root_prefix_specific(0)),
+                                    clginfo->path, new_catalog);
+
+         if (result < 0) {
+            clginfo->expires = time(NULL) + effective_ttl(short_term_ttl);
+            catalog_tree::visit_children(0, update_ttl_shortterm);
+         }
+
+         if (result == 0) {
+            clginfo->expires = now + effective_ttl(catalog::get_ttl(0));
+            catalog_tree::visit_children(0, update_ttl);
+         }
+
+         if (result == 1) {
+            drainout_deadline = time(NULL) + max_cache_timeout;
+            next_root = new_catalog;
+         }
+      }
+
       return 0;
    }
    
@@ -1122,23 +1184,23 @@ namespace cvmfs {
    }
    
    static bool get_dirent_for_inode(const fuse_ino_t ino, struct catalog::t_dirent &dirent) {
-      // TODO: check if this hack is valid
-      fuse_ino_t inode = (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::ROOT_INODE : ino;
-      
       // check the inode cache for speed up
-      if (inode_cache->lookup(inode, dirent)) {
-         pmesg(D_INO_CACHE, "HIT %d -> %s", inode, dirent.name.c_str());
+      if (inode_cache->lookup(ino, dirent)) {
+         pmesg(D_INO_CACHE, "HIT %d -> '%s'", ino, dirent.name.c_str());
          return true;
          
       } else {
-         pmesg(D_INO_CACHE, "MISS %d", inode);
+         int catalog_id = catalog::find_catalog_id_from_inode(ino);
+         pmesg(D_INO_CACHE, "MISS %d --> lookup in catalog with id: %d", ino, catalog_id);
          
-         if (catalog::lookup_inode_unprotected(inode, dirent, true)) {
-            inode_cache->insert(inode, dirent);
+         // lookup inode in catalog
+         if (catalog::lookup_inode_unprotected(ino, dirent, true)) {
+            pmesg(D_INO_CACHE, "CATALOG HIT %d -> '%s'", dirent.inode, dirent.name.c_str());
+            inode_cache->insert(ino, dirent);
             return true;
             
          } else {
-            pmesg(D_CVMFS, "no entry --> maybe data corruption?");
+            pmesg(D_INO_CACHE, "no entry --> maybe data corruption?");
             return false;
          }
       }
@@ -1148,53 +1210,75 @@ namespace cvmfs {
    }
    
    static bool get_path_for_inode(const fuse_ino_t ino, string &path) {
-      // TODO: check if this hack is valid
-      fuse_ino_t inode = (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::ROOT_INODE : ino;
-      
       // check the path cache first
-      // this is not really needed because the following loop will do this
-      // anyway... but we hope to have a lot of cache hits... so save 
-      // some time and check this first
-      if (path_cache->lookup(inode, path)) {
-         pmesg(D_PATH_CACHE, "HIT %d -> %s", inode, path.c_str());
-         
-         // this was easy!
-         return true;
+      if (path_cache->lookup(ino, path)) {
+         pmesg(D_PATH_CACHE, "HIT %d -> '%s'", ino, path.c_str());
+         return true; // this was easy!
       }
       
-      pmesg(D_PATH_CACHE, "MISS %d", inode);
+      pmesg(D_PATH_CACHE, "MISS %d - recursively building path", ino);
       
-      // here the interesting thing happens
-      string resultPath, iPath;
-      struct catalog::t_dirent iDirent;
-      fuse_ino_t iInode = inode;
+      // now we need to find out the parent path recursively and
+      // rebuild the absolute path
+      string parentPath;
+      struct catalog::t_dirent dirent;
       
-      resultPath = "";
+      // get the dirent information of the searched inode
+      if (not get_dirent_for_inode(ino, dirent)) {
+         return false;
+      }
       
-      // go through the path backwards to rebuild it
-      while (iInode != catalog::ROOT_INODE) {
-         assert (iInode != catalog::INVALID_INODE);
+      // check if we reached the root node
+      if (dirent.inode == catalog::get_root_inode()) {
+         // encountered root... finished
+         path = "";
          
-         // check path cache,  maybe the sub path is in there
-         // and we can have some free time instead of looping ;-)
-         if (path_cache->lookup(iInode, iPath)) {
-            // we are building the path backwards... 
-            resultPath = iPath + resultPath;
-            return true;
-            
-         } else {
-            // no luck with path cache... get the dir entry and go to next upper path level
-            if (not get_dirent_for_inode(iInode, iDirent)) {
-               return false;
-            }
+      } else {
+         // retrieve the parent path recursively
+         if (not get_path_for_inode(dirent.parentInode, parentPath)) {
+            return false;
          }
          
-         resultPath = "/" + iDirent.name + resultPath;
-         iInode = iDirent.parentInode;
+         path = parentPath + "/" + dirent.name;
       }
       
-      path_cache->insert(inode, resultPath);
-      path = resultPath; // return value
+      path_cache->insert(dirent.inode, path);
+      return true;
+   }
+   
+   inline fuse_ino_t mangle_inode(fuse_ino_t ino) {
+      // check if this is plausible
+      return (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::get_root_inode() : ino;
+   }
+   
+   bool load_and_attach_nested_catalog(const string &path, const struct catalog::t_dirent &dirent) {
+      // check if catalog is already loaded
+      for (int i = 0; i < catalog::get_num_catalogs(); ++i) {
+         catalog_tree::catalog_meta_t *info = catalog_tree::get_catalog(i);
+         if (info->path == path) {
+            return true;
+         }
+      }
+      
+      // load catalog
+      pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path.c_str());
+      hash::t_sha1 expected_clg;
+      if (!catalog::lookup_nested_unprotected(dirent.catalog_id, catalog::mangled_path(path), expected_clg))
+      {
+         logmsg("Nested catalog at %s not found (ls)", path.c_str());
+         return false;
+      }
+   
+      int result = load_and_attach_catalog(path, hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
+      if (result != 0) {
+         atomic_inc(&nioerr);
+         return false;
+      }
+      
+      // mark direntry in cache as loaded nested catalog
+      struct catalog::t_dirent newDirent = dirent;
+      newDirent.flags = (newDirent.flags & ~catalog::DIR_NESTED) | catalog::DIR_NESTED_ROOT;
+      inode_cache->insert(dirent.inode, dirent);
       
       return true;
    }
@@ -1204,21 +1288,56 @@ namespace cvmfs {
     */
    static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
    {
+      parent = mangle_inode(parent);
 		pmesg(D_CVMFS, "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
       string parentPath;
-      if(not get_path_for_inode(parent, parentPath)) {
+      struct catalog::t_dirent parentDirent;
+      if(not get_path_for_inode(parent, parentPath) || not get_dirent_for_inode(parent, parentDirent)) {
          pmesg(D_CVMFS, "no path for inode found... data corrupt?");
          
          fuse_reply_err(req, ENOENT);
          return;
       }
       
+      catalog::lock();
+      
+      // load nested catalog if parent is a nested catalog
+      if (parentDirent.flags & catalog::DIR_NESTED) {
+         pmesg (D_CVMFS, "lookup encountered nested catalog... loading");
+         if (not load_and_attach_nested_catalog(parentPath, parentDirent)) {
+            pmesg(D_CVMFS, "Error while loading nested catalog %s", parentPath.c_str());
+            catalog::unlock();
+            fuse_reply_err(req, ENOENT);
+            return;
+         }
+      }
+      
       // get information about file out of catalog
       string path = parentPath + "/" + name;
+      int catalog_id = find_catalog_id(path);
+      
+      // check if nested catalog is dirty and reload it if neccessary
+      // this DOES NOT change the catalog id
+      if (refresh_dirty_catalog(catalog_id) != 0) {
+         fuse_reply_err(req, EIO);
+      }
+      
+      // check if catalogs have to be reloaded
+      if (refresh_catalogs(catalog_id) != 0) {
+         fuse_reply_err(req, EIO);
+      }
+      
+      // load information by using the path!! inodes may be srewed after catalog reload
       hash::t_md5 md5(catalog::mangled_path(path));
+      catalog_id = find_catalog_id(path); // better do it again...
       catalog::t_dirent dirent;
-      if (not catalog::lookup(md5, dirent)) {
+      bool found = catalog::lookup_informed_unprotected(md5, catalog_id, dirent);
+      
+      catalog::unlock();
+      
+      // information found?
+      if (not found) {
          fuse_reply_err(req, ENOENT);
          return;
       }
@@ -1226,7 +1345,7 @@ namespace cvmfs {
       // we got the parent inode from FUSE... save it
       dirent.parentInode = parent;
       
-      // maintain caches
+      // maintain caches (TODO: currently this does not work because of dirty catalog reloading)
       inode_cache->insert(dirent.inode, dirent);
       path_cache->insert(dirent.inode, path);
       
@@ -1254,184 +1373,42 @@ namespace cvmfs {
     * they might be cached by the kernel.
     */
    static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_getattr (stat) for inode: %d", ino);
-
-      struct stat s;
-      struct catalog::t_dirent dirent;
       
-      if (get_dirent_for_inode(ino, dirent)) {
-         // cache hit
-         dirent.to_stat(&s);
-         fuse_reply_attr(req, &s, 1.0); // TODO:: replace magic number
-         return;
-      } else {
+      catalog::lock();
+      
+      struct catalog::t_dirent d;
+      if (not get_dirent_for_inode(ino, d)) {
+         catalog::unlock();
          fuse_reply_err(req, ENOENT);
          return;
       }
-
-//       string path;
-//       if (not get_path_for_inode(ino, path)) {
-//          fuse_reply_err(req, ENOENT);
-//          return;
-//       }
-//       
-//       Tracer::trace(Tracer::FUSE_STAT, path, "stat() call");
-//       const hash::t_md5 md5(catalog::mangled_path(path));
-//       
-//       catalog::lock();
-//       int catalog_id = find_catalog_id(path);
-//       time_t now = time(NULL);
-// 
-//       /* Check for drainout timestamp, reload and reset if larger then max_cache_timeout */
-//       if (drainout_deadline && (now > drainout_deadline)) {
-//          /* Reload root catalog */
-//          pmesg(D_CVMFS, "Catalog %d: TTL expired, kernel cache drainout complete, reloading...", catalog_id);
-//          
-//          /* Don't load very old stuff */
-//          if (now > drainout_deadline + max_cache_timeout)
-//             next_root = hash::t_sha1();
-//          
-//          int result = load_and_attach_catalog(catalog::get_catalog_url(0),
-//                                               hash::t_md5(catalog::get_root_prefix_specific(0)),
-//                                               catalog_tree::get_catalog(0)->path, 0, false, next_root);
-// //         fuse_unset_cache_drainout();
-//          drainout_deadline = 0;
-//          
-//          if (result != 0) {
-//             catalog::unlock();
-//             atomic_inc(&nioerr);
-//             fuse_reply_err(req, result);
-//             return;
-//          }
-//          
-//          logmsg("switched to catalog revision %d", catalog::get_revision());
-//       }
-//       
-//       /* Check catalog TTL, goto drainout mode if necessary */
-//       pmesg(D_CVMFS, "current time %lu, deadline %lu", time(NULL), catalog_tree::get_catalog(catalog_id)->expires);      
-//       if ((!drainout_deadline) && (now > catalog_tree::get_catalog(catalog_id)->expires)) {
-//          /* Reload root catalog */
-//          pmesg(D_CVMFS, "Catalog %d: TTL expired, draining out caches...", catalog_id);
-//          
-//          hash::t_sha1 new_catalog;
-//          catalog_tree::catalog_meta_t *clginfo = catalog_tree::get_catalog(0);
-//          int result = check_catalog(catalog::get_catalog_url(0),
-//                                     hash::t_md5(catalog::get_root_prefix_specific(0)),
-//                                     clginfo->path, new_catalog);
-//          
-//          if (result < 0) {
-//             clginfo->expires = time(NULL) + effective_ttl(short_term_ttl);
-//             catalog_tree::visit_children(0, update_ttl_shortterm);
-//          }
-//          
-//          if (result == 0) {
-//             clginfo->expires = now + effective_ttl(catalog::get_ttl(0));
-//             catalog_tree::visit_children(0, update_ttl);
-//          }
-//          
-//          if (result == 1) {
-// //            fuse_set_cache_drainout();
-//             drainout_deadline = time(NULL) + max_cache_timeout;
-//             next_root = new_catalog;
-//          }
-//       }
-//       
-//       /* Hopefully in mem-cache */
-//       if (lookup_cache(md5, d)) {
-//          pmesg(D_CVMFS, "catalog cache HIT (getattr)");
-//          if (d.catalog_id < 0) {
-//             catalog::unlock();
-//             Tracer::trace(Tracer::FUSE_STAT, path, "memcache n-hit");
-//             return -ENOENT;
-//          } else {
-//             Tracer::trace(Tracer::FUSE_STAT, path, "memcache hit");
-//          }
-//       } else {
-//          /* Otherwise, look in the catalog */
-//          pmesg(D_CVMFS, "catalog cache MISS (getattr)");
-//          int catalog_id = find_catalog_id(path);
-//          
-//          /* Check if this catalog is dirty, reload if necessary 
-//             Can only happen for nested catalogs. */
-//          int result = refresh_catalog(catalog_id);
-//          if (result != 0) {
-//             catalog::unlock();
-//             atomic_inc(&nioerr);
-//             return result;
-//          }
-//          
-//          /* Now lookup */
-//          if (!catalog::lookup_informed_unprotected(md5, catalog_id, d)) {
-//             pmesg(D_CVMFS, "getattr: file %s not existant, maybe we are in a nested catalog?", c_path);
-//             
-//             /* Look for nested catalog in a parent path */
-//             const string p_path = get_parent_path(path);
-//             const hash::t_md5 p_md5(catalog::mangled_path(p_path));
-//             catalog::t_dirent p;
-//             if ((lookup_cache(p_md5, p) || catalog::lookup_informed_unprotected(p_md5, find_catalog_id(p_path), p)) && 
-//                 (p.flags & catalog::DIR_NESTED) && (p_path != "")) 
-//             {
-//                /* Load nested catalog */
-//                pmesg(D_CVMFS, "first time access to nested path %s, loading catalog at %s", c_path, p_path.c_str());
-//                hash::t_sha1 expected_clg;
-//                if (!catalog::lookup_nested_unprotected(
-//                    p.catalog_id, catalog::mangled_path(p_path), expected_clg))
-//                {
-//                   catalog::unlock();
-//                   logmsg("Nested catalog at %s not found (getattr)", c_path);
-//                   return -ENOENT;
-//                }
-//                
-//                int result = load_and_attach_catalog(p_path, 
-//                   hash::t_md5(catalog::mangled_path(p_path)), p_path, -1, false, expected_clg);
-//                if (result != 0) {
-//                   catalog::unlock();
-//                   atomic_inc(&nioerr);
-//                   return result;
-//                }
-//                
-//                /* and again, maybe we find it in the nested catalog */
-//                if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-//                   insert_cache_negative(md5);
-//                   catalog::unlock();
-//                   return -ENOENT;
-//                }
-//             } else {
-//                insert_cache_negative(md5);
-//                catalog::unlock();
-//                Tracer::trace(Tracer::FUSE_STAT, path, "ENOENT");
-//                return -ENOENT;
-//             }
-//          }
-//          /* OK, we have d from the catalog */
-//       }
-//       
-//       insert_cache(md5, d);
-//       catalog::unlock();
-//       
-//       /* The actual getattr-work */
-//       d.to_stat(info);
-//       //if (path == "/") {
-//       //   info->st_mode &= ~7;
-//       //}
-//       if (d.flags & catalog::FILE_LINK) {
-//          info->st_size = expand_env(d.symlink).length();
-//          pmesg(D_CVMFS, "stat %s expanded to %s", c_path, expand_env(d.symlink).c_str());
-//       }
       
-//      fuse_reply_err(req, EROFS);
+      catalog::unlock();
+      
+      /* The actual getattr-work */
+      struct stat info;
+      d.to_stat(&info);
+      
+      fuse_reply_attr(req, &info, 1.0); // TODO:: replace magic number
    }
-
 
    /**
     * Reads a symlink from the catalog.  Environment variables are expanded.
     */
    static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_readlink on inode: %d", ino);
       Tracer::trace(Tracer::FUSE_READLINK, "no path provided", "readlink() call");
-   
+      bool found;
       struct catalog::t_dirent d;
-      if (not get_dirent_for_inode(ino, d)) {
+      
+      catalog::lock();
+      found = get_dirent_for_inode(ino, d);
+      catalog::unlock();
+      
+      if (not found) {
          fuse_reply_err(req, ENOENT);
          return;
       }
@@ -1445,88 +1422,6 @@ namespace cvmfs {
    
       fuse_reply_readlink(req, lnk_exp.c_str());
    }
-   
-
-   /**
-    * The ls-callback. If we hit a nested catalog, we load it.
-    */
-   // static int cvmfs_readdir(const char *path, 
-   //                          void *buf, 
-   //                          fuse_fill_dir_t filler, 
-   //                          off_t offset __attribute__((unused)),
-   //                          struct fuse_file_info *fi __attribute__((unused)))
-   // {
-   //    /* Read a directory structure, this is enough to be able to navigate through
-   //       a filesystem */
-   //    struct stat info;
-   //    const hash::t_md5 md5 = hash::t_md5(catalog::mangled_path(path));
-   //    
-   //    pmesg(D_CVMFS, "readdir %s", path);
-   //    
-   //    Tracer::trace(Tracer::FUSE_LS, path, "ls() call");
-   //    
-   //    struct catalog::t_dirent d;
-   //    catalog::lock();
-   //    if (lookup_cache(md5, d)) {
-   //       pmesg(D_CVMFS, "catalog cache HIT");
-   //       if (d.catalog_id < 0) {
-   //          catalog::unlock();
-   //          return -ENOENT;
-   //       }
-   //    } else {
-   //       if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-   //          catalog::unlock();
-   //          return -ENOENT;
-   //       }
-   //    }
-   //    /* Maybe we have to load the nested catalog */
-   //    if (d.flags & catalog::DIR_NESTED) {
-   //       pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path);
-   //       hash::t_sha1 expected_clg;
-   //       if (!catalog::lookup_nested_unprotected(
-   //           d.catalog_id, catalog::mangled_path(path), expected_clg))
-   //       {
-   //          catalog::unlock();
-   //          logmsg("Nested catalog at %s not found (ls)", path);
-   //          return -ENOENT;
-   //       }
-   //       
-   //       int result = load_and_attach_catalog(path, 
-   //          hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
-   //       if (result != 0) {
-   //          catalog::unlock();
-   //          atomic_inc(&nioerr);
-   //          return result;
-   //       }
-   //    }
-   //    
-   //    pmesg(D_CVMFS, "Found entry %s in catalog %d, check if directory", d.name.c_str(), d.catalog_id);
-   //    if(!S_ISDIR(d.mode)) {
-   //       catalog::unlock();
-   //       return -ENOTDIR;
-   //    }
-   //    
-   //    d.to_stat(&info);
-   //    filler(buf, ".", &info, 0);
-   //    
-   //    struct catalog::t_dirent p;
-   //    if (catalog::parent_unprotected(md5, p)) {
-   //       p.to_stat(&info);
-   //       filler(buf, "..", &info, 0);
-   //    }
-   //    
-   //    vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
-   //    catalog::unlock();
-   //    for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); 
-   //         i != iEnd; ++i) 
-   //    {
-   //       i->to_stat(&info);
-   //       filler(buf, i->name.c_str(), &info, 0); 
-   //    }
-   //    
-   //    return 0;
-   // }
-   
 
    /**
     * Open a file from cache.  If necessary, file is downloaded first.
@@ -1536,15 +1431,21 @@ namespace cvmfs {
     */
    static void cvmfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
    { 
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_open on inode: %d", ino);
       Tracer::trace(Tracer::FUSE_OPEN, "no path provided", "open() call");
 
       int fd = -1;
 
-      /* Look for it in the catalog. If it's not there, it doesn't exist. */
       struct catalog::t_dirent d;
       string path;
-      if (not get_dirent_for_inode(ino, d) || not get_path_for_inode(ino, path)) {
+      bool found;
+      
+      catalog::lock();
+      found = get_dirent_for_inode(ino, d) && get_path_for_inode(ino, path);
+      catalog::unlock();
+      
+      if (not found) {
          fuse_reply_err(req, ENOENT);
          return;
       }
@@ -1605,6 +1506,7 @@ namespace cvmfs {
     */
    static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
    {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_read on inode: %d reading %d bytes from offset %d", ino, size, off);
       Tracer::trace(Tracer::FUSE_READ, "path", "read() call");
       
@@ -1627,6 +1529,7 @@ namespace cvmfs {
     */
    static void cvmfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
    {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_release on inode: %d", ino);
             
       const int64_t fd = fi->fh;
@@ -1635,16 +1538,20 @@ namespace cvmfs {
       fuse_reply_err(req, 0);
    }
 	
-   struct dirbuf {
+   struct dirListingBuffer {
       char *p;
       size_t size;
    };
+   
+   std::map<unsigned int, dirListingBuffer> open_dir_listings;
+   unsigned int current_dir_listing_handle = 0;
+   pthread_mutex_t open_dir_listings_mutex = PTHREAD_MUTEX_INITIALIZER;
 
    #define min(x, y) ((x) < (y) ? (x) : (y))
 	
-   static int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize, off_t off, size_t maxsize)
+   static int replyBufferLimited(fuse_req_t req, const char *buf, size_t bufsize, off_t off, size_t maxsize)
    {
-      if (off < bufsize) {
+      if (off < (int)bufsize) {
          return fuse_reply_buf(req, buf + off, min(bufsize - off, maxsize));
       }
       else {
@@ -1652,7 +1559,7 @@ namespace cvmfs {
       }
    }
 
-   static void dirbuf_add(fuse_req_t req, struct dirbuf *b, const char *name, struct stat *s)
+   static void addToDirListingBuffer(fuse_req_t req, struct dirListingBuffer *b, const char *name, struct stat *s)
    {
       size_t oldsize = b->size;
       b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
@@ -1670,7 +1577,75 @@ namespace cvmfs {
     */
    static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 	{
+	   ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_opendir on inode: %d", ino);
+	   
+      string path;
+      struct catalog::t_dirent d;
+      bool found;
+      
+      catalog::lock();
+      found = get_path_for_inode(ino, path) && get_dirent_for_inode(ino, d);
+      
+      if (not found) {
+         fuse_reply_err(req, ENOENT);
+         return;
+      }
+   
+      // load nested catalog
+      if (d.flags & catalog::DIR_NESTED) {
+         pmesg(D_CVMFS, "opendir encountered nested catalog... loading");
+         
+         if (not load_and_attach_nested_catalog(path, d)) {
+            pmesg(D_CVMFS, "failed to load nested catalog");
+            catalog::unlock();
+            fuse_reply_err(req, ENOENT);
+            return;
+         }
+      }
+      
+      if(not S_ISDIR(d.mode)) {
+         catalog::unlock();
+         fuse_reply_err(req, ENOTDIR);
+         return;
+      }
+
+      // build dir listing
+      struct dirListingBuffer b;
+      memset(&b, 0, sizeof(b));
+   
+      // add current directory link
+      struct stat info;
+      memset(&info, 0, sizeof(info));
+      d.to_stat(&info);
+      addToDirListingBuffer(req, &b, ".", &info);
+   
+      // add parent directory link
+      struct catalog::t_dirent p;
+      if (d.inode != catalog::get_root_inode() && get_dirent_for_inode(d.parentInode, p)) {
+         p.to_stat(&info);
+         addToDirListingBuffer(req, &b, "..", &info);
+      }
+
+      // create directory listing
+      hash::t_md5 md5(catalog::mangled_path(path));
+      vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
+      catalog::unlock();
+      
+      for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); i != iEnd; ++i) 
+      {
+         i->to_stat(&info);
+         addToDirListingBuffer(req, &b, i->name.c_str(), &info);
+      }
+      
+      // save the directory listing and return a handle to the listing
+      pthread_mutex_lock(&open_dir_listings_mutex);
+      open_dir_listings[current_dir_listing_handle] = b;
+      fi->fh = current_dir_listing_handle;
+      ++current_dir_listing_handle;
+      pthread_mutex_unlock(&open_dir_listings_mutex);
+      
+      // reply
       fuse_reply_open(req, fi);
 	}
 
@@ -1679,8 +1654,24 @@ namespace cvmfs {
 	 */
 	static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 	{
+	   ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_releasedir on inode: %d", ino);
-      fuse_reply_err(req, 0);
+      
+      // find the directory listing to release and release it
+      int reply = 0;
+      pthread_mutex_lock(&open_dir_listings_mutex);
+      std::map<unsigned int, dirListingBuffer>::iterator openDir = open_dir_listings.find(fi->fh);
+      if (openDir != open_dir_listings.end()) {
+         free(openDir->second.p);
+         open_dir_listings.erase(openDir);
+         reply = 0;
+      } else {
+         reply = EIO;
+      }
+      pthread_mutex_unlock(&open_dir_listings_mutex);
+      
+      // reply on request
+      fuse_reply_err(req, reply);
 	}
 	
 	/**
@@ -1688,84 +1679,18 @@ namespace cvmfs {
     */
    static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
 	{
+	   ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_readdir on inode %d reading %d bytes from offset %d", ino, size, off);
 
-      string path, name;
-      if (not get_path_for_inode(ino, path)) {
-         fuse_reply_err(req, ENOENT);
-         return;
-      }
-   
-      hash::t_md5 md5(catalog::mangled_path(path));
-   
-      struct catalog::t_dirent d;
-      catalog::lock();
-      if (lookup_cache(md5, d)) {
-         pmesg(D_CVMFS, "catalog cache HIT");
-         if (d.catalog_id < 0) {
-            catalog::unlock();
-            fuse_reply_err(req, ENOENT);
-            return;
-         }
+      // find the directory listing to release and release it
+      pthread_mutex_lock(&open_dir_listings_mutex);
+      std::map<unsigned int, dirListingBuffer>::const_iterator openDir = open_dir_listings.find(fi->fh);
+      pthread_mutex_unlock(&open_dir_listings_mutex);
+      if (openDir != open_dir_listings.end()) {
+         replyBufferLimited(req, openDir->second.p, openDir->second.size, off, size);
       } else {
-         if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-            catalog::unlock();
-            fuse_reply_err(req, ENOENT);
-            return;
-         }
+         fuse_reply_err(req, EIO);
       }
-   
-      // load nested catalog
-      if (d.flags & catalog::DIR_NESTED) {
-         pmesg(D_CVMFS, "listing nested catalog at %s (first time access)", path.c_str());
-         hash::t_sha1 expected_clg;
-         if (!catalog::lookup_nested_unprotected(d.catalog_id, catalog::mangled_path(path), expected_clg))
-         {
-            catalog::unlock();
-            logmsg("Nested catalog at %s not found (ls)", path.c_str());
-            fuse_reply_err(req, ENOENT);
-            return;
-         }
-      
-         int result = load_and_attach_catalog(path, hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
-         if (result != 0) {
-            catalog::unlock();
-            atomic_inc(&nioerr);
-            fuse_reply_err(req, result);
-            return;
-         }
-      }
-
-      // build dir listing
-      struct dirbuf b;
-      memset(&b, 0, sizeof(b));
-   
-      struct stat info;
-      memset(&info, 0, sizeof(info));
-
-      d.to_stat(&info);
-
-      dirbuf_add(req, &b, ".", &info);
-   
-      struct catalog::t_dirent p;
-      if (catalog::parent_unprotected(md5, p)) {
-         p.to_stat(&info);
-         dirbuf_add(req, &b, "..", &info);
-      }
-
-      vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
-      catalog::unlock();
-      for (vector<catalog::t_dirent>::const_iterator i = dir.begin(), iEnd = dir.end(); i != iEnd; ++i) 
-      {
-         i->to_stat(&info);
-         name = i->name;
-      
-         // should be improved :D
-         dirbuf_add(req, &b, name.c_str(), &info);
-      }
-   
-      reply_buf_limited(req, b.p, b.size, off, size);
-      free(b.p);
 	}
    
    /**
@@ -1817,6 +1742,7 @@ namespace cvmfs {
 
    static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino)
    {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_statfs on inode: %d", ino);
       
       /* If we return 0 it will cause the fs 
@@ -1871,6 +1797,7 @@ namespace cvmfs {
    }
    
    static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size) {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
       // const string attr = name;
       //       catalog::t_dirent d;
@@ -2051,20 +1978,23 @@ namespace cvmfs {
    }
 
    static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_listxattr on inode: %d", ino);
       fuse_reply_err(req, EROFS);
    }
    
    static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+      ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_forget on inode: %d", ino);
       fuse_reply_err(req, EROFS);
    }
 
    static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
+      ino = mangle_inode(ino);
       // TODO: implement this properly
       
    	pmesg(D_CVMFS, "cvmfs_access on inode: %d with mask %s", ino, humanizeBitmap(mask).c_str());
-      if (mask != 1) {
+      if (mask > 1) {
          fuse_reply_err(req, EACCES);
          return;
       }

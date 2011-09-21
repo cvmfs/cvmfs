@@ -38,7 +38,6 @@ namespace catalog {
    const unsigned int INITIAL_INODE_OFFSET = 255;
 
    const unsigned int INVALID_INODE = 0;
-   const unsigned int ROOT_INODE = 256;
 
 	/**
 	 *  saves the linkcount into the reserved 8-Bit area of the flags bitmap
@@ -145,6 +144,7 @@ namespace catalog {
    bool set_previous_revision(const unsigned cat_id, const hash::t_sha1 &sha1); /* unlocked */
    hash::t_sha1 get_previous_revision(const unsigned cat_id); /* unlocked */
    uint64_t get_num_dirent(const unsigned cat_id); /* unlocked */
+   uint64_t get_root_inode(); /* unlocked */
    
    void transaction(const unsigned cat_id);
    bool transaction_running(const unsigned cat_id);
@@ -171,6 +171,8 @@ namespace catalog {
    bool lookup(const hash::t_md5 &key, t_dirent &result);  /* Locked */
    bool lookup_inode_unprotected(const uint64_t inode, t_dirent &result, const bool lookup_parent);
 	bool lookup_inode(const uint64_t inode, t_dirent &result, const bool lookup_parent); /* Locked */
+   int find_catalog_id_from_inode(const uint64_t inode);
+   uint64_t get_inode_offset_for_catalog_id(const int catalog_id);
 
    bool parent(const hash::t_md5 &key, t_dirent &result);  /* Locked */
    bool parent_unprotected(const hash::t_md5 &key, t_dirent &result);

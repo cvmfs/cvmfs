@@ -67,7 +67,6 @@ namespace catalog {
    gid_t gid; ///< Required for converting a catalog entry into struct stat
    int num_catalogs = 0; ///< We support nested catalogs.  There are loaded by SQLite's ATTACH.  In the end, we operate on a set of multiple catalogs
    int current_catalog = 0; ///< We query the catalogs one after another until success.  We use a lazy approach, meaning after success we ask that catalog next time again.
-	vector<unsigned int> inodeOffsets; ///< inodes are assigned at runtime... the number of entries of all catalog is the offset for the beginning of the next catalog
 	map<unsigned int, map<uint64_t, uint64_t> > hardlinkInodeMap; /// < mapping from catalog_id, hardlinkGroupId to inodeNumber (must be shifted by offset afterwards)
 
    vector<sqlite3 *> db;
@@ -84,6 +83,40 @@ namespace catalog {
    vector<bool> opened_read_only;
    vector<string> catalog_urls;
    vector<string> catalog_files;
+   
+   typedef struct {
+      uint64_t offset;
+      uint64_t size;
+   } inode_chunk_t;
+   
+   uint64_t current_inode_offset = INITIAL_INODE_OFFSET;
+	vector<inode_chunk_t> inode_chunks; ///< inodes are assigned at runtime... every catalog is assigned an inode chunk at attach time
+	
+	inode_chunk_t get_next_inode_chunk_of_size(uint64_t size) {
+      inode_chunk_t new_chunk;
+      new_chunk.offset = current_inode_offset;
+      new_chunk.size = size;
+      current_inode_offset += size;
+      return new_chunk;
+	}
+	
+	inode_chunk_t realign_inode_chunks_for_catalog(int cat_id, uint64_t size) {
+	   // create a new inode chunk out of the old ones
+      inode_chunk_t old_chunk = inode_chunks[cat_id];
+      inode_chunk_t new_chunk;
+      new_chunk.offset = old_chunk.offset;
+      new_chunk.size = size;
+      
+      // align the successing chunks according to the new one
+      int64_t delta_offset = new_chunk.size - old_chunk.size;
+      for (int i = cat_id + 1; i < inode_chunks.size(); ++i) {
+         inode_chunks[i].offset += delta_offset;
+      }
+      
+      // return the new chunk
+      return new_chunk;
+	}
+	
    /* __thread This is actually necessary... but not allowed until C++0x */string sqlError;
 
 	// thread local storage for both Mac OS X and Linux wrapped in a small simple abstraction API
@@ -398,6 +431,14 @@ namespace catalog {
       return (time_t)result;
    }
    
+   uint64_t get_inode_offset_for_catalog_id(int catalog_id) {
+      if (catalog_id >=0 && catalog_id < (int)inode_chunks.size()) {
+         return inode_chunks[catalog_id].offset;
+      } else {
+         return 0;
+      }
+   }
+   
    /**
     * Sets the SHA1 of the previous snapshotted catalog in the properties table
     */
@@ -420,6 +461,22 @@ namespace catalog {
       int err = sqlite3_step(stmt);
       if (err == SQLITE_ROW)
          result.from_hash_str((char *)sqlite3_column_text(stmt, 0));
+      sqlite3_finalize(stmt);
+      
+      return result;
+   }
+   
+   uint64_t get_max_rowid(const unsigned cat_id) {
+      enforce_mem_limit();
+      
+      uint64_t result = 0;
+      
+      const string sql = "SELECT MAX(rowid) FROM catalog;";
+      sqlite3_stmt *stmt;
+      sqlite3_prepare_v2(db[cat_id], sql.c_str(), -1, &stmt, NULL);
+      int err = sqlite3_step(stmt);
+      if (err == SQLITE_ROW)
+         result = sqlite3_column_int64(stmt, 0);
       sqlite3_finalize(stmt);
       
       return result;
@@ -660,6 +717,7 @@ namespace catalog {
             catalog_files[i] = catalog_files[i+1];
             catalog_urls[i] = catalog_urls[i+1];
             opened_read_only[i] = opened_read_only[i+1];
+            inode_chunks[i] = inode_chunks[i+1];
             in_transaction[i] = false;
          }
          stmts_unlink.pop_back();
@@ -672,6 +730,7 @@ namespace catalog {
          stmts_lookup.pop_back();
          stmts_lookup_inode.pop_back();
          in_transaction.pop_back();
+         inode_chunks.pop_back();
          opened_read_only.pop_back();
          catalog_files.pop_back();
          catalog_urls.pop_back();
@@ -681,24 +740,6 @@ namespace catalog {
       
       return result;
    }
-
-	/**
-	 *  gets the number of entries in the catalog loaded before this one (cat_id - 1) and 
-	 *  uses this as inode offset for it's own inode assignments
-	 */
-	void setInodeOffsetForCatalog(const unsigned cat_id) {
-		unsigned int offset = 0;
-		
-		if (cat_id == 0) {
-			// root catalog...
-			offset = INITIAL_INODE_OFFSET;
-		} else {
-			// offset is number of dir entries of all predecessing catalogs
-			offset = get_num_dirent(cat_id - 1) + inodeOffsets[cat_id - 1];
-		}
-		
-		inodeOffsets.push_back(offset);
-	}
 
 
    /**
@@ -768,10 +809,10 @@ namespace catalog {
    
       current_catalog = num_catalogs;
       num_catalogs++;
-
-	  setInodeOffsetForCatalog(current_catalog);
       
       if (open_transaction) transaction(num_catalogs-1);
+      
+      inode_chunks.push_back(get_next_inode_chunk_of_size(get_max_rowid(current_catalog)));
       
       return true;
       
@@ -810,6 +851,8 @@ namespace catalog {
       
       catalog_urls[cat_id] = url;
       catalog_files[cat_id] = db_file;
+      inode_chunks[cat_id] = realign_inode_chunks_for_catalog(cat_id, get_max_rowid(cat_id));
+      
       return true;
    }
    
@@ -1119,6 +1162,10 @@ namespace catalog {
                      const time_t mtime, const hash::t_sha1 &checksum)
    {
       return update_inode_internal(inode, NULL, size, mtime, checksum);
+   }
+   
+   uint64_t get_root_inode() {
+      return (inode_chunks.size() == 0) ? INITIAL_INODE_OFFSET + 1 : inode_chunks[0].offset + 1;
    }
    
    
@@ -1446,12 +1493,12 @@ namespace catalog {
 			}
 		}
 		
-		if (inodeOffsets.size() <= catalog_id) {
+		if (inode_chunks.size() <= catalog_id) {
 			pmesg(D_CATALOG, "catalog_id is not recognized by inode offset vector");
 			exit(1);
 		}
 		
-		return inode + inodeOffsets[catalog_id];
+		return inode + inode_chunks[catalog_id].offset;
 	}
    
    /**
@@ -1542,17 +1589,19 @@ namespace catalog {
    }
    
    int find_catalog_id_from_inode(const uint64_t inode) {
-      vector<unsigned int>::const_iterator i = inodeOffsets.begin();
-      vector<unsigned int>::const_iterator iend = inodeOffsets.end();
-      int cat_id = -1; // not found
+      vector<inode_chunk_t>::const_iterator i = inode_chunks.begin();
+      vector<inode_chunk_t>::const_iterator iend = inode_chunks.end();
+      int cat_id = 0; // not found
       
       // loop through the offset vector to find the catalog according to this offset
-      while (i != iend && *i < inode) {
-         i++;
+      for (; i != iend; ++i) {
+         if (inode > i->offset && inode <= i->size + i->offset) {
+            return cat_id;
+         }
          cat_id++;
       }
       
-      return cat_id;
+      return -1;
    }
    
    bool lookup_inode_unprotected(const uint64_t inode, t_dirent &result, const bool lookup_parent) {
@@ -1565,7 +1614,7 @@ namespace catalog {
       }
       
       sqlite3_stmt *stmt_lookup_inode = stmts_lookup_inode[catalog_id];
-      int rowid = inode - inodeOffsets[catalog_id];
+      int rowid = inode - inode_chunks[catalog_id].offset;
    
       bool found = false;
    
@@ -2081,7 +2130,7 @@ namespace catalog {
       s->st_uid = uid;
       s->st_gid = gid;
       s->st_rdev = 1;
-      s->st_size = size;
+      s->st_size = (flags & catalog::FILE_LINK) ? expand_env(symlink).length() : size;
       s->st_blksize = 4096; /* will be ignored by Fuse */
       s->st_blocks = 1+size/512;
       s->st_atime = mtime;

@@ -361,12 +361,14 @@ namespace talk {
             else if (line == "open catalogs") {
                vector<string> prefix;
                vector<time_t> last_modified, expires;
-               cvmfs::info_loaded_catalogs(prefix, last_modified, expires);
-               string result = "Prefix | Last Modified | Expires\n";
+               vector<unsigned int> inode_offsets;
+               cvmfs::info_loaded_catalogs(prefix, last_modified, expires, inode_offsets);
+               string result = "Prefix | Last Modified | Expires | inode offset\n";
                for (unsigned i = 0; i < prefix.size(); ++i) {
                   result += ((prefix[i] == "") ? "/" : prefix[i]) + " | ";
                   result += ((last_modified[i] == 0) ? "n/a" : localtime_ascii(last_modified[i], true)) + " | ";
-                  result += (expires[i] == 0) ? "n/a" : localtime_ascii(expires[i], true);
+                  result += (expires[i] == 0) ? "n/a" : localtime_ascii(expires[i], true) + " | ";
+                  result += " " + inode_offsets[i];
                   result += "\n";
                }
                                                                            

@@ -10,8 +10,8 @@ namespace hash {
       t_md5(const std::string &str);
       t_md5() { memset(digest, 0, 16); } /* zero-digest (standard initializer) */
       t_md5(const int64_t part1, const int64_t part2) {
-         *(digest + 0) = part1;
-         *(digest + 8) = part2;
+         memcpy(digest, &part1, 8);
+         memcpy(digest+8, &part2, 8);
       }
       bool operator ==(const t_md5 &other) const;
       unsigned char digest[16];

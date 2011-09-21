@@ -143,13 +143,15 @@ private:
 	
 	void compressAndHashFileQueue();
 	void addFileQueueToCatalogs();
+   void releaseFileQueue();
 	
 	inline bool addFileToDatastore(DirEntry *entry, hash::t_sha1 &hash) { return addFileToDatastore(entry, "", hash); }
 	bool addFileToDatastore(DirEntry *entry, const std::string &suffix, hash::t_sha1 &hash);
 	
 	inline HardlinkGroupMap& getHardlinkMap() { return mHardlinkStack.top(); }
 	
-	void addHardlinkGroup(const HardlinkGroupMap &hardlinks);
+	void addHardlinkGroups(const HardlinkGroupMap &hardlinks);
+   void cleanupHardlinkGroups(HardlinkGroupMap &hardlinks);
 };
 
 }
