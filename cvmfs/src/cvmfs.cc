@@ -1799,194 +1799,189 @@ namespace cvmfs {
    static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size) {
       ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
-      // const string attr = name;
-      //       catalog::t_dirent d;
-      //       hash::t_md5 md5(catalog::mangled_path(path));
-      //       
-      //       pmesg(D_CVMFS, "getxattr %s on %s", name, path);
-      //       
-      //       catalog::lock();      
-      //       if (!catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-      //          catalog::unlock();
-      //          return -ENOENT;
-      //       }
-      //       catalog::unlock();
-      //       
-      //       if (attr == "user.pid") {
-      //          ostringstream result;
-      //          result << cvmfs::pid;
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.version") {
-      //          const string result = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
-      //          return fill_xattr(result, value, vlen);
-      //       } else if (attr == "user.hash") {
-      //          if (d.checksum != hash::t_sha1()) {
-      //             const string result = d.checksum.to_string() + " (SHA-1)";
-      //             return fill_xattr(result, value, vlen);
-      //          }
-      //          return -ENOATTR;
-      //       } else if (attr == "user.lhash") {
-      //          if (d.checksum != hash::t_sha1()) {
-      //             string result;
-      //             int fd = cache::open(d.checksum);
-      //             if (fd < 0)
-      //                return fill_xattr("Not in cache", value, vlen);
-      //             
-      //             hash::t_sha1 hash;
-      //             FILE *f = fdopen(fd, "r");
-      //             if (!f)
-      //                return -EIO;
-      //             
-      //             if (compress_file_sha1_only(f, hash.digest) != 0) {
-      //                fclose(f);
-      //                return -EIO;
-      //             }
-      //             fclose(f);
-      //             return fill_xattr(hash.to_string() + " (SHA-1)", value, vlen);
-      //          }
-      //          return -ENOATTR;
-      //       } else if (attr == "user.revision") {
-      //          catalog::lock();
-      //          const uint64_t revision = catalog::get_revision();
-      //          catalog::unlock();
-      //          
-      //          ostringstream result;
-      //          result << revision;
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.expires") {
-      //          catalog::lock();
-      //          int catalog_id = find_catalog_id(path);
-      //          time_t expires = catalog_tree::get_catalog(catalog_id)->expires;
-      //          catalog::unlock();
-      //          
-      //          time_t now = time(NULL);
-      //          ostringstream result;
-      //          result << (expires-now)/60;
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.maxfd") {
-      //          ostringstream result;
-      //          result << nofiles-NUM_RESERVED_FD;
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.usedfd") {
-      //          ostringstream result;
-      //          result << atomic_read(&open_files);
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.nioerr") {
-      //          ostringstream result;
-      //          result << atomic_read(&nioerr);
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.proxy") {
-      //          int num;
-      //          int num_lb;
-      //          char *current;
-      //          int current_lb;
-      //          char **proxies;
-      //          int *lb_starts;
-      //          curl_get_proxy_info(&num, &current, &current_lb, &proxies, &num_lb, &lb_starts);
-      //          string proxy;
-      //          if (num) {
-      //             proxy = string(current);
-      //             for (int i = 0; i < num; ++i) {
-      //                free(proxies[i]);
-      //             }
-      //             free(lb_starts);
-      //             free(proxies);
-      //             free(current);
-      //          } else {
-      //             proxy = "DIRECT";
-      //          }
-      //          
-      //          return fill_xattr(proxy, value, vlen);
-      //       } else if (attr == "user.host") {
-      //          int num;
-      //          int current;
-      //          char **all_hosts;
-      //          int *rtt;
-      //          curl_get_host_info(&num, &current, &all_hosts, &rtt);
-      //          const string host = string(all_hosts[current]);
-      //          free(rtt);
-      //          free(all_hosts);
-      //          
-      //          return fill_xattr(host, value, vlen);
-      //       } else if (attr == "user.uptime") {
-      //          time_t now = time(NULL);
-      //          uint64_t uptime = now - boot_time;
-      //          ostringstream result;
-      //          /*if (uptime / 60) {
-      //             if (uptime / 3600) {
-      //                if (uptime / 84600) {
-      //                   result << uptime/84600 << " days, ";
-      //                }
-      //                result << (uptime / 3600)%24 << " hours, ";
-      //             }
-      //             result << (uptime / 60)%60 << " minutes, ";
-      //          }*/
-      //          result << uptime / 60;
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.nclg") {
-      //          catalog::lock();
-      //          int num = catalog::get_num_catalogs();
-      //          catalog::unlock();
-      //          ostringstream result;
-      //          result << num;
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.nopen") {
-      //          ostringstream result;
-      //          result << atomic_read64(&nopen);
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.ndownload") {
-      //          ostringstream result;
-      //          result << atomic_read64(&ndownload);
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.timeout") {
-      //          unsigned seconds, seconds_direct;
-      //          curl_get_timeout(&seconds, &seconds_direct);
-      //          ostringstream result;
-      //          result << seconds;
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.timeout_direct") {
-      //          unsigned seconds, seconds_direct;
-      //          curl_get_timeout(&seconds, &seconds_direct);
-      //          ostringstream result;
-      //          result << seconds_direct;
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.rx") {
-      //          int64_t rx = curl_get_allbytes();
-      //          ostringstream result;
-      //          result << rx/1024;
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       } else if (attr == "user.speed") {
-      //          int64_t rx = curl_get_allbytes();
-      //          int64_t time = curl_get_alltime();
-      //          ostringstream result;
-      //          if (time == 0)
-      //             result << "n/a"; 
-      //          else
-      //             result << (rx/1024)/time;
-      //          
-      //          return fill_xattr(result.str(), value, vlen);
-      //       }
-   
-      fuse_reply_err(req, ENOATTR);
+      const string attr = name;
+      catalog::t_dirent d;
+      
+      catalog::lock();      
+      if (not get_dirent_for_inode(ino, d)) {
+         catalog::unlock();
+         fuse_reply_err(req, ENOENT);
+         return;
+      }
+      catalog::unlock();
+ 
+      ostringstream message;
+ 
+      if (attr == "user.pid") {
+         message << cvmfs::pid;
+         
+      } else if (attr == "user.version") {
+         message << VERSION << "." << CVMFS_PATCH_LEVEL;
+         
+      } else if (attr == "user.hash") {
+         if (d.checksum != hash::t_sha1()) {
+            message << d.checksum.to_string() << " (SHA-1)";
+         } else {
+            fuse_reply_err(req, ENOATTR);
+            return;
+         }
+         
+      } else if (attr == "user.lhash") {
+         if (d.checksum != hash::t_sha1()) {
+            string result;
+            int fd = cache::open(d.checksum);
+            if (fd < 0) {
+               message << "Not in cache";
+            } else {
+               hash::t_sha1 hash;
+               FILE *f = fdopen(fd, "r");
+               if (not f) {
+                  fuse_reply_err(req, EIO);
+                  return;
+               }
+
+               if (compress_file_sha1_only(f, hash.digest) != 0) {
+                  fclose(f);
+                  fuse_reply_err(req, EIO);
+                  return;
+               }
+               
+               fclose(f);
+               message << hash.to_string() << " (SHA-1)";
+            }
+         } else {
+            fuse_reply_err(req, ENOATTR);
+            return;
+         }
+         
+      } else if (attr == "user.revision") {
+         catalog::lock();
+         const uint64_t revision = catalog::get_revision();
+         catalog::unlock();
+      
+         message << revision;
+         
+      } else if (attr == "user.expires") {
+         catalog::lock();
+         int catalog_id = catalog::find_catalog_id_from_inode(ino);
+         time_t expires = catalog_tree::get_catalog(catalog_id)->expires;
+         catalog::unlock();
+      
+         time_t now = time(NULL);
+         message << (expires-now)/60;
+         
+      } else if (attr == "user.maxfd") {
+         message << nofiles-NUM_RESERVED_FD;
+         
+      } else if (attr == "user.usedfd") {
+         message << atomic_read(&open_files);
+         
+      } else if (attr == "user.nioerr") {
+         message << atomic_read(&nioerr);
+         
+      } else if (attr == "user.proxy") {
+         int num;
+         int num_lb;
+         char *current;
+         int current_lb;
+         char **proxies;
+         int *lb_starts;
+         curl_get_proxy_info(&num, &current, &current_lb, &proxies, &num_lb, &lb_starts);
+         if (num) {
+            message << string(current);
+            for (int i = 0; i < num; ++i) {
+               free(proxies[i]);
+            }
+            free(lb_starts);
+            free(proxies);
+            free(current);
+         } else {
+            message << "DIRECT";
+         }
+      
+      } else if (attr == "user.host") {
+         int num;
+         int current;
+         char **all_hosts;
+         int *rtt;
+         curl_get_host_info(&num, &current, &all_hosts, &rtt);
+         message << string(all_hosts[current]);
+         free(rtt);
+         free(all_hosts);
+      
+      } else if (attr == "user.uptime") {
+         time_t now = time(NULL);
+         uint64_t uptime = now - boot_time;
+         /*if (uptime / 60) {
+            if (uptime / 3600) {
+               if (uptime / 84600) {
+                  result << uptime/84600 << " days, ";
+               }
+               result << (uptime / 3600)%24 << " hours, ";
+            }
+            result << (uptime / 60)%60 << " minutes, ";
+         }*/
+         message << uptime / 60;
+      
+      } else if (attr == "user.nclg") {
+         catalog::lock();
+         int num = catalog::get_num_catalogs();
+         catalog::unlock();
+         message << num;
+         
+      } else if (attr == "user.nopen") {
+         message << atomic_read64(&nopen);
+         
+      } else if (attr == "user.ndownload") {
+         message << atomic_read64(&ndownload);
+         
+      } else if (attr == "user.timeout") {
+         unsigned seconds, seconds_direct;
+         curl_get_timeout(&seconds, &seconds_direct);
+         message << seconds;
+         
+      } else if (attr == "user.timeout_direct") {
+         unsigned seconds, seconds_direct;
+         curl_get_timeout(&seconds, &seconds_direct);
+         message << seconds_direct;
+         
+      } else if (attr == "user.rx") {
+         int64_t rx = curl_get_allbytes();
+         message << rx/1024;
+         
+      } else if (attr == "user.speed") {
+         int64_t rx = curl_get_allbytes();
+         int64_t time = curl_get_alltime();
+         if (time == 0)
+            message << "n/a"; 
+         else
+            message << (rx/1024)/time;
+            
+      } else {
+         fuse_reply_err(req, ENOATTR);
+      }
+      
+      string msg = message.str();
+      
+      if (size == 0) {
+         fuse_reply_xattr(req, msg.length());
+      } else if (size >= msg.length()) {
+         fuse_reply_buf(req, msg.c_str(), msg.length());
+      } else {
+         fuse_reply_err(req, ERANGE);
+      }
    }
 
    static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
       ino = mangle_inode(ino);
-      pmesg(D_CVMFS, "cvmfs_listxattr on inode: %d", ino);
+      pmesg(D_FUSE_STUB, "cvmfs_listxattr on inode: %d", ino);
       fuse_reply_err(req, EROFS);
    }
    
    static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
       ino = mangle_inode(ino);
-      pmesg(D_CVMFS, "cvmfs_forget on inode: %d", ino);
-      fuse_reply_err(req, EROFS);
+      pmesg(D_FUSE_STUB, "cvmfs_forget on inode: %d", ino);
+      fuse_reply_none(req);
    }
 
    static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
