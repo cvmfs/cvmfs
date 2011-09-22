@@ -10,7 +10,8 @@
 namespace cvmfs {
 
    class InodeCache :
-      public LruCache<fuse_ino_t, struct catalog::t_dirent> {
+      public LruCache<fuse_ino_t, struct catalog::t_dirent>
+   {
       
       public:
          InodeCache(unsigned int cacheSize);

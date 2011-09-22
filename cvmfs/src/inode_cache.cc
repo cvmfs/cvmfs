@@ -1,7 +1,5 @@
 #include "inode_cache.h"
 
-#include "hash.h"
-
 extern "C" {
    #include "debug.h"
 }

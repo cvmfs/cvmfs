@@ -1287,17 +1287,17 @@ namespace cvmfs {
    static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
       ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_getattr (stat) for inode: %d", ino);
+      bool found;
+      struct catalog::t_dirent d;
       
       catalog::lock();
+      found = get_dirent_for_inode(ino, d);
+      catalog::unlock();
       
-      struct catalog::t_dirent d;
-      if (not get_dirent_for_inode(ino, d)) {
-         catalog::unlock();
+      if (not found) {
          fuse_reply_err(req, ENOENT);
          return;
       }
-      
-      catalog::unlock();
       
       /* The actual getattr-work */
       struct stat info;
@@ -1598,6 +1598,7 @@ namespace cvmfs {
       pthread_mutex_lock(&open_dir_listings_mutex);
       std::map<unsigned int, dirListingBuffer>::const_iterator openDir = open_dir_listings.find(fi->fh);
       pthread_mutex_unlock(&open_dir_listings_mutex);
+      
       if (openDir != open_dir_listings.end()) {
          replyBufferLimited(req, openDir->second.p, openDir->second.size, off, size);
       } else {
@@ -1699,15 +1700,17 @@ namespace cvmfs {
       pmesg(D_CVMFS, "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
       const string attr = name;
       catalog::t_dirent d;
+      bool found;
       
-      catalog::lock();      
-      if (not get_dirent_for_inode(ino, d)) {
-         catalog::unlock();
+      catalog::lock();
+      found = get_dirent_for_inode(ino, d);
+      catalog::unlock();
+      
+      if (not found) {
          fuse_reply_err(req, ENOENT);
          return;
       }
-      catalog::unlock();
- 
+
       ostringstream message;
  
       if (attr == "user.pid") {
@@ -1887,7 +1890,13 @@ namespace cvmfs {
    	pmesg(D_CVMFS, "cvmfs_access on inode: %d asking for R: %s W: %s X: %s", ino, ((mask & R_OK) ? "yes" : "no"), ((mask & W_OK) ? "yes" : "no"), ((mask & X_OK) ? "yes" : "no"));
    	
       struct catalog::t_dirent d;
-      if (not get_dirent_for_inode(ino, d)) {
+      bool found;
+      
+      catalog::lock();
+      found = get_dirent_for_inode(ino, d);
+      catalog::unlock();
+      
+      if (not found) {
          fuse_reply_err(req, ENOENT);
          return;
       }
@@ -2536,7 +2545,7 @@ int main(int argc, char *argv[])
    set_cvmfs_ops(&cvmfs_operations);
 
    inode_cache = new InodeCache(inode_cache_size);
-   path_cache = new PathCache(path_cache_size, inode_cache);
+   path_cache = new PathCache(path_cache_size);
 
 	if ((ch = fuse_mount(cvmfs::mountpoint.c_str(), &fuse_args)) != NULL) {
 		struct fuse_session *se;

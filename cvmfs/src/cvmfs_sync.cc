@@ -1,11 +1,10 @@
 /**
  * \file cvmfs_sync.cc
  *
- * This tool makes the changes to a repository based on the cvmfsflt
- * kernel module log.
- * We call the user's working directoy "shadow directory".  This shadow 
- * directory is synchronized with a CVMFS2 repository.  The .cvmfscatalog
- * magic file is translated into nested catalogs.
+ * This tool figures out the changes made to a cvmfs repository by means
+ * of a union file system mounted on top of a cvmfs volume.
+ * We take all three volumes (namely union, overlay and repository) into
+ * account to sync the changes back into the repository.
  *
  * On the repository side we have a catalogs directory that mimicks the
  * shadow directory structure and stores compressed and uncompressed
@@ -17,7 +16,9 @@
  * to allow Apache to follow the symlinks.
  *
  * Developed by Jakob Blomer 2010 at CERN
+ * Adapted for Union File Systems by René Meusel 2011 at CERN
  * jakob.blomer@cern.ch
+ * rene@renemeusel.de
  */
 
 

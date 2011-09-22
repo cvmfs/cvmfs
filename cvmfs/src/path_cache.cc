@@ -8,11 +8,8 @@ using namespace std;
 
 namespace cvmfs {
 
-   PathCache::PathCache(unsigned int cacheSize, InodeCache *inodeCache) :
-                              LruCache<fuse_ino_t, string>(cacheSize)
-   {
-      mInodeCache = inodeCache;
-   }
+   PathCache::PathCache(unsigned int cacheSize) :
+      LruCache<fuse_ino_t, string>(cacheSize) {}
    
    bool PathCache::insert(const fuse_ino_t inode, const string &path) {
       pmesg(D_PATH_CACHE, "insert into cache %d -> '%s'", inode, path.c_str());
