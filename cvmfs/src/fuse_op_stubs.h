@@ -85,11 +85,6 @@ static void cvmfs_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name) 
 	fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);
 }
 
-static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
-	pmesg(D_FUSE_STUB, "cvmfs_access on inode: %d", ino);
-	fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);
-}
-
 static void cvmfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, struct fuse_file_info *fi) {
 	pmesg(D_FUSE_STUB, "cvmfs_create on parent inode: %d with name: %s", parent, name);
 	fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);

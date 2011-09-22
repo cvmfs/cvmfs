@@ -935,93 +935,6 @@ namespace cvmfs {
       }
    }
    
-   
-   
-   /**
-    * Tries to find a directory entry in local direct mapped cache.
-    * Same interface as catalog::lookup_unprotected
-    * Lock this function.
-    * \return true, if md5 is in cache, false otherwise
-    */
-   static int resolve_cache_idx_find(const hash::t_md5 &md5, bool &found) {
-      const int idx = catalog_cache_idx(md5);
-      const int bucket_start = idx - idx%2;
-      
-      found = true;
-      if (catalog_cache[bucket_start].md5 == md5)
-         return bucket_start;
-      
-      if (!(catalog_cache[bucket_start+1].md5 == md5)) {
-         found = false;
-      } else {
-         struct catalog_cacheline tmp = catalog_cache[bucket_start];
-         catalog_cache[bucket_start] = catalog_cache[bucket_start+1];
-         catalog_cache[bucket_start+1] = tmp;
-      }
-      
-      return bucket_start;
-   }
-   
-   static int resolve_cache_idx_insert(const hash::t_md5 &md5) {
-      const int idx = catalog_cache_idx(md5);
-      const int bucket_start = idx - idx%2;
-      const hash::t_md5 null_md5;
-      
-      if (!(catalog_cache[bucket_start].md5 == md5) && 
-          !(catalog_cache[bucket_start].md5 == null_md5))
-      {
-         /*if (!(catalog_cache[bucket_start+1].md5 == md5) && 
-             !(catalog_cache[bucket_start].md5 == null_md5))
-         {
-            atomic_inc(&cache_replaces);
-         } */
-         catalog_cache[bucket_start+1] = catalog_cache[bucket_start];
-      }
-      
-      return bucket_start;
-   }
-   
-   static bool lookup_cache(const hash::t_md5 &md5, catalog::t_dirent &d) {
-      bool found;
-      const int idx = resolve_cache_idx_find(md5, found);
-      if (found) {
-      //if (catalog_cache[idx].md5 == md5) {
-         d = catalog_cache[idx].d;
-         atomic_inc(&cache_hits);
-         return true;
-      }
-      
-      atomic_inc(&cache_misses);
-      return false;
-   }
-   
-   
-   /**
-    * Inserts or replaces md5 in local d-cache.
-    */
-   static void insert_cache(const hash::t_md5 &md5, const catalog::t_dirent &d) {
-      const int idx = resolve_cache_idx_insert(md5);
-      //if (!(catalog_cache[idx].md5 == hash::t_md5())) atomic_inc(&cache_replaces);
-
-      catalog_cache[idx].md5 = md5;
-      catalog_cache[idx].d = d;
-      atomic_inc(&cache_inserts);
-   }
-   
-   
-   /**
-    * Inserts a negative entry for md5 in local d-cache.
-    */
-   static void insert_cache_negative(const hash::t_md5 &md5) {
-      const int idx = resolve_cache_idx_insert(md5);
-      //if (!(catalog_cache[idx].md5 == hash::t_md5())) atomic_inc(&cache_replaces);
-
-      catalog_cache[idx].md5 = md5;
-      catalog_cache[idx].d.catalog_id = -1;
-      atomic_inc(&cache_inserts);
-   }
-   
-   
    /**
     * Don't call without catalog::lock()
     */
@@ -1190,8 +1103,7 @@ namespace cvmfs {
          return true;
          
       } else {
-         int catalog_id = catalog::find_catalog_id_from_inode(ino);
-         pmesg(D_INO_CACHE, "MISS %d --> lookup in catalog with id: %d", ino, catalog_id);
+         pmesg(D_INO_CACHE, "MISS %d --> lookup in catalog with id: %d", ino, catalog::find_catalog_id_from_inode(ino));
          
          // lookup inode in catalog
          if (catalog::lookup_inode_unprotected(ino, dirent, true)) {
@@ -1697,7 +1609,7 @@ namespace cvmfs {
     * Emulates the getattr walk done by Fuse
     */
    static int walk_path(const string &path) {
-      struct stat info;
+//      struct stat info;
       // if ((path == "") || (path == "/")) 
       //    return cvmfs_getattr("/", &info);
 
@@ -1780,20 +1692,6 @@ namespace cvmfs {
       
 		fuse_reply_statfs(req, &info);
 //      return 0;
-   }
-   
-   
-   static int fill_xattr(const string src, char *dst, const size_t ldst) {
-      size_t lsrc = src.length();
-
-      if (!dst)
-         return lsrc;
-      
-      if (src.length() > ldst)
-         return -ERANGE;
-      
-      memcpy(dst, &src[0], lsrc);
-      return lsrc;
    }
    
    static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size) {
@@ -2216,7 +2114,7 @@ static void usage(const char *progname) {
    );
 
    /* Print the help from FUSE */
-   const char *args[] = {progname, "-h"};
+//   const char *args[] = {progname, "-h"};
 //   static struct fuse_operations op;
 //   fuse_main(2, (char**)args, &op);
 }
