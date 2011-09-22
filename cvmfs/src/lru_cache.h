@@ -37,6 +37,9 @@
 #include <assert.h>
 #include <map>
 #include <iostream>
+#include <google/dense_hash_map>
+#include <algorithm>
+#include <functional>
 
 #include <string>
 #include <sstream>
@@ -50,7 +53,7 @@ namespace cvmfs {
 	 *  @param Key type of the key values
 	 *  @param Value type of the value values
 	 */
-	template<class Key, class Value>
+   template<class Key, class Value, class HashFunction = SPARSEHASH_HASH<Key>, class EqualKey = std::equal_to<Key> >
 	class LruCache {
 		
 	private:
@@ -73,7 +76,7 @@ namespace cvmfs {
 		} CacheEntry;
 	
 	   // the actual map data structure (TODO: replace this by a hashmap)
-		typedef std::map<Key, CacheEntry> Cache;
+		typedef google::dense_hash_map<Key, CacheEntry, HashFunction, EqualKey> Cache;
 
 		// internal data fields
 		unsigned int mCurrentCacheSize;
@@ -669,6 +672,16 @@ namespace cvmfs {
 			mLruList->clear();
 			mCache.clear();
 		}
+		
+	protected:
+	   /**
+	    *  google dense hash needs two special Key values to mark empty hash table
+	    *  buckets and deleted hash table buckets
+	    */
+	    void setSpecialHashTableKeys(const Key empty, const Key deleted) {
+          mCache.set_empty_key(empty);
+          mCache.set_deleted_key(deleted);
+	    }
 	
 	private:
 		/**
@@ -679,15 +692,15 @@ namespace cvmfs {
 		 *  @return true on successful lookup, false otherwise
 		 */
 		inline bool lookupCache(const Key key, CacheEntry &entry) {
-			typename Cache::iterator foundElement = mCache.find(key);
-
-			if (foundElement == mCache.end()) {
-				// cache miss
-				return false;
-			}
-			
-			// cache hit
-			entry = foundElement->second;
+         typename Cache::iterator foundElement = mCache.find(key);
+         
+         if (foundElement == mCache.end()) {
+            // cache miss
+            return false;
+         }
+         
+         // cache hit
+         entry = foundElement->second;
 			return true;
 		}
 		
@@ -757,8 +770,8 @@ namespace cvmfs {
 	};
 	
 	// initialize the static allocator field
-	template<class Key, class Value>
-   typename LruCache<Key, Value>::ConcreteMemoryAllocator *LruCache<Key, Value>::allocator = NULL;
+	template<class Key, class Value, class HashFunction, class EqualKey >
+   typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator *LruCache<Key, Value, HashFunction, EqualKey>::allocator = NULL;
 	
 } // namespace cvmfs
 

@@ -109,7 +109,7 @@ namespace catalog {
       
       // align the successing chunks according to the new one
       int64_t delta_offset = new_chunk.size - old_chunk.size;
-      for (int i = cat_id + 1; i < inode_chunks.size(); ++i) {
+      for (unsigned int i = cat_id + 1; i < inode_chunks.size(); ++i) {
          inode_chunks[i].offset += delta_offset;
       }
       

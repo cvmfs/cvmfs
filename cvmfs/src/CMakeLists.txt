@@ -119,7 +119,7 @@ set (CVMFS_ZPIPE_SOURCES zlib-duplex.h zpipe.c)
 # configure some compiler flags for proper build
 #
 
-set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DCVMFS_CLIENT")
+set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DCVMFS_CLIENT -fexceptions")
 set (CVMFS2_DEBUG_CFLAGS "${CVMFS2_DEBUG_CFLAGS} ${CVMFS2_CFLAGS} -O0")
 set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DNDEBUGMSG")
 

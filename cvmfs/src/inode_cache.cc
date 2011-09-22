@@ -9,7 +9,10 @@ using namespace std;
 namespace cvmfs {
 
    InodeCache::InodeCache(unsigned int cacheSize) :
-      LruCache<fuse_ino_t, struct catalog::t_dirent>(cacheSize) {}
+      LruCache<fuse_ino_t, struct catalog::t_dirent>(cacheSize) {
+      
+      this->setSpecialHashTableKeys(1000000000, 1000000001);
+   }
 
    bool InodeCache::insert(const fuse_ino_t inode, const struct catalog::t_dirent &dirEntry) {
       pmesg(D_INO_CACHE, "insert inode: %d -> '%s'", inode, dirEntry.name.c_str());
