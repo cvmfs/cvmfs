@@ -7,9 +7,11 @@
  * deletes the entries which are least touched in the last time to maintain a given
  * maximal cache size.
  * The cache uses a hand crafted memory allocator to use memory efficiently
+ * Before you do anything with your new cache, use setSpecialHashTableKeys() !!               <----- IMPORTANT  !!!!!!
  *
  * usage:
  *   LruCache<int, string> cache(100);  // cache mapping ints to strings with maximal size of 100
+ *   cache.setSpecialHashTableKeys(999999999,9999999991); // DO NOT FORGET THIS!! WILL CRASH AT INSERT!!
  *
  *   // inserting some stuff
  *   cache.insert(42, "fourtytwo");
@@ -672,8 +674,7 @@ namespace cvmfs {
 			mLruList->clear();
 			mCache.clear();
 		}
-		
-	protected:
+
 	   /**
 	    *  google dense hash needs two special Key values to mark empty hash table
 	    *  buckets and deleted hash table buckets

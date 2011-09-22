@@ -29,6 +29,7 @@ string lookup(int i, Cache &cache) {
 int main(int argc, char **argv) {
 	cout << "--> create cache (size of 4)" << endl;
 	Cache cache(4);
+	cache.setSpecialHashTableKeys(99999999,99999998);
 	
 	cout << "--> testing cache inital state" << endl;
 	if (cache.getNumberOfEntries() != 0) return 1;
@@ -103,6 +104,7 @@ int main(int argc, char **argv) {
 	
 	const unsigned int bigCacheSize = 1290;
 	Cache bigCache(bigCacheSize);
+	bigCache.setSpecialHashTableKeys(99999999,99999998);
 	
 	// filling big cache
 	for (int i = 0; i < bigCacheSize; ++i) {
