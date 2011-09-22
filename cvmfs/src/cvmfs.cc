@@ -1884,13 +1884,23 @@ namespace cvmfs {
 
    static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
       ino = mangle_inode(ino);
-      // TODO: implement this properly
+   	pmesg(D_CVMFS, "cvmfs_access on inode: %d asking for R: %s W: %s X: %s", ino, ((mask & R_OK) ? "yes" : "no"), ((mask & W_OK) ? "yes" : "no"), ((mask & X_OK) ? "yes" : "no"));
+   	
+      struct catalog::t_dirent d;
+      if (not get_dirent_for_inode(ino, d)) {
+         fuse_reply_err(req, ENOENT);
+         return;
+      }
       
-   	pmesg(D_CVMFS, "cvmfs_access on inode: %d with mask %s", ino, humanizeBitmap(mask).c_str());
-      if (mask > 1) {
+      // check access rights for owner (RWX access bits --> shift six left)
+      // if write access is requested, we always say no
+      unsigned int request = mask << 6;
+      if ((mask & W_OK) || (request & d.mode) != request) {
          fuse_reply_err(req, EACCES);
          return;
       }
+      
+      // all okay... let's go
    	fuse_reply_err(req, 0);
    }
 
