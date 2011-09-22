@@ -1,3 +1,31 @@
+/**
+ *  The SyncMediator is an intermediate layer between the UnionSync
+ *  implementation and the CatalogHandler.
+ *  It's main responsibility is to unwind file system intrinsics as
+ *  deleting all files in a deleted directory. Furthermore newly
+ *  created directories are recursed and all included files are
+ *  added as a whole. (Performance improvement)
+ *
+ *  Furthermore it keeps track of hard link relations. CVMFS defines
+ *  hard links as files with the same inode pointing to the same
+ *  chunk of data. As we cannot determine an appropriate inode number
+ *  while synching, we just keep track of hard link relations itself.
+ *  Inodes will be assigned at run time of the CVMFS client according
+ *  to these relations.
+ *
+ *  Another responsibility of this class is the creation and destruction
+ *  of nested catalogs. If a .cvmfscatalog magic file is encountered,
+ *  either on delete or add, it will be treated as nested catalog change.
+ *
+ *  DirEntries containing data (e.g. not Directories or symlinks) will
+ *  be accumulated and it's contents are compressed at the end of the
+ *  synching process en bloc. This gives us the ability to do this
+ *  computational intensive task concurrently at the end of the sync
+ *  process.
+ *
+ *  Developed by René Meusel 2011 at CERN
+ */
+
 #ifndef CVMFS_SYNC_MEDIATOR_H
 #define CVMFS_SYNC_MEDIATOR_H
 

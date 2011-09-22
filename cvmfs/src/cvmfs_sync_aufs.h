@@ -1,3 +1,37 @@
+/**
+ *  This file defines classes to abstract information retrieval from
+ *  union file system components.
+ *  
+ *  Here you have a class UnionSync which is the base class for all
+ *  supported union file systems and provides some basic principals.
+ *  UnionSync is meant to be a singleton.
+ *
+ *  Furthermore there is a concrete implementation of UnionSync called
+ *  SyncAufs, which is capable of abstracting all AUFS 1.x specifics
+ *  to sync CVMFS by the help of AUFS.
+ *
+ *  There are three main things, an union file system has to do:
+ *    1. Copy on Write
+ *       read-only files in CVMFS will be copied up to an overlay
+ *       volume on write access.
+ *    2. Whiteout
+ *       the union file system has to mark files as deleted, if you
+ *       remove them from a read only file system
+ *    3. Opaque Directories
+ *       if you delete an entire directory from the read only file
+ *       system and recreate it empty afterwards the union file system
+ *       has to mark this directory as opaque to hide all old contents
+ *
+ *  Furthermore the union file system could create special files
+ *  which we don't care about.
+ *
+ *  All these intrinsics are encapsulated and handled be the classes in
+ *  this file.
+ *
+ *  Developed by René Meusel 2011 at CERN
+ *  rene@renemeusel.de
+ */
+
 #ifndef CVMFS_SYNC_AUFS_H
 #define CVMFS_SYNC_AUFS_H
 
@@ -48,10 +82,21 @@ namespace cvmfs {
 		/** clean up */
 		virtual void fini();
 		
+		/** @return the path to the CVMFS repository */
 		inline std::string getRepositoryPath() const { return mRepositoryPath; }
+		
+		/** @return the path to the union volume (mounted union file system) */
 		inline std::string getUnionPath() const { return mUnionPath; }
+		
+		/** @return the path to the overlay directory of the union file system (write overlay) */
 		inline std::string getOverlayPath() const { return mOverlayPath; }
 		
+		/**
+		 *  whiteout files may have special naming conventions
+		 *  this method scratches them and retrieves the original file name
+		 *  @param filename the filename to be mangled
+		 *  @return the original filename of the scratched out file in CVMFS repository
+		 */
 		virtual std::string unwindWhiteoutFilename(const std::string &filename) const = 0;
 		
 		/**
@@ -75,7 +120,7 @@ namespace cvmfs {
 		virtual bool isWhiteoutEntry(const DirEntry *entry) const = 0;
 		
 		/**
-		 *  union file systems may use some special files for bookkeeping reasons
+		 *  union file systems may use some special files for bookkeeping
 		 *  they must not show up in to repository and are ignored by the recursion
 		 *  @return a set of filenames to be ignored
 		 */
@@ -130,6 +175,7 @@ namespace cvmfs {
 	
 	/**
 	 *  syncing a CVMFS repository by the help of an overlayed AUFS 1.x read-write volume
+	 *  this class basically implements the interface defined by UnionSync::
 	 */
 	class SyncAufs1 :
 	 	public UnionSync {

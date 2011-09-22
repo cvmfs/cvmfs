@@ -24,11 +24,11 @@ enum DirEntryType {
 };
 
 /**
- *  this base class implements a reference counting scheme
+ *  This base class implements a reference counting scheme
  *  inspired by NSObjects in Objective-C by Apple.
- *  after object creation, these objects have a reference count of 1
+ *  After object creation, these objects have a reference count of 1
  *  retain() increments release() decrements this counter.
- *  if the reference counter hits 0 the object will be deleted.
+ *  If the reference counter hits 0 the object will be deleted.
  *
  *  This class ONLY works for objects created by 'new' and therefore reside on the heap!!
  *
@@ -90,7 +90,8 @@ private:
 
 public:
 	/**
-	 *  create a new DirEntry (is is normally not required for normal usage)
+	 *  create a new DirEntry (is is normally not required for normal usage
+	 *                         as the RecursionEngine provides you with DirEntries)
 	 *  @param dirPath the RELATIVE path to the file
 	 *  @param filename the name of the file ;-)
 	 *  @param entryType well...
@@ -138,7 +139,7 @@ typedef std::list<DirEntry*> DirEntryList;
 
 /**
  *  the foundDirectory-Callback can decide if the recursion engine should recurse into
- *  the recently found directory. It has to communicate its decision by returning one
+ *  the recently found directory. It has to communicate it's decision by returning one
  *  of these enum elements
  */
 enum RecursionPolicy {
@@ -152,8 +153,11 @@ enum RecursionPolicy {
  *  Hooks will be called on the provided delegate object which has to be of type T
  *
  *  Found directory entries are sent back to the delegate object as a pointer to a
- *  DirEntry structure. The delegate object becomes the owner of these objects and
- *  is responsible for them to be freed
+ *  DirEntry structure. DirEntry objects are reference counted and the recursion
+ *  engine calls release() on them, after sending the callback.
+ *  !! If you want to store a DirEntry for longer than the processing of the call-
+ *     back, you have to retain() it. After that you are responsible for freeing
+ *     your retained DirEntry by calling release().
  */
 template <class T>
 class RecursionEngine {
@@ -165,30 +169,33 @@ private:
 	std::string mRelativeToDirectory;
 	bool mRecurse;
 	
-	/** if these files are found somewhere they are completely ignored */
+	/** if one of these files are found somewhere they are completely ignored */
 	std::set<std::string> mIgnoredFiles;
 
 public:
-	/** message if a directory is entered by the recursion */
+	/** callback if a directory is entered by the recursion */
 	void (T::*enteringDirectory)(DirEntry *entry);
 
-	/** message if a directory is left by the recursion */
+	/** callback if a directory is left by the recursion */
 	void (T::*leavingDirectory)(DirEntry *entry);
 
-	/** message if a file was found */
+	/** callback if a file was found */
 	void (T::*foundRegularFile)(DirEntry *entry);
 
 	/**
-	 *  message if a directory was found
+	 *  callback if a directory was found
 	 *  depending on the response of the callback, the recursion will continue in the found directory
 	 *  if this callback is not specified, it will recurse by default!
 	 */
 	RecursionPolicy (T::*foundDirectory)(DirEntry *entry);
 	
-	/** message for a found directory after it was already recursed */
+	/**
+	 *  callback for a found directory after it was already recursed
+	 *  e.g. for deletion of directories (first delete content, then the directory itself)
+	 */
 	void (T::*foundDirectoryAfterRecursion)(DirEntry *entry);
 
-	/** message if a link was found */
+	/** callback if a symlink was found */
 	void (T::*foundSymlink)(DirEntry *entry);
 
 public:
