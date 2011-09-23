@@ -33,6 +33,7 @@ option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (LIBFUSE_BUILTIN "Don't use system libfuse" ON)
+option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (USE_JEMALLOC "Using jemalloc instead of ordinary malloc implementation" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
@@ -42,14 +43,15 @@ option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" 
 # for the 3rd-party libraries there should be a CVMFS-CMakeLists.txt file provided
 # in the given directory, in order to configure and compile them properly
 #
-set (THIRD_PARTY_LIB_LOCATION	"${CMAKE_SOURCE_DIR}/3rdParty")
-set (THIRD_PARTY_BUILD_LOCATION	"${CMAKE_BINARY_DIR}/3rdPartyBuild")
-set (SQLITE3_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/sqlite3/src")
-set (LIBCURL_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/libcurl/src")
-set (ZLIB_BUILTIN_LOCATION		"${THIRD_PARTY_BUILD_LOCATION}/zlib/src")
-set (LIBFUSE_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/libfuse/src")
-set (LIBFUSE4X_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/libfuse4x/src")
-set (JEMALLOC_BUILTIN_LOCATION	"${THIRD_PARTY_BUILD_LOCATION}/jemalloc/src")
+set (THIRD_PARTY_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/3rdParty")
+set (THIRD_PARTY_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/3rdPartyBuild")
+set (SQLITE3_BUILTIN_LOCATION       "${THIRD_PARTY_BUILD_LOCATION}/sqlite3/src")
+set (LIBCURL_BUILTIN_LOCATION       "${THIRD_PARTY_BUILD_LOCATION}/libcurl/src")
+set (ZLIB_BUILTIN_LOCATION          "${THIRD_PARTY_BUILD_LOCATION}/zlib/src")
+set (LIBFUSE_BUILTIN_LOCATION       "${THIRD_PARTY_BUILD_LOCATION}/libfuse/src")
+set (LIBFUSE4X_BUILTIN_LOCATION     "${THIRD_PARTY_BUILD_LOCATION}/libfuse4x/src")
+set (JEMALLOC_BUILTIN_LOCATION      "${THIRD_PARTY_BUILD_LOCATION}/jemalloc/src")
+set (SPARSEHASH_BUILTIN_LOCATION    "${THIRD_PARTY_BUILD_LOCATION}/jemalloc/src")
 
 # create the directory for controlled out of source building of 3rd party stuff
 file (MAKE_DIRECTORY ${THIRD_PARTY_BUILD_LOCATION})
@@ -69,7 +71,7 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 #
 # set some default flags
 #
-# flags in CMAKE_C**_FLAGS are allways passed to the compiler
+# flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")

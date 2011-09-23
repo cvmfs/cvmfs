@@ -5,6 +5,7 @@ FUSE_VERSION=2.8.4
 FUSE4X_VERSION=2.8.5
 JEMALLOC_VERSION=2.2.1
 ZLIB_VERSION=1.2.5
+SPARSEHASH_VERSION=1.11
 
 # put the extracted stuff out of source for compilation (location given by cmake)
 outOfSource=$1
@@ -68,6 +69,15 @@ cd ../..
 cd 3rdParty/sqlite3
 mkdir -p "$outOfSource/sqlite3/src"
 cp src/* "$outOfSource/sqlite3/src"
+cd ../..
+
+# google sparse hash
+cd 3rdParty/sparsehash
+tar xfz sparsehash-${SPARSEHASH_VERSION}.tar.gz 
+mkdir -p "$outOfSource/sparsehash/src"
+mv sparsehash-${SPARSEHASH_VERSION}/* "$outOfSource/sparsehash/src"
+cp src/* "$outOfSource/sparsehash/src"
+rm -rf sparsehash-${SPARSEHASH_VERSION}
 cd ../..
 
 # create a hint that bootstrapping is already done
