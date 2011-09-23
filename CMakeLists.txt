@@ -51,7 +51,7 @@ set (ZLIB_BUILTIN_LOCATION          "${THIRD_PARTY_BUILD_LOCATION}/zlib/src")
 set (LIBFUSE_BUILTIN_LOCATION       "${THIRD_PARTY_BUILD_LOCATION}/libfuse/src")
 set (LIBFUSE4X_BUILTIN_LOCATION     "${THIRD_PARTY_BUILD_LOCATION}/libfuse4x/src")
 set (JEMALLOC_BUILTIN_LOCATION      "${THIRD_PARTY_BUILD_LOCATION}/jemalloc/src")
-set (SPARSEHASH_BUILTIN_LOCATION    "${THIRD_PARTY_BUILD_LOCATION}/jemalloc/src")
+set (SPARSEHASH_BUILTIN_LOCATION    "${THIRD_PARTY_BUILD_LOCATION}/sparsehash/src")
 
 # create the directory for controlled out of source building of 3rd party stuff
 file (MAKE_DIRECTORY ${THIRD_PARTY_BUILD_LOCATION})

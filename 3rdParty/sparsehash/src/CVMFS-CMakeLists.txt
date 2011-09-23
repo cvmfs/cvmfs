@@ -1,6 +1,6 @@
 include ("${THIRD_PARTY_LIB_LOCATION}/CMake-Register_External_Lib.txt")
 
-register_external_lib (sparsehash ${SPARSEHASH_BUILTIN_LOCATION})
+register_external_lib (sparsehash ${SPARSEHASH_BUILTIN_LOCATION} "dummy") # we are not generating an archive here... but 'make' generates some header files... so call it
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${SPARSEHASH_BUILTIN_LOCATION}/src -D_BUILT_IN_SPARSEHASH")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${SPARSEHASH_BUILTIN_LOCATION}/src -D_BUILT_IN_SPARSEHASH")

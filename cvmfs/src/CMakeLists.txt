@@ -187,8 +187,10 @@ endif (ZLIB_BUILTIN)
 
 if (SPARSEHASH_BUILTIN)
 	include (${SPARSEHASH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_BUILTIN_LOCATION}/src)
 else (SPARSEHASH_BUILTIN)
 	find_package(Sparsehash)
+	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
 endif (SPARSEHASH_BUILTIN)
 
 if (NOT MACOSX)
@@ -256,6 +258,11 @@ if (BUILD_CVMFS)
 		add_dependencies (cvmfs_fsck zlib)
 		add_dependencies (cvmfs_proxy_rtt zlib)
 	endif (ZLIB_BUILTIN)
+	
+	if (SPARSEHASH_BUILTIN)
+		add_dependencies (cvmfs2_debug sparsehash)
+		add_dependencies (cvmfs2 sparsehash)
+	endif (SPARSEHASH_BUILTIN)
 	
 	# set some properties
 	set_target_properties (cvmfs2_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_DEBUG_LD_FLAGS}")
