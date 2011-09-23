@@ -1,0 +1,33 @@
+# include guard
+if (NOT REG_EXT_LIB)
+	set (REG_EXT_LIB 1)
+
+	# this custom macro registers an external library for building
+	#	
+	# first it executes the configureHook.sh script of the library to do some
+	# configuration work (this is done while configuring the CMake stuff)
+	#
+	# also it registers a custom target which main targets can depend
+	# upon in order to control the external library to build while building
+	macro (register_external_lib NAME LOCATION OUTPUTFILE)
+
+		# create a build hook (invoked while compiling)
+		add_custom_command (
+			OUTPUT				${OUTPUTFILE}
+			COMMAND				sh
+			ARGS				"${LOCATION}/makeHook.sh"
+			WORKING_DIRECTORY	${LOCATION}
+			COMMENT				"Building ${NAME}..."
+		)
+		add_custom_target (${NAME} ALL DEPENDS ${OUTPUTFILE})
+
+		# configure the library before generating the final build files
+		message (STATUS "configuring 3rd party library: ${NAME} ...")
+		execute_process (
+			COMMAND				sh ${LOCATION}/configureHook.sh
+			WORKING_DIRECTORY	${LOCATION}
+		)
+
+	endmacro (register_external_lib)
+	
+endif (NOT REG_EXT_LIB)

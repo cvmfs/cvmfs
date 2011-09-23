@@ -1,18 +1,8 @@
+include ("${THIRD_PARTY_LIB_LOCATION}/CMake-Register_External_Lib.txt")
+
 set (LIBCURL_ARCHIVE "${LIBCURL_BUILTIN_LOCATION}/lib/.libs/libcurl.a")
 
-add_custom_command (
-	OUTPUT				${LIBCURL_ARCHIVE}
-	COMMAND				sh
-	ARGS				"${LIBCURL_BUILTIN_LOCATION}/makeHook.sh"
-	WORKING_DIRECTORY	${LIBCURL_BUILTIN_LOCATION}
-	COMMENT				"Building libcurl..."
-)
-
-message (STATUS "configuring 3rd party library: libcurl ...")
-execute_process (
-	COMMAND				sh ${LIBCURL_BUILTIN_LOCATION}/configureHook.sh
-	WORKING_DIRECTORY	${LIBCURL_BUILTIN_LOCATION}
-)
+register_external_lib (libcurl ${LIBCURL_BUILTIN_LOCATION} ${LIBCURL_ARCHIVE})
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${LIBCURL_BUILTIN_LOCATION}/include -D_BUILT_IN_LIBCURL")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${LIBCURL_BUILTIN_LOCATION}/include -D_BUILT_IN_LIBCURL")

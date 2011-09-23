@@ -1,18 +1,9 @@
+include ("${THIRD_PARTY_LIB_LOCATION}/CMake-Register_External_Lib.txt")
+
 set (LIBFUSE_ARCHIVE "${LIBFUSE4X_BUILTIN_LOCATION}/lib/.libs/libfuse4x.a")
 
-add_custom_command (
-	OUTPUT				${LIBFUSE_ARCHIVE}
-	COMMAND				sh
-	ARGS				"${LIBFUSE4X_BUILTIN_LOCATION}/makeHook.sh"
-	WORKING_DIRECTORY	${LIBFUSE4X_BUILTIN_LOCATION}
-	COMMENT				"Building libfuse4x..."
-)
-
-message (STATUS "configuring 3rd party library: libfuse4x ...")
-execute_process (
-	COMMAND				sh ${LIBFUSE4X_BUILTIN_LOCATION}/configureHook.sh
-	WORKING_DIRECTORY	${LIBFUSE4X_BUILTIN_LOCATION}
-)
+# this is the same target as in libfuse... DO NOT INCLUDE THEM BOTH AT THE SAME TIME!!
+register_external_lib (libfuse ${LIBFUSE4X_BUILTIN_LOCATION} ${LIBFUSE_ARCHIVE})
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${LIBFUSE4X_BUILTIN_LOCATION}/include -D_BUILT_IN_LIBFUSE")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${LIBFUSE4X_BUILTIN_LOCATION}/include -D_BUILT_IN_LIBFUSE")

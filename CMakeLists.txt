@@ -32,6 +32,7 @@ option (BUILD_SERVER "Build writer's end programs" ON)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
+option (LIBFUSE_BUILTIN "Don't use system libfuse" ON)
 option (USE_JEMALLOC "Using jemalloc instead of ordinary malloc implementation" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
