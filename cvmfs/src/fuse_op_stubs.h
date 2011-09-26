@@ -75,7 +75,12 @@ static void cvmfs_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync, struct 
 	fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);
 }
 
-static void cvmfs_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, const char *value, size_t size, int flags) {
+#ifdef __APPLE__
+static void cvmfs_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, const char *value, size_t size, int flags, uint32_t position)
+#else
+static void cvmfs_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, const char *value, size_t size, int flags)
+#endif
+{
 	pmesg(D_FUSE_STUB, "cvmfs_setxattr on inode: %d with xattrname: %s and value: %s", ino, name, value);
 	fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);
 }

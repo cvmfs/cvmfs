@@ -1732,7 +1732,12 @@ namespace cvmfs {
 //      return 0;
    }
    
-   static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size) {
+#ifdef __APPLE__
+   static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size, uint32_t position)
+#else
+   static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size)
+#endif   
+   {
       ino = mangle_inode(ino);
       pmesg(D_CVMFS, "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
       const string attr = name;
