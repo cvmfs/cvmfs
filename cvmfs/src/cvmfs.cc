@@ -78,6 +78,7 @@
 #include "fuse_op_stubs.h"
 #include "inode_cache.h"
 #include "path_cache.h"
+#include "md5path_cache.h"
 
 
 extern "C" {
@@ -119,10 +120,12 @@ namespace cvmfs {
    time_t boot_time;
 	struct fuse_lowlevel_ops fuseCallbacks;
 	
-   unsigned int inode_cache_size = 20000;
+   const unsigned int inode_cache_size = 20000;
    InodeCache *inode_cache = NULL;
-   unsigned int path_cache_size = 1000;
+   const unsigned int path_cache_size = 1000;
    PathCache *path_cache = NULL;
+   const unsigned int md5path_cache_size = 10000;
+   Md5PathCache *md5path_cache = NULL;
    
    /* Prevent DoS attacks on the Squid server */
    static struct {
@@ -1099,9 +1102,9 @@ namespace cvmfs {
    static bool get_dirent_for_inode(const fuse_ino_t ino, struct catalog::t_dirent &dirent) {
       // check the inode cache for speed up
       if (inode_cache->lookup(ino, dirent)) {
-         pmesg(D_INO_CACHE, "HIT %d -> '%s'", ino, dirent.name.c_str());
-         return true;
-         
+               pmesg(D_INO_CACHE, "HIT %d -> '%s'", ino, dirent.name.c_str());
+               return true;
+               
       } else {
          pmesg(D_INO_CACHE, "MISS %d --> lookup in catalog with id: %d", ino, catalog::find_catalog_id_from_inode(ino));
          
@@ -1118,6 +1121,50 @@ namespace cvmfs {
       }
       
       // should be unreachable... just to be sure
+      return false;
+   }
+   
+   
+   
+      int insert123;
+      int hit123;
+      int miss123;
+      int noent123;
+   
+   
+   static bool get_dirent_for_path(const string &path, struct catalog::t_dirent &dirent) {
+      hash::t_md5 md5(catalog::mangled_path(path));
+      
+      // check the md5path_cache first (TODO: this is a quick and dirty prototype currently!!)
+      if (md5path_cache->lookup(md5, dirent)) {
+         ++hit123;
+         if (dirent.catalog_id == -1) {
+            pmesg(D_MD5_CACHE, "HIT NEGATIVE %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
+            return false;
+
+         } else {
+            pmesg(D_MD5_CACHE, "HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
+            return true;
+         }
+         
+      } else {
+         int catalog_id = find_catalog_id(path);
+         pmesg(D_MD5_CACHE, "MISS %s --> lookup in catalog with id: %d", md5.to_string().c_str(), catalog_id);
+         ++miss123;
+         
+         if (catalog::lookup_informed_unprotected(md5, catalog_id, dirent)) {
+            pmesg(D_MD5_CACHE, "CATALOG HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
+            md5path_cache->insert(md5, dirent);
+            ++insert123;
+            return true;
+         } else {
+            struct catalog::t_dirent negative;
+            negative.catalog_id = -1;
+            md5path_cache->insert(md5, negative);
+            ++noent123;
+         }
+     }
+      
       return false;
    }
    
@@ -1195,6 +1242,7 @@ namespace cvmfs {
       return true;
    }
    
+   
    /**
     * Do a lookup to find out the inode number of a file name
     */
@@ -1241,10 +1289,8 @@ namespace cvmfs {
       }
       
       // load information by using the path!! inodes may be srewed after catalog reload
-      hash::t_md5 md5(catalog::mangled_path(path));
-      catalog_id = find_catalog_id(path); // better do it again...
       catalog::t_dirent dirent;
-      bool found = catalog::lookup_informed_unprotected(md5, catalog_id, dirent);
+      bool found = get_dirent_for_path(path, dirent);
       
       catalog::unlock();
       
@@ -1254,10 +1300,10 @@ namespace cvmfs {
          return;
       }
       
-      // we got the parent inode from FUSE... save it
+      // we got the parent inode from FUSE... save it (TODO: think about that - caching)
       dirent.parentInode = parent;
       
-      // maintain caches (TODO: currently this does not work because of dirty catalog reloading)
+      // maintain caches
       inode_cache->insert(dirent.inode, dirent);
       path_cache->insert(dirent.inode, path);
       
@@ -1857,7 +1903,10 @@ namespace cvmfs {
             message << "n/a"; 
          else
             message << (rx/1024)/time;
-            
+
+      } else if (attr == "user.mydebug") {
+         message << " insert: " << insert123 << " hit: " << hit123 << " miss: " << miss123 << " noent: " << noent123;
+
       } else {
          fuse_reply_err(req, ENOATTR);
       }
@@ -2546,6 +2595,7 @@ int main(int argc, char *argv[])
 
    inode_cache = new InodeCache(inode_cache_size);
    path_cache = new PathCache(path_cache_size);
+   md5path_cache = new Md5PathCache(md5path_cache_size);
 
 	if ((ch = fuse_mount(cvmfs::mountpoint.c_str(), &fuse_args)) != NULL) {
 		struct fuse_session *se;

@@ -550,7 +550,7 @@ namespace cvmfs {
 			
 			// create memory allocator
 			ConcreteMemoryAllocator *allocator = new ConcreteMemoryAllocator(maxCacheSize);
-         LruCache<Key, Value>::allocator = allocator;
+         LruCache<Key, Value, HashFunction, EqualKey>::allocator = allocator;
 		
 		   // internal state
 			mCurrentCacheSize = 0;

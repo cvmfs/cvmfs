@@ -34,10 +34,14 @@ namespace hash {
    }
    
    bool t_md5::operator ==(const t_md5 &other) const {
-      for (int i = 0; i < 16; i++)
-         if (this->digest[i] != other.digest[i])
-            return false;
-      return true;
+      // evil hack to make it fast
+      // interpret the 128 bit digest as two 64 bit integers and compare them
+      int64_t part1 =      (int64_t) *( (int64_t*)(digest + 0) );
+      int64_t part2 =      (int64_t) *( (int64_t*)(digest + 8) );
+      int64_t otherPart1 = (int64_t) *( (int64_t*)(other.digest + 0) );
+      int64_t otherPart2 = (int64_t) *( (int64_t*)(other.digest + 8) );
+      
+      return (part1 == otherPart1 && part2 == otherPart2);
    }
    
    string t_md5::to_string() const {
