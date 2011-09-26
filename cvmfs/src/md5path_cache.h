@@ -40,7 +40,7 @@ namespace cvmfs {
          Md5PathCache(unsigned int cacheSize);
          
          bool insert(const hash::t_md5 &hash, const struct catalog::t_dirent &dirEntry);
-         bool lookup(const hash::t_md5 &hash, struct  catalog::t_dirent &dirEntry);
+         bool lookup(const hash::t_md5 &hash, struct catalog::t_dirent &dirEntry);
          bool forget(const hash::t_md5 &hash);
    };
 

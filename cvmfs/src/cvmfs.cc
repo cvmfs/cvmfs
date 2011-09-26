@@ -1124,46 +1124,35 @@ namespace cvmfs {
       return false;
    }
    
-   
-   
-      int insert123;
-      int hit123;
-      int miss123;
-      int noent123;
-   
-   
    static bool get_dirent_for_path(const string &path, struct catalog::t_dirent &dirent) {
       hash::t_md5 md5(catalog::mangled_path(path));
       
       // check the md5path_cache first (TODO: this is a quick and dirty prototype currently!!)
-      if (md5path_cache->lookup(md5, dirent)) {
-         ++hit123;
-         if (dirent.catalog_id == -1) {
-            pmesg(D_MD5_CACHE, "HIT NEGATIVE %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
-            return false;
-
-         } else {
-            pmesg(D_MD5_CACHE, "HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
-            return true;
-         }
-         
-      } else {
+      // it actually slows down the stuff... TODO: find out why
+      // if (md5path_cache->lookup(md5, dirent)) {
+      //    if (dirent.catalog_id == -1) {
+      //       pmesg(D_MD5_CACHE, "HIT NEGATIVE %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
+      //       return false;
+      // 
+      //    } else {
+      //       pmesg(D_MD5_CACHE, "HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
+      //       return true;
+      //    }
+      //    
+      // } else {
          int catalog_id = find_catalog_id(path);
          pmesg(D_MD5_CACHE, "MISS %s --> lookup in catalog with id: %d", md5.to_string().c_str(), catalog_id);
-         ++miss123;
          
          if (catalog::lookup_informed_unprotected(md5, catalog_id, dirent)) {
             pmesg(D_MD5_CACHE, "CATALOG HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
             md5path_cache->insert(md5, dirent);
-            ++insert123;
             return true;
-         } else {
-            struct catalog::t_dirent negative;
-            negative.catalog_id = -1;
-            md5path_cache->insert(md5, negative);
-            ++noent123;
+         // } else {
+         //    struct catalog::t_dirent negative;
+         //    negative.catalog_id = -1;
+         //    md5path_cache->insert(md5, negative);
          }
-     }
+     // }
       
       return false;
    }
@@ -1206,7 +1195,10 @@ namespace cvmfs {
    }
    
    inline fuse_ino_t mangle_inode(fuse_ino_t ino) {
-      // check if this is plausible
+      // TODO: check if this is plausible
+      // the mount point sometimes is refered to as a small inode number
+      // I use an offset of INITIAL_INODE_OFFSET and all smaller inodes are mapped to catalog::get_root_inode()
+      // to always jump to the root inode of CVMFS
       return (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::get_root_inode() : ino;
    }
    
@@ -1698,7 +1690,6 @@ namespace cvmfs {
       return result;
    }
 
-
    static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino)
    {
       ino = mangle_inode(ino);
@@ -1903,9 +1894,6 @@ namespace cvmfs {
             message << "n/a"; 
          else
             message << (rx/1024)/time;
-
-      } else if (attr == "user.mydebug") {
-         message << " insert: " << insert123 << " hit: " << hit123 << " miss: " << miss123 << " noent: " << noent123;
 
       } else {
          fuse_reply_err(req, ENOATTR);
@@ -2600,14 +2588,13 @@ int main(int argc, char *argv[])
 	if ((ch = fuse_mount(cvmfs::mountpoint.c_str(), &fuse_args)) != NULL) {
 		struct fuse_session *se;
 
-			   /* Drop rights */
-		/*	   if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
-			      cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
-			      if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
-			         cerr << "Failed to drop credentials" << endl;
-			         goto cvmfs_cleanup;
-			      }
-			   }*/
+	   if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
+	      cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
+	      if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
+	         cerr << "Failed to drop credentials" << endl;
+	         goto cvmfs_cleanup;
+	      }
+	   }
 			
 		cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
 		daemon(0,0);

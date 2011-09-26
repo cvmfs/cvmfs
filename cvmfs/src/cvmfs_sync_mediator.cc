@@ -126,6 +126,7 @@ void SyncMediator::commit() {
 
 void SyncMediator::compressAndHashFileQueue() {
 	// compressing and hashing files
+	// TODO: parallelize this!
 	DirEntryList::iterator i;
 	DirEntryList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {

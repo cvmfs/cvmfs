@@ -67,9 +67,6 @@ namespace cvmfs {
 		
 		void setDirty(const std::string &path);
 		
-		bool isPartOfHardlinkGroup(const DirEntry *entry) const;
-		uint64_t getHardlinkGroup(const DirEntry *entry) const;
-		
 	private:
 		bool initCatalogs();
 		

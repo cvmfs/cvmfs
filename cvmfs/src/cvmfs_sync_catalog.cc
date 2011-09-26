@@ -422,22 +422,6 @@ unsigned int CatalogHandler::getNextFreeHardlinkGroupId(DirEntry *entry) {
 	return maxGroupId + 1;
 }
 
-bool CatalogHandler::isPartOfHardlinkGroup(const DirEntry *entry) const {
-	catalog::t_dirent d;
-	lookup(entry, d);
-	
-	// check if file is part of hard link group
-	return (d.inode != 0);
-}
-
-uint64_t CatalogHandler::getHardlinkGroup(const DirEntry *entry) const {
-	catalog::t_dirent d;
-	lookup(entry, d);
-	
-	// check if file is part of hard link group
-	return d.inode != 0;
-}
-
 bool CatalogHandler::lookup(const DirEntry *entry, catalog::t_dirent &cdirent) const {
 	hash::t_md5 md5(catalog::mangled_path(relativeToCatalogPath(entry->getRelativePath())));
 	

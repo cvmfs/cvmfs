@@ -15,13 +15,11 @@ namespace cvmfs {
    }
    
    bool Md5PathCache::insert(const hash::t_md5 &hash, const struct catalog::t_dirent &dirEntry) {
-      return true;
       pmesg(D_MD5_CACHE, "insert md5: %s -> '%s'", hash.to_string().c_str(), dirEntry.name.c_str());
       return LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >::insert(hash, dirEntry);
    }
    
    bool Md5PathCache::lookup(const hash::t_md5 &hash, struct  catalog::t_dirent &dirEntry) {
-      return false;
       pmesg(D_MD5_CACHE, "lookup md5: %s", hash.to_string().c_str());
       return LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >::lookup(hash, dirEntry);
    }
