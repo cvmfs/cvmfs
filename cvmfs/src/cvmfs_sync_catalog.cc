@@ -291,13 +291,134 @@ bool CatalogHandler::createNestedCatalog(const string &relativeCatalogPath) {
 
 void CatalogHandler::removeNestedCatalog(const std::string &relativeCatalogPath) {
 	const string clg_path = relativeToCatalogPath(relativeCatalogPath);
-	
+
 	cout << "Merging catalogs at " << clg_path << endl;
 	mergeCatalog(clg_path);
 
 	for (int i = 0; i < catalog::get_num_catalogs(); ++i) {
 		catalog::transaction(i);
 	}
+}
+
+bool CatalogHandler::checkOrAttachCatalogs(const std::string &relativePath) {
+   cout << "checking catalog for path: " << relativePath << endl;
+   
+   if (not mLazyAttach) {
+      return true;
+
+   } else {
+      int catalog_id = -1;
+      
+      PathPresent result = isCatalogForPathPresent(relativePath, &catalog_id);
+      
+      // all is fine... searched path was found
+      if (result == ppPresent) {
+         cout << "catalog is present" << endl;
+         return true;
+      
+      // we found the root of a nested catalog... load it
+      } else if (result == ppNotAttachedNestedCatalog) {
+         cout << "found nested catalog... attaching" << endl;
+         return attachCatalog(relativePath, catalog_id);
+      
+      // searched path is not available at the moment... load all nested catalogs in between
+      } else {
+         cout << "path not found... walking through and attaching" << endl;
+         return attachCatalogsForPath(relativePath);
+      }
+   }
+}
+
+bool CatalogHandler::attachCatalogsForPath(const std::string &relativePath) {
+   std::vector<string> pathElements = split_string(relativePath, "/");
+   
+   // go through all sub pathes and attach nested catalogs on the way
+   std::vector<string>::const_iterator i,end;
+   string subPath;
+   for (i = pathElements.begin(), end = pathElements.end(); i != end; ++i) {
+      subPath += "/" + *i;
+      
+      int catalog_id = -1;
+      PathPresent result = isCatalogForPathPresent(subPath, &catalog_id);
+      
+      // sub path is present, just go on
+      if (result == ppPresent) {
+         cout << "found path: " << subPath << endl;
+         continue;
+      
+      // we encountered a not loaded nested catalog, attach and go on
+      } else if (result == ppNotAttachedNestedCatalog) {
+         if (attachCatalog(subPath, catalog_id)) {
+            continue;
+         } else {   
+            return false;
+         }
+      
+      // this should not happen... probably the path doesn't exist at all
+      } else {
+         return false;
+      }
+   }
+   
+   // if we arrive here, everything worked out fine
+   return true;
+}
+
+// TODO: with a tree structure of open catalogs this could be in O(log n) instead of O(n)
+// see (and implement): https://cernvm.cern.ch/project/trac/cernvm/wiki/private/evolving-cvmfs
+CatalogHandler::PathPresent CatalogHandler::isCatalogForPathPresent(const std::string &path, int *catalogId) const {
+   cout << "checking if path is present: " << path << endl;
+   
+   CatalogMap::const_iterator i,end;
+   CatalogInfo bestFittingCatalog;
+   unsigned int lengthOfPathOfBestFittingCatalog = 0;
+   
+   // find best fitting catalog
+   string pathOfCatalog;
+   CatalogInfo catalogInfo;
+   for (i = mOpenCatalogs.begin(), end = mOpenCatalogs.end(); i != end; ++i) {
+      pathOfCatalog = (i->first == "") ? "/" : i->first;
+      catalogInfo = i->second;
+      
+      // if catalog path fits exactly, we're done
+      if (pathOfCatalog == path) {
+         if (catalogId != NULL) *catalogId = catalogInfo.id;
+         cout << "found path: " << path << " in catalog: " << catalogInfo.id << endl;
+         return ppPresent;
+
+      // find the path which fits best
+      } else if (path.find(pathOfCatalog) == 0 && pathOfCatalog.length() > lengthOfPathOfBestFittingCatalog) {
+         lengthOfPathOfBestFittingCatalog = pathOfCatalog.length();
+         bestFittingCatalog = catalogInfo;
+      }
+   }
+   
+   // no best fit found (quite unusual)
+   if (lengthOfPathOfBestFittingCatalog == 0) {
+      cout << "path not found (nothing fits): " << path << endl; 
+      return ppNotPresent;
+   }
+   
+   hash::t_md5 md5(catalog::mangled_path(path));
+   struct catalog::t_dirent d;
+   
+   // if path was not found in best fitting catalog, the path is not present
+   if (not catalog::lookup_informed_unprotected(md5, bestFittingCatalog.id, d)) {
+      cout << "path not found: " << path << endl;
+      return ppNotPresent;
+   }
+   
+   // if the path was found but it is the root node of a (currently not loaded) nested catalog
+   if (d.flags & catalog::DIR_NESTED) {
+      if (catalogId != NULL) *catalogId = bestFittingCatalog.id;
+      cout << "path found: " << path << " NESTED CATALOG with parent id: " << bestFittingCatalog.id << endl;
+      return ppNotAttachedNestedCatalog;
+   }
+   
+   // now we are confident that the catalog for the searched path is loaded
+   cout << "found path: " << path << " in catalog: " << bestFittingCatalog.id << endl;
+   if (catalogId != NULL) *catalogId = bestFittingCatalog.id;
+   return ppPresent;
 }
 
 void CatalogHandler::setDirty(const string& path) {
@@ -336,6 +457,8 @@ bool CatalogHandler::removeDirectory(DirEntry *entry) {
 bool CatalogHandler::removeEntry(DirEntry *entry) {
 	const string catalogPath = relativeToCatalogPath(entry->getRelativePath());
 	const string parentPath = relativeToCatalogPath(entry->getParentPath());
+	
+   checkOrAttachCatalogs(parentPath);
 	
 	catalog::t_dirent d;
 	hash::t_md5 md5(catalog::mangled_path(catalogPath));
@@ -435,13 +558,11 @@ bool CatalogHandler::lookup(const DirEntry *entry, catalog::t_dirent &cdirent) c
 	return true;
 }
 
-bool CatalogHandler::addEntry(DirEntry *entry) {
-	return addEntry(entry, 0); // 0 means: no hardlink group
-}
-
 bool CatalogHandler::addEntry(DirEntry *entry, unsigned int hardlinkGroupId) {
 	const string catalogPath = relativeToCatalogPath(entry->getRelativePath());
 	const string parentPath = relativeToCatalogPath(entry->getParentPath());
+	
+   checkOrAttachCatalogs(parentPath);
 	
 	// compute MD5 hashes of pathes
 	catalog::t_dirent d;

@@ -4,6 +4,11 @@
  *  It is basically just a wrapper around the catalog API of CVMFS.
  *  Furthermore it handles catalog loading and snapshotting.
  *
+ *  TODO: lazy attach, and creation of nested catalogs currently
+ *        screws up things. I did not develop this to stable as
+ *        this mechanics probably change with the pending structural
+ *        changes (René)
+ *
  *  Developed by René Meusel 2011 at CERN
  *  based on code written by Jakob Blomer 2009 at CERN
  */
@@ -72,6 +77,25 @@ namespace cvmfs {
 		
 		bool attachCatalog(const std::string &path, int parentCatalogId);
 		bool attachNestedCatalogsRecursively(const unsigned cat_id, const bool dirty);
+      bool checkOrAttachCatalogs(const std::string &relativePath);
+      bool attachCatalogsForPath(const std::string &relativePath);
+      
+      typedef enum {
+         ppNotPresent,
+         ppPresent,
+         ppNotAttachedNestedCatalog
+      } PathPresent;
+      
+      /**
+       *  This method is only used if catalogs are attached lazily.
+       *  it checks if the catalog containing the given path is already loaded and returns some
+       *  status information if yes.
+       *  @param path the path to check (only parent path for files EXCLUDING the file name)
+       *  @param catalogId [out] this pointer is set to the found catalog id or the parent catalog id
+       *                         in case we found the root of a not loaded nested catalog
+       *  @return a status flag declaring the result of the catalog search
+       */
+      PathPresent isCatalogForPathPresent(const std::string &path, int *catalogId) const;
 		
 		bool closeCatalog(const std::string &path);
 		
@@ -82,8 +106,7 @@ namespace cvmfs {
 		
 		bool removeEntry(DirEntry *entry);
 		
-		bool addEntry(DirEntry *entry);
-		bool addEntry(DirEntry *entry, unsigned int hardlinkGroupId);
+		bool addEntry(DirEntry *entry, unsigned int hardlinkGroupId = 0); // 0 means: no hardlink group
 		
 		unsigned int getNextFreeHardlinkGroupId(DirEntry *entry);
 		

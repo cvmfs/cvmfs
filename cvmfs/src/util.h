@@ -8,6 +8,7 @@
 
 #include <string>
 #include <map>
+#include <vector>
 #include <time.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -64,5 +65,7 @@ char *abs2rel(const char *path, const char *base, char *result, const size_t siz
  *			== NULL: error
  */
 char *rel2abs(const char *path, const char *base, char *result, const size_t size);
+
+std::vector<std::string> split_string(const std::string& s, const std::string& delim, const bool keep_empty = true);
 
 #endif
