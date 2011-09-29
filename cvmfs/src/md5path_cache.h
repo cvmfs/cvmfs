@@ -17,7 +17,6 @@ namespace cvmfs {
 
    struct hash_md5 {
       size_t operator() (const hash::t_md5 &md5) const {
-         pmesg(D_MD5_CACHE, "hashing %s to %d", md5.to_string().c_str(), (size_t)*((size_t*)md5.digest));
          return (size_t)*((size_t*)md5.digest);
       }
    };

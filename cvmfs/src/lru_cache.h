@@ -36,6 +36,9 @@
 #ifndef LRU_CACHE_H
 #define LRU_CACHE_H 1
 
+// if defined the cache is secured by a posix mutex
+//#define LRU_CACHE_THREAD_SAFE 1
+
 #include <assert.h>
 #include <map>
 #include <iostream>
@@ -104,7 +107,9 @@ namespace cvmfs {
 		/**
 		 *  mutex to make cache thread safe
 		 */
+#ifdef LRU_CACHE_THREAD_SAFE
       pthread_mutex_t mLock;
+#endif
 	
 	   /**
 	    *  This MemoryAllocator optimizes the usage of memory for the cache entries.
@@ -558,12 +563,16 @@ namespace cvmfs {
 			mLruList = new ListEntryHead<Key>();
 			
 			// thread safety
+#ifdef LRU_CACHE_THREAD_SAFE
          pthread_mutex_init(&mLock, NULL);
+#endif
 		}
 	
 		virtual ~LruCache() {
 			delete mLruList;
+#ifdef LRU_CACHE_THREAD_SAFE
          pthread_mutex_destroy(&mLock);
+#endif
 		}
 	
 		/**
@@ -576,7 +585,7 @@ namespace cvmfs {
 		 *  @param value the value of the cache entry
 		 *  @return true on successful insertion otherwise false
 		 */
-		virtual bool insert(const Key key, const Value value) {
+		virtual bool insert(const Key &key, const Value &value) {
          this->lock();
           
 			// check if we have to update an existent entry
@@ -606,7 +615,7 @@ namespace cvmfs {
 		 *  @param value (out) here the result is saved (in case of cache miss this is not altered)
 		 *  @return true on successful lookup, false if key was not found
 		 */
-		virtual bool lookup(const Key key, Value &value) { 
+		virtual bool lookup(const Key &key, Value &value) { 
          bool found = false;
          this->lock();
 		   
@@ -627,7 +636,7 @@ namespace cvmfs {
 		 *  @param key the key to delete from the cache
 		 *  @return true if key was deleted, false if key was not in the cache
 		 */
-		virtual bool forget(const Key key) {
+		virtual bool forget(const Key &key) {
          bool found = false;
          this->lock();
          
@@ -670,16 +679,20 @@ namespace cvmfs {
 		 *  may stay in use, we do not call delete on any user data
 		 */
 		virtual void drop() {
+         this->lock();
+		   
 			mCurrentCacheSize = 0;
 			mLruList->clear();
 			mCache.clear();
+			
+         this->unlock();
 		}
 
 	   /**
 	    *  google dense hash needs two special Key values to mark empty hash table
 	    *  buckets and deleted hash table buckets
 	    */
-	    void setSpecialHashTableKeys(const Key empty, const Key deleted) {
+	    void setSpecialHashTableKeys(const Key &empty, const Key &deleted) {
           mCache.set_empty_key(empty);
           mCache.set_deleted_key(deleted);
 	    }
@@ -692,7 +705,7 @@ namespace cvmfs {
 		 *  @param entry a pointer to the entry structure
 		 *  @return true on successful lookup, false otherwise
 		 */
-		inline bool lookupCache(const Key key, CacheEntry &entry) {
+		inline bool lookupCache(const Key &key, CacheEntry &entry) {
          typename Cache::iterator foundElement = mCache.find(key);
          
          if (foundElement == mCache.end()) {
@@ -711,7 +724,7 @@ namespace cvmfs {
 		 *  @param key the key to save the value in
 		 *  @param value the user data
 		 */
-		inline void insertNewEntry(const Key key, const Value value) {
+		inline void insertNewEntry(const Key &key, const Value &value) {
 			assert (not this->isFull());
 		
 			CacheEntry entry;
@@ -729,7 +742,7 @@ namespace cvmfs {
 		 *  @param key the key to save the value in
 		 *  @param entry the CacheEntry structure to save in the cache
 		 */
-		inline void updateExistingEntry(const Key key, const CacheEntry entry) {
+		inline void updateExistingEntry(const Key &key, const CacheEntry &entry) {
 			mCache[key] = entry;
 		}
 	
@@ -759,14 +772,18 @@ namespace cvmfs {
 		 *  locks the cache (thread safety)
 		 */
 		inline void lock() {
+#ifdef LRU_CACHE_THREAD_SAFE
          pthread_mutex_lock(&mLock);
+#endif
 		}
 		
 		/**
 		 *  unlocks the cache (thread safety)
 		 */
 		inline void unlock() {
+#ifdef LRU_CACHE_THREAD_SAFE
          pthread_mutex_unlock(&mLock);
+#endif
 		}
 	};
 	

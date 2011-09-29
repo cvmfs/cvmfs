@@ -80,7 +80,6 @@
 #include "path_cache.h"
 #include "md5path_cache.h"
 
-
 extern "C" {
    #include "debug.h"
    #include "sha1.h"
@@ -124,7 +123,7 @@ namespace cvmfs {
    InodeCache *inode_cache = NULL;
    const unsigned int path_cache_size = 1000;
    PathCache *path_cache = NULL;
-   const unsigned int md5path_cache_size = 10000;
+   const unsigned int md5path_cache_size = 1000;
    Md5PathCache *md5path_cache = NULL;
    
    /* Prevent DoS attacks on the Squid server */
@@ -722,6 +721,7 @@ namespace cvmfs {
          
          path_cache->drop();
          inode_cache->drop();
+         md5path_cache->drop();
       }
    }
    
@@ -1130,16 +1130,15 @@ namespace cvmfs {
       // check the md5path_cache first (TODO: this is a quick and dirty prototype currently!!)
       // it actually slows down the stuff... TODO: find out why
       // if (md5path_cache->lookup(md5, dirent)) {
-      //    if (dirent.catalog_id == -1) {
-      //       pmesg(D_MD5_CACHE, "HIT NEGATIVE %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
-      //       return false;
-      // 
-      //    } else {
-      //       pmesg(D_MD5_CACHE, "HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
-      //       return true;
-      //    }
-      //    
-      // } else {
+      //          if (dirent.catalog_id == -1) {
+      //             pmesg(D_MD5_CACHE, "HIT NEGATIVE %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
+      //             return false;
+      //       
+      //          } else {
+      //             pmesg(D_MD5_CACHE, "HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
+      //             return true;
+      //          }
+      //       } else {
          int catalog_id = find_catalog_id(path);
          pmesg(D_MD5_CACHE, "MISS %s --> lookup in catalog with id: %d", md5.to_string().c_str(), catalog_id);
          
@@ -1147,12 +1146,13 @@ namespace cvmfs {
             pmesg(D_MD5_CACHE, "CATALOG HIT %s -> '%s'", md5.to_string().c_str(), dirent.name.c_str());
             md5path_cache->insert(md5, dirent);
             return true;
-         // } else {
-         //    struct catalog::t_dirent negative;
-         //    negative.catalog_id = -1;
-         //    md5path_cache->insert(md5, negative);
+         } else {
+            struct catalog::t_dirent negative;
+            negative.catalog_id = -1;
+            negative.name = "negative!";
+            md5path_cache->insert(md5, negative);
          }
-     // }
+      // }
       
       return false;
    }
@@ -1202,6 +1202,8 @@ namespace cvmfs {
       return (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::get_root_inode() : ino;
    }
    
+   
+   
    bool load_and_attach_nested_catalog(const string &path, const struct catalog::t_dirent &dirent) {
       // check if catalog is already loaded
       for (int i = 0; i < catalog::get_num_catalogs(); ++i) {
@@ -1219,8 +1221,9 @@ namespace cvmfs {
          logmsg("Nested catalog at %s not found (ls)", path.c_str());
          return false;
       }
-   
-      int result = load_and_attach_catalog(path, hash::t_md5(catalog::mangled_path(path)), path, -1, false, expected_clg);
+      
+      hash::t_md5 md5(catalog::mangled_path(path));
+      int result = load_and_attach_catalog(path, md5, path, -1, false, expected_clg);
       if (result != 0) {
          atomic_inc(&nioerr);
          return false;
@@ -1229,7 +1232,10 @@ namespace cvmfs {
       // mark direntry in cache as loaded nested catalog
       struct catalog::t_dirent newDirent = dirent;
       newDirent.flags = (newDirent.flags & ~catalog::DIR_NESTED) | catalog::DIR_NESTED_ROOT;
-      inode_cache->insert(dirent.inode, dirent);
+      
+      // keep cache coherency!
+      inode_cache->insert(newDirent.inode, newDirent);
+      md5path_cache->insert(md5, newDirent);
       
       return true;
    }
@@ -1239,20 +1245,22 @@ namespace cvmfs {
     * Do a lookup to find out the inode number of a file name
     */
    static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
-   {
+   {  
       parent = mangle_inode(parent);
 		pmesg(D_CVMFS, "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
       string parentPath;
       struct catalog::t_dirent parentDirent;
+      
+      catalog::lock();
+      
       if(not get_path_for_inode(parent, parentPath) || not get_dirent_for_inode(parent, parentDirent)) {
          pmesg(D_CVMFS, "no path for inode found... data corrupt?");
+         catalog::unlock();
          
          fuse_reply_err(req, ENOENT);
          return;
       }
-      
-      catalog::lock();
       
       // load nested catalog if parent is a nested catalog
       if (parentDirent.flags & catalog::DIR_NESTED) {
@@ -1272,22 +1280,25 @@ namespace cvmfs {
       // check if nested catalog is dirty and reload it if neccessary
       // this DOES NOT change the catalog id
       if (refresh_dirty_catalog(catalog_id) != 0) {
+         catalog::unlock();
          fuse_reply_err(req, EIO);
+         return;
       }
       
       // check if catalogs have to be reloaded
       if (refresh_catalogs(catalog_id) != 0) {
+         catalog::unlock();
          fuse_reply_err(req, EIO);
+         return;
       }
       
       // load information by using the path!! inodes may be srewed after catalog reload
       catalog::t_dirent dirent;
       bool found = get_dirent_for_path(path, dirent);
       
-      catalog::unlock();
-      
       // information found?
       if (not found) {
+         catalog::unlock();
          fuse_reply_err(req, ENOENT);
          return;
       }
@@ -1299,6 +1310,8 @@ namespace cvmfs {
       inode_cache->insert(dirent.inode, dirent);
       path_cache->insert(dirent.inode, path);
       
+      catalog::unlock();
+      
 		// reply
       struct stat s;
       dirent.to_stat(&s);
@@ -1307,8 +1320,8 @@ namespace cvmfs {
 		memset(&result, 0, sizeof(result));
 		result.ino = dirent.inode;
 		result.attr = s;
-		result.attr_timeout = 1.0; // TODO: replace these magic numbers
-		result.entry_timeout = 1.0;
+		result.attr_timeout = 2.0; // TODO: replace these magic numbers
+		result.entry_timeout = 2.0;
 
 		fuse_reply_entry(req, &result);
    }
@@ -1456,8 +1469,7 @@ namespace cvmfs {
     */
    static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
    {
-      ino = mangle_inode(ino);
-      pmesg(D_CVMFS, "cvmfs_read on inode: %d reading %d bytes from offset %d", ino, size, off);
+      pmesg(D_CVMFS, "cvmfs_read on inode: %d reading %d bytes from offset %d", mangle_inode(ino), size, off);
       Tracer::trace(Tracer::FUSE_READ, "path", "read() call");
       
       // get data chunk
@@ -1479,8 +1491,7 @@ namespace cvmfs {
     */
    static void cvmfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
    {
-      ino = mangle_inode(ino);
-      pmesg(D_CVMFS, "cvmfs_release on inode: %d", ino);
+      pmesg(D_CVMFS, "cvmfs_release on inode: %d", mangle_inode(ino));
             
       const int64_t fd = fi->fh;
       if (close(fd) == 0) atomic_dec(&open_files);
@@ -1578,6 +1589,7 @@ namespace cvmfs {
       }
 
       // create directory listing
+      // TODO: change this ls_unprotected(md5) to an inode request to get rid of path here
       hash::t_md5 md5(catalog::mangled_path(path));
       vector<catalog::t_dirent> dir = catalog::ls_unprotected(md5);
       catalog::unlock();
@@ -1604,8 +1616,7 @@ namespace cvmfs {
 	 */
 	static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 	{
-	   ino = mangle_inode(ino);
-      pmesg(D_CVMFS, "cvmfs_releasedir on inode: %d", ino);
+      pmesg(D_CVMFS, "cvmfs_releasedir on inode: %d", mangle_inode(ino));
       
       // find the directory listing to release and release it
       int reply = 0;
@@ -1629,10 +1640,9 @@ namespace cvmfs {
     */
    static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
 	{
-	   ino = mangle_inode(ino);
-      pmesg(D_CVMFS, "cvmfs_readdir on inode %d reading %d bytes from offset %d", ino, size, off);
+      pmesg(D_CVMFS, "cvmfs_readdir on inode %d reading %d bytes from offset %d", mangle_inode(ino), size, off);
 
-      // find the directory listing to release and release it
+      // find the directory listing to read
       pthread_mutex_lock(&open_dir_listings_mutex);
       std::map<unsigned int, dirListingBuffer>::const_iterator openDir = open_dir_listings.find(fi->fh);
       pthread_mutex_unlock(&open_dir_listings_mutex);
@@ -2593,13 +2603,13 @@ int main(int argc, char *argv[])
 	if ((ch = fuse_mount(cvmfs::mountpoint.c_str(), &fuse_args)) != NULL) {
 		struct fuse_session *se;
 
-	   if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
-	      cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
-	      if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
-	         cerr << "Failed to drop credentials" << endl;
-	         goto cvmfs_cleanup;
-	      }
-	   }
+      // if ((cvmfs::uid != 0) || (cvmfs::gid != 0)) {
+      //    cout << "CernVM-FS: running with credentials " << cvmfs::uid << ":" << cvmfs::gid << endl;
+      //    if ((setgid(cvmfs::gid) != 0) || (setuid(cvmfs::uid) != 0)) {
+      //       cerr << "Failed to drop credentials" << endl;
+      //       goto cvmfs_cleanup;
+      //    }
+      // }
 			
 		cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
 		daemon(0,0);
