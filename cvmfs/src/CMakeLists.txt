@@ -28,6 +28,9 @@ set (CVMFS2_DEBUG_SOURCES
 	inode_cache.h inode_cache.cc
 	path_cache.h path_cache.cc
 	md5path_cache.h md5path_cache.cc
+	catalog_class.h catalog_class.cc
+	catalog_manager.h catalog_manager.cc
+	directory_entry.h catalog_queries.h
 	cvmfs.h cvmfs.cc)
 
 set (CVMFS2_SOURCES ${CVMFS2_DEBUG_SOURCES})

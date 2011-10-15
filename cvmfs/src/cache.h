@@ -4,6 +4,10 @@
 #include "catalog.h"
 #include "hash.h"
 
+namespace cvmfs {
+  class DirectoryEntry;
+}
+
 #include <string>
 #include <pthread.h>
 #include <cstdlib>
@@ -25,8 +29,8 @@ namespace cache {
               const hash::t_sha1 &sha1, const uint64_t size);
    bool contains(const hash::t_sha1 &id);
    int open(const hash::t_sha1 &id);
-   int open_or_lock(const catalog::t_dirent &d);
-   int fetch(const catalog::t_dirent &d, const std::string &path);
+   int open_or_lock(const cvmfs::DirectoryEntry &d);
+   int fetch(const cvmfs::DirectoryEntry &d, const std::string &path);
    
    bool mem_to_disk(const hash::t_sha1 &id, const char *buffer, const size_t size, const std::string &name);
    bool disk_to_mem(const hash::t_sha1 &id, char **buffer, size_t *size);

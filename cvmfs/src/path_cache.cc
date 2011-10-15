@@ -19,7 +19,7 @@ namespace cvmfs {
       return LruCache<fuse_ino_t, string>::insert(inode, path);
    }
 
-   bool PathCache::lookup(const fuse_ino_t inode, string &path) {
+   bool PathCache::lookup(const fuse_ino_t inode, string *path) {
       pmesg(D_PATH_CACHE, "lookup inode: %d", inode);
       return LruCache<fuse_ino_t, string>::lookup(inode, path);
    }

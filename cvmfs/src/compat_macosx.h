@@ -10,7 +10,7 @@
  *
  * -------------------------------------------- */
 
-/** this is just a quick workaround atm.
+/** 
  *  MSG_NOSIGNAL prevents send() from sending SIGPIPE and EPIPE is return instead,
  *  at least on systems which support this.
  *  MSG_NOSIGNAL is not POSIX compliant, SO_NOSIGPIPE is the Mac OS X equivalent

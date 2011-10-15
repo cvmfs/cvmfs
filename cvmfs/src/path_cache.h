@@ -15,7 +15,7 @@ namespace cvmfs {
          PathCache(unsigned int cacheSize);
          
          bool insert(const fuse_ino_t inode, const std::string &path);
-         bool lookup(const fuse_ino_t inode, std::string &path);
+         bool lookup(const fuse_ino_t inode, std::string *path);
          void drop();
    };
 

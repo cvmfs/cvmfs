@@ -1,6 +1,33 @@
 # include guard
 if (NOT REG_EXT_LIB)
 	set (REG_EXT_LIB 1)
+	
+	#
+	#    EXTERNAL LIBRARY COMPILATION WORKFLOW:
+	#
+	# in every library subdirectory there are three additional files:
+	#    src/configureHook.sh
+	#    src/makeHook.sh
+	#    src/CVMFS-CMakeLists.txt
+	#
+	# 1. the bootstrap.sh script has to decompress the library archive
+	#    usually it is copied into the $CMAKE_BINARY_DIR afterwards, to
+	#    do an out of source build.
+	#
+	# 2. external libraries usually bring their own build system
+	#    if the library is opted for static linkage, the CVMFS-CMakeLists.txt
+	#    will be included and prepares the configure, build and linkage
+	#    information
+	#
+	# 3. while configuring CVMFS with CMake all statically linked
+	#    3rdParty libraries get their configureHook shellscript invoked
+	#    at some point, to start their configuration steps
+	#
+	# 4. the build system finds out about needed external libraries
+	#    and invokes their makeHook shellscript to start the build of
+	#    this external dependency
+	
+	
 
 	# this custom macro registers an external library for building
 	#	

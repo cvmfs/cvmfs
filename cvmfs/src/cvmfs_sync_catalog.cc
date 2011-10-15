@@ -135,7 +135,23 @@ bool CatalogHandler::closeCatalog(const std::string &path) {
 	return (mOpenCatalogs.erase(path) == 1); // erase returns 1 if something was deleted
 }
 
-
+/**
+ *  TODO: this code needs some revision.
+ *        obviously create complex transactions of delete and create catalogs
+ *        a currupt state. Example:
+ *        dir
+ *          dir
+ *          .cvmfscatalog
+ *            dir
+ *              .cvmfscatalog
+ *              dir
+ *
+ *        synching this breaks the consistency.
+ *        Probably one has to rethink the whole procedure of creating and merging
+ *        catalogs, because this now happens on the fly.
+ *        Especially hard link groups, which are maintained on a directory basis
+ *        could also get corrupt while changing the catalog structure.
+ */
 void CatalogHandler::mergeCatalog(const string &path) {
 	// check if catalog is loaded
 	if (not isLoaded(path)) {
@@ -300,6 +316,11 @@ void CatalogHandler::removeNestedCatalog(const std::string &relativeCatalogPath)
 	}
 }
 
+/**
+ *  This one is quite untested:
+ *  It should work to some extent but may cause problems similar to them
+ *  described in line 139.
+ */
 bool CatalogHandler::checkOrAttachCatalogs(const std::string &relativePath) {
    cout << "checking catalog for path: " << relativePath << endl;
    
@@ -725,6 +746,9 @@ void CatalogHandler::createCatalogSnapshot(const string &path, const bool compat
 		}
 	}
 
+      /*
+       *  this is probably not needed anymore
+       */
    
 		//    /* Compat catalog */
 		//    if (compat_catalog) {

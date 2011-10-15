@@ -32,6 +32,7 @@
 #include "cache.h"
 
 #include "catalog.h"
+#include "directory_entry.h"
 #include "lru.h"
 #include "util.h"
 #include "hash.h"
@@ -272,19 +273,19 @@ namespace cache {
     *
     * \return Read-only file descriptor on success, -1 else
     */
-   int open_or_lock(const catalog::t_dirent &d) {
+   int open_or_lock(const cvmfs::DirectoryEntry &d) {
       int fd;
       
-      if ((fd = cache::open(d.checksum)) >= 0) {
-         lru::touch(d.checksum);
+      if ((fd = cache::open(d.checksum())) >= 0) {
+         lru::touch(d.checksum());
          return fd;
       }
       
       pthread_mutex_lock(mutex_download);
       /* We have to check again to avoid race condition */
-      if ((fd = cache::open(d.checksum)) >= 0) {
+      if ((fd = cache::open(d.checksum())) >= 0) {
          pthread_mutex_unlock(mutex_download);
-         lru::touch(d.checksum);
+         lru::touch(d.checksum());
          return fd;
       }
       
@@ -316,7 +317,7 @@ namespace cache {
     * \return Read-only file descriptor for the file pointing into local cache.
     *         On failure a negative error code.
     */
-   int fetch(const catalog::t_dirent &d, const string &path)
+   int fetch(const cvmfs::DirectoryEntry &d, const string &path)
    {
       string url;
       string lpath;
@@ -332,18 +333,18 @@ namespace cache {
       bool nocache = false; /* try once with no-cache-download after failure */
       FILE *f = NULL;
       
-      if (d.size > lru::max_file_size()) {
+      if (d.size() > lru::max_file_size()) {
          pmesg(D_CACHE, "file too big for lru cache");
          return -ENOSPC;
       }
       
       pmesg(D_CACHE, "loading %s", path.c_str());
     
-      const string hash_path = d.checksum.to_string();
+      const string hash_path = d.checksum().to_string();
       url = "/data/" + hash_path.substr(0, 2) + "/" + hash_path.substr(2);
       pmesg(D_CACHE, "curl fetches %s", url.c_str());
 
-      fd = cache::transaction(d.checksum, lpath, txn);
+      fd = cache::transaction(d.checksum(), lpath, txn);
       if (fd < 0) {
          pmesg(D_CACHE, "could not start transaction on %s", lpath.c_str());
          return -EIO;
@@ -367,10 +368,10 @@ namespace cache {
          /* Check checksum, if doesn't match, skip proxy
             if proxy already skipped, reload catalog
             if catalog is fresh: error */
-         if ((d.checksum != sha1) || (curl_result == Z_DATA_ERROR)) {
+         if ((d.checksum() != sha1) || (curl_result == Z_DATA_ERROR)) {
             if (!nocache) {
-               pmesg(D_CACHE, "Checksums do not match, should be %s. I'll retry download with no-cache", d.checksum.to_string().c_str());
-               logmsg("Checksum does not match for %s (SHA1: %s). I'll retry download with no-cache", path.c_str(), d.checksum.to_string().c_str());
+               pmesg(D_CACHE, "Checksums do not match, should be %s. I'll retry download with no-cache", d.checksum().to_string().c_str());
+               logmsg("Checksum does not match for %s (SHA1: %s). I'll retry download with no-cache", path.c_str(), d.checksum().to_string().c_str());
                if (!freset(f))
                   goto fetch_abort;
                nocache = true;
@@ -384,10 +385,10 @@ namespace cache {
          /* Check decompressed size */
          struct stat64 info;
          info.st_size = -1;
-         if ((fstat64(fileno(f), &info) != 0) || (info.st_size != (signed)d.size)) {
+         if ((fstat64(fileno(f), &info) != 0) || (info.st_size != (signed)d.size())) {
             logmsg("size check failure for %s, expected %lu, got %ld", 
-                   url.c_str(), d.size, info.st_size);
-            if (file_copy(txn.c_str(), (cache_path + "/quarantaine/" + d.checksum.to_string()).c_str()) != 0)
+                   url.c_str(), d.size(), info.st_size);
+            if (file_copy(txn.c_str(), (cache_path + "/quarantaine/" + d.checksum().to_string()).c_str()) != 0)
                logmsg("failed to move %s to quarantaine", txn.c_str());
             if (!nocache) {
                logmsg("Re-trying %s with no-cache", path.c_str());
@@ -407,7 +408,7 @@ namespace cache {
             result = -errno;
             return result;
          }
-         if (cache::commit(lpath, txn, path, d.checksum, d.size) == 0) {
+         if (cache::commit(lpath, txn, path, d.checksum(), d.size()) == 0) {
             return fd_return;
          } else {
             close(fd_return);
@@ -416,7 +417,7 @@ namespace cache {
       }
    
    fetch_abort:
-      logmsg("failed to fetch %s (SHA1: %s)", path.c_str(), d.checksum.to_string().c_str());
+      logmsg("failed to fetch %s (SHA1: %s)", path.c_str(), d.checksum().to_string().c_str());
       if (fd >= 0) {
          if (f) fclose(f);
          else close(fd);

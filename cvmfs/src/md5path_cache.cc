@@ -25,7 +25,7 @@ namespace cvmfs {
       return LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >::insert(hash, dirEntry);
    }
    
-   bool Md5PathCache::lookup(const hash::t_md5 &hash, struct  catalog::t_dirent &dirEntry) {
+   bool Md5PathCache::lookup(const hash::t_md5 &hash, struct  catalog::t_dirent *dirEntry) {
 #ifdef DISALBE_MD5_PATH_CACHE
       return false;
 #endif

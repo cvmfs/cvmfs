@@ -37,7 +37,7 @@
 #define LRU_CACHE_H 1
 
 // if defined the cache is secured by a posix mutex
-//#define LRU_CACHE_THREAD_SAFE 1
+#define LRU_CACHE_THREAD_SAFE 1
 
 #include <assert.h>
 #include <map>
@@ -615,7 +615,7 @@ namespace cvmfs {
 		 *  @param value (out) here the result is saved (in case of cache miss this is not altered)
 		 *  @return true on successful lookup, false if key was not found
 		 */
-		virtual bool lookup(const Key &key, Value &value) { 
+		virtual bool lookup(const Key &key, Value *value) { 
          bool found = false;
          this->lock();
 		   
@@ -623,7 +623,7 @@ namespace cvmfs {
 			if (this->lookupCache(key, entry)) {
 				// cache hit
 				this->touchEntry(entry);
-				value = entry.value;
+				*value = entry.value;
 				found = true;
 			}
 			

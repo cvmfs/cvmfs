@@ -194,7 +194,9 @@ namespace talk {
                answer(con_fd, cvmfs::mountpoint + "\n");
             }
             else if (line == "remount") {
-               int result = cvmfs::remount();
+              // TODO: implement this!!
+              int result = -1;
+//               int result = cvmfs::remount()
                if (result < 0) {
                   answer(con_fd, "Failed\n");
                } else if (result == 0) {

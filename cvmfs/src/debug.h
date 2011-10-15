@@ -25,7 +25,8 @@
 #define  D_INO_CACHE  32768
 #define  D_PATH_CACHE 65536
 #define  D_MD5_CACHE  131072
-#define  D_BITMAX     18
+#define  D_SQL        262144
+#define  D_BITMAX     19
 
 extern char *pmesg_cat[];
 extern unsigned verbosity_mask;
