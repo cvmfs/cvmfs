@@ -21,12 +21,12 @@ typedef std::vector<Catalog*> CatalogVector;
 
 class Catalog {
  public:
-  Catalog(const bool is_root = false);
+  Catalog(const std::string &path, Catalog *parent);
   ~Catalog();
-  bool Init(const std::string &db_file, const uint64_t inode_offset, const bool is_root_catalog);
+  bool Init(const std::string &db_file, const uint64_t inode_offset);
   
  public:
-  inline bool IsRoot() const { return is_root_; }
+  inline bool IsRoot() const { return NULL == parent_; }
   
   bool Lookup(const inode_t inode, DirectoryEntry *entry) const;
   bool Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
@@ -36,13 +36,19 @@ class Catalog {
   bool Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing) const;
   inline bool Listing(const std::string &path, DirectoryEntryList *listing) const { return Listing(hash::t_md5(path), listing); }
   
+  inline void addChild(Catalog *child) { children_.push_back(child); }
+  
   inline bool ContainsInode(const inode_t inode) const { return (inode > inode_offset_ && inode <= maximal_row_id_ + inode_offset_); }
   inline CatalogVector GetChildren() const { return children_; }
   inline std::string GetPath() const { return path_; }
   
+  inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) const;
+  
  private:
   inline void Lock() const { pthread_mutex_lock((pthread_mutex_t *)&mutex_); }
   inline void Unlock() const { pthread_mutex_unlock((pthread_mutex_t *)&mutex_); }
+  
+  inline uint64_t GetRowIdFromInode(const inode_t inode) const { return inode - inode_offset_; }
   
   bool EnsureConsistencyOfDirectoryEntry(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
   
@@ -55,7 +61,6 @@ class Catalog {
   sqlite3 *database_; ///< The SQLite3 database handle for this catalog
 
   pthread_mutex_t mutex_;
-  bool is_root_; ///< is this the root catalog?
   std::string root_prefix_; ///< If we mount deep into a nested catalog, we need the full preceeding path to calculate the correct MD5 hash
   std::string path_;
   

@@ -573,14 +573,6 @@ namespace cvmfs {
       return true;
    }
    
-   inline fuse_ino_t mangle_inode(fuse_ino_t ino) {
-      // TODO: check if this is plausible
-      // the mount point sometimes is refered to as a small inode number
-      // I use an offset of INITIAL_INODE_OFFSET and all smaller inodes are mapped to catalog::get_root_inode()
-      // to always jump to the root inode of CVMFS
-      return (ino < catalog::INITIAL_INODE_OFFSET) ? catalog::get_root_inode() : ino;
-   }
-   
    
    
    // bool load_and_attach_nested_catalog(const string &path, const struct catalog::t_dirent &dirent) {
@@ -625,7 +617,7 @@ namespace cvmfs {
     */
    static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
    {  
-      parent = mangle_inode(parent);
+      parent = catalog_manager->MangleInode(parent);
       pmesg(D_CVMFS, "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
       string parentPath;
@@ -667,7 +659,7 @@ namespace cvmfs {
     * they might be cached by the kernel.
     */
    static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
       pmesg(D_CVMFS, "cvmfs_getattr (stat) for inode: %d", ino);
       bool found;
       DirectoryEntry dirent;
@@ -689,7 +681,7 @@ namespace cvmfs {
     * Reads a symlink from the catalog.  Environment variables are expanded.
     */
    static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
       pmesg(D_CVMFS, "cvmfs_readlink on inode: %d", ino);
       Tracer::trace(Tracer::FUSE_READLINK, "no path provided", "readlink() call");
       bool found;
@@ -720,7 +712,7 @@ namespace cvmfs {
     */
    static void cvmfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
    { 
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
       pmesg(D_CVMFS, "cvmfs_open on inode: %d", ino);
       Tracer::trace(Tracer::FUSE_OPEN, "no path provided", "open() call");
 
@@ -793,7 +785,7 @@ namespace cvmfs {
     */
    static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
    {
-      pmesg(D_CVMFS, "cvmfs_read on inode: %d reading %d bytes from offset %d", mangle_inode(ino), size, off);
+      pmesg(D_CVMFS, "cvmfs_read on inode: %d reading %d bytes from offset %d", catalog_manager->MangleInode(ino), size, off);
       Tracer::trace(Tracer::FUSE_READ, "path", "read() call");
       
       // get data chunk
@@ -815,7 +807,7 @@ namespace cvmfs {
     */
    static void cvmfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
    {
-      pmesg(D_CVMFS, "cvmfs_release on inode: %d", mangle_inode(ino));
+      pmesg(D_CVMFS, "cvmfs_release on inode: %d", catalog_manager->MangleInode(ino));
             
       const int64_t fd = fi->fh;
       if (close(fd) == 0) atomic_dec(&open_files);
@@ -862,7 +854,7 @@ namespace cvmfs {
     */
    static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 	{
-	   ino = mangle_inode(ino);
+	   ino = catalog_manager->MangleInode(ino);
       pmesg(D_CVMFS, "cvmfs_opendir on inode: %d", ino);
 	   
       string path;
@@ -928,7 +920,7 @@ namespace cvmfs {
 	 */
 	static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 	{
-      pmesg(D_CVMFS, "cvmfs_releasedir on inode: %d", mangle_inode(ino));
+      pmesg(D_CVMFS, "cvmfs_releasedir on inode: %d", catalog_manager->MangleInode(ino));
       
       // find the directory listing to release and release it
       int reply = 0;
@@ -952,7 +944,7 @@ namespace cvmfs {
     */
    static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
 	{
-      pmesg(D_CVMFS, "cvmfs_readdir on inode %d reading %d bytes from offset %d", mangle_inode(ino), size, off);
+      pmesg(D_CVMFS, "cvmfs_readdir on inode %d reading %d bytes from offset %d", catalog_manager->MangleInode(ino), size, off);
 
       // find the directory listing to read
       pthread_mutex_lock(&open_dir_listings_mutex);
@@ -1014,7 +1006,7 @@ namespace cvmfs {
 
    static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino)
    {
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
       pmesg(D_CVMFS, "cvmfs_statfs on inode: %d", ino);
       
       /* If we return 0 it will cause the fs 
@@ -1060,7 +1052,7 @@ namespace cvmfs {
    static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size)
 #endif   
    {
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
       pmesg(D_CVMFS, "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
       const string attr = name;
       DirectoryEntry d;
@@ -1229,19 +1221,19 @@ namespace cvmfs {
    }
 
    static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
       pmesg(D_FUSE_STUB, "cvmfs_listxattr on inode: %d", ino);
       fuse_reply_err(req, EROFS);
    }
    
    static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
       pmesg(D_FUSE_STUB, "cvmfs_forget on inode: %d", ino);
       fuse_reply_none(req);
    }
 
    static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
-      ino = mangle_inode(ino);
+      ino = catalog_manager->MangleInode(ino);
    	pmesg(D_CVMFS, "cvmfs_access on inode: %d asking for R: %s W: %s X: %s", ino, ((mask & R_OK) ? "yes" : "no"), ((mask & W_OK) ? "yes" : "no"), ((mask & X_OK) ? "yes" : "no"));
    	
       DirectoryEntry d;

@@ -43,29 +43,58 @@ bool CatalogManager::AttachNestedCatalog(const DirectoryEntry &mountpoint, Catal
 }
 
 bool CatalogManager::LoadAndAttachRootCatalog() {
-
-  return true;
-}
-
-bool CatalogManager::Attach(const std::string &db_file, const std::string &url, const Catalog *parent, const bool open_transaction, Catalog **attached_catalog) {
+  string relative_url = "";
+  Catalog *parent = NULL;
   
-  return true;
-}
-
-bool CatalogManager::Reattach(const unsigned int cat_id, const std::string &db_file, const std::string &url, Catalog **attached_catalog) {
-  
-  return true;
-}
-
-bool CatalogManager::Lookup(const uint64_t inode, DirectoryEntry *entry, const bool with_parent) const {
-  Catalog *catalog;
-  bool found_catalog = GetCatalogByInode(inode, &catalog);
-  
-  if (not found_catalog) {
+  string new_catalog_file;
+  if (0 != LoadCatalogFile(relative_url, hash::t_md5(relative_url), "/", &new_catalog_file)) {
+    pmesg(D_CATALOG, "failed to load catalog %s", relative_url.c_str());
+    return false;
+  }
+  if (not AttachCatalog(new_catalog_file, relative_url, parent, false, NULL)) {
+    pmesg(D_CATALOG, "failed to attach catalog %s", relative_url.c_str());
     return false;
   }
   
-  return catalog->Lookup(inode, entry);
+  return true;
+}
+
+bool CatalogManager::AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog) {
+  pmesg(D_CATALOG, "attaching catalog file %s", db_file.c_str());
+  
+  Catalog *new_catalog = new Catalog(url, parent);
+  if (not new_catalog->Init(db_file, kInitialInodeOffset)) {
+    pmesg(D_CATALOG, "initialization of catalog %s failed", db_file.c_str());
+    return false;
+  }
+  
+  catalogs_.push_back(new_catalog);
+  if (NULL != attached_catalog) *attached_catalog = new_catalog;
+  return true;
+}
+
+bool CatalogManager::RefreshCatalog() {
+  
+  return true;
+}
+
+bool CatalogManager::DetachCatalog() {
+  
+  return true;
+}
+
+bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent) const {
+  inode_t internal_inode = MangleInode(inode);
+  
+  Catalog *catalog;
+  bool found_catalog = GetCatalogByInode(internal_inode, &catalog);
+  
+  if (not found_catalog) {
+    pmesg(D_CATALOG, "cannot find catalog for inode %d", inode);
+    return false;
+  }
+  
+  return catalog->Lookup(internal_inode, entry);
   
   // TODO: implement parent lookup
 }
@@ -221,6 +250,142 @@ bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog 
   return true;
 }
 
+int CatalogManager::LoadCatalogFile(const string &url_path, const hash::t_md5 &mount_point, 
+                                    const string &mount_path, const int existing_cat_id, const bool no_cache,
+                                    const hash::t_sha1 expected_clg, std::string *catalog_file)
+{
+  string old_file;
+  hash::t_sha1 sha1_old;
+  hash::t_sha1 sha1_cat;
+  bool cached_copy;
+  int cat_id = existing_cat_id;
+  
+  int result = FetchCatalog(url_path, no_cache, mount_point, 
+                            *catalog_file, sha1_cat, old_file, sha1_old, cached_copy, expected_clg);
+  if (((result == -EPERM) || (result == -EAGAIN) || (result == -EINVAL)) && !no_cache) {
+     /* retry with no-cache pragma */
+     pmesg(D_CVMFS, "could not load catalog, trying again with pragma: no-cache");
+     logmsg("possible data corruption while trying to retrieve catalog from %s, trying with no-cache",
+            (root_url_ + url_path).c_str());
+     result = FetchCatalog(url_path, true, mount_point, 
+                           *catalog_file, sha1_cat, old_file, sha1_old, cached_copy, expected_clg);
+  }
+  /* log certain failures */
+  if (result == -EPERM) {
+     logmsg("signature verification failure while trying to retrieve catalog from %s", 
+            (root_url_ + url_path).c_str());
+  }
+  else if ((result == -EINVAL) || (result == -EAGAIN)) {
+     logmsg("data corruption while trying to retrieve catalog from %s",
+            (root_url_ + url_path).c_str());
+  }
+  else if (result < 0) {
+     logmsg("catalog load failure while try to retrieve catalog from %s", 
+            (root_url_ + url_path).c_str());
+  }
+  
+  /* LRU handling, could still fail due to cache size restrictions */
+  if (((result == 0) && !cached_copy) ||
+      ((existing_cat_id < 0) && ((result == 0) || cached_copy)))
+  {
+     PortableStat64 info;
+     if (portableFileStat64(catalog_file->c_str(), &info) != 0) {
+        /* should never happen */
+        lru::remove(sha1_cat);
+        cached_copy = false;
+        result = -EIO;
+        pmesg(D_CVMFS, "failed to access new catalog");
+        logmsg("catalog access failure for %s", catalog_file->c_str());
+     } else {
+        if (((uint64_t)info.st_size > lru::max_file_size()) ||
+            (!lru::pin(sha1_cat, info.st_size, root_url_ + url_path)))
+        {
+           pmesg(D_CVMFS, "failed to store %s in LRU cache (no space)", catalog_file->c_str());
+           logmsg("catalog load failure for %s (no space)", catalog_file->c_str());
+           lru::remove(sha1_cat);
+           unlink(catalog_file->c_str());
+           cached_copy = false;
+           result = -ENOSPC;
+        } else {
+           /* From now on we have to go with the new catalog */
+           if (!sha1_old.is_null() && (sha1_old != sha1_cat)) {
+              lru::remove(sha1_old);
+              unlink(old_file.c_str());
+           }
+        }
+     }
+  }
+  
+  return result;
+}
+
+/**
+* Uses fetch catalog to get a possibly new catalog version.
+* Old catalog has to be detached afterwards.
+* Updates LRU database and TTL list.
+* \return 0 on success (also cached copy is success), standard error code else
+*/
+// int CatalogManager::LoadAndAttachCatalog(const string &url_path, const hash::t_md5 &mount_point, 
+//                                          const string &mount_path, const int existing_cat_id, const bool no_cache,
+//                                          const hash::t_sha1 expected_clg)
+// {
+// //  LoadCatalog(url_path)
+//   
+//   time_t now = time(NULL);
+//   
+//   /* Now we have the right catalog in cat_file, which might be
+//         already loaded (cache_copy and existing_cat_id > 0) */
+//   if (((result == 0) && !cached_copy) ||
+//       ((existing_cat_id < 0) && ((result == 0) || cached_copy))) 
+//   {
+//      bool attach_result;
+//      if (existing_cat_id >= 0) {
+//        attach_result = Reattach(existing_cat_id, cat_file, url_path, NULL);
+//         /*
+//         
+//         TODO: reimplement this
+//         
+//         catalog::detach_intermediate(existing_cat_id);
+//         attach_result = catalog::reattach(existing_cat_id, cat_file, url_path);
+//         catalog_tree::get_catalog(existing_cat_id)->last_changed = now;
+//         catalog_tree::get_catalog(existing_cat_id)->snapshot = sha1_cat;
+//         */
+//      } else {
+//        attach_result = Attach(cat_file, url_path, NULL, false, NULL);
+//      }
+//      
+//      /* Also for existing_cat_id < 0 to remove the "nested" flags from cache */
+// // TODO: reimplement this
+// //     invalidate_cache(existing_cat_id);
+//         
+//      if (!attach_result) {
+//         /* should never happen, no reasonable continuation */
+//         pmesg(D_CVMFS, "failed to attach new catalog");
+//         logmsg("catalog attach failure for %s", cat_file.c_str());
+//         abort();
+//      } else {
+//         if (existing_cat_id < 0) {
+//            cat_id = catalog::get_num_catalogs()-1;
+//         }
+//      }
+//   }
+//   
+//   /* Back-rename if we have a catalog at all.  No race condition with LRU
+//      because file is pinned. */
+//   if ((result == 0) || cached_copy) {
+//      const string sha1_cat_str = sha1_cat.to_string();
+//      const string final_file = "./" + sha1_cat_str.substr(0, 2) + "/" + 
+//                                sha1_cat_str.substr(2);
+//      (void)rename(cat_file.c_str(), final_file.c_str());
+//   }
+//   
+//   if (cat_id >= 0) {
+//      return 0;
+//   } else {
+//      return result;
+//   }
+// }
+
 string CatalogManager::MakeFilesystemKey(string url) const {
   string::size_type pos;
   while ((pos = url.find(':', 0)) != string::npos) {
@@ -231,6 +396,12 @@ string CatalogManager::MakeFilesystemKey(string url) const {
   }
   return url;
 }
+
+// TODO: code from here on DOES NOT belong here
+//       should be hidden in a FileManager class or something
+//       currently this is here for convenience!!
+//       see: https://cernvm.cern.ch/project/trac/cernvm/wiki/private/evolving-cvmfs
+
 
 /**
 * Loads a catalog from an url into local cache if there is a newer version.
@@ -704,7 +875,7 @@ bool CatalogManager::IsValidCertificate(bool nocache) {
 }
 
 bool CatalogManager::GetCatalogById(const int catalog_id, Catalog **catalog) const {
-  if (catalog_id < 0 || catalog_id >= GetCatalogCount()) {
+  if (catalog_id < 0 || catalog_id >= GetNumberOfAttachedCatalogs()) {
     return false;
   }
   
@@ -712,150 +883,4 @@ bool CatalogManager::GetCatalogById(const int catalog_id, Catalog **catalog) con
   return true;
 }
 
-/**
-* Uses fetch catalog to get a possibly new catalog version.
-* Old catalog has to be detached afterwards.
-* Updates LRU database and TTL list.
-* \return 0 on success (also cached copy is success), standard error code else
-*/
-// int CatalogManager::LoadAndAttachCatalog(const string &url_path, const hash::t_md5 &mount_point, 
-//                                          const string &mount_path, const int existing_cat_id, const bool no_cache,
-//                                          const hash::t_sha1 expected_clg) {
-//   string cat_file;
-//   string old_file;
-//   hash::t_sha1 sha1_old;
-//   hash::t_sha1 sha1_cat;
-//   bool cached_copy;
-//   int cat_id = existing_cat_id;
-//   
-//   int result = FetchCatalog(url_path, no_cache, mount_point, 
-//                             cat_file, sha1_cat, old_file, sha1_old, cached_copy, expected_clg);
-//   if (((result == -EPERM) || (result == -EAGAIN) || (result == -EINVAL)) && !no_cache) {
-//      /* retry with no-cache pragma */
-//      pmesg(D_CVMFS, "could not load catalog, trying again with pragma: no-cache");
-//      logmsg("possible data corruption while trying to retrieve catalog from %s, trying with no-cache",
-//             (root_url_ + url_path).c_str());
-//      result = FetchCatalog(url_path, true, mount_point, 
-//                            cat_file, sha1_cat, old_file, sha1_old, cached_copy, expected_clg);
-//   }
-//   /* log certain failures */
-//   if (result == -EPERM) {
-//      logmsg("signature verification failure while trying to retrieve catalog from %s", 
-//             (root_url_ + url_path).c_str());
-//   }
-//   if ((result == -EINVAL) || (result == -EAGAIN)) {
-//      logmsg("data corruption while trying to retrieve catalog from %s",
-//             (root_url_ + url_path).c_str());
-//   }
-//   else if (result < 0) {
-//      logmsg("catalog load failure while try to retrieve catalog from %s", 
-//             (root_url_ + url_path).c_str());
-//   }
-//   
-//   /* LRU handling, could still fail due to cache size restrictions */
-//   if (((result == 0) && !cached_copy) ||
-//       ((existing_cat_id < 0) && ((result == 0) || cached_copy)))
-//   {
-//      PortableStat64 info;
-//      if (portableFileStat64(cat_file.c_str(), &info) != 0) {
-//         /* should never happen */
-//         lru::remove(sha1_cat);
-//         cached_copy = false;
-//         result = -EIO;
-//         pmesg(D_CVMFS, "failed to access new catalog");
-//         logmsg("catalog access failure for %s", cat_file.c_str());
-//      } else {
-//         if (((uint64_t)info.st_size > lru::max_file_size()) ||
-//             (!lru::pin(sha1_cat, info.st_size, root_url_ + url_path)))
-//         {
-//            pmesg(D_CVMFS, "failed to store %s in LRU cache (no space)", cat_file.c_str());
-//            logmsg("catalog load failure for %s (no space)", cat_file.c_str());
-//            lru::remove(sha1_cat);
-//            unlink(cat_file.c_str());
-//            cached_copy = false;
-//            result = -ENOSPC;
-//         } else {
-//            /* From now on we have to go with the new catalog */
-//            if (!sha1_old.is_null() && (sha1_old != sha1_cat)) {
-//               lru::remove(sha1_old);
-//               unlink(old_file.c_str());
-//            }
-//         }
-//      }
-//   }
-//   
-//   time_t now = time(NULL);
-//   
-//   /* Now we have the right catalog in cat_file, which might be
-//         already loaded (cache_copy and existing_cat_id > 0) */
-//   if (((result == 0) && !cached_copy) ||
-//       ((existing_cat_id < 0) && ((result == 0) || cached_copy))) 
-//   {
-//      bool attach_result;
-//      if (existing_cat_id >= 0) {
-//        attach_result = Reattach(existing_cat_id, cat_file, url_path, NULL);
-//         /*
-//         
-//         TODO: reimplement this
-//         
-//         catalog::detach_intermediate(existing_cat_id);
-//         attach_result = catalog::reattach(existing_cat_id, cat_file, url_path);
-//         catalog_tree::get_catalog(existing_cat_id)->last_changed = now;
-//         catalog_tree::get_catalog(existing_cat_id)->snapshot = sha1_cat;
-//         */
-//      } else {
-//        attach_result = Attach(cat_file, url_path, false, NULL);
-//      }
-//      
-//      /* Also for existing_cat_id < 0 to remove the "nested" flags from cache */
-// // TODO: reimplement this
-// //     invalidate_cache(existing_cat_id);
-//         
-//      if (!attach_result) {
-//         /* should never happen, no reasonable continuation */
-//         pmesg(D_CVMFS, "failed to attach new catalog");
-//         logmsg("catalog attach failure for %s", cat_file.c_str());
-//         abort();
-//      } else {
-//         if (existing_cat_id < 0) {
-//            cat_id = catalog::get_num_catalogs()-1;
-//         }
-//      }
-//   }
-//   
-//   /* Back-rename if we have a catalog at all.  No race condition with LRU
-//      because file is pinned. */
-//   if ((result == 0) || cached_copy) {
-//      const string sha1_cat_str = sha1_cat.to_string();
-//      const string final_file = "./" + sha1_cat_str.substr(0, 2) + "/" + 
-//                                sha1_cat_str.substr(2);
-//      (void)rename(cat_file.c_str(), final_file.c_str());
-//   }
-//   
-//   if (cat_id >= 0) {
-//      catalog_tree::catalog_meta_t *info = catalog_tree::get_catalog(cat_id);
-//      
-//      info->last_checked = now;
-//      /* Forward TTL adjustment, only on success */
-//      if (result == 0) {
-//         info->expires = now + effective_ttl(catalog::get_ttl(cat_id));
-//         if (info->last_checked > info->last_changed) {
-//            catalog_tree::visit_children(cat_id, update_ttl);
-//         }
-//      } else {
-//         info->expires = now + effective_ttl(short_term_ttl);
-//         if (info->last_checked > info->last_changed) {
-//            catalog_tree::visit_children(cat_id, update_ttl_shortterm);
-//         }
-//      }
-//      info->dirty = false;
-//      catalog_tree::visit_children(cat_id, set_dirty);
-// 
-//      return 0;
-//   } else {
-//      return result;
-//   }
-// }
-
-
- }
+}

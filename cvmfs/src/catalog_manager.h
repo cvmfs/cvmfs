@@ -25,9 +25,11 @@ class CatalogManager {
   
   bool LoadAndAttachRootCatalog();
   
-  inline inode_t GetRootInode() const { return 255; } // TODO: replace by something reasonable
+  inline inode_t GetRootInode() const { return kInitialInodeOffset + 1; }
   inline uint64_t GetRevision() const { return 0; } // TODO: implement this
   inline int GetNumberOfAttachedCatalogs() const { return catalogs_.size(); }
+  
+  inline inode_t MangleInode(const inode_t inode) const { return (inode < kInitialInodeOffset) ? GetRootInode() : inode; }
   
  private:
   typedef enum {
@@ -39,12 +41,21 @@ class CatalogManager {
   int FetchCatalog(const std::string &url_path, const bool no_proxy, const hash::t_md5 &mount_point,
                    std::string &cat_file, hash::t_sha1 &cat_sha1, std::string &old_file, hash::t_sha1 &old_sha1, 
                    bool &cached_copy, const hash::t_sha1 &sha1_expected, const bool dry_run = false);
-  int LoadAndAttachCatalog(const std::string &url_path, const hash::t_md5 &mount_point, 
-                           const std::string &mount_path, const int existing_cat_id, const bool no_cache,
-                           const hash::t_sha1 expected_clg = hash::t_sha1());
+                   
+  /** convenience wrapper to hide all the nasty loading stuff which I do not understand */
+  inline int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point, 
+                             const std::string &mount_path, std::string *catalog_file)
+  {
+    return LoadCatalogFile(url_path, mount_point, mount_path, -1, false, hash::t_sha1(), catalog_file);
+  }
+  int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point, 
+                      const std::string &mount_path, const int existing_cat_id, const bool no_cache,
+                      const hash::t_sha1 expected_clg, std::string *catalog_file);
+
   bool AttachNestedCatalog(const DirectoryEntry &mountpoint, Catalog **attached_catalog);
-  bool Attach(const std::string &db_file, const std::string &url, const Catalog *parent, const bool open_transaction, Catalog **attached_catalog);
-  bool Reattach(const unsigned int cat_id, const std::string &db_file, const std::string &url, Catalog **attached_catalog);
+  bool AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog);
+  bool RefreshCatalog();
+  bool DetachCatalog();
 
   bool IsValidCertificate(bool nocache);
   std::string MakeFilesystemKey(std::string url) const;
@@ -53,7 +64,6 @@ class CatalogManager {
   bool GetCatalogById(const int catalog_id, Catalog **catalog) const;
   bool GetCatalogByPath(const std::string &path, const bool load_final_catalog, Catalog **catalog = NULL, DirectoryEntry *entry = NULL);
   bool GetCatalogByInode(const inode_t inode, Catalog **catalog) const;
-  inline int GetCatalogCount() const { return catalogs_.size(); }
   
   Catalog* FindBestFittingCatalogForPath(const std::string &path) const;
   bool LoadNestedCatalogForPath(const std::string &path, const Catalog *entry_point, const bool load_final_catalog, Catalog **final_catalog);
@@ -69,6 +79,8 @@ class CatalogManager {
   
   atomic_int certificate_hits_;
   atomic_int certificate_misses_;
+  
+  const static inode_t kInitialInodeOffset = 255;
 };
   
 }

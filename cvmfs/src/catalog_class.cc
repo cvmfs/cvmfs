@@ -14,17 +14,14 @@ const uint64_t Catalog::DEFAULT_TTL       = 3600; ///< Default TTL for a catalog
 const uint64_t Catalog::GROW_EPOCH        = 1199163600;
 const int      Catalog::SQLITE_THREAD_MEM = 4; ///< SQLite3 heap limit per thread
 
-Catalog::Catalog(const bool is_root) {
-  // initialize mutex
+Catalog::Catalog(const string &path, Catalog *parent) {
   pthread_mutex_init(&mutex_, NULL);
   
-  // initialize catalog hierarchy
-  parent_ = NULL;
-  
-  is_root_ = is_root;
+  parent_ = parent;
+  path_ = path;
 }
 
-bool Catalog::Init(const string &db_file, const uint64_t inode_offset, const bool is_root_catalog) {
+bool Catalog::Init(const string &db_file, const uint64_t inode_offset) {
   int flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
   // open database file for reading
@@ -45,7 +42,7 @@ bool Catalog::Init(const string &db_file, const uint64_t inode_offset, const boo
   inode_offset_ = inode_offset;
   SqlStatement max_row_id_query(database_, "SELECT MAX(rowid) FROM catalog;");
   if (not max_row_id_query.FetchRow()) {
-    pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s", db_file.c_str());
+    pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s (SqliteErrorcode: %d)", db_file.c_str(), max_row_id_query.GetLastError());
     return false;
   }
   maximal_row_id_ = max_row_id_query.RetrieveInt64(0);
@@ -53,12 +50,17 @@ bool Catalog::Init(const string &db_file, const uint64_t inode_offset, const boo
   // get root prefix
   if (IsRoot()) {
     SqlStatement root_prefix_query(database_, "SELECT value FROM properties WHERE key='root_prefix';");
-    if (not root_prefix_query.FetchRow()) {
+    if (root_prefix_query.FetchRow()) {
+      root_prefix_ = string((char *)root_prefix_query.RetrieveText(0));
+      pmesg(D_CATALOG, "found root prefix %s in root catalog file %s", root_prefix_.c_str(), db_file.c_str());
+    } else {
       pmesg(D_CATALOG, "Cannot retrieve root prefix for root catalog file %s", db_file.c_str());
-      return false;
     }
-    root_prefix_ = string((char *)root_prefix_query.RetrieveText(0));
-    pmesg(D_CATALOG, "found root prefix %s in root catalog file %s", root_prefix_.c_str(), db_file.c_str());
+  }
+  
+  // everything went well, notify parent about our existance
+  if (not IsRoot()) {
+    parent_->addChild(this);
   }
   
   return true;
@@ -75,13 +77,14 @@ Catalog::~Catalog() {
   pthread_mutex_destroy(&mutex_);
 }
 
-bool Catalog::Lookup(const uint64_t inode, DirectoryEntry *entry) const {
+bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry) const {
   bool found = false;
+  uint64_t row_id = GetRowIdFromInode(inode);
   
   Lock();
-  inode_lookup_statement_->BindInode(inode);
+  inode_lookup_statement_->BindRowId(row_id);
   if (inode_lookup_statement_->FetchRow()) {
-    *entry = inode_lookup_statement_->GetDirectoryEntry();
+    *entry = inode_lookup_statement_->GetDirectoryEntry(this);
     found = true;
   }
   inode_lookup_statement_->Reset();
@@ -96,7 +99,7 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const 
   Lock();
   path_hash_lookup_statement_->BindPathHash(path_hash);
 	if (path_hash_lookup_statement_->FetchRow()) {
-    *entry = path_hash_lookup_statement_->GetDirectoryEntry();
+    *entry = path_hash_lookup_statement_->GetDirectoryEntry(this);
     found = EnsureConsistencyOfDirectoryEntry(path_hash, entry);
 	}
   path_hash_lookup_statement_->Reset();
@@ -114,7 +117,7 @@ bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing)
   Lock();
   listing_statement_->BindPathHash(path_hash);
   while (listing_statement_->FetchRow()) {
-    DirectoryEntry entry = listing_statement_->GetDirectoryEntry();
+    DirectoryEntry entry = listing_statement_->GetDirectoryEntry(this);
     EnsureConsistencyOfDirectoryEntry(path_hash, &entry);
     listing->push_back(entry);
   }
@@ -141,6 +144,10 @@ bool Catalog::EnsureConsistencyOfDirectoryEntry(const hash::t_md5 &path_hash, Di
 	}
 	
   return true;
+}
+
+inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) const {
+  return row_id + inode_offset_; // TODO: use the hardlink group id as well!
 }
 
 } // namespace cvmfs

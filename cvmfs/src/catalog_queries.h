@@ -13,76 +13,70 @@ extern "C" {
 }
 
 namespace cvmfs {
+  
+class Catalog;
 
 class SqlStatement {
  protected:
   SqlStatement() {};
   
  public:
-  SqlStatement(const sqlite3 *database, const std::string &statement) {
-    Init(database, statement);
-  }
-   
-  inline bool Init(const sqlite3 *database, const std::string &statement) {
-    const bool result = sqlite3_prepare_v2((sqlite3*)database,
-                                           statement.c_str(),
-                                           -1, // parse until null termination
-                                           &statement_,
-                                           NULL);
-
-    if (SQLITE_OK != result) {
-      pmesg(D_SQL, "FAILED to prepare statement '%s' - error code: %d", statement.c_str(), result);
-      return false;
-    }
-
-    pmesg(D_SQL, "SUCCESSFULLY prepared statement '%s'", statement.c_str());
-    return true;
-  }
-
-  virtual ~SqlStatement() {
-    const bool result = sqlite3_finalize(statement_);
-
-    if (SQLITE_OK != result) {
-      pmesg(D_SQL, "FAILED to finalize statement - error code: %d", result);
-    }
-
-    pmesg(D_SQL, "SUCCESSFULLY finalized statement");
-  }
+  SqlStatement(const sqlite3 *database, const std::string &statement);
+  bool Init(const sqlite3 *database, const std::string &statement);
+  virtual ~SqlStatement();
 
   inline bool Reset() {
-    return (SQLITE_OK == sqlite3_reset(statement_));
+    last_error_code_ = sqlite3_reset(statement_);
+    return Successful();
   }
 
   inline bool FetchRow() {
-    return SQLITE_OK == sqlite3_step(statement_);
+    last_error_code_ = sqlite3_step(statement_);
+    return SQLITE_ROW == last_error_code_;
   }
   
+  inline bool Successful() const {
+    return SQLITE_OK   == last_error_code_ || 
+           SQLITE_ROW  == last_error_code_ ||
+           SQLITE_DONE == last_error_code_;
+  }
+  inline int GetLastError() const { return last_error_code_; }
+  
   inline bool BindBlob(const int index, const void* value, const int size, void (*destructor)(void*)) {
-    return SQLITE_OK == sqlite3_bind_blob(statement_, index, value, size, destructor);
+    last_error_code_ = sqlite3_bind_blob(statement_, index, value, size, destructor);
+    return Successful();
   }
   inline bool BindDouble(const int index, const double value) {
-    return SQLITE_OK == sqlite3_bind_double(statement_, index, value);
+    last_error_code_ = sqlite3_bind_double(statement_, index, value);
+    return Successful();
   }
   inline bool BindInt(const int index, const int value) {
-    return SQLITE_OK == sqlite3_bind_int(statement_, index, value);
+    last_error_code_ = sqlite3_bind_int(statement_, index, value);
+    return Successful();
   }
   inline bool BindInt64(const int index, const sqlite3_int64 value) {
-    return SQLITE_OK == sqlite3_bind_int64(statement_, index, value);
+    last_error_code_ = sqlite3_bind_int64(statement_, index, value);
+    return Successful();
   }
   inline bool BindNull(const int index) {
-    return SQLITE_OK == sqlite3_bind_null(statement_, index);
+    last_error_code_ = sqlite3_bind_null(statement_, index);
+    return Successful();
   }
   inline bool BindText(const int index, const char* value, const int size, void (*destructor)(void*)) {
-    return SQLITE_OK == sqlite3_bind_text(statement_, index, value, size, destructor);
+    last_error_code_ = sqlite3_bind_text(statement_, index, value, size, destructor);
+    return Successful();
   }
   inline bool BindText16(const int index, const void* value, const int size, void (*destructor)(void*)) {
-    return SQLITE_OK == sqlite3_bind_text16(statement_, index, value, size, destructor);
+    last_error_code_ = sqlite3_bind_text16(statement_, index, value, size, destructor);
+    return Successful();
   }
   inline bool BindValue(const int index, const sqlite3_value* value) {
-    return SQLITE_OK == sqlite3_bind_value(statement_, index, value);
+    last_error_code_ = sqlite3_bind_value(statement_, index, value);
+    return Successful();
   }
   inline bool BindZeroblob(const int index, const int size) {
-    return SQLITE_OK == sqlite3_bind_zeroblob(statement_, index, size);
+    last_error_code_ = sqlite3_bind_zeroblob(statement_, index, size);
+    return Successful();
   }
   
   inline const void *RetrieveBlob(const int iCol) const {
@@ -116,21 +110,17 @@ class SqlStatement {
     return sqlite3_column_value(statement_, iCol);
   }
 
- protected:
+ private:
   sqlite3_stmt *statement_;
+  int last_error_code_;
 };
 
 class LookupSqlStatement : public SqlStatement {
  protected:
-  inline std::string GetFieldsToSelect() const {
-    return "hash, inode, size, mode, mtime, flags, name, symlink, md5path_1, md5path_2, parent_1, parent_2, rowid";
-  }
+  std::string GetFieldsToSelect() const;
 
  public:
-  inline DirectoryEntry GetDirectoryEntry() const {
-    // TODO: implement me!
-    return DirectoryEntry();
-  }
+  DirectoryEntry GetDirectoryEntry(const Catalog *catalog) const;
   
   inline hash::t_md5 GetPathHash() const {
     // TODO: implement me!
@@ -145,68 +135,27 @@ class LookupSqlStatement : public SqlStatement {
 
 class ListingLookupSqlStatement : public LookupSqlStatement {
  public:
-  ListingLookupSqlStatement(const sqlite3 *database) {
-    std::ostringstream statement;
-    statement << "SELECT " << GetFieldsToSelect() << " FROM catalog "
-                 "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
-    Init(database, statement.str());
-  }
-  
-  inline bool BindPathHash(const struct hash::t_md5 &hash) {
-    return (
-      SQLITE_OK == BindInt64(1, *((sqlite_int64 *)(&hash.digest[0]))) &&
-      SQLITE_OK == BindInt64(2, *((sqlite_int64 *)(&hash.digest[8])))
-    );
-  }
+  ListingLookupSqlStatement(const sqlite3 *database);
+  bool BindPathHash(const struct hash::t_md5 &hash);
 };
 
 class PathHashLookupSqlStatement : public LookupSqlStatement {
  public:
-  PathHashLookupSqlStatement(const sqlite3 *database) {
-    std::ostringstream statement;
-    statement << "SELECT " << GetFieldsToSelect() << " FROM catalog "
-                 "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
-    Init(database, statement.str());
-  }
-
-  inline bool BindPathHash(const struct hash::t_md5 &hash) {
-    return (
-      SQLITE_OK == BindInt64(1, *((sqlite_int64 *)(&hash.digest[0]))) &&
-      SQLITE_OK == BindInt64(2, *((sqlite_int64 *)(&hash.digest[8])))
-    );
-  }
+  PathHashLookupSqlStatement(const sqlite3 *database);
+  bool BindPathHash(const struct hash::t_md5 &hash);
 };
 
 class InodeLookupSqlStatement : public LookupSqlStatement {
  public:
-  InodeLookupSqlStatement(const sqlite3 *database) {
-    std::ostringstream statement;
-    statement << "SELECT " << GetFieldsToSelect() << " FROM catalog "
-                 "WHERE rowid = :rowid;";
-    Init(database, statement.str());
-  }
-
-  inline bool BindInode(const uint64_t inode) {
-    return BindInt64(1, inode);
-  }
+  InodeLookupSqlStatement(const sqlite3 *database);
+  bool BindRowId(const uint64_t inode);
 };
 
 class FindNestedCatalogSqlStatement : public SqlStatement {
  public:
-  FindNestedCatalogSqlStatement(const sqlite3 *database) {
-    Init(database, "SELECT sha1 FROM nested_catalogs WHERE path=:path;");
-  }
-  
-  inline bool BindSearchPath(const std::string &path) {
-    return BindText(1, &path[0], path.length(), SQLITE_STATIC);
-  }
-  
-  inline hash::t_sha1 GetContentHash() const {
-    hash::t_sha1 sha1;
-    const std::string sha1_str = std::string((char *)RetrieveText(0));
-    sha1.from_hash_str(sha1_str);
-    return sha1;
-  }
+  FindNestedCatalogSqlStatement(const sqlite3 *database);
+  bool BindSearchPath(const std::string &path);
+  hash::t_sha1 GetContentHash() const;
 };
 
 } // namespace cvmfs
