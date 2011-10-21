@@ -49,7 +49,7 @@ hash::t_md5 LookupSqlStatement::GetParentPathHash() const {
   return hash::t_md5(RetrieveInt64(10), RetrieveInt64(11));
 }
 
-DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) const {
+DirectoryEntry LookupSqlStatement::GetDirectoryEntry(Catalog *catalog) const {
   // compute file checksum, if there is one
   hash::t_sha1 checksum = (RetrieveBytes(0) > 0) ? 
                   hash::t_sha1(RetrieveBlob(0), RetrieveBytes(0)) :

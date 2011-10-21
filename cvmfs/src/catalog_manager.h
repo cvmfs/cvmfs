@@ -29,6 +29,8 @@ class CatalogManager {
   inline uint64_t GetRevision() const { return 0; } // TODO: implement this
   inline int GetNumberOfAttachedCatalogs() const { return catalogs_.size(); }
   
+  uint64_t GetInodeChunkOfSize(uint64_t size);
+  
   inline inode_t MangleInode(const inode_t inode) const { return (inode < kInitialInodeOffset) ? GetRootInode() : inode; }
   
  private:
@@ -79,6 +81,8 @@ class CatalogManager {
   
   atomic_int certificate_hits_;
   atomic_int certificate_misses_;
+  
+  uint64_t current_inode_offset_;
   
   const static inode_t kInitialInodeOffset = 255;
 };

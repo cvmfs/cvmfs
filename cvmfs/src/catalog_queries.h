@@ -120,7 +120,7 @@ class LookupSqlStatement : public SqlStatement {
   std::string GetFieldsToSelect() const;
 
  public:
-  DirectoryEntry GetDirectoryEntry(const Catalog *catalog) const;
+  DirectoryEntry GetDirectoryEntry(Catalog *catalog) const;
   
   hash::t_md5 GetPathHash() const;
   hash::t_md5 GetParentPathHash() const;

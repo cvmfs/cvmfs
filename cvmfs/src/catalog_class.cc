@@ -2,6 +2,8 @@
 
 #include <assert.h>
 
+#include "catalog_manager.h"
+
 extern "C" {
   #include "debug.h"
 }
@@ -21,7 +23,7 @@ Catalog::Catalog(const string &path, Catalog *parent) {
   path_ = path;
 }
 
-bool Catalog::Init(const string &db_file, const uint64_t inode_offset) {
+bool Catalog::Init(const string &db_file, CatalogManager *catalog_manager) {
   int flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
   // open database file for reading
@@ -39,13 +41,13 @@ bool Catalog::Init(const string &db_file, const uint64_t inode_offset) {
   find_nested_catalog_statement_ = new FindNestedCatalogSqlStatement(database_);
   
   // allocate inode chunk
-  inode_offset_ = inode_offset;
   SqlStatement max_row_id_query(database_, "SELECT MAX(rowid) FROM catalog;");
   if (not max_row_id_query.FetchRow()) {
     pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s (SqliteErrorcode: %d)", db_file.c_str(), max_row_id_query.GetLastError());
     return false;
   }
   maximal_row_id_ = max_row_id_query.RetrieveInt64(0);
+  inode_offset_ = catalog_manager->GetInodeChunkOfSize(maximal_row_id_);
 
   // get root prefix
   if (IsRoot()) {
@@ -77,14 +79,14 @@ Catalog::~Catalog() {
   pthread_mutex_destroy(&mutex_);
 }
 
-  bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const {
+bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const {
   bool found = false;
   uint64_t row_id = GetRowIdFromInode(inode);
   
   Lock();
   inode_lookup_statement_->BindRowId(row_id);
   if (inode_lookup_statement_->FetchRow()) {
-    *entry = inode_lookup_statement_->GetDirectoryEntry(this);
+    *entry = inode_lookup_statement_->GetDirectoryEntry((Catalog*)this);
     found = true;
   }
 
@@ -104,8 +106,8 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const 
   Lock();
   path_hash_lookup_statement_->BindPathHash(path_hash);
 	if (path_hash_lookup_statement_->FetchRow()) {
-    *entry = path_hash_lookup_statement_->GetDirectoryEntry(this);
-    found = EnsureConsistencyOfDirectoryEntry(path_hash, entry);
+    *entry = path_hash_lookup_statement_->GetDirectoryEntry((Catalog*)this);
+    found = EnsureCoherenceOfInodes(path_hash, entry);
 	}
   path_hash_lookup_statement_->Reset();
   Unlock();
@@ -122,8 +124,8 @@ bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing)
   Lock();
   listing_statement_->BindPathHash(path_hash);
   while (listing_statement_->FetchRow()) {
-    DirectoryEntry entry = listing_statement_->GetDirectoryEntry(this);
-    EnsureConsistencyOfDirectoryEntry(path_hash, &entry);
+    DirectoryEntry entry = listing_statement_->GetDirectoryEntry((Catalog*)this);
+    EnsureCoherenceOfInodes(path_hash, &entry);
     listing->push_back(entry);
   }
   listing_statement_->Reset();
@@ -132,14 +134,15 @@ bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing)
   return true;
 }
 
-bool Catalog::EnsureConsistencyOfDirectoryEntry(const hash::t_md5 &path_hash, DirectoryEntry *entry) const {
-  // if we encounter the root entry of a nested catalog the inode has to be
-  // changed to the mount point of this nested catalog. This entry must be
-  // listed in the parent catalog under the same path hash.
+bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEntry *entry) const {
+  // ensure coherence of inodes after a nested catalog is loaded
+  // <nested catalog mountpoint> == <nested catalog root>
+  // BUT: inodes of mountpoint and root differ.
+  //      must lookup the mountpoint inode and use it for the root entry as well
 	if (entry->IsNestedCatalogRoot() && not this->IsRoot()) {
     DirectoryEntry nestedRootMountpoint;
     bool foundMountpoint = parent_->Lookup(path_hash, &nestedRootMountpoint);
-    
+
     if (not foundMountpoint) {
       pmesg(D_CATALOG, "FATAL: mount point of nested catalog root could not be found in parent catalog");
       return false;
@@ -147,12 +150,27 @@ bool Catalog::EnsureConsistencyOfDirectoryEntry(const hash::t_md5 &path_hash, Di
       entry->set_inode(nestedRootMountpoint.inode());
     }
 	}
-	
+  
   return true;
 }
 
-inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) const {
-  return row_id + inode_offset_; // TODO: use the hardlink group id as well!
+inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) {
+  inode_t inode = row_id + inode_offset_;
+	
+	// hardlinks are encoded in catalog-wide unique hard link group ids
+	// these ids must be resolved to actual inode relationships at runtime
+	if (hardlink_group_id > 0) {
+    HardlinkGroupIdMap::const_iterator inodeItr = hardlink_groups_.find(hardlink_group_id);
+  
+    // create a new hardlink group map entry or use the inode already saved there
+    if (inodeItr == hardlink_groups_.end()) {
+      hardlink_groups_[hardlink_group_id] = inode;
+    } else {
+      inode = inodeItr->second;
+    }
+  }
+	
+  return inode;
 }
 
 } // namespace cvmfs

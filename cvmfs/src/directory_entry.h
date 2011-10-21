@@ -39,6 +39,7 @@ class DirectoryEntry {
   
   inline bool IsLink() const { return S_ISLNK(mode_); }
   inline bool IsDirectory() const { return S_ISDIR(mode_); }
+  inline bool IsPartOfHardlinkGroup() const { return GetHardlinkGroupId() > 0; }
   
   inline inode_t inode() const { return inode_; }
   inline inode_t parent_inode() const { return parent_inode_; }
@@ -48,6 +49,7 @@ class DirectoryEntry {
   inline uint64_t size() const { return size_; }
   inline unsigned int mode() const { return mode_; }
   
+  inline int GetHardlinkGroupId() const { return hardlink_group_id_; }
   inline struct stat GetStatStructure() const {
     struct stat s;
     
@@ -91,6 +93,8 @@ class DirectoryEntry {
   hash::t_sha1 checksum_;
   std::string name_;
   std::string symlink_;
+  
+  int hardlink_group_id_;
 };
 
 typedef std::list<DirectoryEntry> DirectoryEntryList;

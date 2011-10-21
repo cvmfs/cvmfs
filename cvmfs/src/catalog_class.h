@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <map>
 
 #include "catalog_queries.h"
 #include "directory_entry.h"
@@ -19,11 +20,13 @@ namespace cvmfs {
 class Catalog;
 typedef std::vector<Catalog*> CatalogVector;
 
+class CatalogManager;
+
 class Catalog {
  public:
   Catalog(const std::string &path, Catalog *parent);
   ~Catalog();
-  bool Init(const std::string &db_file, const uint64_t inode_offset);
+  bool Init(const std::string &db_file, CatalogManager *catalog_manager);
   
  public:
   inline bool IsRoot() const { return NULL == parent_; }
@@ -43,7 +46,7 @@ class Catalog {
   inline std::string path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
   
-  inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) const;
+  inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id);
   
  private:
   inline void Lock() const { pthread_mutex_lock((pthread_mutex_t *)&mutex_); }
@@ -51,12 +54,14 @@ class Catalog {
   
   inline uint64_t GetRowIdFromInode(const inode_t inode) const { return inode - inode_offset_; }
   
-  bool EnsureConsistencyOfDirectoryEntry(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
+  bool EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
   
  private:
   static const uint64_t DEFAULT_TTL; ///< Default TTL for a catalog is one hour.
   static const uint64_t GROW_EPOCH;
   static const int      SQLITE_THREAD_MEM; ///< SQLite3 heap limit per thread
+  
+  typedef std::map<int, inode_t> HardlinkGroupIdMap;
 
  private:
   sqlite3 *database_; ///< The SQLite3 database handle for this catalog
@@ -70,6 +75,8 @@ class Catalog {
   
   uint64_t inode_offset_;
   uint64_t maximal_row_id_;
+  
+  HardlinkGroupIdMap hardlink_groups_;
   
   ListingLookupSqlStatement *listing_statement_;
   PathHashLookupSqlStatement *path_hash_lookup_statement_;

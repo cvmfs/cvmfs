@@ -28,6 +28,7 @@ CatalogManager::CatalogManager(const string &root_url, const string &repo_name, 
   whitelist_ = whitelist;
   blacklist_ = blacklist;
   force_signing_ = force_signing;
+  current_inode_offset_ = CatalogManager::kInitialInodeOffset;
 
   atomic_init(&certificate_hits_);
   atomic_init(&certificate_misses_);
@@ -60,7 +61,7 @@ bool CatalogManager::AttachCatalog(const std::string &db_file, const std::string
   pmesg(D_CATALOG, "attaching catalog file %s", db_file.c_str());
   
   Catalog *new_catalog = new Catalog(url, parent);
-  if (not new_catalog->Init(db_file, kInitialInodeOffset)) {
+  if (not new_catalog->Init(db_file, this)) {
     pmesg(D_CATALOG, "initialization of catalog %s failed", db_file.c_str());
     return false;
   }
@@ -78,6 +79,20 @@ bool CatalogManager::RefreshCatalog() {
 bool CatalogManager::DetachCatalog() {
   
   return true;
+}
+
+/**
+ *  currently this is a very simple approach
+ *  just assign the next free numbers in this 64 bit space
+ *  TODO: think about other allocation methods, this may run out
+ *        of free inodes some time (in the late future admittedly)
+ */
+uint64_t CatalogManager::GetInodeChunkOfSize(uint64_t size) {
+  uint64_t result = current_inode_offset_;
+  current_inode_offset_ = current_inode_offset_ + size;
+  pmesg(D_CATALOG, "allocating inodes from %d to %d.", result, current_inode_offset_);
+  
+  return result;
 }
 
 bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent) const {
