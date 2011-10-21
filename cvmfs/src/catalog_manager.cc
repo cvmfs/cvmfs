@@ -89,9 +89,10 @@ bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bo
     return false;
   }
   
-  // if we are not asked to lookup the parent inode of this
-  // entry, we simply look in this catalog and are done
-  if (not with_parent) {
+  // if we are not asked to lookup the parent inode or if we are
+  // asked for the root inode (which of course has no parent)
+  // we simply look in the best suited catalog and are done
+  if (not with_parent || inode == GetRootInode()) {
     return catalog->Lookup(inode, entry);
   }
   
@@ -171,7 +172,7 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
   assert (best_fitting_catalog != NULL);
 
   // path lookup in this catalog
-  pmesg(D_CATALOG, "looking up %s in catalog: %s", path.c_str(), best_fitting_catalog->GetPath().c_str());
+  pmesg(D_CATALOG, "looking up %s in catalog: %s", path.c_str(), best_fitting_catalog->path().c_str());
   DirectoryEntry d;
   bool entry_found = best_fitting_catalog->Lookup(path, &d);
   
@@ -210,7 +211,7 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
     best_fitting_catalog = new_catalog;
   }
   
-  pmesg(D_CATALOG, "found entry %s in catalog %s", path.c_str(), best_fitting_catalog->GetPath().c_str());
+  pmesg(D_CATALOG, "found entry %s in catalog %s", path.c_str(), best_fitting_catalog->path().c_str());
   if (NULL != catalog) *catalog = best_fitting_catalog;
   if (NULL != entry)   *entry = d;
   return true;

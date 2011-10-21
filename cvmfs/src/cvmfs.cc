@@ -631,7 +631,12 @@ namespace cvmfs {
 
       DirectoryEntry dirent;
       string path = parentPath + "/" + name;
-      catalog_manager->LookupWithoutParent(path, &dirent);
+      bool found_entry = catalog_manager->LookupWithoutParent(path, &dirent);
+      if (not found_entry) {
+        fuse_reply_err(req, ENOENT);
+        return;
+      }
+
       dirent.set_parent_inode(parent);
       
       // maintain caches
@@ -1912,7 +1917,7 @@ int main(int argc, char *argv[])
       // }
 			
 		cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
-//		daemon(0,0);
+		daemon(0,0);
 
 		se = fuse_lowlevel_new(&fuse_args, &cvmfs_operations, sizeof(cvmfs_operations), NULL);
 		if (se != NULL) {
