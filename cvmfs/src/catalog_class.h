@@ -28,7 +28,7 @@ class Catalog {
  public:
   inline bool IsRoot() const { return NULL == parent_; }
   
-  bool Lookup(const inode_t inode, DirectoryEntry *entry) const;
+  bool Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash = NULL) const;
   bool Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
   inline bool Lookup(const std::string &path, DirectoryEntry *entry) const { return Lookup(hash::t_md5(path), entry); }
   
@@ -39,8 +39,9 @@ class Catalog {
   inline void addChild(Catalog *child) { children_.push_back(child); }
   
   inline bool ContainsInode(const inode_t inode) const { return (inode > inode_offset_ && inode <= maximal_row_id_ + inode_offset_); }
-  inline CatalogVector GetChildren() const { return children_; }
-  inline std::string GetPath() const { return path_; }
+  inline CatalogVector children() const { return children_; }
+  inline std::string path() const { return path_; }
+  inline Catalog* parent() const { return parent_; }
   
   inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) const;
   

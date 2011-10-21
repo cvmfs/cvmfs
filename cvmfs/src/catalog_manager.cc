@@ -37,26 +37,23 @@ CatalogManager::~CatalogManager() {
   
 }
 
-bool CatalogManager::AttachNestedCatalog(const DirectoryEntry &mountpoint, Catalog **attached_catalog) {
+bool CatalogManager::LoadAndAttachCatalog(const string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog) {  
+  string new_catalog_file;
+  if (0 != LoadCatalogFile(mountpoint, hash::t_md5(mountpoint), &new_catalog_file)) {
+    pmesg(D_CATALOG, "failed to load catalog %s", mountpoint.c_str());
+    return false;
+  }
+  
+  if (not AttachCatalog(new_catalog_file, mountpoint, parent_catalog, false, attached_catalog)) {
+    pmesg(D_CATALOG, "failed to attach catalog %s", mountpoint.c_str());
+    return false;
+  }
   
   return true;
 }
 
 bool CatalogManager::LoadAndAttachRootCatalog() {
-  string relative_url = "";
-  Catalog *parent = NULL;
-  
-  string new_catalog_file;
-  if (0 != LoadCatalogFile(relative_url, hash::t_md5(relative_url), "/", &new_catalog_file)) {
-    pmesg(D_CATALOG, "failed to load catalog %s", relative_url.c_str());
-    return false;
-  }
-  if (not AttachCatalog(new_catalog_file, relative_url, parent, false, NULL)) {
-    pmesg(D_CATALOG, "failed to attach catalog %s", relative_url.c_str());
-    return false;
-  }
-  
-  return true;
+  return LoadAndAttachCatalog("", NULL);
 }
 
 bool CatalogManager::AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog) {
@@ -84,25 +81,77 @@ bool CatalogManager::DetachCatalog() {
 }
 
 bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent) const {
-  inode_t internal_inode = MangleInode(inode);
-  
+  // get appropriate catalog
   Catalog *catalog;
-  bool found_catalog = GetCatalogByInode(internal_inode, &catalog);
-  
+  bool found_catalog = GetCatalogByInode(inode, &catalog);
   if (not found_catalog) {
     pmesg(D_CATALOG, "cannot find catalog for inode %d", inode);
     return false;
   }
   
-  return catalog->Lookup(internal_inode, entry);
+  // if we are not asked to lookup the parent inode of this
+  // entry, we simply look in this catalog and are done
+  if (not with_parent) {
+    return catalog->Lookup(inode, entry);
+  }
   
-  // TODO: implement parent lookup
+  // to lookup the parent of this entry, we obtain the parent
+  // md5 hash and make potentially two lookups, first in the
+  // previously found catalog and second its parent catalog
+  else {
+    hash::t_md5 parent_hash;
+    DirectoryEntry parent;
+    bool found_entry = catalog->Lookup(inode, entry, &parent_hash);
+    
+    // entry was not found in the first place... no parent lookup
+    if (not found_entry) {
+      return false;
+    }
+    
+    // look for the parent entry in the same catalog
+    bool found_parent_entry = false;
+    found_parent_entry = catalog->Lookup(parent_hash, &parent);
+    
+    // if the entry was not found and there is a parent catalog
+    // we also check this one
+    if (not found_parent_entry && not catalog->IsRoot()) {
+      Catalog *parent_catalog = catalog->parent();
+      found_parent_entry = parent_catalog->Lookup(parent_hash, &parent);
+    }
+    
+    // if we still lack a parent entry, there may be some data corruption!
+    if (not found_parent_entry) {
+      pmesg(D_CATALOG, "cannot find parent entry for inode %d --> data corrupt?", inode);
+      return false;
+    }
+    
+    // all set
+    entry->set_parent_inode(parent.inode());
+    return true;
+  }
 }
 
 bool CatalogManager::Lookup(const string &path, DirectoryEntry *entry, const bool with_parent) {
-  return GetCatalogByPath(path, false, NULL, entry);
+  bool found = false;
+  found = GetCatalogByPath(path, false, NULL, entry);
   
-  // TODO: implement parent lookup
+  if (not found) {
+    return false;
+  }
+  
+  if (with_parent) {
+    string parent_path = get_parent_path(path);
+    DirectoryEntry parent;
+    found = LookupWithoutParent(parent_path, &parent);
+    if (not found) {
+      pmesg(D_CATALOG, "cannot find parent '%s' for entry '%s' --> data corrupt?", parent_path.c_str(), path.c_str());
+      return false;
+    }
+    
+    entry->set_parent_inode(parent.inode());
+  }
+  
+  return true;
 }
 
 bool CatalogManager::Listing(const string &path, DirectoryEntryList *result) {
@@ -126,7 +175,7 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
   DirectoryEntry d;
   bool entry_found = best_fitting_catalog->Lookup(path, &d);
   
-  // if the entry was NOT found, there are two possible reasons:
+  // if we did not find the entry, there are two possible reasons:
   //    1. the entry in question resides in a not yet loaded nested catalog
   //    2. the entry does not exist at all
   if (not entry_found) {
@@ -149,6 +198,16 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
         best_fitting_catalog = nested_catalog;
       }
     }
+  }
+
+  // if the found entry is a nested catalog mount point we have to load in on request
+  else if (load_final_catalog && d.IsNestedCatalogMountpoint()) {
+    Catalog *new_catalog;
+    bool attached_successfully = LoadAndAttachCatalog(path, best_fitting_catalog, &new_catalog);
+    if (not attached_successfully) {
+      return false;
+    }
+    best_fitting_catalog = new_catalog;
   }
   
   pmesg(D_CATALOG, "found entry %s in catalog %s", path.c_str(), best_fitting_catalog->GetPath().c_str());
@@ -175,15 +234,15 @@ bool CatalogManager::GetCatalogByInode(const uint64_t inode, Catalog **catalog) 
 Catalog* CatalogManager::FindBestFittingCatalogForPath(const string &path) const {
   // go and find the best fit in open catalogs for this path
   Catalog *best_fit = GetRootCatalog();
-  while (best_fit->GetPath() != path) {
+  while (best_fit->path() != path) {
     // now go through all children of the current best fit and look for better fits
     unsigned int longest_hit = 0;
     Catalog *next_best_fit = NULL;
-    CatalogVector children = best_fit->GetChildren();
+    CatalogVector children = best_fit->children();
     CatalogVector::const_iterator i,end;
     string child_path;
     for (i = children.begin(), end = children.end(); i != end; ++i) {
-      child_path = (*i)->GetPath();
+      child_path = (*i)->path();
       
       // sort out the best fitting child and continue
       if (path.find(child_path) == 0 && longest_hit < child_path.length()) {
@@ -214,9 +273,9 @@ bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog 
   Catalog *containing_catalog = (entry_point == NULL) ? GetRootCatalog() : (Catalog *)entry_point;
   
   // do all processing relative to the entry_point catalog
-  assert (path.find(containing_catalog->GetPath()) == 0);
-  relative_path = path.substr(containing_catalog->GetPath().length());
-  sub_path = containing_catalog->GetPath();
+  assert (path.find(containing_catalog->path()) == 0);
+  relative_path = path.substr(containing_catalog->path().length() + 1); // +1 --> remove slash '/' from beginning relative path
+  sub_path = containing_catalog->path();
   
   path_elements = split_string(relative_path, "/");
   bool entry_found;
@@ -238,10 +297,12 @@ bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog 
       // if load_final_catalog is false we do not download a nested
       // catalog pointed to by the whole path
       if (sub_path.length() < path.length() || load_final_catalog) {
-        bool attached_successfully = AttachNestedCatalog(entry, &containing_catalog);
+        Catalog *new_catalog;
+        bool attached_successfully = LoadAndAttachCatalog(sub_path, containing_catalog, &new_catalog);
         if (not attached_successfully) {
           return false;
         }
+        containing_catalog = new_catalog;
       }
     }
   }
@@ -251,7 +312,7 @@ bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog 
 }
 
 int CatalogManager::LoadCatalogFile(const string &url_path, const hash::t_md5 &mount_point, 
-                                    const string &mount_path, const int existing_cat_id, const bool no_cache,
+                                    const int existing_cat_id, const bool no_cache,
                                     const hash::t_sha1 expected_clg, std::string *catalog_file)
 {
   string old_file;

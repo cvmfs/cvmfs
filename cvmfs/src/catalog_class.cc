@@ -77,7 +77,7 @@ Catalog::~Catalog() {
   pthread_mutex_destroy(&mutex_);
 }
 
-bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry) const {
+  bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const {
   bool found = false;
   uint64_t row_id = GetRowIdFromInode(inode);
   
@@ -87,6 +87,11 @@ bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry) const {
     *entry = inode_lookup_statement_->GetDirectoryEntry(this);
     found = true;
   }
+
+  if (NULL != parent_hash) {
+    *parent_hash = inode_lookup_statement_->GetParentPathHash();
+  }
+
   inode_lookup_statement_->Reset();
   Unlock();
   

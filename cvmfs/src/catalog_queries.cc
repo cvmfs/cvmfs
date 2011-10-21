@@ -41,6 +41,14 @@ std::string LookupSqlStatement::GetFieldsToSelect() const {
       //    0     1      2     3     4      5      6      7        8          9           10        11       12
 }
 
+hash::t_md5 LookupSqlStatement::GetPathHash() const {
+  return hash::t_md5(RetrieveInt64(8), RetrieveInt64(9));
+}
+
+hash::t_md5 LookupSqlStatement::GetParentPathHash() const {
+  return hash::t_md5(RetrieveInt64(10), RetrieveInt64(11));
+}
+
 DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) const {
   // compute file checksum, if there is one
   hash::t_sha1 checksum = (RetrieveBytes(0) > 0) ? 

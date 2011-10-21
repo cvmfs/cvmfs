@@ -44,15 +44,15 @@ class CatalogManager {
                    
   /** convenience wrapper to hide all the nasty loading stuff which I do not understand */
   inline int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point, 
-                             const std::string &mount_path, std::string *catalog_file)
+                             std::string *catalog_file)
   {
-    return LoadCatalogFile(url_path, mount_point, mount_path, -1, false, hash::t_sha1(), catalog_file);
+    return LoadCatalogFile(url_path, mount_point, -1, false, hash::t_sha1(), catalog_file);
   }
   int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point, 
-                      const std::string &mount_path, const int existing_cat_id, const bool no_cache,
+                      const int existing_cat_id, const bool no_cache,
                       const hash::t_sha1 expected_clg, std::string *catalog_file);
 
-  bool AttachNestedCatalog(const DirectoryEntry &mountpoint, Catalog **attached_catalog);
+  bool LoadAndAttachCatalog(const std::string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog = NULL);
   bool AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog);
   bool RefreshCatalog();
   bool DetachCatalog();

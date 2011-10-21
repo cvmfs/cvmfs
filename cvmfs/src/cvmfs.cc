@@ -521,7 +521,7 @@ namespace cvmfs {
          pmesg(D_MD5_CACHE, "MISS %s --> lookup in catalogs", path.c_str());
          
          if (catalog_manager->Lookup(path, dirent)) {
-            pmesg(D_MD5_CACHE, "CATALOG HIT %s -> '%s'", path, dirent->name().c_str());
+            pmesg(D_MD5_CACHE, "CATALOG HIT %s -> '%s'", path.c_str(), dirent->name().c_str());
 //            md5path_cache->insert(md5, dirent);
             return true;
          } else {
@@ -1207,6 +1207,7 @@ namespace cvmfs {
 
       } else {
          fuse_reply_err(req, ENOATTR);
+         return;
       }
       
       string msg = message.str();
@@ -1911,7 +1912,7 @@ int main(int argc, char *argv[])
       // }
 			
 		cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
-		daemon(0,0);
+//		daemon(0,0);
 
 		se = fuse_lowlevel_new(&fuse_args, &cvmfs_operations, sizeof(cvmfs_operations), NULL);
 		if (se != NULL) {

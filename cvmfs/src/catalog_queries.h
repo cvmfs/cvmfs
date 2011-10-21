@@ -122,15 +122,8 @@ class LookupSqlStatement : public SqlStatement {
  public:
   DirectoryEntry GetDirectoryEntry(const Catalog *catalog) const;
   
-  inline hash::t_md5 GetPathHash() const {
-    // TODO: implement me!
-    return hash::t_md5();
-  }
-  
-  inline hash::t_md5 GetParentPathHash() const {
-    // TODO: implement me!
-    return hash::t_md5();
-  }
+  hash::t_md5 GetPathHash() const;
+  hash::t_md5 GetParentPathHash() const;
 };
 
 class ListingLookupSqlStatement : public LookupSqlStatement {

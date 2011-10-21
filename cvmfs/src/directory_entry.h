@@ -69,10 +69,9 @@ class DirectoryEntry {
     return s;
   }
   
-  inline void set_inode(const inode_t inode) { inode_ = inode; }
-  
   // these accessors are accessible from outside but should be used with extreme caution!
   // (With great power comes huge resonsibility!!)
+  inline void set_inode(const inode_t inode) { inode_ = inode; }
   inline const Catalog* catalog() const { return catalog_; }
   inline void set_parent_inode(const inode_t parent_inode) { parent_inode_ = parent_inode; }
   
