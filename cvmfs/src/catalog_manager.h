@@ -16,20 +16,18 @@ class CatalogManager {
   CatalogManager(const std::string &root_url, const std::string &repo_name, const std::string &whitelist, const std::string &blacklist, const bool force_signing);
   virtual ~CatalogManager();
   
+  bool Init();
+  
   inline bool LookupWithoutParent(const inode_t inode, DirectoryEntry *entry) const { return Lookup(inode, entry, false); };
   inline bool LookupWithoutParent(const std::string &path, DirectoryEntry *entry) { return Lookup(path, entry, false); };
   bool Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent = true) const;
   bool Lookup(const std::string &path, DirectoryEntry *entry, const bool with_parent = true);
   
-  bool Listing(const std::string &path, DirectoryEntryList *result);
-  
-  bool LoadAndAttachRootCatalog();
+  bool Listing(const std::string &path, DirectoryEntryList *listing);
   
   inline inode_t GetRootInode() const { return kInitialInodeOffset + 1; }
   inline uint64_t GetRevision() const { return 0; } // TODO: implement this
   inline int GetNumberOfAttachedCatalogs() const { return catalogs_.size(); }
-  
-  uint64_t GetInodeChunkOfSize(uint64_t size);
   
   inline inode_t MangleInode(const inode_t inode) const { return (inode < kInitialInodeOffset) ? GetRootInode() : inode; }
   
@@ -54,24 +52,35 @@ class CatalogManager {
                       const int existing_cat_id, const bool no_cache,
                       const hash::t_sha1 expected_clg, std::string *catalog_file);
 
+  bool LoadAndAttachRootCatalog();
   bool LoadAndAttachCatalog(const std::string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog = NULL);
   bool AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog);
   bool RefreshCatalog();
   bool DetachCatalog();
+  bool DetachAllCatalogs();
+  
+  uint64_t GetInodeChunkOfSize(uint64_t size);
 
   bool IsValidCertificate(bool nocache);
   std::string MakeFilesystemKey(std::string url) const;
   
   inline Catalog* GetRootCatalog() const { return catalogs_[0]; }
-  bool GetCatalogById(const int catalog_id, Catalog **catalog) const;
   bool GetCatalogByPath(const std::string &path, const bool load_final_catalog, Catalog **catalog = NULL, DirectoryEntry *entry = NULL);
   bool GetCatalogByInode(const inode_t inode, Catalog **catalog) const;
   
   Catalog* FindBestFittingCatalogForPath(const std::string &path) const;
   bool LoadNestedCatalogForPath(const std::string &path, const Catalog *entry_point, const bool load_final_catalog, Catalog **final_catalog);
   
+  inline void ReadLock() const { pthread_rwlock_rdlock((pthread_rwlock_t*)&read_write_lock_); }
+  inline void WriteLock() { pthread_rwlock_wrlock(&read_write_lock_); }
+  inline void ExpandLock() { Unlock(); WriteLock(); }
+  inline void ShrinkLock() { Unlock(); ReadLock(); }
+  inline void Unlock() const { pthread_rwlock_unlock((pthread_rwlock_t*)&read_write_lock_); }
+  
  private:
   CatalogVector catalogs_;
+  
+  pthread_rwlock_t read_write_lock_;
   
   std::string root_url_;
   std::string repo_name_;

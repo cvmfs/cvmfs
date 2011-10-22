@@ -1,7 +1,5 @@
 #include "catalog_class.h"
 
-#include <assert.h>
-
 #include "catalog_manager.h"
 
 extern "C" {
@@ -21,9 +19,12 @@ Catalog::Catalog(const string &path, Catalog *parent) {
   
   parent_ = parent;
   path_ = path;
+  
+  inode_offset_ = 0;
+  maximal_row_id_ = 0;
 }
 
-bool Catalog::Init(const string &db_file, CatalogManager *catalog_manager) {
+bool Catalog::OpenDatabase(const string &db_file) {
   int flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
   // open database file for reading
@@ -47,7 +48,6 @@ bool Catalog::Init(const string &db_file, CatalogManager *catalog_manager) {
     return false;
   }
   maximal_row_id_ = max_row_id_query.RetrieveInt64(0);
-  inode_offset_ = catalog_manager->GetInodeChunkOfSize(maximal_row_id_);
 
   // get root prefix
   if (IsRoot()) {
@@ -62,7 +62,7 @@ bool Catalog::Init(const string &db_file, CatalogManager *catalog_manager) {
   
   // everything went well, notify parent about our existance
   if (not IsRoot()) {
-    parent_->addChild(this);
+    parent_->AddChild(this);
   }
   
   return true;
@@ -79,7 +79,15 @@ Catalog::~Catalog() {
   pthread_mutex_destroy(&mutex_);
 }
 
+void Catalog::AddChild(Catalog *child) {
+  Lock();
+  children_.push_back(child);
+  Unlock();
+}
+
 bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const {
+  assert (IsInitialized());
+  
   bool found = false;
   uint64_t row_id = GetRowIdFromInode(inode);
   
@@ -101,6 +109,8 @@ bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *pa
 }
 
 bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const {
+  assert (IsInitialized());
+
   bool found = false;
   
   Lock();
@@ -116,11 +126,15 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const 
 }
 
 bool Catalog::Listing(const inode_t inode, DirectoryEntryList *listing) const {
+  assert (IsInitialized());
+
   assert (false); // currently not implemented
   return false;
 }
 
 bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing) const {
+  assert (IsInitialized());
+
   Lock();
   listing_statement_->BindPathHash(path_hash);
   while (listing_statement_->FetchRow()) {
@@ -155,6 +169,8 @@ bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEnt
 }
 
 inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) {
+  assert (IsInitialized());
+
   inode_t inode = row_id + inode_offset_;
 	
 	// hardlinks are encoded in catalog-wide unique hard link group ids

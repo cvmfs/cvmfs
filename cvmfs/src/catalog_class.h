@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <assert.h>
 
 #include "catalog_queries.h"
 #include "directory_entry.h"
@@ -26,7 +27,8 @@ class Catalog {
  public:
   Catalog(const std::string &path, Catalog *parent);
   ~Catalog();
-  bool Init(const std::string &db_file, CatalogManager *catalog_manager);
+  bool OpenDatabase(const std::string &db_file);
+  inline bool IsInitialized() const { return inode_offset_ > 0 && maximal_row_id_ > 0; }
   
  public:
   inline bool IsRoot() const { return NULL == parent_; }
@@ -39,12 +41,14 @@ class Catalog {
   bool Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing) const;
   inline bool Listing(const std::string &path, DirectoryEntryList *listing) const { return Listing(hash::t_md5(path), listing); }
   
-  inline void addChild(Catalog *child) { children_.push_back(child); }
+  void AddChild(Catalog *child);
   
-  inline bool ContainsInode(const inode_t inode) const { return (inode > inode_offset_ && inode <= maximal_row_id_ + inode_offset_); }
+  inline bool ContainsInode(const inode_t inode) const { assert(IsInitialized()); return (inode > inode_offset_ && inode <= maximal_row_id_ + inode_offset_); }
   inline CatalogVector children() const { return children_; }
   inline std::string path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
+  inline uint64_t maximal_row_id() const { return maximal_row_id_; }
+  inline void set_inode_offset(const uint64_t inode_offset) { inode_offset_ = inode_offset; }
   
   inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id);
   

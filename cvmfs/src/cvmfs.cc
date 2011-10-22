@@ -1884,8 +1884,8 @@ int main(int argc, char *argv[])
    // }
    
    catalog_manager = new CatalogManager(root_url, repo_name, whitelist, blacklist, force_signing);
-   if (not catalog_manager->LoadAndAttachRootCatalog()) {
-      cerr << "Failed to load root catalog" << endl;
+   if (not catalog_manager->Init()) {
+      cerr << "Failed to initialize catalog manager" << endl;
       goto cvmfs_cleanup;
    }
    catalog_ready = true;

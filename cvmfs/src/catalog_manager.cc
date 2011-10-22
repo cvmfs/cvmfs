@@ -32,53 +32,25 @@ CatalogManager::CatalogManager(const string &root_url, const string &repo_name, 
 
   atomic_init(&certificate_hits_);
   atomic_init(&certificate_misses_);
+  
+  pthread_rwlock_init(&read_write_lock_, NULL);
 }
 
 CatalogManager::~CatalogManager() {
+  DetachAllCatalogs();
   
+  pthread_rwlock_destroy(&read_write_lock_);
 }
 
-bool CatalogManager::LoadAndAttachCatalog(const string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog) {  
-  string new_catalog_file;
-  if (0 != LoadCatalogFile(mountpoint, hash::t_md5(mountpoint), &new_catalog_file)) {
-    pmesg(D_CATALOG, "failed to load catalog %s", mountpoint.c_str());
-    return false;
+bool CatalogManager::Init() {
+  // attaching root catalog
+  bool root_catalog_attached = LoadAndAttachRootCatalog();
+  
+  if (not root_catalog_attached) {
+    pmesg(D_CATALOG, "failed to initialize root catalog");
   }
   
-  if (not AttachCatalog(new_catalog_file, mountpoint, parent_catalog, false, attached_catalog)) {
-    pmesg(D_CATALOG, "failed to attach catalog %s", mountpoint.c_str());
-    return false;
-  }
-  
-  return true;
-}
-
-bool CatalogManager::LoadAndAttachRootCatalog() {
-  return LoadAndAttachCatalog("", NULL);
-}
-
-bool CatalogManager::AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog) {
-  pmesg(D_CATALOG, "attaching catalog file %s", db_file.c_str());
-  
-  Catalog *new_catalog = new Catalog(url, parent);
-  if (not new_catalog->Init(db_file, this)) {
-    pmesg(D_CATALOG, "initialization of catalog %s failed", db_file.c_str());
-    return false;
-  }
-  
-  catalogs_.push_back(new_catalog);
-  if (NULL != attached_catalog) *attached_catalog = new_catalog;
-  return true;
-}
-
-bool CatalogManager::RefreshCatalog() {
-  
-  return true;
-}
-
-bool CatalogManager::DetachCatalog() {
-  
-  return true;
+  return root_catalog_attached;
 }
 
 /**
@@ -96,19 +68,24 @@ uint64_t CatalogManager::GetInodeChunkOfSize(uint64_t size) {
 }
 
 bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent) const {
+  ReadLock();
+  bool found = false;
+  
   // get appropriate catalog
   Catalog *catalog;
   bool found_catalog = GetCatalogByInode(inode, &catalog);
   if (not found_catalog) {
     pmesg(D_CATALOG, "cannot find catalog for inode %d", inode);
-    return false;
+    found = false;
+    goto out;
   }
   
   // if we are not asked to lookup the parent inode or if we are
   // asked for the root inode (which of course has no parent)
   // we simply look in the best suited catalog and are done
   if (not with_parent || inode == GetRootInode()) {
-    return catalog->Lookup(inode, entry);
+    found = catalog->Lookup(inode, entry);
+    goto out;
   }
   
   // to lookup the parent of this entry, we obtain the parent
@@ -121,7 +98,8 @@ bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bo
     
     // entry was not found in the first place... no parent lookup
     if (not found_entry) {
-      return false;
+      found = false;
+      goto out;
     }
     
     // look for the parent entry in the same catalog
@@ -138,47 +116,57 @@ bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bo
     // if we still lack a parent entry, there may be some data corruption!
     if (not found_parent_entry) {
       pmesg(D_CATALOG, "cannot find parent entry for inode %d --> data corrupt?", inode);
-      return false;
+      found = false;
+      goto out;
     }
     
     // all set
     entry->set_parent_inode(parent.inode());
-    return true;
+    found = true;
+    goto out;
   }
+  
+out:
+  Unlock();
+  return found;
 }
 
 bool CatalogManager::Lookup(const string &path, DirectoryEntry *entry, const bool with_parent) {
+  ReadLock();
   bool found = false;
   found = GetCatalogByPath(path, false, NULL, entry);
   
-  if (not found) {
-    return false;
-  }
-  
-  if (with_parent) {
+  // lookup the parent entry, if asked for
+  if (found && with_parent) {
     string parent_path = get_parent_path(path);
     DirectoryEntry parent;
     found = LookupWithoutParent(parent_path, &parent);
     if (not found) {
       pmesg(D_CATALOG, "cannot find parent '%s' for entry '%s' --> data corrupt?", parent_path.c_str(), path.c_str());
-      return false;
+    } else {
+      entry->set_parent_inode(parent.inode());
     }
-    
-    entry->set_parent_inode(parent.inode());
   }
-  
-  return true;
+
+  Unlock();
+  return found;
 }
 
-bool CatalogManager::Listing(const string &path, DirectoryEntryList *result) {
+bool CatalogManager::Listing(const string &path, DirectoryEntryList *listing) {
+  ReadLock();
+  bool result = false;
+  
   Catalog *catalog;
   bool found_catalog = GetCatalogByPath(path, true, &catalog);
   
   if (not found_catalog) {
-    return false;
+    result = false;
+  } else {
+    result = catalog->Listing(path, listing);
   }
   
-  return catalog->Listing(path, result);
+  Unlock();
+  return result;
 }
 
 bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_catalog, Catalog **catalog, DirectoryEntry *entry) {
@@ -327,10 +315,79 @@ bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog 
   return true;
 }
 
+bool CatalogManager::LoadAndAttachRootCatalog() {
+  // pthread quirk!
+  // we have to acquire a read lock here, because LoadAndAttachCatalog assumes this
+  ReadLock();
+  bool found_catalog = LoadAndAttachCatalog("", NULL);
+  Unlock();
+  return found_catalog;
+}
+
+bool CatalogManager::LoadAndAttachCatalog(const string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog) {
+  ExpandLock();
+  
+  string new_catalog_file;
+  if (0 != LoadCatalogFile(mountpoint, hash::t_md5(mountpoint), &new_catalog_file)) {
+    pmesg(D_CATALOG, "failed to load catalog '%s'", mountpoint.c_str());
+    return false;
+  }
+
+  if (not AttachCatalog(new_catalog_file, mountpoint, parent_catalog, false, attached_catalog)) {
+    pmesg(D_CATALOG, "failed to attach catalog '%s'", mountpoint.c_str());
+    return false;
+  }
+  
+  ShrinkLock();
+  return true;
+}
+
+bool CatalogManager::AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog) {
+  pmesg(D_CATALOG, "attaching catalog file %s", db_file.c_str());
+  
+  // initialize the new catalog
+  Catalog *new_catalog = new Catalog(url, parent);
+  if (not new_catalog->OpenDatabase(db_file)) {
+    pmesg(D_CATALOG, "initialization of catalog %s failed", db_file.c_str());
+    return false;
+  }
+  
+  // determine the inode offset of this catalog
+  uint64_t inode_chunk_size = new_catalog->maximal_row_id();
+  uint64_t inode_offset = GetInodeChunkOfSize(inode_chunk_size);
+  new_catalog->set_inode_offset(inode_offset);
+  
+  assert (new_catalog->IsInitialized());
+  
+  // save the catalog
+  catalogs_.push_back(new_catalog);
+  if (NULL != attached_catalog) *attached_catalog = new_catalog;
+  return true;
+}
+
+bool CatalogManager::RefreshCatalog() {
+  
+  return true;
+}
+
+bool CatalogManager::DetachCatalog() {
+  
+  return true;
+}
+
+bool CatalogManager::DetachAllCatalogs() {
+  
+  return true;
+}
+
 int CatalogManager::LoadCatalogFile(const string &url_path, const hash::t_md5 &mount_point, 
                                     const int existing_cat_id, const bool no_cache,
                                     const hash::t_sha1 expected_clg, std::string *catalog_file)
 {
+  
+  // TODO: there is a lot of clutter in here which should be done by a dedicated
+  //       FileManager class...
+  
   string old_file;
   hash::t_sha1 sha1_old;
   hash::t_sha1 sha1_cat;
@@ -393,75 +450,17 @@ int CatalogManager::LoadCatalogFile(const string &url_path, const hash::t_md5 &m
      }
   }
   
+  // rename the loaded catalog file
+  if ((result == 0) || cached_copy) {
+     const string sha1_cat_str = sha1_cat.to_string();
+     const string final_file = "./" + sha1_cat_str.substr(0, 2) + "/" + 
+                               sha1_cat_str.substr(2);
+     (void)rename(catalog_file->c_str(), final_file.c_str());
+     *catalog_file = final_file;
+  }
+  
   return result;
 }
-
-/**
-* Uses fetch catalog to get a possibly new catalog version.
-* Old catalog has to be detached afterwards.
-* Updates LRU database and TTL list.
-* \return 0 on success (also cached copy is success), standard error code else
-*/
-// int CatalogManager::LoadAndAttachCatalog(const string &url_path, const hash::t_md5 &mount_point, 
-//                                          const string &mount_path, const int existing_cat_id, const bool no_cache,
-//                                          const hash::t_sha1 expected_clg)
-// {
-// //  LoadCatalog(url_path)
-//   
-//   time_t now = time(NULL);
-//   
-//   /* Now we have the right catalog in cat_file, which might be
-//         already loaded (cache_copy and existing_cat_id > 0) */
-//   if (((result == 0) && !cached_copy) ||
-//       ((existing_cat_id < 0) && ((result == 0) || cached_copy))) 
-//   {
-//      bool attach_result;
-//      if (existing_cat_id >= 0) {
-//        attach_result = Reattach(existing_cat_id, cat_file, url_path, NULL);
-//         /*
-//         
-//         TODO: reimplement this
-//         
-//         catalog::detach_intermediate(existing_cat_id);
-//         attach_result = catalog::reattach(existing_cat_id, cat_file, url_path);
-//         catalog_tree::get_catalog(existing_cat_id)->last_changed = now;
-//         catalog_tree::get_catalog(existing_cat_id)->snapshot = sha1_cat;
-//         */
-//      } else {
-//        attach_result = Attach(cat_file, url_path, NULL, false, NULL);
-//      }
-//      
-//      /* Also for existing_cat_id < 0 to remove the "nested" flags from cache */
-// // TODO: reimplement this
-// //     invalidate_cache(existing_cat_id);
-//         
-//      if (!attach_result) {
-//         /* should never happen, no reasonable continuation */
-//         pmesg(D_CVMFS, "failed to attach new catalog");
-//         logmsg("catalog attach failure for %s", cat_file.c_str());
-//         abort();
-//      } else {
-//         if (existing_cat_id < 0) {
-//            cat_id = catalog::get_num_catalogs()-1;
-//         }
-//      }
-//   }
-//   
-//   /* Back-rename if we have a catalog at all.  No race condition with LRU
-//      because file is pinned. */
-//   if ((result == 0) || cached_copy) {
-//      const string sha1_cat_str = sha1_cat.to_string();
-//      const string final_file = "./" + sha1_cat_str.substr(0, 2) + "/" + 
-//                                sha1_cat_str.substr(2);
-//      (void)rename(cat_file.c_str(), final_file.c_str());
-//   }
-//   
-//   if (cat_id >= 0) {
-//      return 0;
-//   } else {
-//      return result;
-//   }
-// }
 
 string CatalogManager::MakeFilesystemKey(string url) const {
   string::size_type pos;
@@ -949,15 +948,6 @@ bool CatalogManager::IsValidCertificate(bool nocache) {
       free(mem_url_wl.data);
       return false;
    }
-}
-
-bool CatalogManager::GetCatalogById(const int catalog_id, Catalog **catalog) const {
-  if (catalog_id < 0 || catalog_id >= GetNumberOfAttachedCatalogs()) {
-    return false;
-  }
-  
-  *catalog = catalogs_[catalog_id];
-  return true;
 }
 
 }
