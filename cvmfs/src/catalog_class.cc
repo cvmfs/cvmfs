@@ -20,8 +20,7 @@ Catalog::Catalog(const string &path, Catalog *parent) {
   parent_ = parent;
   path_ = path;
   
-  inode_offset_ = 0;
-  maximal_row_id_ = 0;
+  max_row_id_ = 0;
 }
 
 bool Catalog::OpenDatabase(const string &db_file) {
@@ -47,7 +46,7 @@ bool Catalog::OpenDatabase(const string &db_file) {
     pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s (SqliteErrorcode: %d)", db_file.c_str(), max_row_id_query.GetLastError());
     return false;
   }
-  maximal_row_id_ = max_row_id_query.RetrieveInt64(0);
+  max_row_id_ = max_row_id_query.RetrieveInt64(0);
 
   // get root prefix
   if (IsRoot()) {
@@ -83,6 +82,31 @@ void Catalog::AddChild(Catalog *child) {
   Lock();
   children_.push_back(child);
   Unlock();
+}
+
+void Catalog::RemoveChild(const Catalog *child) {
+  Lock();
+  CatalogList::iterator i;
+  CatalogList::const_iterator end;
+  for (i = children_.begin(), end = children_.end(); i != end; ++i) {
+    if (*i == child) {
+      children_.erase(i);
+      break;
+    }
+  }
+  Unlock();
+}
+
+CatalogList Catalog::GetChildrenRecursively() const {
+  CatalogList result = children_;
+  
+  CatalogList::const_iterator i, end;
+  for(i = children_.begin(), end = children_.end(); i != end; ++i) {
+    CatalogList grand_children = (*i)->GetChildrenRecursively();
+    result.insert(result.end(), grand_children.begin(), grand_children.end());
+  }
+  
+  return result;
 }
 
 bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const {
@@ -171,7 +195,7 @@ bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEnt
 inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) {
   assert (IsInitialized());
 
-  inode_t inode = row_id + inode_offset_;
+  inode_t inode = row_id + inode_chunk_.offset;
 	
 	// hardlinks are encoded in catalog-wide unique hard link group ids
 	// these ids must be resolved to actual inode relationships at runtime

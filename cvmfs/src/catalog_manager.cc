@@ -37,14 +37,18 @@ CatalogManager::CatalogManager(const string &root_url, const string &repo_name, 
 }
 
 CatalogManager::~CatalogManager() {
-  DetachAllCatalogs();
+  WriteLock();
+  DetachCatalog(GetRootCatalog());
+  Unlock();
   
   pthread_rwlock_destroy(&read_write_lock_);
 }
 
 bool CatalogManager::Init() {
   // attaching root catalog
-  bool root_catalog_attached = LoadAndAttachRootCatalog();
+  WriteLock();
+  bool root_catalog_attached = LoadAndAttachCatalog("", NULL);
+  Unlock();
   
   if (not root_catalog_attached) {
     pmesg(D_CATALOG, "failed to initialize root catalog");
@@ -59,12 +63,19 @@ bool CatalogManager::Init() {
  *  TODO: think about other allocation methods, this may run out
  *        of free inodes some time (in the late future admittedly)
  */
-uint64_t CatalogManager::GetInodeChunkOfSize(uint64_t size) {
-  uint64_t result = current_inode_offset_;
+InodeChunk CatalogManager::GetInodeChunkOfSize(uint64_t size) {
+  InodeChunk result;
+  result.offset = current_inode_offset_;
+  result.size = size;
+  
   current_inode_offset_ = current_inode_offset_ + size;
-  pmesg(D_CATALOG, "allocating inodes from %d to %d.", result, current_inode_offset_);
+  pmesg(D_CATALOG, "allocating inodes from %d to %d.", result.offset + 1, current_inode_offset_);
   
   return result;
+}
+
+void CatalogManager::AnnounceInvalidInodeChunk(const InodeChunk chunk) const {
+  // TODO: actually do something here
 }
 
 bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent) const {
@@ -187,7 +198,9 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
     
     // try to load the nested catalogs for this path
     Catalog *nested_catalog;
+    ExtendLock();
     entry_found = LoadNestedCatalogForPath(path, best_fitting_catalog, load_final_catalog, &nested_catalog);
+    ShrinkLock();
     if (not entry_found) {
       pmesg(D_CATALOG, "nested catalog for %s could not be found", path.c_str());
       return false;
@@ -207,7 +220,9 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
   // if the found entry is a nested catalog mount point we have to load in on request
   else if (load_final_catalog && d.IsNestedCatalogMountpoint()) {
     Catalog *new_catalog;
+    ExtendLock();
     bool attached_successfully = LoadAndAttachCatalog(path, best_fitting_catalog, &new_catalog);
+    ShrinkLock();
     if (not attached_successfully) {
       return false;
     }
@@ -223,7 +238,7 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
 bool CatalogManager::GetCatalogByInode(const uint64_t inode, Catalog **catalog) const {
   // TODO: replace this with a more clever algorithm
   //       maybe exploit the ordering in the vector
-  CatalogVector::const_iterator i,end;
+  CatalogList::const_iterator i,end;
   for (i = catalogs_.begin(), end = catalogs_.end(); i != end; ++i) {
     if ((*i)->ContainsInode(inode)) {
       *catalog = *i;
@@ -242,8 +257,8 @@ Catalog* CatalogManager::FindBestFittingCatalogForPath(const string &path) const
     // now go through all children of the current best fit and look for better fits
     unsigned int longest_hit = 0;
     Catalog *next_best_fit = NULL;
-    CatalogVector children = best_fit->children();
-    CatalogVector::const_iterator i,end;
+    CatalogList children = best_fit->children();
+    CatalogList::const_iterator i,end;
     string child_path;
     for (i = children.begin(), end = children.end(); i != end; ++i) {
       child_path = (*i)->path();
@@ -315,18 +330,7 @@ bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog 
   return true;
 }
 
-bool CatalogManager::LoadAndAttachRootCatalog() {
-  // pthread quirk!
-  // we have to acquire a read lock here, because LoadAndAttachCatalog assumes this
-  ReadLock();
-  bool found_catalog = LoadAndAttachCatalog("", NULL);
-  Unlock();
-  return found_catalog;
-}
-
 bool CatalogManager::LoadAndAttachCatalog(const string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog) {
-  ExpandLock();
-  
   string new_catalog_file;
   if (0 != LoadCatalogFile(mountpoint, hash::t_md5(mountpoint), &new_catalog_file)) {
     pmesg(D_CATALOG, "failed to load catalog '%s'", mountpoint.c_str());
@@ -338,7 +342,6 @@ bool CatalogManager::LoadAndAttachCatalog(const string &mountpoint, Catalog *par
     return false;
   }
   
-  ShrinkLock();
   return true;
 }
 
@@ -353,9 +356,9 @@ bool CatalogManager::AttachCatalog(const std::string &db_file, const std::string
   }
   
   // determine the inode offset of this catalog
-  uint64_t inode_chunk_size = new_catalog->maximal_row_id();
-  uint64_t inode_offset = GetInodeChunkOfSize(inode_chunk_size);
-  new_catalog->set_inode_offset(inode_offset);
+  uint64_t inode_chunk_size = new_catalog->max_row_id();
+  InodeChunk chunk = GetInodeChunkOfSize(inode_chunk_size);
+  new_catalog->set_inode_chunk(chunk);
   
   assert (new_catalog->IsInitialized());
   
@@ -365,17 +368,39 @@ bool CatalogManager::AttachCatalog(const std::string &db_file, const std::string
   return true;
 }
 
-bool CatalogManager::RefreshCatalog() {
+bool CatalogManager::RefreshCatalog(Catalog *catalog) {
   
   return true;
 }
 
-bool CatalogManager::DetachCatalog() {
+bool CatalogManager::DetachCatalog(Catalog *catalog) {
+  // detach *catalog from catalog tree
+  if (not catalog->IsRoot()) {
+    catalog->parent()->RemoveChild(catalog);
+  }
   
-  return true;
-}
-
-bool CatalogManager::DetachAllCatalogs() {
+  // determine catalogs to detach (all offsprings of *catalog are detached as well)
+  CatalogList catalogs_to_detach = catalog->GetChildrenRecursively();
+  catalogs_to_detach.push_back(catalog);
+  
+  // detach catalogs
+  CatalogList::iterator i, j;
+  CatalogList::const_iterator iend, jend;
+  Catalog *current_catalog;
+  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end(); i != iend; ++i) {
+    current_catalog = *i;
+    AnnounceInvalidInodeChunk(current_catalog->inode_chunk());
+    
+    // delete catalog from internal lists
+    for (j = catalogs_.begin(), jend = catalogs_.end(); j != jend; ++j) {
+      if (*j == current_catalog) {
+        catalogs_.erase(j);
+        break;
+      }
+    }
+    
+    delete current_catalog;
+  }
   
   return true;
 }

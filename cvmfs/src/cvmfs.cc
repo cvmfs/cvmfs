@@ -1936,6 +1936,8 @@ int main(int argc, char *argv[])
    delete path_cache;
    delete inode_cache;
    
+   delete catalog_manager;
+   
    pmesg(D_CVMFS, "Fuse loop terminated (%d)", result);
    logmsg("CernVM-FS: unmounted %s (%s)", cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
 

@@ -52,19 +52,19 @@ class CatalogManager {
                       const int existing_cat_id, const bool no_cache,
                       const hash::t_sha1 expected_clg, std::string *catalog_file);
 
-  bool LoadAndAttachRootCatalog();
   bool LoadAndAttachCatalog(const std::string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog = NULL);
   bool AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog);
-  bool RefreshCatalog();
-  bool DetachCatalog();
+  bool RefreshCatalog(Catalog *catalog);
+  bool DetachCatalog(Catalog *catalog);
   bool DetachAllCatalogs();
   
-  uint64_t GetInodeChunkOfSize(uint64_t size);
+  InodeChunk GetInodeChunkOfSize(uint64_t size);
+  void AnnounceInvalidInodeChunk(const InodeChunk chunk) const;
 
   bool IsValidCertificate(bool nocache);
   std::string MakeFilesystemKey(std::string url) const;
   
-  inline Catalog* GetRootCatalog() const { return catalogs_[0]; }
+  inline Catalog* GetRootCatalog() const { return catalogs_.front(); }
   bool GetCatalogByPath(const std::string &path, const bool load_final_catalog, Catalog **catalog = NULL, DirectoryEntry *entry = NULL);
   bool GetCatalogByInode(const inode_t inode, Catalog **catalog) const;
   
@@ -73,12 +73,18 @@ class CatalogManager {
   
   inline void ReadLock() const { pthread_rwlock_rdlock((pthread_rwlock_t*)&read_write_lock_); }
   inline void WriteLock() { pthread_rwlock_wrlock(&read_write_lock_); }
-  inline void ExpandLock() { Unlock(); WriteLock(); }
+  inline void ExtendLock() { Unlock(); WriteLock(); }
   inline void ShrinkLock() { Unlock(); ReadLock(); }
   inline void Unlock() const { pthread_rwlock_unlock((pthread_rwlock_t*)&read_write_lock_); }
   
  private:
-  CatalogVector catalogs_;
+  // TODO: this list is actually not really needed.
+  //       the only point we are really using it at the moment
+  //       is for searching the suited catalog for a given inode.
+  //       this might be done better (currently O(n))
+  //  eventually we should only safe the root catalog, representing
+  //  the whole catalog tree in an implicit manor.
+  CatalogList catalogs_;
   
   pthread_rwlock_t read_write_lock_;
   

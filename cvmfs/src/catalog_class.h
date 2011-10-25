@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <string>
-#include <vector>
+#include <list>
 #include <map>
 #include <assert.h>
 
@@ -19,16 +19,32 @@ extern "C" {
 namespace cvmfs {
 
 class Catalog;
-typedef std::vector<Catalog*> CatalogVector;
+typedef std::list<Catalog*> CatalogList;
 
 class CatalogManager;
+
+struct InodeChunk {
+  uint64_t offset;
+  uint64_t size;
+  
+  InodeChunk() {
+    offset = 0;
+    size = 0;
+  }
+  
+  inline bool ContainsInode(const inode_t inode) const {
+    return ((uint64_t)inode > offset && inode <= size + offset);
+  }
+  
+  inline bool IsInitialized() const { return offset > 0 && size > 0; }
+};
 
 class Catalog {
  public:
   Catalog(const std::string &path, Catalog *parent);
   ~Catalog();
   bool OpenDatabase(const std::string &db_file);
-  inline bool IsInitialized() const { return inode_offset_ > 0 && maximal_row_id_ > 0; }
+  inline bool IsInitialized() const { return inode_chunk_.IsInitialized() && max_row_id_ > 0; }
   
  public:
   inline bool IsRoot() const { return NULL == parent_; }
@@ -42,13 +58,17 @@ class Catalog {
   inline bool Listing(const std::string &path, DirectoryEntryList *listing) const { return Listing(hash::t_md5(path), listing); }
   
   void AddChild(Catalog *child);
+  void RemoveChild(const Catalog *child);
+  CatalogList GetChildrenRecursively() const;
   
-  inline bool ContainsInode(const inode_t inode) const { assert(IsInitialized()); return (inode > inode_offset_ && inode <= maximal_row_id_ + inode_offset_); }
-  inline CatalogVector children() const { return children_; }
+  inline bool ContainsInode(const inode_t inode) const { assert(IsInitialized()); return inode_chunk_.ContainsInode(inode); }
+  
+  inline CatalogList children() const { return children_; }
   inline std::string path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
-  inline uint64_t maximal_row_id() const { return maximal_row_id_; }
-  inline void set_inode_offset(const uint64_t inode_offset) { inode_offset_ = inode_offset; }
+  inline uint64_t max_row_id() const { return max_row_id_; }
+  inline InodeChunk inode_chunk() const { return inode_chunk_; }
+  inline void set_inode_chunk(const InodeChunk chunk) { inode_chunk_ = chunk; }
   
   inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id);
   
@@ -56,7 +76,7 @@ class Catalog {
   inline void Lock() const { pthread_mutex_lock((pthread_mutex_t *)&mutex_); }
   inline void Unlock() const { pthread_mutex_unlock((pthread_mutex_t *)&mutex_); }
   
-  inline uint64_t GetRowIdFromInode(const inode_t inode) const { return inode - inode_offset_; }
+  inline uint64_t GetRowIdFromInode(const inode_t inode) const { return inode - inode_chunk_.offset; }
   
   bool EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
   
@@ -75,10 +95,10 @@ class Catalog {
   std::string path_;
   
   Catalog *parent_;
-  CatalogVector children_;
+  CatalogList children_;
   
-  uint64_t inode_offset_;
-  uint64_t maximal_row_id_;
+  InodeChunk inode_chunk_;
+  uint64_t max_row_id_;
   
   HardlinkGroupIdMap hardlink_groups_;
   
