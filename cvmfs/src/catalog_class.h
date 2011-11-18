@@ -1,7 +1,6 @@
 #ifndef CATALOG_CLASS_H
 #define CATALOG_CLASS_H 1
 
-#include <pthread.h>
 #include <stdint.h>
 #include <string>
 #include <list>
@@ -11,6 +10,7 @@
 #include "catalog_queries.h"
 #include "directory_entry.h"
 #include "hash.h"
+#include "thread_safe.h"
 
 extern "C" {
    #include "sqlite3-duplex.h"
@@ -39,10 +39,10 @@ struct InodeChunk {
   inline bool IsInitialized() const { return offset > 0 && size > 0; }
 };
 
-class Catalog {
+class Catalog : public ThreadSafe {
  public:
   Catalog(const std::string &path, Catalog *parent);
-  ~Catalog();
+  virtual ~Catalog();
   bool OpenDatabase(const std::string &db_file);
   inline bool IsInitialized() const { return inode_chunk_.IsInitialized() && max_row_id_ > 0; }
   
@@ -73,12 +73,12 @@ class Catalog {
   inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id);
   
  private:
-  inline void Lock() const { pthread_mutex_lock((pthread_mutex_t *)&mutex_); }
-  inline void Unlock() const { pthread_mutex_unlock((pthread_mutex_t *)&mutex_); }
-  
   inline uint64_t GetRowIdFromInode(const inode_t inode) const { return inode - inode_chunk_.offset; }
   
   bool EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
+  
+  void InitPreparedStatements();
+  void FinalizePreparedStatements();
   
  private:
   static const uint64_t DEFAULT_TTL; ///< Default TTL for a catalog is one hour.
@@ -90,7 +90,6 @@ class Catalog {
  private:
   sqlite3 *database_; ///< The SQLite3 database handle for this catalog
 
-  pthread_mutex_t mutex_;
   std::string root_prefix_; ///< If we mount deep into a nested catalog, we need the full preceeding path to calculate the correct MD5 hash
   std::string path_;
   

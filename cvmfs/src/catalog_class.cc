@@ -1,6 +1,7 @@
 #include "catalog_class.h"
 
 #include "catalog_manager.h"
+#include "util.h"
 
 extern "C" {
   #include "debug.h"
@@ -15,8 +16,6 @@ const uint64_t Catalog::GROW_EPOCH        = 1199163600;
 const int      Catalog::SQLITE_THREAD_MEM = 4; ///< SQLite3 heap limit per thread
 
 Catalog::Catalog(const string &path, Catalog *parent) {
-  pthread_mutex_init(&mutex_, NULL);
-  
   parent_ = parent;
   path_ = path;
   
@@ -34,11 +33,7 @@ bool Catalog::OpenDatabase(const string &db_file) {
   }
   sqlite3_extended_result_codes(database_, 1);
 
-  // initialize prepared statements
-  listing_statement_ = new ListingLookupSqlStatement(database_);
-  path_hash_lookup_statement_ = new PathHashLookupSqlStatement(database_);
-  inode_lookup_statement_ = new InodeLookupSqlStatement(database_);
-  find_nested_catalog_statement_ = new FindNestedCatalogSqlStatement(database_);
+  InitPreparedStatements();
   
   // allocate inode chunk
   SqlStatement max_row_id_query(database_, "SELECT MAX(rowid) FROM catalog;");
@@ -68,24 +63,34 @@ bool Catalog::OpenDatabase(const string &db_file) {
 }
 
 Catalog::~Catalog() {
+  FinalizePreparedStatements();
+  
+  sqlite3_close(database_);
+}
+
+void Catalog::InitPreparedStatements() {
+  listing_statement_ = new ListingLookupSqlStatement(database_);
+  path_hash_lookup_statement_ = new PathHashLookupSqlStatement(database_);
+  inode_lookup_statement_ = new InodeLookupSqlStatement(database_);
+  find_nested_catalog_statement_ = new FindNestedCatalogSqlStatement(database_);
+}
+
+void Catalog::FinalizePreparedStatements() {
   delete listing_statement_;
   delete path_hash_lookup_statement_;
   delete inode_lookup_statement_;
   delete find_nested_catalog_statement_;
-  
-  sqlite3_close(database_);
-  
-  pthread_mutex_destroy(&mutex_);
 }
 
 void Catalog::AddChild(Catalog *child) {
-  Lock();
+  LOCKED_SCOPE;
+  
   children_.push_back(child);
-  Unlock();
 }
 
 void Catalog::RemoveChild(const Catalog *child) {
-  Lock();
+  LOCKED_SCOPE;
+  
   CatalogList::iterator i;
   CatalogList::const_iterator end;
   for (i = children_.begin(), end = children_.end(); i != end; ++i) {
@@ -94,10 +99,11 @@ void Catalog::RemoveChild(const Catalog *child) {
       break;
     }
   }
-  Unlock();
 }
 
 CatalogList Catalog::GetChildrenRecursively() const {
+  LOCKED_SCOPE;
+  
   CatalogList result = children_;
   
   CatalogList::const_iterator i, end;
@@ -109,42 +115,43 @@ CatalogList Catalog::GetChildrenRecursively() const {
   return result;
 }
 
-bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const {
+bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const { 
   assert (IsInitialized());
   
   bool found = false;
   uint64_t row_id = GetRowIdFromInode(inode);
   
-  Lock();
-  inode_lookup_statement_->BindRowId(row_id);
-  if (inode_lookup_statement_->FetchRow()) {
-    *entry = inode_lookup_statement_->GetDirectoryEntry((Catalog*)this);
-    found = true;
-  }
+  {
+    LOCKED_SCOPE;
 
-  if (NULL != parent_hash) {
-    *parent_hash = inode_lookup_statement_->GetParentPathHash();
-  }
+    inode_lookup_statement_->BindRowId(row_id);
+    if (inode_lookup_statement_->FetchRow()) {
+      *entry = inode_lookup_statement_->GetDirectoryEntry((Catalog*)this);
+      found = true;
+    }
 
-  inode_lookup_statement_->Reset();
-  Unlock();
+    if (NULL != parent_hash) {
+      *parent_hash = inode_lookup_statement_->GetParentPathHash();
+    }
+
+    inode_lookup_statement_->Reset();
+  }
   
   return found;
 }
 
 bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const {
+  LOCKED_SCOPE;
+  
   assert (IsInitialized());
 
   bool found = false;
-  
-  Lock();
   path_hash_lookup_statement_->BindPathHash(path_hash);
 	if (path_hash_lookup_statement_->FetchRow()) {
     *entry = path_hash_lookup_statement_->GetDirectoryEntry((Catalog*)this);
     found = EnsureCoherenceOfInodes(path_hash, entry);
 	}
   path_hash_lookup_statement_->Reset();
-  Unlock();
   
   return found;
 }
@@ -157,9 +164,10 @@ bool Catalog::Listing(const inode_t inode, DirectoryEntryList *listing) const {
 }
 
 bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing) const {
+  LOCKED_SCOPE;
+  
   assert (IsInitialized());
 
-  Lock();
   listing_statement_->BindPathHash(path_hash);
   while (listing_statement_->FetchRow()) {
     DirectoryEntry entry = listing_statement_->GetDirectoryEntry((Catalog*)this);
@@ -167,7 +175,6 @@ bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing)
     listing->push_back(entry);
   }
   listing_statement_->Reset();
-  Unlock();
   
   return true;
 }

@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <sstream>
+#include <pthread.h>
 
 extern "C" {
    #include "smalloc.h"
