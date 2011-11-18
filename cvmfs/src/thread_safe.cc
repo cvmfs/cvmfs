@@ -10,12 +10,20 @@ LockGuard::~LockGuard() {
   pthread_mutex_unlock(mutex_);
 }
 
-ThreadSafe::ThreadSafe() {
+ThreadSafeMutex::ThreadSafeMutex() {
   pthread_mutex_init(&mutex_, NULL);
 }
 
-ThreadSafe::~ThreadSafe() {
+ThreadSafeMutex::~ThreadSafeMutex() {
   pthread_mutex_destroy(&mutex_);
+}
+
+ThreadSafeReadWrite::ThreadSafeReadWrite() {
+  pthread_rwlock_init(&read_write_lock_, NULL);
+}
+
+ThreadSafeReadWrite::~ThreadSafeReadWrite() {
+  pthread_rwlock_destroy(&read_write_lock_);
 }
 
 }

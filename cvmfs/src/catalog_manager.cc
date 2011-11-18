@@ -32,16 +32,12 @@ CatalogManager::CatalogManager(const string &root_url, const string &repo_name, 
 
   atomic_init(&certificate_hits_);
   atomic_init(&certificate_misses_);
-  
-  pthread_rwlock_init(&read_write_lock_, NULL);
 }
 
 CatalogManager::~CatalogManager() {
   WriteLock();
-  DetachCatalog(GetRootCatalog());
+  DetachAllCatalogs();
   Unlock();
-  
-  pthread_rwlock_destroy(&read_write_lock_);
 }
 
 bool CatalogManager::Init() {
@@ -105,26 +101,26 @@ bool CatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bo
   else {
     hash::t_md5 parent_hash;
     DirectoryEntry parent;
+    bool found_parent_entry = false;
     bool found_entry = catalog->Lookup(inode, entry, &parent_hash);
     
-    // entry was not found in the first place... no parent lookup
+    // entry was not found... we're done with that --> return
     if (not found_entry) {
       found = false;
       goto out;
     }
     
-    // look for the parent entry in the same catalog
-    bool found_parent_entry = false;
-    found_parent_entry = catalog->Lookup(parent_hash, &parent);
-    
-    // if the entry was not found and there is a parent catalog
-    // we also check this one
-    if (not found_parent_entry && not catalog->IsRoot()) {
+    // if our entry is the root of a nested catalog it's parent resides
+    // in the parent catalog and we have to search there. Otherwise
+    // it should be found in the current catalog
+    if (entry->IsNestedCatalogRoot() && not catalog->IsRoot()) {
       Catalog *parent_catalog = catalog->parent();
       found_parent_entry = parent_catalog->Lookup(parent_hash, &parent);
+    } else {
+      bool found_parent_entry = catalog->Lookup(parent_hash, &parent);
     }
     
-    // if we still lack a parent entry, there may be some data corruption!
+    // if we didn't find a parent entry, there may be some data corruption!
     if (not found_parent_entry) {
       pmesg(D_CATALOG, "cannot find parent entry for inode %d --> data corrupt?", inode);
       found = false;
@@ -198,9 +194,9 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
     
     // try to load the nested catalogs for this path
     Catalog *nested_catalog;
-    ExtendLock();
+    UpgradeLock();
     entry_found = LoadNestedCatalogForPath(path, best_fitting_catalog, load_final_catalog, &nested_catalog);
-    ShrinkLock();
+    DowngradeLock();
     if (not entry_found) {
       pmesg(D_CATALOG, "nested catalog for %s could not be found", path.c_str());
       return false;
@@ -220,9 +216,9 @@ bool CatalogManager::GetCatalogByPath(const string &path, const bool load_final_
   // if the found entry is a nested catalog mount point we have to load in on request
   else if (load_final_catalog && d.IsNestedCatalogMountpoint()) {
     Catalog *new_catalog;
-    ExtendLock();
+    UpgradeLock();
     bool attached_successfully = LoadAndAttachCatalog(path, best_fitting_catalog, &new_catalog);
-    ShrinkLock();
+    DowngradeLock();
     if (not attached_successfully) {
       return false;
     }
@@ -251,6 +247,8 @@ bool CatalogManager::GetCatalogByInode(const uint64_t inode, Catalog **catalog) 
 }
 
 Catalog* CatalogManager::FindBestFittingCatalogForPath(const string &path) const {
+  assert (GetNumberOfAttachedCatalogs() > 0);
+  
   // go and find the best fit in open catalogs for this path
   Catalog *best_fit = GetRootCatalog();
   while (best_fit->path() != path) {
@@ -260,18 +258,16 @@ Catalog* CatalogManager::FindBestFittingCatalogForPath(const string &path) const
     CatalogList children = best_fit->children();
     CatalogList::const_iterator i,end;
     string child_path;
-    for (i = children.begin(), end = children.end(); i != end; ++i) {
+    
+    // loop through the child catalogs and search for the best fit
+    // we might hit the ultimate searched catalog and stop directly (longest_hit == path.length())
+    for (i = children.begin(), end = children.end(); i != end && longest_hit != path.length(); ++i) {
       child_path = (*i)->path();
       
       // sort out the best fitting child and continue
       if (path.find(child_path) == 0 && longest_hit < child_path.length()) {
         next_best_fit = *i;
         longest_hit = child_path.length();
-        
-        // quick way out if we found the right catalog
-        if (longest_hit == path.length()) {
-          break;
-        }
       }
     }
 
@@ -284,6 +280,20 @@ Catalog* CatalogManager::FindBestFittingCatalogForPath(const string &path) const
   }
   
   return best_fit;
+}
+
+bool CatalogManager::IsCatalogAttached(const string &root_path, Catalog **attached_catalog) const {
+  if (GetNumberOfAttachedCatalogs() == 0) {
+    return false;
+  }
+  
+  Catalog *best_fit = FindBestFittingCatalogForPath(root_path);
+  if (best_fit->path() == root_path) {
+    if (NULL != attached_catalog) *attached_catalog = best_fit;
+    return true;
+  }
+  
+  return false;
 }
 
 bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog *entry_point, const bool load_final_catalog, Catalog **final_catalog) {
@@ -331,12 +341,19 @@ bool CatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog 
 }
 
 bool CatalogManager::LoadAndAttachCatalog(const string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog) {
+  // check if catalog is already attached
+  if (IsCatalogAttached(mountpoint, attached_catalog)) {
+    return true;
+  }
+  
+  // load catalog file
   string new_catalog_file;
   if (0 != LoadCatalogFile(mountpoint, hash::t_md5(mountpoint), &new_catalog_file)) {
     pmesg(D_CATALOG, "failed to load catalog '%s'", mountpoint.c_str());
     return false;
   }
 
+  // attach loaded catalog
   if (not AttachCatalog(new_catalog_file, mountpoint, parent_catalog, false, attached_catalog)) {
     pmesg(D_CATALOG, "failed to attach catalog '%s'", mountpoint.c_str());
     return false;

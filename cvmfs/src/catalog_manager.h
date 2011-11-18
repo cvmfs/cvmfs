@@ -8,10 +8,11 @@
 #include "hash.h"
 #include "atomic.h"
 #include "directory_entry.h"
+#include "thread_safe.h"
 
 namespace cvmfs {
   
-class CatalogManager {
+class CatalogManager : public ThreadSafeReadWrite {
  public:
   CatalogManager(const std::string &root_url, const std::string &repo_name, const std::string &whitelist, const std::string &blacklist, const bool force_signing);
   virtual ~CatalogManager();
@@ -32,12 +33,6 @@ class CatalogManager {
   inline inode_t MangleInode(const inode_t inode) const { return (inode < kInitialInodeOffset) ? GetRootInode() : inode; }
   
  private:
-  typedef enum {
-     ppNotPresent,
-     ppPresent,
-     ppNotAttachedNestedCatalog
-  } PathPresent;
-  
   int FetchCatalog(const std::string &url_path, const bool no_proxy, const hash::t_md5 &mount_point,
                    std::string &cat_file, hash::t_sha1 &cat_sha1, std::string &old_file, hash::t_sha1 &old_sha1, 
                    bool &cached_copy, const hash::t_sha1 &sha1_expected, const bool dry_run = false);
@@ -56,7 +51,7 @@ class CatalogManager {
   bool AttachCatalog(const std::string &db_file, const std::string &url, Catalog *parent, const bool open_transaction, Catalog **attached_catalog);
   bool RefreshCatalog(Catalog *catalog);
   bool DetachCatalog(Catalog *catalog);
-  bool DetachAllCatalogs();
+  inline bool DetachAllCatalogs() { return DetachCatalog(GetRootCatalog()); }
   
   InodeChunk GetInodeChunkOfSize(uint64_t size);
   void AnnounceInvalidInodeChunk(const InodeChunk chunk) const;
@@ -69,13 +64,8 @@ class CatalogManager {
   bool GetCatalogByInode(const inode_t inode, Catalog **catalog) const;
   
   Catalog* FindBestFittingCatalogForPath(const std::string &path) const;
+  bool IsCatalogAttached(const std::string &root_path, Catalog **attached_catalog) const;
   bool LoadNestedCatalogForPath(const std::string &path, const Catalog *entry_point, const bool load_final_catalog, Catalog **final_catalog);
-  
-  inline void ReadLock() const { pthread_rwlock_rdlock((pthread_rwlock_t*)&read_write_lock_); }
-  inline void WriteLock() { pthread_rwlock_wrlock(&read_write_lock_); }
-  inline void ExtendLock() { Unlock(); WriteLock(); }
-  inline void ShrinkLock() { Unlock(); ReadLock(); }
-  inline void Unlock() const { pthread_rwlock_unlock((pthread_rwlock_t*)&read_write_lock_); }
   
  private:
   // TODO: this list is actually not really needed.
@@ -85,8 +75,6 @@ class CatalogManager {
   //  eventually we should only safe the root catalog, representing
   //  the whole catalog tree in an implicit manor.
   CatalogList catalogs_;
-  
-  pthread_rwlock_t read_write_lock_;
   
   std::string root_url_;
   std::string repo_name_;

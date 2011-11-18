@@ -39,7 +39,7 @@ struct InodeChunk {
   inline bool IsInitialized() const { return offset > 0 && size > 0; }
 };
 
-class Catalog : public ThreadSafe {
+class Catalog : public ThreadSafeMutex {
  public:
   Catalog(const std::string &path, Catalog *parent);
   virtual ~Catalog();
