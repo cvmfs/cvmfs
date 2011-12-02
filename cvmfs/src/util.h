@@ -25,7 +25,6 @@ bool is_empty_dir(const std::string &path);
 bool file_exists(const std::string &path);
 bool directory_exists(const std::string &path);
 bool mkdir_deep(const std::string &path, mode_t mode);
-std::string expand_env(const std::string &path);
 bool make_cache_dir(const std::string &path, const mode_t mode);
 std::string localtime_ascii(time_t seconds, const bool utc);
 bool parse_keyval(const std::string filename, std::map<char, std::string> &content);

@@ -90,7 +90,7 @@ private:
 
 public:
 	/**
-	 *  create a new DirEntry (is is normally not required for normal usage
+	 *  create a new DirEntry (is normally not required for normal usage
 	 *                         as the RecursionEngine provides you with DirEntries)
 	 *  @param dirPath the RELATIVE path to the file
 	 *  @param filename the name of the file ;-)

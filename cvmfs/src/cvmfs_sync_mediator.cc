@@ -15,8 +15,8 @@ extern "C" {
 using namespace cvmfs;
 using namespace std;
 
-SyncMediator::SyncMediator(CatalogHandler *catalogHandler, const SyncParameters *parameters) {
-	mCatalogHandler = catalogHandler;
+SyncMediator::SyncMediator(WritableCatalogManager *catalogManager, const SyncParameters *parameters) {
+	mCatalogManager = catalogManager;
 	mDataDirectory = canonical_path(parameters->dir_data);
 	mDryRun = parameters->dry_run;
 	mPrintChangeset = parameters->print_changeset;
@@ -120,8 +120,8 @@ void SyncMediator::commit() {
 	compressAndHashFileQueue();
 	addFileQueueToCatalogs();
    releaseFileQueue();
-	mCatalogHandler->precalculateListings();
-	mCatalogHandler->commit();
+	mCatalogManager->PrecalculateListings();
+	mCatalogManager->Commit();
 }
 
 void SyncMediator::compressAndHashFileQueue() {
@@ -168,14 +168,14 @@ void SyncMediator::addFileQueueToCatalogs() {
 	DirEntryList::iterator i;
 	DirEntryList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		mCatalogHandler->addFile(*i);
+		mCatalogManager->AddFile(*i);
 	}
 	
 	// add hardlink groups
 	HardlinkGroupList::iterator j;
 	HardlinkGroupList::const_iterator jend;
 	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
-		mCatalogHandler->addHardlinkGroup(j->hardlinks);
+		mCatalogManager->AddHardlinkGroup(j->hardlinks);
 	}
 }
 
@@ -354,12 +354,12 @@ RecursionPolicy SyncMediator::addDirectoryCallback(DirEntry *entry) {
 
 void SyncMediator::createNestedCatalog(DirEntry *requestFile) {
 	if (mPrintChangeset) cout << "[add] NESTED CATALOG" << endl;
-	if (not mDryRun)     mCatalogHandler->createNestedCatalog(requestFile->getParentPath());
+	if (not mDryRun)     mCatalogManager->CreateNestedCatalog(requestFile->getParentPath());
 }
 
 void SyncMediator::removeNestedCatalog(DirEntry *requestFile) {
 	if (mPrintChangeset) cout << "[rem] NESTED CATALOG" << endl;
-	if (not mDryRun)     mCatalogHandler->removeNestedCatalog(requestFile->getParentPath());
+	if (not mDryRun)     mCatalogManager->RemoveNestedCatalog(requestFile->getParentPath());
 }
 
 void SyncMediator::addFile(DirEntry *entry) {
@@ -367,7 +367,7 @@ void SyncMediator::addFile(DirEntry *entry) {
 	
 	if (entry->isSymlink() && not mDryRun) {
 	   // symlinks have no 'actual' file content, which would have to be compressed...
-		mCatalogHandler->addFile(entry);
+		mCatalogManager->AddFile(entry);
 	} else {
 	   // a normal file has content, that has to be compressed later in the commit-stage
 	   // keep the entry in memory!
@@ -378,27 +378,27 @@ void SyncMediator::addFile(DirEntry *entry) {
 
 void SyncMediator::removeFile(DirEntry *entry) {
 	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogHandler->removeFile(entry);
+	if (not mDryRun)     mCatalogManager->RemoveFile(entry);
 }
 
 void SyncMediator::touchFile(DirEntry *entry) {
 	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogHandler->touchFile(entry);
+	if (not mDryRun)     mCatalogManager->TouchFile(entry);
 }
 
 void SyncMediator::addDirectory(DirEntry *entry) {
 	if (mPrintChangeset) cout << "[add] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogHandler->addDirectory(entry);
+	if (not mDryRun)     mCatalogManager->AddDirectory(entry);
 }
 
 void SyncMediator::removeDirectory(DirEntry *entry) {
 	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogHandler->removeDirectory(entry);
+	if (not mDryRun)     mCatalogManager->RemoveDirectory(entry);
 }
 
 void SyncMediator::touchDirectory(DirEntry *entry) {
 	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogHandler->touchDirectory(entry);
+	if (not mDryRun)     mCatalogManager->TouchDirectory(entry);
 }
 
 void SyncMediator::addHardlinkGroups(const HardlinkGroupMap &hardlinks) {
@@ -417,7 +417,7 @@ void SyncMediator::addHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 		
 		if (i->second.masterFile->isSymlink() && not mDryRun) {
 		   // symlink hardlinks just end up in the database (see SyncMediator::addFile() same semantics here)
-			mCatalogHandler->addHardlinkGroup(i->second.hardlinks);
+			mCatalogManager->AddHardlinkGroup(i->second.hardlinks);
          
 		} else {
 		   // yeah... just see SyncMediator::addFile()

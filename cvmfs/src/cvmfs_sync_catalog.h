@@ -1,3 +1,5 @@
+/** DEPRECATED but still needed for code reusage... will go away soon */
+
 /**
  *  This class is responsible to actually change the file system
  *  information in the CVMFS catalogs

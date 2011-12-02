@@ -2130,7 +2130,7 @@ namespace catalog {
       s->st_uid = uid;
       s->st_gid = gid;
       s->st_rdev = 1;
-      s->st_size = (flags & catalog::FILE_LINK) ? expand_env(symlink).length() : size;
+//      s->st_size = (flags & catalog::FILE_LINK) ? expand_env(symlink).length() : size;
       s->st_blksize = 4096; /* will be ignored by Fuse */
       s->st_blocks = 1+size/512;
       s->st_atime = mtime;

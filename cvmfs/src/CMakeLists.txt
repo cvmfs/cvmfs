@@ -7,14 +7,16 @@ set (CVMFS2_DEBUG_SOURCES
 	smalloc.h smalloc.c 
 	log.c log.h 
 	tracer.h tracer.cc atomic.h 
-	catalog_tree.h catalog_tree.cc 
-	sqlite3-duplex.h catalog.h catalog.cc 
+	sqlite3-duplex.h
 	curl-duplex.h fuse-duplex.h 
 	signature.h signature.cc 
 	lru.h lru.cc 
 	hash.h hash.cc 
 	cache.h cache.cc 
 	talk.h talk.cc 
+	
+	catalog.h catalog.cc
+	catalog_tree.h catalog_tree.cc
 	compat.h 
 	compat_macosx.h 
 	monitor.h monitor.cc 
@@ -28,12 +30,16 @@ set (CVMFS2_DEBUG_SOURCES
 	inode_cache.h inode_cache.cc
 	path_cache.h path_cache.cc
 	md5path_cache.h md5path_cache.cc
-	thread_safe.h thread_safe.cc
-	catalog_class.h catalog_class.cc
-	catalog_manager.h catalog_manager.cc
-	directory_entry.h
-	catalog_queries.h catalog_queries.cc
-	cvmfs.h cvmfs.cc)
+	cvmfs.h cvmfs.cc
+	
+	catalog_queries.h           catalog_queries.cc
+	thread_safe.h               thread_safe.cc
+	Catalog.h                   Catalog.cc
+	AbstractCatalogManager.h    AbstractCatalogManager.cc
+	RemoteCatalogManager.h      RemoteCatalogManager.cc
+	DirectoryEntry.h
+	
+)
 
 set (CVMFS2_SOURCES ${CVMFS2_DEBUG_SOURCES})
 
@@ -56,7 +62,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	zlib-duplex.h compression.h compression.c 
 	md5.h sha1.h sha1.c hash.h hash.cc 
 	catalog_tree.h catalog_tree.cc
-	sqlite3-duplex.h catalog.h catalog.cc 
+	sqlite3-duplex.h 
 	util.cc util.h 
 	log.c log.h 
 	monitor.cc monitor.h 
@@ -64,7 +70,18 @@ set (CVMFS_SYNC_BIN_SOURCES
 	cvmfs_sync_recursion.h cvmfs_sync_recursion.cc
 	cvmfs_sync_aufs.h cvmfs_sync_aufs.cc
 	cvmfs_sync_mediator.h cvmfs_sync_mediator.cc
-	cvmfs_sync_catalog.h cvmfs_sync_catalog.cc)
+	
+	
+	catalog_queries.h           catalog_queries.cc
+	thread_safe.h               thread_safe.cc
+
+	Catalog.h                   Catalog.cc
+	WritableCatalog.h           WritableCatalog.cc
+
+	AbstractCatalogManager.h    AbstractCatalogManager.cc
+	WritableCatalogManager.h    WritableCatalogManager.cc
+	
+	DirectoryEntry.h)
 
 set (CVMFS_CLGCMP_SOURCES
 	smalloc.h smalloc.c 
@@ -227,6 +244,7 @@ include_directories (${INCLUDE_DIRECTORIES})
 # variable to pass some target specific build options.
 #
 
+
 if (BUILD_CVMFS)
 
 	# create targets with according sources and static link libraries
@@ -235,8 +253,7 @@ if (BUILD_CVMFS)
 	add_executable (cvmfs_fsck		${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
 	add_executable (cvmfs_proxy_rtt	${CVMFS_PROXY_RTT_SOURCES} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE})
 	add_executable (testtracer		${TESTTRACER_SOURCES})
-	
-	# add dependencies to targets to control concurrent build tree
+		
 	if (USE_JEMALLOC)
 		add_dependencies (cvmfs2_debug jemalloc)
 		add_dependencies (cvmfs2 jemalloc)
@@ -297,7 +314,6 @@ if (BUILD_SERVER)
 	add_executable (cvmfs_zpipe		${CVMFS_ZPIPE_SOURCES} ${ZLIB_ARCHIVE})
 	add_executable (cvmfs_sync.bin	${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE})
 	
-	# add dependencies to targets to control concurrent build tree
 	if (LIBCURL_BUILTIN)
 		add_dependencies (cvmfs_pull libcurl)
 	endif (LIBCURL_BUILTIN)

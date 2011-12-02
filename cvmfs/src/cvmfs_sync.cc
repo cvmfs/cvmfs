@@ -38,7 +38,7 @@
 #include "util.h"
 #include "monitor.h"
 
-//#include "cvmfs_sync_catalog.h"
+#include "WritableCatalogManager.h"
 
 #include "compat.h"
 
@@ -181,7 +181,13 @@ bool createCacheDir(SyncParameters *p) {
 	}
 	
 	return true;
-} 
+}
+
+WritableCatalogManager* createWritableCatalogManager(SyncParameters *p) {
+  return new WritableCatalogManager(p->dir_catalogs,
+                                    p->dir_data,
+                                    p->lazy_attach);
+}
 
 int main(int argc, char **argv) {
 	SyncParameters parameters;
@@ -193,8 +199,8 @@ int main(int argc, char **argv) {
 	if (not createCacheDir(&parameters)) return 3;
 	
 	// create worker objects
-	CatalogHandler *catalogHandler = new CatalogHandler(&parameters);
-	SyncMediator *mediator = new SyncMediator(catalogHandler, &parameters);
+	WritableCatalogManager *catalogManager = createWritableCatalogManager(&parameters);
+	SyncMediator *mediator = new SyncMediator(catalogManager, &parameters);
 	SyncAufs1::initialize(mediator, &parameters);
 	
 	// sync
@@ -206,7 +212,7 @@ int main(int argc, char **argv) {
 	// clean up
 	UnionSync::sharedInstance()->fini();
 	delete mediator;
-	delete catalogHandler;
+	delete catalogManager;
 	monitor::fini();
    
 	return 0;

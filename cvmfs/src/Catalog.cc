@@ -1,6 +1,8 @@
-#include "catalog_class.h"
+#include "Catalog.h"
 
-#include "catalog_manager.h"
+#include <iostream>
+
+#include "AbstractCatalogManager.h"
 #include "util.h"
 
 extern "C" {
@@ -23,9 +25,9 @@ Catalog::Catalog(const string &path, Catalog *parent) {
 }
 
 bool Catalog::OpenDatabase(const string &db_file) {
-  int flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
+  int flags = DatabaseOpenFlags();
 
-  // open database file for reading
+  // open database file (depending on the flags read-only or read-write)
   pmesg(D_CATALOG, "opening database file %s", db_file.c_str());
   if (SQLITE_OK != sqlite3_open_v2(db_file.c_str(), &database_, flags, NULL)) {
     pmesg(D_CATALOG, "Cannot open catalog database file %s", db_file.c_str());
@@ -35,7 +37,7 @@ bool Catalog::OpenDatabase(const string &db_file) {
 
   InitPreparedStatements();
   
-  // allocate inode chunk
+  // find out the max row id of this database file
   SqlStatement max_row_id_query(database_, "SELECT MAX(rowid) FROM catalog;");
   if (not max_row_id_query.FetchRow()) {
     pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s (SqliteErrorcode: %d)", db_file.c_str(), max_row_id_query.GetLastError());
@@ -124,15 +126,15 @@ bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *pa
   {
     LOCKED_SCOPE;
 
+    // do the actual lookup
     inode_lookup_statement_->BindRowId(row_id);
-    if (inode_lookup_statement_->FetchRow()) {
-      *entry = inode_lookup_statement_->GetDirectoryEntry((Catalog*)this);
-      found = true;
-    }
+    found = inode_lookup_statement_->FetchRow();
+    
+    // retrieve the DirectoryEntry if needed
+    if (found && NULL != entry) *entry = inode_lookup_statement_->GetDirectoryEntry(this);
 
-    if (NULL != parent_hash) {
-      *parent_hash = inode_lookup_statement_->GetParentPathHash();
-    }
+    // retrieve the path_hash of the parent path if needed
+    if (NULL != parent_hash) *parent_hash = inode_lookup_statement_->GetParentPathHash();
 
     inode_lookup_statement_->Reset();
   }
@@ -145,9 +147,9 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const 
   
   assert (IsInitialized());
 
-  bool found = false;
   path_hash_lookup_statement_->BindPathHash(path_hash);
-	if (path_hash_lookup_statement_->FetchRow()) {
+  bool found = path_hash_lookup_statement_->FetchRow();
+	if (found && NULL != entry) {
     *entry = path_hash_lookup_statement_->GetDirectoryEntry((Catalog*)this);
     found = EnsureCoherenceOfInodes(path_hash, entry);
 	}
@@ -157,9 +159,11 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const 
 }
 
 bool Catalog::Listing(const inode_t inode, DirectoryEntryList *listing) const {
+  LOCKED_SCOPE;
+  
   assert (IsInitialized());
 
-  assert (false); // currently not implemented
+  assert (false); // TODO: currently not implemented (not needed though)
   return false;
 }
 

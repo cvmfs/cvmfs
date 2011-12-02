@@ -116,35 +116,6 @@ bool mkdir_deep(const std::string &path, mode_t mode) {
 
 
 /**
- * Expands environment variables, i.e. $(homedir)/bla is converted to an absolute path.
- */
-string expand_env(const string &path) {
-   string result = "";
-   
-   for (string::size_type i = 0; i < path.length(); i++) {
-      string::size_type lpar;
-      string::size_type rpar;
-      if ((path[i] == '$') && 
-          ((lpar = path.find('(', i+1)) != string::npos) &&
-          ((rpar = path.find(')', i+2)) != string::npos) &&
-          (rpar > lpar))  
-      {
-         string var = path.substr(lpar + 1, rpar-lpar-1);
-         char *var_exp = getenv(var.c_str()); /* Don't free! Nothing is allocated here */
-         if (var_exp) {
-            result += var_exp;
-         }
-         i = rpar;
-      } else {
-         result += path[i];
-      }
-   }
-   
-   return result;
-}
-
-
-/**
  * Creates the SHA1 cache directory structure in path.
  */
 bool make_cache_dir(const string &path, const mode_t mode) {

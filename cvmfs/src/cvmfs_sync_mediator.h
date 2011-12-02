@@ -35,7 +35,7 @@
 #include <stack>
 
 #include "compat.h"
-#include "cvmfs_sync_catalog.h"
+#include "WritableCatalogManager.h"
 #include "cvmfs_sync.h"
 
 namespace cvmfs {
@@ -71,7 +71,7 @@ private:
 	typedef std::list<HardlinkGroup> HardlinkGroupList;
 	
 private:
-	CatalogHandler *mCatalogHandler;
+	WritableCatalogManager *mCatalogManager;
 	std::string mDataDirectory;
 	
 	/**
@@ -97,7 +97,7 @@ private:
 	bool mPrintChangeset;
 	
 public:
-	SyncMediator(CatalogHandler *catalogHandler, const SyncParameters *parameters);
+	SyncMediator(WritableCatalogManager *catalogManager, const SyncParameters *parameters);
 	virtual ~SyncMediator();
 	
 	/**

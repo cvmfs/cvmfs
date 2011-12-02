@@ -6,7 +6,7 @@
 #include "lru_cache.h"
 #include "catalog.h"
 #include "fuse-duplex.h"
-#include "directory_entry.h"
+#include "DirectoryEntry.h"
 
 namespace cvmfs {
 

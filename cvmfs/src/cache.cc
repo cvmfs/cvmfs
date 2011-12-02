@@ -32,7 +32,7 @@
 #include "cache.h"
 
 #include "catalog.h"
-#include "directory_entry.h"
+#include "DirectoryEntry.h"
 #include "lru.h"
 #include "util.h"
 #include "hash.h"

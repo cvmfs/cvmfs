@@ -80,8 +80,8 @@
 #include "path_cache.h"
 #include "md5path_cache.h"
 
-#include "catalog_manager.h"
-#include "directory_entry.h"
+#include "RemoteCatalogManager.h"
+#include "DirectoryEntry.h"
 
 extern "C" {
    #include "debug.h"
@@ -122,7 +122,7 @@ namespace cvmfs {
    time_t boot_time;
 	struct fuse_lowlevel_ops fuseCallbacks;
 	
-  CatalogManager *catalog_manager;
+  RemoteCatalogManager *catalog_manager;
 	
    const unsigned int inode_cache_size = 20000;
    InodeCache *inode_cache = NULL;
@@ -704,9 +704,7 @@ namespace cvmfs {
          return;
       }
    
-      const string lnk_exp = expand_env(dirent.symlink());
-   
-      fuse_reply_readlink(req, lnk_exp.c_str());
+      fuse_reply_readlink(req, dirent.symlink().c_str());
    }
 
    /**
@@ -1883,7 +1881,7 @@ int main(int argc, char *argv[])
    //    goto cvmfs_cleanup;
    // }
    
-   catalog_manager = new CatalogManager(root_url, repo_name, whitelist, blacklist, force_signing);
+   catalog_manager = new RemoteCatalogManager(root_url, repo_name, whitelist, blacklist, force_signing);
    if (not catalog_manager->Init()) {
       cerr << "Failed to initialize catalog manager" << endl;
       goto cvmfs_cleanup;
