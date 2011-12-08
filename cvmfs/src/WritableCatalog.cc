@@ -16,6 +16,7 @@ bool WritableCatalog::CreateNewCatalogDatabase(const std::string &file_path,
   }
   
   // open the new catalog to insert the root entry
+  pmesg(D_CATALOG, "inserting root entry into new catalog");
   WritableCatalog *new_catalog = new WritableCatalog(root_entry_parent_path, NULL);
   if (not new_catalog->OpenDatabase(file_path)) {
     pmesg(D_CATALOG, "opening new catalog '%s' for the first time failed.", file_path.c_str());
@@ -215,6 +216,37 @@ bool WritableCatalog::RemoveEntry(const string &file_path) {
   unlink_statement_->Reset();
   
   return result;
+}
+
+bool WritableCatalog::UpdateLastModified() {
+  const time_t now = time(NULL);
+  ostringstream sql;
+  sql << "INSERT OR REPLACE INTO properties "
+     "(key, value) VALUES ('last_modified', '" << now << "');";
+  return SqlStatement(database(), sql.str()).Execute();
+}
+
+bool WritableCatalog::IncrementRevision() {
+  const string sql = "UPDATE properties SET value=value+1 WHERE key='revision';";
+  return SqlStatement(database(), sql).Execute();
+}
+
+bool WritableCatalog::SetPreviousRevision(const hash::t_sha1 &hash) {
+  ostringstream sql;
+  sql << "INSERT OR REPLACE INTO properties "
+         "(key, value) VALUES ('previous_revision', '" << hash.to_string() << "');";
+   return SqlStatement(database(), sql.str()).Execute();
+}
+
+bool WritableCatalog::UpdateNestedCatalogLink(const string &path,
+                                              const hash::t_sha1 &hash) {
+  const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 WHERE path = :path;";
+  SqlStatement stmt(database(), sql);
+
+  stmt.BindText(1, hash.to_string());
+  stmt.BindText(2, path);
+  
+  return stmt.Execute();
 }
 
 }

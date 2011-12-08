@@ -177,7 +177,19 @@ class Catalog : public ThreadSafeMutex {
    */
   inline bool ContainsInode(const inode_t inode) const { assert(IsInitialized()); return inode_chunk_.ContainsInode(inode); }
   
-  inline CatalogList children() const { return children_; }
+  /**
+   *  retrieve the TTL value for this Catalog
+   *  @return the TTL in seconds
+   */
+  uint64_t GetTTL() const;
+  
+  /**
+   *  retrieve the revision number of this Catalog
+   *  @return the revision number of this Catalog
+   */
+  uint64_t GetRevision() const;
+  
+  inline const CatalogList& children() const { return children_; }
   inline std::string path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
   inline uint64_t max_row_id() const { return max_row_id_; }
@@ -232,7 +244,7 @@ class Catalog : public ThreadSafeMutex {
   bool EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
   
  private:
-  static const uint64_t DEFAULT_TTL; ///< Default TTL for a catalog is one hour.
+  static const uint64_t kDefaultTTL = 3600; ///< Default TTL for a catalog is one hour.
   static const uint64_t GROW_EPOCH;
   static const int      SQLITE_THREAD_MEM; ///< SQLite3 heap limit per thread
   

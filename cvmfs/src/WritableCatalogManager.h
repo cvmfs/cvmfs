@@ -24,10 +24,9 @@
 #include <string>
 
 #include "cvmfs_sync_recursion.h"
+#include "WritableCatalog.h"
 
 namespace cvmfs {
-
-class WritableCatalog;
   
 class WritableCatalogManager : public AbstractCatalogManager {
  private:
@@ -81,7 +80,19 @@ class WritableCatalogManager : public AbstractCatalogManager {
   bool GetCatalogByPath(const std::string &path, WritableCatalog **result);
   
 	inline std::string RelativeToCatalogPath(const std::string &relativePath) const { return (relativePath == "") ? "" : "/" + relativePath; }
-  DirectoryEntry CreateNewDirectoryEntry(DirEntry *entry, Catalog *catalog, const int hardlink_group_id = 0) const;
+  DirectoryEntry CreateNewDirectoryEntry(DirEntry *entry, Catalog *catalog, const int hardlink_group_id = 0) const; 
+  
+  /**
+   *  goes through all open catalogs and determines which catalogs need updated
+   *  snapshots.
+   *  @param[out] result the list of catalogs to snapshot
+   */
+  void GetCatalogsToSnapshot(WritableCatalogList &result) const { 
+    unsigned int number_of_dirty_catalogs = GetCatalogsToSnapshotRecursively(GetRootCatalog(), result);
+    assert (number_of_dirty_catalogs <= result.size());
+  }
+  int GetCatalogsToSnapshotRecursively(const Catalog *catalog, WritableCatalogList &result) const;
+  bool SnapshotCatalog(WritableCatalog *catalog) const;
   
  private:
   std::string catalog_directory_;

@@ -125,6 +125,9 @@ class SqlStatement {
     last_error_code_ = sqlite3_bind_null(statement_, index);
     return Successful();
   }
+  inline bool BindText(const int index, const std::string &value) {
+    return BindText(index, value.c_str(), value.length(), NULL);
+  }
   inline bool BindText(const int index, const char* value, const int size, void (*destructor)(void*)) {
     last_error_code_ = sqlite3_bind_text(statement_, index, value, size, destructor);
     return Successful();

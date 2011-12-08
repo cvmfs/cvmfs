@@ -119,7 +119,7 @@ void SyncMediator::leaveAddedDirectory(DirEntry *entry) {
 void SyncMediator::commit() {
 	compressAndHashFileQueue();
 	addFileQueueToCatalogs();
-   releaseFileQueue();
+  releaseFileQueue();
 	mCatalogManager->PrecalculateListings();
 	mCatalogManager->Commit();
 }

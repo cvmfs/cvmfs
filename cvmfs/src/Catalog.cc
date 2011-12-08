@@ -13,7 +13,6 @@ using namespace std;
 
 namespace cvmfs {
   
-const uint64_t Catalog::DEFAULT_TTL       = 3600; ///< Default TTL for a catalog is one hour.
 const uint64_t Catalog::GROW_EPOCH        = 1199163600;
 const int      Catalog::SQLITE_THREAD_MEM = 4; ///< SQLite3 heap limit per thread
 
@@ -222,6 +221,20 @@ inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t h
   }
 	
   return inode;
+}
+
+uint64_t Catalog::GetTTL() const {
+  const string sql = "SELECT value FROM properties WHERE key='TTL';";
+  SqlStatement stmt(database(), sql);
+  
+  return (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : kDefaultTTL;
+}
+
+uint64_t Catalog::GetRevision() const {
+  const string sql = "SELECT value FROM properties WHERE key='revision';";
+  SqlStatement stmt(database(), sql);
+  
+  return (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
 }
 
 } // namespace cvmfs

@@ -5,6 +5,10 @@
 #include <string>
 #include <sstream>
 
+extern "C" {
+  #include "compression.h"
+}
+
 #include "WritableCatalog.h"
 #include "util.h"
 
@@ -116,7 +120,7 @@ bool WritableCatalogManager::GetCatalogByPath(const string &path, WritableCatalo
     return false;
   }
   
-  *result = (WritableCatalog*)catalog;
+  *result = static_cast<WritableCatalog*>(catalog);
   return true;
 }
 
@@ -342,6 +346,254 @@ bool WritableCatalogManager::PrecalculateListings() {
 }
 
 bool WritableCatalogManager::Commit() {
+  WritableCatalogList catalogs_to_snapshot;
+  GetCatalogsToSnapshot(catalogs_to_snapshot);
+  
+  WritableCatalogList::iterator i;
+  WritableCatalogList::const_iterator iend;
+  for (i = catalogs_to_snapshot.begin(), iend = catalogs_to_snapshot.end(); i != iend; ++i) {
+    SnapshotCatalog(*i);
+  }
+  
+  return true;
+}
+
+int WritableCatalogManager::GetCatalogsToSnapshotRecursively(const Catalog *catalog, WritableCatalogList &result) const {
+  // a catalog must be snapshot, if itself or one of it's descendants is dirty
+  // meaning: go through the catalog tree recursively and look
+  //          for dirty catalogs on the way.
+  
+  // this variable will contain the number of dirty catalogs in the sub tree
+  // with *catalog as it's root.
+  const WritableCatalog *wr_catalog = static_cast<const WritableCatalog*>(catalog);
+  int dirty_catalogs = (wr_catalog->IsDirty()) ? 1 : 0;
+  
+  // look for dirty catalogs in the descendants of *catalog
+  CatalogList::const_iterator i,iend;
+  for (i = wr_catalog->children().begin(), iend = wr_catalog->children().end(); i != iend; ++i) {
+    dirty_catalogs += GetCatalogsToSnapshotRecursively(*i, result);
+  }
+
+  // if we found a dirty catalog in the checked sub tree, the root (*catalog)
+  // must be snapshot and ends up in the result list
+  if (dirty_catalogs > 0) {
+    result.push_back(const_cast<WritableCatalog*>(wr_catalog));
+  }
+  
+  // tell the upper layer about our findings
+  return dirty_catalogs;
+}
+
+bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
+  
+  // TODO: this method needs a revision!!
+  //       I (René) don't understand all bits and pieces of this stuff
+  //       and just adapted it to work in this environment.
+  //       It might be useful if a WritableCatalog is capable of doing
+  //       most of the stuff going on here. Especially the parent-
+  //       catalog bookkeeping.
+  
+  // TODO: We are creating a variety of files here, which are probably
+  //       read somewhere else in the client. It seems important to me,
+  //       to aggregate the knowledge of this file intrinsics in one place!
+  
+  // TODO: The mechanics around the data store might also be a candidate for
+  //       refactoring... the knowledge about on disk handling of catalogs
+  //       does definitely not belong in this class structure!
+  
+  cout << "creating snapshot of catalog '" << catalog->path() << "'" << endl;
+
+	const string clg_path = catalog->path();
+	const string cat_path = (clg_path.empty()) ? 
+	                            catalog_directory_ :
+                              catalog_directory_ + clg_path;
+
+	/* Data symlink, whitelist symlink */  
+	string backlink = "../";
+	string parent = get_parent_path(cat_path);
+	while (parent != get_parent_path(data_directory_)) {
+		if (parent == "") {
+			printWarning("cannot find data dir");
+			break;
+		}
+		parent = get_parent_path(parent);
+		backlink += "../";
+	}
+   
+	const string lnk_path_data = cat_path + "/data";
+	const string lnk_path_whitelist = cat_path + "/.cvmfswhitelist";
+	const string backlink_data = backlink + get_file_name(data_directory_);
+	const string backlink_whitelist = backlink + get_file_name(catalog_directory_) + "/.cvmfswhitelist";
+
+	PortableStat64 info;
+	if (portableLinkStat64(lnk_path_data.c_str(), &info) != 0) 
+	{
+		if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
+			printWarning("cannot create catalog store -> data store symlink");
+		}
+	}
+	
+	/* Don't make the symlink for the root catalog */
+	if ((portableLinkStat64(lnk_path_whitelist.c_str(), &info) != 0) && (get_parent_path(cat_path) != get_parent_path(data_directory_)))
+	{
+		if (symlink(backlink_whitelist.c_str(), lnk_path_whitelist.c_str()) != 0) {
+			printWarning("cannot create whitelist symlink");
+		}
+	}
+
+	/* Last-modified time stamp */
+	// TODO: revision hint!
+	//       do this inside the catalog (make UpdateLastModified private)
+	if (not catalog->UpdateLastModified()) {
+		printWarning("failed to update last modified time stamp");
+	}
+	
+	/* Current revision */
+	// TODO: revision hint!
+	//       do this inside the catalog (make IncrementRevision private)
+	if (not catalog->IncrementRevision()) {
+		printWarning("failed to increase revision");
+	}
+	
+	/* Previous revision */
+	map<char, string> ext_chksum;
+	if (parse_keyval(cat_path + "/.cvmfspublished", ext_chksum)) {
+		map<char, string>::const_iterator i = ext_chksum.find('C');
+		if (i != ext_chksum.end()) {
+			hash::t_sha1 sha1_previous;
+			sha1_previous.from_hash_str(i->second);
+			
+    	// TODO: revision hint!
+    	//       do this inside the catalog (make SetPreviousRevision private)
+			if (not catalog->SetPreviousRevision(sha1_previous)) {
+				stringstream ss;
+				ss << "failed store previous catalog revision " << sha1_previous.to_string();
+				printWarning(ss.str());
+			}
+		} else {
+			printWarning("failed to find catalog SHA1 key in .cvmfspublished");
+		}
+	}
+
+	/* Compress catalog */
+	const string src_path = cat_path + "/.cvmfscatalog.working";
+	const string dst_path = data_directory_ + "/txn/compressing.catalog";
+	//const string dst_path = cat_path + "/.cvmfscatalog";
+	hash::t_sha1 sha1;
+	FILE *fsrc = NULL, *fdst = NULL;
+	int fd_dst;
+	
+	if (!(fsrc = fopen(src_path.c_str(), "r"))) {
+    cerr << "cannot open " << src_path << " for reading" << endl;
+	}
+	
+	if ((fd_dst = open(dst_path.c_str(), O_CREAT | O_TRUNC | O_RDWR, plain_file_mode)) < 0) {
+    cerr << "cannot open " << dst_path << " for writing" << endl;
+	}
+	
+	if (!(fdst = fdopen(fd_dst, "w"))) {
+    cerr << "cannot open file descriptor fd_dst for writing" << endl; 
+	}
+	
+	if (compress_file_fp_sha1(fsrc, fdst, sha1.digest) != 0)
+	{
+		stringstream ss;
+		ss << "could not compress catalog '" << src_path << "'";
+		printWarning(ss.str());
+
+	} else {
+		const string sha1str = sha1.to_string();
+		const string hash_name = sha1str.substr(0, 2) + "/" + sha1str.substr(2) + "C";
+		const string cache_path = data_directory_ + "/" + hash_name;
+		if (rename(dst_path.c_str(), cache_path.c_str()) != 0) {
+			stringstream ss;
+			ss << "could not store catalog in data store as " << cache_path;
+			printWarning(ss.str());
+		}
+		const string entry_path = cat_path + "/.cvmfscatalog"; 
+		unlink(entry_path.c_str());
+		if (symlink(("data/" + hash_name).c_str(), entry_path.c_str()) != 0) {
+			stringstream ss;
+			ss << "could not create symlink to catalog " << cache_path;
+			printWarning(ss.str());
+		}
+	}
+	if (fsrc) fclose(fsrc);
+	if (fdst) fclose(fdst);
+
+	/* Remove pending certificate */
+	unlink((cat_path + "/.cvmfspublisher.x509").c_str());   
+
+	/* Create extended checksum */
+	FILE *fpublished = fopen((cat_path + "/.cvmfspublished").c_str(), "w");
+	if (fpublished) {
+		string fields = "C" + sha1.to_string() + "\n";
+		fields += "R" + hash::t_md5(clg_path).to_string() + "\n";
+
+		/* Mucro catalogs */
+		DirectoryEntry d;
+		if (not catalog->Lookup(catalog->path(), &d)) {
+			printWarning("failed to find root entry");
+		}
+		fields += "L" + d.checksum().to_string() + "\n";
+		const uint64_t ttl = catalog->GetTTL();
+		ostringstream strm_ttl;
+		strm_ttl << ttl;
+		fields += "D" + strm_ttl.str() + "\n";
+
+		/* Revision */
+		ostringstream strm_revision;
+		strm_revision << catalog->GetRevision();
+		fields += "S" + strm_revision.str() + "\n";
+
+		if (fwrite(&(fields[0]), 1, fields.length(), fpublished) != fields.length()) {
+			printWarning("failed to write extended checksum");
+		}
+		fclose(fpublished);
+		
+	} else {
+		printWarning("failed to write extended checksum");
+	}
+   
+	/* Update registered catalog SHA1 in nested catalog */
+	// TODO: revision hint
+	//       this might be done implicitly when snapshoting a nested catalog
+	//       Catalogs know about their parent catalog!
+	if (not catalog->IsRoot()) {
+		cout << "updating nested catalog link" << endl;
+		
+		// TODO: this is fishy! but I leave it this way for the moment
+		//       (dynamic_cast<> at least dies, if something goes wrong)
+		if (not dynamic_cast<WritableCatalog*>(catalog->parent())->UpdateNestedCatalogLink(clg_path, sha1)) {
+			stringstream ss;
+			ss << "failed to register modified catalog at " << clg_path << " in parent catalog";
+			printWarning(ss.str());
+		}
+	}
+
+	/* Compress and write SHA1 checksum */
+	char chksum[40];
+	int lchksum = 40;
+	memcpy(chksum, &((sha1.to_string())[0]), 40);
+	void *compr_buf = NULL;
+	size_t compr_size;
+	if (compress_mem(chksum, lchksum, &compr_buf, &compr_size) != 0) {
+		printWarning("could not compress catalog checksum");
+	}
+
+	FILE *fsha1 = NULL;
+	int fd_sha1;
+	if (((fd_sha1 = open((cat_path + "/.cvmfschecksum").c_str(), O_CREAT | O_TRUNC | O_RDWR, plain_file_mode)) < 0) ||
+		!(fsha1 = fdopen(fd_sha1, "w")) ||
+		(fwrite(compr_buf, 1, compr_size, fsha1) != compr_size))
+	{			
+		stringstream ss;
+		ss << "could not store checksum at " << cat_path;
+		printWarning(ss.str());
+	}
+
+	if (fsha1) fclose(fsha1);
+	if (compr_buf) free(compr_buf);
   
   return true;
 }

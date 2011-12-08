@@ -73,6 +73,32 @@ class WritableCatalog : public Catalog {
   int GetMaximalHardlinkGroupId() const;
   
   /**
+   *  sets the last modified time stamp of this catalog
+   *  @return true on success, false otherwise
+   */
+  bool UpdateLastModified();
+  
+  /**
+   *  increments the revision of the catalog in the database
+   *  @return true on success, false otherwise
+   */
+  bool IncrementRevision();
+  
+  /**
+   *  sets the SHA1 content hash of the previous catalog revision
+   *  @return true on success, false otherwise
+   */
+  bool SetPreviousRevision(const hash::t_sha1 &hash);
+  
+  /**
+   *  updates the link to a nested catalog in the database
+   *  @param path the path of the nested catalog to update
+   *  @param hash the hash to set the given nested catalog link to
+   *  @return true on success, false otherwise
+   */
+  bool UpdateNestedCatalogLink(const std::string &path, const hash::t_sha1 &hash);
+  
+  /**
    *  static method to create a new database file and initialize the
    *  database schema in it
    *  @param file_path the absolute location the file should end up in
@@ -115,18 +141,24 @@ class WritableCatalog : public Catalog {
    *  @param file_path the absolute path to the file to create
    *  @return true on success, false otherwise
    */
-  static bool CreateNewDatabaseSchema(const std::string &file_path);
-  inline void SetDirty() { dirty_ = true; }
+  static bool CreateNewDatabaseSchema(const std::string &file_path);   
+  
+  /**
+   *  mark this catalog as dirty
+   *  meaning: something changed in this catalog, it definitely needs a new snapshot
+   */
+  inline void SetDirty() { dirty_ = true; }      
   
  private:
   InsertDirectoryEntrySqlStatement *insert_statement_;
   TouchSqlStatement *touch_statement_;
   UnlinkSqlStatement *unlink_statement_;
   GetMaximalHardlinkGroupIdStatement *max_hardlink_group_id_statement_;
-  
-  bool dirty_;
-  
+                                                    
+  bool dirty_;                     
 };
+
+typedef std::list<WritableCatalog*> WritableCatalogList;
 
 }
 
