@@ -23,7 +23,7 @@
  * jakob.blomer@cern.ch
  */
  
-#define ENOATTR ENODATA /* instead including attr/xattr.h */
+#define ENOATTR ENODATA /* instead of including attr/xattr.h */
 
 #include "cvmfs_config.h"
 
