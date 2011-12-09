@@ -1,5 +1,5 @@
-#ifndef CVMFS_H
-#define CVMFS_H 1
+#ifndef CVMFS_CVMFS_H_
+#define CVMFS_CVMFS_H_
 
 #include <string>
 #include <vector>
@@ -14,11 +14,11 @@ namespace cvmfs {
    extern std::string mountpoint;
    extern int max_cache_timeout;
    int catalog_cache_memusage_bytes();
-   void catalog_cache_memusage_slots(int &positive, int &negative, int &all,
-                                     int &inserts, int &replaces, int &cleans, int &hits, int &misses,
-                                     int &cert_hits, int &cert_misses);
-   void info_loaded_catalogs(std::vector<std::string> &prefix, std::vector<time_t> &last_modified, 
-                             std::vector<time_t> &expires, std::vector<unsigned int> &inode_offsets);
+   void catalog_cache_memusage_slots(int *positive, int *negative, int *all,
+                                     int *inserts, int *replaces, int *cleans, int *hits, int *misses,
+                                     int *cert_hits, int *cert_misses);
+   void info_loaded_catalogs(std::vector<std::string> *prefix, std::vector<time_t> *last_modified,
+                             std::vector<time_t> *expires, std::vector<unsigned int> *inode_offsets);
    int clear_file(const std::string &path);
    int remount();
    unsigned get_max_ttl(); /* in minutes */
@@ -26,4 +26,4 @@ namespace cvmfs {
 }
 
 
-#endif
+#endif // CVMFS_CVMFS_H_
