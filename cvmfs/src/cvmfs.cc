@@ -15,12 +15,9 @@
  * This preparation of directories is transparent to web servers and
  * web proxies.  They just serve static content, i.e. arbitrary files.
  * Any HTTP server should do the job.  We use Apache + Squid.  Serving
- * files from the memory of a web proxy brings significant performance
+ * files from the memory of a web proxy brings a significant performance
  * improvement.
- *  
  *
- * Developed by Jakob Blomer 2009 at CERN
- * jakob.blomer@cern.ch
  */
  
 #define ENOATTR ENODATA /* instead of including attr/xattr.h */
@@ -1704,7 +1701,7 @@ int main(int argc, char *argv[])
    {
       usage(argv[0]);
       goto cvmfs_cleanup;
-	return 1;
+   return 1;
    }
 	
    
