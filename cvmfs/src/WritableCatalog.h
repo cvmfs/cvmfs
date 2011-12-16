@@ -16,6 +16,7 @@
 
 #include "Catalog.h"
 
+#include <list>
 #include <string>
 
 namespace cvmfs {
@@ -97,6 +98,11 @@ class WritableCatalog : public Catalog {
    *  @return true on success, false otherwise
    */
   bool UpdateNestedCatalogLink(const std::string &path, const hash::t_sha1 &hash);
+
+   /**
+    *  TODO: document this
+    */
+   bool SplitContentIntoNewNestedCatalog(WritableCatalog *new_nested_catalog);
   
   /**
    *  static method to create a new database file and initialize the
@@ -110,7 +116,28 @@ class WritableCatalog : public Catalog {
    */
   static bool CreateNewCatalogDatabase(const std::string &file_path, 
                                        const DirectoryEntry &root_entry,
-                                       const std::string &root_entry_parent_path);
+                                       const std::string &root_entry_parent_path,
+                                       const bool root_catalog);
+                                        
+  /**
+  *  insert a nested catalog reference to this catalog
+  *  you can specify the attached catalog object of this mountpoint to
+  *  also update the in-memory representation of the catalog tree
+  *  @param mountpoint the path to the catalog to add a reference to
+  *  @param attached_reference can contain a reference to the attached catalog object of mountpoint
+  *  @return true on success, false otherwise
+  */
+  bool InsertNestedCatalogReference(const std::string &mountpoint, Catalog *attached_reference = NULL);
+
+  /**
+  *  remove a nested catalog reference from the database
+  *  if the catalog 'mountpoint' is currently attached as a child, it will be removed (but not detached)
+  *  though you can catch the object through the second parameter (i.e. pass it to InsertNestedCatalogReference)
+  *  @param[in] mountpoint the mountpoint of the nested catalog to dereference in the database
+  *  @param[out] attached_reference is set to the object of the attached child or to NULL
+  *  @return true on success, false otherwise
+  */
+  bool RemoveNestedCatalogReference(const std::string &mountpoint, Catalog **attached_reference = NULL);
   
  protected:
   /**
@@ -132,6 +159,16 @@ class WritableCatalog : public Catalog {
                 const hash::t_md5 &path_hash, 
                 const hash::t_md5 &parent_hash);
   
+  inline bool AddEntry(const DirectoryEntry &entry,
+                       const std::string &path) {
+    return AddEntry(entry, hash::t_md5(path), hash::t_md5(get_parent_path(path)));
+  }
+  
+  bool UpdateEntry(const DirectoryEntry &entry, const hash::t_md5 &path_hash);
+  inline bool UpdateEntry(const DirectoryEntry &entry, const std::string &path) {
+    return UpdateEntry(entry, hash::t_md5(path));
+  }
+  
   void InitPreparedStatements();
   void FinalizePreparedStatements();
   
@@ -141,18 +178,32 @@ class WritableCatalog : public Catalog {
    *  @param file_path the absolute path to the file to create
    *  @return true on success, false otherwise
    */
-  static bool CreateNewDatabaseSchema(const std::string &file_path);   
+  static bool CreateNewDatabaseSchema(const std::string &file_path);
+  
+  bool MakeNestedCatalogMountpoint(const std::string &mountpoint);
+  bool MakeNestedCatalogRootEntry();
+  inline bool MoveDirectoryStructureToNewNestedCatalog(const std::string dir_structure_root,
+                                                       WritableCatalog *new_nested_catalog,
+                                                       std::list<std::string> &nested_catalog_mountpoints) {
+    return MoveDirectoryStructureToNewNestedCatalogRecursively(dir_structure_root, new_nested_catalog, nested_catalog_mountpoints);
+  }
+  bool MoveDirectoryStructureToNewNestedCatalogRecursively(const std::string dir_structure_root,
+                                                           WritableCatalog *new_nested_catalog,
+                                                           std::list<std::string> &nested_catalog_mountpoints);
+  bool MoveNestedCatalogReferencesToNewNestedCatalog(const std::list<std::string> &nested_catalog_references,
+                                                     WritableCatalog *new_nested_catalog);
   
   /**
    *  mark this catalog as dirty
    *  meaning: something changed in this catalog, it definitely needs a new snapshot
    */
-  inline void SetDirty() { dirty_ = true; }      
+  inline void SetDirty() { dirty_ = true; }
   
  private:
-  InsertDirectoryEntrySqlStatement *insert_statement_;
-  TouchSqlStatement *touch_statement_;
-  UnlinkSqlStatement *unlink_statement_;
+  InsertDirectoryEntrySqlStatement   *insert_statement_;
+  TouchSqlStatement                  *touch_statement_;
+  UnlinkSqlStatement                 *unlink_statement_;
+  UpdateDirectoryEntrySqlStatement   *update_statement_;
   GetMaximalHardlinkGroupIdStatement *max_hardlink_group_id_statement_;
                                                     
   bool dirty_;                     

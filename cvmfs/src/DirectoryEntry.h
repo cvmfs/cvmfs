@@ -19,9 +19,9 @@ class Catalog;
 typedef uint64_t inode_t;
 
 class DirectoryEntry {
-  friend class LookupSqlStatement;               // simplify creation of DirectoryEntry objects
-  friend class InsertDirectoryEntrySqlStatement; // simplify write back of DirectoryEntry objects
-  friend class WritableCatalogManager;           // simplify creation of DirectoryEntry objects for write back        
+  friend class LookupSqlStatement;                   // simplify creation of DirectoryEntry objects
+  friend class ManipulateDirectoryEntrySqlStatement; // simplify write of DirectoryEntry objects in database
+  friend class WritableCatalogManager;               // simplify creation of DirectoryEntry objects for write back        
   
  public:
   const static inode_t kInvalidInode = 0;
@@ -86,10 +86,12 @@ class DirectoryEntry {
   }
   
   // these accessors are accessible from outside but should be used with extreme caution!
-  // (With great power comes huge responsibility!!)
+  // (With great powers comes huge responsibility!!)
   inline void set_inode(const inode_t inode) { inode_ = inode; }
   inline const Catalog* catalog() const { return catalog_; }
   inline void set_parent_inode(const inode_t parent_inode) { parent_inode_ = parent_inode; }
+  inline void set_is_nested_catalog_mountpoint(const bool val) { is_nested_catalog_mountpoint_ = val; }
+  inline void set_is_nested_catalog_root(const bool val) { is_nested_catalog_root_ = val; }
   
  private:
   // associated cvmfs catalog

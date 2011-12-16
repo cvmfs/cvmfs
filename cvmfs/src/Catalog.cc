@@ -84,27 +84,23 @@ void Catalog::FinalizePreparedStatements() {
 }
 
 void Catalog::AddChild(Catalog *child) {
-  LOCKED_SCOPE;
-  
   children_.push_back(child);
+  child->set_parent(this);
 }
 
 void Catalog::RemoveChild(const Catalog *child) {
-  LOCKED_SCOPE;
-  
   CatalogList::iterator i;
   CatalogList::const_iterator end;
   for (i = children_.begin(), end = children_.end(); i != end; ++i) {
     if (*i == child) {
       children_.erase(i);
+      (*i)->set_parent(NULL);
       break;
     }
   }
 }
 
 CatalogList Catalog::GetChildrenRecursively() const {
-  LOCKED_SCOPE;
-  
   CatalogList result = children_;
   
   CatalogList::const_iterator i, end;
@@ -123,8 +119,6 @@ bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *pa
   uint64_t row_id = GetRowIdFromInode(inode);
   
   {
-    LOCKED_SCOPE;
-
     // do the actual lookup
     inode_lookup_statement_->BindRowId(row_id);
     found = inode_lookup_statement_->FetchRow();
@@ -142,8 +136,6 @@ bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *pa
 }
 
 bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const {
-  LOCKED_SCOPE;
-  
   assert (IsInitialized());
 
   path_hash_lookup_statement_->BindPathHash(path_hash);
@@ -158,8 +150,6 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const 
 }
 
 bool Catalog::Listing(const inode_t inode, DirectoryEntryList *listing) const {
-  LOCKED_SCOPE;
-  
   assert (IsInitialized());
 
   assert (false); // TODO: currently not implemented (not needed though)
@@ -167,8 +157,6 @@ bool Catalog::Listing(const inode_t inode, DirectoryEntryList *listing) const {
 }
 
 bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing) const {
-  LOCKED_SCOPE;
-  
   assert (IsInitialized());
 
   listing_statement_->BindPathHash(path_hash);
@@ -235,6 +223,17 @@ uint64_t Catalog::GetRevision() const {
   SqlStatement stmt(database(), sql);
   
   return (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
+}
+
+Catalog* Catalog::FindChildWithMountpoint(const std::string &mountpoint) const {
+  CatalogList::const_iterator i,iend;
+  for (i = children_.begin(), iend = children_.end(); i != iend; ++i) {
+    if ((*i)->path() == mountpoint) {
+      return *i;
+    }
+  }
+  
+  return NULL;
 }
 
 } // namespace cvmfs

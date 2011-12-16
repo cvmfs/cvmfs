@@ -97,6 +97,33 @@ std::string DirectoryEntrySqlStatement::ExpandSymlink(const std::string raw_syml
 // ###########################################################################
 //
 
+bool ManipulateDirectoryEntrySqlStatement::BindDirectoryEntryFields(const int hash_field,
+                                                                    const int inode_field,
+                                                                    const int size_field,
+                                                                    const int mode_field,
+                                                                    const int mtime_field,
+                                                                    const int flags_field,
+                                                                    const int name_field,
+                                                                    const int symlink_field,
+                                                                    const DirectoryEntry &entry) {
+  return (
+    BindSha1Hash( hash_field,    entry.checksum_) &&
+    BindInt64(    inode_field,   entry.hardlink_group_id_) && // quirky database layout here ( legacy ;-) )
+    BindInt64(    size_field,    entry.size_) &&
+    BindInt(      mode_field,    entry.mode_) &&
+    BindInt64(    mtime_field,   entry.mtime_) &&
+    BindInt(      flags_field,   CreateDatabaseFlags(entry)) &&
+    BindText(     name_field,    entry.name_) &&
+    BindText(     symlink_field, entry.symlink_)
+  );
+}
+
+//
+// ###########################################################################
+// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+// ###########################################################################
+//
+
 std::string LookupSqlStatement::GetFieldsToSelect() const {
   return "hash, inode, size, mode, mtime, flags, name, symlink, md5path_1, md5path_2, parent_1, parent_2, rowid";
       //    0     1      2     3     4      5      6      7        8          9           10        11       12
@@ -230,16 +257,31 @@ bool InsertDirectoryEntrySqlStatement::BindParentPathHash(const hash::t_md5 &has
 }
 
 bool InsertDirectoryEntrySqlStatement::BindDirectoryEntry(const DirectoryEntry &entry) {
-  return (
-    BindSha1Hash(5, entry.checksum_) &&
-    BindInt64(6, entry.hardlink_group_id_) && // quirky database layout here ( legacy ;-) )
-    BindInt64(7, entry.size_) &&
-    BindInt(8, entry.mode_) &&
-    BindInt64(9, entry.mtime_) &&
-    BindInt(10, CreateDatabaseFlags(entry)) &&
-    BindText(11, &entry.name_[0], entry.name_.length(), SQLITE_STATIC) &&
-    BindText(12, &entry.symlink_[0], entry.symlink_.length(), SQLITE_STATIC)
-  );
+  return BindDirectoryEntryFields(5,6,7,8,9,10,11,12, entry);
+}
+
+//
+// ###########################################################################
+// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+// ###########################################################################
+//
+
+UpdateDirectoryEntrySqlStatement::UpdateDirectoryEntrySqlStatement(const sqlite3 *database) {
+  Init(database, "UPDATE catalog "
+                 //            1             2             3               4
+                 "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
+                 //          5             6                  7                8
+                 "flags = :flags, name = :name, symlink = :symlink, inode = :inode "
+                 //                     9                        10
+                 "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
+}
+
+bool UpdateDirectoryEntrySqlStatement::BindPathHash(const hash::t_md5 &hash) {
+  return BindMd5Hash(9, 10, hash);
+}
+
+bool UpdateDirectoryEntrySqlStatement::BindDirectoryEntry(const DirectoryEntry &entry) {
+  return BindDirectoryEntryFields(1,8,2,3,4,5,6,7, entry);
 }
 
 //

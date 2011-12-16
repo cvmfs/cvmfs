@@ -8,34 +8,38 @@ namespace cvmfs {
   
 bool WritableCatalog::CreateNewCatalogDatabase(const std::string &file_path,
                                                const DirectoryEntry &root_entry,
-                                               const std::string &root_entry_parent_path) {
+                                               const std::string &root_entry_parent_path,
+                                               const bool root_catalog) {
   // create database schema for new catalog
   if (not WritableCatalog::CreateNewDatabaseSchema(file_path)) {
     pmesg(D_CATALOG, "failed to create database schema for new catalog '%s'", file_path.c_str());
     return false;
   }
+
+  // configure the root entry
+  hash::t_md5 path_hash;
+  hash::t_md5 parent_hash;
+  string root_path;
+  if (root_catalog) {
+    root_path = root_entry.name();
+    path_hash = hash::t_md5(root_path);
+    parent_hash = hash::t_md5();
+  } else {
+    root_path = root_entry_parent_path + "/" + root_entry.name();
+    path_hash = hash::t_md5(root_path);
+    parent_hash = hash::t_md5(root_entry_parent_path);
+  }
   
-  // open the new catalog to insert the root entry
-  pmesg(D_CATALOG, "inserting root entry into new catalog");
-  WritableCatalog *new_catalog = new WritableCatalog(root_entry_parent_path, NULL);
+  // open the new catalog temporarily to insert the root entry
+  // we do not specify the parent directory here!
+  WritableCatalog *new_catalog = new WritableCatalog(root_path, NULL);
   if (not new_catalog->OpenDatabase(file_path)) {
     pmesg(D_CATALOG, "opening new catalog '%s' for the first time failed.", file_path.c_str());
     return false;
   }
   
-  // configure the root entry
-  // (if root_entry_parent_path == "" we assume it to be the ACTUAL root entry of the file system)
-  hash::t_md5 path_hash;
-  hash::t_md5 parent_hash;
-  if (root_entry_parent_path == "") {
-    path_hash = hash::t_md5(root_entry.name());
-    parent_hash = hash::t_md5();
-  } else {
-    path_hash = hash::t_md5(root_entry_parent_path + "/" + root_entry.name());
-    parent_hash = hash::t_md5(root_entry_parent_path);
-  }
-  
   // add the root entry to the new catalog
+  pmesg(D_CATALOG, "inserting root entry '%s' into new catalog '%s'", root_path.c_str(), new_catalog->path().c_str());
   if (not new_catalog->AddEntry(root_entry, path_hash, parent_hash)) {
     pmesg(D_CATALOG, "inserting root entry in new catalog '%s' failed", file_path.c_str());
     return false;
@@ -50,6 +54,12 @@ bool WritableCatalog::CreateNewCatalogDatabase(const std::string &file_path,
 bool WritableCatalog::CreateNewDatabaseSchema(const std::string &file_path) {
   sqlite3 *database;
   int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
+  
+  // create the directory structure for this catalog
+  if (not mkdir_deep(get_parent_path(file_path), plain_dir_mode)) {
+    pmesg(D_CATALOG, "cannot create pseudo directory structure for new nested catalog database file '%s'", file_path.c_str());
+    return false;
+  }
   
   // create the new catalog file and open it
   pmesg(D_CATALOG, "creating new catalog at '%s'", file_path.c_str());
@@ -123,6 +133,7 @@ void WritableCatalog::InitPreparedStatements() {
   insert_statement_                = new InsertDirectoryEntrySqlStatement(database());
   touch_statement_                 = new TouchSqlStatement(database());
   unlink_statement_                = new UnlinkSqlStatement(database());
+  update_statement_                = new UpdateDirectoryEntrySqlStatement(database());
   max_hardlink_group_id_statement_ = new GetMaximalHardlinkGroupIdStatement(database());
 }
 
@@ -132,11 +143,11 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete insert_statement_;
   delete touch_statement_;
   delete unlink_statement_;
+  delete update_statement_;
   delete max_hardlink_group_id_statement_;
 }
 
 int WritableCatalog::GetMaximalHardlinkGroupId() const {
-  LOCKED_SCOPE;
   int result = -1;
   
   if (max_hardlink_group_id_statement_->FetchRow()) {
@@ -170,7 +181,6 @@ bool WritableCatalog::CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
 bool WritableCatalog::AddEntry(const DirectoryEntry &entry, 
                                const hash::t_md5 &path_hash, 
                                const hash::t_md5 &parent_hash) {
-  LOCKED_SCOPE;
   SetDirty();
   
   // perform a add operation for the given directory entry
@@ -187,7 +197,6 @@ bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
 }
 
 bool WritableCatalog::TouchEntry(const string &entry_path, const time_t timestamp) {
-  LOCKED_SCOPE;
   SetDirty();
 
   // perform a touch operation for the given path
@@ -203,7 +212,6 @@ bool WritableCatalog::TouchEntry(const string &entry_path, const time_t timestam
 }
 
 bool WritableCatalog::RemoveEntry(const string &file_path) {
-  LOCKED_SCOPE;
   SetDirty();
   
   // perform a delete operation for the given path
@@ -214,6 +222,21 @@ bool WritableCatalog::RemoveEntry(const string &file_path) {
   );
   
   unlink_statement_->Reset();
+  
+  return result;
+}
+
+bool WritableCatalog::UpdateEntry(const DirectoryEntry &entry, const hash::t_md5 &path_hash) {
+  SetDirty();
+  
+  // perform the update operation
+  bool result = (
+    update_statement_->BindPathHash(path_hash) &&
+    update_statement_->BindDirectoryEntry(entry) &&
+    update_statement_->Execute()
+  );
+  
+  update_statement_->Reset();
   
   return result;
 }
@@ -238,6 +261,185 @@ bool WritableCatalog::SetPreviousRevision(const hash::t_sha1 &hash) {
    return SqlStatement(database(), sql.str()).Execute();
 }
 
+bool WritableCatalog::SplitContentIntoNewNestedCatalog(WritableCatalog *new_nested_catalog) {
+  // create connection between parent and child catalogs
+  if (not MakeNestedCatalogMountpoint(new_nested_catalog->path())) {
+    pmesg(D_CATALOG, "failed to create nested catalog mountpoint in catalog '%s'", path().c_str());
+    return false;
+  }
+  if (not new_nested_catalog->MakeNestedCatalogRootEntry()) {
+    pmesg(D_CATALOG, "failed to create nested catalog root entry in new nested catalog '%s'", new_nested_catalog->path().c_str());
+    return false;
+  }
+  
+  // move the present directory tree into the newly created nested catalog
+  // if we hit nested catalog mountpoints on the way, we return them through
+  // the passed list
+  list<string> nestedNestedCatalogMountpoints;
+  if (not MoveDirectoryStructureToNewNestedCatalog(new_nested_catalog->path(), 
+                                                   new_nested_catalog,
+                                                   nestedNestedCatalogMountpoints)) {
+    pmesg(D_CATALOG, "failed to move directory structure in '%s' to new nested catalog", new_nested_catalog->path().c_str());
+    return false;
+  }
+  
+  // nested catalog mountpoints found in the moved directory structure are now
+  // links to nested catalogs of the newly created nested catalog.
+  // move these references into the new nested catalog
+  if (not MoveNestedCatalogReferencesToNewNestedCatalog(nestedNestedCatalogMountpoints, new_nested_catalog)) {
+    pmesg(D_CATALOG, "failed to move nested catalog references into new nested catalog '%s'", new_nested_catalog->path().c_str());
+    return false;
+  }
+  
+  return true;
+}
+
+bool WritableCatalog::MakeNestedCatalogMountpoint(const string &mountpoint) {
+  // find the directory entry to edit
+  DirectoryEntry mnt_pnt_entry;
+  if (not Lookup(mountpoint, &mnt_pnt_entry)) {
+    return false;
+  }
+  
+  // sanity check
+  if (not mnt_pnt_entry.IsDirectory() || mnt_pnt_entry.IsNestedCatalogRoot()) {
+    return false;
+  }
+  
+  // mark this entry as nested catalog mountpoint
+  mnt_pnt_entry.set_is_nested_catalog_mountpoint(true);
+  
+  // write back
+  if (not UpdateEntry(mnt_pnt_entry, mountpoint)) {
+    return false;
+  }
+  
+  return true;
+}
+
+bool WritableCatalog::MakeNestedCatalogRootEntry() {
+  // retrieve the root entry of this catalog
+  DirectoryEntry root_entry;
+  if (not GetRootEntry(&root_entry)) {
+    pmesg(D_CATALOG, "no root entry found in catalog '%s'", path().c_str());
+    return false;
+  }
+  
+  // sanity checks
+  if (not root_entry.IsDirectory() || root_entry.IsNestedCatalogMountpoint()) {
+    pmesg(D_CATALOG, "root entry is not feasible for nested catalog '%s'", path().c_str());
+    return false;
+  }
+  
+  // mark this as a nested catalog root entry
+  root_entry.set_is_nested_catalog_root(true);
+  
+  // write back
+  if (not UpdateEntry(root_entry, path())) {
+    return false;
+  }
+  
+  return true;
+}
+
+bool WritableCatalog::MoveDirectoryStructureToNewNestedCatalogRecursively(const string dir_structure_root,
+                                                                          WritableCatalog *new_nested_catalog,
+                                                                          list<string> &nested_catalog_mountpoints) {
+  // after creating a new nested catalog we have move all elements
+  // now contained by the new one... list and move them recursively
+  DirectoryEntryList listing;
+  if (not Listing(dir_structure_root, &listing)) {
+    return false;
+  }
+  
+  // go through the listing
+  DirectoryEntryList::const_iterator i,iend;
+  string full_path;
+  for (i = listing.begin(), iend = listing.end(); i != iend; ++i) {
+    full_path = dir_structure_root + "/" + i->name();
+    
+    // the entries are first inserted into the new catalog
+    if (not new_nested_catalog->AddEntry(*i, full_path)) {
+      return false;
+    }
+    
+    // then we check if we have some special cases:
+    if (i->IsNestedCatalogMountpoint()) {
+      // nested catalogs mountpoints will be return through the variable and
+      // then processed later on
+      nested_catalog_mountpoints.push_back(full_path);
+    } else if (i->IsDirectory()) {
+      // recurse deeper into the catalog structure
+      if (not MoveDirectoryStructureToNewNestedCatalogRecursively(full_path,
+                                                                  new_nested_catalog,
+                                                                  nested_catalog_mountpoints)) {
+        return false;
+      }
+    }
+    
+    // after everything is done we delete the entry from the current catalog
+    if (not RemoveEntry(full_path)) {
+      return false;
+    }
+  }
+  
+  // all done...
+  return true;
+}
+bool WritableCatalog::MoveNestedCatalogReferencesToNewNestedCatalog(const list<string> &nested_catalog_references,
+                                                                    WritableCatalog *new_nested_catalog) {
+  list<string>::const_iterator i,iend;
+  for (i = nested_catalog_references.begin(), iend = nested_catalog_references.end(); i != iend; ++i) {
+    Catalog *attached_reference = NULL;
+    if (not this->RemoveNestedCatalogReference(*i, &attached_reference)) {
+      return false;
+    }
+    
+    if (not new_nested_catalog->InsertNestedCatalogReference(*i, attached_reference)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+bool WritableCatalog::InsertNestedCatalogReference(const string &mountpoint, Catalog *attached_reference) {
+  // doing the SQL statement
+  SqlStatement stmt(database(), "INSERT INTO nested_catalogs (path) VALUES (:p);");
+  bool successful = (
+    stmt.BindText(1, mountpoint) &&
+    stmt.Execute()
+  );
+  
+  // if we got passed a reference of the in-memory object of the newly referenced
+  // catalog, we add this to our own children
+  if (successful && attached_reference != NULL) {
+    this->AddChild(attached_reference);
+  }
+  
+  return successful;
+}
+
+bool WritableCatalog::RemoveNestedCatalogReference(const string &mountpoint, Catalog **attached_reference) {
+  // remove the nested catalog from the database
+  SqlStatement stmt(database(), "DELETE FROM nested_catalogs WHERE path = :p;");
+  bool successful = (
+    stmt.BindText(1, mountpoint) &&
+    stmt.Execute()
+  );
+  
+  // if the reference was successfully deleted, we also have to check,
+  // if there is also an attached reference in our in-memory data.
+  // in this case we remove the child and return it through **attached_reference
+  if (successful) {
+    Catalog *child = FindChildWithMountpoint(mountpoint);
+    if (child != NULL) this->RemoveChild(child);
+    if (attached_reference != NULL) *attached_reference = child;
+  }
+  
+  return successful;
+}
+
 bool WritableCatalog::UpdateNestedCatalogLink(const string &path,
                                               const hash::t_sha1 &hash) {
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 WHERE path = :path;";
@@ -245,7 +447,7 @@ bool WritableCatalog::UpdateNestedCatalogLink(const string &path,
 
   stmt.BindText(1, hash.to_string());
   stmt.BindText(2, path);
-  
+
   return stmt.Execute();
 }
 

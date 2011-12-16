@@ -32,10 +32,17 @@
 
 namespace cvmfs {
   
-class AbstractCatalogManager : public ThreadSafeReadWrite {
+class AbstractCatalogManager {
  public:
   AbstractCatalogManager();
   virtual ~AbstractCatalogManager();
+  
+  // TODO: remove these stubs and replace them with actual locking
+  inline void ReadLock() const { }
+  inline void WriteLock() const { }
+  inline void Unlock() const { }
+  inline void UpgradeLock() const { Unlock(); WriteLock(); }
+  inline void DowngradeLock() const { Unlock(); ReadLock(); }
   
   /**
    *  Initializes the CatalogManager

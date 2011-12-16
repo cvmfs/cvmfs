@@ -1,3 +1,29 @@
+/**
+ *  This wrapper object implements a simple approach for a monitored object.
+ *  I.e. All method calls to the wrapped object are synchronized by a mutex.
+ *
+ *  This code is highly inspired by the paper:
+ *     Wrapping C++ Member Function Calls
+ *     by Bjarne Stroustrup
+ *
+ *  Usage:
+ *    Foo a;
+ *    Monitor<Foo> foo(a);
+ *    foo->f();
+ *
+ *  Or:
+ *    Monitor<Foo> foo(new Foo);
+ *    foo->f();
+ *
+ *  When passing a pointer to the Monitor, it will be freed automatically
+ *  by a simple reference counting approach.
+ *
+ *  In any case a Monitor will initialize a mutex, lock it before calling
+ *  f() and unlock it afterwards. This is done automatically.
+ *
+ *  written by René Meusel in Potsdam 2011
+ */
+
 #ifndef THREAD_SAFE_H
 #define THREAD_SAFE_H 1
 
@@ -5,82 +31,116 @@
 
 namespace cvmfs {
 
-/**
- *  base class for thread safe objects
- *  it implements a simple mutex mechanism to make sure the object
- *  is only accessed by one thread at a time
- *
- *  Usage:
- *    1. inherit from ThreadSafe
- *    2. use the macro LOCKED_SCOPE as _first_ statement in any critical scope
- *       i.e:  <method signature>() { LOCKED_SCOPE; doCrazyStuff(); return; }
- *             this will secure the whole method scope with the mutex lock
- *
- *    you can also use the protected methods Lock() and Unlock() for
- *    manual locking, but this is discouraged!
- */
-class ThreadSafeMutex {
- public:
-  ThreadSafeMutex();
-  virtual ~ThreadSafeMutex();
-  
- protected:
-  inline void Lock() { pthread_mutex_lock(&mutex_); }
-  inline void Unlock() { pthread_mutex_unlock(&mutex_); }
- 
- protected:
-  pthread_mutex_t mutex_;
-};
+template<class T> class Monitor;
 
-/**
- *  use this macro to mark scopes to secure by the mutex
- *  see also: the description of ThreadSafe
- */
-#define LOCKED_SCOPE LockGuard _guard_ = LockGuard((pthread_mutex_t *)&mutex_)
-
-/**
-*  simple mutex lock mechanism.
-*  create a stack object of LockGuard while passing the mutex to lock
-*  if the LockGuard runs out of scope (destructor called) it will
-*  unlock the mutex automatically
-*/
-class LockGuard {
+template<class T>
+class SuffixProxy {
  private:
+  T* p_;
   pthread_mutex_t *mutex_;
-
+  mutable bool own_;
+  
+  // usual creation
+  SuffixProxy(T* pp, pthread_mutex_t *mutexp) : 
+      p_(pp), 
+      mutex_(mutexp),
+      own_(true) {}
+  
+  // keep track of ownership
+  SuffixProxy(const SuffixProxy& a) :
+      p_(a.p_),
+      mutex_(a.mutex_),
+      own_(true) {
+    a.own_ = false;
+  }
+  
+  // prevent assignment of these objects
+  SuffixProxy& operator=(const SuffixProxy&);
+  
  public:
-  LockGuard(pthread_mutex_t *mutex_);
-  ~LockGuard();
+  template<class U> friend class Monitor;
+
+  ~SuffixProxy() {
+    if (own_) {
+      pthread_mutex_unlock(mutex_);
+    }
+  }
+  
+  T* operator->() {
+    return p_;
+  }
 };
 
-/**
- *  Use this class for objects which should be read and write lockable
- *  CAUTION!!
- *   - Up- and downgrading locks may introduce race conditions!
- *   - currently this type is not supported by the LockGuard
- *
- *  Usage: see ThreadSafeMutex, works exactly the same
- */
-class ThreadSafeReadWrite {
- public:
-  ThreadSafeReadWrite();
-  virtual ~ThreadSafeReadWrite();
-  
- protected:
-  inline void ReadLock() const { pthread_rwlock_rdlock((pthread_rwlock_t*)&read_write_lock_); }
-  inline void WriteLock() const { pthread_rwlock_wrlock((pthread_rwlock_t*)&read_write_lock_); }
-  inline void Unlock() const { pthread_rwlock_unlock((pthread_rwlock_t*)&read_write_lock_); }
-  
-  /**
-   *  to upgrade a lock we have to give away the read lock and acquire a write lock afterwards
-   *  this may introduce race conditions, as these two steps are not performed atomically
-   *  keep this in mind !!
-   */
-  inline void UpgradeLock() const { Unlock(); WriteLock(); }
-  inline void DowngradeLock() const { Unlock(); ReadLock(); }
+template<class T>
+class Monitor {
+ private:
+  T *p_;
+  int *owned_;
+  mutable bool ownership_;
+  pthread_mutex_t *mutex_;
   
  private:
-  pthread_rwlock_t read_write_lock_;
+  inline void Init() { 
+    owned_ = new int(1);
+    mutex_ = new pthread_mutex_t;
+    pthread_mutex_init(mutex_, NULL);
+  }
+   
+  inline void IncrementOwned() const {
+    ++*owned_;
+  }
+  
+  inline void DecrementOwned() const {
+    if (--*owned_ == 0) {
+      delete owned_;
+      pthread_mutex_destroy(mutex_);
+      
+      if(ownership_) {
+        delete p_;
+      }
+    }
+  }
+
+ public:
+  Monitor(T& x) :
+      p_(&x),
+      ownership_(false) {
+    Init();
+  }
+   
+  Monitor(T* pp) : 
+      p_(pp),
+      ownership_(true) {
+    Init();
+  }
+  
+  Monitor(const Monitor& a) :
+      p_(a.p_),
+      owned_(a.owned_),
+      ownership_(a.ownership_),
+      mutex_(a.mutex_) {
+    IncrementOwned();
+  }
+  
+  Monitor& operator=(const Monitor& a) {
+    a.IncrementOwned();
+    DecrementOwned();
+    p_ = a.p_;
+    owned_ = a.owned_;
+    ownership_ = a.ownership_;
+    mutex_ = a.mutex_;
+    return *this;
+  }
+  
+  ~Monitor() {
+    DecrementOwned();
+  }
+  
+  SuffixProxy<T> operator->() {
+    pthread_mutex_lock(mutex_);
+    return SuffixProxy<T>(p_, mutex_);
+  }
+  
 };
 
 }

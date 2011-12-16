@@ -310,6 +310,33 @@ class DirectoryEntrySqlStatement : public SqlStatement {
 // ###########################################################################
 //
 
+class ManipulateDirectoryEntrySqlStatement : public DirectoryEntrySqlStatement {
+ public:
+   /**
+    *  to bind a whole DirectoryEntry
+    *  @param entry the DirectoryEntry to bind in the SQL statement
+    *  @return true on success, false otherwise
+    */
+  virtual bool BindDirectoryEntry(const DirectoryEntry &entry) = 0;
+
+ protected:
+  bool BindDirectoryEntryFields(const int hash_field,
+                                const int inode_field,
+                                const int size_field,
+                                const int mode_field,
+                                const int mtime_field,
+                                const int flags_field,
+                                const int name_field,
+                                const int symlink_field,
+                                const DirectoryEntry &entry);
+};
+
+//
+// ###########################################################################
+// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+// ###########################################################################
+//
+
 class LookupSqlStatement : public DirectoryEntrySqlStatement {
  protected:
   /**
@@ -397,11 +424,24 @@ class FindNestedCatalogSqlStatement : public SqlStatement {
 // ###########################################################################
 //
 
-class InsertDirectoryEntrySqlStatement : public DirectoryEntrySqlStatement {
+class InsertDirectoryEntrySqlStatement : public ManipulateDirectoryEntrySqlStatement {
  public:
   InsertDirectoryEntrySqlStatement(const sqlite3 *database);
   bool BindPathHash(const hash::t_md5 &hash);
   bool BindParentPathHash(const hash::t_md5 &hash);
+  bool BindDirectoryEntry(const DirectoryEntry &entry);
+};
+
+//
+// ###########################################################################
+// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+// ###########################################################################
+//
+
+class UpdateDirectoryEntrySqlStatement : public ManipulateDirectoryEntrySqlStatement {
+ public:
+  UpdateDirectoryEntrySqlStatement(const sqlite3 *database);
+  bool BindPathHash(const hash::t_md5 &hash);
   bool BindDirectoryEntry(const DirectoryEntry &entry);
 };
 

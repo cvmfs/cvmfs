@@ -65,7 +65,12 @@ int WritableCatalogManager::LoadCatalogFile(const std::string &url_path,
   
   // check if the file exists
   // if not, the 'loading' fails
-  return (file_exists(*catalog_file)) ? 0 : -1;
+  if (not file_exists(*catalog_file)) {
+    pmesg(D_CATALOG, "failed to load catalog file: catalog file '%s' not found", catalog_file->c_str());
+    return -1;
+  }
+  
+  return 0;
 }
 
 Catalog* WritableCatalogManager::CreateCatalogStub(const std::string &mountpoint, Catalog *parent_catalog) const {
@@ -90,9 +95,11 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
   string root_entry_parent_path = "";
 
   // create the database schema and the inital root entry
+  const bool create_root_catalog = true;
   if (not WritableCatalog::CreateNewCatalogDatabase(file_path,
                                                     root_entry,
-                                                    root_entry_parent_path)) {
+                                                    root_entry_parent_path,
+                                                    create_root_catalog)) {
     pmesg(D_CATALOG, "creation of catalog '%s' failed", file_path.c_str());
     return false;
   }
@@ -107,6 +114,7 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
 }
 
 bool WritableCatalogManager::LoadAndAttachCatalogsRecursively() {
+  // TODO: implement me!
   
   return true;
 }
@@ -331,11 +339,69 @@ bool WritableCatalogManager::TouchEntry(DirEntry *entry) {
 }
 
 bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) {
+  const string nested_root_path = RelativeToCatalogPath(mountpoint);
+  
+  // find the catalog currently containing the directory structure, which 
+  // will be represented as a new nested catalog from now on
+  WritableCatalog *old_catalog = NULL;
+  if (not GetCatalogByPath(nested_root_path, &old_catalog)) {
+    pmesg(D_CATALOG, "failed to create nested catalog '%s': mountpoint was not found in current catalog structure", nested_root_path.c_str());
+    return false;
+  }
+  
+  // get the DirectoryEntry for the given path, this will serve as root
+  // entry for the nested catalog we are about to create
+  DirectoryEntry new_root_entry;
+  old_catalog->Lookup(nested_root_path, &new_root_entry);
+  
+  // create the database schema and the inital root entry
+  // for the new nested catalog
+  const string root_entry_parent_path = get_parent_path(nested_root_path);
+  const string database_file_path = GetCatalogFilenameForPath(nested_root_path);
+  const bool create_root_catalog = false;
+  if (not WritableCatalog::CreateNewCatalogDatabase(database_file_path,
+                                                    new_root_entry,
+                                                    root_entry_parent_path,
+                                                    create_root_catalog)) {
+    pmesg(D_CATALOG, "failed to create nested catalog '%s': database schema creation failed", nested_root_path.c_str());
+    return false;
+  }
+  
+  // attach the just created nested catalog
+  Catalog *new_catalog = NULL;
+  if (not LoadAndAttachCatalog(nested_root_path, old_catalog, &new_catalog)) {
+    pmesg(D_CATALOG, "failed to create nested catalog '%s': unable to attach newly created nested catalog", nested_root_path.c_str());
+    return false;
+  }
+  
+  // sanity check, just to be sure, followed by a cast to make new catalog writable
+  assert (new_catalog->IsWritable());
+  WritableCatalog *wr_new_catalog = static_cast<WritableCatalog *>(new_catalog);
+  
+  // from now on, there are two catalogs, spanning the same directory structure
+  // we have to split the overlapping directory entries from the old catalog
+  // to the new catalog to re-gain a valid catalog structure
+  if (not old_catalog->SplitContentIntoNewNestedCatalog(wr_new_catalog)) {
+    DetachCatalog(new_catalog);
+    
+    // TODO: if this happens, we may have destroyed our catalog structure...
+    //       it might me a good idea to take some counter measures here
+    pmesg(D_CATALOG, "[FATAL] failed to create nested catalog '%s': splitting of catalog content failed", nested_root_path.c_str());
+    return false;
+  }
+  
+  // add the newly created nested catalog to the references of the containing
+  // catalog
+  if (not old_catalog->InsertNestedCatalogReference(new_catalog->path())) {
+    pmesg(D_CATALOG, "failed to insert new nested catalog reference '%s' in catalog '%s'", new_catalog->path().c_str(), old_catalog->path().c_str());
+    return false;
+  }
   
   return true;
 }
 
 bool WritableCatalogManager::RemoveNestedCatalog(const std::string &mountpoint) {
+  
   
   return true;
 }
@@ -483,19 +549,10 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	FILE *fsrc = NULL, *fdst = NULL;
 	int fd_dst;
 	
-	if (!(fsrc = fopen(src_path.c_str(), "r"))) {
-    cerr << "cannot open " << src_path << " for reading" << endl;
-	}
-	
-	if ((fd_dst = open(dst_path.c_str(), O_CREAT | O_TRUNC | O_RDWR, plain_file_mode)) < 0) {
-    cerr << "cannot open " << dst_path << " for writing" << endl;
-	}
-	
-	if (!(fdst = fdopen(fd_dst, "w"))) {
-    cerr << "cannot open file descriptor fd_dst for writing" << endl; 
-	}
-	
-	if (compress_file_fp_sha1(fsrc, fdst, sha1.digest) != 0)
+	if ( !(fsrc = fopen(src_path.c_str(), "r")) ||
+	     (fd_dst = open(dst_path.c_str(), O_CREAT | O_TRUNC | O_RDWR, plain_file_mode)) < 0 ||
+	     !(fdst = fdopen(fd_dst, "w")) ||
+	     compress_file_fp_sha1(fsrc, fdst, sha1.digest) != 0)
 	{
 		stringstream ss;
 		ss << "could not compress catalog '" << src_path << "'";

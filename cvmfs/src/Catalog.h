@@ -11,9 +11,6 @@
  *  Every Catalog gets a specific InodeChunk assigned on attachment to
  *  a CatalogManager. Inodes of containing files are assigned at runtime,
  *  out of this InodeChunk.
- *
- *  Note: Catalogs are designed to be thread safe, keep track of your
- *        logging.
  */
 
 #ifndef CATALOG_CLASS_H
@@ -70,7 +67,7 @@ struct InodeChunk {
   inline bool IsInitialized() const { return offset > 0 && size > 0; }
 };
 
-class Catalog : public ThreadSafeMutex {
+class Catalog {
  public:
   Catalog(const std::string &path, Catalog *parent);
   virtual ~Catalog();
@@ -115,15 +112,19 @@ class Catalog : public ThreadSafeMutex {
    *  @param entry will be set to the found DirectoryEntry
    *  @return true if DirectoryEntry was successfully found, false otherwise
    */
-  bool Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry = NULL) const;
+  bool Lookup(const hash::t_md5 &path_hash,
+              DirectoryEntry *entry = NULL) const;
   
   /**
    *  performs a lookup on this Catalog for a given path
-   *  @param path the MD5 hash of the searched path
+   *  @param path the path of the searched entry
    *  @param entry will be set to the found DirectoryEntry
    *  @return true if DirectoryEntry was successfully found, false otherwise
    */ 
-  inline bool Lookup(const std::string &path, DirectoryEntry *entry = NULL) const { return Lookup(hash::t_md5(path), entry); }
+  inline bool Lookup(const std::string &path, 
+                     DirectoryEntry *entry = NULL) const {
+    return Lookup(hash::t_md5(path), entry);
+  }
   
   /**
    *  perform a listing of the directory with the given inode
@@ -133,7 +134,8 @@ class Catalog : public ThreadSafeMutex {
    *  @param listing will be set to the resulting DirectoryEntryList
    *  @return true on successful listing, false otherwise
    */
-  bool Listing(const inode_t inode, DirectoryEntryList *listing) const;
+  bool Listing(const inode_t inode, 
+               DirectoryEntryList *listing) const;
   
   /**
    *  perform a listing of the directory with the given path hash
@@ -141,7 +143,8 @@ class Catalog : public ThreadSafeMutex {
    *  @param listing will be set to the resulting DirectoryEntryList
    *  @return true on successful listing, false otherwise
    */ 
-  bool Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing) const;
+  bool Listing(const hash::t_md5 &path_hash,
+               DirectoryEntryList *listing) const;
   
   /**
    *  perform a listing of the directory with the given path 
@@ -149,7 +152,10 @@ class Catalog : public ThreadSafeMutex {
    *  @param listing will be set to the resulting DirectoryEntryList
    *  @return true on successful listing, false otherwise
    */ 
-  inline bool Listing(const std::string &path, DirectoryEntryList *listing) const { return Listing(hash::t_md5(path), listing); }
+  inline bool Listing(const std::string &path, 
+                      DirectoryEntryList *listing) const {
+    return Listing(hash::t_md5(path), listing);
+  }
   
   /**
    *  add a Catalog as child to this Catalog
@@ -175,7 +181,19 @@ class Catalog : public ThreadSafeMutex {
    *  checks if a given inode might be maintained by this Catalog
    *  @return true if given inodes lies in range, false otherwise
    */
-  inline bool ContainsInode(const inode_t inode) const { assert(IsInitialized()); return inode_chunk_.ContainsInode(inode); }
+  inline bool ContainsInode(const inode_t inode) const {
+    assert(IsInitialized()); 
+    return inode_chunk_.ContainsInode(inode);
+  }
+  
+  /**
+   *  retrieve the root entry of this catalog
+   *  @param[out] root_entry the root_entry we look for
+   *  @return true if root entry was found, false otherwise
+   */
+  inline bool GetRootEntry(DirectoryEntry *root_entry) const { 
+    return Lookup(path(), root_entry);
+  }
   
   /**
    *  retrieve the TTL value for this Catalog
@@ -202,7 +220,8 @@ class Catalog : public ThreadSafeMutex {
    *  @param hardlink_group_id the id of a possibly present hardlink group
    *  @return the assigned inode number
    */
-  inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id);
+  inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, 
+                                              uint64_t hardlink_group_id);
   
  protected:
   /**
@@ -223,7 +242,15 @@ class Catalog : public ThreadSafeMutex {
   virtual void InitPreparedStatements();
   void FinalizePreparedStatements();
   
+  /**
+   *  check if we have a child embodying the given path
+   *  @param mountpoint the mountpoint of the child nested catalog to look for
+   *  @return a pointer to the found Catalog or NULL if not found
+   */
+  Catalog* FindChildWithMountpoint(const std::string &mountpoint) const;
+  
   inline sqlite3* database() const { return database_; }
+  inline void set_parent(Catalog *catalog) { parent_ = catalog; }
   
  private:
   /**

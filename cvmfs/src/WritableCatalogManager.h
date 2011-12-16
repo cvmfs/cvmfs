@@ -69,7 +69,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
   inline std::string GetCatalogFilenameForPath(const std::string &url_path) const {
     return (url_path.empty()) ?
       catalog_directory_ + "/" + kCatalogFilename :
-      catalog_directory_ + "/" + url_path + "/" + kCatalogFilename;
+      catalog_directory_ + url_path + "/" + kCatalogFilename;
   }
    
   bool CreateAndAttachRootCatalog();

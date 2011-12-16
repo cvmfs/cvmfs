@@ -33,7 +33,7 @@ set (CVMFS2_DEBUG_SOURCES
 	cvmfs.h cvmfs.cc
 	
 	catalog_queries.h           catalog_queries.cc
-	thread_safe.h               thread_safe.cc
+	thread_safe.h 
 	Catalog.h                   Catalog.cc
 	AbstractCatalogManager.h    AbstractCatalogManager.cc
 	RemoteCatalogManager.h      RemoteCatalogManager.cc
@@ -73,7 +73,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	
 	
 	catalog_queries.h           catalog_queries.cc
-	thread_safe.h               thread_safe.cc
+	thread_safe.h
 
 	Catalog.h                   Catalog.cc
 	WritableCatalog.h           WritableCatalog.cc

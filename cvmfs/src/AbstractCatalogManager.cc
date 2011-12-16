@@ -339,8 +339,8 @@ bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint, Cata
   }
   
   // this process depends on the derived class, because
-  // loading and concrete type of catalog depend on the
-  // acctual application of this abstract class.
+  // loading a concrete type of catalog depend on the
+  // acctual implementation of this abstract class.
   
   // load catalog file (LoadCatalogFile is virtual)
   string new_catalog_file;
