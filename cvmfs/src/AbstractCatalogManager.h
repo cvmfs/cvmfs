@@ -175,6 +175,17 @@ class AbstractCatalogManager {
   
   /**
    *  removes a catalog (and all of it's children) from this CatalogManager
+   *  the given catalog and all children are freed, if this call succeeds!
+   *  @param catalog the catalog to detach
+   *  @return true on success, false otherwise
+   */
+  bool DetachCatalogTree(Catalog *catalog);
+  
+  /**
+   *  removes a catalog from this CatalogManager
+   *  the given catalog pointer is freed if the call succeeds!
+   *  CAUTION: This method can create dangling children.
+   *           use DetachCatalogTree() if you are unsure!
    *  @param catalog the catalog to detach
    *  @return true on success, false otherwise
    */
@@ -185,7 +196,7 @@ class AbstractCatalogManager {
    *  this is mainly called in the destructor of this class
    *  @return true on success, false otherwise
    */
-  inline bool DetachAllCatalogs() { return DetachCatalog(GetRootCatalog()); }
+  inline bool DetachAllCatalogs() { return DetachCatalogTree(GetRootCatalog()); }
   
   /**
    *  get the root catalog of this CatalogManager

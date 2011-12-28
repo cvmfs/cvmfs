@@ -1,6 +1,7 @@
 #include "WritableCatalog.h"
 
 #include <iostream>
+#include <sstream>
 
 using namespace std;
 
@@ -403,11 +404,16 @@ bool WritableCatalog::MoveNestedCatalogReferencesToNewNestedCatalog(const list<s
   return true;
 }
 
-bool WritableCatalog::InsertNestedCatalogReference(const string &mountpoint, Catalog *attached_reference) {
+bool WritableCatalog::InsertNestedCatalogReference(const string &mountpoint, 
+                                                   Catalog *attached_reference,
+                                                   const hash::t_sha1 content_hash) {
+  const string sha1_string = (not content_hash.is_null()) ? content_hash.to_string() : "";
+  
   // doing the SQL statement
-  SqlStatement stmt(database(), "INSERT INTO nested_catalogs (path) VALUES (:p);");
+  SqlStatement stmt(database(), "INSERT INTO nested_catalogs (path, sha1) VALUES (:p, :sha1);");
   bool successful = (
     stmt.BindText(1, mountpoint) &&
+    stmt.BindText(2, sha1_string) &&
     stmt.Execute()
   );
   
@@ -449,6 +455,133 @@ bool WritableCatalog::UpdateNestedCatalogLink(const string &path,
   stmt.BindText(2, path);
 
   return stmt.Execute();
+}
+
+bool WritableCatalog::MergeIntoParentCatalog() const {
+  // check if we deal with a nested catalog
+  // otherwise we will not find a parent to merge into
+  assert(not IsRoot());
+  
+  WritableCatalog *parent = GetWritableParent();
+  
+  // copy over all DirectoryEntries to the parent catalog
+  if (not CopyDirectoryEntriesToParentCatalog()) {
+    pmesg(D_CATALOG, "failed to copy directory entries from '%s' to parent '%s'", this->path().c_str(), parent->path().c_str());
+    return false;
+  }
+  
+  // copy the nested catalog references
+  if (not CopyNestedCatalogReferencesToParentCatalog()) {
+    pmesg(D_CATALOG, "failed to merge nested catalog references from '%s' to parent '%s'", this->path().c_str(), parent->path().c_str());
+    return false;
+  }
+
+  // remove the nested catalog reference for this nested catalog
+  // CAUTION! from now on this catalog will be dangling!
+  if (not parent->RemoveNestedCatalogReference(this->path())) {
+    pmesg(D_CATALOG, "failed to remove nested catalog reference '%s', in parent catalog '%s'", this->path().c_str(), parent->path().c_str());
+    return false;
+  }
+  
+  return true;
+}
+
+bool WritableCatalog::CopyNestedCatalogReferencesToParentCatalog() const {
+  WritableCatalog *parent = GetWritableParent();
+  
+  // obtain a list of all nested catalog references
+  NestedCatalogReferenceList nested_catalog_references = ListNestedCatalogReferences();
+  
+  // go through the list and update the databases
+  // simultaneously we are checking if the referenced catalogs are currently
+  // attached and update the in-memory data structures as well
+  NestedCatalogReferenceList::const_iterator i,iend;
+  for (i = nested_catalog_references.begin(), 
+       iend = nested_catalog_references.end();
+       i != iend;
+       ++i) {
+    Catalog *child = FindChildWithMountpoint(i->path);
+    parent->InsertNestedCatalogReference(i->path, child, i->content_hash);
+  }
+  
+  return true;
+}
+
+bool WritableCatalog::CopyDirectoryEntriesToParentCatalog() const {
+  // we can simply copy all entries from this database to the 'other' database
+  // BUT: 1. this would create collisions in hardlink group IDs.
+  //         therefor we first update all hardlink group IDs to fit behind the
+  //         ones in the 'other' database
+  //      2. the root entry of the nested catalog is present twice:
+  //         1. in the parent directory (as mount point) and
+  //         2. in the nested catalog (as root entry)
+  //         therefore we delete the mount point from the parent before merging
+  
+  WritableCatalog *parent = GetWritableParent();
+  
+  // Update hardlink group IDs in this nested catalog.
+  // To avoid collisions we add the maximal present hardlink group ID in parent
+  // to all hardlink group IDs in the nested catalog.
+  // (CAUTION: hardlink group ID is saved in the inode field --> legacy :-) )
+  const int offset = parent->GetMaximalHardlinkGroupId();
+  stringstream ss;
+  ss << "UPDATE catalog SET inode = inode + " << offset << " WHERE inode > 0;";
+  const string update_hardlink_group_ids = ss.str();
+  
+  SqlStatement update_hardlink_groups(database(), update_hardlink_group_ids);
+  if (not update_hardlink_groups.Execute()) {
+    pmesg(D_CATALOG, "failed to harmonize the hardlink group IDs in '%s'", this->path().c_str());
+    return false;
+  }
+  
+  // remove the nested catalog mount point
+  // it will be replaced with the nested catalog root entry when copying
+  if (not parent->RemoveEntry(this->path())) {
+    pmesg(D_CATALOG, "failed to remove mount point '%s' of nested catalog to be merged", this->path().c_str());
+    return false;
+  }
+  
+  // now copy over all DirectoryEntries to the 'other' catalog
+  // there will be no data collisions, as we resolved them before hands
+  if (not SqlStatement(database(), "ATTACH '" + parent->database_file() + "' AS other;").Execute()) {
+    pmesg(D_CATALOG, "failed to attach database of catalog '%s' in catalog '%s'", parent->path().c_str(), this->path().c_str());
+    return false;
+  }
+  if (not SqlStatement(database(), "INSERT INTO other.catalog "
+                                   "SELECT * FROM main.catalog;").Execute()) {
+    pmesg(D_CATALOG, "failed to copy DirectoryEntries from catalog '%s' to catalog '%s'", this->path().c_str(), parent->path().c_str());
+    return false;
+  }
+  if (not SqlStatement(database(), "DETACH other;").Execute()) {
+    pmesg(D_CATALOG, "failed to detach database of catalog '%s' from catalog '%s'", parent->path().c_str(), this->path().c_str());
+    return false;
+  }
+  
+  // change the just copied nested catalog root to an ordinary directory
+  // (the nested catalog is merged into it's parent)
+  DirectoryEntry old_root_entry;
+  if (not parent->Lookup(this->path(), &old_root_entry)) {
+    pmesg(D_CATALOG, "root entry of removed nested catalog '%s' not found in parent catalog '%s'", this->path().c_str(), parent->path().c_str());
+    return false;
+  }
+  
+  // sanity checks
+  // just see if everything worked out with our copied 'root entry'
+  if (not old_root_entry.IsDirectory() || 
+      not old_root_entry.IsNestedCatalogRoot() ||
+      old_root_entry.IsNestedCatalogMountpoint()) {
+    pmesg(D_CATALOG, "former root entry '%s' looks strange in '%s'", this->path().c_str(), parent->path().c_str());
+    return false;
+  }
+  
+  // remove the nested catalog root mark
+  old_root_entry.set_is_nested_catalog_root(false);
+  if (not parent->UpdateEntry(old_root_entry, this->path())) {
+    pmesg(D_CATALOG, "unable to remove the 'nested catalog root' mark from '%s'", this->path().c_str());
+    return false;
+  }
+  
+  return true;
 }
 
 }

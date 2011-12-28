@@ -389,36 +389,44 @@ bool AbstractCatalogManager::AttachCatalog(const std::string &db_file, Catalog *
   return true;
 }
 
+bool AbstractCatalogManager::DetachCatalogTree(Catalog *catalog) {
+  // determine catalogs to detach (all offsprings of *catalog are detached as well)
+  CatalogList catalogs_to_detach = catalog->GetChildrenRecursively();
+  catalogs_to_detach.push_back(catalog);
+  
+  // detach catalogs
+  CatalogList::iterator i;
+  CatalogList::const_iterator iend;
+  bool result = true;
+  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end(); i != iend; ++i) {
+    if (not DetachCatalog(*i)) {
+      result = false;
+    }
+  }
+  
+  return result;
+}
+
 bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
   // detach *catalog from catalog tree
   if (not catalog->IsRoot()) {
     catalog->parent()->RemoveChild(catalog);
   }
   
-  // determine catalogs to detach (all offsprings of *catalog are detached as well)
-  CatalogList catalogs_to_detach = catalog->GetChildrenRecursively();
-  catalogs_to_detach.push_back(catalog);
-  
-  // detach catalogs
-  CatalogList::iterator i, j;
-  CatalogList::const_iterator iend, jend;
-  Catalog *current_catalog;
-  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end(); i != iend; ++i) {
-    current_catalog = *i;
-    AnnounceInvalidInodeChunk(current_catalog->inode_chunk());
-    
-    // delete catalog from internal lists
-    for (j = catalogs_.begin(), jend = catalogs_.end(); j != jend; ++j) {
-      if (*j == current_catalog) {
-        catalogs_.erase(j);
-        break;
-      }
+  AnnounceInvalidInodeChunk(catalog->inode_chunk());
+
+  // delete catalog from internal lists
+  CatalogList::iterator i;
+  CatalogList::const_iterator iend;
+  for (i = catalogs_.begin(), iend = catalogs_.end(); i != iend; ++i) {
+    if (*i == catalog) {
+      catalogs_.erase(i);
+      delete catalog;
+      return true;
     }
-    
-    delete current_catalog;
   }
-  
-  return true;
+
+  return false;
 }
 
 }

@@ -125,9 +125,12 @@ class WritableCatalog : public Catalog {
   *  also update the in-memory representation of the catalog tree
   *  @param mountpoint the path to the catalog to add a reference to
   *  @param attached_reference can contain a reference to the attached catalog object of mountpoint
+  *  @param content_hash can be set to safe a content hash together with the reference
   *  @return true on success, false otherwise
   */
-  bool InsertNestedCatalogReference(const std::string &mountpoint, Catalog *attached_reference = NULL);
+  bool InsertNestedCatalogReference(const std::string &mountpoint,
+                                    Catalog *attached_reference = NULL,
+                                    const hash::t_sha1 content_hash = hash::t_sha1());
 
   /**
   *  remove a nested catalog reference from the database
@@ -138,6 +141,11 @@ class WritableCatalog : public Catalog {
   *  @return true on success, false otherwise
   */
   bool RemoveNestedCatalogReference(const std::string &mountpoint, Catalog **attached_reference = NULL);
+  
+  /**
+   *  TODO: document this
+   */
+  bool MergeIntoParentCatalog() const;
   
  protected:
   /**
@@ -172,6 +180,12 @@ class WritableCatalog : public Catalog {
   void InitPreparedStatements();
   void FinalizePreparedStatements();
   
+  inline WritableCatalog* GetWritableParent() const {
+    Catalog *parent = this->parent();
+    assert (parent->IsWritable());
+    return static_cast<WritableCatalog*>(parent);
+  }
+  
  private:
   /**
    *  this method creates a new database file and initializes the database schema
@@ -181,6 +195,7 @@ class WritableCatalog : public Catalog {
   static bool CreateNewDatabaseSchema(const std::string &file_path);
   
   bool MakeNestedCatalogMountpoint(const std::string &mountpoint);
+  
   bool MakeNestedCatalogRootEntry();
   inline bool MoveDirectoryStructureToNewNestedCatalog(const std::string dir_structure_root,
                                                        WritableCatalog *new_nested_catalog,
@@ -192,6 +207,9 @@ class WritableCatalog : public Catalog {
                                                            std::list<std::string> &nested_catalog_mountpoints);
   bool MoveNestedCatalogReferencesToNewNestedCatalog(const std::list<std::string> &nested_catalog_references,
                                                      WritableCatalog *new_nested_catalog);
+                                                     
+  bool CopyNestedCatalogReferencesToParentCatalog() const;
+  bool CopyDirectoryEntriesToParentCatalog() const;
   
   /**
    *  mark this catalog as dirty

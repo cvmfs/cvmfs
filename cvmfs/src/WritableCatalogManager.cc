@@ -1,5 +1,7 @@
 #include "WritableCatalogManager.h"
 
+#include <stdio.h>
+
 #include <iostream>
 
 #include <string>
@@ -382,10 +384,10 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   // we have to split the overlapping directory entries from the old catalog
   // to the new catalog to re-gain a valid catalog structure
   if (not old_catalog->SplitContentIntoNewNestedCatalog(wr_new_catalog)) {
-    DetachCatalog(new_catalog);
+    DetachCatalogTree(new_catalog);
     
     // TODO: if this happens, we may have destroyed our catalog structure...
-    //       it might me a good idea to take some counter measures here
+    //       it might be a good idea to take some counter measures here
     pmesg(D_CATALOG, "[FATAL] failed to create nested catalog '%s': splitting of catalog content failed", nested_root_path.c_str());
     return false;
   }
@@ -401,7 +403,39 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
 }
 
 bool WritableCatalogManager::RemoveNestedCatalog(const std::string &mountpoint) {
+  const string nested_root_path = RelativeToCatalogPath(mountpoint);
   
+  // find the catalog which should be removed
+  WritableCatalog *nested_catalog = NULL;
+  if (not GetCatalogByPath(nested_root_path, &nested_catalog)) {
+    pmesg(D_CATALOG, "failed to remove nested catalog '%s': mountpoint was not found in current catalog structure", nested_root_path.c_str());
+    return false;
+  }
+  
+  // check if the found catalog is really the nested catalog to be deleted
+  if (nested_catalog->IsRoot() || nested_catalog->path() != nested_root_path) {
+    pmesg(D_CATALOG, "failed to remove nested catalog '%s': mountpoint '%s' does not name a nested catalog", nested_catalog->path().c_str(), nested_root_path.c_str());
+    return false;
+  }
+  
+  // merge all data from the nested catalog into it's parent
+  if (not nested_catalog->MergeIntoParentCatalog()) {
+    pmesg(D_CATALOG, "failed to remove nested catalog '%s': merging of content unsuccessful.", nested_catalog->path().c_str());
+    return false;
+  }
+  
+  // remove the catalog from our internal data structures
+  const string database_file = GetCatalogFilenameForPath(nested_catalog->path());
+  if (not DetachCatalog(nested_catalog)) {
+    pmesg(D_CATALOG, "something went wrong while detaching the removed catalog '%s'", nested_catalog->path().c_str());
+    return false;
+  }
+  
+  // delete the catalog database file from the working copy
+  if (remove(database_file.c_str()) != 0) {
+    pmesg(D_CATALOG, "unable to delete the removed nested catalog database file '%s'", database_file.c_str());
+    return false;
+  }
   
   return true;
 }

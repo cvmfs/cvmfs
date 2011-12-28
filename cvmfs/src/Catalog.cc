@@ -25,11 +25,12 @@ Catalog::Catalog(const string &path, Catalog *parent) {
 
 bool Catalog::OpenDatabase(const string &db_file) {
   int flags = DatabaseOpenFlags();
+  database_file_ = db_file;
 
   // open database file (depending on the flags read-only or read-write)
-  pmesg(D_CATALOG, "opening database file %s", db_file.c_str());
-  if (SQLITE_OK != sqlite3_open_v2(db_file.c_str(), &database_, flags, NULL)) {
-    pmesg(D_CATALOG, "Cannot open catalog database file %s", db_file.c_str());
+  pmesg(D_CATALOG, "opening database file %s", database_file_.c_str());
+  if (SQLITE_OK != sqlite3_open_v2(database_file_.c_str(), &database_, flags, NULL)) {
+    pmesg(D_CATALOG, "Cannot open catalog database file %s", database_file_.c_str());
     return false;
   }
   sqlite3_extended_result_codes(database_, 1);
@@ -39,7 +40,7 @@ bool Catalog::OpenDatabase(const string &db_file) {
   // find out the max row id of this database file
   SqlStatement max_row_id_query(database_, "SELECT MAX(rowid) FROM catalog;");
   if (not max_row_id_query.FetchRow()) {
-    pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s (SqliteErrorcode: %d)", db_file.c_str(), max_row_id_query.GetLastError());
+    pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s (SqliteErrorcode: %d)", database_file_.c_str(), max_row_id_query.GetLastError());
     return false;
   }
   max_row_id_ = max_row_id_query.RetrieveInt64(0);
@@ -49,9 +50,9 @@ bool Catalog::OpenDatabase(const string &db_file) {
     SqlStatement root_prefix_query(database_, "SELECT value FROM properties WHERE key='root_prefix';");
     if (root_prefix_query.FetchRow()) {
       root_prefix_ = string((char *)root_prefix_query.RetrieveText(0));
-      pmesg(D_CATALOG, "found root prefix %s in root catalog file %s", root_prefix_.c_str(), db_file.c_str());
+      pmesg(D_CATALOG, "found root prefix %s in root catalog file %s", root_prefix_.c_str(), database_file_.c_str());
     } else {
-      pmesg(D_CATALOG, "Cannot retrieve root prefix for root catalog file %s", db_file.c_str());
+      pmesg(D_CATALOG, "Cannot retrieve root prefix for root catalog file %s", database_file_.c_str());
     }
   }
   
@@ -234,6 +235,21 @@ Catalog* Catalog::FindChildWithMountpoint(const std::string &mountpoint) const {
   }
   
   return NULL;
+}
+
+Catalog::NestedCatalogReferenceList Catalog::ListNestedCatalogReferences() const {
+  const string sql = "SELECT path, sha1 FROM nested_catalogs;";
+  SqlStatement listing(database(), sql);
+  
+  NestedCatalogReferenceList result;
+  while (listing.FetchRow()) {
+    NestedCatalogReference ref;
+    ref.path = string((char*)listing.RetrieveText(0));
+    ref.content_hash = listing.RetrieveSha1HashFromText(1);
+    result.push_back(ref);
+  }
+  
+  return result;
 }
 
 } // namespace cvmfs

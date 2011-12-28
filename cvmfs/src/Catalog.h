@@ -249,7 +249,20 @@ class Catalog {
    */
   Catalog* FindChildWithMountpoint(const std::string &mountpoint) const;
   
+  typedef struct {
+    std::string path;
+    hash::t_sha1 content_hash;
+  } NestedCatalogReference;
+  typedef std::list<NestedCatalogReference> NestedCatalogReferenceList;
+  
+  /**
+   *  get a list of all registered nested catalogs in this catalog
+   *  @return a list of all nested catalog references of this catalog
+   */
+  NestedCatalogReferenceList ListNestedCatalogReferences() const;
+  
   inline sqlite3* database() const { return database_; }
+  inline std::string database_file() const { return database_file_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
   
  private:
@@ -278,6 +291,7 @@ class Catalog {
   typedef std::map<int, inode_t> HardlinkGroupIdMap;
 
  private:
+  std::string database_file_;
   sqlite3 *database_; ///< The SQLite3 database handle for this catalog
 
   std::string root_prefix_; ///< If we mount deep into a nested catalog, we need the full preceeding path to calculate the correct MD5 hash

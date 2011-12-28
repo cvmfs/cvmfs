@@ -156,7 +156,7 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.mode_         = RetrieveInt(3);
   result.size_         = RetrieveInt64(2);
   result.mtime_        = RetrieveInt64(4);
-  result.checksum_     = RetrieveSha1Hash(0);
+  result.checksum_     = RetrieveSha1HashFromBlob(0);
   result.name_         = string((char *)RetrieveText(6));
   result.symlink_      = ExpandSymlink((char *)RetrieveText(7));
   

@@ -206,8 +206,7 @@ class SqlStatement {
   inline sqlite3_value *RetriveValue(const int iCol) const {
     return sqlite3_column_value(statement_, iCol);
   }
-  
- protected:
+
   /**
    *  convenience wrapper for retrieving MD5 hashes
    *  @param iCol1 offset of most significant bits in database query
@@ -219,14 +218,26 @@ class SqlStatement {
   }
   
   /**
-   *  convenience wrapper for retrieving a SHA1 hash
+   *  convenience wrapper for retrieving a SHA1 hash from a blob field
    *  @param iCol offset of the blob field in database query
    *  @result the retrieved SHA1 hash
    */
-  inline hash::t_sha1 RetrieveSha1Hash(const int iCol) const {
+  inline hash::t_sha1 RetrieveSha1HashFromBlob(const int iCol) const {
     return (RetrieveBytes(iCol) > 0) ? 
                     hash::t_sha1(RetrieveBlob(iCol), RetrieveBytes(iCol)) :
                     hash::t_sha1();
+  }
+  
+  /**
+   *  convenience wrapper for retrieving a SHA1 hash from a text field
+   *  @param iCol offset of the text field in the database query
+   *  @result the retrieved SHA1 hash
+   */
+  inline hash::t_sha1 RetrieveSha1HashFromText(const int iCol) const {
+    const std::string hash_string = std::string((char *)RetrieveText(iCol));
+    hash::t_sha1 result;
+    result.from_hash_str(hash_string);
+    return result;
   }
 
  private:
