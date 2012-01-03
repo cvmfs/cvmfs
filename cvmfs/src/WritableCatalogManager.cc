@@ -134,9 +134,9 @@ bool WritableCatalogManager::GetCatalogByPath(const string &path, WritableCatalo
   return true;
 }
 
-bool WritableCatalogManager::RemoveFile(SyncItem *entry) {
-	const string parent_path = RelativeToCatalogPath(entry->getParentPath());
-  const string file_path = RelativeToCatalogPath(entry->getRelativePath());
+bool WritableCatalogManager::RemoveFile(const std::string &path) {
+  const string file_path = RelativeToCatalogPath(path);
+	const string parent_path = get_parent_path(file_path);
 	
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -157,9 +157,9 @@ bool WritableCatalogManager::RemoveFile(SyncItem *entry) {
 	return true;
 }
 
-bool WritableCatalogManager::RemoveDirectory(SyncItem *entry) {
-	const string parent_path = RelativeToCatalogPath(entry->getParentPath());
-  const string directory_path = RelativeToCatalogPath(entry->getRelativePath());
+bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
+  const string directory_path = RelativeToCatalogPath(path);
+	const string parent_path = get_parent_path(directory_path);
 	
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -197,29 +197,9 @@ bool WritableCatalogManager::RemoveDirectory(SyncItem *entry) {
   return true;
 }
 
-
-DirectoryEntry WritableCatalogManager::CreateNewDirectoryEntry(SyncItem *entry, 
-                                                               Catalog *catalog, 
-                                                               const int hardlink_group_id) const {
-  DirectoryEntry dEntry;
-  dEntry.inode_             = DirectoryEntry::kInvalidInode; // inode is determined at runtime of client
-  dEntry.parent_inode_      = DirectoryEntry::kInvalidInode; // ... dito
-  dEntry.mode_              = entry->getUnionStat().st_mode;
-  dEntry.size_              = entry->getUnionStat().st_size;
-  dEntry.mtime_             = entry->getUnionStat().st_mtime;
-  dEntry.checksum_          = entry->getContentHash();
-  dEntry.name_              = entry->getFilename();
-  dEntry.symlink_           = "";
-  dEntry.linkcount_         = entry->getUnionLinkcount();
-  
-  dEntry.catalog_           = catalog;
-  dEntry.hardlink_group_id_ = hardlink_group_id;
-  return dEntry;
-}
-
-bool WritableCatalogManager::AddDirectory(SyncItem *entry) {
-  const string directory_path = RelativeToCatalogPath(entry->getRelativePath());
-  const string parent_path = RelativeToCatalogPath(entry->getParentPath());
+bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry, const std::string &parent_directory) {
+  const string parent_path = RelativeToCatalogPath(parent_directory);
+  const string directory_path = parent_path + "/" + entry.name();
   
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -227,15 +207,13 @@ bool WritableCatalogManager::AddDirectory(SyncItem *entry) {
     return false;
   }
   
-  DirectoryEntry dEntry = CreateNewDirectoryEntry(entry, catalog);
-  catalog->CheckForExistanceAndAddEntry(dEntry, directory_path, parent_path);
-
+  catalog->CheckForExistanceAndAddEntry(entry, directory_path, parent_path);
   return true;
 }
 
-bool WritableCatalogManager::AddFile(SyncItem *entry) {
-  const string parent_path = RelativeToCatalogPath(entry->getParentPath());
-  const string file_path = RelativeToCatalogPath(entry->getRelativePath());
+bool WritableCatalogManager::AddFile(const DirectoryEntry &entry, const std::string &parent_directory) {
+  const string parent_path = RelativeToCatalogPath(parent_directory);
+  const string file_path = parent_path + "/" + entry.name();
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -243,48 +221,42 @@ bool WritableCatalogManager::AddFile(SyncItem *entry) {
     return false;
   }
   
-  DirectoryEntry dEntry = CreateNewDirectoryEntry(entry, catalog);
-  
-  if (entry->isSymlink()) {
-		char slnk[PATH_MAX+1];
-		ssize_t l = readlink((entry->getUnionPath()).c_str(), slnk, PATH_MAX);
-		if (l >= 0) {
-			slnk[l] = '\0';
-			dEntry.symlink_ = slnk;
-		} else {
+  // sanity checks
+  if (entry.IsLink()) {
+    if (entry.symlink() == "") {
       pmesg(D_CATALOG, "unable to read link destination for symlink '%s' - add failed", file_path.c_str());
-			return false;
+  		return false;
 		}
-
-	} else if (entry->isRegularFile() && not entry->hasContentHash()) {
-    pmesg(D_CATALOG, "regular file '%s' has no content hash and cannot be added", file_path.c_str());
-		return false;
-	}
-
-  catalog->CheckForExistanceAndAddEntry(dEntry, file_path, parent_path);
+  } else {
+    if (entry.checksum().is_null()) {
+      pmesg(D_CATALOG, "regular file '%s' has no content hash and cannot be added", file_path.c_str());
+  		return false;
+    }
+  }
   
+  catalog->CheckForExistanceAndAddEntry(entry, file_path, parent_path);
   return true;
 }
 
-bool WritableCatalogManager::AddHardlinkGroup(SyncItemList group) {
+bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries, const std::string &parent_directory) {
   // sanity check
-	if (group.size() == 0) {
+	if (entries.size() == 0) {
     pmesg(D_CATALOG, "tried to add an empty hardlink group");
 		return false;
 	}
 	
-	if (group.size() == 1) {
+	if (entries.size() == 1) {
     pmesg(D_CATALOG, "tried to add a hardlink group with just one member... added as normal file instead");
-    return AddFile(group.front());
+    return AddFile(entries.front(), parent_directory);
 	}
 	
 	// hardlink groups have to reside in the same directory.
-	// therefore it is enough to look for the first in the group
-	const string parent_path = RelativeToCatalogPath(group.front()->getParentPath());
+	// therefore we only have one parent directory here
+	const string parent_path = RelativeToCatalogPath(parent_directory);
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
-    pmesg(D_CATALOG, "catalog for hardlink group containing '%s' cannot be found", group.front()->getRelativePath().c_str());
+    pmesg(D_CATALOG, "catalog for hardlink group containing '%s' cannot be found", parent_path.c_str());
     return false;
   }
 	
@@ -296,15 +268,14 @@ bool WritableCatalogManager::AddHardlinkGroup(SyncItemList group) {
 	}
 	
 	// add the file entries to the catalog
-	SyncItemList::const_iterator i, end;
+  DirectoryEntryList::iterator i;
+	DirectoryEntryList::const_iterator end;
   bool result = true;
   bool successful = true;
-  SyncItem *currentEntry = NULL;
-	for (i = group.begin(), end = group.end(); i != end; ++i) {
-    currentEntry = *i;
-	  string file_path = RelativeToCatalogPath(currentEntry->getRelativePath());
-	  DirectoryEntry dEntry = CreateNewDirectoryEntry(currentEntry, catalog, new_group_id);
-	  successful = catalog->CheckForExistanceAndAddEntry(dEntry, file_path, parent_path);
+	for (i = entries.begin(), end = entries.end(); i != end; ++i) {
+	  string file_path = parent_path + "/" + i->name();
+    i->hardlink_group_id_ = new_group_id;
+	  successful = catalog->CheckForExistanceAndAddEntry(*i, file_path, parent_path);
 	  if (not successful) {
       result = false;
 	  }
@@ -317,9 +288,9 @@ bool WritableCatalogManager::AddHardlinkGroup(SyncItemList group) {
 	return result;
 }
 
-bool WritableCatalogManager::TouchEntry(SyncItem *entry) {
-  const string parent_path = RelativeToCatalogPath(entry->getParentPath());
-  const string entry_path = RelativeToCatalogPath(entry->getRelativePath());
+bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry, const std::string &path) {
+  const string entry_path = RelativeToCatalogPath(path);
+  const string parent_path = get_parent_path(entry_path);
   
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -332,7 +303,7 @@ bool WritableCatalogManager::TouchEntry(SyncItem *entry) {
     return false;
   }
   
-  if (not catalog->TouchEntry(entry_path, entry->getUnionStat().st_mtime)) {
+  if (not catalog->TouchEntry(entry, entry_path)) {
     pmesg(D_CATALOG, "something went wrong while touching entry '%s'", entry_path.c_str());
     return false;
   }

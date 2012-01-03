@@ -165,17 +165,15 @@ void SyncMediator::addFileQueueToCatalogs() {
 	}
 	
 	// add singular files
-	SyncItemList::iterator i;
-	SyncItemList::const_iterator iend;
+	SyncItemList::const_iterator i, iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		mCatalogManager->AddFile(*i);
+		mCatalogManager->AddFile((*i)->createDirectoryEntry(), (*i)->getParentPath());
 	}
 	
 	// add hardlink groups
-	HardlinkGroupList::iterator j;
-	HardlinkGroupList::const_iterator jend;
+	HardlinkGroupList::const_iterator j, jend;
 	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
-		mCatalogManager->AddHardlinkGroup(j->hardlinks);
+    addHardlinkGroup(*j);
 	}
 }
 
@@ -253,8 +251,8 @@ void SyncMediator::insertHardlink(SyncItem *entry) {
 	// find the hard link group in the lists
 	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(inode);
 
-   // this SyncItem will stay for some time... increment reference counter
-   entry->retain();
+  // this SyncItem will stay for some time... increment reference counter
+  entry->retain();
 
 	if (hardlinkGroup == getHardlinkMap().end()) {
 		// create a new hardlink group
@@ -367,7 +365,7 @@ void SyncMediator::addFile(SyncItem *entry) {
 	
 	if (entry->isSymlink() && not mDryRun) {
 	   // symlinks have no 'actual' file content, which would have to be compressed...
-		mCatalogManager->AddFile(entry);
+		mCatalogManager->AddFile(entry->createDirectoryEntry(), entry->getParentPath());
 	} else {
 	   // a normal file has content, that has to be compressed later in the commit-stage
 	   // keep the entry in memory!
@@ -378,31 +376,32 @@ void SyncMediator::addFile(SyncItem *entry) {
 
 void SyncMediator::removeFile(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->RemoveFile(entry);
+	if (not mDryRun)     mCatalogManager->RemoveFile(entry->getRelativePath());
 }
 
 void SyncMediator::touchFile(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->TouchFile(entry);
+	if (not mDryRun)     mCatalogManager->TouchFile(entry->createDirectoryEntry(), entry->getParentPath());
 }
 
 void SyncMediator::addDirectory(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[add] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->AddDirectory(entry);
+	if (not mDryRun)     mCatalogManager->AddDirectory(entry->createDirectoryEntry(),
+	                                                   entry->getParentPath());
 }
 
 void SyncMediator::removeDirectory(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->RemoveDirectory(entry);
+	if (not mDryRun)     mCatalogManager->RemoveDirectory(entry->getRelativePath());
 }
 
 void SyncMediator::touchDirectory(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->TouchDirectory(entry);
+	if (not mDryRun)     mCatalogManager->TouchDirectory(entry->createDirectoryEntry(), entry->getParentPath());
 }
 
 void SyncMediator::addHardlinkGroups(const HardlinkGroupMap &hardlinks) {
-   HardlinkGroupMap::const_iterator i,end;
+  HardlinkGroupMap::const_iterator i,end;
 	for (i = hardlinks.begin(), end = hardlinks.end(); i != end; ++i) {
 	   // currentHardlinkGroup = i->second; --> just to remind you
 	   
@@ -417,13 +416,24 @@ void SyncMediator::addHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 		
 		if (i->second.masterFile->isSymlink() && not mDryRun) {
 		   // symlink hardlinks just end up in the database (see SyncMediator::addFile() same semantics here)
-			mCatalogManager->AddHardlinkGroup(i->second.hardlinks);
+      addHardlinkGroup(i->second);
          
 		} else {
 		   // yeah... just see SyncMediator::addFile()
 			mHardlinkQueue.push_back(i->second);
 		}
 	}
+}
+
+void SyncMediator::addHardlinkGroup(const HardlinkGroup &group) {
+  // create a DirectoryEntry list out of the hardlinks
+  DirectoryEntryList hardlinks;
+  SyncItemList::const_iterator k, kend;
+  for (k    = group.hardlinks.begin(), 
+       kend = group.hardlinks.end(); k != kend; ++k) {
+    hardlinks.push_back((*k)->createDirectoryEntry());
+  }
+	mCatalogManager->AddHardlinkGroup(hardlinks, group.masterFile->getParentPath());
 }
 
 void SyncMediator::cleanupHardlinkGroups(HardlinkGroupMap &hardlinks) {

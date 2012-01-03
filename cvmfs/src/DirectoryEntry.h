@@ -21,7 +21,8 @@ typedef uint64_t inode_t;
 class DirectoryEntry {
   friend class LookupSqlStatement;                   // simplify creation of DirectoryEntry objects
   friend class ManipulateDirectoryEntrySqlStatement; // simplify write of DirectoryEntry objects in database
-  friend class WritableCatalogManager;               // simplify creation of DirectoryEntry objects for write back        
+  friend class SyncItem;                             // simplify creation of DirectoryEntry objects for write back
+  friend class WritableCatalogManager;               // TODO: remove this dependency
   
  public:
   const static inode_t kInvalidInode = 0;
@@ -55,6 +56,7 @@ class DirectoryEntry {
   inline std::string symlink() const { return symlink_; }
   inline hash::t_sha1 checksum() const { return checksum_; }
   inline uint64_t size() const { return (IsLink()) ? symlink().length() : size_; }
+  inline time_t mtime() const { return mtime_; }
   inline unsigned int mode() const { return mode_; }
   inline int hardlink_group_id() const { return hardlink_group_id_; }
   

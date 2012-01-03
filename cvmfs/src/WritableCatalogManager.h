@@ -21,9 +21,9 @@
 
 #include "AbstractCatalogManager.h"
 
+#include <set>
 #include <string>
 
-#include "cvmfs_sync_recursion.h"
 #include "WritableCatalog.h"
 
 namespace cvmfs {
@@ -40,16 +40,20 @@ class WritableCatalogManager : public AbstractCatalogManager {
   
   bool Init();
   
-  bool RemoveFile(SyncItem *entry);
-	bool RemoveDirectory(SyncItem *entry);
+  bool RemoveFile(const std::string &file_path);
+	bool RemoveDirectory(const std::string &directory_path);
 	
-	bool AddDirectory(SyncItem *entry);
-	bool AddFile(SyncItem *entry);
-	bool AddHardlinkGroup(SyncItemList group);
+	bool AddDirectory(const DirectoryEntry &entry, const std::string &parent_directory);
+	bool AddFile(const DirectoryEntry &entry, const std::string &parent_directory);
+	bool AddHardlinkGroup(DirectoryEntryList &entries, const std::string &parent_directory);
 	
-  inline bool TouchFile(SyncItem *entry) { return TouchEntry(entry); }
-  inline bool TouchDirectory(SyncItem *entry) { return TouchEntry(entry); }
-  bool TouchEntry(SyncItem *entry);
+  inline bool TouchFile(const DirectoryEntry entry, const std::string &file_path) {
+    return TouchEntry(entry, file_path);
+  }
+  inline bool TouchDirectory(const DirectoryEntry entry, const std::string &directory_path) {
+    return TouchEntry(entry, directory_path);
+  }
+  bool TouchEntry(const DirectoryEntry entry, const std::string &entry_path);
 	
   bool CreateNestedCatalog(const std::string &mountpoint);
   bool RemoveNestedCatalog(const std::string &mountpoint);
@@ -80,7 +84,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
   bool GetCatalogByPath(const std::string &path, WritableCatalog **result);
   
 	inline std::string RelativeToCatalogPath(const std::string &relativePath) const { return (relativePath == "") ? "" : "/" + relativePath; }
-  DirectoryEntry CreateNewDirectoryEntry(SyncItem *entry, Catalog *catalog, const int hardlink_group_id = 0) const; 
   
   /**
    *  goes through all open catalogs and determines which catalogs need updated

@@ -197,14 +197,14 @@ bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
   return result;
 }
 
-bool WritableCatalog::TouchEntry(const string &entry_path, const time_t timestamp) {
+bool WritableCatalog::TouchEntry(const DirectoryEntry &entry, const std::string &entry_path) {
   SetDirty();
 
   // perform a touch operation for the given path
   hash::t_md5 path_hash(entry_path);
   bool result = (
     touch_statement_->BindPathHash(path_hash) &&
-    touch_statement_->BindTimestamp(timestamp) &&
+    touch_statement_->BindTimestamp(entry.mtime()) &&
     touch_statement_->Execute()
   );
   touch_statement_->Reset();

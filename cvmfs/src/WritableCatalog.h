@@ -52,11 +52,11 @@ class WritableCatalog : public Catalog {
   /**
    *  with this method you can set the mtime of a DirectoryEntry in the catalog
    *  to the current time (touch semantic of unix shells)
+   *  @param entry the entry structure which will be touched
    *  @param entry_path the full path of the entry to touch
-   *  @param timestamp the timestamp to set the mtime of this entry to
    *  @return true on successful touching, false otherwise
    */
-  bool TouchEntry(const std::string &entry_path, const time_t timestamp);
+  bool TouchEntry(const DirectoryEntry &entry, const std::string &entry_path);
   
   /**
    *  this method removes the specified entry from the catalog

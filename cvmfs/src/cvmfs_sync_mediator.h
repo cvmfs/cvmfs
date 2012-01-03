@@ -17,7 +17,7 @@
  *  of nested catalogs. If a .cvmfscatalog magic file is encountered,
  *  either on delete or add, it will be treated as nested catalog change.
  *
- *  DirEntries containing data (e.g. not Directories or symlinks) will
+ *  SyncItems containing data (e.g. not Directories or symlinks) will
  *  be accumulated and it's contents are compressed at the end of the
  *  synching process en bloc. This gives us the ability to do this
  *  computational intensive task concurrently at the end of the sync
@@ -37,6 +37,7 @@
 #include "compat.h"
 #include "WritableCatalogManager.h"
 #include "cvmfs_sync.h"
+#include "cvmfs_sync_recursion.h"
 
 namespace cvmfs {
 
@@ -179,7 +180,8 @@ private:
 	inline HardlinkGroupMap& getHardlinkMap() { return mHardlinkStack.top(); }
 	
 	void addHardlinkGroups(const HardlinkGroupMap &hardlinks);
-   void cleanupHardlinkGroups(HardlinkGroupMap &hardlinks);
+  void addHardlinkGroup(const HardlinkGroup &group);
+  void cleanupHardlinkGroups(HardlinkGroupMap &hardlinks);
 };
 
 }

@@ -12,6 +12,7 @@
 #include "compat.h"
 #include "util.h"
 #include "hash.h"
+#include "DirectoryEntry.h"
 
 namespace cvmfs {
 
@@ -78,9 +79,9 @@ private:
 		PortableStat64 stat;
 	} EntryStat;
 
-	EntryStat mRepositoryStat;
-	EntryStat mUnionStat;
-	EntryStat mOverlayStat;
+	mutable EntryStat mRepositoryStat;
+	mutable EntryStat mUnionStat;
+	mutable EntryStat mOverlayStat;
 	
 	bool mWhiteout;
 
@@ -114,6 +115,7 @@ public:
 	
 	inline std::string getFilename() const { return mFilename; }
 	inline std::string getParentPath() const { return mRelativeParentPath; }
+  DirectoryEntry createDirectoryEntry() const;
 
 	inline std::string getRelativePath() const { return (mRelativeParentPath.empty()) ? mFilename : mRelativeParentPath + "/" + mFilename; }
 	std::string getRepositoryPath() const;
@@ -122,19 +124,19 @@ public:
 
 	void markAsWhiteout();
 	
-	unsigned int getUnionLinkcount();
-	uint64_t getUnionInode();
-	inline PortableStat64 getUnionStat() { statUnion(); return mUnionStat.stat; };
-	bool isNew();
+	unsigned int getUnionLinkcount() const;
+	uint64_t getUnionInode() const;
+	inline PortableStat64 getUnionStat() const { statUnion(); return mUnionStat.stat; };
+	bool isNew() const;
 	
 	inline bool isEqualTo(const SyncItem *otherEntry) const { return (getRelativePath() == otherEntry->getRelativePath()); }
 
 private:
 	// lazy evaluation and caching of results of file stats
-	inline void statRepository() { if (mRepositoryStat.obtained) return; statGeneric(getRepositoryPath(), &mRepositoryStat); } 
-	inline void statUnion() { if (mUnionStat.obtained) return; statGeneric(getUnionPath(), &mUnionStat); } 
-	inline void statOverlay() { if (mOverlayStat.obtained) return; statGeneric(getOverlayPath(), &mOverlayStat); } 
-	void statGeneric(const std::string &path, EntryStat *statStructure);
+	inline void statRepository() const { if (mRepositoryStat.obtained) return; statGeneric(getRepositoryPath(), &mRepositoryStat); } 
+	inline void statUnion() const { if (mUnionStat.obtained) return; statGeneric(getUnionPath(), &mUnionStat); } 
+	inline void statOverlay() const { if (mOverlayStat.obtained) return; statGeneric(getOverlayPath(), &mOverlayStat); } 
+	void statGeneric(const std::string &path, EntryStat *statStructure) const;
 };
 
 typedef std::list<SyncItem*> SyncItemList;

@@ -28,7 +28,7 @@ SyncItem::SyncItem(const string &dirPath, const string &filename, const SyncItem
 SyncItem::~SyncItem() {
 }
 
-bool SyncItem::isNew() {
+bool SyncItem::isNew() const {
 	statRepository();
 	return (mRepositoryStat.errorCode == ENOENT);
 }
@@ -53,17 +53,17 @@ void SyncItem::markAsWhiteout() {
 	else if (S_ISLNK(mRepositoryStat.stat.st_mode)) mType = DE_SYMLINK;
 }
 
-unsigned int SyncItem::getUnionLinkcount() {
+unsigned int SyncItem::getUnionLinkcount() const {
 	statUnion();
 	return mUnionStat.stat.st_nlink;
 }
 
-uint64_t SyncItem::getUnionInode() {
+uint64_t SyncItem::getUnionInode() const {
 	statUnion();
 	return mUnionStat.stat.st_ino;
 }
 
-void SyncItem::statGeneric(const string &path, EntryStat *statStructure) {
+void SyncItem::statGeneric(const string &path, EntryStat *statStructure) const {
 	if (portableLinkStat64(path.c_str(), &statStructure->stat) != 0) {
 		statStructure->errorCode = errno;
 	}
@@ -88,4 +88,28 @@ bool SyncItem::isOpaqueDirectory() const {
 	}
 	
 	return UnionSync::sharedInstance()->isOpaqueDirectory(this);
+}
+
+DirectoryEntry SyncItem::createDirectoryEntry() const {
+  DirectoryEntry dEntry;
+  dEntry.inode_             = DirectoryEntry::kInvalidInode; // inode is determined at runtime of client
+  dEntry.parent_inode_      = DirectoryEntry::kInvalidInode; // ... dito
+  dEntry.mode_              = this->getUnionStat().st_mode;
+  dEntry.size_              = this->getUnionStat().st_size;
+  dEntry.mtime_             = this->getUnionStat().st_mtime;
+  dEntry.checksum_          = this->getContentHash();
+  dEntry.name_              = this->getFilename();
+  
+  if (this->isSymlink()) {
+    char slnk[PATH_MAX+1];
+		ssize_t l = readlink((this->getUnionPath()).c_str(), slnk, PATH_MAX);
+		if (l >= 0) {
+			slnk[l] = '\0';
+			dEntry.symlink_ = slnk;
+		}
+  }
+  
+  dEntry.linkcount_         = this->getUnionLinkcount();
+  
+  return dEntry;
 }
