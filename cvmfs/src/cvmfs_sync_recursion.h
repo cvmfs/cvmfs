@@ -17,7 +17,7 @@ namespace cvmfs {
 
 class UnionSync;
 
-enum DirEntryType {
+enum SyncItemType {
 	DE_DIR,
 	DE_FILE,
 	DE_SYMLINK
@@ -52,17 +52,19 @@ public:
 };
 
 /**
- *  any directory entry emitted by the RecursionEngine is wrapped in a convenient DirEntry structure
+ *  any directory entry emitted by the RecursionEngine is wrapped in a 
+ *  convenient SyncItem structure
  *  This class represents potentially three concrete files:
  *    - <repository path>/<filename>
  *    - <read-write branch>/<filename>
  *    - <union volume path>/<filename>
- *  The main purpose of this class is to cache stat calls to the underlying files in the different locations
+ *  The main purpose of this class is to cache stat calls to the underlying
+ *  files in the different locations as well as hiding some implementation details
  */
-class DirEntry :
+class SyncItem :
    public RefCntObject {
 private:
-	DirEntryType mType;
+	SyncItemType mType;
 
 	/**
 	 *  structure to cache stat calls to the different file locations
@@ -90,14 +92,14 @@ private:
 
 public:
 	/**
-	 *  create a new DirEntry (is normally not required for normal usage
+	 *  create a new SyncItem (is normally not required for normal usage
 	 *                         as the RecursionEngine provides you with DirEntries)
 	 *  @param dirPath the RELATIVE path to the file
 	 *  @param filename the name of the file ;-)
 	 *  @param entryType well...
 	 */
-	DirEntry(const std::string &dirPath, const std::string &filename, const DirEntryType entryType);
-	virtual ~DirEntry();
+	SyncItem(const std::string &dirPath, const std::string &filename, const SyncItemType entryType);
+	virtual ~SyncItem();
 
 	inline bool isDirectory() const { return mType == DE_DIR; }
 	inline bool isRegularFile() const { return mType == DE_FILE; }
@@ -125,7 +127,7 @@ public:
 	inline PortableStat64 getUnionStat() { statUnion(); return mUnionStat.stat; };
 	bool isNew();
 	
-	inline bool isEqualTo(const DirEntry *otherEntry) const { return (getRelativePath() == otherEntry->getRelativePath()); }
+	inline bool isEqualTo(const SyncItem *otherEntry) const { return (getRelativePath() == otherEntry->getRelativePath()); }
 
 private:
 	// lazy evaluation and caching of results of file stats
@@ -135,7 +137,7 @@ private:
 	void statGeneric(const std::string &path, EntryStat *statStructure);
 };
 
-typedef std::list<DirEntry*> DirEntryList;
+typedef std::list<SyncItem*> SyncItemList;
 
 /**
  *  the foundDirectory-Callback can decide if the recursion engine should recurse into
@@ -153,11 +155,11 @@ enum RecursionPolicy {
  *  Hooks will be called on the provided delegate object which has to be of type T
  *
  *  Found directory entries are sent back to the delegate object as a pointer to a
- *  DirEntry structure. DirEntry objects are reference counted and the recursion
+ *  SyncItem structure. SyncItem objects are reference counted and the recursion
  *  engine calls release() on them, after sending the callback.
- *  !! If you want to store a DirEntry for longer than the processing of the call-
+ *  !! If you want to store a SyncItem for longer than the processing of the call-
  *     back, you have to retain() it. After that you are responsible for freeing
- *     your retained DirEntry by calling release().
+ *     your retained SyncItem by calling release().
  */
 template <class T>
 class RecursionEngine {
@@ -174,29 +176,29 @@ private:
 
 public:
 	/** callback if a directory is entered by the recursion */
-	void (T::*enteringDirectory)(DirEntry *entry);
+	void (T::*enteringDirectory)(SyncItem *entry);
 
 	/** callback if a directory is left by the recursion */
-	void (T::*leavingDirectory)(DirEntry *entry);
+	void (T::*leavingDirectory)(SyncItem *entry);
 
 	/** callback if a file was found */
-	void (T::*foundRegularFile)(DirEntry *entry);
+	void (T::*foundRegularFile)(SyncItem *entry);
 
 	/**
 	 *  callback if a directory was found
 	 *  depending on the response of the callback, the recursion will continue in the found directory
 	 *  if this callback is not specified, it will recurse by default!
 	 */
-	RecursionPolicy (T::*foundDirectory)(DirEntry *entry);
+	RecursionPolicy (T::*foundDirectory)(SyncItem *entry);
 	
 	/**
 	 *  callback for a found directory after it was already recursed
 	 *  e.g. for deletion of directories (first delete content, then the directory itself)
 	 */
-	void (T::*foundDirectoryAfterRecursion)(DirEntry *entry);
+	void (T::*foundDirectoryAfterRecursion)(SyncItem *entry);
 
 	/** callback if a symlink was found */
-	void (T::*foundSymlink)(DirEntry *entry);
+	void (T::*foundSymlink)(SyncItem *entry);
 
 public:
 	/**
@@ -223,10 +225,10 @@ public:
 	void recurse(const std::string &dirPath) const;
 
 private:
-	void doRecursion(DirEntry *entry) const;
+	void doRecursion(SyncItem *entry) const;
 
-	bool notifyForDirectory(DirEntry *entry) const;
-	void notifyForDirectoryAfterRecursion(DirEntry *entry) const;
+	bool notifyForDirectory(SyncItem *entry) const;
+	void notifyForDirectoryAfterRecursion(SyncItem *entry) const;
 	void notifyForRegularFile(const std::string &dirPath, const std::string &filename) const;
 	void notifyForSymlink(const std::string &dirPath, const std::string &filename) const;
 	
@@ -275,13 +277,13 @@ void RecursionEngine<T>::recurse(const std::string &dirPath) const {
 	assert(mRelativeToDirectory.length() == 0 || dirPath.substr(0, mRelativeToDirectory.length()) == mRelativeToDirectory);
 
 	std::string relativePath = getRelativePath(dirPath);
-	DirEntry *directory = new DirEntry(get_parent_path(relativePath), get_file_name(relativePath), DE_DIR);
+	SyncItem *directory = new SyncItem(get_parent_path(relativePath), get_file_name(relativePath), DE_DIR);
 	doRecursion(directory);
    directory->release();
 }
 
 template <class T>
-void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
+void RecursionEngine<T>::doRecursion(SyncItem *entry) const {
 	DIR *dip;
 	PortableDirent *dit;
 	std::string filename, absolutePath;
@@ -308,7 +310,7 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 				// we are only creating a new directory entry if the user wants to see it, if has
 				// to be used for recursion or both... otherwise we are skipping the whole stuff
 				if (foundDirectory != NULL || mRecurse) {
-					DirEntry *newEntry = new DirEntry(entry->getRelativePath(), filename, DE_DIR);
+					SyncItem *newEntry = new SyncItem(entry->getRelativePath(), filename, DE_DIR);
 					if (notifyForDirectory(newEntry)) {
 						doRecursion(newEntry); // user can decide to skip directories from recursion
 					}
@@ -333,7 +335,7 @@ void RecursionEngine<T>::doRecursion(DirEntry *entry) const {
 }
 
 template <class T>
-bool RecursionEngine<T>::notifyForDirectory(DirEntry *entry) const {
+bool RecursionEngine<T>::notifyForDirectory(SyncItem *entry) const {
 	bool recurse = true;
 	if (foundDirectory != NULL) {
 		recurse = (mDelegate->*foundDirectory)(entry);
@@ -344,7 +346,7 @@ bool RecursionEngine<T>::notifyForDirectory(DirEntry *entry) const {
 }
 
 template <class T>
-void RecursionEngine<T>::notifyForDirectoryAfterRecursion(DirEntry *entry) const {
+void RecursionEngine<T>::notifyForDirectoryAfterRecursion(SyncItem *entry) const {
 	if (foundDirectoryAfterRecursion != NULL) {
 		(mDelegate->*foundDirectoryAfterRecursion)(entry);
 	}
@@ -356,7 +358,7 @@ void RecursionEngine<T>::notifyForRegularFile(const std::string &dirPath, const 
 		return;
 	}
 
-	DirEntry *entry = new DirEntry(dirPath, filename, DE_FILE);
+	SyncItem *entry = new SyncItem(dirPath, filename, DE_FILE);
 	(mDelegate->*foundRegularFile)(entry);
    entry->release();
 }
@@ -367,7 +369,7 @@ void RecursionEngine<T>::notifyForSymlink(const std::string &dirPath, const std:
 		return;
 	}
 
-	DirEntry *entry = new DirEntry(dirPath, filename, DE_SYMLINK);
+	SyncItem *entry = new SyncItem(dirPath, filename, DE_SYMLINK);
 	(mDelegate->*foundSymlink)(entry);
    entry->release();
 }

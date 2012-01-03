@@ -40,16 +40,16 @@ class WritableCatalogManager : public AbstractCatalogManager {
   
   bool Init();
   
-  bool RemoveFile(DirEntry *entry);
-	bool RemoveDirectory(DirEntry *entry);
+  bool RemoveFile(SyncItem *entry);
+	bool RemoveDirectory(SyncItem *entry);
 	
-	bool AddDirectory(DirEntry *entry);
-	bool AddFile(DirEntry *entry);
-	bool AddHardlinkGroup(DirEntryList group);
+	bool AddDirectory(SyncItem *entry);
+	bool AddFile(SyncItem *entry);
+	bool AddHardlinkGroup(SyncItemList group);
 	
-  inline bool TouchFile(DirEntry *entry) { return TouchEntry(entry); }
-  inline bool TouchDirectory(DirEntry *entry) { return TouchEntry(entry); }
-  bool TouchEntry(DirEntry *entry);
+  inline bool TouchFile(SyncItem *entry) { return TouchEntry(entry); }
+  inline bool TouchDirectory(SyncItem *entry) { return TouchEntry(entry); }
+  bool TouchEntry(SyncItem *entry);
 	
   bool CreateNestedCatalog(const std::string &mountpoint);
   bool RemoveNestedCatalog(const std::string &mountpoint);
@@ -80,7 +80,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
   bool GetCatalogByPath(const std::string &path, WritableCatalog **result);
   
 	inline std::string RelativeToCatalogPath(const std::string &relativePath) const { return (relativePath == "") ? "" : "/" + relativePath; }
-  DirectoryEntry CreateNewDirectoryEntry(DirEntry *entry, Catalog *catalog, const int hardlink_group_id = 0) const; 
+  DirectoryEntry CreateNewDirectoryEntry(SyncItem *entry, Catalog *catalog, const int hardlink_group_id = 0) const; 
   
   /**
    *  goes through all open catalogs and determines which catalogs need updated

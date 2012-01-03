@@ -40,7 +40,7 @@
 
 namespace cvmfs {
 
-class DirEntry;
+class SyncItem;
 
 /**
  *  If we encounter a file with linkcount > 1 it will be added to a HardlinkGroup
@@ -49,8 +49,8 @@ class DirEntry;
  */
 
 typedef struct {
-	DirEntry *masterFile;
-	DirEntryList hardlinks;
+	SyncItem *masterFile;
+	SyncItemList hardlinks;
 } HardlinkGroup;
 
 /**
@@ -87,7 +87,7 @@ private:
 	 *  when committing the changes after recursing the read write branch of the union file system
 	 *  the queues will processed en bloc (for parallelization purposes) and afterwards added
 	 */
-	DirEntryList mFileQueue;
+	SyncItemList mFileQueue;
 	HardlinkGroupList mHardlinkQueue;
 	
 	/** if dry run is set no changes to the repository will be made */
@@ -106,39 +106,39 @@ public:
 	 *  to add all its contents
 	 *  @param entry the entry to add
 	 */
-	void add(DirEntry *entry);
+	void add(SyncItem *entry);
 	
 	/**
 	 *  touching an entry in the repository
 	 *  @param the entry to touch
 	 */
-	void touch(DirEntry *entry);
+	void touch(SyncItem *entry);
 	
 	/**
 	 *  removing an entry from the repository
 	 *  directories will be recursively removed to get rid of its contents
 	 *  @param entry the entry to remove
 	 */
-	void remove(DirEntry *entry);
+	void remove(SyncItem *entry);
 	
 	/**
 	 *  meta operation
 	 *  basically remove the old entry and add the new one
 	 *  @param entry the entry to be replaced by a new one
 	 */
-	void replace(DirEntry *entry);
+	void replace(SyncItem *entry);
 	
 	/**
 	 *  notifier that a new directory was opened for recursion
 	 *  @param entry the opened directory
 	 */
-	void enterDirectory(DirEntry *entry);
+	void enterDirectory(SyncItem *entry);
 	
 	/**
 	 *  notifier that a directory is fully processed by a recursion
 	 *  @param entry the directory which will be left by the recursion
 	 */
-	void leaveDirectory(DirEntry *entry);
+	void leaveDirectory(SyncItem *entry);
 	
 	/**
 	 *  do any pending processing and commit all changes to the catalogs
@@ -147,34 +147,34 @@ public:
 	void commit();
 	
 private:
-	void addDirectoryRecursively(DirEntry *entry);
-	void removeDirectoryRecursively(DirEntry *entry);
-	RecursionPolicy addDirectoryCallback(DirEntry *entry);
+	void addDirectoryRecursively(SyncItem *entry);
+	void removeDirectoryRecursively(SyncItem *entry);
+	RecursionPolicy addDirectoryCallback(SyncItem *entry);
 	
-	uint64_t getTemporaryHardlinkGroupNumber(DirEntry *entry) const;
-	void insertHardlink(DirEntry *entry);
-	void insertExistingHardlink(DirEntry *entry);
-	void completeHardlinks(DirEntry *entry);
+	uint64_t getTemporaryHardlinkGroupNumber(SyncItem *entry) const;
+	void insertHardlink(SyncItem *entry);
+	void insertExistingHardlink(SyncItem *entry);
+	void completeHardlinks(SyncItem *entry);
 	
-	void addFile(DirEntry *entry);
-	void removeFile(DirEntry *entry);
-	void touchFile(DirEntry *entry);
+	void addFile(SyncItem *entry);
+	void removeFile(SyncItem *entry);
+	void touchFile(SyncItem *entry);
 	
-	void addDirectory(DirEntry *entry);
-	void removeDirectory(DirEntry *entry);
-	void touchDirectory(DirEntry *entry);
+	void addDirectory(SyncItem *entry);
+	void removeDirectory(SyncItem *entry);
+	void touchDirectory(SyncItem *entry);
 	
-	void createNestedCatalog(DirEntry *requestFile);
-	void removeNestedCatalog(DirEntry *requestFile);
+	void createNestedCatalog(SyncItem *requestFile);
+	void removeNestedCatalog(SyncItem *requestFile);
 	
-	void leaveAddedDirectory(DirEntry *entry);
+	void leaveAddedDirectory(SyncItem *entry);
 	
 	void compressAndHashFileQueue();
 	void addFileQueueToCatalogs();
    void releaseFileQueue();
 	
-	inline bool addFileToDatastore(DirEntry *entry, hash::t_sha1 &hash) { return addFileToDatastore(entry, "", hash); }
-	bool addFileToDatastore(DirEntry *entry, const std::string &suffix, hash::t_sha1 &hash);
+	inline bool addFileToDatastore(SyncItem *entry, hash::t_sha1 &hash) { return addFileToDatastore(entry, "", hash); }
+	bool addFileToDatastore(SyncItem *entry, const std::string &suffix, hash::t_sha1 &hash);
 	
 	inline HardlinkGroupMap& getHardlinkMap() { return mHardlinkStack.top(); }
 	

@@ -47,7 +47,7 @@
 
 namespace cvmfs {
 	
-	class DirEntry;
+	class SyncItem;
 	
 	enum FileType {FT_DIR, FT_REG, FT_SYM, FT_ERR};
 	
@@ -108,7 +108,7 @@ namespace cvmfs {
 		 *  @param directory the directory to check for opacity
 		 *  @return true if directory is opaque, otherwise false
 		 */
-		virtual bool isOpaqueDirectory(const DirEntry *directory) const = 0;
+		virtual bool isOpaqueDirectory(const SyncItem *directory) const = 0;
 		
 		/**
 		 *  checks if given file is supposed to be whiteout
@@ -117,7 +117,7 @@ namespace cvmfs {
 		 *  @param filename the filename to check
 		 *  @return true if filename seems to be whiteout otherwise false
 		 */
-		virtual bool isWhiteoutEntry(const DirEntry *entry) const = 0;
+		virtual bool isWhiteoutEntry(const SyncItem *entry) const = 0;
 		
 		/**
 		 *  union file systems may use some special files for bookkeeping
@@ -143,34 +143,34 @@ namespace cvmfs {
 		 *  @param dirPath the relative directory path
 		 *  @param filename the filename
 		 */
-		virtual void processFoundRegularFile(DirEntry *entry);
+		virtual void processFoundRegularFile(SyncItem *entry);
 		
-		/**
+		/**SyncItem
 		 *  callback method for the main recursion when a directory is found
 		 *  @param dirPath the relative directory path
 		 *  @param filename the filename
 		 *  @return true if recursion should dig into the given directory, false otherwise
 		 */
-		virtual RecursionPolicy processFoundDirectory(DirEntry *entry);
+		virtual RecursionPolicy processFoundDirectory(SyncItem *entry);
 		
 		/**
 		 *  callback method for the main recursion when a symlink is found
 		 *  @param dirPath the relative directory path
 		 *  @param filename the filename
 		 */
-		virtual void processFoundSymlink(DirEntry *entry);
+		virtual void processFoundSymlink(SyncItem *entry);
 		
 		/**
 		 *  called if the main recursion enters a directory for further recursion
 		 *  @param entry the directory which was stepped into
 		 */
-		virtual void enteringDirectory(DirEntry *entry);
+		virtual void enteringDirectory(SyncItem *entry);
 		
 		/**
 		 *  called before the main recursion leaves the directory after recursing it
 		 *  @param entry the directory which was stepped out
 		 */
-		virtual void leavingDirectory(DirEntry *entry);
+		virtual void leavingDirectory(SyncItem *entry);
 	};
 	
 	/**
@@ -189,8 +189,8 @@ namespace cvmfs {
 		bool doYourMagic();
 		static void initialize(SyncMediator *mediator, const SyncParameters *parameters);
 		
-		inline bool isWhiteoutEntry(const DirEntry *entry) const { return (entry->getFilename().substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
-		inline bool isOpaqueDirectory(const DirEntry *directory) const { return file_exists(directory->getOverlayPath() + "/.wh..wh..opq"); }
+		inline bool isWhiteoutEntry(const SyncItem *entry) const { return (entry->getFilename().substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
+		inline bool isOpaqueDirectory(const SyncItem *directory) const { return file_exists(directory->getOverlayPath() + "/.wh..wh..opq"); }
 		inline std::string unwindWhiteoutFilename(const std::string &filename) const { return filename.substr(mWhiteoutPrefix.length()); }
 		
 		inline std::set<std::string> getIgnoredFilenames() const { return mIgnoredFilenames; };

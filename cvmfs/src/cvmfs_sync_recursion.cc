@@ -10,13 +10,12 @@
 using namespace std;
 using namespace cvmfs;
 
-DirEntry::DirEntry(const string &dirPath, const string &filename, const DirEntryType entryType) {
-	mRelativeParentPath = dirPath;
-	mFilename = filename;
-	mType = entryType;
-	mWhiteout = false;
-	mContentHash = hash::t_sha1();
-
+SyncItem::SyncItem(const string &dirPath, const string &filename, const SyncItemType entryType) :
+  mType(entryType),
+  mWhiteout(false),
+  mRelativeParentPath(dirPath),
+  mFilename(filename)
+{
 	// init stat structures
 	mRepositoryStat.obtained = false;
 	mRepositoryStat.errorCode = 0;
@@ -26,15 +25,15 @@ DirEntry::DirEntry(const string &dirPath, const string &filename, const DirEntry
 	mOverlayStat.errorCode = 0;
 }
 
-DirEntry::~DirEntry() {
+SyncItem::~SyncItem() {
 }
 
-bool DirEntry::isNew() {
+bool SyncItem::isNew() {
 	statRepository();
 	return (mRepositoryStat.errorCode == ENOENT);
 }
 
-void DirEntry::markAsWhiteout() {
+void SyncItem::markAsWhiteout() {
 	// mark the file as whiteout entry and strip the whiteout prefix
 	mWhiteout = true;
 	mFilename = UnionSync::sharedInstance()->unwindWhiteoutFilename(getFilename());
@@ -54,36 +53,36 @@ void DirEntry::markAsWhiteout() {
 	else if (S_ISLNK(mRepositoryStat.stat.st_mode)) mType = DE_SYMLINK;
 }
 
-unsigned int DirEntry::getUnionLinkcount() {
+unsigned int SyncItem::getUnionLinkcount() {
 	statUnion();
 	return mUnionStat.stat.st_nlink;
 }
 
-uint64_t DirEntry::getUnionInode() {
+uint64_t SyncItem::getUnionInode() {
 	statUnion();
 	return mUnionStat.stat.st_ino;
 }
 
-void DirEntry::statGeneric(const string &path, EntryStat *statStructure) {
+void SyncItem::statGeneric(const string &path, EntryStat *statStructure) {
 	if (portableLinkStat64(path.c_str(), &statStructure->stat) != 0) {
 		statStructure->errorCode = errno;
 	}
 	statStructure->obtained = true;
 }
 
-string DirEntry::getRepositoryPath() const {
+string SyncItem::getRepositoryPath() const {
 	return UnionSync::sharedInstance()->getRepositoryPath() + "/" + getRelativePath();
 }
 
-string DirEntry::getUnionPath() const {
+string SyncItem::getUnionPath() const {
 	return UnionSync::sharedInstance()->getUnionPath() + "/" + getRelativePath();
 }
 
-string DirEntry::getOverlayPath() const {
+string SyncItem::getOverlayPath() const {
 	return UnionSync::sharedInstance()->getOverlayPath() + "/" + getRelativePath();
 }
 
-bool DirEntry::isOpaqueDirectory() const {
+bool SyncItem::isOpaqueDirectory() const {
 	if (!isDirectory()) {
 		return false;
 	}

@@ -134,7 +134,7 @@ bool WritableCatalogManager::GetCatalogByPath(const string &path, WritableCatalo
   return true;
 }
 
-bool WritableCatalogManager::RemoveFile(DirEntry *entry) {
+bool WritableCatalogManager::RemoveFile(SyncItem *entry) {
 	const string parent_path = RelativeToCatalogPath(entry->getParentPath());
   const string file_path = RelativeToCatalogPath(entry->getRelativePath());
 	
@@ -157,7 +157,7 @@ bool WritableCatalogManager::RemoveFile(DirEntry *entry) {
 	return true;
 }
 
-bool WritableCatalogManager::RemoveDirectory(DirEntry *entry) {
+bool WritableCatalogManager::RemoveDirectory(SyncItem *entry) {
 	const string parent_path = RelativeToCatalogPath(entry->getParentPath());
   const string directory_path = RelativeToCatalogPath(entry->getRelativePath());
 	
@@ -198,7 +198,7 @@ bool WritableCatalogManager::RemoveDirectory(DirEntry *entry) {
 }
 
 
-DirectoryEntry WritableCatalogManager::CreateNewDirectoryEntry(DirEntry *entry, 
+DirectoryEntry WritableCatalogManager::CreateNewDirectoryEntry(SyncItem *entry, 
                                                                Catalog *catalog, 
                                                                const int hardlink_group_id) const {
   DirectoryEntry dEntry;
@@ -217,7 +217,7 @@ DirectoryEntry WritableCatalogManager::CreateNewDirectoryEntry(DirEntry *entry,
   return dEntry;
 }
 
-bool WritableCatalogManager::AddDirectory(DirEntry *entry) {
+bool WritableCatalogManager::AddDirectory(SyncItem *entry) {
   const string directory_path = RelativeToCatalogPath(entry->getRelativePath());
   const string parent_path = RelativeToCatalogPath(entry->getParentPath());
   
@@ -233,7 +233,7 @@ bool WritableCatalogManager::AddDirectory(DirEntry *entry) {
   return true;
 }
 
-bool WritableCatalogManager::AddFile(DirEntry *entry) {
+bool WritableCatalogManager::AddFile(SyncItem *entry) {
   const string parent_path = RelativeToCatalogPath(entry->getParentPath());
   const string file_path = RelativeToCatalogPath(entry->getRelativePath());
 
@@ -266,7 +266,7 @@ bool WritableCatalogManager::AddFile(DirEntry *entry) {
   return true;
 }
 
-bool WritableCatalogManager::AddHardlinkGroup(DirEntryList group) {
+bool WritableCatalogManager::AddHardlinkGroup(SyncItemList group) {
   // sanity check
 	if (group.size() == 0) {
     pmesg(D_CATALOG, "tried to add an empty hardlink group");
@@ -296,10 +296,10 @@ bool WritableCatalogManager::AddHardlinkGroup(DirEntryList group) {
 	}
 	
 	// add the file entries to the catalog
-	DirEntryList::const_iterator i, end;
+	SyncItemList::const_iterator i, end;
   bool result = true;
   bool successful = true;
-  DirEntry *currentEntry = NULL;
+  SyncItem *currentEntry = NULL;
 	for (i = group.begin(), end = group.end(); i != end; ++i) {
     currentEntry = *i;
 	  string file_path = RelativeToCatalogPath(currentEntry->getRelativePath());
@@ -317,7 +317,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirEntryList group) {
 	return result;
 }
 
-bool WritableCatalogManager::TouchEntry(DirEntry *entry) {
+bool WritableCatalogManager::TouchEntry(SyncItem *entry) {
   const string parent_path = RelativeToCatalogPath(entry->getParentPath());
   const string entry_path = RelativeToCatalogPath(entry->getRelativePath());
   

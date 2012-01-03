@@ -82,7 +82,7 @@ void UnionSync::fini() {
 	mInstance = NULL;
 }
 
-RecursionPolicy UnionSync::processFoundDirectory(DirEntry *entry) {
+RecursionPolicy UnionSync::processFoundDirectory(SyncItem *entry) {
 	if (entry->isNew()) {
 		mMediator->add(entry);
 		return RP_DONT_RECURSE;
@@ -98,7 +98,7 @@ RecursionPolicy UnionSync::processFoundDirectory(DirEntry *entry) {
 	}
 }
 
-void UnionSync::processFoundRegularFile(DirEntry *entry) {
+void UnionSync::processFoundRegularFile(SyncItem *entry) {
 	// process whiteout prefix
 	if (isWhiteoutEntry(entry)) {
 		entry->markAsWhiteout();
@@ -114,15 +114,15 @@ void UnionSync::processFoundRegularFile(DirEntry *entry) {
 	} 
 }
 
-void UnionSync::processFoundSymlink(DirEntry *entry) {
+void UnionSync::processFoundSymlink(SyncItem *entry) {
 	// symlinks are just files in this sense:
 	processFoundRegularFile(entry);
 }
 
-void UnionSync::enteringDirectory(DirEntry *entry) {
+void UnionSync::enteringDirectory(SyncItem *entry) {
 	mMediator->enterDirectory(entry);
 }
 
-void UnionSync::leavingDirectory(DirEntry *entry) {
+void UnionSync::leavingDirectory(SyncItem *entry) {
 	mMediator->leaveDirectory(entry);
 }

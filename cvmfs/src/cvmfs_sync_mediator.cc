@@ -26,7 +26,7 @@ SyncMediator::~SyncMediator() {
 	
 }
 
-void SyncMediator::add(DirEntry *entry) {
+void SyncMediator::add(SyncItem *entry) {
 	if (entry->isDirectory()) {
 		addDirectoryRecursively(entry);
 	}
@@ -53,7 +53,7 @@ void SyncMediator::add(DirEntry *entry) {
 	}
 }
 
-void SyncMediator::touch(DirEntry *entry) {
+void SyncMediator::touch(SyncItem *entry) {
 	if (entry->isDirectory()) {
 		touchDirectory(entry);
 	}
@@ -69,7 +69,7 @@ void SyncMediator::touch(DirEntry *entry) {
 	}
 }
 
-void SyncMediator::remove(DirEntry *entry) {
+void SyncMediator::remove(SyncItem *entry) {
 	if (entry->isDirectory()) {
 		removeDirectoryRecursively(entry);
 	}
@@ -91,26 +91,26 @@ void SyncMediator::remove(DirEntry *entry) {
 	}
 }
 
-void SyncMediator::replace(DirEntry *entry) {
+void SyncMediator::replace(SyncItem *entry) {
 	// an entry is just a representation of a filename
 	// replacing it is as easy as that:
 	remove(entry);
 	add(entry);
 }
 
-void SyncMediator::enterDirectory(DirEntry *entry) {
+void SyncMediator::enterDirectory(SyncItem *entry) {
 	HardlinkGroupMap newMap;
 	mHardlinkStack.push(newMap);
 }
 
-void SyncMediator::leaveDirectory(DirEntry *entry) {
+void SyncMediator::leaveDirectory(SyncItem *entry) {
 	completeHardlinks(entry);
 	addHardlinkGroups(getHardlinkMap());
    cleanupHardlinkGroups(getHardlinkMap());
 	mHardlinkStack.pop();
 }
 
-void SyncMediator::leaveAddedDirectory(DirEntry *entry) {
+void SyncMediator::leaveAddedDirectory(SyncItem *entry) {
 	addHardlinkGroups(getHardlinkMap());
    cleanupHardlinkGroups(getHardlinkMap());
 	mHardlinkStack.pop();
@@ -127,8 +127,8 @@ void SyncMediator::commit() {
 void SyncMediator::compressAndHashFileQueue() {
 	// compressing and hashing files
 	// TODO: parallelize this!
-	DirEntryList::iterator i;
-	DirEntryList::const_iterator iend;
+	SyncItemList::iterator i;
+	SyncItemList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
 		hash::t_sha1 hash;
 		addFileToDatastore(*i, hash);
@@ -139,8 +139,8 @@ void SyncMediator::compressAndHashFileQueue() {
 	// (hardlinks point to the same "data", therefore we only have to compress it once)
 	HardlinkGroupList::iterator j;
 	HardlinkGroupList::const_iterator jend;
-	DirEntryList::iterator k;
-	DirEntryList::const_iterator kend;
+	SyncItemList::iterator k;
+	SyncItemList::const_iterator kend;
 	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
 		// hardlinks to anything else (mostly symlinks) do not have to be compressed
 		if (not j->masterFile->isRegularFile()) {
@@ -165,8 +165,8 @@ void SyncMediator::addFileQueueToCatalogs() {
 	}
 	
 	// add singular files
-	DirEntryList::iterator i;
-	DirEntryList::const_iterator iend;
+	SyncItemList::iterator i;
+	SyncItemList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
 		mCatalogManager->AddFile(*i);
 	}
@@ -181,8 +181,8 @@ void SyncMediator::addFileQueueToCatalogs() {
 
 void SyncMediator::releaseFileQueue() {
    // release DirEntries from file queue
-	DirEntryList::iterator i;
-	DirEntryList::const_iterator iend;
+	SyncItemList::iterator i;
+	SyncItemList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
 		(*i)->release();
 	}
@@ -197,7 +197,7 @@ void SyncMediator::releaseFileQueue() {
 	}
 }
 
-bool SyncMediator::addFileToDatastore(DirEntry *entry, const std::string &suffix, hash::t_sha1 &hash) {
+bool SyncMediator::addFileToDatastore(SyncItem *entry, const std::string &suffix, hash::t_sha1 &hash) {
 	// don't do that, would change something!
 	if (mDryRun) {
 		return true;
@@ -247,13 +247,13 @@ bool SyncMediator::addFileToDatastore(DirEntry *entry, const std::string &suffix
 	return result;
 }
 
-void SyncMediator::insertHardlink(DirEntry *entry) {
+void SyncMediator::insertHardlink(SyncItem *entry) {
 	uint64_t inode = entry->getUnionInode();
 	
 	// find the hard link group in the lists
 	HardlinkGroupMap::iterator hardlinkGroup = getHardlinkMap().find(inode);
 
-   // this DirEntry will stay for some time... increment reference counter
+   // this SyncItem will stay for some time... increment reference counter
    entry->retain();
 
 	if (hardlinkGroup == getHardlinkMap().end()) {
@@ -268,7 +268,7 @@ void SyncMediator::insertHardlink(DirEntry *entry) {
 	}
 }
 
-void SyncMediator::insertExistingHardlink(DirEntry *entry) {
+void SyncMediator::insertExistingHardlink(SyncItem *entry) {
 	// check if found file has hardlinks (nlink > 1)
 	// as we are looking through all files in one directory here, there might be
 	// completely untouched hardlink groups, which we can safely skip
@@ -284,7 +284,7 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 	hlGroup = getHardlinkMap().find(inode);
 
 	if (hlGroup != getHardlinkMap().end()) { // touched hardlinks in this group?
-		DirEntryList::const_iterator i,end;
+		SyncItemList::const_iterator i,end;
 		bool alreadyThere = false;
 		
 		// search for the entry in this group
@@ -306,7 +306,7 @@ void SyncMediator::insertExistingHardlink(DirEntry *entry) {
 	}
 }
 
-void SyncMediator::completeHardlinks(DirEntry *entry) {
+void SyncMediator::completeHardlinks(SyncItem *entry) {
 	// create a recursion engine which DOES NOT recurse into directories by default.
 	// it basically goes through the current directory (in the union volume) and
 	// searches for legacy hardlinks which has to be connected to the new (edited) ones
@@ -323,7 +323,7 @@ void SyncMediator::completeHardlinks(DirEntry *entry) {
 	recursion.recurse(entry->getUnionPath());
 }
 
-void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
+void SyncMediator::addDirectoryRecursively(SyncItem *entry) {
 	addDirectory(entry);
 	
 	// create a recursion engine, which recursively adds all entries in a newly created directory
@@ -336,7 +336,7 @@ void SyncMediator::addDirectoryRecursively(DirEntry *entry) {
 	recursion.recurse(entry->getOverlayPath());
 }
 
-void SyncMediator::removeDirectoryRecursively(DirEntry *entry) {
+void SyncMediator::removeDirectoryRecursively(SyncItem *entry) {
 	RecursionEngine<SyncMediator> recursion(this, UnionSync::sharedInstance()->getRepositoryPath(), UnionSync::sharedInstance()->getIgnoredFilenames());
 	recursion.foundRegularFile = &SyncMediator::remove;
 	// delete a directory AFTER it was emptied (we cannot use the generic SyncMediator::remove() here, because it would start up another recursion)
@@ -347,22 +347,22 @@ void SyncMediator::removeDirectoryRecursively(DirEntry *entry) {
 	removeDirectory(entry);
 }
 
-RecursionPolicy SyncMediator::addDirectoryCallback(DirEntry *entry) {
+RecursionPolicy SyncMediator::addDirectoryCallback(SyncItem *entry) {
 	addDirectory(entry);
 	return RP_RECURSE; // <-- tells the recursion engine to recurse further into this directory
 }
 
-void SyncMediator::createNestedCatalog(DirEntry *requestFile) {
+void SyncMediator::createNestedCatalog(SyncItem *requestFile) {
 	if (mPrintChangeset) cout << "[add] NESTED CATALOG" << endl;
 	if (not mDryRun)     mCatalogManager->CreateNestedCatalog(requestFile->getParentPath());
 }
 
-void SyncMediator::removeNestedCatalog(DirEntry *requestFile) {
+void SyncMediator::removeNestedCatalog(SyncItem *requestFile) {
 	if (mPrintChangeset) cout << "[rem] NESTED CATALOG" << endl;
 	if (not mDryRun)     mCatalogManager->RemoveNestedCatalog(requestFile->getParentPath());
 }
 
-void SyncMediator::addFile(DirEntry *entry) {
+void SyncMediator::addFile(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[add] " << entry->getRepositoryPath() << endl;
 	
 	if (entry->isSymlink() && not mDryRun) {
@@ -376,27 +376,27 @@ void SyncMediator::addFile(DirEntry *entry) {
 	}
 }
 
-void SyncMediator::removeFile(DirEntry *entry) {
+void SyncMediator::removeFile(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
 	if (not mDryRun)     mCatalogManager->RemoveFile(entry);
 }
 
-void SyncMediator::touchFile(DirEntry *entry) {
+void SyncMediator::touchFile(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
 	if (not mDryRun)     mCatalogManager->TouchFile(entry);
 }
 
-void SyncMediator::addDirectory(DirEntry *entry) {
+void SyncMediator::addDirectory(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[add] " << entry->getRepositoryPath() << endl;
 	if (not mDryRun)     mCatalogManager->AddDirectory(entry);
 }
 
-void SyncMediator::removeDirectory(DirEntry *entry) {
+void SyncMediator::removeDirectory(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[rem] " << entry->getRepositoryPath() << endl;
 	if (not mDryRun)     mCatalogManager->RemoveDirectory(entry);
 }
 
-void SyncMediator::touchDirectory(DirEntry *entry) {
+void SyncMediator::touchDirectory(SyncItem *entry) {
 	if (mPrintChangeset) cout << "[tou] " << entry->getRepositoryPath() << endl;
 	if (not mDryRun)     mCatalogManager->TouchDirectory(entry);
 }
@@ -408,7 +408,7 @@ void SyncMediator::addHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 	   
 		if (mPrintChangeset) {
 			cout << "[add] hardlink group around: " << i->second.masterFile->getRepositoryPath() << "( ";	
-			DirEntryList::const_iterator j,jend;
+			SyncItemList::const_iterator j,jend;
 			for (j = i->second.hardlinks.begin(), jend = i->second.hardlinks.end(); j != jend; ++j) {
 				cout << (*j)->getFilename() << " ";
 			}
@@ -429,8 +429,8 @@ void SyncMediator::addHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 void SyncMediator::cleanupHardlinkGroups(HardlinkGroupMap &hardlinks) {
    HardlinkGroupMap::iterator i;
    HardlinkGroupMap::const_iterator iend;
-   DirEntryList::const_iterator j;
-   DirEntryList::const_iterator jend;
+   SyncItemList::const_iterator j;
+   SyncItemList::const_iterator jend;
 	for (i = hardlinks.begin(), iend = hardlinks.end(); i != iend; ++i) {
 	   // currentHardlinkGroup = i->second; --> just to remind you
 		
