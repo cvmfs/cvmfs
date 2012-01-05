@@ -201,19 +201,18 @@ int main(int argc, char **argv) {
 	// create worker objects
 	WritableCatalogManager *catalogManager = createWritableCatalogManager(&parameters);
 	SyncMediator *mediator = new SyncMediator(catalogManager, &parameters);
-	SyncAufs1::initialize(mediator, &parameters);
+  SyncAufs *sync = new SyncAufs(mediator, &parameters);
 	
 	// sync
-	if (not cvmfs::UnionSync::sharedInstance()->doYourMagic()) {
+	if (sync->DoYourMagic()) {
 		printError("something went wrong during sync");
 		return 4;
 	}
 	
 	// clean up
-	UnionSync::sharedInstance()->fini();
 	delete mediator;
 	delete catalogManager;
-	monitor::fini();
+  delete sync;
    
 	return 0;
 }
