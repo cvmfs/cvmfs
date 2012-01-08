@@ -24,21 +24,21 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#include "cvmfs_config.h"
-
-#include "cvmfs_sync_aufs.h"
-#include "cvmfs_sync.h"
-
 #include <string>
 #include <iostream>
 #include <stdlib.h>
 #include <sstream>
 #include <set>
 
-#include "util.h"
-#include "monitor.h"
+#include "SyncUnionAufs.h"
+#include "SyncMediator.h"
 
 #include "WritableCatalogManager.h"
+
+#include "cvmfs_config.h"
+#include "cvmfs_sync.h"
+#include "util.h"
+#include "monitor.h"
 
 #include "compat.h"
 
@@ -183,10 +183,26 @@ bool createCacheDir(SyncParameters *p) {
 	return true;
 }
 
-WritableCatalogManager* createWritableCatalogManager(SyncParameters *p) {
-  return new WritableCatalogManager(p->dir_catalogs,
-                                    p->dir_data,
-                                    p->lazy_attach);
+WritableCatalogManager* createWritableCatalogManager(const SyncParameters &p) {
+  return new WritableCatalogManager(canonical_path(p.dir_catalogs),
+                                    canonical_path(p.dir_data),
+                                    p.lazy_attach);
+}
+
+SyncMediator* createSyncMediator(WritableCatalogManager* catalogManager,
+                                 const SyncParameters &p) {
+  return new SyncMediator(catalogManager,
+                          canonical_path(p.dir_data),
+                          p.dry_run,
+                          p.print_changeset);
+}
+
+SyncUnion* createSynchronisationEngine(SyncMediator* mediator,
+                                       const SyncParameters &p) {
+  return new SyncUnionAufs(mediator,
+                           canonical_path(p.dir_cvmfs),
+                           canonical_path(p.dir_shadow),
+                           canonical_path(p.dir_overlay));
 }
 
 int main(int argc, char **argv) {
@@ -199,12 +215,12 @@ int main(int argc, char **argv) {
 	if (not createCacheDir(&parameters)) return 3;
 	
 	// create worker objects
-	WritableCatalogManager *catalogManager = createWritableCatalogManager(&parameters);
-	SyncMediator *mediator = new SyncMediator(catalogManager, &parameters);
-  SyncAufs *sync = new SyncAufs(mediator, &parameters);
+	WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
+	SyncMediator *mediator = createSyncMediator(catalogManager, parameters);
+  SyncUnion *sync = createSynchronisationEngine(mediator, parameters);
 	
 	// sync
-	if (sync->DoYourMagic()) {
+	if (not sync->DoYourMagic()) {
 		printError("something went wrong during sync");
 		return 4;
 	}

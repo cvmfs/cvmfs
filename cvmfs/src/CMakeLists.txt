@@ -68,8 +68,9 @@ set (CVMFS_SYNC_BIN_SOURCES
 	monitor.cc monitor.h 
 	cvmfs_sync.h cvmfs_sync.cc
 	cvmfs_sync_recursion.h cvmfs_sync_recursion.cc
+	SyncItem.h SyncItem.cc
 	SyncUnion.h SyncUnion.cc
-	SyncAufs.h SyncAufs.cc
+	SyncUnionAufs.h SyncUnionAufs.cc
 	SyncMediator.h SyncMediator.cc
 	
 	

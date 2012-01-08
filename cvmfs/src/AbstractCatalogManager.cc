@@ -429,4 +429,34 @@ bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
   return false;
 }
 
+void AbstractCatalogManager::PrintCatalogHierarchy() const {
+  Catalog *root_catalog = GetRootCatalog();
+  CatalogList catalogs = root_catalog->GetChildrenRecursively();
+  
+  int level = 0;
+  Catalog *parent_before = NULL; // TODO: this is just a mock up... should be a stack or something
+  Catalog *current_parent = root_catalog->parent();
+  Catalog *current_catalog = root_catalog;
+  cout << root_catalog->path() << endl;
+  for (CatalogList::const_iterator i = catalogs.begin(),
+       iend = catalogs.end();
+       i != iend; ++i) {
+    current_catalog = *i;
+    if (current_parent != current_catalog->parent()) {
+      if (current_catalog->parent() == parent_before) {
+        --level;
+      } else {
+        ++level;
+      }
+      parent_before = current_parent;
+      current_parent = current_catalog->parent();
+    }
+    
+    for (int i = 0; i < level; ++i) {
+      cout << "--";
+    }
+    cout << ">> " << current_catalog->path() << endl;
+  }
+}
+
 }

@@ -36,12 +36,11 @@
 
 #include "compat.h"
 #include "WritableCatalogManager.h"
+#include "SyncItem.h"
+
 #include "cvmfs_sync.h"
-#include "cvmfs_sync_recursion.h"
 
 namespace cvmfs {
-
-class SyncItem;
 
 /**
  *  If we encounter a file with linkcount > 1 it will be added to a HardlinkGroup
@@ -49,10 +48,19 @@ class SyncItem;
  *  Assertion: linkcount == HardlinkGroup::hardlinks.size() at the end!!
  */
 
-typedef struct {
-	SyncItem *masterFile;
+struct HardlinkGroup {
+  HardlinkGroup(SyncItem &master_entry) : 
+    masterFile(master_entry) {
+    hardlinks.push_back(master_entry);
+  }
+  
+  void AddHardlink(SyncItem &entry) {
+    hardlinks.push_back(entry);
+  }
+  
+	SyncItem masterFile;
 	SyncItemList hardlinks;
-} HardlinkGroup;
+};
 
 /**
  *  a mapping of inode number to the related HardlinkGroup
@@ -73,7 +81,8 @@ private:
 	
 private:
 	WritableCatalogManager *mCatalogManager;
-	std::string mDataDirectory;
+	const std::string mDataDirectory;
+  SyncUnion *mUnionEngine;
 	
 	/**
 	 *  hardlinks are supported as long as they all reside in the SAME directory.
@@ -98,8 +107,10 @@ private:
 	bool mPrintChangeset;
 	
 public:
-	SyncMediator(WritableCatalogManager *catalogManager, const SyncParameters *parameters);
-	virtual ~SyncMediator();
+	SyncMediator(WritableCatalogManager *catalogManager,
+	             const std::string &data_directory,
+	             const bool dry_run = false,
+	             const bool print_changeset = false);
 	
 	/**
 	 *  adding an entry to the repository
@@ -107,81 +118,108 @@ public:
 	 *  to add all its contents
 	 *  @param entry the entry to add
 	 */
-	void add(SyncItem *entry);
+	void Add(SyncItem &entry);
 	
 	/**
 	 *  touching an entry in the repository
 	 *  @param the entry to touch
 	 */
-	void touch(SyncItem *entry);
+	void Touch(SyncItem &entry);
 	
 	/**
 	 *  removing an entry from the repository
 	 *  directories will be recursively removed to get rid of its contents
 	 *  @param entry the entry to remove
 	 */
-	void remove(SyncItem *entry);
+	void Remove(SyncItem &entry);
 	
 	/**
 	 *  meta operation
 	 *  basically remove the old entry and add the new one
 	 *  @param entry the entry to be replaced by a new one
 	 */
-	void replace(SyncItem *entry);
+	void Replace(SyncItem &entry);
 	
 	/**
 	 *  notifier that a new directory was opened for recursion
 	 *  @param entry the opened directory
 	 */
-	void enterDirectory(SyncItem *entry);
+	void EnterDirectory(SyncItem &entry);
 	
 	/**
 	 *  notifier that a directory is fully processed by a recursion
 	 *  @param entry the directory which will be left by the recursion
 	 */
-	void leaveDirectory(SyncItem *entry);
+	void LeaveDirectory(SyncItem &entry, const bool complete_hardlinks = true);
 	
 	/**
 	 *  do any pending processing and commit all changes to the catalogs
 	 *  to be called AFTER all recursions are finished
 	 */
-	void commit();
+	void Commit();
 	
 private:
-	void addDirectoryRecursively(SyncItem *entry);
-	void removeDirectoryRecursively(SyncItem *entry);
-	RecursionPolicy addDirectoryCallback(SyncItem *entry);
+  // -------------------------------------------------------------
+	void AddDirectoryRecursively(SyncItem &entry);
 	
-	uint64_t getTemporaryHardlinkGroupNumber(SyncItem *entry) const;
-	void insertHardlink(SyncItem *entry);
-	void insertExistingHardlink(SyncItem *entry);
-	void completeHardlinks(SyncItem *entry);
+	bool AddDirectoryCallback(const std::string &parent_dir,
+                            const std::string &dir_name);
+	void AddFileCallback(const std::string &parent_dir,
+                       const std::string &file_name);
+  void AddSymlinkCallback(const std::string &parent_dir,
+                          const std::string &link_name);
+	void EnterAddedDirectoryCallback(const std::string &parent_dir,
+                                   const std::string &dir_name);
+	void LeaveAddedDirectoryCallback(const std::string &parent_dir,
+                                   const std::string &dir_name);
+  // -------------------------------------------------------------                         
+  void RemoveDirectoryRecursively(SyncItem &entry);
+  
+  void RemoveFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
+  void RemoveSymlinkCallback(const std::string &parent_dir,
+                             const std::string &link_name);
+  void RemoveDirectoryCallback(const std::string &parent_dir,
+                               const std::string &dir_name);
+	// -------------------------------------------------------------
+	void CompleteHardlinks(SyncItem &entry);
 	
-	void addFile(SyncItem *entry);
-	void removeFile(SyncItem *entry);
-	void touchFile(SyncItem *entry);
+	void InsertExistingHardlinkFileCallback(const std::string &parent_dir,
+	                                        const std::string &file_name);
+	void InsertExistingHardlinkSymlinkCallback(const std::string &parent_dir,
+	                                           const std::string &file_name);
+  void InsertExistingHardlink(SyncItem &entry);
+  // -------------------------------------------------------------
+  
+	uint64_t GetTemporaryHardlinkGroupNumber(SyncItem &entry) const;
+	void InsertHardlink(SyncItem &entry);
 	
-	void addDirectory(SyncItem *entry);
-	void removeDirectory(SyncItem *entry);
-	void touchDirectory(SyncItem *entry);
+	void AddFile(SyncItem &entry);
+	void RemoveFile(SyncItem &entry);
+	void TouchFile(SyncItem &entry);
 	
-	void createNestedCatalog(SyncItem *requestFile);
-	void removeNestedCatalog(SyncItem *requestFile);
+	void AddDirectory(SyncItem &entry);
+	void RemoveDirectory(SyncItem &entry);
+	void TouchDirectory(SyncItem &entry);
 	
-	void leaveAddedDirectory(SyncItem *entry);
+	void CreateNestedCatalog(SyncItem &requestFile);
+	void RemoveNestedCatalog(SyncItem &requestFile);
 	
-	void compressAndHashFileQueue();
-	void addFileQueueToCatalogs();
-   void releaseFileQueue();
+	void CompressAndHashFileQueue();
+	void AddFileQueueToCatalogs();
 	
-	inline bool addFileToDatastore(SyncItem *entry, hash::t_sha1 &hash) { return addFileToDatastore(entry, "", hash); }
-	bool addFileToDatastore(SyncItem *entry, const std::string &suffix, hash::t_sha1 &hash);
+	inline bool AddFileToDatastore(SyncItem &entry, hash::t_sha1 &hash) { return AddFileToDatastore(entry, "", hash); }
+	bool AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::t_sha1 &hash);
 	
-	inline HardlinkGroupMap& getHardlinkMap() { return mHardlinkStack.top(); }
+	inline HardlinkGroupMap& GetHardlinkMap() { return mHardlinkStack.top(); }
 	
-	void addHardlinkGroups(const HardlinkGroupMap &hardlinks);
-  void addHardlinkGroup(const HardlinkGroup &group);
-  void cleanupHardlinkGroups(HardlinkGroupMap &hardlinks);
+	void AddHardlinkGroups(const HardlinkGroupMap &hardlinks);
+  void AddHardlinkGroup(const HardlinkGroup &group);
+
+  friend class SyncUnion;
+  inline void RegisterSyncUnionEngine(SyncUnion *syncUnionEngine) {
+    mUnionEngine = syncUnionEngine;
+  }
 };
 
 }

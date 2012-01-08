@@ -26,21 +26,32 @@ namespace cvmfs {
  *  syncing a CVMFS repository by the help of an overlayed AUFS 1.x read-write volume
  *  this class basically implements the interface defined by UnionSync::
  */
-class SyncAufs :
+class SyncUnionAufs :
  	public SyncUnion {
  private:
 	std::set<std::string> mIgnoredFilenames;
 	std::string mWhiteoutPrefix;
 
  public:
-	SyncAufs(SyncMediator *mediator, const SyncParameters *parameters);
+	SyncUnionAufs(SyncMediator *mediator,
+  	            const std::string &repository_path,
+  	            const std::string &union_path,
+                const std::string &overlay_path);
 	
 	bool DoYourMagic();
 	
  protected:
-	inline bool IsWhiteoutEntry(const SyncItem *entry) const { return (entry->getFilename().substr(0,mWhiteoutPrefix.length()) == mWhiteoutPrefix); }
-	inline bool IsOpaqueDirectory(const SyncItem *directory) const { return file_exists(directory->getOverlayPath() + "/.wh..wh..opq"); }
-	inline std::string UnwindWhiteoutFilename(const std::string &filename) const { return filename.substr(mWhiteoutPrefix.length()); }
+	inline bool IsWhiteoutEntry(const SyncItem &entry) const {
+	  return (entry.GetFilename().substr(0, mWhiteoutPrefix.length()) == mWhiteoutPrefix);
+	}
+	
+	inline bool IsOpaqueDirectory(const SyncItem *directory) const {
+	  return file_exists(directory->GetOverlayPath() + "/.wh..wh..opq");
+	}
+	
+	inline std::string UnwindWhiteoutFilename(const std::string &filename) const {
+	  return filename.substr(mWhiteoutPrefix.length());
+	}
 	
 	inline std::set<std::string> GetIgnoredFilenames() const { return mIgnoredFilenames; };
 };

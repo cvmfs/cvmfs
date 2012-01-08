@@ -129,6 +129,11 @@ class AbstractCatalogManager {
    */
   inline inode_t MangleInode(const inode_t inode) const { return (inode < kInitialInodeOffset) ? GetRootInode() : inode; }
   
+  /**
+   *  print the currently attached catalog hierarchy to stdout
+   */
+  void PrintCatalogHierarchy() const;
+  
  protected:
   
   /**

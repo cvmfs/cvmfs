@@ -23,12 +23,11 @@ const string WritableCatalogManager::kCatalogFilename = ".cvmfscatalog.working";
 WritableCatalogManager::WritableCatalogManager(
                          const string catalog_directory,
                          const string data_directory,
-                         const bool lazy_attaching)
+                         const bool lazy_attaching) :
+  catalog_directory_(catalog_directory),
+  data_directory_(data_directory),
+  lazy_attach_(lazy_attaching)
 {
-  catalog_directory_ = canonical_path(catalog_directory);
-	data_directory_    = canonical_path(data_directory);
-	lazy_attach_       = lazy_attaching;
-	
   Init();
 }
 

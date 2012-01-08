@@ -102,11 +102,12 @@ void Catalog::RemoveChild(const Catalog *child) {
 }
 
 CatalogList Catalog::GetChildrenRecursively() const {
-  CatalogList result = children_;
+  CatalogList result;
   
   CatalogList::const_iterator i, end;
   for(i = children_.begin(), end = children_.end(); i != end; ++i) {
     CatalogList grand_children = (*i)->GetChildrenRecursively();
+    result.push_back(*i);
     result.insert(result.end(), grand_children.begin(), grand_children.end());
   }
   
