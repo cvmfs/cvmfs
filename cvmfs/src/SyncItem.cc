@@ -1,4 +1,4 @@
-#include "/home/rene/branch/cvmfs/src/SyncItem.h"
+#include "SyncItem.h"
 
 #include <sstream>
 #include <errno.h>
