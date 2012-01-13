@@ -28,6 +28,7 @@ enum LogSource {
   kLogCompress,
   kLogLru,
   kLogTalk,
+  kLogMonitor,
 };
 
 void SetLogSyslogLevel(const int level);

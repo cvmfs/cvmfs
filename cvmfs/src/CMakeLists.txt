@@ -5,7 +5,7 @@
 
 set (CVMFS2_DEBUG_SOURCES 
 	smalloc.h smalloc.c 
-	log.c log.h 
+	log.c log.h
 	logging.cc logging.h
 	tracer.h tracer.cc atomic.h 
 	sqlite3-duplex.h
@@ -66,6 +66,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	sqlite3-duplex.h 
 	util.cc util.h 
 	log.c log.h 
+	logging.cc logging.h
 	monitor.cc monitor.h 
 	cvmfs_sync.h cvmfs_sync.cc
 	cvmfs_sync_recursion.h cvmfs_sync_recursion.cc

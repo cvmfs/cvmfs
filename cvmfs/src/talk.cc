@@ -41,11 +41,11 @@
 #include "catalog_tree.h"
 #include "cvmfs.h"
 #include "util.h"
+#include "logging.h"
 
 extern "C" {
    #include "http_curl.h"
    #include "debug.h"
-   #include "log.h"
    #include "sqlite3-duplex.h"
 }
 
@@ -497,7 +497,9 @@ namespace talk {
             {
                return false;
             }
-            logmsg("There was already a cvmfs_io file in cache directory.  Did we have a crash shutdown?");
+            LogCvmfs(kLogTalk, kLogSyslog,
+                     "There was already a cvmfs_io file in cache directory.  "
+                     "Did we have a crash shutdown?");
          } else {
             return false;
          }
@@ -530,7 +532,8 @@ namespace talk {
       int result;
       result = unlink(socket_path.c_str());
       if (result != 0) {
-         logmsg("Could not remove cvmfs_io socket from cache directory.");
+         LogCvmfs(kLogTalk, kLogSyslog,
+                  "Could not remove cvmfs_io socket from cache directory.");
       }
 
       shutdown(socket_fd, SHUT_RDWR);

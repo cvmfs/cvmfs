@@ -59,6 +59,7 @@
 #include "cvmfs_config.h"
 #include "fuse-duplex.h"
 #include "compat.h"
+#include "logging.h"
 #include "tracer.h"
 #include "catalog.h"
 #include "catalog_tree.h"
@@ -83,11 +84,10 @@ extern "C" {
   #include "http_curl.h"
   #include "compression.h"
   #include "smalloc.h"
-  #include "log.h"
   #include "sqlite3-duplex.h"
 }
 
-using namespace std; //NOLINT
+using namespace std;  // NOLINT
 
 namespace cvmfs {
   string mountpoint = "";
@@ -254,8 +254,9 @@ namespace cvmfs {
       if (!catalog::lookup_nested_unprotected(parent_id,
                                               catalog::mangled_path(info->path),
                                               expected_clg)) {
-        logmsg("Nested catalog at %s not found (forward scan)",
-               (info->path).c_str());
+        LogCvmfs(kLogCvmfs, kLogSyslog,
+                 "Nested catalog at %s not found (forward scan)",
+                 (info->path).c_str());
         info->dirty = true;
         invalidate_cache(catalog_id);
       } else {
@@ -571,15 +572,14 @@ namespace cvmfs {
         return;
       } else {
         if (close(fd) == 0) atomic_dec(&open_files);
-        logmsg("open file descriptor limit exceeded");
+        LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
         fuse_reply_err(req, EMFILE);
         return;
       }
     } else {
-      logmsg("failed to open inode: %d, CAS key %s, error code %d",
-             ino, d.checksum().to_string().c_str(), errno);
-      pmesg(D_CVMFS, "failed to open inode: %d, CAS key %s, error code %d",
-            ino, d.checksum().to_string().c_str(), errno);
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "failed to open inode: %d, CAS key %s, error code %d",
+               ino, d.checksum().to_string().c_str(), errno);
       if (errno == EMFILE) {
         fuse_reply_err(req, EMFILE);
         return;
@@ -1596,9 +1596,8 @@ int main(int argc, char *argv[]) {
   options_ready = true;
 
   /* Syslog level */
-  syslog_setlevel(cvmfs_opts.syslog_level);
-  if (cvmfs::repo_name != "")
-    syslog_setprefix(cvmfs::repo_name.c_str());
+  SetLogSyslogLevel(cvmfs_opts.syslog_level);
+  SetLogSyslogPrefix(cvmfs::repo_name);
 
   /* Maximum number of open files */
   if (cvmfs_opts.nofiles) {
@@ -1763,8 +1762,9 @@ int main(int argc, char *argv[]) {
   talk_ready = true;
 
   /* Set fuse callbacks, remove url from arguments */
-  logmsg("CernVM-FS: linking %s to remote directoy %s",
-         cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
+  LogCvmfs(kLogCvmfs, kLogSyslog,
+           "CernVM-FS: linking %s to remote directoy %s",
+           cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
   struct fuse_lowlevel_ops cvmfs_operations;
   cvmfs::set_cvmfs_ops(&cvmfs_operations);
 
@@ -1807,9 +1807,8 @@ int main(int argc, char *argv[]) {
 
   delete cvmfs::catalog_manager;
 
-  pmesg(D_CVMFS, "Fuse loop terminated (%d)", result);
-  logmsg("CernVM-FS: unmounted %s (%s)",
-         cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+           cvmfs::mountpoint.c_str(), cvmfs::root_url.c_str());
 
 
  cvmfs_cleanup:

@@ -2,7 +2,7 @@
  * \file cache.cc
  * \namespace cache
  *
- * The cache module maintains the local file cache.  Files are 
+ * The cache module maintains the local file cache.  Files are
  * requested by fetch().  The cache stores files with a name according
  * to their SHA1-hash.
  *
@@ -11,8 +11,8 @@
  *   -# If it is in local cache: return file descriptor
  *   -# Otherwise download, store in cache and return fd
  *
- * Each running CVMFS instance has to have a separate cache directory. 
- * The local cache directory (directories 00..ff) can be accessed 
+ * Each running CVMFS instance has to have a separate cache directory.
+ * The local cache directory (directories 00..ff) can be accessed
  * in parallel to a running CVMFS, i.e. files can be deleted for instance
  * anytime.  Files are created in txn directory first.  At the very latest
  * point they are renamed into their "real" SHA1 names atomically by rename().
@@ -53,10 +53,10 @@
 #include <pthread.h>
 #include <dirent.h>
 
+#include "logging.h"
 extern "C" {
    #include "http_curl.h"
    #include "debug.h"
-   #include "log.h"
    #include "sha1.h"
    #include "smalloc.h"
    #include "compression.h"
@@ -65,27 +65,27 @@ extern "C" {
 using namespace std;
 
 namespace cache {
-   
+
    /* These will be set on init */
    string cache_path = "";
    string root_url = "";
    pthread_mutex_t *mutex_download = NULL;
-   
+
    /**
     * Inits cache directory.
     * We get some global parameters and options from cvmfs.cc here.
     *
     * \return True on success, false otherwise
     */
-   bool init(const string &c_path, const string &r_url, pthread_mutex_t * const m_download) 
+   bool init(const string &c_path, const string &r_url, pthread_mutex_t * const m_download)
    {
       cache_path = c_path;
       root_url = r_url;
       mutex_download = m_download;
-      
+
       if (!make_cache_dir(cache_path, 0700))
          return false;
-      
+
       /* Cleanup dangling checksums */
       DIR *dirp = NULL;
       dirent *d;
@@ -95,7 +95,7 @@ namespace cache {
       }
       while ((d = readdir(dirp)) != NULL) {
          if (d->d_type != DT_REG) continue;
-         
+
          const string name = d->d_name;
          if (name.substr(0, 14) == "cvmfs.checksum") {
             const string current_path = cache_path + "/" + name;
@@ -105,16 +105,16 @@ namespace cache {
                if (fread(sha1, 1, 40, f) == 40) {
                   const string sha1_str = string(sha1, 40);
                   pmesg(D_CACHE, "found checksum %s", sha1_str.c_str());
-                  const string sha1_path = cache_path + "/" + sha1_str.substr(0,2) + 
+                  const string sha1_path = cache_path + "/" + sha1_str.substr(0,2) +
                                            "/" + sha1_str.substr(2);
-                  
-                  /* legacy handling */                  
+
+                  /* legacy handling */
                   unlink((cache_path + "/" + "cvmfs.catalog" + name.substr(14)).c_str());
-                  
+
                   if (!file_exists(sha1_path))
                      unlink(current_path.c_str());
                } else {
-                  unlink(current_path.c_str());                  
+                  unlink(current_path.c_str());
                }
                fclose(f);
             } else {
@@ -124,18 +124,18 @@ namespace cache {
          }
       }
       closedir(dirp);
-      
+
       return true;
    }
-   
-   
+
+
    /**
     * NOP currently.
     */
    void fini() {
    }
-   
-   
+
+
    /**
     * Transforms a catalog entry into a name for local cache.
     *
@@ -146,8 +146,8 @@ namespace cache {
       const string hash_path = id.to_string();
       return cache_path + "/" + hash_path.substr(0, 2) + "/" + hash_path.substr(2);
    }
-   
-   
+
+
    /**
     * Transform a catalog entry into a temporary name in txn-directory.
     *
@@ -159,8 +159,8 @@ namespace cache {
       const string hash_path = id.to_string();
       return cache_path + "/txn/" + hash_path.substr(6) + "XXXXXX";
    }
-   
-   
+
+
    /**
     * Tries to open a catalog entry in local cache.
     *
@@ -170,10 +170,10 @@ namespace cache {
    int open(const hash::t_sha1 &id) {
       const string lpath = cached_name(id);
       int result = ::open(lpath.c_str(), O_RDONLY, 0);
-      
+
       if (result >= 0) pmesg(D_CACHE, "hit %s", lpath.c_str());
       else pmesg(D_CACHE, "miss %s (%d)", lpath.c_str(), result);
-      
+
       return result;
    }
 
@@ -208,10 +208,10 @@ namespace cache {
       }
       return result;
    }
-   
-   
+
+
    /**
-    * Aborts a file download started with transaction() and cleans 
+    * Aborts a file download started with transaction() and cleans
     * temporoary storage.
     *
     * @param[in] txn Absolute path of the temporoary file in local cache
@@ -222,7 +222,7 @@ namespace cache {
       return unlink(txn.c_str());
    }
 
-   
+
    /**
     * Commits a file download started with transaction(), i.e. renames
     * the txn-file to its real SHA1 name.
@@ -235,9 +235,9 @@ namespace cache {
     * \return Zero on success, non-zero else.
     */
    int commit(const string &lpath, const string &txn, const string &cvmfs_path,
-              const hash::t_sha1 &sha1, const uint64_t size) 
+              const hash::t_sha1 &sha1, const uint64_t size)
    {
-      int result;      
+      int result;
       pmesg(D_CACHE, "commit %s %s", lpath.c_str(), txn.c_str());
       result = rename(txn.c_str(), lpath.c_str());
       if (result < 0) {
@@ -252,10 +252,10 @@ namespace cache {
       }
       return result;
    }
-   
-   
+
+
    /**
-    * Checks for a file in local cache.  Because we support parallel operations, 
+    * Checks for a file in local cache.  Because we support parallel operations,
     * this is just a hint.  Open gives a definitive answer.
     *
     * @param[in] id SHA1 checksum of the catalog entry.
@@ -265,7 +265,7 @@ namespace cache {
       struct stat info;
       return stat(cached_name(id).c_str(), &info) == 0;
    }
-   
+
    /**
     * Tries to find a file in the local disk cache.  If it is not
     * available, it locks download_mutex for the succeeding fetch
@@ -275,12 +275,12 @@ namespace cache {
     */
    int open_or_lock(const cvmfs::DirectoryEntry &d) {
       int fd;
-      
+
       if ((fd = cache::open(d.checksum())) >= 0) {
          lru::touch(d.checksum());
          return fd;
       }
-      
+
       pthread_mutex_lock(mutex_download);
       /* We have to check again to avoid race condition */
       if ((fd = cache::open(d.checksum())) >= 0) {
@@ -288,10 +288,10 @@ namespace cache {
          lru::touch(d.checksum());
          return fd;
       }
-      
+
       return -1;
    }
-   
+
    static bool freset(FILE *f) {
       if (fflush(f) != 0)
          return false;
@@ -300,8 +300,8 @@ namespace cache {
       rewind(f);
       return true;
    }
-   
-   
+
+
    /**
     * Returns a read-only file descriptor for a specific catalog entry.
     * After successful call, the file resides in local cache.
@@ -327,19 +327,19 @@ namespace cache {
       int result = -EIO;
       int retval;
       char strmbuf[4096];
-          
+
       /* Not in cache, we are holding the mutex and download */
       int curl_result;
       bool nocache = false; /* try once with no-cache-download after failure */
       FILE *f = NULL;
-      
+
       if (d.size() > lru::max_file_size()) {
          pmesg(D_CACHE, "file too big for lru cache");
          return -ENOSPC;
       }
-      
+
       pmesg(D_CACHE, "loading %s", path.c_str());
-    
+
       const string hash_path = d.checksum().to_string();
       url = "/data/" + hash_path.substr(0, 2) + "/" + hash_path.substr(2);
       pmesg(D_CACHE, "curl fetches %s", url.c_str());
@@ -358,20 +358,22 @@ namespace cache {
       }
       retval = setvbuf(f, strmbuf, _IOFBF, 4096);
       assert(retval == 0);
-      
+
       curl_result = curl_download_stream(url.c_str(), f, sha1.digest, 1, 1);
-   
+
    download_retry:
       if ((curl_result == CURLE_OK) || (curl_result == Z_DATA_ERROR)) {
          pmesg(D_CACHE, "curl finished downloading of %s, checksum: %s", url.c_str(), sha1.to_string().c_str());
-         
+
          /* Check checksum, if doesn't match, skip proxy
             if proxy already skipped, reload catalog
             if catalog is fresh: error */
          if ((d.checksum() != sha1) || (curl_result == Z_DATA_ERROR)) {
             if (!nocache) {
-               pmesg(D_CACHE, "Checksums do not match, should be %s. I'll retry download with no-cache", d.checksum().to_string().c_str());
-               logmsg("Checksum does not match for %s (SHA1: %s). I'll retry download with no-cache", path.c_str(), d.checksum().to_string().c_str());
+               LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+                        "Checksum does not match for %s (SHA1: %s). "
+                        "I'll retry download with no-cache",
+                        path.c_str(), d.checksum().to_string().c_str());
                if (!freset(f))
                   goto fetch_abort;
                nocache = true;
@@ -381,17 +383,20 @@ namespace cache {
             pmesg(D_CACHE, "no-cache didn't help, aborting now");
             goto fetch_abort;
          }
-         
+
          /* Check decompressed size */
          struct stat64 info;
          info.st_size = -1;
          if ((fstat64(fileno(f), &info) != 0) || (info.st_size != (signed)d.size())) {
-            logmsg("size check failure for %s, expected %lu, got %ld", 
-                   url.c_str(), d.size(), info.st_size);
+            LogCvmfs(kLogCache, kLogSyslog,
+                     "size check failure for %s, expected %lu, got %ld",
+                     url.c_str(), d.size(), info.st_size);
             if (file_copy(txn.c_str(), (cache_path + "/quarantaine/" + d.checksum().to_string()).c_str()) != 0)
-               logmsg("failed to move %s to quarantaine", txn.c_str());
+               LogCvmfs(kLogCache, kLogSyslog,
+                        "failed to move %s to quarantaine", txn.c_str());
             if (!nocache) {
-               logmsg("Re-trying %s with no-cache", path.c_str());
+               LogCvmfs(kLogCache, kLogSyslog, "Re-trying %s with no-cache",
+                        path.c_str());
                if (!freset(f))
                   goto fetch_abort;
                nocache = true;
@@ -400,7 +405,7 @@ namespace cache {
             }
             goto fetch_abort;
          }
-      
+
          pmesg(D_CACHE, "trying to commit");
          fclose(f);
          fd_return = ::open(txn.c_str(), O_RDONLY, 0);
@@ -415,9 +420,10 @@ namespace cache {
             return -EIO;
          }
       }
-   
+
    fetch_abort:
-      logmsg("failed to fetch %s (SHA1: %s)", path.c_str(), d.checksum().to_string().c_str());
+      LogCvmfs(kLogCache, kLogSyslog, "failed to fetch %s (SHA1: %s)",
+               path.c_str(), d.checksum().to_string().c_str());
       if (fd >= 0) {
          if (f) fclose(f);
          else close(fd);
@@ -425,45 +431,45 @@ namespace cache {
       }
       return result;
    }
-   
-   bool mem_to_disk(const hash::t_sha1 &id, const char *buffer, const size_t size, 
-                    const std::string &name) 
+
+   bool mem_to_disk(const hash::t_sha1 &id, const char *buffer, const size_t size,
+                    const std::string &name)
    {
       string txn;
       string path;
-      
+
       int fd = transaction(id, path, txn);
       if (fd < 0)
          return false;
-      
+
       ssize_t retval = write(fd, buffer, size);
       close(fd);
       if ((retval < 0) || ((size_t)retval != size)) {
          abort(txn);
          return false;
       }
-      
+
       return commit(path, txn, name, id, size) == 0;
    }
-   
+
    bool disk_to_mem(const hash::t_sha1 &id, char **buffer, size_t *size) {
       *size = 0;
       *buffer = NULL;
-      
+
       int fd = open(id);
-      
+
       if (fd < 0)
          return false;
-      
+
       PortableStat64 info;
       if (portableFileDescriptorStat64(fd, &info) != 0) {
          close(fd);
          return false;
       }
-      
+
       *size = info.st_size;
       *buffer = (char *)smalloc(*size);
-      
+
       ssize_t retval = read(fd, *buffer, *size);
       if ((retval < 0) || ((size_t)retval != *size)) {
          close(fd);
@@ -472,7 +478,7 @@ namespace cache {
          *size = 0;
          return false;
       }
-      
+
       close(fd);
       return true;
    }

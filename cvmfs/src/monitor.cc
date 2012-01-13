@@ -9,7 +9,7 @@
  * Developed by Jakob Blomer 2010 at CERN
  * jakob.blomer@cern.ch
  */
- 
+
 #include "cvmfs_config.h"
 #include "monitor.h"
 
@@ -39,10 +39,8 @@
 #include <pthread.h>
 #include <time.h>
 
-extern "C" {
-   #include "log.h"
-}
-   
+#include "logging.h"
+
 using namespace std;
 
 
@@ -61,7 +59,7 @@ namespace monitor {
 	 */
 	void* getInstructionPointer(ucontext_t *uc) {
 		void *result;
-		
+
 		#ifdef __APPLE__
 			#ifdef __x86_64__
 			 	result = (void *)uc->uc_mcontext->__ss.__rip;
@@ -70,12 +68,12 @@ namespace monitor {
 			#endif
 		#else
 			#ifdef __x86_64__
-			    result = (void *)uc->uc_mcontext.gregs[REG_RIP]; 
+			    result = (void *)uc->uc_mcontext.gregs[REG_RIP];
 			#else
 			    result = (void *)uc->uc_mcontext.gregs[REG_EIP];
 			#endif
 		#endif
-		
+
 		return result;
 	}
 
@@ -83,20 +81,20 @@ namespace monitor {
    /**
     * Signal handler for bad things.  Send debug information to watchdog.
     */
-   static void send_trace(int signal, 
+   static void send_trace(int signal,
                           siginfo_t *siginfo __attribute__((unused)),
-                          void *context) 
+                          void *context)
    {
       int send_errno = errno;
       if (portableSpinlockTrylock(&lock_handler) != 0) {
          /* concurrent call, wait for the first one to exit the process */
          while (true) {}
       }
-      
+
       void *adr_buf[MAX_BACKTRACE];
       char cflow = 'S';
       if (write(pipe_wd[1], &cflow, 1) != 1) _exit(1);
-      
+
       if (write(pipe_wd[1], &signal, sizeof(int)) != sizeof(int)) _exit(1);
       if (write(pipe_wd[1], &send_errno, sizeof(int)) != sizeof(int)) _exit(1);
 
@@ -105,21 +103,21 @@ namespace monitor {
       if (stack_size > 1) {
          ucontext_t *uc;
          uc = (ucontext_t *)context;
-         adr_buf[1] = getInstructionPointer(uc); 
+         adr_buf[1] = getInstructionPointer(uc);
       }
       if (write(pipe_wd[1], &stack_size, sizeof(int)) != sizeof(int)) _exit(1);
       backtrace_symbols_fd(adr_buf, stack_size, pipe_wd[1]);
-      
+
       cflow = 'Q';
       (void)write(pipe_wd[1], &cflow, 1);
-      
+
       _exit(1);
    }
-   
-   
+
+
    /**
     * Log a string to syslog and into $cachedir/stacktrace.
-    * We expect ideally nothing to be logged, so that file is created on demand. 
+    * We expect ideally nothing to be logged, so that file is created on demand.
     */
    static void log_emerg(string msg) {
       FILE *fp = fopen((cache_dir + "/stacktrace").c_str(), "a");
@@ -132,12 +130,12 @@ namespace monitor {
       } else {
          msg += " (failed to open log file in cache directory)";
       }
-      logmsg(msg.c_str());
+      LogCvmfs(kLogMonitor, kLogSyslog, "%s", msg.c_str());
    }
-   
-   
+
+
    /**
-    * Read a line from the pipe.  
+    * Read a line from the pipe.
     * Quite inefficient but good enough for the purpose.
     */
    static string read_line() {
@@ -149,8 +147,8 @@ namespace monitor {
       }
       return result;
    }
-   
-   
+
+
    /**
     * Generates useful information from the backtrace log in the pipe.
     */
@@ -158,39 +156,39 @@ namespace monitor {
       int stack_size;
       string debug = "--\n";
       ostringstream convert;
-      
+
       int recv_signal;
       if (read(pipe_wd[0], &recv_signal, sizeof(int)) < (int)sizeof(int))
          return "failure while reading signal number";
       convert << recv_signal;
       debug += "Signal: " + convert.str();
       convert.clear();
-      
+
       int recv_errno;
       if (read(pipe_wd[0], &recv_errno, sizeof(int)) < (int)sizeof(int))
          return "failure while reading errno";
       convert << recv_errno;
       debug += ", errno: " + convert.str() + "\n";
-      
-      debug += "version: " + string(VERSION) + "\n"; 
-      
+
+      debug += "version: " + string(VERSION) + "\n";
+
       if (read(pipe_wd[0], &stack_size, sizeof(int)) < (int)sizeof(int))
          return "failure while reading stacktrace";
-      
+
       for (int i = 0; i < stack_size; ++i) {
          debug += read_line();
       }
       return debug;
    }
-    
-        
+
+
    /**
     * Listens on the pipe and logs the stacktrace or quits silently
     */
-   static void watchdog() {     
+   static void watchdog() {
       char cflow;
       int num_read;
-      
+
       while ((num_read = read(pipe_wd[0], &cflow, 1)) > 0) {
          if (cflow == 'S') {
             const string debug = report_stacktrace();
@@ -203,18 +201,18 @@ namespace monitor {
          }
       }
       if (num_read <= 0) log_emerg("unexpected termination");
-      
-      close(pipe_wd[0]); 
+
+      close(pipe_wd[0]);
    }
 
-   
-   
+
+
    bool init(const string cache_dir, const bool check_nofiles) {
 	  int maxNoOfFiles = 0;
       unsigned int currMaxNoOfFiles = 0;
       monitor::cache_dir = cache_dir;
       if (portableSpinlockInit(&lock_handler, 0) != 0) return false;
-   
+
       /* check number of open files */
       if (check_nofiles) {
 
@@ -229,29 +227,30 @@ namespace monitor {
 			cout << "Warning: could not retrieve maximal allowed number of open files" << endl;
 		}
 	#else
-				maxNoOfFiles = rpl.rlim_max;	
+				maxNoOfFiles = rpl.rlim_max;
 	#endif
 
          if (currMaxNoOfFiles < MIN_OPEN_FILES) {
-            cout << "Warning: current limits for number of open files are " << 
-                     currMaxNoOfFiles << "/" << maxNoOfFiles << endl;
-            cout << "CernVM-FS is likely to run out of file descriptors, set ulimit -n to at least " << 
-                    MIN_OPEN_FILES << endl;
-            logmsg("Low maximum number of open files (%lu/%lu)", currMaxNoOfFiles, maxNoOfFiles);
+            LogCvmfs(kLogMonitor, kLogSyslog | kLogStdout,
+                     "Warning: current limits for number of open files are "
+                     "(%lu/%lu)\n"
+                     "CernVM-FS is likely to run out of file descriptors, "
+                     "set ulimit -n to at least %lu",
+                     currMaxNoOfFiles, maxNoOfFiles, MIN_OPEN_FILES);
          }
          nofiles = currMaxNoOfFiles;
       } else {
          nofiles = 0;
       }
-      
+
       /* dummy call to backtrace to load library */
       void *unused = NULL;
       backtrace(&unused, 1);
       if (!unused) return false;
-      
+
       return true;
    }
-   
+
    void fini() {
       if (spawned) {
          char quit = 'Q';
@@ -260,13 +259,13 @@ namespace monitor {
       }
       portableSpinlockDestroy(&lock_handler);
    }
-   
+
    /* fork watchdog */
    void spawn() {
       int retval;
       retval = pipe(pipe_wd);
       assert(retval == 0);
-      
+
       pid_t pid;
       int statloc;
       switch (pid = fork()) {
@@ -278,7 +277,8 @@ namespace monitor {
                case 0: {
                   close(pipe_wd[1]);
                   if (daemon(1, 1) == -1) {
-                     logmsg("watchdog failed to deamonize");
+                     LogCvmfs(kLogMonitor, kLogSyslog,
+                              "watchdog failed to deamonize");
                      exit(1);
                   }
                   watchdog();
@@ -292,13 +292,13 @@ namespace monitor {
             if (waitpid(pid, &statloc, 0) != pid) abort();
             if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
       }
-      
+
       struct sigaction sa;
       memset(&sa, 0, sizeof(sa));
       sa.sa_sigaction = send_trace;
       sa.sa_flags = SA_SIGINFO;
       sigfillset(&sa.sa_mask);
-      
+
       if (sigaction(SIGQUIT, &sa, NULL) ||
           sigaction(SIGILL, &sa, NULL) ||
           sigaction(SIGABRT, &sa, NULL) ||
@@ -311,7 +311,7 @@ namespace monitor {
       }
       spawned = true;
    }
-   
+
    unsigned get_nofiles() {
       return nofiles;
    }
