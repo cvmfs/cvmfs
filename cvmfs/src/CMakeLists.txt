@@ -6,6 +6,7 @@
 set (CVMFS2_DEBUG_SOURCES 
 	smalloc.h smalloc.c 
 	log.c log.h 
+	logging.cc logging.h
 	tracer.h tracer.cc atomic.h 
 	sqlite3-duplex.h
 	curl-duplex.h fuse-duplex.h 

@@ -20,10 +20,10 @@ pthread_mutex_t pmesg_lock = PTHREAD_MUTEX_INITIALIZER;
 static FILE *file_dbg = NULL;
 
 /**
- * Change the log file.  If the old one cannot be closed or if 
+ * Change the log file.  If the old one cannot be closed or if
  * the new one cannot be opened, we die;
  * we never close stdout or stderr.
- */  
+ */
 void debug_set_log(const char *filename) {
    pthread_mutex_lock(&pmesg_lock);
 
@@ -49,12 +49,12 @@ void pmesg(int mask, const char* format, ...) {
 
    if (mask & verbosity_mask) {
       pthread_mutex_lock(&pmesg_lock);
-      
+
       /* Set the file pointer for debuging to stderr, if necessary */
       if (file_dbg == NULL) {
          file_dbg = stderr;
       }
-      
+
       fprintf(file_dbg, "(");
       int i;
       for (i = 0; i < D_BITMAX; ++i) {
@@ -65,11 +65,11 @@ void pmesg(int mask, const char* format, ...) {
       }
       if (mask) fprintf(file_dbg, " %s", pmesg_cat[0]);
       fprintf(file_dbg, " ) ");
-      
+
       va_start(vl, format);
       vfprintf(file_dbg, format, vl);
       va_end(vl);
-      
+
       /* Timestamp and final line break */
       time_t rawtime;
       time(&rawtime);
@@ -77,7 +77,7 @@ void pmesg(int mask, const char* format, ...) {
       localtime_r(&rawtime, &now);
       fprintf(file_dbg, "    [%02d-%02d-%04d %02d:%02d:%02d %s]\n",
          (now.tm_mon)+1, now.tm_mday, (now.tm_year)+1900, now.tm_hour, now.tm_min, now.tm_sec, now.tm_zone);
-      
+
       fflush(file_dbg);
 
       pthread_mutex_unlock(&pmesg_lock);
