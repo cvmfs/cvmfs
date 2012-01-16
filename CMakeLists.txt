@@ -12,9 +12,9 @@ project (${PROJECT_NAME})
 #
 # The version numbers
 #
-set (CernVM-FS_VERSION_MAJOR 0)
-set (CernVM-FS_VERSION_MINOR 2)
-set (CernVM-FS_VERSION_PATCH 77)
+set (CernVM-FS_VERSION_MAJOR 2)
+set (CernVM-FS_VERSION_MINOR 1)
+set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #

@@ -15,7 +15,6 @@ enum LogFacilities {
   kLogStdout = 2,
   kLogStderr = 4,
   kLogSyslog = 8,
-  kLogTrace = 16,
 };
 
 enum LogSource {

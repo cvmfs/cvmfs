@@ -205,7 +205,7 @@ std::string filename_;
 int buffer_size_;
   int flush_threshold_;
 atomic_int seq_no_;  /**< Starts with 0 and gets incremented by each call to
-                          trace.  Contains the first non-used sequence number. */
+                          trace. Contains the first non-used sequence number. */
 atomic_int flushed_;  /**< Starts with 0 and gets incremented by the flush
                            thread.  Points to the first non-flushed message.
                            flushed <= seq_no holds. */
