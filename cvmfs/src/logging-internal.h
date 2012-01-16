@@ -8,7 +8,6 @@
 #define _CVMFS_LOGGING_INTERNAL_H_
 
 #include <cstdarg>
-
 #include <string>
 
 enum LogFacilities {

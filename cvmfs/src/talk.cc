@@ -88,7 +88,7 @@ namespace talk {
             //pmesg(D_TALK, "received command %s", line.c_str());
 
             if (line == "flush") {
-               Tracer::flush();
+               tracer::Flush();
                answer(con_fd, "OK\n");
             }
             else if (line == "cache size") {

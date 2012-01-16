@@ -97,7 +97,7 @@ namespace cvmfs {
   /** blacklist for compromised certificates */
   string blacklist = "/etc/cvmfs/blacklist";
   string deep_mount = "";
-  string repo_name = ""; /**< Expected repository name, e.g. atlas.cern.ch */
+  string repo_name = "";  /**< Expected repository name, e.g. atlas.cern.ch */
   const double whitelist_lifetime = 3600.0*24.0*30.0; /**< 30 days in seconds */
   const int short_term_ttl = 240; /* in offline mode, check every 4 minutes */
   string pubkey = "/etc/cvmfs/keys/cern.ch.pub";
@@ -511,7 +511,7 @@ namespace cvmfs {
   static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
     ino = catalog_manager->MangleInode(ino);
     LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
-    Tracer::trace(Tracer::FUSE_READLINK, "no path provided", "readlink() call");
+    tracer::Trace(tracer::kFuseReadlink, "no path provided", "readlink() call");
     bool found;
     DirectoryEntry dirent;
 
@@ -540,7 +540,7 @@ namespace cvmfs {
                          struct fuse_file_info *fi) {
     ino = catalog_manager->MangleInode(ino);
     LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
-    Tracer::trace(Tracer::FUSE_OPEN, "no path provided", "open() call");
+    tracer::Trace(tracer::kFuseOpen, "no path provided", "open() call");
 
     int fd = -1;
 
@@ -563,7 +563,7 @@ namespace cvmfs {
     fd = cache::open_or_lock(d);
     atomic_inc64(&nopen);
     if (fd < 0) {
-      Tracer::trace(Tracer::FUSE_OPEN, "path", "disk cache miss");
+      tracer::Trace(tracer::kFuseOpen, "path", "disk cache miss");
       fd = cache::fetch(d, path);
       pthread_mutex_unlock(&mutex_download);
       atomic_inc64(&ndownload);
@@ -616,7 +616,7 @@ namespace cvmfs {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "cvmfs_read on inode: %d reading %d bytes from offset %d",
              catalog_manager->MangleInode(ino), size, off);
-    Tracer::trace(Tracer::FUSE_READ, "path", "read() call");
+    tracer::Trace(tracer::kFuseRead, "path", "read() call");
 
     // get data chunk
     char *data = static_cast<char *>(alloca(size));
@@ -670,6 +670,7 @@ namespace cvmfs {
                                     const char *name, struct stat *s) {
     size_t oldsize = b->size;
     b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
+    /* TODO: move logic to smalloc */
     char *newp = static_cast<char *>(realloc(b->p, b->size));
     if (!newp) {
       fprintf(stderr, "*** fatal error: cannot allocate memory\n");
@@ -1121,9 +1122,9 @@ namespace cvmfs {
 
     /* Setup Tracer */
     if (tracefile != "")
-      Tracer::init(8192, 7000, tracefile);
+      tracer::Init(8192, 7000, tracefile);
     else
-      Tracer::init_null();
+      tracer::InitNull();
 
     lru::spawn();
     talk::spawn();
@@ -1133,7 +1134,7 @@ namespace cvmfs {
 
   static void cvmfs_destroy(void *unused __attribute__((unused))) {
     LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
-    Tracer::fini();
+    tracer::Fini();
   }
 
   /**
