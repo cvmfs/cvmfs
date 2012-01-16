@@ -23,6 +23,7 @@
 
 #include <pthread.h>
 #include <sys/time.h>
+#include <stdint.h>
 
 #include <cstdlib>
 #include <cstdio>
@@ -70,10 +71,10 @@ struct FlushThreadStartData {
 /**
  *  Returns a timestamp at now+ms.
  */
-void GetTimespecRel(const long ms, timespec *ts) {
+void GetTimespecRel(const int64_t ms, timespec *ts) {
   timeval now;
   gettimeofday(&now, NULL);
-  long nsecs = now.tv_usec * 1000 + (ms % 1000)*1000*1000;
+  int64_t nsecs = now.tv_usec * 1000 + (ms % 1000)*1000*1000;
   int carry = 0;
   if (nsecs >= 1000*1000*1000) {
     carry = 1;
@@ -87,17 +88,17 @@ void GetTimespecRel(const long ms, timespec *ts) {
 string Stringify(int v) {
   ostringstream o;
   if (!(o << v))
-    assert (false || "Could not convert int to string");
+    assert(false || "Could not convert int to string");
   return o.str();
 }
 
 
 string Stringify(timeval v) {
   ostringstream o;
-  long msec = v.tv_sec * 1000;
+  int64_t msec = v.tv_sec * 1000;
   msec += v.tv_usec / 1000;
   if (!(o << msec << "." << setw(3) << setfill('0') << v.tv_usec % 1000))
-    assert (false || "Could not convert timeval to string");
+    assert(false || "Could not convert timeval to string");
   return o.str();
 }
 
@@ -232,7 +233,8 @@ pthread_mutex_t sig_continue_trace_mutex;
  *            be opened in 'a' mode, i.e. messages are appended.
  */
 void Init(const int buffer_size, const int flush_threshold,
-          const string &filename) {
+          const string &filename)
+{
   active = true;
   filename_ = filename;
   buffer_size_ = buffer_size;
@@ -258,7 +260,6 @@ void Init(const int buffer_size, const int flush_threshold,
   retval = pthread_cond_init(&sig_flush, NULL);
   assert(retval == 0 && "Could not create flush signal");
 
-  // TODO: low-priority thread
   FlushThreadStartData *start_data = new FlushThreadStartData;
   start_data->sig_flush = &sig_flush;
   start_data->sig_continue_trace = &sig_continue_trace;
@@ -308,7 +309,8 @@ void Fini() {
   retval = pthread_cond_destroy(&sig_continue_trace);
   assert(retval == 0 && "Continue-trace signal could not be destroyed");
   retval = pthread_mutex_destroy(&sig_continue_trace_mutex);
-  assert(retval == 0 && "Mutex for continue-trace signal could not be destroyed");
+  assert(retval == 0 &&
+         "Mutex for continue-trace signal could not be destroyed");
   retval = pthread_cond_destroy(&sig_flush);
   assert(retval == 0 && "Flush signal could not be destroyed");
 

@@ -32,7 +32,8 @@ int32_t TraceInternal(const int event, const std::string &id,
                       const std::string &msg);
 void Flush();
 void inline __attribute__((used)) Trace(const int event, const std::string &id,
-                                        const std::string &msg) {
+                                        const std::string &msg)
+{
    if (active) TraceInternal(event, id, msg);
 }
 
