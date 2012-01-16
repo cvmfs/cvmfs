@@ -53,8 +53,6 @@ set (CVMFS_FSCK_SOURCES
 	hash.cc hash.h
 	util.cc util.h cvmfs_fsck.cc)
 
-set (TESTTRACER_SOURCES atomic.h tracer.cc tracer.h test_tracer.cc)
-
 set (CVMFS_SYNC_BIN_SOURCES
 	smalloc.h smalloc.c
 	debug.h debug.c
@@ -253,7 +251,6 @@ if (BUILD_CVMFS)
 	add_executable (cvmfs2_debug	${CVMFS2_DEBUG_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE})
 	add_executable (cvmfs2			${CVMFS2_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE})
 	add_executable (cvmfs_fsck		${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
-	add_executable (testtracer		${TESTTRACER_SOURCES})
 
 	if (USE_JEMALLOC)
 		add_dependencies (cvmfs2_debug jemalloc)
@@ -290,13 +287,11 @@ if (BUILD_CVMFS)
 	set_target_properties (cvmfs2_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_DEBUG_LD_FLAGS}")
 	set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS}")
 	set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}" LINK_FLAGS "${CVMFS_FSCK_LD_FLAGS}")
-	set_target_properties (testtracer PROPERTIES COMPILE_FLAGS "${TESTTRACER_CFLAGS}" LINK_FLAGS "${TESTTRACER_LD_FLAGS}")
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
 	target_link_libraries (cvmfs2_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE} pthread)
 	target_link_libraries (cvmfs2			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${ZLIB_ARCHIVE} ${JEMALLOC_ARCHIVE} pthread)
 	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
-	target_link_libraries (testtracer		${TESTTRACER_LIBS} pthread)
 
 endif (BUILD_CVMFS)
 
