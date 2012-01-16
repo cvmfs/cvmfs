@@ -50,7 +50,6 @@
 #include <cstdio>
 
 #include <string>
-#include <iostream>
 #include <sstream>
 #include <fstream>
 #include <vector>
@@ -79,7 +78,6 @@
 #include "DirectoryEntry.h"
 
 extern "C" {
-  #include "debug.h"
   #include "sha1.h"
   #include "http_curl.h"
   #include "compression.h"
@@ -176,8 +174,9 @@ namespace cvmfs {
     if (current_max == 0)
       return ttl;
 
-    pmesg(D_CVMFS, "building effective TTL from max (%u) and given (%u)",
-          current_max, ttl);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "building effective TTL from max (%u) and given (%u)",
+             current_max, ttl);
     return (current_max < ttl) ? current_max : ttl;
   }
 
@@ -227,7 +226,8 @@ namespace cvmfs {
    */
   static void invalidate_cache(const int catalog_id) {
     if (path_cache != NULL && inode_cache != NULL && catalog_id >= 0) {
-      pmesg(D_CVMFS, "dropping caches for catalog: %d", catalog_id);
+      LogCvmfs(kLogCvmfs, kLogDebug, "dropping caches for catalog: %d",
+               catalog_id);
 
       // int minInode = catalog::get_inode_offset_for_catalog_id(catalog_id)+1;
       // int maxInode = minInode + catalog::get_num_dirent(catalog_id);
@@ -317,21 +317,24 @@ namespace cvmfs {
                                    DirectoryEntry *dirent) {
     // check the inode cache for speed up
     if (inode_cache->lookup(ino, dirent)) {
-      pmesg(D_INO_CACHE, "HIT %d -> '%s'", ino, dirent->name().c_str());
+      LogCvmfs(kLogInodeCache, kLogDebug, "HIT %d -> '%s'",
+               ino, dirent->name().c_str());
       return true;
 
     } else {
-      pmesg(D_INO_CACHE, "MISS %d --> lookup in catalogs", ino);
+      LogCvmfs(kLogInodeCache, kLogDebug, "MISS %d --> lookup in catalogs",
+               ino);
 
       // lookup inode in catalog
       if (catalog_manager->Lookup(ino, dirent)) {
-        pmesg(D_INO_CACHE, "CATALOG HIT %d -> '%s'",
-              dirent->inode(), dirent->name().c_str());
+        LogCvmfs(kLogInodeCache, kLogDebug, "CATALOG HIT %d -> '%s'",
+                 dirent->inode(), dirent->name().c_str());
         inode_cache->insert(ino, *dirent);
         return true;
 
       } else {
-        pmesg(D_INO_CACHE, "no entry --> maybe data corruption?");
+        LogCvmfs(kLogInodeCache, kLogDebug,
+                 "no entry --> maybe data corruption?");
         return false;
       }
     }
@@ -370,10 +373,11 @@ namespace cvmfs {
     //             return true;
     //          }
     //       } else {
-    pmesg(D_MD5_CACHE, "MISS %s --> lookup in catalogs", path.c_str());
+    LogCvmfs(kLogMd5Cache, kLogDebug, "MISS %s --> lookup in catalogs",
+             path.c_str());
 
     if (catalog_manager->Lookup(path, dirent)) {
-      pmesg(D_MD5_CACHE, "CATALOG HIT %s -> '%s'",
+      LogCvmfs(kLogMd5Cache, kLogDebug, "CATALOG HIT %s -> '%s'",
             path.c_str(), dirent->name().c_str());
       //            md5path_cache->insert(md5, dirent);
       return true;
@@ -392,11 +396,12 @@ namespace cvmfs {
   static bool get_path_for_inode(const fuse_ino_t ino, string *path) {
     // check the path cache first
     if (path_cache->lookup(ino, path)) {
-      pmesg(D_PATH_CACHE, "HIT %d -> '%s'", ino, path->c_str());
+      LogCvmfs(kLogPathCache, kLogDebug, "HIT %d -> '%s'", ino, path->c_str());
       return true;  // this was easy!
     }
 
-    pmesg(D_PATH_CACHE, "MISS %d - recursively building path", ino);
+    LogCvmfs(kLogPathCache, kLogDebug, "MISS %d - recursively building path",
+             ino);
 
     // now we need to find out the parent path recursively and
     // rebuild the absolute path
@@ -433,13 +438,14 @@ namespace cvmfs {
   static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
                            const char *name) {
     parent = catalog_manager->MangleInode(parent);
-    pmesg(D_CVMFS, "cvmfs_lookup in parent inode: %d for name: %s",
-          parent, name);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
     string parentPath;
 
     if (not get_path_for_inode(parent, &parentPath)) {
-      pmesg(D_CVMFS, "no path for inode found... data corrupt?");
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "no path for inode found... data corrupt?");
 
       fuse_reply_err(req, ENOENT);
       return;
@@ -482,7 +488,7 @@ namespace cvmfs {
   static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                             struct fuse_file_info *fi) {
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_CVMFS, "cvmfs_getattr (stat) for inode: %d", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %d", ino);
     bool found;
     DirectoryEntry dirent;
 
@@ -504,7 +510,7 @@ namespace cvmfs {
    */
   static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_CVMFS, "cvmfs_readlink on inode: %d", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
     Tracer::trace(Tracer::FUSE_READLINK, "no path provided", "readlink() call");
     bool found;
     DirectoryEntry dirent;
@@ -533,7 +539,7 @@ namespace cvmfs {
   static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi) {
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_CVMFS, "cvmfs_open on inode: %d", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
     Tracer::trace(Tracer::FUSE_OPEN, "no path provided", "open() call");
 
     int fd = -1;
@@ -566,7 +572,7 @@ namespace cvmfs {
     if (fd >= 0) {
       if (atomic_xadd(&open_files, 1) <
           (static_cast<int>(nofiles))-NUM_RESERVED_FD) {
-        pmesg(D_CVMFS, "file %s opened", path.c_str());
+        LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened", path.c_str());
         fi->fh = fd;
         fuse_reply_open(req, fi);
         return;
@@ -607,8 +613,9 @@ namespace cvmfs {
    */
   static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                          struct fuse_file_info *fi) {
-    pmesg(D_CVMFS, "cvmfs_read on inode: %d reading %d bytes from offset %d",
-          catalog_manager->MangleInode(ino), size, off);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "cvmfs_read on inode: %d reading %d bytes from offset %d",
+             catalog_manager->MangleInode(ino), size, off);
     Tracer::trace(Tracer::FUSE_READ, "path", "read() call");
 
     // get data chunk
@@ -630,8 +637,8 @@ namespace cvmfs {
    */
   static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
                             struct fuse_file_info *fi) {
-    pmesg(D_CVMFS, "cvmfs_release on inode: %d",
-          catalog_manager->MangleInode(ino));
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d",
+             catalog_manager->MangleInode(ino));
 
     const int64_t fd = fi->fh;
     if (close(fd) == 0) atomic_dec(&open_files);
@@ -678,7 +685,7 @@ namespace cvmfs {
   static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                             struct fuse_file_info *fi) {
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_CVMFS, "cvmfs_opendir on inode: %d", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
 
     string path;
     DirectoryEntry d;
@@ -743,8 +750,8 @@ namespace cvmfs {
 	 */
   static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
                                struct fuse_file_info *fi) {
-    pmesg(D_CVMFS, "cvmfs_releasedir on inode: %d",
-          catalog_manager->MangleInode(ino));
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode: %d",
+             catalog_manager->MangleInode(ino));
 
     // find the directory listing to release and release it
     int reply = 0;
@@ -769,8 +776,9 @@ namespace cvmfs {
    */
   static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                             off_t off, struct fuse_file_info *fi) {
-    pmesg(D_CVMFS, "cvmfs_readdir on inode %d reading %d bytes from offset %d",
-          catalog_manager->MangleInode(ino), size, off);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "cvmfs_readdir on inode %d reading %d bytes from offset %d",
+             catalog_manager->MangleInode(ino), size, off);
 
     // find the directory listing to read
     pthread_mutex_lock(&open_dir_listings_mutex);
@@ -834,7 +842,7 @@ namespace cvmfs {
 
   static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_CVMFS, "cvmfs_statfs on inode: %d", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %d", ino);
 
     /* If we return 0 it will cause the fs
      to be ignored in "df" */
@@ -881,7 +889,8 @@ namespace cvmfs {
                              size_t size) {
 #endif
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_CVMFS, "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
     const string attr = name;
     DirectoryEntry d;
     bool found;
@@ -1054,22 +1063,24 @@ namespace cvmfs {
 
   static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_FUSE_STUB, "cvmfs_listxattr on inode: %d", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %d", ino);
     fuse_reply_err(req, EROFS);
   }
 
   static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino,
                            unsigned long nlookup) {  // NOLINT(runtime/int)
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_FUSE_STUB, "cvmfs_forget on inode: %d", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_forget on inode: %d", ino);
     fuse_reply_none(req);
   }
 
   static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
     ino = catalog_manager->MangleInode(ino);
-    pmesg(D_CVMFS, "cvmfs_access on inode: %d asking for R: %s W: %s X: %s",
-          ino, ((mask & R_OK) ? "yes" : "no"), ((mask & W_OK) ? "yes" : "no"),
-          ((mask & X_OK) ? "yes" : "no"));
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "cvmfs_access on inode: %d asking for R: %s W: %s X: %s", ino,
+             ((mask & R_OK) ? "yes" : "no"),
+             ((mask & W_OK) ? "yes" : "no"),
+             ((mask & X_OK) ? "yes" : "no"));
 
     DirectoryEntry d;
     bool found;
@@ -1097,7 +1108,7 @@ namespace cvmfs {
    * Do after-daemon() initialization
    */
   static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
-    pmesg(D_CVMFS, "cvmfs_init");
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init");
     int retval;
 
     pid = getpid();
@@ -1121,7 +1132,7 @@ namespace cvmfs {
   }
 
   static void cvmfs_destroy(void *unused __attribute__((unused))) {
-    pmesg(D_CVMFS, "cvmfs_destroy");
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
     Tracer::fini();
   }
 
@@ -1674,16 +1685,18 @@ int main(int argc, char *argv[]) {
 
   signature::init();
   if (!signature::load_public_key(cvmfs::pubkey)) {
-    cout << "Warning: cvmfs public master key could not be loaded. "
-         << "Cvmfs will fail on signed catalogs!" << endl;
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Warning: cvmfs public master key could not be loaded.\n"
+             "Cvmfs will fail on signed catalogs!");
   } else {
-    cout << "CernVM-FS: using public key " << cvmfs::pubkey << endl;
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: using public key %s",
+             cvmfs::pubkey.c_str());
   }
   signature_ready = true;
 
   /* Init quota / lru cache */
   if (cvmfs_opts.quota_limit < 0) {
-    pmesg(D_CVMFS, "unlimited cache size");
+    LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size");
     cvmfs_opts.quota_limit = -1;
     cvmfs_opts.quota_threshold = 0;
   } else {
@@ -1693,30 +1706,31 @@ int main(int argc, char *argv[]) {
   if (!lru::init(".", (uint64_t)cvmfs_opts.quota_limit,
                  (uint64_t)cvmfs_opts.quota_threshold,
                  cvmfs_opts.rebuild_cachedb)) {
-    cerr << "Failed to initialize lru cache" << endl;
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize lru cache");
     goto cvmfs_cleanup;
   }
   quota_ready = true;
 
   if (cvmfs_opts.rebuild_cachedb) {
-    cout << "CernVM-FS: rebuilding lru cache database..." << endl;
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: rebuilding lru cache database...");
     if (!lru::build()) {
-      cerr << "Failed to rebuild lru cache database" << endl;
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to rebuild lru cache database");
       goto cvmfs_cleanup;
     }
   }
   if (lru::size() > lru::capacity()) {
-    cout << "Warning: your cache is already beyond quota size, cleaning up"
-         << endl;
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Warning: your cache is already beyond quota size, cleaning up");
     if (!lru::cleanup(cvmfs_opts.quota_threshold*(1024*1024))) {
-      cerr << "Failed to clean up" << endl;
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to clean up");
       goto cvmfs_cleanup;
     }
   }
   if (cvmfs_opts.quota_limit) {
-    cout << "CernVM-FS: quota initialized, current size "
-         << lru::size()/(1024*1024)
-         << "MB" << endl;
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: quota initialized, current size %luMB",
+             lru::size()/(1024*1024));
   }
 
   /* Create the file catalog from the web server */
@@ -1750,13 +1764,14 @@ int main(int argc, char *argv[]) {
                                 cvmfs::whitelist, cvmfs::blacklist,
                                 cvmfs::force_signing);
   if (not cvmfs::catalog_manager->Init()) {
-    cerr << "Failed to initialize catalog manager" << endl;
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize catalog manager");
     goto cvmfs_cleanup;
   }
   catalog_ready = true;
 
   if (!talk::init(".")) {
-    cerr << "Failed to initialize talk socket (" << errno << ")" << endl;
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize talk socket (%d)",
+             errno);
     goto cvmfs_cleanup;
   }
   talk_ready = true;
@@ -1784,7 +1799,8 @@ int main(int argc, char *argv[]) {
     //    }
     // }
 
-    cout << "CernVM-FS: mounted cvmfs on " << cvmfs::mountpoint << endl;
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
+             cvmfs::mountpoint.c_str());
     daemon(0, 0);
 
     se = fuse_lowlevel_new(&fuse_args, &cvmfs_operations,

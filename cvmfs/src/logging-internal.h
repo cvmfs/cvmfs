@@ -29,6 +29,9 @@ enum LogSource {
   kLogLru,
   kLogTalk,
   kLogMonitor,
+  kLogInodeCache,
+  kLogPathCache,
+  kLogMd5Cache,
 };
 
 void SetLogSyslogLevel(const int level);
