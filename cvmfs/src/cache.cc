@@ -169,7 +169,7 @@ namespace cache {
     */
    int open(const hash::t_sha1 &id) {
       const string lpath = cached_name(id);
-      int result = ::open(lpath.c_str(), O_RDONLY, 0);
+      int result = ::open(lpath.c_str(), O_RDONLY | O_DIRECT | O_NOATIME, 0);
 
       if (result >= 0) pmesg(D_CACHE, "hit %s", lpath.c_str());
       else pmesg(D_CACHE, "miss %s (%d)", lpath.c_str(), result);
@@ -387,7 +387,7 @@ namespace cache {
          /* Check decompressed size */
          struct stat64 info;
          info.st_size = -1;
-         if ((fstat64(fileno(f), &info) != 0) || (info.st_size != (signed)d.size())) {
+         if ((fstat64(fileno(f), &info) != 0) || (info.st_size != (int64_t)d.size())) {
             LogCvmfs(kLogCache, kLogSyslog,
                      "size check failure for %s, expected %lu, got %ld",
                      url.c_str(), d.size(), info.st_size);
@@ -408,7 +408,7 @@ namespace cache {
 
          pmesg(D_CACHE, "trying to commit");
          fclose(f);
-         fd_return = ::open(txn.c_str(), O_RDONLY, 0);
+         fd_return = ::open(txn.c_str(), O_RDONLY | O_DIRECT | O_NOATIME, 0);
          if (fd_return < 0) {
             result = -errno;
             return result;

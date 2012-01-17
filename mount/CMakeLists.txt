@@ -11,14 +11,6 @@ if (MACOSX)
 		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 	)
 
-#	Mac OS X seems to not support unmount scripts... you can use the built-in umount command instead	
-#	install (
-#		FILES			umount.cvmfs
-#		DESTINATION		"/sbin"
-#		RENAME			umount_cvmfs
-#		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-#	)
-
 #	This is probably not needed or has to be treated differently under Mac OS X
 #	install (
 #		FILES			cvmfs.initd
@@ -51,7 +43,7 @@ else (MACOSX)
 	)
 	
 	install (
-		FILES			mount.cvmfs umount.cvmfs
+		FILES			mount.cvmfs 
 		DESTINATION		"/sbin"
 		PERMISSIONS		OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 	)

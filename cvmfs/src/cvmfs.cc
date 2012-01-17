@@ -1685,13 +1685,17 @@ int main(int argc, char *argv[]) {
   monitor_ready = true;
 
   signature::init();
-  if (!signature::load_public_key(cvmfs::pubkey)) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "Warning: cvmfs public master key could not be loaded.\n"
-             "Cvmfs will fail on signed catalogs!");
+  if (!signature::load_public_keys(cvmfs_opts.pubkey ? cvmfs_opts.pubkey : "")) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to load public key(s)");
+    goto cvmfs_cleanup;
   } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: using public key %s",
-             cvmfs::pubkey.c_str());
+    if (!cvmfs_opts.pubkey)
+      LogCvmfs(kLogCvmfs, kLogStdout, "Warning: No public master key given. "
+               "Cvmfs will fail on signed catalogs!");
+    else
+      LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: using public key(s) %s",
+               join_strings(
+                 split_string(cvmfs_opts.pubkey, ':'), ", ").c_str());
   }
   signature_ready = true;
 
@@ -1723,7 +1727,7 @@ int main(int argc, char *argv[]) {
   if (lru::size() > lru::capacity()) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "Warning: your cache is already beyond quota size, cleaning up");
-    if (!lru::cleanup(cvmfs_opts.quota_threshold*(1024*1024))) {
+    if (!lru::cleanup(cvmfs_opts.quota_threshold)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to clean up");
       goto cvmfs_cleanup;
     }

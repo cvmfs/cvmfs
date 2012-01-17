@@ -6,7 +6,31 @@
 # description: Background daemon that writes the cvmfs character device into a log file. Requires setuid bit.
 # processname: cvmfsd
 
-. /etc/init.d/functions
+LSB_INIT=0
+if [ -f /etc/init.d/functions ]; then
+   . /etc/init.d/functions
+else
+   . /lib/lsb/init-functions || exit 1
+   LSB_INIT=1
+fi
+
+portable_success() {
+   if [ $LSB_INIT -eq 1 ]; then
+      log_success_msg
+   else
+      echo_success
+      echo
+   fi
+}
+
+portable_failure() {
+   if [ $LSB_INIT -eq 1 ]; then
+      log_failure_msg
+   else
+      echo_failure
+      echo
+   fi
+}
 
 RETVAL=0
 PID_FILE=/var/run/cvmfsd.pid
@@ -84,7 +108,7 @@ start() {
    echo -n "Looking for $SHADOW_DIR"
    if [ -d "$SHADOW_DIR" ]
    then
-      echo_success
+      portable_success
    else
       return 1
    fi
@@ -97,12 +121,12 @@ start() {
       mkdir -p "$log_file_dir"
       if [ $? -eq 0 ]
       then
-         echo_success
+         portable_success
       else
          return 1
       fi
    else
-      echo_success
+      portable_success
    fi
    echo
 
@@ -110,7 +134,7 @@ start() {
    modprobe redirfs > /dev/null 2>&1
    if [ $? -eq 0 ]
    then
-      echo_success
+      portable_success
    else
       return 1
    fi
@@ -120,7 +144,7 @@ start() {
    modprobe cvmfsflt > /dev/null 2>&1
    if [ $? -eq 0 ]
    then
-      echo_success
+      portable_success
    else
       return 1
    fi
@@ -132,7 +156,7 @@ start() {
    mknod /dev/cvmfs c $major 0 > /dev/null 2>&1 && chmod 0600 /dev/cvmfs
    if [ $? -eq 0 ]
    then
-      echo_success
+      portable_success
    else
       return 1
    fi
@@ -142,7 +166,7 @@ start() {
    echo -n "a:i:$SHADOW_DIR" > /sys/fs/redirfs/filters/cvmfsflt/paths
    if [ $? -eq 0 ]
    then
-      echo_success
+      portable_success
    else
       return 1
    fi
@@ -152,7 +176,7 @@ start() {
    listen
    if [ $? -eq 0 ]
    then
-      echo_success
+      portable_success
    else
       return 1
    fi
@@ -183,10 +207,10 @@ pause() {
    echo -n "1" > /sys/fs/redirfs/filters/cvmfsflt/lockdown
    if [ $? -ne 0 ]
    then
-      echo_failure
+      portable_failure
       return 1
    else
-      echo_success
+      portable_success
    fi
    echo
    
@@ -196,7 +220,7 @@ pause() {
       nowops=`cat /sys/fs/redirfs/filters/cvmfsflt/nowops`
       if [ $? -ne 0 ]
       then
-         echo_failure
+         portable_failure
          return 1
       fi
       
@@ -207,7 +231,7 @@ pause() {
       
       sleep 1
    done
-   echo_success
+   portable_success
    echo
    
    echo -n "Waiting for pending messages in call buffer"
@@ -216,7 +240,7 @@ pause() {
       noll=`cat /sys/fs/redirfs/filters/cvmfsflt/noll`
       if [ $? -ne 0 ]
       then
-         echo_failure
+         portable_failure
          return 1
       fi
       
@@ -227,17 +251,17 @@ pause() {
       
       sleep 1
    done
-   echo_success
+   portable_success
    echo
    
    echo -n $"Stopping journal writer"
    unlisten
    if [ $RETVAL -ne 0 ]
    then
-      echo_failure
+      portable_failure
       return 1
    else
-      echo_success
+      portable_success
    fi
    echo
    
@@ -264,10 +288,10 @@ resume() {
    retval=$?
    if [ $retval -ne 0 ]
    then
-      echo_failure
+      portable_failure
       return 1
    else
-      echo_success
+      portable_success
    fi
    echo
    
@@ -275,10 +299,10 @@ resume() {
    echo -n "0" > /sys/fs/redirfs/filters/cvmfsflt/lockdown
    if [ $? -ne 0 ]
    then
-      echo_failure
+      portable_failure
       return 1
    else
-      echo_success
+      portable_success
    fi
    echo
    
@@ -322,7 +346,7 @@ stop() {
    then
       return 1
    fi
-   echo_success
+   portable_success
    echo
    
    echo -n "Shutting down CernVM-FS daemon"
@@ -337,9 +361,9 @@ flush() {
    cat /dev/null > "$LOG_FILE"
    if [ $? -eq 0 ]
    then
-      echo_success
+      portable_success
    else
-      echo_failure
+      portable_failure
    fi
    echo
 }
@@ -353,11 +377,11 @@ case "$1" in
       RETVAL=$?
       case $RETVAL in
          0)
-            echo_success
+            portable_success
             echo
             ;;
          1)
-            echo_failure
+            portable_failure
             echo
             ;;
       esac
@@ -368,11 +392,11 @@ case "$1" in
       RETVAL=$?
       case $RETVAL in
          0)
-            echo_success
+            portable_success
             echo
             ;;
          1)
-            echo_failure
+            portable_failure
             echo
             ;;
       esac
@@ -401,20 +425,20 @@ case "$1" in
       RETVAL=$?
       case $RETVAL in
          0)
-            echo_success
+            portable_success
             echo
             start $*
             RETVAL=$?
             if [ $RETVAL -eq 0 ]
             then
-               echo_success
+               portable_success
             else
-               echo_failure
+               portable_failure
             fi
             echo
             ;;
          1)
-            echo_failure
+            portable_failure
             echo
             ;;
       esac

@@ -60,7 +60,7 @@ sub usage {
     print "  open catalogs          shows information about currently      \n";
     print "                         loaded catalogs (_not_ all cached ones)\n";
     print "\n";
-    
+
     exit 1;
 }
 
@@ -72,7 +72,7 @@ my $command = join(' ', @ARGV) or usage;
 $command .= "\0";
 
 sub talk {
-   my $instance_current = shift; 
+   my $instance_current = shift;
    my $cache_dir;
 
    if (!$cache_base) {
@@ -88,7 +88,7 @@ sub talk {
    } else {
       $cache_dir="$cache_base/$instance_current";
    }
-   
+
    if (! -d $cache_dir) {
       print "Cache directory $cache_dir not accessible\n";
       return 1;
@@ -106,7 +106,7 @@ sub talk {
       print "You don't have permissions to talk to instance in $cache_dir\n";
       return 1;
    }
-   
+
    my $socket_name = sockaddr_un("$cache_dir/cvmfs_io");
 
    socket(SOCKET, PF_UNIX, SOCK_STREAM, 0);
@@ -122,9 +122,9 @@ sub talk {
 
    # read the response from cvmfs-instance (maximal $length bytes)
    while (recv(SOCKET, $response, $length, 0) && $length) {
-   	print $response;
-	}
-   
+   	  print $response;
+	 }
+
    return 0;
 }
 
@@ -132,11 +132,16 @@ if ($instance) {
    exit talk($instance);
 } else {
    my @config_line = grep(/^CVMFS_REPOSITORIES=/, `cvmfs_config showconfig`);
+   if (scalar(@config_line) == 0) {
+      print "No repositories specified (CVMFS_REPOSITORIES undefined)\n";
+      exit 1;
+   }
+
    my @config = split(' ', $config_line[0]);
    (my $trash, my $repo_list) = split(/=/, $config[0]);
    chomp($repo_list);
    my @repos = split(/,/, $repo_list);
-   
+
    my $retval = 0;
    foreach my $i (@repos) {
       print "$i:\n";

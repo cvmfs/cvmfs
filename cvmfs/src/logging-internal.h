@@ -4,8 +4,8 @@
 
 // Internal use, include only logging.h!
 
-#ifndef _CVMFS_LOGGING_INTERNAL_H_
-#define _CVMFS_LOGGING_INTERNAL_H_
+#ifndef CVMFS_LOGGING_INTERNAL_H_
+#define CVMFS_LOGGING_INTERNAL_H_
 
 #include <cstdarg>
 #include <string>
@@ -41,4 +41,4 @@ void SetLogDebugFile(const std::string &filename);
 #define SetLogDebugFile(filename) ((void)0)
 #endif
 
-#endif  // _CVMFS_LOGGING_INTERNAL_H_
+#endif  // CVMFS_LOGGING_INTERNAL_H_

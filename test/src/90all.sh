@@ -4,8 +4,8 @@ cvmfs_test_name="All Cern repositories"
 cvmfs_run_test() {
   logfile=$1
 
-  echo "CVMFS_REPOSITORIES=alice,atlas,atlas-condb,atlas-nightlies,boss,cms,geant4,grid,hepsoft,hone,lcd,lhcb,na61,sft" > /etc/cvmfs/default.local || return 1
-  echo "CVMFS_SERVER_URL=http://cernvm-webfs.cern.ch/opt/@org@" > /etc/cvmfs/domain.d/cern.ch.local
+  echo "CVMFS_REPOSITORIES=alice,atlas,atlas-condb,atlas-nightlies,boss,cms,geant4,grid,hone,lcd,lhcb,na61,sft" > /etc/cvmfs/default.local || return 1
+  echo "CVMFS_SERVER_URL=http://cvmfs-stratum-zero.cern.ch/opt/@org@" > /etc/cvmfs/domain.d/cern.ch.local
   echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local
   service cvmfs restartclean >> $logfile 2>&1 || return 2
   service cvmfs probe >> $logfile 2>&1 || return 3
@@ -22,21 +22,21 @@ cvmfs_run_test() {
   service cvmfs restartclean >> $logfile 2>&1 || return 40
   service cvmfs probe >> $logfile 2>&1 || return 41
 
-  echo "http://cvmfs.racf.bnl.gov:8000/opt/@org@" > /etc/cvmfs/domain.d/cern.ch.local
+  echo "CVMFS_SERVER_URL=http://cvmfs.racf.bnl.gov:8000/opt/@org@" > /etc/cvmfs/domain.d/cern.ch.local
   service cvmfs restartclean >> $logfile 2>&1 || return 50
   service cvmfs probe >> $logfile 2>&1 || return 51
 
   rm -f /etc/cvmfs/domain.d/cern.ch.local
   service cvmfs restart >> $logfile 2>&1 || return 52
 
-  for r in alien grid hepsoft hone lcd 
+  for r in grid hone lcd 
   do
     ls /opt/$r >> $logfile 2>&1 || return 4
   done 
 
   service cvmfs stop >> $logfile 2>&1 || return 5
   
-  for r in alien atlas atlas-condb atlas-nightlies boss cms grid hepsoft hone lcd lhcb na61 sft       
+  for r in atlas atlas-condb atlas-nightlies boss cms grid hone lcd lhcb na61 sft       
   do
     ls /opt/$r >> $logfile 2>&1
     if [ $? -eq 0 ]; then
@@ -48,7 +48,7 @@ cvmfs_run_test() {
   rm -rf /etc/cvmfs/local.d/* || return 7
 
   service cvmfs start >> $logfile 2>&1 || return 9
-  for r in alien atlas-condb grid hepsoft hone lcd 
+  for r in atlas-condb grid hepsoft hone lcd 
   do
     ls /opt/$r >> $logfile 2>&1
     if [ $? -eq 0 ]; then

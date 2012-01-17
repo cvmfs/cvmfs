@@ -114,7 +114,10 @@ fi
 if [ "x$CVMFS_MUCATALOGS" == "xyes" ]; then
   MUCATALOGS="-m"
 fi
-$syncbin -s "$SHADOW_DIR" -r "$PUB_DIR" -l "$LOG_FILE" "$IMMUTABLES" $COMPAT_CATALOG $KEYFILE $CVMFS_LAZYATTACH $CVMFS_BOOKKEEPING $CVMFS_SYNC_THREADS $MUCATALOGS 2>&1 | tee "${LOG_FILE}.sync.$timestamp"
+if [ "x$CVMFS_SYSTEM_UMASK" == "xyes" ]; then
+  SYSTEM_UMASK="-u"
+fi
+$syncbin -s "$SHADOW_DIR" -r "$PUB_DIR" -l "$LOG_FILE" "$IMMUTABLES" $COMPAT_CATALOG $KEYFILE $CVMFS_LAZYATTACH $CVMFS_BOOKKEEPING $CVMFS_SYNC_THREADS $MUCATALOGS $SYSTEM_UMASK 2>&1 | tee "${LOG_FILE}.sync.$timestamp"
 if [ $PIPESTATUS -eq 0 ]; then
   $ctrlbin flush
 fi

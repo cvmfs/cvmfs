@@ -34,7 +34,7 @@ setup_sft() {
 
 
 setup_defaultdomain() {
-  echo "CVMFS_REPOSITORIES=atlas.cern.ch,lhcb,hepsoft.cern.ch,grid" > /etc/cvmfs/default.local || return 1
+  echo "CVMFS_REPOSITORIES=atlas.cern.ch,lhcb,cms.cern.ch,grid" > /etc/cvmfs/default.local || return 1
   echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local || return 1
   echo "CVMFS_QUOTA_LIMIT=1000" >>  /etc/cvmfs/default.local || return 1
   #echo "CVMFS_DEBUGLOG=/tmp/cvmfs_test.log" >> /etc/cvmfs/default.local || return 1
@@ -60,6 +60,7 @@ extract_local_repo() {
 resign_local() {
   for c in `find server/pub/catalogs -name .cvmfspublished`
   do
+    cp $c $c.unsigned
     cvmfs_sign -c /tmp/cvmfs_test.crt -k /tmp/cvmfs_test.key -n 127.0.0.1 $c >> $logfile 2>&1 || return 10
   done
   cp /tmp/whitelist.test.signed server/pub/catalogs/.cvmfswhitelist >> $logfile 2>&1
@@ -90,6 +91,7 @@ setup_local() {
   echo "CVMFS_REPOSITORIES=127.0.0.1" > /etc/cvmfs/default.local || return 3
   echo "CVMFS_TIMEOUT=1" >> /etc/cvmfs/default.local || return 3
   echo "CVMFS_TIMEOUT_DIRECT=1" >> /etc/cvmfs/default.local || return 3
+  echo "CVMFS_QUOTA_LIMIT=8000" >> /etc/cvmfs/default.local || return 3
   #echo "CVMFS_DEBUGLOG=/tmp/cvmfs_test.log" >> /etc/cvmfs/default.local || return 3
   if [ -z "$1" ]; then
     echo "CVMFS_SERVER_URL=http://127.0.0.1:8080/catalogs" > /etc/cvmfs/config.d/127.0.0.1.conf || return 6

@@ -30,8 +30,8 @@ std::string localtime_ascii(time_t seconds, const bool utc);
 bool parse_keyval(const std::string filename, std::map<char, std::string> &content);
 bool parse_keyval(const char *buf, const int size, int &sig_start,
                   hash::t_sha1 &sha1, std::map<char, std::string> &content);
-bool read_sig_tail(const void *buf, const unsigned buf_size, const unsigned skip, 
-                   void **sig_buf, unsigned *sig_buf_size); 
+bool read_sig_tail(const void *buf, const unsigned buf_size, const unsigned skip,
+                   void **sig_buf, unsigned *sig_buf_size);
 bool write_memchunk(const std::string &patch, const void *chunk, const int &size);
 FILE *temp_file(const std::string &path_prefix, const int mode, const char *open_flags,
                 std::string &final_path);
@@ -66,5 +66,9 @@ char *abs2rel(const char *path, const char *base, char *result, const size_t siz
 char *rel2abs(const char *path, const char *base, char *result, const size_t size);
 
 std::vector<std::string> split_string(const std::string& s, const std::string& delim, const bool keep_empty = true);
+
+std::vector<std::string> split_string(const std::string &str, const char delim);
+std::string join_strings(const std::vector<std::string> &strings,
+                         const std::string &joint);
 
 #endif

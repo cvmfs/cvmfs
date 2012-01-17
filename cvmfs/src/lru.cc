@@ -461,7 +461,9 @@ namespace lru {
          snprintf(hex, 3, "%02x", i);
          path = cache_dir + "/" + string(hex);
          if ((dirp = opendir(path.c_str())) == NULL) {
-            pmesg(D_LRU, "failed to open directory %s", path.c_str());
+            LogCvmfs(kLogLru, kLogDebug | kLogSyslog,
+                     "failed to open directory %s (tmpwatch interfering?)",
+                     path.c_str());
             goto build_return;
          }
          while ((d = readdir(dirp)) != NULL) {

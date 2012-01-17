@@ -73,13 +73,17 @@ cvmfs_readconfig() {
   if [ "x$fqrn" != "x" ] 
   then
     local found_repo; found_repo=0
-    for r in `echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
-    do
-      if [ `cvmfs_mkfqrn $r` == $fqrn ]; then
-        found_repo=1
-        break
-      fi
-    done
+    if [ "x$CVMFS_STRICT_MOUNT" != "xno" ]; then
+      for r in `echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+      do
+        if [ `cvmfs_mkfqrn $r` == $fqrn ]; then
+          found_repo=1
+          break
+        fi
+      done
+    else
+      found_repo=1
+    fi  
     if [ $found_repo -eq 0 ]; then
       CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/$fqrn"
       return 2

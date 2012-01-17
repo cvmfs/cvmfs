@@ -106,7 +106,7 @@ if [ ! -z $CVMFS_TIMEOUT_DIRECT ]; then
 fi
  
 
-while getopts "vfo:" OPTION
+while getopts "vfo:n" OPTION
 do
   case $OPTION in
     v)
@@ -116,6 +116,9 @@ do
     ;;
     o)
       mount_options="${mount_options},$OPTARG"
+    ;;
+    n)
+      echo "Note: fusermount _does_ modify /etc/mtab in case it is writable." 
     ;;
     ?)
       echo "Invalid option"
@@ -178,18 +181,6 @@ else
     /bin/sh -c "$cmd"
   fi
   retval=$?
-fi
-
-# Mac OS X uses its ordinary umount command... we don't need to keep the record here
-if [ $unamestr != 'Darwin' ]; then
-	if [ $retval -eq 0 ]; then
-	  grep -q "^cvmfs2 $mountpoint fuse " /etc/mtab
-	  if [ $? -eq 0 ]; then
-	    sed -i "s|^cvmfs2 $mountpoint fuse \(.*\)|cvmfs2 $mountpoint cvmfs \1|" /etc/mtab 
-	  else
-	    grep "^cvmfs2 $mountpoint fuse " /proc/mounts | sed "s|^cvmfs2 $mountpoint fuse \(.*\)|cvmfs2 $mountpoint cvmfs \1|" >> /etc/mtab
-	  fi
-	fi
 fi
 
 exit $retval
