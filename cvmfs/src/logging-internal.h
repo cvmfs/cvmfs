@@ -22,7 +22,7 @@ enum LogSource {
   kLogCatalog,
   kLogCvmfs,
   kLogHash,
-  kLogCurl,
+  kLogDownload,
   kLogCompress,
   kLogLru,
   kLogTalk,
