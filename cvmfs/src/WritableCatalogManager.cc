@@ -425,7 +425,7 @@ bool WritableCatalogManager::Commit() {
     SnapshotCatalog(*i);
   }
   
-  return true;
+  return true; // TODO: this might be stupid
 }
 
 int WritableCatalogManager::GetCatalogsToSnapshotRecursively(const Catalog *catalog, WritableCatalogList &result) const {

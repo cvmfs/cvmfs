@@ -215,8 +215,8 @@ int main(int argc, char **argv) {
 	if (not createCacheDir(&parameters)) return 3;
 	
 	// create worker objects
-	WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
-	SyncMediator *mediator = createSyncMediator(catalogManager, parameters);
+  WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
+  SyncMediator *mediator = createSyncMediator(catalogManager, parameters);
   SyncUnion *sync = createSynchronisationEngine(mediator, parameters);
 	
 	// sync
