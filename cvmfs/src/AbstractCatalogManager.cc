@@ -390,21 +390,26 @@ bool AbstractCatalogManager::AttachCatalog(const std::string &db_file, Catalog *
 }
 
 bool AbstractCatalogManager::DetachCatalogTree(Catalog *catalog) {
-  // determine catalogs to detach (all offsprings of *catalog are detached as well)
-  CatalogList catalogs_to_detach = catalog->GetChildrenRecursively();
-  catalogs_to_detach.push_back(catalog);
+  bool successful = true;
   
-  // detach catalogs
-  CatalogList::iterator i;
+  // detach all child catalogs recursively
+  CatalogList::const_iterator i;
   CatalogList::const_iterator iend;
-  bool result = true;
-  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end(); i != iend; ++i) {
-    if (not DetachCatalog(*i)) {
-      result = false;
+  CatalogList catalogs_to_detach = catalog->children();
+  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end();
+       i != iend;
+       ++i) {
+    if (not DetachCatalogTree(*i)) {
+      successful = false;
     }
   }
   
-  return result;
+  // detach the catalog itself
+  if (not DetachCatalog(catalog)) {
+    successful = false;
+  }
+  
+  return successful;
 }
 
 bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
@@ -429,33 +434,41 @@ bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
   return false;
 }
 
-void AbstractCatalogManager::PrintCatalogHierarchy() const {
-  Catalog *root_catalog = GetRootCatalog();
-  CatalogList catalogs = root_catalog->GetChildrenRecursively();
+bool AbstractCatalogManager::LoadAndAttachCatalogsRecursively(Catalog *catalog) {
+  bool successful = true;
   
-  int level = 0;
-  Catalog *parent_before = NULL; // TODO: this is just a mock up... should be a stack or something
-  Catalog *current_parent = root_catalog->parent();
-  Catalog *current_catalog = root_catalog;
-  cout << root_catalog->path() << endl;
-  for (CatalogList::const_iterator i = catalogs.begin(),
-       iend = catalogs.end();
-       i != iend; ++i) {
-    current_catalog = *i;
-    if (current_parent != current_catalog->parent()) {
-      if (current_catalog->parent() == parent_before) {
-        --level;
-      } else {
-        ++level;
-      }
-      parent_before = current_parent;
-      current_parent = current_catalog->parent();
+  // go through all children of the given parent catalog and attach them
+  Catalog::NestedCatalogReferenceList children = catalog->ListNestedCatalogReferences();
+  Catalog::NestedCatalogReferenceList::const_iterator j,jend;
+  for (j = children.begin(), jend = children.end();
+       j != jend;
+       ++j) {
+    Catalog *new_catalog;
+    if (not LoadAndAttachCatalog(j->path, catalog, &new_catalog) ||
+        not LoadAndAttachCatalogsRecursively(new_catalog)) {
+      successful = false;
     }
-    
-    for (int i = 0; i < level; ++i) {
-      cout << "--";
-    }
-    cout << ">> " << current_catalog->path() << endl;
+  }
+  
+  return successful;
+}
+
+void AbstractCatalogManager::PrintCatalogHierarchyRecursively(const Catalog *catalog,
+                                                              const int recursion_depth) const {
+  CatalogList children = catalog->children();
+  
+  // indent the stuff according to the recursion_depth (ASCII art ftw!!)
+  for (int j = 0; j < recursion_depth; ++j) {
+    cout << "    ";
+  }
+  cout << "'-> " << catalog->path() << endl;
+  
+  // recursively go though all children
+  CatalogList::const_iterator i,iend;
+  for (i = children.begin(), iend = children.end();
+       i != iend;
+       ++i) {
+    PrintCatalogHierarchyRecursively(*i, recursion_depth + 1);
   }
 }
 

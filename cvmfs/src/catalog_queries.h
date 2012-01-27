@@ -435,6 +435,19 @@ class FindNestedCatalogSqlStatement : public SqlStatement {
 // ###########################################################################
 //
 
+class ListNestedCatalogsSqlStatement : public SqlStatement {
+ public:
+  ListNestedCatalogsSqlStatement(const sqlite3 *database);
+  std::string GetMountpoint() const;
+  hash::t_sha1 GetContentHash() const;
+};
+
+//
+// ###########################################################################
+// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+// ###########################################################################
+//
+
 class InsertDirectoryEntrySqlStatement : public ManipulateDirectoryEntrySqlStatement {
  public:
   InsertDirectoryEntrySqlStatement(const sqlite3 *database);

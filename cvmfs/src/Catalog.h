@@ -222,6 +222,18 @@ class Catalog {
    */
   inode_t GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, 
                                               uint64_t hardlink_group_id);
+
+  typedef struct {
+    std::string path;
+    hash::t_sha1 content_hash;
+  } NestedCatalogReference;
+  typedef std::list<NestedCatalogReference> NestedCatalogReferenceList;
+
+  /**
+   *  get a list of all registered nested catalogs in this catalog
+   *  @return a list of all nested catalog references of this catalog
+   */
+  NestedCatalogReferenceList ListNestedCatalogReferences() const;
   
  protected:
   /**
@@ -248,18 +260,6 @@ class Catalog {
    *  @return a pointer to the found Catalog or NULL if not found
    */
   Catalog* FindChildWithMountpoint(const std::string &mountpoint) const;
-  
-  typedef struct {
-    std::string path;
-    hash::t_sha1 content_hash;
-  } NestedCatalogReference;
-  typedef std::list<NestedCatalogReference> NestedCatalogReferenceList;
-  
-  /**
-   *  get a list of all registered nested catalogs in this catalog
-   *  @return a list of all nested catalog references of this catalog
-   */
-  NestedCatalogReferenceList ListNestedCatalogReferences() const;
   
   inline sqlite3* database() const { return database_; }
   inline std::string database_file() const { return database_file_; }
@@ -309,6 +309,7 @@ class Catalog {
   PathHashLookupSqlStatement *path_hash_lookup_statement_;
   InodeLookupSqlStatement *inode_lookup_statement_;
   FindNestedCatalogSqlStatement *find_nested_catalog_statement_;
+  ListNestedCatalogsSqlStatement *list_nested_catalogs_statement_;
 };
 
 }

@@ -241,6 +241,27 @@ hash::t_sha1 FindNestedCatalogSqlStatement::GetContentHash() const {
 // ###########################################################################
 //
 
+ListNestedCatalogsSqlStatement::ListNestedCatalogsSqlStatement(const sqlite3 *database) {
+  Init(database, "SELECT path, sha1 FROM nested_catalogs;");
+}
+
+string ListNestedCatalogsSqlStatement::GetMountpoint() const {
+  return string((char*)RetrieveText(0));
+}
+
+hash::t_sha1 ListNestedCatalogsSqlStatement::GetContentHash() const {
+  hash::t_sha1 sha1;
+  const std::string sha1_str = std::string((char *)RetrieveText(1));
+  sha1.from_hash_str(sha1_str);
+  return sha1;
+}
+
+//
+// ###########################################################################
+// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+// ###########################################################################
+//
+
 InsertDirectoryEntrySqlStatement::InsertDirectoryEntrySqlStatement(const sqlite3 *database) {
   Init(database, "INSERT INTO catalog "
   //                  1           2         3         4       5     6      7     8      9      10    11     12

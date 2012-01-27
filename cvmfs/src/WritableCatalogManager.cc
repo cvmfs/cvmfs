@@ -32,7 +32,8 @@ WritableCatalogManager::WritableCatalogManager(
 }
 
 WritableCatalogManager::~WritableCatalogManager() {
-  
+  // currently we have nothing to do here...
+  // detachment of catalogs is done by AbstractCatalogManager
 }
 
 bool WritableCatalogManager::Init() {
@@ -110,12 +111,6 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
     pmesg(D_CATALOG, "failed to attach newly created root catalog");
     return false;
   }
-  
-  return true;
-}
-
-bool WritableCatalogManager::LoadAndAttachCatalogsRecursively() {
-  // TODO: implement me!
   
   return true;
 }
@@ -440,7 +435,9 @@ int WritableCatalogManager::GetCatalogsToSnapshotRecursively(const Catalog *cata
   
   // look for dirty catalogs in the descendants of *catalog
   CatalogList::const_iterator i,iend;
-  for (i = wr_catalog->children().begin(), iend = wr_catalog->children().end(); i != iend; ++i) {
+  for (i = wr_catalog->children().begin(), iend = wr_catalog->children().end();
+       i != iend;
+       ++i) {
     dirty_catalogs += GetCatalogsToSnapshotRecursively(*i, result);
   }
 

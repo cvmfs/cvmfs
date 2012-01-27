@@ -82,7 +82,9 @@ class AbstractCatalogManager {
    *  @param with_parent perform a second lookup to get information about the parent
    *  @return true if lookup succeeded otherwise false
    */
-  bool Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent = true) const;
+  bool Lookup(const inode_t inode, 
+              DirectoryEntry *entry, 
+              const bool with_parent = true) const;
   
   /**
    *  perform a lookup for a specific DirectoryEntry in the catalogs
@@ -91,7 +93,9 @@ class AbstractCatalogManager {
    *  @param with_parent perform a second lookup to get information about the parent
    *  @return true if lookup succeeded otherwise false
    */
-  bool Lookup(const std::string &path, DirectoryEntry *entry, const bool with_parent = true);
+  bool Lookup(const std::string &path, 
+              DirectoryEntry *entry, 
+              const bool with_parent = true);
   
   /**
    *  do a listing of the specified directory
@@ -132,7 +136,7 @@ class AbstractCatalogManager {
   /**
    *  print the currently attached catalog hierarchy to stdout
    */
-  void PrintCatalogHierarchy() const;
+  inline void PrintCatalogHierarchy() const { PrintCatalogHierarchyRecursively(GetRootCatalog()); }
   
  protected:
   
@@ -157,7 +161,8 @@ class AbstractCatalogManager {
    *  @param parent_catalog the parent of the catalog to create
    *  @return a newly created (derived) Catalog for future usage
    */
-  virtual Catalog* CreateCatalogStub(const std::string &mountpoint, Catalog *parent_catalog) const = 0;
+  virtual Catalog* CreateCatalogStub(const std::string &mountpoint, 
+                                     Catalog *parent_catalog) const = 0;
 
   /**
    *  loads a new catalog and attaches it on this CatalogManager
@@ -167,7 +172,17 @@ class AbstractCatalogManager {
    *  @param attached_catalog will be set to the newly attached catalog
    *  @return true on success otherwise false
    */
-  bool LoadAndAttachCatalog(const std::string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog = NULL);
+  bool LoadAndAttachCatalog(const std::string &mountpoint,
+                            Catalog *parent_catalog, 
+                            Catalog **attached_catalog = NULL);
+  
+  /**
+   *  Attaches all catalogs of the repository recursively
+   *  This is useful when updating a repository on the server.
+   *  Be careful when using it on remote catalogs
+   *  @return true on success, false otherwise
+   */
+  inline bool LoadAndAttachCatalogsRecursively() { return LoadAndAttachCatalogsRecursively(GetRootCatalog()); }
   
   /**
    *  attaches a newly created catalog
@@ -176,7 +191,9 @@ class AbstractCatalogManager {
    *  @param open_transaction ????
    *  @return true on success, false otherwise
    */
-  bool AttachCatalog(const std::string &db_file, Catalog *new_catalog, const bool open_transaction);
+  bool AttachCatalog(const std::string &db_file, 
+                     Catalog *new_catalog,
+                     const bool open_transaction);
   
   /**
    *  removes a catalog (and all of it's children) from this CatalogManager
@@ -185,16 +202,16 @@ class AbstractCatalogManager {
    *  @return true on success, false otherwise
    */
   bool DetachCatalogTree(Catalog *catalog);
-  
-  /**
-   *  removes a catalog from this CatalogManager
-   *  the given catalog pointer is freed if the call succeeds!
-   *  CAUTION: This method can create dangling children.
-   *           use DetachCatalogTree() if you are unsure!
-   *  @param catalog the catalog to detach
-   *  @return true on success, false otherwise
-   */
-  bool DetachCatalog(Catalog *catalog);
+
+   /**
+    *  removes a catalog from this CatalogManager
+    *  the given catalog pointer is freed if the call succeeds!
+    *  CAUTION: This method can create dangling children.
+    *           use DetachCatalogTree() if you are unsure!
+    *  @param catalog the catalog to detach
+    *  @return true on success, false otherwise
+    */
+   bool DetachCatalog(Catalog *catalog);
   
   /**
    *  detach all catalogs from this CatalogManager
@@ -220,7 +237,10 @@ class AbstractCatalogManager {
    *               DirectoryEntry representing the last part of the given path
    *  @return true if catalog was found, false otherwise
    */
-  bool GetCatalogByPath(const std::string &path, const bool load_final_catalog, Catalog **catalog = NULL, DirectoryEntry *entry = NULL);
+  bool GetCatalogByPath(const std::string &path, 
+                        const bool load_final_catalog, 
+                        Catalog **catalog = NULL, 
+                        DirectoryEntry *entry = NULL);
   
   /**
    *  finds the appropriate catalog for a given inode
@@ -239,7 +259,8 @@ class AbstractCatalogManager {
    *  @param attached_catalog is set to the searched catalog, in case of presence
    *  @return true if catalog is already present, false otherwise
    */
-  bool IsCatalogAttached(const std::string &root_path, Catalog **attached_catalog) const;
+  bool IsCatalogAttached(const std::string &root_path, 
+                         Catalog **attached_catalog) const;
   
  private:
    
@@ -266,6 +287,15 @@ class AbstractCatalogManager {
                                 const Catalog *entry_point, 
                                 const bool load_final_catalog, 
                                 Catalog **final_catalog);
+
+  /**
+   *  prints all attached catalogs to stdout
+   *  this is mainly for debugging purposes!
+   *  @param catalog the catalog to traverse in this recursion step
+   *  @param recursion_depth to determine the indentation
+   */
+  void PrintCatalogHierarchyRecursively(const Catalog *catalog,
+                                        const int recursion_depth = 0) const;
   
   /**
    *  allocate a chunk of inodes for the given size
@@ -282,6 +312,17 @@ class AbstractCatalogManager {
    *  @param chunk the InodeChunk to be freed
    */
   void AnnounceInvalidInodeChunk(const InodeChunk chunk) const;
+  
+  /**
+   *  Attaches all catalogs of the repository recursively
+   *  This is useful when updating a repository on the server.
+   *  Be careful when using it on remote catalogs.
+   *  (This is the actual recursion, there is a convenience wrapper in the
+   *   protected part of this class)
+   *  @param catalog the catalog whose children are attached in this recursion step
+   *  @return true on success, false otherwise
+   */
+  bool LoadAndAttachCatalogsRecursively(Catalog *catalog);
   
  private:
   // TODO: this list is actually not really needed.

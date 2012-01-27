@@ -198,14 +198,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
   bool CreateAndAttachRootCatalog();
   
   /**
-   *  Attaches all catalogs of the repository recursively
-   *  i.e. afterwards all currently used catalogs of the whole repository
-   *       are directly accessible.
-   *  @return true on success, false otherwise
-   */
-  bool LoadAndAttachCatalogsRecursively();
-  
-  /**
    *  Tries to retrieve the catalog containing the given path
    *  This method is just a wrapper around the GetCatalogByPath method of
    *  AbstractCatalogManager to provide a direct interface returning
@@ -234,6 +226,13 @@ class WritableCatalogManager : public AbstractCatalogManager {
     assert (number_of_dirty_catalogs <= result.size());
   }
   int GetCatalogsToSnapshotRecursively(const Catalog *catalog, WritableCatalogList &result) const;
+  
+  /**
+   *  TODO!!
+   *  This method is basically the same function used before the last major
+   *  refactoring. I (René) have no idea about the bits and pieces it does
+   *  This should definitely be revised.
+   */
   bool SnapshotCatalog(WritableCatalog *catalog) const;
   
  private:

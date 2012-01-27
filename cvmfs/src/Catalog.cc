@@ -75,6 +75,7 @@ void Catalog::InitPreparedStatements() {
   path_hash_lookup_statement_ = new PathHashLookupSqlStatement(database_);
   inode_lookup_statement_ = new InodeLookupSqlStatement(database_);
   find_nested_catalog_statement_ = new FindNestedCatalogSqlStatement(database_);
+  list_nested_catalogs_statement_ = new ListNestedCatalogsSqlStatement(database_);
 }
 
 void Catalog::FinalizePreparedStatements() {
@@ -82,6 +83,7 @@ void Catalog::FinalizePreparedStatements() {
   delete path_hash_lookup_statement_;
   delete inode_lookup_statement_;
   delete find_nested_catalog_statement_;
+  delete list_nested_catalogs_statement_;
 }
 
 void Catalog::AddChild(Catalog *child) {
@@ -239,16 +241,15 @@ Catalog* Catalog::FindChildWithMountpoint(const std::string &mountpoint) const {
 }
 
 Catalog::NestedCatalogReferenceList Catalog::ListNestedCatalogReferences() const {
-  const string sql = "SELECT path, sha1 FROM nested_catalogs;";
-  SqlStatement listing(database(), sql);
-  
   NestedCatalogReferenceList result;
-  while (listing.FetchRow()) {
+  while (list_nested_catalogs_statement_->FetchRow()) {
     NestedCatalogReference ref;
-    ref.path = string((char*)listing.RetrieveText(0));
-    ref.content_hash = listing.RetrieveSha1HashFromText(1);
+    ref.path = list_nested_catalogs_statement_->GetMountpoint();
+    ref.content_hash = list_nested_catalogs_statement_->GetContentHash();
     result.push_back(ref);
   }
+  
+  list_nested_catalogs_statement_->Reset();
   
   return result;
 }
