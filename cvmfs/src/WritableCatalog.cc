@@ -119,8 +119,8 @@ out_fail:
 }
 
 WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
-  dirty_(false),
-  Catalog(path, parent)
+  Catalog(path, parent),
+  dirty_(false)
 {}
 
 WritableCatalog::~WritableCatalog() {

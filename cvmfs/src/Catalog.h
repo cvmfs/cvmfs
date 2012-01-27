@@ -172,12 +172,6 @@ class Catalog {
   void RemoveChild(const Catalog *child);
   
   /**
-   *  list all children in the hierarchy seen from this catalog
-   *  @return a list of all attached children in this hierarchy
-   */
-  CatalogList GetChildrenRecursively() const;
-  
-  /**
    *  checks if a given inode might be maintained by this Catalog
    *  @return true if given inodes lies in range, false otherwise
    */

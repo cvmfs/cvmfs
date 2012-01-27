@@ -103,19 +103,6 @@ void Catalog::RemoveChild(const Catalog *child) {
   }
 }
 
-CatalogList Catalog::GetChildrenRecursively() const {
-  CatalogList result;
-  
-  CatalogList::const_iterator i, end;
-  for(i = children_.begin(), end = children_.end(); i != end; ++i) {
-    CatalogList grand_children = (*i)->GetChildrenRecursively();
-    result.push_back(*i);
-    result.insert(result.end(), grand_children.begin(), grand_children.end());
-  }
-  
-  return result;
-}
-
 bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const { 
   assert (IsInitialized());
   
