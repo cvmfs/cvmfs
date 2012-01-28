@@ -75,7 +75,8 @@ int WritableCatalogManager::LoadCatalogFile(const std::string &url_path,
   return 0;
 }
 
-Catalog* WritableCatalogManager::CreateCatalogStub(const std::string &mountpoint, Catalog *parent_catalog) const {
+Catalog* WritableCatalogManager::CreateCatalogStub(const std::string &mountpoint,
+                                                   Catalog *parent_catalog) const {
   return new WritableCatalog(mountpoint, parent_catalog);
 }
 
@@ -115,10 +116,13 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
   return true;
 }
 
-bool WritableCatalogManager::GetCatalogByPath(const string &path, WritableCatalog **result) {
+bool WritableCatalogManager::GetCatalogByPath(const string &path,
+                                              WritableCatalog **result) {
   const bool load_final_catalog = true;
   Catalog *catalog = NULL;
-  bool found = AbstractCatalogManager::GetCatalogByPath(path, load_final_catalog, &catalog);
+  bool found = AbstractCatalogManager::GetCatalogByPath(path,
+                                                        load_final_catalog,
+                                                        &catalog);
   
   if (not found || not catalog->IsWritable()) {
     return false;
@@ -191,7 +195,8 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   return true;
 }
 
-bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry, const std::string &parent_directory) {
+bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
+                                          const std::string &parent_directory) {
   const string parent_path = RelativeToCatalogPath(parent_directory);
   const string directory_path = parent_path + "/" + entry.name();
   
@@ -205,7 +210,8 @@ bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry, const std
   return true;
 }
 
-bool WritableCatalogManager::AddFile(const DirectoryEntry &entry, const std::string &parent_directory) {
+bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
+                                     const std::string &parent_directory) {
   const string parent_path = RelativeToCatalogPath(parent_directory);
   const string file_path = parent_path + "/" + entry.name();
 
@@ -232,7 +238,8 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry, const std::str
   return true;
 }
 
-bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries, const std::string &parent_directory) {
+bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
+                                              const std::string &parent_directory) {
   // sanity check
 	if (entries.size() == 0) {
     pmesg(D_CATALOG, "tried to add an empty hardlink group");
@@ -282,7 +289,8 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries, const
 	return result;
 }
 
-bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry, const std::string &path) {
+bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
+                                        const std::string &path) {
   const string entry_path = RelativeToCatalogPath(path);
   const string parent_path = get_parent_path(entry_path);
   
@@ -420,10 +428,11 @@ bool WritableCatalogManager::Commit() {
     SnapshotCatalog(*i);
   }
   
-  return true; // TODO: this might be stupid
+  return true; // TODO: this might be stupid (see WritableCatalogManager::SnapshotCatalog)
 }
 
-int WritableCatalogManager::GetCatalogsToSnapshotRecursively(const Catalog *catalog, WritableCatalogList &result) const {
+int WritableCatalogManager::GetCatalogsToSnapshotRecursively(const Catalog *catalog,
+                                                             WritableCatalogList &result) const {
   // a catalog must be snapshot, if itself or one of it's descendants is dirty
   // meaning: go through the catalog tree recursively and look
   //          for dirty catalogs on the way.
@@ -434,8 +443,9 @@ int WritableCatalogManager::GetCatalogsToSnapshotRecursively(const Catalog *cata
   int dirty_catalogs = (wr_catalog->IsDirty()) ? 1 : 0;
   
   // look for dirty catalogs in the descendants of *catalog
+  CatalogList children = wr_catalog->GetChildren();
   CatalogList::const_iterator i,iend;
-  for (i = wr_catalog->children().begin(), iend = wr_catalog->children().end();
+  for (i = children.begin(), iend = children.end();
        i != iend;
        ++i) {
     dirty_catalogs += GetCatalogsToSnapshotRecursively(*i, result);

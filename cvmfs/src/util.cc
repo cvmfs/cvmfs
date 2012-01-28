@@ -505,17 +505,12 @@ vector<string> split_string(const string& s, const string& delim, const bool kee
 vector<string> split_string(const string &str, const char delim) {
   vector<string> result;
 
-  const unsigned size = str.size();
-  unsigned marker = 0;
-  unsigned i;
-  for (i = 0; i < size; ++i) {
-    if (str[i] == delim) {
-      result.push_back(str.substr(marker, i-marker));
-      marker = i+1;
-    }
+  std::stringstream ss(str);
+  std::string item;
+  while(std::getline(ss, item, delim)) {
+      result.push_back(item);
   }
-  result.push_back(str.substr(marker, i-marker));
-
+  
   return result;
 }
 

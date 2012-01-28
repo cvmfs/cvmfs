@@ -198,7 +198,8 @@ bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
   return result;
 }
 
-bool WritableCatalog::TouchEntry(const DirectoryEntry &entry, const std::string &entry_path) {
+bool WritableCatalog::TouchEntry(const DirectoryEntry &entry,
+                                 const std::string &entry_path) {
   SetDirty();
 
   // perform a touch operation for the given path
@@ -228,7 +229,8 @@ bool WritableCatalog::RemoveEntry(const string &file_path) {
   return result;
 }
 
-bool WritableCatalog::UpdateEntry(const DirectoryEntry &entry, const hash::t_md5 &path_hash) {
+bool WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
+                                  const hash::t_md5 &path_hash) {
   SetDirty();
   
   // perform the update operation

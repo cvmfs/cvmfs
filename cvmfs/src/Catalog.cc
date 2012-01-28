@@ -16,12 +16,10 @@ namespace cvmfs {
 const uint64_t Catalog::GROW_EPOCH        = 1199163600;
 const int      Catalog::SQLITE_THREAD_MEM = 4; ///< SQLite3 heap limit per thread
 
-Catalog::Catalog(const string &path, Catalog *parent) {
-  parent_ = parent;
-  path_ = path;
-  
-  max_row_id_ = 0;
-}
+Catalog::Catalog(const string &path, Catalog *parent) :
+  path_(path),
+  parent_(parent),
+  max_row_id_(0) {}
 
 bool Catalog::OpenDatabase(const string &db_file) {
   int flags = DatabaseOpenFlags();
@@ -87,52 +85,84 @@ void Catalog::FinalizePreparedStatements() {
 }
 
 void Catalog::AddChild(Catalog *child) {
-  children_.push_back(child);
+  assert (NULL == FindChildWithMountpoint(child->path()));
+  
+  children_[child->path()] = child;
   child->set_parent(this);
 }
 
-void Catalog::RemoveChild(const Catalog *child) {
-  CatalogList::iterator i;
-  CatalogList::const_iterator end;
-  for (i = children_.begin(), end = children_.end(); i != end; ++i) {
-    if (*i == child) {
-      children_.erase(i);
-      (*i)->set_parent(NULL);
+void Catalog::RemoveChild(Catalog *child) {
+  assert (NULL != FindChildWithMountpoint(child->path()));
+  
+  child->set_parent(NULL);
+  children_.erase(child->path());
+}
+
+Catalog* Catalog::FindBestFittingChild(const string &path) const {
+  // first we check if this catalog fits the beginning of the path
+  // as we expect to see this call in a sequence climbing down the
+  // catalog hierarchy, this case should rarely happen
+  if (path.find(this->path()) == string::npos) {
+    return NULL;
+  }
+
+  // now we tokenize the remaining string
+  string remaining = path.substr(this->path().length());
+  vector<string> tokens = split_string(remaining, "/", false);
+  
+  // now we recombine the tokens successively
+  // in order to find a child which serves a part of the path
+  vector<string>::const_iterator i,iend;
+  stringstream subpathstream; subpathstream << this->path();
+  Catalog *hit = NULL;
+  for (i = tokens.begin(), iend = tokens.end();
+       i != iend;
+       ++i) {
+    subpathstream << '/' << *i;
+    hit = FindChildWithMountpoint(subpathstream.str());
+    
+    // if we found a child serving a part of the path we can stop searching.
+    // all remaining sub path elements should be served by a grand child in
+    // the just found child catalog
+    if (NULL != hit) {
       break;
     }
   }
+  
+  return hit;
 }
 
-bool Catalog::Lookup(const inode_t inode, DirectoryEntry *entry, hash::t_md5 *parent_hash) const { 
+bool Catalog::Lookup(const inode_t inode,
+                     DirectoryEntry *entry, 
+                     hash::t_md5 *parent_hash) const { 
   assert (IsInitialized());
   
   bool found = false;
   uint64_t row_id = GetRowIdFromInode(inode);
   
-  {
-    // do the actual lookup
-    inode_lookup_statement_->BindRowId(row_id);
-    found = inode_lookup_statement_->FetchRow();
-    
-    // retrieve the DirectoryEntry if needed
-    if (found && NULL != entry) *entry = inode_lookup_statement_->GetDirectoryEntry(this);
+  // do the actual lookup
+  inode_lookup_statement_->BindRowId(row_id);
+  found = inode_lookup_statement_->FetchRow();
+  
+  // retrieve the DirectoryEntry if needed
+  if (found && NULL != entry) *entry = inode_lookup_statement_->GetDirectoryEntry(this);
 
-    // retrieve the path_hash of the parent path if needed
-    if (NULL != parent_hash) *parent_hash = inode_lookup_statement_->GetParentPathHash();
+  // retrieve the path_hash of the parent path if needed
+  if (NULL != parent_hash) *parent_hash = inode_lookup_statement_->GetParentPathHash();
 
-    inode_lookup_statement_->Reset();
-  }
+  inode_lookup_statement_->Reset();
   
   return found;
 }
 
-bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const {
+bool Catalog::Lookup(const hash::t_md5 &path_hash, 
+                     DirectoryEntry *entry) const {
   assert (IsInitialized());
 
   path_hash_lookup_statement_->BindPathHash(path_hash);
   bool found = path_hash_lookup_statement_->FetchRow();
 	if (found && NULL != entry) {
-    *entry = path_hash_lookup_statement_->GetDirectoryEntry((Catalog*)this);
+    *entry = path_hash_lookup_statement_->GetDirectoryEntry(this);
     found = EnsureCoherenceOfInodes(path_hash, entry);
 	}
   path_hash_lookup_statement_->Reset();
@@ -140,19 +170,21 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash, DirectoryEntry *entry) const 
   return found;
 }
 
-bool Catalog::Listing(const inode_t inode, DirectoryEntryList *listing) const {
+bool Catalog::Listing(const inode_t inode,
+                      DirectoryEntryList *listing) const {
   assert (IsInitialized());
 
   assert (false); // TODO: currently not implemented (not needed though)
   return false;
 }
 
-bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing) const {
+bool Catalog::Listing(const hash::t_md5 &path_hash,
+                      DirectoryEntryList *listing) const {
   assert (IsInitialized());
 
   listing_statement_->BindPathHash(path_hash);
   while (listing_statement_->FetchRow()) {
-    DirectoryEntry entry = listing_statement_->GetDirectoryEntry((Catalog*)this);
+    DirectoryEntry entry = listing_statement_->GetDirectoryEntry(this);
     EnsureCoherenceOfInodes(path_hash, &entry);
     listing->push_back(entry);
   }
@@ -161,7 +193,8 @@ bool Catalog::Listing(const hash::t_md5 &path_hash, DirectoryEntryList *listing)
   return true;
 }
 
-bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEntry *entry) const {
+bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash,
+                                      DirectoryEntry *entry) const {
   // ensure coherence of inodes after a nested catalog is loaded
   // <nested catalog mountpoint> == <nested catalog root>
   // BUT: inodes of mountpoint and root differ.
@@ -181,7 +214,8 @@ bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEnt
   return true;
 }
 
-inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, uint64_t hardlink_group_id) {
+inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, 
+                                                     uint64_t hardlink_group_id) {
   assert (IsInitialized());
 
   inode_t inode = row_id + inode_chunk_.offset;
@@ -217,14 +251,20 @@ uint64_t Catalog::GetRevision() const {
 }
 
 Catalog* Catalog::FindChildWithMountpoint(const std::string &mountpoint) const {
-  CatalogList::const_iterator i,iend;
-  for (i = children_.begin(), iend = children_.end(); i != iend; ++i) {
-    if ((*i)->path() == mountpoint) {
-      return *i;
-    }
+  NestedCatalogMap::const_iterator result;
+  result = children_.find(mountpoint);
+  return (result == children_.end()) ? NULL : result->second;
+}
+
+CatalogList Catalog::GetChildren() const {
+  CatalogList result;
+  NestedCatalogMap::const_iterator i,iend;
+  for(i = children_.begin(), iend = children_.end();
+      i != iend;
+      ++i) {
+    result.push_back(i->second);
   }
-  
-  return NULL;
+  return result;
 }
 
 Catalog::NestedCatalogReferenceList Catalog::ListNestedCatalogReferences() const {

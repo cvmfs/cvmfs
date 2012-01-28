@@ -169,7 +169,17 @@ class Catalog {
    *  this is meant to be used only internally!!
    *  @param child the Catalog to delete as child
    */
-  void RemoveChild(const Catalog *child);
+  void RemoveChild(Catalog *child);
+  
+  /**
+   *  find the child catalog which best fits to the given path.
+   *  In a sense that most of the path is served by this catalog and it might
+   *  be possible that the rest of the path is served by a child of the found
+   *  best fitting catalog
+   *  @param path the path to find a best fitting catalog for
+   *  @return a pointer to the best fitting child or NULL if it does not fit at all
+   */
+  Catalog* FindBestFittingChild(const std::string &path) const;
   
   /**
    *  checks if a given inode might be maintained by this Catalog
@@ -201,7 +211,12 @@ class Catalog {
    */
   uint64_t GetRevision() const;
   
-  inline const CatalogList& children() const { return children_; }
+  /**
+   *  returns a list of all attached children of this catalog
+   *  @return a list of all attached children
+   */
+  CatalogList GetChildren() const;
+  
   inline std::string path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
   inline uint64_t max_row_id() const { return max_row_id_; }
@@ -283,6 +298,7 @@ class Catalog {
   static const int      SQLITE_THREAD_MEM; ///< SQLite3 heap limit per thread
   
   typedef std::map<int, inode_t> HardlinkGroupIdMap;
+  typedef std::map<std::string, Catalog*> NestedCatalogMap;
 
  private:
   std::string database_file_;
@@ -292,7 +308,7 @@ class Catalog {
   std::string path_;
   
   Catalog *parent_;
-  CatalogList children_;
+  NestedCatalogMap children_;
   
   InodeChunk inode_chunk_;
   uint64_t max_row_id_;

@@ -47,7 +47,9 @@ class WritableCatalog : public Catalog {
    *  @param parent_path the full path of the containing directory
    *  @return true if DirectoryEntry was added, false otherwise
    */
-  bool CheckForExistanceAndAddEntry(const DirectoryEntry &entry, const std::string &entry_path, const std::string &parent_path);
+  bool CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
+                                    const std::string &entry_path,
+                                    const std::string &parent_path);
   
   /**
    *  with this method you can set the mtime of a DirectoryEntry in the catalog
@@ -140,7 +142,8 @@ class WritableCatalog : public Catalog {
   *  @param[out] attached_reference is set to the object of the attached child or to NULL
   *  @return true on success, false otherwise
   */
-  bool RemoveNestedCatalogReference(const std::string &mountpoint, Catalog **attached_reference = NULL);
+  bool RemoveNestedCatalogReference(const std::string &mountpoint,
+                                    Catalog **attached_reference = NULL);
   
   /**
    *  TODO: document this

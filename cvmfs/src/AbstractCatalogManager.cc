@@ -54,7 +54,9 @@ void AbstractCatalogManager::AnnounceInvalidInodeChunk(const InodeChunk chunk) c
   // TODO: actually do something here
 }
 
-bool AbstractCatalogManager::Lookup(const inode_t inode, DirectoryEntry *entry, const bool with_parent) const {
+bool AbstractCatalogManager::Lookup(const inode_t inode,
+                                    DirectoryEntry *entry,
+                                    const bool with_parent) const {
   ReadLock();
   bool found = false;
   
@@ -118,7 +120,9 @@ out:
   return found;
 }
 
-bool AbstractCatalogManager::Lookup(const string &path, DirectoryEntry *entry, const bool with_parent) {
+bool AbstractCatalogManager::Lookup(const string &path,
+                                    DirectoryEntry *entry,
+                                    const bool with_parent) {
   ReadLock();
   
   // the actual lookup is performed while finding the correct
@@ -142,7 +146,8 @@ bool AbstractCatalogManager::Lookup(const string &path, DirectoryEntry *entry, c
   return found;
 }
 
-bool AbstractCatalogManager::Listing(const string &path, DirectoryEntryList *listing) {
+bool AbstractCatalogManager::Listing(const string &path,
+                                     DirectoryEntryList *listing) {
   ReadLock();
   bool result = false;
   
@@ -161,7 +166,10 @@ bool AbstractCatalogManager::Listing(const string &path, DirectoryEntryList *lis
   return result;
 }
 
-bool AbstractCatalogManager::GetCatalogByPath(const string &path, const bool load_final_catalog, Catalog **catalog, DirectoryEntry *entry) {
+bool AbstractCatalogManager::GetCatalogByPath(const string &path, 
+                                              const bool load_final_catalog,
+                                              Catalog **catalog, 
+                                              DirectoryEntry *entry) {
   // find the best fitting loaded catalog for this path
   Catalog *best_fitting_catalog = FindBestFittingCatalogForPath(path);
   assert (best_fitting_catalog != NULL);
@@ -181,7 +189,10 @@ bool AbstractCatalogManager::GetCatalogByPath(const string &path, const bool loa
     // try to load the nested catalogs for this path
     Catalog *nested_catalog;
     UpgradeLock();
-    entry_found = LoadNestedCatalogForPath(path, best_fitting_catalog, load_final_catalog, &nested_catalog);
+    entry_found = LoadNestedCatalogForPath(path,
+                                           best_fitting_catalog,
+                                           load_final_catalog,
+                                           &nested_catalog);
     DowngradeLock();
     if (not entry_found) {
       pmesg(D_CATALOG, "nested catalog for '%s' could not be found", path.c_str());
@@ -203,7 +214,9 @@ bool AbstractCatalogManager::GetCatalogByPath(const string &path, const bool loa
   else if (load_final_catalog && d.IsNestedCatalogMountpoint()) {
     Catalog *new_catalog;
     UpgradeLock();
-    bool attached_successfully = LoadAndAttachCatalog(path, best_fitting_catalog, &new_catalog);
+    bool attached_successfully = LoadAndAttachCatalog(path,
+                                                      best_fitting_catalog,
+                                                      &new_catalog);
     DowngradeLock();
     if (not attached_successfully) {
       return false;
@@ -218,7 +231,8 @@ bool AbstractCatalogManager::GetCatalogByPath(const string &path, const bool loa
   return true;
 }
 
-bool AbstractCatalogManager::GetCatalogByInode(const uint64_t inode, Catalog **catalog) const {
+bool AbstractCatalogManager::GetCatalogByInode(const uint64_t inode,
+                                               Catalog **catalog) const {
   // TODO: replace this with a more clever algorithm
   //       maybe exploit the ordering in the vector
   CatalogList::const_iterator i,end;
@@ -239,24 +253,9 @@ Catalog* AbstractCatalogManager::FindBestFittingCatalogForPath(const string &pat
   // we start at the root catalog and successive go down the catalog
   // tree to find the best fitting catalog for the given path
   Catalog *best_fit = GetRootCatalog();
+  Catalog *next_best_fit = NULL;
   while (best_fit->path() != path) {
-    unsigned int longest_hit = 0;
-    Catalog *next_best_fit = NULL;
-    CatalogList children = best_fit->children();
-    CatalogList::const_iterator i,end;
-    string child_path;
-    
-    // loop through the child catalogs and search for the best fit
-    // we might hit the ultimate searched catalog and stop directly (longest_hit == path.length())
-    for (i = children.begin(), end = children.end(); i != end && longest_hit != path.length(); ++i) {
-      child_path = (*i)->path();
-      
-      // sort out the best fitting child and continue
-      if (path.find(child_path) == 0 && longest_hit < child_path.length()) {
-        next_best_fit = *i;
-        longest_hit = child_path.length();
-      }
-    }
+    next_best_fit = best_fit->FindBestFittingChild(path);
 
     // if there was a child which fitted better than 
     // continue in this catalog, otherwise break
@@ -270,7 +269,8 @@ Catalog* AbstractCatalogManager::FindBestFittingCatalogForPath(const string &pat
   return best_fit;
 }
 
-bool AbstractCatalogManager::IsCatalogAttached(const string &root_path, Catalog **attached_catalog) const {
+bool AbstractCatalogManager::IsCatalogAttached(const string &root_path, 
+                                               Catalog **attached_catalog) const {
   if (GetNumberOfAttachedCatalogs() == 0) {
     return false;
   }
@@ -288,7 +288,10 @@ bool AbstractCatalogManager::IsCatalogAttached(const string &root_path, Catalog 
   return true;
 }
 
-bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path, const Catalog *entry_point, const bool load_final_catalog, Catalog **final_catalog) {
+bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path, 
+                                                      const Catalog *entry_point, 
+                                                      const bool load_final_catalog, 
+                                                      Catalog **final_catalog) {
   std::vector<string> path_elements;
   string sub_path, relative_path;
   Catalog *containing_catalog = (entry_point == NULL) ? GetRootCatalog() : (Catalog *)entry_point;
@@ -319,7 +322,9 @@ bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path, const 
       // catalog pointed to by the whole path
       if (sub_path.length() < path.length() || load_final_catalog) {
         Catalog *new_catalog;
-        bool attached_successfully = LoadAndAttachCatalog(sub_path, containing_catalog, &new_catalog);
+        bool attached_successfully = LoadAndAttachCatalog(sub_path,
+                                                          containing_catalog,
+                                                          &new_catalog);
         if (not attached_successfully) {
           return false;
         }
@@ -332,7 +337,9 @@ bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path, const 
   return true;
 }
 
-bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint, Catalog *parent_catalog, Catalog **attached_catalog) {
+bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint, 
+                                                  Catalog *parent_catalog, 
+                                                  Catalog **attached_catalog) {
   // check if catalog is already attached
   if (IsCatalogAttached(mountpoint, attached_catalog)) {
     return true;
@@ -355,7 +362,7 @@ bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint, Cata
   // attach loaded catalog (from here on everything is the same)
   if (not AttachCatalog(new_catalog_file, new_catalog, false)) {
     pmesg(D_CATALOG, "failed to attach catalog '%s'", mountpoint.c_str());
-    delete new_catalog;
+    DetachCatalog(new_catalog);
     return false;
   }
   
@@ -364,7 +371,9 @@ bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint, Cata
   return true;
 }
 
-bool AbstractCatalogManager::AttachCatalog(const std::string &db_file, Catalog *new_catalog, const bool open_transaction) {
+bool AbstractCatalogManager::AttachCatalog(const std::string &db_file,
+                                           Catalog *new_catalog,
+                                           const bool open_transaction) {
   pmesg(D_CATALOG, "attaching catalog file %s", db_file.c_str());
   
   // initialize the new catalog
@@ -395,7 +404,7 @@ bool AbstractCatalogManager::DetachCatalogTree(Catalog *catalog) {
   // detach all child catalogs recursively
   CatalogList::const_iterator i;
   CatalogList::const_iterator iend;
-  CatalogList catalogs_to_detach = catalog->children();
+  CatalogList catalogs_to_detach = catalog->GetChildren();
   for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end();
        i != iend;
        ++i) {
@@ -455,7 +464,7 @@ bool AbstractCatalogManager::LoadAndAttachCatalogsRecursively(Catalog *catalog) 
 
 void AbstractCatalogManager::PrintCatalogHierarchyRecursively(const Catalog *catalog,
                                                               const int recursion_depth) const {
-  CatalogList children = catalog->children();
+  CatalogList children = catalog->GetChildren();
   
   // indent the stuff according to the recursion_depth (ASCII art ftw!!)
   for (int j = 0; j < recursion_depth; ++j) {
@@ -463,7 +472,7 @@ void AbstractCatalogManager::PrintCatalogHierarchyRecursively(const Catalog *cat
   }
   cout << "'-> " << catalog->path() << endl;
   
-  // recursively go though all children
+  // recursively go through all children
   CatalogList::const_iterator i,iend;
   for (i = children.begin(), iend = children.end();
        i != iend;
