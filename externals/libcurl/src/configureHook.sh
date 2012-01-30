@@ -1,8 +1,12 @@
 #!/bin/sh
 
-sh configure LDFLAGS="$LDFLAGS -rdynamic" CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls" \
+cd ../../c-ares/src
+make clean && make
+cd ../../libcurl/src
+
+sh configure LDFLAGS="$LDFLAGS -L${PWD}/../../c-ares/src/.libs -rdynamic" CFLAGS="$CFLAGS -I${PWD}/../../c-ares/src -D_FILE_OFFSET_BITS=64 -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls" \
   $CVMFS_ZLIB --enable-warnings \
-  --disable-ares \
+  --enable-ares \
   --disable-shared \
   --enable-static \
   --disable-ftp \
@@ -33,4 +37,5 @@ sh configure LDFLAGS="$LDFLAGS -rdynamic" CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64
   --without-ca-bundle \
   --without-ca-path \
   --without-libssh2 \
-  --without-libidn
+  --without-libidn \
+  --disable-verbose

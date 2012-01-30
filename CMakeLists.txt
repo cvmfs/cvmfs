@@ -50,18 +50,19 @@ option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" 
 # for the external libraries there should be a CVMFS-CMakeLists.txt file provided
 # in the given directory, in order to configure and compile them properly
 #
-set (THIRD_PARTY_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
-set (THIRD_PARTY_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
-set (SQLITE3_BUILTIN_LOCATION       "${THIRD_PARTY_BUILD_LOCATION}/sqlite3/src")
-set (LIBCURL_BUILTIN_LOCATION       "${THIRD_PARTY_BUILD_LOCATION}/libcurl/src")
-set (ZLIB_BUILTIN_LOCATION          "${THIRD_PARTY_BUILD_LOCATION}/zlib/src")
-set (LIBFUSE_BUILTIN_LOCATION       "${THIRD_PARTY_BUILD_LOCATION}/libfuse/src")
-set (LIBFUSE4X_BUILTIN_LOCATION     "${THIRD_PARTY_BUILD_LOCATION}/libfuse4x/src")
-set (JEMALLOC_BUILTIN_LOCATION      "${THIRD_PARTY_BUILD_LOCATION}/jemalloc/src")
-set (SPARSEHASH_BUILTIN_LOCATION    "${THIRD_PARTY_BUILD_LOCATION}/sparsehash/src")
+set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
+set (EXTERNALS_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
+set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/sqlite3/src")
+set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/c-ares/src")
+set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libcurl/src")
+set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")
+set (LIBFUSE_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libfuse/src")
+set (LIBFUSE4X_BUILTIN_LOCATION   "${EXTERNALS_BUILD_LOCATION}/libfuse4x/src")
+set (JEMALLOC_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/jemalloc/src")
+set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/sparsehash/src")
 
 # create the directory for controlled out of source building of external stuff
-file (MAKE_DIRECTORY ${THIRD_PARTY_BUILD_LOCATION})
+file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
 
 #
 # run the bootstrap shellscript (not needed in the distributed version of the source)
@@ -70,7 +71,7 @@ file (MAKE_DIRECTORY ${THIRD_PARTY_BUILD_LOCATION})
 if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 	message (STATUS "running bootstrap.sh ...")
 	execute_process (
-		COMMAND			sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${THIRD_PARTY_BUILD_LOCATION}
+		COMMAND			sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
 		WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}
 	)
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")

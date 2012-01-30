@@ -1,6 +1,7 @@
 #!/bin/sh
 
-CURL_VERSION=7.21.3
+CARES_VERSION=1.7.5
+CURL_VERSION=7.24.0
 FUSE_VERSION=2.8.4
 FUSE4X_VERSION=2.8.5
 JEMALLOC_VERSION=2.2.1
@@ -14,6 +15,15 @@ outOfSource=$1
 if [ -f "$outOfSource/.decompressionDone" ]; then
 	exit 0
 fi
+
+# C-ARES
+cd externals/c-ares
+tar xvfz c-ares-${CARES_VERSION}.tar.gz
+mkdir -p "$outOfSource/c-ares/src"
+mv c-ares-1.7.5/* "$outOfSource/c-ares/src"
+cp src/* "$outOfSource/c-ares/src"
+rm -rf c-ares-${CARES_VERSION}
+cd ../..
 
 # CURL
 cd externals/libcurl
