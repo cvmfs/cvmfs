@@ -16,7 +16,7 @@ if [ -f "$outOfSource/.decompressionDone" ]; then
 fi
 
 # CURL
-cd 3rdParty/libcurl
+cd externals/libcurl
 tar xfz curl-${CURL_VERSION}.tar.gz 
 mkdir -p "$outOfSource/libcurl/src"
 mv curl-${CURL_VERSION}/* "$outOfSource/libcurl/src"
@@ -25,7 +25,7 @@ rm -rf curl-${CURL_VERSION}
 cd ../..
 
 # FUSE
-cd 3rdParty/libfuse
+cd externals/libfuse
 tar xfz fuse-${FUSE_VERSION}.tar.gz
 mkdir -p "$outOfSource/libfuse/src"
 mv fuse-${FUSE_VERSION}/* "$outOfSource/libfuse/src"
@@ -35,7 +35,7 @@ rm -rf fuse-${FUSE_VERSION}
 cd ../..
 
 # Fuse4x
-cd 3rdParty/libfuse4x
+cd externals/libfuse4x
 tar xfz fuse4x-${FUSE4X_VERSION}.tar.gz
 mkdir -p "$outOfSource/libfuse4x/src"
 mv fuse4x-${FUSE4X_VERSION}/* "$outOfSource/libfuse4x/src"
@@ -45,7 +45,7 @@ rm -rf fuse4x-${FUSE4X_VERSION}
 cd ../..
 
 # Jemalloc
-cd 3rdParty/jemalloc
+cd externals/jemalloc
 tar xfj jemalloc-${JEMALLOC_VERSION}.tar.bz2
 mv jemalloc-${JEMALLOC_VERSION}/configure.ac jemalloc-${JEMALLOC_VERSION}/configure.ac.vanilla
 touch jemalloc-${JEMALLOC_VERSION}/configure.ac
@@ -57,7 +57,7 @@ rm -rf jemalloc-${JEMALLOC_VERSION}
 cd ../..
 
 # Zlib
-cd 3rdParty/zlib
+cd externals/zlib
 tar xfz zlib-${ZLIB_VERSION}.tar.gz
 mkdir -p "$outOfSource/zlib/src"
 mv zlib-${ZLIB_VERSION}/* "$outOfSource/zlib/src"
@@ -66,13 +66,13 @@ rm -rf zlib-${ZLIB_VERSION}
 cd ../..
 
 # sqlite3
-cd 3rdParty/sqlite3
+cd externals/sqlite3
 mkdir -p "$outOfSource/sqlite3/src"
 cp src/* "$outOfSource/sqlite3/src"
 cd ../..
 
 # google sparse hash
-cd 3rdParty/sparsehash
+cd externals/sparsehash
 tar xfz sparsehash-${SPARSEHASH_VERSION}.tar.gz 
 mkdir -p "$outOfSource/sparsehash/src"
 mv sparsehash-${SPARSEHASH_VERSION}/* "$outOfSource/sparsehash/src"

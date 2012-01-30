@@ -20,7 +20,7 @@ if (NOT REG_EXT_LIB)
 	#    information
 	#
 	# 3. while configuring CVMFS with CMake all statically linked
-	#    3rdParty libraries get their configureHook shellscript invoked
+	#    external libraries get their configureHook shellscript invoked
 	#    at some point, to start their configuration steps
 	#
 	# 4. the build system finds out about needed external libraries
@@ -52,7 +52,7 @@ if (NOT REG_EXT_LIB)
 		endif (${ARGC} EQUAL 3)
 
 		# configure the library before generating the final build files
-		message (STATUS "configuring 3rd party library: ${NAME} ...")
+		message (STATUS "configuring external library: ${NAME} ...")
 		execute_process (
 			COMMAND				sh ${LOCATION}/configureHook.sh
 			WORKING_DIRECTORY	${LOCATION}
