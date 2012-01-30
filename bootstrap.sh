@@ -4,7 +4,6 @@ CARES_VERSION=1.7.5
 CURL_VERSION=7.24.0
 FUSE_VERSION=2.8.4
 FUSE4X_VERSION=2.8.5
-JEMALLOC_VERSION=2.2.1
 ZLIB_VERSION=1.2.5
 SPARSEHASH_VERSION=1.11
 
@@ -52,18 +51,6 @@ mv fuse4x-${FUSE4X_VERSION}/* "$outOfSource/libfuse4x/src"
 patch -d "$outOfSource/libfuse4x" -N -p0 < fuse4x-drainout.patch
 cp src/* "$outOfSource/libfuse4x/src"
 rm -rf fuse4x-${FUSE4X_VERSION}
-cd ../..
-
-# Jemalloc
-cd externals/jemalloc
-tar xfj jemalloc-${JEMALLOC_VERSION}.tar.bz2
-mv jemalloc-${JEMALLOC_VERSION}/configure.ac jemalloc-${JEMALLOC_VERSION}/configure.ac.vanilla
-touch jemalloc-${JEMALLOC_VERSION}/configure.ac
-mkdir -p "$outOfSource/jemalloc/src"
-mv jemalloc-${JEMALLOC_VERSION}/* "$outOfSource/jemalloc/src"
-patch -d "$outOfSource/jemalloc" -N -p0 < jemalloc-2.2.1-64bit_literals.patch
-cp src/* "$outOfSource/jemalloc/src"
-rm -rf jemalloc-${JEMALLOC_VERSION} 
 cd ../..
 
 # Zlib

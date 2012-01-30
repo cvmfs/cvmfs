@@ -1,5 +1,0 @@
-include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
-
-set (JEMALLOC_ARCHIVE "${JEMALLOC_BUILTIN_LOCATION}/lib/libjemalloc.a")
-
-register_external_lib (jemalloc ${JEMALLOC_BUILTIN_LOCATION} ${JEMALLOC_ARCHIVE})
