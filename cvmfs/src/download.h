@@ -5,8 +5,10 @@
 #ifndef CVMFS_DOWNLOAD_H_
 #define CVMFS_DOWNLOAD_H_
 
+#include <stdint.h>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include "curl_duplex.h"
 extern "C" {
@@ -35,8 +37,8 @@ enum Failures {
   kFailOk = 1,
   kFailLocalIO,
   kFailBadUrl,
-  kFailConnection,
-  kFailHttp,
+  kFailProxyConnection,
+  kFailHostConnection,
   kFailBadData,
   kFailOther,
 };
@@ -48,7 +50,7 @@ enum Failures {
 struct JobInfo {
   const std::string *url;
   bool compressed;
-  bool nocache;
+  bool probe_hosts;
   Destination destination;
   struct {
     size_t size;
@@ -60,17 +62,17 @@ struct JobInfo {
   const hash::t_sha1 *expected_hash;
 
   // One constructor per destination
-  JobInfo(const std::string *u, const bool c, const bool n,
+  JobInfo(const std::string *u, const bool c, const bool ph,
           const std::string *p, const hash::t_sha1 *h) : url(u), compressed(c),
-          nocache(n), destination(kDestinationPath), destination_path(p),
+          probe_hosts(ph), destination(kDestinationPath), destination_path(p),
           expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
-  JobInfo(const std::string *u, const bool c, const bool n,
-          FILE *f, const hash::t_sha1 *h) : url(u), compressed(c), nocache(n),
+  JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
+          const hash::t_sha1 *h) : url(u), compressed(c), probe_hosts(ph),
           destination(kDestinationFile), destination_file(f), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
-  JobInfo(const std::string *u, const bool c, const bool n,
-          const hash::t_sha1 *h) : url(u), compressed(c), nocache(n),
+  JobInfo(const std::string *u, const bool c, const bool ph,
+          const hash::t_sha1 *h) : url(u), compressed(c), probe_hosts(ph),
           destination(kDestinationMem), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   ~JobInfo() {
@@ -85,15 +87,34 @@ struct JobInfo {
   z_stream zstream;
   sha1_context_t sha1_context;
   int wait_at[2];  /**< Pipe used for the return value */
+  std::string proxy;
+  bool nocache;
   Failures error_code;
-  int num_retries;
+  unsigned char num_failed_proxies;
+  unsigned char num_failed_hosts;
 };
 
 
-void Init();
+void Init(const unsigned max_pool_handles);
 void Fini();
 void Spawn();
 Failures Fetch(JobInfo *info);
+
+void SetDnsServer(const std::string &address);
+void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
+void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
+uint64_t GetTransferredBytes();
+uint64_t GetTransferTime();
+void SetHostChain(const std::string &host_list);
+void GetHostInfo(std::vector<std::string> *host_chain,
+                 std::vector<int> *rtt, unsigned *current_host);
+void ProbeHosts();
+void SwitchHost();
+void SetProxyChain(const std::string &proxy_list);
+void GetProxyInfo(std::vector< std::vector<std::string> > *proxy_chain,
+                  unsigned *current_group);
+void RebalanceProxies();
+void SwitchProxyGroup();
 
 }  // namespace download
 
