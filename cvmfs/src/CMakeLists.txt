@@ -9,7 +9,7 @@ set (CVMFS2_DEBUG_SOURCES
 	logging.cc logging.h
 	tracer.h tracer.cc atomic.h
 	sqlite3-duplex.h
-	curl-duplex.h fuse-duplex.h
+	curl_duplex.h fuse-duplex.h
 	signature.h signature.cc
 	lru.h lru.cc
 	hash.h hash.cc
@@ -26,7 +26,7 @@ set (CVMFS2_DEBUG_SOURCES
 	sha1.h sha1.c
 	md5.h
 	debug.h debug.c
-	http_curl.h http_curl.c
+	download.cc download.h
 	lru_cache.h
 	inode_cache.h inode_cache.cc
 	path_cache.h path_cache.cc
@@ -119,7 +119,7 @@ set (CVMFS_PULL_SOURCES
 	debug.h debug.c
 	log.h log.c
 	zlib-duplex.h compression.h compression.c
-	curl-duplex.h http_curl.h http_curl.c
+	curl_duplex.h http_curl.h http_curl.c
 	md5.h sha1.h sha1.c
 	hash.h hash.cc
 	util.h util.cc

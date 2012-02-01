@@ -71,4 +71,7 @@ std::vector<std::string> split_string(const std::string &str, const char delim);
 std::string join_strings(const std::vector<std::string> &strings,
                          const std::string &joint);
 
+bool HasPrefix(const std::string &str, const std::string &prefix,
+               const bool ignore_case);
+
 #endif

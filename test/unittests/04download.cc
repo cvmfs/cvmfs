@@ -1,3 +1,12 @@
+//all: test
+
+//test: test.cc download.cc download.h curl_duplex.h logging.cc logging.h logging-internal.h smalloc.h smalloc.c compression.c compression.h zlib-duplex.h sha1.c sha1.h debug.c debug.h hash.cc hash.h md5.h cvmfs_config.h util.cc util.h compat.h compat_linux.h compat_macosx.h
+//        gcc -c -O2 smalloc.c
+//        gcc -c -O2 compression.c
+//        gcc -c -O2 sha1.c
+//        gcc -c -O2 debug.c
+//        g++ -g -Wall -D_BUILT_IN_LIBCURL -DDEBUGMSG -O0 -o test test.cc download.cc util.cc logging.cc hash.cc sha1.o debug.o compression.o smalloc.o curl-7.24.0/lib/.libs/libcurl.a ../V2_1/build/externals/c-ares/src/.libs/libcares.a -lz -lssl -lrt
+
 
 #include <unistd.h>
 #include <pthread.h>

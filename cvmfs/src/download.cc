@@ -80,7 +80,7 @@ unsigned opt_timeout_proxy_ ;
 unsigned opt_timeout_direct_;
 vector<string> *opt_host_chain_ = NULL;
 vector<int> *opt_host_chain_rtt_ = NULL; /**< created by SetHostChain(),
-   filled by probe_hosts.  Contains time to get .cvmfschecksum in ms.
+  filled by probe_hosts.  Contains time to get .cvmfschecksum in ms.
   -1 is unprobed, -2 is error */
 unsigned opt_host_chain_current_;
 vector< vector<string> > *opt_proxy_groups_ = NULL;
@@ -90,28 +90,9 @@ unsigned opt_num_proxies_;
 
 // Writes and reads should be atomic because reading happens in a different
 // thread than writing.
-double stat_transferred_bytes_ ;
+double stat_transferred_bytes_;
 double stat_transfer_time_;
 
-
-  /* TODO: in util.cc */
-  static bool HasPrefix(const string &str, const string &prefix,
-                        const bool ignore_case)
-  {
-    if (prefix.length() > str.length())
-      return false;
-
-    for (unsigned i = 0, l = prefix.length(); i < l; ++i) {
-      if (ignore_case) {
-        if (toupper(str[i]) != toupper(prefix[i]))
-          return false;
-      } else {
-        if (str[i] != prefix[i])
-          return false;
-      }
-    }
-    return true;
-  }
 
 /**
  * Escape special chars from the URL, except for ':' and '/',
@@ -295,7 +276,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   const string header_line(static_cast<const char *>(ptr), num_bytes);
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
-  //LogCvmfs(kLogDownload, kLogDebug, "Header callback with line %s", header_line.c_str());
+  //LogCvmfs(kLogDownload, kLogDebug, "Header callback with line %s",
+  //         header_line.c_str());
 
   // Check for http status code errors
   if (HasPrefix(header_line, "HTTP/1.", false)) {
@@ -322,7 +304,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       HasPrefix(header_line, "CONTENT-LENGTH:", true))
   {
     char *tmp = (char *)alloca(num_bytes+1);
-    unsigned long length = 0;
+    uint64_t length = 0;
     sscanf(header_line.c_str(), "%s %lu", tmp, &length);
     if (length > 0)
       info->destination_mem.data = static_cast<char *>(smalloc(length));
@@ -501,7 +483,7 @@ static void UpdateStatistics(CURL *handle) {
 
   if (curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val) == CURLE_OK)
     stat_transferred_bytes_ += val;
-  // TODO: wrong values for multi interface
+  // TODO(jakob): wrong values for multi interface
   if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &val) == CURLE_OK)
     stat_transfer_time_ += val;
 }
@@ -514,7 +496,8 @@ static void UpdateStatistics(CURL *handle) {
  * \return true if another download should be performed, false otherwise
  */
 static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
-  //LogCvmfs(kLogDownload, kLogDebug, "Verify Download (curl error %d)", curl_error);
+  //LogCvmfs(kLogDownload, kLogDebug, "Verify Download (curl error %d)",
+  //         curl_error);
   UpdateStatistics(info->curl_handle);
 
   // Verification and error classification
@@ -690,12 +673,12 @@ Failures Fetch(JobInfo *info) {
       assert(retval == 0);
     }
 
-    //LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d", info->wait_at[0], info->wait_at[1]);
+    //LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
+    //         info->wait_at[0], info->wait_at[1]);
     retval = write(pipe_jobs_[1], &info, sizeof(info));
     assert(retval == sizeof(info));
     retval = read(info->wait_at[0], &result, sizeof(result));
     assert(retval == sizeof(result));
-
     //LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     CURL *handle = AcquireCurlHandle();
@@ -728,7 +711,8 @@ Failures Fetch(JobInfo *info) {
 static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                               void *userp, void *socketp)
 {
-  //LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy handle %p, socket %d, action %d", easy, s, action);
+  //LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
+  //         "handle %p, socket %d, action %d", easy, s, action);
   if (action == CURL_POLL_NONE)
     return 0;
 
@@ -1190,7 +1174,7 @@ void ProbeHosts() {
         free(info.destination_mem.data);
       if (result == kFailOk) {
         // Time substraction, from GCC documentation
-        // TODO: Timestamp / time calculation business in util
+        // TODO(jakob): Timestamp / time calculation business in util
         if (tv_end.tv_usec < tv_start.tv_usec) {
           int nsec = (tv_end.tv_usec - tv_start.tv_usec) / 1000000 + 1;
           tv_start.tv_usec -= 1000000 * nsec;

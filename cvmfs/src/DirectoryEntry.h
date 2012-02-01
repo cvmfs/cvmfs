@@ -23,10 +23,11 @@ class DirectoryEntry {
   friend class ManipulateDirectoryEntrySqlStatement; // simplify write of DirectoryEntry objects in database
   friend class SyncItem;                             // simplify creation of DirectoryEntry objects for write back
   friend class WritableCatalogManager;               // TODO: remove this dependency
-  
+
  public:
+  hash::t_sha1 checksum_;
   const static inode_t kInvalidInode = 0;
-  
+
   /**
    *  constructor initializes structure to a (senseless) zero value
    */
@@ -41,14 +42,14 @@ class DirectoryEntry {
     hardlink_group_id_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) {}
-  
+
   inline bool IsNestedCatalogRoot() const { return is_nested_catalog_root_; }
   inline bool IsNestedCatalogMountpoint() const { return is_nested_catalog_mountpoint_; }
-  
+
   inline bool IsLink() const { return S_ISLNK(mode_); }
   inline bool IsDirectory() const { return S_ISDIR(mode_); }
   inline bool IsPartOfHardlinkGroup() const { return hardlink_group_id() > 0; }
-  
+
   inline inode_t inode() const { return inode_; }
   inline inode_t parent_inode() const { return parent_inode_; }
   inline int linkcount() const { return linkcount_; }
@@ -59,7 +60,7 @@ class DirectoryEntry {
   inline time_t mtime() const { return mtime_; }
   inline unsigned int mode() const { return mode_; }
   inline int hardlink_group_id() const { return hardlink_group_id_; }
-  
+
   /**
    *  returns a plain old struct stat containing all
    *  known meta data of the represented file. This can simple be used as output
@@ -68,7 +69,7 @@ class DirectoryEntry {
    */
   inline struct stat GetStatStructure() const {
     struct stat s;
-    
+
     memset(&s, 0, sizeof(s));
     s.st_dev = 1;
     s.st_ino = inode_;
@@ -83,10 +84,10 @@ class DirectoryEntry {
     s.st_atime = mtime_;
     s.st_mtime = mtime_;
     s.st_ctime = mtime_;
-    
+
     return s;
   }
-  
+
   // these accessors are accessible from outside but should be used with extreme caution!
   // (With great powers comes huge responsibility!!)
   inline void set_inode(const inode_t inode) { inode_ = inode; }
@@ -94,11 +95,11 @@ class DirectoryEntry {
   inline void set_parent_inode(const inode_t parent_inode) { parent_inode_ = parent_inode; }
   inline void set_is_nested_catalog_mountpoint(const bool val) { is_nested_catalog_mountpoint_ = val; }
   inline void set_is_nested_catalog_root(const bool val) { is_nested_catalog_root_ = val; }
-  
+
  private:
   // associated cvmfs catalog
   Catalog* catalog_;
-  
+
   // general file information
   inode_t inode_;
   inode_t parent_inode_;
@@ -106,10 +107,9 @@ class DirectoryEntry {
   unsigned int mode_;
   uint64_t size_;
   time_t mtime_;
-  hash::t_sha1 checksum_;
   std::string name_;
   std::string symlink_;
-  
+
   // administrative data
   int hardlink_group_id_;
   bool is_nested_catalog_root_;

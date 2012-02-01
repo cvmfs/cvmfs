@@ -2,7 +2,7 @@
 #ifndef HTTP_CURL_H
 #define HTTP_CURL_H 1
 
-#include "curl-duplex.h"
+#include "curl_duplex.h"
 #include "sha1.h"
 #include <stdint.h>
 
@@ -21,12 +21,12 @@ int curl_download_mem(const char *url, struct mem_url *p_mem_url, int probe_host
 int curl_download_mem_nocache(const char *url, struct mem_url *p_mem_url, int probe_hosts, int compressed); /* Locked */
 
 int curl_download_tee(const char *url, FILE *f, unsigned char digest[SHA1_DIGEST_LENGTH],
-                      int (*cb_size)(size_t size_compr, void *user_data), 
+                      int (*cb_size)(size_t size_compr, void *user_data),
                       int (*cb_data_compr)(const void *buf, const size_t buf_size, void *user_data),
                       void *user_data);
-                      
+
 void curl_download_parallel(unsigned num, char **url, char **path, unsigned char *digest,
-                            int *result); 
+                            int *result);
 
 int curl_set_host_chain(const char *host_list); /* Locked */
 void curl_get_host_info(int *num, int *current, char ***hosts, int **rtt); /* Locked */

@@ -60,6 +60,7 @@
 #include "compat.h"
 #include "logging.h"
 #include "tracer.h"
+#include "download.h"
 #include "catalog.h"
 #include "catalog_tree.h"
 #include "cache.h"
@@ -79,7 +80,6 @@
 
 extern "C" {
   #include "sha1.h"
-  #include "http_curl.h"
   #include "compression.h"
   #include "smalloc.h"
   #include "sqlite3-duplex.h"
@@ -970,35 +970,25 @@ namespace cvmfs {
       message << atomic_read(&nioerr);
 
     } else if (attr == "user.proxy") {
-      int num;
-      int num_lb;
-      char *current;
-      int current_lb;
-      char **proxies;
-      int *lb_starts;
-      curl_get_proxy_info(&num, &current, &current_lb, &proxies,
-                          &num_lb, &lb_starts);
-      if (num) {
-        message << string(current);
-        for (int i = 0; i < num; ++i) {
-          free(proxies[i]);
-        }
-        free(lb_starts);
-        free(proxies);
-        free(current);
+      vector< vector<string> > proxy_chain;
+      unsigned current_group;
+      download::GetProxyInfo(&proxy_chain, &current_group);
+      if (proxy_chain.size()) {
+        message << proxy_chain[current_group][0];
       } else {
         message << "DIRECT";
       }
 
     } else if (attr == "user.host") {
-      int num;
-      int current;
-      char **all_hosts;
-      int *rtt;
-      curl_get_host_info(&num, &current, &all_hosts, &rtt);
-      message << string(all_hosts[current]);
-      free(rtt);
-      free(all_hosts);
+      vector<string> host_chain;
+      vector<int> rtt;
+      unsigned current_host;
+      download::GetHostInfo(&host_chain, &rtt, &current_host);
+      if (host_chain.size()) {
+        message << string(host_chain[current_host]);
+      } else {
+        message << "internal error: no hosts defined";
+      }
 
     } else if (attr == "user.uptime") {
       time_t now = time(NULL);
@@ -1026,21 +1016,21 @@ namespace cvmfs {
 
     } else if (attr == "user.timeout") {
       unsigned seconds, seconds_direct;
-      curl_get_timeout(&seconds, &seconds_direct);
+      download::GetTimeout(&seconds, &seconds_direct);
       message << seconds;
 
     } else if (attr == "user.timeout_direct") {
       unsigned seconds, seconds_direct;
-      curl_get_timeout(&seconds, &seconds_direct);
+      download::GetTimeout(&seconds, &seconds_direct);
       message << seconds_direct;
 
     } else if (attr == "user.rx") {
-      int64_t rx = curl_get_allbytes();
+      int64_t rx = download::GetTransferredBytes();
       message << rx/1024;
 
     } else if (attr == "user.speed") {
-      int64_t rx = curl_get_allbytes();
-      int64_t time = curl_get_alltime();
+      int64_t rx = download::GetTransferredBytes();
+      int64_t time = download::GetTransferTime();
       if (time == 0)
         message << "n/a";
       else
@@ -1502,7 +1492,7 @@ static void libcrypto_mt_cleanup(void) {
 int main(int argc, char *argv[]) {
   int result = 1;
   bool options_ready = false;
-  bool curl_ready = false;
+  bool download_ready = false;
   bool cache_ready = false;
   bool monitor_ready = false;
   bool signature_ready = false;
@@ -1510,7 +1500,6 @@ int main(int argc, char *argv[]) {
   bool catalog_ready = false;
   bool talk_ready = false;
   int err_catalog;
-  int num_hosts;
 
   /* Set a decent umask for new files (no write access to group/everyone).
    We want to allow group write access for the talk-socket. */
@@ -1644,10 +1633,13 @@ int main(int argc, char *argv[]) {
     debug_set_log(cvmfs_opts.logfile);
   }
 
+  download::Init(16);
+  download_ready = true;
+
   /* CVMFS has its own proxy environment, chain of proxies */
-  num_hosts = curl_set_host_chain(cvmfs_opts.hostname);
-  curl_set_proxy_chain(cvmfs::proxies.c_str());
-  curl_set_timeout(cvmfs_opts.timeout, cvmfs_opts.timeout_direct);
+  download::SetHostChain(string(cvmfs_opts.hostname));
+  download::SetProxyChain(string(cvmfs::proxies.c_str()));
+  download::SetTimeout(cvmfs_opts.timeout, cvmfs_opts.timeout_direct);
 
   /* Try to jump to cache directory.  This tests, if it is accassible.
      Also, it brings speed later on. */
@@ -1662,8 +1654,6 @@ int main(int argc, char *argv[]) {
          << endl;
     goto cvmfs_cleanup;
   }
-
-  curl_ready = true;
 
   /* Try to init the cache... this creates a set of directories in
    cvmfs::cachedir (256 directories named 00..ff) */
@@ -1839,6 +1829,7 @@ int main(int argc, char *argv[]) {
   if (signature_ready) signature::fini();
   if (cache_ready) cache::fini();
   if (monitor_ready) monitor::fini();
+  if (download_ready) download::Fini();
   if (options_ready) {
     fuse_opt_free_args(&fuse_args);
     free_cvmfs_opts(&cvmfs_opts);

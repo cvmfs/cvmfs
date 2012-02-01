@@ -43,7 +43,6 @@ enum Failures {
   kFailOther,
 };
 
-
 /**
  * Contains all the information to specify a download job.
  */

@@ -510,7 +510,7 @@ vector<string> split_string(const string &str, const char delim) {
   while(std::getline(ss, item, delim)) {
       result.push_back(item);
   }
-  
+
   return result;
 }
 
@@ -526,5 +526,24 @@ string join_strings(const vector<string> &strings, const string &joint) {
   }
 
   return result;
+}
+
+
+bool HasPrefix(const string &str, const string &prefix,
+               const bool ignore_case)
+{
+  if (prefix.length() > str.length())
+    return false;
+
+  for (unsigned i = 0, l = prefix.length(); i < l; ++i) {
+    if (ignore_case) {
+      if (toupper(str[i]) != toupper(prefix[i]))
+        return false;
+    } else {
+      if (str[i] != prefix[i])
+        return false;
+    }
+  }
+  return true;
 }
 
