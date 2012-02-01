@@ -426,14 +426,13 @@ namespace cvmfs {
     }
 
     /* we have all bits and pieces, write checksum and catalog into cache directory */
-    const string sha1_download_str = sha1_download.to_string();
     cat_file = tmp_file;
     cat_sha1 = sha1_download;
     cached_copy = false;
 
     int fdchksum = open(lpath_chksum.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
     if (fdchksum >= 0) {
-      string local_chksum = sha1_local.to_string();
+      string local_chksum = sha1_download.to_string();
       map<char, string>::const_iterator published = chksum_keyval.find('T');
       if (published != chksum_keyval.end())
         local_chksum += "T" + published->second;

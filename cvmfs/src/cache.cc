@@ -333,14 +333,14 @@ namespace cache {
     url = "/data/" + hash_path.substr(0, 2) + "/" + hash_path.substr(2);
     pmesg(D_CACHE, "curl fetches %s", url.c_str());
 
-    // TODO(jakob): 1 struct per thread
-    download::JobInfo download_job(&url, true, true, f, &d.checksum_);
-
     fd = cache::transaction(d.checksum(), lpath, txn);
     if (fd < 0) {
       pmesg(D_CACHE, "could not start transaction on %s", lpath.c_str());
       return -EIO;
     }
+
+    // TODO(jakob): 1 struct per thread
+    download::JobInfo download_job(&url, true, true, f,  &d.checksum_);
 
     f = fdopen(fd, "r+");
     if (!f) {
@@ -351,6 +351,7 @@ namespace cache {
     retval = setvbuf(f, strmbuf, _IOFBF, 4096);
     assert(retval == 0);
 
+    download_job.destination_file = f;
     download_result = download::Fetch(&download_job);
 
     if (download_result == download::kFailOk) {
