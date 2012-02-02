@@ -1,5 +1,5 @@
 #!/bin/sh
 
-#make clean
+make clean
 make
 

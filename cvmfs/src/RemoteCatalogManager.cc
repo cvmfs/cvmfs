@@ -6,11 +6,12 @@
 #include "cache.h"
 #include "signature.h"
 #include "download.h"
+#include "compression.h"
 
 extern "C" {
 #include "debug.h"
 #include "log.h"
-#include "compression.h"
+#include "sha1.h"
 }
 
 using namespace std;
@@ -340,10 +341,13 @@ namespace cvmfs {
 
           /* verify downloaded chunk */
           void *outbuf;
-          size_t outsize;
+          int64_t outsize;
           hash::t_sha1 verify_sha1;
           bool verify_result;
-          if (compress_mem(download_certificate.destination_mem.data, download_certificate.destination_mem.size, &outbuf, &outsize) != 0) {
+          if (!zlib::CompressMem2Mem(download_certificate.destination_mem.data,
+                                     download_certificate.destination_mem.size,
+                                     &outbuf, &outsize))
+          {
             verify_result = false;
           } else {
             sha1_mem(outbuf, outsize, verify_sha1.digest);

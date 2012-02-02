@@ -5,7 +5,7 @@
  *
  * Developed by Jakob Blomer at CERN, 2010
  */
- 
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -23,10 +23,11 @@
 #include "signature.h"
 #include "hash.h"
 #include "util.h"
+#include "compression.h"
 
 extern "C" {
-   #include "compression.h"
-   #include "smalloc.h"
+#include "smalloc.h"
+#include "sha1.h"
 }
 
 using namespace std;
@@ -36,18 +37,18 @@ static void usage() {
    cout << "Usage: cvmfs_sign [-c <x509 certificate>] [-k <private key>] [-p <password>] [-n <repository name>] <catalog>" << endl;
 }
 
-int main(int argc, char **argv) {  
+int main(int argc, char **argv) {
    if (argc < 2) {
       usage();
       return 1;
    }
-   
+
    string dir_catalogs = "";
    string certificate = "";
    string priv_key = "";
    string pwd = "";
    string repo_name = "";
-   
+
    char c;
    while ((c = getopt(argc, argv, "c:k:p:n:h")) != -1) {
       switch (c) {
@@ -76,13 +77,13 @@ int main(int argc, char **argv) {
       return 1;
    }
    dir_catalogs = canonical_path(get_parent_path(string(argv[optind])));
-   
+
    const string clg_path = dir_catalogs + "/.cvmfscatalog.working";
    const string snapshot_path = dir_catalogs + "/.cvmfscatalog";
-   
+
    /* Load certificate */
    signature::init();
-   
+
    void *cert_buf;
    unsigned cert_buf_size;
    if (certificate == "") {
@@ -95,7 +96,7 @@ int main(int argc, char **argv) {
       return 2;
    }
    //cout << signature::whois() << endl;
-   
+
    /* Load private key */
    if (priv_key == "") {
       cout << "Enter file name of private key file to your certificate []: " << flush;
@@ -114,14 +115,14 @@ int main(int argc, char **argv) {
             cerr << "terminal failure" << endl;
             return 2;
          }
-      
+
          cout << "Enter password for private key: " << flush;
          pwd = "";
          while (cin.get(c) && (c != '\n'))
             pwd += c;
          tcsetattr(fileno(stdin), TCSANOW, &defrsett);
          cout << endl;
-         
+
          success = signature::load_private_key(priv_key, pwd);
          if (!success)
             cerr << "failed to load private key, " << signature::get_crypto_err() << endl;
@@ -131,34 +132,34 @@ int main(int argc, char **argv) {
          return 2;
    }
    if (!signature::keys_match()) {
-      cerr << "the private key doesn't seem to match your certificate " << signature::get_crypto_err() << endl;  
+      cerr << "the private key doesn't seem to match your certificate " << signature::get_crypto_err() << endl;
       signature::unload_private_key();
       return 2;
    }
-   
+
    /* Now do the real work */
    {
       cout << "Signing " << snapshot_path << endl;
       const string chksum_path = dir_catalogs + "/.cvmfschecksum";
-      
+
       ifstream chkfile(chksum_path.c_str(), ios::in|ios::binary|ios::ate);
       if (!chkfile.is_open()) {
          cerr << "Failed to open " << chksum_path << endl;
          goto sign_fail;
       }
-      
+
       /* read .cvmfschecksum */
       ifstream::pos_type buf_compr_size = chkfile.tellg();
       void *buf_compr = smalloc(buf_compr_size);
       chkfile.seekg(0, ios::beg);
       chkfile.read((char *)buf_compr, buf_compr_size);
       chkfile.close();
-      
+
       /* uncompress, extract sha1 + addons */
       void *sha1_buf;
-      size_t sha1_buf_size;
-      if ((decompress_mem(buf_compr, buf_compr_size, &sha1_buf, &sha1_buf_size) != 0) ||
-          (sha1_buf_size < 40)) 
+      int64_t sha1_buf_size;
+      if (!zlib::DecompressMem2Mem(buf_compr, buf_compr_size, &sha1_buf, &sha1_buf_size) ||
+          (sha1_buf_size < 40))
       {
          cerr << "Failed to read checksum" << endl;
          goto sign_fail;
@@ -174,7 +175,7 @@ int main(int argc, char **argv) {
       }
       free(buf_compr);
       free(sha1_buf);
-      
+
       /* Sign checksum */
       void *sig;
       unsigned sig_size;
@@ -182,7 +183,7 @@ int main(int argc, char **argv) {
          cerr << "failed to sign" << endl;
          goto sign_fail;
       }
-      
+
       /* Safe checksum and signature */
       char tail = '\n';
       unsigned chk_buf_size = write_back.length() + 1 + sig_size;
@@ -191,28 +192,28 @@ int main(int argc, char **argv) {
       memcpy(chk_buf + write_back.length(), &tail, 1);
       memcpy(chk_buf + write_back.length() + 1, sig, sig_size);
       void *compr_buf;
-      size_t compr_size;
-      if (compress_mem(chk_buf, chk_buf_size, &compr_buf, &compr_size) != 0) {
+      int64_t compr_size;
+      if (!zlib::CompressMem2Mem(chk_buf, chk_buf_size, &compr_buf, &compr_size)) {
          cerr << "Failed to compress signature" << endl;
          goto sign_fail;
       }
       free(sig);
       free(chk_buf);
-      
+
       FILE *fp = fopen(chksum_path.c_str(), "w");
       if (fp == NULL) {
          cerr << "Failed to save signature" << endl;
          goto sign_fail;
       }
-      if (fwrite(compr_buf, 1, compr_size, fp) < compr_size) {
+      if (static_cast<int64_t>(fwrite(compr_buf, 1, compr_size, fp)) < compr_size) {
          cerr << "Failed to save signature" << endl;
          goto sign_fail;
       }
       fclose(fp);
       free(compr_buf);
-      
+
       /* Safe certificate */
-      if (compress_mem(cert_buf, cert_buf_size, &compr_buf, &compr_size) != 0) {
+      if (!zlib::CompressMem2Mem(cert_buf, cert_buf_size, &compr_buf, &compr_size)) {
          cerr << "Failed to compress certificate" << endl;
          goto sign_fail;
       }
@@ -226,14 +227,14 @@ int main(int argc, char **argv) {
          cerr << "Failed to save certificate" << endl;
          goto sign_fail;
       }
-      if (fwrite(compr_buf, 1, compr_size, fcert) < compr_size) {
+      if (static_cast<int64_t>(fwrite(compr_buf, 1, compr_size, fcert)) < compr_size) {
          cerr << "Failed to save certificate" << endl;
          goto sign_fail;
       }
       fclose(fcert);
       free(compr_buf);
-      
-      const string sha1_path = sha1.to_string().substr(0, 2) + "/" + 
+
+      const string sha1_path = sha1.to_string().substr(0, 2) + "/" +
       sha1.to_string().substr(2) + "X";
       const string cert_path = dir_catalogs + "/data/" + sha1_path;
       if (rename(cert_path_tmp.c_str(), cert_path.c_str()) != 0) {
@@ -245,7 +246,7 @@ int main(int argc, char **argv) {
          cerr << "Failed to symlink certificate" << endl;
          goto sign_fail;
       }
-      
+
       /* Write extended checksum */
       map<char, string> content;
       if (!parse_keyval(dir_catalogs + "/.cvmfspublished", content) ||
@@ -259,7 +260,7 @@ int main(int argc, char **argv) {
          content['T'] = str_time.str();
          if (repo_name != "")
             content['N'] = repo_name;
-         
+
          string final;
          final = 'C' + content['C'] + "\n";
          for (map<char, string>::const_iterator itr = content.begin(), itrEnd = content.end();
@@ -272,7 +273,7 @@ int main(int argc, char **argv) {
          sha1_mem(&(final[0]), final.length(), sha1.digest);
          const string sha1_str = sha1.to_string();
          final += "--\n" + sha1_str + "\n";
-         
+
          FILE *fext = fopen((dir_catalogs + "/.cvmfspublished").c_str(), "w");
          if (!fext) {
             cerr << "Failed to write extended checksum" << endl;
@@ -283,7 +284,7 @@ int main(int argc, char **argv) {
             fclose(fext);
             goto sign_fail;
          }
-         
+
          /* Sign checksum and write signature */
          void *sig;
          unsigned sig_size;
@@ -299,11 +300,11 @@ int main(int argc, char **argv) {
             goto sign_fail;
          }
          free(sig);
-         
+
          fclose(fext);
       }
    }
-   
+
    signature::fini();
    return 0;
 sign_fail:

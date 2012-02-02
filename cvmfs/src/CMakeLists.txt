@@ -6,6 +6,7 @@
 set (CVMFS2_DEBUG_SOURCES
 	smalloc.h smalloc.c
 	log.c log.h
+	sha1.h sha1.c
 	logging.cc logging.h
 	tracer.h tracer.cc atomic.h
 	sqlite3-duplex.h
@@ -23,7 +24,6 @@ set (CVMFS2_DEBUG_SOURCES
 	monitor.h monitor.cc
 	util.cc util.h
 	zlib-duplex.h compression.h compression.cc
-	sha1.h sha1.c
 	md5.h
 	debug.h debug.c
 	download.cc download.h

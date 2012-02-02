@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "curl_duplex.h"
+#include "compression.h"
+
 extern "C" {
-  #include "compression.h"
+#include "sha1.h"
 }
 
 namespace hash {

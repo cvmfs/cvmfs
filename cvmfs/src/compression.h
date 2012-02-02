@@ -1,35 +1,52 @@
-#ifndef COMPRESSION_H
-#define COMPRESSION_H 1
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef CVMFS_COMPRESSION_H_
+#define CVMFS_COMPRESSION_H_
 
 #include <stdio.h>
+#include <stdint.h>
 #include "zlib-duplex.h"
-#include "sha1.h"
 
-#define Z_CHUNK 16384
+namespace hash {
+struct t_sha1;
+}
 
-int compress_strm_init(z_stream *strm);
-int decompress_strm_init(z_stream *strm);
-void compress_strm_fini(z_stream *strm);
-void decompress_strm_fini(z_stream *strm);
+bool CopyPath2Path(const char *src, const char *dest);
 
-/* returns -1 (error), 0 (sucessful decompressed chunk), 1 (success, end of stream) */
-int decompress_strm_file(z_stream *strm, FILE *f, const void *buf, const size_t size);
+namespace zlib {
 
+enum StreamStates {
+  kStreamError = 0,
+  kStreamContinue,
+  kStreamEnd,
+};
 
-/* User of these functions has to free out_buf */
-int decompress_mem(const void *buf, const size_t size, void **out_buf, size_t *out_size);
-int compress_mem(const void *buf, const size_t size, void **out_buf, size_t *out_size);
+bool CompressInit(z_stream *strm);
+bool DecompressInit(z_stream *strm);
+void CompressFini(z_stream *strm);
+void DecompressFini(z_stream *strm);
 
-int compress_file(const char *src, const char *dest);
-int compress_file_sha1(const char *src, const char *dest, unsigned char digest[20]);
-int compress_file_sha1_only(FILE *fsrc, unsigned char digest[20]);
-int compress_file_fp(FILE *fsrc, FILE *fdest);
-int compress_file_fp_sha1(FILE *fsrc, FILE *fdest, unsigned char digest[20]);
-//int compress_file_inplace(const char *name);
-int decompress_file(const char *src, const char *dest);
-int decompress_file_fp(FILE *fsrc, FILE *fdest);
+StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
+                                    const int64_t size);
 
-int file_copy(const char *src, const char *dest);
+bool CompressPath2Path(const char *src, const char *dest);
+bool CompressPath2Path(const char *src, const char *dest,
+                       hash::t_sha1 *compressed_hash);
+bool DecompressPath2Path(const char *src, const char *dest);
 
-#endif
+bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash);
+bool CompressFile2File(FILE *fsrc, FILE *fdest);
+bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash);
+bool DecompressFile2File(FILE *fsrc, FILE *fdest);
 
+// User of these functions has to free out_buf, if successful
+bool CompressMem2Mem(const void *buf, const int64_t size,
+                     void **out_buf, int64_t *out_size);
+bool DecompressMem2Mem(const void *buf, const int64_t size,
+                       void **out_buf, int64_t *out_size);
+
+}  // namespace zlib
+
+#endif  // CVMFS_COMPRESSION_H_

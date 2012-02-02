@@ -77,10 +77,10 @@
 #include "md5path_cache.h"
 #include "RemoteCatalogManager.h"
 #include "DirectoryEntry.h"
+#include "compression.h"
 
 extern "C" {
   #include "sha1.h"
-  #include "compression.h"
   #include "smalloc.h"
   #include "sqlite3-duplex.h"
 }
@@ -936,7 +936,7 @@ namespace cvmfs {
             return;
           }
 
-          if (compress_file_sha1_only(f, hash.digest) != 0) {
+          if (!zlib::CompressFile2Null(f, &hash)) {
             fclose(f);
             fuse_reply_err(req, EIO);
             return;

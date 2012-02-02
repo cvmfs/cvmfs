@@ -47,9 +47,9 @@
 #include "atomic.h"
 #include "hash.h"
 #include "util.h"
+#include "compression.h"
 extern "C" {
   #include "smalloc.h"
-  #include "compression.h"
   #include "sha1.h"
 }
 
@@ -344,8 +344,9 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   } else {
     // Write to file
     if (info->compressed) {
-      int retval = decompress_strm_file(&info->zstream, info->destination_file,
-                                        ptr, num_bytes);
+      int retval = zlib::DecompressZStream2File(&info->zstream,
+                                                info->destination_file,
+                                                ptr, num_bytes);
       if (retval < 0) {
         info->error_code = kFailBadData;
         return 0;
@@ -416,7 +417,7 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
   info->num_failed_proxies = 0;
   info->num_failed_hosts = 0;
   if (info->compressed) {
-    int retval = decompress_strm_init(&(info->zstream));
+    int retval = zlib::DecompressInit(&(info->zstream));
     assert(retval == Z_OK);
   }
   if (info->expected_hash)
@@ -513,9 +514,10 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // Decompress memory in a single run
       if ((info->destination == kDestinationMem) && info->compressed) {
         void *buf;
-        size_t size;
-        int retval = decompress_mem(info->destination_mem.data,
-                                    info->destination_mem.size, &buf, &size);
+        int64_t size;
+        int retval = zlib::DecompressMem2Mem(info->destination_mem.data,
+                                             info->destination_mem.size,
+                                             &buf, &size);
         if (retval == 0) {
           free(info->destination_mem.data);
           info->destination_mem.data = static_cast<char *>(buf);
@@ -626,7 +628,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
 
   if (info->compressed)
-    decompress_strm_fini(&info->zstream);
+    zlib::DecompressFini(&info->zstream);
 
   return false;  // stop transfer and return to Fetch()
 }

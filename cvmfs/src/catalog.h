@@ -59,44 +59,44 @@ namespace catalog {
 	inline unsigned char getLinkcountInFlags(const unsigned int flags) {
 		return (flags & NLINK_COUNT) / NLINK_COUNT_0;
 	}
-	
+
 	bool getMaximalHardlinkGroupId(const unsigned cat_id, unsigned int &maxId);
-	
+
 	uint64_t getInode(unsigned int rowid, uint64_t hardlinkGroupId, unsigned int catalog_id);
-	
+
    struct t_dirent {
       t_dirent() : catalog_id(0), flags(setLinkcountInFlags(0, 1)), inode(0), mode(0), size(0), mtime(0) {
          parentInode = INVALID_INODE;
       }
       t_dirent(const int cat_id,
-               const std::string &n, 
-               const std::string &sym, 
-               const int f, 
+               const std::string &n,
+               const std::string &sym,
+               const int f,
                const uint64_t hardlinkGroup,
-               const unsigned m, 
-               const uint64_t s, 
-               const time_t t, 
-               const hash::t_sha1 &c) : 
+               const unsigned m,
+               const uint64_t s,
+               const time_t t,
+               const hash::t_sha1 &c) :
 						catalog_id(cat_id), flags(f), inode(hardlinkGroup),  mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {
 
 							// the linkcount defaults to 1 !!
 							if (getLinkcountInFlags(f) == 0) {
 								flags = setLinkcountInFlags(f, 1);
 							}
-							
+
                      parentInode = INVALID_INODE;
 						}
 
 	    t_dirent(const int cat_id,
-	            const std::string &n, 
-	            const std::string &sym, 
-	            const int f, 
+	            const std::string &n,
+	            const std::string &sym,
+	            const int f,
 	            const uint64_t ino,
-	            const unsigned m, 
-	            const uint64_t s, 
-	            const time_t t, 
+	            const unsigned m,
+	            const uint64_t s,
+	            const time_t t,
 	            const hash::t_sha1 &c,
-					const unsigned int rowId) : 
+					const unsigned int rowId) :
 						catalog_id(cat_id), flags(f), mode(m), size(s), mtime(t), checksum(c), name(n), symlink(sym) {
 							inode = getInode(rowId, ino, cat_id);
                      parentInode = INVALID_INODE;
@@ -121,8 +121,8 @@ namespace catalog {
 
    bool init(const uid_t puid, const gid_t pgid);
    void fini();
-   
-   bool attach(const std::string &db_file, const std::string &url, 
+
+   bool attach(const std::string &db_file, const std::string &url,
 					const bool read_only, const bool open_transaction); /* Lock this manually! */
    bool reattach(const unsigned cat_id, const std::string &db_file, const std::string &url); /* Lock this manually! */
    std::string get_catalog_url(const unsigned cat_id); /* Lock this manually! */
@@ -130,7 +130,7 @@ namespace catalog {
    int get_num_catalogs(); /* Lock this manually! */
    bool detach(const unsigned cat_id); /* Lock this manually */
    bool detach_intermediate(const unsigned cat_id); /* Lock this manually, use only with reattach! */
-   
+
    bool set_root_prefix(const std::string &r_prefix, const unsigned cat_id);
    std::string get_root_prefix();
    std::string get_root_prefix_specific(const unsigned cat_id);
@@ -145,21 +145,21 @@ namespace catalog {
    hash::t_sha1 get_previous_revision(const unsigned cat_id); /* unlocked */
    uint64_t get_num_dirent(const unsigned cat_id); /* unlocked */
    uint64_t get_root_inode(); /* unlocked */
-   
+
    void transaction(const unsigned cat_id);
    bool transaction_running(const unsigned cat_id);
    void commit(const unsigned cat_id);
    void rollback(const unsigned cat_id);
-   
+
    bool insert_unprotected(const hash::t_md5 &name, const hash::t_md5 &parent, const t_dirent &entry);
    bool insert(const hash::t_md5 &name, const hash::t_md5 &parent, const t_dirent &entry); /* Locked */
    bool update_unprotected(const hash::t_md5 &name, const t_dirent &entry);
    bool update(const hash::t_md5 &name, const t_dirent &entry); /* Locked */
 
-   // bool update_inode(const uint64_t inode, const unsigned mode, 
+   // bool update_inode(const uint64_t inode, const unsigned mode,
    //                   const uint64_t size, const time_t mtime, const hash::t_sha1 &checksum); /* Locked */
-   // 
-   // bool update_inode(const uint64_t inode, const uint64_t size, 
+   //
+   // bool update_inode(const uint64_t inode, const uint64_t size,
    //                   const time_t mtime, const hash::t_sha1 &checksum); /* Locked */
    // not supported anymore
 
@@ -178,29 +178,28 @@ namespace catalog {
    bool parent_unprotected(const hash::t_md5 &key, t_dirent &result);
    std::vector<t_dirent> ls_unprotected(const hash::t_md5 &parent);
    std::vector<t_dirent> ls(const hash::t_md5 &parent);  /* Locked */
-   bool ls_nested(const unsigned cat_id, std::vector<std::string> &ls); 
+   bool ls_nested(const unsigned cat_id, std::vector<std::string> &ls);
    bool register_nested(const unsigned cat_id, const std::string &path);
    bool unregister_nested(const unsigned cat_id, const std::string &path);
-   bool update_nested_sha1(const unsigned cat_id, const std::string path, 
+   bool update_nested_sha1(const unsigned cat_id, const std::string path,
                            const hash::t_sha1 &sha1);
    bool lookup_nested_unprotected(const unsigned cat_id, const std::string &path,
                                   hash::t_sha1 &sha1);
 
-   
+
    bool vacuum(); /* Lock this manually */
    bool relink_unprotected(const std::string &from_dir, const std::string &to_dir);
    bool relink(const std::string &from_dir, const std::string &to_dir); /* Locked */
    bool merge(const std::string &nested_dir); /* Locked */
-   bool create_compat(const std::string &growfsdir, const std::string &rootdir);
    bool make_ls(const std::string &path, const std::string &filename); /* Lock manually! */
-   //bool clone(const unsigned id_src, const std::string &snapshot); 
-   
+   //bool clone(const unsigned id_src, const std::string &snapshot);
+
    std::string get_sql_error();
 #ifdef CVMFS_CLIENT
    std::string get_db_memory_usage(); /* Lock manually */
 #endif
 
-   /* 
+   /*
       External access to internal mutex.
       Be careful! Mutex is not nested.
       We use it for on-the-fly catalog replacement.
