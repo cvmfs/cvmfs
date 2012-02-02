@@ -432,7 +432,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
   sha1_str.substr(2) + "C";
   if (!file_exists(clg_data_path)) {
     cout << "Writing catalog to " << clg_data_path << endl;
-    if (!zlib::CompressPath2Path(tmp_file, clg_data_path.c_str())) {
+    if (!zlib::CompressPath2Path(tmp_path, clg_data_path)) {
       cerr << "Warning: failed to store catalog" << endl;
       return -1;
     }
@@ -467,7 +467,7 @@ static bool fetch_deprecated_catalog(const hash::t_sha1 &snapshot_id, string &tm
   sha1_clg_str.substr(2) + "C";
   if (!file_exists(clg_data_path)) {
     cout << "Writing catalog to " << clg_data_path << endl;
-    if (!zlib::CompressPath2Path(tmp_path.c_str(), clg_data_path.c_str())) {
+    if (!zlib::CompressPath2Path(tmp_path, clg_data_path)) {
       cerr << "Warning: failed to store catalog" << endl;
     }
   }

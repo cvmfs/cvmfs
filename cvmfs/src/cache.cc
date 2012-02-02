@@ -366,7 +366,7 @@ namespace cache {
         LogCvmfs(kLogCache, kLogSyslog,
                  "size check failure for %s, expected %lu, got %ld",
                  url.c_str(), d.size(), info.st_size);
-        if (CopyPath2Path(txn.c_str(), (cache_path + "/quarantaine/" + d.checksum().to_string()).c_str()) != 0)
+        if (CopyPath2Path(txn, cache_path + "/quarantaine/" + d.checksum().to_string()) != 0)
           LogCvmfs(kLogCache, kLogSyslog,
                    "failed to move %s to quarantaine", txn.c_str());
         goto fetch_abort;

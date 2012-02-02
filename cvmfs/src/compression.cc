@@ -25,6 +25,9 @@ extern "C" {
 }
 
 
+using namespace std;  // NOLINT
+
+
 static bool CopyFile2File(FILE *fsrc, FILE *fdest) {
   unsigned char buf[1024];
   rewind(fsrc);
@@ -40,16 +43,16 @@ static bool CopyFile2File(FILE *fsrc, FILE *fdest) {
 }
 
 
-bool CopyPath2Path(const char *src, const char *dest) {
+bool CopyPath2Path(const string &src, const string &dest) {
   FILE *fsrc = NULL;
   FILE *fdest = NULL;
   int retval = -1;
   struct stat info;
 
-  fsrc = fopen(src, "r");
+  fsrc = fopen(src.c_str(), "r");
   if (!fsrc) goto file_copy_final;
 
-  fdest = fopen(dest, "w");
+  fdest = fopen(dest.c_str(), "w");
   if (!fdest) goto file_copy_final;
 
   if (!CopyFile2File(fsrc, fdest)) goto file_copy_final;
@@ -134,24 +137,24 @@ StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
 }
 
 
-bool CompressPath2Path(const char *src, const char *dest) {
-  FILE *fsrc = fopen(src, "r");
+bool CompressPath2Path(const string &src, const string &dest) {
+  FILE *fsrc = fopen(src.c_str(), "r");
   if (!fsrc) {
     LogCvmfs(kLogCompress, kLogDebug,  "open %s as compression source failed",
-             src);
+             src.c_str());
     return false;
   }
 
-  FILE *fdest = fopen(dest, "w");
+  FILE *fdest = fopen(dest.c_str(), "w");
   if (!fdest) {
     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression destination "
-             "failed", dest);
+             "failed", dest.c_str());
     fclose(fsrc);
     return false;
   }
 
   LogCvmfs(kLogCompress, kLogDebug, "opened %s and %s for compression",
-           src, dest);
+           src.c_str(), dest.c_str());
   const bool result = CompressFile2File(fsrc, fdest);
 
   fclose(fsrc);
@@ -160,26 +163,26 @@ bool CompressPath2Path(const char *src, const char *dest) {
 }
 
 
-bool CompressPath2Path(const char *src, const char *dest,
+bool CompressPath2Path(const string &src, const string &dest,
                        hash::t_sha1 *compressed_hash)
 {
-  FILE *fsrc = fopen(src, "r");
+  FILE *fsrc = fopen(src.c_str(), "r");
   if (!fsrc) {
     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression source failed",
-             src);
+             src.c_str());
     return false;
   }
 
-  FILE *fdest = fopen(dest, "w");
+  FILE *fdest = fopen(dest.c_str(), "w");
   if (!fdest) {
     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression destination "
-             "failed", dest);
+             "failed", dest.c_str());
     fclose(fsrc);
     return false;
   }
 
   LogCvmfs(kLogCompress, kLogDebug, "opened %s and %s for compression",
-           src, dest);
+           src.c_str(), dest.c_str());
   bool result = false;
   if (!CompressFile2File(fsrc, fdest, compressed_hash))
     goto compress_path2path_final;
@@ -197,15 +200,15 @@ bool CompressPath2Path(const char *src, const char *dest,
 }
 
 
-bool DecompressPath2Path(const char *src, const char *dest) {
+bool DecompressPath2Path(const string &src, const string &dest) {
   FILE *fsrc = NULL;
   FILE *fdest = NULL;
   int result = false;
 
-  fsrc = fopen(src, "r");
+  fsrc = fopen(src.c_str(), "r");
   if (!fsrc) goto decompress_path2path_final;
 
-  fdest = fopen(dest, "w");
+  fdest = fopen(dest.c_str(), "w");
   if (!fdest) goto decompress_path2path_final;
 
   result = DecompressFile2File(fsrc, fdest);
