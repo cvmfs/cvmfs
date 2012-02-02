@@ -7,25 +7,10 @@
 
 #define Z_CHUNK 16384
 
-struct z_estream {
-   z_stream strm;
-   int z_ret;
-   int flush;
-   int eof;
-   unsigned have;
-   unsigned rgauge;
-   unsigned char in[Z_CHUNK];
-   unsigned char out[Z_CHUNK];
-};
-
 int compress_strm_init(z_stream *strm);
-int compress_estrm_init(struct z_estream *estrm);
 int decompress_strm_init(z_stream *strm);
 void compress_strm_fini(z_stream *strm);
-void compress_estrm_fini(struct z_estream *estrm);
 void decompress_strm_fini(z_stream *strm);
-
-int read_and_compress(FILE *fsrc, struct z_estream *estrm, void *buf, const int buf_size);
 
 /* returns -1 (error), 0 (sucessful decompressed chunk), 1 (success, end of stream) */
 int decompress_strm_file(z_stream *strm, FILE *f, const void *buf, const size_t size);

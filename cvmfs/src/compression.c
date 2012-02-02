@@ -35,19 +35,6 @@ int compress_strm_init(z_stream *strm)
 }
 
 
-int compress_estrm_init(struct z_estream *estrm)
-{
-   int result = compress_strm_init(&estrm->strm);
-   estrm->strm.next_out = estrm->out;
-   estrm->strm.avail_out = Z_CHUNK;
-   estrm->flush = Z_NO_FLUSH;
-   estrm->rgauge = 0;
-   estrm->have = 0;
-   estrm->eof = 0;
-   return result;
-}
-
-
 int decompress_strm_init(z_stream *strm)
 {
    strm->zalloc = Z_NULL;
@@ -62,12 +49,6 @@ int decompress_strm_init(z_stream *strm)
 void compress_strm_fini(z_stream *strm)
 {
    (void)deflateEnd(strm);
-}
-
-
-void compress_estrm_fini(struct z_estream *estrm)
-{
-   compress_strm_fini(&estrm->strm);
 }
 
 
@@ -375,61 +356,6 @@ compress_file_sha1_only_final:
    compress_strm_fini(&strm);
    pmesg(D_COMPRESS, "file compression finished with error code %d", result);
    return result;
-}
-
-
-
-int read_and_compress(FILE *fsrc, struct z_estream *estrm, void *buf, const int buf_size)
-{
-   if (buf_size <= 0) return buf_size;
-   if (estrm->eof) return 0;
-   
-   int buf_pos = 0;
-   
-read_and_compress_next_chunk:
-   /* fill from the estrm out-buffer as much as possible */
-   if (estrm->rgauge < estrm->have)
-   {
-      unsigned nbytes = ((unsigned)(buf_size - buf_pos) > (estrm->have - estrm->rgauge)) ? 
-         estrm->have - estrm->rgauge : (unsigned)(buf_size - buf_pos);
-      memcpy(buf+buf_pos, estrm->out + estrm->rgauge, nbytes);
-      estrm->rgauge += nbytes;
-      buf_pos += nbytes;
-      if (buf_pos == buf_size) return buf_size;
-   }
-   estrm->rgauge = 0;
-   
-read_and_compress_deflate:
-   /* run deflate() on input until output buffer not full */
-   if (estrm->strm.avail_out == 0)
-   {
-      estrm->strm.avail_out = Z_CHUNK;
-      estrm->strm.next_out = estrm->out;
-      estrm->z_ret = deflate(&(estrm->strm), estrm->flush);
-      if (estrm->z_ret == Z_STREAM_ERROR) return -1;
-      estrm->have = Z_CHUNK - estrm->strm.avail_out;
-      goto read_and_compress_next_chunk; 
-   }
-
-   /* read next chunk of file */
-   if (estrm->flush != Z_FINISH) {
-      estrm->strm.avail_in = fread(estrm->in, 1, Z_CHUNK, fsrc);
-      //pmesg(D_COMPRESS, "read %d bytes", estrm->strm.avail_in);
-      if (ferror(fsrc)) return -1; 
-
-      estrm->flush = feof(fsrc) ? Z_FINISH : Z_NO_FLUSH;
-      estrm->strm.next_in = estrm->in;
-      
-      /* Marker to jump into deflate */
-      estrm->strm.avail_out = 0;
-
-      goto read_and_compress_deflate;
-   };
- 
-   if (estrm->z_ret != Z_STREAM_END) return -1;
-
-   estrm->eof = 1;
-   return buf_pos;
 }
 
 
