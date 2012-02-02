@@ -169,9 +169,12 @@ namespace cache {
    */
   int open(const hash::t_sha1 &id) {
     const string lpath = cached_name(id);
-    int result = ::open(lpath.c_str(), O_RDONLY | O_DIRECT | O_NOATIME, 0);
+    int result = ::open(lpath.c_str(), O_RDONLY);
 
-    if (result >= 0) pmesg(D_CACHE, "hit %s", lpath.c_str());
+    if (result >= 0) {
+      pmesg(D_CACHE, "hit %s", lpath.c_str());
+      posix_fadvise(result, 0, 0, POSIX_FADV_NOREUSE);
+    }
     else pmesg(D_CACHE, "miss %s (%d)", lpath.c_str(), result);
 
     return result;
@@ -312,7 +315,6 @@ namespace cache {
     string url;
     string lpath;
     string txn;
-    hash::t_sha1 sha1;
     int fd, fd_return;
     int result = -EIO;
     int retval;
@@ -355,7 +357,7 @@ namespace cache {
     download_result = download::Fetch(&download_job);
 
     if (download_result == download::kFailOk) {
-      pmesg(D_CACHE, "curl finished downloading of %s, checksum: %s", url.c_str(), sha1.to_string().c_str());
+      pmesg(D_CACHE, "curl finished downloading of %s", url.c_str());
 
       // Check decompressed size
       struct stat64 info;
@@ -372,12 +374,13 @@ namespace cache {
 
       pmesg(D_CACHE, "trying to commit");
       fclose(f);
-      fd_return = ::open(txn.c_str(), O_RDONLY | O_DIRECT | O_NOATIME, 0);
+      fd_return = ::open(txn.c_str(), O_RDONLY);
       if (fd_return < 0) {
         result = -errno;
         return result;
       }
       if (cache::commit(lpath, txn, path, d.checksum(), d.size()) == 0) {
+        posix_fadvise(fd_return, 0, 0, POSIX_FADV_NOREUSE);
         return fd_return;
       } else {
         close(fd_return);

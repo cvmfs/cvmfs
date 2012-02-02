@@ -572,7 +572,8 @@ namespace cvmfs {
     if (fd >= 0) {
       if (atomic_xadd(&open_files, 1) <
           (static_cast<int>(nofiles))-NUM_RESERVED_FD) {
-        LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened", path.c_str());
+        LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
+                 path.c_str(), fd);
         fi->fh = fd;
         fuse_reply_open(req, fi);
         return;
@@ -614,8 +615,8 @@ namespace cvmfs {
   static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                          struct fuse_file_info *fi) {
     LogCvmfs(kLogCvmfs, kLogDebug,
-             "cvmfs_read on inode: %d reading %d bytes from offset %d",
-             catalog_manager->MangleInode(ino), size, off);
+             "cvmfs_read on inode: %d reading %d bytes from offset %d fd %d",
+             catalog_manager->MangleInode(ino), size, off, fi->fh);
     tracer::Trace(tracer::kFuseRead, "path", "read() call");
 
     // get data chunk
@@ -626,7 +627,9 @@ namespace cvmfs {
     // push it to user
     if (result >= 0) {
       fuse_reply_buf(req, data, result);
+      LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", result);
     } else {
+      LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, result);
       fuse_reply_err(req, errno);
     }
   }
@@ -1631,6 +1634,7 @@ int main(int argc, char *argv[]) {
   /* Set debug log file */
   if (cvmfs_opts.logfile) {
     debug_set_log(cvmfs_opts.logfile);
+    SetLogDebugFile(string(cvmfs_opts.logfile));
   }
 
   download::Init(16);
