@@ -173,7 +173,7 @@ namespace cache {
 
     if (result >= 0) {
       pmesg(D_CACHE, "hit %s", lpath.c_str());
-      posix_fadvise(result, 0, 0, POSIX_FADV_NOREUSE);
+      posix_fadvise(result, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
     }
     else pmesg(D_CACHE, "miss %s (%d)", lpath.c_str(), result);
 
@@ -380,7 +380,7 @@ namespace cache {
         return result;
       }
       if (cache::commit(lpath, txn, path, d.checksum(), d.size()) == 0) {
-        posix_fadvise(fd_return, 0, 0, POSIX_FADV_NOREUSE);
+        posix_fadvise(fd_return, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
         return fd_return;
       } else {
         close(fd_return);

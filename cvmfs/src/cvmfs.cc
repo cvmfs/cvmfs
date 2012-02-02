@@ -1122,6 +1122,8 @@ namespace cvmfs {
     lru::spawn();
     talk::spawn();
 
+    download::Spawn();
+
     //      max_cache_timeout = fuse_get_max_cache_timeout();
   }
 
