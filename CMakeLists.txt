@@ -1,8 +1,8 @@
 #
 # CMake build script to configure and build CernVM-FS and all it's
-# 3rd party dependencies, if they are statically linked into the binaries
+# external dependencies, if they are statically linked into the binaries
 #
-# See 3rdParty/CMake-Register_External_Lib.txt for details on 3rdParty inclusion
+# See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
 cmake_minimum_required (VERSION 2.6.4)

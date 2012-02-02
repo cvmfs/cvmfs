@@ -118,8 +118,9 @@ set (CVMFS_PULL_SOURCES
 	smalloc.h smalloc.c
 	debug.h debug.c
 	log.h log.c
+	logging.cc logging.h
 	zlib-duplex.h compression.h compression.c
-	curl_duplex.h http_curl.h http_curl.c
+	curl_duplex.h download.cc download.h
 	md5.h sha1.h sha1.c
 	hash.h hash.cc
 	util.h util.cc

@@ -13,13 +13,6 @@
 
 #include "cvmfs_config.h"
 
-#include "util.h"
-#include "catalog.h"
-#include "signature.h"
-#include "hash.h"
-
-#include "compat.h"
-
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -34,8 +27,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "compat.h"
+#include "util.h"
+#include "catalog.h"
+#include "signature.h"
+#include "hash.h"
+#include "download.h"
+
 extern "C" {
-   #include "http_curl.h"
    #include "compression.h"
 }
 
@@ -66,7 +65,7 @@ static void usage() {
    cout << "                  [-k <CernVM public key>] [-b <certificate blacklist>] [-n <parallel downloads>]" << endl;
    cout << "                  [-m <repository name>] [-s <snapshot name>] [-i(inital)] [-e(xit on errors)]" << endl;
    cout << "                  [-o <difference set output>] [-q <fault chunks output>] [-w(rite only difference set)]" << endl;
-   cout << "(use http://cernvm-bkp.cern.ch) " << endl
+   cout << "(use http://cvmfs-stratum-zero.cern.ch) " << endl
         << endl;
 }
 
@@ -83,17 +82,17 @@ static bool valid_certificate(const string &save_as, const bool nocache) {
    }
 
    /* download whitelist */
-   int curl_result;
-   struct mem_url mem_url_wl;
-   mem_url_wl.data = NULL;
-   if (nocache) curl_result = curl_download_mem_nocache("/.cvmfswhitelist", &mem_url_wl, 1, 0); /* TODO */
-   else curl_result = curl_download_mem("/.cvmfswhitelist", &mem_url_wl, 1, 0);
-   if ((curl_result != CURLE_OK) || !mem_url_wl.data) {
+   const string url_whitelist = "/.cvmfswhitelist";
+   download::JobInfo download_whitelist(&url_whitelist, false, true, NULL);
+   if ((download::Fetch(&download_whitelist) != download::kFailOk) || 
+       !download_whitelist.destination_mem.data)
+   {
       cerr << "Warning: whitelist could not be loaded" << endl;
       return false;
    }
-   const string buffer = string(mem_url_wl.data, mem_url_wl.size);
-   free(mem_url_wl.data);
+   const string buffer = string(download_whitelist.destination_mem.data, 
+                                download_whitelist.destination_mem.size);
+   free(download_whitelist.destination_mem.data);
 
    /* parse whitelist */
    unsigned skip = 0;
@@ -226,22 +225,15 @@ static int fetch_catalog(const string &path, const bool no_proxy,
                          const hash::t_md5 &mount_point, string &tmp_path)
 {
    const string lpath_chksum = dir_catalogs + path + "/.cvmfspublished";
-   const string lpath_compat_chksum = dir_catalogs + path + "/.cvmfschecksum";
    const string rpath_chksum = path + "/.cvmfspublished";
-   const string rpath_compat_chksum = path + "/.cvmfschecksum";
    bool have_cached = false;
    hash::t_sha1 sha1_download;
    hash::t_sha1 sha1_local;
    hash::t_sha1 sha1_chksum; /* required for signature verification */
-   struct mem_url mem_url_chksum;
-   struct mem_url mem_url_compat_chksum;
-   struct mem_url mem_url_cert;
    map<char, string> chksum_keyval_local;
    map<char, string> chksum_keyval_remote;
-   int curl_result;
    int64_t local_modified = 0;
    char *checksum;
-   char *compat_checksum = NULL;
 
    /* load local checksum */
    if (parse_keyval(lpath_chksum, chksum_keyval_local)) {
@@ -256,30 +248,19 @@ static int fetch_catalog(const string &path, const bool no_proxy,
    }
 
    /* load remote checksum */
-   if (no_proxy) curl_result = curl_download_mem_nocache(rpath_chksum.c_str(), &mem_url_chksum, 1, 0);
-   else curl_result = curl_download_mem(rpath_chksum.c_str(), &mem_url_chksum, 1, 0);
-   if (curl_result != CURLE_OK) {
+   download::JobInfo download_checksum(&rpath_chksum, false, true, NULL);
+   if (download::Fetch(&download_checksum) != download::kFailOk) {
       cerr << "Warning: failed to load checksum" << endl;
       return -1;
    }
-   checksum = (char *)alloca(mem_url_chksum.size);
-   memcpy(checksum, mem_url_chksum.data, mem_url_chksum.size);
-   free(mem_url_chksum.data);
-
-   /* load compat checksum */
-   if (no_proxy) curl_result = curl_download_mem_nocache(rpath_compat_chksum.c_str(), &mem_url_compat_chksum, 1, 0);
-   else curl_result = curl_download_mem(rpath_compat_chksum.c_str(), &mem_url_compat_chksum, 1, 0);
-   if (curl_result != CURLE_OK) {
-      cerr << "Warning: failed to load compat checksum" << endl;
-   } else {
-      compat_checksum = (char *)alloca(mem_url_compat_chksum.size);
-      memcpy(compat_checksum, mem_url_compat_chksum.data, mem_url_compat_chksum.size);
-      free(mem_url_compat_chksum.data);
-   }
+   checksum = (char *)alloca(download_checksum.destination_mem.size);
+   memcpy(checksum, download_checksum.destination_mem.data, 
+          download_checksum.destination_mem.size);
+   free(download_checksum.destination_mem.data);
 
    /* parse remote checksum */
    int sig_start;
-   parse_keyval(checksum, mem_url_chksum.size, sig_start, sha1_chksum, chksum_keyval_remote);
+   parse_keyval(checksum, download_checksum.destination_mem.size, sig_start, sha1_chksum, chksum_keyval_remote);
 
    map<char, string>::const_iterator clg_key = chksum_keyval_remote.find('C');
    if (clg_key == chksum_keyval_remote.end()) {
@@ -317,7 +298,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
    void *sig_buf_heap;
    unsigned sig_buf_size;
    if ((sig_start > 0) &&
-       read_sig_tail(checksum, mem_url_chksum.size, sig_start,
+       read_sig_tail(checksum, download_checksum.destination_mem.size, sig_start,
                      &sig_buf_heap, &sig_buf_size))
    {
       void *sig_buf = alloca(sig_buf_size);
@@ -336,10 +317,11 @@ static int fetch_catalog(const string &path, const bool no_proxy,
 
       const string url_cert = "/data/" + key_cert->second.substr(0,2) + "/" +
                               key_cert->second.substr(2) + "X";
-      if (curl_download_mem(url_cert.c_str(), &mem_url_cert, 1, 1) != CURLE_OK) {
+      download::JobInfo download_certificate(&url_cert, true, true, NULL);
+      if (download::Fetch(&download_certificate) != download::kFailOk) {
          cerr << "Warning: failed to load certificate from " << url_cert
-              << "(" << curl_result << ")" << endl;
-         if (mem_url_cert.size > 0) free(mem_url_cert.data);
+              << "(" << download_certificate.error_code << ")" << endl;
+         if (download_certificate.destination_mem.size > 0) free(download_certificate.destination_mem.data);
          return -1;
       }
 
@@ -348,7 +330,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
       size_t outsize;
       hash::t_sha1 verify_sha1;
       bool verify_result;
-      if (compress_mem(mem_url_cert.data, mem_url_cert.size, &outbuf, &outsize) != 0) {
+      if (compress_mem(download_certificate.destination_mem.data, download_certificate.destination_mem.size, &outbuf, &outsize) != 0) {
          verify_result = false;
       } else {
          sha1_mem(outbuf, outsize, verify_sha1.digest);
@@ -357,14 +339,14 @@ static int fetch_catalog(const string &path, const bool no_proxy,
       }
       if (!verify_result) {
          cerr << "Warning: certificate invalid" << endl;
-         free(mem_url_cert.data);
+         free(download_certificate.destination_mem.data);
          return -1;
       }
 
       /* read certificate */
-      if (!signature::load_certificate(mem_url_cert.data, mem_url_cert.size, false)) {
+      if (!signature::load_certificate(download_certificate.destination_mem.data, download_certificate.destination_mem.size, false)) {
          cerr << "Warning: failed to read certificate" << endl;
-         free(mem_url_cert.data);
+         free(download_certificate.destination_mem.data);
          return -1;
       }
 
@@ -373,7 +355,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
           !signature::verify(&((sha1_chksum.to_string())[0]), 40, sig_buf, sig_buf_size))
       {
          cerr << "Warning: signature verification failed against " << sha1_chksum.to_string() << endl;
-         free(mem_url_cert.data);
+         free(download_certificate.destination_mem.data);
          return -1;
       }
 
@@ -382,22 +364,14 @@ static int fetch_catalog(const string &path, const bool no_proxy,
          cout << "Writing certificate to " << dir_catalogs + url_cert << endl;
          void *out_buf = NULL;
          size_t out_size;
-         if ((compress_mem(mem_url_cert.data, mem_url_cert.size, &out_buf, &out_size) != 0) ||
+         if ((compress_mem(download_certificate.destination_mem.data, download_certificate.destination_mem.size, &out_buf, &out_size) != 0) ||
              !write_memchunk(dir_catalogs + url_cert, out_buf, out_size))
          {
             cerr << "Failed to write certificate" << endl;
          }
          if (out_buf) free(out_buf);
       }
-      free(mem_url_cert.data);
-
-      /* compat certificate */
-      const string compat_cert = dir_catalogs + path + "/.cvmfspublisher.x509";
-      cout << "Writing compat certificate to " << compat_cert << endl;
-      unlink(compat_cert.c_str());
-      if (symlink(url_cert.substr(1).c_str(), compat_cert.c_str()) != 0) {
-         cerr << "Warning: failed to create " << compat_cert << endl;
-      }
+      free(download_certificate.destination_mem.data);
    } else {
       cerr << "Warning: remote checksum is not signed" << endl;
       return -1;
@@ -439,32 +413,20 @@ static int fetch_catalog(const string &path, const bool no_proxy,
    const string sha1_clg_str = sha1_download.to_string();
    const string url_clg = "/data/" + sha1_clg_str.substr(0, 2) + "/" +
                           sha1_clg_str.substr(2) + "C";
-   if ((curl_download_stream(url_clg.c_str(), tmp_fp, sha1_local.digest, 1, 1) != CURLE_OK) ||
-       (sha1_local != sha1_download))
-   {
+   download::JobInfo download_catalog(&url_clg, true, true, tmp_fp, &sha1_download);
+   download::Fetch(&download_catalog);
+   if (download_catalog.error_code != download::kFailOk) {
       cerr << "Warning: failed to load catalog from " << url_clg << endl;
       fclose(tmp_fp);
       return -1;
    }
    fclose(tmp_fp);
-   if (sha1_local != sha1_download) {
-      cerr << "Warning: invalid catalog from " << url_clg << endl;
-      unlink(tmp_file);
-      return -1;
-   }
 
    /* we have all bits and pieces, write checksum */
    cout << "Writing checksum to " << lpath_chksum << endl;
-   if (!write_memchunk(lpath_chksum, checksum, mem_url_chksum.size)) {
+   if (!write_memchunk(lpath_chksum, checksum, download_checksum.destination_mem.size)) {
       cerr << "Warning: failed to write " << lpath_chksum << endl;
       return -1;
-   }
-   if (compat_checksum) {
-      cout << "Writing compat checksum to " << lpath_compat_chksum << endl;
-      if (!write_memchunk(lpath_compat_chksum, compat_checksum, mem_url_compat_chksum.size)) {
-         cerr << "Warning: failed to write " << lpath_compat_chksum << endl;
-         return -1;
-      }
    }
 
    /* write catalog */
@@ -477,17 +439,6 @@ static int fetch_catalog(const string &path, const bool no_proxy,
          cerr << "Warning: failed to store catalog" << endl;
          return -1;
       }
-   }
-
-   /* compat catalog */
-   const string compat_catalog = dir_catalogs + path + "/.cvmfscatalog";
-   const string compat_catalog_link = "data/" + sha1_str.substr(0, 2) + "/" +
-                                      sha1_str.substr(2) + "C";
-   cout << "Writing compat catalog to " << compat_catalog << endl;
-   unlink(compat_catalog.c_str());
-   if (symlink(compat_catalog_link.c_str(), compat_catalog.c_str()) != 0) {
-      cerr << "Warning: failed to create " << compat_catalog << endl;
-      return -1;
    }
 
    return 1;
@@ -504,16 +455,15 @@ static bool fetch_deprecated_catalog(const hash::t_sha1 &snapshot_id, string &tm
    const string sha1_clg_str = snapshot_id.to_string();
    const string url_clg = "/data/" + sha1_clg_str.substr(0, 2) + "/" +
                           sha1_clg_str.substr(2) + "C";
-   if ((curl_download_stream(url_clg.c_str(), tmp_fp, sha1_rcvd.digest, 1, 1) != CURLE_OK) ||
-       (sha1_rcvd != snapshot_id))
-   {
-      cerr << "Warning: failed to load deprecated catalog from " << url_clg << endl;
-   }
-   fclose(tmp_fp);
-   if (sha1_rcvd != snapshot_id) {
+   download::JobInfo download_catalog(&url_clg, true, true, tmp_fp, &snapshot_id);
+   download::Fetch(&download_catalog);
+   if (download_catalog.error_code != download::kFailOk) {
       unlink(tmp_path.c_str());
+      fclose(tmp_fp);
+      cerr << "Warning: failed to load deprecated catalog from " << url_clg << endl;
       return false;
    }
+   fclose(tmp_fp);
 
    /* write catalog */
    const string clg_data_path = dir_catalogs + "/data/" + sha1_clg_str.substr(0, 2) + "/" +
@@ -528,78 +478,58 @@ static bool fetch_deprecated_catalog(const hash::t_sha1 &snapshot_id, string &tm
    return true;
 }
 
-
 /**
  * Returns number of successful downloads
  */
 static int download_bunch(const bool ignore_errors = false) {
-   unsigned num = download_bucket.size();
-   int *curl_result = (int *)alloca(num * sizeof(int));
-   vector<char *> tmp_path_cstr;
-   vector<char *> rpath_cstr;
-   vector<string> final_path;
-   unsigned char *digest = (unsigned char *)alloca(num * hash::t_sha1::BIT_SIZE / 8);
-   vector<hash::t_sha1> expected;
-   vector<unsigned> remaining;
-
+   vector<string> chunk_urls;
+   vector<string> lpaths;
+   vector<string> final_paths;
+   vector<hash::t_sha1> hashes;
+   
    for (set<string>::const_iterator i = download_bucket.begin(), iEnd = download_bucket.end();
         i != iEnd; ++i)
    {
-      const string tmp_path = dir_data + "/txn/" + (*i);
-      tmp_path_cstr.push_back(strdupa(tmp_path.c_str()));
       const string sha1_str = "/" + i->substr(0, 2) + "/" + i->substr(2);
-      const string rpath = url + "/data" + sha1_str;
-      rpath_cstr.push_back(strdupa(rpath.c_str()));
-      final_path.push_back(dir_data + sha1_str);
+      chunk_urls.push_back(url + "/data" + sha1_str);
+      lpaths.push_back(dir_data + "/txn/" + (*i));
+      final_paths.push_back(dir_data + sha1_str);
       hash::t_sha1 expected_sha1;
       expected_sha1.from_hash_str(*i);
-      expected.push_back(expected_sha1);
+      hashes.push_back(expected_sha1);
    }
+   int num = download_bucket.size();
    download_bucket.clear();
-
-   //cout << "WE GOT " << string(rpath_cstr[0]) << " AND " << string(tmp_path_cstr[0]) << " AND " << final_path[0] << endl;
-   curl_download_parallel(num, &(rpath_cstr[0]), &(tmp_path_cstr[0]), digest, curl_result);
-
-   for (unsigned i = 0; i < num; ++i) {
-      if ((curl_result[i] == CURLE_OK) && (expected[i] == hash::t_sha1(digest+i*20, 20))) {
-         if (rename(tmp_path_cstr[i], final_path[i].c_str()) != 0) {
-            remaining.push_back(i);
-         }
-      } else {
-         remaining.push_back(i);
-      }
-   }
-
+   
    int faulty = 0;
-   if (!remaining.empty()) {
-      cerr << "Parallel download failures " << remaining.size() << "/" << num << endl;
-      for (vector<unsigned>::const_iterator i = remaining.begin(), iEnd = remaining.end();
-           i != iEnd; ++i)
-      {
-         hash::t_sha1 sha1;
-         unsigned again = 1;
-         bool result;
-         do {
-            result = (curl_download_path_nocache(rpath_cstr[*i], tmp_path_cstr[*i], sha1.digest, 0, 0) == CURLE_OK) &&
-                     (sha1 == expected[*i]);
-            if (!result)
-               unlink(tmp_path_cstr[*i]);
-            again++;
-         } while (!result && (again < retries));
-         overall_retries += again-1;
-
-         if (result) {
-            if ((rename(tmp_path_cstr[*i], (final_path[*i]).c_str()) != 0) && !ignore_errors) {
-               cerr << "Warning: rename to " << final_path[*i] << " failed" << endl;
-               faulty++;
-               faulty_chunks.insert(rpath_cstr[*i]);
-               unlink(tmp_path_cstr[*i]);
-            }
-         } else {
-            cerr << "Warning: failed to download " << final_path[*i] << endl;
+#pragma omp parallel for num_threads(num_parallel)
+   for (int i = 0; i < num; ++i) {
+      download::JobInfo download_chunk(&chunk_urls[i], true, false, &lpaths[i], 
+                                       &hashes[i]);
+      unsigned attempts = 0;
+      do {
+         download::Fetch(&download_chunk);
+         attempts++;
+      } while ((download_chunk.error_code != download::kFailOk) && 
+               (attempts < retries));
+      
+      if (download_chunk.error_code != download::kFailOk) {
+#pragma omp critical
+         {
             if (!ignore_errors) {
                faulty++;
-               faulty_chunks.insert(string(rpath_cstr[*i]));
+               faulty_chunks.insert(chunk_urls[i]);
+            }
+            cerr << "Warning: failed to download " << chunk_urls[i] << endl;
+         }
+      } else {
+         if (rename(lpaths[i].c_str(), final_paths[i].c_str()) != 0) {
+ #pragma omp critical
+            
+            {
+               cerr << "Warning: failed to commit " << chunk_urls[i] << endl;
+               faulty++;
+               faulty_chunks.insert(chunk_urls[i]);
             }
          }
       }
@@ -797,7 +727,7 @@ int main(int argc, char **argv) {
 
    int timeout = 10;
 
-   bool curl_ready = false;
+   bool download_ready = false;
    bool signature_ready = false;
    bool catalog_ready = false;
    bool override_master_test = false;
@@ -922,13 +852,23 @@ int main(int argc, char **argv) {
       }
    }
 
-   curl_set_host_chain(url.c_str());
+   download::Init(num_parallel);
+   download::SetHostChain(url);
    cout << "CernVM-FS Pull: synchronizing with " << url << endl;
    if (proxies != "")
-      curl_set_proxy_chain(proxies.c_str());
-   curl_set_timeout(timeout, timeout);
-
-   curl_ready = true;
+      download::SetProxyChain(proxies);
+   download::SetTimeout(timeout, timeout);
+   download::Spawn();
+   download_ready = true;
+   
+   /* Check if we have a replica-ready server */
+   string url_master_replica("/.cvmfs_master_replica");
+   download::JobInfo download_master_replica(&url_master_replica, false, true, NULL);
+   if (!override_master_test && (download::Fetch(&download_master_replica) != download::kFailOk)) {
+      cerr << "This is not a CernVM-FS server for replication, try http://cvmfs-stratum-zero.cern.ch" << endl;
+      goto pull_cleanup;
+   }
+   free(download_master_replica.destination_mem.data);
 
    signature::init();
    if (!signature::load_public_keys(pubkey)) {
@@ -945,12 +885,6 @@ int main(int argc, char **argv) {
       goto pull_cleanup;
    }
    catalog_ready = true;
-
-   /* Check if we have a replica-ready server */
-   if (!override_master_test && (curl_download_path("/.cvmfs_master_replica", "/dev/null", dummy.digest, 1, 0) != CURLE_OK)) {
-      cerr << "This is not a CernVM-FS server for replication, try http://cernvm-bkp.cern.ch" << endl;
-      goto pull_cleanup;
-   }
 
    /* Check if we have a valid starting point */
    if (!initial && exit_on_error && !file_exists(dir_catalogs + "/.cvmfs_replica")) {
@@ -998,6 +932,7 @@ int main(int argc, char **argv) {
 pull_cleanup:
    if (catalog_ready) catalog::fini();
    if (signature_ready) signature::fini();
+   if (download_ready) download::Fini();
    if (ffaulty.is_open()) ffaulty.close();
    if (fdiff.is_open()) fdiff.close();
    return result;
