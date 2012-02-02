@@ -74,4 +74,6 @@ std::string join_strings(const std::vector<std::string> &strings,
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
 
+double DiffTimeSeconds(struct timeval start, struct timeval end);
+
 #endif

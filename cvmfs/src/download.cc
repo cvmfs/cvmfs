@@ -483,9 +483,6 @@ static void UpdateStatistics(CURL *handle) {
 
   if (curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val) == CURLE_OK)
     stat_transferred_bytes_ += val;
-  // TODO(jakob): wrong values for multi interface
-  if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &val) == CURLE_OK)
-    stat_transfer_time_ += val;
 }
 
 
@@ -688,6 +685,9 @@ Failures Fetch(JobInfo *info) {
     int retval;
     do {
       retval = curl_easy_perform(handle);
+      double elapsed;
+      if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &elapsed) == CURLE_OK)
+        stat_transfer_time_ += elapsed;
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code;
     ReleaseCurlHandle(info->curl_handle);
@@ -789,8 +789,17 @@ static void *MainDownload(void *data __attribute__((unused))) {
   watch_fds_inuse_ = 2;
 
   int still_running = 0;
+  struct timeval timeval_start, timeval_stop;
+  gettimeofday(&timeval_start, NULL);
   while (true) {
-    int timeout = (still_running == 0) ? -1 : 1;
+    int timeout;
+    if (still_running) {
+      timeout = 1;
+    } else {
+      timeout = -1;
+      gettimeofday(&timeval_stop, NULL);
+      stat_transfer_time_ += DiffTimeSeconds(timeval_start, timeval_stop);
+    }
     int retval = poll(watch_fds_, watch_fds_inuse_, timeout);
     assert(retval >= 0);
 
@@ -813,6 +822,8 @@ static void *MainDownload(void *data __attribute__((unused))) {
       //LogCvmfs(kLogDownload, kLogDebug, "IO thread, got job: url %s, compressed %d, nocache %d, destination %d, file %p, expected hash %p, wait at %d", info->url->c_str(), info->compressed, info->nocache,
       //         info->destination, info->destination_file, info->expected_hash, info->wait_at[1]);
 
+      if (!still_running)
+        gettimeofday(&timeval_start, NULL);
       CURL *handle = AcquireCurlHandle();
       InitializeRequest(info, handle);
       SetUrlOptions(info);
@@ -1039,6 +1050,7 @@ uint64_t GetTransferredBytes() {
  * Overall time spend in receiving data.
  */
 uint64_t GetTransferTime() {
+  LogCvmfs(kLogDownload, kLogDebug, "Transfer time %lf", stat_transfer_time_);
   return uint64_t(stat_transfer_time_);
 }
 
@@ -1173,26 +1185,9 @@ void ProbeHosts() {
       if (info.destination_mem.data)
         free(info.destination_mem.data);
       if (result == kFailOk) {
-        // Time substraction, from GCC documentation
-        // TODO(jakob): Timestamp / time calculation business in util
-        if (tv_end.tv_usec < tv_start.tv_usec) {
-          int nsec = (tv_end.tv_usec - tv_start.tv_usec) / 1000000 + 1;
-          tv_start.tv_usec -= 1000000 * nsec;
-          tv_start.tv_sec += nsec;
-        }
-        if (tv_end.tv_usec - tv_start.tv_usec > 1000000) {
-          int nsec = (tv_end.tv_usec - tv_start.tv_usec) / 1000000;
-          tv_start.tv_usec += 1000000 * nsec;
-          tv_start.tv_sec -= nsec;
-        }
-
-        // Compute the time remaining to wait in ms.
-        // tv_usec is certainly positive.
-        int elapsed = ((tv_end.tv_sec - tv_start.tv_sec)*1000) +
-        ((tv_end.tv_usec - tv_start.tv_usec)/1000);
-        host_rtt[i] = elapsed;
+        host_rtt[i] = int(DiffTimeSeconds(tv_start, tv_end));
         LogCvmfs(kLogDownload, kLogDebug, "probing host %s had %dms rtt",
-                 url.c_str(), elapsed);
+                 url.c_str(), host_rtt[i]);
       } else {
         LogCvmfs(kLogDownload, kLogDebug, "error while probing host %s: %d",
                  url.c_str(), result);
