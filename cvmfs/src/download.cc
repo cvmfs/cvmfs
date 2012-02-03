@@ -417,8 +417,7 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
   info->num_failed_proxies = 0;
   info->num_failed_hosts = 0;
   if (info->compressed) {
-    int retval = zlib::DecompressInit(&(info->zstream));
-    assert(retval == Z_OK);
+    zlib::DecompressInit(&(info->zstream));
   }
   if (info->expected_hash)
     sha1_init(&info->sha1_context);

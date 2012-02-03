@@ -26,8 +26,8 @@ enum StreamStates {
   kStreamEnd,
 };
 
-bool CompressInit(z_stream *strm);
-bool DecompressInit(z_stream *strm);
+void CompressInit(z_stream *strm);
+void DecompressInit(z_stream *strm);
 void CompressFini(z_stream *strm);
 void DecompressFini(z_stream *strm);
 

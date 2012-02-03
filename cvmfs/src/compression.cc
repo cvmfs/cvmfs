@@ -8,14 +8,13 @@
  * TODO: think about code deduplication
  */
 
-#define _FILE_OFFSET_BITS 64
-
 #include "compression.h"
 
 #include <stdlib.h>
 #include <sys/stat.h>
 
 #include <cstring>
+#include <cassert>
 
 #include "logging.h"
 #include "hash.h"
@@ -71,23 +70,25 @@ namespace zlib {
 const unsigned kZChunk = 16384;
 const unsigned kBufferSize = 32768;
 
-bool CompressInit(z_stream *strm) {
+void CompressInit(z_stream *strm) {
   strm->zalloc = Z_NULL;
   strm->zfree = Z_NULL;
   strm->opaque = Z_NULL;
   strm->next_in = Z_NULL;
   strm->avail_in = 0;
-  return deflateInit(strm, Z_DEFAULT_COMPRESSION) == 0;
+  int retval = deflateInit(strm, Z_DEFAULT_COMPRESSION);
+  assert(retval == 0);
 }
 
 
-bool DecompressInit(z_stream *strm) {
+void DecompressInit(z_stream *strm) {
   strm->zalloc = Z_NULL;
   strm->zfree = Z_NULL;
   strm->opaque = Z_NULL;
   strm->avail_in = 0;
   strm->next_in = Z_NULL;
-  return inflateInit(strm) == 0;
+  int retval = inflateInit(strm);
+  assert(retval == 0);
 }
 
 
@@ -229,7 +230,7 @@ bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash) {
   unsigned char out[kZChunk];
   sha1_context_t sha1_ctx;
 
-  if (!CompressInit(&strm)) goto compress_file2null_final;
+  CompressInit(&strm);
   sha1_init(&sha1_ctx);
 
   // Compress until end of file
@@ -278,7 +279,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest) {
   unsigned char in[kZChunk];
   unsigned char out[kZChunk];
 
-  if (!CompressInit(&strm)) goto compress_file2file_final;
+  CompressInit(&strm);
 
   // Compress until end of file
   do {
@@ -327,7 +328,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash) {
   unsigned char out[kZChunk];
   sha1_context_t sha1_ctx;
 
-  if (!CompressInit(&strm)) goto compress_file2file_hashed_final;
+  CompressInit(&strm);
   sha1_init(&sha1_ctx);
 
   // Compress until end of file
@@ -377,7 +378,7 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
   size_t have;
   unsigned char buf[kBufferSize];
 
-  if (!DecompressInit(&strm)) goto decompress_file2file_final;
+  DecompressInit(&strm);
 
   while ((have = fread(buf, 1, kBufferSize, fsrc)) > 0) {
     stream_state = DecompressZStream2File(&strm, fdest, buf, have);
@@ -410,8 +411,7 @@ bool CompressMem2Mem(const void *buf, const int64_t size,
   int64_t pos = 0;
   uint64_t alloc_size = kZChunk;
 
-  if (!CompressInit(&strm)) return false;
-
+  CompressInit(&strm);
   *out_buf = smalloc(alloc_size);
   *out_size = 0;
 
@@ -468,12 +468,7 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
   int64_t pos = 0;
   uint64_t alloc_size = kZChunk;
 
-  if (!DecompressInit(&strm)) {
-    *out_buf = NULL;
-    *out_size = 0;
-    return false;
-  }
-
+  DecompressInit(&strm);
   *out_buf = smalloc(alloc_size);
   *out_size = 0;
 
