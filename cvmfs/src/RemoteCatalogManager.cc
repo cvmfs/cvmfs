@@ -27,8 +27,8 @@ namespace cvmfs {
     blacklist_ = blacklist;
     force_signing_ = force_signing;
 
-    atomic_init(&certificate_hits_);
-    atomic_init(&certificate_misses_);
+    atomic_init32(&certificate_hits_);
+    atomic_init32(&certificate_misses_);
   }
 
   RemoteCatalogManager::~RemoteCatalogManager() {
@@ -324,10 +324,10 @@ namespace cvmfs {
         char *data_certificate;
         size_t size_certificate;
         if (cache::Open2Mem(cert_sha1, &data_certificate, &size_certificate)) {
-          atomic_inc(&certificate_hits_);
+          atomic_inc32(&certificate_hits_);
           cached_cert = true;
         } else {
-          atomic_inc(&certificate_misses_);
+          atomic_inc32(&certificate_misses_);
           cached_cert = false;
 
           const string url_cert = "/data/" + key_cert->second.substr(0, 2) + "/" +

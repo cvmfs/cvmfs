@@ -147,23 +147,23 @@ namespace cvmfs {
     catalog::t_dirent d;
   };
   struct catalog_cacheline catalog_cache[CATALOG_CACHE_SIZE];
-  atomic_int cache_inserts;
-  atomic_int cache_replaces;
-  atomic_int cache_cleans;
-  atomic_int cache_hits;
-  atomic_int cache_misses;
+  atomic_int32 cache_inserts;
+  atomic_int32 cache_replaces;
+  atomic_int32 cache_cleans;
+  atomic_int32 cache_hits;
+  atomic_int32 cache_misses;
 
-  atomic_int certificate_hits;
-  atomic_int certificate_misses;
+  atomic_int32 certificate_hits;
+  atomic_int32 certificate_misses;
 
   atomic_int64 nopen;
   atomic_int64 ndownload;
 
-  atomic_int open_files; /**< number of currently open files by Fuse calls */
+  atomic_int32 open_files; /**< number of currently open files by Fuse calls */
   unsigned nofiles; /**< maximum allowed number of open files */
   /** number of reserved file descriptors for internal use */
   const int NUM_RESERVED_FD = 512;
-  atomic_int nioerr;
+  atomic_int32 nioerr;
 
   static uint64_t effective_ttl(const uint64_t ttl) {
     pthread_mutex_lock(&mutex_max_ttl);
@@ -298,14 +298,14 @@ namespace cvmfs {
           (*positive)++;
       }
     }
-    *inserts = atomic_read(&cache_inserts);
-    *replaces = atomic_read(&cache_replaces);
-    *cleans = atomic_read(&cache_cleans);
-    *hits = atomic_read(&cache_hits);
-    *misses = atomic_read(&cache_misses);
+    *inserts = atomic_read32(&cache_inserts);
+    *replaces = atomic_read32(&cache_replaces);
+    *cleans = atomic_read32(&cache_cleans);
+    *hits = atomic_read32(&cache_hits);
+    *misses = atomic_read32(&cache_misses);
 
-    *cert_hits = atomic_read(&certificate_hits);
-    *cert_misses = atomic_read(&certificate_misses);
+    *cert_hits = atomic_read32(&certificate_hits);
+    *cert_misses = atomic_read32(&certificate_misses);
   }
 
   static int find_catalog_id(const string &path) {
@@ -563,7 +563,7 @@ namespace cvmfs {
     atomic_inc64(&nopen);
 
     if (fd >= 0) {
-      if (atomic_xadd(&open_files, 1) <
+      if (atomic_xadd32(&open_files, 1) <
           (static_cast<int>(nofiles))-NUM_RESERVED_FD) {
         LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                  path.c_str(), fd);
@@ -571,7 +571,7 @@ namespace cvmfs {
         fuse_reply_open(req, fi);
         return;
       } else {
-        if (close(fd) == 0) atomic_dec(&open_files);
+        if (close(fd) == 0) atomic_dec32(&open_files);
         LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
         fuse_reply_err(req, EMFILE);
         return;
@@ -598,7 +598,7 @@ namespace cvmfs {
     }
     prev_io_error.timestamp = now;
 
-    atomic_inc(&nioerr);
+    atomic_inc32(&nioerr);
     fuse_reply_err(req, EIO);
   }
 
@@ -637,7 +637,7 @@ namespace cvmfs {
              catalog_manager->MangleInode(ino));
 
     const int64_t fd = fi->fh;
-    if (close(fd) == 0) atomic_dec(&open_files);
+    if (close(fd) == 0) atomic_dec32(&open_files);
 
     fuse_reply_err(req, 0);
   }
@@ -960,10 +960,10 @@ namespace cvmfs {
       message << nofiles-NUM_RESERVED_FD;
 
     } else if (attr == "user.usedfd") {
-      message << atomic_read(&open_files);
+      message << atomic_read32(&open_files);
 
     } else if (attr == "user.nioerr") {
-      message << atomic_read(&nioerr);
+      message << atomic_read32(&nioerr);
 
     } else if (attr == "user.proxy") {
       vector< vector<string> > proxy_chain;
@@ -1528,14 +1528,14 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < cvmfs::CATALOG_CACHE_SIZE; ++i) {
     cvmfs::catalog_cache[i].md5 = hash::t_md5();
   }
-  atomic_init(&cvmfs::cache_inserts);
-  atomic_init(&cvmfs::cache_replaces);
-  atomic_init(&cvmfs::cache_cleans);
-  atomic_init(&cvmfs::cache_hits);
-  atomic_init(&cvmfs::cache_misses);
+  atomic_init32(&cvmfs::cache_inserts);
+  atomic_init32(&cvmfs::cache_replaces);
+  atomic_init32(&cvmfs::cache_cleans);
+  atomic_init32(&cvmfs::cache_hits);
+  atomic_init32(&cvmfs::cache_misses);
 
-  atomic_init(&cvmfs::certificate_hits);
-  atomic_init(&cvmfs::certificate_misses);
+  atomic_init32(&cvmfs::certificate_hits);
+  atomic_init32(&cvmfs::certificate_misses);
 
   atomic_init64(&cvmfs::nopen);
   atomic_init64(&cvmfs::ndownload);
@@ -1669,8 +1669,8 @@ int main(int argc, char *argv[]) {
     goto cvmfs_cleanup;
   }
   cvmfs::nofiles = monitor::get_nofiles();
-  atomic_init(&cvmfs::open_files);
-  atomic_init(&cvmfs::nioerr);
+  atomic_init32(&cvmfs::open_files);
+  atomic_init32(&cvmfs::nioerr);
   monitor_ready = true;
 
   signature::init();

@@ -57,11 +57,11 @@ struct FlushThreadStartData {
   pthread_cond_t *sig_flush;
   pthread_cond_t *sig_continue_trace;
   BufferEntry *ring_buffer;
-  atomic_int *commit_buffer;
-  atomic_int *seq_no;
-  atomic_int *flushed;
-  atomic_int *terminate;
-  atomic_int *flush_immediately;
+  atomic_int32 *commit_buffer;
+  atomic_int32 *seq_no;
+  atomic_int32 *flushed;
+  atomic_int32 *terminate;
+  atomic_int32 *flush_immediately;
   int size;
   int threshold;
   string filename;
@@ -142,9 +142,9 @@ extern "C" void *tf_flush(void *data) {
   struct timespec timeout;
 
   do {
-    while ((atomic_read(start_data->terminate) == 0) &&
-           (atomic_read(start_data->flush_immediately) == 0) &&
-           (atomic_read(start_data->seq_no) - atomic_read(start_data->flushed)
+    while ((atomic_read32(start_data->terminate) == 0) &&
+           (atomic_read32(start_data->flush_immediately) == 0) &&
+           (atomic_read32(start_data->seq_no) - atomic_read32(start_data->flushed)
              <= start_data->threshold))
     {
       GetTimespecRel(2000, &timeout);
@@ -153,10 +153,10 @@ extern "C" void *tf_flush(void *data) {
       assert(retval != EINVAL && "Error while waiting on flush signal");
     }
 
-    int base = atomic_read(start_data->flushed) % start_data->size;
+    int base = atomic_read32(start_data->flushed) % start_data->size;
     int pos, i = 0;
     while ((i <= start_data->threshold) &&
-           (atomic_read(&start_data->commit_buffer[
+           (atomic_read32(&start_data->commit_buffer[
              pos = ((base + i) % start_data->size)]) == 1))
     {
       string tmp;
@@ -173,17 +173,17 @@ extern "C" void *tf_flush(void *data) {
       retval |= fflush(f);
       assert(retval == 0 && "Error while writing into trace file");
 
-      atomic_dec(&start_data->commit_buffer[pos]);
+      atomic_dec32(&start_data->commit_buffer[pos]);
       ++i;
     }
-    atomic_xadd(start_data->flushed, i);
-    atomic_cas(start_data->flush_immediately, 1, 0);
+    atomic_xadd32(start_data->flushed, i);
+    atomic_cas32(start_data->flush_immediately, 1, 0);
 
     retval = pthread_cond_broadcast(start_data->sig_continue_trace);
     assert(retval == 0 && "Could not signal trace threads");
-  } while ((atomic_read(start_data->terminate) == 0) ||
-           (atomic_read(start_data->flushed) <
-             atomic_read(start_data->seq_no)));
+  } while ((atomic_read32(start_data->terminate) == 0) ||
+           (atomic_read32(start_data->flushed) <
+             atomic_read32(start_data->seq_no)));
 
   retval = fclose(f);
   assert(retval == 0 && "Could not gracefully close trace file");
@@ -204,15 +204,15 @@ bool active = false;
 std::string filename_;
 int buffer_size_;
   int flush_threshold_;
-atomic_int seq_no_;  /**< Starts with 0 and gets incremented by each call to
+atomic_int32 seq_no_;  /**< Starts with 0 and gets incremented by each call to
                           trace. Contains the first non-used sequence number. */
-atomic_int flushed_;  /**< Starts with 0 and gets incremented by the flush
-                           thread.  Points to the first non-flushed message.
-                           flushed <= seq_no holds. */
-atomic_int terminate_flush_thread;
-atomic_int flush_immediately;
+atomic_int32 flushed_;  /**< Starts with 0 and gets incremented by the flush
+                             thread.  Points to the first non-flushed message.
+                             flushed <= seq_no holds. */
+atomic_int32 terminate_flush_thread;
+atomic_int32 flush_immediately;
 BufferEntry *ring_buffer;
-atomic_int *commit_buffer;  /**< Has the same size as the ring buffer.  If a
+atomic_int32 *commit_buffer;  /**< Has the same size as the ring buffer.  If a
                                  message is actually copied to the ring buffer
                                  memory, the respective flag is set to 1.
                                  Flags are reset to 0 by the flush thread. */
@@ -243,14 +243,14 @@ void Init(const int buffer_size, const int flush_threshold,
   assert(0 <= flush_threshold_ && flush_threshold_ < buffer_size_ &&
          "Invalid threshold");
 
-  atomic_init(&seq_no_);
-  atomic_init(&flushed_);
-  atomic_init(&terminate_flush_thread);
-  atomic_init(&flush_immediately);
+  atomic_init32(&seq_no_);
+  atomic_init32(&flushed_);
+  atomic_init32(&terminate_flush_thread);
+  atomic_init32(&flush_immediately);
   ring_buffer = new BufferEntry[buffer_size_];
-  commit_buffer = new atomic_int[buffer_size_];
+  commit_buffer = new atomic_int32[buffer_size_];
   for (int i = 0; i < buffer_size_; i++)
-    atomic_init(&commit_buffer[i]);
+    atomic_init32(&commit_buffer[i]);
 
   int retval;
   retval = pthread_cond_init(&sig_continue_trace, NULL);
@@ -300,7 +300,7 @@ void Fini() {
 
   // Trigger flushing and wait for it
   int retval;
-  atomic_inc(&terminate_flush_thread);
+  atomic_inc32(&terminate_flush_thread);
   retval = pthread_cond_signal(&sig_flush);
   assert(retval == 0 && "Could not signal flush thread");
   retval = pthread_join(thread_flush, NULL);
@@ -337,12 +337,12 @@ void Fini() {
  * \return The sequence number which was used to trace the record
  */
 int32_t TraceInternal(const int event, const string &id, const string &msg) {
-  int32_t my_seq_no = atomic_xadd(&seq_no_, 1);
+  int32_t my_seq_no = atomic_xadd32(&seq_no_, 1);
   timeval now;
   gettimeofday(&now, NULL);
   int pos = my_seq_no % buffer_size_;
 
-  while (my_seq_no - atomic_read(&flushed_) >= buffer_size_) {
+  while (my_seq_no - atomic_read32(&flushed_) >= buffer_size_) {
     timespec timeout;
     int retval;
     GetTimespecRel(25, &timeout);
@@ -358,9 +358,9 @@ int32_t TraceInternal(const int event, const string &id, const string &msg) {
   ring_buffer[pos].code = event;
   ring_buffer[pos].id = id;
   ring_buffer[pos].msg = msg;
-  atomic_inc(&commit_buffer[pos]);
+  atomic_inc32(&commit_buffer[pos]);
 
-  if (my_seq_no - atomic_read(&flushed_) == flush_threshold_) {
+  if (my_seq_no - atomic_read32(&flushed_) == flush_threshold_) {
     int err_code __attribute__((unused)) = pthread_cond_signal(&sig_flush);
     assert(err_code == 0 && "Could not signal flush thread");
   }
@@ -378,11 +378,11 @@ void Flush() {
   if (!active) return;
 
   int32_t save_seq_no = TraceInternal(-3, "Tracer", "flushed ring buffer");
-  while (atomic_read(&flushed_) <= save_seq_no) {
+  while (atomic_read32(&flushed_) <= save_seq_no) {
     timespec timeout;
     int retval;
 
-    atomic_cas(&flush_immediately, 0, 1);
+    atomic_cas32(&flush_immediately, 0, 1);
     retval = pthread_cond_signal(&sig_flush);
     assert(retval == 0 && "Could not signal flush thread");
 

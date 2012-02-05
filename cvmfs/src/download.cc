@@ -66,7 +66,7 @@ curl_slist *http_headers_ = NULL;
 curl_slist *http_headers_nocache_ = NULL;
 
 pthread_t thread_download_;
-atomic_int multi_threaded_;
+atomic_int32 multi_threaded_;
 int pipe_terminate_[2];
 
 int pipe_jobs_[2];
@@ -665,7 +665,7 @@ Failures Fetch(JobInfo *info) {
   if (result != kFailOk)
     return result;
 
-  if (atomic_xadd(&multi_threaded_, 0) == 1) {
+  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     int retval;
     if (info->wait_at[0] == -1) {
       retval = pipe(info->wait_at);
@@ -895,7 +895,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
 
 
 void Init(const unsigned max_pool_handles) {
-  atomic_init(&multi_threaded_);
+  atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
   pool_handles_idle_ = new set<CURL *>;
@@ -945,7 +945,7 @@ void Init(const unsigned max_pool_handles) {
 
 
 void Fini() {
-  if (atomic_xadd(&multi_threaded_, 0) == 1) {
+  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
     char buf = 'T';
     int retval = write(pipe_terminate_[1], &buf, 1);
@@ -996,7 +996,7 @@ void Spawn() {
   retval = pthread_create(&thread_download_, NULL, MainDownload, NULL);
   assert(retval == 0);
 
-  atomic_inc(&multi_threaded_);
+  atomic_inc32(&multi_threaded_);
 }
 
 

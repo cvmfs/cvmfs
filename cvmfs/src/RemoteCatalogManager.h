@@ -19,7 +19,7 @@ namespace cvmfs {
 
 class RemoteCatalogManager : public AbstractCatalogManager {
  public:
-  RemoteCatalogManager(const std::string &root_url, const std::string &repo_name, const std::string &whitelist, 
+  RemoteCatalogManager(const std::string &root_url, const std::string &repo_name, const std::string &whitelist,
                        const std::string &blacklist, const bool force_signing);
   virtual ~RemoteCatalogManager();
 
@@ -34,12 +34,12 @@ class RemoteCatalogManager : public AbstractCatalogManager {
    *  @param catalog_file this pointer contains the path of the loaded catalog file
    *  @return 0 on success otherwise an error code
    */
-  inline int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point, 
+  inline int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point,
                             std::string *catalog_file)
   {
     return LoadCatalogFile(url_path, mount_point, -1, false, hash::t_sha1(), catalog_file);
   }
-  
+
   /** see AbstractCatalogManager for details */
   Catalog* CreateCatalogStub(const std::string &mountpoint, Catalog *parent_catalog) const;
 
@@ -49,37 +49,37 @@ class RemoteCatalogManager : public AbstractCatalogManager {
    *  Jakob... this is your job. ;-)
    */
   int FetchCatalog(const std::string &url_path, const bool no_proxy, const hash::t_md5 &mount_point,
-                   std::string &cat_file, hash::t_sha1 &cat_sha1, std::string &old_file, hash::t_sha1 &old_sha1, 
+                   std::string &cat_file, hash::t_sha1 &cat_sha1, std::string &old_file, hash::t_sha1 &old_sha1,
                    bool &cached_copy, const hash::t_sha1 &sha1_expected, const bool dry_run = false);
-  
+
   /**
-   *  yeah... what ever... 
-   */            
-  int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point, 
+   *  yeah... what ever...
+   */
+  int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point,
                       const int existing_cat_id, const bool no_cache,
                       const hash::t_sha1 expected_clg, std::string *catalog_file);
-     
+
   /**
    * ??
    */
   bool IsValidCertificate(bool nocache);
-  
+
   /**
    * ??
    */
   std::string MakeFilesystemKey(std::string url) const;
-                      
+
   bool RefreshCatalog(Catalog *catalog);
-  
+
  private:
   std::string root_url_;
   std::string repo_name_;
   std::string whitelist_;
   std::string blacklist_;
   bool force_signing_;
-  
-  atomic_int certificate_hits_;
-  atomic_int certificate_misses_;
+
+  atomic_int32 certificate_hits_;
+  atomic_int32 certificate_misses_;
 };
 
 }

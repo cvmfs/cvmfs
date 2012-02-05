@@ -52,11 +52,11 @@ static void usage() {
 
 
 string cache_dir;
-atomic_int num_files;
-atomic_int num_err_fixed;
-atomic_int num_err_unfixed;
-atomic_int num_err_operational;
-atomic_int num_tmp_catalog;
+atomic_int32 num_files;
+atomic_int32 num_err_fixed;
+atomic_int32 num_err_unfixed;
+atomic_int32 num_err_operational;
+atomic_int32 num_tmp_catalog;
 pthread_mutex_t mutex_output = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_traverse = PTHREAD_MUTEX_INITIALIZER;
 DIR *DIRP_current = 0;
@@ -146,7 +146,7 @@ static void *checker(void *data __attribute__((unused))) {
   while (next_file(rel_path, hash_name)) {
     const string path = cache_dir + "/" + rel_path;
 
-    int n = atomic_xadd(&num_files, 1);
+    int n = atomic_xadd32(&num_files, 1);
     if ((n % 1000) == 0) {
       pthread_mutex_lock(&mutex_output);
       cout << "." << flush;
@@ -155,18 +155,18 @@ static void *checker(void *data __attribute__((unused))) {
 
     if (rel_path[rel_path.length()-1] == 'T') {
       cout << "Warning: temporary file catalog found " << path << endl;
-      atomic_inc(&num_tmp_catalog);
+      atomic_inc32(&num_tmp_catalog);
       if (fix_errors) {
         if (unlink(rel_path.c_str()) == 0) {
           pthread_mutex_lock(&mutex_output);
           cout << "Fix: " << path << " unlinked" << endl;
           pthread_mutex_unlock(&mutex_output);
-          atomic_inc(&num_err_fixed);
+          atomic_inc32(&num_err_fixed);
         } else {
           pthread_mutex_lock(&mutex_output);
           cout << "Error: failed to unlink " << path << endl;
           pthread_mutex_unlock(&mutex_output);
-          atomic_inc(&num_err_unfixed);
+          atomic_inc32(&num_err_unfixed);
         }
       }
       continue;
@@ -177,7 +177,7 @@ static void *checker(void *data __attribute__((unused))) {
       pthread_mutex_lock(&mutex_output);
       cout << "Error: cannot open " << path << endl;
       pthread_mutex_unlock(&mutex_output);
-      atomic_inc(&num_err_operational);
+      atomic_inc32(&num_err_operational);
       continue;
     }
 
@@ -187,7 +187,7 @@ static void *checker(void *data __attribute__((unused))) {
       pthread_mutex_lock(&mutex_output);
       cout << "Error: could not compress " << path << endl;
       pthread_mutex_unlock(&mutex_output);
-      atomic_inc(&num_err_operational);
+      atomic_inc32(&num_err_operational);
     } else {
       if (sha1.to_string() != hash_name) {
         if (fix_errors) {
@@ -216,21 +216,21 @@ static void *checker(void *data __attribute__((unused))) {
           }
 
           if (fixed) {
-            atomic_inc(&num_err_fixed);
+            atomic_inc32(&num_err_fixed);
 
             /* Changes made, we have to rebuild the managed cache db */
             pthread_mutex_lock(&mutex_force_rebuild);
             force_rebuild = modified_cache = true;
             pthread_mutex_unlock(&mutex_force_rebuild);
           } else {
-            atomic_inc(&num_err_unfixed);
+            atomic_inc32(&num_err_unfixed);
           }
         } else {
           pthread_mutex_lock(&mutex_output);
           cout << "Error: " << path << " has compressed checksum " << sha1.to_string() <<
           ", delete this file from cache directory!" << endl;
           pthread_mutex_unlock(&mutex_output);
-          atomic_inc(&num_err_unfixed);
+          atomic_inc32(&num_err_unfixed);
         }
       }
     }
@@ -301,11 +301,11 @@ int main(int argc, char **argv) {
     return ERROR_UNFIXED;
   }
 
-  atomic_init(&num_files);
-  atomic_init(&num_err_fixed);
-  atomic_init(&num_err_unfixed);
-  atomic_init(&num_err_operational);
-  atomic_init(&num_tmp_catalog);
+  atomic_init32(&num_files);
+  atomic_init32(&num_err_fixed);
+  atomic_init32(&num_err_unfixed);
+  atomic_init32(&num_err_operational);
+  atomic_init32(&num_tmp_catalog);
   pthread_t *workers = (pthread_t *)smalloc(nthreads * sizeof(pthread_t));
   cout << "Verifying: " << flush;
   for (int i = 0; i < nthreads; ++i) {
@@ -319,20 +319,20 @@ int main(int argc, char **argv) {
   }
   free(workers);
   cout << endl;
-  cout << "Verified " << atomic_read(&num_files) << " files" << endl;
+  cout << "Verified " << atomic_read32(&num_files) << " files" << endl;
 
-  if (atomic_read(&num_tmp_catalog) > 0) {
+  if (atomic_read32(&num_tmp_catalog) > 0) {
     cout << "Temorary file catalogs were found." << endl;
   }
 
   if (force_rebuild) {
     if (unlink("cvmfscatalog.cache") == 0) {
       cout << "Fix: managed cache db unlinked, will be rebuilt on next mount" << endl;
-      atomic_inc(&num_err_fixed);
+      atomic_inc32(&num_err_fixed);
     } else {
       if (errno != ENOENT) {
         cout << "Error: could not unlink managed cache database (" << errno << ")" << endl;
-        atomic_inc(&num_err_unfixed);
+        atomic_inc32(&num_err_unfixed);
       }
     }
   }
@@ -345,11 +345,11 @@ int main(int argc, char **argv) {
   }
 
   int retval = 0;
-  if (atomic_read(&num_err_fixed) > 0)
+  if (atomic_read32(&num_err_fixed) > 0)
     retval |= ERROR_FIXED;
-  if (atomic_read(&num_err_unfixed) > 0)
+  if (atomic_read32(&num_err_unfixed) > 0)
     retval |= ERROR_UNFIXED;
-  if (atomic_read(&num_err_operational) > 0)
+  if (atomic_read32(&num_err_operational) > 0)
     retval |= ERROR_OPERATIONAL;
 
   return retval;
