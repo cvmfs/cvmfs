@@ -24,6 +24,7 @@
  * proxies are selected randomly (load-balancing set).
  */
 
+#include "cvmfs_config.h"
 #include "download.h"
 
 #include <stdint.h>

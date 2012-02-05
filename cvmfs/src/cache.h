@@ -1,37 +1,43 @@
-#ifndef CACHE_H
-#define CACHE_H 1
+/**
+ * This file is part of the CernVM File System.
+ */
 
-#include "catalog.h"
-#include "hash.h"
+#ifndef CVMFS_CACHE_H_
+#define CVMFS_CACHE_H_
+
+#include <stdint.h>
+#include <string>
 
 namespace cvmfs {
 class DirectoryEntry;
 }
 
-#include <string>
-#include <pthread.h>
-#include <cstdlib>
+namespace hash {
+struct t_sha1;
+}
 
 namespace cache {
 
 extern std::string cache_path;
 
-bool init(const std::string &c_path, const std::string &r_url, pthread_mutex_t * const m_download);
-void fini();
+bool Init(const std::string &cache_path, const std::string &root_url);
+void Fini();
 
-int transaction(const hash::t_sha1 &id, std::string &lpath, std::string &txn);
-int abort(const std::string &txn);
-int commit(const std::string &lpath, const std::string &txn, const std::string &cvmfs_path,
-           const hash::t_sha1 &sha1, const uint64_t size);
-bool contains(const hash::t_sha1 &id);
-int open(const hash::t_sha1 &id);
-int open_or_lock(const cvmfs::DirectoryEntry &d);
-int fetch(const cvmfs::DirectoryEntry &d, const std::string &path);
+int Open(const hash::t_sha1 &id);
+bool Open2Mem(const hash::t_sha1 &id, char **buffer, uint64_t *size);
+int StartTransaction(const hash::t_sha1 &id,
+                     std::string *final_path, std::string *temp_path);
+int AbortTransaction(const std::string &temp_path);
+int CommitTransaction(const std::string &final_path,
+                      const std::string &temp_path,
+                      const std::string &cvmfs_path,
+                      const hash::t_sha1 &hash,
+                      const uint64_t size);
+bool CommitFromMem(const hash::t_sha1 &id, const char *buffer,
+                   const uint64_t size, const std::string &cvmfs_path);
+bool Contains(const hash::t_sha1 &id);
+int Fetch(const cvmfs::DirectoryEntry &d, const std::string &cvmfs_path);
 
-bool mem_to_disk(const hash::t_sha1 &id, const char *buffer, const size_t size, const std::string &name);
-bool disk_to_mem(const hash::t_sha1 &id, char **buffer, size_t *size);
+}  // namespace cache
 
-}
-
-
-#endif
+#endif  // CVMFS_CACHE_H_

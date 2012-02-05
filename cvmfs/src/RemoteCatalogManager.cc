@@ -323,7 +323,7 @@ namespace cvmfs {
 
         char *data_certificate;
         size_t size_certificate;
-        if (cache::disk_to_mem(cert_sha1, &data_certificate, &size_certificate)) {
+        if (cache::Open2Mem(cert_sha1, &data_certificate, &size_certificate)) {
           atomic_inc(&certificate_hits_);
           cached_cert = true;
         } else {
@@ -382,8 +382,8 @@ namespace cvmfs {
         signature_ok = true;
 
         if (!cached_cert) {
-          cache::mem_to_disk(cert_sha1, data_certificate, size_certificate,
-                             "certificate of " + signature::whois());
+          cache::CommitFromMem(cert_sha1, data_certificate, size_certificate,
+                               "certificate of " + signature::whois());
         }
         free(data_certificate);
       } else {

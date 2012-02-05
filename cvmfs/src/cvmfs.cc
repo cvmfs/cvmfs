@@ -19,6 +19,8 @@
  * improvement.
  */
 
+// TODO: ndownload into cache
+
 #define ENOATTR ENODATA /* instead of including attr/xattr.h */
 
 #include <dirent.h>
@@ -132,9 +134,6 @@ namespace cvmfs {
   const int MAX_INIT_IO_DELAY = 32;
   const int MAX_IO_DELAY = 2000; /**< Maximum 2 seconds */
   const int FORGET_DOS = 10000; /**< Clear DoS memory after 10 seconds */
-
-  /** avoids downloading the same file twice */
-  pthread_mutex_t mutex_download = PTHREAD_MUTEX_INITIALIZER;
 
   // Caches
   const int CATALOG_CACHE_SIZE = 32768*2;
@@ -560,14 +559,8 @@ namespace cvmfs {
       return;
     }
 
-    fd = cache::open_or_lock(d);
+    fd = cache::Fetch(d, path);
     atomic_inc64(&nopen);
-    if (fd < 0) {
-      tracer::Trace(tracer::kFuseOpen, "path", "disk cache miss");
-      fd = cache::fetch(d, path);
-      pthread_mutex_unlock(&mutex_download);
-      atomic_inc64(&ndownload);
-    }
 
     if (fd >= 0) {
       if (atomic_xadd(&open_files, 1) <
@@ -925,7 +918,7 @@ namespace cvmfs {
     } else if (attr == "user.lhash") {
       if (d.checksum() != hash::t_sha1()) {
         string result;
-        int fd = cache::open(d.checksum());
+        int fd = cache::Open(d.checksum());
         if (fd < 0) {
           message << "Not in cache";
         } else {
@@ -1663,7 +1656,7 @@ int main(int argc, char *argv[]) {
 
   /* Try to init the cache... this creates a set of directories in
    cvmfs::cachedir (256 directories named 00..ff) */
-  if (!cache::init(".", cvmfs::root_url, &cvmfs::mutex_download)) {
+  if (!cache::Init(".", cvmfs::root_url)) {
     cerr << "Failed to setup cache in " << cvmfs::cachedir
          << ": " << strerror(errno) << endl;
     goto cvmfs_cleanup;
@@ -1833,7 +1826,7 @@ int main(int argc, char *argv[]) {
   if (catalog_ready) catalog::fini();
   if (quota_ready) lru::fini();
   if (signature_ready) signature::fini();
-  if (cache_ready) cache::fini();
+  if (cache_ready) cache::Fini();
   if (monitor_ready) monitor::fini();
   if (download_ready) download::Fini();
   if (options_ready) {

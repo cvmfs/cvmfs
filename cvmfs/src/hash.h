@@ -5,7 +5,7 @@
 #include <cstring>
 
 namespace hash {
-   
+
    struct t_md5 {
       t_md5(const std::string &str);
       t_md5() { memset(digest, 0, 16); } /* zero-digest (standard initializer) */
@@ -17,7 +17,7 @@ namespace hash {
       unsigned char digest[16];
       std::string to_string() const;
    };
-   
+
    struct t_sha1 {
       const static unsigned CHAR_SIZE = 40;
       const static unsigned BIT_SIZE = 160;
@@ -34,6 +34,8 @@ namespace hash {
       unsigned char digest[20];
    };
 
+  std::string MakePath(const t_sha1 &hash, const unsigned dir_levels,
+                       const unsigned subdirs_per_level);
 }
 
 

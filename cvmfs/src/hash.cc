@@ -24,15 +24,15 @@ extern "C" {
 
 using namespace std;
 
-namespace hash { 
+namespace hash {
 
    t_md5::t_md5(const string &str) {
-      md5_state_t md5_state; 
+      md5_state_t md5_state;
       md5_init(&md5_state);
       md5_append(&md5_state, reinterpret_cast<const unsigned char *>(&str[0]), str.length());
       md5_finish(&md5_state, this->digest);
    }
-   
+
    bool t_md5::operator ==(const t_md5 &other) const {
       // evil hack to make it fast
       // interpret the 128 bit digest as two 64 bit integers and compare them
@@ -40,10 +40,10 @@ namespace hash {
       int64_t part2 =      (int64_t) *( (int64_t*)(digest + 8) );
       int64_t otherPart1 = (int64_t) *( (int64_t*)(other.digest + 0) );
       int64_t otherPart2 = (int64_t) *( (int64_t*)(other.digest + 8) );
-      
+
       return (part1 == otherPart1 && part2 == otherPart2);
    }
-   
+
    string t_md5::to_string() const {
       string result;
       for (int i = 0; i < 16; ++i) {
@@ -56,27 +56,27 @@ namespace hash {
       }
       return result;
    }
-   
+
 
    t_sha1::t_sha1(const void * const buf_digest, const int buf_size) {
       const int num_bytes = buf_size > 20 ? 20 : buf_size;
       memcpy(digest, buf_digest, num_bytes);
    }
-      
-   
+
+
    t_sha1::t_sha1(const std::string &value) {
       sha1_context_t ctx;
       sha1_init(&ctx);
       sha1_update(&ctx, reinterpret_cast<const unsigned char *>(&value[0]), value.length());
       sha1_final(this->digest, &ctx);
    }
-   
-   
+
+
    void t_sha1::from_hash_str(const string &sha1_str) {
       if (sha1_str.length() < 40) return;
       for (int i = 0; i < 40; i += 2)
-         this->digest[i/2] = (sha1_str[i] <= '9' ? sha1_str[i] -'0' : sha1_str[i] - 'a' + 10)*16 + 
-                             (sha1_str[i+1] <= '9' ? sha1_str[i+1] - '0' : sha1_str[i+1] - 'a' + 10); 
+         this->digest[i/2] = (sha1_str[i] <= '9' ? sha1_str[i] -'0' : sha1_str[i] - 'a' + 10)*16 +
+                             (sha1_str[i+1] <= '9' ? sha1_str[i+1] - '0' : sha1_str[i+1] - 'a' + 10);
    }
 
    string t_sha1::to_string() const {
@@ -84,14 +84,14 @@ namespace hash {
       sha1_string(digest, sha1_str);
       return string(sha1_str);
    }
-   
+
    bool t_sha1::is_null() const {
       for (int i = 0; i < 20; ++i)
          if (digest[i] != 0)
             return false;
       return true;
    }
-   
+
    bool t_sha1::operator ==(const t_sha1 &other) const {
       //t_sha1 s1 = *this;
       //t_sha1 s2 = other;
@@ -101,14 +101,14 @@ namespace hash {
             return false;
       return true;
    }
-      
+
    bool t_sha1::operator !=(const t_sha1 &other) const {
       //t_sha1 s1 = *this;
       //t_sha1 s2 = other;
       //pmesg(D_HASH, "compare (!=) %s and %s", s1.to_string().c_str(), s2.to_string().c_str());
       return !(*this == other);
    }
-   
+
    bool t_sha1::operator <(const t_sha1 &other) const {
       //t_sha1 s1 = *this;
       //t_sha1 s2 = other;
@@ -122,7 +122,7 @@ namespace hash {
       //pmesg(D_HASH, "identical");
       return false;
    }
-   
+
    bool t_sha1::operator >(const t_sha1 &other) const {
       for (int i = 0; i < 20; i++) {
          if (this->digest[i] < other.digest[i])
@@ -132,5 +132,31 @@ namespace hash {
       }
       return false;
    }
-   
+
+
+  string MakePath(const t_sha1 &hash, const unsigned dir_levels,
+                  const unsigned bytes_per_level)
+  {
+    const unsigned string_length = t_sha1::CHAR_SIZE + dir_levels + 1;
+    char result[string_length];
+
+    unsigned i = 0, pos = 0;
+    while (i < t_sha1::CHAR_SIZE) {
+      if (((i % bytes_per_level) == 0) &&
+          ((i / bytes_per_level) <= dir_levels))
+      {
+        result[pos] = '/';
+        ++pos;
+      }
+      char digit = ((i % 2) == 0) ? hash.digest[i/2] / 16 :
+                                    hash.digest[i/2] % 16;
+      digit += (digit <= 9) ? '0' : 'a' - 10;
+      result[pos] = digit;
+      ++pos;
+      ++i;
+    }
+
+    return string(result, string_length);
+  }
+
 }

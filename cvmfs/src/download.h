@@ -36,7 +36,7 @@ enum Destination {
  * Possible return values.
  */
 enum Failures {
-  kFailOk = 1,
+  kFailOk = 0,
   kFailLocalIO,
   kFailBadUrl,
   kFailProxyConnection,
@@ -63,6 +63,7 @@ struct JobInfo {
   const hash::t_sha1 *expected_hash;
 
   // One constructor per destination
+  JobInfo() { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph,
           const std::string *p, const hash::t_sha1 *h) : url(u), compressed(c),
           probe_hosts(ph), destination(kDestinationPath), destination_path(p),

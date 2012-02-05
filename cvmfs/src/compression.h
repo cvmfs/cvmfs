@@ -13,7 +13,7 @@
 #include "zlib-duplex.h"
 
 namespace hash {
-struct t_sha1;
+  struct t_sha1;
 }
 
 bool CopyPath2Path(const std::string &src, const std::string &dest);
