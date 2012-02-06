@@ -1,23 +1,23 @@
-#ifndef COMPAT_MACOSX_H
-#define COMPAT_MACOSX_H
+#ifndef CVMFS_COMPAT_MACOSX_H_
+#define CVMFS_COMPAT_MACOSX_H_
 
-#include <string.h>
+#include <cstring>
 #include <stdlib.h>
 
-/* -------------------------------------------- 
+/* --------------------------------------------
  *
  *  socket stuff
  *
  * -------------------------------------------- */
 
-/** 
+/**
  *  MSG_NOSIGNAL prevents send() from sending SIGPIPE and EPIPE is return instead,
  *  at least on systems which support this.
  *  MSG_NOSIGNAL is not POSIX compliant, SO_NOSIGPIPE is the Mac OS X equivalent
  */
 #define MSG_NOSIGNAL SO_NOSIGPIPE
 
-/* -------------------------------------------- 
+/* --------------------------------------------
  *
  *  spinlocks
  *
@@ -29,7 +29,7 @@ inline int portableSpinlockInit(PortableSpinlock *lock, int pshared) { *lock = 0
 inline int portableSpinlockDestroy(PortableSpinlock *lock) { return 0; }
 inline int portableSpinlockTrylock(PortableSpinlock *lock) { return (OSSpinLockTry(lock)) ? 0 : -1; }
 
-/* -------------------------------------------- 
+/* --------------------------------------------
  *
  *  directory and file handling
  *
@@ -45,11 +45,11 @@ inline int portableFileStat64(const char *path, PortableStat64 *buf) { return st
 inline int portableLinkStat64(const char *path, PortableStat64 *buf) { return lstat(path, buf); }
 inline int portableFileDescriptorStat64(int filedes, PortableStat64 *buf) { return fstat(filedes, buf); }
 
-/* -------------------------------------------- 
+/* --------------------------------------------
  *
  *  string handling
  *
  * -------------------------------------------- */
 #define strdupa(s) strcpy((char *)alloca(strlen((s)) + 1), (s))
 
-#endif
+#endif  // CVMFS_COMPAT_MACOSX_H_

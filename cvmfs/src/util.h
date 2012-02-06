@@ -1,27 +1,32 @@
-#ifndef CVMFS_UTIL_H
-#define CVMFS_UTIL_H 1
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef CVMFS_UTIL_H_
+#define CVMFS_UTIL_H_
 
 #include "cvmfs_config.h"
 
-#include "hash.h"
-#include "compat.h"
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <fcntl.h>
 
+#include <cstdio>
 #include <string>
 #include <map>
 #include <vector>
-#include <time.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <cstdio>
+
+#include "compat.h"
+#include "hash.h"
 
 const int plain_file_mode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
-const int plain_dir_mode = S_IXUSR | S_IWUSR | S_IRUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+const int plain_dir_mode = S_IXUSR | S_IWUSR | S_IRUSR |
+                           S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 
 std::string canonical_path(const std::string &p);
 std::string get_parent_path(const std::string &path);
 std::string get_file_name(const std::string &path);
-bool is_empty_dir(const std::string &path);
 bool file_exists(const std::string &path);
 bool directory_exists(const std::string &path);
 bool mkdir_deep(const std::string &path, mode_t mode);
@@ -76,4 +81,4 @@ bool HasPrefix(const std::string &str, const std::string &prefix,
 
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
-#endif
+#endif  // CVMFS_UTIL_H_

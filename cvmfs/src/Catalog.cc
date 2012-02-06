@@ -12,7 +12,7 @@ extern "C" {
 using namespace std;
 
 namespace cvmfs {
-  
+
 const uint64_t Catalog::GROW_EPOCH        = 1199163600;
 const int      Catalog::SQLITE_THREAD_MEM = 4; ///< SQLite3 heap limit per thread
 
@@ -34,7 +34,7 @@ bool Catalog::OpenDatabase(const string &db_file) {
   sqlite3_extended_result_codes(database_, 1);
 
   InitPreparedStatements();
-  
+
   // find out the max row id of this database file
   SqlStatement max_row_id_query(database_, "SELECT MAX(rowid) FROM catalog;");
   if (not max_row_id_query.FetchRow()) {
@@ -53,18 +53,18 @@ bool Catalog::OpenDatabase(const string &db_file) {
       pmesg(D_CATALOG, "Cannot retrieve root prefix for root catalog file %s", database_file_.c_str());
     }
   }
-  
+
   // everything went well, notify parent about our existance
   if (not IsRoot()) {
     parent_->AddChild(this);
   }
-  
+
   return true;
 }
 
 Catalog::~Catalog() {
   FinalizePreparedStatements();
-  
+
   sqlite3_close(database_);
 }
 
@@ -86,14 +86,14 @@ void Catalog::FinalizePreparedStatements() {
 
 void Catalog::AddChild(Catalog *child) {
   assert (NULL == FindChildWithMountpoint(child->path()));
-  
+
   children_[child->path()] = child;
   child->set_parent(this);
 }
 
 void Catalog::RemoveChild(Catalog *child) {
   assert (NULL != FindChildWithMountpoint(child->path()));
-  
+
   child->set_parent(NULL);
   children_.erase(child->path());
 }
@@ -109,7 +109,7 @@ Catalog* Catalog::FindBestFittingChild(const string &path) const {
   // now we tokenize the remaining string
   string remaining = path.substr(this->path().length());
   vector<string> tokens = split_string(remaining, "/", false);
-  
+
   // now we recombine the tokens successively
   // in order to find a child which serves a part of the path
   vector<string>::const_iterator i,iend;
@@ -120,7 +120,7 @@ Catalog* Catalog::FindBestFittingChild(const string &path) const {
        ++i) {
     subpathstream << '/' << *i;
     hit = FindChildWithMountpoint(subpathstream.str());
-    
+
     // if we found a child serving a part of the path we can stop searching.
     // all remaining sub path elements should be served by a grand child in
     // the just found child catalog
@@ -128,22 +128,22 @@ Catalog* Catalog::FindBestFittingChild(const string &path) const {
       break;
     }
   }
-  
+
   return hit;
 }
 
 bool Catalog::Lookup(const inode_t inode,
-                     DirectoryEntry *entry, 
-                     hash::t_md5 *parent_hash) const { 
+                     DirectoryEntry *entry,
+                     hash::t_md5 *parent_hash) const {
   assert (IsInitialized());
-  
+
   bool found = false;
   uint64_t row_id = GetRowIdFromInode(inode);
-  
+
   // do the actual lookup
   inode_lookup_statement_->BindRowId(row_id);
   found = inode_lookup_statement_->FetchRow();
-  
+
   // retrieve the DirectoryEntry if needed
   if (found && NULL != entry) *entry = inode_lookup_statement_->GetDirectoryEntry(this);
 
@@ -151,11 +151,11 @@ bool Catalog::Lookup(const inode_t inode,
   if (NULL != parent_hash) *parent_hash = inode_lookup_statement_->GetParentPathHash();
 
   inode_lookup_statement_->Reset();
-  
+
   return found;
 }
 
-bool Catalog::Lookup(const hash::t_md5 &path_hash, 
+bool Catalog::Lookup(const hash::t_md5 &path_hash,
                      DirectoryEntry *entry) const {
   assert (IsInitialized());
 
@@ -166,7 +166,7 @@ bool Catalog::Lookup(const hash::t_md5 &path_hash,
     found = EnsureCoherenceOfInodes(path_hash, entry);
 	}
   path_hash_lookup_statement_->Reset();
-  
+
   return found;
 }
 
@@ -189,7 +189,7 @@ bool Catalog::Listing(const hash::t_md5 &path_hash,
     listing->push_back(entry);
   }
   listing_statement_->Reset();
-  
+
   return true;
 }
 
@@ -206,25 +206,25 @@ bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash,
     if (not foundMountpoint) {
       pmesg(D_CATALOG, "FATAL: mount point of nested catalog root could not be found in parent catalog");
       return false;
-    } else {  
+    } else {
       entry->set_inode(nestedRootMountpoint.inode());
     }
 	}
-  
+
   return true;
 }
 
-inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id, 
+inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id,
                                                      uint64_t hardlink_group_id) {
   assert (IsInitialized());
 
   inode_t inode = row_id + inode_chunk_.offset;
-	
+
 	// hardlinks are encoded in catalog-wide unique hard link group ids
 	// these ids must be resolved to actual inode relationships at runtime
 	if (hardlink_group_id > 0) {
     HardlinkGroupIdMap::const_iterator inodeItr = hardlink_groups_.find(hardlink_group_id);
-  
+
     // create a new hardlink group map entry or use the inode already saved there
     if (inodeItr == hardlink_groups_.end()) {
       hardlink_groups_[hardlink_group_id] = inode;
@@ -232,21 +232,21 @@ inode_t Catalog::GetInodeFromRowIdAndHardlinkGroupId(uint64_t row_id,
       inode = inodeItr->second;
     }
   }
-	
+
   return inode;
 }
 
 uint64_t Catalog::GetTTL() const {
   const string sql = "SELECT value FROM properties WHERE key='TTL';";
   SqlStatement stmt(database(), sql);
-  
+
   return (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : kDefaultTTL;
 }
 
 uint64_t Catalog::GetRevision() const {
   const string sql = "SELECT value FROM properties WHERE key='revision';";
   SqlStatement stmt(database(), sql);
-  
+
   return (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
 }
 
@@ -275,9 +275,9 @@ Catalog::NestedCatalogReferenceList Catalog::ListNestedCatalogReferences() const
     ref.content_hash = list_nested_catalogs_statement_->GetContentHash();
     result.push_back(ref);
   }
-  
+
   list_nested_catalogs_statement_->Reset();
-  
+
   return result;
 }
 

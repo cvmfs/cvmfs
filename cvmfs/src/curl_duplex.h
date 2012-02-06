@@ -3,5 +3,3 @@
 #else
   #include <curl/curl.h>
 #endif
-
-

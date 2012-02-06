@@ -1,10 +1,7 @@
 /**
- * \file util.cc
+ * This file is part of the CernVM File System.
  *
  * Some common functions.
- *
- * Developed by Jakob Blomer 2010 at CERN
- * jakob.blomer@cern.ch
  */
 
 #define _FILE_OFFSET_BITS 64
@@ -39,7 +36,7 @@ extern "C" {
 }
 
 
-using namespace std;
+using namespace std;  // NOLINT
 
 
 string canonical_path(const string &p) {
@@ -67,21 +64,6 @@ string get_file_name(const string &path) {
       return path.substr(idx+1);
    else
       return path;
-}
-
-bool is_empty_dir(const string &path) {
-   DIR *dir = opendir(path.c_str());
-   if (!dir)
-      return true;
-
-   PortableDirent *d;
-   while ((d = portableReaddir(dir)) != NULL) {
-      if ((string(d->d_name) == ".") || (string(d->d_name) == "..")) continue;
-      closedir(dir);
-      return false;
-   }
-   closedir(dir);
-   return true;
 }
 
 bool file_exists(const string &path) {
@@ -244,6 +226,8 @@ bool read_sig_tail(const void *buf, const unsigned buf_size, const unsigned skip
    }
 }
 
+
+// TODO: Move to compression
 bool write_memchunk(const string &path, const void *chunk, const int &size) {
    int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, plain_file_mode);
    if (fd < 0)
@@ -467,6 +451,7 @@ void printWarning(const string &message) {
 	cerr << "[WARNING] " << message << endl;
 }
 
+// TODO: perhaps in logging
 string humanizeBitmap(const unsigned int bitmap) {
    stringstream outp;
    unsigned int mask = 1 << (sizeof(int) * 8 - 1);
@@ -481,6 +466,7 @@ string humanizeBitmap(const unsigned int bitmap) {
    return outp.str();
 }
 
+// TODO: merge
 vector<string> split_string(const string& s, const string& delim, const bool keep_empty) {
     vector<string> result;
     if (delim.empty()) {

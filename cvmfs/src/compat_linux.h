@@ -1,5 +1,5 @@
-#ifndef COMPAT_LINUX_H
-#define COMPAT_LINUX_H
+#ifndef CVMFS_COMPAT_LINUX_H_
+#define CVMFS_COMPAT_LINUX_H_
 
 #include <pthread.h>
 typedef pthread_spinlock_t PortableSpinlock;
@@ -17,4 +17,4 @@ inline int portableFileStat64(const char *path, PortableStat64 *buf) { return st
 inline int portableLinkStat64(const char *path, PortableStat64 *buf) { return lstat64(path, buf); }
 inline int portableFileDescriptorStat64(int filedes, PortableStat64 *buf) { return fstat64(filedes, buf); }
 
-#endif
+#endif  // CVMFS_COMPAT_LINUX_H_
