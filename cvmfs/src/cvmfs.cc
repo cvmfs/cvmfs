@@ -19,7 +19,7 @@
  * improvement.
  */
 
-// TODO: ndownload into cache
+// TODO: ndownload into cache, Lock on boot / finalize
 
 #define ENOATTR ENODATA /* instead of including attr/xattr.h */
 

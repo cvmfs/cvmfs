@@ -24,6 +24,8 @@
  * proxies are selected randomly (load-balancing set).
  */
 
+//TODO: Kahan Sum for time
+
 #include "cvmfs_config.h"
 #include "download.h"
 

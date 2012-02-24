@@ -369,10 +369,13 @@ cvmfs_chksetup() {
             echo "Warning: no public key (CVMFS_PUBLIC_KEY) defined for $fqrn"
             num_warnings=$[$num_warnings+1]
          else
-            if [ ! -f $CVMFS_PUBLIC_KEY ]; then
-               echo "Error: public key $CVMFS_PUBLIC_KEY for $fqrn not accessible"
-               num_errors=$[$num_errors+1]
-            fi
+            for k in `echo $CVMFS_PUBLIC_KEY | tr ':' " "`
+            do
+               if [ ! -f "$k" ]; then
+                  echo "Error: public key $k for $fqrn not accessible"
+                  num_errors=$[$num_errors+1]
+               fi
+            done
          fi
 
 
