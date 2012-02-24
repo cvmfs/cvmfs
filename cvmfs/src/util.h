@@ -17,7 +17,7 @@
 #include <map>
 #include <vector>
 
-#include "compat.h"
+#include "platform.h"
 #include "hash.h"
 
 const int plain_file_mode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
@@ -40,7 +40,7 @@ bool read_sig_tail(const void *buf, const unsigned buf_size, const unsigned skip
 bool write_memchunk(const std::string &patch, const void *chunk, const int &size);
 FILE *temp_file(const std::string &path_prefix, const int mode, const char *open_flags,
                 std::string &final_path);
-bool get_file_info(const std::string &path, PortableStat64 *info);
+bool get_file_info(const std::string &path, platform_stat64 *info);
 
 void printError(const std::string &message);
 void printWarning(const std::string &message);

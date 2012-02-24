@@ -10,7 +10,7 @@
 
 #include <list>
 
-#include "compat.h"
+#include "platform.h"
 #include "util.h"
 
 namespace cvmfs {

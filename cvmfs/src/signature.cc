@@ -20,7 +20,7 @@
 #include "hash.h"
 #include "util.h"
 
-#include "compat.h"
+#include "platform.h"
 
 #include <string>
 #include <vector>

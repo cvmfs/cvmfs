@@ -58,7 +58,7 @@ uint64_t SyncItem::GetUnionInode() const {
 }
 
 void SyncItem::StatGeneric(const string &path, EntryStat *statStructure) const {
-	if (portableLinkStat64(path.c_str(), &statStructure->stat) != 0) {
+	if (platform_lstat(path.c_str(), &statStructure->stat) != 0) {
 		statStructure->errorCode = errno;
 	}
 	statStructure->obtained = true;
@@ -68,7 +68,7 @@ bool SyncItem::IsOpaqueDirectory() const {
 	if (not IsDirectory()) {
 		return false;
 	}
-	
+
 	return mUnionEngine->IsOpaqueDirectory(this);
 }
 
@@ -81,7 +81,7 @@ DirectoryEntry SyncItem::CreateDirectoryEntry() const {
   dEntry.mtime_             = this->GetUnionStat().st_mtime;
   dEntry.checksum_          = this->GetContentHash();
   dEntry.name_              = this->GetFilename();
-  
+
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
 		ssize_t l = readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
@@ -90,9 +90,9 @@ DirectoryEntry SyncItem::CreateDirectoryEntry() const {
 			dEntry.symlink_ = slnk;
 		}
   }
-  
+
   dEntry.linkcount_         = this->GetUnionLinkcount();
-  
+
   return dEntry;
 }
 

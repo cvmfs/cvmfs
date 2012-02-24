@@ -499,8 +499,8 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	const string backlink_data = backlink + get_file_name(data_directory_);
 	const string backlink_whitelist = backlink + get_file_name(catalog_directory_) + "/.cvmfswhitelist";
 
-	PortableStat64 info;
-	if (portableLinkStat64(lnk_path_data.c_str(), &info) != 0)
+	platform_stat64 info;
+	if (platform_lstat(lnk_path_data.c_str(), &info) != 0)
 	{
 		if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
 			printWarning("cannot create catalog store -> data store symlink");
@@ -508,7 +508,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	}
 
 	/* Don't make the symlink for the root catalog */
-	if ((portableLinkStat64(lnk_path_whitelist.c_str(), &info) != 0) && (get_parent_path(cat_path) != get_parent_path(data_directory_)))
+	if ((platform_lstat(lnk_path_whitelist.c_str(), &info) != 0) && (get_parent_path(cat_path) != get_parent_path(data_directory_)))
 	{
 		if (symlink(backlink_whitelist.c_str(), lnk_path_whitelist.c_str()) != 0) {
 			printWarning("cannot create whitelist symlink");

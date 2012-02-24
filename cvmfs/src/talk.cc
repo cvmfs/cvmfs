@@ -18,7 +18,7 @@
 #include "cvmfs_config.h"
 #include "talk.h"
 
-#include "compat.h"
+#include "platform.h"
 
 #include <string>
 #include <sstream>

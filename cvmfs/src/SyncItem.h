@@ -4,7 +4,7 @@
 #include <string>
 
 #include "hash.h"
-#include "compat.h"
+#include "platform.h"
 
 #include "DirectoryEntry.h"
 #include "SyncUnion.h"
@@ -18,7 +18,7 @@ enum SyncItemType {
 };
 
 /**
- *  any directory entry emitted by the RecursionEngine is wrapped in a 
+ *  any directory entry emitted by the RecursionEngine is wrapped in a
  *  convenient SyncItem structure
  *  This class represents potentially three concrete files:
  *    - <repository path>/<filename>
@@ -41,24 +41,24 @@ class SyncItem {
 	  EntryStat() :
 	    obtained(false),
 	    errorCode(0) {}
-	  
+
 		bool obtained;
 		int errorCode;
-		PortableStat64 stat;
+		platform_stat64 stat;
 	};
 
 	mutable EntryStat mRepositoryStat;
 	mutable EntryStat mUnionStat;
 	mutable EntryStat mOverlayStat;
-	
+
 	bool mWhiteout;
 
 	std::string mRelativeParentPath;
 	std::string mFilename;
-	
+
 	/** the hash of the file's content (computed by the SyncMediator) */
 	hash::t_sha1 mContentHash;
-	
+
   const SyncUnion *mUnionEngine;
 
  public:
@@ -81,11 +81,11 @@ class SyncItem {
 	inline bool IsWhiteout() const { return mWhiteout; }
 	inline bool IsCatalogRequestFile() const { return mFilename == ".cvmfscatalog"; }
 	bool IsOpaqueDirectory() const;
-	
+
 	inline hash::t_sha1 GetContentHash() const { return mContentHash; }
 	inline void SetContentHash(hash::t_sha1 &hash) { mContentHash = hash; }
 	inline bool HasContentHash() { return mContentHash != hash::t_sha1(); }
-	
+
 	inline std::string GetFilename() const { return mFilename; }
 	inline std::string GetParentPath() const { return mRelativeParentPath; }
   DirectoryEntry CreateDirectoryEntry() const;
@@ -97,19 +97,19 @@ class SyncItem {
   std::string GetOverlayPath() const;
 
   void MarkAsWhiteout(const std::string &actual_filename);
-	
+
 	unsigned int GetUnionLinkcount() const;
 	uint64_t GetUnionInode() const;
-	inline PortableStat64 GetUnionStat() const { StatUnion(); return mUnionStat.stat; };
+	inline platform_stat64 GetUnionStat() const { StatUnion(); return mUnionStat.stat; };
 	bool IsNew() const;
-	
+
   bool operator==(const SyncItem &otherEntry) const { return (GetRelativePath() == otherEntry.GetRelativePath()); }
 
  private:
 	// lazy evaluation and caching of results of file stats
-	inline void StatRepository() const { if (mRepositoryStat.obtained) return; StatGeneric(GetRepositoryPath(), &mRepositoryStat); } 
-	inline void StatUnion() const { if (mUnionStat.obtained) return; StatGeneric(GetUnionPath(), &mUnionStat); } 
-	inline void StatOverlay() const { if (mOverlayStat.obtained) return; StatGeneric(GetOverlayPath(), &mOverlayStat); } 
+	inline void StatRepository() const { if (mRepositoryStat.obtained) return; StatGeneric(GetRepositoryPath(), &mRepositoryStat); }
+	inline void StatUnion() const { if (mUnionStat.obtained) return; StatGeneric(GetUnionPath(), &mUnionStat); }
+	inline void StatOverlay() const { if (mOverlayStat.obtained) return; StatGeneric(GetOverlayPath(), &mOverlayStat); }
 	void StatGeneric(const std::string &path, EntryStat *statStructure) const;
 };
 

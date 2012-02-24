@@ -23,6 +23,8 @@
 
 #define ENOATTR ENODATA /* instead of including attr/xattr.h */
 
+#include "cvmfs_config.h"
+
 #include <dirent.h>
 #include <errno.h>
 #include <stddef.h>
@@ -57,9 +59,8 @@
 #include <vector>
 #include <map>
 
-#include "cvmfs_config.h"
+#include "platform.h"
 #include "fuse-duplex.h"
-#include "compat.h"
 #include "logging.h"
 #include "tracer.h"
 #include "download.h"

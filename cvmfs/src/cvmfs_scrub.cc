@@ -1,17 +1,17 @@
 /*
  *  \file cvmfs_fsck.cc
  *  This tool checks a cvmfs2 cache directory for consistency.
- *  If necessary, the managed cache db is removed so that 
+ *  If necessary, the managed cache db is removed so that
  *  it will be rebuilt on next mount.
  */
- 
+
 #define _FILE_OFFSET_BITS 64
 #include "cvmfs_config.h"
 #include "util.h"
 #include "hash.h"
 #include "atomic.h"
 
-#include "compat.h"
+#include "platform.h"
 
 #include <iostream>
 #include <string>
@@ -45,7 +45,7 @@ typedef struct dir_data dir_data_t;
 string data_dir;
 
 
-int main(int argc, char **argv) {     
+int main(int argc, char **argv) {
    /* Switch to cache directory */
    if (argc < 2) {
       usage();
@@ -56,10 +56,10 @@ int main(int argc, char **argv) {
       cerr << "could not change to " << data_dir << endl;
       return 1;
    }
-   
+
    bool found_corruption = false;
    int num_files = 0;
-   
+
    /* Walk through sub directories */
    cout << "Verifying: " << flush;
    for (int i = 0; i <= 0xff; ++i) {
@@ -69,28 +69,28 @@ int main(int argc, char **argv) {
          cerr << "Error: cannot open " << data_dir << "/" << hex << endl;
          continue;
       }
-      
+
       DIR *dirp = opendir(".");
       if (!dirp) {
          cerr << "Error: cannot access " << data_dir << "/" << hex << endl;
          continue;
       }
-      PortableDirent *d;
-      while ((d = portableReaddir(dirp)) != NULL) {            
+      platform_dirent64 *d;
+      while ((d = platform_readdir(dirp)) != NULL) {
          const string name = d->d_name;
          if ((name == ".") || (name == ".."))
             continue;
-         
+
          if ((num_files % 1000) == 0)
             cout << "." << flush;
          num_files++;
-         
+
          const string path = data_dir + "/" + string(hex, 2) + "/" + name;
          const string sha1_name = string(hex, 2) + name.substr(0, 38);
-         
+
          hash::t_sha1 expected;
          expected.from_hash_str(sha1_name);
-         
+
          hash::t_sha1 calculated;
          if (sha1_file(d->d_name, calculated.digest) != 0) {
             cerr << "Error: failed to open " << path << endl;
@@ -103,16 +103,16 @@ int main(int argc, char **argv) {
          }
       }
       closedir(dirp);
-      
+
       if (chdir("..") != 0) {
          cerr << "Error: cannot access " << data_dir << endl;
          return 3;
       }
    }
    cout << endl;
-   
+
    if (found_corruption)
       return 5;
-   
+
    return 0;
 }

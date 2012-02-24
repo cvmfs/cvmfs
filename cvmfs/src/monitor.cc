@@ -13,7 +13,7 @@
 #include "cvmfs_config.h"
 #include "monitor.h"
 
-#include "compat.h"
+#include "platform.h"
 
 #include <string>
 #include <iostream>
@@ -51,7 +51,7 @@ namespace monitor {
    const unsigned MIN_OPEN_FILES = 8192;
    const unsigned MAX_BACKTRACE = 64;
    int pipe_wd[2];
-   PortableSpinlock lock_handler;
+   platform_spinlock lock_handler;
    bool spawned = false;
 
 	/**
@@ -86,7 +86,7 @@ namespace monitor {
                           void *context)
    {
       int send_errno = errno;
-      if (portableSpinlockTrylock(&lock_handler) != 0) {
+      if (platform_spinlock_trylock(&lock_handler) != 0) {
          /* concurrent call, wait for the first one to exit the process */
          while (true) {}
       }
@@ -211,7 +211,7 @@ namespace monitor {
 	  int maxNoOfFiles = 0;
       unsigned int currMaxNoOfFiles = 0;
       monitor::cache_dir = cache_dir;
-      if (portableSpinlockInit(&lock_handler, 0) != 0) return false;
+      if (platform_spinlock_init(&lock_handler, 0) != 0) return false;
 
       /* check number of open files */
       if (check_nofiles) {
@@ -257,7 +257,7 @@ namespace monitor {
          (void)write(pipe_wd[1], &quit, 1);
          close(pipe_wd[1]);
       }
-      portableSpinlockDestroy(&lock_handler);
+      platform_spinlock_destroy(&lock_handler);
    }
 
    /* fork watchdog */

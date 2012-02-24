@@ -41,7 +41,7 @@
 #include <map>
 #include <vector>
 
-#include "compat.h"
+#include "platform.h"
 #include "catalog.h"
 #include "DirectoryEntry.h"
 #include "lru.h"
@@ -101,13 +101,13 @@ bool Init(const string &cache_path, const string &root_url) {
 
   // Cleanup dangling checksums
   DIR *dirp = NULL;
-  dirent *d;
+  platform_dirent64 *d;
   if ((dirp = opendir(cache_path.c_str())) == NULL) {
     LogCvmfs(kLogCache, kLogDebug, "failed to open directory %s",
              cache_path.c_str());
     return false;
   }
-  while ((d = readdir(dirp)) != NULL) {
+  while ((d = platform_readdir(dirp)) != NULL) {
     if (d->d_type != DT_REG) continue;
 
     const string name(d->d_name);
@@ -218,8 +218,8 @@ bool Open2Mem(const hash::t_sha1 &id, char **buffer, uint64_t *size) {
   if (fd < 0)
     return false;
 
-  PortableStat64 info;
-  if (portableFileDescriptorStat64(fd, &info) != 0) {
+  platform_stat64 info;
+  if (platform_fstat(fd, &info) != 0) {
     close(fd);
     return false;
   }
@@ -363,8 +363,8 @@ bool CommitFromMem(const hash::t_sha1 &id, const char *buffer,
  * \return True, if file is in local cache, false otherwise.
  */
 bool Contains(const hash::t_sha1 &id) {
-  struct stat info;
-  return stat(GetPathInCache(id).c_str(), &info) == 0;
+  platform_stat64 info;
+  return platform_stat(GetPathInCache(id).c_str(), &info) == 0;
 }
 
 
@@ -476,9 +476,9 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
     LogCvmfs(kLogCache, kLogDebug, "finished downloading of %s", url.c_str());
 
     // Check decompressed size (a cross check just in case)
-    struct stat64 stat_info;
+    platform_stat64 stat_info;
     stat_info.st_size = -1;
-    if ((fstat64(fileno(f), &stat_info) != 0) ||
+    if ((platform_fstat(fileno(f), &stat_info) != 0) ||
         (stat_info.st_size != (int64_t)d.size()))
     {
       LogCvmfs(kLogCache, kLogSyslog,

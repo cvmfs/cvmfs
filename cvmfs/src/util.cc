@@ -10,7 +10,7 @@
 #include "util.h"
 #include "hash.h"
 
-#include "compat.h"
+#include "platform.h"
 
 #include <string>
 #include <sstream>
@@ -67,13 +67,15 @@ string get_file_name(const string &path) {
 }
 
 bool file_exists(const string &path) {
-   PortableStat64 info;
-   return ((portableFileStat64(path.c_str(), &info) == 0) && S_ISREG(info.st_mode));
+   platform_stat64 info;
+   return ((platform_lstat(path.c_str(), &info) == 0) &&
+           S_ISREG(info.st_mode));
 }
 
 bool directory_exists(const std::string &path) {
-	PortableStat64 info;
-	return ((portableFileStat64(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode));
+	platform_stat64 info;
+	return ((platform_lstat(path.c_str(), &info) == 0) &&
+          S_ISDIR(info.st_mode));
 }
 
 bool mkdir_deep(const std::string &path, mode_t mode) {
@@ -83,8 +85,8 @@ bool mkdir_deep(const std::string &path, mode_t mode) {
    if (res == 0) return true;
 
    if (errno == EEXIST) {
-      PortableStat64 info;
-      if ((portableFileStat64(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode))
+      platform_stat64 info;
+      if ((platform_lstat(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode))
          return true;
       return false;
    }
@@ -108,8 +110,8 @@ bool make_cache_dir(const string &path, const mode_t mode) {
 
    lpath = cpath + "/ff";
 
-   PortableStat64 buf;
-   if (portableFileStat64(lpath.c_str(), &buf) != 0) {
+   platform_stat64 buf;
+   if (platform_stat(lpath.c_str(), &buf) != 0) {
       if (mkdir(lpath.c_str(), mode) != 0) return false;
       lpath = cpath + "/txn";
       if (mkdir(lpath.c_str(), mode) != 0) return false;
@@ -433,8 +435,8 @@ erange:
 	return (NULL);
 }
 
-bool get_file_info(const string &path, PortableStat64 *info) {
-	if (portableLinkStat64(path.c_str(), info) != 0) {
+bool get_file_info(const string &path, platform_stat64 *info) {
+	if (platform_lstat(path.c_str(), info) != 0) {
 		stringstream ss;
 		ss << "could not stat " << path;
 		printWarning(ss.str());

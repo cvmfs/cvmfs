@@ -49,7 +49,7 @@
 #include <string>
 #include <sstream>
 
-#include "compat.h"
+#include "platform.h"
 
 namespace cvmfs {
 
@@ -60,14 +60,14 @@ namespace cvmfs {
 	 */
    template<class Key, class Value, class HashFunction = SPARSEHASH_HASH<Key>, class EqualKey = std::equal_to<Key> >
 	class LruCache {
-		
+
 	private:
 		// forward declarations of private internal data structures
 		template<class T> class ListEntry;
 		template<class T> class ListEntryHead;
 		template<class T> class ListEntryContent;
 		template<class M> class MemoryAllocator;
-		
+
 		// helpers to get the template magic right
       typedef ListEntryContent<Key> ConcreteListEntryContent;
       typedef MemoryAllocator<ConcreteListEntryContent> ConcreteMemoryAllocator;
@@ -79,7 +79,7 @@ namespace cvmfs {
 			ListEntryContent<Key> *listEntry;
 			Value value;
 		} CacheEntry;
-	
+
 	   // the actual map data structure (TODO: replace this by a hashmap)
 		typedef google::dense_hash_map<Key, CacheEntry, HashFunction, EqualKey> Cache;
 
@@ -87,7 +87,7 @@ namespace cvmfs {
 		unsigned int mCurrentCacheSize;
 		unsigned int mMaxCacheSize;
       static ConcreteMemoryAllocator *allocator;
-      
+
 		/**
 		 *  a double linked list to keep track of the least recently
 		 *  used data entries.
@@ -97,20 +97,20 @@ namespace cvmfs {
 		 *  deleted to obtain some space.
 		 */
 		ListEntryHead<Key> *mLruList;
-		
+
 		/**
 		 *  the actual caching data structure
 		 *  it has to be a map of some kind... lookup performance is crucial
 		 */
 		Cache mCache;
-		
+
 		/**
 		 *  mutex to make cache thread safe
 		 */
 #ifdef LRU_CACHE_THREAD_SAFE
       pthread_mutex_t mLock;
 #endif
-	
+
 	   /**
 	    *  This MemoryAllocator optimizes the usage of memory for the cache entries.
 	    *  It allocates enough memory for the maximal number of cache entries at startup,
@@ -128,7 +128,7 @@ namespace cvmfs {
          unsigned int mNextFreeSlot;  // <-- position of next free slot in the pool
          char *mBlocks; // <-- a bitmap to mark slots as allocated
          M *mMemory;    // <-- the actual memory pool
-      
+
       public:
          /**
           *  creates a MemoryAllocator to handle a memory pool
@@ -138,30 +138,30 @@ namespace cvmfs {
             // how many bitmap chunks (chars) do we need?
             unsigned int bytesNeededForBitmap = numberOfSlots / sizeof(char);
             if (bytesNeededForBitmap * sizeof(char) < numberOfSlots) bytesNeededForBitmap++;
-            
+
             // how much actual memory do we need?
             const unsigned int bytesOfMemoryNeeded = sizeof(M) * numberOfSlots;
-         
+
             // allocate memory
             mBlocks = (char *)malloc(bytesNeededForBitmap);
             mMemory = (M *)malloc(bytesOfMemoryNeeded);
-         
+
             // check for successfully allocated memory
             if (mBlocks == NULL || mMemory == NULL) {
                std::cerr << "memory allocation for LRU cache failed" << std::endl;
                abort();
             }
-            
+
             // zero memory
             memset(mBlocks, 0, bytesNeededForBitmap);
             memset(mMemory, 0, bytesOfMemoryNeeded);
-         
+
             // create initial state
             mNumberOfSlots = numberOfSlots;
             mFreeSlots = numberOfSlots;
             mNextFreeSlot = 0;
          }
-      
+
          /**
           *  free all data
           *  if the MemoryAllocator is gone, all data is gone too!
@@ -176,7 +176,7 @@ namespace cvmfs {
           *  @return true if all slots are occupied, otherwise false
           */
          inline bool isFull() const { return mFreeSlots == 0; }
-      
+
          /**
           *  allocates a slot and returns a pointer to the memory
           *  @return a pointer to a chunk of the memory pool
@@ -190,19 +190,19 @@ namespace cvmfs {
                this->setBit(mNextFreeSlot);
                --mFreeSlots;
                M *slot = mMemory + mNextFreeSlot;
-               
+
                // find a new free slot if there are some left
                if (not this->isFull()) {
                   while (this->getBit(mNextFreeSlot)) {
                      mNextFreeSlot = (mNextFreeSlot + 1) % mNumberOfSlots;
                   }
                }
-               
+
                // done
                return slot;
             }
          }
-      
+
          /**
           *  free a given slot in the memory pool
           *  @param slot a pointer to the slot be freed
@@ -212,19 +212,19 @@ namespace cvmfs {
             if (slot < mMemory || slot > mMemory + mNumberOfSlots) {
                return;
             }
-            
+
             // get position of slot
             const unsigned int position = slot - mMemory;
-         
+
             // check if slot was already freed
             assert (this->getBit(position));
-         
+
             // free slot
             this->unsetBit(position);
             mNextFreeSlot = position; // <-- save the position of this slot as free (faster reallocation)
             ++mFreeSlots;
          }
-      
+
       private:
          /**
           *  check a bit in the internal allocation bitmap
@@ -235,7 +235,7 @@ namespace cvmfs {
             assert (position < mNumberOfSlots);
             return ((mBlocks[position / 8] & (1 << (position % 8))) != 0);
          }
-      
+
          /**
           *  set a bit in the internal allocation bitmap
           *  @param position the number of the bit to be set
@@ -244,7 +244,7 @@ namespace cvmfs {
             assert (position < mNumberOfSlots);
             mBlocks[position / 8] |= 1 << (position % 8);
          }
-      
+
          /**
           *  clear a bit in the internal allocation bitmap
           *  @param position the number of the bit to be cleared
@@ -254,7 +254,7 @@ namespace cvmfs {
             mBlocks[position / 8] &= ~(1 << (position % 8));
          }
       };
-	
+
 		/**
 		 *  INTERNAL DATA STRUCTURE
 		 *  abstract ListEntry class to maintain a double linked list
@@ -274,39 +274,39 @@ namespace cvmfs {
 				this->prev = this;
 			}
 			virtual ~ListEntry() {}
-		
+
 			/**
 			 *  checks if the ListEntry is the list head
 			 *  @return true if ListEntry is list head otherwise false
 			 */
 			virtual bool isListHead() const = 0;
-		
+
 			/**
 			 *  a lonely ListEntry has no connection to other elements
 			 *  @return true if ListEntry is lonely otherwise false
 			 */
 			bool isLonely() const { return (this->next == this && this->prev == this); }
-		
+
 		protected:
-			
+
 			/**
 			 *  insert a given ListEntry after this one
 			 *  @param entry the ListEntry to insert after this one
 			 */
 			inline void insertAsSuccessor(ListEntryContent<T> *entry) {
 				assert (entry->isLonely());
-			
+
 				// mount the new element between this and this->next
 				entry->next = this->next;
 				entry->prev = this;
-			
+
 				// point this->next->prev to entry and _afterwards_ overwrite this->next
 				this->next->prev = entry;
 				this->next = entry;
-			
+
 				assert (not entry->isLonely());
 			}
-			
+
 			/**
 			 *  insert a given ListEntry in front of this one
 			 *  @param entry the ListEntry to insert in front of this one
@@ -314,18 +314,18 @@ namespace cvmfs {
 			inline void insertAsPredecessor(ListEntryContent<T> *entry) {
 				assert (entry->isLonely());
 				assert (not entry->isListHead());
-			
+
 				// mount the new element between this and this->prev
 				entry->next = this;
 				entry->prev = this->prev;
-			
+
 				// point this->prev->next to entry and _afterwards_ overwrite this->prev
 				this->prev->next = entry;
 				this->prev = entry;
-			
+
 				assert (not entry->isLonely());
 			}
-		
+
 			/**
 			 *  remove this element from it's list
 			 *  the function connects this->next with this->prev leaving the complete list
@@ -348,7 +348,7 @@ namespace cvmfs {
 			ListEntryContent(Key content) {
 				mContent = content;
 			};
-			
+
 			/**
 			 *  overwritten the new operator of this class to redirect it to our own
 			 *  memory allocator. This ensures that heap is not fragmented by loads of
@@ -358,7 +358,7 @@ namespace cvmfs {
             assert(LruCache::allocator != NULL);
             return (void *)LruCache::allocator->allocate();
 			}
-			
+
 			/**
 			 *  overwritten delete operator to redirect deallocation to our own memory
 			 *  allocator
@@ -396,7 +396,7 @@ namespace cvmfs {
 				assert (this->isLonely());
 			}
 		};
-	
+
 		/**
 		 *  Specialized ListEntry to form a list head.
 		 *  Every list has exactly one list head which is also the entry point
@@ -409,7 +409,7 @@ namespace cvmfs {
 			virtual ~ListEntryHead() {
 				this->clear();
 			}
-		
+
 			/**
 			 *  remove all entries from the list
 			 *  ListEntry objects are deleted but contained data keeps available
@@ -423,23 +423,23 @@ namespace cvmfs {
 					entry = entry->next;
 					delete entryToDelete;
 				}
-			
+
 				// reset the list to lonely
 				this->next = this;
 				this->prev = this;
 			}
-		
+
 			/**
 			 *  see ListEntry base class
 			 */
 			inline bool isListHead() const { return true; }
-		
+
 			/**
 			 *  check if the list is empty
 			 *  @return true if the list only contains the ListEntryHead otherwise false
 			 */
 			inline bool isEmpty() const { return this->isLonely(); }
-		
+
 			/**
 			 *  retrieve the data in the front of the list
 			 *  @return the first data object in the list
@@ -448,7 +448,7 @@ namespace cvmfs {
 				assert (not this->isEmpty());
 				return this->next->getContent();
 			}
-			
+
 			/**
 			 *  retrieve the data in the back of the list
 			 *  @return the last data object in the list
@@ -457,7 +457,7 @@ namespace cvmfs {
 				assert (not this->isEmpty());
 				return this->prev->getContent();
 			}
-		
+
 			/**
 			 *  push a new data object to the end of the list
 			 *  @param the data object to insert
@@ -468,7 +468,7 @@ namespace cvmfs {
 				this->insertAsPredecessor(newEntry);
 				return newEntry;
 			}
-		
+
 			/**
 			 *  push a new data object to the front of the list
 			 *  @param the data object to insert
@@ -479,7 +479,7 @@ namespace cvmfs {
 				this->insertAsSuccessor(newEntry);
 				return newEntry;
 			}
-		
+
 			/**
 			 *  pop the first object of the list
 			 *  the object is returned and removed from the list
@@ -499,14 +499,14 @@ namespace cvmfs {
 				assert (not this->isEmpty());
 				return pop(this->prev);
 			}
-		
+
 			/**
 			 *  take a list entry out of it's list and reinsert just behind this ListEntryHead
 			 *  @param the ListEntry to be moved to the beginning of this list
 			 */
 			inline void moveToFront(ListEntryContent<T> *entry) {
 				assert (not entry->isLonely());
-			
+
 				entry->removeFromList();
 				this->insertAsSuccessor(entry);
 			}
@@ -517,16 +517,16 @@ namespace cvmfs {
 			 */
 			inline void moveToBack(ListEntryContent<T> *entry) {
 				assert (not entry->isLonely());
-			
+
 				entry->removeFromList();
 				this->insertAsPredecessor(entry);
 			}
-			
+
 			/**
 			 *  see ListEntry base class
 			 */
 			inline void removeFromList() { assert (false); }
-		
+
 		private:
 			/**
 			 *  pop a ListEntry from the list (arbitrary position)
@@ -536,7 +536,7 @@ namespace cvmfs {
 			 */
 			inline T pop(ListEntry<T> *poppedEntry) {
 				assert (not poppedEntry->isListHead());
-			
+
 				ListEntryContent<T> *popped = (ListEntryContent<T> *) poppedEntry;
 				popped->removeFromList();
 				T res = popped->getContent();
@@ -544,7 +544,7 @@ namespace cvmfs {
 				return res;
 			}
 		};
-	
+
 	public:
 		/**
 		 *  create a new LRU cache object
@@ -552,29 +552,29 @@ namespace cvmfs {
 		 */
 		LruCache(const unsigned int maxCacheSize) {
 			assert (maxCacheSize > 0);
-			
+
 			// create memory allocator
 			ConcreteMemoryAllocator *allocator = new ConcreteMemoryAllocator(maxCacheSize);
          LruCache<Key, Value, HashFunction, EqualKey>::allocator = allocator;
-		
+
 		   // internal state
 			mCurrentCacheSize = 0;
 			mMaxCacheSize = maxCacheSize;
 			mLruList = new ListEntryHead<Key>();
-			
+
 			// thread safety
 #ifdef LRU_CACHE_THREAD_SAFE
          pthread_mutex_init(&mLock, NULL);
 #endif
 		}
-	
+
 		virtual ~LruCache() {
 			delete mLruList;
 #ifdef LRU_CACHE_THREAD_SAFE
          pthread_mutex_destroy(&mLock);
 #endif
 		}
-	
+
 		/**
 		 *  insert a new key-value pair to the list
 		 *  if the cache is already full, the least recently used object is removed
@@ -587,7 +587,7 @@ namespace cvmfs {
 		 */
 		virtual bool insert(const Key &key, const Value &value) {
          this->lock();
-          
+
 			// check if we have to update an existent entry
 			CacheEntry entry;
 			if (this->lookupCache(key, entry)) {
@@ -603,11 +603,11 @@ namespace cvmfs {
    			// insert a new entry
    			this->insertNewEntry(key, value);
 			}
-			
+
          this->unlock();
 			return true;
 		}
-	
+
 		/**
 		 *  retrieve an element from the cache
 		 *  if the element was found, it will be marked as 'recently used' and returned
@@ -615,10 +615,10 @@ namespace cvmfs {
 		 *  @param value (out) here the result is saved (in case of cache miss this is not altered)
 		 *  @return true on successful lookup, false if key was not found
 		 */
-		virtual bool lookup(const Key &key, Value *value) { 
+		virtual bool lookup(const Key &key, Value *value) {
          bool found = false;
          this->lock();
-		   
+
 			CacheEntry entry;
 			if (this->lookupCache(key, entry)) {
 				// cache hit
@@ -626,11 +626,11 @@ namespace cvmfs {
 				*value = entry.value;
 				found = true;
 			}
-			
+
          this->unlock();
 			return found;
 		}
-		
+
 		/**
 		 *  forgets about a specific cache entry
 		 *  @param key the key to delete from the cache
@@ -639,40 +639,40 @@ namespace cvmfs {
 		virtual bool forget(const Key &key) {
          bool found = false;
          this->lock();
-         
+
          CacheEntry entry;
          if (this->lookupCache(key, entry)) {
             found = true;
-            
+
             entry.listEntry->removeFromList();
             delete entry.listEntry;
    			mCache.erase(key);
             --mCurrentCacheSize;
          }
-         
+
          this->unlock();
          return found;
 		}
-	
+
 		/**
 		 *  checks if the cache is filled completely
 		 *  if yes, an insert of a new element will delete the least recently used one
 		 *  @return true if cache is fully used otherwise false
 		 */
 		inline bool isFull() const { return mCurrentCacheSize >= mMaxCacheSize; }
-		
+
 		/**
 		 *  checks if there is at least one element in the cache
 		 *  @return true if cache is completely empty otherwise false
 		 */
 		inline bool isEmpty() const { return mCurrentCacheSize == 0; }
-		
+
 		/**
 		 *  returns the current amount of entries in the cache
 		 *  @return the number of entries currently in the cache
 		 */
 		inline unsigned int getNumberOfEntries() const { return mCurrentCacheSize; }
-	
+
 		/**
 		 *  clears all elements from the cache
 		 *  all memory of internal data structures will be freed but data of cache entries
@@ -680,11 +680,11 @@ namespace cvmfs {
 		 */
 		virtual void drop() {
          this->lock();
-		   
+
 			mCurrentCacheSize = 0;
 			mLruList->clear();
 			mCache.clear();
-			
+
          this->unlock();
 		}
 
@@ -696,7 +696,7 @@ namespace cvmfs {
           mCache.set_empty_key(empty);
           mCache.set_deleted_key(deleted);
 	    }
-	
+
 	private:
 		/**
 		 *  this just performs a lookup in the cache
@@ -707,17 +707,17 @@ namespace cvmfs {
 		 */
 		inline bool lookupCache(const Key &key, CacheEntry &entry) {
          typename Cache::iterator foundElement = mCache.find(key);
-         
+
          if (foundElement == mCache.end()) {
             // cache miss
             return false;
          }
-         
+
          // cache hit
          entry = foundElement->second;
 			return true;
 		}
-		
+
 		/**
 		 *  insert a new entry in the cache
 		 *  wraps the user data in an internal data structure
@@ -726,15 +726,15 @@ namespace cvmfs {
 		 */
 		inline void insertNewEntry(const Key &key, const Value &value) {
 			assert (not this->isFull());
-		
+
 			CacheEntry entry;
 			entry.listEntry = mLruList->push_back(key);
 			entry.value = value;
-		
+
 			mCache[key] = entry;
 			mCurrentCacheSize++;
 		}
-		
+
 		/**
 		 *  update an entry which is already in the cache
 		 *  this will not change the LRU order. Just the new data object is
@@ -745,7 +745,7 @@ namespace cvmfs {
 		inline void updateExistingEntry(const Key &key, const CacheEntry &entry) {
 			mCache[key] = entry;
 		}
-	
+
 		/**
 		 *  touch an entry
 		 *  the entry will be moved to the back of the LRU list to mark it
@@ -755,19 +755,19 @@ namespace cvmfs {
 		inline void touchEntry(const CacheEntry &entry) {
 			mLruList->moveToBack(entry.listEntry);
 		}
-	
+
 		/**
 		 *  deletes the least recently used entry from the cache
 		 */
 		inline void deleteOldestEntry() {
 			assert (not this->isEmpty());
-		
+
 			Key keyToDelete = mLruList->pop_front();
 			mCache.erase(keyToDelete);
-			
+
 			--mCurrentCacheSize;
 		}
-		
+
 		/**
 		 *  locks the cache (thread safety)
 		 */
@@ -776,7 +776,7 @@ namespace cvmfs {
          pthread_mutex_lock(&mLock);
 #endif
 		}
-		
+
 		/**
 		 *  unlocks the cache (thread safety)
 		 */
@@ -786,11 +786,11 @@ namespace cvmfs {
 #endif
 		}
 	};
-	
+
 	// initialize the static allocator field
 	template<class Key, class Value, class HashFunction, class EqualKey >
    typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator *LruCache<Key, Value, HashFunction, EqualKey>::allocator = NULL;
-	
+
 } // namespace cvmfs
 
 #endif

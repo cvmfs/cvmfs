@@ -10,7 +10,7 @@
 #include "util.h"
 #include "catalog.h"
 
-#include "compat.h"
+#include "platform.h"
 #include "compression.h"
 
 #include <string>
@@ -56,12 +56,12 @@ static vector<t_fsent> lsfs(const string dir) {
    vector<t_fsent> result;
    DIR *dp = opendir(dir.c_str());
    if (dp) {
-      PortableDirent *d;
-      while ((d = portableReaddir(dp)) != NULL) {
+      platform_dirent64 *d;
+      while ((d = platform_readdir(dp)) != NULL) {
          const string name = d->d_name;
          if ((name == ".") || (name == "..") || (name == ".cvmfscatalog")) continue;
-         PortableStat64 info;
-         if (portableLinkStat64((dir + "/" + d->d_name).c_str(), &info) == 0) {
+         platform_stat64 info;
+         if (platform_lstat((dir + "/" + d->d_name).c_str(), &info) == 0) {
             result.push_back(t_fsent(d->d_name, info.st_mode, info.st_ino, info.st_mtime, info.st_size));
          }
       }
@@ -106,8 +106,8 @@ int main(int argc, char **argv) {
       cerr << "could not switch to directory to compare." << endl;
       return 1;
    }
-   PortableStat64 info_root;
-   if (portableFileStat64(".", &info_root) != 0) {
+   platform_stat64 info_root;
+   if (platform_stat(".", &info_root) != 0) {
       cerr << "could not inspect directory." << endl;
       return 1;
    }

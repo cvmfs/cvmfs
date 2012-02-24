@@ -19,8 +19,7 @@ set (CVMFS2_DEBUG_SOURCES
 
 	catalog.h catalog.cc
 	catalog_tree.h catalog_tree.cc
-	compat.h
-	compat_macosx.h
+	platform.h platform_osx.h platform_linux.h
 	monitor.h monitor.cc
 	util.cc util.h
 	zlib-duplex.h compression.h compression.cc

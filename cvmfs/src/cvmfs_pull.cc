@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "compat.h"
+#include "platform.h"
 #include "util.h"
 #include "catalog.h"
 #include "signature.h"
@@ -600,8 +600,8 @@ static bool recursive_pull(const string &path)
   const string lnk_path_data = dir_catalogs + path + "/data";
   const string backlink_data = backlink + get_file_name(dir_data);
 
-  PortableStat64 info;
-  if (portableLinkStat64(lnk_path_data.c_str(), &info) != 0)  {
+  platform_stat64 info;
+  if (platform_lstat(lnk_path_data.c_str(), &info) != 0)  {
     if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
       cerr << "Warning: cannot create catalog store -> data store symlink" << endl;
       if (exit_on_error) return false;

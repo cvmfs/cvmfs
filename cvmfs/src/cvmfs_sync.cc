@@ -8,11 +8,11 @@
  *
  * On the repository side we have a catalogs directory that mimicks the
  * shadow directory structure and stores compressed and uncompressed
- * versions of all catalogs.  The raw data are stored in the data 
+ * versions of all catalogs.  The raw data are stored in the data
  * subdirectory in zlib-compressed form.  They are named with their SHA1
- * hash of the compressed file (like in CVMFS client cache, but with a 
- * 2-level cache hierarchy).  Symlinks from the catalog directory to the 
- * data directory form the connection. If necessary, add a .htaccess file 
+ * hash of the compressed file (like in CVMFS client cache, but with a
+ * 2-level cache hierarchy).  Symlinks from the catalog directory to the
+ * data directory form the connection. If necessary, add a .htaccess file
  * to allow Apache to follow the symlinks.
  *
  * Developed by Jakob Blomer 2010 at CERN
@@ -40,7 +40,7 @@
 #include "util.h"
 #include "monitor.h"
 
-#include "compat.h"
+#include "platform.h"
 
 using namespace std;
 using namespace cvmfs;
@@ -48,12 +48,12 @@ using namespace cvmfs;
 static void usage() {
    cout << "CernVM-FS sync shadow tree with repository" << endl;
    cout << "Usage: cvmfs_sync -s <union volume> -o <overlay directory> -c <cvmfs mounted volume> -r <repository store>" << endl
-        << "                  [-p(rint change set)] [-d(ry run)] [-i <immutable dir(,dir)*>]" << endl 
+        << "                  [-p(rint change set)] [-d(ry run)] [-i <immutable dir(,dir)*>]" << endl
         << "                  [-k(ey file)] [-z (lazy attach of catalogs)] [-b(ookkeeping of dirty catalogs)]" << endl
         << "                  [-t <threads>] [-m(ucatalogs)]" << endl << endl
         << "Make sure that a 'data' and a 'catalogs' subdirectory exist in your repository store." << endl
         << "Also, your webserver must be able to follow symlinks in the catalogs subdirectory." << endl
-        << "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file." 
+        << "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file."
         << endl << endl;
 }
 
@@ -64,7 +64,7 @@ bool parseParameters(int argc, char **argv, SyncParameters *p) {
 		usage();
 		return false;
 	}
-	
+
 	// set defaults
 	p->print_changeset = false;
 	p->dry_run = false;
@@ -129,7 +129,7 @@ bool parseParameters(int argc, char **argv, SyncParameters *p) {
 			return false;
 		}
 	}
-	
+
 	return true;
 }
 
@@ -141,7 +141,7 @@ bool initWatchdog() {
 		return false;
 	}
 	monitor::spawn();
-	
+
 	return true;
 }
 
@@ -150,7 +150,7 @@ bool doSanityChecks(SyncParameters *p) {
 		printError("overlay (copy on write) directory does not exist");
 		return false;
 	}
-	
+
 	if (not directory_exists(p->dir_shadow)) {
 		printError("shadow directory does not exist");
 		return false;
@@ -160,17 +160,17 @@ bool doSanityChecks(SyncParameters *p) {
 		printError("mounted cvmfs repository does not exist");
 		return false;
 	}
-	
+
 	if (not directory_exists(p->dir_data)) {
 		printError("data store directory does not exist");
 		return false;
 	}
-	
+
 	if (not directory_exists(p->dir_catalogs)) {
 		printError("catalog store directory does not exist");
 		return false;
 	}
-	
+
 	return true;
 }
 
@@ -179,7 +179,7 @@ bool createCacheDir(SyncParameters *p) {
 		printError("could not initialize data store");
 		return false;
 	}
-	
+
 	return true;
 }
 
@@ -207,28 +207,28 @@ SyncUnion* createSynchronisationEngine(SyncMediator* mediator,
 
 int main(int argc, char **argv) {
 	SyncParameters parameters;
-	
+
 	// do some initialization
 	if (not parseParameters(argc, argv, &parameters)) return 1;
 	if (not initWatchdog()) return 1;
 	if (not doSanityChecks(&parameters)) return 2;
 	if (not createCacheDir(&parameters)) return 3;
-	
+
 	// create worker objects
   WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
   SyncMediator *mediator = createSyncMediator(catalogManager, parameters);
   SyncUnion *sync = createSynchronisationEngine(mediator, parameters);
-	
+
 	// sync
 	if (not sync->DoYourMagic()) {
 		printError("something went wrong during sync");
 		return 4;
 	}
-	
+
 	// clean up
 	delete mediator;
 	delete catalogManager;
   delete sync;
-   
+
 	return 0;
 }

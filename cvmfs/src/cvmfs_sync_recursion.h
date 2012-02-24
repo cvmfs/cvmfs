@@ -7,7 +7,7 @@
 
 #include <iostream> // TODO: remove me
 
-#include "compat.h"
+#include "platform.h"
 
 namespace cvmfs {
 
@@ -32,7 +32,7 @@ private:
 	/** if one of these files are found somewhere they are completely ignored */
 	std::set<std::string> ignored_files_;
 
-public:  
+public:
 	typedef void (T::*VoidCallback)(const std::string &relative_path,
                                   const std::string &dir_name);
 	typedef bool (T::*BoolCallback)(const std::string &relative_path,
@@ -109,17 +109,17 @@ public:
   	DoRecursion(parent_path, dir_name);
   }
 
-private:  
+private:
   void Init() {
     // we definitely don't care about these "virtual" directories
     ignored_files_.insert(".");
     ignored_files_.insert("..");
   }
-  
+
 	void DoRecursion(const std::string &parent_path, const std::string &dir_name) const
 	{
   DIR *dip;
-  PortableDirent *dit;
+  platform_dirent64 *dit;
   const std::string path = parent_path + "/" + dir_name;
 
   // get into directory and notify the user
@@ -127,12 +127,12 @@ private:
   Notify(enteringDirectory, parent_path, dir_name);
 
   // go through the open directory notifying the user at specific positions
-  while ((dit = portableReaddir(dip)) != NULL) {
+  while ((dit = platform_readdir(dip)) != NULL) {
     // check if filename is included in the ignored files list
     if (ignored_files_.find(dit->d_name) != ignored_files_.end()) {
       continue;
     }
-    
+
     // notify user about found directory entry
     switch (dit->d_type) {
       case DT_DIR:
@@ -194,7 +194,7 @@ private:
     }
   }
 };
-  
+
 } // namespace cvmfs
 
 #endif

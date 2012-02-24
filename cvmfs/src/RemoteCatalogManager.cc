@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fstream>
 
+#include "platform.h"
 #include "cache.h"
 #include "signature.h"
 #include "download.h"
@@ -80,8 +81,8 @@ namespace cvmfs {
     if (((result == 0) && !cached_copy) ||
         ((existing_cat_id < 0) && ((result == 0) || cached_copy)))
     {
-      PortableStat64 info;
-      if (portableFileStat64(catalog_file->c_str(), &info) != 0) {
+      platform_stat64 info;
+      if (platform_stat(catalog_file->c_str(), &info) != 0) {
         /* should never happen */
         lru::remove(sha1_cat);
         cached_copy = false;

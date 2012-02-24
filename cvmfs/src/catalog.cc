@@ -25,7 +25,7 @@
 #include "cvmfs.h"
 #endif
 
-#include "compat.h"
+#include "platform.h"
 
 #include <cstdlib>
 #include <iostream>

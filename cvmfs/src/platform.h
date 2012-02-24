@@ -8,9 +8,9 @@
 #define CVMFS_PLATFORM_H_
 
 #ifdef __APPLE__
-#include "compat_macosx.h"
+  #include "platform_osx.h"
 #else
-#include "compat_linux.h"
+  #include "platform_linux.h"
 #endif
 
 #endif  // CVMFS_PLATFORM_H_

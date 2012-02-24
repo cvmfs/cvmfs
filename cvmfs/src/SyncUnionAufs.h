@@ -15,7 +15,7 @@
 #include <list>
 #include <map>
 
-#include "compat.h"
+#include "platform.h"
 
 #include "SyncUnion.h"
 #include "SyncMediator.h"
@@ -37,22 +37,22 @@ class SyncUnionAufs :
   	            const std::string &repository_path,
   	            const std::string &union_path,
                 const std::string &overlay_path);
-	
+
 	bool DoYourMagic();
-	
+
  protected:
 	inline bool IsWhiteoutEntry(const SyncItem &entry) const {
 	  return (entry.GetFilename().substr(0, mWhiteoutPrefix.length()) == mWhiteoutPrefix);
 	}
-	
+
 	inline bool IsOpaqueDirectory(const SyncItem *directory) const {
 	  return file_exists(directory->GetOverlayPath() + "/.wh..wh..opq");
 	}
-	
+
 	inline std::string UnwindWhiteoutFilename(const std::string &filename) const {
 	  return filename.substr(mWhiteoutPrefix.length());
 	}
-	
+
 	inline std::set<std::string> GetIgnoredFilenames() const { return mIgnoredFilenames; };
 };
 
