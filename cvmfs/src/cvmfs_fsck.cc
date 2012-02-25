@@ -13,10 +13,7 @@
 
 #include "platform.h"
 #include "compression.h"
-
-extern "C" {
 #include "smalloc.h"
-}
 
 #include <iostream>
 #include <string>

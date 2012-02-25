@@ -24,9 +24,7 @@
 #include <ctime>
 #include <cstring>
 
-extern "C" {
-  #include "smalloc.h"
-}
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -37,9 +35,9 @@ pthread_mutex_t lock_stderr = PTHREAD_MUTEX_INITIALIZER;
 #ifdef DEBUGMSG
 pthread_mutex_t lock_debug = PTHREAD_MUTEX_INITIALIZER;
 FILE *file_debug = NULL;
-char *module_names[] = { "unknown", "cache", "catalog", "cvmfs", "hash",
-  "curl", "compress", "lru", "talk", "monitor", "inode cache", "path cache",
-  "md5 cache"};
+char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs", "hash",
+  "download", "compress", "lru", "talk", "monitor", "inode cache", "path cache",
+  "md5 cache", "fuse stub"};
 #endif
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;

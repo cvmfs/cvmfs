@@ -4,9 +4,7 @@
 #
 
 set (CVMFS2_DEBUG_SOURCES
-	smalloc.h smalloc.c
-	log.c log.h
-	sha1.h sha1.c
+	smalloc.h
 	logging.cc logging.h
 	tracer.h tracer.cc atomic.h
 	sqlite3-duplex.h
@@ -23,8 +21,6 @@ set (CVMFS2_DEBUG_SOURCES
 	monitor.h monitor.cc
 	util.cc util.h
 	zlib-duplex.h compression.h compression.cc
-	md5.h
-	debug.h debug.c
 	download.cc download.h
 	lru_cache.h
 	inode_cache.h inode_cache.cc
@@ -44,23 +40,18 @@ set (CVMFS2_DEBUG_SOURCES
 set (CVMFS2_SOURCES ${CVMFS2_DEBUG_SOURCES})
 
 set (CVMFS_FSCK_SOURCES
-	smalloc.h smalloc.c
-	debug.c debug.h
-	md5.h
-	sha1.c sha1.h
+	smalloc.h
 	zlib-duplex.h compression.cc compression.h
 	hash.cc hash.h
 	util.cc util.h cvmfs_fsck.cc)
 
 set (CVMFS_SYNC_BIN_SOURCES
-	smalloc.h smalloc.c
-	debug.h debug.c
+	smalloc.h
 	zlib-duplex.h compression.h compression.cc
-	md5.h sha1.h sha1.c hash.h hash.cc
+  hash.h hash.cc
 	catalog_tree.h catalog_tree.cc
 	sqlite3-duplex.h
 	util.cc util.h
-	log.c log.h
 	logging.cc logging.h
 	monitor.cc monitor.h
 	cvmfs_sync.h cvmfs_sync.cc
@@ -83,44 +74,33 @@ set (CVMFS_SYNC_BIN_SOURCES
 	DirectoryEntry.h)
 
 set (CVMFS_CLGCMP_SOURCES
-	smalloc.h smalloc.c
-	debug.c debug.h
+	smalloc.h
 	zlib-duplex.h compression.cc compression.h
 	catalog_tree.h catalog_tree.cc
 	catalog.cc catalog.h
-	md5.h
-	sha1.c sha1.h
 	hash.cc hash.h
 	util.cc util.h cvmfs_clgcmp.cc)
 
 set (CVMFS_LSCAT_SOURCES
-	smalloc.h smalloc.c
-	debug.c debug.h
+	smalloc.h
 	zlib-duplex.h compression.cc compression.h
 	catalog_tree.h catalog_tree.cc
 	sqlite3-duplex.h catalog.cc catalog.h
-	md5.h sha1.c sha1.h
 	hash.cc hash.h
 	util.cc util.h cvmfs_lscat.cc)
 
 set (CVMFS_SIGN_SOURCES
-	smalloc.h smalloc.c
-	debug.c debug.h
+	smalloc.h
 	zlib-duplex.h compression.h compression.cc
-	md5.h
-	sha1.c sha1.h
 	hash.cc hash.h
 	util.h util.cc
 	signature.cc signature.h cvmfs_sign.cc)
 
 set (CVMFS_PULL_SOURCES
-	smalloc.h smalloc.c
-	debug.h debug.c
-	log.h log.c
+	smalloc.h
 	logging.cc logging.h
 	zlib-duplex.h compression.h compression.cc
 	curl_duplex.h download.cc download.h
-	md5.h sha1.h sha1.c
 	hash.h hash.cc
 	util.h util.cc
 	catalog_tree.h catalog_tree.cc
@@ -129,9 +109,7 @@ set (CVMFS_PULL_SOURCES
 	cvmfs_pull.cc)
 
 set (CVMFS_SCRUB_SOURCES
-	smalloc.h smalloc.c
-	debug.h debug.c
-	md5.h sha1.h sha1.c
+	smalloc.h
 	hash.h hash.cc
 	util.h util.cc
 	cvmfs_scrub.cc)

@@ -1,10 +1,31 @@
-#ifndef SMALLOC_H
-#define SMALLOC_H 1
+/**
+ * This file is part of the CernVM File System.
+ *
+ * Ensures that cvmfs aborts on out-of-memory errors.
+ */
+
+#ifndef CVMFS_SMALLOC_H
+#define CVMFS_SMALLOC_H 1
 
 #include <stdlib.h>
+#include <cassert>
 
-void *smalloc(size_t size);
-void *srealloc(void *ptr, size_t size);
-void *scalloc(size_t count, size_t size);
+static inline void * __attribute__((used)) smalloc(size_t size) {
+  void *mem = malloc(size);
+  assert(mem && "Out Of Memory");
+  return mem;
+}
 
-#endif
+static inline void * __attribute__((used)) srealloc(void *ptr, size_t size) {
+  void *mem = realloc(ptr, size);
+  assert(mem && "Out Of Memory");
+  return mem;
+}
+
+static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
+  void *mem = calloc(count, size);
+  assert(mem && "Out Of Memory");
+  return mem;
+}
+
+#endif  // CVMFS_SMALLOC_H

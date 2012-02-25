@@ -20,6 +20,7 @@ enum LogFacilities {
 enum LogSource {
   kLogCache = 1,
   kLogCatalog,
+  kLogSql,
   kLogCvmfs,
   kLogHash,
   kLogDownload,
@@ -30,6 +31,7 @@ enum LogSource {
   kLogInodeCache,
   kLogPathCache,
   kLogMd5Cache,
+  kLogFuse,
 };
 
 void SetLogSyslogLevel(const int level);

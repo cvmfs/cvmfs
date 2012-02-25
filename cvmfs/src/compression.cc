@@ -19,11 +19,7 @@
 
 #include "logging.h"
 #include "hash.h"
-extern "C" {
-#include "sha1.h"
 #include "smalloc.h"
-}
-
 
 using namespace std;  // NOLINT
 
@@ -232,7 +228,7 @@ bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash) {
   sha1_context_t sha1_ctx;
 
   CompressInit(&strm);
-  sha1_init(&sha1_ctx);
+  hash::sha1_init(&sha1_ctx);
 
   // Compress until end of file
   do {
@@ -251,7 +247,7 @@ bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash) {
       if (z_ret == Z_STREAM_ERROR)
         goto compress_file2null_final;  // state not clobbered
       have = kZChunk - strm.avail_out;
-      sha1_update(&sha1_ctx, out, have);
+      hash::sha1_update(&sha1_ctx, out, have);
     } while (strm.avail_out == 0);
 
     // Done when last data in file processed
@@ -260,7 +256,7 @@ bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash) {
   // stream will be complete
   if (z_ret != Z_STREAM_END) goto compress_file2null_final;
 
-  sha1_final(compressed_hash->digest, &sha1_ctx);
+  hash::sha1_final(compressed_hash->digest, &sha1_ctx);
   result = true;
 
   // Clean up and return
@@ -330,7 +326,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash) {
   sha1_context_t sha1_ctx;
 
   CompressInit(&strm);
-  sha1_init(&sha1_ctx);
+  hash::sha1_init(&sha1_ctx);
 
   // Compress until end of file
   do {
@@ -351,7 +347,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash) {
       have = kZChunk - strm.avail_out;
       if (fwrite(out, 1, have, fdest) != have || ferror(fdest))
         goto compress_file2file_hashed_final;
-      sha1_update(&sha1_ctx, out, have);
+      hash::sha1_update(&sha1_ctx, out, have);
     } while (strm.avail_out == 0);
 
     // Done when last data in file processed
@@ -360,7 +356,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash) {
   // Stream will be complete
   if (z_ret != Z_STREAM_END) goto compress_file2file_hashed_final;
 
-  sha1_final(compressed_hash->digest, &sha1_ctx);
+  hash::sha1_final(compressed_hash->digest, &sha1_ctx);
   result = true;
 
   // Clean up and return

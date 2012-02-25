@@ -16,18 +16,94 @@
 #include <string>
 #include <cstring>
 
-extern "C" {
-   #include "md5.h"
-   #include "sha1.h"
-   #include "debug.h"
-}
-
 using namespace std;
 
 namespace hash {
 
+  static inline void md5_init(MD5_CTX *pms)
+  {
+    MD5_Init(pms);
+  }
+
+  static inline void md5_append(MD5_CTX *pms, const unsigned char *buf, int len)
+  {
+    MD5_Update(pms, buf, len);
+  }
+
+  static inline void md5_finish(MD5_CTX *pms, unsigned char digest[16])
+  {
+    MD5_Final(digest, pms);
+  }
+
+  void sha1_init(SHA_CTX *ctx) {
+    SHA1_Init(ctx);
+  }
+
+  void sha1_update(SHA_CTX *ctx, const unsigned char *buf, unsigned len) {
+    SHA1_Update(ctx, buf, len);
+  }
+
+
+  void sha1_final(unsigned char digest[20], SHA_CTX *ctx) {
+    SHA1_Final(digest, ctx);
+  }
+
+  static void sha1_string(const unsigned char digest[20], char sha1_str[41])
+  {
+    int i;
+    for(i=0; i<20; ++i) {
+      char dgt1 = (unsigned)digest[i] / 16;
+      char dgt2 = (unsigned)digest[i] % 16;
+      dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
+      dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
+      sha1_str[i*2] = dgt1;
+      sha1_str[i*2+1] = dgt2;
+      //sprintf(&sha1_str[i*2],"%02x",(unsigned)digest[i]);
+    }
+    sha1_str[40] = 0;
+  }
+
+  void sha1_mem(const void *buf, const unsigned buf_size,
+                unsigned char digest[20])
+  {
+    SHA_CTX ctx;
+    sha1_init(&ctx);
+    sha1_update(&ctx, (const unsigned char *)buf, buf_size);
+    sha1_final(digest, &ctx);
+  }
+
+  static void sha1_file_fp(FILE *fp, unsigned char digest[20])
+  {
+    SHA_CTX context;
+    int actual;
+    unsigned char buffer[4096];
+
+    sha1_init(&context);
+    while ((actual = fread(buffer, 1, 4096, fp))) {
+      sha1_update(&context, buffer, actual);
+    }
+    sha1_final(digest, &context);
+  }
+
+
+  int sha1_file(const char *filename, unsigned char digest[20])
+  {
+    FILE *file;
+
+    file = fopen(filename, "rb");
+    if(!file) return 1;
+
+    //  pmesg(D_HASH, "checksumming file %s", filename);
+    sha1_file_fp(file, digest);
+
+    fclose(file);
+    return 0;
+  }
+
+
+
    t_md5::t_md5(const string &str) {
-      md5_state_t md5_state;
+      MD5_CTX md5_state;
       md5_init(&md5_state);
       md5_append(&md5_state, reinterpret_cast<const unsigned char *>(&str[0]), str.length());
       md5_finish(&md5_state, this->digest);
@@ -65,7 +141,7 @@ namespace hash {
 
 
    t_sha1::t_sha1(const std::string &value) {
-      sha1_context_t ctx;
+      SHA_CTX ctx;
       sha1_init(&ctx);
       sha1_update(&ctx, reinterpret_cast<const unsigned char *>(&value[0]), value.length());
       sha1_final(this->digest, &ctx);

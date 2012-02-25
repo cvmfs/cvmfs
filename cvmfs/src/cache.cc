@@ -50,9 +50,7 @@
 #include "logging.h"
 #include "download.h"
 #include "compression.h"
-extern "C" {
 #include "smalloc.h"
-}
 
 using namespace std;  // NOLINT
 

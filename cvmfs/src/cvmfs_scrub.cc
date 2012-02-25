@@ -7,11 +7,6 @@
 
 #define _FILE_OFFSET_BITS 64
 #include "cvmfs_config.h"
-#include "util.h"
-#include "hash.h"
-#include "atomic.h"
-
-#include "platform.h"
 
 #include <iostream>
 #include <string>
@@ -24,9 +19,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-extern "C" {
-   #include "sha1.h"
-};
+#include "platform.h"
+#include "util.h"
+#include "hash.h"
+#include "atomic.h"
 
 using namespace std;
 
@@ -92,7 +88,7 @@ int main(int argc, char **argv) {
          expected.from_hash_str(sha1_name);
 
          hash::t_sha1 calculated;
-         if (sha1_file(d->d_name, calculated.digest) != 0) {
+        if (hash::sha1_file(d->d_name, calculated.digest) != 0) {
             cerr << "Error: failed to open " << path << endl;
             found_corruption = true;
             continue;

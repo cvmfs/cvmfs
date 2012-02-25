@@ -25,14 +25,10 @@
 
 #include "hash.h"
 #include "DirectoryEntry.h"
-
-extern "C" {
-   #include "sqlite3-duplex.h"
-   #include "debug.h"
-}
+#include "sqlite3-duplex.h"
 
 namespace cvmfs {
-  
+
 class Catalog;
 
 /**
@@ -43,7 +39,7 @@ class Catalog;
 class SqlStatement {
  protected:
   SqlStatement() {};
-  
+
  public:
   /**
    *  basic constructor to use this class for different (not wrapped)
@@ -53,7 +49,7 @@ class SqlStatement {
    */
   SqlStatement(const sqlite3 *database, const std::string &statement);
   virtual ~SqlStatement();
-  
+
  protected:
   bool Init(const sqlite3 *database, const std::string &statement);
 
@@ -62,11 +58,11 @@ class SqlStatement {
    *  @return true if last action succeeded otherwise false
    */
   inline bool Successful() const {
-    return SQLITE_OK   == last_error_code_ || 
+    return SQLITE_OK   == last_error_code_ ||
            SQLITE_ROW  == last_error_code_ ||
            SQLITE_DONE == last_error_code_;
   }
-  
+
  public:
   /**
    *  resets a prepared statement to make it reusable
@@ -88,7 +84,7 @@ class SqlStatement {
     last_error_code_ = sqlite3_step(statement_);
     return SQLITE_ROW == last_error_code_;
   }
-  
+
   /**
    *  executes the prepared statement
    *  (this method should be used for modifying statements like DELETE or INSERT)
@@ -98,13 +94,13 @@ class SqlStatement {
     last_error_code_ = sqlite3_step(statement_);
     return SQLITE_DONE == last_error_code_ || SQLITE_OK == last_error_code_;
   }
-  
+
   /**
    *  return the error code of the last performed action
    *  @return the error code of the last action
    */
   inline int GetLastError() const { return last_error_code_; }
-  
+
   inline bool BindBlob(const int index, const void* value, const int size, void (*destructor)(void*)) {
     last_error_code_ = sqlite3_bind_blob(statement_, index, value, size, destructor);
     return Successful();
@@ -144,7 +140,7 @@ class SqlStatement {
     last_error_code_ = sqlite3_bind_zeroblob(statement_, index, size);
     return Successful();
   }
-  
+
  protected:
   /**
    *  convenience wrapper for binding a MD5 hash
@@ -159,7 +155,7 @@ class SqlStatement {
       BindInt64(iCol2, *((sqlite_int64 *)(&hash.digest[8])))
     );
   }
-  
+
   /**
    *  convenience wrapper for binding a SHA1 hash
    *  @param iCol offset of the blob field in database query
@@ -173,9 +169,9 @@ class SqlStatement {
       return BindBlob(iCol, hash.digest, 20, SQLITE_STATIC);
     }
   }
-  
+
  public:
-  
+
   inline const void *RetrieveBlob(const int iCol) const {
     return sqlite3_column_blob(statement_, iCol);
   }
@@ -216,18 +212,18 @@ class SqlStatement {
   inline hash::t_md5 RetrieveMd5Hash(const int iCol1, const int iCol2) const {
     return hash::t_md5(RetrieveInt64(iCol1), RetrieveInt64(iCol2));
   }
-  
+
   /**
    *  convenience wrapper for retrieving a SHA1 hash from a blob field
    *  @param iCol offset of the blob field in database query
    *  @result the retrieved SHA1 hash
    */
   inline hash::t_sha1 RetrieveSha1HashFromBlob(const int iCol) const {
-    return (RetrieveBytes(iCol) > 0) ? 
+    return (RetrieveBytes(iCol) > 0) ?
                     hash::t_sha1(RetrieveBlob(iCol), RetrieveBytes(iCol)) :
                     hash::t_sha1();
   }
-  
+
   /**
    *  convenience wrapper for retrieving a SHA1 hash from a text field
    *  @param iCol offset of the text field in the database query
@@ -253,7 +249,7 @@ class SqlStatement {
 
 class DirectoryEntrySqlStatement : public SqlStatement {
  protected:
-  
+
   // definition of bit positions for the flags field of a DirectoryEntry
   // all not specified bit positions are currently not in use
   const static int kFlagDir                 = 1;
@@ -272,7 +268,7 @@ class DirectoryEntrySqlStatement : public SqlStatement {
   const static int kFlagLinkCount_6         = kFlagLinkCount_0 << 6;
   const static int kFlagLinkCount_7         = kFlagLinkCount_0 << 7;
   const static int kFlagLinkCount           = kFlagLinkCount_0 | kFlagLinkCount_1 | kFlagLinkCount_2 | kFlagLinkCount_3 | kFlagLinkCount_4 | kFlagLinkCount_5 | kFlagLinkCount_6 | kFlagLinkCount_7;
- 
+
  protected:
   /**
    *  take the meta data from the DirectoryEntry and transform it
@@ -281,7 +277,7 @@ class DirectoryEntrySqlStatement : public SqlStatement {
    *  @return an integer containing the bitmap of the flags field
    */
   unsigned int CreateDatabaseFlags(const DirectoryEntry &entry) const;
-  
+
   /**
    *  replaces place holder variables in a symbolic link by actual
    *  path elements
@@ -289,7 +285,7 @@ class DirectoryEntrySqlStatement : public SqlStatement {
    *  @return the expanded symlink
    */
   std::string ExpandSymlink(const std::string raw_symlink) const;
-   
+
   /**
    *  retrieve the linkcount of the read DirectoryEntry from it's flags field
    *  @param flags the integer containing the flags bitmap
@@ -298,7 +294,7 @@ class DirectoryEntrySqlStatement : public SqlStatement {
   inline int GetLinkcountFromFlags(const unsigned int flags) const {
     return (flags & kFlagLinkCount) / kFlagLinkCount_0;
   }
-  
+
   /**
    *  encodes the linkcount into the flags bitmap.
    *  Note: there are only 8 bit reserved for this number!
@@ -364,14 +360,14 @@ class LookupSqlStatement : public DirectoryEntrySqlStatement {
    *  @return the retrieved DirectoryEntry
    */
   DirectoryEntry GetDirectoryEntry(const Catalog *catalog) const;
-  
+
   /**
    *  DirectoryEntrys do not contain their full path.
    *  This method retrieves the saved path hash from the database
    *  @return the MD5 path hash of a freshly performed lookup
    */
   hash::t_md5 GetPathHash() const;
-  
+
   /**
    *  DirectoryEntrys do not contain their full parent path.
    *  This method retrieves the saved parent path hash from the database

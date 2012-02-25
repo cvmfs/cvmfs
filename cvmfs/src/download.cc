@@ -51,10 +51,7 @@
 #include "hash.h"
 #include "util.h"
 #include "compression.h"
-extern "C" {
-  #include "smalloc.h"
-  #include "sha1.h"
-}
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -335,7 +332,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     return 0;
 
   if (info->expected_hash)
-    sha1_update(&info->sha1_context, (unsigned char *)ptr, num_bytes);
+    hash::sha1_update(&info->sha1_context, (unsigned char *)ptr, num_bytes);
 
   if (info->destination == kDestinationMem) {
     // Write to memory
@@ -423,7 +420,7 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
     zlib::DecompressInit(&(info->zstream));
   }
   if (info->expected_hash)
-    sha1_init(&info->sha1_context);
+    hash::sha1_init(&info->sha1_context);
 
   if ((info->destination == kDestinationMem) &&
       (HasPrefix(*(info->url), "file://", false)))
@@ -505,9 +502,11 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_OK:
       // Verify content hash
       if (info->expected_hash) {
-        unsigned char digest[SHA1_DIGEST_LENGTH];
-        sha1_final(digest, &info->sha1_context);
-        if (memcmp(digest, info->expected_hash->digest, SHA1_DIGEST_LENGTH)) {
+        unsigned char digest[hash::t_sha1::DIGEST_SIZE];
+        hash::sha1_final(digest, &info->sha1_context);
+        if (memcmp(digest, info->expected_hash->digest,
+                   hash::t_sha1::DIGEST_SIZE))
+        {
           info->error_code = kFailBadData;
           break;
         }

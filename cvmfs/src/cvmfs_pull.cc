@@ -330,7 +330,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
     if (!zlib::CompressMem2Mem(download_certificate.destination_mem.data, download_certificate.destination_mem.size, &outbuf, &outsize)) {
       verify_result = false;
     } else {
-      sha1_mem(outbuf, outsize, verify_sha1.digest);
+      hash::sha1_mem(outbuf, outsize, verify_sha1.digest);
       free(outbuf);
       verify_result = (verify_sha1 == cert_sha1);
     }

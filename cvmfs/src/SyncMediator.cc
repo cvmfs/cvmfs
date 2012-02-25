@@ -4,10 +4,7 @@
 #include <iostream> // TODO: remove that!
 
 #include "compression.h"
-
-extern "C" {
-   #include "smalloc.h"
-}
+#include "smalloc.h"
 
 #include "hash.h"
 #include "cvmfs_sync_recursion.h"

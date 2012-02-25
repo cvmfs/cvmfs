@@ -24,11 +24,7 @@
 #include "hash.h"
 #include "util.h"
 #include "compression.h"
-
-extern "C" {
 #include "smalloc.h"
-#include "sha1.h"
-}
 
 using namespace std;
 
@@ -217,7 +213,7 @@ int main(int argc, char **argv) {
          cerr << "Failed to compress certificate" << endl;
          goto sign_fail;
       }
-      sha1_mem(compr_buf, compr_size, sha1.digest);
+     hash::sha1_mem(compr_buf, compr_size, sha1.digest);
       const string cert_path_tmp = dir_catalogs + "/data/txn/cvmfspublisher.tmp";
       int fd_cert;
       FILE *fcert;
@@ -270,7 +266,7 @@ int main(int argc, char **argv) {
                continue;
             final += itr->first + itr->second + "\n";
          }
-         sha1_mem(&(final[0]), final.length(), sha1.digest);
+        hash::sha1_mem(&(final[0]), final.length(), sha1.digest);
          const string sha1_str = sha1.to_string();
          final += "--\n" + sha1_str + "\n";
 

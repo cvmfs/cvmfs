@@ -8,12 +8,8 @@
 #include "signature.h"
 #include "download.h"
 #include "compression.h"
-
-extern "C" {
-#include "debug.h"
-#include "log.h"
-#include "sha1.h"
-}
+#include "logging.h"
+#include "hash.h"
 
 using namespace std;
 
@@ -57,24 +53,27 @@ namespace cvmfs {
                               *catalog_file, sha1_cat, old_file, sha1_old, cached_copy, expected_clg);
     if (((result == -EPERM) || (result == -EAGAIN) || (result == -EINVAL)) && !no_cache) {
       /* retry with no-cache pragma */
-      pmesg(D_CVMFS, "could not load catalog, trying again with pragma: no-cache");
-      logmsg("possible data corruption while trying to retrieve catalog from %s, trying with no-cache",
-             (root_url_ + url_path).c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+               "possible data corruption while trying to retrieve catalog "
+               "from %s, trying with no-cache", (root_url_ + url_path).c_str());
       result = FetchCatalog(url_path, true, mount_point,
                             *catalog_file, sha1_cat, old_file, sha1_old, cached_copy, expected_clg);
     }
     /* log certain failures */
     if (result == -EPERM) {
-      logmsg("signature verification failure while trying to retrieve catalog from %s",
-             (root_url_ + url_path).c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslog,
+               "signature verification failure while trying to retrieve "
+               "catalog from %s", (root_url_ + url_path).c_str());
     }
     else if ((result == -EINVAL) || (result == -EAGAIN)) {
-      logmsg("data corruption while trying to retrieve catalog from %s",
-             (root_url_ + url_path).c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslog,
+               "data corruption while trying to retrieve catalog from %s",
+               (root_url_ + url_path).c_str());
     }
     else if (result < 0) {
-      logmsg("catalog load failure while try to retrieve catalog from %s",
-             (root_url_ + url_path).c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslog,
+               "catalog load failure while try to retrieve catalog from %s",
+               (root_url_ + url_path).c_str());
     }
 
     /* LRU handling, could still fail due to cache size restrictions */
@@ -87,14 +86,15 @@ namespace cvmfs {
         lru::remove(sha1_cat);
         cached_copy = false;
         result = -EIO;
-        pmesg(D_CVMFS, "failed to access new catalog");
-        logmsg("catalog access failure for %s", catalog_file->c_str());
+        LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+                 "catalog access failure for %s", catalog_file->c_str());
       } else {
         if (((uint64_t)info.st_size > lru::max_file_size()) ||
             (!lru::pin(sha1_cat, info.st_size, root_url_ + url_path)))
         {
-          pmesg(D_CVMFS, "failed to store %s in LRU cache (no space)", catalog_file->c_str());
-          logmsg("catalog load failure for %s (no space)", catalog_file->c_str());
+          LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+                   "catalog load failure for %s (no space)",
+                   catalog_file->c_str());
           lru::remove(sha1_cat);
           unlink(catalog_file->c_str());
           cached_copy = false;
@@ -176,7 +176,8 @@ namespace cvmfs {
     int64_t local_modified;
     char *checksum = NULL;
 
-    pmesg(D_CVMFS, "searching for filesystem at %s", (root_url_ + url_path).c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "searching for filesystem at %s",
+             (root_url_ + url_path).c_str());
 
     cached_copy = false;
     cat_file = old_file = "";
@@ -184,7 +185,8 @@ namespace cvmfs {
     local_modified = 0;
 
     /* load local checksum */
-    pmesg(D_CVMFS, "local checksum file is %s", lpath_chksum.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "local checksum file is %s",
+             lpath_chksum.c_str());
     FILE *fchksum = fopen(lpath_chksum.c_str(), "r");
     char tmp[40];
     if (fchksum && (fread(tmp, 1, 40, fchksum) == 40))
@@ -199,7 +201,8 @@ namespace cvmfs {
         while (fread(&buf_modified, 1, 1, fchksum) == 1)
           str_modified += string(&buf_modified, 1);
         local_modified = atoll(str_modified.c_str());
-        pmesg(D_CVMFS, "cached copy publish date %s", localtime_ascii(local_modified, true).c_str());
+        LogCvmfs(kLogCvmfs, kLogDebug, "cached copy publish date %s",
+                 localtime_ascii(local_modified, true).c_str());
       }
 
       /* Sanity check, do we have the catalog? If yes, save it to temporary file. */
@@ -207,13 +210,15 @@ namespace cvmfs {
         if (rename(cat_file.c_str(), (cat_file + "T").c_str()) != 0) {
           cat_file = "";
           unlink(lpath_chksum.c_str());
-          pmesg(D_CVMFS, "checksum existed but no catalog with it");
+          LogCvmfs(kLogCvmfs, kLogDebug,
+                   "checksum existed but no catalog with it");
         } else {
           cat_file += "T";
           old_file = cat_file;
           cat_sha1 = old_sha1 = sha1_local;
           have_cached = cached_copy = true;
-          pmesg(D_CVMFS, "local checksum is %s", sha1_local.to_string().c_str());
+          LogCvmfs(kLogCvmfs, kLogDebug, "local checksum is %s",
+                    sha1_local.to_string().c_str());
         }
       } else {
         old_file = cat_file;
@@ -221,7 +226,7 @@ namespace cvmfs {
         have_cached = cached_copy = true;
       }
     } else {
-      pmesg(D_CVMFS, "unable to read local checksum");
+      LogCvmfs(kLogCvmfs, kLogDebug, "unable to read local checksum");
     }
     if (fchksum) fclose(fchksum);
 
@@ -231,8 +236,9 @@ namespace cvmfs {
       download::JobInfo download_checksum(&rpath_chksum, false, true, NULL);
       download::Fetch(&download_checksum);
       if (download_checksum.error_code != download::kFailOk) {
-        pmesg(D_CVMFS, "unable to load checksum from %s (%d), going to offline mode", rpath_chksum.c_str(), download_checksum.error_code);
-        logmsg("unable to load checksum from %s (%d), going to offline mode", rpath_chksum.c_str(), download_checksum.error_code);
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                  "unable to load checksum from %s (%d), going to offline mode",
+                 rpath_chksum.c_str(), download_checksum.error_code);
         return -EIO;
       }
       checksum_size = download_checksum.destination_mem.size;
@@ -246,11 +252,13 @@ namespace cvmfs {
 
       map<char, string>::const_iterator clg_key = chksum_keyval.find('C');
       if (clg_key == chksum_keyval.end()) {
-        pmesg(D_CVMFS, "failed to find catalog key in checksum");
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "failed to find catalog key in checksum");
         return -EINVAL;
       }
       sha1_download.from_hash_str(clg_key->second);
-      pmesg(D_CVMFS, "remote checksum is %s", sha1_download.to_string().c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug, "remote checksum is %s",
+               sha1_download.to_string().c_str());
     } else {
       sha1_download = sha1_expected;
     }
@@ -264,8 +272,9 @@ namespace cvmfs {
       map<char, string>::const_iterator published = chksum_keyval.find('T');
       if (published != chksum_keyval.end()) {
         if (local_modified > atoll(published->second.c_str())) {
-          pmesg(D_CVMFS, "cached checksum newer than loaded checksum");
-          logmsg("Cached copy of %s newer than remote copy", rpath_chksum.c_str());
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                   "cached copy of %s newer than remote copy",
+                   rpath_chksum.c_str());
           return 0;
         }
       }
@@ -276,12 +285,14 @@ namespace cvmfs {
       if (repo_name_ != "") {
         map<char, string>::const_iterator name = chksum_keyval.find('N');
         if (name == chksum_keyval.end()) {
-          pmesg(D_CVMFS, "failed to find repository name in checksum");
+          LogCvmfs(kLogCvmfs, kLogDebug,
+                   "failed to find repository name in checksum");
           return -EINVAL;
         }
         if (name->second != repo_name_) {
-          pmesg(D_CVMFS, "expected repository name does not match");
-          logmsg("Expected repository name does not match in %s", rpath_chksum.c_str());
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                   "expected repository name does not match in %s",
+                   rpath_chksum.c_str());
           return -EINVAL;
         }
       }
@@ -290,12 +301,14 @@ namespace cvmfs {
       /* Sanity check: root prefix */
       map<char, string>::const_iterator root_prefix = chksum_keyval.find('R');
       if (root_prefix == chksum_keyval.end()) {
-        pmesg(D_CVMFS, "failed to find root prefix in checksum");
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "failed to find root prefix in checksum");
         return -EINVAL;
       }
       if (root_prefix->second != mount_point.to_string()) {
-        pmesg(D_CVMFS, "expected mount point does not match");
-        logmsg("Expected mount point does not match in %s", rpath_chksum.c_str());
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                 "expected mount point does not match in %s",
+                 rpath_chksum.c_str());
         return -EINVAL;
       }
 
@@ -314,7 +327,7 @@ namespace cvmfs {
         /* retrieve certificate */
         map<char, string>::const_iterator key_cert = chksum_keyval.find('X');
         if ((key_cert == chksum_keyval.end()) || (key_cert->second.length() < 40)) {
-          pmesg(D_CVMFS, "invalid certificate in checksum");
+          LogCvmfs(kLogCvmfs, kLogDebug, "invalid certificate in checksum");
           return -EINVAL;
         }
 
@@ -336,7 +349,9 @@ namespace cvmfs {
           download::JobInfo download_certificate(&url_cert, true, true, NULL);
           download::Fetch(&download_certificate);
           if (download_certificate.error_code != download::kFailOk) {
-            pmesg(D_CVMFS, "unable to load certificate from %s (%d)", url_cert.c_str(), download_certificate.error_code);
+            LogCvmfs(kLogCvmfs, kLogDebug,
+                     "unable to load certificate from %s (%d)",
+                     url_cert.c_str(), download_certificate.error_code);
             return -EAGAIN;
           }
 
@@ -351,12 +366,13 @@ namespace cvmfs {
           {
             verify_result = false;
           } else {
-            sha1_mem(outbuf, outsize, verify_sha1.digest);
+            hash::sha1_mem(outbuf, outsize, verify_sha1.digest);
             free(outbuf);
             verify_result = (verify_sha1 == cert_sha1);
           }
           if (!verify_result) {
-            pmesg(D_CVMFS, "data corruption for %s", url_cert.c_str());
+            LogCvmfs(kLogCvmfs, kLogDebug, "data corruption for %s",
+                     url_cert.c_str());
             free(download_certificate.destination_mem.data);
             return -EAGAIN;
           }
@@ -366,7 +382,7 @@ namespace cvmfs {
 
         /* read certificate */
         if (!signature::load_certificate(data_certificate, size_certificate, false)) {
-          pmesg(D_CVMFS, "could not read certificate");
+          LogCvmfs(kLogCvmfs, kLogDebug, "could not read certificate");
           free(data_certificate);
           return -EINVAL;
         }
@@ -375,11 +391,14 @@ namespace cvmfs {
         if (!IsValidCertificate(no_proxy) ||
             !signature::verify(&((sha1_chksum.to_string())[0]), 40, sig_buf, sig_buf_size))
         {
-          pmesg(D_CVMFS, "signature verification failed against %s", sha1_chksum.to_string().c_str());
+          LogCvmfs(kLogCvmfs, kLogDebug,
+                   "signature verification failed against %s",
+                   sha1_chksum.to_string().c_str());
           free(data_certificate);
           return -EPERM;
         }
-        pmesg(D_CVMFS, "catalog signed by: %s", signature::whois().c_str());
+        LogCvmfs(kLogCvmfs, kLogDebug, "catalog signed by: %s",
+                 signature::whois().c_str());
         signature_ok = true;
 
         if (!cached_cert) {
@@ -388,9 +407,10 @@ namespace cvmfs {
         }
         free(data_certificate);
       } else {
-        pmesg(D_CVMFS, "remote checksum is not signed");
+        LogCvmfs(kLogCvmfs, kLogDebug, "remote checksum is not signed");
         if (force_signing_) {
-          logmsg("Remote checksum %s is not signed", rpath_chksum.c_str());
+          LogCvmfs(kLogCvmfs, kLogSyslog, "remote checksum %s is not signed",
+                   rpath_chksum.c_str());
           return -EPERM;
         }
       }
@@ -424,8 +444,9 @@ namespace cvmfs {
     download::Fetch(&download_catalog);
     fclose(tmp_fp);
     if (download_catalog.error_code != download::kFailOk) {
-      pmesg(D_CVMFS, "unable to load catalog from %s, going to offline mode (%d)", url_clg.c_str(), download_catalog.error_code);
-      logmsg("unable to load catalog from %s, going to offline mode", url_clg.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "unable to load catalog from %s, going to offline mode (%d)",
+               url_clg.c_str(), download_catalog.error_code);
       unlink(tmp_file);
       return -EAGAIN;
     }
@@ -454,8 +475,9 @@ namespace cvmfs {
       unlink(lpath_chksum.c_str());
     }
     if ((sha1_expected == hash::t_sha1()) && signature_ok) {
-      logmsg("Signed catalog loaded from %s, signed by %s",
-             (root_url_ + url_path).c_str(), signature::whois().c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslog,
+               "signed catalog loaded from %s, signed by %s",
+               (root_url_ + url_path).c_str(), signature::whois().c_str());
     }
     return 0;
   }
@@ -468,10 +490,12 @@ namespace cvmfs {
   bool RemoteCatalogManager::IsValidCertificate(bool nocache) {
     const string fingerprint = signature::fingerprint();
     if (fingerprint == "") {
-      pmesg(D_CVMFS, "invalid catalog signature");
+      LogCvmfs(kLogCvmfs, kLogDebug, "invalid catalog signature");
       return false;
     }
-    pmesg(D_CVMFS, "checking certificate with fingerprint %s against whitelist", fingerprint.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "checking certificate with fingerprint %s against whitelist",
+             fingerprint.c_str());
 
     time_t local_timestamp = time(NULL);
     string buffer;
@@ -483,7 +507,8 @@ namespace cvmfs {
     download::JobInfo download_whitelist(&whitelist_, false, true, NULL);
     download::Fetch(&download_whitelist);
     if ((download_whitelist.error_code != download::kFailOk) || !download_whitelist.destination_mem.data) {
-      pmesg(D_CVMFS, "whitelist could not be loaded from %s", whitelist_.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug, "whitelist could not be loaded from %s",
+               whitelist_.c_str());
       return false;
     }
     buffer = string(download_whitelist.destination_mem.data, download_whitelist.destination_mem.size);
@@ -493,7 +518,7 @@ namespace cvmfs {
 
     /* check timestamp (UTC) */
     if (!getline(stream, line) || (line.length() != 14)) {
-      pmesg(D_CVMFS, "invalid timestamp format");
+      LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp format");
       free(download_whitelist.destination_mem.data);
       return false;
     }
@@ -502,7 +527,7 @@ namespace cvmfs {
 
     /* Now expiry date */
     if (!getline(stream, line) || (line.length() != 15)) {
-      pmesg(D_CVMFS, "invalid timestamp format");
+      LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp format");
       free(download_whitelist.destination_mem.data);
       return false;
     }
@@ -516,29 +541,34 @@ namespace cvmfs {
     tm_wl.tm_min = 0; /* exact on hours level */
     tm_wl.tm_sec = 0;
     time_t timestamp = timegm(&tm_wl);
-    pmesg(D_CVMFS, "whitelist UTC expiry timestamp in localtime: %s", localtime_ascii(timestamp, false).c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "whitelist UTC expiry timestamp in localtime: %s",
+             localtime_ascii(timestamp, false).c_str());
     if (timestamp < 0) {
-      pmesg(D_CVMFS, "invalid timestamp");
+      LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp");
       free(download_whitelist.destination_mem.data);
       return false;
     }
-    pmesg(D_CVMFS, "local time: %s", localtime_ascii(local_timestamp, true).c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug,  "local time: %s",
+             localtime_ascii(local_timestamp, true).c_str());
     if (local_timestamp > timestamp) {
-      pmesg(D_CVMFS, "whitelist lifetime verification failed, expired");
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "whitelist lifetime verification failed, expired");
       free(download_whitelist.destination_mem.data);
       return false;
     }
 
     /* Check repository name */
     if (!getline(stream, line)) {
-      pmesg(D_CVMFS, "failed to get repository name");
+      LogCvmfs(kLogCvmfs, kLogDebug, "failed to get repository name");
       free(download_whitelist.destination_mem.data);
       return false;
     }
     skip += line.length() + 1;
     if ((repo_name_ != "") && ("N" + repo_name_ != line)) {
-      pmesg(D_CVMFS, "repository name does not match (found %s, expected %s)",
-            line.c_str(), repo_name_.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "repository name does not match (found %s, expected %s)",
+               line.c_str(), repo_name_.c_str());
       free(download_whitelist.destination_mem.data);
       return false;
     }
@@ -552,7 +582,8 @@ namespace cvmfs {
         found = true;
     }
     if (!found) {
-      pmesg(D_CVMFS, "the certificate's fingerprint is not on the whitelist");
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "the certificate's fingerprint is not on the whitelist");
       if (download_whitelist.destination_mem.data)
         free(download_whitelist.destination_mem.data);
       return false;
@@ -560,14 +591,15 @@ namespace cvmfs {
 
     /* check whitelist signature */
     if (!getline(stream, line) || (line.length() < 40)) {
-      pmesg(D_CVMFS, "no checksum at the end of whitelist found");
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "no checksum at the end of whitelist found");
       free(download_whitelist.destination_mem.data);
       return false;
     }
     hash::t_sha1 sha1;
     sha1.from_hash_str(line.substr(0, 40));
     if (sha1 != hash::t_sha1(buffer.substr(0, skip-3))) {
-      pmesg(D_CVMFS, "whitelist checksum does not match");
+      LogCvmfs(kLogCvmfs, kLogDebug, "whitelist checksum does not match");
       free(download_whitelist.destination_mem.data);
       return false;
     }
@@ -579,8 +611,8 @@ namespace cvmfs {
       string blackline;
       while (getline(fblacklist, blackline)) {
         if (blackline.substr(0, 59) == fingerprint) {
-          pmesg(D_CVMFS, "this fingerprint is blacklisted");
-          logmsg("Blacklisted fingerprint (%s)", fingerprint.c_str());
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                   "blacklisted fingerprint (%s)", fingerprint.c_str());
           fblacklist.close();
           free(download_whitelist.destination_mem.data);
           return false;
@@ -594,15 +626,20 @@ namespace cvmfs {
     if (!read_sig_tail(&buffer[0], buffer.length(), skip,
                        &sig_buf, &sig_buf_size))
     {
-      pmesg(D_CVMFS, "no signature at the end of whitelist found");
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "no signature at the end of whitelist found");
       free(download_whitelist.destination_mem.data);
       return false;
     }
     const string sha1str = sha1.to_string();
     bool result = signature::verify_rsa(&sha1str[0], 40, sig_buf, sig_buf_size);
     free(sig_buf);
-    if (!result) pmesg(D_CVMFS, "whitelist signature verification failed, %s", signature::get_crypto_err().c_str());
-    else pmesg(D_CVMFS, "whitelist signature verification passed");
+    if (!result)
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "whitelist signature verification failed, %s",
+               signature::get_crypto_err().c_str());
+    else
+      LogCvmfs(kLogCvmfs, kLogDebug, "whitelist signature verification passed");
 
     if (result) {
       return true;

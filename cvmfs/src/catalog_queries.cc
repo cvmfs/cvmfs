@@ -1,6 +1,7 @@
 #include "catalog_queries.h"
 
 #include "Catalog.h"
+#include "logging.h"
 
 using namespace std;
 
@@ -14,10 +15,11 @@ SqlStatement::~SqlStatement() {
   last_error_code_ = sqlite3_finalize(statement_);
 
   if (not Successful()) {
-    pmesg(D_SQL, "FAILED to finalize statement - error code: %d", last_error_code_);
+    LogCvmfs(kLogSql, kLogDebug,
+             "FAILED to finalize statement - error code: %d", last_error_code_);
   }
 
-  pmesg(D_SQL, "successfully finalized statement");
+  LogCvmfs(kLogSql, kLogDebug, "successfully finalized statement");
 }
 
 bool SqlStatement::Init(const sqlite3 *database, const std::string &statement) {
@@ -28,12 +30,16 @@ bool SqlStatement::Init(const sqlite3 *database, const std::string &statement) {
                                         NULL);
 
   if (not Successful()) {
-    pmesg(D_SQL, "FAILED to prepare statement '%s' - error code: %d", statement.c_str(), GetLastError());
-    pmesg(D_SQL, "Error message: '%s'", sqlite3_errmsg((sqlite3*)database));
+    LogCvmfs(kLogSql, kLogDebug,
+             "FAILED to prepare statement '%s' - error code: %d",
+             statement.c_str(), GetLastError());
+    LogCvmfs(kLogSql, kLogDebug, "Error message: '%s'",
+             sqlite3_errmsg((sqlite3*)database));
     return false;
   }
 
-  pmesg(D_SQL, "successfully prepared statement '%s'", statement.c_str());
+  LogCvmfs(kLogSql, kLogDebug, "successfully prepared statement '%s'",
+           statement.c_str());
   return true;
 }
 
@@ -45,15 +51,15 @@ bool SqlStatement::Init(const sqlite3 *database, const std::string &statement) {
 
 unsigned int DirectoryEntrySqlStatement::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   unsigned int database_flags = 0;
-  
+
   if (entry.IsNestedCatalogRoot()) {
     database_flags |= kFlagDirNestedRoot;
   }
-  
+
   if (entry.IsNestedCatalogMountpoint()) {
     database_flags |= kFlagDirNestedMountpoint;
   }
-  
+
   if (entry.IsDirectory()) {
     database_flags |= kFlagDir;
   } else if (entry.IsLink()) {
@@ -61,21 +67,21 @@ unsigned int DirectoryEntrySqlStatement::CreateDatabaseFlags(const DirectoryEntr
   } else {
     database_flags |= kFlagFile;
   }
-  
+
   database_flags = SetLinkcountInFlags(database_flags, entry.linkcount());
   return database_flags;
 }
 
 std::string DirectoryEntrySqlStatement::ExpandSymlink(const std::string raw_symlink) const {
   string result = "";
-   
+
   for (string::size_type i = 0; i < raw_symlink.length(); i++) {
     string::size_type lpar;
     string::size_type rpar;
-    if ((raw_symlink[i] == '$') && 
+    if ((raw_symlink[i] == '$') &&
         ((lpar = raw_symlink.find('(', i+1)) != string::npos) &&
         ((rpar = raw_symlink.find(')', i+2)) != string::npos) &&
-        (rpar > lpar))  
+        (rpar > lpar))
     {
       string var = raw_symlink.substr(lpar + 1, rpar-lpar-1);
       char *var_exp = getenv(var.c_str()); /* Don't free! Nothing is allocated here */
@@ -141,14 +147,14 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   // fill the directory entry
   // (this method is a friend of DirectoryEntry ;-) )
   DirectoryEntry result;
-  
+
   // read administrative stuff from the result
   int database_flags                   = RetrieveInt(5);
   result.catalog_                      = (Catalog*)catalog;
   result.is_nested_catalog_root_       = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ = (database_flags & kFlagDirNestedMountpoint);
   result.hardlink_group_id_            = RetrieveInt64(1); // quirky database layout here ( legacy ;-) )
-  
+
   // read the usual file information
   result.inode_        = ((Catalog*)catalog)->GetInodeFromRowIdAndHardlinkGroupId(RetrieveInt64(12), RetrieveInt64(1));
   result.parent_inode_ = DirectoryEntry::kInvalidInode; // must be set later by a second catalog lookup
@@ -159,7 +165,7 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.checksum_     = RetrieveSha1HashFromBlob(0);
   result.name_         = string((char *)RetrieveText(6));
   result.symlink_      = ExpandSymlink((char *)RetrieveText(7));
-  
+
   return result;
 }
 

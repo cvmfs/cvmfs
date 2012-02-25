@@ -11,10 +11,7 @@
 #include <ctime>
 #include <sys/stat.h>
 #include <stdint.h>
-
-extern "C" {
-   #include "sqlite3-duplex.h"
-}
+#include "sqlite3-duplex.h"
 
 namespace catalog {
 

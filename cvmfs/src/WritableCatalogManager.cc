@@ -10,6 +10,7 @@
 #include "compression.h"
 #include "WritableCatalog.h"
 #include "util.h"
+#include "logging.h"
 
 using namespace std;
 
@@ -40,14 +41,14 @@ bool WritableCatalogManager::Init() {
   // create a root catalog
   if (not succeeded &&
       not CreateAndAttachRootCatalog()) {
-    pmesg(D_CATALOG, "unable to init catalog manager (cannot create root catalog)");
+    LogCvmfs(kLogCatalog, kLogDebug, "unable to init catalog manager (cannot create root catalog)");
     return false;
   }
 
   // do lazy attach if asked for
   if (not IsLazyAttaching() &&
       not LoadAndAttachCatalogsRecursively()) {
-    pmesg(D_CATALOG, "unable to load catalogs recursively");
+    LogCvmfs(kLogCatalog, kLogDebug, "unable to load catalogs recursively");
     return false;
   }
 
@@ -65,7 +66,7 @@ int WritableCatalogManager::LoadCatalogFile(const std::string &url_path,
   // check if the file exists
   // if not, the 'loading' fails
   if (not file_exists(*catalog_file)) {
-    pmesg(D_CATALOG, "failed to load catalog file: catalog file '%s' not found", catalog_file->c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog file: catalog file '%s' not found", catalog_file->c_str());
     return -1;
   }
 
@@ -100,13 +101,13 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
                                                     root_entry,
                                                     root_entry_parent_path,
                                                     create_root_catalog)) {
-    pmesg(D_CATALOG, "creation of catalog '%s' failed", file_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "creation of catalog '%s' failed", file_path.c_str());
     return false;
   }
 
   // attach the just created catalog
   if (not LoadAndAttachCatalog("", NULL)) {
-    pmesg(D_CATALOG, "failed to attach newly created root catalog");
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to attach newly created root catalog");
     return false;
   }
 
@@ -135,17 +136,17 @@ bool WritableCatalogManager::RemoveFile(const std::string &path) {
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
-    pmesg(D_CATALOG, "catalog for file '%s' cannot be found", file_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "catalog for file '%s' cannot be found", file_path.c_str());
     return false;
   }
 
   if (not catalog->Lookup(file_path)) {
-    pmesg(D_CATALOG, "file '%s' does not exist and thus cannot be deleted", file_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "file '%s' does not exist and thus cannot be deleted", file_path.c_str());
     return false;
   }
 
   if (not catalog->RemoveEntry(file_path)) {
-    pmesg(D_CATALOG, "something went wrong while deleting '%s'", file_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while deleting '%s'", file_path.c_str());
     return false;
   }
 
@@ -158,34 +159,34 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
-    pmesg(D_CATALOG, "catalog for directory '%s' cannot be found", directory_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "catalog for directory '%s' cannot be found", directory_path.c_str());
     return false;
   }
 
   DirectoryEntry dir;
   if (not catalog->Lookup(directory_path, &dir)) {
-    pmesg(D_CATALOG, "directory '%s' does not exist and thus cannot be deleted", directory_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' does not exist and thus cannot be deleted", directory_path.c_str());
     return false;
   }
 
   if (dir.IsNestedCatalogMountpoint()) {
-    pmesg(D_CATALOG, "directory '%s' is a mount point of a nested catalog, delete is not allowed", directory_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' is a mount point of a nested catalog, delete is not allowed", directory_path.c_str());
     return false;
   }
 
   if (dir.IsNestedCatalogRoot()) {
-    pmesg(D_CATALOG, "directory '%s' is the root of a nested catalog, delete is not allowed", directory_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' is the root of a nested catalog, delete is not allowed", directory_path.c_str());
     return false;
   }
 
   DirectoryEntryList listing;
   if (not catalog->Listing(directory_path, &listing) && listing.size() > 0) {
-    pmesg(D_CATALOG, "directory '%s' is not empty and cannot be deleted", directory_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' is not empty and cannot be deleted", directory_path.c_str());
     return false;
   }
 
   if (not catalog->RemoveEntry(directory_path)) {
-    pmesg(D_CATALOG, "something went wrong while deleting '%s'", directory_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while deleting '%s'", directory_path.c_str());
     return false;
   }
 
@@ -199,7 +200,7 @@ bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
-    pmesg(D_CATALOG, "catalog for directory '%s' cannot be found", directory_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "catalog for directory '%s' cannot be found", directory_path.c_str());
     return false;
   }
 
@@ -214,19 +215,19 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
-    pmesg(D_CATALOG, "catalog for file '%s' cannot be found", file_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "catalog for file '%s' cannot be found", file_path.c_str());
     return false;
   }
 
   // sanity checks
   if (entry.IsLink()) {
     if (entry.symlink() == "") {
-      pmesg(D_CATALOG, "unable to read link destination for symlink '%s' - add failed", file_path.c_str());
+      LogCvmfs(kLogCatalog, kLogDebug, "unable to read link destination for symlink '%s' - add failed", file_path.c_str());
   		return false;
 		}
   } else {
     if (entry.checksum().is_null()) {
-      pmesg(D_CATALOG, "regular file '%s' has no content hash and cannot be added", file_path.c_str());
+      LogCvmfs(kLogCatalog, kLogDebug, "regular file '%s' has no content hash and cannot be added", file_path.c_str());
   		return false;
     }
   }
@@ -239,12 +240,12 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
                                               const std::string &parent_directory) {
   // sanity check
 	if (entries.size() == 0) {
-    pmesg(D_CATALOG, "tried to add an empty hardlink group");
+    LogCvmfs(kLogCatalog, kLogDebug, "tried to add an empty hardlink group");
 		return false;
 	}
 
 	if (entries.size() == 1) {
-    pmesg(D_CATALOG, "tried to add a hardlink group with just one member... added as normal file instead");
+    LogCvmfs(kLogCatalog, kLogDebug, "tried to add a hardlink group with just one member... added as normal file instead");
     return AddFile(entries.front(), parent_directory);
 	}
 
@@ -254,14 +255,14 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
-    pmesg(D_CATALOG, "catalog for hardlink group containing '%s' cannot be found", parent_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "catalog for hardlink group containing '%s' cannot be found", parent_path.c_str());
     return false;
   }
 
 	// get a valid hardlink group id for the catalog the group will end up in
 	int new_group_id = catalog->GetMaximalHardlinkGroupId() + 1;
 	if (new_group_id <= 0) {
-    pmesg(D_CATALOG, "failed to retrieve a new valid hardlink group id");
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to retrieve a new valid hardlink group id");
 		return false;
 	}
 
@@ -280,7 +281,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	}
 
 	if (false == result) {
-    pmesg(D_CATALOG, "something went wrong while adding a hardlink group");
+    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while adding a hardlink group");
 	}
 
 	return result;
@@ -293,17 +294,17 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
-    pmesg(D_CATALOG, "catalog for entry '%s' cannot be found", entry_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "catalog for entry '%s' cannot be found", entry_path.c_str());
     return false;
   }
 
   if (not catalog->Lookup(entry_path)) {
-    pmesg(D_CATALOG, "entry '%s' does not exist and thus cannot be touched", entry_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "entry '%s' does not exist and thus cannot be touched", entry_path.c_str());
     return false;
   }
 
   if (not catalog->TouchEntry(entry, entry_path)) {
-    pmesg(D_CATALOG, "something went wrong while touching entry '%s'", entry_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while touching entry '%s'", entry_path.c_str());
     return false;
   }
 
@@ -317,7 +318,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   // will be represented as a new nested catalog from now on
   WritableCatalog *old_catalog = NULL;
   if (not GetCatalogByPath(nested_root_path, &old_catalog)) {
-    pmesg(D_CATALOG, "failed to create nested catalog '%s': mountpoint was not found in current catalog structure", nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': mountpoint was not found in current catalog structure", nested_root_path.c_str());
     return false;
   }
 
@@ -335,14 +336,14 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
                                                     new_root_entry,
                                                     root_entry_parent_path,
                                                     create_root_catalog)) {
-    pmesg(D_CATALOG, "failed to create nested catalog '%s': database schema creation failed", nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': database schema creation failed", nested_root_path.c_str());
     return false;
   }
 
   // attach the just created nested catalog
   Catalog *new_catalog = NULL;
   if (not LoadAndAttachCatalog(nested_root_path, old_catalog, &new_catalog)) {
-    pmesg(D_CATALOG, "failed to create nested catalog '%s': unable to attach newly created nested catalog", nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': unable to attach newly created nested catalog", nested_root_path.c_str());
     return false;
   }
 
@@ -358,14 +359,14 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
 
     // TODO: if this happens, we may have destroyed our catalog structure...
     //       it might be a good idea to take some counter measures here
-    pmesg(D_CATALOG, "[FATAL] failed to create nested catalog '%s': splitting of catalog content failed", nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "[FATAL] failed to create nested catalog '%s': splitting of catalog content failed", nested_root_path.c_str());
     return false;
   }
 
   // add the newly created nested catalog to the references of the containing
   // catalog
   if (not old_catalog->InsertNestedCatalogReference(new_catalog->path())) {
-    pmesg(D_CATALOG, "failed to insert new nested catalog reference '%s' in catalog '%s'", new_catalog->path().c_str(), old_catalog->path().c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to insert new nested catalog reference '%s' in catalog '%s'", new_catalog->path().c_str(), old_catalog->path().c_str());
     return false;
   }
 
@@ -378,32 +379,32 @@ bool WritableCatalogManager::RemoveNestedCatalog(const std::string &mountpoint) 
   // find the catalog which should be removed
   WritableCatalog *nested_catalog = NULL;
   if (not GetCatalogByPath(nested_root_path, &nested_catalog)) {
-    pmesg(D_CATALOG, "failed to remove nested catalog '%s': mountpoint was not found in current catalog structure", nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog '%s': mountpoint was not found in current catalog structure", nested_root_path.c_str());
     return false;
   }
 
   // check if the found catalog is really the nested catalog to be deleted
   if (nested_catalog->IsRoot() || nested_catalog->path() != nested_root_path) {
-    pmesg(D_CATALOG, "failed to remove nested catalog '%s': mountpoint '%s' does not name a nested catalog", nested_catalog->path().c_str(), nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog '%s': mountpoint '%s' does not name a nested catalog", nested_catalog->path().c_str(), nested_root_path.c_str());
     return false;
   }
 
   // merge all data from the nested catalog into it's parent
   if (not nested_catalog->MergeIntoParentCatalog()) {
-    pmesg(D_CATALOG, "failed to remove nested catalog '%s': merging of content unsuccessful.", nested_catalog->path().c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog '%s': merging of content unsuccessful.", nested_catalog->path().c_str());
     return false;
   }
 
   // remove the catalog from our internal data structures
   const string database_file = GetCatalogFilenameForPath(nested_catalog->path());
   if (not DetachCatalog(nested_catalog)) {
-    pmesg(D_CATALOG, "something went wrong while detaching the removed catalog '%s'", nested_catalog->path().c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while detaching the removed catalog '%s'", nested_catalog->path().c_str());
     return false;
   }
 
   // delete the catalog database file from the working copy
   if (remove(database_file.c_str()) != 0) {
-    pmesg(D_CATALOG, "unable to delete the removed nested catalog database file '%s'", database_file.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "unable to delete the removed nested catalog database file '%s'", database_file.c_str());
     return false;
   }
 

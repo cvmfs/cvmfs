@@ -12,10 +12,7 @@
 
 #include "curl_duplex.h"
 #include "compression.h"
-
-extern "C" {
-#include "sha1.h"
-}
+#include "hash.h"
 
 namespace hash {
 struct t_sha1;

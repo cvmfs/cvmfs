@@ -81,12 +81,8 @@
 #include "RemoteCatalogManager.h"
 #include "DirectoryEntry.h"
 #include "compression.h"
-
-extern "C" {
-  #include "sha1.h"
-  #include "smalloc.h"
-  #include "sqlite3-duplex.h"
-}
+#include "sqlite3-duplex.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -1629,7 +1625,6 @@ int main(int argc, char *argv[]) {
 
   /* Set debug log file */
   if (cvmfs_opts.logfile) {
-    debug_set_log(cvmfs_opts.logfile);
     SetLogDebugFile(string(cvmfs_opts.logfile));
   }
 

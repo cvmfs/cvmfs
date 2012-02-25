@@ -37,10 +37,7 @@
 #include <openssl/rsa.h>
 #include <openssl/engine.h>
 
-extern "C" {
-  #include "sha1.h"
-  #include "smalloc.h"
-}
+#include "smalloc.h"
 
 using namespace std;
 
@@ -288,7 +285,7 @@ namespace signature {
     if (buf_size < 0) return "";
 
     hash::t_sha1 sha1;
-    sha1_mem(buf, (unsigned)buf_size, sha1.digest);
+    hash::sha1_mem(buf, (unsigned)buf_size, sha1.digest);
     free(buf);
 
     const string sha1_str = sha1.to_string();

@@ -31,10 +31,7 @@
 #include <sstream>
 #include <pthread.h>
 
-extern "C" {
-   #include "smalloc.h"
-}
-
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 

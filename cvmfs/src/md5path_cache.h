@@ -9,10 +9,6 @@
 
 #include "atomic.h"
 
-extern "C" {
-   #include "debug.h"
-}
-
 namespace cvmfs {
 
    struct hash_md5 {
@@ -20,7 +16,7 @@ namespace cvmfs {
          return (size_t)*((size_t*)md5.digest);
       }
    };
-   
+
    struct hash_equal {
       bool operator() (const hash::t_md5 &a, const hash::t_md5 &b) const {
          return a == b;
@@ -34,10 +30,10 @@ namespace cvmfs {
       public LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >
    {
    private:
-      
+
       public:
          Md5PathCache(unsigned int cacheSize);
-         
+
          bool insert(const hash::t_md5 &hash, const struct catalog::t_dirent &dirEntry);
          bool lookup(const hash::t_md5 &hash, struct catalog::t_dirent *dirEntry);
          bool forget(const hash::t_md5 &hash);

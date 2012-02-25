@@ -43,11 +43,7 @@
 #include "util.h"
 #include "logging.h"
 #include "download.h"
-
-extern "C" {
-#include "debug.h"
 #include "sqlite3-duplex.h"
-}
 
 using namespace std;
 
@@ -62,13 +58,13 @@ namespace talk {
   bool spawned = false;
 
   static void answer(const int con_fd, const string &msg) {
-		pmesg(D_TALK, "message length: %d", msg.length());
+		LogCvmfs(kLogTalk, kLogDebug, "message length: %d", msg.length());
 
     (void)send(con_fd, &msg[0], msg.length(), MSG_NOSIGNAL);
   }
 
   static void *tf_talk(void *data __attribute__((unused))) {
-    pmesg(D_TALK, "talk thread started");
+    LogCvmfs(kLogTalk, kLogDebug, "talk thread started");
 
     struct sockaddr_un remote;
     socklen_t s = sizeof(remote);
@@ -491,7 +487,7 @@ namespace talk {
     if (listen(socket_fd, 1) < -1)
       return false;
 
-    pmesg(D_TALK, "socket created at %s", socket_path.c_str());
+    LogCvmfs(kLogTalk, kLogDebug, "socket created at %s", socket_path.c_str());
 
     return true;
   }
@@ -522,7 +518,7 @@ namespace talk {
     shutdown(socket_fd, SHUT_RDWR);
     close(socket_fd);
     if (spawned) pthread_join(thread_cvmfs_talk, NULL);
-    pmesg(D_TALK, "talk thread stopped");
+    LogCvmfs(kLogTalk, kLogDebug, "talk thread stopped");
   }
 
 }

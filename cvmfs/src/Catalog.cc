@@ -4,10 +4,7 @@
 
 #include "AbstractCatalogManager.h"
 #include "util.h"
-
-extern "C" {
-  #include "debug.h"
-}
+#include "logging.h"
 
 using namespace std;
 
@@ -26,9 +23,11 @@ bool Catalog::OpenDatabase(const string &db_file) {
   database_file_ = db_file;
 
   // open database file (depending on the flags read-only or read-write)
-  pmesg(D_CATALOG, "opening database file %s", database_file_.c_str());
+  LogCvmfs(kLogCatalog, kLogDebug, "opening database file %s",
+           database_file_.c_str());
   if (SQLITE_OK != sqlite3_open_v2(database_file_.c_str(), &database_, flags, NULL)) {
-    pmesg(D_CATALOG, "Cannot open catalog database file %s", database_file_.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "cannot open catalog database file %s",
+             database_file_.c_str());
     return false;
   }
   sqlite3_extended_result_codes(database_, 1);
@@ -38,7 +37,10 @@ bool Catalog::OpenDatabase(const string &db_file) {
   // find out the max row id of this database file
   SqlStatement max_row_id_query(database_, "SELECT MAX(rowid) FROM catalog;");
   if (not max_row_id_query.FetchRow()) {
-    pmesg(D_CATALOG, "Cannot retrieve maximal row id for database file %s (SqliteErrorcode: %d)", database_file_.c_str(), max_row_id_query.GetLastError());
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "Cannot retrieve maximal row id for database file %s "
+             "(SqliteErrorcode: %d)",
+             database_file_.c_str(), max_row_id_query.GetLastError());
     return false;
   }
   max_row_id_ = max_row_id_query.RetrieveInt64(0);
@@ -48,9 +50,13 @@ bool Catalog::OpenDatabase(const string &db_file) {
     SqlStatement root_prefix_query(database_, "SELECT value FROM properties WHERE key='root_prefix';");
     if (root_prefix_query.FetchRow()) {
       root_prefix_ = string((char *)root_prefix_query.RetrieveText(0));
-      pmesg(D_CATALOG, "found root prefix %s in root catalog file %s", root_prefix_.c_str(), database_file_.c_str());
+      LogCvmfs(kLogCatalog, kLogDebug,
+               "found root prefix %s in root catalog file %s",
+               root_prefix_.c_str(), database_file_.c_str());
     } else {
-      pmesg(D_CATALOG, "Cannot retrieve root prefix for root catalog file %s", database_file_.c_str());
+      LogCvmfs(kLogCatalog, kLogDebug,
+               "Cannot retrieve root prefix for root catalog file %s",
+               database_file_.c_str());
     }
   }
 
@@ -204,7 +210,8 @@ bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash,
     bool foundMountpoint = parent_->Lookup(path_hash, &nestedRootMountpoint);
 
     if (not foundMountpoint) {
-      pmesg(D_CATALOG, "FATAL: mount point of nested catalog root could not be found in parent catalog");
+      LogCvmfs(kLogCatalog, kLogDebug, "FATAL: mount point of nested catalog "
+               "root could not be found in parent catalog");
       return false;
     } else {
       entry->set_inode(nestedRootMountpoint.inode());
