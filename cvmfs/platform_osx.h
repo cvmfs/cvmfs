@@ -65,6 +65,7 @@ inline int platform_fstat(int filedes, platform_stat64 *buf) {
  */
 #include <alloca.h>
 #include <cstring>
-#define strdupa(s) strcpy((char *)alloca(strlen((s)) + 1), (s))
+#define strdupa(s) strcpy(reinterpret_cast<char *> \
+  (alloca(strlen((s)) + 1), (s)))
 
 #endif  // CVMFS_PLATFORM_OSX_H_

@@ -4,8 +4,8 @@
  * Ensures that cvmfs aborts on out-of-memory errors.
  */
 
-#ifndef CVMFS_SMALLOC_H
-#define CVMFS_SMALLOC_H 1
+#ifndef CVMFS_SMALLOC_H_
+#define CVMFS_SMALLOC_H_ 1
 
 #include <stdlib.h>
 #include <cassert>
@@ -28,4 +28,4 @@ static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
   return mem;
 }
 
-#endif  // CVMFS_SMALLOC_H
+#endif  // CVMFS_SMALLOC_H_
