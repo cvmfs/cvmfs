@@ -18,6 +18,7 @@ namespace cvmfs {
   RemoteCatalogManager::RemoteCatalogManager(const string &root_url, const string &repo_name, const string &whitelist,
                                              const string &blacklist, const bool force_signing)
   {
+    LogCvmfs(kLogCatalog, kLogDebug, "constructing remote catalog mgr");
     root_url_ = root_url;
     repo_name_ = repo_name;
     whitelist_ = whitelist;

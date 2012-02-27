@@ -5,7 +5,7 @@
  */
 
 #ifndef CVMFS_SMALLOC_H_
-#define CVMFS_SMALLOC_H_ 1
+#define CVMFS_SMALLOC_H_
 
 #include <stdlib.h>
 #include <cassert>

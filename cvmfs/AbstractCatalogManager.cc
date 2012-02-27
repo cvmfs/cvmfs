@@ -19,6 +19,7 @@ AbstractCatalogManager::~AbstractCatalogManager() {
 
 bool AbstractCatalogManager::Init() {
   // attaching root catalog
+  LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog");
   WriteLock();
   bool root_catalog_attached = LoadAndAttachCatalog("", NULL);
   Unlock();

@@ -24,7 +24,7 @@
  * proxies are selected randomly (load-balancing set).
  */
 
-//TODO: Kahan Sum for time
+//TODO: MS for time summing
 
 #include "cvmfs_config.h"
 #include "download.h"
@@ -507,6 +507,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
         if (memcmp(digest, info->expected_hash->digest,
                    hash::t_sha1::DIGEST_SIZE))
         {
+          // TODO(jakob): Logging
           info->error_code = kFailBadData;
           break;
         }
@@ -703,6 +704,8 @@ Failures Fetch(JobInfo *info) {
     info->destination_mem.data = NULL;
     info->destination_mem.size = 0;
   }
+
+  LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d)", result);
 
   return result;
 }
