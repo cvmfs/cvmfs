@@ -13,15 +13,12 @@
 #define CVMFS_HASH_H_
 
 #include <stdint.h>
-#include <openssl/md5.h>
-#include <openssl/sha.h>
 
 #include <cstring>
 #include <cassert>
 
 #include <string>
-
-typedef SHA_CTX sha1_context_t;
+#include "logging.h"
 
 namespace hash {
 
@@ -65,28 +62,35 @@ struct Digest {
   unsigned char digest[digest_size_];
   Algorithms algorithm;
 
+  unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
+
   Digest() {
     algorithm = algorithm_;
     memset(digest, 0, digest_size_);
   }
 
-  Digest(const void *digest_buffer, const unsigned buffer_size) {
-    algorithm = algorithm_;
-    assert(buffer_size <= digest_size_);
-    memcpy(digest, digest_buffer, buffer_size);
-  }
+  explicit Digest(const Algorithms a, const HexPtr hex) {
+    algorithm = a;
+    assert((algorithm_ == kAny) || (a == algorithm_));
+    const unsigned char_size = 2*kDigestSizes[a];
 
-  explicit Digest(HexPtr hex) {
-    algorithm = algorithm_;
     const std::string *str = hex.str;
     const unsigned length = str->length();
-    assert(length < 2*digest_size_);
+    assert(length >= char_size);
 
-    for (unsigned i = 0; i < digest_size_; i += 2) {
+    for (unsigned i = 0; i < char_size; i += 2) {
       this->digest[i/2] =
-        ((*str)[i] <= '9' ? (*str)[i] -'0' : (*str)[i] - 'a' + 10)*16 +
-        ((*str)[i+1] <= '9' ? (*str)[i+1] - '0' : (*str)[i+1] - 'a' + 10);
+      ((*str)[i] <= '9' ? (*str)[i] -'0' : (*str)[i] - 'a' + 10)*16 +
+      ((*str)[i+1] <= '9' ? (*str)[i+1] - '0' : (*str)[i+1] - 'a' + 10);
     }
+  }
+
+  Digest(const Algorithms a,
+         const unsigned char *digest_buffer, const unsigned buffer_size)
+  {
+    algorithm = a;
+    assert(buffer_size <= digest_size_);
+    memcpy(digest, digest_buffer, buffer_size);
   }
 
   void ToCStr(char cstr[digest_size_+1]) const {
@@ -103,16 +107,9 @@ struct Digest {
   }
 
   std::string ToString() const {
-    std::string result(2*kDigestSizes[algorithm], 0);
-    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
-      char dgt1 = (unsigned)digest[i] / 16;
-      char dgt2 = (unsigned)digest[i] % 16;
-      dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
-      dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
-      result += dgt1;
-      result += dgt2;
-    }
-    return result;
+    char result[2*kDigestSizes[algorithm]+1];
+    ToCStr(result);
+    return std::string(result, 2*kDigestSizes[algorithm]);
   }
 
   /**
@@ -121,19 +118,18 @@ struct Digest {
   std::string MakePath(const unsigned dir_levels,
                        const unsigned bytes_per_level) const
   {
-    const unsigned string_length = 2*kDigestSizes[algorithm] + dir_levels;
+    const unsigned string_length = 2*kDigestSizes[algorithm] + dir_levels + 1;
     std::string result(string_length, 0);
 
     unsigned i = 0, pos = 0;
-    while (i < kDigestSizes[algorithm]) {
+    while (i < 2*kDigestSizes[algorithm]) {
       if (((i % bytes_per_level) == 0) &&
           ((i / bytes_per_level) <= dir_levels))
       {
         result[pos] = '/';
         ++pos;
       }
-      char digit = ((i % 2) == 0) ? digest[i/2] / 16 :
-      digest[i/2] % 16;
+      char digit = ((i % 2) == 0) ? digest[i/2] / 16 : digest[i/2] % 16;
       digit += (digit <= 9) ? '0' : 'a' - 10;
       result[pos] = digit;
       ++pos;
@@ -151,7 +147,8 @@ struct Digest {
   }
 
   bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
-    assert(this->algorithm == other.algorithm);
+    if (this->algorithm != other.algorithm)
+      return false;
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
       if (this->digest[i] != other.digest[i])
         return false;
@@ -185,30 +182,31 @@ struct Digest {
 
 
 struct Md5 : public Digest<16, kMd5> {
-  explicit Md5(AsciiPtr ascii);
+  Md5() : Digest<16, kMd5>() { }
+  explicit Md5(const AsciiPtr ascii);
+
   /**
    * An MD5 hash can be seen as two 64bit integers.
    */
-  Md5(const int64_t lo, const int64_t hi);
-  void ToIntPair(int64_t *lo, int64_t *hi) const;
+  Md5(const uint64_t lo, const uint64_t hi);
+  void ToIntPair(uint64_t *lo, uint64_t *hi) const;
 };
 
 struct Sha1 : public Digest<20, kSha1> { };
 
 /**
- * Note that Any as such must not be used except for digest storage.
+ * Any as such must not be used except for digest storage.
  * To do real work, the class has to be "blessed" to be a real hash by
  * setting the algorithm field accordingly.
  */
-struct Any : public Digest<20, kAny> { };
-
-
-/**
- * Holds an OpenSSL context, only required for hash operations.
- */
-struct ContextPtr {
-  void *buffer;
-  unsigned size;
+struct Any : public Digest<20, kAny> {
+  Any() : Digest<20, kAny>() { }
+  Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
+  Any(const Algorithms a,
+      const unsigned char *digest_buffer, const unsigned buffer_size)
+    : Digest<20, kAny>(a, digest_buffer, buffer_size) { }
+  explicit Any(const Algorithms a, const HexPtr hex) :
+    Digest<20, kAny>(a, hex) { }
 };
 
 
@@ -217,57 +215,38 @@ struct ContextPtr {
  * iterative operations.
  */
 unsigned GetContextSize(const Algorithms algorithm);
-void Init(const Algorithms algorithm, ContextPtr context);
-void Update(const Algorithms algorithm,
-            const unsigned char *buffer, const unsigned buffer_size,
+
+/**
+ * Holds an OpenSSL context, only required for hash operations.  Allows to
+ * deferr the storage allocation for the context to alloca.
+ */
+struct ContextPtr {
+  Algorithms algorithm;
+  void *buffer;
+  unsigned size;
+
+  ContextPtr() {
+    algorithm = kAny;
+    size = 0;
+    buffer = NULL;
+  }
+
+  ContextPtr(const Algorithms a) {
+    algorithm = a;
+    size = GetContextSize(a);
+    buffer = NULL;
+  }
+};
+
+void Init(ContextPtr context);
+void Update(const unsigned char *buffer, const unsigned buffer_size,
             ContextPtr context);
-void Final(const Algorithms algorithm, ContextPtr context, Any *any_digest);
+void Final(ContextPtr context, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
+//void HashMemSha1(const unsigned char *buffer, const unsigned buffer_size,
+//                 Sha1 *sha1_digest);
 bool HashFile(const std::string filename, Any *any_digest);
-
-
-
-
-
-  void sha1_init(SHA_CTX *ctx);
-  void sha1_update(SHA_CTX *ctx, const unsigned char *buf, unsigned len);
-  void sha1_final(unsigned char digest[20], SHA_CTX *ctx);
-
-   struct t_md5 {
-      t_md5(const std::string &str);
-      t_md5() { memset(digest, 0, 16); } /* zero-digest (standard initializer) */
-      t_md5(const int64_t part1, const int64_t part2) {
-         memcpy(digest, &part1, 8);
-         memcpy(digest+8, &part2, 8);
-      }
-      bool operator ==(const t_md5 &other) const;
-      unsigned char digest[16];
-      std::string to_string() const;
-   };
-
-   struct t_sha1 {
-      const static unsigned DIGEST_SIZE = 20;
-      const static unsigned CHAR_SIZE = 40;
-      const static unsigned BIT_SIZE = 160;
-      t_sha1(const void * const buf_digest, const int buf_size);
-      t_sha1() { memset(digest, 0, 20); } /* zero-digest (standard initializer) */
-      t_sha1(const std::string &value);
-      void from_hash_str(const std::string &hash_str);
-      std::string to_string() const;
-      bool is_null() const;
-      bool operator ==(const t_sha1 &other) const;
-      bool operator !=(const t_sha1 &other) const;
-      bool operator <(const t_sha1 &other) const;
-      bool operator >(const t_sha1 &other) const;
-      unsigned char digest[20];
-   };
-
-  std::string MakePath(const t_sha1 &hash, const unsigned dir_levels,
-                       const unsigned subdirs_per_level);
-  void sha1_mem(const void *buf, const unsigned buf_size,
-                unsigned char digest[40]);
-  int sha1_file(const char *filename, unsigned char digest[20]);
 
 }  // namespace hash
 

@@ -17,7 +17,7 @@ SyncItem::SyncItem(const string &dirPath,
   mWhiteout(false),
   mRelativeParentPath(dirPath),
   mFilename(filename),
-  mUnionEngine(syncUnionEngine) {}
+  mUnionEngine(syncUnionEngine) { mContentHash.algorithm = hash::kSha1; /* TODO */}
 
 SyncItem::~SyncItem() {
 }

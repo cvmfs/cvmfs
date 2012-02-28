@@ -13,7 +13,7 @@
 #include "zlib-duplex.h"
 
 namespace hash {
-  struct t_sha1;
+  struct Any;
 }
 
 bool CopyPath2Path(const std::string &src, const std::string &dest);
@@ -36,12 +36,12 @@ StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
 
 bool CompressPath2Path(const std::string &src, const std::string &dest);
 bool CompressPath2Path(const std::string &src, const std::string &dest,
-                       hash::t_sha1 *compressed_hash);
+                       hash::Any *compressed_hash);
 bool DecompressPath2Path(const std::string &src, const std::string &dest);
 
-bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash);
+bool CompressFile2Null(FILE *fsrc, hash::Any *compressed_hash);
 bool CompressFile2File(FILE *fsrc, FILE *fdest);
-bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash);
+bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash);
 bool DecompressFile2File(FILE *fsrc, FILE *fdest);
 
 // User of these functions has to free out_buf, if successful

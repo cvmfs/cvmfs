@@ -36,19 +36,18 @@ namespace cvmfs {
     return new Catalog(mountpoint, parent_catalog);
   }
 
-  int RemoteCatalogManager::LoadCatalogFile(const string &url_path, const hash::t_md5 &mount_point,
+  int RemoteCatalogManager::LoadCatalogFile(const string &url_path, const hash::Md5 &mount_point,
                                             const int existing_cat_id, const bool no_cache,
-                                            const hash::t_sha1 expected_clg, std::string *catalog_file)
+                                            const hash::Any &expected_clg, std::string *catalog_file)
   {
 
     // TODO: there is a lot of clutter in here which should be done by a dedicated
     //       FileManager class...
 
     string old_file;
-    hash::t_sha1 sha1_old;
-    hash::t_sha1 sha1_cat;
+    hash::Any sha1_old(hash::kSha1);
+    hash::Any sha1_cat(hash::kSha1);
     bool cached_copy;
-    int cat_id = existing_cat_id;
 
     int result = FetchCatalog(url_path, no_cache, mount_point,
                               *catalog_file, sha1_cat, old_file, sha1_old, cached_copy, expected_clg);
@@ -102,7 +101,7 @@ namespace cvmfs {
           result = -ENOSPC;
         } else {
           /* From now on we have to go with the new catalog */
-          if (!sha1_old.is_null() && (sha1_old != sha1_cat)) {
+          if (!sha1_old.IsNull() && (sha1_old != sha1_cat)) {
             lru::remove(sha1_old);
             unlink(old_file.c_str());
           }
@@ -112,7 +111,7 @@ namespace cvmfs {
 
     // rename the loaded catalog file
     if ((result == 0) || cached_copy) {
-      const string sha1_cat_str = sha1_cat.to_string();
+      const string sha1_cat_str = sha1_cat.ToString();
       const string final_file = "./" + sha1_cat_str.substr(0, 2) + "/" +
       sha1_cat_str.substr(2);
       (void)rename(catalog_file->c_str(), final_file.c_str());
@@ -161,18 +160,18 @@ namespace cvmfs {
    * \return 0 on success, a standard error code else
    */
   int RemoteCatalogManager::FetchCatalog(
-                                         const string &url_path, const bool no_proxy, const hash::t_md5 &mount_point,
-                                         string &cat_file, hash::t_sha1 &cat_sha1, string &old_file, hash::t_sha1 &old_sha1,
-                                         bool &cached_copy, const hash::t_sha1 &sha1_expected, const bool dry_run) {
+                                         const string &url_path, const bool no_proxy, const hash::Md5 &mount_point,
+                                         string &cat_file, hash::Any &cat_sha1, string &old_file, hash::Any &old_sha1,
+                                         bool &cached_copy, const hash::Any &sha1_expected, const bool dry_run) {
     const string fskey = (repo_name_ == "") ? root_url_ : repo_name_;
     const string lpath_chksum = "./cvmfs.checksum." + MakeFilesystemKey(fskey + url_path);
     const string rpath_chksum = url_path + "/.cvmfspublished";
     bool have_cached = false;
     bool signature_ok = false;
     unsigned checksum_size = 0;
-    hash::t_sha1 sha1_download;
-    hash::t_sha1 sha1_local;
-    hash::t_sha1 sha1_chksum; /* required for signature verification */
+    hash::Any sha1_download(hash::kSha1);
+    hash::Any sha1_local(hash::kSha1);
+    hash::Any sha1_chksum(hash::kSha1); /* required for signature verification */
     map<char, string> chksum_keyval;
     int64_t local_modified;
     char *checksum = NULL;
@@ -182,7 +181,7 @@ namespace cvmfs {
 
     cached_copy = false;
     cat_file = old_file = "";
-    old_sha1 = cat_sha1 = hash::t_sha1();
+    old_sha1 = cat_sha1 = hash::Any(hash::kSha1);
     local_modified = 0;
 
     /* load local checksum */
@@ -192,7 +191,7 @@ namespace cvmfs {
     char tmp[40];
     if (fchksum && (fread(tmp, 1, 40, fchksum) == 40))
     {
-      sha1_local.from_hash_str(string(tmp, 40));
+      sha1_local = hash::Any(hash::kSha1, hash::HexPtr(string(tmp, 40)));
       cat_file = "./" + string(tmp, 2) + "/" + string(tmp+2, 38);
 
       /* try to get local last modified time */
@@ -219,7 +218,7 @@ namespace cvmfs {
           cat_sha1 = old_sha1 = sha1_local;
           have_cached = cached_copy = true;
           LogCvmfs(kLogCvmfs, kLogDebug, "local checksum is %s",
-                    sha1_local.to_string().c_str());
+                    sha1_local.ToString().c_str());
         }
       } else {
         old_file = cat_file;
@@ -233,7 +232,7 @@ namespace cvmfs {
 
     /* load remote checksum */
     int sig_start = 0;
-    if (sha1_expected == hash::t_sha1()) {
+    if (sha1_expected == hash::Any(hash::kSha1)) {
       download::JobInfo download_checksum(&rpath_chksum, false, true, NULL);
       download::Fetch(&download_checksum);
       if (download_checksum.error_code != download::kFailOk) {
@@ -257,9 +256,9 @@ namespace cvmfs {
                  "failed to find catalog key in checksum");
         return -EINVAL;
       }
-      sha1_download.from_hash_str(clg_key->second);
+      sha1_download = hash::Any(hash::kSha1, hash::HexPtr(clg_key->second));
       LogCvmfs(kLogCvmfs, kLogDebug, "remote checksum is %s",
-               sha1_download.to_string().c_str());
+               sha1_download.ToString().c_str());
     } else {
       sha1_download = sha1_expected;
     }
@@ -281,7 +280,7 @@ namespace cvmfs {
       }
     }
 
-    if (sha1_expected == hash::t_sha1()) {
+    if (sha1_expected.IsNull()) {
       /* Sanity check: repository name */
       if (repo_name_ != "") {
         map<char, string>::const_iterator name = chksum_keyval.find('N');
@@ -306,7 +305,7 @@ namespace cvmfs {
                  "failed to find root prefix in checksum");
         return -EINVAL;
       }
-      if (root_prefix->second != mount_point.to_string()) {
+      if (root_prefix->second != mount_point.ToString()) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
                  "expected mount point does not match in %s",
                  rpath_chksum.c_str());
@@ -333,8 +332,7 @@ namespace cvmfs {
         }
 
         bool cached_cert = false;
-        hash::t_sha1 cert_sha1;
-        cert_sha1.from_hash_str(key_cert->second.substr(0, 40));
+        hash::Any cert_sha1(hash::kSha1, hash::HexPtr(key_cert->second.substr(0, 40)));
 
         char *data_certificate;
         size_t size_certificate;
@@ -359,7 +357,7 @@ namespace cvmfs {
           /* verify downloaded chunk */
           void *outbuf;
           int64_t outsize;
-          hash::t_sha1 verify_sha1;
+          hash::Any verify_sha1(hash::kSha1);
           bool verify_result;
           if (!zlib::CompressMem2Mem(download_certificate.destination_mem.data,
                                      download_certificate.destination_mem.size,
@@ -367,7 +365,7 @@ namespace cvmfs {
           {
             verify_result = false;
           } else {
-            hash::sha1_mem(outbuf, outsize, verify_sha1.digest);
+            hash::HashMem((unsigned char *)outbuf, outsize, &verify_sha1);
             free(outbuf);
             verify_result = (verify_sha1 == cert_sha1);
           }
@@ -390,11 +388,11 @@ namespace cvmfs {
 
         /* verify certificate and signature */
         if (!IsValidCertificate(no_proxy) ||
-            !signature::verify(&((sha1_chksum.to_string())[0]), 40, sig_buf, sig_buf_size))
+            !signature::verify(&((sha1_chksum.ToString())[0]), 40, sig_buf, sig_buf_size))
         {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "signature verification failed against %s",
-                   sha1_chksum.to_string().c_str());
+                   sha1_chksum.ToString().c_str());
           free(data_certificate);
           return -EPERM;
         }
@@ -438,7 +436,7 @@ namespace cvmfs {
     retval = setvbuf(tmp_fp, strmbuf, _IOFBF, 4096);
     assert(retval == 0);
 
-    const string sha1_clg_str = sha1_download.to_string();
+    const string sha1_clg_str = sha1_download.ToString();
     const string url_clg = "/data/" + sha1_clg_str.substr(0, 2) + "/" +
     sha1_clg_str.substr(2) + "C";
     download::JobInfo download_catalog(&url_clg, true, true, tmp_fp, &sha1_download);
@@ -459,7 +457,7 @@ namespace cvmfs {
 
     int fdchksum = open(lpath_chksum.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
     if (fdchksum >= 0) {
-      string local_chksum = sha1_download.to_string();
+      string local_chksum = sha1_download.ToString();
       map<char, string>::const_iterator published = chksum_keyval.find('T');
       if (published != chksum_keyval.end())
         local_chksum += "T" + published->second;
@@ -475,7 +473,7 @@ namespace cvmfs {
     } else {
       unlink(lpath_chksum.c_str());
     }
-    if ((sha1_expected == hash::t_sha1()) && signature_ok) {
+    if (sha1_expected.IsNull() && signature_ok) {
       LogCvmfs(kLogCvmfs, kLogSyslog,
                "signed catalog loaded from %s, signed by %s",
                (root_url_ + url_path).c_str(), signature::whois().c_str());
@@ -597,9 +595,10 @@ namespace cvmfs {
       free(download_whitelist.destination_mem.data);
       return false;
     }
-    hash::t_sha1 sha1;
-    sha1.from_hash_str(line.substr(0, 40));
-    if (sha1 != hash::t_sha1(buffer.substr(0, skip-3))) {
+    hash::Any sha1(hash::kSha1, hash::HexPtr(line.substr(0, 40)));
+    hash::Any compare(hash::kSha1);
+    hash::HashMem((const unsigned char *)&buffer[0], skip-3, &compare);
+    if (sha1 != compare) {
       LogCvmfs(kLogCvmfs, kLogDebug, "whitelist checksum does not match");
       free(download_whitelist.destination_mem.data);
       return false;
@@ -632,7 +631,7 @@ namespace cvmfs {
       free(download_whitelist.destination_mem.data);
       return false;
     }
-    const string sha1str = sha1.to_string();
+    const string sha1str = sha1.ToString();
     bool result = signature::verify_rsa(&sha1str[0], 40, sig_buf, sig_buf_size);
     free(sig_buf);
     if (!result)

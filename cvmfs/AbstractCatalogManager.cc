@@ -72,7 +72,7 @@ bool AbstractCatalogManager::Lookup(const inode_t inode,
   // asked for the root inode (which of course has no parent)
   // we simply look in the best suited catalog and are done
   if (not with_parent || inode == GetRootInode()) {
-    found = catalog->Lookup(inode, entry);
+    found = catalog->LookupInode(inode, entry);
     goto out;
   }
 
@@ -80,10 +80,10 @@ bool AbstractCatalogManager::Lookup(const inode_t inode,
   // md5 hash and make potentially two lookups, first in the
   // previously found catalog and second its parent catalog
   else {
-    hash::t_md5 parent_hash;
+    hash::Md5 parent_hash;
     DirectoryEntry parent;
     bool found_parent_entry = false;
-    bool found_entry = catalog->Lookup(inode, entry, &parent_hash);
+    bool found_entry = catalog->LookupInode(inode, entry, &parent_hash);
 
     // entry was not found... we're done with that --> return
     if (not found_entry) {
@@ -96,9 +96,9 @@ bool AbstractCatalogManager::Lookup(const inode_t inode,
     // it should be found in the current catalog
     if (entry->IsNestedCatalogRoot() && not catalog->IsRoot()) {
       Catalog *parent_catalog = catalog->parent();
-      found_parent_entry = parent_catalog->Lookup(parent_hash, &parent);
+      found_parent_entry = parent_catalog->LookupMd5(parent_hash, &parent);
     } else {
-      found_parent_entry = catalog->Lookup(parent_hash, &parent);
+      found_parent_entry = catalog->LookupMd5(parent_hash, &parent);
     }
 
     // if we didn't find a parent entry, there may be some data corruption!
@@ -182,7 +182,7 @@ bool AbstractCatalogManager::GetCatalogByPath(const string &path,
   LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
            path.c_str(), best_fitting_catalog->path().c_str());
   DirectoryEntry d;
-  bool entry_found = best_fitting_catalog->Lookup(path, &d);
+  bool entry_found = best_fitting_catalog->LookupPath(path, &d);
 
   // if we did not find the entry, there are two possible reasons:
   //    1. the entry in question resides in a not yet loaded nested catalog
@@ -206,7 +206,7 @@ bool AbstractCatalogManager::GetCatalogByPath(const string &path,
 
     // retry the lookup with the nested catalog
     } else {
-      entry_found = nested_catalog->Lookup(path, &d);
+      entry_found = nested_catalog->LookupPath(path, &d);
       if (not entry_found) {
         LogCvmfs(kLogCatalog, kLogDebug,
                  "nested catalogs loaded but entry '%s' was still not found",
@@ -320,7 +320,7 @@ bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path,
   for (i = path_elements.begin(), end = path_elements.end(); i != end; ++i) {
     sub_path += "/" + *i;
 
-    entry_found = containing_catalog->Lookup(sub_path, &entry);
+    entry_found = containing_catalog->LookupPath(sub_path, &entry);
     if (not entry_found) {
       return false;
     }
@@ -360,7 +360,7 @@ bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint,
 
   // load catalog file (LoadCatalogFile is virtual)
   string new_catalog_file;
-  if (0 != LoadCatalogFile(mountpoint, hash::t_md5(mountpoint), &new_catalog_file)) {
+  if (0 != LoadCatalogFile(mountpoint, hash::Md5(hash::AsciiPtr(mountpoint)), &new_catalog_file)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s'",
              mountpoint.c_str());
     return false;

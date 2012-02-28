@@ -37,8 +37,8 @@
 
 #include "tracer.h"
 #include "lru.h"
-#include "catalog.h"
-#include "catalog_tree.h"
+//#include "catalog.h"
+//#include "catalog_tree.h"
 #include "cvmfs.h"
 #include "util.h"
 #include "logging.h"
@@ -208,14 +208,15 @@ namespace talk {
             sleep(cvmfs::max_cache_timeout);
           }
         }
-        else if (line == "revision") {
+        // TODO
+        /*else if (line == "revision") {
           catalog::lock();
           const uint64_t revision = catalog::get_revision();
           catalog::unlock();
           ostringstream revision_str;
           revision_str << revision;
           answer(con_fd, revision_str.str() + "\n");
-        }
+        }*/
         else if (line == "max ttl info") {
           const unsigned max_ttl = cvmfs::get_max_ttl();
           if (max_ttl == 0) {
@@ -339,7 +340,7 @@ namespace talk {
             answer(con_fd, "OK\n");
           }
         }
-        else if (line == "open catalogs") {
+      /*  TODO  else if (line == "open catalogs") {
           vector<string> prefix;
           vector<time_t> last_modified, expires;
           vector<unsigned int> inode_offsets;
@@ -354,6 +355,7 @@ namespace talk {
           }
 
           answer(con_fd, result);
+         TODO
         } else if (line == "sqlite memory") {
           ostringstream result;
           int current = 0;
@@ -419,9 +421,9 @@ namespace talk {
 
           answer(con_fd, result.str());
         }
-        else if (line == "catalog tree") {
+        } else if (line == "catalog tree") {
           answer(con_fd, catalog_tree::show_tree());
-        }
+        }*/
         else if (line == "pid") {
           ostringstream spid;
           spid << cvmfs::pid << endl;

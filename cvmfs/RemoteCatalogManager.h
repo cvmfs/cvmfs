@@ -34,10 +34,10 @@ class RemoteCatalogManager : public AbstractCatalogManager {
    *  @param catalog_file this pointer contains the path of the loaded catalog file
    *  @return 0 on success otherwise an error code
    */
-  inline int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point,
+  inline int LoadCatalogFile(const std::string &url_path, const hash::Md5 &mount_point,
                             std::string *catalog_file)
   {
-    return LoadCatalogFile(url_path, mount_point, -1, false, hash::t_sha1(), catalog_file);
+    return LoadCatalogFile(url_path, mount_point, -1, false, hash::Any(hash::kSha1), catalog_file);
   }
 
   /** see AbstractCatalogManager for details */
@@ -48,16 +48,16 @@ class RemoteCatalogManager : public AbstractCatalogManager {
    *  well... heaven knows, what is actually going on here
    *  Jakob... this is your job. ;-)
    */
-  int FetchCatalog(const std::string &url_path, const bool no_proxy, const hash::t_md5 &mount_point,
-                   std::string &cat_file, hash::t_sha1 &cat_sha1, std::string &old_file, hash::t_sha1 &old_sha1,
-                   bool &cached_copy, const hash::t_sha1 &sha1_expected, const bool dry_run = false);
+  int FetchCatalog(const std::string &url_path, const bool no_proxy, const hash::Md5 &mount_point,
+                   std::string &cat_file, hash::Any &cat_sha1, std::string &old_file, hash::Any &old_sha1,
+                   bool &cached_copy, const hash::Any &sha1_expected, const bool dry_run = false);
 
   /**
    *  yeah... what ever...
    */
-  int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point,
+  int LoadCatalogFile(const std::string &url_path, const hash::Md5 &mount_point,
                       const int existing_cat_id, const bool no_cache,
-                      const hash::t_sha1 expected_clg, std::string *catalog_file);
+                      const hash::Any &expected_clg, std::string *catalog_file);
 
   /**
    * ??

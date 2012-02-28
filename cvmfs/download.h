@@ -14,10 +14,6 @@
 #include "compression.h"
 #include "hash.h"
 
-namespace hash {
-struct t_sha1;
-}
-
 namespace download {
 
 /**
@@ -57,21 +53,21 @@ struct JobInfo {
   } destination_mem;
   FILE *destination_file;
   const std::string *destination_path;
-  const hash::t_sha1 *expected_hash;
+  const hash::Any *expected_hash;
 
   // One constructor per destination
   JobInfo() { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const std::string *p, const hash::t_sha1 *h) : url(u), compressed(c),
+          const std::string *p, const hash::Any *h) : url(u), compressed(c),
           probe_hosts(ph), destination(kDestinationPath), destination_path(p),
           expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
-          const hash::t_sha1 *h) : url(u), compressed(c), probe_hosts(ph),
+          const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
           destination(kDestinationFile), destination_file(f), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const hash::t_sha1 *h) : url(u), compressed(c), probe_hosts(ph),
+          const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
           destination(kDestinationMem), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   ~JobInfo() {
@@ -84,7 +80,7 @@ struct JobInfo {
   // Internal state, don't touch
   CURL *curl_handle;
   z_stream zstream;
-  sha1_context_t sha1_context;
+  hash::ContextPtr hash_context;
   int wait_at[2];  /**< Pipe used for the return value */
   std::string proxy;
   bool nocache;

@@ -10,33 +10,33 @@ using namespace std;
 namespace cvmfs {
 
    Md5PathCache::Md5PathCache(unsigned int cacheSize) :
-      LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >(cacheSize) {
+      LruCache<hash::Md5, cvmfs::DirectoryEntry, hash_md5, hash_equal >(cacheSize) {
 
-      this->setSpecialHashTableKeys(hash::t_md5("!"), hash::t_md5("?"));
+        this->setSpecialHashTableKeys(hash::Md5(hash::AsciiPtr("!")), hash::Md5(hash::AsciiPtr("?")));
    }
 
-   bool Md5PathCache::insert(const hash::t_md5 &hash, const struct catalog::t_dirent &dirEntry) {
+   bool Md5PathCache::insert(const hash::Md5 &hash, const cvmfs::DirectoryEntry &dirEntry) {
 #ifdef DISALBE_MD5_PATH_CACHE
       return true;
 #endif
-      LogCvmfs(kLogMd5Cache, kLogDebug, "insert md5: %s -> '%s'", hash.to_string().c_str(), dirEntry.name.c_str());
-      return LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >::insert(hash, dirEntry);
+      LogCvmfs(kLogMd5Cache, kLogDebug, "insert md5: %s -> '%s'", hash.ToString().c_str(), dirEntry.name_.c_str());
+      return LruCache<hash::Md5, cvmfs::DirectoryEntry, hash_md5, hash_equal >::insert(hash, dirEntry);
    }
 
-   bool Md5PathCache::lookup(const hash::t_md5 &hash, struct  catalog::t_dirent *dirEntry) {
+   bool Md5PathCache::lookup(const hash::Md5 &hash, cvmfs::DirectoryEntry *dirEntry) {
 #ifdef DISALBE_MD5_PATH_CACHE
       return false;
 #endif
-      LogCvmfs(kLogMd5Cache, kLogDebug, "lookup md5: %s", hash.to_string().c_str());
-      return LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >::lookup(hash, dirEntry);
+      LogCvmfs(kLogMd5Cache, kLogDebug, "lookup md5: %s", hash.ToString().c_str());
+      return LruCache<hash::Md5, cvmfs::DirectoryEntry, hash_md5, hash_equal >::lookup(hash, dirEntry);
    }
 
-   bool Md5PathCache::forget(const hash::t_md5 &hash) {
+   bool Md5PathCache::forget(const hash::Md5 &hash) {
 #ifdef DISALBE_MD5_PATH_CACHE
       return true;
 #endif
-      LogCvmfs(kLogMd5Cache, kLogDebug, "forget md5: %s", hash.to_string().c_str());
-      return LruCache<hash::t_md5, struct catalog::t_dirent, hash_md5, hash_equal >::forget(hash);
+      LogCvmfs(kLogMd5Cache, kLogDebug, "forget md5: %s", hash.ToString().c_str());
+      return LruCache<hash::Md5, cvmfs::DirectoryEntry, hash_md5, hash_equal >::forget(hash);
    }
 
 } // namespace cvmfs

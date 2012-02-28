@@ -19,17 +19,17 @@ bool WritableCatalog::CreateNewCatalogDatabase(const std::string &file_path,
   }
 
   // configure the root entry
-  hash::t_md5 path_hash;
-  hash::t_md5 parent_hash;
+  hash::Md5 path_hash;
+  hash::Md5 parent_hash;
   string root_path;
   if (root_catalog) {
     root_path = root_entry.name();
-    path_hash = hash::t_md5(root_path);
-    parent_hash = hash::t_md5();
+    path_hash = hash::Md5(hash::AsciiPtr(root_path));
+    parent_hash = hash::Md5();
   } else {
     root_path = root_entry_parent_path + "/" + root_entry.name();
-    path_hash = hash::t_md5(root_path);
-    parent_hash = hash::t_md5(root_entry_parent_path);
+    path_hash = hash::Md5(hash::AsciiPtr(root_path));
+    parent_hash = hash::Md5(hash::AsciiPtr(root_entry_parent_path));
   }
 
   // open the new catalog temporarily to insert the root entry
@@ -165,14 +165,22 @@ bool WritableCatalog::CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
                                                    const string &entry_path,
                                                    const string &parent_path) {
   // check if entry already exists
-  hash::t_md5 path_hash(entry_path);
-  if (Lookup(path_hash)) {
+
+
+
+  //hash::Md5 path_hash(hash::AsciiPtr(entry_path)); // TODO: why doesn't this compile?
+  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(entry_path));
+  if (LookupMd5(path_hash)) {
+
+
+
     LogCvmfs(kLogCatalog, kLogDebug, "entry '%s' exists and thus cannot be created", entry_path.c_str());
     return false;
   }
 
   // add the entry to the catalog
-  hash::t_md5 parent_hash(parent_path);
+  //hash::Md5 parent_hash(hash::AsciiPtr(parent_path));
+  hash::Md5 parent_hash = hash::Md5(hash::AsciiPtr(parent_path));
   if (not AddEntry(entry, path_hash, parent_hash)) {
     LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while inserting new entry '%s'", entry_path.c_str());
     return false;
@@ -182,8 +190,8 @@ bool WritableCatalog::CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
 }
 
 bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
-                               const hash::t_md5 &path_hash,
-                               const hash::t_md5 &parent_hash) {
+                               const hash::Md5 &path_hash,
+                               const hash::Md5 &parent_hash) {
   SetDirty();
 
   // perform a add operation for the given directory entry
@@ -204,7 +212,7 @@ bool WritableCatalog::TouchEntry(const DirectoryEntry &entry,
   SetDirty();
 
   // perform a touch operation for the given path
-  hash::t_md5 path_hash(entry_path);
+  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(entry_path));
   bool result = (
     touch_statement_->BindPathHash(path_hash) &&
     touch_statement_->BindTimestamp(entry.mtime()) &&
@@ -219,7 +227,7 @@ bool WritableCatalog::RemoveEntry(const string &file_path) {
   SetDirty();
 
   // perform a delete operation for the given path
-  hash::t_md5 path_hash(file_path);
+  hash::Md5 path_hash= hash::Md5(hash::AsciiPtr(file_path));
   bool result = (
     unlink_statement_->BindPathHash(path_hash) &&
     unlink_statement_->Execute()
@@ -231,7 +239,7 @@ bool WritableCatalog::RemoveEntry(const string &file_path) {
 }
 
 bool WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
-                                  const hash::t_md5 &path_hash) {
+                                  const hash::Md5 &path_hash) {
   SetDirty();
 
   // perform the update operation
@@ -259,10 +267,10 @@ bool WritableCatalog::IncrementRevision() {
   return SqlStatement(database(), sql).Execute();
 }
 
-bool WritableCatalog::SetPreviousRevision(const hash::t_sha1 &hash) {
+bool WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
   ostringstream sql;
   sql << "INSERT OR REPLACE INTO properties "
-         "(key, value) VALUES ('previous_revision', '" << hash.to_string() << "');";
+         "(key, value) VALUES ('previous_revision', '" << hash.ToString() << "');";
    return SqlStatement(database(), sql.str()).Execute();
 }
 
@@ -302,7 +310,7 @@ bool WritableCatalog::SplitContentIntoNewNestedCatalog(WritableCatalog *new_nest
 bool WritableCatalog::MakeNestedCatalogMountpoint(const string &mountpoint) {
   // find the directory entry to edit
   DirectoryEntry mnt_pnt_entry;
-  if (not Lookup(mountpoint, &mnt_pnt_entry)) {
+  if (not LookupPath(mountpoint, &mnt_pnt_entry)) {
     return false;
   }
 
@@ -410,8 +418,8 @@ bool WritableCatalog::MoveNestedCatalogReferencesToNewNestedCatalog(const list<s
 
 bool WritableCatalog::InsertNestedCatalogReference(const string &mountpoint,
                                                    Catalog *attached_reference,
-                                                   const hash::t_sha1 content_hash) {
-  const string sha1_string = (not content_hash.is_null()) ? content_hash.to_string() : "";
+                                                   const hash::Any content_hash) {
+  const string sha1_string = (not content_hash.IsNull()) ? content_hash.ToString() : "";
 
   // doing the SQL statement
   SqlStatement stmt(database(), "INSERT INTO nested_catalogs (path, sha1) VALUES (:p, :sha1);");
@@ -451,11 +459,11 @@ bool WritableCatalog::RemoveNestedCatalogReference(const string &mountpoint, Cat
 }
 
 bool WritableCatalog::UpdateNestedCatalogLink(const string &path,
-                                              const hash::t_sha1 &hash) {
+                                              const hash::Any &hash) {
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 WHERE path = :path;";
   SqlStatement stmt(database(), sql);
 
-  stmt.BindText(1, hash.to_string());
+  stmt.BindText(1, hash.ToString());
   stmt.BindText(2, path);
 
   return stmt.Execute();
@@ -564,7 +572,7 @@ bool WritableCatalog::CopyDirectoryEntriesToParentCatalog() const {
   // change the just copied nested catalog root to an ordinary directory
   // (the nested catalog is merged into it's parent)
   DirectoryEntry old_root_entry;
-  if (not parent->Lookup(this->path(), &old_root_entry)) {
+  if (not parent->LookupPath(this->path(), &old_root_entry)) {
     LogCvmfs(kLogCatalog, kLogDebug, "root entry of removed nested catalog '%s' not found in parent catalog '%s'", this->path().c_str(), parent->path().c_str());
     return false;
   }

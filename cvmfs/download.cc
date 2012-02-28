@@ -332,7 +332,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     return 0;
 
   if (info->expected_hash)
-    hash::sha1_update(&info->sha1_context, (unsigned char *)ptr, num_bytes);
+    hash::Update((unsigned char *)ptr, num_bytes, info->hash_context);
 
   if (info->destination == kDestinationMem) {
     // Write to memory
@@ -419,8 +419,10 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
   if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
   }
-  if (info->expected_hash)
-    hash::sha1_init(&info->sha1_context);
+  if (info->expected_hash) {
+    assert(info->hash_context.buffer != NULL);
+    hash::Init(info->hash_context);
+  }
 
   if ((info->destination == kDestinationMem) &&
       (HasPrefix(*(info->url), "file://", false)))
@@ -502,11 +504,9 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_OK:
       // Verify content hash
       if (info->expected_hash) {
-        unsigned char digest[hash::t_sha1::DIGEST_SIZE];
-        hash::sha1_final(digest, &info->sha1_context);
-        if (memcmp(digest, info->expected_hash->digest,
-                   hash::t_sha1::DIGEST_SIZE))
-        {
+        hash::Any match_hash;
+        hash::Final(info->hash_context, &match_hash);
+        if (match_hash != *(info->expected_hash)) {
           // TODO(jakob): Logging
           info->error_code = kFailBadData;
           break;
@@ -667,6 +667,13 @@ Failures Fetch(JobInfo *info) {
   if (result != kFailOk)
     return result;
 
+  if (info->expected_hash) {
+    const hash::Algorithms algorithm = info->expected_hash->algorithm;
+    info->hash_context.algorithm = algorithm;
+    info->hash_context.size = hash::GetContextSize(algorithm);
+    info->hash_context.buffer = alloca(info->hash_context.size);
+  }
+
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     int retval;
     if (info->wait_at[0] == -1) {
@@ -705,7 +712,9 @@ Failures Fetch(JobInfo *info) {
     info->destination_mem.size = 0;
   }
 
-  LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d)", result);
+  if (result != kFailOk) {
+    LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d)", result);
+  }
 
   return result;
 }
@@ -807,7 +816,9 @@ static void *MainDownload(void *data __attribute__((unused))) {
       stat_transfer_time_ += DiffTimeSeconds(timeval_start, timeval_stop);
     }
     int retval = poll(watch_fds_, watch_fds_inuse_, timeout);
-    assert(retval >= 0);
+    if (errno == -1) {
+      continue;
+    }
 
     // Handle timeout
     if (retval == 0) {

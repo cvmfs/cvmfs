@@ -4,7 +4,6 @@
 #include <string>
 
 #include "lru_cache.h"
-#include "catalog.h"
 #include "fuse-duplex.h"
 #include "DirectoryEntry.h"
 
@@ -13,10 +12,10 @@ namespace cvmfs {
    class InodeCache :
       public LruCache<fuse_ino_t, DirectoryEntry>
    {
-      
+
       public:
          InodeCache(unsigned int cacheSize);
-         
+
          bool insert(const fuse_ino_t inode, const DirectoryEntry &dirEntry);
          bool lookup(const fuse_ino_t inode, DirectoryEntry *dirEntry);
          void drop();

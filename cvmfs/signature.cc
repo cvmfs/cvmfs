@@ -284,11 +284,13 @@ namespace signature {
     buf_size = i2d_X509(certificate, &buf);
     if (buf_size < 0) return "";
 
-    hash::t_sha1 sha1;
-    hash::sha1_mem(buf, (unsigned)buf_size, sha1.digest);
+
+    hash::Any sha1;
+    sha1.algorithm = hash::kSha1; // TODO
+    hash::HashMem(buf, buf_size, &sha1);
     free(buf);
 
-    const string sha1_str = sha1.to_string();
+    const string sha1_str = sha1.ToString();
     string result;
     for (unsigned i = 0; i < sha1_str.length(); ++i) {
       if ((i > 0) && (i%2 == 0)) result += ":";

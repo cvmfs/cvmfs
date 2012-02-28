@@ -60,7 +60,7 @@ namespace lru {
   int pipe_insert[2];
   map<string, string> key2paths; ///< maps SHA1 chunks to their file name on insert
   pthread_mutex_t mutex_key2paths = PTHREAD_MUTEX_INITIALIZER;
-  set<hash::t_sha1> pinned_chunks;
+  set<hash::Any> pinned_chunks;
   pthread_mutex_t mutex_pinned = PTHREAD_MUTEX_INITIALIZER;
 
   uint64_t limit; ///< If the cache grows above this size, we clean up until cleanup_threshold.
@@ -85,18 +85,19 @@ namespace lru {
     LogCvmfs(kLogLru, kLogDebug, "starting touch thread");
     sqlite3_soft_heap_limit(SQLITE_THREAD_MEM*1024*1024);
 
-    hash::t_sha1 sha1;
+    hash::Any any_hash;
+    any_hash.algorithm = hash::kSha1;  // TODO
 
-    while (read(pipe_touch[0], sha1.digest, 20) == 20) {
-      const string sha1_str = sha1.to_string();
-      LogCvmfs(kLogLru, kLogDebug, "touching %s", sha1_str.c_str());
+    while (read(pipe_touch[0], any_hash.digest, 20) == 20) {
+      const string hash_str = any_hash.ToString();
+      LogCvmfs(kLogLru, kLogDebug, "touching %s", hash_str.c_str());
 
       pthread_mutex_lock(&mutex);
 
       sqlite3_bind_int64(stmt_touch, 1, seq++);
-      sqlite3_bind_text(stmt_touch, 2, &sha1_str[0], sha1_str.length(), SQLITE_STATIC);
+      sqlite3_bind_text(stmt_touch, 2, &hash_str[0], hash_str.length(), SQLITE_STATIC);
       int result = sqlite3_step(stmt_touch);
-      LogCvmfs(kLogLru, kLogDebug, "touching %s (%ld): %d", sha1_str.c_str(), seq-1, result);
+      LogCvmfs(kLogLru, kLogDebug, "touching %s (%ld): %d", hash_str.c_str(), seq-1, result);
       errno = result;
       assert(((result == SQLITE_DONE) || (result == SQLITE_OK)) && "LRU touch failed");
       sqlite3_reset(stmt_touch);
@@ -114,7 +115,8 @@ namespace lru {
     LogCvmfs(kLogLru, kLogDebug, "starting insert thread");
     sqlite3_soft_heap_limit(SQLITE_THREAD_MEM*1024*1024);
 
-    hash::t_sha1 sha1;
+    hash::Any any_hash;
+    any_hash.algorithm = hash::kSha1;  // TODO
     uint64_t size;
     unsigned char buf[20+sizeof(size)];
 
@@ -124,15 +126,15 @@ namespace lru {
 				break;
 			}
 
-      memcpy(sha1.digest, buf, 20);
+      memcpy(any_hash.digest, buf, 20);
       memcpy(&size, buf+20, sizeof(size));
-      const string sha1_str = sha1.to_string();
-      LogCvmfs(kLogLru, kLogDebug, "insert thread, got sha1 %s", sha1_str.c_str());
+      const string hash_str = any_hash.ToString();
+      LogCvmfs(kLogLru, kLogDebug, "insert thread, got sha1 %s", hash_str.c_str());
       string path = "(UNKNOWN)";
 
       pthread_mutex_lock(&mutex_key2paths);
 
-      map<string, string>::iterator i = key2paths.find(sha1_str);
+      map<string, string>::iterator i = key2paths.find(hash_str);
       if (i != key2paths.end()) {
         path = i->second;
         key2paths.erase(i);
@@ -151,7 +153,7 @@ namespace lru {
       }
 
       /* insert */
-      sqlite3_bind_text(stmt_new, 1, &(sha1_str[0]), hash::t_sha1::CHAR_SIZE, SQLITE_STATIC);
+      sqlite3_bind_text(stmt_new, 1, &hash_str[0], hash_str.length(), SQLITE_STATIC);
       sqlite3_bind_int64(stmt_new, 2, size);
       sqlite3_bind_int64(stmt_new, 3, seq++);
       sqlite3_bind_text(stmt_new, 4, &(path[0]), path.length(), SQLITE_STATIC);
@@ -358,7 +360,7 @@ namespace lru {
   void fini() {
     if (running) {
       /* unpin */
-      for (set<hash::t_sha1>::const_iterator i = pinned_chunks.begin(), iEnd = pinned_chunks.end();
+      for (set<hash::Any>::const_iterator i = pinned_chunks.begin(), iEnd = pinned_chunks.end();
            i != iEnd; ++i)
       {
         touch(*i);
@@ -552,12 +554,13 @@ namespace lru {
         break;
       }
 
+      // TODO
       sha1 = string((char *)sqlite3_column_text(stmt_lru, 0));
 
       //trash.push(cache_dir + "/" + sha1.substr(0, 2) + "/" +
       //   sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2)));
       unlink((cache_dir + "/" + sha1.substr(0, 2) + "/" +
-              sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2))).c_str());
+              sha1.substr(2)).c_str());
       gauge -= sqlite3_column_int64(stmt_lru, 1);
       LogCvmfs(kLogLru, kLogDebug, "lru cleanup %s", sha1.c_str());
 
@@ -617,12 +620,13 @@ namespace lru {
    *
    * \return True on success, false otherwise
    */
-  bool insert(const hash::t_sha1 &sha1, const uint64_t size,
+  bool insert(const hash::Any &any_hash, const uint64_t size,
               const string &cvmfs_path)
   {
     if (limit == 0) return true;
 
-    const string sha1_str = sha1.to_string();
+    // TODO
+    const string sha1_str = any_hash.ToString();
     LogCvmfs(kLogLru, kLogDebug, "insert into lru %s, path %s", sha1_str.c_str(), cvmfs_path.c_str());
 
     pthread_mutex_lock(&mutex_key2paths);
@@ -630,7 +634,7 @@ namespace lru {
     pthread_mutex_unlock(&mutex_key2paths);
 
     unsigned char buf[20 + sizeof(size)];
-    memcpy(buf, sha1.digest, 20);
+    memcpy(buf, any_hash.digest, 20);
     memcpy(buf+20, &size, sizeof(size));
     int r = write(pipe_insert[1], buf, 20+sizeof(size));
     assert(r==20+sizeof(size));
@@ -645,24 +649,25 @@ namespace lru {
    *
    * \return True on success, false otherwise
    */
-  bool pin(const hash::t_sha1 &sha1, const uint64_t size,
+  bool pin(const hash::Any &any_hash, const uint64_t size,
            const string &cvmfs_path)
   {
     if (limit == 0) return true;
 
-    const string sha1_str = sha1.to_string();
-    LogCvmfs(kLogLru, kLogDebug, "pin into lru %s, path %s", sha1_str.c_str(), cvmfs_path.c_str());
+    // TODO
+    const string hash_str = any_hash.ToString();
+    LogCvmfs(kLogLru, kLogDebug, "pin into lru %s, path %s", hash_str.c_str(), cvmfs_path.c_str());
 
     pthread_mutex_lock(&mutex);
     pthread_mutex_lock(&mutex_pinned);
-    if (pinned_chunks.find(sha1) == pinned_chunks.end()) {
+    if (pinned_chunks.find(any_hash) == pinned_chunks.end()) {
       if ((cleanup_threshold > 0) && (pinned + size > cleanup_threshold)) {
         pthread_mutex_unlock(&mutex_pinned);
         pthread_mutex_unlock(&mutex);
-        LogCvmfs(kLogLru, kLogDebug, "failed to insert %s (pinned), no space", sha1_str.c_str());
+        LogCvmfs(kLogLru, kLogDebug, "failed to insert %s (pinned), no space", hash_str.c_str());
         return false;
       }
-      pinned_chunks.insert(sha1);
+      pinned_chunks.insert(any_hash);
       pinned += size;
     } else {
       /* Already in, nothing to do */
@@ -674,7 +679,7 @@ namespace lru {
 
     /* It could already be in unpinned, check */
     bool exists = false;
-    sqlite3_bind_text(stmt_size, 1, &(sha1_str[0]), sha1_str.length(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt_size, 1, &(hash_str[0]), hash_str.length(), SQLITE_STATIC);
     if (sqlite3_step(stmt_size) == SQLITE_ROW) {
       exists = true;
     }
@@ -690,7 +695,7 @@ namespace lru {
     }
 
     /* insert */
-    sqlite3_bind_text(stmt_new, 1, &(sha1_str[0]), hash::t_sha1::CHAR_SIZE, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_new, 1, &hash_str[0], hash_str.length(), SQLITE_STATIC);
     sqlite3_bind_int64(stmt_new, 2, size);
     sqlite3_bind_int64(stmt_new, 3, seq++);
     sqlite3_bind_text(stmt_new, 4, &(cvmfs_path[0]), cvmfs_path.length(), SQLITE_STATIC);
@@ -714,9 +719,10 @@ namespace lru {
    * Updates the sequence number of the file specified by an SHA1 hash.
    * Actual work is done by touch thread.
    */
-  void touch(const hash::t_sha1 &file) {
+  void touch(const hash::Any &file) {
     if (limit == 0) return;
 
+    // TODO
     int r = write(pipe_touch[1], file.digest, 20);
     assert(r==20);
   }
@@ -726,21 +732,21 @@ namespace lru {
   /**
    * Removes a SHA1 chunk from cache, if it exists.
    */
-  void remove(const hash::t_sha1 &file) {
-    string sha1 = file.to_string();
+  void remove(const hash::Any &file) {
+    string hash_str = file.ToString();
 
     if (limit != 0) {
       sqlite3_soft_heap_limit(SQLITE_THREAD_MEM*1024*1024);
       int result;
 
-      LogCvmfs(kLogLru, kLogDebug, "manually removing %s", sha1.c_str());
+      LogCvmfs(kLogLru, kLogDebug, "manually removing %s", hash_str.c_str());
       pthread_mutex_lock(&mutex);
-      sqlite3_bind_text(stmt_size, 1, &(sha1[0]), sha1.length(), SQLITE_STATIC);
+      sqlite3_bind_text(stmt_size, 1, &(hash_str[0]), hash_str.length(), SQLITE_STATIC);
       if ((result = sqlite3_step(stmt_size)) == SQLITE_ROW) {
         uint64_t size = sqlite3_column_int64(stmt_size, 0);
         uint64_t is_pinned = sqlite3_column_int64(stmt_size, 1);
 
-        sqlite3_bind_text(stmt_rm, 1, &(sha1[0]), sha1.length(), SQLITE_STATIC);
+        sqlite3_bind_text(stmt_rm, 1, &(hash_str[0]), hash_str.length(), SQLITE_STATIC);
         result = sqlite3_step(stmt_rm);
         if ((result == SQLITE_DONE) || (result == SQLITE_OK)) {
           gauge -= size;
@@ -751,7 +757,7 @@ namespace lru {
             pthread_mutex_unlock(&mutex_pinned);
           }
         } else {
-          LogCvmfs(kLogLru, kLogDebug, "could not delete %s, error %d", sha1.c_str(), result);
+          LogCvmfs(kLogLru, kLogDebug, "could not delete %s, error %d", hash_str.c_str(), result);
         }
 
         sqlite3_reset(stmt_rm);
@@ -760,8 +766,8 @@ namespace lru {
       pthread_mutex_unlock(&mutex);
     }
 
-    unlink((cache_dir + "/" + sha1.substr(0, 2) + "/" +
-            sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2))).c_str());
+    unlink((cache_dir + "/" + hash_str.substr(0, 2) + "/" +
+            hash_str.substr(2)).c_str());
   }
 
 

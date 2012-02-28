@@ -64,8 +64,6 @@
 #include "logging.h"
 #include "tracer.h"
 #include "download.h"
-#include "catalog.h"
-#include "catalog_tree.h"
 #include "cache.h"
 #include "hash.h"
 #include "talk.h"
@@ -109,7 +107,7 @@ namespace cvmfs {
   pthread_mutex_t mutex_max_ttl = PTHREAD_MUTEX_INITIALIZER;
   int max_cache_timeout = 0;
   time_t drainout_deadline = 0;
-  hash::t_sha1 next_root;
+  hash::Any next_root(hash::kSha1);
   time_t boot_time;
   struct fuse_lowlevel_ops fuseCallbacks;
 
@@ -133,17 +131,6 @@ namespace cvmfs {
   const int FORGET_DOS = 10000; /**< Clear DoS memory after 10 seconds */
 
   // Caches
-  const int CATALOG_CACHE_SIZE = 32768*2;
-  static inline int catalog_cache_idx(const hash::t_md5 &md5) {
-    // return md5.digest[0] + (md5.digest[1] % 256) * 256;
-    return static_cast<int>(md5.digest[0]) +
-           (static_cast<int>(md5.digest[1]) << 8);
-  }
-  struct catalog_cacheline {
-    hash::t_md5 md5;
-    catalog::t_dirent d;
-  };
-  struct catalog_cacheline catalog_cache[CATALOG_CACHE_SIZE];
   atomic_int32 cache_inserts;
   atomic_int32 cache_replaces;
   atomic_int32 cache_cleans;
@@ -162,20 +149,6 @@ namespace cvmfs {
   const int NUM_RESERVED_FD = 512;
   atomic_int32 nioerr;
 
-  static uint64_t effective_ttl(const uint64_t ttl) {
-    pthread_mutex_lock(&mutex_max_ttl);
-    const uint64_t current_max = max_ttl;
-    pthread_mutex_unlock(&mutex_max_ttl);
-
-    if (current_max == 0)
-      return ttl;
-
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "building effective TTL from max (%u) and given (%u)",
-             current_max, ttl);
-    return (current_max < ttl) ? current_max : ttl;
-  }
-
   unsigned get_max_ttl() {
     pthread_mutex_lock(&mutex_max_ttl);
     const unsigned current_max = max_ttl/60;
@@ -188,33 +161,6 @@ namespace cvmfs {
     pthread_mutex_lock(&mutex_max_ttl);
     max_ttl = value*60;
     pthread_mutex_unlock(&mutex_max_ttl);
-  }
-
-  void info_loaded_catalogs(vector<string> *prefix,
-                            vector<time_t> *last_modified,
-                            vector<time_t> *expires,
-                            vector<unsigned int> *inode_offsets) {
-    catalog::lock();
-    for (int i = 0; i < catalog::get_num_catalogs(); ++i) {
-      catalog_tree::catalog_meta_t *info = catalog_tree::get_catalog(i);
-      string path = info->path;
-      if (info->dirty)
-        path = "(!) " + path;
-      prefix->push_back(path);
-      last_modified->push_back(catalog::get_lastmodified(i));
-      expires->push_back(info->expires);
-      inode_offsets->push_back(info->inode_offset);
-    }
-    catalog::unlock();
-  }
-
-  static void update_ttl(catalog_tree::catalog_meta_t *info) {
-    info->expires = time(NULL) +
-                    effective_ttl(catalog::get_ttl(info->catalog_id));
-  }
-
-  static void update_ttl_shortterm(catalog_tree::catalog_meta_t *info) {
-    info->expires = time(NULL) + effective_ttl(short_term_ttl);
   }
 
   /**
@@ -239,44 +185,17 @@ namespace cvmfs {
     }
   }
 
-  static void set_dirty(catalog_tree::catalog_meta_t *info) {
-    const int catalog_id = info->catalog_id;
-    const int parent_id = catalog_tree::get_parent(catalog_id)->catalog_id;
-
-    if (catalog_tree::get_catalog(parent_id)->dirty) {
-      info->dirty = true;
-    } else {
-      hash::t_sha1 expected_clg;
-      if (!catalog::lookup_nested_unprotected(parent_id,
-                                              catalog::mangled_path(info->path),
-                                              expected_clg)) {
-        LogCvmfs(kLogCvmfs, kLogSyslog,
-                 "Nested catalog at %s not found (forward scan)",
-                 (info->path).c_str());
-        info->dirty = true;
-        invalidate_cache(catalog_id);
-      } else {
-        if (expected_clg != info->snapshot) {
-          info->dirty = true;
-          invalidate_cache(catalog_id);
-        } else {
-          info->dirty = false;
-        }
-      }
-    }
-  }
-
 
   /**
    * Don't call without catalog::lock()
    */
   int catalog_cache_memusage_bytes() {
     int result = 0;
-    for (int i = 0; i < CATALOG_CACHE_SIZE; ++i) {
+    /*for (int i = 0; i < CATALOG_CACHE_SIZE; ++i) {
       result += sizeof(catalog_cacheline);
       result += catalog_cache[i].d.name.capacity();
       result += catalog_cache[i].d.symlink.capacity();
-    }
+    }*/
     return result;
   }
 
@@ -284,7 +203,7 @@ namespace cvmfs {
                                     int *inserts, int *replaces, int *cleans,
                                     int *hits, int *misses,
                                     int *cert_hits, int *cert_misses) {
-    *positive = *negative = 0;
+   /* *positive = *negative = 0;
     *all = CATALOG_CACHE_SIZE;
     hash::t_md5 null;
     for (int i = 0; i < CATALOG_CACHE_SIZE; ++i) {
@@ -302,11 +221,7 @@ namespace cvmfs {
     *misses = atomic_read32(&cache_misses);
 
     *cert_hits = atomic_read32(&certificate_hits);
-    *cert_misses = atomic_read32(&certificate_misses);
-  }
-
-  static int find_catalog_id(const string &path) {
-    return catalog_tree::get_hosting((path == "") ? "/" : path)->catalog_id;
+    *cert_misses = atomic_read32(&certificate_misses);*/
   }
 
   static bool get_dirent_for_inode(const fuse_ino_t ino,
@@ -576,7 +491,7 @@ namespace cvmfs {
     } else {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
                "failed to open inode: %d, CAS key %s, error code %d",
-               ino, d.checksum().to_string().c_str(), errno);
+               ino, d.checksum().ToString().c_str(), errno);
       if (errno == EMFILE) {
         fuse_reply_err(req, EMFILE);
         return;
@@ -806,9 +721,10 @@ namespace cvmfs {
 
   /**
    * Removes a file from local cache
+   * TODO
    */
   int clear_file(const string &path) {
-    int attr_result = walk_path(path);
+  /*  int attr_result = walk_path(path);
     if (attr_result != 0)
       return attr_result;
 
@@ -831,7 +747,8 @@ namespace cvmfs {
 
     catalog::unlock();
 
-    return result;
+    return result;*/
+    return 0;
   }
 
   static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
@@ -905,21 +822,21 @@ namespace cvmfs {
       message << VERSION << "." << CVMFS_PATCH_LEVEL;
 
     } else if (attr == "user.hash") {
-      if (d.checksum() != hash::t_sha1()) {
-        message << d.checksum().to_string() << " (SHA-1)";
+      if (!d.checksum().IsNull()) {
+        message << d.checksum().ToString() << " (SHA-1)";
       } else {
         fuse_reply_err(req, ENOATTR);
         return;
       }
 
     } else if (attr == "user.lhash") {
-      if (d.checksum() != hash::t_sha1()) {
+      if (!d.checksum().IsNull()) {
         string result;
         int fd = cache::Open(d.checksum());
         if (fd < 0) {
           message << "Not in cache";
         } else {
-          hash::t_sha1 hash;
+          hash::Any hash(hash::kSha1); // TODO
           FILE *f = fdopen(fd, "r");
           if (not f) {
             fuse_reply_err(req, EIO);
@@ -933,7 +850,7 @@ namespace cvmfs {
           }
 
           fclose(f);
-          message << hash.to_string() << " (SHA-1)";
+          message << hash.ToString() << " (SHA-1)";
         }
       } else {
         fuse_reply_err(req, ENOATTR);
@@ -1494,7 +1411,6 @@ int main(int argc, char *argv[]) {
   bool quota_ready = false;
   bool catalog_ready = false;
   bool talk_ready = false;
-  int err_catalog;
 
   /* Set a decent umask for new files (no write access to group/everyone).
    We want to allow group write access for the talk-socket. */
@@ -1504,11 +1420,7 @@ int main(int argc, char *argv[]) {
   cvmfs::prev_io_error.timestamp = 0;
   cvmfs::prev_io_error.delay = 0;
 
-	/* enable the catalog tree by switching it's switch
-   (hopefully I do not end up in hell for this hack) */
-  catalog_tree::enable();
-
-  libcrypto_mt_setup();
+	libcrypto_mt_setup();
 
   /* Tune SQlite3 memory */
   void *sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads
@@ -1522,9 +1434,6 @@ int main(int argc, char *argv[]) {
   assert(sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128) == SQLITE_OK);
 
   /* Catalog memory cache */
-  for (int i = 0; i < cvmfs::CATALOG_CACHE_SIZE; ++i) {
-    cvmfs::catalog_cache[i].md5 = hash::t_md5();
-  }
   atomic_init32(&cvmfs::cache_inserts);
   atomic_init32(&cvmfs::cache_replaces);
   atomic_init32(&cvmfs::cache_cleans);
@@ -1819,7 +1728,6 @@ int main(int argc, char *argv[]) {
 
  cvmfs_cleanup:
   if (talk_ready) talk::fini();
-  if (catalog_ready) catalog::fini();
   if (quota_ready) lru::fini();
   if (signature_ready) signature::fini();
   if (cache_ready) cache::Fini();

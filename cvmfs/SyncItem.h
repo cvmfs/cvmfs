@@ -57,7 +57,7 @@ class SyncItem {
 	std::string mFilename;
 
 	/** the hash of the file's content (computed by the SyncMediator) */
-	hash::t_sha1 mContentHash;
+	hash::Any mContentHash;
 
   const SyncUnion *mUnionEngine;
 
@@ -82,9 +82,9 @@ class SyncItem {
 	inline bool IsCatalogRequestFile() const { return mFilename == ".cvmfscatalog"; }
 	bool IsOpaqueDirectory() const;
 
-	inline hash::t_sha1 GetContentHash() const { return mContentHash; }
-	inline void SetContentHash(hash::t_sha1 &hash) { mContentHash = hash; }
-	inline bool HasContentHash() { return mContentHash != hash::t_sha1(); }
+	inline hash::Any GetContentHash() const { return mContentHash; }
+	inline void SetContentHash(hash::Any &hash) { mContentHash = hash; }
+	inline bool HasContentHash() { return !mContentHash.IsNull(); }
 
 	inline std::string GetFilename() const { return mFilename; }
 	inline std::string GetParentPath() const { return mRelativeParentPath; }

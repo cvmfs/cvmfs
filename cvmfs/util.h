@@ -34,7 +34,7 @@ bool make_cache_dir(const std::string &path, const mode_t mode);
 std::string localtime_ascii(time_t seconds, const bool utc);
 bool parse_keyval(const std::string filename, std::map<char, std::string> &content);
 bool parse_keyval(const char *buf, const int size, int &sig_start,
-                  hash::t_sha1 &sha1, std::map<char, std::string> &content);
+                  hash::Any &hash, std::map<char, std::string> &content);
 bool read_sig_tail(const void *buf, const unsigned buf_size, const unsigned skip,
                    void **sig_buf, unsigned *sig_buf_size);
 bool write_memchunk(const std::string &patch, const void *chunk, const int &size);

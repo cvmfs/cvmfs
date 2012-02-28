@@ -149,10 +149,12 @@ class SqlStatement {
    *  @param hash the hash to bind in the query
    *  @result true on success, false otherwise
    */
-  inline bool BindMd5Hash(const int iCol1, const int iCol2, const struct hash::t_md5 &hash) {
+  inline bool BindMd5Hash(const int iCol1, const int iCol2, const struct hash::Md5 &hash) {
+    uint64_t lo, hi;
+    hash.ToIntPair(&lo, &hi);
     return (
-      BindInt64(iCol1, *((sqlite_int64 *)(&hash.digest[0]))) &&
-      BindInt64(iCol2, *((sqlite_int64 *)(&hash.digest[8])))
+      BindInt64(iCol1, lo) &&
+      BindInt64(iCol2, hi)
     );
   }
 
@@ -162,11 +164,11 @@ class SqlStatement {
    *  @param hash the hash to bind in the query
    *  @result true on success, false otherwise
    */
-  inline bool BindSha1Hash(const int iCol, const struct hash::t_sha1 &hash) {
-    if (hash.is_null()) {
+  inline bool BindSha1Hash(const int iCol, const struct hash::Any &hash) {
+    if (hash.IsNull()) {
       return BindNull(iCol);
     } else {
-      return BindBlob(iCol, hash.digest, 20, SQLITE_STATIC);
+      return BindBlob(iCol, hash.digest, hash.GetDigestSize(), SQLITE_STATIC);
     }
   }
 
@@ -209,8 +211,8 @@ class SqlStatement {
    *  @param iCol2 offset of least significant bits in database query
    *  @result the retrieved MD5 hash
    */
-  inline hash::t_md5 RetrieveMd5Hash(const int iCol1, const int iCol2) const {
-    return hash::t_md5(RetrieveInt64(iCol1), RetrieveInt64(iCol2));
+  inline hash::Md5 RetrieveMd5Hash(const int iCol1, const int iCol2) const {
+    return hash::Md5(RetrieveInt64(iCol1), RetrieveInt64(iCol2));
   }
 
   /**
@@ -218,10 +220,10 @@ class SqlStatement {
    *  @param iCol offset of the blob field in database query
    *  @result the retrieved SHA1 hash
    */
-  inline hash::t_sha1 RetrieveSha1HashFromBlob(const int iCol) const {
+  inline hash::Any RetrieveSha1HashFromBlob(const int iCol) const {
     return (RetrieveBytes(iCol) > 0) ?
-                    hash::t_sha1(RetrieveBlob(iCol), RetrieveBytes(iCol)) :
-                    hash::t_sha1();
+                    hash::Any(hash::kSha1, (unsigned char *)RetrieveBlob(iCol), RetrieveBytes(iCol)) :
+                    hash::Any(hash::kSha1);
   }
 
   /**
@@ -229,11 +231,9 @@ class SqlStatement {
    *  @param iCol offset of the text field in the database query
    *  @result the retrieved SHA1 hash
    */
-  inline hash::t_sha1 RetrieveSha1HashFromText(const int iCol) const {
+  inline hash::Any RetrieveSha1HashFromText(const int iCol) const {
     const std::string hash_string = std::string((char *)RetrieveText(iCol));
-    hash::t_sha1 result;
-    result.from_hash_str(hash_string);
-    return result;
+    return hash::Any(hash::kSha1, hash::HexPtr(hash_string));
   }
 
  private:
@@ -366,14 +366,14 @@ class LookupSqlStatement : public DirectoryEntrySqlStatement {
    *  This method retrieves the saved path hash from the database
    *  @return the MD5 path hash of a freshly performed lookup
    */
-  hash::t_md5 GetPathHash() const;
+  hash::Md5 GetPathHash() const;
 
   /**
    *  DirectoryEntrys do not contain their full parent path.
    *  This method retrieves the saved parent path hash from the database
    *  @return the MD5 parent path hash of a freshly performed lookup
    */
-  hash::t_md5 GetParentPathHash() const;
+  hash::Md5 GetParentPathHash() const;
 };
 
 //
@@ -385,7 +385,7 @@ class LookupSqlStatement : public DirectoryEntrySqlStatement {
 class ListingLookupSqlStatement : public LookupSqlStatement {
  public:
   ListingLookupSqlStatement(const sqlite3 *database);
-  bool BindPathHash(const struct hash::t_md5 &hash);
+  bool BindPathHash(const struct hash::Md5 &hash);
 };
 
 //
@@ -397,7 +397,7 @@ class ListingLookupSqlStatement : public LookupSqlStatement {
 class PathHashLookupSqlStatement : public LookupSqlStatement {
  public:
   PathHashLookupSqlStatement(const sqlite3 *database);
-  bool BindPathHash(const struct hash::t_md5 &hash);
+  bool BindPathHash(const struct hash::Md5 &hash);
 };
 
 //
@@ -422,7 +422,7 @@ class FindNestedCatalogSqlStatement : public SqlStatement {
  public:
   FindNestedCatalogSqlStatement(const sqlite3 *database);
   bool BindSearchPath(const std::string &path);
-  hash::t_sha1 GetContentHash() const;
+  hash::Any GetContentHash() const;
 };
 
 //
@@ -435,7 +435,7 @@ class ListNestedCatalogsSqlStatement : public SqlStatement {
  public:
   ListNestedCatalogsSqlStatement(const sqlite3 *database);
   std::string GetMountpoint() const;
-  hash::t_sha1 GetContentHash() const;
+  hash::Any GetContentHash() const;
 };
 
 //
@@ -447,8 +447,8 @@ class ListNestedCatalogsSqlStatement : public SqlStatement {
 class InsertDirectoryEntrySqlStatement : public ManipulateDirectoryEntrySqlStatement {
  public:
   InsertDirectoryEntrySqlStatement(const sqlite3 *database);
-  bool BindPathHash(const hash::t_md5 &hash);
-  bool BindParentPathHash(const hash::t_md5 &hash);
+  bool BindPathHash(const hash::Md5 &hash);
+  bool BindParentPathHash(const hash::Md5 &hash);
   bool BindDirectoryEntry(const DirectoryEntry &entry);
 };
 
@@ -461,7 +461,7 @@ class InsertDirectoryEntrySqlStatement : public ManipulateDirectoryEntrySqlState
 class UpdateDirectoryEntrySqlStatement : public ManipulateDirectoryEntrySqlStatement {
  public:
   UpdateDirectoryEntrySqlStatement(const sqlite3 *database);
-  bool BindPathHash(const hash::t_md5 &hash);
+  bool BindPathHash(const hash::Md5 &hash);
   bool BindDirectoryEntry(const DirectoryEntry &entry);
 };
 
@@ -474,7 +474,7 @@ class UpdateDirectoryEntrySqlStatement : public ManipulateDirectoryEntrySqlState
 class TouchSqlStatement : public SqlStatement {
  public:
   TouchSqlStatement(const sqlite3 *database);
-  bool BindPathHash(const hash::t_md5 &hash);
+  bool BindPathHash(const hash::Md5 &hash);
   bool BindTimestamp(time_t timestamp);
 };
 
@@ -487,7 +487,7 @@ class TouchSqlStatement : public SqlStatement {
 class UnlinkSqlStatement : public SqlStatement {
  public:
   UnlinkSqlStatement(const sqlite3 *database);
-  bool BindPathHash(const hash::t_md5 &hash);
+  bool BindPathHash(const hash::Md5 &hash);
 };
 
 //

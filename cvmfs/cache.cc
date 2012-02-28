@@ -42,7 +42,6 @@
 #include <vector>
 
 #include "platform.h"
-#include "catalog.h"
 #include "DirectoryEntry.h"
 #include "lru.h"
 #include "util.h"
@@ -65,7 +64,7 @@ struct ThreadLocalStorage {
   download::JobInfo download_job;
 };
 
-typedef map< hash::t_sha1, vector<int> * > ThreadQueues;
+typedef map< hash::Any, vector<int> * > ThreadQueues;
 
 string *cache_path_ = NULL;
 string *root_url_ = NULL;
@@ -76,7 +75,7 @@ pthread_mutex_t lock_queues_download_ = PTHREAD_MUTEX_INITIALIZER;
 pthread_key_t thread_local_storage_;
 
 
-static void CleanupLocalStorage(void *data) {
+static void CleanupTLS(void *data) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(data);
   close(tls->pipe_wait[0]);
   close(tls->pipe_wait[1]);
@@ -134,7 +133,7 @@ bool Init(const string &cache_path, const string &root_url) {
   }
   closedir(dirp);
 
-  int retval = pthread_key_create(&thread_local_storage_, CleanupLocalStorage);
+  int retval = pthread_key_create(&thread_local_storage_, CleanupTLS);
   assert(retval == 0);
 
   return true;
@@ -160,8 +159,8 @@ void Fini() {
  * @param[in] id content hash of the catalog entry.
  * \return Absolute path in local cache.
  */
-static inline string GetPathInCache(const hash::t_sha1 &id) {
-  return *cache_path_ + hash::MakePath(id, 1, 2);
+static inline string GetPathInCache(const hash::Any &id) {
+  return *cache_path_ + id.MakePath(1, 2);
 }
 
 
@@ -171,7 +170,7 @@ static inline string GetPathInCache(const hash::t_sha1 &id) {
  * @param[in] id content hash of the catalog entry.
  * \return Absolute path in local cache txn-directory.
  */
-static inline string GetTempName(const hash::t_sha1 &id)
+static inline string GetTempName()
 {
   return *cache_path_ + "/txn/" + "fetchXXXXXX";
 }
@@ -183,7 +182,7 @@ static inline string GetTempName(const hash::t_sha1 &id)
  * @param[in] id content hash of the catalog entry.
  * \return A file descriptor if file is in cache.  Error code of open() else.
  */
-int Open(const hash::t_sha1 &id) {
+int Open(const hash::Any &id) {
   const string path = GetPathInCache(id);
   int result = ::open(path.c_str(), O_RDONLY);
 
@@ -208,7 +207,7 @@ int Open(const hash::t_sha1 &id) {
  * @param[out] size Size of the file
  * \return True if successful, false otherwise.
  */
-bool Open2Mem(const hash::t_sha1 &id, char **buffer, uint64_t *size) {
+bool Open2Mem(const hash::Any &id, char **buffer, uint64_t *size) {
   *size = 0;
   *buffer = NULL;
 
@@ -248,12 +247,12 @@ bool Open2Mem(const hash::t_sha1 &id, char **buffer, uint64_t *size) {
  * @param[out] temp_path Absolute path of the temporoary file in local cache
  * \return File descriptor of temporary file, error code of mkstemp() else
  */
-int StartTransaction(const hash::t_sha1 &id,
+int StartTransaction(const hash::Any &id,
                      string *final_path, string *temp_path)
 {
   int result;
   *final_path = GetPathInCache(id);
-  *temp_path = GetTempName(id);
+  *temp_path = GetTempName();
   const unsigned temp_path_length = temp_path->length();
 
   char template_path[temp_path_length + 1];
@@ -304,7 +303,7 @@ int AbortTransaction(const string &temp_path) {
 int CommitTransaction(const string &final_path,
                       const string &temp_path,
                       const string &cvmfs_path,
-                      const hash::t_sha1 &hash,
+                      const hash::Any &hash,
                       const uint64_t size)
 {
   int result;
@@ -332,7 +331,7 @@ int CommitTransaction(const string &final_path,
  * Commits the memory blob buffer to the given chunk id and name on cvmfs.
  * No checking! The hash and the memory blob need to match.
  */
-bool CommitFromMem(const hash::t_sha1 &id, const char *buffer,
+bool CommitFromMem(const hash::Any &id, const char *buffer,
                    const uint64_t size, const std::string &cvmfs_path)
 {
   string temp_path;
@@ -360,7 +359,7 @@ bool CommitFromMem(const hash::t_sha1 &id, const char *buffer,
  * @param[in] id content hash of the catalog entry.
  * \return True, if file is in local cache, false otherwise.
  */
-bool Contains(const hash::t_sha1 &id) {
+bool Contains(const hash::Any &id) {
   platform_stat64 info;
   return platform_stat(GetPathInCache(id).c_str(), &info) == 0;
 }
@@ -440,7 +439,7 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
   // The download path starts here
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", cvmfs_path.c_str());
 
-  const string url = "/data" + hash::MakePath(d.checksum_, 1, 2);
+  const string url = "/data" + d.checksum_.MakePath(1, 2);
   string final_path;
   string temp_path;
   int fd;  // Used to write the downloaded file
@@ -468,6 +467,7 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
 
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
+  tls->download_job.expected_hash = &d.checksum_;
   download::Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {
@@ -483,7 +483,7 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
                "size check failure for %s, expected %lu, got %ld",
                url.c_str(), d.size(), stat_info.st_size);
       if (CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
-                        d.checksum().to_string()) != 0)
+                        d.checksum().ToString()) != 0)
       {
         LogCvmfs(kLogCache, kLogSyslog,
                  "failed to move %s to quarantaine", temp_path.c_str());
@@ -516,7 +516,7 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
            cvmfs_path.c_str());
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "failed to fetch %s (hash: %s, "
-             "error %d)", cvmfs_path.c_str(), d.checksum_.to_string().c_str(),
+             "error %d)", cvmfs_path.c_str(), d.checksum_.ToString().c_str(),
              tls->download_job.error_code);
   }
   if (fd >= 0) {

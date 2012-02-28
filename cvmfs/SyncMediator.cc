@@ -120,7 +120,7 @@ void SyncMediator::CompressAndHashFileQueue() {
 	SyncItemList::iterator i;
 	SyncItemList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		hash::t_sha1 hash;
+		hash::Any hash(hash::kSha1);
 		AddFileToDatastore(*i, hash);
 		i->SetContentHash(hash);
 	}
@@ -138,7 +138,7 @@ void SyncMediator::CompressAndHashFileQueue() {
 		}
 
 		// compress the master file
-		hash::t_sha1 hash;
+		hash::Any hash(hash::kSha1);
 		AddFileToDatastore(j->masterFile, hash);
 
 		// distribute the obtained hash for every hardlink
@@ -167,7 +167,7 @@ void SyncMediator::AddFileQueueToCatalogs() {
 	}
 }
 
-bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::t_sha1 &hash) {
+bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::Any &hash) {
 	// don't do that, would change something!
 	if (mDryRun) {
 		return true;
@@ -187,7 +187,7 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
 		     (fdst = fdopen(fd_dst, "w")) &&
          zlib::CompressFile2File(fsrc, fdst, &hash) )
 		{
-			const string sha1str = hash.to_string();
+			const string sha1str = hash.ToString();
 			const string cache_path = mDataDirectory + "/" + sha1str.substr(0, 2) + "/" +
 			sha1str.substr(2) + suffix;
 			fflush(fdst);

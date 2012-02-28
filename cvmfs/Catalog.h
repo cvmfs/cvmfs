@@ -99,9 +99,9 @@ class Catalog {
    *  @param parent_hash this will be set to the hash of the parent path
    *  @return true if lookup was successful, false otherwise
    */
-  bool Lookup(const inode_t inode,
+  bool LookupInode(const inode_t inode,
               DirectoryEntry *entry = NULL,
-              hash::t_md5 *parent_hash = NULL) const;
+              hash::Md5 *parent_hash = NULL) const;
 
   /**
    *  performs a lookup on this Catalog for a given path hash
@@ -109,7 +109,7 @@ class Catalog {
    *  @param entry will be set to the found DirectoryEntry
    *  @return true if DirectoryEntry was successfully found, false otherwise
    */
-  bool Lookup(const hash::t_md5 &path_hash,
+  bool LookupMd5(const hash::Md5 &path_hash,
               DirectoryEntry *entry = NULL) const;
 
   /**
@@ -118,9 +118,9 @@ class Catalog {
    *  @param entry will be set to the found DirectoryEntry
    *  @return true if DirectoryEntry was successfully found, false otherwise
    */
-  inline bool Lookup(const std::string &path,
+  inline bool LookupPath(const std::string &path,
                      DirectoryEntry *entry = NULL) const {
-    return Lookup(hash::t_md5(path), entry);
+    return LookupMd5(hash::Md5(hash::AsciiPtr(path)), entry);
   }
 
   /**
@@ -140,7 +140,7 @@ class Catalog {
    *  @param listing will be set to the resulting DirectoryEntryList
    *  @return true on successful listing, false otherwise
    */
-  bool Listing(const hash::t_md5 &path_hash,
+  bool Listing(const hash::Md5 &path_hash,
                DirectoryEntryList *listing) const;
 
   /**
@@ -151,7 +151,7 @@ class Catalog {
    */
   inline bool Listing(const std::string &path,
                       DirectoryEntryList *listing) const {
-    return Listing(hash::t_md5(path), listing);
+    return Listing(hash::Md5(hash::AsciiPtr(path)), listing);
   }
 
   /**
@@ -193,7 +193,7 @@ class Catalog {
    *  @return true if root entry was found, false otherwise
    */
   inline bool GetRootEntry(DirectoryEntry *root_entry) const {
-    return Lookup(path(), root_entry);
+    return LookupPath(path(), root_entry);
   }
 
   /**
@@ -231,7 +231,7 @@ class Catalog {
 
   typedef struct {
     std::string path;
-    hash::t_sha1 content_hash;
+    hash::Any content_hash;
   } NestedCatalogReference;
   typedef std::list<NestedCatalogReference> NestedCatalogReferenceList;
 
@@ -287,7 +287,7 @@ class Catalog {
    *  @param entry the DirectoryEntry to perform coherence fixes on
    *  @return true on success, false otherwise
    */
-  bool EnsureCoherenceOfInodes(const hash::t_md5 &path_hash, DirectoryEntry *entry) const;
+  bool EnsureCoherenceOfInodes(const hash::Md5 &path_hash, DirectoryEntry *entry) const;
 
  private:
   static const uint64_t kDefaultTTL = 3600; ///< Default TTL for a catalog is one hour.

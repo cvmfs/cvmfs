@@ -135,11 +135,11 @@ std::string LookupSqlStatement::GetFieldsToSelect() const {
       //    0     1      2     3     4      5      6      7        8          9           10        11       12
 }
 
-hash::t_md5 LookupSqlStatement::GetPathHash() const {
+hash::Md5 LookupSqlStatement::GetPathHash() const {
   return RetrieveMd5Hash(8, 9);
 }
 
-hash::t_md5 LookupSqlStatement::GetParentPathHash() const {
+hash::Md5 LookupSqlStatement::GetParentPathHash() const {
   return RetrieveMd5Hash(10, 11);
 }
 
@@ -182,7 +182,7 @@ ListingLookupSqlStatement::ListingLookupSqlStatement(const sqlite3 *database) {
   Init(database, statement.str());
 }
 
-bool ListingLookupSqlStatement::BindPathHash(const struct hash::t_md5 &hash) {
+bool ListingLookupSqlStatement::BindPathHash(const struct hash::Md5 &hash) {
   return BindMd5Hash(1, 2, hash);
 }
 
@@ -199,7 +199,7 @@ PathHashLookupSqlStatement::PathHashLookupSqlStatement(const sqlite3 *database) 
   Init(database, statement.str());
 }
 
-bool PathHashLookupSqlStatement::BindPathHash(const struct hash::t_md5 &hash) {
+bool PathHashLookupSqlStatement::BindPathHash(const struct hash::Md5 &hash) {
   return BindMd5Hash(1, 2, hash);
 }
 
@@ -234,11 +234,9 @@ bool FindNestedCatalogSqlStatement::BindSearchPath(const std::string &path) {
   return BindText(1, &path[0], path.length(), SQLITE_STATIC);
 }
 
-hash::t_sha1 FindNestedCatalogSqlStatement::GetContentHash() const {
-  hash::t_sha1 sha1;
+hash::Any FindNestedCatalogSqlStatement::GetContentHash() const {
   const std::string sha1_str = std::string((char *)RetrieveText(0));
-  sha1.from_hash_str(sha1_str);
-  return sha1;
+  return hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
 }
 
 //
@@ -255,11 +253,9 @@ string ListNestedCatalogsSqlStatement::GetMountpoint() const {
   return string((char*)RetrieveText(0));
 }
 
-hash::t_sha1 ListNestedCatalogsSqlStatement::GetContentHash() const {
-  hash::t_sha1 sha1;
+hash::Any ListNestedCatalogsSqlStatement::GetContentHash() const {
   const std::string sha1_str = std::string((char *)RetrieveText(1));
-  sha1.from_hash_str(sha1_str);
-  return sha1;
+  return hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
 }
 
 //
@@ -275,11 +271,11 @@ InsertDirectoryEntrySqlStatement::InsertDirectoryEntrySqlStatement(const sqlite3
                  "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :ino, :size, :mode, :mtime, :flags, :name, :symlink);");
 }
 
-bool InsertDirectoryEntrySqlStatement::BindPathHash(const hash::t_md5 &hash) {
+bool InsertDirectoryEntrySqlStatement::BindPathHash(const hash::Md5 &hash) {
   return BindMd5Hash(1, 2, hash);
 }
 
-bool InsertDirectoryEntrySqlStatement::BindParentPathHash(const hash::t_md5 &hash) {
+bool InsertDirectoryEntrySqlStatement::BindParentPathHash(const hash::Md5 &hash) {
   return BindMd5Hash(3, 4, hash);
 }
 
@@ -303,7 +299,7 @@ UpdateDirectoryEntrySqlStatement::UpdateDirectoryEntrySqlStatement(const sqlite3
                  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
-bool UpdateDirectoryEntrySqlStatement::BindPathHash(const hash::t_md5 &hash) {
+bool UpdateDirectoryEntrySqlStatement::BindPathHash(const hash::Md5 &hash) {
   return BindMd5Hash(9, 10, hash);
 }
 
@@ -322,7 +318,7 @@ TouchSqlStatement::TouchSqlStatement(const sqlite3 *database) {
                  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
-bool TouchSqlStatement::BindPathHash(const hash::t_md5 &hash) {
+bool TouchSqlStatement::BindPathHash(const hash::Md5 &hash) {
   return BindMd5Hash(2, 3, hash);
 }
 
@@ -341,7 +337,7 @@ UnlinkSqlStatement::UnlinkSqlStatement(const sqlite3 *database) {
                  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
-bool UnlinkSqlStatement::BindPathHash(const hash::t_md5 &hash) {
+bool UnlinkSqlStatement::BindPathHash(const hash::Md5 &hash) {
   return BindMd5Hash(1, 2, hash);
 }
 

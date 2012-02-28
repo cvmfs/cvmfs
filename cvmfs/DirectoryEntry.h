@@ -12,6 +12,7 @@
 
 #include "platform.h"
 #include "util.h"
+#include "hash.h"
 
 namespace cvmfs {
 
@@ -25,8 +26,9 @@ class DirectoryEntry {
   friend class WritableCatalogManager;               // TODO: remove this dependency
 
  public:
-  hash::t_sha1 checksum_;
+  hash::Any checksum_;
   const static inode_t kInvalidInode = 0;
+  std::string name_;
 
   /**
    *  constructor initializes structure to a (senseless) zero value
@@ -55,7 +57,7 @@ class DirectoryEntry {
   inline int linkcount() const { return linkcount_; }
   inline std::string name() const { return name_; }
   inline std::string symlink() const { return symlink_; }
-  inline hash::t_sha1 checksum() const { return checksum_; }
+  inline hash::Any checksum() const { return checksum_; }
   inline uint64_t size() const { return (IsLink()) ? symlink().length() : size_; }
   inline time_t mtime() const { return mtime_; }
   inline unsigned int mode() const { return mode_; }
@@ -107,7 +109,6 @@ class DirectoryEntry {
   unsigned int mode_;
   uint64_t size_;
   time_t mtime_;
-  std::string name_;
   std::string symlink_;
 
   // administrative data

@@ -31,26 +31,26 @@
 #include "hash.h"
 
 namespace cvmfs {
-  
+
 class AbstractCatalogManager {
  public:
   AbstractCatalogManager();
   virtual ~AbstractCatalogManager();
-  
+
   // TODO: remove these stubs and replace them with actual locking
   inline void ReadLock() const { }
   inline void WriteLock() const { }
   inline void Unlock() const { }
   inline void UpgradeLock() const { Unlock(); WriteLock(); }
   inline void DowngradeLock() const { Unlock(); ReadLock(); }
-  
+
   /**
    *  Initializes the CatalogManager
    *  i.e. loads and attaches the root entry
    *  @return true on successful init otherwise false
    */
   virtual bool Init();
-  
+
   /**
    *  convenience wrapper around the Lookup methods, to specifically set the
    *  lookup_without_parent flag in the call of Lookup.
@@ -74,7 +74,7 @@ class AbstractCatalogManager {
    *  @return true if lookup succeeded otherwise false
    */
   inline bool LookupWithoutParent(const std::string &path, DirectoryEntry *entry) { return Lookup(path, entry, false); };
-  
+
   /**
    *  perform a lookup for a specific DirectoryEntry in the catalogs
    *  @param inode the inode to find in the catalogs
@@ -82,10 +82,10 @@ class AbstractCatalogManager {
    *  @param with_parent perform a second lookup to get information about the parent
    *  @return true if lookup succeeded otherwise false
    */
-  bool Lookup(const inode_t inode, 
-              DirectoryEntry *entry, 
+  bool Lookup(const inode_t inode,
+              DirectoryEntry *entry,
               const bool with_parent = true) const;
-  
+
   /**
    *  perform a lookup for a specific DirectoryEntry in the catalogs
    *  @param path the path to find in the catalogs
@@ -93,10 +93,10 @@ class AbstractCatalogManager {
    *  @param with_parent perform a second lookup to get information about the parent
    *  @return true if lookup succeeded otherwise false
    */
-  bool Lookup(const std::string &path, 
-              DirectoryEntry *entry, 
+  bool Lookup(const std::string &path,
+              DirectoryEntry *entry,
               const bool with_parent = true);
-  
+
   /**
    *  do a listing of the specified directory
    *  @param path the path of the directory to list
@@ -104,27 +104,27 @@ class AbstractCatalogManager {
    *  @return true if listing succeeded otherwise false
    */
   bool Listing(const std::string &path, DirectoryEntryList *listing);
-  
+
   /**
    *  get the inode number of the root DirectoryEntry
    *  'root' here means the actual root of the whole file system
    *  @return the root inode number
    */
   inline inode_t GetRootInode() const { return kInitialInodeOffset + 1; }
-  
+
   /**
    *  get the revision of the catalog
    *  TODO: CURRENTLY NOT IMPLEMENTED
    *  @return the revision number of the catalog
    */
   inline uint64_t GetRevision() const { return 0; } // TODO: implement this
-  
+
   /**
    *  count all attached catalogs
    *  @return the number of all attached catalogs
    */
   inline int GetNumberOfAttachedCatalogs() const { return catalogs_.size(); }
-  
+
   /**
    *  Inodes are ambiquitous under some circumstances, to prevent problems
    *  they must be passed through this method first
@@ -132,14 +132,14 @@ class AbstractCatalogManager {
    *  @return the revised inode
    */
   inline inode_t MangleInode(const inode_t inode) const { return (inode < kInitialInodeOffset) ? GetRootInode() : inode; }
-  
+
   /**
    *  print the currently attached catalog hierarchy to stdout
    */
   inline void PrintCatalogHierarchy() const { PrintCatalogHierarchyRecursively(GetRootCatalog()); }
-  
+
  protected:
-  
+
   /**
    *  This pure virtual method has to be implemented by deriving classes
    *  It should perform a specific loading action, return 0 on success and
@@ -149,9 +149,9 @@ class AbstractCatalogManager {
    *  @param catalog_file must be set to the path of the loaded file
    *  @return 0 on success otherwise a application specific error code
    */
-  virtual int LoadCatalogFile(const std::string &url_path, const hash::t_md5 &mount_point, 
+  virtual int LoadCatalogFile(const std::string &url_path, const hash::Md5 &mount_point,
                               std::string *catalog_file) = 0;
-                              
+
   /**
    *  Pure virtual method to create a new catalog structure
    *  Under different circumstances we might need different types of catalog
@@ -161,7 +161,7 @@ class AbstractCatalogManager {
    *  @param parent_catalog the parent of the catalog to create
    *  @return a newly created (derived) Catalog for future usage
    */
-  virtual Catalog* CreateCatalogStub(const std::string &mountpoint, 
+  virtual Catalog* CreateCatalogStub(const std::string &mountpoint,
                                      Catalog *parent_catalog) const = 0;
 
   /**
@@ -173,9 +173,9 @@ class AbstractCatalogManager {
    *  @return true on success otherwise false
    */
   bool LoadAndAttachCatalog(const std::string &mountpoint,
-                            Catalog *parent_catalog, 
+                            Catalog *parent_catalog,
                             Catalog **attached_catalog = NULL);
-  
+
   /**
    *  Attaches all catalogs of the repository recursively
    *  This is useful when updating a repository on the server.
@@ -183,7 +183,7 @@ class AbstractCatalogManager {
    *  @return true on success, false otherwise
    */
   inline bool LoadAndAttachCatalogsRecursively() { return LoadAndAttachCatalogsRecursively(GetRootCatalog()); }
-  
+
   /**
    *  attaches a newly created catalog
    *  @param db_file the file on a local file system containing the database
@@ -191,10 +191,10 @@ class AbstractCatalogManager {
    *  @param open_transaction ????
    *  @return true on success, false otherwise
    */
-  bool AttachCatalog(const std::string &db_file, 
+  bool AttachCatalog(const std::string &db_file,
                      Catalog *new_catalog,
                      const bool open_transaction);
-  
+
   /**
    *  removes a catalog (and all of it's children) from this CatalogManager
    *  the given catalog and all children are freed, if this call succeeds!
@@ -212,36 +212,36 @@ class AbstractCatalogManager {
     *  @return true on success, false otherwise
     */
    bool DetachCatalog(Catalog *catalog);
-  
+
   /**
    *  detach all catalogs from this CatalogManager
    *  this is mainly called in the destructor of this class
    *  @return true on success, false otherwise
    */
   inline bool DetachAllCatalogs() { return DetachCatalogTree(GetRootCatalog()); }
-  
+
   /**
    *  get the root catalog of this CatalogManager
    *  @return the root catalog of this CatalogMananger
    */
   inline Catalog* GetRootCatalog() const { return catalogs_.front(); }
-  
+
   /**
    *  find the appropriate catalog for a given path.
    *  this method might load additional nested catalogs.
    *  @param path the path for which the catalog is needed
-   *  @param load_final_catalog if the last part of the given path is a nested catalog 
+   *  @param load_final_catalog if the last part of the given path is a nested catalog
    *                            it is loaded as well, otherwise not (i.e. directory listing)
    *  @param catalog this pointer will be set to the searched catalog
    *  @param entry if a DirectoryEntry pointer is given, it will be set to the
    *               DirectoryEntry representing the last part of the given path
    *  @return true if catalog was found, false otherwise
    */
-  bool GetCatalogByPath(const std::string &path, 
-                        const bool load_final_catalog, 
-                        Catalog **catalog = NULL, 
+  bool GetCatalogByPath(const std::string &path,
+                        const bool load_final_catalog,
+                        Catalog **catalog = NULL,
                         DirectoryEntry *entry = NULL);
-  
+
   /**
    *  finds the appropriate catalog for a given inode
    *  Note: This method will NOT load additional nested catalogs
@@ -251,7 +251,7 @@ class AbstractCatalogManager {
    *  @return true if catalog was present, false otherwise
    */
   bool GetCatalogByInode(const inode_t inode, Catalog **catalog) const;
-  
+
   /**
    *  checks if a searched catalog is already present in this CatalogManager
    *  based on it's path.
@@ -259,11 +259,11 @@ class AbstractCatalogManager {
    *  @param attached_catalog is set to the searched catalog, in case of presence
    *  @return true if catalog is already present, false otherwise
    */
-  bool IsCatalogAttached(const std::string &root_path, 
+  bool IsCatalogAttached(const std::string &root_path,
                          Catalog **attached_catalog) const;
-  
+
  private:
-   
+
   /**
    *  this method finds the most probably fitting catalog for a given path
    *  Note: this might still not be the catalog you are looking for
@@ -272,7 +272,7 @@ class AbstractCatalogManager {
    *  @return the catalog which is best fitting at the given path
    */
   Catalog* FindBestFittingCatalogForPath(const std::string &path) const;
-  
+
   /**
    *  this method loads all nested catalogs neccessary to serve a certain path
    *  @param path the path to load the associated nested catalog for
@@ -283,9 +283,9 @@ class AbstractCatalogManager {
    *  @param final_catalog this will be set to the resulting catalog
    *  @return true if desired nested catalog was successfully loaded, false otherwise
    */
-  bool LoadNestedCatalogForPath(const std::string &path, 
-                                const Catalog *entry_point, 
-                                const bool load_final_catalog, 
+  bool LoadNestedCatalogForPath(const std::string &path,
+                                const Catalog *entry_point,
+                                const bool load_final_catalog,
                                 Catalog **final_catalog);
 
   /**
@@ -296,7 +296,7 @@ class AbstractCatalogManager {
    */
   void PrintCatalogHierarchyRecursively(const Catalog *catalog,
                                         const int recursion_depth = 0) const;
-  
+
   /**
    *  allocate a chunk of inodes for the given size
    *  this is done while attaching a new catalog
@@ -304,7 +304,7 @@ class AbstractCatalogManager {
    *  @return a structure defining a chunk of inodes to use for this catalog
    */
   InodeChunk GetInodeChunkOfSize(uint64_t size);
-  
+
   /**
    *  this method is called if a catalog is detached
    *  which renders the associated InodeChunk invalid
@@ -312,7 +312,7 @@ class AbstractCatalogManager {
    *  @param chunk the InodeChunk to be freed
    */
   void AnnounceInvalidInodeChunk(const InodeChunk chunk) const;
-  
+
   /**
    *  Attaches all catalogs of the repository recursively
    *  This is useful when updating a repository on the server.
@@ -323,7 +323,7 @@ class AbstractCatalogManager {
    *  @return true on success, false otherwise
    */
   bool LoadAndAttachCatalogsRecursively(Catalog *catalog);
-  
+
  private:
   // TODO: this list is actually not really needed.
   //       the only point we are really using it at the moment
@@ -332,12 +332,12 @@ class AbstractCatalogManager {
   //  eventually we should only safe the root catalog, representing
   //  the whole catalog tree in an implicit manor.
   CatalogList catalogs_;
-  
+
   uint64_t current_inode_offset_;
-  
+
   const static inode_t kInitialInodeOffset = 255;
 };
-  
+
 }
 
 #endif /* ABSTRACT_CATALOG_MANAGER_H */

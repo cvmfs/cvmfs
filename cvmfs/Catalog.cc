@@ -138,9 +138,9 @@ Catalog* Catalog::FindBestFittingChild(const string &path) const {
   return hit;
 }
 
-bool Catalog::Lookup(const inode_t inode,
+bool Catalog::LookupInode(const inode_t inode,
                      DirectoryEntry *entry,
-                     hash::t_md5 *parent_hash) const {
+                     hash::Md5 *parent_hash) const {
   assert (IsInitialized());
 
   bool found = false;
@@ -161,7 +161,7 @@ bool Catalog::Lookup(const inode_t inode,
   return found;
 }
 
-bool Catalog::Lookup(const hash::t_md5 &path_hash,
+bool Catalog::LookupMd5(const hash::Md5 &path_hash,
                      DirectoryEntry *entry) const {
   assert (IsInitialized());
 
@@ -184,7 +184,7 @@ bool Catalog::Listing(const inode_t inode,
   return false;
 }
 
-bool Catalog::Listing(const hash::t_md5 &path_hash,
+bool Catalog::Listing(const hash::Md5 &path_hash,
                       DirectoryEntryList *listing) const {
   assert (IsInitialized());
 
@@ -199,7 +199,7 @@ bool Catalog::Listing(const hash::t_md5 &path_hash,
   return true;
 }
 
-bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash,
+bool Catalog::EnsureCoherenceOfInodes(const hash::Md5 &path_hash,
                                       DirectoryEntry *entry) const {
   // ensure coherence of inodes after a nested catalog is loaded
   // <nested catalog mountpoint> == <nested catalog root>
@@ -207,7 +207,7 @@ bool Catalog::EnsureCoherenceOfInodes(const hash::t_md5 &path_hash,
   //      must lookup the mountpoint inode and use it for the root entry as well
 	if (entry->IsNestedCatalogRoot() && not this->IsRoot()) {
     DirectoryEntry nestedRootMountpoint;
-    bool foundMountpoint = parent_->Lookup(path_hash, &nestedRootMountpoint);
+    bool foundMountpoint = parent_->LookupMd5(path_hash, &nestedRootMountpoint);
 
     if (not foundMountpoint) {
       LogCvmfs(kLogCatalog, kLogDebug, "FATAL: mount point of nested catalog "

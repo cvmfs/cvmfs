@@ -13,6 +13,7 @@
 
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <alloca.h>
 
 #include <cstring>
 #include <cassert>
@@ -162,7 +163,7 @@ bool CompressPath2Path(const string &src, const string &dest) {
 
 
 bool CompressPath2Path(const string &src, const string &dest,
-                       hash::t_sha1 *compressed_hash)
+                       hash::Any *compressed_hash)
 {
   FILE *fsrc = fopen(src.c_str(), "r");
   if (!fsrc) {
@@ -218,17 +219,18 @@ bool DecompressPath2Path(const string &src, const string &dest) {
 }
 
 
-bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash) {
+bool CompressFile2Null(FILE *fsrc, hash::Any *compressed_hash) {
   int z_ret, flush;
   bool result = -1;
   unsigned have;
   z_stream strm;
   unsigned char in[kZChunk];
   unsigned char out[kZChunk];
-  sha1_context_t sha1_ctx;
+  hash::ContextPtr hash_context(compressed_hash->algorithm);
 
   CompressInit(&strm);
-  hash::sha1_init(&sha1_ctx);
+  hash_context.buffer = alloca(hash_context.size);
+  hash::Init(hash_context);
 
   // Compress until end of file
   do {
@@ -247,7 +249,7 @@ bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash) {
       if (z_ret == Z_STREAM_ERROR)
         goto compress_file2null_final;  // state not clobbered
       have = kZChunk - strm.avail_out;
-      hash::sha1_update(&sha1_ctx, out, have);
+      hash::Update(out, have, hash_context);
     } while (strm.avail_out == 0);
 
     // Done when last data in file processed
@@ -256,7 +258,7 @@ bool CompressFile2Null(FILE *fsrc, hash::t_sha1 *compressed_hash) {
   // stream will be complete
   if (z_ret != Z_STREAM_END) goto compress_file2null_final;
 
-  hash::sha1_final(compressed_hash->digest, &sha1_ctx);
+  hash::Final(hash_context, compressed_hash);
   result = true;
 
   // Clean up and return
@@ -316,17 +318,18 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest) {
 }
 
 
-bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash) {
+bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash) {
   int z_ret, flush;
   bool result = false;
   unsigned have;
   z_stream strm;
   unsigned char in[kZChunk];
   unsigned char out[kZChunk];
-  sha1_context_t sha1_ctx;
+  hash::ContextPtr hash_context(compressed_hash->algorithm);
 
   CompressInit(&strm);
-  hash::sha1_init(&sha1_ctx);
+  hash_context.buffer = alloca(hash_context.size);
+  hash::Init(hash_context);
 
   // Compress until end of file
   do {
@@ -347,7 +350,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash) {
       have = kZChunk - strm.avail_out;
       if (fwrite(out, 1, have, fdest) != have || ferror(fdest))
         goto compress_file2file_hashed_final;
-      hash::sha1_update(&sha1_ctx, out, have);
+      hash::Update(out, have, hash_context);
     } while (strm.avail_out == 0);
 
     // Done when last data in file processed
@@ -356,7 +359,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::t_sha1 *compressed_hash) {
   // Stream will be complete
   if (z_ret != Z_STREAM_END) goto compress_file2file_hashed_final;
 
-  hash::sha1_final(compressed_hash->digest, &sha1_ctx);
+  hash::Final(hash_context, compressed_hash);
   result = true;
 
   // Clean up and return

@@ -208,8 +208,8 @@ private:
 	void CompressAndHashFileQueue();
 	void AddFileQueueToCatalogs();
 
-	inline bool AddFileToDatastore(SyncItem &entry, hash::t_sha1 &hash) { return AddFileToDatastore(entry, "", hash); }
-	bool AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::t_sha1 &hash);
+	inline bool AddFileToDatastore(SyncItem &entry, hash::Any &hash) { return AddFileToDatastore(entry, "", hash); }
+	bool AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::Any &hash);
 
 	inline HardlinkGroupMap& GetHardlinkMap() { return mHardlinkStack.top(); }
 

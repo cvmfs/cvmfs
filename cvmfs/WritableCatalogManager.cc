@@ -56,7 +56,7 @@ bool WritableCatalogManager::Init() {
 }
 
 int WritableCatalogManager::LoadCatalogFile(const std::string &url_path,
-                                            const hash::t_md5 &mount_point,
+                                            const hash::Md5 &mount_point,
                                             string *catalog_file)
 {
   // actually we have nothing to load here...
@@ -90,7 +90,7 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
   root_entry.mode_              = 16877;
   root_entry.size_              = 4096;
   root_entry.mtime_             = time(NULL);
-  root_entry.checksum_          = hash::t_sha1();
+  root_entry.checksum_          = hash::Any(hash::kSha1); // TODO
   root_entry.linkcount_         = 1;
 
   string root_entry_parent_path = "";
@@ -140,7 +140,7 @@ bool WritableCatalogManager::RemoveFile(const std::string &path) {
     return false;
   }
 
-  if (not catalog->Lookup(file_path)) {
+  if (not catalog->LookupPath(file_path)) {
     LogCvmfs(kLogCatalog, kLogDebug, "file '%s' does not exist and thus cannot be deleted", file_path.c_str());
     return false;
   }
@@ -164,7 +164,7 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   }
 
   DirectoryEntry dir;
-  if (not catalog->Lookup(directory_path, &dir)) {
+  if (not catalog->LookupPath(directory_path, &dir)) {
     LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' does not exist and thus cannot be deleted", directory_path.c_str());
     return false;
   }
@@ -226,7 +226,7 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
   		return false;
 		}
   } else {
-    if (entry.checksum().is_null()) {
+    if (entry.checksum().IsNull()) {
       LogCvmfs(kLogCatalog, kLogDebug, "regular file '%s' has no content hash and cannot be added", file_path.c_str());
   		return false;
     }
@@ -298,7 +298,7 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
     return false;
   }
 
-  if (not catalog->Lookup(entry_path)) {
+  if (not catalog->LookupPath(entry_path)) {
     LogCvmfs(kLogCatalog, kLogDebug, "entry '%s' does not exist and thus cannot be touched", entry_path.c_str());
     return false;
   }
@@ -325,7 +325,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   // get the DirectoryEntry for the given path, this will serve as root
   // entry for the nested catalog we are about to create
   DirectoryEntry new_root_entry;
-  old_catalog->Lookup(nested_root_path, &new_root_entry);
+  old_catalog->LookupPath(nested_root_path, &new_root_entry);
 
   // create the database schema and the inital root entry
   // for the new nested catalog
@@ -535,14 +535,13 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	if (parse_keyval(cat_path + "/.cvmfspublished", ext_chksum)) {
 		map<char, string>::const_iterator i = ext_chksum.find('C');
 		if (i != ext_chksum.end()) {
-			hash::t_sha1 sha1_previous;
-			sha1_previous.from_hash_str(i->second);
+			hash::Any sha1_previous(hash::kSha1, hash::HexPtr(i->second));
 
     	// TODO: revision hint!
     	//       do this inside the catalog (make SetPreviousRevision private)
 			if (not catalog->SetPreviousRevision(sha1_previous)) {
 				stringstream ss;
-				ss << "failed store previous catalog revision " << sha1_previous.to_string();
+				ss << "failed store previous catalog revision " << sha1_previous.ToString();
 				printWarning(ss.str());
 			}
 		} else {
@@ -554,7 +553,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	const string src_path = cat_path + "/.cvmfscatalog.working";
 	const string dst_path = data_directory_ + "/txn/compressing.catalog";
 	//const string dst_path = cat_path + "/.cvmfscatalog";
-	hash::t_sha1 sha1;
+	hash::Any sha1(hash::kSha1);
 	FILE *fsrc = NULL, *fdst = NULL;
 	int fd_dst;
 
@@ -568,7 +567,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 		printWarning(ss.str());
 
 	} else {
-		const string sha1str = sha1.to_string();
+		const string sha1str = sha1.ToString();
 		const string hash_name = sha1str.substr(0, 2) + "/" + sha1str.substr(2) + "C";
 		const string cache_path = data_directory_ + "/" + hash_name;
 		if (rename(dst_path.c_str(), cache_path.c_str()) != 0) {
@@ -593,15 +592,15 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	/* Create extended checksum */
 	FILE *fpublished = fopen((cat_path + "/.cvmfspublished").c_str(), "w");
 	if (fpublished) {
-		string fields = "C" + sha1.to_string() + "\n";
-		fields += "R" + hash::t_md5(clg_path).to_string() + "\n";
+		string fields = "C" + sha1.ToString() + "\n";
+		fields += "R" + hash::Md5(hash::AsciiPtr(clg_path)).ToString() + "\n";
 
 		/* Mucro catalogs */
 		DirectoryEntry d;
-		if (not catalog->Lookup(catalog->path(), &d)) {
+		if (not catalog->LookupPath(catalog->path(), &d)) {
 			printWarning("failed to find root entry");
 		}
-		fields += "L" + d.checksum().to_string() + "\n";
+		fields += "L" + d.checksum().ToString() + "\n";
 		const uint64_t ttl = catalog->GetTTL();
 		ostringstream strm_ttl;
 		strm_ttl << ttl;
@@ -640,7 +639,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	/* Compress and write SHA1 checksum */
 	char chksum[40];
 	int lchksum = 40;
-	memcpy(chksum, &((sha1.to_string())[0]), 40);
+	memcpy(chksum, &((sha1.ToString())[0]), 40);
 	void *compr_buf = NULL;
 	int64_t compr_size;
 	if (!zlib::CompressMem2Mem(chksum, lchksum, &compr_buf, &compr_size)) {

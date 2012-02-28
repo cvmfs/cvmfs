@@ -4,7 +4,6 @@
 #include "lru_cache.h"
 #include "inode_cache.h"
 
-#include "catalog.h"
 #include "fuse-duplex.h"
 
 namespace cvmfs {
@@ -13,7 +12,7 @@ namespace cvmfs {
       public LruCache<fuse_ino_t, std::string> {
       public:
          PathCache(unsigned int cacheSize);
-         
+
          bool insert(const fuse_ino_t inode, const std::string &path);
          bool lookup(const fuse_ino_t inode, std::string *path);
          void drop();
