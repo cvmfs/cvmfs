@@ -92,10 +92,13 @@ static void SendTrace(int signal,
 
   void *adr_buf[kMaxBacktrace];
   char cflow = 'S';
-  if (write(pipe_wd_[1], &cflow, 1) != 1) _exit(1);
+  if (write(pipe_wd_[1], &cflow, 1) != 1)
+    _exit(1);
 
-  if (write(pipe_wd_[1], &signal, sizeof(int)) != sizeof(int)) _exit(1);
-  if (write(pipe_wd_[1], &send_errno, sizeof(int)) != sizeof(int)) _exit(1);
+  if (write(pipe_wd_[1], &signal, sizeof(signal)) != sizeof(signal))
+    _exit(1);
+  if (write(pipe_wd_[1], &send_errno, sizeof(send_errno)) != sizeof(send_errno))
+    _exit(1);
 
   int stack_size = backtrace(adr_buf, kMaxBacktrace);
   // Fix around sigaction
@@ -103,7 +106,8 @@ static void SendTrace(int signal,
     ucontext_t *uc = reinterpret_cast<ucontext_t *>(context);
     adr_buf[1] = GetInstructionPointer(uc);
   }
-  if (write(pipe_wd_[1], &stack_size, sizeof(int)) != sizeof(int)) _exit(1);
+  if (write(pipe_wd_[1], &stack_size, sizeof(stack_size)) != sizeof(stack_size))
+    _exit(1);
   backtrace_symbols_fd(adr_buf, stack_size, pipe_wd_[1]);
 
   cflow = 'Q';
@@ -118,10 +122,12 @@ static void SendTrace(int signal,
  * We expect ideally nothing to be logged, so that file is created on demand.
  */
 static void LogEmergency(string msg) {
+  char ctime_buffer[32];
+
   FILE *fp = fopen((*cache_dir_ + "/stacktrace").c_str(), "a");
   if (fp) {
     time_t now = time(NULL);
-    msg += "\nTimestamp: " + string(ctime(&now));
+    msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
     if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
       msg += " (failed to report into log file in cache directory)";
     fclose(fp);
@@ -156,21 +162,30 @@ static string ReportStacktrace() {
   char buffer[48];
 
   int recv_signal;
-  if (read(pipe_wd_[0], &recv_signal, sizeof(int)) < (int)sizeof(int))
+  if (read(pipe_wd_[0], &recv_signal, sizeof(recv_signal)) <
+      reinterpret_cast<int>(sizeof(recv_signal)))
+  {
     return "failure while reading signal number";
-  snprintf(buffer, 48, "%d", recv_signal);
+  }
+  snprintf(buffer, sizeof(buffer), "%d", recv_signal);
   debug += "Signal: " + string(buffer);
 
   int recv_errno;
-  if (read(pipe_wd_[0], &recv_errno, sizeof(int)) < (int)sizeof(int))
+  if (read(pipe_wd_[0], &recv_errno, sizeof(recv_errno)) <
+      reinterpret_cast<int>(sizeof(recv_errno)))
+  {
     return "failure while reading errno";
-  snprintf(buffer, 48, "%d", recv_errno);
+  }
+  snprintf(buffer, sizeof(buffer), "%d", recv_errno);
   debug += ", errno: " + string(buffer) + "\n";
 
   debug += "version: " + string(VERSION) + "\n";
 
-  if (read(pipe_wd_[0], &stack_size, sizeof(int)) < (int)sizeof(int))
+  if (read(pipe_wd_[0], &stack_size, sizeof(stack_size)) <
+      reinterpret_cast<int>(sizeof(stack_size)))
+  {
     return "failure while reading stacktrace";
+  }
 
   for (int i = 0; i < stack_size; ++i) {
     debug += ReadLineFromPipe();
@@ -215,14 +230,14 @@ bool Init(const string cache_dir, const bool check_max_open_files) {
     struct rlimit rpl;
     memset(&rpl, 0, sizeof(rpl));
     getrlimit(RLIMIT_NOFILE, &rpl);
-		soft_limit = rpl.rlim_cur;
+    soft_limit = rpl.rlim_cur;
 
 #ifdef __APPLE__
-		hard_limit = sysconf(_SC_OPEN_MAX);
-		if (hard_limit < 0) {
+    hard_limit = sysconf(_SC_OPEN_MAX);
+    if (hard_limit < 0) {
       LogCvmfs(kLogMonitor, kLogStdout, "Warning: could not retrieve "
                "hard limit for the number of open files");
-		}
+    }
 #else
     hard_limit = rpl.rlim_max;
 #endif
