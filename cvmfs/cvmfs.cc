@@ -1578,8 +1578,8 @@ int main(int argc, char *argv[]) {
   atomic_init32(&cvmfs::nioerr);
   monitor_ready = true;
 
-  signature::init();
-  if (!signature::load_public_keys(cvmfs_opts.pubkey ? cvmfs_opts.pubkey : "")) {
+  signature::Init();
+  if (!signature::LoadPublicRsaKeys(cvmfs_opts.pubkey ? cvmfs_opts.pubkey : "")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to load public key(s)");
     goto cvmfs_cleanup;
   } else {
@@ -1729,7 +1729,7 @@ int main(int argc, char *argv[]) {
  cvmfs_cleanup:
   if (talk_ready) talk::fini();
   if (quota_ready) lru::fini();
-  if (signature_ready) signature::fini();
+  if (signature_ready) signature::Fini();
   if (cache_ready) cache::Fini();
   if (monitor_ready) monitor::Fini();
   if (download_ready) download::Fini();

@@ -11,28 +11,30 @@
 
 namespace signature {
 
-void init();
-void fini();
+void Init();
+void Fini();
+std::string GetCryptoError();
 
-bool load_private_key(const std::string file_pem, const std::string password);
-void unload_private_key();
-bool load_ca2chain(const std::string file_pem);
-//bool load_crl2chain(std::string file_pem);
-bool load_certificate(const std::string file_pem, const bool verify);
-bool load_certificate(const void *buf, const unsigned buf_size, const bool verify);
-bool load_public_keys(const std::string file_list);
-std::string fingerprint(); /* use only when certificate is loaded */
-bool write_certificate(const std::string file_pem);
-bool write_certificate(void **buf, unsigned *buf_size);
-bool keys_match();
-std::string whois();
+bool LoadPrivateKeyPath(const std::string &file_pem,
+                        const std::string &password);
+void UnloadPrivateKey();
 
-bool sign(const void *buf, const unsigned size_buf, void **sig, unsigned *sig_size);
-bool verify(const void *buf, const unsigned buf_size, const void *sig, unsigned sig_size);
-bool verify(const void *buf, const unsigned buf_size, const std::string file_sig);
-bool verify_rsa(const void *buf, const unsigned buf_size, const void *sig, unsigned sig_size);
+bool LoadCertificatePath(const std::string &file_pem);
+bool LoadCertificateMem(const unsigned char *buffer,
+                        const unsigned buffer_size);
+bool WriteCertificateMem(unsigned char **buffer, unsigned *buffer_size);
+bool KeysMatch();
+std::string Whois();
+std::string FingerprintCertificate();
 
-std::string get_crypto_err();
+bool LoadPublicRsaKeys(const std::string &file_list);
+
+bool Sign(const unsigned char *buffer, const unsigned buffer_size,
+          unsigned char **signature, unsigned *signature_size);
+bool Verify(const unsigned char *buffer, const unsigned buffer_size,
+            const unsigned char *signature, unsigned signature_size);
+bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
+               const unsigned char *signature, unsigned signature_size);
 
 }  // namespace signature
 

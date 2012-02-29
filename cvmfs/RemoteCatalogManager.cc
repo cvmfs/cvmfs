@@ -380,7 +380,7 @@ namespace cvmfs {
         }
 
         /* read certificate */
-        if (!signature::load_certificate(data_certificate, size_certificate, false)) {
+        if (!signature::LoadCertificateMem((const unsigned char *)data_certificate, size_certificate)) {
           LogCvmfs(kLogCvmfs, kLogDebug, "could not read certificate");
           free(data_certificate);
           return -EINVAL;
@@ -388,7 +388,7 @@ namespace cvmfs {
 
         /* verify certificate and signature */
         if (!IsValidCertificate(no_proxy) ||
-            !signature::verify(&((sha1_chksum.ToString())[0]), 40, sig_buf, sig_buf_size))
+            !signature::Verify((const unsigned char *)&((sha1_chksum.ToString())[0]), 40, (const unsigned char *)sig_buf, sig_buf_size))
         {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "signature verification failed against %s",
@@ -397,12 +397,12 @@ namespace cvmfs {
           return -EPERM;
         }
         LogCvmfs(kLogCvmfs, kLogDebug, "catalog signed by: %s",
-                 signature::whois().c_str());
+                 signature::Whois().c_str());
         signature_ok = true;
 
         if (!cached_cert) {
           cache::CommitFromMem(cert_sha1, data_certificate, size_certificate,
-                               "certificate of " + signature::whois());
+                               "certificate of " + signature::Whois());
         }
         free(data_certificate);
       } else {
@@ -476,7 +476,7 @@ namespace cvmfs {
     if (sha1_expected.IsNull() && signature_ok) {
       LogCvmfs(kLogCvmfs, kLogSyslog,
                "signed catalog loaded from %s, signed by %s",
-               (root_url_ + url_path).c_str(), signature::whois().c_str());
+               (root_url_ + url_path).c_str(), signature::Whois().c_str());
     }
     return 0;
   }
@@ -487,7 +487,7 @@ namespace cvmfs {
    * With nocache, whitelist is downloaded with pragma:no-cache
    */
   bool RemoteCatalogManager::IsValidCertificate(bool nocache) {
-    const string fingerprint = signature::fingerprint();
+    const string fingerprint = signature::FingerprintCertificate();
     if (fingerprint == "") {
       LogCvmfs(kLogCvmfs, kLogDebug, "invalid catalog signature");
       return false;
@@ -632,12 +632,13 @@ namespace cvmfs {
       return false;
     }
     const string sha1str = sha1.ToString();
-    bool result = signature::verify_rsa(&sha1str[0], 40, sig_buf, sig_buf_size);
+    bool result = signature::VerifyRsa((const unsigned char *)&sha1str[0], 40,
+                                       (const unsigned char *)sig_buf, sig_buf_size);
     free(sig_buf);
     if (!result)
       LogCvmfs(kLogCvmfs, kLogDebug,
                "whitelist signature verification failed, %s",
-               signature::get_crypto_err().c_str());
+               signature::GetCryptoError().c_str());
     else
       LogCvmfs(kLogCvmfs, kLogDebug, "whitelist signature verification passed");
 

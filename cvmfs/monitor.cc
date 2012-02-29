@@ -267,6 +267,7 @@ bool Init(const string cache_dir, const bool check_max_open_files) {
 
 void Fini() {
   delete cache_dir_;
+  cache_dir_ = NULL;
   if (spawned_) {
     char quit = 'Q';
     (void)write(pipe_wd_[1], &quit, 1);
