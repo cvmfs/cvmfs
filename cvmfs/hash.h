@@ -42,12 +42,12 @@ const unsigned kDigestSizes[] = {16, 20, 20};
  */
 struct HexPtr {
   const std::string *str;
-  HexPtr(const std::string &s) { str = &s; }
+  explicit HexPtr(const std::string &s) { str = &s; }
 };
 
 struct AsciiPtr {
   const std::string *str;
-  AsciiPtr(const std::string &s) { str = &s; }
+  explicit AsciiPtr(const std::string &s) { str = &s; }
 };
 
 
@@ -201,7 +201,7 @@ struct Sha1 : public Digest<20, kSha1> { };
  */
 struct Any : public Digest<20, kAny> {
   Any() : Digest<20, kAny>() { }
-  Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
+  explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
   Any(const Algorithms a,
       const unsigned char *digest_buffer, const unsigned buffer_size)
     : Digest<20, kAny>(a, digest_buffer, buffer_size) { }
@@ -231,7 +231,7 @@ struct ContextPtr {
     buffer = NULL;
   }
 
-  ContextPtr(const Algorithms a) {
+  explicit ContextPtr(const Algorithms a) {
     algorithm = a;
     size = GetContextSize(a);
     buffer = NULL;
@@ -244,8 +244,6 @@ void Update(const unsigned char *buffer, const unsigned buffer_size,
 void Final(ContextPtr context, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
-//void HashMemSha1(const unsigned char *buffer, const unsigned buffer_size,
-//                 Sha1 *sha1_digest);
 bool HashFile(const std::string filename, Any *any_digest);
 
 }  // namespace hash

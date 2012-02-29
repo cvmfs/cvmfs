@@ -168,8 +168,7 @@ bool WritableCatalog::CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
 
 
 
-  //hash::Md5 path_hash(hash::AsciiPtr(entry_path)); // TODO: why doesn't this compile?
-  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(entry_path));
+  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
   if (LookupMd5(path_hash)) {
 
 
@@ -179,8 +178,7 @@ bool WritableCatalog::CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
   }
 
   // add the entry to the catalog
-  //hash::Md5 parent_hash(hash::AsciiPtr(parent_path));
-  hash::Md5 parent_hash = hash::Md5(hash::AsciiPtr(parent_path));
+  hash::Md5 parent_hash((hash::AsciiPtr(parent_path)));
   if (not AddEntry(entry, path_hash, parent_hash)) {
     LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while inserting new entry '%s'", entry_path.c_str());
     return false;
