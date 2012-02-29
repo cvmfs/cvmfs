@@ -1,35 +1,23 @@
 /**
- * \file monitor.cc
- * \namespace monitor
+ * This file is part of the CernVM File System.
  *
  * This module forks a watchdog process that listens on
  * a pipe and prints a stackstrace into syslog, when cvmfs
  * fails.
  *
- * Developed by Jakob Blomer 2010 at CERN
- * jakob.blomer@cern.ch
+ * Also, it handles getting and setting the maximum number of file descriptors.
  */
 
 #include "cvmfs_config.h"
 #include "monitor.h"
 
-#include "platform.h"
-
-#include <string>
-#include <iostream>
-#include <sstream>
-
-#include <cstring>
-#include <cstdio>
-#include <cstdlib>
-#include <cassert>
 #include <signal.h>
 #include <sys/resource.h>
 #include <execinfo.h>
 #ifdef __APPLE__
-	#include <sys/ucontext.h>
+#include <sys/ucontext.h>
 #else
-	#include <ucontext.h>
+#include <ucontext.h>
 #endif
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -39,282 +27,294 @@
 #include <pthread.h>
 #include <time.h>
 
+#include <string>
+
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+
+#include "platform.h"
 #include "logging.h"
 
-using namespace std;
-
+using namespace std;  // NOLINT
 
 namespace monitor {
 
-   string cache_dir;
-   unsigned nofiles;
-   const unsigned MIN_OPEN_FILES = 8192;
-   const unsigned MAX_BACKTRACE = 64;
-   int pipe_wd[2];
-   platform_spinlock lock_handler;
-   bool spawned = false;
+const unsigned kMinOpenFiles = 8192;  /**< minmum threshold for the maximum
+                                       number of open files */
+const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
 
-	/**
-	 *  get the instruction pointer in a platform independant fashion
-	 */
-	void* getInstructionPointer(ucontext_t *uc) {
-		void *result;
-
-		#ifdef __APPLE__
-			#ifdef __x86_64__
-			 	result = (void *)uc->uc_mcontext->__ss.__rip;
-			#else
-				result = (void *)uc-uc_mcontext->__ss.__eip;
-			#endif
-		#else
-			#ifdef __x86_64__
-			    result = (void *)uc->uc_mcontext.gregs[REG_RIP];
-			#else
-			    result = (void *)uc->uc_mcontext.gregs[REG_EIP];
-			#endif
-		#endif
-
-		return result;
-	}
+string *cache_dir_ = NULL;
+bool spawned_ = false;
+unsigned max_open_files_;
+int pipe_wd_[2];
+platform_spinlock lock_handler_;
 
 
-   /**
-    * Signal handler for bad things.  Send debug information to watchdog.
-    */
-   static void send_trace(int signal,
-                          siginfo_t *siginfo __attribute__((unused)),
-                          void *context)
-   {
-      int send_errno = errno;
-      if (platform_spinlock_trylock(&lock_handler) != 0) {
-         /* concurrent call, wait for the first one to exit the process */
-         while (true) {}
-      }
+/**
+ * Get the instruction pointer in a platform independant fashion.
+ */
+static void* GetInstructionPointer(ucontext_t *uc) {
+  void *result;
 
-      void *adr_buf[MAX_BACKTRACE];
-      char cflow = 'S';
-      if (write(pipe_wd[1], &cflow, 1) != 1) _exit(1);
+#ifdef __APPLE__
+#ifdef __x86_64__
+  result = reinterpret_cast<void *>(uc->uc_mcontext->__ss.__rip);
+#else
+  result = reinterpret_cast<void *>(uc-uc_mcontext->__ss.__eip);
+#endif
 
-      if (write(pipe_wd[1], &signal, sizeof(int)) != sizeof(int)) _exit(1);
-      if (write(pipe_wd[1], &send_errno, sizeof(int)) != sizeof(int)) _exit(1);
+#else
+#ifdef __x86_64__
+  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_RIP]);
+#else
+  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_EIP]);
+#endif
+#endif
 
-      int stack_size = backtrace(adr_buf, MAX_BACKTRACE);
-      /* fix around sigaction */
-      if (stack_size > 1) {
-         ucontext_t *uc;
-         uc = (ucontext_t *)context;
-         adr_buf[1] = getInstructionPointer(uc);
-      }
-      if (write(pipe_wd[1], &stack_size, sizeof(int)) != sizeof(int)) _exit(1);
-      backtrace_symbols_fd(adr_buf, stack_size, pipe_wd[1]);
-
-      cflow = 'Q';
-      (void)write(pipe_wd[1], &cflow, 1);
-
-      _exit(1);
-   }
-
-
-   /**
-    * Log a string to syslog and into $cachedir/stacktrace.
-    * We expect ideally nothing to be logged, so that file is created on demand.
-    */
-   static void log_emerg(string msg) {
-      FILE *fp = fopen((cache_dir + "/stacktrace").c_str(), "a");
-      if (fp) {
-         time_t now = time(NULL);
-         msg += "\nTimestamp: " + string(ctime(&now));
-         if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
-            msg += " (failed to report into log file in cache directory)";
-         fclose(fp);
-      } else {
-         msg += " (failed to open log file in cache directory)";
-      }
-      LogCvmfs(kLogMonitor, kLogSyslog, "%s", msg.c_str());
-   }
-
-
-   /**
-    * Read a line from the pipe.
-    * Quite inefficient but good enough for the purpose.
-    */
-   static string read_line() {
-      string result = "";
-      char next;
-      while (read(pipe_wd[0], &next, 1) == 1) {
-         result += next;
-         if (next == '\n') break;
-      }
-      return result;
-   }
-
-
-   /**
-    * Generates useful information from the backtrace log in the pipe.
-    */
-   static string report_stacktrace() {
-      int stack_size;
-      string debug = "--\n";
-      ostringstream convert;
-
-      int recv_signal;
-      if (read(pipe_wd[0], &recv_signal, sizeof(int)) < (int)sizeof(int))
-         return "failure while reading signal number";
-      convert << recv_signal;
-      debug += "Signal: " + convert.str();
-      convert.clear();
-
-      int recv_errno;
-      if (read(pipe_wd[0], &recv_errno, sizeof(int)) < (int)sizeof(int))
-         return "failure while reading errno";
-      convert << recv_errno;
-      debug += ", errno: " + convert.str() + "\n";
-
-      debug += "version: " + string(VERSION) + "\n";
-
-      if (read(pipe_wd[0], &stack_size, sizeof(int)) < (int)sizeof(int))
-         return "failure while reading stacktrace";
-
-      for (int i = 0; i < stack_size; ++i) {
-         debug += read_line();
-      }
-      return debug;
-   }
-
-
-   /**
-    * Listens on the pipe and logs the stacktrace or quits silently
-    */
-   static void watchdog() {
-      char cflow;
-      int num_read;
-
-      while ((num_read = read(pipe_wd[0], &cflow, 1)) > 0) {
-         if (cflow == 'S') {
-            const string debug = report_stacktrace();
-            log_emerg(debug);
-         } else if (cflow == 'Q') {
-            break;
-         } else {
-            log_emerg("unexpected error");
-            break;
-         }
-      }
-      if (num_read <= 0) log_emerg("unexpected termination");
-
-      close(pipe_wd[0]);
-   }
-
-
-
-   bool init(const string cache_dir, const bool check_nofiles) {
-	  int maxNoOfFiles = 0;
-      unsigned int currMaxNoOfFiles = 0;
-      monitor::cache_dir = cache_dir;
-      if (platform_spinlock_init(&lock_handler, 0) != 0) return false;
-
-      /* check number of open files */
-      if (check_nofiles) {
-
-        struct rlimit rpl;
-        memset(&rpl, 0, sizeof(rpl));
-        getrlimit(RLIMIT_NOFILE, &rpl);
-		currMaxNoOfFiles = rpl.rlim_cur;
-
-	#ifdef __APPLE__
-		maxNoOfFiles = sysconf(_SC_OPEN_MAX);
-		if (maxNoOfFiles < 0) {
-			cout << "Warning: could not retrieve maximal allowed number of open files" << endl;
-		}
-	#else
-				maxNoOfFiles = rpl.rlim_max;
-	#endif
-
-         if (currMaxNoOfFiles < MIN_OPEN_FILES) {
-            LogCvmfs(kLogMonitor, kLogSyslog | kLogStdout,
-                     "Warning: current limits for number of open files are "
-                     "(%lu/%lu)\n"
-                     "CernVM-FS is likely to run out of file descriptors, "
-                     "set ulimit -n to at least %lu",
-                     currMaxNoOfFiles, maxNoOfFiles, MIN_OPEN_FILES);
-         }
-         nofiles = currMaxNoOfFiles;
-      } else {
-         nofiles = 0;
-      }
-
-      /* dummy call to backtrace to load library */
-      void *unused = NULL;
-      backtrace(&unused, 1);
-      if (!unused) return false;
-
-      return true;
-   }
-
-   void fini() {
-      if (spawned) {
-         char quit = 'Q';
-         (void)write(pipe_wd[1], &quit, 1);
-         close(pipe_wd[1]);
-      }
-      platform_spinlock_destroy(&lock_handler);
-   }
-
-   /* fork watchdog */
-   void spawn() {
-      int retval;
-      retval = pipe(pipe_wd);
-      assert(retval == 0);
-
-      pid_t pid;
-      int statloc;
-      switch (pid = fork()) {
-         case -1: abort();
-         case 0:
-            /* double fork to avoid zombie */
-            switch (fork()) {
-               case -1: exit(1);
-               case 0: {
-                  close(pipe_wd[1]);
-                  if (daemon(1, 1) == -1) {
-                     LogCvmfs(kLogMonitor, kLogSyslog,
-                              "watchdog failed to deamonize");
-                     exit(1);
-                  }
-                  watchdog();
-                  exit(0);
-               }
-               default:
-                  exit(0);
-            }
-         default:
-            close(pipe_wd[0]);
-            if (waitpid(pid, &statloc, 0) != pid) abort();
-            if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
-      }
-
-      struct sigaction sa;
-      memset(&sa, 0, sizeof(sa));
-      sa.sa_sigaction = send_trace;
-      sa.sa_flags = SA_SIGINFO;
-      sigfillset(&sa.sa_mask);
-
-      if (sigaction(SIGQUIT, &sa, NULL) ||
-          sigaction(SIGILL, &sa, NULL) ||
-          sigaction(SIGABRT, &sa, NULL) ||
-          sigaction(SIGFPE, &sa, NULL) ||
-          sigaction(SIGSEGV, &sa, NULL) ||
-          sigaction(SIGBUS, &sa, NULL) ||
-          sigaction(SIGXFSZ, &sa, NULL))
-      {
-         abort();
-      }
-      spawned = true;
-   }
-
-   unsigned get_nofiles() {
-      return nofiles;
-   }
-
+  return result;
 }
 
+
+/**
+ * Signal handler for bad things.  Send debug information to watchdog.
+ */
+static void SendTrace(int signal,
+                      siginfo_t *siginfo __attribute__((unused)),
+                      void *context)
+{
+  int send_errno = errno;
+  if (platform_spinlock_trylock(&lock_handler_) != 0) {
+    // Concurrent call, wait for the first one to exit the process
+    while (true) {}
+  }
+
+  void *adr_buf[kMaxBacktrace];
+  char cflow = 'S';
+  if (write(pipe_wd_[1], &cflow, 1) != 1) _exit(1);
+
+  if (write(pipe_wd_[1], &signal, sizeof(int)) != sizeof(int)) _exit(1);
+  if (write(pipe_wd_[1], &send_errno, sizeof(int)) != sizeof(int)) _exit(1);
+
+  int stack_size = backtrace(adr_buf, kMaxBacktrace);
+  // Fix around sigaction
+  if (stack_size > 1) {
+    ucontext_t *uc = reinterpret_cast<ucontext_t *>(context);
+    adr_buf[1] = GetInstructionPointer(uc);
+  }
+  if (write(pipe_wd_[1], &stack_size, sizeof(int)) != sizeof(int)) _exit(1);
+  backtrace_symbols_fd(adr_buf, stack_size, pipe_wd_[1]);
+
+  cflow = 'Q';
+  (void)write(pipe_wd_[1], &cflow, 1);
+
+  _exit(1);
+}
+
+
+/**
+ * Log a string to syslog and into $cachedir/stacktrace.
+ * We expect ideally nothing to be logged, so that file is created on demand.
+ */
+static void LogEmergency(string msg) {
+  FILE *fp = fopen((*cache_dir_ + "/stacktrace").c_str(), "a");
+  if (fp) {
+    time_t now = time(NULL);
+    msg += "\nTimestamp: " + string(ctime(&now));
+    if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
+      msg += " (failed to report into log file in cache directory)";
+    fclose(fp);
+  } else {
+    msg += " (failed to open log file in cache directory)";
+  }
+  LogCvmfs(kLogMonitor, kLogSyslog, "%s", msg.c_str());
+}
+
+
+/**
+ * Read a line from the pipe.
+ * Quite inefficient but good enough for the purpose.
+ */
+static string ReadLineFromPipe() {
+  string result = "";
+  char next;
+  while (read(pipe_wd_[0], &next, 1) == 1) {
+    result += next;
+    if (next == '\n') break;
+  }
+  return result;
+}
+
+
+/**
+ * Generates useful information from the backtrace log in the pipe.
+ */
+static string ReportStacktrace() {
+  int stack_size;
+  string debug = "--\n";
+  char buffer[48];
+
+  int recv_signal;
+  if (read(pipe_wd_[0], &recv_signal, sizeof(int)) < (int)sizeof(int))
+    return "failure while reading signal number";
+  snprintf(buffer, 48, "%d", recv_signal);
+  debug += "Signal: " + string(buffer);
+
+  int recv_errno;
+  if (read(pipe_wd_[0], &recv_errno, sizeof(int)) < (int)sizeof(int))
+    return "failure while reading errno";
+  snprintf(buffer, 48, "%d", recv_errno);
+  debug += ", errno: " + string(buffer) + "\n";
+
+  debug += "version: " + string(VERSION) + "\n";
+
+  if (read(pipe_wd_[0], &stack_size, sizeof(int)) < (int)sizeof(int))
+    return "failure while reading stacktrace";
+
+  for (int i = 0; i < stack_size; ++i) {
+    debug += ReadLineFromPipe();
+  }
+  return debug;
+}
+
+
+/**
+ * Listens on the pipe and logs the stacktrace or quits silently.
+ */
+static void Watchdog() {
+  char cflow;
+  int num_read;
+
+  while ((num_read = read(pipe_wd_[0], &cflow, 1)) > 0) {
+    if (cflow == 'S') {
+      const string debug = ReportStacktrace();
+      LogEmergency(debug);
+    } else if (cflow == 'Q') {
+      break;
+    } else {
+      LogEmergency("unexpected error");
+      break;
+    }
+  }
+  if (num_read <= 0) LogEmergency("unexpected termination");
+
+  close(pipe_wd_[0]);
+}
+
+
+bool Init(const string cache_dir, const bool check_max_open_files) {
+  monitor::cache_dir_ = new string(cache_dir);
+  if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
+
+  /* check number of open files */
+  if (check_max_open_files) {
+    unsigned int soft_limit = 0;
+    int hard_limit = 0;
+
+    struct rlimit rpl;
+    memset(&rpl, 0, sizeof(rpl));
+    getrlimit(RLIMIT_NOFILE, &rpl);
+		soft_limit = rpl.rlim_cur;
+
+#ifdef __APPLE__
+		hard_limit = sysconf(_SC_OPEN_MAX);
+		if (hard_limit < 0) {
+      LogCvmfs(kLogMonitor, kLogStdout, "Warning: could not retrieve "
+               "hard limit for the number of open files");
+		}
+#else
+    hard_limit = rpl.rlim_max;
+#endif
+
+    if (soft_limit < kMinOpenFiles) {
+      LogCvmfs(kLogMonitor, kLogSyslog | kLogStdout,
+               "Warning: current limits for number of open files are "
+               "(%lu/%lu)\n"
+               "CernVM-FS is likely to run out of file descriptors, "
+               "set ulimit -n to at least %lu",
+               soft_limit, hard_limit, kMinOpenFiles);
+    }
+    max_open_files_ = soft_limit;
+  } else {
+    max_open_files_ = 0;
+  }
+
+  // Dummy call to backtrace to load library
+  void *unused = NULL;
+  backtrace(&unused, 1);
+  if (!unused) return false;
+
+  return true;
+}
+
+
+void Fini() {
+  delete cache_dir_;
+  if (spawned_) {
+    char quit = 'Q';
+    (void)write(pipe_wd_[1], &quit, 1);
+    close(pipe_wd_[1]);
+  }
+  platform_spinlock_destroy(&lock_handler_);
+}
+
+/**
+ * Fork watchdog.
+ */
+void Spawn() {
+  int retval;
+  retval = pipe(pipe_wd_);
+  assert(retval == 0);
+
+  pid_t pid;
+  int statloc;
+  switch (pid = fork()) {
+    case -1: abort();
+    case 0:
+      // Double fork to avoid zombie
+      switch (fork()) {
+        case -1: exit(1);
+        case 0: {
+          close(pipe_wd_[1]);
+          if (daemon(1, 1) == -1) {
+            LogCvmfs(kLogMonitor, kLogSyslog,
+                     "watchdog failed to deamonize");
+            exit(1);
+          }
+          Watchdog();
+          exit(0);
+        }
+        default:
+          exit(0);
+      }
+    default:
+      close(pipe_wd_[0]);
+      if (waitpid(pid, &statloc, 0) != pid) abort();
+      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
+  }
+
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = SendTrace;
+  sa.sa_flags = SA_SIGINFO;
+  sigfillset(&sa.sa_mask);
+
+  if (sigaction(SIGQUIT, &sa, NULL) ||
+      sigaction(SIGILL, &sa, NULL) ||
+      sigaction(SIGABRT, &sa, NULL) ||
+      sigaction(SIGFPE, &sa, NULL) ||
+      sigaction(SIGSEGV, &sa, NULL) ||
+      sigaction(SIGBUS, &sa, NULL) ||
+      sigaction(SIGXFSZ, &sa, NULL))
+  {
+    abort();
+  }
+  spawned_ = true;
+}
+
+unsigned GetMaxOpenFiles() {
+  return max_open_files_;
+}
+
+}  // namespace monitor

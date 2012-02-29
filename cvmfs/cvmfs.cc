@@ -1018,7 +1018,7 @@ namespace cvmfs {
     retval = chdir(cachedir.c_str());
     assert(retval == 0);
 
-    monitor::spawn();
+    monitor::Spawn();
 
     /* Setup Tracer */
     if (tracefile != "")
@@ -1569,11 +1569,11 @@ int main(int argc, char *argv[]) {
   cache_ready = true;
 
   /* Monitor, check for maximum number of open files */
-  if (!monitor::init(".", true)) {
+  if (!monitor::Init(".", true)) {
     cerr << "Failed to initialize watchdog." << endl;
     goto cvmfs_cleanup;
   }
-  cvmfs::nofiles = monitor::get_nofiles();
+  cvmfs::nofiles = monitor::GetMaxOpenFiles();
   atomic_init32(&cvmfs::open_files);
   atomic_init32(&cvmfs::nioerr);
   monitor_ready = true;
@@ -1731,7 +1731,7 @@ int main(int argc, char *argv[]) {
   if (quota_ready) lru::fini();
   if (signature_ready) signature::fini();
   if (cache_ready) cache::Fini();
-  if (monitor_ready) monitor::fini();
+  if (monitor_ready) monitor::Fini();
   if (download_ready) download::Fini();
   if (options_ready) {
     fuse_opt_free_args(&fuse_args);

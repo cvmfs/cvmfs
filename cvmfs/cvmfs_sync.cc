@@ -133,14 +133,15 @@ bool parseParameters(int argc, char **argv, SyncParameters *p) {
 	return true;
 }
 
+// TODO monitor::fini
 bool initWatchdog() {
 	umask(022);
 
-	if (!monitor::init(".", false)) {
+	if (!monitor::Init(".", false)) {
 		printError("Failed to init watchdog");
 		return false;
 	}
-	monitor::spawn();
+	monitor::Spawn();
 
 	return true;
 }
