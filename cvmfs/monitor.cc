@@ -15,9 +15,9 @@
 #include <sys/resource.h>
 #include <execinfo.h>
 #ifdef __APPLE__
-#include <sys/ucontext.h>
+  #include <sys/ucontext.h>
 #else
-#include <ucontext.h>
+  #include <ucontext.h>
 #endif
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -65,7 +65,8 @@ static void* GetInstructionPointer(ucontext_t *uc) {
   result = reinterpret_cast<void *>(uc-uc_mcontext->__ss.__eip);
 #endif
 
-#else
+#else  // Linux
+
 #ifdef __x86_64__
   result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_RIP]);
 #else
@@ -163,7 +164,7 @@ static string ReportStacktrace() {
 
   int recv_signal;
   if (read(pipe_wd_[0], &recv_signal, sizeof(recv_signal)) <
-      reinterpret_cast<int>(sizeof(recv_signal)))
+      int(sizeof(recv_signal)))
   {
     return "failure while reading signal number";
   }
@@ -172,7 +173,7 @@ static string ReportStacktrace() {
 
   int recv_errno;
   if (read(pipe_wd_[0], &recv_errno, sizeof(recv_errno)) <
-      reinterpret_cast<int>(sizeof(recv_errno)))
+      int(sizeof(recv_errno)))
   {
     return "failure while reading errno";
   }
@@ -182,7 +183,7 @@ static string ReportStacktrace() {
   debug += "version: " + string(VERSION) + "\n";
 
   if (read(pipe_wd_[0], &stack_size, sizeof(stack_size)) <
-      reinterpret_cast<int>(sizeof(stack_size)))
+      int(sizeof(stack_size)))
   {
     return "failure while reading stacktrace";
   }
