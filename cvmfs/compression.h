@@ -17,6 +17,8 @@ namespace hash {
 }
 
 bool CopyPath2Path(const std::string &src, const std::string &dest);
+bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
+                  const std::string &path);
 
 namespace zlib {
 

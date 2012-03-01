@@ -20,6 +20,7 @@
 
 #include "logging.h"
 #include "hash.h"
+#include "util.h"
 #include "smalloc.h"
 
 using namespace std;  // NOLINT
@@ -60,6 +61,19 @@ bool CopyPath2Path(const string &src, const string &dest) {
   if (fsrc) fclose(fsrc);
   if (fdest) fclose(fdest);
   return retval == 0;
+}
+
+bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
+                  const string &path)
+{
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
+  if (fd < 0)
+    return false;
+
+  int written = write(fd, buffer, buffer_size);
+  close(fd);
+
+  return (written >=0) && (unsigned(written) == buffer_size);
 }
 
 

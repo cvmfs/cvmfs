@@ -1089,7 +1089,7 @@ void SetHostChain(const string &host_list) {
     return;
   }
 
-  opt_host_chain_ = new vector<string>(split_string(host_list, ';'));
+  opt_host_chain_ = new vector<string>(SplitString(host_list, ';'));
   opt_host_chain_rtt_ = new vector<int>();
   for (unsigned i = 0, s = opt_host_chain_->size(); i < s; ++i)
     opt_host_chain_rtt_->push_back(-1);
@@ -1131,11 +1131,11 @@ void SetProxyChain(const std::string &proxy_list) {
     return;
   }
 
-  vector<string> proxy_groups = split_string(proxy_list, ';');
+  vector<string> proxy_groups = SplitString(proxy_list, ';');
   opt_proxy_groups_ = new vector< vector<string> >();
   opt_num_proxies_ = 0;
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
-    opt_proxy_groups_->push_back(split_string(proxy_groups[i], '|'));
+    opt_proxy_groups_->push_back(SplitString(proxy_groups[i], '|'));
     opt_num_proxies_ += (*opt_proxy_groups_)[i].size();
   }
   opt_proxy_groups_current_ = 0;

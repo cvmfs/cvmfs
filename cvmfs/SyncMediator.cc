@@ -44,7 +44,7 @@ void SyncMediator::Add(SyncItem &entry) {
 	else {
 		stringstream ss;
 		ss << "'" << entry.GetRelativePath() << "' cannot be added. Unregcognized file format.";
-		printWarning(ss.str());
+		PrintWarning(ss.str());
 	}
 }
 
@@ -60,7 +60,7 @@ void SyncMediator::Touch(SyncItem &entry) {
 	else {
 		stringstream ss;
 		ss << "'" << entry.GetRelativePath() << "' cannot be touched. Unregcognized file format.";
-		printWarning(ss.str());
+		PrintWarning(ss.str());
 	}
 }
 
@@ -82,7 +82,7 @@ void SyncMediator::Remove(SyncItem &entry) {
 	else {
 		stringstream ss;
 		ss << "'" << entry.GetRelativePath() << "' cannot be deleted. Unregcognized file format.";
-		printWarning(ss.str());
+		PrintWarning(ss.str());
 	}
 }
 
@@ -180,7 +180,7 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
 	strncpy(tmp_path, templ.c_str(), templ.length() + 1);
 	int fd_dst = mkstemp(tmp_path);
 
-	if ((fd_dst >= 0) && (fchmod(fd_dst, plain_file_mode) == 0)) {
+	if ((fd_dst >= 0) && (fchmod(fd_dst, kDefaultFileMode) == 0)) {
 		/* Compress and calculate SHA1 */
 		FILE *fsrc = NULL, *fdst = NULL;
 		if ( (fsrc = fopen(entry.GetOverlayPath().c_str(), "r")) &&
@@ -197,19 +197,19 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
 				unlink(tmp_path);
 				stringstream ss;
 				ss << "could not rename " << tmp_path << " to " << cache_path;
-				printWarning(ss.str());
+				PrintWarning(ss.str());
 			}
 		} else {
 			stringstream ss;
 			ss << "could not compress " << entry.GetOverlayPath();
-			printWarning(ss.str());
+			PrintWarning(ss.str());
 		}
 		if (fsrc) fclose(fsrc);
 		if (fdst) fclose(fdst);
 	} else {
 		stringstream ss;
 		ss << "could not create temporary file " << templ;
-		printWarning(ss.str());
+		PrintWarning(ss.str());
 		result = false;
 	}
 	free(tmp_path);

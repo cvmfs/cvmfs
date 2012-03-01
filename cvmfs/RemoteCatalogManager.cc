@@ -202,7 +202,7 @@ namespace cvmfs {
           str_modified += string(&buf_modified, 1);
         local_modified = atoll(str_modified.c_str());
         LogCvmfs(kLogCvmfs, kLogDebug, "cached copy publish date %s",
-                 localtime_ascii(local_modified, true).c_str());
+                 StringifyTime(local_modified, true).c_str());
       }
 
       /* Sanity check, do we have the catalog? If yes, save it to temporary file. */
@@ -248,7 +248,7 @@ namespace cvmfs {
       free(download_checksum.destination_mem.data);
 
       /* parse remote checksum */
-      parse_keyval(checksum, download_checksum.destination_mem.size, sig_start, sha1_chksum, chksum_keyval);
+      ParseKeyvalMem((const unsigned char *)checksum, download_checksum.destination_mem.size, &sig_start, &sha1_chksum, &chksum_keyval);
 
       map<char, string>::const_iterator clg_key = chksum_keyval.find('C');
       if (clg_key == chksum_keyval.end()) {
@@ -317,8 +317,8 @@ namespace cvmfs {
       void *sig_buf_heap;
       unsigned sig_buf_size;
       if ((sig_start > 0) &&
-          read_sig_tail(checksum, checksum_size, sig_start,
-                        &sig_buf_heap, &sig_buf_size))
+          signature::ReadSignatureTail((const unsigned char *)checksum, checksum_size, sig_start,
+                                       (unsigned char **)&sig_buf_heap, &sig_buf_size))
       {
         void *sig_buf = alloca(sig_buf_size);
         memcpy(sig_buf, sig_buf_heap, sig_buf_size);
@@ -542,14 +542,14 @@ namespace cvmfs {
     time_t timestamp = timegm(&tm_wl);
     LogCvmfs(kLogCvmfs, kLogDebug,
              "whitelist UTC expiry timestamp in localtime: %s",
-             localtime_ascii(timestamp, false).c_str());
+             StringifyTime(timestamp, false).c_str());
     if (timestamp < 0) {
       LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp");
       free(download_whitelist.destination_mem.data);
       return false;
     }
     LogCvmfs(kLogCvmfs, kLogDebug,  "local time: %s",
-             localtime_ascii(local_timestamp, true).c_str());
+             StringifyTime(local_timestamp, true).c_str());
     if (local_timestamp > timestamp) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "whitelist lifetime verification failed, expired");
@@ -623,8 +623,8 @@ namespace cvmfs {
 
     void *sig_buf;
     unsigned sig_buf_size;
-    if (!read_sig_tail(&buffer[0], buffer.length(), skip,
-                       &sig_buf, &sig_buf_size))
+    if (!signature::ReadSignatureTail((const unsigned char *)&buffer[0], buffer.length(), skip,
+                                      (unsigned char **)&sig_buf, &sig_buf_size))
     {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "no signature at the end of whitelist found");

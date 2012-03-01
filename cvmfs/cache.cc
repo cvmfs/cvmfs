@@ -93,7 +93,7 @@ bool Init(const string &cache_path, const string &root_url) {
   root_url_ = new string(root_url);
   queues_download_ = new ThreadQueues();
 
-  if (!make_cache_dir(cache_path, 0700))
+  if (!MakeCacheDirectories(cache_path, 0700))
     return false;
 
   // Cleanup dangling checksums
@@ -119,7 +119,7 @@ bool Init(const string &cache_path, const string &root_url) {
           const string sha1_path = cache_path + "/" + sha1_str.substr(0,2) +
                                    "/" + sha1_str.substr(2);
 
-          if (!file_exists(sha1_path))
+          if (!FileExists(sha1_path))
             unlink(current_path.c_str());
         } else {
           unlink(current_path.c_str());

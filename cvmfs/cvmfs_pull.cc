@@ -198,7 +198,7 @@ static bool valid_certificate(const string &save_as, const bool nocache) {
     << signature::get_crypto_err() << endl;
   } else {
     cout << "Writing whitelist to " << save_as << endl;
-    if (!write_memchunk(save_as, &(buffer[0]), buffer.length())) {
+    if (!CopyMem2Path(&(buffer[0]), buffer.length(), save_as)) {
       cerr << "Warning: failed to write " << save_as << endl;
     }
   }
@@ -362,7 +362,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
       void *out_buf = NULL;
       int64_t out_size;
       if (!zlib::CompressMem2Mem(download_certificate.destination_mem.data, download_certificate.destination_mem.size, &out_buf, &out_size) ||
-          !write_memchunk(dir_catalogs + url_cert, out_buf, out_size))
+          !CopyMem2Path(out_buf, out_size, dir_catalogs + url_cert))
       {
         cerr << "Failed to write certificate" << endl;
       }
@@ -421,7 +421,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
 
   /* we have all bits and pieces, write checksum */
   cout << "Writing checksum to " << lpath_chksum << endl;
-  if (!write_memchunk(lpath_chksum, checksum, download_checksum.destination_mem.size)) {
+  if (!CopyMem2Path(checksum, download_checksum.destination_mem.size, lpath_chksum)) {
     cerr << "Warning: failed to write " << lpath_chksum << endl;
     return -1;
   }
@@ -444,7 +444,7 @@ static int fetch_catalog(const string &path, const bool no_proxy,
 
 
 static bool fetch_deprecated_catalog(const hash::t_sha1 &snapshot_id, string &tmp_path) {
-  FILE *tmp_fp = temp_file(dir_data + "/txn/cvmfs.catalog", plain_file_mode, "w", tmp_path);
+  FILE *tmp_fp = CreateTempFile(dir_data + "/txn/cvmfs.catalog", plain_file_mode, "w", &tmp_path);
   if (!tmp_fp)
     return false;
 

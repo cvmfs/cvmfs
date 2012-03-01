@@ -65,7 +65,7 @@ int WritableCatalogManager::LoadCatalogFile(const std::string &url_path,
 
   // check if the file exists
   // if not, the 'loading' fails
-  if (not file_exists(*catalog_file)) {
+  if (not FileExists(*catalog_file)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog file: catalog file '%s' not found", catalog_file->c_str());
     return -1;
   }
@@ -132,7 +132,7 @@ bool WritableCatalogManager::GetCatalogByPath(const string &path,
 
 bool WritableCatalogManager::RemoveFile(const std::string &path) {
   const string file_path = RelativeToCatalogPath(path);
-	const string parent_path = get_parent_path(file_path);
+	const string parent_path = GetParentPath(file_path);
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -155,7 +155,7 @@ bool WritableCatalogManager::RemoveFile(const std::string &path) {
 
 bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   const string directory_path = RelativeToCatalogPath(path);
-	const string parent_path = get_parent_path(directory_path);
+	const string parent_path = GetParentPath(directory_path);
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -290,7 +290,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
                                         const std::string &path) {
   const string entry_path = RelativeToCatalogPath(path);
-  const string parent_path = get_parent_path(entry_path);
+  const string parent_path = GetParentPath(entry_path);
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -329,7 +329,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
 
   // create the database schema and the inital root entry
   // for the new nested catalog
-  const string root_entry_parent_path = get_parent_path(nested_root_path);
+  const string root_entry_parent_path = GetParentPath(nested_root_path);
   const string database_file_path = GetCatalogFilenameForPath(nested_root_path);
   const bool create_root_catalog = false;
   if (not WritableCatalog::CreateNewCatalogDatabase(database_file_path,
@@ -485,34 +485,34 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 
 	/* Data symlink, whitelist symlink */
 	string backlink = "../";
-	string parent = get_parent_path(cat_path);
-	while (parent != get_parent_path(data_directory_)) {
+	string parent = GetParentPath(cat_path);
+	while (parent != GetParentPath(data_directory_)) {
 		if (parent == "") {
-			printWarning("cannot find data dir");
+			PrintWarning("cannot find data dir");
 			break;
 		}
-		parent = get_parent_path(parent);
+		parent = GetParentPath(parent);
 		backlink += "../";
 	}
 
 	const string lnk_path_data = cat_path + "/data";
 	const string lnk_path_whitelist = cat_path + "/.cvmfswhitelist";
-	const string backlink_data = backlink + get_file_name(data_directory_);
-	const string backlink_whitelist = backlink + get_file_name(catalog_directory_) + "/.cvmfswhitelist";
+	const string backlink_data = backlink + GetFileName(data_directory_);
+	const string backlink_whitelist = backlink + GetFileName(catalog_directory_) + "/.cvmfswhitelist";
 
 	platform_stat64 info;
 	if (platform_lstat(lnk_path_data.c_str(), &info) != 0)
 	{
 		if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
-			printWarning("cannot create catalog store -> data store symlink");
+			PrintWarning("cannot create catalog store -> data store symlink");
 		}
 	}
 
 	/* Don't make the symlink for the root catalog */
-	if ((platform_lstat(lnk_path_whitelist.c_str(), &info) != 0) && (get_parent_path(cat_path) != get_parent_path(data_directory_)))
+	if ((platform_lstat(lnk_path_whitelist.c_str(), &info) != 0) && (GetParentPath(cat_path) != GetParentPath(data_directory_)))
 	{
 		if (symlink(backlink_whitelist.c_str(), lnk_path_whitelist.c_str()) != 0) {
-			printWarning("cannot create whitelist symlink");
+			PrintWarning("cannot create whitelist symlink");
 		}
 	}
 
@@ -520,19 +520,19 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	// TODO: revision hint!
 	//       do this inside the catalog (make UpdateLastModified private)
 	if (not catalog->UpdateLastModified()) {
-		printWarning("failed to update last modified time stamp");
+		PrintWarning("failed to update last modified time stamp");
 	}
 
 	/* Current revision */
 	// TODO: revision hint!
 	//       do this inside the catalog (make IncrementRevision private)
 	if (not catalog->IncrementRevision()) {
-		printWarning("failed to increase revision");
+		PrintWarning("failed to increase revision");
 	}
 
 	/* Previous revision */
 	map<char, string> ext_chksum;
-	if (parse_keyval(cat_path + "/.cvmfspublished", ext_chksum)) {
+	if (ParseKeyvalPath(cat_path + "/.cvmfspublished", &ext_chksum)) {
 		map<char, string>::const_iterator i = ext_chksum.find('C');
 		if (i != ext_chksum.end()) {
 			hash::Any sha1_previous(hash::kSha1, hash::HexPtr(i->second));
@@ -542,10 +542,10 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 			if (not catalog->SetPreviousRevision(sha1_previous)) {
 				stringstream ss;
 				ss << "failed store previous catalog revision " << sha1_previous.ToString();
-				printWarning(ss.str());
+				PrintWarning(ss.str());
 			}
 		} else {
-			printWarning("failed to find catalog SHA1 key in .cvmfspublished");
+			PrintWarning("failed to find catalog SHA1 key in .cvmfspublished");
 		}
 	}
 
@@ -558,13 +558,13 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	int fd_dst;
 
 	if ( !(fsrc = fopen(src_path.c_str(), "r")) ||
-	     (fd_dst = open(dst_path.c_str(), O_CREAT | O_TRUNC | O_RDWR, plain_file_mode)) < 0 ||
+	     (fd_dst = open(dst_path.c_str(), O_CREAT | O_TRUNC | O_RDWR, kDefaultFileMode)) < 0 ||
 	     !(fdst = fdopen(fd_dst, "w")) ||
        zlib::CompressFile2File(fsrc, fdst, &sha1) )
 	{
 		stringstream ss;
 		ss << "could not compress catalog '" << src_path << "'";
-		printWarning(ss.str());
+		PrintWarning(ss.str());
 
 	} else {
 		const string sha1str = sha1.ToString();
@@ -573,14 +573,14 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 		if (rename(dst_path.c_str(), cache_path.c_str()) != 0) {
 			stringstream ss;
 			ss << "could not store catalog in data store as " << cache_path;
-			printWarning(ss.str());
+			PrintWarning(ss.str());
 		}
 		const string entry_path = cat_path + "/.cvmfscatalog";
 		unlink(entry_path.c_str());
 		if (symlink(("data/" + hash_name).c_str(), entry_path.c_str()) != 0) {
 			stringstream ss;
 			ss << "could not create symlink to catalog " << cache_path;
-			printWarning(ss.str());
+			PrintWarning(ss.str());
 		}
 	}
 	if (fsrc) fclose(fsrc);
@@ -598,7 +598,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 		/* Mucro catalogs */
 		DirectoryEntry d;
 		if (not catalog->LookupPath(catalog->path(), &d)) {
-			printWarning("failed to find root entry");
+			PrintWarning("failed to find root entry");
 		}
 		fields += "L" + d.checksum().ToString() + "\n";
 		const uint64_t ttl = catalog->GetTTL();
@@ -612,12 +612,12 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 		fields += "S" + strm_revision.str() + "\n";
 
 		if (fwrite(&(fields[0]), 1, fields.length(), fpublished) != fields.length()) {
-			printWarning("failed to write extended checksum");
+			PrintWarning("failed to write extended checksum");
 		}
 		fclose(fpublished);
 
 	} else {
-		printWarning("failed to write extended checksum");
+		PrintWarning("failed to write extended checksum");
 	}
 
 	/* Update registered catalog SHA1 in nested catalog */
@@ -632,7 +632,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 		if (not dynamic_cast<WritableCatalog*>(catalog->parent())->UpdateNestedCatalogLink(clg_path, sha1)) {
 			stringstream ss;
 			ss << "failed to register modified catalog at " << clg_path << " in parent catalog";
-			printWarning(ss.str());
+			PrintWarning(ss.str());
 		}
 	}
 
@@ -643,18 +643,18 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	void *compr_buf = NULL;
 	int64_t compr_size;
 	if (!zlib::CompressMem2Mem(chksum, lchksum, &compr_buf, &compr_size)) {
-		printWarning("could not compress catalog checksum");
+		PrintWarning("could not compress catalog checksum");
 	}
 
 	FILE *fsha1 = NULL;
 	int fd_sha1;
-	if (((fd_sha1 = open((cat_path + "/.cvmfschecksum").c_str(), O_CREAT | O_TRUNC | O_RDWR, plain_file_mode)) < 0) ||
+	if (((fd_sha1 = open((cat_path + "/.cvmfschecksum").c_str(), O_CREAT | O_TRUNC | O_RDWR, kDefaultFileMode)) < 0) ||
 		!(fsha1 = fdopen(fd_sha1, "w")) ||
 		(static_cast<int64_t>(fwrite(compr_buf, 1, compr_size, fsha1)) != compr_size))
 	{
 		stringstream ss;
 		ss << "could not store checksum at " << cat_path;
-		printWarning(ss.str());
+		PrintWarning(ss.str());
 	}
 
 	if (fsha1) fclose(fsha1);

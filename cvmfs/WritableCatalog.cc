@@ -58,7 +58,7 @@ bool WritableCatalog::CreateNewDatabaseSchema(const std::string &file_path) {
   int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
 
   // create the directory structure for this catalog
-  if (not mkdir_deep(get_parent_path(file_path), plain_dir_mode)) {
+  if (not MkdirDeep(GetParentPath(file_path), kDefaultDirMode)) {
     LogCvmfs(kLogCatalog, kLogDebug, "cannot create pseudo directory structure for new nested catalog database file '%s'", file_path.c_str());
     return false;
   }

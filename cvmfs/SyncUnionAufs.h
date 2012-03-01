@@ -46,7 +46,7 @@ class SyncUnionAufs :
 	}
 
 	inline bool IsOpaqueDirectory(const SyncItem *directory) const {
-	  return file_exists(directory->GetOverlayPath() + "/.wh..wh..opq");
+	  return FileExists(directory->GetOverlayPath() + "/.wh..wh..opq");
 	}
 
 	inline std::string UnwindWhiteoutFilename(const std::string &filename) const {

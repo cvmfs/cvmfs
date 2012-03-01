@@ -37,7 +37,7 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
 	if (mRepositoryStat.errorCode != 0) {
 		stringstream ss;
 		ss << "'" << GetRelativePath() << "' should be deleted, but was not found in repository.";
-		printWarning(ss.str());
+		PrintWarning(ss.str());
 		return;
 	}
 

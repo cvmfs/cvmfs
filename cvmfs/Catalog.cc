@@ -114,7 +114,7 @@ Catalog* Catalog::FindBestFittingChild(const string &path) const {
 
   // now we tokenize the remaining string
   string remaining = path.substr(this->path().length());
-  vector<string> tokens = split_string(remaining, "/", false);
+  vector<string> tokens = SplitString(remaining, '/');  // TODO: why was this done in a way that empty paths were omitted.  Where do empty paths happen?
 
   // now we recombine the tokens successively
   // in order to find a child which serves a part of the path

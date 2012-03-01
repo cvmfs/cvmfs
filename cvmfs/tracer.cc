@@ -90,7 +90,7 @@ pthread_mutex_t sig_continue_trace_mutex_;
 
 
 /**
- *  Returns a timestamp at now+ms.
+ * Returns a timestamp at now+ms.
  */
 static void GetTimespecRel(const int64_t ms, timespec *ts) {
   timeval now;

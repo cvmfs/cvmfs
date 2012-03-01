@@ -172,7 +172,7 @@ class WritableCatalog : public Catalog {
 
   inline bool AddEntry(const DirectoryEntry &entry,
                        const std::string &path) {
-    return AddEntry(entry, hash::Md5(hash::AsciiPtr(path)), hash::Md5(hash::AsciiPtr(get_parent_path(path))));
+    return AddEntry(entry, hash::Md5(hash::AsciiPtr(path)), hash::Md5(hash::AsciiPtr(GetParentPath(path))));
   }
 
   bool UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);

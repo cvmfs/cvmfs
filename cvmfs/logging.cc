@@ -174,3 +174,13 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
   free(msg);
 }
+
+
+void PrintError(const string &message) {
+  LogCvmfs(kLogCvmfs, kLogStderr, "[ERROR] %s", message.c_str());
+}
+
+
+void PrintWarning(const string &message) {
+  LogCvmfs(kLogCvmfs, kLogStderr, "[WARNING] %s", message.c_str());
+}

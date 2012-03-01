@@ -711,7 +711,7 @@ namespace cvmfs {
     // if ((path == "") || (path == "/"))
     //    return cvmfs_getattr("/", &info);
 
-    int attr_result = walk_path(get_parent_path(path));
+    int attr_result = walk_path(GetParentPath(path));
     // if (attr_result == 0)
     //    return cvmfs_getattr(path.c_str(), &info);
 
@@ -1475,13 +1475,13 @@ int main(int argc, char *argv[]) {
   if (cvmfs_opts.pubkey) cvmfs::pubkey = cvmfs_opts.pubkey;
   if (cvmfs_opts.tracefile) cvmfs::tracefile = cvmfs_opts.tracefile;
   if (cvmfs_opts.deep_mount)
-    cvmfs::deep_mount = canonical_path(cvmfs_opts.deep_mount);
+    cvmfs::deep_mount = MakeCanonicalPath(cvmfs_opts.deep_mount);
   if (cvmfs_opts.blacklist) cvmfs::blacklist = cvmfs_opts.blacklist;
   if (cvmfs_opts.repo_name) cvmfs::repo_name = cvmfs_opts.repo_name;
   if (cvmfs_opts.kernel_cache)
-      printWarning("using deprecated mount option 'kernel_cache' - ignoring");
+      PrintWarning("using deprecated mount option 'kernel_cache' - ignoring");
   if (cvmfs_opts.auto_cache)
-      printWarning("using deprecated mount option 'auto_cache' - ignoring");
+      PrintWarning("using deprecated mount option 'auto_cache' - ignoring");
 
   /* seperate first host from hostlist */
   unsigned iter_hostname;
@@ -1547,7 +1547,7 @@ int main(int argc, char *argv[]) {
 
   /* Try to jump to cache directory.  This tests, if it is accassible.
      Also, it brings speed later on. */
-  if (!mkdir_deep(cvmfs::cachedir, 0700)) {
+  if (!MkdirDeep(cvmfs::cachedir, 0700)) {
     cerr << "Failure: cannot create cache directory " << cvmfs::cachedir
          << endl;
     goto cvmfs_cleanup;
@@ -1588,8 +1588,8 @@ int main(int argc, char *argv[]) {
                "Cvmfs will fail on signed catalogs!");
     else
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: using public key(s) %s",
-               join_strings(
-                 split_string(cvmfs_opts.pubkey, ':'), ", ").c_str());
+               JoinStrings(
+                 SplitString(cvmfs_opts.pubkey, ':'), ", ").c_str());
   }
   signature_ready = true;
 

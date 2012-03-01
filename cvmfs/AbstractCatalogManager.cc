@@ -133,7 +133,7 @@ bool AbstractCatalogManager::Lookup(const string &path,
 
   // lookup the parent entry, if asked for
   if (found && with_parent) {
-    string parent_path = get_parent_path(path);
+    string parent_path = GetParentPath(path);
     DirectoryEntry parent;
     found = LookupWithoutParent(parent_path, &parent);
     if (not found) {
@@ -310,7 +310,7 @@ bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path,
   relative_path = path.substr(containing_catalog->path().length() + 1); // +1 --> remove slash '/' from beginning relative path
   sub_path = containing_catalog->path();
 
-  path_elements = split_string(relative_path, "/");
+  path_elements = SplitString(relative_path, '/');
   bool entry_found;
   DirectoryEntry entry;
 

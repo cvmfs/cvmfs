@@ -284,7 +284,7 @@ namespace talk {
           if (proxy_chain.size()) {
             info << "Load-balance groups:" << endl;
             for (unsigned i = 0; i < proxy_chain.size(); ++i) {
-              info << "[" << i << "] " << join_strings(proxy_chain[i], ", ")
+              info << "[" << i << "] " << JoinStrings(proxy_chain[i], ", ")
                    << endl;
             }
             info << "Active proxy: [" << active_group << "] "

@@ -35,6 +35,9 @@ bool Verify(const unsigned char *buffer, const unsigned buffer_size,
             const unsigned char *signature, unsigned signature_size);
 bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
                const unsigned char *signature, unsigned signature_size);
+bool ReadSignatureTail(const unsigned char *buffer, const unsigned buffer_size,
+                       const unsigned skip_bytes,
+                       unsigned char **signature, unsigned *signature_size);
 
 }  // namespace signature
 

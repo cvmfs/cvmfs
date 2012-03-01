@@ -183,7 +183,7 @@ bool LoadPublicRsaKeys(const string &file_list) {
 
   if (file_list == "")
     return true;
-  const vector<string> pem_files = split_string(file_list, ':');
+  const vector<string> pem_files = SplitString(file_list, ':');
 
   char *nopwd = strdupa("");
   FILE *fp;
@@ -393,6 +393,33 @@ bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
   }
 
   return false;
+}
+
+
+/**
+ * Reads after skip bytes in memory, looks for a line break and saves
+ * the rest into sig_buf, which will be allocated.
+ */
+bool ReadSignatureTail(const unsigned char *buffer, const unsigned buffer_size,
+                       const unsigned skip_bytes,
+                       unsigned char **signature, unsigned *signature_size)
+{
+  unsigned i;
+  for (i = skip_bytes; i < buffer_size; ++i) {
+    if (((char *)buffer)[i] == '\n') break;
+  }
+  i++;
+  /* at least one byte after \n required */
+  if (i >= buffer_size) {
+    *signature = NULL;
+    *signature_size = 0;
+    return false;
+  } else {
+    *signature_size = buffer_size-i;
+    *signature = reinterpret_cast<unsigned char *>(smalloc(*signature_size));
+    memcpy(*signature, ((char *)buffer)+i, *signature_size);
+    return true;
+  }
 }
 
 }  // namespace signature

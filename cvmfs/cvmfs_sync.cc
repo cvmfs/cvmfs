@@ -57,6 +57,7 @@ static void usage() {
         << endl << endl;
 }
 
+
 bool parseParameters(int argc, char **argv, SyncParameters *p) {
 	// print some help if needed
 	if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help") ||
@@ -79,19 +80,19 @@ bool parseParameters(int argc, char **argv, SyncParameters *p) {
 
 		// directories
 		case 's':
-			p->dir_shadow = canonical_path(optarg);
+			p->dir_shadow = MakeCanonicalPath(optarg);
 			break;
 		case 'c':
-			p->dir_cvmfs = canonical_path(optarg);
+			p->dir_cvmfs = MakeCanonicalPath(optarg);
 			break;
 		case 'r': {
-			const string path = canonical_path(optarg);
+			const string path = MakeCanonicalPath(optarg);
 			p->dir_data = path + "/data";
 			p->dir_catalogs = path + "/catalogs";
 			break;
 		}
 		case 'o':
-			p->dir_overlay = canonical_path(optarg);
+			p->dir_overlay = MakeCanonicalPath(optarg);
 			break;
 
 		// switches
@@ -112,7 +113,7 @@ bool parseParameters(int argc, char **argv, SyncParameters *p) {
 		case 'i': {
 			char *token = strtok(optarg, ",");
 			while (token != NULL) {
-				p->immutables.insert(canonical_path(token));
+				p->immutables.insert(MakeCanonicalPath(token));
 				token = strtok(NULL, ",");
 			}
 			break;
@@ -138,7 +139,7 @@ bool initWatchdog() {
 	umask(022);
 
 	if (!monitor::Init(".", false)) {
-		printError("Failed to init watchdog");
+		PrintError("Failed to init watchdog");
 		return false;
 	}
 	monitor::Spawn();
@@ -147,28 +148,28 @@ bool initWatchdog() {
 }
 
 bool doSanityChecks(SyncParameters *p) {
-	if (not directory_exists(p->dir_overlay)) {
-		printError("overlay (copy on write) directory does not exist");
+	if (not DirectoryExists(p->dir_overlay)) {
+		PrintError("overlay (copy on write) directory does not exist");
 		return false;
 	}
 
-	if (not directory_exists(p->dir_shadow)) {
-		printError("shadow directory does not exist");
+	if (not DirectoryExists(p->dir_shadow)) {
+		PrintError("shadow directory does not exist");
 		return false;
 	}
 
-	if (not directory_exists(p->dir_cvmfs)) {
-		printError("mounted cvmfs repository does not exist");
+	if (not DirectoryExists(p->dir_cvmfs)) {
+		PrintError("mounted cvmfs repository does not exist");
 		return false;
 	}
 
-	if (not directory_exists(p->dir_data)) {
-		printError("data store directory does not exist");
+	if (not DirectoryExists(p->dir_data)) {
+		PrintError("data store directory does not exist");
 		return false;
 	}
 
-	if (not directory_exists(p->dir_catalogs)) {
-		printError("catalog store directory does not exist");
+	if (not DirectoryExists(p->dir_catalogs)) {
+		PrintError("catalog store directory does not exist");
 		return false;
 	}
 
@@ -176,8 +177,8 @@ bool doSanityChecks(SyncParameters *p) {
 }
 
 bool createCacheDir(SyncParameters *p) {
-	if (!make_cache_dir(p->dir_data, 0755)) {
-		printError("could not initialize data store");
+	if (!MakeCacheDirectories(p->dir_data, 0755)) {
+		PrintError("could not initialize data store");
 		return false;
 	}
 
@@ -185,15 +186,15 @@ bool createCacheDir(SyncParameters *p) {
 }
 
 WritableCatalogManager* createWritableCatalogManager(const SyncParameters &p) {
-  return new WritableCatalogManager(canonical_path(p.dir_catalogs),
-                                    canonical_path(p.dir_data),
+  return new WritableCatalogManager(MakeCanonicalPath(p.dir_catalogs),
+                                    MakeCanonicalPath(p.dir_data),
                                     p.lazy_attach);
 }
 
 SyncMediator* createSyncMediator(WritableCatalogManager* catalogManager,
                                  const SyncParameters &p) {
   return new SyncMediator(catalogManager,
-                          canonical_path(p.dir_data),
+                          MakeCanonicalPath(p.dir_data),
                           p.dry_run,
                           p.print_changeset);
 }
@@ -201,9 +202,9 @@ SyncMediator* createSyncMediator(WritableCatalogManager* catalogManager,
 SyncUnion* createSynchronisationEngine(SyncMediator* mediator,
                                        const SyncParameters &p) {
   return new SyncUnionAufs(mediator,
-                           canonical_path(p.dir_cvmfs),
-                           canonical_path(p.dir_shadow),
-                           canonical_path(p.dir_overlay));
+                           MakeCanonicalPath(p.dir_cvmfs),
+                           MakeCanonicalPath(p.dir_shadow),
+                           MakeCanonicalPath(p.dir_overlay));
 }
 
 int main(int argc, char **argv) {
@@ -222,7 +223,7 @@ int main(int argc, char **argv) {
 
 	// sync
 	if (not sync->DoYourMagic()) {
-		printError("something went wrong during sync");
+		PrintError("something went wrong during sync");
 		return 4;
 	}
 
