@@ -19,11 +19,11 @@
  *       down on assertion.  This might be not desired behavior.
  */
 
+#include "config.h"
 #include "tracer.h"
 
 #include <pthread.h>
 #include <sys/time.h>
-#include <stdint.h>
 
 #include <cstdlib>
 #include <cstdio>
@@ -31,14 +31,14 @@
 #include <cerrno>
 
 #include <string>
-#include <sstream>
-#include <iomanip>
 
+#include "util.h"
 #include "atomic.h"
 
 using namespace std;  // NOLINT
 
-namespace {
+namespace tracer {
+
 /**
  * Contents of a trace line.
  * \todo memory alignment
@@ -67,11 +67,32 @@ struct FlushThreadStartData {
   string filename;
 };
 
+bool active_ = false;
+std::string filename_;
+int buffer_size_;
+int flush_threshold_;
+atomic_int32 seq_no_;  /**< Starts with 0 and gets incremented by each call to
+                        trace. Contains the first non-used sequence number. */
+atomic_int32 flushed_;  /**< Starts with 0 and gets incremented by the flush
+                         thread.  Points to the first non-flushed message.
+                         flushed <= seq_no holds. */
+atomic_int32 terminate_flush_thread_;
+atomic_int32 flush_immediately_;
+BufferEntry *ring_buffer_;
+atomic_int32 *commit_buffer_;  /**< Has the same size as the ring buffer.  If a
+                                message is actually copied to the ring buffer
+                                memory, the respective flag is set to 1.
+                                Flags are reset to 0 by the flush thread. */
+pthread_t thread_flush_;
+pthread_cond_t sig_flush_;
+pthread_cond_t sig_continue_trace_;
+pthread_mutex_t sig_continue_trace_mutex_;
+
 
 /**
  *  Returns a timestamp at now+ms.
  */
-void GetTimespecRel(const int64_t ms, timespec *ts) {
+static void GetTimespecRel(const int64_t ms, timespec *ts) {
   timeval now;
   gettimeofday(&now, NULL);
   int64_t nsecs = now.tv_usec * 1000 + (ms % 1000)*1000*1000;
@@ -85,25 +106,7 @@ void GetTimespecRel(const int64_t ms, timespec *ts) {
 }
 
 
-string Stringify(int v) {
-  ostringstream o;
-  if (!(o << v))
-    assert(false || "Could not convert int to string");
-  return o.str();
-}
-
-
-string Stringify(timeval v) {
-  ostringstream o;
-  int64_t msec = v.tv_sec * 1000;
-  msec += v.tv_usec / 1000;
-  if (!(o << msec << "." << setw(3) << setfill('0') << v.tv_usec % 1000))
-    assert(false || "Could not convert timeval to string");
-  return o.str();
-}
-
-
-int WriteCsvFp(FILE *fp, const string &field) {
+static int WriteCsvFile(FILE *fp, const string &field) {
   if (fp == NULL)
     return 0;
 
@@ -128,7 +131,7 @@ int WriteCsvFp(FILE *fp, const string &field) {
 }
 
 
-extern "C" void *tf_flush(void *data) {
+static void *MainFlush(void *data) {
   FlushThreadStartData *start_data =
     reinterpret_cast<FlushThreadStartData *>(data);
   pthread_mutex_t sig_flush_mutex;
@@ -160,15 +163,15 @@ extern "C" void *tf_flush(void *data) {
              pos = ((base + i) % start_data->size)]) == 1))
     {
       string tmp;
-      tmp = Stringify(start_data->ring_buffer[pos].time_stamp);
-      retval = WriteCsvFp(f, tmp);
+      tmp = StringifyTimeval(start_data->ring_buffer[pos].time_stamp);
+      retval = WriteCsvFile(f, tmp);
       retval |= fputc(',', f) - ',';
-      tmp = Stringify(start_data->ring_buffer[pos].code);
-      retval = WriteCsvFp(f, tmp);
+      tmp = StringifyInt(start_data->ring_buffer[pos].code);
+      retval = WriteCsvFile(f, tmp);
       retval |= fputc(',', f) - ',';
-      retval |= WriteCsvFp(f, start_data->ring_buffer[pos].id);
+      retval |= WriteCsvFile(f, start_data->ring_buffer[pos].id);
       retval |= fputc(',', f) - ',';
-      retval |= WriteCsvFp(f, start_data->ring_buffer[pos].msg);
+      retval |= WriteCsvFile(f, start_data->ring_buffer[pos].msg);
       retval |= (fputc(13, f) - 13) | (fputc(10, f) - 10);
       retval |= fflush(f);
       assert(retval == 0 && "Error while writing into trace file");
@@ -194,34 +197,6 @@ extern "C" void *tf_flush(void *data) {
   return NULL;
 }
 
-}  // namespace
-
-
-namespace tracer {
-
-bool active = false;
-
-std::string filename_;
-int buffer_size_;
-  int flush_threshold_;
-atomic_int32 seq_no_;  /**< Starts with 0 and gets incremented by each call to
-                          trace. Contains the first non-used sequence number. */
-atomic_int32 flushed_;  /**< Starts with 0 and gets incremented by the flush
-                             thread.  Points to the first non-flushed message.
-                             flushed <= seq_no holds. */
-atomic_int32 terminate_flush_thread;
-atomic_int32 flush_immediately;
-BufferEntry *ring_buffer;
-atomic_int32 *commit_buffer;  /**< Has the same size as the ring buffer.  If a
-                                 message is actually copied to the ring buffer
-                                 memory, the respective flag is set to 1.
-                                 Flags are reset to 0 by the flush thread. */
-pthread_t thread_flush;
-pthread_cond_t sig_flush;
-pthread_cond_t sig_continue_trace;
-pthread_mutex_t sig_continue_trace_mutex;
-
-
 /**
  * Initialize module and spawns the helper thread for flushing.
  * @param[in] buffer_size The number of messages that are kept at maximum in the
@@ -235,7 +210,7 @@ pthread_mutex_t sig_continue_trace_mutex;
 void Init(const int buffer_size, const int flush_threshold,
           const string &filename)
 {
-  active = true;
+  active_ = true;
   filename_ = filename;
   buffer_size_ = buffer_size;
   flush_threshold_ = flush_threshold;
@@ -245,34 +220,34 @@ void Init(const int buffer_size, const int flush_threshold,
 
   atomic_init32(&seq_no_);
   atomic_init32(&flushed_);
-  atomic_init32(&terminate_flush_thread);
-  atomic_init32(&flush_immediately);
-  ring_buffer = new BufferEntry[buffer_size_];
-  commit_buffer = new atomic_int32[buffer_size_];
+  atomic_init32(&terminate_flush_thread_);
+  atomic_init32(&flush_immediately_);
+  ring_buffer_ = new BufferEntry[buffer_size_];
+  commit_buffer_ = new atomic_int32[buffer_size_];
   for (int i = 0; i < buffer_size_; i++)
-    atomic_init32(&commit_buffer[i]);
+    atomic_init32(&commit_buffer_[i]);
 
   int retval;
-  retval = pthread_cond_init(&sig_continue_trace, NULL);
+  retval = pthread_cond_init(&sig_continue_trace_, NULL);
   assert(retval == 0 && "Could not create continue-trace signal");
-  retval = pthread_mutex_init(&sig_continue_trace_mutex, NULL);
+  retval = pthread_mutex_init(&sig_continue_trace_mutex_, NULL);
   assert(retval == 0 && "Could not create mutex for continue-trace signal");
-  retval = pthread_cond_init(&sig_flush, NULL);
+  retval = pthread_cond_init(&sig_flush_, NULL);
   assert(retval == 0 && "Could not create flush signal");
 
   FlushThreadStartData *start_data = new FlushThreadStartData;
-  start_data->sig_flush = &sig_flush;
-  start_data->sig_continue_trace = &sig_continue_trace;
-  start_data->ring_buffer = ring_buffer;
-  start_data->commit_buffer = commit_buffer;
+  start_data->sig_flush = &sig_flush_;
+  start_data->sig_continue_trace = &sig_continue_trace_;
+  start_data->ring_buffer = ring_buffer_;
+  start_data->commit_buffer = commit_buffer_;
   start_data->seq_no = &seq_no_;
   start_data->flushed = &flushed_;
-  start_data->terminate = &terminate_flush_thread;
-  start_data->flush_immediately = &flush_immediately;
+  start_data->terminate = &terminate_flush_thread_;
+  start_data->flush_immediately = &flush_immediately_;
   start_data->size = buffer_size_;
   start_data->threshold = flush_threshold_;
   start_data->filename = filename_;
-  retval = pthread_create(&thread_flush, NULL, tf_flush,
+  retval = pthread_create(&thread_flush_, NULL, MainFlush,
                           reinterpret_cast<void *> (start_data));
   assert(retval == 0 && "Could not create flush thread");
 
@@ -284,7 +259,7 @@ void Init(const int buffer_size, const int flush_threshold,
  * Turns the tracer off.
  */
 void InitNull() {
-  active = false;
+  active_ = false;
 }
 
 
@@ -294,28 +269,28 @@ void InitNull() {
  * functions have returned before destroying.
  */
 void Fini() {
-  if (!active) return;
+  if (!active_) return;
 
   TraceInternal(-2, "Tracer", "Destroying trace buffer...");
 
   // Trigger flushing and wait for it
   int retval;
-  atomic_inc32(&terminate_flush_thread);
-  retval = pthread_cond_signal(&sig_flush);
+  atomic_inc32(&terminate_flush_thread_);
+  retval = pthread_cond_signal(&sig_flush_);
   assert(retval == 0 && "Could not signal flush thread");
-  retval = pthread_join(thread_flush, NULL);
+  retval = pthread_join(thread_flush_, NULL);
   assert(retval == 0 && "Flush thread not gracefully terminated");
 
-  retval = pthread_cond_destroy(&sig_continue_trace);
+  retval = pthread_cond_destroy(&sig_continue_trace_);
   assert(retval == 0 && "Continue-trace signal could not be destroyed");
-  retval = pthread_mutex_destroy(&sig_continue_trace_mutex);
+  retval = pthread_mutex_destroy(&sig_continue_trace_mutex_);
   assert(retval == 0 &&
          "Mutex for continue-trace signal could not be destroyed");
-  retval = pthread_cond_destroy(&sig_flush);
+  retval = pthread_cond_destroy(&sig_flush_);
   assert(retval == 0 && "Flush signal could not be destroyed");
 
-  delete[] ring_buffer;
-  delete[] commit_buffer;
+  delete[] ring_buffer_;
+  delete[] commit_buffer_;
 }
 
 
@@ -346,22 +321,22 @@ int32_t TraceInternal(const int event, const string &id, const string &msg) {
     timespec timeout;
     int retval;
     GetTimespecRel(25, &timeout);
-    retval = pthread_mutex_lock(&sig_continue_trace_mutex);
-    retval |= pthread_cond_timedwait(&sig_continue_trace,
-                                     &sig_continue_trace_mutex, &timeout);
-    retval |= pthread_mutex_unlock(&sig_continue_trace_mutex);
+    retval = pthread_mutex_lock(&sig_continue_trace_mutex_);
+    retval |= pthread_cond_timedwait(&sig_continue_trace_,
+                                     &sig_continue_trace_mutex_, &timeout);
+    retval |= pthread_mutex_unlock(&sig_continue_trace_mutex_);
     assert((retval == ETIMEDOUT || retval == 0) &&
            "Error while waiting to continue tracing");
   }
 
-  ring_buffer[pos].time_stamp = now;
-  ring_buffer[pos].code = event;
-  ring_buffer[pos].id = id;
-  ring_buffer[pos].msg = msg;
-  atomic_inc32(&commit_buffer[pos]);
+  ring_buffer_[pos].time_stamp = now;
+  ring_buffer_[pos].code = event;
+  ring_buffer_[pos].id = id;
+  ring_buffer_[pos].msg = msg;
+  atomic_inc32(&commit_buffer_[pos]);
 
   if (my_seq_no - atomic_read32(&flushed_) == flush_threshold_) {
-    int err_code __attribute__((unused)) = pthread_cond_signal(&sig_flush);
+    int err_code __attribute__((unused)) = pthread_cond_signal(&sig_flush_);
     assert(err_code == 0 && "Could not signal flush thread");
   }
 
@@ -375,22 +350,22 @@ int32_t TraceInternal(const int event, const string &id, const string &msg) {
  * affect further tracing during its execution.
  */
 void Flush() {
-  if (!active) return;
+  if (!active_) return;
 
   int32_t save_seq_no = TraceInternal(-3, "Tracer", "flushed ring buffer");
   while (atomic_read32(&flushed_) <= save_seq_no) {
     timespec timeout;
     int retval;
 
-    atomic_cas32(&flush_immediately, 0, 1);
-    retval = pthread_cond_signal(&sig_flush);
+    atomic_cas32(&flush_immediately_, 0, 1);
+    retval = pthread_cond_signal(&sig_flush_);
     assert(retval == 0 && "Could not signal flush thread");
 
     GetTimespecRel(250, &timeout);
-    retval = pthread_mutex_lock(&sig_continue_trace_mutex);
-    retval |= pthread_cond_timedwait(&sig_continue_trace,
-                                       &sig_continue_trace_mutex, &timeout);
-    retval |= pthread_mutex_unlock(&sig_continue_trace_mutex);
+    retval = pthread_mutex_lock(&sig_continue_trace_mutex_);
+    retval |= pthread_cond_timedwait(&sig_continue_trace_,
+                                       &sig_continue_trace_mutex_, &timeout);
+    retval |= pthread_mutex_unlock(&sig_continue_trace_mutex_);
     assert((retval == ETIMEDOUT || retval == 0) &&
            "Error while waiting in flush ()");
   }

@@ -5,8 +5,6 @@
 #ifndef CVMFS_UTIL_H_
 #define CVMFS_UTIL_H_
 
-#include "cvmfs_config.h"
-
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -45,6 +43,9 @@ bool get_file_info(const std::string &path, platform_stat64 *info);
 void printError(const std::string &message);
 void printWarning(const std::string &message);
 std::string humanizeBitmap(const unsigned int bitmap);
+
+std::string StringifyInt(const int value);
+std::string StringifyTimeval(const timeval value);
 
 /*
  * abs2rel: convert an absolute path name into relative.

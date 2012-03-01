@@ -4,13 +4,14 @@
  * Some common functions.
  */
 
-#define _FILE_OFFSET_BITS 64
-
 #include "cvmfs_config.h"
 #include "util.h"
 #include "hash.h"
 
 #include "platform.h"
+
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
 #include <string>
 #include <sstream>
@@ -552,4 +553,21 @@ double DiffTimeSeconds(struct timeval start, struct timeval end) {
   (end.tv_usec - start.tv_usec);
   return double(elapsed_usec)/1000000.0;
 }
+
+string StringifyInt(const int value) {
+  char buffer[48];
+  snprintf(buffer, sizeof(buffer), "%d", value);
+  return string(buffer);
+}
+
+
+string StringifyTimeval(const timeval value) {
+  char buffer[64];
+  int64_t msec = value.tv_sec * 1000;
+  msec += value.tv_usec / 1000;
+  snprintf(buffer, sizeof(buffer), "%"PRId64".%03d",
+           msec, int(value.tv_usec % 1000));
+  return string(buffer);
+}
+
 

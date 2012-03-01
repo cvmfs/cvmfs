@@ -10,7 +10,7 @@
 
 namespace tracer {
 
-extern bool active;
+extern bool active_;
 
 enum TraceEvents {
   kFuseOpen = 1,
@@ -34,7 +34,9 @@ void Flush();
 void inline __attribute__((used)) Trace(const int event, const std::string &id,
                                         const std::string &msg)
 {
-   if (active) TraceInternal(event, id, msg);
+  // TODO: could be done more elegantly by templates
+  // (only 1 if when initialized)
+  if (active_) TraceInternal(event, id, msg);
 }
 
 }  // namespace tracer

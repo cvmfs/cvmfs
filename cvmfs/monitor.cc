@@ -35,6 +35,7 @@
 #include <cassert>
 
 #include "platform.h"
+#include "util.h"
 #include "logging.h"
 
 using namespace std;  // NOLINT
@@ -160,7 +161,6 @@ static string ReadLineFromPipe() {
 static string ReportStacktrace() {
   int stack_size;
   string debug = "--\n";
-  char buffer[48];
 
   int recv_signal;
   if (read(pipe_wd_[0], &recv_signal, sizeof(recv_signal)) <
@@ -168,8 +168,7 @@ static string ReportStacktrace() {
   {
     return "failure while reading signal number";
   }
-  snprintf(buffer, sizeof(buffer), "%d", recv_signal);
-  debug += "Signal: " + string(buffer);
+  debug += "Signal: " + StringifyInt(recv_signal);
 
   int recv_errno;
   if (read(pipe_wd_[0], &recv_errno, sizeof(recv_errno)) <
@@ -177,8 +176,7 @@ static string ReportStacktrace() {
   {
     return "failure while reading errno";
   }
-  snprintf(buffer, sizeof(buffer), "%d", recv_errno);
-  debug += ", errno: " + string(buffer) + "\n";
+  debug += ", errno: " + StringifyInt(errno) + "\n";
 
   debug += "version: " + string(VERSION) + "\n";
 
