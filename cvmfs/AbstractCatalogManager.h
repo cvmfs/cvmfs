@@ -25,7 +25,6 @@
 #include <vector>
 #include <string>
 
-#include "thread_safe.h"
 #include "Catalog.h"
 #include "DirectoryEntry.h"
 #include "hash.h"

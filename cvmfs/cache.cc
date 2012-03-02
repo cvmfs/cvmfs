@@ -316,7 +316,7 @@ int CommitTransaction(const string &final_path,
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(temp_path.c_str());
   } else {
-    if (!lru::insert(hash, size, cvmfs_path)) {
+    if (!lru::Insert(hash, size, cvmfs_path)) {
       LogCvmfs(kLogCache, kLogDebug, "insert into lru failed");
       unlink(final_path.c_str());
       result = -1;
@@ -382,14 +382,14 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
 
-  if (d.size() > lru::max_file_size()) {
+  if (d.size() > lru::GetMaxFileSize()) {
     LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache");
     return -ENOSPC;
   }
 
   // Try to open from local cache
   if ((fd_return = cache::Open(d.checksum_)) >= 0) {
-    lru::touch(d.checksum_);
+    lru::Touch(d.checksum_);
     return fd_return;
   }
 
@@ -427,7 +427,7 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
     fd_return = cache::Open(d.checksum_);
     if (fd_return >= 0) {
       pthread_mutex_unlock(&lock_queues_download_);
-      lru::touch(d.checksum_);
+      lru::Touch(d.checksum_);
       return fd_return;
     }
 

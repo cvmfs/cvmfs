@@ -761,17 +761,17 @@ namespace cvmfs {
     memset(&info, 0, sizeof(info));
 
     /* Unmanaged cache */
-    if (lru::capacity() == 0) {
+    if (lru::GetCapacity() == 0) {
       fuse_reply_statfs(req, &info);
       return;
     }
 
     uint64_t available = 0;
-    uint64_t size = lru::size();
+    uint64_t size = lru::GetSize();
 
     info.f_bsize = 1;
 
-    if (lru::capacity() == (uint64_t)(-1)) {
+    if (lru::GetCapacity() == (uint64_t)(-1)) {
       /* Unrestricted cache, look at free space on cache dir fs */
       struct statfs cache_buf;
       if (statfs(".", &cache_buf) == 0) {
@@ -782,8 +782,8 @@ namespace cvmfs {
       }
     } else {
       /* Take values from LRU module */
-      info.f_blocks = lru::capacity();
-      available = lru::capacity() - size;
+      info.f_blocks = lru::GetCapacity();
+      available = lru::GetCapacity() - size;
     }
 
     info.f_bfree = info.f_bavail = available;
@@ -1026,7 +1026,7 @@ namespace cvmfs {
     else
       tracer::InitNull();
 
-    lru::spawn();
+    lru::Spawn();
     talk::spawn();
 
     download::Spawn();
@@ -1602,7 +1602,7 @@ int main(int argc, char *argv[]) {
     cvmfs_opts.quota_limit *= 1024*1024;
     cvmfs_opts.quota_threshold *= 1024*1024;
   }
-  if (!lru::init(".", (uint64_t)cvmfs_opts.quota_limit,
+  if (!lru::Init(".", (uint64_t)cvmfs_opts.quota_limit,
                  (uint64_t)cvmfs_opts.quota_threshold,
                  cvmfs_opts.rebuild_cachedb)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize lru cache");
@@ -1613,15 +1613,15 @@ int main(int argc, char *argv[]) {
   if (cvmfs_opts.rebuild_cachedb) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: rebuilding lru cache database...");
-    if (!lru::build()) {
+    if (!lru::BuildDatabase()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to rebuild lru cache database");
       goto cvmfs_cleanup;
     }
   }
-  if (lru::size() > lru::capacity()) {
+  if (lru::GetSize() > lru::GetCapacity()) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "Warning: your cache is already beyond quota size, cleaning up");
-    if (!lru::cleanup(cvmfs_opts.quota_threshold)) {
+    if (!lru::Cleanup(cvmfs_opts.quota_threshold)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to clean up");
       goto cvmfs_cleanup;
     }
@@ -1629,7 +1629,7 @@ int main(int argc, char *argv[]) {
   if (cvmfs_opts.quota_limit) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: quota initialized, current size %luMB",
-             lru::size()/(1024*1024));
+             lru::GetSize()/(1024*1024));
   }
 
   /* Create the file catalog from the web server */
@@ -1728,7 +1728,7 @@ int main(int argc, char *argv[]) {
 
  cvmfs_cleanup:
   if (talk_ready) talk::fini();
-  if (quota_ready) lru::fini();
+  if (quota_ready) lru::Fini();
   if (signature_ready) signature::Fini();
   if (cache_ready) cache::Fini();
   if (monitor_ready) monitor::Fini();

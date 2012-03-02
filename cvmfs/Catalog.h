@@ -25,7 +25,6 @@
 #include "catalog_queries.h"
 #include "DirectoryEntry.h"
 #include "hash.h"
-#include "thread_safe.h"
 #include "sqlite3-duplex.h"
 
 namespace cvmfs {

@@ -88,12 +88,12 @@ namespace talk {
           answer(con_fd, "OK\n");
         }
         else if (line == "cache size") {
-          if (lru::capacity() == 0)
+          if (lru::GetCapacity() == 0)
             answer(con_fd, "Cache is unmanaged\n");
           else {
             ostringstream size;
-            uint64_t size_unpinned = lru::size();
-            uint64_t size_pinned = lru::size_pinned();
+            uint64_t size_unpinned = lru::GetSize();
+            uint64_t size_pinned = lru::GetSizePinned();
             size << "Current cache size is " << size_unpinned / (1024*1024) << "MB ("
             << size_unpinned << " Bytes), "
             << "pinned: " << size_pinned / (1024*1024) << "MB ("
@@ -102,10 +102,10 @@ namespace talk {
           }
         }
         else if (line == "cache list") {
-          if (lru::capacity() == 0)
+          if (lru::GetCapacity() == 0)
             answer(con_fd, "Cache is unmanaged\n");
           else {
-            vector<string> ls = lru::list();
+            vector<string> ls = lru::List();
             string ls_result;
             for (unsigned i = 0; i < ls.size(); ++i) {
               ls_result += ls[i] + "\n";
@@ -114,10 +114,10 @@ namespace talk {
           }
         }
         else if (line == "cache list pinned") {
-          if (lru::capacity() == 0)
+          if (lru::GetCapacity() == 0)
             answer(con_fd, "Cache is unmanaged\n");
           else {
-            vector<string> ls = lru::list_pinned();
+            vector<string> ls = lru::ListPinned();
             string ls_result;
             for (unsigned i = 0; i < ls.size(); ++i) {
               ls_result += ls[i] + "\n";
@@ -126,10 +126,10 @@ namespace talk {
           }
         }
         else if (line == "cache list catalogs") {
-          if (lru::capacity() == 0)
+          if (lru::GetCapacity() == 0)
             answer(con_fd, "Cache is unmanaged\n");
           else {
-            vector<string> ls = lru::list_catalogs();
+            vector<string> ls = lru::ListCatalogs();
             string ls_result;
             for (unsigned i = 0; i < ls.size(); ++i) {
               ls_result += ls[i] + "\n";
@@ -138,7 +138,7 @@ namespace talk {
           }
         }
         else if (line.substr(0, 7) == "cleanup") {
-          if (lru::capacity() == 0) {
+          if (lru::GetCapacity() == 0) {
             answer(con_fd, "Cache is unmanaged\n");
           } else {
             if (line.length() < 9) {
@@ -148,7 +148,7 @@ namespace talk {
               uint64_t size;
               ssize >> size;
               size *= 1024*1024;
-              if (lru::cleanup(size)) {
+              if (lru::Cleanup(size)) {
                 answer(con_fd, "OK\n");
               } else {
                 answer(con_fd, "Not fully cleaned (there might be pinned chunks)\n");
@@ -157,7 +157,7 @@ namespace talk {
           }
         }
         else if (line.substr(0, 10) == "clear file") {
-          if (lru::capacity() == 0) {
+          if (lru::GetCapacity() == 0) {
             answer(con_fd, "Cache is unmanaged\n");
           } else {
             if (line.length() < 12) {

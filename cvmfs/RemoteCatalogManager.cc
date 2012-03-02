@@ -83,26 +83,26 @@ namespace cvmfs {
       platform_stat64 info;
       if (platform_stat(catalog_file->c_str(), &info) != 0) {
         /* should never happen */
-        lru::remove(sha1_cat);
+        lru::Remove(sha1_cat);
         cached_copy = false;
         result = -EIO;
         LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
                  "catalog access failure for %s", catalog_file->c_str());
       } else {
-        if (((uint64_t)info.st_size > lru::max_file_size()) ||
-            (!lru::pin(sha1_cat, info.st_size, root_url_ + url_path)))
+        if (((uint64_t)info.st_size > lru::GetMaxFileSize()) ||
+            (!lru::Pin(sha1_cat, info.st_size, root_url_ + url_path)))
         {
           LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
                    "catalog load failure for %s (no space)",
                    catalog_file->c_str());
-          lru::remove(sha1_cat);
+          lru::Remove(sha1_cat);
           unlink(catalog_file->c_str());
           cached_copy = false;
           result = -ENOSPC;
         } else {
           /* From now on we have to go with the new catalog */
           if (!sha1_old.IsNull() && (sha1_old != sha1_cat)) {
-            lru::remove(sha1_old);
+            lru::Remove(sha1_old);
             unlink(old_file.c_str());
           }
         }
