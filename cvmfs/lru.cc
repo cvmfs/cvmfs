@@ -6,7 +6,7 @@
  * and remove files based on least recently used strategy.
  *
  * We setup another SQLite catalog, a "cache catalog", that helps us
- * to keep files, file sizes and access times.
+ * in the bookkeeping of files, file sizes and access times.
  *
  * We might choose to not manage the local cache.  This is indicated
  * by limit == 0 and everything succeeds in that case.
@@ -31,13 +31,14 @@
 #include <cstdio>
 
 #include <string>
-#include <sstream>
 #include <map>
 #include <set>
 
 #include "logging.h"
 #include "sqlite3-duplex.h"
 #include "hash.h"
+#include "util.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -51,13 +52,36 @@ enum FileTypes {
   kFileCatalog,
 };
 
+enum CommandType {
+  kTouch = 0,
+  kInsert,
+  kReserve,
+  kPin,
+  kUnpin,
+  kCleanup,
+  kList,
+  kListPinned,
+  kListCatalogs,
+  kStatus,
+};
+
+struct LruCommand {
+  CommandType command_type;
+  uint64_t size;
+  union {
+    unsigned char digest[hash::kMaxDigestSize];
+    int return_pipe;  // For cleanup and listing
+  };
+  uint16_t path_length;  // Maximum 512-sizeof(LruCommand) in order to guarantee
+                         // atomic pipe operations
+};
+
 /**
  * Maximum page cache per thread (Bytes).
  */
-const int kSqliteMemPerThread = 2*1024*1024;
-
-const string FTYPESTR_REG = "0";
-const string FTYPESTR_CLG = "1";
+const unsigned kSqliteMemPerThread = 2*1024*1024;
+const unsigned kCommandBufferSize = 64;
+const unsigned kMaxCvmfsPath = 512;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t thread_touch;
@@ -65,6 +89,7 @@ pthread_t thread_insert;
 bool running;
 int pipe_touch[2];
 int pipe_insert[2];
+int pipe_lru_[2];
 map<string, string> key2paths; ///< maps SHA1 chunks to their file name on insert
 pthread_mutex_t mutex_key2paths = PTHREAD_MUTEX_INITIALIZER;
 set<hash::Any> pinned_chunks;
@@ -86,6 +111,257 @@ sqlite3_stmt *stmt_rm = NULL;
 sqlite3_stmt *stmt_list = NULL;
 sqlite3_stmt *stmt_list_pinned = NULL; /* loaded catalogs are pinned */
 sqlite3_stmt *stmt_list_catalogs = NULL;
+
+
+
+static bool DoCleanup(const uint64_t leave_size) {
+  if ((limit == 0) || (gauge <= leave_size))
+    return true;
+
+  LogCvmfs(kLogLru, kLogSyslog,
+           "cleanup cache until %lu KB are free", leave_size/1024);
+
+  bool result;
+  string sha1;
+
+  do {
+    sqlite3_reset(stmt_lru);
+    if (sqlite3_step(stmt_lru) != SQLITE_ROW) {
+      LogCvmfs(kLogLru, kLogDebug, "could not get lru-entry");
+      break;
+    }
+
+    // TODO
+    sha1 = string((char *)sqlite3_column_text(stmt_lru, 0));
+
+    //trash.push(cache_dir + "/" + sha1.substr(0, 2) + "/" +
+    //   sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2)));
+    unlink((cache_dir + "/" + sha1.substr(0, 2) + "/" +
+            sha1.substr(2)).c_str());
+    gauge -= sqlite3_column_int64(stmt_lru, 1);
+    LogCvmfs(kLogLru, kLogDebug, "lru cleanup %s", sha1.c_str());
+
+    sqlite3_bind_text(stmt_rm, 1, sha1.c_str(), sha1.length(), SQLITE_STATIC);
+    result = (sqlite3_step(stmt_rm) == SQLITE_DONE);
+    sqlite3_reset(stmt_rm);
+
+    if (!result) {
+      LogCvmfs(kLogLru, kLogDebug, "could not remove lru-entry");
+      return false;
+    }
+  } while (gauge > leave_size);
+
+    /* Double fork avoids zombie */
+    /*if (!trash.empty()) {
+     pid_t pid;
+     int statloc;
+     if ((pid = fork()) == 0) {
+     if (fork() == 0) {
+     while (!trash.empty()) {
+     pmesg(D_LRU, "unlink %s", trash.top().c_str());
+     unlink(trash.top().c_str());
+     trash.pop();
+     }
+     exit(0);
+     }
+     exit(0);
+     } else {
+     if (pid > 0) waitpid(pid, &statloc, 0);
+     else return false;
+     }
+     }*/
+
+  return gauge <= leave_size;
+}
+
+
+static void ProcessCommandBunch(const unsigned num,
+                                const LruCommand *commands, const char *paths)
+{
+  int retval = sqlite3_exec(db, "BEGIN", NULL, NULL, NULL);
+  assert(retval == SQLITE_OK);
+
+  for (unsigned i = 0; i < num; ++i) {
+    const hash::Any hash(hash::kSha1, commands[i].digest,
+                         sizeof(commands[i].digest));
+    const string hash_str = hash.ToString();
+    const unsigned size = commands[i].size;
+    LogCvmfs(kLogLru, kLogDebug, "processing %s (%d)",
+             hash_str.c_str(), commands[i].command_type);
+
+    bool exists;
+    switch (commands[i].command_type) {
+      case kTouch:
+        sqlite3_bind_int64(stmt_touch, 1, seq++);
+        sqlite3_bind_text(stmt_touch, 2, &hash_str[0], hash_str.length(),
+                          SQLITE_STATIC);
+        retval = sqlite3_step(stmt_touch);
+        LogCvmfs(kLogLru, kLogDebug, "touching %s (%ld): %d",
+                 hash_str.c_str(), seq-1, retval);
+        errno = retval;
+        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        sqlite3_reset(stmt_touch);
+        break;
+      case kPin:
+      case kInsert:
+        // It could already be in, check
+        exists = false;
+        sqlite3_bind_text(stmt_size, 1, &hash_str[0], hash_str.length(),
+                          SQLITE_STATIC);
+        if (sqlite3_step(stmt_size) == SQLITE_ROW)
+          exists = true;
+        sqlite3_reset(stmt_size);
+
+        // Cleanup, move to trash and unlink
+        if (!exists && (gauge + size > limit)) {
+          LogCvmfs(kLogLru, kLogDebug, "over limit, gauge %lu, file size %lu",
+                   gauge, size);
+          retval = DoCleanup(cleanup_threshold);
+          assert(retval != 0);
+        }
+
+        // Insert or replace
+        sqlite3_bind_text(stmt_new, 1, &hash_str[0], hash_str.length(),
+                          SQLITE_STATIC);
+        sqlite3_bind_int64(stmt_new, 2, size);
+        sqlite3_bind_int64(stmt_new, 3, seq++);
+        sqlite3_bind_text(stmt_new, 4, &paths[i*kMaxCvmfsPath],
+                          commands[i].path_length, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt_new, 5, (commands[i].command_type == kPin) ?
+                           kFileCatalog : kFileRegular);
+        sqlite3_bind_int64(stmt_new, 6, (commands[i].command_type == kPin) ?
+                           1 : 0);
+        retval = sqlite3_step(stmt_new);
+        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        sqlite3_reset(stmt_new);
+
+        if (exists) gauge += size;
+        break;
+      default:
+        abort();  // other types should have been taken care of by main thread
+    }
+  }
+
+  retval = sqlite3_exec(db, "COMMIT", NULL, NULL, NULL);
+  assert(retval == SQLITE_OK);
+}
+
+
+/**
+ * Event loop for processing commands.  Most of them are queued, some have
+ * to be executed immediately.
+ */
+static void *MainCommandServer(void *data __attribute__((unused))) {
+  LogCvmfs(kLogLru, kLogDebug, "starting cache manager thread");
+  sqlite3_soft_heap_limit(kSqliteMemPerThread);
+
+  LruCommand command_buffer[kCommandBufferSize];
+  char path_buffer[kCommandBufferSize*kMaxCvmfsPath];
+  unsigned num_commands = 0;
+
+  while (read(pipe_lru_[0], &command_buffer[num_commands],
+              sizeof(command_buffer[0])) == sizeof(command_buffer[0]))
+  {
+    const CommandType command_type = command_buffer[num_commands].command_type;
+    const uint64_t size = command_buffer[num_commands].size;
+
+    // Inserts and pins come with a cvmfs path
+    if ((command_type == kInsert) || (command_type == kPin)) {
+      const int path_length = command_buffer[num_commands].path_length;
+      int num_bytes = read(pipe_lru_[0], &path_buffer[num_commands],
+                           path_length);
+      assert(num_bytes == path_length);
+    }
+
+    // Reservations are handled immediately and "out of band"
+    if (command_type == kReserve) {
+      bool success = true;
+      int return_pipe = command_buffer[num_commands].return_pipe;
+      const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
+                           hash::kDigestSizes[hash::kSha1]);
+      const string hash_str(hash.ToString());
+
+      if (pinned_chunks.find(hash) == pinned_chunks.end()) {
+        if ((cleanup_threshold > 0) && (pinned + size > cleanup_threshold)) {
+          LogCvmfs(kLogLru, kLogDebug, "failed to insert %s (pinned), no space",
+                   hash_str.c_str());
+          success = false;
+        }
+        pinned_chunks.insert(hash);
+        pinned += size;
+      }
+
+      int num_bytes = write(return_pipe, &success, sizeof(success));
+      assert(num_bytes == sizeof(success));
+      continue;
+    }
+
+    // Immediate commands trigger flushing of the buffer
+    bool immediate_command = (command_type == kCleanup) ||
+      (command_type == kList) || (command_type == kListPinned) ||
+      (command_type == kListCatalogs);
+    if (!immediate_command) num_commands++;
+
+    if ((num_commands == kCommandBufferSize) || immediate_command)
+    {
+      ProcessCommandBunch(num_commands, command_buffer, path_buffer);
+      if (!immediate_command) num_commands = 0;
+    }
+
+    if (immediate_command) {
+      // Process cleanup, listings
+      int return_pipe = command_buffer[num_commands].return_pipe;
+      int retval;
+      int num_bytes;
+      sqlite3_stmt *this_stmt_list = NULL;
+      switch (command_type) {
+        case kCleanup:
+          retval = DoCleanup(size);
+          num_bytes = write(return_pipe, &retval, sizeof(retval));
+          assert(num_bytes == sizeof(retval));
+          break;
+        case kList:
+          if (!this_stmt_list) this_stmt_list = stmt_list;
+        case kListPinned:
+          if (!this_stmt_list) this_stmt_list = stmt_list_pinned;
+        case kListCatalogs:
+          if (!this_stmt_list) this_stmt_list = stmt_list_catalogs;
+
+          // Pipe back the list, one by one
+          while (sqlite3_step(this_stmt_list) == SQLITE_ROW) {
+            string path = "(NULL)";
+            if (sqlite3_column_type(this_stmt_list, 0) != SQLITE_NULL) {
+              path = string(
+                reinterpret_cast<const char *>(
+                  sqlite3_column_text(this_stmt_list, 0)));
+            }
+            int length = path.length();
+            num_bytes = write(return_pipe, &length, sizeof(length));
+            assert(num_bytes == sizeof(length));
+            num_bytes = write(return_pipe, &path[0], length);
+            assert(num_bytes == length);
+          }
+          sqlite3_reset(this_stmt_list);
+          break;
+        case kStatus:
+          num_bytes = write(return_pipe, &gauge, sizeof(gauge));
+          assert(num_bytes == sizeof(gauge));
+          num_bytes = write(return_pipe, &pinned, sizeof(pinned));
+          assert(num_bytes == sizeof(pinned));
+          break;
+        default:
+          abort();  // other types are handled by the bunch processor
+      }
+      num_commands = 0;
+    }
+  }
+
+  close(pipe_lru_[0]);
+  LogCvmfs(kLogLru, kLogDebug, "stopping cache manager thread");
+  ProcessCommandBunch(num_commands, command_buffer, path_buffer);
+  return NULL;
+}
+
 
 
 static void *MainTouch(void *data __attribute__((unused))) {
@@ -153,7 +429,7 @@ static void *MainInsert(void *data __attribute__((unused))) {
     /* cleanup, move to trash and unlink when unlocked */
     if (gauge + size > limit) {
       LogCvmfs(kLogLru, kLogDebug, "over limit, gauge %lu, file size %lu", gauge, size);
-      if (!CleanupUnprotected(cleanup_threshold)) {
+      if (!DoCleanup(cleanup_threshold)) {
         pthread_mutex_unlock(&mutex);
         continue;
       }
@@ -243,7 +519,7 @@ init_recover:
   "ALTER TABLE cache_catalog ADD pinned INTEGER";
   err = sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
   if (err == SQLITE_OK) {
-    sql = "UPDATE cache_catalog SET type=" + FTYPESTR_REG + ";";
+    sql = "UPDATE cache_catalog SET type=" + StringifyInt(kFileRegular) + ";";
     err = sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
     if (err != SQLITE_OK) {
       LogCvmfs(kLogLru, kLogDebug, "could not init cache database (failed: %s)", sql.c_str());
@@ -324,13 +600,13 @@ init_recover:
   sqlite3_prepare_v2(db, "SELECT sha1, size FROM cache_catalog WHERE acseq=(SELECT min(acseq) FROM cache_catalog WHERE pinned=0);",
                      -1, &stmt_lru, NULL);
   sqlite3_prepare_v2(db,
-                     ("SELECT path FROM cache_catalog WHERE type=" + FTYPESTR_REG + ";").c_str(),
+                     ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileRegular) + ";").c_str(),
                      -1, &stmt_list, NULL);
   sqlite3_prepare_v2(db,
                      "SELECT path FROM cache_catalog WHERE pinned=1;",
                      -1, &stmt_list_pinned, NULL);
   sqlite3_prepare_v2(db,
-                     ("SELECT path FROM cache_catalog WHERE type=" + FTYPESTR_CLG + ";").c_str(),
+                     ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) + ";").c_str(),
                      -1, &stmt_list_catalogs, NULL);
 
   if ((pipe(pipe_touch) != 0) || (pipe(pipe_insert) != 0)) {
@@ -541,69 +817,6 @@ build_return:
 
 
 /**
- * See cleanup().
- */
-bool CleanupUnprotected(const uint64_t leave_size) {
-  if ((limit == 0) || (gauge <= leave_size))
-    return true;
-
-  LogCvmfs(kLogLru, kLogSyslog,
-           "cleanup cache until %lu KB are free", leave_size/1024);
-
-  bool result;
-  string sha1;
-
-  do {
-    sqlite3_reset(stmt_lru);
-    if (sqlite3_step(stmt_lru) != SQLITE_ROW) {
-      LogCvmfs(kLogLru, kLogDebug, "could not get lru-entry");
-      break;
-    }
-
-    // TODO
-    sha1 = string((char *)sqlite3_column_text(stmt_lru, 0));
-
-    //trash.push(cache_dir + "/" + sha1.substr(0, 2) + "/" +
-    //   sha1.substr(sha1.length() - (hash::t_sha1::CHAR_SIZE - 2)));
-    unlink((cache_dir + "/" + sha1.substr(0, 2) + "/" +
-            sha1.substr(2)).c_str());
-    gauge -= sqlite3_column_int64(stmt_lru, 1);
-    LogCvmfs(kLogLru, kLogDebug, "lru cleanup %s", sha1.c_str());
-
-    sqlite3_bind_text(stmt_rm, 1, sha1.c_str(), sha1.length(), SQLITE_STATIC);
-    result = (sqlite3_step(stmt_rm) == SQLITE_DONE);
-    sqlite3_reset(stmt_rm);
-
-    if (!result) {
-      LogCvmfs(kLogLru, kLogDebug, "could not remove lru-entry");
-      return false;
-    }
-  } while (gauge > leave_size);
-
-  /* Double fork avoids zombie */
-  /*if (!trash.empty()) {
-   pid_t pid;
-   int statloc;
-   if ((pid = fork()) == 0) {
-   if (fork() == 0) {
-   while (!trash.empty()) {
-   pmesg(D_LRU, "unlink %s", trash.top().c_str());
-   unlink(trash.top().c_str());
-   trash.pop();
-   }
-   exit(0);
-   }
-   exit(0);
-   } else {
-   if (pid > 0) waitpid(pid, &statloc, 0);
-   else return false;
-   }
-   }*/
-
-  return gauge <= leave_size;
-}
-
-/**
  * Cleans up in data cache, until cache size is below leave_size.  The actual unlinking
  * is done in a separate process (fork).
  *
@@ -613,7 +826,7 @@ bool Cleanup(const uint64_t leave_size) {
   bool result;
 
   pthread_mutex_lock(&mutex);
-  result = CleanupUnprotected(leave_size);
+  result = DoCleanup(leave_size);
   pthread_mutex_unlock(&mutex);
 
   return result;
@@ -694,7 +907,7 @@ bool Pin(const hash::Any &any_hash, const uint64_t size,
   /* cleanup, move to trash and unlink when unlocked */
   if (!exists && (gauge + size > limit)) {
     LogCvmfs(kLogLru, kLogDebug, "over limit, gauge %lu, file size %lu", gauge, size);
-    if (!CleanupUnprotected(cleanup_threshold)) {
+    if (!DoCleanup(cleanup_threshold)) {
       pthread_mutex_unlock(&mutex);
       return false;
     }
@@ -880,29 +1093,30 @@ string GetMemoryUsage() {
   if (limit == 0)
     return "LRU not active\n";
 
-  ostringstream result;
+  string result("LRU:\n");
   int current = 0;
   int highwater = 0;
 
   pthread_mutex_lock(&mutex);
 
-  result << "LRU:" << endl;
-
-  sqlite3_db_status(db, SQLITE_DBSTATUS_LOOKASIDE_USED, &current, &highwater, 0);
-  result << "  Number of lookaside slots used " << current << " / " << highwater << endl;
+  sqlite3_db_status(db, SQLITE_DBSTATUS_LOOKASIDE_USED,
+                    &current, &highwater, 0);
+  result += "  Number of lookaside slots used " + StringifyInt(current) +
+            " / " + StringifyInt(highwater) + "\n";
 
   sqlite3_db_status(db, SQLITE_DBSTATUS_CACHE_USED, &current, &highwater, 0);
-  result << "  Page cache used " << current/1024 << " KB" << endl;
+  result += "  Page cache used " + StringifyInt(current/1024) + " KB\n";
 
   sqlite3_db_status(db, SQLITE_DBSTATUS_SCHEMA_USED, &current, &highwater, 0);
-  result << "  Schema memory used " << current/1024 << " KB" << endl;
+  result += "  Schema memory used " + StringifyInt(current/1024) + " KB\n";
 
   sqlite3_db_status(db, SQLITE_DBSTATUS_STMT_USED, &current, &highwater, 0);
-  result << "  Prepared statements memory used " << current/1024 << " KB" << endl;
+  result += "  Prepared statements memory used " + StringifyInt(current/1024) +
+            " KB\n";
 
   pthread_mutex_unlock(&mutex);
 
-  return result.str();
+  return result;
 }
 
 }  // namespace lru

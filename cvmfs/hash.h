@@ -34,6 +34,7 @@ enum Algorithms {
  * digest sizes.
  */
 const unsigned kDigestSizes[] = {16, 20, 20};
+const unsigned kMaxDigestSize = 20;
 
 
 /**

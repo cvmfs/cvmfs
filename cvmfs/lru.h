@@ -3,7 +3,7 @@
  */
 
 #ifndef CVMFS_LRU_H_
-#define CVMFS_LRU_H_ 1
+#define CVMFS_LRU_H_
 
 #include <stdint.h>
 
@@ -23,7 +23,6 @@ void Fini();
 
 bool BuildDatabase();
 bool Cleanup(const uint64_t leave_size);
-bool CleanupUnprotected(const uint64_t leave_size);
 
 bool Insert(const hash::Any &hash, const uint64_t size,
             const std::string &cmvfs_path);
