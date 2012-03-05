@@ -805,6 +805,10 @@ void Fini() {
 bool Cleanup(const uint64_t leave_size) {
   bool result;
 
+  if (!running_) {
+    return DoCleanup(leave_size);
+  }
+
   int pipe_cleanup[2];
   MakePipe(pipe_cleanup);
 
