@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <cassert>
 
 #include <string>
 #include <map>
@@ -66,6 +67,33 @@ string GetFileName(const string &path) {
     return path.substr(idx+1);
   else
     return path;
+}
+
+
+/**
+ * Creating a pipe should always succeed.
+ */
+void MakePipe(int pipe_fd[2]) {
+  int retval = pipe(pipe_fd);
+  assert(retval == 0);
+}
+
+
+/**
+ * Writes to a pipe should always succeed.
+ */
+void WritePipe(int fd, const void *buf, size_t nbyte) {
+  int num_bytes = write(fd, buf, nbyte);
+  assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+}
+
+
+/**
+ * Reads from a pipe should always succeed.
+ */
+void ReadPipe(int fd, void *buf, size_t nbyte) {
+  int num_bytes = read(fd, buf, nbyte);
+  assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
 }
 
 

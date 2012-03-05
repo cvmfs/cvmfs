@@ -278,9 +278,7 @@ void Fini() {
  * Fork watchdog.
  */
 void Spawn() {
-  int retval;
-  retval = pipe(pipe_wd_);
-  assert(retval == 0);
+  MakePipe(pipe_wd_);
 
   pid_t pid;
   int statloc;

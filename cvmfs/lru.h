@@ -17,14 +17,14 @@ namespace hash {
 namespace lru {
 
 bool Init(const std::string &cache_dir, const uint64_t limit,
-          const uint64_t limit_threshold, const bool build_database);
+          const uint64_t limit_threshold, const bool rebuild_database);
 void Spawn();
 void Fini();
 
-bool BuildDatabase();
+  bool RebuildDatabase();
 bool Cleanup(const uint64_t leave_size);
 
-bool Insert(const hash::Any &hash, const uint64_t size,
+void Insert(const hash::Any &hash, const uint64_t size,
             const std::string &cmvfs_path);
 bool Pin(const hash::Any &hash, const uint64_t size,
          const std::string &path_on_cvmfs);

@@ -1604,7 +1604,7 @@ int main(int argc, char *argv[]) {
   }
   if (!lru::Init(".", (uint64_t)cvmfs_opts.quota_limit,
                  (uint64_t)cvmfs_opts.quota_threshold,
-                 cvmfs_opts.rebuild_cachedb)) {
+                  cvmfs_opts.rebuild_cachedb)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize lru cache");
     goto cvmfs_cleanup;
   }
@@ -1613,7 +1613,7 @@ int main(int argc, char *argv[]) {
   if (cvmfs_opts.rebuild_cachedb) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: rebuilding lru cache database...");
-    if (!lru::BuildDatabase()) {
+    if (!lru::RebuildDatabase()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to rebuild lru cache database");
       goto cvmfs_cleanup;
     }

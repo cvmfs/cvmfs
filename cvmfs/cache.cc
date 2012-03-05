@@ -316,11 +316,7 @@ int CommitTransaction(const string &final_path,
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(temp_path.c_str());
   } else {
-    if (!lru::Insert(hash, size, cvmfs_path)) {
-      LogCvmfs(kLogCache, kLogDebug, "insert into lru failed");
-      unlink(final_path.c_str());
-      result = -1;
-    }
+    lru::Insert(hash, size, cvmfs_path);
   }
 
   return result;

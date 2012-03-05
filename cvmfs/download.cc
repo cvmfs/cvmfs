@@ -675,18 +675,14 @@ Failures Fetch(JobInfo *info) {
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
-    int retval;
     if (info->wait_at[0] == -1) {
-      retval = pipe(info->wait_at);
-      assert(retval == 0);
+      MakePipe(info->wait_at);
     }
 
     //LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
     //         info->wait_at[0], info->wait_at[1]);
-    retval = write(pipe_jobs_[1], &info, sizeof(info));
-    assert(retval == sizeof(info));
-    retval = read(info->wait_at[0], &result, sizeof(result));
-    assert(retval == sizeof(result));
+    WritePipe(pipe_jobs_[1], &info, sizeof(info));
+    ReadPipe(info->wait_at[0], &result, sizeof(result));
     //LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     CURL *handle = AcquireCurlHandle();
@@ -786,7 +782,6 @@ static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
 }
 
 
-
 /**
  * Worker thread event loop. Waits on new JobInfo structs on a pipe.
  */
@@ -834,8 +829,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
     if (watch_fds_[1].revents) {
       watch_fds_[1].revents = 0;
       JobInfo *info;
-      retval = read(pipe_jobs_[0], &info, sizeof(info));
-      assert(retval == sizeof(info));
+      ReadPipe(pipe_jobs_[0], &info, sizeof(info));
       //LogCvmfs(kLogDownload, kLogDebug, "IO thread, got job: url %s, compressed %d, nocache %d, destination %d, file %p, expected hash %p, wait at %d", info->url->c_str(), info->compressed, info->nocache,
       //         info->destination, info->destination_file, info->expected_hash, info->wait_at[1]);
 
@@ -888,9 +882,8 @@ static void *MainDownload(void *data __attribute__((unused))) {
           // Return easy handle into pool and write result back
           ReleaseCurlHandle(easy_handle);
 
-          int written = write(info->wait_at[1], &info->error_code,
-                              sizeof(info->error_code));
-          assert(written == sizeof(info->error_code));
+          WritePipe(info->wait_at[1], &info->error_code,
+                    sizeof(info->error_code));
         }
       }
     }
@@ -963,8 +956,7 @@ void Fini() {
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
     char buf = 'T';
-    int retval = write(pipe_terminate_[1], &buf, 1);
-    assert(retval == 1);
+    WritePipe(pipe_terminate_[1], &buf, 1);
     pthread_join(thread_download_, NULL);
     // All handles are removed from the multi stack
     close(pipe_terminate_[1]);
@@ -1003,12 +995,10 @@ void Fini() {
  * No way back except Fini(); Init();
  */
 void Spawn() {
-  int retval = pipe(pipe_terminate_);
-  assert(retval == 0);
-  retval = pipe(pipe_jobs_);
-  assert(retval == 0);
+  MakePipe(pipe_terminate_);
+  MakePipe(pipe_jobs_);
 
-  retval = pthread_create(&thread_download_, NULL, MainDownload, NULL);
+  int retval = pthread_create(&thread_download_, NULL, MainDownload, NULL);
   assert(retval == 0);
 
   atomic_inc32(&multi_threaded_);
