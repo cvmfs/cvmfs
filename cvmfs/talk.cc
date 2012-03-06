@@ -149,7 +149,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
             Answer(con_fd, "Usage: clear file <path>\n");
           } else {
             const string path = line.substr(11);
-            int retval = cvmfs::clear_file(path);
+            int retval = cvmfs::ClearFile(path);
             switch (retval) {
               case 0:
                 Answer(con_fd, "OK\n");
@@ -169,7 +169,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           }
         }
       } else if (line == "mountpoint") {
-        Answer(con_fd, cvmfs::mountpoint + "\n");
+        Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {
         // TODO: implement this!!
         int result = -1;
@@ -198,12 +198,11 @@ static void *MainTalk(void *data __attribute__((unused))) {
        revision_str << revision;
        Answer(con_fd, revision_str.str() + "\n"); */
       } else if (line == "max ttl info") {
-        const unsigned max_ttl = cvmfs::get_max_ttl();
+        const unsigned max_ttl = cvmfs::GetMaxTtl();
         if (max_ttl == 0) {
           Answer(con_fd, "unset\n");
         } else {
-          const string max_ttl_str = StringifyInt(cvmfs::get_max_ttl()) +
-                                     " minutes\n";
+          const string max_ttl_str = StringifyInt(max_ttl) + " minutes\n";
           Answer(con_fd, max_ttl_str);
         }
       } else if (line.substr(0, 11) == "max ttl set") {
@@ -211,7 +210,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "Usage: max ttl set <minutes>\n");
         } else {
           const unsigned max_ttl = String2Uint64(line.substr(12));
-          cvmfs::set_max_ttl(max_ttl);
+          cvmfs::SetMaxTtl(max_ttl);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "host info") {
@@ -391,7 +390,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
        } else if (line == "catalog tree") {
        Answer(con_fd, catalog_tree::show_tree()); */
       } else if (line == "pid") {
-        const string pid_str = StringifyInt(cvmfs::pid) + "\n";
+        const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "version") {
         Answer(con_fd, string(VERSION) + "\n");
@@ -443,9 +442,6 @@ bool Init(const string &cachedir) {
       {
         return false;
       }
-      LogCvmfs(kLogTalk, kLogSyslog,
-               "There was already a cvmfs_io file in cache directory.  "
-               "Did we have a crash shutdown?");
     } else {
       return false;
     }

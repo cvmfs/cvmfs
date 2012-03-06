@@ -1,6 +1,5 @@
 /**
- * \file lru_cache.h
- * \namespace cvmfs
+ * This file is part of the CernVM File System.
  *
  * This class provides an Least Recently Used (LRU) cache for arbitrary data
  * It stores Key-Value pairs of arbitrary data types in a fast hash which automatically
@@ -28,9 +27,6 @@
  *
  *   // maintaining the cache
  *   cache.drop();     // empty the cache
- *
- * Developed by René Meusel 2011 at CERN
- * rene@renemeusel.de
  */
 
 #ifndef LRU_CACHE_H
