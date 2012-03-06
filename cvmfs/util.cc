@@ -196,9 +196,9 @@ FILE *CreateTempFile(const string &path_prefix, const int mode,
 }
 
 
-string StringifyInt(const int value) {
+string StringifyInt(const int64_t value) {
   char buffer[48];
-  snprintf(buffer, sizeof(buffer), "%d", value);
+  snprintf(buffer, sizeof(buffer), "%"PRId64, value);
   return string(buffer);
 }
 
@@ -232,6 +232,25 @@ string StringifyTimeval(const timeval value) {
   snprintf(buffer, sizeof(buffer), "%"PRId64".%03d",
            msec, static_cast<int>(value.tv_usec % 1000));
   return string(buffer);
+}
+
+
+int64_t String2Int64(const string &value) {
+  int64_t result;
+  sscanf(value.c_str(), "%"PRId64, &result);
+  return result;
+}
+
+
+uint64_t String2Uint64(const string &value) {
+  uint64_t result;
+  sscanf(value.c_str(), "%"PRIu64, &result);
+  return result;
+}
+
+
+void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
+  sscanf(value.c_str(), "%"PRIu64" %"PRIu64, a, b);
 }
 
 

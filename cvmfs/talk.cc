@@ -28,7 +28,6 @@
 #include <cstdlib>
 
 #include <string>
-#include <sstream>
 #include <vector>
 
 #include "platform.h"
@@ -44,164 +43,152 @@ using namespace std;  // NOLINT
 
 namespace talk {
 
-string cachedir;  /**< Stores the cache directory from cvmfs.
-                       Pipe files will be created here. */
-string socket_path; /**< $cache_dir/cvmfs_io */
-int socket_fd;
-pthread_t thread_cvmfs_talk;
-bool spawned = false;
+const unsigned kMaxCommandSize = 512;
 
-static void answer(const int con_fd, const string &msg) {
-  LogCvmfs(kLogTalk, kLogDebug, "message length: %d", msg.length());
+string *cachedir_ = NULL;  /**< Stores the cache directory from cvmfs.
+                                Pipe files will be created here. */
+string *socket_path_ = NULL;  /**< $cache_dir/cvmfs_io */
+int socket_fd_;
+pthread_t thread_talk_;
+bool spawned_;
 
+
+static void Answer(const int con_fd, const string &msg) {
   (void)send(con_fd, &msg[0], msg.length(), MSG_NOSIGNAL);
 }
 
-static void *tf_talk(void *data __attribute__((unused))) {
+
+static void AnswerStringList(const int con_fd, const vector<string> &list) {
+  string list_str;
+  for (unsigned i = 0; i < list.size(); ++i) {
+    list_str += list[i] + "\n";
+  }
+  Answer(con_fd, list_str);
+}
+
+
+static void *MainTalk(void *data __attribute__((unused))) {
   LogCvmfs(kLogTalk, kLogDebug, "talk thread started");
 
   struct sockaddr_un remote;
-  socklen_t s = sizeof(remote);
+  socklen_t socket_size = sizeof(remote);
   int con_fd = -1;
   while (true) {
     if (con_fd > 0) {
       shutdown(con_fd, SHUT_RDWR);
       close(con_fd);
     }
-    if ((con_fd = accept(socket_fd, (struct sockaddr *)&remote, &s)) < 0) {
+    if ((con_fd = accept(socket_fd_, (struct sockaddr *)&remote, &socket_size))
+         < 0)
+    {
       break;
     }
 
-    char buf[256];
-    if (recv(con_fd, buf, 256, 0) > 0) {
+    char buf[kMaxCommandSize];
+    if (recv(con_fd, buf, sizeof(buf), 0) > 0) {
       const string line = string(buf);
-      //pmesg(D_TALK, "received command %s", line.c_str());
 
       if (line == "flush") {
         tracer::Flush();
-        answer(con_fd, "OK\n");
-      }
-      else if (line == "cache size") {
-        if (lru::GetCapacity() == 0)
-          answer(con_fd, "Cache is unmanaged\n");
-        else {
-          ostringstream size;
+        Answer(con_fd, "OK\n");
+      } else if (line == "cache size") {
+        if (lru::GetCapacity() == 0) {
+          Answer(con_fd, "Cache is unmanaged\n");
+        } else {
           uint64_t size_unpinned = lru::GetSize();
           uint64_t size_pinned = lru::GetSizePinned();
-          size << "Current cache size is " << size_unpinned / (1024*1024) << "MB ("
-          << size_unpinned << " Bytes), "
-          << "pinned: " << size_pinned / (1024*1024) << "MB ("
-          << size_pinned << " Bytes)" <<  endl;
-          answer(con_fd, size.str());
+          const string size_str = "Current cache size is " +
+            StringifyInt(size_unpinned / (1024*1024)) + "MB (" +
+            StringifyInt(size_unpinned) + " Bytes),pinned: " +
+            StringifyInt(size_pinned / (1024*1024)) + "MB (" +
+            StringifyInt(size_pinned) + " Bytes)\n";
+          Answer(con_fd, size_str);
         }
-      }
-      else if (line == "cache list") {
-        if (lru::GetCapacity() == 0)
-          answer(con_fd, "Cache is unmanaged\n");
-        else {
-          vector<string> ls = lru::List();
-          string ls_result;
-          for (unsigned i = 0; i < ls.size(); ++i) {
-            ls_result += ls[i] + "\n";
-          }
-          answer(con_fd, ls_result);
-        }
-      }
-      else if (line == "cache list pinned") {
-        if (lru::GetCapacity() == 0)
-          answer(con_fd, "Cache is unmanaged\n");
-        else {
-          vector<string> ls = lru::ListPinned();
-          string ls_result;
-          for (unsigned i = 0; i < ls.size(); ++i) {
-            ls_result += ls[i] + "\n";
-          }
-          answer(con_fd, ls_result);
-        }
-      }
-      else if (line == "cache list catalogs") {
-        if (lru::GetCapacity() == 0)
-          answer(con_fd, "Cache is unmanaged\n");
-        else {
-          vector<string> ls = lru::ListCatalogs();
-          string ls_result;
-          for (unsigned i = 0; i < ls.size(); ++i) {
-            ls_result += ls[i] + "\n";
-          }
-          answer(con_fd, ls_result);
-        }
-      }
-      else if (line.substr(0, 7) == "cleanup") {
+      } else if (line == "cache list") {
         if (lru::GetCapacity() == 0) {
-          answer(con_fd, "Cache is unmanaged\n");
+          Answer(con_fd, "Cache is unmanaged\n");
+        } else {
+          vector<string> ls = lru::List();
+          AnswerStringList(con_fd, ls);
+        }
+      } else if (line == "cache list pinned") {
+        if (lru::GetCapacity() == 0) {
+          Answer(con_fd, "Cache is unmanaged\n");
+        } else {
+          vector<string> ls_pinned = lru::ListPinned();
+          AnswerStringList(con_fd, ls_pinned);
+        }
+      } else if (line == "cache list catalogs") {
+        if (lru::GetCapacity() == 0) {
+          Answer(con_fd, "Cache is unmanaged\n");
+        } else {
+          vector<string> ls_catalogs = lru::ListCatalogs();
+          AnswerStringList(con_fd, ls_catalogs);
+        }
+      } else if (line.substr(0, 7) == "cleanup") {
+        if (lru::GetCapacity() == 0) {
+          Answer(con_fd, "Cache is unmanaged\n");
         } else {
           if (line.length() < 9) {
-            answer(con_fd, "Usage: cleanup <MB>\n");
+            Answer(con_fd, "Usage: cleanup <MB>\n");
           } else {
-            istringstream ssize(line.substr(8));
-            uint64_t size;
-            ssize >> size;
-            size *= 1024*1024;
+            const uint64_t size = String2Uint64(line.substr(8))*1024*1024;
             if (lru::Cleanup(size)) {
-              answer(con_fd, "OK\n");
+              Answer(con_fd, "OK\n");
             } else {
-              answer(con_fd, "Not fully cleaned (there might be pinned chunks)\n");
+              Answer(con_fd, "Not fully cleaned "
+                     "(there might be pinned chunks)\n");
             }
           }
         }
-      }
-      else if (line.substr(0, 10) == "clear file") {
+      } else if (line.substr(0, 10) == "clear file") {
         if (lru::GetCapacity() == 0) {
-          answer(con_fd, "Cache is unmanaged\n");
+          Answer(con_fd, "Cache is unmanaged\n");
         } else {
           if (line.length() < 12) {
-            answer(con_fd, "Usage: clear file <path>\n");
+            Answer(con_fd, "Usage: clear file <path>\n");
           } else {
-            istringstream spath(line.substr(11));
-            string path;
-            spath >> path;
-            int result = cvmfs::clear_file(path);
-            switch (result) {
+            const string path = line.substr(11);
+            int retval = cvmfs::clear_file(path);
+            switch (retval) {
               case 0:
-                answer(con_fd, "OK\n");
+                Answer(con_fd, "OK\n");
                 break;
               case -ENOENT:
-                answer(con_fd, "No such file\n");
+                Answer(con_fd, "No such file\n");
                 break;
               case -EINVAL:
-                answer(con_fd, "Not a regular file\n");
+                Answer(con_fd, "Not a regular file\n");
                 break;
               default:
-                ostringstream err_unknown;
-                err_unknown << "Unknown error (" << result << ")" << endl;
-                answer(con_fd, err_unknown.str());
+                const string error_str = "Unknown error (" +
+                                         StringifyInt(retval) + ")\n";
+                Answer(con_fd, error_str);
                 break;
             }
           }
         }
-      }
-      else if (line == "mountpoint") {
-        answer(con_fd, cvmfs::mountpoint + "\n");
-      }
-      else if (line == "remount") {
+      } else if (line == "mountpoint") {
+        Answer(con_fd, cvmfs::mountpoint + "\n");
+      } else if (line == "remount") {
         // TODO: implement this!!
         int result = -1;
         //               int result = cvmfs::remount()
         if (result < 0) {
-          answer(con_fd, "Failed\n");
-        } else if (result == 0) {
-          answer(con_fd, "Catalog up to date\n");
+          Answer(con_fd, "Failed\n");
+        }/* else if (result == 0) {
+          Answer(con_fd, "Catalog up to date\n");
         } else if (result == 2) {
-          answer(con_fd, "Already draining out caches\n");
+          Answer(con_fd, "Already draining out caches\n");
         } else {
           ostringstream str_max_cache_timeout;
           str_max_cache_timeout << "Remounting, draining out kernel caches for "
           << cvmfs::max_cache_timeout
           << " seconds..." << endl;
-          answer(con_fd, str_max_cache_timeout.str());
+          Answer(con_fd, str_max_cache_timeout.str());
           sleep(cvmfs::max_cache_timeout);
         }
-      }
+      } */
       // TODO
       /*else if (line == "revision") {
        catalog::lock();
@@ -209,132 +196,118 @@ static void *tf_talk(void *data __attribute__((unused))) {
        catalog::unlock();
        ostringstream revision_str;
        revision_str << revision;
-       answer(con_fd, revision_str.str() + "\n");
-       }*/
-      else if (line == "max ttl info") {
+       Answer(con_fd, revision_str.str() + "\n"); */
+      } else if (line == "max ttl info") {
         const unsigned max_ttl = cvmfs::get_max_ttl();
         if (max_ttl == 0) {
-          answer(con_fd, "unset\n");
+          Answer(con_fd, "unset\n");
         } else {
-          ostringstream max_ttl_str;
-          max_ttl_str << cvmfs::get_max_ttl() << " minutes";
-          answer(con_fd, max_ttl_str.str() + "\n");
+          const string max_ttl_str = StringifyInt(cvmfs::get_max_ttl()) +
+                                     " minutes\n";
+          Answer(con_fd, max_ttl_str);
         }
-      }
-      else if (line.substr(0, 11) == "max ttl set") {
+      } else if (line.substr(0, 11) == "max ttl set") {
         if (line.length() < 13) {
-          answer(con_fd, "Usage: max ttl set <minutes>\n");
+          Answer(con_fd, "Usage: max ttl set <minutes>\n");
         } else {
-          istringstream smaxttl(line.substr(12));
-          unsigned max_ttl;
-          smaxttl >> max_ttl;
+          const unsigned max_ttl = String2Uint64(line.substr(12));
           cvmfs::set_max_ttl(max_ttl);
-          answer(con_fd, "OK\n");
+          Answer(con_fd, "OK\n");
         }
-      }
-      else if (line == "host info") {
+      } else if (line == "host info") {
         vector<string> host_chain;
         vector<int> rtt;
         unsigned active_host;
 
         download::GetHostInfo(&host_chain, &rtt, &active_host);
-        ostringstream info;
+        string host_str;
         for (unsigned i = 0; i < host_chain.size(); ++i) {
-          info << "  [" << i << "]" << " " << host_chain[i] << " (";
-          if (rtt[i] == -1) info << "unprobed";
-          else if (rtt[i] == -2) info << "host down";
-          else info << rtt[i] << " ms";
-          info << ")" << endl;
+          host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
+          if (rtt[i] == -1)
+            host_str += "unprobed";
+          else if (rtt[i] == -2)
+            host_str += "host down";
+          else
+            host_str += StringifyInt(rtt[i]) + " ms";
+          host_str += ")\n";
         }
-        info << "Active host " << active_host << ": "
-        << host_chain[active_host] << endl;
-        answer(con_fd, info.str());
-      }
-      else if (line == "host probe") {
+        host_str += "Active host " + StringifyInt(active_host) + ": " +
+                    host_chain[active_host] + "\n";
+        Answer(con_fd, host_str);
+      } else if (line == "host probe") {
         download::ProbeHosts();
-        answer(con_fd, "OK\n");
-      }
-      else if (line == "host switch") {
+        Answer(con_fd, "OK\n");
+      } else if (line == "host switch") {
         download::SwitchHost();
-        answer(con_fd, "OK\n");
-      }
-      else if (line.substr(0, 8) == "host set") {
+        Answer(con_fd, "OK\n");
+      } else if (line.substr(0, 8) == "host set") {
         if (line.length() < 10) {
-          answer(con_fd, "Usage: host set <host list>\n");
+          Answer(con_fd, "Usage: host set <host list>\n");
         } else {
-          istringstream shosts(line.substr(9));
-          string hosts;
-          shosts >> hosts;
+          const string hosts = line.substr(9);
           download::SetHostChain(hosts);
-          answer(con_fd, "OK\n");
+          Answer(con_fd, "OK\n");
         }
-      }
-      else if (line == "proxy info") {
+      } else if (line == "proxy info") {
         vector< vector<string> > proxy_chain;
         unsigned active_group;
         download::GetProxyInfo(&proxy_chain, &active_group);
 
-        ostringstream info;
+        string proxy_str;
         if (proxy_chain.size()) {
-          info << "Load-balance groups:" << endl;
+          proxy_str += "Load-balance groups:\n";
           for (unsigned i = 0; i < proxy_chain.size(); ++i) {
-            info << "[" << i << "] " << JoinStrings(proxy_chain[i], ", ")
-            << endl;
+            proxy_str += "[" + StringifyInt(i) + "] " +
+                         JoinStrings(proxy_chain[i], ", ") + "\n";
           }
-          info << "Active proxy: [" << active_group << "] "
-          << proxy_chain[active_group][0] << endl;
+          proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] " +
+                       proxy_chain[active_group][0] + "\n";
         } else {
-          info << "No proxies defined\n";
+          proxy_str = "No proxies defined\n";
         }
 
-        answer(con_fd, info.str());
-      }
-      else if (line == "proxy rebalance") {
+        Answer(con_fd, proxy_str);
+      } else if (line == "proxy rebalance") {
         download::RebalanceProxies();
-        answer(con_fd, "OK\n");
-      }
-      else if (line == "proxy group switch") {
+        Answer(con_fd, "OK\n");
+      } else if (line == "proxy group switch") {
         download::SwitchProxyGroup();
-        answer(con_fd, "OK\n");
-      }
-      else if (line.substr(0, 9) == "proxy set") {
+        Answer(con_fd, "OK\n");
+      } else if (line.substr(0, 9) == "proxy set") {
         if (line.length() < 11) {
-          answer(con_fd, "Usage: proxy set <proxy list>\n");
+          Answer(con_fd, "Usage: proxy set <proxy list>\n");
         } else {
-          istringstream sproxies(line.substr(10));
-          string proxies;
-          sproxies >> proxies;
+          const string proxies = line.substr(10);
           download::SetProxyChain(proxies);
-          answer(con_fd, "OK\n");
+          Answer(con_fd, "OK\n");
         }
-      }
-      else if (line == "timeout info") {
+      } else if (line == "timeout info") {
         unsigned timeout;
         unsigned timeout_direct;
         download::GetTimeout(&timeout, &timeout_direct);
-        ostringstream info;
-        info << "Timeout with proxy: ";
-        if (timeout) info << timeout << "s\n";
-        else info << "no timeout\n";
-        info << "Timeout without proxy: ";
-        if (timeout_direct) info << timeout_direct << "s\n";
-        else info << "no timeout\n";
-        answer(con_fd, info.str());
-      }
-      else if (line.substr(0, 11) == "timeout set") {
+        string timeout_str =  "Timeout with proxy: ";
+        if (timeout)
+          timeout_str += StringifyInt(timeout) + "s\n";
+        else
+          timeout_str += "no timeout\n";
+        timeout_str += "Timeout without proxy: ";
+        if (timeout_direct)
+          timeout_str += StringifyInt(timeout_direct) + "s\n";
+        else
+          timeout_str += "no timeout\n";
+        Answer(con_fd, timeout_str);
+      } else if (line.substr(0, 11) == "timeout set") {
         if (line.length() < 13) {
-          answer(con_fd, "Usage: timeout set <proxy> <direct>\n");
+          Answer(con_fd, "Usage: timeout set <proxy> <direct>\n");
         } else {
-          istringstream stimeouts(line.substr(12));
-          unsigned timeout;
-          stimeouts >> timeout;
-          unsigned timeout_direct = timeout;
-          stimeouts >> timeout_direct;
+          uint64_t timeout;
+          uint64_t timeout_direct;
+          String2Uint64Pair(line.substr(12), &timeout, &timeout_direct);
           download::SetTimeout(timeout, timeout_direct);
-          answer(con_fd, "OK\n");
+          Answer(con_fd, "OK\n");
         }
-      }
-      /*  TODO  else if (line == "open catalogs") {
+      /*}
+        TODO  else if (line == "open catalogs") {
        vector<string> prefix;
        vector<time_t> last_modified, expires;
        vector<unsigned int> inode_offsets;
@@ -348,7 +321,7 @@ static void *tf_talk(void *data __attribute__((unused))) {
        result += "\n";
        }
 
-       answer(con_fd, result);
+       Answer(con_fd, result);
        TODO
        } else if (line == "sqlite memory") {
        ostringstream result;
@@ -413,23 +386,19 @@ static void *tf_talk(void *data __attribute__((unused))) {
        lru::unlock();
        catalog::unlock();
 
-       answer(con_fd, result.str());
+       Answer(con_fd, result.str());
        }
        } else if (line == "catalog tree") {
-       answer(con_fd, catalog_tree::show_tree());
-       }*/
-      else if (line == "pid") {
-        ostringstream spid;
-        spid << cvmfs::pid << endl;
-        answer(con_fd, spid.str());
-      }
-      else if (line == "version") {
-        answer(con_fd, string(VERSION) + "\n");
-      }
-      else if (line == "version patchlevel") {
-        answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
+       Answer(con_fd, catalog_tree::show_tree()); */
+      } else if (line == "pid") {
+        const string pid_str = StringifyInt(cvmfs::pid) + "\n";
+        Answer(con_fd, pid_str);
+      } else if (line == "version") {
+        Answer(con_fd, string(VERSION) + "\n");
+      } else if (line == "version patchlevel") {
+        Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
       } else {
-        answer(con_fd, "What?\n");
+        Answer(con_fd, "What?\n");
       }
     }
   }
@@ -442,32 +411,34 @@ static void *tf_talk(void *data __attribute__((unused))) {
  * Init the socket.
  */
 bool Init(const string &cachedir) {
-  talk::cachedir = cachedir;
+  spawned_ = false;
+  cachedir_ = new string(cachedir);
 
   struct sockaddr_un sock_addr;
-  socket_path = cachedir + "/cvmfs_io";
-  if (socket_path.length() >= sizeof(sock_addr.sun_path))
+  socket_path_ = new string(cachedir + "/cvmfs_io");
+  if (socket_path_->length() >= sizeof(sock_addr.sun_path))
     return false;
 
-  if ((socket_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+  if ((socket_fd_ = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
     return false;
 
 #ifndef __APPLE__
   // fchmod on a socket is not allowed under Mac OS X
   // using default here... (0770 in this case)
-  if (fchmod(socket_fd, 0660) != 0)
+  if (fchmod(socket_fd_, 0660) != 0)
     return false;
 #endif
 
   sock_addr.sun_family = AF_UNIX;
-  strncpy(sock_addr.sun_path, socket_path.c_str(), sizeof(sock_addr.sun_path));
+  strncpy(sock_addr.sun_path, socket_path_->c_str(),
+          sizeof(sock_addr.sun_path));
 
-  if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+  if (bind(socket_fd_, (struct sockaddr *)&sock_addr,
            sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
-    if ((errno == EADDRINUSE) && (unlink(socket_path.c_str()) == 0)) {
-      /* second try, perhaps the file was left over */
-      if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+    if ((errno == EADDRINUSE) && (unlink(socket_path_->c_str()) == 0)) {
+      // Second try, perhaps the file was left over
+      if (bind(socket_fd_, (struct sockaddr *)&sock_addr,
                sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
       {
         return false;
@@ -480,10 +451,10 @@ bool Init(const string &cachedir) {
     }
   }
 
-  if (listen(socket_fd, 1) < -1)
+  if (listen(socket_fd_, 1) < -1)
     return false;
 
-  LogCvmfs(kLogTalk, kLogDebug, "socket created at %s", socket_path.c_str());
+  LogCvmfs(kLogTalk, kLogDebug, "socket created at %s", socket_path_->c_str());
 
   return true;
 }
@@ -494,9 +465,9 @@ bool Init(const string &cachedir) {
  */
 void Spawn() {
   int result;
-  result = pthread_create(&thread_cvmfs_talk, NULL, tf_talk, NULL);
-  assert((result == 0) && "talk thread creation failed");
-  spawned = true;
+  result = pthread_create(&thread_talk_, NULL, MainTalk, NULL);
+  assert(result == 0);
+  spawned_ = true;
 }
 
 
@@ -505,16 +476,21 @@ void Spawn() {
  */
 void Fini() {
   int result;
-  result = unlink(socket_path.c_str());
+  result = unlink(socket_path_->c_str());
   if (result != 0) {
     LogCvmfs(kLogTalk, kLogSyslog,
              "Could not remove cvmfs_io socket from cache directory.");
   }
 
-  shutdown(socket_fd, SHUT_RDWR);
-  close(socket_fd);
-  if (spawned) pthread_join(thread_cvmfs_talk, NULL);
+  delete cachedir_;
+  delete socket_path_;
+  cachedir_ = NULL;
+  socket_path_ = NULL;
+
+  shutdown(socket_fd_, SHUT_RDWR);
+  close(socket_fd_);
+  if (spawned_) pthread_join(thread_talk_, NULL);
   LogCvmfs(kLogTalk, kLogDebug, "talk thread stopped");
 }
 
-}
+}  // namespace talk

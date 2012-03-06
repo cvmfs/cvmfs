@@ -9,9 +9,9 @@
 
 namespace talk {
 
-   bool Init(const std::string &cachedir);
-   void Spawn();
-   void Fini();
+bool Init(const std::string &cachedir);
+void Spawn();
+void Fini();
 
 }  // namespace talk
 

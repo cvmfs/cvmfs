@@ -38,9 +38,12 @@ bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
 
-std::string StringifyInt(const int value);
+std::string StringifyInt(const int64_t value);
 std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
+int64_t String2Int64(const std::string &value);
+uint64_t String2Uint64(const std::string &value);
+void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
 

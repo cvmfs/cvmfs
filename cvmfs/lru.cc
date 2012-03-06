@@ -88,7 +88,7 @@ const unsigned kMaxCvmfsPath = 512-sizeof(LruCommand);
 
 pthread_t thread_lru_;
 int pipe_lru_[2];
-bool running_;
+bool spawned_;
 set<hash::Any> *pinned_chunks_ = NULL;
 
 uint64_t limit_;  /**< If the cache grows above this size,
@@ -584,7 +584,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   string sql;
   sqlite3_stmt *stmt;
 
-  running_ = false;
+  spawned_ = false;
 
   limit_ = limit;
   pinned_ = 0;
@@ -752,7 +752,7 @@ void Spawn() {
     abort();
   }
 
-  running_ = true;
+  spawned_ = true;
 }
 
 
@@ -760,7 +760,7 @@ void Spawn() {
  * Cleanup, closes SQLite connections.
  */
 void Fini() {
-  if (running_) {
+  if (spawned_) {
     char fin = 0;
     WritePipe(pipe_lru_[1], &fin, 1);
     close(pipe_lru_[1]);
@@ -805,7 +805,7 @@ void Fini() {
 bool Cleanup(const uint64_t leave_size) {
   bool result;
 
-  if (!running_) {
+  if (!spawned_) {
     return DoCleanup(leave_size);
   }
 
@@ -875,7 +875,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
            hash_str.c_str(), cvmfs_path.c_str());
 
   // Has to run when not spawned yet
-  if (!running_) {
+  if (!spawned_) {
     // Currently code duplication here, not sure there is a more elegant way
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
       if ((cleanup_threshold_ > 0) && (pinned_ + size > cleanup_threshold_)) {
@@ -1041,7 +1041,7 @@ static void GetStatus(uint64_t *gauge, uint64_t *pinned) {
 
 
 uint64_t GetSize() {
-  if (!running_) return gauge_;
+  if (!spawned_) return gauge_;
 
   uint64_t gauge, size_pinned;
   GetStatus(&gauge, &size_pinned);
@@ -1050,7 +1050,7 @@ uint64_t GetSize() {
 
 
 uint64_t GetSizePinned() {
-  if (!running_) return pinned_;
+  if (!spawned_) return pinned_;
 
   uint64_t gauge, size_pinned;
   GetStatus(&gauge, &size_pinned);
