@@ -27,7 +27,6 @@ set (CVMFS2_DEBUG_SOURCES
 	cvmfs.h cvmfs.cc
 
 	catalog_queries.h           catalog_queries.cc
-	thread_safe.h
 	Catalog.h                   Catalog.cc
 	AbstractCatalogManager.h    AbstractCatalogManager.cc
 	RemoteCatalogManager.h      RemoteCatalogManager.cc
@@ -60,7 +59,6 @@ set (CVMFS_SYNC_BIN_SOURCES
 
 
 	catalog_queries.h           catalog_queries.cc
-	thread_safe.h
 
 	Catalog.h                   Catalog.cc
 	WritableCatalog.h           WritableCatalog.cc
@@ -312,7 +310,7 @@ if (BUILD_CVMFS)
 	)
 
 	install (
-		FILES			cvmfs-talk cvmfs_config
+		FILES			cvmfs_talk cvmfs_config
 		DESTINATION		bin
 		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 	)

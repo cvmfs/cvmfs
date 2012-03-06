@@ -1027,7 +1027,7 @@ namespace cvmfs {
       tracer::InitNull();
 
     lru::Spawn();
-    talk::spawn();
+    talk::Spawn();
 
     download::Spawn();
 
@@ -1668,7 +1668,7 @@ int main(int argc, char *argv[]) {
   }
   catalog_ready = true;
 
-  if (!talk::init(".")) {
+  if (!talk::Init(".")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize talk socket (%d)",
              errno);
     goto cvmfs_cleanup;
@@ -1727,7 +1727,7 @@ int main(int argc, char *argv[]) {
 
 
  cvmfs_cleanup:
-  if (talk_ready) talk::fini();
+  if (talk_ready) talk::Fini();
   if (quota_ready) lru::Fini();
   if (signature_ready) signature::Fini();
   if (cache_ready) cache::Fini();

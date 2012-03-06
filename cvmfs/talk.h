@@ -1,16 +1,18 @@
-#ifndef CVMFS_TALK_H
-#define CVMFS_TALK_H 1
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef CVMFS_TALK_H_
+#define CVMFS_TALK_H_
 
 #include <string>
-#include "tracer.h"
 
 namespace talk {
 
-   bool init(std::string cachedir);
-   void spawn();
-   void fini();
+   bool Init(const std::string &cachedir);
+   void Spawn();
+   void Fini();
 
-}
+}  // namespace talk
 
-#endif
-
+#endif  // CVMFS_TALK_H_
