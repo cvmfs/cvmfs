@@ -19,9 +19,9 @@ extern int max_cache_timeout_;
 
 int ClearFile(const std::string &path);
 int Remount();
-unsigned GetMaxTtl(); // in minutes
-void SetMaxTtl(const unsigned value); // in minutes
+unsigned GetMaxTtl();  // in minutes
+void SetMaxTtl(const unsigned value);  // in minutes
 
 }  // namespace cvmfs
 
-#endif // CVMFS_CVMFS_H_
+#endif  // CVMFS_CVMFS_H_

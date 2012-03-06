@@ -9,6 +9,7 @@
 #include "download.h"
 #include "compression.h"
 #include "logging.h"
+#include "quota.h"
 #include "hash.h"
 
 using namespace std;
@@ -76,33 +77,33 @@ namespace cvmfs {
                (root_url_ + url_path).c_str());
     }
 
-    /* LRU handling, could still fail due to cache size restrictions */
+    /* Quota handling, could still fail due to cache size restrictions */
     if (((result == 0) && !cached_copy) ||
         ((existing_cat_id < 0) && ((result == 0) || cached_copy)))
     {
       platform_stat64 info;
       if (platform_stat(catalog_file->c_str(), &info) != 0) {
         /* should never happen */
-        lru::Remove(sha1_cat);
+        quota::Remove(sha1_cat);
         cached_copy = false;
         result = -EIO;
         LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
                  "catalog access failure for %s", catalog_file->c_str());
       } else {
-        if (((uint64_t)info.st_size > lru::GetMaxFileSize()) ||
-            (!lru::Pin(sha1_cat, info.st_size, root_url_ + url_path)))
+        if (((uint64_t)info.st_size > quota::GetMaxFileSize()) ||
+            (!quota::Pin(sha1_cat, info.st_size, root_url_ + url_path)))
         {
           LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
                    "catalog load failure for %s (no space)",
                    catalog_file->c_str());
-          lru::Remove(sha1_cat);
+          quota::Remove(sha1_cat);
           unlink(catalog_file->c_str());
           cached_copy = false;
           result = -ENOSPC;
         } else {
           /* From now on we have to go with the new catalog */
           if (!sha1_old.IsNull() && (sha1_old != sha1_cat)) {
-            lru::Remove(sha1_old);
+            quota::Remove(sha1_old);
             unlink(old_file.c_str());
           }
         }

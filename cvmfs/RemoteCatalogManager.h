@@ -13,7 +13,6 @@
 #include "AbstractCatalogManager.h"
 
 #include "atomic.h"
-#include "lru.h"
 
 namespace cvmfs {
 

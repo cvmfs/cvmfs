@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_LRU_H_
-#define CVMFS_LRU_H_
+#ifndef CVMFS_QUOTA_H_
+#define CVMFS_QUOTA_H_
 
 #include <stdint.h>
 
@@ -14,7 +14,7 @@ namespace hash {
   struct Any;
 }
 
-namespace lru {
+namespace quota {
 
 bool Init(const std::string &cache_dir, const uint64_t limit,
           const uint64_t limit_threshold, const bool rebuild_database);
@@ -40,6 +40,6 @@ uint64_t GetSize();
 uint64_t GetSizePinned();
 std::string GetMemoryUsage();
 
-}  // namespace lru
+}  // namespace quota
 
-#endif  // CVMFS_LRU_H_
+#endif  // CVMFS_QUOTA_H_

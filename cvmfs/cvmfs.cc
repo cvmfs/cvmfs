@@ -66,7 +66,7 @@
 #include "talk.h"
 #include "monitor.h"
 #include "signature.h"
-#include "lru.h"
+#include "quota.h"
 #include "util.h"
 #include "atomic.h"
 #include "fuse_op_stubs.h"
@@ -715,7 +715,7 @@ int ClearFile(const string &path) {
    if ((!(d.flags & catalog::FILE)) || (d.flags & catalog::FILE_LINK)) {
    result = -EINVAL;
    } else {
-   lru::remove(d.checksum);
+   quota::remove(d.checksum);
    result = 0;
    }
    } else {
@@ -738,17 +738,17 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   memset(&info, 0, sizeof(info));
 
   /* Unmanaged cache */
-  if (lru::GetCapacity() == 0) {
+  if (quota::GetCapacity() == 0) {
     fuse_reply_statfs(req, &info);
     return;
   }
 
   uint64_t available = 0;
-  uint64_t size = lru::GetSize();
+  uint64_t size = quota::GetSize();
 
   info.f_bsize = 1;
 
-  if (lru::GetCapacity() == (uint64_t)(-1)) {
+  if (quota::GetCapacity() == (uint64_t)(-1)) {
     /* Unrestricted cache, look at free space on cache dir fs */
     struct statfs cache_buf;
     if (statfs(".", &cache_buf) == 0) {
@@ -759,8 +759,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
     }
   } else {
     /* Take values from LRU module */
-    info.f_blocks = lru::GetCapacity();
-    available = lru::GetCapacity() - size;
+    info.f_blocks = quota::GetCapacity();
+    available = quota::GetCapacity() - size;
   }
 
   info.f_bfree = info.f_bavail = available;
@@ -814,7 +814,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       if (fd < 0) {
         message << "Not in cache";
       } else {
-        hash::Any hash(hash::kSha1); // TODO
+        hash::Any hash(hash::kSha1);  // TODO
         FILE *f = fdopen(fd, "r");
         if (not f) {
           fuse_reply_err(req, EIO);
@@ -997,7 +997,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   pid_ = getpid();
   monitor::Spawn();
   download::Spawn();
-  lru::Spawn();
+  quota::Spawn();
   talk::Spawn();
 
   if (*tracefile_ != "")
@@ -1204,9 +1204,9 @@ static void usage(const char *progname) {
       2, 2);
 
   // Print the help from FUSE
-  //const char *args[] = {progname, "-h"};
-  //static struct fuse_operations op;
-  //fuse_main(2, (char**)args, &op);
+  // const char *args[] = {progname, "-h"};
+  // static struct fuse_operations op;
+  // fuse_main(2, (char**)args, &op);
 }
 
 
@@ -1563,7 +1563,7 @@ int main(int argc, char *argv[]) {
     gCvmfsOpts.quota_limit *= 1024*1024;
     gCvmfsOpts.quota_threshold *= 1024*1024;
   }
-  if (!lru::Init(".", (uint64_t)gCvmfsOpts.quota_limit,
+  if (!quota::Init(".", (uint64_t)gCvmfsOpts.quota_limit,
                  (uint64_t)gCvmfsOpts.quota_threshold,
                  gCvmfsOpts.rebuild_cachedb)) {
     PrintError("Failed to initialize lru cache");
@@ -1574,14 +1574,14 @@ int main(int argc, char *argv[]) {
   if (gCvmfsOpts.rebuild_cachedb) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: rebuilding lru cache database...");
-    if (!lru::RebuildDatabase()) {
+    if (!quota::RebuildDatabase()) {
       PrintError("Failed to rebuild lru cache database");
       goto cvmfs_cleanup;
     }
   }
-  if (lru::GetSize() > lru::GetCapacity()) {
+  if (quota::GetSize() > quota::GetCapacity()) {
     PrintWarning("your cache is already beyond quota size, cleaning up");
-    if (!lru::Cleanup(gCvmfsOpts.quota_threshold)) {
+    if (!quota::Cleanup(gCvmfsOpts.quota_threshold)) {
       PrintWarning("Failed to clean up");
       goto cvmfs_cleanup;
     }
@@ -1589,7 +1589,7 @@ int main(int argc, char *argv[]) {
   if (gCvmfsOpts.quota_limit) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: quota initialized, current size %luMB",
-             lru::GetSize()/(1024*1024));
+             quota::GetSize()/(1024*1024));
   }
 
   // Monitor, check for maximum number of open files
@@ -1688,7 +1688,7 @@ int main(int argc, char *argv[]) {
   if (download_ready) download::Fini();
   if (talk_ready) talk::Fini();
   if (monitor_ready) monitor::Fini();
-  if (quota_ready) lru::Fini();
+  if (quota_ready) quota::Fini();
   if (cache_ready) cache::Fini();
   if (running_created) unlink("running");
   if (fd_lockfile >= 0) {

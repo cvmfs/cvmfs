@@ -16,7 +16,7 @@
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
-#include "lru.h"
+#include "quota.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -45,7 +45,7 @@
 
 using namespace std;  // NOLINT
 
-namespace lru {
+namespace quota {
 
 /**
  * Loaded catalogs are pinned in the LRU and have to be treated differently.

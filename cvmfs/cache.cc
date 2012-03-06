@@ -43,7 +43,7 @@
 
 #include "platform.h"
 #include "DirectoryEntry.h"
-#include "lru.h"
+#include "quota.h"
 #include "util.h"
 #include "hash.h"
 #include "logging.h"
@@ -316,7 +316,7 @@ int CommitTransaction(const string &final_path,
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(temp_path.c_str());
   } else {
-    lru::Insert(hash, size, cvmfs_path);
+    quota::Insert(hash, size, cvmfs_path);
   }
 
   return result;
@@ -378,14 +378,14 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
 
-  if (d.size() > lru::GetMaxFileSize()) {
+  if (d.size() > quota::GetMaxFileSize()) {
     LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache");
     return -ENOSPC;
   }
 
   // Try to open from local cache
   if ((fd_return = cache::Open(d.checksum_)) >= 0) {
-    lru::Touch(d.checksum_);
+    quota::Touch(d.checksum_);
     return fd_return;
   }
 
@@ -423,7 +423,7 @@ int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
     fd_return = cache::Open(d.checksum_);
     if (fd_return >= 0) {
       pthread_mutex_unlock(&lock_queues_download_);
-      lru::Touch(d.checksum_);
+      quota::Touch(d.checksum_);
       return fd_return;
     }
 

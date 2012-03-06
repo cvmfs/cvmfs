@@ -32,7 +32,7 @@
 
 #include "platform.h"
 #include "tracer.h"
-#include "lru.h"
+#include "quota.h"
 #include "cvmfs.h"
 #include "util.h"
 #include "logging.h"
@@ -92,11 +92,11 @@ static void *MainTalk(void *data __attribute__((unused))) {
         tracer::Flush();
         Answer(con_fd, "OK\n");
       } else if (line == "cache size") {
-        if (lru::GetCapacity() == 0) {
+        if (quota::GetCapacity() == 0) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          uint64_t size_unpinned = lru::GetSize();
-          uint64_t size_pinned = lru::GetSizePinned();
+          uint64_t size_unpinned = quota::GetSize();
+          uint64_t size_pinned = quota::GetSizePinned();
           const string size_str = "Current cache size is " +
             StringifyInt(size_unpinned / (1024*1024)) + "MB (" +
             StringifyInt(size_unpinned) + " Bytes),pinned: " +
@@ -105,35 +105,35 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, size_str);
         }
       } else if (line == "cache list") {
-        if (lru::GetCapacity() == 0) {
+        if (quota::GetCapacity() == 0) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls = lru::List();
+          vector<string> ls = quota::List();
           AnswerStringList(con_fd, ls);
         }
       } else if (line == "cache list pinned") {
-        if (lru::GetCapacity() == 0) {
+        if (quota::GetCapacity() == 0) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls_pinned = lru::ListPinned();
+          vector<string> ls_pinned = quota::ListPinned();
           AnswerStringList(con_fd, ls_pinned);
         }
       } else if (line == "cache list catalogs") {
-        if (lru::GetCapacity() == 0) {
+        if (quota::GetCapacity() == 0) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls_catalogs = lru::ListCatalogs();
+          vector<string> ls_catalogs = quota::ListCatalogs();
           AnswerStringList(con_fd, ls_catalogs);
         }
       } else if (line.substr(0, 7) == "cleanup") {
-        if (lru::GetCapacity() == 0) {
+        if (quota::GetCapacity() == 0) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
           if (line.length() < 9) {
             Answer(con_fd, "Usage: cleanup <MB>\n");
           } else {
             const uint64_t size = String2Uint64(line.substr(8))*1024*1024;
-            if (lru::Cleanup(size)) {
+            if (quota::Cleanup(size)) {
               Answer(con_fd, "OK\n");
             } else {
               Answer(con_fd, "Not fully cleaned "
@@ -142,7 +142,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           }
         }
       } else if (line.substr(0, 10) == "clear file") {
-        if (lru::GetCapacity() == 0) {
+        if (quota::GetCapacity() == 0) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
           if (line.length() < 12) {
@@ -338,7 +338,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
        int cert_misses = 0;
 
        catalog::lock();
-       lru::lock();
+       quota::lock();
 
        result << "File catalog memcache " << cvmfs::catalog_cache_memusage_bytes()/1024 << " KB" << endl;
        cvmfs::catalog_cache_memusage_slots(&pcache, &ncache, &acache,
@@ -380,9 +380,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
        result << "Largest scratch allocation " << highwater/1024 << " KB" << endl;
 
        result << catalog::get_db_memory_usage();
-       result << lru::get_memory_usage();
+       result << quota::get_memory_usage();
 
-       lru::unlock();
+       quota::unlock();
        catalog::unlock();
 
        Answer(con_fd, result.str());

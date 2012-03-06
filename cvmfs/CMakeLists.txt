@@ -10,7 +10,7 @@ set (CVMFS2_DEBUG_SOURCES
 	sqlite3-duplex.h
 	curl_duplex.h fuse-duplex.h
 	signature.h signature.cc
-	lru.h lru.cc
+	quota.h quota.cc
 	hash.h hash.cc
 	cache.h cache.cc
 	talk.h talk.cc
