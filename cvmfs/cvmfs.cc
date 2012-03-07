@@ -51,10 +51,9 @@
 #include <cstdio>
 
 #include <string>
-#include <sstream>
-#include <fstream>
 #include <vector>
 #include <map>
+#include <algorithm>
 
 #include "platform.h"
 #include "fuse-duplex.h"
@@ -99,11 +98,21 @@ static struct {
   int delay;
 } previous_io_error_;
 
+/**
+ * For cvmfs_opendir / cvmfs_readdir
+ */
+struct DirectoryListing {
+  char *buffer;  /**< Filled by fuse_add_direntry */
+  size_t size;
+  size_t capacity;
+
+  DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
+};
+
 string *mountpoint_ = NULL;
 string *root_url_ = NULL;
 string *cachedir_ = NULL;
 string *tracefile_ = NULL;
-string *blacklist_ = NULL;  /**< blacklist for compromised certificates */
 string *repository_name_ = NULL;  /**< Expected repository name,
                                        e.g. atlas.cern.ch */
 uid_t uid_ = 0;  /**< will be set to uid of launching user. */
@@ -116,6 +125,10 @@ RemoteCatalogManager *catalog_manager_;
 InodeCache *inode_cache_ = NULL;
 PathCache *path_cache_ = NULL;
 Md5PathCache *md5path_cache_ = NULL;
+
+map<uint64_t, DirectoryListing> *directory_handles_ = NULL;
+pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
+uint64_t next_directory_handle_ = 0;
 
 atomic_int64 num_open_;
 atomic_int64 num_download_;
@@ -134,102 +147,39 @@ unsigned GetMaxTtl() {
   return current_max;
 }
 
+
 void SetMaxTtl(const unsigned value) {
   pthread_mutex_lock(&lock_max_ttl_);
   max_ttl_ = value*60;
   pthread_mutex_unlock(&lock_max_ttl_);
 }
 
-/**
- * Carefully invalidate memory cache
- */
-static void invalidate_cache(const int catalog_id) {
-  if (path_cache_ != NULL && inode_cache_ != NULL && catalog_id >= 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "dropping caches for catalog: %d",
-             catalog_id);
 
-    // int minInode = catalog::get_inode_offset_for_catalog_id(catalog_id)+1;
-    // int maxInode = minInode + catalog::get_num_dirent(catalog_id);
-    //
-    // for (int i = minInode; i < maxInode; ++i) {
-    //    path_cache_->forget(i);
-    //    inode_cache_->forget(i);
-    // }
-
-    path_cache_->drop();
-    inode_cache_->drop();
-    md5path_cache_->drop();
-  }
-}
-
-
-/**
- * Don't call without catalog::lock()
- */
-int catalog_cache_memusage_bytes() {
-  int result = 0;
-  /*for (int i = 0; i < CATALOG_CACHE_SIZE; ++i) {
-   result += sizeof(catalog_cacheline);
-   result += catalog_cache[i].d.name.capacity();
-   result += catalog_cache[i].d.symlink.capacity();
-   }*/
-  return result;
-}
-
-void catalog_cache_memusage_slots(int *positive, int *negative, int *all,
-                                  int *inserts, int *replaces, int *cleans,
-                                  int *hits, int *misses,
-                                  int *cert_hits, int *cert_misses) {
-  /* *positive = *negative = 0;
-   *all = CATALOG_CACHE_SIZE;
-   hash::t_md5 null;
-   for (int i = 0; i < CATALOG_CACHE_SIZE; ++i) {
-   if (!(catalog_cache[i].md5 == null)) {
-   if (catalog_cache[i].d.catalog_id == -1)
-   (*negative)++;
-   else
-   (*positive)++;
-   }
-   }
-   *inserts = atomic_read32(&cache_inserts);
-   *replaces = atomic_read32(&cache_replaces);
-   *cleans = atomic_read32(&cache_cleans);
-   *hits = atomic_read32(&cache_hits);
-   *misses = atomic_read32(&cache_misses);
-
-   *cert_hits = atomic_read32(&certificate_hits);
-   *cert_misses = atomic_read32(&certificate_misses);*/
-}
-
-static bool get_dirent_for_inode(const fuse_ino_t ino,
-                                 DirectoryEntry *dirent) {
-  // check the inode cache for speed up
+static bool GetDirentForInode(const fuse_ino_t ino, DirectoryEntry *dirent) {
+  // Lookup inode in cache
   if (inode_cache_->lookup(ino, dirent)) {
     LogCvmfs(kLogInodeCache, kLogDebug, "HIT %d -> '%s'",
              ino, dirent->name().c_str());
     return true;
-
   } else {
     LogCvmfs(kLogInodeCache, kLogDebug, "MISS %d --> lookup in catalogs",
              ino);
 
-    // lookup inode in catalog
+    // Lookup inode in catalog
     if (catalog_manager_->Lookup(ino, dirent)) {
       LogCvmfs(kLogInodeCache, kLogDebug, "CATALOG HIT %d -> '%s'",
                dirent->inode(), dirent->name().c_str());
       inode_cache_->insert(ino, *dirent);
       return true;
-
     } else {
       LogCvmfs(kLogInodeCache, kLogDebug,
                "no entry --> maybe data corruption?");
       return false;
     }
   }
-
-  // should be unreachable... just to be sure
-  return false;
+  return false;  // unreachable
 }
+
 
 static bool get_dirent_for_path(const string &path, DirectoryEntry *dirent) {
   /*
@@ -281,38 +231,34 @@ static bool get_dirent_for_path(const string &path, DirectoryEntry *dirent) {
   return false;
 }
 
-static bool get_path_for_inode(const fuse_ino_t ino, string *path) {
-  // check the path cache first
+static bool GetPathForInode(const fuse_ino_t ino, string *path) {
+  // Check the path cache first
   if (path_cache_->lookup(ino, path)) {
     LogCvmfs(kLogPathCache, kLogDebug, "HIT %d -> '%s'", ino, path->c_str());
-    return true;  // this was easy!
+    return true;
   }
 
   LogCvmfs(kLogPathCache, kLogDebug, "MISS %d - recursively building path",
            ino);
 
-  // now we need to find out the parent path recursively and
-  // rebuild the absolute path
-  string parentPath;
+  // Find out the parent path recursively and rebuild the absolute path
+  string parent_path;
   DirectoryEntry dirent;
 
-  // get the dirent information of the searched inode
-  if (not get_dirent_for_inode(ino, &dirent)) {
+  if (!GetDirentForInode(ino, &dirent)) {
     return false;
   }
 
-  // check if we reached the root node
+  // Check if we reached the root node
   if (dirent.inode() == catalog_manager_->GetRootInode()) {
-    // encountered root... finished
     *path = "";
-
   } else {
-    // retrieve the parent path recursively
-    if (not get_path_for_inode(dirent.parent_inode(), &parentPath)) {
+    // Retrieve the parent path recursively
+    if (!GetPathForInode(dirent.parent_inode(), &parent_path)) {
       return false;
     }
 
-    *path = parentPath + "/" + dirent.name();
+    *path = parent_path + "/" + dirent.name();
   }
 
   path_cache_->insert(dirent.inode(), *path);
@@ -321,39 +267,38 @@ static bool get_path_for_inode(const fuse_ino_t ino, string *path) {
 
 
 /**
- * Do a lookup to find out the inode number of a file name
+ * Find the inode number of a file name in a directory given by inode.
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
-                         const char *name) {
+                         const char *name)
+{
   parent = catalog_manager_->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
-  string parentPath;
+  string parent_path;
 
-  if (not get_path_for_inode(parent, &parentPath)) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "no path for inode found... data corrupt?");
+  if (!GetPathForInode(parent, &parent_path)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
 
     fuse_reply_err(req, ENOENT);
     return;
   }
 
   DirectoryEntry dirent;
-  string path = parentPath + "/" + name;
-  bool found_entry = catalog_manager_->LookupWithoutParent(path, &dirent);
-  if (not found_entry) {
+  const string path = parent_path + "/" + name;
+  // TODO: getdirent for path?
+  const bool found_entry = catalog_manager_->LookupWithoutParent(path, &dirent);
+  if (!found_entry) {
     fuse_reply_err(req, ENOENT);
     return;
   }
 
   dirent.set_parent_inode(parent);
 
-  // maintain caches
   inode_cache_->insert(dirent.inode(), dirent);
   path_cache_->insert(dirent.inode(), path);
 
-  // reply
   struct fuse_entry_param result;
   memset(&result, 0, sizeof(result));
   result.ino = dirent.inode();
@@ -364,10 +309,11 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   fuse_reply_entry(req, &result);
 }
 
+
 /**
  * Gets called as kind of prerequisit to every operation.
  * We do two kinds of magic here: check catalog TTL (and reload, if necessary)
- * and load nested catalogs. Nested catalogs may also be loaded on readdir.
+ * and load nested catalogs.  Nested catalogs may also be loaded on readdir.
  *
  * Also, we insert things in our d-cache here.  It is not sufficient to do
  * all the inserts here, even though stat will be called before anything else;
@@ -377,21 +323,20 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %d", ino);
-  bool found;
+
   DirectoryEntry dirent;
+  const bool found = GetDirentForInode(ino, &dirent);
 
-  found = get_dirent_for_inode(ino, &dirent);
-
-  if (not found) {
+  if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
   }
 
-  /* The actual getattr-work */
   struct stat info = dirent.GetStatStructure();
 
   fuse_reply_attr(req, &info, 1.0);  // TODO(rene): replace magic number
 }
+
 
 /**
  * Reads a symlink from the catalog.  Environment variables are expanded.
@@ -400,51 +345,217 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
   tracer::Trace(tracer::kFuseReadlink, "no path provided", "readlink() call");
-  bool found;
+
   DirectoryEntry dirent;
+  const bool found = GetDirentForInode(ino, &dirent);
 
-  found = get_dirent_for_inode(ino, &dirent);
-
-  if (not found) {
+  if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
   }
 
-  if (not dirent.IsLink()) {
-    fuse_reply_err(req, ENOENT);
+  if (!dirent.IsLink()) {
+    fuse_reply_err(req, EINVAL);
     return;
   }
 
-  fuse_reply_readlink(req, dirent.symlink().c_str());
+  fuse_reply_readlink(req, dirent.ExpandSymlink().c_str());
 }
+
+
+static void AddToDirListing(const fuse_req_t req,
+                            const char *name, const struct stat *stat_info,
+                            struct DirectoryListing *listing)
+{
+  size_t remaining_size = listing->capacity - listing->size;
+  const size_t entry_size = fuse_add_direntry(req, NULL, 0, name, stat_info, 0);
+
+  while (entry_size > remaining_size) {
+    listing->capacity = listing->capacity ? 2*listing->capacity : 512;
+    listing->buffer =
+      reinterpret_cast<char *>(srealloc(listing->buffer, listing->capacity));
+    remaining_size = listing->capacity - listing->size;
+  }
+  fuse_add_direntry(req, listing->buffer + listing->size,
+                    remaining_size, name, stat_info,
+                    listing->size + entry_size);
+  listing->size += entry_size;
+}
+
+
+/**
+ * Open a directory for listing
+ */
+static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
+                          struct fuse_file_info *fi) {
+  ino = catalog_manager_->MangleInode(ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
+
+  string path;
+  DirectoryEntry d;
+  const bool found = GetPathForInode(ino, &path) && GetDirentForInode(ino, &d);
+
+  if (!found) {
+    fuse_reply_err(req, ENOENT);
+    return;
+  }
+
+  if (!d.IsDirectory()) {
+    fuse_reply_err(req, ENOTDIR);
+    return;
+  }
+
+  // Build listing
+  DirectoryListing listing;
+
+  // Add current directory link
+  struct stat info;
+  info = d.GetStatStructure();
+  AddToDirListing(req, ".", &info, &listing);
+
+  // Add parent directory link
+  DirectoryEntry p;
+  if (d.inode() != catalog_manager_->GetRootInode() &&
+      GetDirentForInode(d.parent_inode(), &p)) {
+    info = p.GetStatStructure();
+    AddToDirListing(req, "..", &info, &listing);
+  }
+
+  // Add all names
+  DirectoryEntryList listing_from_catalog;
+  if (!catalog_manager_->Listing(path, &listing_from_catalog)) {
+    free(listing.buffer);
+    fuse_reply_err(req, EIO);
+    return;
+  }
+  for (DirectoryEntryList::const_iterator i = listing_from_catalog.begin(),
+       iEnd = listing_from_catalog.end(); i != iEnd; ++i)
+  {
+    info = i->GetStatStructure();
+    AddToDirListing(req, i->name().c_str(), &info, &listing);
+  }
+
+  // Save the directory listing and return a handle to the listing
+  pthread_mutex_lock(&lock_directory_handles_);
+  (*directory_handles_)[next_directory_handle_] = listing;
+  fi->fh = next_directory_handle_;
+  ++next_directory_handle_;
+  pthread_mutex_unlock(&lock_directory_handles_);
+
+  fuse_reply_open(req, fi);
+}
+
+
+/**
+ * Release a directory.
+ */
+static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
+                             struct fuse_file_info *fi) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode: %d",
+           catalog_manager_->MangleInode(ino));
+
+  int reply = 0;
+
+  pthread_mutex_lock(&lock_directory_handles_);
+  map<uint64_t, DirectoryListing>::iterator iter_handle =
+    directory_handles_->find(fi->fh);
+  if (iter_handle != directory_handles_->end()) {
+    free(iter_handle->second.buffer);
+    directory_handles_->erase(iter_handle);
+    reply = 0;
+  } else {
+    reply = EINVAL;
+  }
+  pthread_mutex_unlock(&lock_directory_handles_);
+
+  fuse_reply_err(req, reply);
+}
+
+
+/**
+ * Very large directory listings have to be sent in slices.
+ */
+static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
+                             const size_t buffer_size, const off_t offset,
+                             const size_t max_size)
+{
+  if (offset < static_cast<int>(buffer_size)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "DATA Reply");
+    fuse_reply_buf(req, buffer + offset,
+                   std::min(buffer_size - offset, max_size));
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug, "NULL Reply");
+    fuse_reply_buf(req, NULL, 0);
+  }
+}
+
+
+/**
+ * Read the directory listing
+ */
+static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+                          off_t off, struct fuse_file_info *fi)
+{
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "cvmfs_readdir on inode %d reading %d bytes from offset %d",
+           catalog_manager_->MangleInode(ino), size, off);
+
+  DirectoryListing listing;
+
+  pthread_mutex_lock(&lock_directory_handles_);
+  map<uint64_t, DirectoryListing>::const_iterator iter_handle =
+    directory_handles_->find(fi->fh);
+  if (iter_handle != directory_handles_->end()) {
+    listing = iter_handle->second;
+    pthread_mutex_unlock(&lock_directory_handles_);
+
+    ReplyBufferSlice(req, listing.buffer, listing.size, off, size);
+    return;
+  }
+
+  pthread_mutex_unlock(&lock_directory_handles_);
+  fuse_reply_err(req, EINVAL);
+}
+
 
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
- * Also catalog reload magic can happen, if file download fails.
  *
  * \return Read-only file descriptor in fi->fh
  */
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
-                       struct fuse_file_info *fi) {
+                       struct fuse_file_info *fi)
+{
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
   tracer::Trace(tracer::kFuseOpen, "no path provided", "open() call");
 
   int fd = -1;
-
   DirectoryEntry d;
   string path;
-  bool found;
 
-  found = get_dirent_for_inode(ino, &d) && get_path_for_inode(ino, &path);
+  const bool found = GetDirentForInode(ino, &d) && GetPathForInode(ino, &path);
 
-  if (not found) {
-    fuse_reply_err(req, ENOENT);
+  if (!found) {
+    if (fi->flags & O_CREAT)
+      fuse_reply_err(req, EROFS);
+    else
+      fuse_reply_err(req, ENOENT);
     return;
   }
 
   if ((fi->flags & 3) != O_RDONLY) {
-    fuse_reply_err(req, EACCES);
+    fuse_reply_err(req, EROFS);
+    return;
+  }
+#ifdef __APPLE__
+  if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
+    fuse_reply_err(req, EOPNOTSUPP);
+    return;
+  }
+#endif
+  if (fi->flags & O_EXCL) {
+    fuse_reply_err(req, EEXIST);
     return;
   }
 
@@ -491,22 +602,24 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   fuse_reply_err(req, EIO);
 }
 
+
 /**
  * Redirected to pread into cache.
  */
 static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
-                       struct fuse_file_info *fi) {
+                       struct fuse_file_info *fi)
+{
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_read on inode: %d reading %d bytes from offset %d fd %d",
            catalog_manager_->MangleInode(ino), size, off, fi->fh);
-  tracer::Trace(tracer::kFuseRead, "path", "read() call");
+  tracer::Trace(tracer::kFuseRead, "no path provided", "read() call");
 
-  // get data chunk
+  // Get data chunk (<=4k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
   const int64_t fd = fi->fh;
   int result = pread(fd, data, size, off);
 
-  // push it to user
+  // Push it to user
   if (result >= 0) {
     fuse_reply_buf(req, data, result);
     LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", result);
@@ -518,10 +631,11 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
 
 /**
- * File close operation. Redirected into cache.
+ * File close operation, redirected into cache.
  */
 static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
-                          struct fuse_file_info *fi) {
+                          struct fuse_file_info *fi)
+{
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d",
            catalog_manager_->MangleInode(ino));
 
@@ -531,154 +645,6 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   fuse_reply_err(req, 0);
 }
 
-struct dirListingBuffer {
-  char *p;
-  size_t size;
-};
-
-std::map<unsigned int, dirListingBuffer> open_dir_listings;
-unsigned int current_dir_listing_handle = 0;
-pthread_mutex_t open_dir_listings_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-#define min(x, y) ((x) < (y) ? (x) : (y))
-
-static int replyBufferLimited(fuse_req_t req, const char *buf, size_t bufsize,
-                              off_t off, size_t maxsize) {
-  if (off < static_cast<int>(bufsize)) {
-    return fuse_reply_buf(req, buf + off, min(bufsize - off, maxsize));
-  } else {
-    return fuse_reply_buf(req, NULL, 0);
-  }
-}
-
-static void addToDirListingBuffer(fuse_req_t req, struct dirListingBuffer *b,
-                                  const char *name, struct stat *s) {
-  size_t oldsize = b->size;
-  b->size += fuse_add_direntry(req, NULL, 0, name, NULL, 0);
-  /* TODO: move logic to smalloc */
-  char *newp = static_cast<char *>(realloc(b->p, b->size));
-  if (!newp) {
-    fprintf(stderr, "*** fatal error: cannot allocate memory\n");
-    abort();
-  }
-  b->p = newp;
-  fuse_add_direntry(req, b->p + oldsize, b->size - oldsize, name, s, b->size);
-}
-
-/**
- * Open a directory for listing
- */
-static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
-                          struct fuse_file_info *fi) {
-  ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
-
-  string path;
-  DirectoryEntry d;
-  bool found;
-
-  found = get_path_for_inode(ino, &path) && get_dirent_for_inode(ino, &d);
-
-  if (not found) {
-    fuse_reply_err(req, ENOENT);
-    return;
-  }
-
-  if (!d.IsDirectory()) {
-    fuse_reply_err(req, ENOTDIR);
-    return;
-  }
-
-  // build dir listing
-  struct dirListingBuffer b;
-  memset(&b, 0, sizeof(b));
-
-  // add current directory link
-  struct stat info;
-  memset(&info, 0, sizeof(info));
-  info = d.GetStatStructure();
-  addToDirListingBuffer(req, &b, ".", &info);
-
-  // add parent directory link
-  DirectoryEntry p;
-  if (d.inode() != catalog_manager_->GetRootInode() &&
-      get_dirent_for_inode(d.parent_inode(), &p)) {
-    info = p.GetStatStructure();
-    addToDirListingBuffer(req, &b, "..", &info);
-  }
-
-  // create directory listing
-  DirectoryEntryList dir_listing;
-  if (not catalog_manager_->Listing(path, &dir_listing)) {
-    fuse_reply_err(req, EIO);
-    return;
-  }
-
-  DirectoryEntryList::const_iterator i, iEnd;
-  for (i = dir_listing.begin(), iEnd = dir_listing.end(); i != iEnd; ++i) {
-    info = i->GetStatStructure();
-    addToDirListingBuffer(req, &b, i->name().c_str(), &info);
-  }
-
-  // save the directory listing and return a handle to the listing
-  pthread_mutex_lock(&open_dir_listings_mutex);
-  open_dir_listings[current_dir_listing_handle] = b;
-  fi->fh = current_dir_listing_handle;
-  ++current_dir_listing_handle;
-  pthread_mutex_unlock(&open_dir_listings_mutex);
-
-  // reply
-  fuse_reply_open(req, fi);
-}
-
-/**
- * Release a directory (probably called after reading it)
- */
-static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
-                             struct fuse_file_info *fi) {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode: %d",
-           catalog_manager_->MangleInode(ino));
-
-  // find the directory listing to release and release it
-  int reply = 0;
-  pthread_mutex_lock(&open_dir_listings_mutex);
-  std::map<unsigned int, dirListingBuffer>::iterator openDir =
-  open_dir_listings.find(fi->fh);
-  if (openDir != open_dir_listings.end()) {
-    free(openDir->second.p);
-    open_dir_listings.erase(openDir);
-    reply = 0;
-  } else {
-    reply = EIO;
-  }
-  pthread_mutex_unlock(&open_dir_listings_mutex);
-
-  // reply on request
-  fuse_reply_err(req, reply);
-}
-
-/**
- * Read the directory listing
- */
-static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
-                          off_t off, struct fuse_file_info *fi) {
-  LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_readdir on inode %d reading %d bytes from offset %d",
-           catalog_manager_->MangleInode(ino), size, off);
-
-  // find the directory listing to read
-  pthread_mutex_lock(&open_dir_listings_mutex);
-  std::map<unsigned int, dirListingBuffer>::const_iterator openDir =
-  open_dir_listings.find(fi->fh);
-  pthread_mutex_unlock(&open_dir_listings_mutex);
-
-  if (openDir != open_dir_listings.end()) {
-    replyBufferLimited(req, openDir->second.p, openDir->second.size, off,
-                       size);
-  } else {
-    fuse_reply_err(req, EIO);
-  }
-}
 
 /**
  * Emulates the getattr walk done by Fuse
@@ -732,12 +698,11 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %d", ino);
 
-  /* If we return 0 it will cause the fs
-   to be ignored in "df" */
+  // If we return 0 it will cause the fs to be ignored in "df"
   struct statvfs info;
   memset(&info, 0, sizeof(info));
 
-  /* Unmanaged cache */
+  // Unmanaged cache
   if (quota::GetCapacity() == 0) {
     fuse_reply_statfs(req, &info);
     return;
@@ -745,11 +710,10 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
 
   uint64_t available = 0;
   uint64_t size = quota::GetSize();
-
   info.f_bsize = 1;
 
   if (quota::GetCapacity() == (uint64_t)(-1)) {
-    /* Unrestricted cache, look at free space on cache dir fs */
+    // Unrestricted cache, look at free space on cache dir fs
     struct statfs cache_buf;
     if (statfs(".", &cache_buf) == 0) {
       available = cache_buf.f_bavail * cache_buf.f_bsize;
@@ -758,7 +722,7 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
       info.f_blocks = size;
     }
   } else {
-    /* Take values from LRU module */
+    // Take values from LRU module
     info.f_blocks = quota::GetCapacity();
     available = quota::GetCapacity() - size;
   }
@@ -766,8 +730,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info.f_bfree = info.f_bavail = available;
 
   fuse_reply_statfs(req, &info);
-  //      return 0;
 }
+
 
 #ifdef __APPLE__
 static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
@@ -780,178 +744,172 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
+
   const string attr = name;
   DirectoryEntry d;
-  bool found;
+  const bool found = GetDirentForInode(ino, &d);
 
-  found = get_dirent_for_inode(ino, &d);
-
-  if (not found) {
+  if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
   }
 
-  ostringstream message;
+  string attribute_value;
 
   if (attr == "user.pid") {
-    message << cvmfs::pid_;
-
+    attribute_value = StringifyInt(pid_);
   } else if (attr == "user.version") {
-    message << VERSION << "." << CVMFS_PATCH_LEVEL;
-
+    attribute_value = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
   } else if (attr == "user.hash") {
     if (!d.checksum().IsNull()) {
-      message << d.checksum().ToString() << " (SHA-1)";
+      attribute_value = d.checksum().ToString() + " (SHA-1)";
     } else {
       fuse_reply_err(req, ENOATTR);
       return;
     }
-
   } else if (attr == "user.lhash") {
     if (!d.checksum().IsNull()) {
       string result;
       int fd = cache::Open(d.checksum());
       if (fd < 0) {
-        message << "Not in cache";
+        attribute_value = "Not in cache";
       } else {
-        hash::Any hash(hash::kSha1);  // TODO
+        hash::Any hash(hash::kSha1);
         FILE *f = fdopen(fd, "r");
-        if (not f) {
+        if (!f) {
           fuse_reply_err(req, EIO);
           return;
         }
-
         if (!zlib::CompressFile2Null(f, &hash)) {
           fclose(f);
           fuse_reply_err(req, EIO);
           return;
         }
-
         fclose(f);
-        message << hash.ToString() << " (SHA-1)";
+        attribute_value = hash.ToString() + " (SHA-1)";
       }
     } else {
       fuse_reply_err(req, ENOATTR);
       return;
     }
-
   } else if (attr == "user.revision") {
     const uint64_t revision = catalog_manager_->GetRevision();
-
-    message << revision;
-
+    attribute_value = StringifyInt(revision);
   } else if (attr == "user.expires") {
     time_t expires = 0;
     // TODO(rene): remove that or implement it properly
     // catalog_manager_->GetExpireTime();
-
     time_t now = time(NULL);
-    message << (expires-now)/60;
-
+    attribute_value = StringifyInt((expires-now)/60);
   } else if (attr == "user.maxfd") {
-    message << max_open_files_ - kNumReservedFd;
-
+    attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
   } else if (attr == "user.usedfd") {
-    message << atomic_read32(&open_files_);
-
+    attribute_value = StringifyInt(atomic_read32(&open_files_));
   } else if (attr == "user.nioerr") {
-    message << atomic_read32(&num_io_error_);
-
+    attribute_value = StringifyInt(atomic_read32(&num_io_error_));
   } else if (attr == "user.proxy") {
     vector< vector<string> > proxy_chain;
     unsigned current_group;
     download::GetProxyInfo(&proxy_chain, &current_group);
     if (proxy_chain.size()) {
-      message << proxy_chain[current_group][0];
+      attribute_value = proxy_chain[current_group][0];
     } else {
-      message << "DIRECT";
+      attribute_value = "DIRECT";
     }
-
   } else if (attr == "user.host") {
     vector<string> host_chain;
     vector<int> rtt;
     unsigned current_host;
     download::GetHostInfo(&host_chain, &rtt, &current_host);
     if (host_chain.size()) {
-      message << string(host_chain[current_host]);
+      attribute_value = string(host_chain[current_host]);
     } else {
-      message << "internal error: no hosts defined";
+      attribute_value = "internal error: no hosts defined";
     }
-
   } else if (attr == "user.uptime") {
     time_t now = time(NULL);
     uint64_t uptime = now - boot_time_;
-    /*if (uptime / 60) {
-     if (uptime / 3600) {
-     if (uptime / 84600) {
-     result << uptime/84600 << " days, ";
-     }
-     result << (uptime / 3600)%24 << " hours, ";
-     }
-     result << (uptime / 60)%60 << " minutes, ";
-     }*/
-    message << uptime / 60;
-
+    attribute_value = StringifyInt(uptime / 60);
   } else if (attr == "user.nclg") {
-    int num = catalog_manager_->GetNumberOfAttachedCatalogs();
-    message << num;
-
+    const int num_catalogs = catalog_manager_->GetNumberOfAttachedCatalogs();
+    attribute_value = StringifyInt(num_catalogs);
   } else if (attr == "user.nopen") {
-    message << atomic_read64(&num_open_);
-
+    attribute_value = StringifyInt(atomic_read64(&num_open_));
   } else if (attr == "user.ndownload") {
-    message << atomic_read64(&num_download_);
-
+    attribute_value = StringifyInt(atomic_read64(&num_download_));
   } else if (attr == "user.timeout") {
     unsigned seconds, seconds_direct;
     download::GetTimeout(&seconds, &seconds_direct);
-    message << seconds;
-
+    attribute_value = StringifyInt(seconds);
   } else if (attr == "user.timeout_direct") {
     unsigned seconds, seconds_direct;
     download::GetTimeout(&seconds, &seconds_direct);
-    message << seconds_direct;
-
+    attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
     int64_t rx = download::GetTransferredBytes();
-    message << rx/1024;
-
+    attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
     int64_t rx = download::GetTransferredBytes();
     int64_t time = download::GetTransferTime();
     if (time == 0)
-      message << "n/a";
+      attribute_value = "n/a";
     else
-      message << (rx/1024)/time;
-
+      attribute_value = StringifyInt((rx/1024)/time);
   } else {
     fuse_reply_err(req, ENOATTR);
     return;
   }
 
-  string msg = message.str();
-
   if (size == 0) {
-    fuse_reply_xattr(req, msg.length());
-  } else if (size >= msg.length()) {
-    fuse_reply_buf(req, msg.c_str(), msg.length());
+    fuse_reply_xattr(req, attribute_value.length());
+  } else if (size >= attribute_value.length()) {
+    fuse_reply_buf(req, &attribute_value[0], attribute_value.length());
   } else {
     fuse_reply_err(req, ERANGE);
   }
 }
 
+
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %d", ino);
-  fuse_reply_err(req, EROFS);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %d, size %u",
+           ino, size);
+
+  DirectoryEntry d;
+  const bool found = GetDirentForInode(ino, &d);
+  if (!found) {
+    fuse_reply_err(req, ENOENT);
+    return;
+  }
+
+  const char base_list[] = "user.pid\0user.version\0user.revision\0"
+    "user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0user.host\0"
+    "user.uptime\0user.nclg\0user.nopen\0user.ndownload\0user.timeout\0"
+    "user.timeout_direct\0user.rx\0user.speed\0";
+  string attribute_list(base_list, sizeof(base_list));
+  if (!d.checksum().IsNull()) {
+    const char regular_file_list[] = "user.hash\0user.lhash\0";
+    attribute_list += string(regular_file_list, sizeof(regular_file_list));
+  }
+
+  if (size == 0) {
+    fuse_reply_xattr(req, attribute_list.length());
+  } else if (size >= attribute_list.length()) {
+    fuse_reply_buf(req, &attribute_list[0], attribute_list.length());
+  } else {
+    fuse_reply_err(req, ERANGE);
+  }
 }
 
+
 static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino,
-                         unsigned long nlookup) {  // NOLINT(runtime/int)
+                         unsigned long nlookup)  // NOLINT(runtime/int)
+{
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_forget on inode: %d", ino);
   fuse_reply_none(req);
 }
+
 
 static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
   ino = catalog_manager_->MangleInode(ino);
@@ -962,26 +920,23 @@ static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
            ((mask & X_OK) ? "yes" : "no"));
 
   DirectoryEntry d;
-  bool found;
+  const bool found = GetDirentForInode(ino, &d);
 
-  found = get_dirent_for_inode(ino, &d);
-
-  if (not found) {
+  if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
   }
 
-  // check access rights for owner (RWX access bits --> shift six left)
-  // if write access is requested, we always say no
-  unsigned int request = mask << 6;
-  if ((mask & W_OK) || (request & d.mode()) != request) {
+  // Check access rights for owner (RWX access bits shifted six to the left)
+  unsigned int mask_for_owner = mask << 6;
+  if ((mask & W_OK) || (mask_for_owner & d.mode()) != mask_for_owner) {
     fuse_reply_err(req, EACCES);
     return;
   }
 
-  // all okay... let's go
   fuse_reply_err(req, 0);
 }
+
 
 /**
  * Do after-daemon() initialization
@@ -1015,11 +970,11 @@ static void cvmfs_destroy(void *unused __attribute__((unused))) {
  * Puts the callback functions in one single structure
  */
 static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
-  /* Init/Fini */
+  // Init/Fini
   cvmfs_operations->init     = cvmfs_init;
   cvmfs_operations->destroy  = cvmfs_destroy;
 
-  /* Implemented */
+  // Implemented
   cvmfs_operations->lookup      = cvmfs_lookup;
   cvmfs_operations->forget      = cvmfs_forget;
   cvmfs_operations->getattr     = cvmfs_getattr;
@@ -1035,7 +990,7 @@ static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->listxattr   = cvmfs_listxattr;
   cvmfs_operations->access      = cvmfs_access;
 
-  /* Not implemented... just stubs */
+  // Stubs
   cvmfs_operations->setattr     = cvmfs_setattr;
   cvmfs_operations->mknod       = cvmfs_mknod;
   cvmfs_operations->mkdir       = cvmfs_mkdir;
@@ -1142,6 +1097,8 @@ static struct fuse_opt cvmfs_array_opts[] = {
 
 CvmfsOptions gCvmfsOpts;
 struct fuse_args gFuseArgs;
+bool gIsForeground = false;
+bool gIsSingleThreaded = false;
 
 /**
  * Display the usage message.
@@ -1225,13 +1182,11 @@ static void FreeCvmfsOptions(CvmfsOptions *opts) {
   if (opts->repo_name)      free(opts->repo_name);
   delete cvmfs::cachedir_;
   delete cvmfs::tracefile_;
-  delete cvmfs::blacklist_;
   delete cvmfs::repository_name_;
   delete cvmfs::root_url_;
   delete cvmfs::mountpoint_;
   cvmfs::cachedir_ = NULL;
   cvmfs::tracefile_ = NULL;
-  cvmfs::blacklist_ = NULL;
   cvmfs::repository_name_ = NULL;
   cvmfs::root_url_ = NULL;
   cvmfs::mountpoint_ = NULL;
@@ -1310,10 +1265,10 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       exit(0);
 
     case KEY_FOREGROUND:
-      fuse_opt_add_arg(outargs, "-f");
+      gIsForeground = true;
       return 0;
     case KEY_SINGLETHREAD:
-      fuse_opt_add_arg(outargs, "-s");
+      gIsSingleThreaded = true;
       return 0;
     case KEY_DEBUG:
       fuse_opt_add_arg(outargs, "-d");
@@ -1420,17 +1375,10 @@ int main(int argc, char *argv[]) {
   // Fill cvmfs option variables from Fuse options
   cvmfs::cachedir_ = new string(gCvmfsOpts.cachedir);
   cvmfs::tracefile_ = new string(gCvmfsOpts.tracefile);
-  cvmfs::blacklist_ = new string(gCvmfsOpts.blacklist);
   cvmfs::repository_name_ = new string(gCvmfsOpts.repo_name);
   if (!cvmfs::uid_) cvmfs::uid_ = getuid();
   if (!cvmfs::gid_) cvmfs::gid_ = getgid();
   if (gCvmfsOpts.max_ttl) cvmfs::max_ttl_ = gCvmfsOpts.max_ttl*60;
-
-  // ??
-  if (gCvmfsOpts.kernel_cache)
-      PrintWarning("using deprecated mount option 'kernel_cache' - ignoring");
-  if (gCvmfsOpts.auto_cache)
-      PrintWarning("using deprecated mount option 'auto_cache' - ignoring");
 
   // Seperate first host from hostlist
   unsigned iter_hostname;
@@ -1635,8 +1583,7 @@ int main(int argc, char *argv[]) {
   // Load initial file catalog
   cvmfs::catalog_manager_ = new
     cvmfs::RemoteCatalogManager(*cvmfs::root_url_, *cvmfs::repository_name_,
-                                "/.cvmfswhitelist", *cvmfs::blacklist_,
-                                gCvmfsOpts.force_signing);
+      "/.cvmfswhitelist", gCvmfsOpts.blacklist, gCvmfsOpts.force_signing);
   if (not cvmfs::catalog_manager_->Init()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize catalog manager");
     goto cvmfs_cleanup;
@@ -1653,11 +1600,13 @@ int main(int argc, char *argv[]) {
   cvmfs::inode_cache_ = new cvmfs::InodeCache(cvmfs::kInodeCacheSize);
   cvmfs::path_cache_ = new cvmfs::PathCache(cvmfs::kPathCacheSize);
   cvmfs::md5path_cache_ = new cvmfs::Md5PathCache(cvmfs::kMd5pathCacheSize);
+  cvmfs::directory_handles_ = new map<uint64_t, cvmfs::DirectoryListing>();
 
   if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &gFuseArgs)) != NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
              cvmfs::mountpoint_->c_str());
-    daemon(0, 0);
+    if (!gIsForeground)
+      daemon(0, 0);
 
     struct fuse_session *se;
     se = fuse_lowlevel_new(&gFuseArgs, &cvmfs_operations,
@@ -1665,7 +1614,10 @@ int main(int argc, char *argv[]) {
     if (se != NULL) {
       if (fuse_set_signal_handlers(se) != -1) {
         fuse_session_add_chan(se, ch);
-        result = fuse_session_loop_mt(se);
+        if (gIsSingleThreaded)
+          result = fuse_session_loop(se);
+        else
+          result = fuse_session_loop_mt(se);
         fuse_remove_signal_handlers(se);
         fuse_session_remove_chan(ch);
       }
@@ -1675,10 +1627,16 @@ int main(int argc, char *argv[]) {
   }
   fuse_opt_free_args(&gFuseArgs);
 
+  delete cvmfs::catalog_manager_;
+  delete cvmfs::directory_handles_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
-  delete cvmfs::catalog_manager_;
+  cvmfs::catalog_manager_ = NULL;
+  cvmfs::directory_handles_ = NULL;
+  cvmfs::path_cache_ = NULL;
+  cvmfs::inode_cache_ = NULL;
+  cvmfs::md5path_cache_ = NULL;
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            cvmfs::mountpoint_->c_str(), cvmfs::root_url_->c_str());

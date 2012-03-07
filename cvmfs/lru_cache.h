@@ -35,15 +35,14 @@
 // if defined the cache is secured by a posix mutex
 #define LRU_CACHE_THREAD_SAFE 1
 
-#include <assert.h>
+#include <cassert>
 #include <map>
 #include <iostream>
-#include <google/dense_hash_map>
 #include <algorithm>
 #include <functional>
-
 #include <string>
-#include <sstream>
+
+#include <google/dense_hash_map>
 
 #include "platform.h"
 

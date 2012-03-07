@@ -5,10 +5,13 @@
  *  bookkeeping data like the associated catalog.
  */
 
+// TODO: expand symlink
+
 #ifndef DIRECTORY_ENTRY_H
 #define DIRECTORY_ENTRY_H 1
 
 #include <list>
+#include <string>
 
 #include "platform.h"
 #include "util.h"
@@ -45,6 +48,7 @@ class DirectoryEntry {
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) {}
 
+  std::string ExpandSymlink() const { return symlink_; } // TODO
   inline bool IsNestedCatalogRoot() const { return is_nested_catalog_root_; }
   inline bool IsNestedCatalogMountpoint() const { return is_nested_catalog_mountpoint_; }
 
