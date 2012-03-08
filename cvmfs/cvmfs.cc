@@ -18,6 +18,7 @@
 // TODO: ndownload into cache
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
+#define FUSE_USE_VERSION 26
 
 #include "cvmfs_config.h"
 
@@ -42,6 +43,8 @@
 #include <sys/xattr.h>
 
 #include <openssl/crypto.h>
+#include <fuse/fuse_lowlevel.h>
+#include <fuse/fuse_opt.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -56,7 +59,6 @@
 #include <algorithm>
 
 #include "platform.h"
-#include "fuse-duplex.h"
 #include "logging.h"
 #include "tracer.h"
 #include "download.h"
@@ -75,7 +77,7 @@
 #include "RemoteCatalogManager.h"
 #include "DirectoryEntry.h"
 #include "compression.h"
-#include "sqlite3-duplex.h"
+#include "duplex_sqlite3.h"
 #include "smalloc.h"
 
 using namespace std;  // NOLINT
@@ -384,7 +386,7 @@ static void AddToDirListing(const fuse_req_t req,
 
 
 /**
- * Open a directory for listing
+ * Open a directory for listing.
  */
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
@@ -491,7 +493,7 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
 
 
 /**
- * Read the directory listing
+ * Read the directory listing.
  */
 static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                           off_t off, struct fuse_file_info *fi)
@@ -647,7 +649,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 
 
 /**
- * Emulates the getattr walk done by Fuse
+ * Emulates the getattr walk done by Fuse.
  */
 static int walk_path(const string &path) {
   //      struct stat info;
@@ -693,6 +695,7 @@ int ClearFile(const string &path) {
    return result;*/
   return 0;
 }
+
 
 static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   ino = catalog_manager_->MangleInode(ino);
@@ -1095,10 +1098,10 @@ static struct fuse_opt cvmfs_array_opts[] = {
 };
 
 
-CvmfsOptions gCvmfsOpts;
-struct fuse_args gFuseArgs;
-bool gIsForeground = false;
-bool gIsSingleThreaded = false;
+CvmfsOptions g_cvmfs_opts;
+struct fuse_args g_fuse_args;
+bool g_foreground = false;
+bool g_single_threaded = false;
 
 /**
  * Display the usage message.
@@ -1239,12 +1242,12 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       return 1;
 
     case FUSE_OPT_KEY_NONOPT:
-      if (!gCvmfsOpts.hostname &&
+      if (!g_cvmfs_opts.hostname &&
           ((strstr(arg, "http://") == arg) ||
            (strstr(arg, "file://") == arg))) {
         // If we receive a parameter that contains "http://"
         // we know for sure that it's our remote server
-        gCvmfsOpts.hostname = strdup(arg);
+        g_cvmfs_opts.hostname = strdup(arg);
       } else {
         // If we receive any other string, we take it as the mount point.
         cvmfs::mountpoint_ = new string(arg);
@@ -1265,10 +1268,10 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       exit(0);
 
     case KEY_FOREGROUND:
-      gIsForeground = true;
+      g_foreground = true;
       return 0;
     case KEY_SINGLETHREAD:
-      gIsSingleThreaded = true;
+      g_single_threaded = true;
       return 0;
     case KEY_DEBUG:
       fuse_opt_add_arg(outargs, "-d");
@@ -1351,51 +1354,50 @@ int main(int argc, char *argv[]) {
   SetupLibcryptoMt();
 
   // Parse options
-  gFuseArgs.argc = argc;
-  gFuseArgs.argv = argv;
-  gFuseArgs.allocated = 0;
-  if ((fuse_opt_parse(&gFuseArgs, &gCvmfsOpts, cvmfs_array_opts,
+  g_fuse_args.argc = argc;
+  g_fuse_args.argv = argv;
+  g_fuse_args.allocated = 0;
+  if ((fuse_opt_parse(&g_fuse_args, &g_cvmfs_opts, cvmfs_array_opts,
                       ParseFuseOptions) != 0) ||
-      !gCvmfsOpts.hostname) {
+      !g_cvmfs_opts.hostname) {
     usage(argv[0]);
     goto cvmfs_cleanup;
     return 1;
   }
 
   // Default options
-  if (gCvmfsOpts.timeout == 0) gCvmfsOpts.timeout = 2;
-  if (gCvmfsOpts.timeout_direct == 0) gCvmfsOpts.timeout_direct = 2;
-  if (gCvmfsOpts.syslog_level == 0) gCvmfsOpts.syslog_level = 3;
-  if (!gCvmfsOpts.tracefile) gCvmfsOpts.tracefile = strdup("");
-  if (!gCvmfsOpts.blacklist) gCvmfsOpts.blacklist = strdup("");
-  if (!gCvmfsOpts.repo_name) gCvmfsOpts.repo_name = strdup("");
-  if (!gCvmfsOpts.cachedir)
-    gCvmfsOpts.cachedir = strdup("/var/lib/cvmfs/default");
+  if (g_cvmfs_opts.timeout == 0) g_cvmfs_opts.timeout = 2;
+  if (g_cvmfs_opts.timeout_direct == 0) g_cvmfs_opts.timeout_direct = 2;
+  if (g_cvmfs_opts.syslog_level == 0) g_cvmfs_opts.syslog_level = 3;
+  if (!g_cvmfs_opts.tracefile) g_cvmfs_opts.tracefile = strdup("");
+  if (!g_cvmfs_opts.blacklist) g_cvmfs_opts.blacklist = strdup("");
+  if (!g_cvmfs_opts.repo_name) g_cvmfs_opts.repo_name = strdup("");
+  if (!g_cvmfs_opts.cachedir)
+    g_cvmfs_opts.cachedir = strdup("/var/lib/cvmfs/default");
 
   // Fill cvmfs option variables from Fuse options
-  cvmfs::cachedir_ = new string(gCvmfsOpts.cachedir);
-  cvmfs::tracefile_ = new string(gCvmfsOpts.tracefile);
-  cvmfs::repository_name_ = new string(gCvmfsOpts.repo_name);
+  cvmfs::cachedir_ = new string(g_cvmfs_opts.cachedir);
+  cvmfs::tracefile_ = new string(g_cvmfs_opts.tracefile);
+  cvmfs::repository_name_ = new string(g_cvmfs_opts.repo_name);
   if (!cvmfs::uid_) cvmfs::uid_ = getuid();
   if (!cvmfs::gid_) cvmfs::gid_ = getgid();
-  if (gCvmfsOpts.max_ttl) cvmfs::max_ttl_ = gCvmfsOpts.max_ttl*60;
+  if (g_cvmfs_opts.max_ttl) cvmfs::max_ttl_ = g_cvmfs_opts.max_ttl*60;
 
   // Seperate first host from hostlist
   unsigned iter_hostname;
-  for (iter_hostname = 0; iter_hostname < strlen(gCvmfsOpts.hostname);
+  for (iter_hostname = 0; iter_hostname < strlen(g_cvmfs_opts.hostname);
        ++iter_hostname)
   {
-    if (gCvmfsOpts.hostname[iter_hostname] == ',') break;
+    if (g_cvmfs_opts.hostname[iter_hostname] == ',') break;
   }
   if (iter_hostname == 0)
     cvmfs::root_url_ = new string("");
   else
-    cvmfs::root_url_ = new string(gCvmfsOpts.hostname, iter_hostname);
+    cvmfs::root_url_ = new string(g_cvmfs_opts.hostname, iter_hostname);
   options_ready = true;
 
   // Tune SQlite3 memory
-  sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads
-  // (2 slots per thread)
+  sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   sqlite_page_cache = smalloc(1280*3275);  // 4MB
   retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, sqlite_scratch, 8192, 16);
   assert(retval == SQLITE_OK);
@@ -1414,23 +1416,23 @@ int main(int argc, char *argv[]) {
   cvmfs::previous_io_error_.delay = 0;
 
   // Logging
-  SetLogSyslogLevel(gCvmfsOpts.syslog_level);
+  SetLogSyslogLevel(g_cvmfs_opts.syslog_level);
   SetLogSyslogPrefix(*cvmfs::repository_name_);
-  if (gCvmfsOpts.logfile)
-    SetLogDebugFile(string(gCvmfsOpts.logfile));
+  if (g_cvmfs_opts.logfile)
+    SetLogDebugFile(string(g_cvmfs_opts.logfile));
 
   // Maximum number of open files
-  if (gCvmfsOpts.nofiles) {
-    if (gCvmfsOpts.nofiles < 0) {
+  if (g_cvmfs_opts.nofiles) {
+    if (g_cvmfs_opts.nofiles < 0) {
       PrintError("number of open files must be a positive number");
       goto cvmfs_cleanup;
     }
     struct rlimit rpl;
     memset(&rpl, 0, sizeof(rpl));
     getrlimit(RLIMIT_NOFILE, &rpl);
-    if (rpl.rlim_max < (unsigned)gCvmfsOpts.nofiles)
-      rpl.rlim_max = gCvmfsOpts.nofiles;
-    rpl.rlim_cur = gCvmfsOpts.nofiles;
+    if (rpl.rlim_max < (unsigned)g_cvmfs_opts.nofiles)
+      rpl.rlim_max = g_cvmfs_opts.nofiles;
+    rpl.rlim_cur = g_cvmfs_opts.nofiles;
     if (setrlimit(RLIMIT_NOFILE, &rpl) != 0) {
       PrintError("Failed to set maximum number of open files, "
                  "insufficient permissions");
@@ -1439,7 +1441,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Grab mountpoint
-  if (gCvmfsOpts.grab_mountpoint) {
+  if (g_cvmfs_opts.grab_mountpoint) {
     if ((chown(cvmfs::mountpoint_->c_str(), cvmfs::uid_, cvmfs::gid_) != 0) ||
         (chmod(cvmfs::mountpoint_->c_str(), 0755) != 0)) {
       PrintError("Failed to grab mountpoint (" + StringifyInt(errno) + ")");
@@ -1483,7 +1485,7 @@ int main(int argc, char *argv[]) {
     if (platform_stat("running", &info) == 0) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
                "crashed previously, rebuilding cache database");
-      gCvmfsOpts.rebuild_cachedb = 1;
+      g_cvmfs_opts.rebuild_cachedb = 1;
     }
   }
   retval = open("running", O_RDONLY | O_CREAT, 0600);
@@ -1503,23 +1505,23 @@ int main(int argc, char *argv[]) {
   cache_ready = true;
 
   // Init quota / managed cache
-  if (gCvmfsOpts.quota_limit < 0) {
+  if (g_cvmfs_opts.quota_limit < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size");
-    gCvmfsOpts.quota_limit = -1;
-    gCvmfsOpts.quota_threshold = 0;
+    g_cvmfs_opts.quota_limit = -1;
+    g_cvmfs_opts.quota_threshold = 0;
   } else {
-    gCvmfsOpts.quota_limit *= 1024*1024;
-    gCvmfsOpts.quota_threshold *= 1024*1024;
+    g_cvmfs_opts.quota_limit *= 1024*1024;
+    g_cvmfs_opts.quota_threshold *= 1024*1024;
   }
-  if (!quota::Init(".", (uint64_t)gCvmfsOpts.quota_limit,
-                 (uint64_t)gCvmfsOpts.quota_threshold,
-                 gCvmfsOpts.rebuild_cachedb)) {
+  if (!quota::Init(".", (uint64_t)g_cvmfs_opts.quota_limit,
+                 (uint64_t)g_cvmfs_opts.quota_threshold,
+                 g_cvmfs_opts.rebuild_cachedb)) {
     PrintError("Failed to initialize lru cache");
     goto cvmfs_cleanup;
   }
   quota_ready = true;
 
-  if (gCvmfsOpts.rebuild_cachedb) {
+  if (g_cvmfs_opts.rebuild_cachedb) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: rebuilding lru cache database...");
     if (!quota::RebuildDatabase()) {
@@ -1529,12 +1531,12 @@ int main(int argc, char *argv[]) {
   }
   if (quota::GetSize() > quota::GetCapacity()) {
     PrintWarning("your cache is already beyond quota size, cleaning up");
-    if (!quota::Cleanup(gCvmfsOpts.quota_threshold)) {
+    if (!quota::Cleanup(g_cvmfs_opts.quota_threshold)) {
       PrintWarning("Failed to clean up");
       goto cvmfs_cleanup;
     }
   }
-  if (gCvmfsOpts.quota_limit) {
+  if (g_cvmfs_opts.quota_limit) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: quota initialized, current size %luMB",
              quota::GetSize()/(1024*1024));
@@ -1559,31 +1561,33 @@ int main(int argc, char *argv[]) {
 
   // Network initialization
   download::Init(16);
-  download::SetHostChain(string(gCvmfsOpts.hostname));
-  download::SetProxyChain(gCvmfsOpts.proxies ? string(gCvmfsOpts.proxies) : "");
-  download::SetTimeout(gCvmfsOpts.timeout, gCvmfsOpts.timeout_direct);
+  download::SetHostChain(string(g_cvmfs_opts.hostname));
+  download::SetProxyChain(g_cvmfs_opts.proxies ?
+                          string(g_cvmfs_opts.proxies) : "");
+  download::SetTimeout(g_cvmfs_opts.timeout, g_cvmfs_opts.timeout_direct);
   download_ready = true;
 
   signature::Init();
-  if (!signature::LoadPublicRsaKeys(gCvmfsOpts.pubkey ? gCvmfsOpts.pubkey : ""))
+  if (!signature::LoadPublicRsaKeys(g_cvmfs_opts.pubkey ?
+                                    g_cvmfs_opts.pubkey : ""))
   {
     PrintError("failed to load public key(s)");
     goto cvmfs_cleanup;
   } else {
-    if (!gCvmfsOpts.pubkey)
+    if (!g_cvmfs_opts.pubkey)
       PrintWarning("No public master key given. "
                    "Cvmfs will fail on signed catalogs!");
     else
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: using public key(s) %s",
                JoinStrings(
-                 SplitString(gCvmfsOpts.pubkey, ':'), ", ").c_str());
+                 SplitString(g_cvmfs_opts.pubkey, ':'), ", ").c_str());
   }
   signature_ready = true;
 
   // Load initial file catalog
   cvmfs::catalog_manager_ = new
     cvmfs::RemoteCatalogManager(*cvmfs::root_url_, *cvmfs::repository_name_,
-      "/.cvmfswhitelist", gCvmfsOpts.blacklist, gCvmfsOpts.force_signing);
+      "/.cvmfswhitelist", g_cvmfs_opts.blacklist, g_cvmfs_opts.force_signing);
   if (not cvmfs::catalog_manager_->Init()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize catalog manager");
     goto cvmfs_cleanup;
@@ -1602,19 +1606,19 @@ int main(int argc, char *argv[]) {
   cvmfs::md5path_cache_ = new cvmfs::Md5PathCache(cvmfs::kMd5pathCacheSize);
   cvmfs::directory_handles_ = new map<uint64_t, cvmfs::DirectoryListing>();
 
-  if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &gFuseArgs)) != NULL) {
+  if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &g_fuse_args)) != NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
              cvmfs::mountpoint_->c_str());
-    if (!gIsForeground)
+    if (!g_foreground)
       daemon(0, 0);
 
     struct fuse_session *se;
-    se = fuse_lowlevel_new(&gFuseArgs, &cvmfs_operations,
+    se = fuse_lowlevel_new(&g_fuse_args, &cvmfs_operations,
                            sizeof(cvmfs_operations), NULL);
     if (se != NULL) {
       if (fuse_set_signal_handlers(se) != -1) {
         fuse_session_add_chan(se, ch);
-        if (gIsSingleThreaded)
+        if (g_single_threaded)
           result = fuse_session_loop(se);
         else
           result = fuse_session_loop_mt(se);
@@ -1625,7 +1629,7 @@ int main(int argc, char *argv[]) {
     }
     fuse_unmount(cvmfs::mountpoint_->c_str(), ch);
   }
-  fuse_opt_free_args(&gFuseArgs);
+  fuse_opt_free_args(&g_fuse_args);
 
   delete cvmfs::catalog_manager_;
   delete cvmfs::directory_handles_;
@@ -1655,8 +1659,8 @@ int main(int argc, char *argv[]) {
     close(fd_lockfile);
   }
   if (options_ready) {
-    fuse_opt_free_args(&gFuseArgs);
-    FreeCvmfsOptions(&gCvmfsOpts);
+    fuse_opt_free_args(&g_fuse_args);
+    FreeCvmfsOptions(&g_cvmfs_opts);
   }
 
   if (sqlite_page_cache) free(sqlite_page_cache);

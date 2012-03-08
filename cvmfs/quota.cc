@@ -38,7 +38,7 @@
 
 #include "platform.h"
 #include "logging.h"
-#include "sqlite3-duplex.h"
+#include "duplex_sqlite3.h"
 #include "hash.h"
 #include "util.h"
 #include "smalloc.h"
@@ -1089,4 +1089,4 @@ string GetMemoryUsage() {
   return result;*/
 }
 
-}  // namespace lru
+}  // namespace quota

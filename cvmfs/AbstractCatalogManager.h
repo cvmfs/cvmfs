@@ -1,26 +1,28 @@
 /**
- *  The AbstractCatalogManager provides all the functionality a read-only
- *  catalog has to provide. Namely you have various methods for lookups of
- *  DirectoryEntrys. Furthermore directory listing is supported.
- *  All intrinsic catalog magic is also happening here and transparent to
- *  the user of this class. Namely reloading of expired catalogs, attaching
- *  of nested catalogs and delegating of lookups to the appropriate catalog.
+ * This file is part of the CernVM File System.
  *
- *  To be as extensible as possible it provides a couple of virtual methods
- *  which can be implemented by derived classes.
+ * The AbstractCatalogManager provides the functionality a read-only
+ * catalog has to provide.   There are various methods for lookups of
+ * DirectoryEntrys.  Directory listing is supported.
+ * All intrinsic catalog magic is also happening here and transparent to
+ * the user of this class (such as reloading of expired catalogs, attaching
+ * of nested catalogs and delegating of lookups to the appropriate catalog).
  *
- *  The concrete CatalogManager implementations are meant to be thread safe.
- *  Thus it is highly encouraged to use the synchronisation methods provided
- *  by the inherited class ThreadSafeReadWrite.
+ * To be as extensible as possible it provides a couple of virtual methods
+ * which can be implemented by derived classes.
  *
- *  Usage:
- *    DerivedAbstractCatalogManager *catMngr = new DerivedAbstractCatalogManager();
- *    catMngr->Init();
- *    catMngr->Lookup(<inode>, &<result_entry>);
+ * The concrete CatalogManager implementations are meant to be thread safe.
+ * Thus it is highly encouraged to use the synchronisation methods provided
+ * by the inherited class ThreadSafeReadWrite.
+ *
+ * Usage:
+ *   DerivedCatalogManager *catMngr = new DerivedCatalogManager();
+ *   catMngr->Init();
+ *   catMngr->Lookup(<inode>, &<result_entry>);
  */
 
-#ifndef ABSTRACT_CATALOG_MANAGER_H
-#define ABSTRACT_CATALOG_MANAGER_H 1
+#ifndef CVMFS_ABSTRACT_CATALOG_MANAGER_H_
+#define CVMFS_ABSTRACT_CATALOG_MANAGER_H_
 
 #include <vector>
 #include <string>
@@ -339,4 +341,4 @@ class AbstractCatalogManager {
 
 }
 
-#endif /* ABSTRACT_CATALOG_MANAGER_H */
+#endif  // CVMFS_ABSTRACT_CATALOG_MANAGER_H_

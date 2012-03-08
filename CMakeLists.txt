@@ -39,7 +39,6 @@ option (BUILD_SERVER "Build writer's end programs" ON)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
-option (LIBFUSE_BUILTIN "Don't use system libfuse" ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
@@ -55,8 +54,6 @@ set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/sqlite3/src")
 set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/c-ares/src")
 set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libcurl/src")
 set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")
-set (LIBFUSE_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libfuse/src")
-set (LIBFUSE4X_BUILTIN_LOCATION   "${EXTERNALS_BUILD_LOCATION}/libfuse4x/src")
 set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/sparsehash/src")
 
 # create the directory for controlled out of source building of external stuff

@@ -37,7 +37,7 @@
 #include "util.h"
 #include "logging.h"
 #include "download.h"
-#include "sqlite3-duplex.h"
+#include "duplex_sqlite3.h"
 
 using namespace std;  // NOLINT
 

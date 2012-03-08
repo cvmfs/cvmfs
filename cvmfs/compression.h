@@ -10,7 +10,7 @@
 
 #include <string>
 
-#include "zlib-duplex.h"
+#include "duplex_zlib.h"
 
 namespace hash {
   struct Any;

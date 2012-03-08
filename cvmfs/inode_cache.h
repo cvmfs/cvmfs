@@ -3,8 +3,8 @@
 
 #include <string>
 
+#include <fuse/fuse_lowlevel.h>
 #include "lru_cache.h"
-#include "fuse-duplex.h"
 #include "DirectoryEntry.h"
 
 namespace cvmfs {

@@ -7,8 +7,7 @@ set (CVMFS2_DEBUG_SOURCES
 	smalloc.h
 	logging.cc logging.h
 	tracer.h tracer.cc atomic.h
-	sqlite3-duplex.h
-	curl_duplex.h fuse-duplex.h
+	duplex_sqlite3.h duplex_curl.h
 	signature.h signature.cc
 	quota.h quota.cc
 	hash.h hash.cc
@@ -18,7 +17,7 @@ set (CVMFS2_DEBUG_SOURCES
 	platform.h platform_osx.h platform_linux.h
 	monitor.h monitor.cc
 	util.cc util.h
-	zlib-duplex.h compression.h compression.cc
+	duplex_zlib.h compression.h compression.cc
 	download.cc download.h
 	lru_cache.h
 	inode_cache.h inode_cache.cc
@@ -44,9 +43,9 @@ set (CVMFS2_SOURCES ${CVMFS2_DEBUG_SOURCES})
 
 set (CVMFS_SYNC_BIN_SOURCES
 	smalloc.h
-	zlib-duplex.h compression.h compression.cc
+	duplex_zlib.h compression.h compression.cc
   hash.h hash.cc
-	sqlite3-duplex.h
+	duplex_sqlite3.h
 	util.cc util.h
 	logging.cc logging.h
 	monitor.cc monitor.h
@@ -70,15 +69,15 @@ set (CVMFS_SYNC_BIN_SOURCES
 
 #set (CVMFS_LSCAT_SOURCES
 #	smalloc.h
-#	zlib-duplex.h compression.cc compression.h
+#	duplex_zlib.h compression.cc compression.h
 #	catalog_tree.h catalog_tree.cc
-#	sqlite3-duplex.h catalog.cc catalog.h
+#	duplex_sqlite3.h catalog.cc catalog.h
 #	hash.cc hash.h
 #	util.cc util.h cvmfs_lscat.cc)
 
 #set (CVMFS_SIGN_SOURCES
 #	smalloc.h
-#	zlib-duplex.h compression.h compression.cc
+#	duplex_zlib.h compression.h compression.cc
 #	hash.cc hash.h
 #	util.h util.cc
 #	signature.cc signature.h cvmfs_sign.cc)
@@ -86,12 +85,12 @@ set (CVMFS_SYNC_BIN_SOURCES
 #set (CVMFS_PULL_SOURCES
 #	smalloc.h
 #	logging.cc logging.h
-#	zlib-duplex.h compression.h compression.cc
-#	curl_duplex.h download.cc download.h
+#	duplex_zlib.h compression.h compression.cc
+#	duplex_curl.h download.cc download.h
 #	hash.h hash.cc
 #	util.h util.cc
 #	catalog_tree.h catalog_tree.cc
-#	sqlite3-duplex.h catalog.h catalog.cc
+#	duplex_sqlite3.h catalog.h catalog.cc
 #	signature.h signature.cc
 #	cvmfs_pull.cc)
 
@@ -101,14 +100,14 @@ set (CVMFS_SYNC_BIN_SOURCES
 #	util.h util.cc
 #	cvmfs_scrub.cc)
 
-set (CVMFS_ZPIPE_SOURCES zlib-duplex.h zpipe.c)
+set (CVMFS_ZPIPE_SOURCES duplex_zlib.h zpipe.c)
 
 #
 # configure some compiler flags for proper build
 #
 
-set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DCVMFS_CLIENT -fexceptions")
-set (CVMFS2_DEBUG_CFLAGS "${CVMFS2_DEBUG_CFLAGS} ${CVMFS2_CFLAGS} -O0 -DDEBUGMSG")
+set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DCVMFS_CLIENT -D_FILE_OFFSET_BITS=64 -fexceptions")
+set (CVMFS2_DEBUG_CFLAGS "${CVMFS2_DEBUG_CFLAGS} ${CVMFS2_CFLAGS} -D_FILE_OFFSET_BITS=64 -O0 -DDEBUGMSG")
 set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS}")
 
 #set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
@@ -127,22 +126,12 @@ set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS}")
 #
 
 if (MACOSX)
-	if (LIBFUSE_BUILTIN)
-		include (${LIBFUSE4X_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-		set (FUSE_LIBRARIES "")
-	else (LIBFUSE_BUILTIN)
-		find_package (Fuse4x REQUIRED)
-		set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
-		set (FUSE_LIBRARIES ${FUSE4X_LIBRARIES}) # just abstract the difference here... they are compatible
-	endif (LIBFUSE_BUILTIN)
+  find_package (Fuse4x REQUIRED)
+	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
+	set (FUSE_LIBRARIES ${FUSE4X_LIBRARIES}) # just abstract the difference here... they are compatible
 else (MACOSX)
-	if (LIBFUSE_BUILTIN)
-		include (${LIBFUSE_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-		set (FUSE_LIBRARIES "")
-	else (LIBFUSE_BUILTIN)
-		find_package (FUSE REQUIRED)
-		set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
-	endif (LIBFUSE_BUILTIN)
+  find_package (FUSE REQUIRED)
+	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
 endif (MACOSX)
 
 if (LIBCURL_BUILTIN)

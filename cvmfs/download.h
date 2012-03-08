@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "curl_duplex.h"
+#include "duplex_curl.h"
 #include "compression.h"
 #include "hash.h"
 

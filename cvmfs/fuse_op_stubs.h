@@ -8,7 +8,7 @@
 #define CVMFS_FUSE_OP_STUBS_H_
 
 #include <errno.h>
-#include "fuse-duplex.h"
+#include <fuse/fuse_lowlevel.h>
 #include "logging.h"
 
 #define DEFAULT_STUB_ERROR_CODE EROFS  // read only file system

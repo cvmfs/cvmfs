@@ -44,8 +44,7 @@
 
 #include <set>
 
-#include "cvmfs_config.h"
-#include "curl_duplex.h"
+#include "duplex_curl.h"
 #include "logging.h"
 #include "atomic.h"
 #include "hash.h"
