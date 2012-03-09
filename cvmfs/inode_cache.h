@@ -5,7 +5,7 @@
 
 #include <fuse/fuse_lowlevel.h>
 #include "lru_cache.h"
-#include "DirectoryEntry.h"
+#include "dirent.h"
 
 namespace cvmfs {
 

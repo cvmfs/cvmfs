@@ -189,7 +189,7 @@ static bool Contains(const string &hash_str) {
   if (sqlite3_step(stmt_size_) == SQLITE_ROW)
     result = true;
   sqlite3_reset(stmt_size_);
-  LogCvmfs(kLogLru, kLogDebug, "conatins %s returns %d",
+  LogCvmfs(kLogLru, kLogDebug, "contains %s returns %d",
            hash_str.c_str(), result);
 
   return result;

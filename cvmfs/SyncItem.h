@@ -6,7 +6,7 @@
 #include "hash.h"
 #include "platform.h"
 
-#include "DirectoryEntry.h"
+#include "dirent.h"
 #include "SyncUnion.h"
 
 namespace cvmfs {

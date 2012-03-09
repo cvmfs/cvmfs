@@ -114,17 +114,15 @@ Catalog* Catalog::FindBestFittingChild(const string &path) const {
 
   // now we tokenize the remaining string
   string remaining = path.substr(this->path().length());
-  vector<string> tokens = SplitString(remaining, '/');  // TODO: why was this done in a way that empty paths were omitted.  Where do empty paths happen?
+  vector<string> tokens = SplitString(remaining, '/');
 
   // now we recombine the tokens successively
   // in order to find a child which serves a part of the path
-  vector<string>::const_iterator i,iend;
   stringstream subpathstream; subpathstream << this->path();
   Catalog *hit = NULL;
-  for (i = tokens.begin(), iend = tokens.end();
-       i != iend;
-       ++i) {
-    subpathstream << '/' << *i;
+  // Skip first empty TODO: test multiple nested
+  for (unsigned i = 1, iEnd = tokens.size(); i < iEnd; ++i) {
+    subpathstream << '/' << tokens[i];
     hit = FindChildWithMountpoint(subpathstream.str());
 
     // if we found a child serving a part of the path we can stop searching.

@@ -6,7 +6,7 @@
 #include "lru_cache.h"
 #include "hash.h"
 #include "atomic.h"
-#include "DirectoryEntry.h"
+#include "dirent.h"
 
 namespace cvmfs {
 

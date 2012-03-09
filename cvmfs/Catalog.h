@@ -23,7 +23,7 @@
 #include <assert.h>
 
 #include "catalog_queries.h"
-#include "DirectoryEntry.h"
+#include "dirent.h"
 #include "hash.h"
 #include "duplex_sqlite3.h"
 

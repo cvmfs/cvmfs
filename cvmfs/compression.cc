@@ -63,6 +63,7 @@ bool CopyPath2Path(const string &src, const string &dest) {
   return retval == 0;
 }
 
+
 bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
                   const string &path)
 {
@@ -76,6 +77,40 @@ bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
   return (written >=0) && (unsigned(written) == buffer_size);
 }
 
+
+bool CopyPath2Mem(const string &path,
+                  unsigned char **buffer, unsigned *buffer_size)
+{
+  const int fd = open(path.c_str(), O_RDONLY);
+  if (fd < 0)
+    return false;
+
+  *buffer_size = 512;
+  *buffer = reinterpret_cast<unsigned char *>(smalloc(*buffer_size));
+  unsigned total_bytes = 0;
+  while (true) {
+    unsigned num_bytes = read(fd, *buffer + total_bytes,
+                              *buffer_size - total_bytes);
+    if (num_bytes == 0)
+      break;
+    if (num_bytes < 0) {
+      close(fd);
+      free(*buffer);
+      *buffer_size = 0;
+      return false;
+    }
+    total_bytes += num_bytes;
+    if (total_bytes >= *buffer_size) {
+      *buffer_size *= 2;
+      *buffer =
+        reinterpret_cast<unsigned char *>(srealloc(*buffer, *buffer_size));
+    }
+  }
+
+  close(fd);
+  *buffer_size = total_bytes;
+  return true;
+}
 
 namespace zlib {
 

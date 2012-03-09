@@ -27,7 +27,8 @@ bool KeysMatch();
 std::string Whois();
 std::string FingerprintCertificate();
 
-bool LoadPublicRsaKeys(const std::string &file_list);
+bool LoadPublicRsaKeys(const std::string &path_list);
+bool LoadBlacklist(const std::string &path_blacklist);
 
 bool Sign(const unsigned char *buffer, const unsigned buffer_size,
           unsigned char **signature, unsigned *signature_size);
@@ -38,6 +39,8 @@ bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
 bool ReadSignatureTail(const unsigned char *buffer, const unsigned buffer_size,
                        const unsigned skip_bytes,
                        unsigned char **signature, unsigned *signature_size);
+bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
+                     const std::string &expected_repository);
 
 }  // namespace signature
 

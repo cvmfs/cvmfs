@@ -76,6 +76,7 @@ namespace cvmfs {
                "catalog load failure while try to retrieve catalog from %s",
                (root_url_ + url_path).c_str());
     }
+    LogCvmfs(kLogCatalog, kLogDebug, "catalog fetched (%d)", result);
 
     /* Quota handling, could still fail due to cache size restrictions */
     if (((result == 0) && !cached_copy) ||
@@ -119,7 +120,7 @@ namespace cvmfs {
       *catalog_file = final_file;
     }
 
-    return result;
+    return 0;//result;
   }
 
   string RemoteCatalogManager::MakeFilesystemKey(string url) const {

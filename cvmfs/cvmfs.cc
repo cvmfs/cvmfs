@@ -75,10 +75,11 @@
 #include "path_cache.h"
 #include "md5path_cache.h"
 #include "RemoteCatalogManager.h"
-#include "DirectoryEntry.h"
+#include "dirent.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
 #include "smalloc.h"
+#include "globals.h"
 
 using namespace std;  // NOLINT
 
@@ -117,8 +118,6 @@ string *cachedir_ = NULL;
 string *tracefile_ = NULL;
 string *repository_name_ = NULL;  /**< Expected repository name,
                                        e.g. atlas.cern.ch */
-uid_t uid_ = 0;  /**< will be set to uid of launching user. */
-gid_t gid_ = 0;  /**< will be set to gid of launching user. */
 pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
 unsigned max_ttl_ = 0;
@@ -482,11 +481,9 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
                              const size_t max_size)
 {
   if (offset < static_cast<int>(buffer_size)) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "DATA Reply");
     fuse_reply_buf(req, buffer + offset,
                    std::min(buffer_size - offset, max_size));
   } else {
-    LogCvmfs(kLogCvmfs, kLogDebug, "NULL Reply");
     fuse_reply_buf(req, NULL, 0);
   }
 }
@@ -1232,11 +1229,11 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
         return 0;
       }
       if (strstr(arg, "uid=")) {
-        cvmfs::uid_ = atoi(arg+4);
+        g_uid = atoi(arg+4);
         return 0;
       }
       if (strstr(arg, "gid=")) {
-        cvmfs::gid_ = atoi(arg+4);
+        g_gid = atoi(arg+4);
         return 0;
       }
       return 1;
@@ -1379,8 +1376,8 @@ int main(int argc, char *argv[]) {
   cvmfs::cachedir_ = new string(g_cvmfs_opts.cachedir);
   cvmfs::tracefile_ = new string(g_cvmfs_opts.tracefile);
   cvmfs::repository_name_ = new string(g_cvmfs_opts.repo_name);
-  if (!cvmfs::uid_) cvmfs::uid_ = getuid();
-  if (!cvmfs::gid_) cvmfs::gid_ = getgid();
+  if (!g_uid) g_uid = getuid();
+  if (!g_gid) g_gid = getgid();
   if (g_cvmfs_opts.max_ttl) cvmfs::max_ttl_ = g_cvmfs_opts.max_ttl*60;
 
   // Seperate first host from hostlist
@@ -1442,7 +1439,7 @@ int main(int argc, char *argv[]) {
 
   // Grab mountpoint
   if (g_cvmfs_opts.grab_mountpoint) {
-    if ((chown(cvmfs::mountpoint_->c_str(), cvmfs::uid_, cvmfs::gid_) != 0) ||
+    if ((chown(cvmfs::mountpoint_->c_str(), g_uid, g_gid) != 0) ||
         (chmod(cvmfs::mountpoint_->c_str(), 0755) != 0)) {
       PrintError("Failed to grab mountpoint (" + StringifyInt(errno) + ")");
       goto cvmfs_cleanup;
@@ -1450,10 +1447,10 @@ int main(int argc, char *argv[]) {
   }
 
   // Drop credentials
-  if ((cvmfs::uid_ != 0) || (cvmfs::gid_ != 0)) {
+  if ((g_uid != 0) || (g_gid != 0)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
-             cvmfs::uid_, cvmfs::gid_);
-    if ((setgid(cvmfs::gid_) != 0) || (setuid(cvmfs::uid_) != 0)) {
+             g_uid, g_gid);
+    if ((setgid(g_gid) != 0) || (setuid(g_uid) != 0)) {
       PrintError("Failed to drop credentials");
       goto cvmfs_cleanup;
     }

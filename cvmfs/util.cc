@@ -326,6 +326,14 @@ double DiffTimeSeconds(struct timeval start, struct timeval end) {
 }
 
 
+string GetLine(const char *text, const int text_size) {
+  int pos = 0;
+  while ((pos < text_size) && (text[pos] != '\n'))
+    pos++;
+  return string(text, pos);
+}
+
+
 bool ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
                     int *start_of_signature,
                     hash::Any *hash, map<char, string> *content)

@@ -28,7 +28,7 @@
 #include <string>
 
 #include "Catalog.h"
-#include "DirectoryEntry.h"
+#include "dirent.h"
 #include "hash.h"
 
 namespace cvmfs {

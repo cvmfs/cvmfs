@@ -42,7 +42,7 @@
 #include <vector>
 
 #include "platform.h"
-#include "DirectoryEntry.h"
+#include "dirent.h"
 #include "quota.h"
 #include "util.h"
 #include "hash.h"

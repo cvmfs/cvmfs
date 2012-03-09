@@ -34,6 +34,7 @@
 #include "hash.h"
 #include "util.h"
 #include "smalloc.h"
+#include "compression.h"
 
 using namespace std;  // NOLINT
 
@@ -44,11 +45,12 @@ const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch.pub";
 EVP_PKEY *private_key_ = NULL;
 X509 *certificate_ = NULL;
 vector<RSA *> *public_keys_;  /**< Contains cvmfs public master keys */
-
+vector<string> *blacklisted_certificates_ = NULL;
 
 void Init() {
   OpenSSL_add_all_algorithms();
   public_keys_ = new vector<RSA *>();
+  blacklisted_certificates_ = new vector<string>();
 }
 
 
@@ -62,7 +64,9 @@ void Fini() {
     public_keys_->clear();
   }
   delete public_keys_;
+  delete blacklisted_certificates_;
   public_keys_ = NULL;
+  blacklisted_certificates_ = NULL;
 }
 
 
@@ -174,16 +178,16 @@ bool LoadCertificateMem(const unsigned char *buffer,
 /**
  * Loads a list of public RSA keys separated by ":".
  */
-bool LoadPublicRsaKeys(const string &file_list) {
+bool LoadPublicRsaKeys(const string &path_list) {
   if (!public_keys_->empty()) {
     for (unsigned i = 0; i < public_keys_->size(); ++i)
       RSA_free((*public_keys_)[i]);
     public_keys_->clear();
   }
 
-  if (file_list == "")
+  if (path_list == "")
     return true;
-  const vector<string> pem_files = SplitString(file_list, ':');
+  const vector<string> pem_files = SplitString(path_list, ':');
 
   char *nopwd = strdupa("");
   FILE *fp;
@@ -205,6 +209,34 @@ bool LoadPublicRsaKeys(const string &file_list) {
 
   return true;
 }
+
+
+/**
+ * Loads a list of blacklisted certificates (fingerprints) from a file.
+ */
+bool LoadBlacklist(const std::string &path_blacklist) {
+  blacklisted_certificates_->clear();
+
+  char *buffer;
+  unsigned buffer_size;
+  if (!CopyPath2Mem(path_blacklist,
+                    reinterpret_cast<unsigned char **>(&buffer), &buffer_size))
+  {
+    return false;
+  }
+
+  unsigned num_bytes = 0;
+  while (num_bytes < buffer_size) {
+    const string fingerprint = GetLine(buffer + num_bytes,
+                                       buffer_size - num_bytes);
+    blacklisted_certificates_->push_back(fingerprint);
+    num_bytes += fingerprint.length() + 1;
+  }
+  free(buffer);
+
+  return true;
+}
+
 
 /**
  * Returns SHA-1 hash from DER encoded certificate, encoded the same way
@@ -420,6 +452,138 @@ bool ReadSignatureTail(const unsigned char *buffer, const unsigned buffer_size,
     memcpy(*signature, ((char *)buffer)+i, *signature_size);
     return true;
   }
+}
+
+
+/**
+ * Checks whether the fingerprint of the loaded PEM certificate is listed on the
+ * whitelist stored in a memory chunk.
+ */
+bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
+                     const string &expected_repository)
+{
+  const string fingerprint = FingerprintCertificate();
+  if (fingerprint == "") {
+    LogCvmfs(kLogCvmfs, kLogDebug, "invalid fingerprint");
+    return false;
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "checking certificate with fingerprint %s against whitelist",
+           fingerprint.c_str());
+
+  time_t local_timestamp = time(NULL);
+  string line;
+  unsigned payload_bytes = 0;
+
+  // Check timestamp (UTC), ignore issue date (legacy)
+  line = GetLine(whitelist, whitelist_size);
+  if (line.length() != 14) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp format");
+    return false;
+  }
+  payload_bytes += 15;
+
+  // Expiry date
+  line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
+  if (line.length() != 15) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp format");
+    return false;
+  }
+  struct tm tm_wl;
+  memset(&tm_wl, 0, sizeof(struct tm));
+  tm_wl.tm_year = String2Int64(line.substr(1, 4))-1900;
+  tm_wl.tm_mon = String2Int64(line.substr(5, 2)) - 1;
+  tm_wl.tm_mday = String2Int64(line.substr(7, 2));
+  tm_wl.tm_hour = String2Int64(line.substr(9, 2));
+  tm_wl.tm_min = tm_wl.tm_sec = 0;  // exact on hours level
+  time_t timestamp = timegm(&tm_wl);
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "whitelist UTC expiry timestamp in localtime: %s",
+           StringifyTime(timestamp, false).c_str());
+  if (timestamp < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp");
+    return false;
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug,  "local time: %s",
+           StringifyTime(local_timestamp, true).c_str());
+  if (local_timestamp > timestamp) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "whitelist lifetime verification failed, expired");
+    return false;
+  }
+  payload_bytes += 16;
+
+  // Check repository name
+  line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
+  if ((expected_repository != "") && ("N" + expected_repository != line)) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "repository name does not match (found %s, expected %s)",
+             line.c_str(), expected_repository.c_str());
+    return false;
+  }
+  payload_bytes += line.length() + 1;
+
+  // Search the fingerprint
+  bool found = false;
+  do {
+    line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
+    if (line == "--") break;
+    if (line.substr(0, 59) == fingerprint)
+      found = true;
+    payload_bytes += line.length() + 1;
+  } while (payload_bytes < whitelist_size);
+
+  if (!found) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "the certificate's fingerprint is not on the whitelist");
+    return false;
+  }
+
+  // Check whitelist signature
+  line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
+  if (line.length() < 40) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "no checksum at the end of whitelist found");
+    return false;
+  }
+  hash::Any hash(hash::kSha1, hash::HexPtr(line.substr(0, 40)));
+  hash::Any compare(hash::kSha1);
+  hash::HashMem((const unsigned char *)whitelist, payload_bytes-3, &compare);
+  if (hash != compare) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "whitelist checksum does not match");
+    return false;
+  }
+
+  // Check local blacklist TODO: test
+  for (unsigned i = 0; i < blacklisted_certificates_->size(); ++i) {
+    if ((*blacklisted_certificates_)[i].substr(0, 59) == fingerprint) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "blacklisted fingerprint (%s)", fingerprint.c_str());
+    }
+  }
+
+  // Verify signature
+  unsigned char *signature;
+  unsigned signature_size;
+  if (!ReadSignatureTail((const unsigned char *)whitelist, whitelist_size,
+                         payload_bytes, &signature, &signature_size))
+  {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "no signature at the end of whitelist found");
+    return false;
+  }
+  const string hash_str = hash.ToString();
+  bool result = VerifyRsa((const unsigned char *)&hash_str[0],
+                          hash_str.length(), signature, signature_size);
+  free(signature);
+  if (!result)
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "whitelist signature verification failed, %s",
+             GetCryptoError().c_str());
+  else
+    LogCvmfs(kLogCvmfs, kLogDebug, "whitelist signature verification passed");
+
+  return result;
 }
 
 }  // namespace signature
