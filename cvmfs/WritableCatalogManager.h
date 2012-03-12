@@ -26,7 +26,7 @@
 
 #include "WritableCatalog.h"
 
-namespace cvmfs {
+namespace catalog {
 
 class WritableCatalogManager : public AbstractCatalogManager {
  private:

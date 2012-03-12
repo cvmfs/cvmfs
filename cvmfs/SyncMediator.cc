@@ -12,7 +12,7 @@
 using namespace cvmfs;
 using namespace std;
 
-SyncMediator::SyncMediator(WritableCatalogManager *catalogManager,
+SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
                            const string &data_directory,
                            const bool dry_run,
                            const bool print_changeset) :
@@ -461,7 +461,7 @@ void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
 void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   // create a DirectoryEntry list out of the hardlinks
-  DirectoryEntryList hardlinks;
+  catalog::DirectoryEntryList hardlinks;
   SyncItemList::const_iterator k, kend;
   for (k    = group.hardlinks.begin(),
        kend = group.hardlinks.end(); k != kend; ++k) {

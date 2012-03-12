@@ -5,7 +5,7 @@
 
 using namespace std;
 
-namespace cvmfs {
+namespace catalog {
 
 AbstractCatalogManager::AbstractCatalogManager() {
   current_inode_offset_ = AbstractCatalogManager::kInitialInodeOffset;
@@ -37,8 +37,8 @@ bool AbstractCatalogManager::Init() {
  *  TODO: think about other allocation methods, this may run out
  *        of free inodes some time (in the late future admittedly)
  */
-InodeChunk AbstractCatalogManager::GetInodeChunkOfSize(uint64_t size) {
-  InodeChunk result;
+InodeRange AbstractCatalogManager::GetInodeChunkOfSize(uint64_t size) {
+  InodeRange result;
   result.offset = current_inode_offset_;
   result.size = size;
 
@@ -49,7 +49,7 @@ InodeChunk AbstractCatalogManager::GetInodeChunkOfSize(uint64_t size) {
   return result;
 }
 
-void AbstractCatalogManager::AnnounceInvalidInodeChunk(const InodeChunk chunk) const {
+void AbstractCatalogManager::AnnounceInvalidInodeChunk(const InodeRange chunk) const {
   // TODO: actually do something here
 }
 
@@ -72,7 +72,7 @@ bool AbstractCatalogManager::Lookup(const inode_t inode,
   // asked for the root inode (which of course has no parent)
   // we simply look in the best suited catalog and are done
   if (not with_parent || inode == GetRootInode()) {
-    found = catalog->LookupInode(inode, entry);
+    found = catalog->LookupInode(inode, entry, NULL);
     goto out;
   }
 
@@ -96,9 +96,9 @@ bool AbstractCatalogManager::Lookup(const inode_t inode,
     // it should be found in the current catalog
     if (entry->IsNestedCatalogRoot() && not catalog->IsRoot()) {
       Catalog *parent_catalog = catalog->parent();
-      found_parent_entry = parent_catalog->LookupMd5(parent_hash, &parent);
+      found_parent_entry = parent_catalog->LookupMd5Path(parent_hash, &parent);
     } else {
-      found_parent_entry = catalog->LookupMd5(parent_hash, &parent);
+      found_parent_entry = catalog->LookupMd5Path(parent_hash, &parent);
     }
 
     // if we didn't find a parent entry, there may be some data corruption!
@@ -162,7 +162,7 @@ bool AbstractCatalogManager::Listing(const string &path,
   if (not found_catalog) {
     result = false;
   } else {
-    result = catalog->Listing(path, listing);
+    result = catalog->ListingPath(path, listing);
   }
 
   Unlock();
@@ -246,7 +246,7 @@ bool AbstractCatalogManager::GetCatalogByInode(const uint64_t inode,
   //       maybe exploit the ordering in the vector
   CatalogList::const_iterator i,end;
   for (i = catalogs_.begin(), end = catalogs_.end(); i != end; ++i) {
-    if ((*i)->ContainsInode(inode)) {
+    if ((*i)->inode_range().ContainsInode(inode)) {
       *catalog = *i;
       return true;
     }
@@ -264,7 +264,7 @@ Catalog* AbstractCatalogManager::FindBestFittingCatalogForPath(const string &pat
   Catalog *best_fit = GetRootCatalog();
   Catalog *next_best_fit = NULL;
   while (best_fit->path() != path) {
-    next_best_fit = best_fit->FindBestFittingChild(path);
+    next_best_fit = best_fit->FindSubtree(path);
 
     // if there was a child which fitted better than
     // continue in this catalog, otherwise break
@@ -397,8 +397,8 @@ bool AbstractCatalogManager::AttachCatalog(const std::string &db_file,
 
   // determine the inode offset of this catalog
   uint64_t inode_chunk_size = new_catalog->max_row_id();
-  InodeChunk chunk = GetInodeChunkOfSize(inode_chunk_size);
-  new_catalog->set_inode_chunk(chunk);
+  InodeRange range = GetInodeChunkOfSize(inode_chunk_size);
+  new_catalog->set_inode_range(range);
 
   // check if everything worked out
   if (not new_catalog->IsInitialized()) {
@@ -441,7 +441,7 @@ bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
     catalog->parent()->RemoveChild(catalog);
   }
 
-  AnnounceInvalidInodeChunk(catalog->inode_chunk());
+  AnnounceInvalidInodeChunk(catalog->inode_range());
 
   // delete catalog from internal lists
   CatalogList::iterator i;
@@ -461,8 +461,8 @@ bool AbstractCatalogManager::LoadAndAttachCatalogsRecursively(Catalog *catalog) 
   bool successful = true;
 
   // go through all children of the given parent catalog and attach them
-  Catalog::NestedCatalogReferenceList children = catalog->ListNestedCatalogReferences();
-  Catalog::NestedCatalogReferenceList::const_iterator j,jend;
+  Catalog::NestedCatalogList children = catalog->ListNestedCatalogs();
+  Catalog::NestedCatalogList::const_iterator j,jend;
   for (j = children.begin(), jend = children.end();
        j != jend;
        ++j) {

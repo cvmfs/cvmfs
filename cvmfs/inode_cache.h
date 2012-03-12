@@ -9,17 +9,14 @@
 
 namespace cvmfs {
 
-   class InodeCache :
-      public LruCache<fuse_ino_t, DirectoryEntry>
-   {
+class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
+ public:
+  InodeCache(unsigned int cacheSize);
 
-      public:
-         InodeCache(unsigned int cacheSize);
-
-         bool insert(const fuse_ino_t inode, const DirectoryEntry &dirEntry);
-         bool lookup(const fuse_ino_t inode, DirectoryEntry *dirEntry);
-         void drop();
-   };
+  bool insert(const fuse_ino_t inode, const catalog::DirectoryEntry &dirEntry);
+  bool lookup(const fuse_ino_t inode, catalog::DirectoryEntry *dirEntry);
+  void drop();
+};
 
 } // namespace cvmfs
 

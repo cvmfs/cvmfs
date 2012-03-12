@@ -26,15 +26,15 @@ namespace cvmfs {
    *  this is currently just a quick and dirty prototype!!
    */
   class Md5PathCache :
-  public LruCache<hash::Md5, cvmfs::DirectoryEntry, hash_md5, hash_equal >
+  public LruCache<hash::Md5, catalog::DirectoryEntry, hash_md5, hash_equal >
   {
   private:
 
   public:
     Md5PathCache(unsigned int cacheSize);
 
-    bool insert(const hash::Md5 &hash, const struct cvmfs::DirectoryEntry &dirEntry);
-    bool lookup(const hash::Md5 &hash, struct cvmfs::DirectoryEntry *dirEntry);
+    bool insert(const hash::Md5 &hash, const struct catalog::DirectoryEntry &dirEntry);
+    bool lookup(const hash::Md5 &hash, struct catalog::DirectoryEntry *dirEntry);
     bool forget(const hash::Md5 &hash);
   };
 

@@ -20,6 +20,10 @@
 #include "globals.h"
 
 namespace cvmfs {
+class SyncItem;
+}
+
+namespace catalog {
 
   class Catalog;
   typedef uint64_t inode_t;
@@ -27,7 +31,7 @@ namespace cvmfs {
   class DirectoryEntry {
     friend class LookupSqlStatement;                   // simplify creation of DirectoryEntry objects
     friend class ManipulateDirectoryEntrySqlStatement; // simplify write of DirectoryEntry objects in database
-    friend class SyncItem;                             // simplify creation of DirectoryEntry objects for write back
+    friend class cvmfs::SyncItem;                             // simplify creation of DirectoryEntry objects for write back
     friend class WritableCatalogManager;               // TODO: remove this dependency
 
   public:
@@ -50,7 +54,6 @@ namespace cvmfs {
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) { }
 
-    std::string ExpandSymlink() const { return symlink_; } // TODO
     inline bool IsNestedCatalogRoot() const { return is_nested_catalog_root_; }
     inline bool IsNestedCatalogMountpoint() const {
       return is_nested_catalog_mountpoint_;
@@ -130,6 +133,6 @@ namespace cvmfs {
 
   typedef std::list<DirectoryEntry> DirectoryEntryList;
 
-} // cvmfs
+} // namespace catalog
 
 #endif  // CVMFS_DIRENT_H_

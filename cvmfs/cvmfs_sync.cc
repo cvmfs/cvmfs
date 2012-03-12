@@ -185,13 +185,13 @@ bool createCacheDir(SyncParameters *p) {
 	return true;
 }
 
-WritableCatalogManager* createWritableCatalogManager(const SyncParameters &p) {
-  return new WritableCatalogManager(MakeCanonicalPath(p.dir_catalogs),
+catalog::WritableCatalogManager* createWritableCatalogManager(const SyncParameters &p) {
+  return new catalog::WritableCatalogManager(MakeCanonicalPath(p.dir_catalogs),
                                     MakeCanonicalPath(p.dir_data),
                                     p.lazy_attach);
 }
 
-SyncMediator* createSyncMediator(WritableCatalogManager* catalogManager,
+SyncMediator* createSyncMediator(catalog::WritableCatalogManager* catalogManager,
                                  const SyncParameters &p) {
   return new SyncMediator(catalogManager,
                           MakeCanonicalPath(p.dir_data),
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
 	if (not createCacheDir(&parameters)) return 3;
 
 	// create worker objects
-  WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
+  catalog::WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
   SyncMediator *mediator = createSyncMediator(catalogManager, parameters);
   SyncUnion *sync = createSynchronisationEngine(mediator, parameters);
 

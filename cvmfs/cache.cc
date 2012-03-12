@@ -373,7 +373,7 @@ bool Contains(const hash::Any &id) {
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int Fetch(const cvmfs::DirectoryEntry &d, const string &cvmfs_path)
+int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
 {
   int fd_return;  // Read-only file descriptor that is returned
   int retval;

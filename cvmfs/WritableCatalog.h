@@ -14,14 +14,15 @@
 #ifndef WRITABLE_CATALOG_H
 #define WRITABLE_CATALOG_H 1
 
-#include "Catalog.h"
+#include "catalog.h"
 
 #include <list>
 #include <string>
 
-namespace cvmfs {
+namespace catalog {
 
 class WritableCatalog : public Catalog {
+  friend class WritableCatalogManager;
  public:
   WritableCatalog(const std::string &path, Catalog *parent);
   virtual ~WritableCatalog();
@@ -148,7 +149,7 @@ class WritableCatalog : public Catalog {
   /**
    *  TODO: document this
    */
-  bool MergeIntoParentCatalog() const;
+  bool MergeIntoParentCatalog();
 
  protected:
   /**
@@ -211,7 +212,7 @@ class WritableCatalog : public Catalog {
   bool MoveNestedCatalogReferencesToNewNestedCatalog(const std::list<std::string> &nested_catalog_references,
                                                      WritableCatalog *new_nested_catalog);
 
-  bool CopyNestedCatalogReferencesToParentCatalog() const;
+  bool CopyNestedCatalogReferencesToParentCatalog();
   bool CopyDirectoryEntriesToParentCatalog() const;
 
   /**

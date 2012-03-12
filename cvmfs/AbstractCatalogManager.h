@@ -27,11 +27,11 @@
 #include <vector>
 #include <string>
 
-#include "Catalog.h"
+#include "catalog.h"
 #include "dirent.h"
 #include "hash.h"
 
-namespace cvmfs {
+namespace catalog {
 
 class AbstractCatalogManager {
  public:
@@ -304,7 +304,7 @@ class AbstractCatalogManager {
    *  @param size the number of inodes needed
    *  @return a structure defining a chunk of inodes to use for this catalog
    */
-  InodeChunk GetInodeChunkOfSize(uint64_t size);
+  InodeRange GetInodeChunkOfSize(uint64_t size);
 
   /**
    *  this method is called if a catalog is detached
@@ -312,7 +312,7 @@ class AbstractCatalogManager {
    *  here you can clean caches or do some other fancy stuff
    *  @param chunk the InodeChunk to be freed
    */
-  void AnnounceInvalidInodeChunk(const InodeChunk chunk) const;
+  void AnnounceInvalidInodeChunk(const InodeRange chunk) const;
 
   /**
    *  Attaches all catalogs of the repository recursively

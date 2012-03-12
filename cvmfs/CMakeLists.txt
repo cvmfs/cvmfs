@@ -27,7 +27,7 @@ set (CVMFS2_DEBUG_SOURCES
 	cvmfs.h cvmfs.cc
 
 	catalog_queries.h           catalog_queries.cc
-	Catalog.h                   Catalog.cc
+	catalog.h                   catalog.cc
 	AbstractCatalogManager.h    AbstractCatalogManager.cc
 	RemoteCatalogManager.h      RemoteCatalogManager.cc
 	dirent.h
@@ -61,7 +61,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 
 	catalog_queries.h           catalog_queries.cc
 
-	Catalog.h                   Catalog.cc
+	catalog.h                   catalog.cc
 	WritableCatalog.h           WritableCatalog.cc
 
 	AbstractCatalogManager.h    AbstractCatalogManager.cc

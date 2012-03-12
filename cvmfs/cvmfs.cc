@@ -122,7 +122,7 @@ pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
 unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
-RemoteCatalogManager *catalog_manager_;
+catalog::RemoteCatalogManager *catalog_manager_;
 InodeCache *inode_cache_ = NULL;
 PathCache *path_cache_ = NULL;
 Md5PathCache *md5path_cache_ = NULL;
@@ -156,7 +156,7 @@ void SetMaxTtl(const unsigned value) {
 }
 
 
-static bool GetDirentForInode(const fuse_ino_t ino, DirectoryEntry *dirent) {
+static bool GetDirentForInode(const fuse_ino_t ino, catalog::DirectoryEntry *dirent) {
   // Lookup inode in cache
   if (inode_cache_->lookup(ino, dirent)) {
     LogCvmfs(kLogInodeCache, kLogDebug, "HIT %d -> '%s'",
@@ -182,7 +182,7 @@ static bool GetDirentForInode(const fuse_ino_t ino, DirectoryEntry *dirent) {
 }
 
 
-static bool get_dirent_for_path(const string &path, DirectoryEntry *dirent) {
+static bool get_dirent_for_path(const string &path, catalog::DirectoryEntry *dirent) {
   /*
    *  this one is pretty nasty!
    *  in a unit test ../../test/unittests/02....cc
@@ -244,7 +244,7 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
 
   // Find out the parent path recursively and rebuild the absolute path
   string parent_path;
-  DirectoryEntry dirent;
+  catalog::DirectoryEntry dirent;
 
   if (!GetDirentForInode(ino, &dirent)) {
     return false;
@@ -286,7 +286,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
     return;
   }
 
-  DirectoryEntry dirent;
+  catalog::DirectoryEntry dirent;
   const string path = parent_path + "/" + name;
   // TODO: getdirent for path?
   const bool found_entry = catalog_manager_->LookupWithoutParent(path, &dirent);
@@ -325,7 +325,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %d", ino);
 
-  DirectoryEntry dirent;
+  catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
 
   if (!found) {
@@ -347,7 +347,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
   tracer::Trace(tracer::kFuseReadlink, "no path provided", "readlink() call");
 
-  DirectoryEntry dirent;
+  catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
 
   if (!found) {
@@ -360,7 +360,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
     return;
   }
 
-  fuse_reply_readlink(req, dirent.ExpandSymlink().c_str());
+  fuse_reply_readlink(req, dirent.symlink().c_str());
 }
 
 
@@ -393,7 +393,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
 
   string path;
-  DirectoryEntry d;
+  catalog::DirectoryEntry d;
   const bool found = GetPathForInode(ino, &path) && GetDirentForInode(ino, &d);
 
   if (!found) {
@@ -415,7 +415,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   AddToDirListing(req, ".", &info, &listing);
 
   // Add parent directory link
-  DirectoryEntry p;
+  catalog::DirectoryEntry p;
   if (d.inode() != catalog_manager_->GetRootInode() &&
       GetDirentForInode(d.parent_inode(), &p)) {
     info = p.GetStatStructure();
@@ -423,13 +423,13 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   }
 
   // Add all names
-  DirectoryEntryList listing_from_catalog;
+  catalog::DirectoryEntryList listing_from_catalog;
   if (!catalog_manager_->Listing(path, &listing_from_catalog)) {
     free(listing.buffer);
     fuse_reply_err(req, EIO);
     return;
   }
-  for (DirectoryEntryList::const_iterator i = listing_from_catalog.begin(),
+  for (catalog::DirectoryEntryList::const_iterator i = listing_from_catalog.begin(),
        iEnd = listing_from_catalog.end(); i != iEnd; ++i)
   {
     info = i->GetStatStructure();
@@ -530,7 +530,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   tracer::Trace(tracer::kFuseOpen, "no path provided", "open() call");
 
   int fd = -1;
-  DirectoryEntry d;
+  catalog::DirectoryEntry d;
   string path;
 
   const bool found = GetDirentForInode(ino, &d) && GetPathForInode(ino, &path);
@@ -746,7 +746,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
            "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
 
   const string attr = name;
-  DirectoryEntry d;
+  catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
 
   if (!found) {
@@ -875,7 +875,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %d, size %u",
            ino, size);
 
-  DirectoryEntry d;
+  catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -919,7 +919,7 @@ static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
            ((mask & W_OK) ? "yes" : "no"),
            ((mask & X_OK) ? "yes" : "no"));
 
-  DirectoryEntry d;
+  catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
 
   if (!found) {
@@ -1583,7 +1583,7 @@ int main(int argc, char *argv[]) {
 
   // Load initial file catalog
   cvmfs::catalog_manager_ = new
-    cvmfs::RemoteCatalogManager(*cvmfs::root_url_, *cvmfs::repository_name_,
+    catalog::RemoteCatalogManager(*cvmfs::root_url_, *cvmfs::repository_name_,
       "/.cvmfswhitelist", g_cvmfs_opts.blacklist, g_cvmfs_opts.force_signing);
   if (not cvmfs::catalog_manager_->Init()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize catalog manager");

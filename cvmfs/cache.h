@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string>
 
-namespace cvmfs {
+namespace catalog {
 class DirectoryEntry;
 }
 
@@ -36,7 +36,7 @@ int CommitTransaction(const std::string &final_path,
 bool CommitFromMem(const hash::Any &id, const char *buffer,
                    const uint64_t size, const std::string &cvmfs_path);
 bool Contains(const hash::Any &id);
-int Fetch(const cvmfs::DirectoryEntry &d, const std::string &cvmfs_path);
+int Fetch(const catalog::DirectoryEntry &d, const std::string &cvmfs_path);
 
 }  // namespace cache
 

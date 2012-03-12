@@ -14,7 +14,7 @@
 
 using namespace std;
 
-namespace cvmfs {
+namespace catalog {
 
 const string WritableCatalogManager::kCatalogFilename = ".cvmfscatalog.working";
 
@@ -140,7 +140,7 @@ bool WritableCatalogManager::RemoveFile(const std::string &path) {
     return false;
   }
 
-  if (not catalog->LookupPath(file_path)) {
+  if (not catalog->LookupPath(file_path, NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "file '%s' does not exist and thus cannot be deleted", file_path.c_str());
     return false;
   }
@@ -180,7 +180,7 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   }
 
   DirectoryEntryList listing;
-  if (not catalog->Listing(directory_path, &listing) && listing.size() > 0) {
+  if (not catalog->ListingPath(directory_path, &listing) && listing.size() > 0) {
     LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' is not empty and cannot be deleted", directory_path.c_str());
     return false;
   }
@@ -298,7 +298,7 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
     return false;
   }
 
-  if (not catalog->LookupPath(entry_path)) {
+  if (not catalog->LookupPath(entry_path, NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "entry '%s' does not exist and thus cannot be touched", entry_path.c_str());
     return false;
   }

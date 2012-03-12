@@ -72,10 +72,10 @@ bool SyncItem::IsOpaqueDirectory() const {
 	return mUnionEngine->IsOpaqueDirectory(this);
 }
 
-DirectoryEntry SyncItem::CreateDirectoryEntry() const {
-  DirectoryEntry dEntry;
-  dEntry.inode_             = DirectoryEntry::kInvalidInode; // inode is determined at runtime of client
-  dEntry.parent_inode_      = DirectoryEntry::kInvalidInode; // ... dito
+catalog::DirectoryEntry SyncItem::CreateDirectoryEntry() const {
+  catalog::DirectoryEntry dEntry;
+  dEntry.inode_             = catalog::DirectoryEntry::kInvalidInode; // inode is determined at runtime of client
+  dEntry.parent_inode_      = catalog::DirectoryEntry::kInvalidInode; // ... dito
   dEntry.mode_              = this->GetUnionStat().st_mode;
   dEntry.size_              = this->GetUnionStat().st_size;
   dEntry.mtime_             = this->GetUnionStat().st_mtime;

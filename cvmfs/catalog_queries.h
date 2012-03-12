@@ -27,7 +27,7 @@
 #include "dirent.h"
 #include "duplex_sqlite3.h"
 
-namespace cvmfs {
+namespace catalog {
 
 class Catalog;
 

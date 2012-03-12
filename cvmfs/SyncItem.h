@@ -88,7 +88,7 @@ class SyncItem {
 
 	inline std::string GetFilename() const { return mFilename; }
 	inline std::string GetParentPath() const { return mRelativeParentPath; }
-  DirectoryEntry CreateDirectoryEntry() const;
+  catalog::DirectoryEntry CreateDirectoryEntry() const;
 
 	inline std::string GetRelativePath() const { return (mRelativeParentPath.empty()) ? mFilename : mRelativeParentPath + "/" + mFilename; }
 

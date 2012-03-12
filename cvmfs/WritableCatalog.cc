@@ -6,7 +6,7 @@
 
 using namespace std;
 
-namespace cvmfs {
+namespace catalog {
 
 bool WritableCatalog::CreateNewCatalogDatabase(const std::string &file_path,
                                                const DirectoryEntry &root_entry,
@@ -169,7 +169,7 @@ bool WritableCatalog::CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
 
 
   hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
-  if (LookupMd5(path_hash)) {
+  if (LookupMd5Path(path_hash, NULL)) {
 
 
 
@@ -331,7 +331,7 @@ bool WritableCatalog::MakeNestedCatalogMountpoint(const string &mountpoint) {
 bool WritableCatalog::MakeNestedCatalogRootEntry() {
   // retrieve the root entry of this catalog
   DirectoryEntry root_entry;
-  if (not GetRootEntry(&root_entry)) {
+  if (not LookupPath(path(), &root_entry)) {
     LogCvmfs(kLogCatalog, kLogDebug, "no root entry found in catalog '%s'", path().c_str());
     return false;
   }
@@ -359,7 +359,7 @@ bool WritableCatalog::MoveDirectoryStructureToNewNestedCatalogRecursively(const 
   // after creating a new nested catalog we have move all elements
   // now contained by the new one... list and move them recursively
   DirectoryEntryList listing;
-  if (not Listing(dir_structure_root, &listing)) {
+  if (not ListingPath(dir_structure_root, &listing)) {
     return false;
   }
 
@@ -448,7 +448,7 @@ bool WritableCatalog::RemoveNestedCatalogReference(const string &mountpoint, Cat
   // if there is also an attached reference in our in-memory data.
   // in this case we remove the child and return it through **attached_reference
   if (successful) {
-    Catalog *child = FindChildWithMountpoint(mountpoint);
+    Catalog *child = FindNested(mountpoint);
     if (child != NULL) this->RemoveChild(child);
     if (attached_reference != NULL) *attached_reference = child;
   }
@@ -467,7 +467,7 @@ bool WritableCatalog::UpdateNestedCatalogLink(const string &path,
   return stmt.Execute();
 }
 
-bool WritableCatalog::MergeIntoParentCatalog() const {
+bool WritableCatalog::MergeIntoParentCatalog() {
   // check if we deal with a nested catalog
   // otherwise we will not find a parent to merge into
   assert(not IsRoot());
@@ -496,21 +496,21 @@ bool WritableCatalog::MergeIntoParentCatalog() const {
   return true;
 }
 
-bool WritableCatalog::CopyNestedCatalogReferencesToParentCatalog() const {
+bool WritableCatalog::CopyNestedCatalogReferencesToParentCatalog() {
   WritableCatalog *parent = GetWritableParent();
 
   // obtain a list of all nested catalog references
-  NestedCatalogReferenceList nested_catalog_references = ListNestedCatalogReferences();
+  NestedCatalogList nested_catalog_references = ListNestedCatalogs();
 
   // go through the list and update the databases
   // simultaneously we are checking if the referenced catalogs are currently
   // attached and update the in-memory data structures as well
-  NestedCatalogReferenceList::const_iterator i,iend;
+  NestedCatalogList::const_iterator i,iend;
   for (i = nested_catalog_references.begin(),
        iend = nested_catalog_references.end();
        i != iend;
        ++i) {
-    Catalog *child = FindChildWithMountpoint(i->path);
+    Catalog *child = FindNested(i->path);
     parent->InsertNestedCatalogReference(i->path, child, i->content_hash);
   }
 
@@ -553,7 +553,7 @@ bool WritableCatalog::CopyDirectoryEntriesToParentCatalog() const {
 
   // now copy over all DirectoryEntries to the 'other' catalog
   // there will be no data collisions, as we resolved them before hands
-  if (not SqlStatement(database(), "ATTACH '" + parent->database_file() + "' AS other;").Execute()) {
+  if (not SqlStatement(database(), "ATTACH '" + parent->database_path() + "' AS other;").Execute()) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach database of catalog '%s' in catalog '%s'", parent->path().c_str(), this->path().c_str());
     return false;
   }

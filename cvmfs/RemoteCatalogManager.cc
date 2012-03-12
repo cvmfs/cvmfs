@@ -14,7 +14,7 @@
 
 using namespace std;
 
-namespace cvmfs {
+namespace catalog {
 
   RemoteCatalogManager::RemoteCatalogManager(const string &root_url, const string &repo_name, const string &whitelist,
                                              const string &blacklist, const bool force_signing)

@@ -80,7 +80,7 @@ private:
 	typedef std::list<HardlinkGroup> HardlinkGroupList;
 
 private:
-	WritableCatalogManager *mCatalogManager;
+  catalog::WritableCatalogManager *mCatalogManager;
 	const std::string mDataDirectory;
   SyncUnion *mUnionEngine;
 
@@ -107,7 +107,7 @@ private:
 	bool mPrintChangeset;
 
 public:
-	SyncMediator(WritableCatalogManager *catalogManager,
+	SyncMediator(catalog::WritableCatalogManager *catalogManager,
 	             const std::string &data_directory,
 	             const bool dry_run = false,
 	             const bool print_changeset = false);

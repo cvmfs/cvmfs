@@ -14,7 +14,7 @@
 
 #include "atomic.h"
 
-namespace cvmfs {
+namespace catalog {
 
 class RemoteCatalogManager : public AbstractCatalogManager {
  public:
