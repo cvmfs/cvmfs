@@ -4,7 +4,7 @@
 
 #include "catalog.h"
 
-#include "AbstractCatalogManager.h"
+#include "catalog_mgr.h"
 #include "util.h"
 #include "logging.h"
 #include "smalloc.h"
@@ -44,8 +44,7 @@ void Catalog::InitPreparedStatements() {
   sql_lookup_md5path_ = new PathHashLookupSqlStatement(database_);
   sql_lookup_inode_ = new InodeLookupSqlStatement(database_);
   sql_lookup_nested_ = new FindNestedCatalogSqlStatement(database_);
-  sql_list_nested_ =
-  new ListNestedCatalogsSqlStatement(database_);
+  sql_list_nested_ = new ListNestedCatalogsSqlStatement(database_);
 }
 
 
@@ -273,11 +272,28 @@ Catalog::NestedCatalogList Catalog::ListNestedCatalogs() const {
 
 
 /**
+ * Looks for a specific registered nested catalog based on a path.
+ */
+bool Catalog::FindNested(const string &mountpoint, hash::Any *hash) const {
+  pthread_mutex_lock(lock_);
+  sql_lookup_nested_->BindSearchPath(mountpoint);
+  bool found = sql_lookup_nested_->FetchRow();
+  if (found && (hash != NULL)) {
+    *hash = sql_lookup_nested_->GetContentHash();
+  }
+  sql_lookup_nested_->Reset();
+  pthread_mutex_unlock(lock_);
+
+  return found;
+}
+
+
+/**
  * Add a Catalog as child to this Catalog.
  * @param child the Catalog to define as child
  */
 void Catalog::AddChild(Catalog *child) {
-  assert(NULL == FindNested(child->path()));
+  assert(NULL == FindChild(child->path()));
 
   pthread_mutex_lock(lock_);
   children_[child->path()] = child;
@@ -291,7 +307,7 @@ void Catalog::AddChild(Catalog *child) {
  * @param child the Catalog to delete as child
  */
 void Catalog::RemoveChild(Catalog *child) {
-  assert(NULL != FindNested(child->path()));
+  assert(NULL != FindChild(child->path()));
 
   pthread_mutex_lock(lock_);
   child->set_parent(NULL);
@@ -338,7 +354,7 @@ Catalog* Catalog::FindSubtree(const string &path) const {
   // Skip first empty token
   for (unsigned i = 1, iEnd = tokens.size(); i < iEnd; ++i) {
     path_prefix += "/" + tokens[i];
-    result = FindNested(path_prefix);
+    result = FindChild(path_prefix);
 
     // If we found a child serving a part of the path we can stop searching.
     // Remaining sub path elements are possbily served by a grand child.
@@ -350,7 +366,11 @@ Catalog* Catalog::FindSubtree(const string &path) const {
 }
 
 
-Catalog* Catalog::FindNested(const std::string &mountpoint) const {
+/**
+ * Looks for a child catalog, which is a subset of all registered nested
+ * catalogs.
+ */
+Catalog* Catalog::FindChild(const std::string &mountpoint) const {
   NestedCatalogMap::const_iterator nested_iter;
 
   pthread_mutex_lock(lock_);

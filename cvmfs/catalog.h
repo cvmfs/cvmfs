@@ -23,6 +23,7 @@ namespace catalog {
 
 class CatalogManager;
 class Catalog;
+
 typedef std::list<Catalog *> CatalogList;
 
 
@@ -38,10 +39,10 @@ struct InodeRange {
   InodeRange() : offset(0), size(0) { }
 
   inline bool ContainsInode(const inode_t inode) const {
-    return ((uint64_t)inode > offset && inode <= size + offset);
+    return ((inode > offset) && (inode <= size + offset));
   }
 
-  inline bool IsInitialized() const { return offset > 0 && size > 0; }
+  inline bool IsInitialized() const { return (offset > 0) && (size > 0); }
 };
 
 
@@ -54,7 +55,7 @@ struct InodeRange {
  * Read-only catalog. A sub-class provides read-write access.
  */
 class Catalog {
-  friend class AbstractCatalogManager;
+  friend class CatalogManager;
   friend class LookupSqlStatement;  // for mangled inode
  public:
   Catalog(const std::string &path, Catalog *parent);
@@ -99,6 +100,7 @@ class Catalog {
   } NestedCatalog;
   typedef std::list<NestedCatalog> NestedCatalogList;
   NestedCatalogList ListNestedCatalogs() const;
+  bool FindNested(const std::string &mountpoint, hash::Any *hash) const;
 
  protected:
   /**
@@ -114,8 +116,8 @@ class Catalog {
   void AddChild(Catalog *child);
   void RemoveChild(Catalog *child);
   CatalogList GetChildren() const;
-  Catalog* FindNested(const std::string &mountpoint) const;
   Catalog* FindSubtree(const std::string &path) const;
+  Catalog* FindChild(const std::string &mountpoint) const;
 
   inline sqlite3* database() const { return database_; }
   inline std::string database_path() const { return database_path_; }

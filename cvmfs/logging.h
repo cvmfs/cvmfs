@@ -6,7 +6,7 @@
 #define CVMFS_LOGGING_H_
 
 // Shared declarations of debug and non-debug logging
-#include "logging-internal.h"
+#include "logging_internal.h"
 
 void LogCvmfs(const LogSource source, const int mask, const char *format, ...);
 // Ensure that pure debug messages are not compiled except in DEBUGMSG mode

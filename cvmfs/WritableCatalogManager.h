@@ -19,7 +19,7 @@
 #ifndef WRITABLE_CATALOG_MANAGER_H
 #define WRITABLE_CATALOG_MANAGER_H
 
-#include "AbstractCatalogManager.h"
+#include "catalog_mgr.h"
 
 #include <set>
 #include <string>
@@ -28,7 +28,7 @@
 
 namespace catalog {
 
-class WritableCatalogManager : public AbstractCatalogManager {
+class WritableCatalogManager : public CatalogManager {
  private:
   const static std::string kCatalogFilename; // see top of WritableCatalogManager.cc
 

@@ -1,9 +1,8 @@
 /**
- *  This file provides classes to wrap often used catalog SQL statements.
- *  The C API for sqlite3 is quite odd. It allows named place holders
- *  in prepared SQL statements but requires to fill them by their offset.
- *  To overcome this potential nasty error source, these classes encapsulate
- *  commonly used database queries.
+ * This file is part of the CernVM file system.
+ *
+ * This file provides classes to wrap often used catalog SQL statements.
+ * In particular, it wraps around sqlite3 prepared statement syntax.
  *
  *  Usage example:
  *
@@ -13,8 +12,6 @@
  *     statement.GetDirectoryEntry(<catalog>);
  *   }
  *   statement.Reset();
- *
- *  Developed by René Meusel 2011
  */
 
 #ifndef CATALOG_QUERIES_H

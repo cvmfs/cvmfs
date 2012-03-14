@@ -35,7 +35,7 @@ WritableCatalogManager::~WritableCatalogManager() {
 }
 
 bool WritableCatalogManager::Init() {
-  bool succeeded = AbstractCatalogManager::Init();
+  bool succeeded = CatalogManager::Init();
 
   // if the abstract initialization fails, we have a fresh repository here
   // create a root catalog
@@ -118,7 +118,7 @@ bool WritableCatalogManager::GetCatalogByPath(const string &path,
                                               WritableCatalog **result) {
   const bool load_final_catalog = true;
   Catalog *catalog = NULL;
-  bool found = AbstractCatalogManager::GetCatalogByPath(path,
+  bool found = CatalogManager::GetCatalogByPath(path,
                                                         load_final_catalog,
                                                         &catalog);
 

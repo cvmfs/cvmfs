@@ -10,13 +10,13 @@
 #ifndef REMOTE_CATALOG_MANAGER_H
 #define REMOTE_CATALOG_MANAGER_H 1
 
-#include "AbstractCatalogManager.h"
+#include "catalog_mgr.h"
 
 #include "atomic.h"
 
 namespace catalog {
 
-class RemoteCatalogManager : public AbstractCatalogManager {
+class RemoteCatalogManager : public CatalogManager {
  public:
   RemoteCatalogManager(const std::string &root_url, const std::string &repo_name, const std::string &whitelist,
                        const std::string &blacklist, const bool force_signing);

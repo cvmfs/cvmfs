@@ -11,7 +11,7 @@
  * If DEBUGMSG is undefined, pure debug messages are compiled into no-ops.
  */
 
-#include "logging-internal.h"
+#include "logging_internal.h"
 
 #include <pthread.h>
 #include <errno.h>

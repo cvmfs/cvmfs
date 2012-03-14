@@ -448,7 +448,7 @@ bool WritableCatalog::RemoveNestedCatalogReference(const string &mountpoint, Cat
   // if there is also an attached reference in our in-memory data.
   // in this case we remove the child and return it through **attached_reference
   if (successful) {
-    Catalog *child = FindNested(mountpoint);
+    Catalog *child = FindChild(mountpoint);
     if (child != NULL) this->RemoveChild(child);
     if (attached_reference != NULL) *attached_reference = child;
   }
@@ -510,7 +510,7 @@ bool WritableCatalog::CopyNestedCatalogReferencesToParentCatalog() {
        iend = nested_catalog_references.end();
        i != iend;
        ++i) {
-    Catalog *child = FindNested(i->path);
+    Catalog *child = FindChild(i->path);
     parent->InsertNestedCatalogReference(i->path, child, i->content_hash);
   }
 

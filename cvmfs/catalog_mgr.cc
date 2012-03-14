@@ -1,35 +1,210 @@
-#include "AbstractCatalogManager.h"
+/**
+ * This file is part of the CernVM File System
+ */
+
+#include "catalog_mgr.h"
 
 #include <iostream>
 #include "logging.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace catalog {
 
-AbstractCatalogManager::AbstractCatalogManager() {
-  current_inode_offset_ = AbstractCatalogManager::kInitialInodeOffset;
+CatalogManager::CatalogManager() {
+  current_inode_offset_ = CatalogManager::kInitialInodeOffset;
 }
 
-AbstractCatalogManager::~AbstractCatalogManager() {
-  WriteLock();
+
+CatalogManager::~CatalogManager() {
   DetachAllCatalogs();
-  Unlock();
 }
 
-bool AbstractCatalogManager::Init() {
-  // attaching root catalog
+
+/**
+ * Initializes the CatalogManager and loads and attaches the root entry.
+ * @return true on successful init, otherwise false
+ */
+bool CatalogManager::Init() {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog");
   WriteLock();
-  bool root_catalog_attached = LoadAndAttachCatalog("", NULL);
+  bool attached = LoadAndAttachCatalog("", NULL);
   Unlock();
 
-  if (not root_catalog_attached) {
+  if (!attached) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to initialize root catalog");
   }
 
-  return root_catalog_attached;
+  return attached;
 }
+
+
+/**
+ * Perform a lookup for a specific DirectoryEntry in the catalogs.
+ * @param inode the inode to find in the catalogs
+ * @param options whether to perform another lookup to get the parent entry, too
+ * @param dirent the resulting DirectoryEntry
+ * @return true if lookup succeeded otherwise false
+ */
+bool CatalogManager::LookupInode(const inode_t inode,
+                                 const LookupOptions options,
+                                 DirectoryEntry *dirent) const
+{
+  ReadLock();
+  bool found = false;
+
+  // Get corresponding catalog
+  Catalog *catalog;
+  const bool found_catalog = GetCatalogByInode(inode, &catalog);
+  if (!found_catalog) {
+    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %d", inode);
+    goto lookup_inode_fini;
+  }
+
+  if ((options == kLookupSole) || (inode == GetRootInode())) {
+    found = catalog->LookupInode(inode, dirent, NULL);
+    goto lookup_inode_fini;
+  } else {
+    // Lookup including parent entry
+    hash::Md5 parent_md5path;
+    DirectoryEntry parent;
+    bool found_parent = false;
+
+    found = catalog->LookupInode(inode, dirent, &parent_md5path);
+    if (!found)
+      goto lookup_inode_fini;
+
+    // Parent is possibly in the parent catalog
+    if (dirent->IsNestedCatalogRoot() && !catalog->IsRoot()) {
+      Catalog *parent_catalog = catalog->parent();
+      found_parent = parent_catalog->LookupMd5Path(parent_md5path, &parent);
+    } else {
+      found_parent = catalog->LookupMd5Path(parent_md5path, &parent);
+    }
+
+    // If there is no parent entry, it might be data corruption
+    if (!found_parent) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+               "cannot find parent entry for inode %d --> data corrupt?",
+               inode);
+      found = false;
+    } else {
+      dirent->set_parent_inode(parent.inode());
+      found = true;
+    }
+  }
+
+ lookup_inode_fini:
+  Unlock();
+  return found;
+}
+
+
+/**
+ * Perform a lookup for a specific DirectoryEntry in the catalogs.
+ * @param path the path to find in the catalogs
+ * @param options whether to perform another lookup to get the parent entry, too
+ * @param dirent the resulting DirectoryEntry
+ * @return true if lookup succeeded otherwise false
+ */
+bool CatalogManager::LookupPath(const string &path, const LookupOptions options,
+                                DirectoryEntry *dirent)
+{
+  ReadLock();
+
+  Catalog *best_fit = WalkTree(path);
+  assert(best_fit != NULL);
+
+  LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
+           path.c_str(), best_fit->path().c_str());
+  bool found = best_fit->LookupPath(path, dirent);
+
+  // Possibly in a nested catalog
+  if (!found) {
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "entry not found, we may have to load nested catalogs");
+
+    Catalog *nested_catalog;
+    UpgradeLock();
+    found = MountSubtree(path, best_fit, &nested_catalog);
+    DowngradeLock();
+
+    if (!found) {
+      LogCvmfs(kLogCatalog, kLogDebug,
+               "failed to load nested catalog for '%s'", path.c_str());
+      goto lookup_path_notfound;
+    }
+
+    if (nested_catalog != best_fit) {
+      found = nested_catalog->LookupPath(path, dirent);
+      if (!found) {
+        LogCvmfs(kLogCatalog, kLogDebug,
+                 "nested catalogs loaded but entry '%s' was still not found",
+                 path.c_str());
+        goto lookup_path_notfound;
+      } else {
+        best_fit = nested_catalog;
+      }
+    } else {
+      LogCvmfs(kLogCatalog, kLogDebug, "no nested catalog fits");
+      goto lookup_path_notfound;
+    }
+  }
+  LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s",
+           path.c_str(), best_fit->path().c_str());
+
+  // Look for parent entry
+  if (options == kLookupFull) {
+    string parent_path = GetParentPath(path);
+    DirectoryEntry parent;
+    found = LookupPath(parent_path, kLookupSole, &parent);
+    if (!found) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+               "cannot find parent '%s' for entry '%s' --> data corrupt?",
+               parent_path.c_str(), path.c_str());
+    } else {
+      dirent->set_parent_inode(parent.inode());
+    }
+  }
+
+  Unlock();
+  return true;
+
+ lookup_path_notfound:
+  Unlock();
+  return false;
+}
+
+
+/**
+ * Do a listing of the specified directory.
+ * @param path the path of the directory to list
+ * @param listing the resulting DirectoryEntryList
+ * @return true if listing succeeded otherwise false
+ */
+bool CatalogManager::Listing(const string &path,
+                             DirectoryEntryList *listing) {
+  bool result;
+  ReadLock();
+
+  // Find catalog, possibly load nested
+  Catalog *best_fit = WalkTree(path);
+  Catalog *catalog;
+  UpgradeLock();
+  result = MountSubtree(path, best_fit, &catalog);
+  DowngradeLock();
+  if (!result) {
+    Unlock();
+    return false;
+  }
+
+  result = catalog->ListingPath(path, listing);
+
+  Unlock();
+  return result;
+}
+
+
 
 /**
  *  currently this is a very simple approach
@@ -37,7 +212,7 @@ bool AbstractCatalogManager::Init() {
  *  TODO: think about other allocation methods, this may run out
  *        of free inodes some time (in the late future admittedly)
  */
-InodeRange AbstractCatalogManager::GetInodeChunkOfSize(uint64_t size) {
+InodeRange CatalogManager::GetInodeChunkOfSize(uint64_t size) {
   InodeRange result;
   result.offset = current_inode_offset_;
   result.size = size;
@@ -49,132 +224,17 @@ InodeRange AbstractCatalogManager::GetInodeChunkOfSize(uint64_t size) {
   return result;
 }
 
-void AbstractCatalogManager::AnnounceInvalidInodeChunk(const InodeRange chunk) const {
+void CatalogManager::AnnounceInvalidInodeChunk(const InodeRange chunk) const {
   // TODO: actually do something here
 }
 
-bool AbstractCatalogManager::Lookup(const inode_t inode,
-                                    DirectoryEntry *entry,
-                                    const bool with_parent) const {
-  ReadLock();
-  bool found = false;
 
-  // get appropriate catalog
-  Catalog *catalog;
-  bool found_catalog = GetCatalogByInode(inode, &catalog);
-  if (not found_catalog) {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %d", inode);
-    found = false;
-    goto out;
-  }
-
-  // if we are not asked to lookup the parent inode or if we are
-  // asked for the root inode (which of course has no parent)
-  // we simply look in the best suited catalog and are done
-  if (not with_parent || inode == GetRootInode()) {
-    found = catalog->LookupInode(inode, entry, NULL);
-    goto out;
-  }
-
-  // to lookup the parent of this entry, we obtain the parent
-  // md5 hash and make potentially two lookups, first in the
-  // previously found catalog and second its parent catalog
-  else {
-    hash::Md5 parent_hash;
-    DirectoryEntry parent;
-    bool found_parent_entry = false;
-    bool found_entry = catalog->LookupInode(inode, entry, &parent_hash);
-
-    // entry was not found... we're done with that --> return
-    if (not found_entry) {
-      found = false;
-      goto out;
-    }
-
-    // if our entry is the root of a nested catalog it's parent resides
-    // in the parent catalog and we have to search there. Otherwise
-    // it should be found in the current catalog
-    if (entry->IsNestedCatalogRoot() && not catalog->IsRoot()) {
-      Catalog *parent_catalog = catalog->parent();
-      found_parent_entry = parent_catalog->LookupMd5Path(parent_hash, &parent);
-    } else {
-      found_parent_entry = catalog->LookupMd5Path(parent_hash, &parent);
-    }
-
-    // if we didn't find a parent entry, there may be some data corruption!
-    if (not found_parent_entry) {
-      LogCvmfs(kLogCatalog, kLogDebug,
-               "cannot find parent entry for inode %d --> data corrupt?",
-               inode);
-      found = false;
-      goto out;
-    }
-
-    // all set
-    entry->set_parent_inode(parent.inode());
-    found = true;
-    goto out;
-  }
-
-out:
-  Unlock();
-  return found;
-}
-
-bool AbstractCatalogManager::Lookup(const string &path,
-                                    DirectoryEntry *entry,
-                                    const bool with_parent) {
-  ReadLock();
-
-  // the actual lookup is performed while finding the correct
-  // catalog as a side product
-  bool found = false;
-  found = GetCatalogByPath(path, false, NULL, entry);
-
-  // lookup the parent entry, if asked for
-  if (found && with_parent) {
-    string parent_path = GetParentPath(path);
-    DirectoryEntry parent;
-    found = LookupWithoutParent(parent_path, &parent);
-    if (not found) {
-      LogCvmfs(kLogCatalog, kLogDebug,
-                "cannot find parent '%s' for entry '%s' --> data corrupt?",
-               parent_path.c_str(), path.c_str());
-    } else {
-      entry->set_parent_inode(parent.inode());
-    }
-  }
-
-  Unlock();
-  return found;
-}
-
-bool AbstractCatalogManager::Listing(const string &path,
-                                     DirectoryEntryList *listing) {
-  ReadLock();
-  bool result = false;
-
-  // find the catalog where path resides
-  Catalog *catalog;
-  bool found_catalog = GetCatalogByPath(path, true, &catalog);
-
-  // do the listing
-  if (not found_catalog) {
-    result = false;
-  } else {
-    result = catalog->ListingPath(path, listing);
-  }
-
-  Unlock();
-  return result;
-}
-
-bool AbstractCatalogManager::GetCatalogByPath(const string &path,
+bool CatalogManager::GetCatalogByPath(const string &path,
                                               const bool load_final_catalog,
                                               Catalog **catalog,
                                               DirectoryEntry *entry) {
   // find the best fitting loaded catalog for this path
-  Catalog *best_fitting_catalog = FindBestFittingCatalogForPath(path);
+  Catalog *best_fitting_catalog = WalkTree(path);
   assert (best_fitting_catalog != NULL);
 
   // path lookup in this catalog
@@ -240,7 +300,7 @@ bool AbstractCatalogManager::GetCatalogByPath(const string &path,
   return true;
 }
 
-bool AbstractCatalogManager::GetCatalogByInode(const uint64_t inode,
+bool CatalogManager::GetCatalogByInode(const uint64_t inode,
                                                Catalog **catalog) const {
   // TODO: replace this with a more clever algorithm
   //       maybe exploit the ordering in the vector
@@ -256,36 +316,37 @@ bool AbstractCatalogManager::GetCatalogByInode(const uint64_t inode,
   return false;
 }
 
-Catalog* AbstractCatalogManager::FindBestFittingCatalogForPath(const string &path) const {
-  assert (GetNumberOfAttachedCatalogs() > 0);
 
-  // we start at the root catalog and successive go down the catalog
-  // tree to find the best fitting catalog for the given path
+/**
+ * Find the catalog leaf in the tree that fits the path.
+ * The path might be served by a not yet loaded nested catalog.
+ * @param path the path a catalog is searched for
+ * @return the catalog which is best fitting at the given path
+ */
+Catalog* CatalogManager::WalkTree(const string &path) const {
+  assert (GetNumCatalogs() > 0);
+
+  // Start at the root catalog and successive go down the catalog tree
   Catalog *best_fit = GetRootCatalog();
-  Catalog *next_best_fit = NULL;
+  Catalog *next_fit = NULL;
   while (best_fit->path() != path) {
-    next_best_fit = best_fit->FindSubtree(path);
-
-    // if there was a child which fitted better than
-    // continue in this catalog, otherwise break
-    if (next_best_fit != NULL) {
-      best_fit = next_best_fit;
-    } else {
+    next_fit = best_fit->FindSubtree(path);
+    if (next_fit == NULL)
       break;
-    }
+    best_fit = next_fit;
   }
 
   return best_fit;
 }
 
-bool AbstractCatalogManager::IsCatalogAttached(const string &root_path,
+bool CatalogManager::IsCatalogAttached(const string &root_path,
                                                Catalog **attached_catalog) const {
-  if (GetNumberOfAttachedCatalogs() == 0) {
+  if (GetNumCatalogs() == 0) {
     return false;
   }
 
   // look through the attached catalogs to find the searched one
-  Catalog *best_fit = FindBestFittingCatalogForPath(root_path);
+  Catalog *best_fit = WalkTree(root_path);
 
   // not found... too bad
   if (best_fit->path() != root_path) {
@@ -297,7 +358,45 @@ bool AbstractCatalogManager::IsCatalogAttached(const string &root_path,
   return true;
 }
 
-bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path,
+
+/**
+ * Recursively mounts all nested catalogs required to serve a path.
+ * The final leaf nested catalog is returned.
+ */
+bool CatalogManager::MountSubtree(const string &path,
+                                  const Catalog *entry_point,
+                                  Catalog **leaf_catalog)
+{
+  bool result = true;
+  Catalog *parent = (entry_point == NULL) ?
+                    GetRootCatalog() : const_cast<Catalog *>(entry_point);
+  assert(path.find(parent->path()) == 0);
+
+  // Try to find path as a super string of nested catalog mount points
+  const Catalog::NestedCatalogList nested_catalogs =
+    parent->ListNestedCatalogs();
+  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
+       iEnd = nested_catalogs.end(); i != iEnd; ++i)
+  {
+    // Next nesting level
+    if ((path + "/").find(i->path + "/") == 0) {
+      Catalog *new_nested;
+      LogCvmfs(kLogCatalog, kLogDebug, "load nested catalog at %s",
+               i->path.c_str());
+      result = LoadAndAttachCatalog(i->path, parent, &new_nested);
+      if (!result)
+        return false;
+
+      result = MountSubtree(path, new_nested, &parent);
+    }
+  }
+
+  *leaf_catalog = parent;
+  return result;
+}
+
+
+bool CatalogManager::LoadNestedCatalogForPath(const string &path,
                                                       const Catalog *entry_point,
                                                       const bool load_final_catalog,
                                                       Catalog **final_catalog) {
@@ -346,7 +445,7 @@ bool AbstractCatalogManager::LoadNestedCatalogForPath(const string &path,
   return true;
 }
 
-bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint,
+bool CatalogManager::LoadAndAttachCatalog(const string &mountpoint,
                                                   Catalog *parent_catalog,
                                                   Catalog **attached_catalog) {
   // check if catalog is already attached
@@ -382,7 +481,7 @@ bool AbstractCatalogManager::LoadAndAttachCatalog(const string &mountpoint,
   return true;
 }
 
-bool AbstractCatalogManager::AttachCatalog(const std::string &db_file,
+bool CatalogManager::AttachCatalog(const std::string &db_file,
                                            Catalog *new_catalog,
                                            const bool open_transaction) {
   LogCvmfs(kLogCatalog, kLogDebug, "attaching catalog file %s",
@@ -412,7 +511,7 @@ bool AbstractCatalogManager::AttachCatalog(const std::string &db_file,
   return true;
 }
 
-bool AbstractCatalogManager::DetachCatalogTree(Catalog *catalog) {
+bool CatalogManager::DetachCatalogTree(Catalog *catalog) {
   bool successful = true;
 
   // detach all child catalogs recursively
@@ -435,7 +534,7 @@ bool AbstractCatalogManager::DetachCatalogTree(Catalog *catalog) {
   return successful;
 }
 
-bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
+bool CatalogManager::DetachCatalog(Catalog *catalog) {
   // detach *catalog from catalog tree
   if (not catalog->IsRoot()) {
     catalog->parent()->RemoveChild(catalog);
@@ -457,7 +556,7 @@ bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
   return false;
 }
 
-bool AbstractCatalogManager::LoadAndAttachCatalogsRecursively(Catalog *catalog) {
+bool CatalogManager::LoadAndAttachCatalogsRecursively(Catalog *catalog) {
   bool successful = true;
 
   // go through all children of the given parent catalog and attach them
@@ -476,7 +575,7 @@ bool AbstractCatalogManager::LoadAndAttachCatalogsRecursively(Catalog *catalog) 
   return successful;
 }
 
-void AbstractCatalogManager::PrintCatalogHierarchyRecursively(const Catalog *catalog,
+void CatalogManager::PrintCatalogHierarchyRecursively(const Catalog *catalog,
                                                               const int recursion_depth) const {
   CatalogList children = catalog->GetChildren();
 

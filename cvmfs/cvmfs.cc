@@ -167,7 +167,7 @@ static bool GetDirentForInode(const fuse_ino_t ino, catalog::DirectoryEntry *dir
              ino);
 
     // Lookup inode in catalog
-    if (catalog_manager_->Lookup(ino, dirent)) {
+    if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
       LogCvmfs(kLogInodeCache, kLogDebug, "CATALOG HIT %d -> '%s'",
                dirent->inode(), dirent->name().c_str());
       inode_cache_->insert(ino, *dirent);
@@ -215,7 +215,7 @@ static bool get_dirent_for_path(const string &path, catalog::DirectoryEntry *dir
   LogCvmfs(kLogMd5Cache, kLogDebug, "MISS %s --> lookup in catalogs",
            path.c_str());
 
-  if (catalog_manager_->Lookup(path, dirent)) {
+  if (catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent)) {
     LogCvmfs(kLogMd5Cache, kLogDebug, "CATALOG HIT %s -> '%s'",
              path.c_str(), dirent->name().c_str());
     //            md5path_cache_->insert(md5, dirent);
@@ -289,7 +289,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   catalog::DirectoryEntry dirent;
   const string path = parent_path + "/" + name;
   // TODO: getdirent for path?
-  const bool found_entry = catalog_manager_->LookupWithoutParent(path, &dirent);
+  const bool found_entry =
+    catalog_manager_->LookupPath(path, catalog::kLookupSole, &dirent);
   if (!found_entry) {
     fuse_reply_err(req, ENOENT);
     return;
@@ -831,7 +832,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     uint64_t uptime = now - boot_time_;
     attribute_value = StringifyInt(uptime / 60);
   } else if (attr == "user.nclg") {
-    const int num_catalogs = catalog_manager_->GetNumberOfAttachedCatalogs();
+    const int num_catalogs = catalog_manager_->GetNumCatalogs();
     attribute_value = StringifyInt(num_catalogs);
   } else if (attr == "user.nopen") {
     attribute_value = StringifyInt(atomic_read64(&num_open_));

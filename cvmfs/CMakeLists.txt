@@ -5,7 +5,7 @@
 
 set (CVMFS2_DEBUG_SOURCES
 	smalloc.h
-	logging.cc logging.h
+	logging.cc logging.h logging_internal.h
 	tracer.h tracer.cc atomic.h
 	duplex_sqlite3.h duplex_curl.h
 	signature.h signature.cc
@@ -26,12 +26,11 @@ set (CVMFS2_DEBUG_SOURCES
   globals.h globals.cc
 	cvmfs.h cvmfs.cc
 
-	catalog_queries.h           catalog_queries.cc
-	catalog.h                   catalog.cc
-	AbstractCatalogManager.h    AbstractCatalogManager.cc
+	catalog_queries.h catalog_queries.cc
+	catalog.h catalog.cc
+	catalog_mgr.h catalog_mgr.cc
 	RemoteCatalogManager.h      RemoteCatalogManager.cc
 	dirent.h
-
 )
 
 set (CVMFS2_SOURCES ${CVMFS2_DEBUG_SOURCES})
@@ -49,7 +48,7 @@ set (CVMFS_SYNC_BIN_SOURCES
   hash.h hash.cc
 	duplex_sqlite3.h
 	util.cc util.h
-	logging.cc logging.h
+	logging.cc logging.h logging_internal.h
 	monitor.cc monitor.h
 	cvmfs_sync.h cvmfs_sync.cc
 	cvmfs_sync_recursion.h cvmfs_sync_recursion.cc
@@ -64,7 +63,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	catalog.h                   catalog.cc
 	WritableCatalog.h           WritableCatalog.cc
 
-	AbstractCatalogManager.h    AbstractCatalogManager.cc
+	catalog_mgr.h catalog_mgr.cc
 	WritableCatalogManager.h    WritableCatalogManager.cc
 
 	dirent.h)
@@ -86,7 +85,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 
 #set (CVMFS_PULL_SOURCES
 #	smalloc.h
-#	logging.cc logging.h
+#	logging.cc logging.h logging_internal.h
 #	duplex_zlib.h compression.h compression.cc
 #	duplex_curl.h download.cc download.h
 #	hash.h hash.cc

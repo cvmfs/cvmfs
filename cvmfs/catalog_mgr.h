@@ -1,28 +1,9 @@
 /**
  * This file is part of the CernVM File System.
- *
- * The AbstractCatalogManager provides the functionality a read-only
- * catalog has to provide.   There are various methods for lookups of
- * DirectoryEntrys.  Directory listing is supported.
- * All intrinsic catalog magic is also happening here and transparent to
- * the user of this class (such as reloading of expired catalogs, attaching
- * of nested catalogs and delegating of lookups to the appropriate catalog).
- *
- * To be as extensible as possible it provides a couple of virtual methods
- * which can be implemented by derived classes.
- *
- * The concrete CatalogManager implementations are meant to be thread safe.
- * Thus it is highly encouraged to use the synchronisation methods provided
- * by the inherited class ThreadSafeReadWrite.
- *
- * Usage:
- *   DerivedCatalogManager *catMngr = new DerivedCatalogManager();
- *   catMngr->Init();
- *   catMngr->Lookup(<inode>, &<result_entry>);
  */
 
-#ifndef CVMFS_ABSTRACT_CATALOG_MANAGER_H_
-#define CVMFS_ABSTRACT_CATALOG_MANAGER_H_
+#ifndef CVMFS_CATALOG_MGR_H_
+#define CVMFS_CATALOG_MGR_H_
 
 #include <vector>
 #include <string>
@@ -33,77 +14,36 @@
 
 namespace catalog {
 
-class AbstractCatalogManager {
+enum LookupOptions {
+  kLookupSole = 0,
+  kLookupFull,
+};
+
+/**
+ * This class provides the read-only interface to a tree of catalogs
+ * representing a (subtree of a) repository.
+ * Mostly lookup functions filling DirectoryEntry objects.
+ * Reloading of expired catalogs, attaching of nested catalogs and delegating
+ * of lookups to the appropriate catalog is done transparently.
+ *
+ * The loading / creating of catalogs is up to derived classes.
+ *
+ * Usage:
+ *   DerivedCatalogManager *catalog_manager = new DerivedCatalogManager();
+ *   catalog_manager->Init();
+ *   catalog_manager->Lookup(<inode>, &<result_entry>);
+ */
+class CatalogManager {
  public:
-  AbstractCatalogManager();
-  virtual ~AbstractCatalogManager();
+  CatalogManager();
+  virtual ~CatalogManager();
 
-  // TODO: remove these stubs and replace them with actual locking
-  inline void ReadLock() const { }
-  inline void WriteLock() const { }
-  inline void Unlock() const { }
-  inline void UpgradeLock() const { Unlock(); WriteLock(); }
-  inline void DowngradeLock() const { Unlock(); ReadLock(); }
-
-  /**
-   *  Initializes the CatalogManager
-   *  i.e. loads and attaches the root entry
-   *  @return true on successful init otherwise false
-   */
   virtual bool Init();
 
-  /**
-   *  convenience wrapper around the Lookup methods, to specifically set the
-   *  lookup_without_parent flag in the call of Lookup.
-   *  This means, the CatalogManager does not perform a second lookup in the
-   *  catalogs to find about the inode of the result's parent. This is useful
-   *  if that information is simply not needed or can be obtained differently.
-   *  @param inode the inode to find in the catalogs
-   *  @param entry the resulting DirectoryEntry
-   *  @return true if lookup succeeded otherwise false
-   */
-  inline bool LookupWithoutParent(const inode_t inode, DirectoryEntry *entry) const { return Lookup(inode, entry, false); };
-
-  /**
-   *  convenience wrapper around the Lookup methods, to specifically set the
-   *  lookup_without_parent flag in the call of Lookup.
-   *  This means, the CatalogManager does not perform a second lookup in the
-   *  catalogs to find about the inode of the result's parent. This is useful
-   *  if that information is simply not needed or can be obtained differently.
-   *  @param path the path to find in the catalogs
-   *  @param entry the resulting DirectoryEntry
-   *  @return true if lookup succeeded otherwise false
-   */
-  inline bool LookupWithoutParent(const std::string &path, DirectoryEntry *entry) { return Lookup(path, entry, false); };
-
-  /**
-   *  perform a lookup for a specific DirectoryEntry in the catalogs
-   *  @param inode the inode to find in the catalogs
-   *  @param entry the resulting DirectoryEntry
-   *  @param with_parent perform a second lookup to get information about the parent
-   *  @return true if lookup succeeded otherwise false
-   */
-  bool Lookup(const inode_t inode,
-              DirectoryEntry *entry,
-              const bool with_parent = true) const;
-
-  /**
-   *  perform a lookup for a specific DirectoryEntry in the catalogs
-   *  @param path the path to find in the catalogs
-   *  @param entry the resulting DirectoryEntry
-   *  @param with_parent perform a second lookup to get information about the parent
-   *  @return true if lookup succeeded otherwise false
-   */
-  bool Lookup(const std::string &path,
-              DirectoryEntry *entry,
-              const bool with_parent = true);
-
-  /**
-   *  do a listing of the specified directory
-   *  @param path the path of the directory to list
-   *  @param listing the resulting DirectoryEntryList
-   *  @return true if listing succeeded otherwise false
-   */
+  bool LookupInode(const inode_t inode, const LookupOptions options,
+                   DirectoryEntry *entry) const;
+  bool LookupPath(const std::string &path, const LookupOptions options,
+                  DirectoryEntry *entry);
   bool Listing(const std::string &path, DirectoryEntryList *listing);
 
   /**
@@ -124,7 +64,7 @@ class AbstractCatalogManager {
    *  count all attached catalogs
    *  @return the number of all attached catalogs
    */
-  inline int GetNumberOfAttachedCatalogs() const { return catalogs_.size(); }
+  inline int GetNumCatalogs() const { return catalogs_.size(); }
 
   /**
    *  Inodes are ambiquitous under some circumstances, to prevent problems
@@ -140,6 +80,13 @@ class AbstractCatalogManager {
   inline void PrintCatalogHierarchy() const { PrintCatalogHierarchyRecursively(GetRootCatalog()); }
 
  protected:
+
+  // TODO: remove these stubs and replace them with actual locking
+  inline void ReadLock() const { }
+  inline void WriteLock() const { }
+  inline void Unlock() const { }
+  inline void UpgradeLock() const { Unlock(); WriteLock(); }
+  inline void DowngradeLock() const { Unlock(); ReadLock(); }
 
   /**
    *  This pure virtual method has to be implemented by deriving classes
@@ -264,15 +211,9 @@ class AbstractCatalogManager {
                          Catalog **attached_catalog) const;
 
  private:
-
-  /**
-   *  this method finds the most probably fitting catalog for a given path
-   *  Note: this might still not be the catalog you are looking for
-   *  Mainly designed for internal use.
-   *  @param path the path a catalog is searched for
-   *  @return the catalog which is best fitting at the given path
-   */
-  Catalog* FindBestFittingCatalogForPath(const std::string &path) const;
+  Catalog* WalkTree(const std::string &path) const;
+  bool MountSubtree(const std::string &path, const Catalog *entry_point,
+                    Catalog **leaf_catalog);
 
   /**
    *  this method loads all nested catalogs neccessary to serve a certain path
@@ -341,4 +282,4 @@ class AbstractCatalogManager {
 
 }
 
-#endif  // CVMFS_ABSTRACT_CATALOG_MANAGER_H_
+#endif  // CVMFS_CATALOG_MGR_H_
