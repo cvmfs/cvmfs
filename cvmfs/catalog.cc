@@ -261,7 +261,7 @@ Catalog::NestedCatalogList Catalog::ListNestedCatalogs() const {
   while (sql_list_nested_->FetchRow()) {
     NestedCatalog nested;
     nested.path = sql_list_nested_->GetMountpoint();
-    nested.content_hash = sql_list_nested_->GetContentHash();
+    nested.hash = sql_list_nested_->GetContentHash();
     result.push_back(nested);
   }
   sql_list_nested_->Reset();

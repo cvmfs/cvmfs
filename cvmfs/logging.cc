@@ -37,7 +37,7 @@ pthread_mutex_t lock_debug = PTHREAD_MUTEX_INITIALIZER;
 FILE *file_debug = NULL;
 char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs", "hash",
   "download", "compress", "quota", "talk", "monitor", "inode cache",
-  "path cache", "md5 cache", "fuse stub"};
+  "path cache", "md5 cache", "fuse stub", "signature"};
 #endif
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;

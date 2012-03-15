@@ -28,7 +28,7 @@
 
 namespace catalog {
 
-class WritableCatalogManager : public CatalogManager {
+class WritableCatalogManager : public AbstractCatalogManager {
  private:
   const static std::string kCatalogFilename; // see top of WritableCatalogManager.cc
 
@@ -162,8 +162,8 @@ class WritableCatalogManager : public CatalogManager {
    *                      name of the catalog afterwards
    *  @return 0 on success, different otherwise
    */
-  int LoadCatalogFile(const std::string &url_path, const hash::Md5 &mount_point,
-                      std::string *catalog_file);
+  LoadError LoadCatalog(const std::string &mountpoint, const hash::Any &hash,
+                        std::string *catalog_path);
 
   /**
    *  This method is virtual in AbstractCatalogManager. It returns a new catalog
@@ -173,7 +173,7 @@ class WritableCatalogManager : public CatalogManager {
    *  @param parent_catalog the parent of the catalog stub to create
    *  @return a pointer to the catalog stub structure created
    */
-  Catalog* CreateCatalogStub(const std::string &mountpoint, Catalog *parent_catalog) const;
+  Catalog* CreateCatalog(const std::string &mountpoint, Catalog *parent_catalog) const;
 
  private:
   /**

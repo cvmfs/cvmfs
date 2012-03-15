@@ -511,7 +511,7 @@ bool WritableCatalog::CopyNestedCatalogReferencesToParentCatalog() {
        i != iend;
        ++i) {
     Catalog *child = FindChild(i->path);
-    parent->InsertNestedCatalogReference(i->path, child, i->content_hash);
+    parent->InsertNestedCatalogReference(i->path, child, i->hash);
   }
 
   return true;

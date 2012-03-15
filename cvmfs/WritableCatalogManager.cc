@@ -35,7 +35,7 @@ WritableCatalogManager::~WritableCatalogManager() {
 }
 
 bool WritableCatalogManager::Init() {
-  bool succeeded = CatalogManager::Init();
+  bool succeeded = AbstractCatalogManager::Init();
 
   // if the abstract initialization fails, we have a fresh repository here
   // create a root catalog
@@ -55,26 +55,26 @@ bool WritableCatalogManager::Init() {
 	return true;
 }
 
-int WritableCatalogManager::LoadCatalogFile(const std::string &url_path,
-                                            const hash::Md5 &mount_point,
-                                            string *catalog_file)
+LoadError WritableCatalogManager::LoadCatalog(const std::string &mountpoint,
+                                              const hash::Any &hash,
+                                              std::string *catalog_path)
 {
   // actually we have nothing to load here...
   // just redirect to the appropriate catalog file on disk
-  *catalog_file = GetCatalogFilenameForPath(url_path);
+  *catalog_path = GetCatalogFilenameForPath(mountpoint);
 
   // check if the file exists
   // if not, the 'loading' fails
-  if (not FileExists(*catalog_file)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog file: catalog file '%s' not found", catalog_file->c_str());
-    return -1;
+  if (not FileExists(*catalog_path)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog file: catalog file '%s' not found", catalog_path->c_str());
+    return kLoadFail;
   }
 
-  return 0;
+  return kLoadNew;
 }
 
-Catalog* WritableCatalogManager::CreateCatalogStub(const std::string &mountpoint,
-                                                   Catalog *parent_catalog) const {
+Catalog* WritableCatalogManager::CreateCatalog(const std::string &mountpoint,
+                                               Catalog *parent_catalog) const {
   return new WritableCatalog(mountpoint, parent_catalog);
 }
 
@@ -106,7 +106,7 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
   }
 
   // attach the just created catalog
-  if (not LoadAndAttachCatalog("", NULL)) {
+  if (not MountCatalog("", hash::Any(), NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach newly created root catalog");
     return false;
   }
@@ -116,11 +116,14 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
 
 bool WritableCatalogManager::GetCatalogByPath(const string &path,
                                               WritableCatalog **result) {
-  const bool load_final_catalog = true;
+  Catalog *best_fit = FindCatalog(path);
+  assert (best_fit != NULL);
   Catalog *catalog = NULL;
-  bool found = CatalogManager::GetCatalogByPath(path,
-                                                        load_final_catalog,
-                                                        &catalog);
+  bool retval = MountSubtree(path, best_fit, &catalog);
+  if (!retval)
+    return false;
+
+  bool found = LookupPath(path, kLookupSole, NULL);
 
   if (not found || not catalog->IsWritable()) {
     return false;
@@ -342,7 +345,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
 
   // attach the just created nested catalog
   Catalog *new_catalog = NULL;
-  if (not LoadAndAttachCatalog(nested_root_path, old_catalog, &new_catalog)) {
+  if (!(new_catalog = MountCatalog(nested_root_path, hash::Any(), old_catalog))) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': unable to attach newly created nested catalog", nested_root_path.c_str());
     return false;
   }

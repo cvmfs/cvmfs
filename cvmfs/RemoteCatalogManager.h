@@ -16,7 +16,7 @@
 
 namespace catalog {
 
-class RemoteCatalogManager : public CatalogManager {
+class RemoteCatalogManager : public AbstractCatalogManager {
  public:
   RemoteCatalogManager(const std::string &root_url, const std::string &repo_name, const std::string &whitelist,
                        const std::string &blacklist, const bool force_signing);
@@ -39,10 +39,17 @@ class RemoteCatalogManager : public CatalogManager {
     return LoadCatalogFile(url_path, mount_point, -1, false, hash::Any(hash::kSha1), catalog_file);
   }
 
+
+  LoadError LoadCatalog(const std::string &mountpoint, const hash::Any &hash,
+                        std::string *catalog_path);
+
+
   /** see AbstractCatalogManager for details */
-  Catalog* CreateCatalogStub(const std::string &mountpoint, Catalog *parent_catalog) const;
+  Catalog* CreateCatalog(const std::string &mountpoint, Catalog *parent_catalog) const;
 
  private:
+  LoadError LoadCatalogCas(const hash::Any &hash, std::string *catalog_path);
+
   /**
    *  well... heaven knows, what is actually going on here
    *  Jakob... this is your job. ;-)

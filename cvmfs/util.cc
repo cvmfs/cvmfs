@@ -108,6 +108,18 @@ bool FileExists(const string &path) {
 
 
 /**
+ * Returns -1 on failure.
+ */
+int64_t GetFileSize(const string &path) {
+  platform_stat64 info;
+  int retval = platform_stat(path.c_str(), &info);
+  if (retval != 0)
+    return -1;
+  return info.st_size;
+}
+
+
+/**
  * Checks if the directory (not symlink) path exists.
  */
 bool DirectoryExists(const std::string &path) {

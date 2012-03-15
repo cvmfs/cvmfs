@@ -21,7 +21,7 @@
 
 namespace catalog {
 
-class CatalogManager;
+class AbstractCatalogManager;
 class Catalog;
 
 typedef std::list<Catalog *> CatalogList;
@@ -55,7 +55,7 @@ struct InodeRange {
  * Read-only catalog. A sub-class provides read-write access.
  */
 class Catalog {
-  friend class CatalogManager;
+  friend class AbstractCatalogManager;
   friend class LookupSqlStatement;  // for mangled inode
  public:
   Catalog(const std::string &path, Catalog *parent);
@@ -96,7 +96,7 @@ class Catalog {
 
   typedef struct {
     std::string path;
-    hash::Any content_hash;
+    hash::Any hash;
   } NestedCatalog;
   typedef std::list<NestedCatalog> NestedCatalogList;
   NestedCatalogList ListNestedCatalogs() const;

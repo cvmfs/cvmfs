@@ -464,10 +464,10 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
 {
   const string fingerprint = FingerprintCertificate();
   if (fingerprint == "") {
-    LogCvmfs(kLogCvmfs, kLogDebug, "invalid fingerprint");
+    LogCvmfs(kLogSignature, kLogDebug, "invalid fingerprint");
     return false;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug,
+  LogCvmfs(kLogSignature, kLogDebug,
            "checking certificate with fingerprint %s against whitelist",
            fingerprint.c_str());
 
@@ -478,7 +478,7 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   // Check timestamp (UTC), ignore issue date (legacy)
   line = GetLine(whitelist, whitelist_size);
   if (line.length() != 14) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp format");
+    LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
     return false;
   }
   payload_bytes += 15;
@@ -486,7 +486,7 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   // Expiry date
   line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
   if (line.length() != 15) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp format");
+    LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
     return false;
   }
   struct tm tm_wl;
@@ -497,17 +497,17 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   tm_wl.tm_hour = String2Int64(line.substr(9, 2));
   tm_wl.tm_min = tm_wl.tm_sec = 0;  // exact on hours level
   time_t timestamp = timegm(&tm_wl);
-  LogCvmfs(kLogCvmfs, kLogDebug,
+  LogCvmfs(kLogSignature, kLogDebug,
            "whitelist UTC expiry timestamp in localtime: %s",
            StringifyTime(timestamp, false).c_str());
   if (timestamp < 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "invalid timestamp");
+    LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp");
     return false;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug,  "local time: %s",
+  LogCvmfs(kLogSignature, kLogDebug,  "local time: %s",
            StringifyTime(local_timestamp, true).c_str());
   if (local_timestamp > timestamp) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug,
              "whitelist lifetime verification failed, expired");
     return false;
   }
@@ -516,7 +516,7 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   // Check repository name
   line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
   if ((expected_repository != "") && ("N" + expected_repository != line)) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug,
              "repository name does not match (found %s, expected %s)",
              line.c_str(), expected_repository.c_str());
     return false;
@@ -532,9 +532,10 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
       found = true;
     payload_bytes += line.length() + 1;
   } while (payload_bytes < whitelist_size);
+  payload_bytes += line.length() + 1;
 
   if (!found) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug,
              "the certificate's fingerprint is not on the whitelist");
     return false;
   }
@@ -542,7 +543,7 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   // Check whitelist signature
   line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
   if (line.length() < 40) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug,
              "no checksum at the end of whitelist found");
     return false;
   }
@@ -550,14 +551,14 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   hash::Any compare(hash::kSha1);
   hash::HashMem((const unsigned char *)whitelist, payload_bytes-3, &compare);
   if (hash != compare) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "whitelist checksum does not match");
+    LogCvmfs(kLogSignature, kLogDebug, "whitelist checksum does not match");
     return false;
   }
 
   // Check local blacklist TODO: test
   for (unsigned i = 0; i < blacklisted_certificates_->size(); ++i) {
     if ((*blacklisted_certificates_)[i].substr(0, 59) == fingerprint) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslog,
                "blacklisted fingerprint (%s)", fingerprint.c_str());
     }
   }
@@ -568,7 +569,7 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   if (!ReadSignatureTail((const unsigned char *)whitelist, whitelist_size,
                          payload_bytes, &signature, &signature_size))
   {
-    LogCvmfs(kLogCvmfs, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug,
              "no signature at the end of whitelist found");
     return false;
   }
@@ -577,11 +578,11 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
                           hash_str.length(), signature, signature_size);
   free(signature);
   if (!result)
-    LogCvmfs(kLogCvmfs, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug,
              "whitelist signature verification failed, %s",
              GetCryptoError().c_str());
   else
-    LogCvmfs(kLogCvmfs, kLogDebug, "whitelist signature verification passed");
+    LogCvmfs(kLogSignature, kLogDebug, "whitelist signature verification passed");
 
   return result;
 }

@@ -50,6 +50,7 @@
 #include "download.h"
 #include "compression.h"
 #include "smalloc.h"
+#include "signature.h"
 
 using namespace std;  // NOLINT
 
@@ -67,7 +68,6 @@ struct ThreadLocalStorage {
 typedef map< hash::Any, vector<int> * > ThreadQueues;
 
 string *cache_path_ = NULL;
-string *root_url_ = NULL;
 ThreadQueues *queues_download_ = NULL;  /**< maps currently
   downloaded chunks to an array of writer's ends of a pipe to signal the waiting
   threads when the download has finished */
@@ -88,9 +88,8 @@ static void CleanupTLS(void *data) {
  *
  * \return True on success, false otherwise
  */
-bool Init(const string &cache_path, const string &root_url) {
+bool Init(const string &cache_path) {
   cache_path_ = new string(cache_path);
-  root_url_ = new string(root_url);
   queues_download_ = new ThreadQueues();
 
   if (!MakeCacheDirectories(cache_path, 0700))
@@ -145,10 +144,8 @@ void Fini() {
   // (they are canceled by finilizing the download thread)
   pthread_key_delete(thread_local_storage_);
   delete cache_path_;
-  delete root_url_;
   delete queues_download_;
   cache_path_ = NULL;
-  root_url_ = NULL;
   queues_download_ = NULL;
 }
 
@@ -207,7 +204,7 @@ int Open(const hash::Any &id) {
  * @param[out] size Size of the file
  * \return True if successful, false otherwise.
  */
-bool Open2Mem(const hash::Any &id, char **buffer, uint64_t *size) {
+bool Open2Mem(const hash::Any &id, unsigned char **buffer, uint64_t *size) {
   *size = 0;
   *buffer = NULL;
 
@@ -222,7 +219,7 @@ bool Open2Mem(const hash::Any &id, char **buffer, uint64_t *size) {
   }
 
   *size = info.st_size;
-  *buffer = static_cast<char *>(smalloc(*size));
+  *buffer = static_cast<unsigned char *>(smalloc(*size));
 
   int64_t retval = read(fd, *buffer, *size);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != *size)) {
@@ -327,7 +324,7 @@ int CommitTransaction(const string &final_path,
  * Commits the memory blob buffer to the given chunk id and name on cvmfs.
  * No checking! The hash and the memory blob need to match.
  */
-bool CommitFromMem(const hash::Any &id, const char *buffer,
+bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
                    const uint64_t size, const std::string &cvmfs_path)
 {
   string temp_path;
@@ -533,6 +530,365 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
   pthread_mutex_unlock(&lock_queues_download_);
 
   return result;
+}
+
+
+CatalogManager::CatalogManager(const string &repo_name,
+                               const bool ignore_signature)
+{
+  LogCvmfs(kLogCache, kLogDebug, "constructing cache catalog manager");
+  repo_name_ = repo_name;
+  ignore_signature_ = ignore_signature;
+  atomic_init32(&certificate_hits_);
+  atomic_init32(&certificate_misses_);
+}
+
+
+catalog::Catalog* CatalogManager::CreateCatalog(const std::string &mountpoint,
+  catalog::Catalog *parent_catalog) const
+{
+  return new catalog::Catalog(mountpoint, parent_catalog);
+}
+
+
+catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
+                                                  std::string *catalog_path)
+{
+  int64_t size;
+  int retval;
+  bool pin_retval;
+
+  // Try from cache
+  const string cache_path = *cache_path_ + hash.MakePath(1, 2);
+  *catalog_path = cache_path + "T";
+  retval = rename(cache_path.c_str(), catalog_path->c_str());
+  if (retval == 0) {
+    LogCvmfs(kLogCache, kLogDebug, "found catalog %s in cache",
+             hash.ToString().c_str());
+
+    size = GetFileSize(catalog_path->c_str());
+    assert(size > 0);
+    pin_retval = quota::Pin(hash, uint64_t(size), "catalog " + hash.ToString());
+    if (!pin_retval) {
+      quota::Remove(hash);
+      unlink(catalog_path->c_str());
+      LogCvmfs(kLogCache, kLogDebug,
+               "failed to pin cached copy of catalog %s",
+               hash.ToString().c_str());
+      return catalog::kLoadNoSpace;
+    }
+    // Pinned, can be safely renamed
+    retval = rename(catalog_path->c_str(), cache_path.c_str());
+    *catalog_path = cache_path;
+    return catalog::kLoadNew;
+  }
+
+  // Download
+  string temp_path;
+  int catalog_fd = StartTransaction(hash, catalog_path, &temp_path);
+  if (catalog_fd < 0)
+    return catalog::kLoadFail;
+
+  FILE *catalog_file = fdopen(catalog_fd, "w");
+  if (!catalog_file) {
+    AbortTransaction(temp_path);
+    return catalog::kLoadFail;
+  }
+
+  const string url = "/data" + hash.MakePath(1, 2) + "C";
+  download::JobInfo download_catalog(&url, true, true, catalog_file, &hash);
+  download::Fetch(&download_catalog);
+  fclose(catalog_file);
+  if (download_catalog.error_code != download::kFailOk) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "unable to load catalog with key %s (%d)",
+             hash.ToString().c_str(), download_catalog.error_code);
+    AbortTransaction(temp_path);
+    return catalog::kLoadFail;
+  }
+
+  size = GetFileSize(temp_path.c_str());
+  assert(size > 0);
+  if (uint64_t(size) > quota::GetMaxFileSize()) {
+    AbortTransaction(temp_path);
+    return catalog::kLoadNoSpace;
+  }
+
+  // Instead of commit, manually rename and pin, otherwise there is a race
+  pin_retval = quota::Pin(hash, uint64_t(size), "catalog " + hash.ToString());
+  if (!pin_retval) {
+    AbortTransaction(temp_path);
+    return catalog::kLoadNoSpace;
+  }
+
+  retval = rename(temp_path.c_str(), catalog_path->c_str());
+  if (retval != 0) {
+    quota::Remove(hash);
+    return catalog::kLoadFail;
+  }
+  return catalog::kLoadNew;
+}
+
+
+catalog::LoadError CatalogManager::LoadCatalog(const std::string &mountpoint,
+                                               const hash::Any &hash,
+                                               std::string *catalog_path)
+{
+  bool retval;
+  if (!hash.IsNull())
+    return LoadCatalogCas(hash, catalog_path);
+
+  // Happens only on init/remount, i.e. quota won't delete a cached catalog
+
+  const string checksum_path = "cvmfschecksum." + repo_name_;
+  const string checksum_url = "/.cvmfspublished";
+  map<char, string> checksum_keyval;
+  size_t checksum_size;
+  unsigned char *checksum_buffer;
+  hash::Any checksum_hash;
+  hash::Any cache_hash;
+  hash::Any remote_hash;
+  uint64_t cache_last_modified = 0;
+  int signature_start = 0;
+  *catalog_path = "";
+
+  // Load local checksum
+  FILE *file_checksum = fopen(checksum_path.c_str(), "r");
+  char tmp[40];
+  if (file_checksum && (fread(tmp, 1, 40, file_checksum) == 40)) {
+    cache_hash = hash::Any(hash::kSha1, hash::HexPtr(string(tmp, 40)));
+    *catalog_path = "." + cache_hash.MakePath(1, 2);
+    if (!FileExists(*catalog_path)) {
+      LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
+      *catalog_path = "";
+    } else {
+      // Get local last modified time
+      char buf_modified;
+      string str_modified;
+      if ((fread(&buf_modified, 1, 1, file_checksum) == 1) &&
+          (buf_modified == 'T'))
+      {
+        while (fread(&buf_modified, 1, 1, file_checksum) == 1)
+          str_modified += string(&buf_modified, 1);
+        cache_last_modified = String2Uint64(str_modified);
+        LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s",
+                 StringifyTime(cache_last_modified, true).c_str());
+      }
+    }
+  } else {
+    LogCvmfs(kLogCache, kLogDebug, "unable to read local checksum");
+  }
+  if (file_checksum) fclose(file_checksum);
+
+  // Load remote checksum
+  download::JobInfo download_checksum(&checksum_url, false, true, NULL);
+  download::Fetch(&download_checksum);
+  if (download_checksum.error_code != download::kFailOk) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "unable to load checksum from %s (%d)",
+             checksum_url.c_str(), download_checksum.error_code);
+    return catalog::kLoadFail;
+  }
+  checksum_size = download_checksum.destination_mem.size;
+
+  checksum_buffer = reinterpret_cast<unsigned char *>(alloca(checksum_size));
+  memcpy(checksum_buffer, download_checksum.destination_mem.data,
+         checksum_size);
+  free(download_checksum.destination_mem.data);
+
+  // Parse remote checksum
+  ParseKeyvalMem(checksum_buffer, checksum_size,
+                 &signature_start, &checksum_hash, &checksum_keyval);
+
+  map<char, string>::const_iterator key_catalog = checksum_keyval.find('C');
+  if (key_catalog == checksum_keyval.end()) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "failed to find catalog key in checksum");
+    return catalog::kLoadFail;
+  }
+  remote_hash = hash::Any(hash::kSha1, hash::HexPtr(key_catalog->second));
+  LogCvmfs(kLogCache, kLogDebug, "remote checksum is %s",
+           remote_hash.ToString().c_str());
+
+  // Short way out, use cached copy
+  if ((*catalog_path != "") && (remote_hash == cache_hash)) {
+    // quota::Pin is only effective on first load, afterwards it is a NOP
+    int64_t size = GetFileSize(*catalog_path);
+    assert(size >= 0);
+    retval = quota::Pin(cache_hash, uint64_t(size),
+                        "root catalog for " + repo_name_);
+    if (!retval) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "failed to pin cached root catalog");
+      return catalog::kLoadFail;
+    }
+    return catalog::kLoadUp2Date;
+  }
+
+  // Sanity check, last modified (if available, i.e. if signed)
+  map<char, string>::const_iterator key_published = checksum_keyval.find('T');
+  if (key_published != checksum_keyval.end()) {
+    if (cache_last_modified > String2Uint64(key_published->second)) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "cached copy of %s newer than remote copy",
+               checksum_url.c_str());
+      return catalog::kLoadFail;
+    }
+  }
+
+  // Sanity check: repository name
+  if (repo_name_ != "") {
+    map<char, string>::const_iterator key_name = checksum_keyval.find('N');
+    if (key_name == checksum_keyval.end()) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "failed to find repository name in checksum");
+      return catalog::kLoadFail;
+    }
+    if (key_name->second != repo_name_) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "expected repository name does not match in %s",
+               checksum_url.c_str());
+      return catalog::kLoadFail;
+    }
+  }
+
+  // Sanity check: empty root prefix
+  map<char, string>::const_iterator key_root_prefix = checksum_keyval.find('R');
+  if (key_root_prefix == checksum_keyval.end()) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "failed to find root prefix in checksum");
+    return catalog::kLoadFail;
+  }
+  if (key_root_prefix->second != hash::Md5(hash::AsciiPtr("")).ToString()) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "expected mount point does not match in %s",
+             checksum_url.c_str());
+    return catalog::kLoadFail;
+  }
+
+  // Verify signature of remote checksum signature
+  if (signature_start > 0) {
+    // Download certificate
+    map<char, string>::const_iterator key_cert = checksum_keyval.find('X');
+    if ((key_cert == checksum_keyval.end()) || (key_cert->second.length() < 40))
+    {
+      LogCvmfs(kLogCache, kLogDebug, "invalid certificate in checksum");
+      return catalog::kLoadFail;
+    }
+    hash::Any cert_hash(hash::kSha1,
+                        hash::HexPtr(key_cert->second.substr(0, 40)));
+
+    unsigned char *cert_data;
+    size_t cert_size;
+    if (Open2Mem(cert_hash, &cert_data, &cert_size)) {
+      atomic_inc32(&certificate_hits_);
+    } else {
+      atomic_inc32(&certificate_misses_);
+
+      const string cert_url = "/data" + cert_hash.MakePath(1, 2) + "X";
+      download::JobInfo download_certificate(&cert_url, true, true, &cert_hash);
+      download::Fetch(&download_certificate);
+      if (download_certificate.error_code != download::kFailOk) {
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+                 "unable to load certificate from %s (%d)",
+                 cert_url.c_str(), download_certificate.error_code);
+        return catalog::kLoadFail;
+      }
+
+      cert_data = (unsigned char *)download_certificate.destination_mem.data;
+      cert_size = download_certificate.destination_mem.size;
+      CommitFromMem(cert_hash, cert_data, cert_size,
+                    "certificate of " + signature::Whois());
+    }
+
+    // Load certificate
+    retval = signature::LoadCertificateMem(cert_data, cert_size);
+    free(cert_data);
+    if (!retval) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "could not read certificate");
+      return catalog::kLoadFail;
+    }
+
+    // Verify certificate against whitelist
+    const string whitelist_url = "/.cvmfswhitelist";
+    download::JobInfo download_whitelist(&whitelist_url, false, true, NULL);
+    download::Fetch(&download_whitelist);
+    if (download_whitelist.error_code != download::kFailOk) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "unable to load whitelist from %s (%d)",
+               whitelist_url.c_str(), download_whitelist.error_code);
+      return catalog::kLoadFail;
+    }
+    retval = signature::VerifyWhitelist(download_whitelist.destination_mem.data,
+                                        download_whitelist.destination_mem.size,
+                                        repo_name_);
+    free(download_whitelist.destination_mem.data);
+    if (!retval) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "whitelist verification failed");
+      return catalog::kLoadFail;
+    }
+
+    // Verify checksum signature
+    unsigned char *signature_buffer;
+    unsigned signature_size;
+    retval = signature::ReadSignatureTail(checksum_buffer, checksum_size,
+                                          signature_start,
+                                          &signature_buffer, &signature_size);
+    if (!retval) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "cannot read signature");
+      return catalog::kLoadFail;
+    }
+    retval = signature::Verify(
+                               reinterpret_cast<const unsigned char *>(&((checksum_hash.ToString())[0])),
+                               40, signature_buffer, signature_size);
+    free(signature_buffer);
+    if (!retval) {
+      LogCvmfs(kLogCache, kLogDebug,
+               "catalog signature verification failed against %s",
+               checksum_hash.ToString().c_str());
+      return catalog::kLoadFail;
+    }
+    LogCvmfs(kLogCache, kLogSyslog,
+             "catalog signature verification passed, signed by %s",
+             signature::Whois().c_str());
+  } else {
+    LogCvmfs(kLogCache, kLogDebug, "remote checksum is not signed");
+    if (!ignore_signature_) {
+      LogCvmfs(kLogCache, kLogSyslog, "remote checksum %s is not signed",
+               checksum_url.c_str());
+      return catalog::kLoadFail;
+    }
+  }
+
+  catalog::LoadError load_retval = LoadCatalogCas(remote_hash, catalog_path);
+  if (load_retval != catalog::kLoadNew)
+    return load_retval;
+
+  // Store checksum
+  int fdchksum = open(checksum_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+  if (fdchksum >= 0) {
+    string cache_checksum = remote_hash.ToString();
+    map<char, string>::const_iterator key_published = checksum_keyval.find('T');
+    if (key_published != checksum_keyval.end())
+      cache_checksum += "T" + key_published->second;
+
+    file_checksum = fdopen(fdchksum, "w");
+    if (file_checksum) {
+      if (fwrite(&(cache_checksum[0]), 1, cache_checksum.length(),
+                 file_checksum) != cache_checksum.length())
+      {
+        unlink(checksum_path.c_str());
+      }
+      fclose(file_checksum);
+    } else {
+      unlink(checksum_path.c_str());
+    }
+  } else {
+    unlink(checksum_path.c_str());
+  }
+
+  return catalog::kLoadNew;
 }
 
 }  // namespace cache

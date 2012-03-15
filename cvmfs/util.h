@@ -32,6 +32,7 @@ void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);
 
 bool FileExists(const std::string &path);
+int64_t GetFileSize(const std::string &path);
 bool DirectoryExists(const std::string &path);
 bool MkdirDeep(const std::string &path, const mode_t mode);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);

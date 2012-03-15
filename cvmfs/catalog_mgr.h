@@ -14,9 +14,23 @@
 
 namespace catalog {
 
+/**
+ * Lookup a directory entry including its parent entry or not.
+ */
 enum LookupOptions {
   kLookupSole = 0,
   kLookupFull,
+};
+
+
+/**
+ * Results upon loading a catalog file.
+ */
+enum LoadError {
+  kLoadNew = 0,
+  kLoadUp2Date,
+  kLoadNoSpace,
+  kLoadFail,
 };
 
 /**
@@ -33,10 +47,10 @@ enum LookupOptions {
  *   catalog_manager->Init();
  *   catalog_manager->Lookup(<inode>, &<result_entry>);
  */
-class CatalogManager {
+class AbstractCatalogManager {
  public:
-  CatalogManager();
-  virtual ~CatalogManager();
+  AbstractCatalogManager();
+  virtual ~AbstractCatalogManager();
 
   virtual bool Init();
 
@@ -46,59 +60,32 @@ class CatalogManager {
                   DirectoryEntry *entry);
   bool Listing(const std::string &path, DirectoryEntryList *listing);
 
+  uint64_t GetRevision() const;
+  int GetNumCatalogs() const;
+  std::string PrintHierarchy() const;
+
   /**
-   *  get the inode number of the root DirectoryEntry
-   *  'root' here means the actual root of the whole file system
-   *  @return the root inode number
+   * Get the inode number of the root DirectoryEntry
+   * ('root' means the root of the whole file system)
+   * @return the root inode number
    */
   inline inode_t GetRootInode() const { return kInitialInodeOffset + 1; }
-
   /**
-   *  get the revision of the catalog
-   *  TODO: CURRENTLY NOT IMPLEMENTED
-   *  @return the revision number of the catalog
+   * Inodes are ambiquitous under some circumstances, to prevent problems
+   * they must be passed through this method first
+   * @param inode the raw inode
+   * @return the revised inode
    */
-  inline uint64_t GetRevision() const { return 0; } // TODO: implement this
-
-  /**
-   *  count all attached catalogs
-   *  @return the number of all attached catalogs
-   */
-  inline int GetNumCatalogs() const { return catalogs_.size(); }
-
-  /**
-   *  Inodes are ambiquitous under some circumstances, to prevent problems
-   *  they must be passed through this method first
-   *  @param inode the raw inode
-   *  @return the revised inode
-   */
-  inline inode_t MangleInode(const inode_t inode) const { return (inode < kInitialInodeOffset) ? GetRootInode() : inode; }
-
-  /**
-   *  print the currently attached catalog hierarchy to stdout
-   */
-  inline void PrintCatalogHierarchy() const { PrintCatalogHierarchyRecursively(GetRootCatalog()); }
+  inline inode_t MangleInode(const inode_t inode) const {
+    return (inode < kInitialInodeOffset) ? GetRootInode() : inode;
+  }
 
  protected:
 
-  // TODO: remove these stubs and replace them with actual locking
-  inline void ReadLock() const { }
-  inline void WriteLock() const { }
-  inline void Unlock() const { }
-  inline void UpgradeLock() const { Unlock(); WriteLock(); }
-  inline void DowngradeLock() const { Unlock(); ReadLock(); }
 
-  /**
-   *  This pure virtual method has to be implemented by deriving classes
-   *  It should perform a specific loading action, return 0 on success and
-   *  communicate a path to the readily loaded catalog file for attachment.
-   *  @param url_path the url path of the catalog to load
-   *  @param mount_point the md5 hash of the mount point for this catalog
-   *  @param catalog_file must be set to the path of the loaded file
-   *  @return 0 on success otherwise a application specific error code
-   */
-  virtual int LoadCatalogFile(const std::string &url_path, const hash::Md5 &mount_point,
-                              std::string *catalog_file) = 0;
+  virtual LoadError LoadCatalog(const std::string &mountpoint,
+                                const hash::Any &hash,
+                                std::string *catalog_path) = 0;
 
   /**
    *  Pure virtual method to create a new catalog structure
@@ -109,20 +96,12 @@ class CatalogManager {
    *  @param parent_catalog the parent of the catalog to create
    *  @return a newly created (derived) Catalog for future usage
    */
-  virtual Catalog* CreateCatalogStub(const std::string &mountpoint,
-                                     Catalog *parent_catalog) const = 0;
+  virtual Catalog* CreateCatalog(const std::string &mountpoint,
+                                 Catalog *parent_catalog) const = 0;
 
-  /**
-   *  loads a new catalog and attaches it on this CatalogManager
-   *  for loading of the catalog the pure virtual method LoadCatalogFile is used.
-   *  @param mountpoint the mount point path of the catalog to load/attach
-   *  @param parent_catalog the direct parent of the catalog to load
-   *  @param attached_catalog will be set to the newly attached catalog
-   *  @return true on success otherwise false
-   */
-  bool LoadAndAttachCatalog(const std::string &mountpoint,
-                            Catalog *parent_catalog,
-                            Catalog **attached_catalog = NULL);
+  Catalog *MountCatalog(const std::string &mountpoint, const hash::Any &hash,
+                        Catalog *parent_catalog);
+
 
   /**
    *  Attaches all catalogs of the repository recursively
@@ -168,37 +147,7 @@ class CatalogManager {
    */
   inline bool DetachAllCatalogs() { return DetachCatalogTree(GetRootCatalog()); }
 
-  /**
-   *  get the root catalog of this CatalogManager
-   *  @return the root catalog of this CatalogMananger
-   */
   inline Catalog* GetRootCatalog() const { return catalogs_.front(); }
-
-  /**
-   *  find the appropriate catalog for a given path.
-   *  this method might load additional nested catalogs.
-   *  @param path the path for which the catalog is needed
-   *  @param load_final_catalog if the last part of the given path is a nested catalog
-   *                            it is loaded as well, otherwise not (i.e. directory listing)
-   *  @param catalog this pointer will be set to the searched catalog
-   *  @param entry if a DirectoryEntry pointer is given, it will be set to the
-   *               DirectoryEntry representing the last part of the given path
-   *  @return true if catalog was found, false otherwise
-   */
-  bool GetCatalogByPath(const std::string &path,
-                        const bool load_final_catalog,
-                        Catalog **catalog = NULL,
-                        DirectoryEntry *entry = NULL);
-
-  /**
-   *  finds the appropriate catalog for a given inode
-   *  Note: This method will NOT load additional nested catalogs
-   *  it will match the inode to a allocated inode range.
-   *  @param inode the inode to find the associated catalog for
-   *  @param catalog this pointer will be set to the result catalog
-   *  @return true if catalog was present, false otherwise
-   */
-  bool GetCatalogByInode(const inode_t inode, Catalog **catalog) const;
 
   /**
    *  checks if a searched catalog is already present in this CatalogManager
@@ -210,34 +159,29 @@ class CatalogManager {
   bool IsCatalogAttached(const std::string &root_path,
                          Catalog **attached_catalog) const;
 
- private:
-  Catalog* WalkTree(const std::string &path) const;
+  Catalog *FindCatalog(const std::string &path) const;
+
   bool MountSubtree(const std::string &path, const Catalog *entry_point,
                     Catalog **leaf_catalog);
-
+ private:
+  const static inode_t kInitialInodeOffset = 255;
   /**
-   *  this method loads all nested catalogs neccessary to serve a certain path
-   *  @param path the path to load the associated nested catalog for
-   *  @param entry_point one can specify the catalog to start the search at
-   *                     (i.e. the result of FindBestFittingCatalogForPath)
-   *  @param load_final_catalog if the last part of path is a nested catalog
-   *                            it will be loaded as well, otherwise not
-   *  @param final_catalog this will be set to the resulting catalog
-   *  @return true if desired nested catalog was successfully loaded, false otherwise
+   * This list is only needed to find a catalog given an inode.
+   * This might possibly be done by walking the catalog tree, similar to
+   * finding a catalog given the path.
    */
-  bool LoadNestedCatalogForPath(const std::string &path,
-                                const Catalog *entry_point,
-                                const bool load_final_catalog,
-                                Catalog **final_catalog);
+  CatalogList catalogs_;
+  uint64_t current_inode_offset_;
 
-  /**
-   *  prints all attached catalogs to stdout
-   *  this is mainly for debugging purposes!
-   *  @param catalog the catalog to traverse in this recursion step
-   *  @param recursion_depth to determine the indentation
-   */
-  void PrintCatalogHierarchyRecursively(const Catalog *catalog,
-                                        const int recursion_depth = 0) const;
+  // TODO: remove these stubs and replace them with actual locking
+  inline void ReadLock() const { }
+  inline void WriteLock() const { }
+  inline void Unlock() const { }
+  inline void UpgradeLock() const { Unlock(); WriteLock(); }
+  inline void DowngradeLock() const { Unlock(); ReadLock(); }
+
+  std::string PrintHierarchyRecursively(const Catalog *catalog,
+                                        const int level) const;
 
   /**
    *  allocate a chunk of inodes for the given size
@@ -265,21 +209,8 @@ class CatalogManager {
    *  @return true on success, false otherwise
    */
   bool LoadAndAttachCatalogsRecursively(Catalog *catalog);
+};  // class CatalogManager
 
- private:
-  // TODO: this list is actually not really needed.
-  //       the only point we are really using it at the moment
-  //       is for searching the suited catalog for a given inode.
-  //       this might be done better (currently O(n))
-  //  eventually we should only safe the root catalog, representing
-  //  the whole catalog tree in an implicit manor.
-  CatalogList catalogs_;
-
-  uint64_t current_inode_offset_;
-
-  const static inode_t kInitialInodeOffset = 255;
-};
-
-}
+}  // namespace catalog
 
 #endif  // CVMFS_CATALOG_MGR_H_

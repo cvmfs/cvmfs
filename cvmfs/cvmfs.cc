@@ -74,7 +74,6 @@
 #include "inode_cache.h"
 #include "path_cache.h"
 #include "md5path_cache.h"
-#include "RemoteCatalogManager.h"
 #include "dirent.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
@@ -113,7 +112,6 @@ struct DirectoryListing {
 };
 
 string *mountpoint_ = NULL;
-string *root_url_ = NULL;
 string *cachedir_ = NULL;
 string *tracefile_ = NULL;
 string *repository_name_ = NULL;  /**< Expected repository name,
@@ -122,7 +120,7 @@ pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
 unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
-catalog::RemoteCatalogManager *catalog_manager_;
+cache::CatalogManager *catalog_manager_;
 InodeCache *inode_cache_ = NULL;
 PathCache *path_cache_ = NULL;
 Md5PathCache *md5path_cache_ = NULL;
@@ -1184,12 +1182,10 @@ static void FreeCvmfsOptions(CvmfsOptions *opts) {
   delete cvmfs::cachedir_;
   delete cvmfs::tracefile_;
   delete cvmfs::repository_name_;
-  delete cvmfs::root_url_;
   delete cvmfs::mountpoint_;
   cvmfs::cachedir_ = NULL;
   cvmfs::tracefile_ = NULL;
   cvmfs::repository_name_ = NULL;
-  cvmfs::root_url_ = NULL;
   cvmfs::mountpoint_ = NULL;
 }
 
@@ -1368,7 +1364,6 @@ int main(int argc, char *argv[]) {
   if (g_cvmfs_opts.timeout_direct == 0) g_cvmfs_opts.timeout_direct = 2;
   if (g_cvmfs_opts.syslog_level == 0) g_cvmfs_opts.syslog_level = 3;
   if (!g_cvmfs_opts.tracefile) g_cvmfs_opts.tracefile = strdup("");
-  if (!g_cvmfs_opts.blacklist) g_cvmfs_opts.blacklist = strdup("");
   if (!g_cvmfs_opts.repo_name) g_cvmfs_opts.repo_name = strdup("");
   if (!g_cvmfs_opts.cachedir)
     g_cvmfs_opts.cachedir = strdup("/var/lib/cvmfs/default");
@@ -1380,18 +1375,6 @@ int main(int argc, char *argv[]) {
   if (!g_uid) g_uid = getuid();
   if (!g_gid) g_gid = getgid();
   if (g_cvmfs_opts.max_ttl) cvmfs::max_ttl_ = g_cvmfs_opts.max_ttl*60;
-
-  // Seperate first host from hostlist
-  unsigned iter_hostname;
-  for (iter_hostname = 0; iter_hostname < strlen(g_cvmfs_opts.hostname);
-       ++iter_hostname)
-  {
-    if (g_cvmfs_opts.hostname[iter_hostname] == ',') break;
-  }
-  if (iter_hostname == 0)
-    cvmfs::root_url_ = new string("");
-  else
-    cvmfs::root_url_ = new string(g_cvmfs_opts.hostname, iter_hostname);
   options_ready = true;
 
   // Tune SQlite3 memory
@@ -1495,7 +1478,7 @@ int main(int argc, char *argv[]) {
   running_created = true;
 
   // Creates a set of cache directories (256 directories named 00..ff)
-  if (!cache::Init(".", *cvmfs::root_url_)) {
+  if (!cache::Init(".")) {
     PrintError("Failed to setup cache in " + *cvmfs::cachedir_ +
                ": " + strerror(errno));
     goto cvmfs_cleanup;
@@ -1581,12 +1564,18 @@ int main(int argc, char *argv[]) {
                  SplitString(g_cvmfs_opts.pubkey, ':'), ", ").c_str());
   }
   signature_ready = true;
+  if (g_cvmfs_opts.blacklist) {
+    if (!signature::LoadBlacklist(g_cvmfs_opts.blacklist)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "failed to load blacklist");
+      goto cvmfs_cleanup;
+    }
+  }
 
   // Load initial file catalog
   cvmfs::catalog_manager_ = new
-    catalog::RemoteCatalogManager(*cvmfs::root_url_, *cvmfs::repository_name_,
-      "/.cvmfswhitelist", g_cvmfs_opts.blacklist, g_cvmfs_opts.force_signing);
-  if (not cvmfs::catalog_manager_->Init()) {
+    cache::CatalogManager(*cvmfs::repository_name_,
+                          !g_cvmfs_opts.force_signing);
+  if (!cvmfs::catalog_manager_->Init()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize catalog manager");
     goto cvmfs_cleanup;
   }
@@ -1594,8 +1583,8 @@ int main(int argc, char *argv[]) {
 
   // Set fuse callbacks, remove url from arguments
   LogCvmfs(kLogCvmfs, kLogSyslog,
-           "CernVM-FS: linking %s to remote directoy %s",
-           cvmfs::mountpoint_->c_str(), cvmfs::root_url_->c_str());
+           "CernVM-FS: linking %s to repository %s",
+           cvmfs::mountpoint_->c_str(), cvmfs::repository_name_->c_str());
   struct fuse_lowlevel_ops cvmfs_operations;
   cvmfs::set_cvmfs_ops(&cvmfs_operations);
 
@@ -1641,7 +1630,7 @@ int main(int argc, char *argv[]) {
   cvmfs::md5path_cache_ = NULL;
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-           cvmfs::mountpoint_->c_str(), cvmfs::root_url_->c_str());
+           cvmfs::mountpoint_->c_str(), cvmfs::repository_name_->c_str());
 
  cvmfs_cleanup:
   if (signature_ready) signature::Fini();
