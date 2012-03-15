@@ -11,12 +11,12 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 AbstractCatalogManager::AbstractCatalogManager() {
-  current_inode_offset_ = AbstractCatalogManager::kInitialInodeOffset;
+  inode_gauge_ = AbstractCatalogManager::kInodeOffset;
 }
 
 
 AbstractCatalogManager::~AbstractCatalogManager() {
-  DetachAllCatalogs();
+  DetachAll();
 }
 
 
@@ -229,29 +229,41 @@ int AbstractCatalogManager::GetNumCatalogs() const {
 }
 
 
+/**
+ * Gets a formatted tree of the currently attached catalogs
+ */
+string AbstractCatalogManager::PrintHierarchy() const {
+  ReadLock();
+  const string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
+  Unlock();
+  return output;
+}
+
 
 /**
- *  currently this is a very simple approach
- *  just assign the next free numbers in this 64 bit space
- *  TODO: think about other allocation methods, this may run out
- *        of free inodes some time (in the late future admittedly)
+ * Assigns the next free numbers in the 64 bit space
+ * TODO: this may run out of free inodes at some point (with 32bit at least)
  */
-InodeRange AbstractCatalogManager::GetInodeChunkOfSize(uint64_t size) {
+InodeRange AbstractCatalogManager::AcquireInodes(uint64_t size) {
   InodeRange result;
-  result.offset = current_inode_offset_;
+  result.offset = inode_gauge_;
   result.size = size;
 
-  current_inode_offset_ = current_inode_offset_ + size;
+  inode_gauge_ += size;
   LogCvmfs(kLogCatalog, kLogDebug, "allocating inodes from %d to %d.",
-           result.offset + 1, current_inode_offset_);
+           result.offset + 1, inode_gauge_);
 
   return result;
 }
 
-void AbstractCatalogManager::AnnounceInvalidInodeChunk(const InodeRange chunk)
-  const
-{
-  // TODO: actually do something here
+
+/**
+ * Called if a catalog is detached which renders the associated InodeChunk
+ * invalid.
+ * @param chunk the InodeChunk to be freed
+ */
+void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
+  // TODO: adjust inode_gauge_
 }
 
 
@@ -277,8 +289,15 @@ Catalog* AbstractCatalogManager::FindCatalog(const string &path) const {
   return best_fit;
 }
 
-bool AbstractCatalogManager::IsCatalogAttached(const string &root_path,
-                                               Catalog **attached_catalog) const
+
+/**
+ * Checks if a searched catalog is already mounted to this CatalogManager
+ * @param root_path the root path of the searched catalog
+ * @param attached_catalog is set to the searched catalog, if not NULL
+ * @return true if catalog is already present, false otherwise
+ */
+bool AbstractCatalogManager::IsAttached(const string &root_path,
+                                        Catalog **attached_catalog) const
 {
   if (GetNumCatalogs() == 0) {
     return false;
@@ -344,7 +363,7 @@ Catalog *AbstractCatalogManager::MountCatalog(const string &mountpoint,
                                               Catalog *parent_catalog)
 {
   Catalog *attached_catalog = NULL;
-  if (IsCatalogAttached(mountpoint, &attached_catalog))
+  if (IsAttached(mountpoint, &attached_catalog))
     return attached_catalog;
 
   string catalog_path;
@@ -358,7 +377,7 @@ Catalog *AbstractCatalogManager::MountCatalog(const string &mountpoint,
   attached_catalog = CreateCatalog(mountpoint, parent_catalog);
 
   // Attach loaded catalog (end of virtual behavior)
-  if (!AttachCatalog(catalog_path, attached_catalog, false)) {
+  if (!AttachCatalog(catalog_path, attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
     DetachCatalog(attached_catalog);
@@ -369,111 +388,116 @@ Catalog *AbstractCatalogManager::MountCatalog(const string &mountpoint,
 }
 
 
-bool AbstractCatalogManager::AttachCatalog(const std::string &db_file,
-                                           Catalog *new_catalog,
-                                           const bool open_transaction) {
+/**
+ * Attaches a newly created catalog.
+ * @param db_path the file on a local file system containing the database
+ * @param new_catalog the catalog to attach to this CatalogManager
+ * @return true on success, false otherwise
+ */
+bool AbstractCatalogManager::AttachCatalog(const std::string &db_path,
+                                           Catalog *new_catalog)
+{
   LogCvmfs(kLogCatalog, kLogDebug, "attaching catalog file %s",
-           db_file.c_str());
+           db_path.c_str());
 
-  // initialize the new catalog
-  if (not new_catalog->OpenDatabase(db_file)) {
+  // Initialize the new catalog
+  if (!new_catalog->OpenDatabase(db_path)) {
     LogCvmfs(kLogCatalog, kLogDebug, "initialization of catalog %s failed",
-             db_file.c_str());
+             db_path.c_str());
     return false;
   }
 
-  // determine the inode offset of this catalog
+  // Determine the inode offset of this catalog
   uint64_t inode_chunk_size = new_catalog->max_row_id();
-  InodeRange range = GetInodeChunkOfSize(inode_chunk_size);
+  InodeRange range = AcquireInodes(inode_chunk_size);
   new_catalog->set_inode_range(range);
 
-  // check if everything worked out
-  if (not new_catalog->IsInitialized()) {
+  // Add catalog to the manager
+  if (!new_catalog->IsInitialized()) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "catalog initialization failed (obscure data)");
     return false;
   }
 
-  // save the catalog
   catalogs_.push_back(new_catalog);
   return true;
 }
 
-bool AbstractCatalogManager::DetachCatalogTree(Catalog *catalog) {
-  bool successful = true;
 
-  // detach all child catalogs recursively
-  CatalogList::const_iterator i;
-  CatalogList::const_iterator iend;
-  CatalogList catalogs_to_detach = catalog->GetChildren();
-  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end();
-       i != iend;
-       ++i) {
-    if (not DetachCatalogTree(*i)) {
-      successful = false;
-    }
-  }
-
-  // detach the catalog itself
-  if (not DetachCatalog(catalog)) {
-    successful = false;
-  }
-
-  return successful;
-}
-
-bool AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
-  // detach *catalog from catalog tree
-  if (not catalog->IsRoot()) {
+/**
+ * Removes a catalog from this CatalogManager, the catalog pointer is
+ * freed if the call succeeds.
+ * This method can create dangling children if a catalog in the middle of
+ * a tree is removed.
+ * @param catalog the catalog to detach
+ * @return true on success, false otherwise
+ */
+void AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
+  if (!catalog->IsRoot())
     catalog->parent()->RemoveChild(catalog);
-  }
 
-  AnnounceInvalidInodeChunk(catalog->inode_range());
+  ReleaseInodes(catalog->inode_range());
 
-  // delete catalog from internal lists
+  // Delete catalog from internal lists
   CatalogList::iterator i;
   CatalogList::const_iterator iend;
   for (i = catalogs_.begin(), iend = catalogs_.end(); i != iend; ++i) {
     if (*i == catalog) {
       catalogs_.erase(i);
       delete catalog;
-      return true;
+      return;
     }
   }
 
-  return false;
-}
-
-bool AbstractCatalogManager::LoadAndAttachCatalogsRecursively(Catalog *catalog) {
-  bool successful = true;
-
-  // go through all children of the given parent catalog and attach them
-  Catalog::NestedCatalogList children = catalog->ListNestedCatalogs();
-  Catalog::NestedCatalogList::const_iterator j,jend;
-  for (j = children.begin(), jend = children.end();
-       j != jend;
-       ++j) {
- // TODO
- //   Catalog *new_catalog;
- //   if (not LoadAndAttachCatalog(j->path, catalog, &new_catalog) ||
- //       not LoadAndAttachCatalogsRecursively(new_catalog)) {
- //     successful = false;
- //   }
-  }
-
-  return successful;
+  assert(false);
 }
 
 
 /**
- * Gets a formatted tree of the currently attached catalogs
+ * Removes a catalog (and all of it's children) from this CatalogManager.
+ * The given catalog and all children are freed, if this call succeeds.
+ * @param catalog the catalog to detach
+ * @return true on success, false otherwise
  */
-string AbstractCatalogManager::PrintHierarchy() const {
-  ReadLock();
-  const string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
-  Unlock();
-  return output;
+void AbstractCatalogManager::DetachSubtree(Catalog *catalog) {
+  // Detach all child catalogs recursively
+  CatalogList::const_iterator i;
+  CatalogList::const_iterator iend;
+  CatalogList catalogs_to_detach = catalog->GetChildren();
+  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end();
+       i != iend; ++i)
+  {
+    DetachSubtree(*i);
+  }
+
+  DetachCatalog(catalog);
 }
+
+
+/**
+ * Attaches all catalogs of the repository recursively.
+ * This is useful when updating small repositories on the server.
+ * @return true on success, false otherwise
+ */
+bool AbstractCatalogManager::MountRecursively(Catalog *catalog) {
+  bool success = true;
+
+  // Go through all children of the given parent catalog and attach them
+  Catalog::NestedCatalogList children = catalog->ListNestedCatalogs();
+  for (Catalog::NestedCatalogList::const_iterator i = children.begin(),
+       iEnd = children.end(); i != iEnd; ++i)
+  {
+    Catalog *new_catalog = MountCatalog(i->path, hash::Any(), catalog);
+    if (new_catalog)
+      success = MountRecursively(new_catalog);
+    else
+      success = false;
+  }
+
+  return success;
+}
+
+
 
 /**
  * Formats the catalog hierarchy

@@ -29,7 +29,6 @@ set (CVMFS2_DEBUG_SOURCES
 	catalog_queries.h catalog_queries.cc
 	catalog.h catalog.cc
 	catalog_mgr.h catalog_mgr.cc
-	RemoteCatalogManager.h      RemoteCatalogManager.cc
 	dirent.h
 )
 

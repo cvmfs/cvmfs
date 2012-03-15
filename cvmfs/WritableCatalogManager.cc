@@ -47,7 +47,7 @@ bool WritableCatalogManager::Init() {
 
   // do lazy attach if asked for
   if (not IsLazyAttaching() &&
-      not LoadAndAttachCatalogsRecursively()) {
+      not MountAll()) {
     LogCvmfs(kLogCatalog, kLogDebug, "unable to load catalogs recursively");
     return false;
   }
@@ -358,7 +358,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   // we have to split the overlapping directory entries from the old catalog
   // to the new catalog to re-gain a valid catalog structure
   if (not old_catalog->SplitContentIntoNewNestedCatalog(wr_new_catalog)) {
-    DetachCatalogTree(new_catalog);
+    DetachSubtree(new_catalog);
 
     // TODO: if this happens, we may have destroyed our catalog structure...
     //       it might be a good idea to take some counter measures here
@@ -400,10 +400,7 @@ bool WritableCatalogManager::RemoveNestedCatalog(const std::string &mountpoint) 
 
   // remove the catalog from our internal data structures
   const string database_file = GetCatalogFilenameForPath(nested_catalog->path());
-  if (not DetachCatalog(nested_catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while detaching the removed catalog '%s'", nested_catalog->path().c_str());
-    return false;
-  }
+  DetachCatalog(nested_catalog);
 
   // delete the catalog database file from the working copy
   if (remove(database_file.c_str()) != 0) {
