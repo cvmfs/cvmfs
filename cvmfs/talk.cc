@@ -171,24 +171,24 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "mountpoint") {
         Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {
-        // TODO: implement this!!
-        int result = -1;
-        //               int result = cvmfs::remount()
-        if (result < 0) {
-          Answer(con_fd, "Failed\n");
-        }/* else if (result == 0) {
-          Answer(con_fd, "Catalog up to date\n");
-        } else if (result == 2) {
-          Answer(con_fd, "Already draining out caches\n");
-        } else {
-          ostringstream str_max_cache_timeout;
-          str_max_cache_timeout << "Remounting, draining out kernel caches for "
-          << cvmfs::max_cache_timeout
-          << " seconds..." << endl;
-          Answer(con_fd, str_max_cache_timeout.str());
-          sleep(cvmfs::max_cache_timeout);
+        catalog::LoadError result = cvmfs::Remount();
+        switch (result) {
+          case catalog::kLoadFail:
+            Answer(con_fd, "Failed\n");
+            break;
+          case catalog::kLoadNoSpace:
+            Answer(con_fd, "Failed (no space)\n");
+            break;
+          case catalog::kLoadUp2Date:
+            Answer(con_fd, "Catalog up to date\n");
+            break;
+          case catalog::kLoadNew:
+            Answer(con_fd, "New revision applied\n");
+            break;
+          default:
+            Answer(con_fd, "internal error\n");
         }
-      } */
+      //} */
       // TODO
       /*else if (line == "revision") {
        catalog::lock();

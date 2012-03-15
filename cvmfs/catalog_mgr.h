@@ -5,6 +5,8 @@
 #ifndef CVMFS_CATALOG_MGR_H_
 #define CVMFS_CATALOG_MGR_H_
 
+#include <cassert>
+
 #include <vector>
 #include <string>
 
@@ -53,6 +55,7 @@ class AbstractCatalogManager {
   virtual ~AbstractCatalogManager();
 
   virtual bool Init();
+  LoadError Remount();
 
   bool LookupInode(const inode_t inode, const LookupOptions options,
                    DirectoryEntry *entry) const;
@@ -125,11 +128,20 @@ class AbstractCatalogManager {
    */
   CatalogList catalogs_;
   uint64_t inode_gauge_;  /**< highest issued inode */
+  pthread_rwlock_t *rwlock_;
 
-  // TODO: remove these stubs and replace them with actual locking
-  inline void ReadLock() const { }
-  inline void WriteLock() const { }
-  inline void Unlock() const { }
+  inline void ReadLock() const {
+    int retval = pthread_rwlock_rdlock(rwlock_);
+    assert(retval == 0);
+  }
+  inline void WriteLock() const {
+    int retval = pthread_rwlock_wrlock(rwlock_);
+    assert(retval == 0);
+  }
+  inline void Unlock() const {
+    int retval = pthread_rwlock_unlock(rwlock_);
+    assert(retval == 0);
+  }
   inline void UpgradeLock() const { Unlock(); WriteLock(); }
   inline void DowngradeLock() const { Unlock(); ReadLock(); }
 

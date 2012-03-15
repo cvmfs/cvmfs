@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "catalog_mgr.h"
+
 namespace cvmfs {
 
 extern pid_t pid_;
@@ -18,7 +20,7 @@ extern std::string *mountpoint_;
 extern int max_cache_timeout_;
 
 int ClearFile(const std::string &path);
-int Remount();
+catalog::LoadError Remount();
 unsigned GetMaxTtl();  // in minutes
 void SetMaxTtl(const unsigned value);  // in minutes
 

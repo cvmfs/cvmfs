@@ -3,8 +3,11 @@
  */
 
 #include "catalog_mgr.h"
-#include <iostream>
+
+#include <cassert>
+
 #include "logging.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -12,11 +15,17 @@ namespace catalog {
 
 AbstractCatalogManager::AbstractCatalogManager() {
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
+  rwlock_ =
+    reinterpret_cast<pthread_rwlock_t *>(smalloc(sizeof(pthread_rwlock_t)));
+  int retval = pthread_rwlock_init(rwlock_, NULL);
+  assert(retval == 0);
 }
 
 
 AbstractCatalogManager::~AbstractCatalogManager() {
   DetachAll();
+  pthread_rwlock_destroy(rwlock_);
+  free(rwlock_);
 }
 
 
@@ -35,6 +44,23 @@ bool AbstractCatalogManager::Init() {
   }
 
   return attached;
+}
+
+
+/**
+ * Remounts the root catalog if necessary.  If a newer root catalog exists,
+ * it is mounted and replaces the currently mounted tree (all existing catalogs
+ * are detached)
+ */
+LoadError AbstractCatalogManager::Remount() {
+  LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
+  string catalog_path;
+
+  WriteLock();
+  const LoadError retval = LoadCatalog("", hash::Any(), &catalog_path);
+  Unlock();
+
+  return retval;
 }
 
 
@@ -263,7 +289,7 @@ InodeRange AbstractCatalogManager::AcquireInodes(uint64_t size) {
  * @param chunk the InodeChunk to be freed
  */
 void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
-  // TODO: adjust inode_gauge_
+  // TODO currently inodes are only released on remount
 }
 
 
@@ -274,7 +300,7 @@ void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
  * @return the catalog which is best fitting at the given path
  */
 Catalog* AbstractCatalogManager::FindCatalog(const string &path) const {
-  assert (GetNumCatalogs() > 0);
+  assert (catalogs_.size() > 0);
 
   // Start at the root catalog and successive go down the catalog tree
   Catalog *best_fit = GetRootCatalog();
@@ -299,20 +325,14 @@ Catalog* AbstractCatalogManager::FindCatalog(const string &path) const {
 bool AbstractCatalogManager::IsAttached(const string &root_path,
                                         Catalog **attached_catalog) const
 {
-  if (GetNumCatalogs() == 0) {
+  if (catalogs_.size() == 0)
     return false;
-  }
 
-  // look through the attached catalogs to find the searched one
   Catalog *best_fit = FindCatalog(root_path);
-
-  // not found... too bad
-  if (best_fit->path() != root_path) {
+  if (best_fit->path() != root_path)
     return false;
-  }
 
-  // found... yeepie!
-  if (NULL != attached_catalog) *attached_catalog = best_fit;
+  if (attached_catalog != NULL) *attached_catalog = best_fit;
   return true;
 }
 

@@ -154,6 +154,11 @@ void SetMaxTtl(const unsigned value) {
 }
 
 
+catalog::LoadError Remount() {
+  return catalog_manager_->Remount();
+}
+
+
 static bool GetDirentForInode(const fuse_ino_t ino, catalog::DirectoryEntry *dirent) {
   // Lookup inode in cache
   if (inode_cache_->lookup(ino, dirent)) {
@@ -1042,6 +1047,7 @@ struct CvmfsOptions {
   int      attr_timeout;
   int      negative_timeout;
   int      use_ino;
+  int      kcache_timeout;
 
   int64_t  quota_limit;
   int64_t  quota_threshold;
@@ -1075,12 +1081,9 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("repo_name=%s",        repo_name, 0),
   CVMFS_OPT("blacklist=%s",        blacklist, 0),
   CVMFS_OPT("syslog_level=%d",     syslog_level, 3),
-  CVMFS_OPT("entry_timeout=%d",    entry_timeout, 60),
-  CVMFS_OPT("attr_timeout=%d",     attr_timeout, 60),
-  CVMFS_OPT("negative_timeout=%d", negative_timeout, 60),
   CVMFS_SWITCH("use_ino",          entry_timeout),
-  CVMFS_SWITCH("kernel_cache",     kernel_cache),
-  CVMFS_SWITCH("auto_cache",       auto_cache),
+  CVMFS_OPT("kcache_timeout=%d",   kcache_timeout, 60),
+
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
