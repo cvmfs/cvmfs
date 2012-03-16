@@ -74,7 +74,7 @@ LoadError WritableCatalogManager::LoadCatalog(const std::string &mountpoint,
 }
 
 Catalog* WritableCatalogManager::CreateCatalog(const std::string &mountpoint,
-                                               Catalog *parent_catalog) const {
+                                               Catalog *parent_catalog) {
   return new WritableCatalog(mountpoint, parent_catalog);
 }
 

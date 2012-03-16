@@ -52,15 +52,27 @@ bool AbstractCatalogManager::Init() {
  * it is mounted and replaces the currently mounted tree (all existing catalogs
  * are detached)
  */
-LoadError AbstractCatalogManager::Remount() {
-  LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
-  string catalog_path;
+LoadError AbstractCatalogManager::Remount(const bool dry_run) {
+  LogCvmfs(kLogCatalog, kLogDebug,
+           "remounting repositories (dry run %d)", dry_run);
+  if (dry_run)
+    return LoadCatalog("", hash::Any(), NULL);
 
   WriteLock();
-  const LoadError retval = LoadCatalog("", hash::Any(), &catalog_path);
+  string catalog_path;
+  const LoadError load_error = LoadCatalog("", hash::Any(), &catalog_path);
+  if (load_error == kLoadNew) {
+    DetachAll();
+    inode_gauge_ = AbstractCatalogManager::kInodeOffset;
+
+    Catalog *new_root = CreateCatalog("", NULL);
+    assert(new_root);
+    bool retval = AttachCatalog(catalog_path, new_root);
+    assert(retval);
+  }
   Unlock();
 
-  return retval;
+  return load_error;
 }
 
 
@@ -457,6 +469,7 @@ void AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
     catalog->parent()->RemoveChild(catalog);
 
   ReleaseInodes(catalog->inode_range());
+  UnloadCatalog(catalog->path());
 
   // Delete catalog from internal lists
   CatalogList::iterator i;

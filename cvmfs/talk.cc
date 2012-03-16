@@ -171,7 +171,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "mountpoint") {
         Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {
-        catalog::LoadError result = cvmfs::Remount();
+        catalog::LoadError result = cvmfs::RemountStart();
         switch (result) {
           case catalog::kLoadFail:
             Answer(con_fd, "Failed\n");

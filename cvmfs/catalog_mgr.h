@@ -55,7 +55,7 @@ class AbstractCatalogManager {
   virtual ~AbstractCatalogManager();
 
   virtual bool Init();
-  LoadError Remount();
+  LoadError Remount(const bool dry_run);
 
   bool LookupInode(const inode_t inode, const LookupOptions options,
                    DirectoryEntry *entry) const;
@@ -91,6 +91,7 @@ class AbstractCatalogManager {
   virtual LoadError LoadCatalog(const std::string &mountpoint,
                                 const hash::Any &hash,
                                 std::string *catalog_path) = 0;
+  virtual void UnloadCatalog(const std::string &mountpoint) { }
 
   /**
    * Create a new Catalog object.
@@ -101,7 +102,7 @@ class AbstractCatalogManager {
    * @return a newly created (derived) Catalog
    */
   virtual Catalog* CreateCatalog(const std::string &mountpoint,
-                                 Catalog *parent_catalog) const = 0;
+                                 Catalog *parent_catalog) = 0;
 
   Catalog *MountCatalog(const std::string &mountpoint, const hash::Any &hash,
                         Catalog *parent_catalog);

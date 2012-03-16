@@ -126,6 +126,7 @@ PathCache *path_cache_ = NULL;
 Md5PathCache *md5path_cache_ = NULL;
 double kcache_timeout_ = 60.0;  /**< TTL (s) of meta data in the kernel cache */
 atomic_int32 drainout_mode_;
+time_t drainout_deadline_;
 
 map<uint64_t, DirectoryListing> *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
@@ -157,14 +158,44 @@ void SetMaxTtl(const unsigned value) {
 
 
 static inline double GetKcacheTimeout() {
-  int drainout = atomic_read32(&drainout_mode_);
-  if (drainout) return 0.0;
+  if (atomic_read32(&drainout_mode_)) return 0.0;
   return kcache_timeout_;
 }
 
 
-catalog::LoadError Remount() {
-  return catalog_manager_->Remount();
+/**
+ * If there is a new catalog version, switches to drainout mode.
+ * lookup or getattr will take care of actual remounting once the caches are
+ * drained out.
+ */
+catalog::LoadError RemountStart() {
+  catalog::LoadError retval = catalog_manager_->Remount(true);
+  if (retval == catalog::kLoadNew) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "new catalog revision available, draining out meta-data caches");
+    drainout_deadline_ = time(NULL) + int(kcache_timeout_);
+    atomic_cas32(&drainout_mode_, 0, 1);
+  }
+  // TODO: short term TTL on failure
+  return retval;
+}
+
+
+/**
+ * If the cached are drained out, a new catalog revision is applied and
+ * kernel caches are activated again.
+ */
+static void RemountFinish() {
+  if (!atomic_cas32(&drainout_mode_, 1, 0))
+    return;
+
+  if (time(NULL) > drainout_deadline_) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
+    catalog_manager_->Remount(false);
+    // TODO Set new alarm for next remount
+  } else {
+    atomic_cas32(&drainout_mode_, 0, 1);
+  }
 }
 
 
@@ -284,6 +315,8 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
                          const char *name)
 {
+  RemountFinish();
+
   parent = catalog_manager_->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
@@ -334,7 +367,10 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
  * they might be cached by the kernel.
  */
 static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
-                          struct fuse_file_info *fi) {
+                          struct fuse_file_info *fi)
+{
+  RemountFinish();
+
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %d", ino);
 

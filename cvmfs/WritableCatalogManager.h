@@ -173,7 +173,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
    *  @param parent_catalog the parent of the catalog stub to create
    *  @return a pointer to the catalog stub structure created
    */
-  Catalog* CreateCatalog(const std::string &mountpoint, Catalog *parent_catalog) const;
+  Catalog* CreateCatalog(const std::string &mountpoint, Catalog *parent_catalog);
 
  private:
   /**

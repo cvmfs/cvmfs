@@ -6,7 +6,10 @@
 #define CVMFS_CACHE_H_
 
 #include <stdint.h>
+
 #include <string>
+#include <map>
+#include <vector>
 
 #include "catalog_mgr.h"
 #include "atomic.h"
@@ -55,13 +58,20 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   catalog::LoadError LoadCatalog(const std::string &mountpoint,
                                  const hash::Any &hash,
                                  std::string *catalog_path);
+  void UnloadCatalog(const std::string &mountpoint);
   catalog::Catalog* CreateCatalog(const std::string &mountpoint,
-                                  catalog::Catalog *parent_catalog) const;
+                                  catalog::Catalog *parent_catalog);
 
  private:
   catalog::LoadError LoadCatalogCas(const hash::Any &hash,
+                                    const std::string &cvmfs_path,
                                     std::string *catalog_path);
 
+  /**
+   * required for unpinning
+   */
+  std::map< std::string, hash::Any> loaded_catalogs_;
+  std::map< std::string, hash::Any> mounted_catalogs_;
   std::string repo_name_;
   bool ignore_signature_;
   atomic_int32 certificate_hits_;

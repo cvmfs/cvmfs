@@ -60,6 +60,7 @@ enum CommandType {
   kInsert,
   kReserve,
   kPin,
+  kUnpin,
   kRemove,
   kCleanup,
   kList,
@@ -71,10 +72,8 @@ enum CommandType {
 struct LruCommand {
   CommandType command_type;
   uint64_t size;
-  union {
-    unsigned char digest[hash::kMaxDigestSize];
-    int return_pipe;  // For cleanup and listing
-  };
+  int return_pipe;  // For cleanup, listing, and reservations
+  unsigned char digest[hash::kMaxDigestSize];
   uint16_t path_length;  // Maximum 512-sizeof(LruCommand) in order to guarantee
                          // atomic pipe operations
 };
@@ -89,7 +88,7 @@ const unsigned kMaxCvmfsPath = 512-sizeof(LruCommand);
 pthread_t thread_lru_;
 int pipe_lru_[2];
 bool spawned_;
-set<hash::Any> *pinned_chunks_ = NULL;
+map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
 
 uint64_t limit_;  /**< If the cache grows above this size,
                       we clean up until cleanup_threshold. */
@@ -103,6 +102,7 @@ string *cache_dir_ = NULL;
 
 sqlite3 *db_ = NULL;
 sqlite3_stmt *stmt_touch_ = NULL;
+sqlite3_stmt *stmt_unpin_ = NULL;
 sqlite3_stmt *stmt_new_ = NULL;
 sqlite3_stmt *stmt_lru_ = NULL;
 sqlite3_stmt *stmt_size_ = NULL;
@@ -116,6 +116,7 @@ static bool DoCleanup(const uint64_t leave_size) {
   if ((limit_ == 0) || (gauge_ <= leave_size))
     return true;
 
+  // TODO transaction
   LogCvmfs(kLogLru, kLogSyslog,
            "cleanup cache until %lu KB are free", leave_size/1024);
   LogCvmfs(kLogLru, kLogDebug, "gauge %"PRIu64, gauge_);
@@ -223,6 +224,16 @@ static void ProcessCommandBunch(const unsigned num,
         assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
         sqlite3_reset(stmt_touch_);
         break;
+      case kUnpin:
+        sqlite3_bind_text(stmt_unpin_, 1, &hash_str[0], hash_str.length(),
+                          SQLITE_STATIC);
+        retval = sqlite3_step(stmt_unpin_);
+        LogCvmfs(kLogLru, kLogDebug, "unpinning %s: %d",
+                 hash_str.c_str(), retval);
+        errno = retval;
+        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        sqlite3_reset(stmt_unpin_);
+        break;
       case kPin:
       case kInsert:
         // It could already be in, check
@@ -248,6 +259,8 @@ static void ProcessCommandBunch(const unsigned num,
         sqlite3_bind_int64(stmt_new_, 6, (commands[i].command_type == kPin) ?
                            1 : 0);
         retval = sqlite3_step(stmt_new_);
+        LogCvmfs(kLogLru, kLogDebug, "insert or replace %s, pin %d: %d",
+                 hash_str.c_str(), commands[i].command_type, retval);
         assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
         sqlite3_reset(stmt_new_);
 
@@ -285,7 +298,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     // Inserts and pins come with a cvmfs path
     if ((command_type == kInsert) || (command_type == kPin)) {
       const int path_length = command_buffer[num_commands].path_length;
-      ReadPipe(pipe_lru_[0], &path_buffer[num_commands], path_length);
+      ReadPipe(pipe_lru_[0], &path_buffer[kMaxCvmfsPath*num_commands],
+               path_length);
     }
 
     // Reservations are handled immediately and "out of band"
@@ -293,8 +307,10 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       bool success = true;
       int return_pipe = command_buffer[num_commands].return_pipe;
       const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
-                           hash.GetDigestSize());
+                           sizeof(command_buffer[num_commands].digest));
       const string hash_str(hash.ToString());
+      LogCvmfs(kLogLru, kLogDebug, "reserve %d bytes for %s",
+               size, hash_str.c_str());
 
       if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
         if ((cleanup_threshold_ > 0) && (pinned_ + size > cleanup_threshold_)) {
@@ -302,13 +318,28 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                    hash_str.c_str());
           success = false;
         } else {
-          pinned_chunks_->insert(hash);
+          (*pinned_chunks_)[hash] = size;
           pinned_ += size;
         }
       }
 
       WritePipe(return_pipe, &success, sizeof(success));
       continue;
+    }
+
+    // Unpinnings are also handled immediately with respect to the pinned gauge
+    if (command_type == kUnpin) {
+      const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
+                           sizeof(command_buffer[num_commands].digest));
+      const string hash_str(hash.ToString());
+
+      map<hash::Any, uint64_t>::iterator iter = pinned_chunks_->find(hash);
+      if (iter != pinned_chunks_->end()) {
+        pinned_ -= iter->second;
+        pinned_chunks_->erase(iter);
+      } else {
+        LogCvmfs(kLogLru, kLogDebug, "this chunk was not pinned");
+      }
     }
 
     // Immediate commands trigger flushing of the buffer
@@ -407,10 +438,10 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
   // Unpin
   command_buffer[0].command_type = kTouch;
-  for (set<hash::Any>::const_iterator i = pinned_chunks_->begin(),
+  for (map<hash::Any, uint64_t>::const_iterator i = pinned_chunks_->begin(),
        iEnd = pinned_chunks_->end(); i != iEnd; ++i)
   {
-    memcpy(command_buffer[0].digest, i->digest, i->GetDigestSize());
+    memcpy(command_buffer[0].digest, i->first.digest, i->first.GetDigestSize());
     ProcessCommandBunch(1, command_buffer, path_buffer);
   }
 
@@ -590,7 +621,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   pinned_ = 0;
   cleanup_threshold_ = cleanup_threshold;
   cache_dir_ = new string(cache_dir);
-  pinned_chunks_ = new set<hash::Any>();
+  pinned_chunks_ = new map<hash::Any, uint64_t>();
 
   // Initialize cache catalog
   bool retry = false;
@@ -713,6 +744,8 @@ bool Init(const string &cache_dir, const uint64_t limit,
   // Prepare touch, new, remove statements
   sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET acseq=:seq "
                      "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
+  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=0 "
+                     "WHERE sha1=:sha1;", -1, &stmt_unpin_, NULL);
   sqlite3_prepare_v2(db_,
     "INSERT OR REPLACE INTO cache_catalog "
     "(sha1, size, acseq, path, type, pinned) "
@@ -777,6 +810,7 @@ void Fini() {
   if (stmt_rm_) sqlite3_finalize(stmt_rm_);
   if (stmt_size_) sqlite3_finalize(stmt_size_);
   if (stmt_touch_) sqlite3_finalize(stmt_touch_);
+  if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
   if (stmt_new_) sqlite3_finalize(stmt_new_);
   if (db_) sqlite3_close(db_);
 
@@ -883,7 +917,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
                  hash_str.c_str());
         return false;
       } else {
-        pinned_chunks_->insert(hash);
+        (*pinned_chunks_)[hash] = size;
         pinned_ += size;
       }
     }
@@ -927,6 +961,17 @@ bool Pin(const hash::Any &hash, const uint64_t size,
   DoInsert(hash, size, cvmfs_path, true);
 
   return true;
+}
+
+
+void Unpin(const hash::Any &hash) {
+  if (limit_ == 0) return;
+  LogCvmfs(kLogLru, kLogDebug, "Unpin %s", hash.ToString().c_str());
+
+  LruCommand cmd;
+  cmd.command_type = kUnpin;
+  memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 }
 
 

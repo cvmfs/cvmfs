@@ -28,6 +28,7 @@ void Insert(const hash::Any &hash, const uint64_t size,
             const std::string &cmvfs_path);
 bool Pin(const hash::Any &hash, const uint64_t size,
          const std::string &path_on_cvmfs);
+void Unpin(const hash::Any &hash);
 void Touch(const hash::Any &hash);
 void Remove(const hash::Any &file);
 std::vector<std::string> List();
