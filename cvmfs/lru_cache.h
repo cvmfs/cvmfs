@@ -45,6 +45,7 @@
 #include <google/dense_hash_map>
 
 #include "platform.h"
+#include "logging.h"
 
 namespace cvmfs {
 

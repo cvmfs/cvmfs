@@ -124,6 +124,8 @@ cache::CatalogManager *catalog_manager_;
 InodeCache *inode_cache_ = NULL;
 PathCache *path_cache_ = NULL;
 Md5PathCache *md5path_cache_ = NULL;
+double kcache_timeout_ = 60.0;  /**< TTL (s) of meta data in the kernel cache */
+atomic_int32 drainout_mode_;
 
 map<uint64_t, DirectoryListing> *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
@@ -154,34 +156,40 @@ void SetMaxTtl(const unsigned value) {
 }
 
 
+static inline double GetKcacheTimeout() {
+  int drainout = atomic_read32(&drainout_mode_);
+  if (drainout) return 0.0;
+  return kcache_timeout_;
+}
+
+
 catalog::LoadError Remount() {
   return catalog_manager_->Remount();
 }
 
 
-static bool GetDirentForInode(const fuse_ino_t ino, catalog::DirectoryEntry *dirent) {
+static bool GetDirentForInode(const fuse_ino_t ino,
+                              catalog::DirectoryEntry *dirent)
+{
   // Lookup inode in cache
   if (inode_cache_->lookup(ino, dirent)) {
     LogCvmfs(kLogInodeCache, kLogDebug, "HIT %d -> '%s'",
              ino, dirent->name().c_str());
     return true;
-  } else {
-    LogCvmfs(kLogInodeCache, kLogDebug, "MISS %d --> lookup in catalogs",
-             ino);
-
-    // Lookup inode in catalog
-    if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
-      LogCvmfs(kLogInodeCache, kLogDebug, "CATALOG HIT %d -> '%s'",
-               dirent->inode(), dirent->name().c_str());
-      inode_cache_->insert(ino, *dirent);
-      return true;
-    } else {
-      LogCvmfs(kLogInodeCache, kLogDebug,
-               "no entry --> maybe data corruption?");
-      return false;
-    }
   }
-  return false;  // unreachable
+
+  LogCvmfs(kLogInodeCache, kLogDebug, "MISS %d --> lookup in catalogs", ino);
+  // Lookup inode in catalog
+  if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
+    LogCvmfs(kLogInodeCache, kLogDebug, "CATALOG HIT %d -> '%s'",
+             dirent->inode(), dirent->name().c_str());
+    inode_cache_->insert(ino, *dirent);
+    return true;
+  }
+
+  LogCvmfs(kLogInodeCache, kLogDebug,
+           "no entry --> maybe data corruption?");
+  return false;
 }
 
 
@@ -308,8 +316,9 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   memset(&result, 0, sizeof(result));
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
-  result.attr_timeout = 2.0;  // TODO(rene): replace these magic numbers
-  result.entry_timeout = 2.0;
+  double timeout = GetKcacheTimeout();
+  result.attr_timeout = timeout;
+  result.entry_timeout = timeout;
 
   fuse_reply_entry(req, &result);
 }
@@ -339,7 +348,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   struct stat info = dirent.GetStatStructure();
 
-  fuse_reply_attr(req, &info, 1.0);  // TODO(rene): replace magic number
+  fuse_reply_attr(req, &info, GetKcacheTimeout());
 }
 
 
@@ -534,10 +543,11 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   tracer::Trace(tracer::kFuseOpen, "no path provided", "open() call");
 
   int fd = -1;
-  catalog::DirectoryEntry d;
+  catalog::DirectoryEntry dirent;
   string path;
 
-  const bool found = GetDirentForInode(ino, &d) && GetPathForInode(ino, &path);
+  const bool found = GetDirentForInode(ino, &dirent) &&
+                     GetPathForInode(ino, &path);
 
   if (!found) {
     if (fi->flags & O_CREAT)
@@ -562,7 +572,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  fd = cache::Fetch(d, path);
+  fd = cache::Fetch(dirent, path);
   atomic_inc64(&num_open_);
 
   if (fd >= 0) {
@@ -570,6 +580,17 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
+      // If file has changed with a new catalog, the kernel data cache needs
+      // to be invalidated
+      fi->keep_cache = 1;
+      if (dirent.cached_mtime() != dirent.mtime()) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "file is new or has changed, invalidating cache (%d %d)",
+                 dirent.mtime(), dirent.cached_mtime());
+        fi->keep_cache = 0;
+        dirent.set_cached_mtime(dirent.mtime());
+        inode_cache_->insert(ino, dirent);
+      }
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
@@ -582,7 +603,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "failed to open inode: %d, CAS key %s, error code %d",
-             ino, d.checksum().ToString().c_str(), errno);
+             ino, dirent.checksum().ToString().c_str(), errno);
     if (errno == EMFILE) {
       fuse_reply_err(req, EMFILE);
       return;
@@ -590,6 +611,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   // Prevent Squid DoS
+  // TODO: move to download
   time_t now = time(NULL);
   if (now - previous_io_error_.timestamp < kForgetDos) {
     usleep(previous_io_error_.delay*1000);
@@ -602,7 +624,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   previous_io_error_.timestamp = now;
 
   atomic_inc32(&num_io_error_);
-  fuse_reply_err(req, EIO);
+  fuse_reply_err(req, -fd);
 }
 
 
@@ -963,6 +985,8 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
     tracer::Init(8192, 7000, *tracefile_);
   else
     tracer::InitNull();
+
+  atomic_init32(&drainout_mode_);
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
@@ -1036,7 +1060,7 @@ struct CvmfsOptions {
   char     *logfile;
   char     *blacklist;
   char     *repo_name;
-  int      force_signing;
+  int      ignore_signature;
   int      rebuild_cachedb;
   int      nofiles;
   int      grab_mountpoint;
@@ -1070,7 +1094,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("cachedir=%s",         cachedir, 0),
   CVMFS_OPT("proxies=%s",          proxies, 0),
   CVMFS_OPT("tracefile=%s",        tracefile, 0),
-  CVMFS_SWITCH("force_signing",    force_signing),
+  CVMFS_SWITCH("ignore_signature", ignore_signature),
   CVMFS_OPT("pubkey=%s",           pubkey, 0),
   CVMFS_OPT("logfile=%s",          logfile, 0),
   CVMFS_SWITCH("rebuild_cachedb",  rebuild_cachedb),
@@ -1128,14 +1152,16 @@ static void usage(const char *progname) {
       "Timeout for network operations without proxy (default is %d)\n"
     " -o max_ttl=MINUTES         "
       "Maximum TTL for file catalogs (default: take from catalog)\n"
+    " -o kcache_timeout=SECONDS  "
+      "Timeout of the kernel meta-data cache (default %d, turn off with -1)\n"
     " -o cachedir=DIR            Where to store disk cache\n"
     " -o proxies=HTTP_PROXIES    "
       "Set the HTTP proxy list, such as 'proxy1|proxy2;DIRECT'\n"
     " -o tracefile=FILE          Trace FUSE opaerations into FILE\n"
     " -o pubkey=PEMFILE          "
       "Public RSA key that is used to verify the whitelist signature.\n"
-    " -o force_signing           "
-      "Except only signed catalogs\n"
+    " -o ignore_signature        "
+      "Except unsigned catalogs\n"
     " -o rebuild_cachedb         "
       "Force rebuilding the quota cache db from cache directory\n"
     " -o quota_limit=MB          "
@@ -1160,7 +1186,7 @@ static void usage(const char *progname) {
       "Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
     "                            Default is NOTICE.\n"
     " Note: you cannot load files greater than quota_limit-quota_threshold\n",
-      2, 2);
+    2, 2, int(cvmfs::kcache_timeout_));
 
   // Print the help from FUSE
   // const char *args[] = {progname, "-h"};
@@ -1378,6 +1404,12 @@ int main(int argc, char *argv[]) {
   if (!g_uid) g_uid = getuid();
   if (!g_gid) g_gid = getgid();
   if (g_cvmfs_opts.max_ttl) cvmfs::max_ttl_ = g_cvmfs_opts.max_ttl*60;
+  if (g_cvmfs_opts.kcache_timeout) {
+    cvmfs::kcache_timeout_ = (g_cvmfs_opts.kcache_timeout == -1) ?
+                             0.0 : double(g_cvmfs_opts.kcache_timeout);
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expires after %d seconds",
+           int(cvmfs::kcache_timeout_));
   options_ready = true;
 
   // Tune SQlite3 memory
@@ -1577,7 +1609,7 @@ int main(int argc, char *argv[]) {
   // Load initial file catalog
   cvmfs::catalog_manager_ = new
     cache::CatalogManager(*cvmfs::repository_name_,
-                          !g_cvmfs_opts.force_signing);
+                          g_cvmfs_opts.ignore_signature);
   if (!cvmfs::catalog_manager_->Init()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize catalog manager");
     goto cvmfs_cleanup;

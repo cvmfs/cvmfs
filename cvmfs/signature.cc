@@ -555,11 +555,12 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
     return false;
   }
 
-  // Check local blacklist TODO: test
+  // Check local blacklist
   for (unsigned i = 0; i < blacklisted_certificates_->size(); ++i) {
     if ((*blacklisted_certificates_)[i].substr(0, 59) == fingerprint) {
       LogCvmfs(kLogSignature, kLogDebug | kLogSyslog,
                "blacklisted fingerprint (%s)", fingerprint.c_str());
+      return false;
     }
   }
 

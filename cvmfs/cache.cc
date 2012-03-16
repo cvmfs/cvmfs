@@ -24,6 +24,8 @@
  * the download and informs the other, waiting threads on pipes.
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "cvmfs_config.h"
 #include "cache.h"
 
@@ -32,6 +34,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <dirent.h>
+#include <inttypes.h>
 
 #include <cassert>
 #include <cstring>
@@ -376,13 +379,14 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
   int retval;
 
   if (d.size() > quota::GetMaxFileSize()) {
-    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache");
+    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64")",
+             d.size());
     return -ENOSPC;
   }
 
   // Try to open from local cache
-  if ((fd_return = cache::Open(d.checksum_)) >= 0) {
-    quota::Touch(d.checksum_);
+  if ((fd_return = cache::Open(d.checksum())) >= 0) {
+    quota::Touch(d.checksum());
     return fd_return;
   }
 
@@ -402,7 +406,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
 
   // Lock queue and start downloading or enqueue
   pthread_mutex_lock(&lock_queues_download_);
-  ThreadQueues::iterator iDownloadQueue = queues_download_->find(d.checksum_);
+  ThreadQueues::iterator iDownloadQueue = queues_download_->find(d.checksum());
   if (iDownloadQueue != queues_download_->end()) {
     LogCvmfs(kLogCache, kLogDebug, "waiting for download of %s",
              cvmfs_path.c_str());
@@ -417,28 +421,26 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
     return fd_return;
   } else {
     // Seems we are the first one, check again in the cache (race condition)
-    fd_return = cache::Open(d.checksum_);
+    fd_return = cache::Open(d.checksum());
     if (fd_return >= 0) {
       pthread_mutex_unlock(&lock_queues_download_);
-      quota::Touch(d.checksum_);
+      quota::Touch(d.checksum());
       return fd_return;
     }
 
     // Create a new queue for this chunk
-    (*queues_download_)[d.checksum_] = &tls->other_pipes_waiting;
+    (*queues_download_)[d.checksum()] = &tls->other_pipes_waiting;
     pthread_mutex_unlock(&lock_queues_download_);
   }
 
   // The download path starts here
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", cvmfs_path.c_str());
 
-  const string url = "/data" + d.checksum_.MakePath(1, 2);
+  const string url = "/data" + d.checksum().MakePath(1, 2);
   string final_path;
   string temp_path;
   int fd;  // Used to write the downloaded file
   FILE *f = NULL;
-  char strmbuf[4096];  // Place FILE stream buffer on the stack
-  // TODO(jakob): Reuse in thread
   int result = -EIO;
 
   fd = StartTransaction(d.checksum(), &final_path, &temp_path);
@@ -455,12 +457,10 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
     LogCvmfs(kLogCache, kLogDebug, "could not fdopen %s", final_path.c_str());
     goto fetch_finalize;
   }
-  retval = setvbuf(f, strmbuf, _IOFBF, 4096);
-  assert(retval == 0);
 
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
-  tls->download_job.expected_hash = &d.checksum_;
+  tls->download_job.expected_hash = d.checksum_ptr();
   download::Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {
@@ -494,7 +494,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
       goto fetch_finalize;
     }
     result = cache::CommitTransaction(final_path, temp_path, cvmfs_path,
-                                      d.checksum_, d.size());
+                                      d.checksum(), d.size());
     if (result == 0) {
       posix_fadvise(fd_return, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
       result = fd_return;
@@ -509,7 +509,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
            cvmfs_path.c_str());
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "failed to fetch %s (hash: %s, "
-             "error %d)", cvmfs_path.c_str(), d.checksum_.ToString().c_str(),
+             "error %d)", cvmfs_path.c_str(), d.checksum().ToString().c_str(),
              tls->download_job.error_code);
   }
   if (fd >= 0) {
@@ -526,7 +526,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
     assert(retval == sizeof(int));
   }
   tls->other_pipes_waiting.clear();
-  queues_download_->erase(d.checksum_);
+  queues_download_->erase(d.checksum());
   pthread_mutex_unlock(&lock_queues_download_);
 
   return result;

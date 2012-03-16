@@ -19,7 +19,7 @@ namespace cvmfs {
 #ifdef DISALBE_MD5_PATH_CACHE
       return true;
 #endif
-      LogCvmfs(kLogMd5Cache, kLogDebug, "insert md5: %s -> '%s'", hash.ToString().c_str(), dirEntry.name_.c_str());
+      LogCvmfs(kLogMd5Cache, kLogDebug, "insert md5: %s -> '%s'", hash.ToString().c_str(), dirEntry.name().c_str());
       return LruCache<hash::Md5, catalog::DirectoryEntry, hash_md5, hash_equal >::insert(hash, dirEntry);
    }
 

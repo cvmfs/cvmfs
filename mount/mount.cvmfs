@@ -138,8 +138,8 @@ fi
 if [ "x$CVMFS_SYSLOG_LEVEL" != "x" ]; then
   mount_options="${mount_options},syslog_level=$CVMFS_SYSLOG_LEVEL"  
 fi
-if [ "x$CVMFS_FORCE_SIGNING" == "xyes" ]; then
-  mount_options="${mount_options},force_signing"
+if [ "x$CVMFS_IGNORE_SIGNATURE" == "xyes" ]; then
+  mount_options="${mount_options},ignore_signature"
 fi
 if [ "x$CVMFS_PUBLIC_KEY" != "x" ]; then
   mount_options="${mount_options},pubkey=$CVMFS_PUBLIC_KEY"
