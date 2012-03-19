@@ -109,7 +109,7 @@ class LruCache {
    * memory pool (by overriding the 'new' and 'delete' operators of
    * ListEntryContent).
    *
-   * @param BIN the type of object to be allocated by this MemoryAllocator
+   * @param T the type of object to be allocated by this MemoryAllocator
    */
   template<class T> class MemoryAllocator {
    public:
@@ -166,6 +166,7 @@ class LruCache {
 
       // Find a new free slot if there are some left
       if (!this->IsFull()) {
+        // TODO: speed up, scan the bitmap faster
         while (this->GetBit(next_free_slot_)) {
           next_free_slot_ = (next_free_slot_ + 1) % num_slots_;
         }
@@ -730,14 +731,18 @@ class Md5PathCache :
   {
     this->SetSpecialKeys(hash::Md5(hash::AsciiPtr("!")),
                          hash::Md5(hash::AsciiPtr("?")));
+    dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }
 
   bool Insert(const hash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
-    return true;
     LogCvmfs(kLogLru, kLogDebug, "insert md5 --> dirent: %s -> '%s'",
              hash.ToString().c_str(), dirent.name().c_str());
     return LruCache<hash::Md5, catalog::DirectoryEntry,
                     hash_md5, equal_md5>::Insert(hash, dirent);
+  }
+
+  bool InsertNegative(const hash::Md5 &hash) {
+    return Insert(hash, dirent_negative_);
   }
 
   bool Lookup(const hash::Md5 &hash, catalog::DirectoryEntry *dirent) {
@@ -749,12 +754,14 @@ class Md5PathCache :
   }
 
   bool Forget(const hash::Md5 &hash) {
-    return true;
     LogCvmfs(kLogLru, kLogDebug, "forget md5: %s",
              hash.ToString().c_str());
     return LruCache<hash::Md5, catalog::DirectoryEntry,
                     hash_md5, equal_md5>::Forget(hash);
   }
+
+ private:
+  catalog::DirectoryEntry dirent_negative_;
 };
 
 }  // namespace lru

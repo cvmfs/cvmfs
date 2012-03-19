@@ -26,6 +26,11 @@ namespace catalog {
 class Catalog;
 typedef uint64_t inode_t;
 
+enum SpecialDirents {
+  kDirentNormal = 0,
+  kDirentNegative,
+};
+
 class DirectoryEntry {
   friend class LookupSqlStatement;                   // simplify creation of DirectoryEntry objects
   friend class ManipulateDirectoryEntrySqlStatement; // simplify write of DirectoryEntry objects in database
@@ -51,6 +56,12 @@ public:
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) { }
 
+  inline explicit DirectoryEntry(SpecialDirents special_type) :
+    catalog_((Catalog *)(-1)) { };
+
+  inline SpecialDirents GetSpecial() {
+    return (catalog_ == (Catalog *)(-1)) ? kDirentNegative : kDirentNormal;
+  }
   inline bool IsNestedCatalogRoot() const { return is_nested_catalog_root_; }
   inline bool IsNestedCatalogMountpoint() const {
     return is_nested_catalog_mountpoint_;

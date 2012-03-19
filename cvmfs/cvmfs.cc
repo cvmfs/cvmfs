@@ -210,56 +210,43 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
   }
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "no entry, data corruption?");
+  LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode, no entry");
   return false;
 }
 
 
-static bool get_dirent_for_path(const string &path, catalog::DirectoryEntry *dirent) {
+static bool GetDirentForPath(const string &path, const fuse_ino_t parent_inode,
+                             catalog::DirectoryEntry *dirent)
+{
   /*
-   *  this one is pretty nasty!
-   *  in a unit test ../../test/unittests/02....cc
-   *  the cache showed reasonable performance (1.2 millon transactions in 4 seconds)
-   *  but here it SLOWS DOWN the Davinci benchmark about 20 seconds
+   * in a unit test ../../test/unittests/02....cc
+   * the cache showed reasonable performance (1.2 millon transactions
+   * in 4 seconds)
+   * but here it SLOWS DOWN the Davinci benchmark about 20 seconds
    *
-   *  there must either be something wrong in the code itself or
-   *  I must have overseen some cache coherency problem.
+   * There must either be something wrong in the code itself or
+   * we must have overseen some cache coherency problem.
    *
-   *  I.e. the data coming out of it is somehow corrupt.
-   *  But this is very unlikely,
-   *  because the tests do not fail, they are just slower.
+   * I.e. the data coming out of it is somehow corrupt.
+   * But this is very unlikely,
+   * because the tests do not fail, they are just slower.
    */
+  hash::Md5 md5path((hash::AsciiPtr(path)));
+  if (md5path_cache_->Lookup(md5path, dirent))
+    return dirent->GetSpecial() != catalog::kDirentNegative;
 
-  // check the md5path_cache first
-  // (TODO: this is a quick and dirty prototype currently!!)
-  // it actually slows down the stuff... TODO: find out why
-  // if (md5path_cache_->Lookup(md5, dirent)) {
-  //          if (dirent.catalog_id == -1) {
-  //             pmesg(D_MD5_CACHE, "HIT NEGATIVE %s -> '%s'",
-  //                   md5.to_string().c_str(), dirent.name.c_str());
-  //             return false;
-  //
-  //          } else {
-  //             pmesg(D_MD5_CACHE, "HIT %s -> '%s'",
-  //                   md5.to_string().c_str(), dirent.name.c_str());
-  //             return true;
-  //          }
-  //       } else {
-
-  if (catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent)) {
-    //            md5path_cache_->Insert(md5, dirent);
+  // Lookup inode in catalog TODO: not twice md5 calculation
+  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+    dirent->set_parent_inode(parent_inode);
+    md5path_cache_->Insert(md5path, *dirent);
     return true;
-  } else {
-    // struct catalog::t_dirent negative;
-    // negative.catalog_id = -1;
-    // negative.name = "negative!";
-    //            md5path_cache_->Insert(md5, negative);
-    return false;
   }
-  // }
 
+  LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForPath, no entry");
+  md5path_cache_->InsertNegative(md5path);
   return false;
 }
+
 
 static bool GetPathForInode(const fuse_ino_t ino, string *path) {
   // Check the path cache first
@@ -267,25 +254,21 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
     return true;
   }
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - recursively building path",
-           ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - recursively building path", ino);
 
   // Find out the parent path recursively and rebuild the absolute path
-  string parent_path;
   catalog::DirectoryEntry dirent;
-
-  if (!GetDirentForInode(ino, &dirent)) {
+  if (!GetDirentForInode(ino, &dirent))
     return false;
-  }
 
   // Check if we reached the root node
   if (dirent.inode() == catalog_manager_->GetRootInode()) {
     *path = "";
   } else {
     // Retrieve the parent path recursively
-    if (!GetPathForInode(dirent.parent_inode(), &parent_path)) {
+    string parent_path;
+    if (!GetPathForInode(dirent.parent_inode(), &parent_path))
       return false;
-    }
 
     *path = parent_path + "/" + dirent.name();
   }
@@ -318,18 +301,16 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
 
   catalog::DirectoryEntry dirent;
   const string path = parent_path + "/" + name;
-  // TODO: getdirent for path?
-  const bool found_entry =
-    catalog_manager_->LookupPath(path, catalog::kLookupSole, &dirent);
-  if (!found_entry) {
+  if (!GetDirentForPath(path, parent, &dirent)) {
     fuse_reply_err(req, ENOENT);
     return;
   }
 
-  dirent.set_parent_inode(parent);
-
+  // Don't insert yet, only on stat
+/*  dirent.set_parent_inode(parent);
   inode_cache_->Insert(dirent.inode(), dirent);
-  path_cache_->Insert(dirent.inode(), path);
+  if (dirent.IsDirectory())
+    path_cache_->Insert(dirent.inode(), path); */
 
   struct fuse_entry_param result;
   memset(&result, 0, sizeof(result));
