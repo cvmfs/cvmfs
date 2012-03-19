@@ -201,23 +201,16 @@ static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
   // Lookup inode in cache
-  if (inode_cache_->lookup(ino, dirent)) {
-    LogCvmfs(kLogInodeCache, kLogDebug, "HIT %d -> '%s'",
-             ino, dirent->name().c_str());
+  if (inode_cache_->Lookup(ino, dirent))
     return true;
-  }
 
-  LogCvmfs(kLogInodeCache, kLogDebug, "MISS %d --> lookup in catalogs", ino);
   // Lookup inode in catalog
   if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
-    LogCvmfs(kLogInodeCache, kLogDebug, "CATALOG HIT %d -> '%s'",
-             dirent->inode(), dirent->name().c_str());
-    inode_cache_->insert(ino, *dirent);
+    inode_cache_->Insert(ino, *dirent);
     return true;
   }
 
-  LogCvmfs(kLogInodeCache, kLogDebug,
-           "no entry --> maybe data corruption?");
+  LogCvmfs(kLogCvmfs, kLogDebug, "no entry, data corruption?");
   return false;
 }
 
@@ -240,7 +233,7 @@ static bool get_dirent_for_path(const string &path, catalog::DirectoryEntry *dir
   // check the md5path_cache first
   // (TODO: this is a quick and dirty prototype currently!!)
   // it actually slows down the stuff... TODO: find out why
-  // if (md5path_cache_->lookup(md5, dirent)) {
+  // if (md5path_cache_->Lookup(md5, dirent)) {
   //          if (dirent.catalog_id == -1) {
   //             pmesg(D_MD5_CACHE, "HIT NEGATIVE %s -> '%s'",
   //                   md5.to_string().c_str(), dirent.name.c_str());
@@ -252,19 +245,15 @@ static bool get_dirent_for_path(const string &path, catalog::DirectoryEntry *dir
   //             return true;
   //          }
   //       } else {
-  LogCvmfs(kLogMd5Cache, kLogDebug, "MISS %s --> lookup in catalogs",
-           path.c_str());
 
   if (catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent)) {
-    LogCvmfs(kLogMd5Cache, kLogDebug, "CATALOG HIT %s -> '%s'",
-             path.c_str(), dirent->name().c_str());
-    //            md5path_cache_->insert(md5, dirent);
+    //            md5path_cache_->Insert(md5, dirent);
     return true;
   } else {
     // struct catalog::t_dirent negative;
     // negative.catalog_id = -1;
     // negative.name = "negative!";
-    //            md5path_cache_->insert(md5, negative);
+    //            md5path_cache_->Insert(md5, negative);
     return false;
   }
   // }
@@ -274,12 +263,11 @@ static bool get_dirent_for_path(const string &path, catalog::DirectoryEntry *dir
 
 static bool GetPathForInode(const fuse_ino_t ino, string *path) {
   // Check the path cache first
-  if (path_cache_->lookup(ino, path)) {
-    LogCvmfs(kLogPathCache, kLogDebug, "HIT %d -> '%s'", ino, path->c_str());
+  if (path_cache_->Lookup(ino, path)) {
     return true;
   }
 
-  LogCvmfs(kLogPathCache, kLogDebug, "MISS %d - recursively building path",
+  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - recursively building path",
            ino);
 
   // Find out the parent path recursively and rebuild the absolute path
@@ -302,7 +290,7 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
     *path = parent_path + "/" + dirent.name();
   }
 
-  path_cache_->insert(dirent.inode(), *path);
+  path_cache_->Insert(dirent.inode(), *path);
   return true;
 }
 
@@ -340,8 +328,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
 
   dirent.set_parent_inode(parent);
 
-  inode_cache_->insert(dirent.inode(), dirent);
-  path_cache_->insert(dirent.inode(), path);
+  inode_cache_->Insert(dirent.inode(), dirent);
+  path_cache_->Insert(dirent.inode(), path);
 
   struct fuse_entry_param result;
   memset(&result, 0, sizeof(result));
@@ -623,7 +611,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                  dirent.mtime(), dirent.cached_mtime());
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
-        inode_cache_->insert(ino, dirent);
+        inode_cache_->Insert(ino, dirent);
       }*/
       fi->fh = fd;
       fuse_reply_open(req, fi);

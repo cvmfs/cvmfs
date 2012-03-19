@@ -6,11 +6,11 @@
  * deletes the entries which are least touched in the last time to maintain a given
  * maximal cache size.
  * The cache uses a hand crafted memory allocator to use memory efficiently
- * Before you do anything with your new cache, use setSpecialHashTableKeys() !!               <----- IMPORTANT  !!!!!!
+ * Before you do anything with your new cache, use SetSpecialKeys() !!               <----- IMPORTANT  !!!!!!
  *
  * usage:
  *   LruCache<int, string> cache(100);  // cache mapping ints to strings with maximal size of 100
- *   cache.setSpecialHashTableKeys(999999999,9999999991); // DO NOT FORGET THIS!! WILL CRASH AT INSERT!!
+ *   cache.SetSpecialKeys(999999999,9999999991); // DO NOT FORGET THIS!! WILL CRASH AT INSERT!!
  *
  *   // inserting some stuff
  *   cache.insert(42, "fourtytwo");
@@ -483,63 +483,66 @@ class LruCache {
    * @param value the value of the cache entry
    * @return true on successful insertion otherwise false
    */
-  virtual bool insert(const Key &key, const Value &value) {
-    this->lock();
+  virtual bool Insert(const Key &key, const Value &value) {
+    this->Lock();
 
-    // check if we have to update an existent entry
+    // Check if we have to update an existent entry
     CacheEntry entry;
-    if (this->lookupCache(key, entry)) {
+    if (this->DoLookup(key, entry)) {
       entry.value = value;
-      this->updateExistingEntry(key, entry);
-      this->touchEntry(entry);
+      cache_[key] = entry;
+      this->Touch(entry);
     } else {
-      // check if we have to make some space in the cache
-      if (this->IsFull()) {
-        this->deleteOldestEntry();
-      }
+      // Check if we have to make some space in the cache a
+      if (this->IsFull())
+        this->DeleteOldest();
 
-      // insert a new entry
-      this->insertNewEntry(key, value);
+      CacheEntry entry;
+      entry.list_entry = lru_list_->PushBack(key);
+      entry.value = value;
+
+      cache_[key] = entry;
+      cache_gauge_++;
     }
 
-    this->unlock();
+    this->Unlock();
     return true;
   }
 
   /**
-   *  retrieve an element from the cache
-   *  if the element was found, it will be marked as 'recently used' and returned
-   *  @param key the key to perform a lookup on
-   *  @param value (out) here the result is saved (in case of cache miss this is not altered)
-   *  @return true on successful lookup, false if key was not found
+   * Retrieve an element from the cache.
+   * If the element was found, it will be marked as 'recently used' and returned
+   * @param key the key to perform a lookup on
+   * @param value (out) here the result is saved (not touch in case of miss)
+   * @return true on successful lookup, false if key was not found
    */
-  virtual bool lookup(const Key &key, Value *value) {
+  virtual bool Lookup(const Key &key, Value *value) {
     bool found = false;
-    this->lock();
+    this->Lock();
 
     CacheEntry entry;
-    if (this->lookupCache(key, entry)) {
-      // cache hit
-      this->touchEntry(entry);
+    if (this->DoLookup(key, entry)) {
+      // Hit
+      this->Touch(entry);
       *value = entry.value;
       found = true;
     }
 
-    this->unlock();
+    this->Unlock();
     return found;
   }
 
   /**
-   *  forgets about a specific cache entry
-   *  @param key the key to delete from the cache
-   *  @return true if key was deleted, false if key was not in the cache
+   * Forgets about a specific cache entry
+   * @param key the key to delete from the cache
+   * @return true if key was deleted, false if key was not in the cache
    */
-  virtual bool forget(const Key &key) {
+  virtual bool Forget(const Key &key) {
     bool found = false;
-    this->lock();
+    this->Lock();
 
     CacheEntry entry;
-    if (this->lookupCache(key, entry)) {
+    if (this->DoLookup(key, entry)) {
       found = true;
 
       entry.list_entry->RemoveFromList();
@@ -548,30 +551,30 @@ class LruCache {
       --cache_gauge_;
     }
 
-    this->unlock();
+    this->Unlock();
     return found;
   }
 
   /**
-   *  clears all elements from the cache
-   *  all memory of internal data structures will be freed but data of cache entries
-   *  may stay in use, we do not call delete on any user data
+   * Clears all elements from the cache.
+   * All memory of internal data structures will be freed but data of
+   * cache entries may stay in use, we do not call delete on any user data.
    */
-  virtual void drop() {
-    this->lock();
+  virtual void Drop() {
+    this->Lock();
 
     cache_gauge_ = 0;
     lru_list_->clear();
     cache_.clear();
 
-    this->unlock();
+    this->Unlock();
   }
 
   /**
-   *  Google dense hash needs two special Key values to mark empty hash table
-   *  buckets and deleted hash table buckets
+   * Google dense hash needs two special Key values to mark empty hash table
+   * buckets and deleted hash table buckets
    */
-  void setSpecialHashTableKeys(const Key &empty, const Key &deleted) {
+  void SetSpecialKeys(const Key &empty, const Key &deleted) {
     cache_.set_empty_key(empty);
     cache_.set_deleted_key(deleted);
   }
@@ -579,7 +582,7 @@ class LruCache {
   inline bool IsFull() const { return cache_gauge_ >= cache_size_; }
   inline bool IsEmpty() const { return cache_gauge_ == 0; }
 
-private:
+ private:
   /**
    *  this just performs a lookup in the cache
    *  WITHOUT changing the LRU order
@@ -587,7 +590,7 @@ private:
    *  @param entry a pointer to the entry structure
    *  @return true on successful lookup, false otherwise
    */
-  inline bool lookupCache(const Key &key, CacheEntry &entry) {
+  inline bool DoLookup(const Key &key, CacheEntry &entry) {
     typename Cache::iterator foundElement = cache_.find(key);
 
     if (foundElement == cache_.end()) {
@@ -601,51 +604,23 @@ private:
   }
 
   /**
-   *  insert a new entry in the cache
-   *  wraps the user data in an internal data structure
-   *  @param key the key to save the value in
-   *  @param value the user data
+   * Touch an entry.
+   * The entry will be moved to the back of the LRU list to mark it
+   * as 'recently used'... this saves the entry from being deleted
+   * @param entry the CacheEntry to be touched (CacheEntry is the internal wrapper data structure)
    */
-  inline void insertNewEntry(const Key &key, const Value &value) {
-    assert (not this->IsFull());
-
-    CacheEntry entry;
-    entry.list_entry = lru_list_->PushBack(key);
-    entry.value = value;
-
-    cache_[key] = entry;
-    cache_gauge_++;
-  }
-
-  /**
-   *  update an entry which is already in the cache
-   *  this will not change the LRU order. Just the new data object is
-   *  associated with the given key value in the cache
-   *  @param key the key to save the value in
-   *  @param entry the CacheEntry structure to save in the cache
-   */
-  inline void updateExistingEntry(const Key &key, const CacheEntry &entry) {
-    cache_[key] = entry;
-  }
-
-  /**
-   *  touch an entry
-   *  the entry will be moved to the back of the LRU list to mark it
-   *  as 'recently used'... this saves the entry from being deleted
-   *  @param entry the CacheEntry to be touched (CacheEntry is the internal wrapper data structure)
-   */
-  inline void touchEntry(const CacheEntry &entry) {
+  inline void Touch(const CacheEntry &entry) {
     lru_list_->MoveToBack(entry.list_entry);
   }
 
   /**
-   *  deletes the least recently used entry from the cache
+   * Deletes the least recently used entry from the cache.
    */
-  inline void deleteOldestEntry() {
-    assert (not this->IsEmpty());
+  inline void DeleteOldest() {
+    assert(!this->IsEmpty());
 
-    Key keyToDelete = lru_list_->PopFront();
-    cache_.erase(keyToDelete);
+    Key delete_me = lru_list_->PopFront();
+    cache_.erase(delete_me);
 
     --cache_gauge_;
   }
@@ -653,7 +628,7 @@ private:
   /**
    * Locks the cache (thread safety).
    */
-  inline void lock() {
+  inline void Lock() {
 #ifdef LRU_CACHE_THREAD_SAFE
     pthread_mutex_lock(&lock_);
 #endif
@@ -662,7 +637,7 @@ private:
   /**
    * Unlocks the cache (thread safety).
    */
-  inline void unlock() {
+  inline void Unlock() {
 #ifdef LRU_CACHE_THREAD_SAFE
     pthread_mutex_unlock(&lock_);
 #endif
@@ -671,7 +646,8 @@ private:
 
 // initialize the static allocator field
 template<class Key, class Value, class HashFunction, class EqualKey >
-typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator *LruCache<Key, Value, HashFunction, EqualKey>::allocator_ = NULL;
+typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator
+  *LruCache<Key, Value, HashFunction, EqualKey>::allocator_ = NULL;
 
 
 class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
@@ -680,25 +656,26 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
     LruCache<fuse_ino_t, catalog::DirectoryEntry>(cache_size)
   {
     // TODO
-    this->setSpecialHashTableKeys(1000000000, 1000000001);
+    this->SetSpecialKeys(1000000000, 1000000001);
   }
 
-  bool insert(const fuse_ino_t inode, const catalog::DirectoryEntry &dirent) {
+  bool Insert(const fuse_ino_t inode, const catalog::DirectoryEntry &dirent) {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %d -> '%s'",
              inode, dirent.name().c_str());
-    return LruCache<fuse_ino_t, catalog::DirectoryEntry>::insert(inode,
-                                                                 dirent);
+    return LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
   }
 
-  bool lookup(const fuse_ino_t inode, catalog::DirectoryEntry *dirent) {
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %d", inode);
-    return LruCache<fuse_ino_t, catalog::DirectoryEntry>::lookup(inode,
-                                                                 dirent);
+  bool Lookup(const fuse_ino_t inode, catalog::DirectoryEntry *dirent) {
+    const bool result =
+      LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(inode, dirent);
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %d (%s)",
+             inode, result ? "hit" : "miss");
+    return result;
   }
 
-  void drop() {
+  void Drop() {
     LogCvmfs(kLogLru, kLogDebug, "dropping inode cache");
-    LruCache<fuse_ino_t, catalog::DirectoryEntry>::drop();
+    LruCache<fuse_ino_t, catalog::DirectoryEntry>::Drop();
   }
 };
 
@@ -708,23 +685,25 @@ class PathCache : public LruCache<fuse_ino_t, std::string> {
   PathCache(unsigned int cache_size) :
     LruCache<fuse_ino_t, std::string>(cache_size)
   {
-    this->setSpecialHashTableKeys(1000000000, 1000000001);
+    this->SetSpecialKeys(1000000000, 1000000001);
   }
 
-  bool insert(const fuse_ino_t inode, const std::string &path) {
+  bool Insert(const fuse_ino_t inode, const std::string &path) {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %d -> '%s'",
              inode, path.c_str());
-    return LruCache<fuse_ino_t, std::string>::insert(inode, path);
+    return LruCache<fuse_ino_t, std::string>::Insert(inode, path);
   }
 
-  bool lookup(const fuse_ino_t inode, std::string *path) {
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %d", inode);
-    return LruCache<fuse_ino_t, std::string>::lookup(inode, path);
+  bool Lookup(const fuse_ino_t inode, std::string *path) {
+    const bool result = LruCache<fuse_ino_t, std::string>::Lookup(inode, path);
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %d (%s)",
+             inode, result ? "hit" : "miss");
+    return result;
   }
 
-  void drop() {
+  void Drop() {
     LogCvmfs(kLogLru, kLogDebug, "dropping path cache");
-    LruCache<fuse_ino_t, std::string>::drop();
+    LruCache<fuse_ino_t, std::string>::Drop();
   }
 };
 
@@ -749,31 +728,32 @@ class Md5PathCache :
     LruCache<hash::Md5, catalog::DirectoryEntry,
              hash_md5, equal_md5>(cache_size)
   {
-    this->setSpecialHashTableKeys(hash::Md5(hash::AsciiPtr("!")),
-                                  hash::Md5(hash::AsciiPtr("?")));
+    this->SetSpecialKeys(hash::Md5(hash::AsciiPtr("!")),
+                         hash::Md5(hash::AsciiPtr("?")));
   }
 
-  bool insert(const hash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
+  bool Insert(const hash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
     return true;
     LogCvmfs(kLogLru, kLogDebug, "insert md5 --> dirent: %s -> '%s'",
              hash.ToString().c_str(), dirent.name().c_str());
     return LruCache<hash::Md5, catalog::DirectoryEntry,
-                    hash_md5, equal_md5>::insert(hash, dirent);
+                    hash_md5, equal_md5>::Insert(hash, dirent);
   }
 
-  bool lookup(const hash::Md5 &hash, catalog::DirectoryEntry *dirent) {
-    LogCvmfs(kLogLru, kLogDebug, "lookup md5 --> dirent: %s",
-             hash.ToString().c_str());
-    return LruCache<hash::Md5, catalog::DirectoryEntry,
-                    hash_md5, equal_md5>::lookup(hash, dirent);
+  bool Lookup(const hash::Md5 &hash, catalog::DirectoryEntry *dirent) {
+    const bool result = LruCache<hash::Md5, catalog::DirectoryEntry,
+                                 hash_md5, equal_md5>::Lookup(hash, dirent);
+    LogCvmfs(kLogLru, kLogDebug, "lookup md5 --> dirent: %s (%s)",
+             hash.ToString().c_str(), result ? "hit" : "miss");
+    return result;
   }
 
-  bool forget(const hash::Md5 &hash) {
+  bool Forget(const hash::Md5 &hash) {
     return true;
     LogCvmfs(kLogLru, kLogDebug, "forget md5: %s",
              hash.ToString().c_str());
     return LruCache<hash::Md5, catalog::DirectoryEntry,
-                    hash_md5, equal_md5>::forget(hash);
+                    hash_md5, equal_md5>::Forget(hash);
   }
 };
 

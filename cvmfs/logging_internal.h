@@ -29,9 +29,6 @@ enum LogSource {
   kLogTalk,
   kLogMonitor,
   kLogLru,
-  kLogInodeCache,
-  kLogPathCache,
-  kLogMd5Cache,
   kLogFuse,
   kLogSignature,
 };
