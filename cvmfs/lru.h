@@ -44,543 +44,444 @@
 #include <string>
 
 #include <google/dense_hash_map>
+#include <fuse/fuse_lowlevel.h>
 
 #include "platform.h"
 #include "logging.h"
+#include "smalloc.h"
+#include "dirent.h"
+#include "hash.h"
 
 namespace lru {
 
 /**
- *  template class to create a LRU cache
- *  @param Key type of the key values
- *  @param Value type of the value values
+ * Template class to create a LRU cache
+ * @param Key type of the key values
+ * @param Value type of the value values
  */
-template<class Key, class Value, class HashFunction = SPARSEHASH_HASH<Key>, class EqualKey = std::equal_to<Key> >
+template<class Key, class Value, class HashFunction = SPARSEHASH_HASH<Key>,
+                                 class EqualKey = std::equal_to<Key> >
 class LruCache {
-
-private:
-  // forward declarations of private internal data structures
+ private:
+  // Forward declarations of private internal data structures
   template<class T> class ListEntry;
   template<class T> class ListEntryHead;
   template<class T> class ListEntryContent;
   template<class M> class MemoryAllocator;
 
-  // helpers to get the template magic right
+  // Helpers to get the template magic right
   typedef ListEntryContent<Key> ConcreteListEntryContent;
   typedef MemoryAllocator<ConcreteListEntryContent> ConcreteMemoryAllocator;
 
   /**
-   *  this structure wraps the user data and relates it to the LRU list entry
+   * This structure wraps the user data and relates it to the LRU list entry
    */
   typedef struct {
-    ListEntryContent<Key> *listEntry;
+    ListEntryContent<Key> *list_entry;
     Value value;
   } CacheEntry;
 
-  // the actual map data structure (TODO: replace this by a hashmap)
+  // The actual map data structure
   typedef google::dense_hash_map<Key, CacheEntry, HashFunction, EqualKey> Cache;
 
-  // internal data fields
-  unsigned int mCurrentCacheSize;
-  unsigned int mMaxCacheSize;
-  static ConcreteMemoryAllocator *allocator;
+  // Internal data fields
+  unsigned int cache_gauge_;
+  unsigned int cache_size_;
+  static ConcreteMemoryAllocator *allocator_;
 
   /**
-   *  a double linked list to keep track of the least recently
-   *  used data entries.
-   *  New entries get pushed back to the list. If an entry is touched
-   *  it is moved to the back of the list again.
-   *  If the cache gets too long, the first element (the oldest) gets
-   *  deleted to obtain some space.
+   * A doubly linked list to keep track of the least recently used data entries.
+   * New entries get pushed back to the list. If an entry is touched
+   * it is moved to the back of the list again.
+   * If the cache gets too long, the first element (the oldest) gets
+   * deleted to obtain some space.
    */
-  ListEntryHead<Key> *mLruList;
-
-  /**
-   *  the actual caching data structure
-   *  it has to be a map of some kind... lookup performance is crucial
-   */
-  Cache mCache;
-
-  /**
-   *  mutex to make cache thread safe
-   */
+  ListEntryHead<Key> *lru_list_;
+  Cache cache_;  /**< The actual cache map. */
 #ifdef LRU_CACHE_THREAD_SAFE
-  pthread_mutex_t mLock;
+  pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
 #endif
 
   /**
-   *  This MemoryAllocator optimizes the usage of memory for the cache entries.
-   *  It allocates enough memory for the maximal number of cache entries at startup,
-   *  and assigns new ListEntryContent objects a free spot in this memory pool.
-   *  This is done by overriding the 'new' and 'delete' operators of ListEntryContent.
-   *  As the cache is meant to be completely filled at all times it is no problem to
-   *  allocate all memory already at startup.
-   *  @param M the type of object to be allocated by this MemoryAllocator
+   * A special purpose memory allocator for the cache entries.
+   * It allocates enough memory for the maximal number of cache entries at
+   * startup, and assigns new ListEntryContent objects to a free spot in this
+   * memory pool (by overriding the 'new' and 'delete' operators of
+   * ListEntryContent).
+   *
+   * @param BIN the type of object to be allocated by this MemoryAllocator
    */
-  template<class M>
-  class MemoryAllocator {
-  private:
-    unsigned int mNumberOfSlots; // <-- overall number of slots in the memory pool
-    unsigned int mFreeSlots;     // <-- number of free slots left
-    unsigned int mNextFreeSlot;  // <-- position of next free slot in the pool
-    char *mBlocks; // <-- a bitmap to mark slots as allocated
-    M *mMemory;    // <-- the actual memory pool
-
-  public:
+  template<class T> class MemoryAllocator {
+   public:
     /**
-     *  creates a MemoryAllocator to handle a memory pool
-     *  @param numberOfSlots the number of slots to be allocated for the given datatype M
+     * Creates a MemoryAllocator to handle a memory pool for objects of type T
+     * @param num_slots the number of slots to be allocated for the given datatype T
      */
-    MemoryAllocator(const unsigned int numberOfSlots) {
+    MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
-      unsigned int bytesNeededForBitmap = numberOfSlots / sizeof(char);
-      if (bytesNeededForBitmap * sizeof(char) < numberOfSlots) bytesNeededForBitmap++;
+      unsigned int num_bytes_bitmap = num_slots / sizeof(char);
+      if ((num_slots % sizeof(char)) != 0) num_bytes_bitmap++;
 
-      // how much actual memory do we need?
-      const unsigned int bytesOfMemoryNeeded = sizeof(M) * numberOfSlots;
+      // How much actual memory do we need?
+      const unsigned int num_bytes_memory = sizeof(T) * num_slots;
 
-      // allocate memory
-      mBlocks = (char *)malloc(bytesNeededForBitmap);
-      mMemory = (M *)malloc(bytesOfMemoryNeeded);
+      // Allocate zero'd memory
+      bitmap_ = reinterpret_cast<char *>(smalloc(num_bytes_bitmap));
+      memory_ = reinterpret_cast<T *>(smalloc(num_bytes_memory));
+      memset(bitmap_, 0, num_bytes_bitmap);
+      memset(memory_, 0, num_bytes_memory);
 
-      // check for successfully allocated memory
-      if (mBlocks == NULL || mMemory == NULL) {
-        LogCvmfs(kLogLru, kLogDebug, "memory allocation failed");
-        abort();
-      }
-
-      // zero memory
-      memset(mBlocks, 0, bytesNeededForBitmap);
-      memset(mMemory, 0, bytesOfMemoryNeeded);
-
-      // create initial state
-      mNumberOfSlots = numberOfSlots;
-      mFreeSlots = numberOfSlots;
-      mNextFreeSlot = 0;
+      // Create initial state
+      num_slots_ = num_slots;
+      num_free_slots_ = num_slots;
+      next_free_slot_ = 0;
     }
 
     /**
-     *  free all data
-     *  if the MemoryAllocator is gone, all data is gone too!
+     * The memory allocator also frees all allocated data
      */
     virtual ~MemoryAllocator() {
-      free(mBlocks);
-      free(mMemory);
+      free(bitmap_);
+      free(memory_);
     }
 
     /**
-     *  check if the memory pool is full
-     *  @return true if all slots are occupied, otherwise false
+     * Check if the memory pool is full.
+     * @return true if all slots are occupied, otherwise false
      */
-    inline bool isFull() const { return mFreeSlots == 0; }
+    inline bool IsFull() const { return num_free_slots_ == 0; }
 
     /**
-     *  allocates a slot and returns a pointer to the memory
-     *  @return a pointer to a chunk of the memory pool
+     * Allocate a slot and returns a pointer to the memory.
+     * @return a pointer to a chunk of the memory pool
      */
-    M* allocate() {
-      // check if memory is left
-      if (this->isFull()) {
+    T* Allocate() {
+      if (this->IsFull())
         return NULL;
-      } else {
-        // allocate a slot
-        this->setBit(mNextFreeSlot);
-        --mFreeSlots;
-        M *slot = mMemory + mNextFreeSlot;
 
-        // find a new free slot if there are some left
-        if (not this->isFull()) {
-          while (this->getBit(mNextFreeSlot)) {
-            mNextFreeSlot = (mNextFreeSlot + 1) % mNumberOfSlots;
-          }
+      // Allocate a slot
+      this->SetBit(next_free_slot_);
+      --num_free_slots_;
+      T *slot = memory_ + next_free_slot_;
+
+      // Find a new free slot if there are some left
+      if (!this->IsFull()) {
+        while (this->GetBit(next_free_slot_)) {
+          next_free_slot_ = (next_free_slot_ + 1) % num_slots_;
         }
-
-        // done
-        return slot;
       }
+
+      return slot;
     }
 
     /**
-     *  free a given slot in the memory pool
-     *  @param slot a pointer to the slot be freed
+     * Free a given slot in the memory pool
+     * @param slot a pointer to the slot be freed
      */
-    void deallocate(M* slot) {
-      // check if given slot is in bounds
-      if (slot < mMemory || slot > mMemory + mNumberOfSlots) {
-        return;
-      }
+    void Deallocate(T* slot) {
+      // Check if given slot is in bounds
+      assert((slot >= memory_) && (slot <= memory_ + num_slots_));
 
-      // get position of slot
-      const unsigned int position = slot - mMemory;
+      // Get position of slot
+      const unsigned int position = slot - memory_;
 
-      // check if slot was already freed
-      assert (this->getBit(position));
+      // Check if slot was already freed
+      assert(this->GetBit(position));
 
-      // free slot
-      this->unsetBit(position);
-      mNextFreeSlot = position; // <-- save the position of this slot as free (faster reallocation)
-      ++mFreeSlots;
+      // Free slot, save the position of this slot as free (faster reallocation)
+      this->UnsetBit(position);
+      next_free_slot_ = position;
+      ++num_free_slots_;
     }
 
-  private:
+   private:
     /**
-     *  check a bit in the internal allocation bitmap
-     *  @param position the position to check
-     *  @return true if bit is set, otherwise false
+     * Check a bit in the internal allocation bitmap.
+     * @param position the position to check
+     * @return true if bit is set, otherwise false
      */
-    inline bool getBit(const unsigned int position) {
-      assert (position < mNumberOfSlots);
-      return ((mBlocks[position / 8] & (1 << (position % 8))) != 0);
+    inline bool GetBit(const unsigned int position) {
+      assert(position < num_slots_);
+      return ((bitmap_[position / 8] & (1 << (position % 8))) != 0);
     }
 
     /**
      *  set a bit in the internal allocation bitmap
      *  @param position the number of the bit to be set
      */
-    inline void setBit(const unsigned int position) {
-      assert (position < mNumberOfSlots);
-      mBlocks[position / 8] |= 1 << (position % 8);
+    inline void SetBit(const unsigned int position) {
+      assert(position < num_slots_);
+      bitmap_[position / 8] |= 1 << (position % 8);
     }
 
     /**
-     *  clear a bit in the internal allocation bitmap
-     *  @param position the number of the bit to be cleared
+     * Clear a bit in the internal allocation bitmap
+     * @param position the number of the bit to be cleared
      */
-    inline void unsetBit(const unsigned int position) {
-      assert (position < mNumberOfSlots);
-      mBlocks[position / 8] &= ~(1 << (position % 8));
+    inline void UnsetBit(const unsigned int position) {
+      assert(position < num_slots_);
+      bitmap_[position / 8] &= ~(1 << (position % 8));
     }
+
+    unsigned int num_slots_;  /**< Overall number of slots in memory pool. */
+    unsigned int num_free_slots_;  /**< Current number of free slots left. */
+    unsigned int next_free_slot_;  /**< Position of next free slot in pool. */
+    char *bitmap_;  /**< A bitmap to mark slots as allocated. */
+    T *memory_;  /**< The memory pool, array of Ms. */
   };
 
-  /**
-   *  INTERNAL DATA STRUCTURE
-   *  abstract ListEntry class to maintain a double linked list
-   *  the list keeps track of the least recently used keys in the cache
-   */
-  template<class T>
-  class ListEntry {
-  public:
-    ListEntry<T> *next; // <-- pointer to next element in the list
-    ListEntry<T> *prev; // <-- ... take an educated guess... ;-)
 
-  public:
+  /**
+   * Internal LRU list entry, to maintain the doubly linked list.
+   * The list keeps track of the least recently used keys in the cache.
+   */
+  template<class T> class ListEntry {
+   public:
+    /**
+     * Create a new list entry as lonely, both next and prev pointing to this.
+     */
     ListEntry() {
-      // create a new list entry as lonely
-      // both next and prev pointing to this
       this->next = this;
       this->prev = this;
     }
     virtual ~ListEntry() {}
 
     /**
-     *  checks if the ListEntry is the list head
-     *  @return true if ListEntry is list head otherwise false
+     * Checks if the ListEntry is the list head
+     * @return true if ListEntry is list head otherwise false
      */
-    virtual bool isListHead() const = 0;
+    virtual bool IsListHead() const = 0;
 
     /**
-     *  a lonely ListEntry has no connection to other elements
-     *  @return true if ListEntry is lonely otherwise false
+     * A lonely ListEntry has no connection to other elements.
+     * @return true if ListEntry is lonely otherwise false
      */
-    bool isLonely() const { return (this->next == this && this->prev == this); }
+    bool IsLonely() const { return (this->next == this && this->prev == this); }
 
-  protected:
+    ListEntry<T> *next;  /**< Pointer to next element in the list. */
+    ListEntry<T> *prev;  /**< Pointer to previous element in the list. */
 
+   protected:
     /**
-     *  insert a given ListEntry after this one
-     *  @param entry the ListEntry to insert after this one
+     * Insert a given ListEntry after this one.
+     * @param entry the ListEntry to insert after this one
      */
-    inline void insertAsSuccessor(ListEntryContent<T> *entry) {
-      assert (entry->isLonely());
+    inline void InsertAsSuccessor(ListEntryContent<T> *entry) {
+      assert(entry->IsLonely());
 
-      // mount the new element between this and this->next
+      // Mount the new element between this and this->next
       entry->next = this->next;
       entry->prev = this;
 
-      // point this->next->prev to entry and _afterwards_ overwrite this->next
+      // Fix pointers of existing list elements
       this->next->prev = entry;
       this->next = entry;
-
-      assert (not entry->isLonely());
+      assert(!entry->IsLonely());
     }
 
     /**
-     *  insert a given ListEntry in front of this one
-     *  @param entry the ListEntry to insert in front of this one
+     * Insert a given ListEntry in front of this one
+     * @param entry the ListEntry to insert in front of this one
      */
-    inline void insertAsPredecessor(ListEntryContent<T> *entry) {
-      assert (entry->isLonely());
-      assert (not entry->isListHead());
+    inline void InsertAsPredecessor(ListEntryContent<T> *entry) {
+      assert(entry->IsLonely());
+      assert(!entry->IsListHead());
 
-      // mount the new element between this and this->prev
+      // Mount the new element between this and this->prev
       entry->next = this;
       entry->prev = this->prev;
 
-      // point this->prev->next to entry and _afterwards_ overwrite this->prev
+      // Fix pointers of existing list elements
       this->prev->next = entry;
       this->prev = entry;
 
-      assert (not entry->isLonely());
+      assert(!entry->IsLonely());
     }
 
     /**
-     *  remove this element from it's list
-     *  the function connects this->next with this->prev leaving the complete list
-     *  in a consistent state. The ListEntry itself is lonely afterwards, but not
-     *  deleted!!
+     * Remove this element from it's list.
+     * The function connects this->next with this->prev leaving the list
+     * in a consistent state.  The ListEntry itself is lonely afterwards,
+     * but not deleted.
      */
-    virtual void removeFromList() = 0;
+    virtual void RemoveFromList() = 0;
   };
 
   /**
-   *  Specialized ListEntry to contain a data entry of type T
+   * Specialized ListEntry to contain a data entry of type T
    */
-  template<class T>
-  class ListEntryContent
-  : public ListEntry<T> {
-  private:
-    T mContent; // <-- the data content of this ListEntry
-
-  public:
+  template<class T> class ListEntryContent : public ListEntry<T> {
+   public:
     ListEntryContent(Key content) {
-      mContent = content;
+      content_ = content;
     };
 
     /**
-     *  overwritten the new operator of this class to redirect it to our own
-     *  memory allocator. This ensures that heap is not fragmented by loads of
-     *  malloc and free calls
+     * Overwritten the new operator of this class to redirect it to our own
+     * memory allocator.  This ensures that heap is not fragmented by loads of
+     * malloc and free calls.
      */
-    static void* operator new (size_t size) {
-      assert(LruCache::allocator != NULL);
-      return (void *)LruCache::allocator->allocate();
+    static void* operator new(size_t size) {
+      assert(LruCache::allocator_ != NULL);
+      return (void *)LruCache::allocator_->Allocate();
     }
 
     /**
-     *  overwritten delete operator to redirect deallocation to our own memory
-     *  allocator
+     * Overwritten delete operator to redirect deallocation to our own memory
+     * allocator.
      */
     static void operator delete (void *p) {
-      assert(LruCache::allocator != NULL);
-      LruCache::allocator->deallocate(static_cast<ListEntryContent<T> *>(p));
+      assert(LruCache::allocator_ != NULL);
+      LruCache::allocator_->Deallocate(static_cast<ListEntryContent<T> *>(p));
     }
 
-    /**
-     *  see ListEntry base class
-     */
-    inline bool isListHead() const { return false; }
+    inline bool IsListHead() const { return false; }
+    inline T content() const { return content_; }
 
     /**
-     *  retrieve to content of this ListEntry
-     *  @return the content of this ListEntry
+     * See ListEntry base class.
      */
-    inline T getContent() const { return mContent; }
+    inline void RemoveFromList() {
+      assert (!this->IsLonely());
 
-    /**
-     *  see ListEntry base class
-     */
-    inline void removeFromList() {
-      assert (not this->isLonely());
-
-      // remove this from list
+      // Remove this from list
       this->prev->next = this->next;
       this->next->prev = this->prev;
 
-      // make this lonely
+      // Make this lonely
       this->next = this;
       this->prev = this;
-
-      assert (this->isLonely());
     }
+   private:
+    T content_;  /**< The data content of this ListEntry */
   };
 
   /**
-   *  Specialized ListEntry to form a list head.
-   *  Every list has exactly one list head which is also the entry point
-   *  in the list. It is used to manipulate the list.
+   * Specialized ListEntry to form a list head.
+   * Every list has exactly one list head which is also the entry point
+   * in the list. It is used to manipulate the list.
    */
-  template<class T>
-  class ListEntryHead
-  : public ListEntry<T> {
-  public:
+  template<class T> class ListEntryHead : public ListEntry<T> {
+   public:
     virtual ~ListEntryHead() {
       this->clear();
     }
 
     /**
-     *  remove all entries from the list
-     *  ListEntry objects are deleted but contained data keeps available
+     * Remove all entries from the list.
+     * ListEntry objects are deleted but contained data keeps available
      */
     void clear() {
-      // delete all list entries
+      // Delete all list entries
       ListEntry<T> *entry = this->next;
-      ListEntry<T> *entryToDelete;
-      while (not entry->isListHead()) {
-        entryToDelete = entry;
+      ListEntry<T> *delete_me;
+      while (!entry->IsListHead()) {
+        delete_me = entry;
         entry = entry->next;
-        delete entryToDelete;
+        delete delete_me;
       }
 
-      // reset the list to lonely
+      // Reset the list to lonely
       this->next = this;
       this->prev = this;
     }
 
-    /**
-     *  see ListEntry base class
-     */
-    inline bool isListHead() const { return true; }
+    inline bool IsListHead() const { return true; }
+    inline bool IsEmpty() const { return this->IsLonely(); }
 
     /**
-     *  check if the list is empty
-     *  @return true if the list only contains the ListEntryHead otherwise false
+     * Push a new data object to the end of the list.
+     * @param the data object to insert
+     * @return the ListEntryContent structure wrapped around the data object
      */
-    inline bool isEmpty() const { return this->isLonely(); }
-
-    /**
-     *  retrieve the data in the front of the list
-     *  @return the first data object in the list
-     */
-    inline T getFront() const {
-      assert (not this->isEmpty());
-      return this->next->getContent();
+    inline ListEntryContent<T>* PushBack(T content) {
+      ListEntryContent<T> *new_entry = new ListEntryContent<T>(content);
+      this->InsertAsPredecessor(new_entry);
+      return new_entry;
     }
 
     /**
-     *  retrieve the data in the back of the list
-     *  @return the last data object in the list
+     * Pop the first object of the list.
+     * The object is returned and removed from the list
+     * @return the data object which resided in the first list entry
      */
-    inline T getBack() const {
-      assert (not this->isEmpty());
-      return this->prev->getContent();
+    inline T PopFront() {
+      assert (!this->IsEmpty());
+      return Pop(this->next);
     }
 
     /**
-     *  push a new data object to the end of the list
-     *  @param the data object to insert
-     *  @return the ListEntryContent structure which was wrapped around the data object
+     * Take a list entry out of it's list and reinsert at the end of this list.
+     * @param the ListEntry to be moved to the end of this list
      */
-    inline ListEntryContent<T>* push_back(T content) {
-      ListEntryContent<T> *newEntry = new ListEntryContent<T>(content);
-      this->insertAsPredecessor(newEntry);
-      return newEntry;
+    inline void MoveToBack(ListEntryContent<T> *entry) {
+      assert(!entry->IsLonely());
+
+      entry->RemoveFromList();
+      this->InsertAsPredecessor(entry);
     }
 
     /**
-     *  push a new data object to the front of the list
-     *  @param the data object to insert
-     *  @return the ListEntryContent structure which was wrapped around the data object
+     * See ListEntry base class
      */
-    inline ListEntryContent<T>* push_front(T content) {
-      ListEntryContent<T> *newEntry = new ListEntryContent<T>(content);
-      this->insertAsSuccessor(newEntry);
-      return newEntry;
-    }
+    inline void RemoveFromList() { assert(false); }
 
+   private:
     /**
-     *  pop the first object of the list
-     *  the object is returned and removed from the list
-     *  @return the data object which resided in the first list entry
+     * Pop a ListEntry from the list (arbitrary position).
+     * The given ListEntry is removed from the list, deleted and it's
+     * data content is returned
+     * @param popped_entry the entry to be popped
+     * @return the data object of the popped ListEntry
      */
-    inline T pop_front() {
-      assert (not this->isEmpty());
-      return pop(this->next);
-    }
+    inline T Pop(ListEntry<T> *popped_entry) {
+      assert(!popped_entry->IsListHead());
 
-    /**
-     *  pop the last object of the list
-     *  the object is returned and removed from the list
-     *  @return the data object which resided in the last list entry
-     */
-    inline T pop_back() {
-      assert (not this->isEmpty());
-      return pop(this->prev);
-    }
-
-    /**
-     *  take a list entry out of it's list and reinsert just behind this ListEntryHead
-     *  @param the ListEntry to be moved to the beginning of this list
-     */
-    inline void moveToFront(ListEntryContent<T> *entry) {
-      assert (not entry->isLonely());
-
-      entry->removeFromList();
-      this->insertAsSuccessor(entry);
-    }
-
-    /**
-     *  take a list entry out of it's list and reinsert at the end of this list
-     *  @param the ListEntry to be moved to the end of this list
-     */
-    inline void moveToBack(ListEntryContent<T> *entry) {
-      assert (not entry->isLonely());
-
-      entry->removeFromList();
-      this->insertAsPredecessor(entry);
-    }
-
-    /**
-     *  see ListEntry base class
-     */
-    inline void removeFromList() { assert (false); }
-
-  private:
-    /**
-     *  pop a ListEntry from the list (arbitrary position)
-     *  the given ListEntry is removed from the list, deleted and it's data content is returned
-     *  @param poppedEntry the entry to be popped
-     *  @return the data object of the popped ListEntry
-     */
-    inline T pop(ListEntry<T> *poppedEntry) {
-      assert (not poppedEntry->isListHead());
-
-      ListEntryContent<T> *popped = (ListEntryContent<T> *) poppedEntry;
-      popped->removeFromList();
-      T res = popped->getContent();
-      delete popped;
-      return res;
+      ListEntryContent<T> *popped = (ListEntryContent<T> *)popped_entry;
+      popped->RemoveFromList();
+      T result = popped->content();
+      delete popped_entry;
+      return result;
     }
   };
 
-public:
+ public:  // LruCache
   /**
-   *  create a new LRU cache object
-   *  @param maxCacheSize the maximal size of the cache
+   * Create a new LRU cache object
+   * @param cache_size the maximal size of the cache
    */
-  LruCache(const unsigned int maxCacheSize) {
-    assert (maxCacheSize > 0);
+  LruCache(const unsigned int cache_size) {
+    assert(cache_size > 0);
 
-    // create memory allocator
-    ConcreteMemoryAllocator *allocator = new ConcreteMemoryAllocator(maxCacheSize);
-    LruCache<Key, Value, HashFunction, EqualKey>::allocator = allocator;
+    LruCache<Key, Value, HashFunction, EqualKey>::allocator_ =
+      new ConcreteMemoryAllocator(cache_size);
 
-    // internal state
-    mCurrentCacheSize = 0;
-    mMaxCacheSize = maxCacheSize;
-    mLruList = new ListEntryHead<Key>();
+    cache_gauge_ = 0;
+    cache_size_ = cache_size;
+    lru_list_ = new ListEntryHead<Key>();
 
-    // thread safety
 #ifdef LRU_CACHE_THREAD_SAFE
-    pthread_mutex_init(&mLock, NULL);
+    int retval = pthread_mutex_init(&lock_, NULL);
+    assert(retval == 0);
 #endif
   }
 
   virtual ~LruCache() {
-    delete mLruList;
+    delete lru_list_;
 #ifdef LRU_CACHE_THREAD_SAFE
-    pthread_mutex_destroy(&mLock);
+    pthread_mutex_destroy(&lock_);
 #endif
   }
 
   /**
-   *  insert a new key-value pair to the list
-   *  if the cache is already full, the least recently used object is removed
-   *  afterwards the new object is inserted
-   *  if the object is already present it is updated and moved back to the end
-   *  of the list
-   *  @param key the key where the value is saved
-   *  @param value the value of the cache entry
-   *  @return true on successful insertion otherwise false
+   * Insert a new key-value pair to the list.
+   * If the cache is already full, the least recently used object is removed;
+   * afterwards the new object is inserted.
+   * If the object is already present it is updated and moved back to the end
+   * of the list
+   * @param key the key where the value is saved
+   * @param value the value of the cache entry
+   * @return true on successful insertion otherwise false
    */
   virtual bool insert(const Key &key, const Value &value) {
     this->lock();
@@ -593,7 +494,7 @@ public:
       this->touchEntry(entry);
     } else {
       // check if we have to make some space in the cache
-      if (this->isFull()) {
+      if (this->IsFull()) {
         this->deleteOldestEntry();
       }
 
@@ -641,34 +542,15 @@ public:
     if (this->lookupCache(key, entry)) {
       found = true;
 
-      entry.listEntry->removeFromList();
-      delete entry.listEntry;
-      mCache.erase(key);
-      --mCurrentCacheSize;
+      entry.list_entry->RemoveFromList();
+      delete entry.list_entry;
+      cache_.erase(key);
+      --cache_gauge_;
     }
 
     this->unlock();
     return found;
   }
-
-  /**
-   *  checks if the cache is filled completely
-   *  if yes, an insert of a new element will delete the least recently used one
-   *  @return true if cache is fully used otherwise false
-   */
-  inline bool isFull() const { return mCurrentCacheSize >= mMaxCacheSize; }
-
-  /**
-   *  checks if there is at least one element in the cache
-   *  @return true if cache is completely empty otherwise false
-   */
-  inline bool isEmpty() const { return mCurrentCacheSize == 0; }
-
-  /**
-   *  returns the current amount of entries in the cache
-   *  @return the number of entries currently in the cache
-   */
-  inline unsigned int getNumberOfEntries() const { return mCurrentCacheSize; }
 
   /**
    *  clears all elements from the cache
@@ -678,21 +560,24 @@ public:
   virtual void drop() {
     this->lock();
 
-    mCurrentCacheSize = 0;
-    mLruList->clear();
-    mCache.clear();
+    cache_gauge_ = 0;
+    lru_list_->clear();
+    cache_.clear();
 
     this->unlock();
   }
 
   /**
-   *  google dense hash needs two special Key values to mark empty hash table
+   *  Google dense hash needs two special Key values to mark empty hash table
    *  buckets and deleted hash table buckets
    */
   void setSpecialHashTableKeys(const Key &empty, const Key &deleted) {
-    mCache.set_empty_key(empty);
-    mCache.set_deleted_key(deleted);
+    cache_.set_empty_key(empty);
+    cache_.set_deleted_key(deleted);
   }
+
+  inline bool IsFull() const { return cache_gauge_ >= cache_size_; }
+  inline bool IsEmpty() const { return cache_gauge_ == 0; }
 
 private:
   /**
@@ -703,9 +588,9 @@ private:
    *  @return true on successful lookup, false otherwise
    */
   inline bool lookupCache(const Key &key, CacheEntry &entry) {
-    typename Cache::iterator foundElement = mCache.find(key);
+    typename Cache::iterator foundElement = cache_.find(key);
 
-    if (foundElement == mCache.end()) {
+    if (foundElement == cache_.end()) {
       // cache miss
       return false;
     }
@@ -722,14 +607,14 @@ private:
    *  @param value the user data
    */
   inline void insertNewEntry(const Key &key, const Value &value) {
-    assert (not this->isFull());
+    assert (not this->IsFull());
 
     CacheEntry entry;
-    entry.listEntry = mLruList->push_back(key);
+    entry.list_entry = lru_list_->PushBack(key);
     entry.value = value;
 
-    mCache[key] = entry;
-    mCurrentCacheSize++;
+    cache_[key] = entry;
+    cache_gauge_++;
   }
 
   /**
@@ -740,7 +625,7 @@ private:
    *  @param entry the CacheEntry structure to save in the cache
    */
   inline void updateExistingEntry(const Key &key, const CacheEntry &entry) {
-    mCache[key] = entry;
+    cache_[key] = entry;
   }
 
   /**
@@ -750,43 +635,147 @@ private:
    *  @param entry the CacheEntry to be touched (CacheEntry is the internal wrapper data structure)
    */
   inline void touchEntry(const CacheEntry &entry) {
-    mLruList->moveToBack(entry.listEntry);
+    lru_list_->MoveToBack(entry.list_entry);
   }
 
   /**
    *  deletes the least recently used entry from the cache
    */
   inline void deleteOldestEntry() {
-    assert (not this->isEmpty());
+    assert (not this->IsEmpty());
 
-    Key keyToDelete = mLruList->pop_front();
-    mCache.erase(keyToDelete);
+    Key keyToDelete = lru_list_->PopFront();
+    cache_.erase(keyToDelete);
 
-    --mCurrentCacheSize;
+    --cache_gauge_;
   }
 
   /**
-   *  locks the cache (thread safety)
+   * Locks the cache (thread safety).
    */
   inline void lock() {
 #ifdef LRU_CACHE_THREAD_SAFE
-    pthread_mutex_lock(&mLock);
+    pthread_mutex_lock(&lock_);
 #endif
   }
 
   /**
-   *  unlocks the cache (thread safety)
+   * Unlocks the cache (thread safety).
    */
   inline void unlock() {
 #ifdef LRU_CACHE_THREAD_SAFE
-    pthread_mutex_unlock(&mLock);
+    pthread_mutex_unlock(&lock_);
 #endif
   }
 };
 
 // initialize the static allocator field
 template<class Key, class Value, class HashFunction, class EqualKey >
-typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator *LruCache<Key, Value, HashFunction, EqualKey>::allocator = NULL;
+typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator *LruCache<Key, Value, HashFunction, EqualKey>::allocator_ = NULL;
+
+
+class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
+ public:
+  InodeCache(unsigned int cache_size) :
+    LruCache<fuse_ino_t, catalog::DirectoryEntry>(cache_size)
+  {
+    // TODO
+    this->setSpecialHashTableKeys(1000000000, 1000000001);
+  }
+
+  bool insert(const fuse_ino_t inode, const catalog::DirectoryEntry &dirent) {
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %d -> '%s'",
+             inode, dirent.name().c_str());
+    return LruCache<fuse_ino_t, catalog::DirectoryEntry>::insert(inode,
+                                                                 dirent);
+  }
+
+  bool lookup(const fuse_ino_t inode, catalog::DirectoryEntry *dirent) {
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %d", inode);
+    return LruCache<fuse_ino_t, catalog::DirectoryEntry>::lookup(inode,
+                                                                 dirent);
+  }
+
+  void drop() {
+    LogCvmfs(kLogLru, kLogDebug, "dropping inode cache");
+    LruCache<fuse_ino_t, catalog::DirectoryEntry>::drop();
+  }
+};
+
+
+class PathCache : public LruCache<fuse_ino_t, std::string> {
+ public:
+  PathCache(unsigned int cache_size) :
+    LruCache<fuse_ino_t, std::string>(cache_size)
+  {
+    this->setSpecialHashTableKeys(1000000000, 1000000001);
+  }
+
+  bool insert(const fuse_ino_t inode, const std::string &path) {
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %d -> '%s'",
+             inode, path.c_str());
+    return LruCache<fuse_ino_t, std::string>::insert(inode, path);
+  }
+
+  bool lookup(const fuse_ino_t inode, std::string *path) {
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %d", inode);
+    return LruCache<fuse_ino_t, std::string>::lookup(inode, path);
+  }
+
+  void drop() {
+    LogCvmfs(kLogLru, kLogDebug, "dropping path cache");
+    LruCache<fuse_ino_t, std::string>::drop();
+  }
+};
+
+
+struct hash_md5 {
+  size_t operator() (const hash::Md5 &md5) const {
+    return (size_t)*((size_t*)md5.digest);
+  }
+};
+
+struct equal_md5 {
+  bool operator() (const hash::Md5 &a, const hash::Md5 &b) const {
+    return a == b;
+  }
+};
+
+class Md5PathCache :
+  public LruCache<hash::Md5, catalog::DirectoryEntry, hash_md5, equal_md5 >
+{
+ public:
+  Md5PathCache(unsigned int cache_size) :
+    LruCache<hash::Md5, catalog::DirectoryEntry,
+             hash_md5, equal_md5>(cache_size)
+  {
+    this->setSpecialHashTableKeys(hash::Md5(hash::AsciiPtr("!")),
+                                  hash::Md5(hash::AsciiPtr("?")));
+  }
+
+  bool insert(const hash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
+    return true;
+    LogCvmfs(kLogLru, kLogDebug, "insert md5 --> dirent: %s -> '%s'",
+             hash.ToString().c_str(), dirent.name().c_str());
+    return LruCache<hash::Md5, catalog::DirectoryEntry,
+                    hash_md5, equal_md5>::insert(hash, dirent);
+  }
+
+  bool lookup(const hash::Md5 &hash, catalog::DirectoryEntry *dirent) {
+    LogCvmfs(kLogLru, kLogDebug, "lookup md5 --> dirent: %s",
+             hash.ToString().c_str());
+    return LruCache<hash::Md5, catalog::DirectoryEntry,
+                    hash_md5, equal_md5>::lookup(hash, dirent);
+  }
+
+  bool forget(const hash::Md5 &hash) {
+    return true;
+    LogCvmfs(kLogLru, kLogDebug, "forget md5: %s",
+             hash.ToString().c_str());
+    return LruCache<hash::Md5, catalog::DirectoryEntry,
+                    hash_md5, equal_md5>::forget(hash);
+  }
+};
 
 }  // namespace lru
 

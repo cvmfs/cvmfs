@@ -20,9 +20,6 @@ set (CVMFS2_DEBUG_SOURCES
 	duplex_zlib.h compression.h compression.cc
 	download.cc download.h
 	lru.h
-	inode_cache.h inode_cache.cc
-	path_cache.h path_cache.cc
-	md5path_cache.h md5path_cache.cc
   globals.h globals.cc
 	cvmfs.h cvmfs.cc
 

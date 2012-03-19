@@ -3,7 +3,6 @@
 
 #include <fuse/fuse_lowlevel.h>
 #include "lru.h"
-#include "inode_cache.h"
 
 namespace lru {
 
