@@ -8,7 +8,7 @@
 #include "atomic.h"
 #include "dirent.h"
 
-namespace cvmfs {
+namespace lru {
 
   struct hash_md5 {
     size_t operator() (const hash::Md5 &md5) const {

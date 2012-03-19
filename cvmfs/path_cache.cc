@@ -4,7 +4,7 @@
 
 using namespace std;
 
-namespace cvmfs {
+namespace lru {
 
    PathCache::PathCache(unsigned int cacheSize) :
       LruCache<fuse_ino_t, string>(cacheSize) {

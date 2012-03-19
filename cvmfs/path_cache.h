@@ -5,7 +5,7 @@
 #include "lru_cache.h"
 #include "inode_cache.h"
 
-namespace cvmfs {
+namespace lru {
 
    class PathCache :
       public LruCache<fuse_ino_t, std::string> {

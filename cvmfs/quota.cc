@@ -117,9 +117,9 @@ static bool DoCleanup(const uint64_t leave_size) {
     return true;
 
   // TODO transaction
-  LogCvmfs(kLogLru, kLogSyslog,
+  LogCvmfs(kLogQuota, kLogSyslog,
            "cleanup cache until %lu KB are free", leave_size/1024);
-  LogCvmfs(kLogLru, kLogDebug, "gauge %"PRIu64, gauge_);
+  LogCvmfs(kLogQuota, kLogDebug, "gauge %"PRIu64, gauge_);
 
   bool result;
   string hash_str;
@@ -128,13 +128,13 @@ static bool DoCleanup(const uint64_t leave_size) {
   do {
     sqlite3_reset(stmt_lru_);
     if (sqlite3_step(stmt_lru_) != SQLITE_ROW) {
-      LogCvmfs(kLogLru, kLogDebug, "could not get lru-entry");
+      LogCvmfs(kLogQuota, kLogDebug, "could not get lru-entry");
       break;
     }
 
     hash_str = string(reinterpret_cast<const char *>(
                       sqlite3_column_text(stmt_lru_, 0)));
-    LogCvmfs(kLogLru, kLogDebug, "removing %s", hash_str.c_str());
+    LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
     hash::Any hash(hash::kSha1, hash::HexPtr(
       hash_str.substr(0, 2*hash::kDigestSizes[hash::kSha1])));
     if (pinned_chunks_->find(hash) != pinned_chunks_->end())
@@ -142,7 +142,7 @@ static bool DoCleanup(const uint64_t leave_size) {
 
     trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
     gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
-    LogCvmfs(kLogLru, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
+    LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
              hash_str.c_str(), gauge_);
 
     sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
@@ -151,7 +151,7 @@ static bool DoCleanup(const uint64_t leave_size) {
     sqlite3_reset(stmt_rm_);
 
     if (!result) {
-      LogCvmfs(kLogLru, kLogDebug, "could not remove lru-entry");
+      LogCvmfs(kLogQuota, kLogDebug, "could not remove lru-entry");
       return false;
     }
   } while (gauge_ > leave_size);
@@ -164,7 +164,7 @@ static bool DoCleanup(const uint64_t leave_size) {
     if ((pid = fork()) == 0) {
       if (fork() == 0) {
         for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
-          LogCvmfs(kLogLru, kLogDebug, "unlink %s", trash[i].c_str());
+          LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
           unlink(trash[i].c_str());
         }
         _exit(0);
@@ -190,7 +190,7 @@ static bool Contains(const string &hash_str) {
   if (sqlite3_step(stmt_size_) == SQLITE_ROW)
     result = true;
   sqlite3_reset(stmt_size_);
-  LogCvmfs(kLogLru, kLogDebug, "contains %s returns %d",
+  LogCvmfs(kLogQuota, kLogDebug, "contains %s returns %d",
            hash_str.c_str(), result);
 
   return result;
@@ -208,7 +208,7 @@ static void ProcessCommandBunch(const unsigned num,
                          sizeof(commands[i].digest));
     const string hash_str = hash.ToString();
     const unsigned size = commands[i].size;
-    LogCvmfs(kLogLru, kLogDebug, "processing %s (%d)",
+    LogCvmfs(kLogQuota, kLogDebug, "processing %s (%d)",
              hash_str.c_str(), commands[i].command_type);
 
     bool exists;
@@ -218,7 +218,7 @@ static void ProcessCommandBunch(const unsigned num,
         sqlite3_bind_text(stmt_touch_, 2, &hash_str[0], hash_str.length(),
                           SQLITE_STATIC);
         retval = sqlite3_step(stmt_touch_);
-        LogCvmfs(kLogLru, kLogDebug, "touching %s (%ld): %d",
+        LogCvmfs(kLogQuota, kLogDebug, "touching %s (%ld): %d",
                  hash_str.c_str(), seq_-1, retval);
         errno = retval;
         assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
@@ -228,7 +228,7 @@ static void ProcessCommandBunch(const unsigned num,
         sqlite3_bind_text(stmt_unpin_, 1, &hash_str[0], hash_str.length(),
                           SQLITE_STATIC);
         retval = sqlite3_step(stmt_unpin_);
-        LogCvmfs(kLogLru, kLogDebug, "unpinning %s: %d",
+        LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d",
                  hash_str.c_str(), retval);
         errno = retval;
         assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
@@ -241,7 +241,7 @@ static void ProcessCommandBunch(const unsigned num,
 
         // Cleanup, move to trash and unlink
         if (!exists && (gauge_ + size > limit_)) {
-          LogCvmfs(kLogLru, kLogDebug, "over limit, gauge %lu, file size %lu",
+          LogCvmfs(kLogQuota, kLogDebug, "over limit, gauge %lu, file size %lu",
                    gauge_, size);
           retval = DoCleanup(cleanup_threshold_);
           assert(retval != 0);
@@ -259,7 +259,7 @@ static void ProcessCommandBunch(const unsigned num,
         sqlite3_bind_int64(stmt_new_, 6, (commands[i].command_type == kPin) ?
                            1 : 0);
         retval = sqlite3_step(stmt_new_);
-        LogCvmfs(kLogLru, kLogDebug, "insert or replace %s, pin %d: %d",
+        LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, pin %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
         assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
         sqlite3_reset(stmt_new_);
@@ -281,7 +281,7 @@ static void ProcessCommandBunch(const unsigned num,
  * to be executed immediately.
  */
 static void *MainCommandServer(void *data __attribute__((unused))) {
-  LogCvmfs(kLogLru, kLogDebug, "starting cache manager");
+  LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
   sqlite3_soft_heap_limit(kSqliteMemPerThread);
 
   LruCommand command_buffer[kCommandBufferSize];
@@ -292,7 +292,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
               sizeof(command_buffer[0])) == sizeof(command_buffer[0]))
   {
     const CommandType command_type = command_buffer[num_commands].command_type;
-    LogCvmfs(kLogLru, kLogDebug, "received command %d", command_type);
+    LogCvmfs(kLogQuota, kLogDebug, "received command %d", command_type);
     const uint64_t size = command_buffer[num_commands].size;
 
     // Inserts and pins come with a cvmfs path
@@ -309,13 +309,13 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
                            sizeof(command_buffer[num_commands].digest));
       const string hash_str(hash.ToString());
-      LogCvmfs(kLogLru, kLogDebug, "reserve %d bytes for %s",
+      LogCvmfs(kLogQuota, kLogDebug, "reserve %d bytes for %s",
                size, hash_str.c_str());
 
       if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
         if ((cleanup_threshold_ > 0) && (pinned_ + size > cleanup_threshold_)) {
-          LogCvmfs(kLogLru, kLogDebug, "failed to insert %s (pinned), no space",
-                   hash_str.c_str());
+          LogCvmfs(kLogQuota, kLogDebug,
+                   "failed to insert %s (pinned), no space", hash_str.c_str());
           success = false;
         } else {
           (*pinned_chunks_)[hash] = size;
@@ -338,7 +338,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
         pinned_ -= iter->second;
         pinned_chunks_->erase(iter);
       } else {
-        LogCvmfs(kLogLru, kLogDebug, "this chunk was not pinned");
+        LogCvmfs(kLogQuota, kLogDebug, "this chunk was not pinned");
       }
     }
 
@@ -365,7 +365,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
                                sizeof(command_buffer[num_commands].digest));
           const string hash_str = hash.ToString();
-          LogCvmfs(kLogLru, kLogDebug, "manually removing %s",
+          LogCvmfs(kLogQuota, kLogDebug, "manually removing %s",
                    hash_str.c_str());
 
           sqlite3_bind_text(stmt_size_, 1, &hash_str[0], hash_str.length(),
@@ -385,7 +385,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                 pinned_ -= size;
               }
             } else {
-              LogCvmfs(kLogLru, kLogDebug, "could not delete %s, error %d",
+              LogCvmfs(kLogQuota, kLogDebug, "could not delete %s, error %d",
                        hash_str.c_str(), retval);
             }
             sqlite3_reset(stmt_rm_);
@@ -433,7 +433,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
   }
 
   close(pipe_lru_[0]);
-  LogCvmfs(kLogLru, kLogDebug, "stopping cache manager");
+  LogCvmfs(kLogQuota, kLogDebug, "stopping cache manager");
   ProcessCommandBunch(num_commands, command_buffer, path_buffer);
 
   // Unpin
@@ -469,13 +469,13 @@ bool RebuildDatabase() {
   string path;
   set<string> catalogs;
 
-  LogCvmfs(kLogLru, kLogDebug, "re-building cache-database");
+  LogCvmfs(kLogQuota, kLogDebug, "re-building cache-database");
 
   // Empty cache catalog and fscache
   sql = "DELETE FROM cache_catalog; DELETE FROM fscache;";
   sqlerr = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
   if (sqlerr != SQLITE_OK) {
-    LogCvmfs(kLogLru, kLogDebug, "could not clear cache database");
+    LogCvmfs(kLogQuota, kLogDebug, "could not clear cache database");
     goto build_return;
   }
 
@@ -483,7 +483,7 @@ bool RebuildDatabase() {
 
   // Gather file catalog hash values
   if ((dirp = opendir(cache_dir_->c_str())) == NULL) {
-    LogCvmfs(kLogLru, kLogDebug, "failed to open directory %s", path.c_str());
+    LogCvmfs(kLogQuota, kLogDebug, "failed to open directory %s", path.c_str());
     goto build_return;
   }
   while ((d = platform_readdir(dirp)) != NULL) {
@@ -495,7 +495,7 @@ bool RebuildDatabase() {
       if (f != NULL) {
         char sha1[40];
         if (fread(sha1, 1, 40, f) == 40) {
-          LogCvmfs(kLogLru, kLogDebug, "added %s to catalog list",
+          LogCvmfs(kLogQuota, kLogDebug, "added %s to catalog list",
                    string(sha1, 40).c_str());
           catalogs.insert(string(sha1, 40).c_str());
         }
@@ -513,7 +513,7 @@ bool RebuildDatabase() {
     snprintf(hex, sizeof(hex), "%02x", i);
     path = (*cache_dir_) + "/" + string(hex);
     if ((dirp = opendir(path.c_str())) == NULL) {
-      LogCvmfs(kLogLru, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
                "failed to open directory %s (tmpwatch interfering?)",
                path.c_str());
       goto build_return;
@@ -528,14 +528,14 @@ bool RebuildDatabase() {
         sqlite3_bind_int64(stmt_insert, 2, info.st_size);
         sqlite3_bind_int64(stmt_insert, 3, info.st_atime);
         if (sqlite3_step(stmt_insert) != SQLITE_DONE) {
-          LogCvmfs(kLogLru, kLogDebug, "could not insert into temp table");
+          LogCvmfs(kLogQuota, kLogDebug, "could not insert into temp table");
           goto build_return;
         }
         sqlite3_reset(stmt_insert);
 
         gauge_ += info.st_size;
       } else {
-        LogCvmfs(kLogLru, kLogDebug, "could not stat %s/%s",
+        LogCvmfs(kLogQuota, kLogDebug, "could not stat %s/%s",
                  path.c_str(), d->d_name);
       }
     }
@@ -564,7 +564,7 @@ bool RebuildDatabase() {
       sqlite3_bind_int64(stmt_insert, 4, kFileRegular);
 
     if (sqlite3_step(stmt_insert) != SQLITE_DONE) {
-      LogCvmfs(kLogLru, kLogDebug, "could not insert into cache catalog");
+      LogCvmfs(kLogQuota, kLogDebug, "could not insert into cache catalog");
       goto build_return;
     }
     sqlite3_reset(stmt_insert);
@@ -574,14 +574,14 @@ bool RebuildDatabase() {
   sql = "DELETE FROM fscache;";
   sqlerr = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
   if (sqlerr != SQLITE_OK) {
-    LogCvmfs(kLogLru, kLogDebug, "could not clear temporary table (%d)",
+    LogCvmfs(kLogQuota, kLogDebug, "could not clear temporary table (%d)",
              sqlerr);
     goto build_return;
   }
 
   seq_ = seq;
   result = true;
-  LogCvmfs(kLogLru, kLogDebug,
+  LogCvmfs(kLogQuota, kLogDebug,
            "rebuilding finished, seqence %"PRIu64 ", gauge %"PRIu64,
            seq_, gauge_);
 
@@ -606,7 +606,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
           const uint64_t cleanup_threshold, const bool rebuild_database)
 {
   if ((cleanup_threshold >= limit) && (limit > 0)) {
-    LogCvmfs(kLogLru, kLogDebug,
+    LogCvmfs(kLogQuota, kLogDebug,
              "invalid parameters: limit %"PRIu64", cleanup_threshold %"PRIu64"",
              limit, cleanup_threshold_);
     return false;
@@ -629,7 +629,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   const string db_file = (*cache_dir_) + "/cvmfscatalog.cache";
   int err = sqlite3_open(db_file.c_str(), &db_);
   if (err != SQLITE_OK) {
-    LogCvmfs(kLogLru, kLogDebug, "could not open cache database (%d)", err);
+    LogCvmfs(kLogQuota, kLogDebug, "could not open cache database (%d)", err);
     return false;
   }
   sql = "PRAGMA synchronous=0; PRAGMA locking_mode=EXCLUSIVE; "
@@ -651,10 +651,10 @@ bool Init(const string &cache_dir, const uint64_t limit,
       sqlite3_close(db_);
       unlink(db_file.c_str());
       unlink((db_file + "-journal").c_str());
-      LogCvmfs(kLogLru, kLogSyslog, "LRU database corrupted, re-building");
+      LogCvmfs(kLogQuota, kLogSyslog, "LRU database corrupted, re-building");
       goto init_recover;
     }
-    LogCvmfs(kLogLru, kLogDebug, "could not init cache database (failed: %s)",
+    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
              sql.c_str());
     return false;
   }
@@ -668,8 +668,8 @@ bool Init(const string &cache_dir, const uint64_t limit,
     sql = "UPDATE cache_catalog SET type=" + StringifyInt(kFileRegular) + ";";
     err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
     if (err != SQLITE_OK) {
-      LogCvmfs(kLogLru, kLogDebug, "could not init cache database (failed: %s)",
-               sql.c_str());
+      LogCvmfs(kLogQuota, kLogDebug,
+               "could not init cache database (failed: %s)", sql.c_str());
       return false;
     }
   }
@@ -678,7 +678,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   sql = "UPDATE cache_catalog SET pinned=0;";
   err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
   if (err != SQLITE_OK) {
-    LogCvmfs(kLogLru, kLogDebug, "could not init cache database (failed: %s)",
+    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
              sql.c_str());
     return false;
   }
@@ -688,7 +688,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
         "VALUES ('schema', '1.0')";
   err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
   if (err != SQLITE_OK) {
-    LogCvmfs(kLogLru, kLogDebug, "could not init cache database (failed: %s)",
+    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
              sql.c_str());
     return false;
   }
@@ -705,12 +705,12 @@ bool Init(const string &cache_dir, const uint64_t limit,
     sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
     if (sqlite3_step(stmt) == SQLITE_ROW) {
       if ((sqlite3_column_int64(stmt, 0)) == 0 && !RebuildDatabase()) {
-        LogCvmfs(kLogLru, kLogDebug,
+        LogCvmfs(kLogQuota, kLogDebug,
                  "could not build cache database from file system");
         return false;
       }
     } else {
-      LogCvmfs(kLogLru, kLogDebug, "could not select on cache catalog");
+      LogCvmfs(kLogQuota, kLogDebug, "could not select on cache catalog");
       sqlite3_finalize(stmt);
       return false;
     }
@@ -723,7 +723,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   if (sqlite3_step(stmt) == SQLITE_ROW) {
     gauge_ = sqlite3_column_int64(stmt, 0);
   } else {
-    LogCvmfs(kLogLru, kLogDebug, "could not determine cache size");
+    LogCvmfs(kLogQuota, kLogDebug, "could not determine cache size");
     sqlite3_finalize(stmt);
     return false;
   }
@@ -735,7 +735,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   if (sqlite3_step(stmt) == SQLITE_ROW) {
     seq_ = sqlite3_column_int64(stmt, 0)+1;
   } else {
-    LogCvmfs(kLogLru, kLogDebug, "could not determine highest seq-no");
+    LogCvmfs(kLogQuota, kLogDebug, "could not determine highest seq-no");
     sqlite3_finalize(stmt);
     return false;
   }
@@ -781,7 +781,7 @@ void Spawn() {
     return;
 
   if (pthread_create(&thread_lru_, NULL, MainCommandServer, NULL) != 0) {
-    LogCvmfs(kLogLru, kLogDebug, "could not create lru thread");
+    LogCvmfs(kLogQuota, kLogDebug, "could not create lru thread");
     abort();
   }
 
@@ -864,7 +864,7 @@ static void DoInsert(const hash::Any &hash, const uint64_t size,
                      const string &cvmfs_path, const bool pin)
 {
   const string hash_str = hash.ToString();
-  LogCvmfs(kLogLru, kLogDebug, "insert into lru %s, path %s",
+  LogCvmfs(kLogQuota, kLogDebug, "insert into lru %s, path %s",
            hash_str.c_str(), cvmfs_path.c_str());
   const unsigned path_length = (cvmfs_path.length() > kMaxCvmfsPath) ?
     kMaxCvmfsPath : cvmfs_path.length();
@@ -905,7 +905,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
   if (limit_ == 0) return true;
 
   const string hash_str = hash.ToString();
-  LogCvmfs(kLogLru, kLogDebug, "pin into lru %s, path %s",
+  LogCvmfs(kLogQuota, kLogDebug, "pin into lru %s, path %s",
            hash_str.c_str(), cvmfs_path.c_str());
 
   // Has to run when not spawned yet
@@ -913,7 +913,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
     // Currently code duplication here, not sure there is a more elegant way
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
       if ((cleanup_threshold_ > 0) && (pinned_ + size > cleanup_threshold_)) {
-        LogCvmfs(kLogLru, kLogDebug, "failed to insert %s (pinned), no space",
+        LogCvmfs(kLogQuota, kLogDebug, "failed to insert %s (pinned), no space",
                  hash_str.c_str());
         return false;
       } else {
@@ -923,7 +923,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
     }
     bool exists = Contains(hash_str);
     if (!exists && (gauge_ + size > limit_)) {
-      LogCvmfs(kLogLru, kLogDebug, "over limit, gauge %lu, file size %lu",
+      LogCvmfs(kLogQuota, kLogDebug, "over limit, gauge %lu, file size %lu",
                gauge_, size);
       int retval = DoCleanup(cleanup_threshold_);
       assert(retval != 0);
@@ -966,7 +966,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
 
 void Unpin(const hash::Any &hash) {
   if (limit_ == 0) return;
-  LogCvmfs(kLogLru, kLogDebug, "Unpin %s", hash.ToString().c_str());
+  LogCvmfs(kLogQuota, kLogDebug, "Unpin %s", hash.ToString().c_str());
 
   LruCommand cmd;
   cmd.command_type = kUnpin;

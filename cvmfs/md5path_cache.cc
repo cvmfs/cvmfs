@@ -7,7 +7,7 @@ using namespace std;
 // TODO: enable this - slowed things down last time
 #define DISALBE_MD5_PATH_CACHE
 
-namespace cvmfs {
+namespace lru {
 
    Md5PathCache::Md5PathCache(unsigned int cacheSize) :
       LruCache<hash::Md5, catalog::DirectoryEntry, hash_md5, hash_equal >(cacheSize) {

@@ -121,9 +121,9 @@ time_t boot_time_;
 unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 cache::CatalogManager *catalog_manager_;
-InodeCache *inode_cache_ = NULL;
-PathCache *path_cache_ = NULL;
-Md5PathCache *md5path_cache_ = NULL;
+lru::InodeCache *inode_cache_ = NULL;
+lru::PathCache *path_cache_ = NULL;
+lru::Md5PathCache *md5path_cache_ = NULL;
 double kcache_timeout_ = 60.0;  /**< TTL (s) of meta data in the kernel cache */
 atomic_int32 drainout_mode_;
 time_t drainout_deadline_;
@@ -619,14 +619,14 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // If file has changed with a new catalog, the kernel data cache needs
       // to be invalidated
       fi->keep_cache = 1;
-      if (dirent.cached_mtime() != dirent.mtime()) {
+      /*if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "file is new or has changed, invalidating cache (%d %d)",
                  dirent.mtime(), dirent.cached_mtime());
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
         inode_cache_->insert(ino, dirent);
-      }
+      }*/
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
@@ -1659,9 +1659,9 @@ int main(int argc, char *argv[]) {
   struct fuse_lowlevel_ops cvmfs_operations;
   cvmfs::set_cvmfs_ops(&cvmfs_operations);
 
-  cvmfs::inode_cache_ = new cvmfs::InodeCache(cvmfs::kInodeCacheSize);
-  cvmfs::path_cache_ = new cvmfs::PathCache(cvmfs::kPathCacheSize);
-  cvmfs::md5path_cache_ = new cvmfs::Md5PathCache(cvmfs::kMd5pathCacheSize);
+  cvmfs::inode_cache_ = new lru::InodeCache(cvmfs::kInodeCacheSize);
+  cvmfs::path_cache_ = new lru::PathCache(cvmfs::kPathCacheSize);
+  cvmfs::md5path_cache_ = new lru::Md5PathCache(cvmfs::kMd5pathCacheSize);
   cvmfs::directory_handles_ = new map<uint64_t, cvmfs::DirectoryListing>();
 
   if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &g_fuse_args)) != NULL) {

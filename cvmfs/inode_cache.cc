@@ -4,7 +4,7 @@
 
 using namespace std;
 
-namespace cvmfs {
+namespace lru {
 
   InodeCache::InodeCache(unsigned int cacheSize) :
   LruCache<fuse_ino_t, catalog::DirectoryEntry>(cacheSize) {

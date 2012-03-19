@@ -7,7 +7,7 @@
 #include "lru_cache.h"
 #include "dirent.h"
 
-namespace cvmfs {
+namespace lru {
 
 class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
  public:
