@@ -82,7 +82,7 @@ then
   QUOTA="$QUOTA,quota_threshold="$[$CVMFS_QUOTA_LIMIT/2]
 fi
 
-mount_options="-o fsname=cvmfs2,nodev,grab_mountpoint,kernel_cache,auto_cache"
+mount_options="-o fsname=cvmfs2,nodev,grab_mountpoint"
 mount_options="${mount_options}${CVMFS_ID},cachedir=$CVMFS_CACHE_DIR,$QUOTA,$CVMFS_OPTIONS,proxies='$CVMFS_HTTP_PROXY',repo_name=$name"
 
 # set the number of open file handles per process
