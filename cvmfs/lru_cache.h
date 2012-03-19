@@ -35,6 +35,7 @@
 // if defined the cache is secured by a posix mutex
 #define LRU_CACHE_THREAD_SAFE 1
 
+#include <cstring>
 #include <cassert>
 #include <map>
 #include <iostream>

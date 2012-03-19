@@ -156,8 +156,8 @@ cvmfs_chksetup() {
    local tools
    if [ $unamestr == 'Darwin' ]; then
 	  tools="/sbin/mount_cvmfs"
-   elif [$unamestr == 'Linux' ]; then
-	  tools="/sbin/mount.cvmfs /sbin/umount.cvmfs /etc/init.d/cvmfs"
+   elif [ $unamestr == 'Linux' ]; then
+	  tools="/sbin/mount.cvmfs /etc/init.d/cvmfs"
    fi
    local tool
    for tool in $tools $service

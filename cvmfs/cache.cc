@@ -796,7 +796,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const std::string &mountpoint,
                         hash::HexPtr(key_cert->second.substr(0, 40)));
 
     unsigned char *cert_data;
-    size_t cert_size;
+    uint64_t cert_size;
     if (Open2Mem(cert_hash, &cert_data, &cert_size)) {
       atomic_inc32(&certificate_hits_);
     } else {

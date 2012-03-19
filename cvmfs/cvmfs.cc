@@ -531,7 +531,7 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
 {
   if (offset < static_cast<int>(buffer_size)) {
     fuse_reply_buf(req, buffer + offset,
-                   std::min(buffer_size - offset, max_size));
+      std::min(static_cast<size_t>(buffer_size - offset), max_size));
   } else {
     fuse_reply_buf(req, NULL, 0);
   }

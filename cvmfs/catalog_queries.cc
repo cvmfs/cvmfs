@@ -1,5 +1,7 @@
 #include "catalog_queries.h"
 
+#include <cstdlib>
+
 #include "catalog.h"
 #include "logging.h"
 
