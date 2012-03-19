@@ -1,5 +1,8 @@
 #include "WritableCatalog.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 #include <iostream>
 #include <sstream>
 #include "logging.h"

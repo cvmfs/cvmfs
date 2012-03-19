@@ -857,8 +857,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const std::string &mountpoint,
       return catalog::kLoadFail;
     }
     retval = signature::Verify(
-                               reinterpret_cast<const unsigned char *>(&((checksum_hash.ToString())[0])),
-                               40, signature_buffer, signature_size);
+      reinterpret_cast<const unsigned char *>(&((checksum_hash.ToString())[0])),
+      40, signature_buffer, signature_size);
     free(signature_buffer);
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug,
