@@ -4,7 +4,7 @@
 #include <string>
 
 #include <fuse/fuse_lowlevel.h>
-#include "lru_cache.h"
+#include "lru.h"
 #include "dirent.h"
 
 namespace lru {

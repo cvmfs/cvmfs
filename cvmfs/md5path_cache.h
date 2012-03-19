@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "lru_cache.h"
+#include "lru.h"
 #include "hash.h"
 #include "atomic.h"
 #include "dirent.h"

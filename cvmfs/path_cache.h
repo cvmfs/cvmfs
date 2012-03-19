@@ -2,7 +2,7 @@
 #define PATH_CACHE_H 1
 
 #include <fuse/fuse_lowlevel.h>
-#include "lru_cache.h"
+#include "lru.h"
 #include "inode_cache.h"
 
 namespace lru {
