@@ -460,6 +460,7 @@ class LruCache {
     cache_gauge_ = 0;
     cache_size_ = cache_size;
     lru_list_ = new ListEntryHead<Key>();
+    pause_ = false;
 
 #ifdef LRU_CACHE_THREAD_SAFE
     int retval = pthread_mutex_init(&lock_, NULL);
@@ -486,6 +487,10 @@ class LruCache {
    */
   virtual bool Insert(const Key &key, const Value &value) {
     this->Lock();
+    if (pause_) {
+      Unlock();
+      return false;
+    }
 
     // Check if we have to update an existent entry
     CacheEntry entry;
@@ -519,17 +524,21 @@ class LruCache {
    */
   virtual bool Lookup(const Key &key, Value *value) {
     bool found = false;
-    this->Lock();
+    Lock();
+    if (pause_) {
+      Unlock();
+      return false;
+    }
 
     CacheEntry entry;
-    if (this->DoLookup(key, entry)) {
+    if (DoLookup(key, entry)) {
       // Hit
-      this->Touch(entry);
+      Touch(entry);
       *value = entry.value;
       found = true;
     }
 
-    this->Unlock();
+    Unlock();
     return found;
   }
 
@@ -578,6 +587,18 @@ class LruCache {
   void SetSpecialKeys(const Key &empty, const Key &deleted) {
     cache_.set_empty_key(empty);
     cache_.set_deleted_key(deleted);
+  }
+
+  void Pause() {
+    Lock();
+    pause_ = true;
+    Unlock();
+  }
+
+  void Resume() {
+    Lock();
+    pause_ = false;
+    Unlock();
   }
 
   inline bool IsFull() const { return cache_gauge_ >= cache_size_; }
@@ -643,6 +664,8 @@ class LruCache {
     pthread_mutex_unlock(&lock_);
 #endif
   }
+
+  bool pause_;  /**< Temporarily stops the cache in order to avoid poisoning */
 };
 
 // initialize the static allocator field
@@ -758,6 +781,12 @@ class Md5PathCache :
              hash.ToString().c_str());
     return LruCache<hash::Md5, catalog::DirectoryEntry,
                     hash_md5, equal_md5>::Forget(hash);
+  }
+
+  void Drop() {
+    LogCvmfs(kLogLru, kLogDebug, "dropping md5path cache");
+    LruCache<hash::Md5, catalog::DirectoryEntry,
+             hash_md5, equal_md5>::Drop();
   }
 
  private:

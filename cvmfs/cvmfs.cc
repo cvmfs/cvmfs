@@ -189,7 +189,16 @@ static void RemountFinish() {
 
   if (time(NULL) > drainout_deadline_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
+    inode_cache_->Pause();
+    inode_cache_->Drop();
+    path_cache_->Pause();
+    path_cache_->Drop();
+    md5path_cache_->Pause();
+    md5path_cache_->Drop();
     catalog_manager_->Remount(false);
+    inode_cache_->Resume();
+    path_cache_->Resume();
+    md5path_cache_->Resume();
     // TODO Set new alarm for next remount
   } else {
     atomic_cas32(&drainout_mode_, 0, 1);
@@ -305,12 +314,6 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
     fuse_reply_err(req, ENOENT);
     return;
   }
-
-  // Don't insert yet, only on stat
-/*  dirent.set_parent_inode(parent);
-  inode_cache_->Insert(dirent.inode(), dirent);
-  if (dirent.IsDirectory())
-    path_cache_->Insert(dirent.inode(), path); */
 
   struct fuse_entry_param result;
   memset(&result, 0, sizeof(result));
@@ -586,14 +589,14 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // If file has changed with a new catalog, the kernel data cache needs
       // to be invalidated
       fi->keep_cache = 1;
-      /*if (dirent.cached_mtime() != dirent.mtime()) {
+      if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
-                 "file is new or has changed, invalidating cache (%d %d)",
+                 "file might be new or changed, invalidating cache (%d %d)",
                  dirent.mtime(), dirent.cached_mtime());
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
         inode_cache_->Insert(ino, dirent);
-      }*/
+      }
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
