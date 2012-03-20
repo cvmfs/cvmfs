@@ -352,7 +352,7 @@ cvmfs_chksetup() {
          fi
 
          # Check CVMFS_OPTIONS
-         if [ -z $CVMFS_OPTIONS ] || [ $CVMFS_OPTIONS != "allow_other,entry_timeout=60,attr_timeout=60,negative_timeout=60,use_ino" ]
+         if [ -z $CVMFS_OPTIONS ] || [ $CVMFS_OPTIONS != "allow_other,use_ino,default_permissions,intr" ]
          then
             echo "Warning: tampered with CVMFS_OPTIONS"
             num_warnings=$[$num_warnings+1]
