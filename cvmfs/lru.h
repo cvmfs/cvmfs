@@ -8,6 +8,8 @@
  * The cache uses a hand crafted memory allocator to use memory efficiently
  * Before you do anything with your new cache, use SetSpecialKeys() !!               <----- IMPORTANT  !!!!!!
  *
+ * Number of slots has to be a multiply of 64.
+ *
  * usage:
  *   LruCache<int, string> cache(100);  // cache mapping ints to strings with maximal size of 100
  *   cache.SetSpecialKeys(999999999,9999999991); // DO NOT FORGET THIS!! WILL CRASH AT INSERT!!
@@ -34,6 +36,8 @@
 
 // if defined the cache is secured by a posix mutex
 #define LRU_CACHE_THREAD_SAFE 1
+
+#include <stdint.h>
 
 #include <cstring>
 #include <cassert>
@@ -120,13 +124,13 @@ class LruCache {
     MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
       unsigned int num_bytes_bitmap = num_slots / sizeof(char);
-      if ((num_slots % sizeof(char)) != 0) num_bytes_bitmap++;
+      assert((num_slots % sizeof(bitmap_[0])) == 0);
 
       // How much actual memory do we need?
       const unsigned int num_bytes_memory = sizeof(T) * num_slots;
 
       // Allocate zero'd memory
-      bitmap_ = reinterpret_cast<char *>(smalloc(num_bytes_bitmap));
+      bitmap_ = reinterpret_cast<uint64_t *>(smalloc(num_bytes_bitmap));
       memory_ = reinterpret_cast<T *>(smalloc(num_bytes_memory));
       memset(bitmap_, 0, num_bytes_bitmap);
       memset(memory_, 0, num_bytes_memory);
@@ -166,10 +170,13 @@ class LruCache {
 
       // Find a new free slot if there are some left
       if (!this->IsFull()) {
-        // TODO: speed up, scan the bitmap faster
-        while (this->GetBit(next_free_slot_)) {
-          next_free_slot_ = (next_free_slot_ + 1) % num_slots_;
-        }
+        unsigned bitmap_block = next_free_slot_ / sizeof(bitmap_[0]);
+        while (!(~bitmap_[bitmap_block]))
+          bitmap_block = (bitmap_block + 1) % num_slots_;
+        // TODO: faster search inside the int
+        next_free_slot_ = bitmap_block * sizeof(bitmap_[0]);
+        while (this->GetBit(next_free_slot_))
+          next_free_slot_++;
       }
 
       return slot;
@@ -203,7 +210,8 @@ class LruCache {
      */
     inline bool GetBit(const unsigned int position) {
       assert(position < num_slots_);
-      return ((bitmap_[position / 8] & (1 << (position % 8))) != 0);
+      return ((bitmap_[position / sizeof(bitmap_[0])] &
+               (1 << (position % sizeof(bitmap_[0])))) != 0);
     }
 
     /**
@@ -212,7 +220,8 @@ class LruCache {
      */
     inline void SetBit(const unsigned int position) {
       assert(position < num_slots_);
-      bitmap_[position / 8] |= 1 << (position % 8);
+      bitmap_[position / sizeof(bitmap_[0])] |=
+        1 << (position % sizeof(bitmap_[0]));
     }
 
     /**
@@ -221,13 +230,14 @@ class LruCache {
      */
     inline void UnsetBit(const unsigned int position) {
       assert(position < num_slots_);
-      bitmap_[position / 8] &= ~(1 << (position % 8));
+      bitmap_[position / sizeof(bitmap_[0])] &=
+        ~(1 << (position % sizeof(bitmap_[0])));
     }
 
     unsigned int num_slots_;  /**< Overall number of slots in memory pool. */
     unsigned int num_free_slots_;  /**< Current number of free slots left. */
     unsigned int next_free_slot_;  /**< Position of next free slot in pool. */
-    char *bitmap_;  /**< A bitmap to mark slots as allocated. */
+    uint64_t *bitmap_;  /**< A bitmap to mark slots as allocated. */
     T *memory_;  /**< The memory pool, array of Ms. */
   };
 
@@ -734,7 +744,7 @@ class PathCache : public LruCache<fuse_ino_t, std::string> {
 
 struct hash_md5 {
   size_t operator() (const hash::Md5 &md5) const {
-    return (size_t)*((size_t*)md5.digest);
+    return (size_t) *((size_t *)md5.digest);
   }
 };
 

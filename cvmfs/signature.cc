@@ -424,6 +424,7 @@ bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
     free(to);
   }
 
+  LogCvmfs(kLogSignature, kLogDebug, "VerifyRsa, no public key fits");
   return false;
 }
 
@@ -580,8 +581,8 @@ bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
   free(signature);
   if (!result)
     LogCvmfs(kLogSignature, kLogDebug,
-             "whitelist signature verification failed, %s",
-             GetCryptoError().c_str());
+             "whitelist signature verification failed (hash %s), %s",
+             hash_str.c_str(), GetCryptoError().c_str());
   else
     LogCvmfs(kLogSignature, kLogDebug, "whitelist signature verification passed");
 

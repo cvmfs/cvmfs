@@ -82,9 +82,9 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-const unsigned int kInodeCacheSize = 20000;
-const unsigned int kPathCacheSize = 1000;
-const unsigned int kMd5pathCacheSize = 1000;
+  const unsigned int kInodeCacheSize = 320;//20000;
+  const unsigned int kPathCacheSize = 320;//1000;
+  const unsigned int kMd5pathCacheSize = 320;//1000;
 
 const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
                                      backoff */
