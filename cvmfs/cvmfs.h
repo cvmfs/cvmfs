@@ -21,8 +21,8 @@ extern int max_cache_timeout_;
 
 int ClearFile(const std::string &path);
 catalog::LoadError RemountStart();
-unsigned GetMaxTtl();  // in minutes
-void SetMaxTtl(const unsigned value);  // in minutes
+unsigned GetMaxTTL();  // in minutes
+void SetMaxTTL(const unsigned value);  // in minutes
 
 }  // namespace cvmfs
 

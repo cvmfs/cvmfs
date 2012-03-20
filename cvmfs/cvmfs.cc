@@ -86,6 +86,9 @@ const unsigned int kInodeCacheSize = 32000;
 const unsigned int kPathCacheSize = 32000;
 const unsigned int kMd5pathCacheSize = 32000;
 
+const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
+                                              in 3 minutes */
+
 const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
                                      backoff */
 const int kMaxIoDelay = 2000; /**< Maximum 2 seconds */
@@ -123,6 +126,7 @@ lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
 double kcache_timeout_ = 60.0;  /**< TTL (s) of meta data in the kernel cache */
+atomic_int32 catalogs_expired_;
 atomic_int32 drainout_mode_;
 time_t drainout_deadline_;
 
@@ -139,7 +143,7 @@ const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
 
 
-unsigned GetMaxTtl() {
+unsigned GetMaxTTL() {
   pthread_mutex_lock(&lock_max_ttl_);
   const unsigned current_max = max_ttl_/60;
   pthread_mutex_unlock(&lock_max_ttl_);
@@ -148,16 +152,32 @@ unsigned GetMaxTtl() {
 }
 
 
-void SetMaxTtl(const unsigned value) {
+void SetMaxTTL(const unsigned value) {
   pthread_mutex_lock(&lock_max_ttl_);
   max_ttl_ = value*60;
   pthread_mutex_unlock(&lock_max_ttl_);
 }
 
 
+static unsigned GetEffectiveTTL() {
+  const unsigned max_ttl = GetMaxTTL()*60;
+  const unsigned catalog_ttl = catalog_manager_->GetTTL();
+
+  return std::min(max_ttl, catalog_ttl);
+}
+
+
 static inline double GetKcacheTimeout() {
   if (atomic_read32(&drainout_mode_)) return 0.0;
   return kcache_timeout_;
+}
+
+
+static void AlarmReload(int signal __attribute__((unused)),
+                        siginfo_t *siginfo __attribute__((unused)),
+                        void *context __attribute__((unused)))
+{
+  atomic_cas32(&catalogs_expired_, 0, 1);
 }
 
 
@@ -174,7 +194,6 @@ catalog::LoadError RemountStart() {
     drainout_deadline_ = time(NULL) + int(kcache_timeout_);
     atomic_cas32(&drainout_mode_, 0, 1);
   }
-  // TODO: short term TTL on failure
   return retval;
 }
 
@@ -195,13 +214,37 @@ static void RemountFinish() {
     path_cache_->Drop();
     md5path_cache_->Pause();
     md5path_cache_->Drop();
-    catalog_manager_->Remount(false);
+    catalog::LoadError retval = catalog_manager_->Remount(false);
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
-    // TODO Set new alarm for next remount
+    if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "reload/finish failed, "
+               "applying short term TTL");
+      alarm(kShortTermTTL);
+    } else {
+      alarm(GetEffectiveTTL());
+    }
   } else {
     atomic_cas32(&drainout_mode_, 0, 1);
+  }
+}
+
+
+/**
+ * Runs at the beginning of lookup, checks if a previously started remount needs
+ * to be finished or starts a new remount if the TTL timer has been fired.
+ */
+static void RemountCheck() {
+  RemountFinish();
+
+  if (atomic_cas32(&catalogs_expired_, 1, 0)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, reload");
+    catalog::LoadError retval = RemountStart();
+    if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "reload failed, applying short term TTL");
+      alarm(kShortTermTTL);
+    }
   }
 }
 
@@ -227,19 +270,6 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 static bool GetDirentForPath(const string &path, const fuse_ino_t parent_inode,
                              catalog::DirectoryEntry *dirent)
 {
-  /*
-   * in a unit test ../../test/unittests/02....cc
-   * the cache showed reasonable performance (1.2 millon transactions
-   * in 4 seconds)
-   * but here it SLOWS DOWN the Davinci benchmark about 20 seconds
-   *
-   * There must either be something wrong in the code itself or
-   * we must have overseen some cache coherency problem.
-   *
-   * I.e. the data coming out of it is somehow corrupt.
-   * But this is very unlikely,
-   * because the tests do not fail, they are just slower.
-   */
   hash::Md5 md5path((hash::AsciiPtr(path)));
   if (md5path_cache_->Lookup(md5path, dirent))
     return dirent->GetSpecial() != catalog::kDirentNegative;
@@ -289,11 +319,13 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
 
 /**
  * Find the inode number of a file name in a directory given by inode.
+ * This or getattr is called as kind of prerequisit to every operation.
+ * We do check catalog TTL here (and reload, if necessary).
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
                          const char *name)
 {
-  RemountFinish();
+  RemountCheck();
 
   parent = catalog_manager_->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -328,18 +360,12 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
 
 
 /**
- * Gets called as kind of prerequisit to every operation.
- * We do two kinds of magic here: check catalog TTL (and reload, if necessary)
- * and load nested catalogs.  Nested catalogs may also be loaded on readdir.
- *
- * Also, we insert things in our d-cache here.  It is not sufficient to do
- * all the inserts here, even though stat will be called before anything else;
- * they might be cached by the kernel.
+ * Transform a cvmfs dirent into a struct stat.
  */
 static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
-  RemountFinish();
+  RemountCheck();
 
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %d", ino);
@@ -1191,13 +1217,17 @@ static void usage(const char *progname) {
     " -o syslog_level=NUMBER     "
       "Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
     "                            Default is NOTICE.\n"
-    " Note: you cannot load files greater than quota_limit-quota_threshold\n",
+    " Note: you cannot load files greater than quota_limit-quota_threshold\n"
+    "\nFuse options:\n"
+    " -o allow_other             "
+      "allow access to other users\n"
+    " -o allow_root              "
+      "allow access to root\n"
+    " -o nonempty                "
+      "allow mounts over non-empty file/dir\n"
+    " -o default_permissions     "
+      "enable permission checking by kernel\n",
     2, 2, int(cvmfs::kcache_timeout_));
-
-  // Print the help from FUSE
-  // const char *args[] = {progname, "-h"};
-  // static struct fuse_operations op;
-  // fuse_main(2, (char**)args, &op);
 }
 
 
@@ -1621,6 +1651,17 @@ int main(int argc, char *argv[]) {
     goto cvmfs_cleanup;
   }
   catalog_ready = true;
+
+  // Setup catalog reload alarm
+  atomic_init32(&cvmfs::catalogs_expired_);
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = cvmfs::AlarmReload;
+  sa.sa_flags = SA_SIGINFO;
+  sigfillset(&sa.sa_mask);
+  retval = sigaction(SIGALRM, &sa, NULL);
+  assert(retval == 0);
+  alarm(cvmfs::GetEffectiveTTL());
 
   // Set fuse callbacks, remove url from arguments
   LogCvmfs(kLogCvmfs, kLogSyslog,

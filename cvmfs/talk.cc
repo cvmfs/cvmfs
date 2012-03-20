@@ -99,7 +99,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           uint64_t size_pinned = quota::GetSizePinned();
           const string size_str = "Current cache size is " +
             StringifyInt(size_unpinned / (1024*1024)) + "MB (" +
-            StringifyInt(size_unpinned) + " Bytes),pinned: " +
+            StringifyInt(size_unpinned) + " Bytes), pinned: " +
             StringifyInt(size_pinned / (1024*1024)) + "MB (" +
             StringifyInt(size_pinned) + " Bytes)\n";
           Answer(con_fd, size_str);
@@ -198,7 +198,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
        revision_str << revision;
        Answer(con_fd, revision_str.str() + "\n"); */
       } else if (line == "max ttl info") {
-        const unsigned max_ttl = cvmfs::GetMaxTtl();
+        const unsigned max_ttl = cvmfs::GetMaxTTL();
         if (max_ttl == 0) {
           Answer(con_fd, "unset\n");
         } else {
@@ -210,7 +210,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "Usage: max ttl set <minutes>\n");
         } else {
           const unsigned max_ttl = String2Uint64(line.substr(12));
-          cvmfs::SetMaxTtl(max_ttl);
+          cvmfs::SetMaxTTL(max_ttl);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "host info") {

@@ -64,6 +64,7 @@ class AbstractCatalogManager {
   bool Listing(const std::string &path, DirectoryEntryList *listing);
 
   uint64_t GetRevision() const;
+  uint64_t GetTTL() const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;
 

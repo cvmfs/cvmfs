@@ -259,6 +259,14 @@ uint64_t AbstractCatalogManager::GetRevision() const {
 }
 
 
+uint64_t AbstractCatalogManager::GetTTL() const {
+  ReadLock();
+  const uint64_t revision = GetRootCatalog()->GetTTL();
+  Unlock();
+  return revision;
+}
+
+
 int AbstractCatalogManager::GetNumCatalogs() const {
   ReadLock();
   int result = catalogs_.size();
