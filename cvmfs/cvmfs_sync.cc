@@ -231,6 +231,8 @@ int main(int argc, char **argv) {
 	delete mediator;
 	delete catalogManager;
   delete sync;
+  
+  std::cout << "done" << std::endl;
 
 	return 0;
 }

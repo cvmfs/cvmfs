@@ -413,7 +413,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash) {
 
   // Clean up and return
  compress_file2file_hashed_final:
-  DecompressFini(&strm);
+  CompressFini(&strm);
   LogCvmfs(kLogCompress, kLogDebug, "file compression finished with result %d",
            result);
   return result;

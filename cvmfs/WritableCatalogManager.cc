@@ -560,7 +560,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	if ( !(fsrc = fopen(src_path.c_str(), "r")) ||
 	     (fd_dst = open(dst_path.c_str(), O_CREAT | O_TRUNC | O_RDWR, kDefaultFileMode)) < 0 ||
 	     !(fdst = fdopen(fd_dst, "w")) ||
-       zlib::CompressFile2File(fsrc, fdst, &sha1) )
+       !zlib::CompressFile2File(fsrc, fdst, &sha1) )
 	{
 		stringstream ss;
 		ss << "could not compress catalog '" << src_path << "'";
