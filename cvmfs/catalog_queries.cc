@@ -238,7 +238,7 @@ bool FindNestedCatalogSqlStatement::BindSearchPath(const std::string &path) {
 
 hash::Any FindNestedCatalogSqlStatement::GetContentHash() const {
   const std::string sha1_str = std::string((char *)RetrieveText(0));
-  return hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
+  return (sha1_str.empty()) ? hash::Any(hash::kSha1) : hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
 }
 
 //
@@ -257,7 +257,7 @@ string ListNestedCatalogsSqlStatement::GetMountpoint() const {
 
 hash::Any ListNestedCatalogsSqlStatement::GetContentHash() const {
   const std::string sha1_str = std::string((char *)RetrieveText(1));
-  return hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
+  return (sha1_str.empty()) ? hash::Any(hash::kSha1) : hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
 }
 
 //
