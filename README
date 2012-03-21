@@ -4,9 +4,9 @@ of Parrot in the CC Tools developed at the University of Notre Dame.
 
 CVMFS shows a remote HTTP directory as local file system.  The client
 sees all available files.  On first access, a file is downloaded and
-cached locally.  All downloaded pieces are verified with SHA1.
+cached locally.  All downloaded pieces are verified with SHA-1.
  
-To do so, a directory hive has to be transformed into a CVMFS2
+To do so, a directory hive has to be transformed into a CVMFS
 "repository".  This can be done by cvmfs_journald, which let 
 inotify keep track of changes to the hive, processes the
 resulting journal and synchronized it with a repository 
