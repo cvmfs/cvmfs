@@ -1,5 +1,5 @@
 CVMFS is a FUSE module which implements an HTTP read-only filesystem.
-The original idea is based on GROW-FS.  GROW-FS filesystem makes part 
+The idea is based on GROW-FS.  GROW-FS filesystem makes part 
 of Parrot in the CC Tools developed at the University of Notre Dame.
 
 CVMFS shows a remote HTTP directory as local file system.  The client
@@ -17,8 +17,6 @@ web proxies.  They just serve static content, i.e. arbitrary files.
 Any HTTP server should do the job.  We use Apache + Squid.  Serving
 files from the memory of a web proxy brings significant performance
 improvement.
-
-Check also "cvmfs_journal --help" and "cvmfs2 --help". 
 
                    _________________
 
