@@ -1,5 +1,46 @@
 #!/bin/bash
 
+bin_path=/usr/local/bin
+
+function usage()
+{
+  echo -e "Script to mount cvmfs on Linux/Mac OS X.
+           Mandatory arguments:
+           repository name: <repository>
+           mountpoint of the repository: <mountpoint>
+           Options:
+           -o <mount options>
+           -f dry run, just prints out the mount command
+           -h print this help\n" 1>&2
+}
+
+function add_mount_option()
+{
+  if [[ -z ${mount_options} ]]; then
+    mount_options="$1"
+  else
+    mount_options="${mount_options},$1"
+  fi
+}
+
+while [ $# -ge 1 ]; do
+  case $1 in
+    -o ) add_mount_option $2; shift 2 ;;
+    -v ) shift ;;
+    -f ) dryrun=true; shift ;;
+    -n ) echo "Note: fusermount _does_ modify /etc/mtab in case it is writable." ;;
+    -h ) usage 1>&2; exit 1 ;;
+    -* ) echo "$0: unrecognised option $1, use -h for help" 1>&2; exit 1 ;;
+    *  ) args="$args;$1"; shift ;;
+  esac
+done
+
+[ ${#args} -eq 0 ] || set $(echo $args | tr ";" "\n")
+
+if [ $# -lt 2 ]; then
+  echo "$0: Takes at least two arguments, use -h for help" 1>&2
+fi
+
 if [ -f /etc/cvmfs/config.sh ]
 then
   . /etc/cvmfs/config.sh
@@ -23,14 +64,13 @@ unamestr=`uname`
 
 # Check for fuse
 if [ ! -c /dev/fuse ]; then
-	if [ $unamestr != 'Darwin' ]; then     # if fuse is installed on Mac OS it will be loaded just in time
-  		echo "Fuse not loaded"
-  		exit 1
-	fi
+  if [ $unamestr != 'Darwin' ]; then     # if fuse is installed on Mac OS it will be loaded just in time
+    echo "Fuse not loaded"
+    exit 1
+  fi
 fi
 
 mountpoint=$2 
-shift 2
 
 cvmfs_readconfig $fqrn
 retval=$?
@@ -66,7 +106,7 @@ uid=`id -u $CVMFS_USER 2> /dev/null` && gid=`id -g $CVMFS_USER 2> /dev/null`
 
 if [ $? -eq 0 ]
 then
-   CVMFS_ID=",uid=$uid,gid=$gid"
+   CVMFS_ID="uid=$uid,gid=$gid"
 else
    echo "Error: user $CVMFS_USER does not exist." 
    exit 1
@@ -82,74 +122,52 @@ then
   QUOTA="$QUOTA,quota_threshold="$[$CVMFS_QUOTA_LIMIT/2]
 fi
 
-mount_options="-o fsname=cvmfs2,nodev,grab_mountpoint"
-mount_options="${mount_options}${CVMFS_ID},cachedir=$CVMFS_CACHE_DIR,$QUOTA,$CVMFS_OPTIONS,proxies='$CVMFS_HTTP_PROXY',repo_name=$name"
+add_mount_option "fsname=cvmfs2,nodev,grab_mountpoint"
+add_mount_option "${CVMFS_ID},cachedir=$CVMFS_CACHE_DIR,$QUOTA,$CVMFS_OPTIONS,proxies='$CVMFS_HTTP_PROXY',repo_name=$name"
 
 # set the number of open file handles per process
+# at some point that will be handled a LaunchdScript
 if [[ "$unamestr" == 'Darwin' ]]; then
-	if [ `id -u` -ne 0 ]; then
-		echo "Error: you will need root previliges to increase maximal number of open file descriptors"
-		exit 1
-	fi
+  if [ `id -u` -ne 0 ]; then
+    echo "Error: you will need root previliges to increase maximal number of open file descriptors"
+    exit 1
+  fi
 	
-	MAXFILES_OVERALL=$[$CVMFS_NFILES + 512]
-	sysctl -w kern.maxfilesperproc=$CVMFS_NFILES kern.maxfiles=$MAXFILES_OVERALL > /dev/null
+  MAXFILES_OVERALL=$[$CVMFS_NFILES + 512]
+  sysctl -w kern.maxfilesperproc=$CVMFS_NFILES kern.maxfiles=$MAXFILES_OVERALL > /dev/null
 fi	
 ulimit -n $CVMFS_NFILES
-mount_options="$mount_options,nofiles=$CVMFS_NFILES"
+add_mount_option "nofiles=$CVMFS_NFILES"
 
 if [ ! -z $CVMFS_TIMEOUT ]; then
-   mount_options="$mount_options,timeout=$CVMFS_TIMEOUT"
+   add_mount_option "timeout=$CVMFS_TIMEOUT"
 fi
 if [ ! -z $CVMFS_TIMEOUT_DIRECT ]; then
-   mount_options="$mount_options,timeout_direct=$CVMFS_TIMEOUT_DIRECT"
+   add_mount_option "timeout_direct=$CVMFS_TIMEOUT_DIRECT"
 fi
- 
 
-while getopts "vfo:n" OPTION
-do
-  case $OPTION in
-    v)
-    ;;
-    f)
-      dryrun="true"
-    ;;
-    o)
-      mount_options="${mount_options},$OPTARG"
-    ;;
-    n)
-      echo "Note: fusermount _does_ modify /etc/mtab in case it is writable." 
-    ;;
-    ?)
-      echo "Invalid option"
-      exit 1
-    ;;
-  esac
-done
-
-cvmfs_exe=cvmfs2
+cvmfs_exe=$bin_path/cvmfs2
 if [ "x$CVMFS_DEBUGLOG" != "x" ]; then
-  cvmfs_exe=cvmfs2_debug
-  mount_options="${mount_options},logfile=$CVMFS_DEBUGLOG"
+  cvmfs_exe=$bin_path/cvmfs2_debug
+  add_mount_option "logfile=$CVMFS_DEBUGLOG"
 fi
 if [ "x$CVMFS_TRACEFILE" != "x" ]; then
-  mount_options="${mount_options},tracefile=$CVMFS_TRACEFILE"
+  add_mount_option "tracefile=$CVMFS_TRACEFILE"
 fi
 if [ "x$CVMFS_SYSLOG_LEVEL" != "x" ]; then
-  mount_options="${mount_options},syslog_level=$CVMFS_SYSLOG_LEVEL"  
+  add_mount_option "syslog_level=$CVMFS_SYSLOG_LEVEL"  
 fi
 if [ "x$CVMFS_IGNORE_SIGNATURE" == "xyes" ]; then
-  mount_options="${mount_options},ignore_signature"
+  add_mount_option "ignore_signature"
 fi
 if [ "x$CVMFS_PUBLIC_KEY" != "x" ]; then
-  mount_options="${mount_options},pubkey=$CVMFS_PUBLIC_KEY"
+  add_mount_option "pubkey=$CVMFS_PUBLIC_KEY"
 fi
 if [ "x$CVMFS_MAX_TTL" != "x" ]; then
-  mount_options="${mount_options},max_ttl=$CVMFS_MAX_TTL"
+  add_mount_option "max_ttl=$CVMFS_MAX_TTL"
 fi
 
-
-cmd="$cvmfs_exe ${mount_options} $mountpoint '$repository'"
+cmd="$cvmfs_exe -o ${mount_options} $mountpoint '$repository'"
 
 #check if group fuse exists
 if [[ "$unamestr" == 'Linux' ]]; then
