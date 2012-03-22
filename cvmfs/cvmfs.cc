@@ -1030,6 +1030,8 @@ static void cvmfs_destroy(void *unused __attribute__((unused))) {
  * Puts the callback functions in one single structure
  */
 static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
+  memset(cvmfs_operations, 0, sizeof(*cvmfs_operations));
+
   // Init/Fini
   cvmfs_operations->init     = cvmfs_init;
   cvmfs_operations->destroy  = cvmfs_destroy;
@@ -1069,8 +1071,6 @@ static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->getlk       = cvmfs_getlk;
   cvmfs_operations->setlk       = cvmfs_setlk;
   cvmfs_operations->bmap        = cvmfs_bmap;
-  cvmfs_operations->ioctl       = cvmfs_ioctl;
-  cvmfs_operations->poll        = cvmfs_poll;
 }
 
 }  // namespace cvmfs
