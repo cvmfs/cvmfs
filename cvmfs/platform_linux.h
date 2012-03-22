@@ -28,10 +28,20 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
 
 
 /**
+ * pthread_self() is not necessarily an unsigned long.
+ */
+inline unsigned long platform_gettid() {
+  return pthread_self();
+}
+
+
+/**
  * File system functions, ensure 64bit versions.
  */
+#include <fcntl.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <cassert>
 
 typedef struct dirent64 platform_dirent64;
 
@@ -51,6 +61,10 @@ inline int platform_lstat(const char *path, platform_stat64 *buf) {
 
 inline int platform_fstat(int filedes, platform_stat64 *buf) {
   return fstat64(filedes, buf);
+}
+
+inline void platform_disable_kcache(int filedes) {
+  posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
 
 #endif  // CVMFS_PLATFORM_LINUX_H_

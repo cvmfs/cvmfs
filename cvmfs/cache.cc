@@ -188,7 +188,7 @@ int Open(const hash::Any &id) {
 
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
-    posix_fadvise(result, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
+    platform_disable_kcache(result);
   } else {
     result = -errno;
     LogCvmfs(kLogCache, kLogDebug, "miss %s (%d)", path.c_str(), result);
@@ -496,7 +496,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
     result = cache::CommitTransaction(final_path, temp_path, cvmfs_path,
                                       d.checksum(), d.size());
     if (result == 0) {
-      posix_fadvise(fd_return, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
+      platform_disable_kcache(fd_return);
       result = fd_return;
     } else {
       close(fd_return);
