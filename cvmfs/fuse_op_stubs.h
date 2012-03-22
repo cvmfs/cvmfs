@@ -148,20 +148,4 @@ static void cvmfs_bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize,
   fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);
 }
 
-static void cvmfs_ioctl(fuse_req_t req, fuse_ino_t ino, int cmd, void *arg,
-                        struct fuse_file_info *fi, unsigned flagsp,
-                        const void *in_buf, size_t in_bufsz, size_t out_bufszp)
-{
-  LogCvmfs(kLogFuse, kLogDebug, "cvmfs_ioctl on inode: %d with command: %d",
-           ino, cmd);
-  fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);
-}
-
-static void cvmfs_poll(fuse_req_t req, fuse_ino_t ino,
-                       struct fuse_file_info *fi, struct fuse_pollhandle *ph)
-{
-  LogCvmfs(kLogFuse, kLogDebug, "cvmfs_poll on inode: %d", ino);
-  fuse_reply_err(req, DEFAULT_STUB_ERROR_CODE);
-}
-
 #endif  // CVMFS_FUSE_OP_STUBS_H_

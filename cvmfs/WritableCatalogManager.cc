@@ -1,6 +1,7 @@
 #include "WritableCatalogManager.h"
 
-#include <stdio.h>
+#include <cstdio>
+#include <cstdlib>
 
 #include <iostream>
 
