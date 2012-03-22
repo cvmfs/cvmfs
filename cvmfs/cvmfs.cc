@@ -1360,8 +1360,8 @@ static void CallbackLibcryptoLock(int mode, int type,
   assert(retval == 0);
 }
 
-static pthread_t CallbackLibcryptoThreadId() {
-  return pthread_self();
+static unsigned long CallbackLibcryptoThreadId() {
+  return platform_gettid();
 }
 
 static void SetupLibcryptoMt() {

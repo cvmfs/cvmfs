@@ -25,11 +25,13 @@
  */
 
 //TODO: MS for time summing
+#define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
 #include "download.h"
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <alloca.h>
@@ -304,7 +306,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   {
     char *tmp = (char *)alloca(num_bytes+1);
     uint64_t length = 0;
-    sscanf(header_line.c_str(), "%s %lu", tmp, &length);
+    sscanf(header_line.c_str(), "%s %"PRIu64, tmp, &length);
     if (length > 0)
       info->destination_mem.data = static_cast<char *>(smalloc(length));
     else
