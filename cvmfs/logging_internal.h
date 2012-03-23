@@ -15,6 +15,8 @@ enum LogFacilities {
   kLogStdout = 2,
   kLogStderr = 4,
   kLogSyslog = 8,
+  // Flags
+  kLogNoLinebreak = 16,
 };
 
 enum LogSource {

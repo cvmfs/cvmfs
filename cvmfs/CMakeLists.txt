@@ -31,11 +31,15 @@ set (CVMFS2_DEBUG_SOURCES
 
 set (CVMFS2_SOURCES ${CVMFS2_DEBUG_SOURCES})
 
-#set (CVMFS_FSCK_SOURCES
-#	smalloc.h
-#	zlib-duplex.h compression.cc compression.h
-#	hash.cc hash.h
-#	util.cc util.h cvmfs_fsck.cc)
+set (CVMFS_FSCK_SOURCES
+	platform.h platform_linux.h platform_osx.h
+  logging_internal.h logging.h logging.cc
+  smalloc.h
+  atomic.h
+	duplex_zlib.h compression.cc compression.h
+	hash.cc hash.h
+	util.cc util.h
+  cvmfs_fsck.cc)
 
 set (CVMFS_SYNC_BIN_SOURCES
 	smalloc.h
@@ -107,7 +111,7 @@ set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DCVMFS_CLIENT -D_FILE_OFFSET_BITS=64 -fexc
 set (CVMFS2_DEBUG_CFLAGS "${CVMFS2_DEBUG_CFLAGS} ${CVMFS2_CFLAGS} -D_FILE_OFFSET_BITS=64 -O0 -DDEBUGMSG")
 set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS}")
 
-#set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
+set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
 #
 # set properties for configurable libraries
@@ -198,7 +202,7 @@ if (BUILD_CVMFS)
 	# create targets with according sources and static link libraries
 	add_executable (cvmfs2_debug	${CVMFS2_DEBUG_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
 	add_executable (cvmfs2			${CVMFS2_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-#	add_executable (cvmfs_fsck		${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
+	add_executable (cvmfs_fsck		${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
 
 	if (LIBFUSE_BUILTIN)
 		add_dependencies (cvmfs2_debug libfuse) # here it does not matter if libfuse or libfuse4x
@@ -218,7 +222,7 @@ if (BUILD_CVMFS)
 	if (ZLIB_BUILTIN)
 		add_dependencies (cvmfs2_debug zlib)
 		add_dependencies (cvmfs2 zlib)
-#		add_dependencies (cvmfs_fsck zlib)
+		add_dependencies (cvmfs_fsck zlib)
 	endif (ZLIB_BUILTIN)
 
 	if (SPARSEHASH_BUILTIN)
@@ -229,12 +233,12 @@ if (BUILD_CVMFS)
 	# set some properties
 	set_target_properties (cvmfs2_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_DEBUG_LD_FLAGS}")
 	set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS}")
-#	set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}" LINK_FLAGS "${CVMFS_FSCK_LD_FLAGS}")
+	set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}" LINK_FLAGS "${CVMFS_FSCK_LD_FLAGS}")
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
 	target_link_libraries (cvmfs2_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
 	target_link_libraries (cvmfs2			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
-#	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
+	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
 
 endif (BUILD_CVMFS)
 
@@ -289,8 +293,7 @@ endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)
 	install (
-#		TARGETS			cvmfs2_debug cvmfs2 cvmfs_fsck
-    TARGETS			cvmfs2_debug cvmfs2
+		TARGETS			cvmfs2_debug cvmfs2 cvmfs_fsck
 		RUNTIME
 		DESTINATION		bin
 	)

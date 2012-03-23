@@ -153,13 +153,19 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
   if (mask & kLogStdout) {
     pthread_mutex_lock(&lock_stdout);
-    printf("%s\n", msg);
+    printf("%s", msg);
+    if (!(mask & kLogNoLinebreak))
+      printf("\n");
+    else
+      fflush(stdout);
     pthread_mutex_unlock(&lock_stdout);
   }
 
   if (mask & kLogStderr) {
     pthread_mutex_lock(&lock_stderr);
-    fprintf(stderr, "%s\n", msg);
+    fprintf(stderr, "%s", msg);
+    if (!(mask & kLogNoLinebreak))
+      printf("\n");
     pthread_mutex_unlock(&lock_stderr);
   }
 
