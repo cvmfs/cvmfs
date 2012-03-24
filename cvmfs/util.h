@@ -38,6 +38,8 @@ bool MkdirDeep(const std::string &path, const mode_t mode);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
+int LockFile(const std::string path);
+void UnlockFile(const int filedes);
 
 std::string StringifyInt(const int64_t value);
 std::string StringifyTime(const time_t seconds, const bool utc);

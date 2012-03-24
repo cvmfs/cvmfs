@@ -25,7 +25,7 @@ var_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_MOUNT_DIR CVMFS_QUOTA_L
           CVMFS_SERVER_URL CVMFS_OPTIONS CVMFS_DEBUGLOG CVMFS_HTTP_PROXY CERNVM_CDN_HOST \
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_TRACEFILE CVMFS_DEFAULT_DOMAIN \
           CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_FORCE_SIGNING CVMFS_STRICT_MOUNT \
-          CVMFS_MAX_TTL CVMFS_REPOSITORIES"
+          CVMFS_MAX_TTL CVMFS_DISKLESS CVMFS_REPOSITORIES"
 
 
 cvmfs_config_usage() {
@@ -352,7 +352,7 @@ cvmfs_chksetup() {
          fi
 
          # Check CVMFS_OPTIONS
-         if [ -z $CVMFS_OPTIONS ] || [ $CVMFS_OPTIONS != "allow_other,use_ino,default_permissions,intr" ]
+         if [ -z $CVMFS_OPTIONS ] || [ $CVMFS_OPTIONS != "allow_other,default_permissions" ]
          then
             echo "Warning: tampered with CVMFS_OPTIONS"
             num_warnings=$[$num_warnings+1]

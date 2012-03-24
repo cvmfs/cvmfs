@@ -72,6 +72,7 @@
 #include "atomic.h"
 #include "fuse_op_stubs.h"
 #include "lru.h"
+#include "peers.h"
 #include "dirent.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
@@ -1104,6 +1105,7 @@ struct CvmfsOptions {
   int      negative_timeout;
   int      use_ino;
   int      kcache_timeout;
+  int      diskless;
 
   int64_t  quota_limit;
   int64_t  quota_threshold;
@@ -1137,9 +1139,8 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("repo_name=%s",        repo_name, 0),
   CVMFS_OPT("blacklist=%s",        blacklist, 0),
   CVMFS_OPT("syslog_level=%d",     syslog_level, 3),
-  CVMFS_SWITCH("use_ino",          entry_timeout),
   CVMFS_OPT("kcache_timeout=%d",   kcache_timeout, 60),
-
+  CVMFS_SWITCH("diskless",         diskless),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1389,6 +1390,17 @@ static void CleanupLibcryptoMt(void) {
  * Off we go
  */
 int main(int argc, char *argv[]) {
+  // Set a decent umask for new files (no write access to group/everyone).
+  // We want to allow group write access for the talk-socket.
+  umask(007);
+
+  // Jump into alternative process flavors
+  if (argc > 1) {
+    if (strcmp(argv[1], "__peersrv__") == 0) {
+      return peers::MainPeerServer(argc, argv);
+    }
+  }
+
   int retval;
   int result = -1;
   struct fuse_chan *ch;
@@ -1398,16 +1410,13 @@ int main(int argc, char *argv[]) {
   bool options_ready = false;
   bool download_ready = false;
   bool cache_ready = false;
+  bool peers_ready = false;
   bool monitor_ready = false;
   bool signature_ready = false;
   bool quota_ready = false;
   bool catalog_ready = false;
   bool talk_ready = false;
   bool running_created = false;
-
-  // Set a decent umask for new files (no write access to group/everyone).
-  // We want to allow group write access for the talk-socket.
-  umask(007);
 
   cvmfs::boot_time_ = time(NULL);
   SetupLibcryptoMt();
@@ -1511,24 +1520,31 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Try to jump to cache directory.  This tests, if it is accassible.
-  // Also, it brings speed later on.
+  // Create cache directory, if necessary
   if (!MkdirDeep(*cvmfs::cachedir_, 0700)) {
     PrintError("cannot create cache directory " + *cvmfs::cachedir_);
     goto cvmfs_cleanup;
   }
+
+  // Spawn / connect to peer server
+  if (g_cvmfs_opts.diskless) {
+    if (!peers::Init(GetParentPath(*cvmfs::cachedir_), argv[0])) {
+      PrintError("failed to initialize peer socket");
+      goto cvmfs_cleanup;
+    }
+  }
+  peers_ready = true;
+
+  // Try to jump to cache directory.  This tests, if it is accassible.
+  // Also, it brings speed later on.
   if (chdir(cvmfs::cachedir_->c_str()) != 0) {
     PrintError("cache directory " + *cvmfs::cachedir_ + " is unavailable");
     goto cvmfs_cleanup;
   }
 
-  // Create lock file
-  fd_lockfile = open("lock", O_RDONLY | O_CREAT, 0600);
+  // Create lock file and running sentinel
+  fd_lockfile = LockFile("lock");
   if (fd_lockfile < 0) {
-    PrintError("could not open lock file (" + StringifyInt(errno) + ")");
-    goto cvmfs_cleanup;
-  }
-  if (flock(fd_lockfile, LOCK_EX) != 0) {
     PrintError("could not acquire lock (" + StringifyInt(errno) + ")");
     goto cvmfs_cleanup;
   }
@@ -1647,7 +1663,7 @@ int main(int argc, char *argv[]) {
     cache::CatalogManager(*cvmfs::repository_name_,
                           g_cvmfs_opts.ignore_signature);
   if (!cvmfs::catalog_manager_->Init()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize catalog manager");
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize root file catalog");
     goto cvmfs_cleanup;
   }
   catalog_ready = true;
@@ -1722,11 +1738,8 @@ int main(int argc, char *argv[]) {
   if (quota_ready) quota::Fini();
   if (cache_ready) cache::Fini();
   if (running_created) unlink("running");
-  if (fd_lockfile >= 0) {
-    int retval = flock(fd_lockfile, LOCK_UN);
-    assert(retval == 0);
-    close(fd_lockfile);
-  }
+  if (fd_lockfile >= 0) UnlockFile(fd_lockfile);
+  if (peers_ready) peers::Fini();
   if (options_ready) {
     fuse_opt_free_args(&g_fuse_args);
     FreeCvmfsOptions(&g_cvmfs_opts);

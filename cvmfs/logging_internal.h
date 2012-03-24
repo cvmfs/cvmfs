@@ -33,6 +33,7 @@ enum LogSource {
   kLogLru,
   kLogFuse,
   kLogSignature,
+  kLogPeers,
 };
 
 void SetLogSyslogLevel(const int level);

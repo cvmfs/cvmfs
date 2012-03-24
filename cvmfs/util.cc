@@ -11,6 +11,7 @@
 
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/file.h>
 #include <time.h>
 #include <inttypes.h>
 #include <dirent.h>
@@ -177,6 +178,29 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
     }
   }
   return true;
+}
+
+/**
+ * Locks file path, blocks if file is already locked.  Creates path if required.
+ *
+ * \return file descriptor, -1 on error
+ */
+int LockFile(const std::string path) {
+  const int fd_lockfile = open(path.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (fd_lockfile < 0)
+    return -1;
+
+  if (flock(fd_lockfile, LOCK_EX) != 0)
+    return -1;
+
+  return fd_lockfile;
+}
+
+
+void UnlockFile(const int filedes) {
+  int retval = flock(filedes, LOCK_UN);
+  assert(retval == 0);
+  close(filedes);
 }
 
 

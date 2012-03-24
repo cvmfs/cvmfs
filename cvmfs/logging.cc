@@ -37,7 +37,7 @@ pthread_mutex_t lock_debug = PTHREAD_MUTEX_INITIALIZER;
 FILE *file_debug = NULL;
 const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
-  "fuse stub", "signature" };
+  "fuse stub", "signature", "peers" };
 #endif
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
