@@ -27,6 +27,7 @@ std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
 std::string GetFileName(const std::string &path);
 
+int MakeSocket(const std::string &path, const int mode);
 void MakePipe(int pipe_fd[2]);
 void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);

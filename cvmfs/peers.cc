@@ -4,7 +4,10 @@
 
 #include "peers.h"
 
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/file.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
@@ -38,10 +41,14 @@ bool Init(const string &cachedir, const string &exe_path) {
   MakePipe(pipe_fork);
   MakePipe(pipe_boot);
 
-  pid_t pid_peer_server = fork();
-  assert(pid_peer_server >= 0);
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    // Double fork to disconnect from parent
+    pid_t pid_peer_server = fork();
+    assert(pid_peer_server >= 0);
+    if (pid_peer_server != 0) _exit(0);
 
-  if (pid_peer_server == 0) {
     int max_fd;
     int fd_flags;
     const char *argv[] = {exe_path.c_str(), "__peersrv__", cachedir_->c_str(),
@@ -78,6 +85,8 @@ bool Init(const string &cachedir, const string &exe_path) {
     write(pipe_fork[1], &failed, 1);
     _exit(1);
   }
+  int statloc;
+  waitpid(pid, &statloc, 0);
 
   close(pipe_fork[1]);
   char buf;
@@ -118,17 +127,32 @@ int MainPeerServer(int argc, char **argv) {
   cachedir_ = new string(argv[2]);
   int pipe_boot = String2Int64(argv[3]);
 
-  if (!freopen("/dev/null", "w", stdout) ||
-      !freopen("/dev/null", "w", stderr) ||
-      !freopen("/dev/null", "r", stdin))
-  {
-    LogCvmfs(kLogPeers, kLogDebug, "failed to disconnect from TTY");
+  int socket_fd = MakeSocket(*cachedir_ + "/peers", 0600);
+  if (socket_fd == -1) {
+    LogCvmfs(kLogPeers, kLogDebug, "failed to create peer socket (%d)", errno);
     return 1;
   }
+  if (listen(socket_fd, 128) != 0) {
+    LogCvmfs(kLogPeers, kLogDebug, "failed to listen at peer socket (%d)",
+             errno);
+    return 1;
+  }
+  LogCvmfs(kLogPeers, kLogDebug, "listening on %s",
+           (*cachedir_ + "/peers").c_str());
 
+  int retval = daemon(1, 0);
+  assert(retval == 0);
   char buf = 'C';
   WritePipe(pipe_boot, &buf, 1);
   close(pipe_boot);
+
+  struct sockaddr_un remote;
+  socklen_t socket_size = sizeof(remote);
+  int connection_fd = -1;
+  while (true) {
+    connection_fd = accept(socket_fd, (struct sockaddr *)&remote, &socket_size);
+  }
+
   return 0;
 }
 

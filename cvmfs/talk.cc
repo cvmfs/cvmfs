@@ -412,40 +412,11 @@ static void *MainTalk(void *data __attribute__((unused))) {
 bool Init(const string &cachedir) {
   spawned_ = false;
   cachedir_ = new string(cachedir);
-
-  struct sockaddr_un sock_addr;
   socket_path_ = new string(cachedir + "/cvmfs_io");
-  if (socket_path_->length() >= sizeof(sock_addr.sun_path))
+
+  socket_fd_ = MakeSocket(*socket_path_, 0660);
+  if (socket_fd_ == -1)
     return false;
-
-  if ((socket_fd_ = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
-    return false;
-
-#ifndef __APPLE__
-  // fchmod on a socket is not allowed under Mac OS X
-  // using default here... (0770 in this case)
-  if (fchmod(socket_fd_, 0660) != 0)
-    return false;
-#endif
-
-  sock_addr.sun_family = AF_UNIX;
-  strncpy(sock_addr.sun_path, socket_path_->c_str(),
-          sizeof(sock_addr.sun_path));
-
-  if (bind(socket_fd_, (struct sockaddr *)&sock_addr,
-           sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
-  {
-    if ((errno == EADDRINUSE) && (unlink(socket_path_->c_str()) == 0)) {
-      // Second try, perhaps the file was left over
-      if (bind(socket_fd_, (struct sockaddr *)&sock_addr,
-               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
-      {
-        return false;
-      }
-    } else {
-      return false;
-    }
-  }
 
   if (listen(socket_fd_, 1) < -1)
     return false;
