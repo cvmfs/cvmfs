@@ -14,6 +14,7 @@
 #include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <arpa/inet.h>
 #include <time.h>
 #include <inttypes.h>
 #include <dirent.h>
@@ -333,6 +334,13 @@ string StringifyTimeval(const timeval value) {
   snprintf(buffer, sizeof(buffer), "%"PRId64".%03d",
            msec, static_cast<int>(value.tv_usec % 1000));
   return string(buffer);
+}
+
+
+string StringifyIpv4(const uint32_t ip4_address) {
+  struct in_addr in_addr;
+  in_addr.s_addr = ip4_address;
+  return string(inet_ntoa(in_addr));
 }
 
 

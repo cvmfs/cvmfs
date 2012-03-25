@@ -1094,6 +1094,7 @@ struct CvmfsOptions {
   char     *logfile;
   char     *blacklist;
   char     *repo_name;
+  char     *interface;
   int      ignore_signature;
   int      rebuild_cachedb;
   int      nofiles;
@@ -1142,6 +1143,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("syslog_level=%d",     syslog_level, 3),
   CVMFS_OPT("kcache_timeout=%d",   kcache_timeout, 60),
   CVMFS_SWITCH("diskless",         diskless),
+  CVMFS_OPT("interface=%s",        interface, 0),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1246,6 +1248,7 @@ static void FreeCvmfsOptions(CvmfsOptions *opts) {
   if (opts->logfile)        free(opts->logfile);
   if (opts->blacklist)      free(opts->blacklist);
   if (opts->repo_name)      free(opts->repo_name);
+  if (opts->interface)      free(opts->interface);
   delete cvmfs::cachedir_;
   delete cvmfs::tracefile_;
   delete cvmfs::repository_name_;
@@ -1441,6 +1444,7 @@ int main(int argc, char *argv[]) {
   if (g_cvmfs_opts.syslog_level == 0) g_cvmfs_opts.syslog_level = 3;
   if (!g_cvmfs_opts.tracefile) g_cvmfs_opts.tracefile = strdup("");
   if (!g_cvmfs_opts.repo_name) g_cvmfs_opts.repo_name = strdup("");
+  if (!g_cvmfs_opts.interface) g_cvmfs_opts.interface = strdup("");
   if (!g_cvmfs_opts.cachedir)
     g_cvmfs_opts.cachedir = strdup("/var/lib/cvmfs/default");
 
@@ -1530,7 +1534,9 @@ int main(int argc, char *argv[]) {
 
   // Spawn / connect to peer server
   if (g_cvmfs_opts.diskless) {
-    if (!peers::Init(GetParentPath(*cvmfs::cachedir_), argv[0])) {
+    if (!peers::Init(GetParentPath(*cvmfs::cachedir_), argv[0],
+                     g_cvmfs_opts.interface))
+    {
       PrintError("failed to initialize peer socket");
       goto cvmfs_cleanup;
     }
