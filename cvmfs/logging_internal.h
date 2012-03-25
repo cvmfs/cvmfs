@@ -41,8 +41,10 @@ void SetLogSyslogPrefix(const std::string &prefix);
 
 #ifdef DEBUGMSG
 void SetLogDebugFile(const std::string &filename);
+std::string GetLogDebugFile();
 #else
 #define SetLogDebugFile(filename) ((void)0)
+#define GetLogDebugFile() (std::string(""))
 #endif
 
 #endif  // CVMFS_LOGGING_INTERNAL_H_

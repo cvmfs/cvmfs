@@ -113,6 +113,7 @@ struct DirectoryListing {
   DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
 };
 
+bool foreground_ = false;
 string *mountpoint_ = NULL;
 string *cachedir_ = NULL;
 string *tracefile_ = NULL;
@@ -1329,6 +1330,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
 
     case KEY_FOREGROUND:
       g_foreground = true;
+      cvmfs::foreground_ = true;
       return 0;
     case KEY_SINGLETHREAD:
       g_single_threaded = true;

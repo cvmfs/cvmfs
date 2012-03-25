@@ -79,6 +79,8 @@ string GetFileName(const string &path) {
 int MakeSocket(const string &path, const int mode) {
   struct sockaddr_un sock_addr;
   assert(path.length() < sizeof(sock_addr.sun_path));
+  sock_addr.sun_family = AF_UNIX;
+  strncpy(sock_addr.sun_path, path.c_str(), sizeof(sock_addr.sun_path));
 
   const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   assert(socket_fd != -1);
@@ -89,9 +91,6 @@ int MakeSocket(const string &path, const int mode) {
   if (fchmod(socket_fd, mode) != 0)
     return false;
 #endif
-
-  sock_addr.sun_family = AF_UNIX;
-  strncpy(sock_addr.sun_path, path.c_str(), sizeof(sock_addr.sun_path));
 
   if (bind(socket_fd, (struct sockaddr *)&sock_addr,
            sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
@@ -106,6 +105,31 @@ int MakeSocket(const string &path, const int mode) {
     } else {
       return -1;
     }
+  }
+
+  return socket_fd;
+}
+
+
+/**
+ * Connects to a named socket.
+ *
+ * \return socket file descriptor on success, -1 else
+ */
+int ConnectSocket(const string &path) {
+  struct sockaddr_un sock_addr;
+  assert(path.length() < sizeof(sock_addr.sun_path));
+  sock_addr.sun_family = AF_UNIX;
+  strncpy(sock_addr.sun_path, path.c_str(), sizeof(sock_addr.sun_path));
+
+  const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  assert(socket_fd != -1);
+
+  if (connect(socket_fd, (struct sockaddr *)&sock_addr,
+              sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
+  {
+    close (socket_fd);
+    return -1;
   }
 
   return socket_fd;

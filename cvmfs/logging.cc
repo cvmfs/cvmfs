@@ -35,6 +35,7 @@ pthread_mutex_t lock_stderr = PTHREAD_MUTEX_INITIALIZER;
 #ifdef DEBUGMSG
 pthread_mutex_t lock_debug = PTHREAD_MUTEX_INITIALIZER;
 FILE *file_debug = NULL;
+string *path_debug = NULL;
 const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
   "fuse stub", "signature", "peers" };
@@ -103,6 +104,15 @@ void SetLogDebugFile(const string &filename) {
             filename.c_str(), errno);
     abort();
   }
+  delete path_debug;
+  path_debug = new string(filename);
+}
+
+
+string GetLogDebugFile() {
+  if (path_debug)
+    return *path_debug;
+  return "";
 }
 #endif
 
