@@ -70,7 +70,7 @@ if [ ! -c /dev/fuse ]; then
   fi
 fi
 
-mountpoint=$2 
+mountpoint=$2
 
 cvmfs_readconfig $fqrn
 retval=$?
@@ -95,7 +95,7 @@ if [ $? -eq 0 ]; then
 fi
 
 repository=`echo $CVMFS_SERVER_URL | sed "s/@org@/$org/g" | sed "s/@fqrn@/$fqrn/g"`
-if [ x$CERNVM_CDN_HOST != x ] 
+if [ x$CERNVM_CDN_HOST != x ]
 then
   mdir=`echo $repository |  cut -d/ -f4-`
   repository="$repository,http://$CERNVM_CDN_HOST/$mdir"
@@ -108,13 +108,12 @@ if [ $? -eq 0 ]
 then
    CVMFS_ID="uid=$uid,gid=$gid"
 else
-   echo "Error: user $CVMFS_USER does not exist." 
+   echo "Error: user $CVMFS_USER does not exist."
    exit 1
 fi
 
 mkdir -p $CVMFS_CACHE_DIR
 chown $CVMFS_USER $CVMFS_CACHE_DIR
-dryrun=
 
 QUOTA="quota_limit=$CVMFS_QUOTA_LIMIT"
 if [ $CVMFS_QUOTA_LIMIT -gt 0 ]
@@ -132,10 +131,10 @@ if [[ "$unamestr" == 'Darwin' ]]; then
     echo "Error: you will need root previliges to increase maximal number of open file descriptors"
     exit 1
   fi
-	
+
   MAXFILES_OVERALL=$[$CVMFS_NFILES + 512]
   sysctl -w kern.maxfilesperproc=$CVMFS_NFILES kern.maxfiles=$MAXFILES_OVERALL > /dev/null
-fi	
+fi
 ulimit -n $CVMFS_NFILES
 add_mount_option "nofiles=$CVMFS_NFILES"
 
@@ -155,7 +154,7 @@ if [ "x$CVMFS_TRACEFILE" != "x" ]; then
   add_mount_option "tracefile=$CVMFS_TRACEFILE"
 fi
 if [ "x$CVMFS_SYSLOG_LEVEL" != "x" ]; then
-  add_mount_option "syslog_level=$CVMFS_SYSLOG_LEVEL"  
+  add_mount_option "syslog_level=$CVMFS_SYSLOG_LEVEL"
 fi
 if [ "x$CVMFS_IGNORE_SIGNATURE" == "xyes" ]; then
   add_mount_option "ignore_signature"
@@ -174,7 +173,7 @@ if [[ "$unamestr" == 'Linux' ]]; then
 	getent group fuse > /dev/null
 elif [[ "$unamestr" == 'Darwin' ]]; then
 	dseditgroup -o read fuse > /dev/null 2> /dev/null
-fi	
+fi
 if [ $? -eq 0 ]; then
   jump_group=y
 else
