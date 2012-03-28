@@ -12,6 +12,9 @@ project (${PROJECT_NAME})
 #
 # The version numbers
 #
+# DON'T DELETE
+## CVMFS_VERSION 2.1.0
+#---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 1)
 set (CernVM-FS_VERSION_PATCH 0)
@@ -134,6 +137,7 @@ include_directories (${INCLUDE_DIRECTORIES})
 #
 add_subdirectory (cvmfs)
 add_subdirectory (cvmfsd)
+add_subdirectory (replica)
 
 if (INSTALL_MOUNT_SCRIPTS)
 	add_subdirectory (mount)

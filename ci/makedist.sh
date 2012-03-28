@@ -1,21 +1,21 @@
 #!/bin/sh
 
-svndir=$1
-[ -z $svndir ] && exit 1
+gitdir=$1
+[ -z $gitdir ] && exit 1
 distdir=$2
 [ -z $distdir ] && exit 2
-[ -d $distdir ] && exit 9
 issnapshot=$3
 [ -z $issnapshot ] && exit 3
 
-svn export $svndir $distdir || exit 4
-cd $distdir || exit 5
+mkdir -p $distdir
+cd $gitdir
+treeish=`git show master | head -n1 | cut -d" " -f2 | head -c16`
 if [ $issnapshot -eq 1 ]; then
-  revision=`svn info $svndir | grep "^Revision:" | cut -d" " -f2`
-  sed -i -e "s/^AC_INIT(\[CVMFS\], \[[0-9\.]*\]/AC_INIT(\[CVMFS\], [r${revision}svn]/" configure.ac
+  version="git-$treeish"  
+else
+  version=`grep CVMFS_VERSION CMakeLists.txt | cut -d" " -f3`
 fi
 
-./bootstrap.sh || exit 6
-./configure --enable-sqlite3-builtin || exit 7
-make dist || exit 8
+git archive --prefix ${version}/ -o $distdir/cvmfs-${version}.tar.gz --format tar.gz master AUTHORS CMakeLists.txt COPYING CPackLists.txt  ChangeLog FAQ INSTALL NEWS README InstallerResources add-ons bootstrap.sh cmake config_cmake.h.in cvmfs cvmfsd doc externals keys mount replica test || exit 8
+
 
