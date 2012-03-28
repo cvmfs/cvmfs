@@ -38,4 +38,5 @@ sh configure LDFLAGS="$LDFLAGS -L${PWD}/../../c-ares/src/.libs -rdynamic" CFLAGS
   --without-ca-path \
   --without-libssh2 \
   --without-libidn \
+  --without-librtmp \
   --disable-verbose
