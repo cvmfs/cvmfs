@@ -25,7 +25,7 @@ sh configure LDFLAGS="$LDFLAGS -L${PWD}/../../c-ares/src/.libs -rdynamic" CFLAGS
   --disable-gopher \
   --disable-threaded-resolver \
   --disable-manual \
-  --disable-ipv6 \
+  --enable-ipv6 \
   --disable-sspi \
   --disable-crypto-auth \
   --disable-cookies \
