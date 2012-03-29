@@ -1,0 +1,28 @@
+
+module cvmfs 1.0;
+
+require {
+	type mount_var_run_t;
+	type fusermount_exec_t;
+	type mount_t;
+	type shadow_t;
+	type var_t;
+	type file_t;
+	class sock_file { create unlink };
+	class capability fowner;
+	class file { open execute_no_trans rename create unlink setattr };
+	class netlink_audit_socket create;
+	class dir { add_name remove_name create };
+}
+
+#============= mount_t ==============
+allow mount_t fusermount_exec_t:file execute_no_trans;
+allow mount_t mount_var_run_t:sock_file { create unlink };
+allow mount_t self:capability fowner;
+allow mount_t self:netlink_audit_socket create;
+allow mount_t shadow_t:file open;
+allow mount_t var_t:file { rename create unlink };
+allow mount_t file_t:dir { add_name remove_name create };
+allow mount_t file_t:file { rename create unlink };
+allow mount_t file_t:sock_file { create unlink };
+allow mount_t file_t:file setattr;

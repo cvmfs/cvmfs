@@ -1,0 +1,2 @@
+allow mount_t file_t:dir add_name; # allow cache directory to be created somewhere
+allow mount_t file_t:file { rename create unlink }; # ~
