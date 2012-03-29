@@ -9,7 +9,7 @@ Summary: CernVM File System
 Name: cvmfs
 Version: 2.1.0
 Release: 1%{?dist}
-Source0: https://cernvm.cern.ch/project/trac/downloads/cernvm/%{name}-%{version}.tar.gz
+Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
 %endif
@@ -130,6 +130,7 @@ rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 mkdir -p $RPM_BUILD_ROOT/var/cache/cvmfs2
 mkdir -p $RPM_BUILD_ROOT/cvmfs
+mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 
 # Keys are in cvmfs-keys
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -203,8 +204,7 @@ fi
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
 %{_bindir}/cvmfs2_debug
-%{_bindir}/cvmfs_proxy_rtt
-%{_bindir}/cvmfs-talk
+%{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
 %{_sysconfdir}/init.d/cvmfs
