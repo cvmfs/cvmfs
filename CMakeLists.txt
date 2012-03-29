@@ -144,6 +144,15 @@ if (INSTALL_MOUNT_SCRIPTS)
 endif (INSTALL_MOUNT_SCRIPTS)
 
 #
+# Documentation
+#
+install (
+		FILES                   README AUTHORS ChangeLog COPYING
+		DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
+		PERMISSIONS             OWNER_READ GROUP_READ WORLD_READ
+        )
+
+#
 # configure the packaging stuff
 #
 include (CPackLists.txt)

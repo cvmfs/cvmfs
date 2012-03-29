@@ -138,8 +138,6 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
 %if 0%{?suse_version}
 mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
-%else
-#FIX-PRERELEASE-DOCDIR
 %endif
 
 %if 0%{?selinux_cvmfs}
@@ -224,7 +222,7 @@ fi
 %attr(700,cvmfs,cvmfs) %dir /var/cache/cvmfs2
 %config %{_sysconfdir}/cvmfs/default.conf 
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
-%doc COPYING AUTHORS README NEWS ChangeLog FAQ
+%doc COPYING AUTHORS README ChangeLog
 
 %changelog
 * Mon Feb 20 2012 Jakob Blomer <jblomer@cern.ch>
