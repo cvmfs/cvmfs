@@ -80,7 +80,9 @@ cp %{SOURCE1} SELinux
 %ifarch x86_64
 %cmake -DBUILD_SERVER=no .
 %else
-CFLAGS="-march=i686" CXXFLAGS="-march=i686" ./configure --enable-sqlite3-builtin --enable-libcurl-builtin --enable-zlib-builtin --enable-mount-scripts --disable-server --prefix=/usr
+export CFLAGS="-march=i686" 
+export CXXFLAGS="-march=i686"
+%cmake -DBUILD_SERVER=no .
 %endif
 make %{?_smp_mflags}
 
