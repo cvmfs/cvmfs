@@ -1,5 +1,5 @@
 Parallel kernel compile:
-  download linux 2.16.13 into repository
+  download linux 2.6.18.8 into repository
   make defconfig, safe .config
   make mrproper
   publish
