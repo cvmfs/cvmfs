@@ -42,6 +42,7 @@ bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
                    const uint64_t size, const std::string &cvmfs_path);
 bool Contains(const hash::Any &id);
 int Fetch(const catalog::DirectoryEntry &d, const std::string &cvmfs_path);
+int64_t GetNumDownloads();
 
 
 /**

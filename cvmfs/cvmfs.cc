@@ -131,13 +131,13 @@ double kcache_timeout_ = 60.0;  /**< TTL (s) of meta data in the kernel cache */
 atomic_int32 catalogs_expired_;
 atomic_int32 drainout_mode_;
 time_t drainout_deadline_;
+time_t catalogs_valid_until_;
 
 map<uint64_t, DirectoryListing> *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
 atomic_int64 num_open_;
-atomic_int64 num_download_;
 atomic_int32 num_io_error_;
 atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
 unsigned max_open_files_; /**< maximum allowed number of open files */
@@ -165,13 +165,37 @@ static unsigned GetEffectiveTTL() {
   const unsigned max_ttl = GetMaxTTL()*60;
   const unsigned catalog_ttl = catalog_manager_->GetTTL();
 
-  return std::min(max_ttl, catalog_ttl);
+  return max_ttl ? std::min(max_ttl, catalog_ttl) : catalog_ttl;
 }
 
 
 static inline double GetKcacheTimeout() {
   if (atomic_read32(&drainout_mode_)) return 0.0;
   return kcache_timeout_;
+}
+
+
+unsigned GetRevision() {
+  return catalog_manager_->GetRevision();
+};
+
+
+std::string GetOpenCatalogs() {
+  return catalog_manager_->PrintHierarchy();
+}
+
+
+void ResetErrorCounters() {
+  atomic_init32(&num_io_error_);
+}
+
+
+void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
+                      lru::Statistics *md5path_stats)
+{
+  *inode_stats = inode_cache_->statistics();
+  *path_stats = path_cache_->statistics();
+  *md5path_stats = md5path_cache_->statistics();
 }
 
 
@@ -224,8 +248,10 @@ static void RemountFinish() {
       LogCvmfs(kLogCvmfs, kLogDebug, "reload/finish failed, "
                "applying short term TTL");
       alarm(kShortTermTTL);
+      catalogs_valid_until_ = time(NULL) + kShortTermTTL;
     } else {
       alarm(GetEffectiveTTL());
+      catalogs_valid_until_ = time(NULL) + GetEffectiveTTL();
     }
   } else {
     atomic_cas32(&drainout_mode_, 0, 1);
@@ -246,6 +272,7 @@ static void RemountCheck() {
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "reload failed, applying short term TTL");
       alarm(kShortTermTTL);
+      catalogs_valid_until_ = time(NULL) + kShortTermTTL;
     }
   }
 }
@@ -856,11 +883,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     const uint64_t revision = catalog_manager_->GetRevision();
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.expires") {
-    time_t expires = 0;
-    // TODO(rene): remove that or implement it properly
-    // catalog_manager_->GetExpireTime();
     time_t now = time(NULL);
-    attribute_value = StringifyInt((expires-now)/60);
+    attribute_value = StringifyInt((catalogs_valid_until_-now)/60);
   } else if (attr == "user.maxfd") {
     attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
   } else if (attr == "user.usedfd") {
@@ -896,7 +920,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.nopen") {
     attribute_value = StringifyInt(atomic_read64(&num_open_));
   } else if (attr == "user.ndownload") {
-    attribute_value = StringifyInt(atomic_read64(&num_download_));
+    attribute_value = StringifyInt(cache::GetNumDownloads());
   } else if (attr == "user.timeout") {
     unsigned seconds, seconds_direct;
     download::GetTimeout(&seconds, &seconds_direct);
@@ -1477,7 +1501,6 @@ int main(int argc, char *argv[]) {
 
   // Runtime counters
   atomic_init64(&cvmfs::num_open_);
-  atomic_init64(&cvmfs::num_download_);
   atomic_init32(&cvmfs::num_io_error_);
   cvmfs::previous_io_error_.timestamp = 0;
   cvmfs::previous_io_error_.delay = 0;
@@ -1686,6 +1709,7 @@ int main(int argc, char *argv[]) {
   retval = sigaction(SIGALRM, &sa, NULL);
   assert(retval == 0);
   alarm(cvmfs::GetEffectiveTTL());
+  cvmfs::catalogs_valid_until_ = time(NULL) + cvmfs::GetEffectiveTTL();
 
   // Set fuse callbacks, remove url from arguments
   LogCvmfs(kLogCvmfs, kLogSyslog,

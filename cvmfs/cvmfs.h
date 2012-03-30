@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "catalog_mgr.h"
+#include "lru.h"
 
 namespace cvmfs {
 
@@ -22,8 +23,13 @@ extern bool foreground_;
 
 int ClearFile(const std::string &path);
 catalog::LoadError RemountStart();
+unsigned GetRevision();
+std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes
 void SetMaxTTL(const unsigned value);  // in minutes
+void ResetErrorCounters();
+void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
+                      lru::Statistics *md5path_stats);
 
 }  // namespace cvmfs
 

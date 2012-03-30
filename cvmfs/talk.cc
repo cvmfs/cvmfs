@@ -38,6 +38,7 @@
 #include "logging.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
+#include "lru.h"
 
 using namespace std;  // NOLINT
 
@@ -188,15 +189,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
           default:
             Answer(con_fd, "internal error\n");
         }
-      //} */
-      // TODO
-      /*else if (line == "revision") {
-       catalog::lock();
-       const uint64_t revision = catalog::get_revision();
-       catalog::unlock();
-       ostringstream revision_str;
-       revision_str << revision;
-       Answer(con_fd, revision_str.str() + "\n"); */
+      } else if (line == "revision") {
+        Answer(con_fd, StringifyInt(cvmfs::GetRevision()) + "\n");
       } else if (line == "max ttl info") {
         const unsigned max_ttl = cvmfs::GetMaxTTL();
         if (max_ttl == 0) {
@@ -305,90 +299,61 @@ static void *MainTalk(void *data __attribute__((unused))) {
           download::SetTimeout(timeout, timeout_direct);
           Answer(con_fd, "OK\n");
         }
-      /*}
-        TODO  else if (line == "open catalogs") {
-       vector<string> prefix;
-       vector<time_t> last_modified, expires;
-       vector<unsigned int> inode_offsets;
-       cvmfs::info_loaded_catalogs(&prefix, &last_modified, &expires, &inode_offsets);
-       string result = "Prefix | Last Modified | Expires | inode offset\n";
-       for (unsigned i = 0; i < prefix.size(); ++i) {
-       result += ((prefix[i] == "") ? "/" : prefix[i]) + " | ";
-       result += ((last_modified[i] == 0) ? "n/a" : localtime_ascii(last_modified[i], true)) + " | ";
-       result += (expires[i] == 0) ? "n/a" : localtime_ascii(expires[i], true) + " | ";
-       result += " " + inode_offsets[i];
-       result += "\n";
-       }
+      } else if (line == "open catalogs") {
+        Answer(con_fd, cvmfs::GetOpenCatalogs());
+      } else if (line == "sqlite memory") {
+        int current;
+        int highwater;
+        lru::Statistics inode_stats;
+        lru::Statistics path_stats;
+        lru::Statistics md5path_stats;
+        string result;
 
-       Answer(con_fd, result);
-       TODO
-       } else if (line == "sqlite memory") {
-       ostringstream result;
-       int current = 0;
-       int highwater = 0;
-       int ncache = 0;
-       int pcache = 0;
-       int acache = 0;
-       int cache_inserts = 0;
-       int cache_replaces = 0;
-       int cache_cleans = 0;
-       int cache_hits = 0;
-       int cache_misses = 0;
-       int cert_hits = 0;
-       int cert_misses = 0;
+        cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
+        result += "File Catalog Memeory Cache:\n" +
+                  string("  inode cache:   ") + inode_stats.Print() +
+                  string("  path cache:    ") + path_stats.Print() +
+                  string("  md5path cache: ") + md5path_stats.Print();
 
-       catalog::lock();
-       quota::lock();
+        sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
+        result += "Number of allocations " + StringifyInt(current) + "\n";
 
-       result << "File catalog memcache " << cvmfs::catalog_cache_memusage_bytes()/1024 << " KB" << endl;
-       cvmfs::catalog_cache_memusage_slots(&pcache, &ncache, &acache,
-       &cache_inserts, &cache_replaces, &cache_cleans, &cache_hits, &cache_misses,
-       &cert_hits, &cert_misses);
-       result << "File catalog memcache slots "
-       << pcache << " positive, " << ncache << " negative / " << acache << " slots, "
-       << cache_inserts << " inserts, " << cache_replaces << " replaces (not measured), " << cache_cleans << " cleans, "
-       << cache_hits << " hits, " << cache_misses << " misses" << endl
-       << "certificate disk cache hits/misses " << cert_hits << "/" << cert_misses << endl;
+        sqlite3_status(SQLITE_STATUS_MEMORY_USED, &current, &highwater, 0);
+        result += "General purpose allocator " +StringifyInt(current/1024) +
+                  " KB / " + StringifyInt(highwater/1024) + " KB\n";
 
+        sqlite3_status(SQLITE_STATUS_MALLOC_SIZE, &current, &highwater, 0);
+        result += "Largest malloc " + StringifyInt(highwater) + " Bytes\n";
 
-       sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
-       result << "Number of allocations " << current << endl;
+        sqlite3_status(SQLITE_STATUS_PAGECACHE_USED, &current, &highwater, 0);
+        result += "Page cache allocations " + StringifyInt(current) + " / " +
+                  StringifyInt(highwater) + "\n";
 
-       sqlite3_status(SQLITE_STATUS_MEMORY_USED, &current, &highwater, 0);
-       result << "General purpose allocator " << current/1024 << " KB / "
-       << highwater/1024 << " KB" << endl;
+        sqlite3_status(SQLITE_STATUS_PAGECACHE_OVERFLOW,
+                       &current, &highwater, 0);
+        result += "Page cache overflows " + StringifyInt(current/1024) +
+                  " KB / " + StringifyInt(highwater/1024) + " KB\n";
 
-       sqlite3_status(SQLITE_STATUS_MALLOC_SIZE, &current, &highwater, 0);
-       result << "Largest malloc " << highwater << " Bytes" << endl;
+        sqlite3_status(SQLITE_STATUS_PAGECACHE_SIZE, &current, &highwater, 0);
+        result += "Largest page cache allocation " + StringifyInt(highwater) +
+                  " Bytes\n";
 
-       sqlite3_status(SQLITE_STATUS_PAGECACHE_USED, &current, &highwater, 0);
-       result << "Page cache allocations " << current << " / " << highwater << endl;
+        sqlite3_status(SQLITE_STATUS_SCRATCH_USED, &current, &highwater, 0);
+        result += "Scratch allocations " + StringifyInt(current) + " / " +
+                  StringifyInt(highwater) + "\n";
 
-       sqlite3_status(SQLITE_STATUS_PAGECACHE_OVERFLOW, &current, &highwater, 0);
-       result << "Page cache overflows " << current/1024 << " KB / " << highwater/1024 << " KB" << endl;
+        sqlite3_status(SQLITE_STATUS_SCRATCH_OVERFLOW, &current, &highwater, 0);
+        result += "Scratch overflows " + StringifyInt(current) + " / " +
+                  StringifyInt(highwater) + "\n";
 
-       sqlite3_status(SQLITE_STATUS_PAGECACHE_SIZE, &current, &highwater, 0);
-       result << "Largest page cache allocation " << highwater << " Bytes" << endl;
+        sqlite3_status(SQLITE_STATUS_SCRATCH_SIZE, &current, &highwater, 0);
+        result += "Largest scratch allocation " + StringifyInt(highwater/1024) +
+                  " KB\n";
 
-       sqlite3_status(SQLITE_STATUS_SCRATCH_USED, &current, &highwater, 0);
-       result << "Scratch allocations " << current << " / " << highwater << endl;
-
-       sqlite3_status(SQLITE_STATUS_SCRATCH_OVERFLOW, &current, &highwater, 0);
-       result << "Scratch overflows " << current << " / " << highwater << endl;
-
-       sqlite3_status(SQLITE_STATUS_SCRATCH_SIZE, &current, &highwater, 0);
-       result << "Largest scratch allocation " << highwater/1024 << " KB" << endl;
-
-       result << catalog::get_db_memory_usage();
-       result << quota::get_memory_usage();
-
-       quota::unlock();
-       catalog::unlock();
-
-       Answer(con_fd, result.str());
-       }
-       } else if (line == "catalog tree") {
-       Answer(con_fd, catalog_tree::show_tree()); */
+        Answer(con_fd, result);
+      } else if (line == "reset error counters") {
+        cvmfs::ResetErrorCounters();
+        Answer(con_fd, "OK\n");
       } else if (line == "pid") {
         const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
@@ -428,7 +393,7 @@ bool Init(const string &cachedir) {
 
 
 /**
- * Spawns the socket-dealing thread
+ * Spawns the socket listener
  */
 void Spawn() {
   int result;

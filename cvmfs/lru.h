@@ -55,8 +55,43 @@
 #include "smalloc.h"
 #include "dirent.h"
 #include "hash.h"
+#include "atomic.h"
+#include "util.h"
 
 namespace lru {
+
+struct Statistics {
+  int64_t size;
+  atomic_int64 num_hit;
+  atomic_int64 num_miss;
+  atomic_int64 num_insert;
+  atomic_int64 num_update;
+  atomic_int64 num_forget;
+  atomic_int64 num_drop;
+  atomic_int64 allocated;
+
+  Statistics() {
+    size = 0;
+    atomic_init64(&num_hit);
+    atomic_init64(&num_miss);
+    atomic_init64(&num_insert);
+    atomic_init64(&num_update);
+    atomic_init64(&num_forget);
+    atomic_init64(&num_drop);
+    atomic_init64(&allocated);
+  }
+
+  std::string Print() {
+    return "size: " + StringifyInt(size) + "    " +
+      "hits: " + StringifyInt(atomic_read64(&num_hit)) + "    " +
+      "misses: " + StringifyInt(atomic_read64(&num_miss)) + "    " +
+      "inserts: " + StringifyInt(atomic_read64(&num_insert)) + "    " +
+      "updates: " + StringifyInt(atomic_read64(&num_update)) + "    " +
+      "forgets: " + StringifyInt(atomic_read64(&num_forget)) + "    " +
+      "drops: " + StringifyInt(atomic_read64(&num_drop)) + "    " +
+      "allocated: " + StringifyInt(atomic_read64(&allocated) / 1024) + " KB\n";
+  }
+};
 
 /**
  * Template class to create a LRU cache
@@ -139,6 +174,7 @@ class LruCache {
       num_slots_ = num_slots;
       num_free_slots_ = num_slots;
       next_free_slot_ = 0;
+      bytes_allocated_ = num_bytes_bitmap + num_bytes_memory;
     }
 
     /**
@@ -202,6 +238,8 @@ class LruCache {
       ++num_free_slots_;
     }
 
+    uint64_t bytes_allocated() { return bytes_allocated_; }
+
    private:
     /**
      * Check a bit in the internal allocation bitmap.
@@ -237,6 +275,7 @@ class LruCache {
     unsigned int num_slots_;  /**< Overall number of slots in memory pool. */
     unsigned int num_free_slots_;  /**< Current number of free slots left. */
     unsigned int next_free_slot_;  /**< Position of next free slot in pool. */
+    uint64_t bytes_allocated_;
     uint64_t *bitmap_;  /**< A bitmap to mark slots as allocated. */
     T *memory_;  /**< The memory pool, array of Ms. */
   };
@@ -469,6 +508,8 @@ class LruCache {
 
     cache_gauge_ = 0;
     cache_size_ = cache_size;
+    statistics_.size = cache_size_;
+    cache_ = Cache(cache_size_);
     lru_list_ = new ListEntryHead<Key>();
     pause_ = false;
 
@@ -493,7 +534,7 @@ class LruCache {
    * of the list
    * @param key the key where the value is saved
    * @param value the value of the cache entry
-   * @return true on successful insertion otherwise false
+   * @return true on insert, false on update
    */
   virtual bool Insert(const Key &key, const Value &value) {
     this->Lock();
@@ -502,26 +543,30 @@ class LruCache {
       return false;
     }
 
-    // Check if we have to update an existent entry
     CacheEntry entry;
+
+    // Check if we have to update an existent entry
     if (this->DoLookup(key, entry)) {
+      atomic_inc64(&statistics_.num_update);
       entry.value = value;
       cache_[key] = entry;
       this->Touch(entry);
-    } else {
-      // Check if we have to make some space in the cache a
-      if (this->IsFull())
-        this->DeleteOldest();
-
-      CacheEntry entry;
-      entry.list_entry = lru_list_->PushBack(key);
-      entry.value = value;
-
-      cache_[key] = entry;
-      cache_gauge_++;
+      this->Unlock();
+      return false;
     }
 
-    this->Unlock();
+    atomic_inc64(&statistics_.num_insert);
+    // Check if we have to make some space in the cache a
+    if (this->IsFull())
+      this->DeleteOldest();
+
+    entry.list_entry = lru_list_->PushBack(key);
+    entry.value = value;
+
+    cache_[key] = entry;
+    cache_gauge_++;
+
+    Unlock();
     return true;
   }
 
@@ -543,9 +588,12 @@ class LruCache {
     CacheEntry entry;
     if (DoLookup(key, entry)) {
       // Hit
+      atomic_inc64(&statistics_.num_hit);
       Touch(entry);
       *value = entry.value;
       found = true;
+    } else {
+      atomic_inc64(&statistics_.num_miss);
     }
 
     Unlock();
@@ -564,6 +612,7 @@ class LruCache {
     CacheEntry entry;
     if (this->DoLookup(key, entry)) {
       found = true;
+      atomic_inc64(&statistics_.num_forget);
 
       entry.list_entry->RemoveFromList();
       delete entry.list_entry;
@@ -585,7 +634,10 @@ class LruCache {
 
     cache_gauge_ = 0;
     lru_list_->clear();
-    cache_.clear();
+    cache_.clear_no_resize();
+    atomic_inc64(&statistics_.num_drop);
+    atomic_init64(&statistics_.allocated);
+    atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated());
 
     this->Unlock();
   }
@@ -613,6 +665,11 @@ class LruCache {
 
   inline bool IsFull() const { return cache_gauge_ >= cache_size_; }
   inline bool IsEmpty() const { return cache_gauge_ == 0; }
+
+  Statistics statistics() { return statistics_; }
+
+ protected:
+  Statistics statistics_;
 
  private:
   /**
@@ -696,7 +753,15 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
   bool Insert(const fuse_ino_t inode, const catalog::DirectoryEntry &dirent) {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %d -> '%s'",
              inode, dirent.name().c_str());
-    return LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
+    const bool result =
+      LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
+    if (result) {
+      atomic_xadd64(&statistics_.allocated, sizeof(inode));
+      atomic_xadd64(&statistics_.allocated, sizeof(dirent));
+      atomic_xadd64(&statistics_.allocated, dirent.name().capacity());
+      atomic_xadd64(&statistics_.allocated, dirent.symlink().capacity());
+    }
+    return result;
   }
 
   bool Lookup(const fuse_ino_t inode, catalog::DirectoryEntry *dirent) {
@@ -725,7 +790,12 @@ class PathCache : public LruCache<fuse_ino_t, std::string> {
   bool Insert(const fuse_ino_t inode, const std::string &path) {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %d -> '%s'",
              inode, path.c_str());
-    return LruCache<fuse_ino_t, std::string>::Insert(inode, path);
+    const bool result = LruCache<fuse_ino_t, std::string>::Insert(inode, path);
+    if (result) {
+      atomic_xadd64(&statistics_.allocated, sizeof(inode));
+      atomic_xadd64(&statistics_.allocated, path.capacity());
+    }
+    return result;
   }
 
   bool Lookup(const fuse_ino_t inode, std::string *path) {
@@ -770,12 +840,25 @@ class Md5PathCache :
   bool Insert(const hash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
     LogCvmfs(kLogLru, kLogDebug, "insert md5 --> dirent: %s -> '%s'",
              hash.ToString().c_str(), dirent.name().c_str());
-    return LruCache<hash::Md5, catalog::DirectoryEntry,
-                    hash_md5, equal_md5>::Insert(hash, dirent);
+    const bool result =
+      LruCache<hash::Md5, catalog::DirectoryEntry,
+               hash_md5, equal_md5>::Insert(hash, dirent);
+    if (result) {
+      atomic_xadd64(&statistics_.allocated, sizeof(hash));
+      atomic_xadd64(&statistics_.allocated, sizeof(dirent));
+      atomic_xadd64(&statistics_.allocated, dirent.name().capacity());
+      atomic_xadd64(&statistics_.allocated, dirent.symlink().capacity());
+    }
+    return result;
   }
 
   bool InsertNegative(const hash::Md5 &hash) {
-    return Insert(hash, dirent_negative_);
+    const bool result = Insert(hash, dirent_negative_);
+    if (result) {
+      atomic_xadd64(&statistics_.allocated, sizeof(hash));
+      atomic_xadd64(&statistics_.allocated, sizeof(dirent_negative_));
+    }
+    return result;
   }
 
   bool Lookup(const hash::Md5 &hash, catalog::DirectoryEntry *dirent) {

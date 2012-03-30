@@ -54,6 +54,7 @@
 #include "compression.h"
 #include "smalloc.h"
 #include "signature.h"
+#include "atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -76,6 +77,7 @@ ThreadQueues *queues_download_ = NULL;  /**< maps currently
   threads when the download has finished */
 pthread_mutex_t lock_queues_download_ = PTHREAD_MUTEX_INITIALIZER;
 pthread_key_t thread_local_storage_;
+atomic_int64 num_download_;
 
 
 static void CleanupTLS(void *data) {
@@ -94,6 +96,7 @@ static void CleanupTLS(void *data) {
 bool Init(const string &cache_path) {
   cache_path_ = new string(cache_path);
   queues_download_ = new ThreadQueues();
+  atomic_init64(&num_download_);
 
   if (!MakeCacheDirectories(cache_path, 0700))
     return false;
@@ -435,6 +438,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
 
   // The download path starts here
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", cvmfs_path.c_str());
+  atomic_inc64(&num_download_);
 
   const string url = "/data" + d.checksum().MakePath(1, 2);
   string final_path;
@@ -530,6 +534,11 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
   pthread_mutex_unlock(&lock_queues_download_);
 
   return result;
+}
+
+
+int64_t GetNumDownloads() {
+  return atomic_read64(&num_download_);
 }
 
 
