@@ -16,10 +16,11 @@ cvmfs_run_test() {
   start_time=`date -u +%s`
   $AtlasSetup/python/asetup.py --debugprint 17.0.0 >> $logfile 2>&1 || return 3 
   end_time=`date -u +%s`
+  rm -f '<undefined>'
   echo "$[$end_time-$start_time] seconds required" >> $logfile
 
   check_time $start_time $end_time 20 || return 4
-  check_memory atlas 30000 || return 5
+  check_memory atlas.cern.ch 30000 || return 5
  
   return 0
 }

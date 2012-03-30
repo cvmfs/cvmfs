@@ -1229,4 +1229,9 @@ void ProbeHosts() {
   pthread_mutex_unlock(&lock_options_);
 }
 
+
+void RestartNetwork() {
+  // TODO: transfer special job
+}
+
 }  // namespace download

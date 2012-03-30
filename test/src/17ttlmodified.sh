@@ -6,7 +6,7 @@ do_tests() {
 
   extract_local_repo ttlbase || return 1
   setup_local none || return 1
-  service cvmfs restartclean >> $logfile 2>&1 || return 1
+  restart_clean || return 1
 
   ls /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 2
   file=`cat /cvmfs/127.0.0.1/file` || return 3
@@ -16,11 +16,11 @@ do_tests() {
   
   extract_local_repo ttlmodified || return 5
   resign_local
-  date -s next-week >> $logfile || return 6
+  sudo date -s next-week >> $logfile || return 6
   stat /cvmfs/127.0.0.1 >> $logfile
   sleep 62
   file=`cat /cvmfs/127.0.0.1/file`
-  date -s last-week >> $logfile || return 7
+  sudo date -s last-week >> $logfile || return 7
   if [ $file != "modified" ]; then
     return 8
   fi

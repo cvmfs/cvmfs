@@ -6,7 +6,6 @@ cvmfs_run_test() {
 
   extract_local_repo pub
   setup_local || return 1
-  service cvmfs restartclean >> $logfile 2>&1 
   RETVAL=$? 
  
   ls /cvmfs/127.0.0.1 >> $logfile 2>&1

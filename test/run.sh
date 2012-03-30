@@ -31,7 +31,7 @@ do
   . $t || exit 2
   echo "-- Testing $t" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
-  sh -c ". test_functions.sh && . $t && cvmfs_run_test $logfile && exit $?"
+  sh -c ". ./test_functions.sh && . $t && cvmfs_run_test $logfile && exit $?"
   RETVAL=$?
   if [ $RETVAL -eq 0 ]; then
     echo "OK"

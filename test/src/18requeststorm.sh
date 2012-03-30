@@ -6,12 +6,12 @@ do_tests() {
 
   extract_local_repo ttlbase || return 1
   setup_local none || return 1
-  service cvmfs restartclean >> $logfile 2>&1 || return 1
+  restart_clean || return 1
 
   ls /cvmfs/127.0.0.1 >> $logfile 2>&1 || return 2
-  rm -rf /var/cache/cvmfs2/127.0.0.1/7a
+  sudo rm -rf /var/cache/cvmfs2/127.0.0.1/7a
   
-  numBefore=`grep -i "failed to open" /var/log/messages | grep cvmfs2 | wc -l`
+  numBefore=`sudo grep -i "failed to open" /var/log/messages | grep cvmfs2 | wc -l`
 
   cat /cvmfs/127.0.0.1/file > /dev/null 2>>$logfile
   if [ $? -eq 0 ]; then
@@ -19,7 +19,7 @@ do_tests() {
   fi
 
   sync
-  numAfter=`grep -i "failed to open" /var/log/messages | grep cvmfs2 | wc -l`
+  numAfter=`sudo grep -i "failed to open" /var/log/messages | grep cvmfs2 | wc -l`
   
   if [ $[$numAfter-$numBefore] -ne 1 ]; then
     return 4
@@ -38,8 +38,8 @@ do_tests() {
     return 5
   fi
 
-  mkdir /var/cache/cvmfs2/127.0.0.1/7a
-  chown cvmfs:cvmfs /var/cache/cvmfs2/127.0.0.1/7a
+  sudo mkdir /var/cache/cvmfs2/127.0.0.1/7a
+  sudo chown cvmfs:cvmfs /var/cache/cvmfs2/127.0.0.1/7a
   cat /cvmfs/127.0.0.1/file >> $logfile
   if [ $? -ne 0 ]; then
     return 6

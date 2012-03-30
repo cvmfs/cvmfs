@@ -110,6 +110,7 @@ void GetProxyInfo(std::vector< std::vector<std::string> > *proxy_chain,
                   unsigned *current_group);
 void RebalanceProxies();
 void SwitchProxyGroup();
+void RestartNetwork();
 
 }  // namespace download
 
