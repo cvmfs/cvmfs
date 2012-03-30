@@ -84,8 +84,8 @@ using namespace std;  // NOLINT
 namespace cvmfs {
 
 const unsigned int kInodeCacheSize = 6400;
-const unsigned int kPathCacheSize = 1600;
-const unsigned int kMd5pathCacheSize = 6400;
+const unsigned int kPathCacheSize = 6400;
+const unsigned int kMd5pathCacheSize = 12800;
 
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
@@ -196,6 +196,11 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
   *inode_stats = inode_cache_->statistics();
   *path_stats = path_cache_->statistics();
   *md5path_stats = md5path_cache_->statistics();
+}
+
+
+catalog::Statistics GetCatalogStatistics() {
+  return catalog_manager_->statistics();
 }
 
 

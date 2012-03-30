@@ -307,13 +307,16 @@ static void *MainTalk(void *data __attribute__((unused))) {
         lru::Statistics inode_stats;
         lru::Statistics path_stats;
         lru::Statistics md5path_stats;
+        catalog::Statistics catalog_stats;
         string result;
 
         cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
-        result += "File Catalog Memeory Cache:\n" +
+        result += "File Catalog Memory Cache:\n" +
                   string("  inode cache:   ") + inode_stats.Print() +
                   string("  path cache:    ") + path_stats.Print() +
                   string("  md5path cache: ") + md5path_stats.Print();
+
+        result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
 
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
         result += "Number of allocations " + StringifyInt(current) + "\n";

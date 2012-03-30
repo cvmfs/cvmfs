@@ -755,12 +755,12 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
              inode, dirent.name().c_str());
     const bool result =
       LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
-    if (result) {
+    /*if (result) {
       atomic_xadd64(&statistics_.allocated, sizeof(inode));
       atomic_xadd64(&statistics_.allocated, sizeof(dirent));
       atomic_xadd64(&statistics_.allocated, dirent.name().capacity());
       atomic_xadd64(&statistics_.allocated, dirent.symlink().capacity());
-    }
+    }*/
     return result;
   }
 
@@ -791,10 +791,10 @@ class PathCache : public LruCache<fuse_ino_t, std::string> {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %d -> '%s'",
              inode, path.c_str());
     const bool result = LruCache<fuse_ino_t, std::string>::Insert(inode, path);
-    if (result) {
+    /*if (result) {
       atomic_xadd64(&statistics_.allocated, sizeof(inode));
       atomic_xadd64(&statistics_.allocated, path.capacity());
-    }
+    }*/
     return result;
   }
 
@@ -843,21 +843,21 @@ class Md5PathCache :
     const bool result =
       LruCache<hash::Md5, catalog::DirectoryEntry,
                hash_md5, equal_md5>::Insert(hash, dirent);
-    if (result) {
+    /*if (result) {
       atomic_xadd64(&statistics_.allocated, sizeof(hash));
       atomic_xadd64(&statistics_.allocated, sizeof(dirent));
       atomic_xadd64(&statistics_.allocated, dirent.name().capacity());
       atomic_xadd64(&statistics_.allocated, dirent.symlink().capacity());
-    }
+    }*/
     return result;
   }
 
   bool InsertNegative(const hash::Md5 &hash) {
     const bool result = Insert(hash, dirent_negative_);
-    if (result) {
+    /*if (result) {
       atomic_xadd64(&statistics_.allocated, sizeof(hash));
       atomic_xadd64(&statistics_.allocated, sizeof(dirent_negative_));
-    }
+    }*/
     return result;
   }
 

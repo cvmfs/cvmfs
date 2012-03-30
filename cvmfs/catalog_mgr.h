@@ -13,6 +13,8 @@
 #include "catalog.h"
 #include "dirent.h"
 #include "hash.h"
+#include "atomic.h"
+#include "util.h"
 
 namespace catalog {
 
@@ -33,6 +35,28 @@ enum LoadError {
   kLoadUp2Date,
   kLoadNoSpace,
   kLoadFail,
+};
+
+
+struct Statistics {
+  atomic_int64 num_lookup_inode;
+  atomic_int64 num_lookup_path;
+  atomic_int64 num_listing;
+
+  Statistics() {
+    atomic_init64(&num_lookup_inode);
+    atomic_init64(&num_lookup_path);
+    atomic_init64(&num_listing);
+  }
+
+  std::string Print() {
+    return
+      "lookup(inode): " + StringifyInt(atomic_read64(&num_lookup_inode)) +
+      "    " +
+      "lookup(path): " + StringifyInt(atomic_read64(&num_lookup_path)) +
+      "    " +
+      "listing: " + StringifyInt(atomic_read64(&num_listing)) + "\n";
+  }
 };
 
 /**
@@ -58,11 +82,12 @@ class AbstractCatalogManager {
   LoadError Remount(const bool dry_run);
 
   bool LookupInode(const inode_t inode, const LookupOptions options,
-                   DirectoryEntry *entry) const;
+                   DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,
                   DirectoryEntry *entry);
   bool Listing(const std::string &path, DirectoryEntryList *listing);
 
+  Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
   int GetNumCatalogs() const;
@@ -131,6 +156,7 @@ class AbstractCatalogManager {
   CatalogList catalogs_;
   uint64_t inode_gauge_;  /**< highest issued inode */
   pthread_rwlock_t *rwlock_;
+  Statistics statistics_;
 
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);

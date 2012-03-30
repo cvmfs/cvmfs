@@ -85,7 +85,7 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
  */
 bool AbstractCatalogManager::LookupInode(const inode_t inode,
                                          const LookupOptions options,
-                                         DirectoryEntry *dirent) const
+                                         DirectoryEntry *dirent)
 {
   ReadLock();
   bool found = false;
@@ -106,9 +106,11 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
   }
 
   if ((options == kLookupSole) || (inode == GetRootInode())) {
+    atomic_inc64(&statistics_.num_lookup_inode);
     found = catalog->LookupInode(inode, dirent, NULL);
     goto lookup_inode_fini;
   } else {
+    atomic_inc64(&statistics_.num_lookup_inode);
     // Lookup including parent entry
     hash::Md5 parent_md5path;
     DirectoryEntry parent;
@@ -119,6 +121,7 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
       goto lookup_inode_fini;
 
     // Parent is possibly in the parent catalog
+    atomic_inc64(&statistics_.num_lookup_path);
     if (dirent->IsNestedCatalogRoot() && !catalog->IsRoot()) {
       Catalog *parent_catalog = catalog->parent();
       found_parent = parent_catalog->LookupMd5Path(parent_md5path, &parent);
@@ -160,6 +163,7 @@ bool AbstractCatalogManager::LookupPath(const string &path,
   Catalog *best_fit = FindCatalog(path);
   assert(best_fit != NULL);
 
+  atomic_inc64(&statistics_.num_lookup_path);
   LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
            path.c_str(), best_fit->path().c_str());
   bool found = best_fit->LookupPath(path, dirent);
@@ -181,6 +185,7 @@ bool AbstractCatalogManager::LookupPath(const string &path,
     }
 
     if (nested_catalog != best_fit) {
+      atomic_inc64(&statistics_.num_lookup_path);
       found = nested_catalog->LookupPath(path, dirent);
       if (!found) {
         LogCvmfs(kLogCatalog, kLogDebug,
@@ -244,6 +249,7 @@ bool AbstractCatalogManager::Listing(const string &path,
     return false;
   }
 
+  atomic_inc64(&statistics_.num_listing);
   result = catalog->ListingPath(path, listing);
 
   Unlock();
@@ -420,7 +426,7 @@ Catalog *AbstractCatalogManager::MountCatalog(const string &mountpoint,
   if (!AttachCatalog(catalog_path, attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
-    DetachCatalog(attached_catalog);
+    UnloadCatalog(attached_catalog->path());
     return NULL;
   }
 
@@ -456,6 +462,7 @@ bool AbstractCatalogManager::AttachCatalog(const std::string &db_path,
   if (!new_catalog->IsInitialized()) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "catalog initialization failed (obscure data)");
+    inode_gauge_ -= inode_chunk_size;
     return false;
   }
 
@@ -552,7 +559,7 @@ string AbstractCatalogManager::PrintHierarchyRecursively(const Catalog *catalog,
   for (int i = 0; i < level; ++i)
     output += "    ";
 
-  output += "'-> " + catalog->path() + "\n";
+  output += "-> " + catalog->path() + "\n";
 
   CatalogList children = catalog->GetChildren();
   CatalogList::const_iterator i,iend;
