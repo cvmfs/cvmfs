@@ -82,6 +82,7 @@ class Catalog {
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
 
+  inline float schema() const { return schema_; }
   inline std::string path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
   inline uint64_t max_row_id() const { return max_row_id_; }
@@ -143,6 +144,7 @@ class Catalog {
 
   std::string root_prefix_;
   std::string path_;
+  float schema_;
 
   Catalog *parent_;
   NestedCatalogMap children_;

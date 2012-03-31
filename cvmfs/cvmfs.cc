@@ -45,7 +45,7 @@
 #include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
-#include <google/sparse_hash_map>
+#include <google/dense_hash_map>
 
 #include <cstdlib>
 #include <cstring>
@@ -135,7 +135,7 @@ atomic_int32 drainout_mode_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
-typedef google::sparse_hash_map< uint64_t, DirectoryListing,
+typedef google::dense_hash_map< uint64_t, DirectoryListing,
   SPARSEHASH_HASH<uint64_t>, std::equal_to<uint64_t> > DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
@@ -1736,7 +1736,7 @@ int main(int argc, char *argv[]) {
   cvmfs::path_cache_ = new lru::PathCache(cvmfs::kPathCacheSize);
   cvmfs::md5path_cache_ = new lru::Md5PathCache(cvmfs::kMd5pathCacheSize);
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
-  //cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
+  cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
 
   if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &g_fuse_args)) != NULL) {

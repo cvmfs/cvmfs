@@ -104,6 +104,15 @@ bool Catalog::OpenDatabase(const string &db_path) {
     }
   }
 
+  // Get schema version
+  SqlStatement sql_schema(database_, "SELECT value FROM properties "
+                                     "WHERE key='schema';");
+  if (sql_schema.FetchRow()) {
+    schema_ = sql_schema.RetrieveDouble(0);
+  } else {
+    schema_ = 1.0;
+  }
+
   if (!IsRoot()) {
     parent_->AddChild(this);
   }

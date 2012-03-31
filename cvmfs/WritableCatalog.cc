@@ -112,7 +112,7 @@ bool WritableCatalog::CreateNewDatabaseSchema(const std::string &file_path) {
 
   if (not
     SqlStatement(database,
-                "INSERT OR REPLACE INTO properties (key, value) VALUES ('schema', '1.2');").Execute()) goto out_fail;
+                "INSERT OR REPLACE INTO properties (key, value) VALUES ('schema', '2.0');").Execute()) goto out_fail;
 
   sqlite3_close(database);
   return true;

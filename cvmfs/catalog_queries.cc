@@ -155,10 +155,12 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.catalog_                      = (Catalog*)catalog;
   result.is_nested_catalog_root_       = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ = (database_flags & kFlagDirNestedMountpoint);
-  result.hardlink_group_id_            = RetrieveInt64(1); // quirky database layout here ( legacy ;-) )
+  result.hardlink_group_id_            = (catalog->schema() < 2.0) ?
+                                         0 : RetrieveInt64(1); // quirky database layout here ( legacy ;-) )
 
   // read the usual file information
-  result.inode_        = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0); // TODO RetrieveInt64(1));
+  result.inode_        = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
+                          (catalog->schema() < 2.0) ? 0 : RetrieveInt64(1));
   result.parent_inode_ = DirectoryEntry::kInvalidInode; // must be set later by a second catalog lookup
   result.linkcount_    = GetLinkcountFromFlags(database_flags);
   result.mode_         = RetrieveInt(3);
