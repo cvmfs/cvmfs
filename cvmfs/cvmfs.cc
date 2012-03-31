@@ -83,9 +83,12 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-const unsigned int kInodeCacheSize = 6400;
-const unsigned int kPathCacheSize = 6400;
-const unsigned int kMd5pathCacheSize = 12800;
+const unsigned int kInodeCacheSize = 128;
+const unsigned int kPathCacheSize = 128;
+const unsigned int kMd5pathCacheSize = 128;
+//const unsigned int kInodeCacheSize = 6400;
+//const unsigned int kPathCacheSize = 6400;
+//const unsigned int kMd5pathCacheSize = 12800;
 
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
@@ -996,6 +999,11 @@ static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino,
 {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_forget on inode: %d", ino);
+
+  // File system may ignore forget messages
+  //path_cache_->Forget(ino);
+  //inode_cache_->Forget(ino);
+
   fuse_reply_none(req);
 }
 

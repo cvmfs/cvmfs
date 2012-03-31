@@ -23,7 +23,7 @@ setup_atlaslhcb() {
   #sudo sh -c 'echo "CVMFS_DEBUGLOG=/tmp/cvmfs_test.log" >> /etc/cvmfs/default.local' || return 1
   restart_all || return 2
   sudo /sbin/service cvmfs probe > /dev/null 2>&1 || return 3
-  
+
   return 0
 }
 
@@ -68,7 +68,7 @@ extract_local_repo() {
   #sudo chown -R `whoami` server/pub
   cd ..
 
-  return 0 
+  return 0
 }
 
 
@@ -93,8 +93,8 @@ setup_local() {
     make linux >> $logfile 2>&1 || return 2
     cd ../..
   fi
-  screen -dmS webserver sh -c "server/mongoose/mongoose -r server/pub -p 8080 >> $logfile 2>&1" 
-  screen -dmS webserver2 sh -c "server/mongoose/mongoose-timeout -r server/pub -p 8081 >> $logfile 2>&1" 
+  screen -dmS webserver sh -c "server/mongoose/mongoose -r server/pub -p 8080 >> $logfile 2>&1"
+  screen -dmS webserver2 sh -c "server/mongoose/mongoose-timeout -r server/pub -p 8081 >> $logfile 2>&1"
   if [ -z "$1" ]; then
     screen -dmS proxy sh -c "server/faulty_proxy.pl 3128 all >> $logfile 2>&1"
   else
@@ -127,7 +127,7 @@ setup_local() {
   resign_local
   openssl x509 -fingerprint -sha1 -in /tmp/cvmfs_test.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' > /tmp/whitelist.test.unsigned || return 11
   echo `date -u "+%Y%m%d%H%M%S"` > /tmp/whitelist.test.signed || return 11
-  echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> /tmp/whitelist.test.signed || return 11  
+  echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> /tmp/whitelist.test.signed || return 11
   echo "N127.0.0.1" >> /tmp/whitelist.test.signed || return 11
   cat /tmp/whitelist.test.unsigned >> /tmp/whitelist.test.signed || return 11
   sha1=`openssl sha1 < /tmp/whitelist.test.signed | tr -d " " | sed 's/(stdin)=//' | head -c40` || return 11
@@ -138,7 +138,7 @@ setup_local() {
   openssl rsa -in /tmp/cvmfs_master.key -pubout -out /tmp/cvmfs_master.pub >> $logfile 2>&1 || return 12
   openssl rsautl -inkey /tmp/cvmfs_master.key -sign -in /tmp/whitelist.test.sha1 -out /tmp/whitelist.test.signature >> $logfile 2>&1 || return 12
   cat /tmp/whitelist.test.signature >> /tmp/whitelist.test.signed || return 12
-  cp /tmp/whitelist.test.signed server/pub/catalogs/.cvmfswhitelist || return 13 
+  cp /tmp/whitelist.test.signed server/pub/catalogs/.cvmfswhitelist || return 13
   dd if=/dev/zero of=/tmp/cvmfs.faulty bs=1024 count=8 >> $logfile 2>&1 || return 14
   echo "faulty file" >> /tmp/cvmfs.faulty || return 14
 
@@ -190,7 +190,7 @@ check_time() {
     echo "Time limit exceeded" >&2
     return 1
   fi
-  
+
   return 0
 }
 

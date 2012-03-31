@@ -157,7 +157,7 @@ status() {
             list_mounts | grep $CVMFS_MOUNT_DIR/$fqrn > /dev/null
             if [ $? -eq 0 ]; then
                local pid
-               pid=`/usr/bin/cvmfs-talk -c "$CVMFS_CACHE_BASE" -i "$fqrn" pid`
+               pid=`/usr/bin/cvmfs_talk -c "$CVMFS_CACHE_BASE" -i "$fqrn" pid`
                echo $pid | grep ^[0-9]*$ > /dev/null
                if [ $? -eq 0 ]; then
                   echo "CernVM-FS mounted on $CVMFS_MOUNT_DIR/$fqrn with pid $pid"
@@ -211,7 +211,7 @@ flush() {
             echo -n "Flushing $fqrn:"
             stat $CVMFS_MOUNT_DIR/$fqrn/. > /dev/null 2>&1
             if [ $? -eq 0 ]; then
-               /usr/bin/cvmfs-talk -c "$CVMFS_CACHE_BASE" -i "$fqrn" cleanup 0 > /dev/null
+               /usr/bin/cvmfs_talk -c "$CVMFS_CACHE_BASE" -i "$fqrn" cleanup 0 > /dev/null
                if [ $? -ne 0 ]; then
                   portable_failure
                   RETVAL=1
@@ -255,18 +255,18 @@ reload() {
             cvmfs_readconfig $fqrn
 
             echo -n "Reloading $fqrn:"
-            cvmfs-talk -i $fqrn pid > /dev/null 2>&1
+            cvmfs_talk -i $fqrn pid > /dev/null 2>&1
             if [ $? -eq 0 ]; then
-               retstr=`cvmfs-talk -i $fqrn timeout set $CVMFS_TIMEOUT $CVMFS_TIMEOUT_DIRECT 2>&1`
+               retstr=`cvmfs_talk -i $fqrn timeout set $CVMFS_TIMEOUT $CVMFS_TIMEOUT_DIRECT 2>&1`
                if [ "$retstr" != "OK" ]; then
                   RETVAL=1
                fi
-               retstr=`cvmfs-talk -i $fqrn proxy set $CVMFS_HTTP_PROXY 2>&1`
+               retstr=`cvmfs_talk -i $fqrn proxy set $CVMFS_HTTP_PROXY 2>&1`
                if [ "$retstr" != "OK" ]; then
                   RETVAL=1
                fi
                hosts=`echo $CVMFS_SERVER_URL | sed s/@org@/$org/g | sed s/@fqrn@/$fqrn/g`
-               retstr=`cvmfs-talk -i $fqrn host set $hosts 2>&1`
+               retstr=`cvmfs_talk -i $fqrn host set $hosts 2>&1`
                if [ "$retstr" != "OK" ]; then
                   RETVAL=1
                fi
@@ -275,7 +275,7 @@ reload() {
                else
                   max_ttl="$CVMFS_MAX_TTL"
                fi
-               retstr=`cvmfs-talk -i $fqrn max ttl set $max_ttl 2>&1`
+               retstr=`cvmfs_talk -i $fqrn max ttl set $max_ttl 2>&1`
                if [ "$retstr" != "OK" ]; then
                   RETVAL=1
                fi

@@ -66,6 +66,7 @@ struct Statistics {
   atomic_int64 num_miss;
   atomic_int64 num_insert;
   atomic_int64 num_update;
+  atomic_int64 num_replace;
   atomic_int64 num_forget;
   atomic_int64 num_drop;
   atomic_int64 allocated;
@@ -76,6 +77,7 @@ struct Statistics {
     atomic_init64(&num_miss);
     atomic_init64(&num_insert);
     atomic_init64(&num_update);
+    atomic_init64(&num_replace);
     atomic_init64(&num_forget);
     atomic_init64(&num_drop);
     atomic_init64(&allocated);
@@ -87,6 +89,7 @@ struct Statistics {
       "misses: " + StringifyInt(atomic_read64(&num_miss)) + "    " +
       "inserts: " + StringifyInt(atomic_read64(&num_insert)) + "    " +
       "updates: " + StringifyInt(atomic_read64(&num_update)) + "    " +
+      "replacements: " + StringifyInt(atomic_read64(&num_replace)) + "    " +
       "forgets: " + StringifyInt(atomic_read64(&num_forget)) + "    " +
       "drops: " + StringifyInt(atomic_read64(&num_drop)) + "    " +
       "allocated: " + StringifyInt(atomic_read64(&allocated) / 1024) + " KB\n";
@@ -159,16 +162,16 @@ class LruCache {
     MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
       unsigned int num_bytes_bitmap = num_slots / sizeof(char);
-      assert((num_slots % sizeof(bitmap_[0])) == 0);
+      bits_per_block_ = 8 * sizeof(bitmap_[0]);
+      assert((num_slots % bits_per_block_) == 0);
+      assert(num_slots >= 2*bits_per_block_);
 
       // How much actual memory do we need?
       const unsigned int num_bytes_memory = sizeof(T) * num_slots;
 
       // Allocate zero'd memory
-      bitmap_ = reinterpret_cast<uint64_t *>(smalloc(num_bytes_bitmap));
-      memory_ = reinterpret_cast<T *>(smalloc(num_bytes_memory));
-      memset(bitmap_, 0, num_bytes_bitmap);
-      memset(memory_, 0, num_bytes_memory);
+      bitmap_ = reinterpret_cast<uint64_t *>(scalloc(num_bytes_bitmap, 1));
+      memory_ = reinterpret_cast<T *>(scalloc(num_bytes_memory, 1));
 
       // Create initial state
       num_slots_ = num_slots;
@@ -206,14 +209,15 @@ class LruCache {
 
       // Find a new free slot if there are some left
       if (!this->IsFull()) {
-        unsigned bitmap_block = next_free_slot_ / sizeof(bitmap_[0]);
-        while (!(~bitmap_[bitmap_block]))
-          bitmap_block = (bitmap_block + 1) % num_slots_;
+        unsigned bitmap_block = next_free_slot_ / bits_per_block_;
+        while (~bitmap_[bitmap_block] == 0)
+          bitmap_block = (bitmap_block + 1) % (num_slots_ / bits_per_block_);
         // TODO: faster search inside the int
-        next_free_slot_ = bitmap_block * sizeof(bitmap_[0]);
+        next_free_slot_ = bitmap_block * bits_per_block_;
         while (this->GetBit(next_free_slot_))
           next_free_slot_++;
       }
+      LogCvmfs(kLogLru, kLogDebug, "ALLOCATE, next free slot %u, num_free_slots %u, bitmap0 %llu, bitmap1 %llu", next_free_slot_, num_free_slots_, bitmap_[0], bitmap_[1]);
 
       return slot;
     }
@@ -236,6 +240,7 @@ class LruCache {
       this->UnsetBit(position);
       next_free_slot_ = position;
       ++num_free_slots_;
+      LogCvmfs(kLogLru, kLogDebug, "DEALLOCATE, next free slot %u, num_free_slots %u, bitmap0 %llu, bitmap1 %llu", next_free_slot_, num_free_slots_, bitmap_[0], bitmap_[1]);
     }
 
     uint64_t bytes_allocated() { return bytes_allocated_; }
@@ -246,30 +251,30 @@ class LruCache {
      * @param position the position to check
      * @return true if bit is set, otherwise false
      */
-    inline bool GetBit(const unsigned int position) {
+    inline bool GetBit(const unsigned position) {
       assert(position < num_slots_);
-      return ((bitmap_[position / sizeof(bitmap_[0])] &
-               (1 << (position % sizeof(bitmap_[0])))) != 0);
+      return ((bitmap_[position / bits_per_block_] &
+               (uint64_t(1) << (position % bits_per_block_))) != 0);
     }
 
     /**
      *  set a bit in the internal allocation bitmap
      *  @param position the number of the bit to be set
      */
-    inline void SetBit(const unsigned int position) {
+    inline void SetBit(const unsigned position) {
       assert(position < num_slots_);
-      bitmap_[position / sizeof(bitmap_[0])] |=
-        1 << (position % sizeof(bitmap_[0]));
+      bitmap_[position / bits_per_block_] |=
+        uint64_t(1) << (position % bits_per_block_);
     }
 
     /**
      * Clear a bit in the internal allocation bitmap
      * @param position the number of the bit to be cleared
      */
-    inline void UnsetBit(const unsigned int position) {
+    inline void UnsetBit(const unsigned position) {
       assert(position < num_slots_);
-      bitmap_[position / sizeof(bitmap_[0])] &=
-        ~(1 << (position % sizeof(bitmap_[0])));
+      bitmap_[position / bits_per_block_] &=
+        ~(uint64_t(1) << (position % bits_per_block_));
     }
 
     unsigned int num_slots_;  /**< Overall number of slots in memory pool. */
@@ -277,6 +282,7 @@ class LruCache {
     unsigned int next_free_slot_;  /**< Position of next free slot in pool. */
     uint64_t bytes_allocated_;
     uint64_t *bitmap_;  /**< A bitmap to mark slots as allocated. */
+    unsigned bits_per_block_;
     T *memory_;  /**< The memory pool, array of Ms. */
   };
 
@@ -608,6 +614,10 @@ class LruCache {
   virtual bool Forget(const Key &key) {
     bool found = false;
     this->Lock();
+    if (pause_) {
+      Unlock();
+      return false;
+    }
 
     CacheEntry entry;
     if (this->DoLookup(key, entry)) {
@@ -708,6 +718,7 @@ class LruCache {
   inline void DeleteOldest() {
     assert(!this->IsEmpty());
 
+    atomic_inc64(&statistics_.num_replace);
     Key delete_me = lru_list_->PopFront();
     cache_.erase(delete_me);
 
