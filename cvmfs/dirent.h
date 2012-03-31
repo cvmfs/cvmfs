@@ -147,7 +147,7 @@ private:
   bool is_nested_catalog_mountpoint_;
 };
 
-typedef std::list<DirectoryEntry> DirectoryEntryList;
+typedef std::vector<DirectoryEntry> DirectoryEntryList;
 
 } // namespace catalog
 

@@ -45,6 +45,7 @@
 #include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
+#include <google/sparse_hash_map>
 
 #include <cstdlib>
 #include <cstring>
@@ -57,6 +58,7 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <functional>
 
 #include "platform.h"
 #include "logging.h"
@@ -133,7 +135,9 @@ atomic_int32 drainout_mode_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
-map<uint64_t, DirectoryListing> *directory_handles_ = NULL;
+typedef google::sparse_hash_map< uint64_t, DirectoryListing,
+  SPARSEHASH_HASH<uint64_t>, std::equal_to<uint64_t> > DirectoryHandles;
+DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
@@ -292,7 +296,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 
   // Lookup inode in catalog
   if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
-    //inode_cache_->Insert(ino, *dirent);
+    inode_cache_->Insert(ino, *dirent);
     return true;
   }
 
@@ -311,12 +315,12 @@ static bool GetDirentForPath(const string &path, const fuse_ino_t parent_inode,
   // Lookup inode in catalog TODO: not twice md5 calculation
   if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
     dirent->set_parent_inode(parent_inode);
-    //md5path_cache_->Insert(md5path, *dirent);
+    md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForPath, no entry");
-  //md5path_cache_->InsertNegative(md5path);
+  md5path_cache_->InsertNegative(md5path);
   return false;
 }
 
@@ -346,7 +350,7 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
     *path = parent_path + "/" + dirent.name();
   }
 
-  //path_cache_->Insert(dirent.inode(), *path);
+  path_cache_->Insert(dirent.inode(), *path);
   return true;
 }
 
@@ -537,7 +541,7 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
   int reply = 0;
 
   pthread_mutex_lock(&lock_directory_handles_);
-  map<uint64_t, DirectoryListing>::iterator iter_handle =
+  DirectoryHandles::iterator iter_handle =
     directory_handles_->find(fi->fh);
   if (iter_handle != directory_handles_->end()) {
     free(iter_handle->second.buffer);
@@ -581,7 +585,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   DirectoryListing listing;
 
   pthread_mutex_lock(&lock_directory_handles_);
-  map<uint64_t, DirectoryListing>::const_iterator iter_handle =
+  DirectoryHandles::const_iterator iter_handle =
     directory_handles_->find(fi->fh);
   if (iter_handle != directory_handles_->end()) {
     listing = iter_handle->second;
@@ -1731,7 +1735,9 @@ int main(int argc, char *argv[]) {
   cvmfs::inode_cache_ = new lru::InodeCache(cvmfs::kInodeCacheSize);
   cvmfs::path_cache_ = new lru::PathCache(cvmfs::kPathCacheSize);
   cvmfs::md5path_cache_ = new lru::Md5PathCache(cvmfs::kMd5pathCacheSize);
-  cvmfs::directory_handles_ = new map<uint64_t, cvmfs::DirectoryListing>();
+  cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
+  //cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
+  cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
 
   if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &g_fuse_args)) != NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",

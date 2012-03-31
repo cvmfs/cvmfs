@@ -71,8 +71,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   /**
    * required for unpinning
    */
-  std::map< std::string, hash::Any> loaded_catalogs_;
-  std::map< std::string, hash::Any> mounted_catalogs_;
+  std::map<std::string, hash::Any> loaded_catalogs_;
+  std::map<std::string, hash::Any> mounted_catalogs_;
   std::string repo_name_;
   bool ignore_signature_;
   atomic_int32 certificate_hits_;

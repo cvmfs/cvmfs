@@ -47,8 +47,8 @@
 #include <functional>
 #include <string>
 
-#include <google/dense_hash_map>
-//#include <google/sparse_hash_map>
+//#include <google/dense_hash_map>
+#include <google/sparse_hash_map>
 #include <fuse/fuse_lowlevel.h>
 
 #include "platform.h"
@@ -125,7 +125,7 @@ class LruCache {
   } CacheEntry;
 
   // The actual map data structure
-  typedef google::dense_hash_map<Key, CacheEntry, HashFunction, EqualKey> Cache;
+  typedef google::sparse_hash_map<Key, CacheEntry, HashFunction, EqualKey> Cache;
 
   // Internal data fields
   unsigned int cache_gauge_;
@@ -645,8 +645,8 @@ class LruCache {
 
     cache_gauge_ = 0;
     lru_list_->clear();
-    cache_.clear_no_resize();
-    //cache_.clear();
+    //cache_.clear_no_resize();
+    cache_.clear();
     atomic_inc64(&statistics_.num_drop);
     atomic_init64(&statistics_.allocated);
     atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated());
@@ -659,7 +659,7 @@ class LruCache {
    * buckets and deleted hash table buckets
    */
   void SetSpecialKeys(const Key &empty, const Key &deleted) {
-    cache_.set_empty_key(empty);
+    //cache_.set_empty_key(empty);
     cache_.set_deleted_key(deleted);
   }
 

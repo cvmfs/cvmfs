@@ -158,7 +158,7 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.hardlink_group_id_            = RetrieveInt64(1); // quirky database layout here ( legacy ;-) )
 
   // read the usual file information
-  result.inode_        = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), RetrieveInt64(1));
+  result.inode_        = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0); // TODO RetrieveInt64(1));
   result.parent_inode_ = DirectoryEntry::kInvalidInode; // must be set later by a second catalog lookup
   result.linkcount_    = GetLinkcountFromFlags(database_flags);
   result.mode_         = RetrieveInt(3);

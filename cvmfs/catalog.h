@@ -24,7 +24,7 @@ namespace catalog {
 class AbstractCatalogManager;
 class Catalog;
 
-typedef std::list<Catalog *> CatalogList;
+typedef std::vector<Catalog *> CatalogList;
 
 
 /**
