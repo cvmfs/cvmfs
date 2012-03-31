@@ -19,11 +19,14 @@ AbstractCatalogManager::AbstractCatalogManager() {
     reinterpret_cast<pthread_rwlock_t *>(smalloc(sizeof(pthread_rwlock_t)));
   int retval = pthread_rwlock_init(rwlock_, NULL);
   assert(retval == 0);
+  retval = pthread_key_create(&pkey_sqlitemem_, NULL);
+  assert(retval == 0);
 }
 
 
 AbstractCatalogManager::~AbstractCatalogManager() {
   DetachAll();
+  pthread_key_delete(pkey_sqlitemem_);
   pthread_rwlock_destroy(rwlock_);
   free(rwlock_);
 }
@@ -87,6 +90,7 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
                                          const LookupOptions options,
                                          DirectoryEntry *dirent)
 {
+  EnforceSqliteMemLimit();
   ReadLock();
   bool found = false;
 
@@ -158,6 +162,7 @@ bool AbstractCatalogManager::LookupPath(const string &path,
                                         const LookupOptions options,
                                         DirectoryEntry *dirent)
 {
+  EnforceSqliteMemLimit();
   ReadLock();
 
   Catalog *best_fit = FindCatalog(path);
@@ -235,6 +240,7 @@ bool AbstractCatalogManager::LookupPath(const string &path,
 bool AbstractCatalogManager::Listing(const string &path,
                                      DirectoryEntryList *listing)
 {
+  EnforceSqliteMemLimit();
   bool result;
   ReadLock();
 
@@ -570,6 +576,16 @@ string AbstractCatalogManager::PrintHierarchyRecursively(const Catalog *catalog,
   }
 
   return output;
+}
+
+
+void AbstractCatalogManager::EnforceSqliteMemLimit() {
+  char *mem_enforced =
+    static_cast<char *>(pthread_getspecific(pkey_sqlitemem_));
+  if (mem_enforced == NULL) {
+    sqlite3_soft_heap_limit(kSqliteMemPerThread);
+    pthread_setspecific(pkey_sqlitemem_, (char *)(1));
+  }
 }
 
 }

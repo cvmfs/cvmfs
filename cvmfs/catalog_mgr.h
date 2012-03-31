@@ -5,6 +5,7 @@
 #ifndef CVMFS_CATALOG_MGR_H_
 #define CVMFS_CATALOG_MGR_H_
 
+#include <pthread.h>
 #include <cassert>
 
 #include <vector>
@@ -17,6 +18,8 @@
 #include "util.h"
 
 namespace catalog {
+
+const unsigned kSqliteMemPerThread = 1*1024*1024;
 
 /**
  * Lookup a directory entry including its parent entry or not.
@@ -157,6 +160,7 @@ class AbstractCatalogManager {
   uint64_t inode_gauge_;  /**< highest issued inode */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
+  pthread_key_t pkey_sqlitemem_;
 
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);
@@ -180,6 +184,8 @@ class AbstractCatalogManager {
   void ReleaseInodes(const InodeRange chunk);
 
   bool MountRecursively(Catalog *catalog);
+
+  void EnforceSqliteMemLimit();
 };  // class CatalogManager
 
 }  // namespace catalog

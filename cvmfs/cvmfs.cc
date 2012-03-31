@@ -83,12 +83,9 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-const unsigned int kInodeCacheSize = 128;
-const unsigned int kPathCacheSize = 128;
-const unsigned int kMd5pathCacheSize = 128;
-//const unsigned int kInodeCacheSize = 6400;
-//const unsigned int kPathCacheSize = 6400;
-//const unsigned int kMd5pathCacheSize = 12800;
+const unsigned int kInodeCacheSize = 6400;
+const unsigned int kPathCacheSize = 6400;
+const unsigned int kMd5pathCacheSize = 12800;
 
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
@@ -295,7 +292,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 
   // Lookup inode in catalog
   if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
-    inode_cache_->Insert(ino, *dirent);
+    //inode_cache_->Insert(ino, *dirent);
     return true;
   }
 
@@ -314,12 +311,12 @@ static bool GetDirentForPath(const string &path, const fuse_ino_t parent_inode,
   // Lookup inode in catalog TODO: not twice md5 calculation
   if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
     dirent->set_parent_inode(parent_inode);
-    md5path_cache_->Insert(md5path, *dirent);
+    //md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForPath, no entry");
-  md5path_cache_->InsertNegative(md5path);
+  //md5path_cache_->InsertNegative(md5path);
   return false;
 }
 
@@ -349,7 +346,7 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
     *path = parent_path + "/" + dirent.name();
   }
 
-  path_cache_->Insert(dirent.inode(), *path);
+  //path_cache_->Insert(dirent.inode(), *path);
   return true;
 }
 
