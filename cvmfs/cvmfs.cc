@@ -137,7 +137,42 @@ time_t catalogs_valid_until_;
 
 struct hash_dirhandle {
   size_t operator() (const uint64_t handle) const {
+#ifdef __x86_64__
     return (size_t) *((size_t *)&handle);
+#else
+    // MurmurHash2
+    const unsigned int m = 0x5bd1e995;
+    const int r = 24;
+    const unsigned seed = 0x07387a4f;
+    int len = sizeof(handle);  // has to be multiple of 4
+
+    // Initialize the hash to a 'random' value
+    unsigned int h = seed ^ len;
+
+    // Mix 4 bytes at a time into the hash
+    const unsigned char *data = (const unsigned char *)&handle;
+    while (len >= 4) {
+      unsigned int k = *(unsigned int *)data;
+
+      k *= m;
+      k ^= k >> r;
+      k *= m;
+
+      h *= m;
+      h ^= k;
+
+      data += 4;
+      len -= 4;
+    }
+
+    // Do a few final mixes of the hash to ensure the last few
+    // bytes are well-incorporated.
+    h ^= h >> 13;
+    h *= m;
+    h ^= h >> 15;
+
+    return h;
+#endif
   }
 };
 typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_dirhandle>
