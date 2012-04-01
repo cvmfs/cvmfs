@@ -135,8 +135,13 @@ atomic_int32 drainout_mode_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
-typedef google::dense_hash_map< uint64_t, DirectoryListing,
-  SPARSEHASH_HASH<uint64_t>, std::equal_to<uint64_t> > DirectoryHandles;
+struct hash_dirhandle {
+  size_t operator() (const uint64_t handle) const {
+    return (size_t) *((size_t *)&handle);
+  }
+};
+typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_dirhandle>
+  DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
