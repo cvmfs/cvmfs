@@ -50,6 +50,7 @@
 //#include <google/dense_hash_map>
 #include <google/sparse_hash_map>
 #include <fuse/fuse_lowlevel.h>
+#include "MurmurHash2.h"
 
 #include "platform.h"
 #include "logging.h"
@@ -516,6 +517,7 @@ class LruCache {
     cache_gauge_ = 0;
     cache_size_ = cache_size;
     statistics_.size = cache_size_;
+    atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated());
     cache_ = Cache(cache_size_);
     lru_list_ = new ListEntryHead<Key>();
     pause_ = false;
@@ -753,11 +755,22 @@ template<class Key, class Value, class HashFunction, class EqualKey >
 typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator
   *LruCache<Key, Value, HashFunction, EqualKey>::allocator_ = NULL;
 
+struct hash_inode {
+  size_t operator() (const fuse_ino_t inode) const {
+#ifdef __x86_64__
+    return MurmurHash64A(&inode, sizeof(inode), 0x9ce603115bba659bLLU);
+#else
+    return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
+#endif
+  }
+};
 
-class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
+class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry,
+                                   hash_inode>
+{
  public:
   InodeCache(unsigned int cache_size) :
-    LruCache<fuse_ino_t, catalog::DirectoryEntry>(cache_size)
+    LruCache<fuse_ino_t, catalog::DirectoryEntry, hash_inode>(cache_size)
   {
     // TODO
     this->SetSpecialKeys(1000000000, 1000000001);
@@ -767,7 +780,8 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %d -> '%s'",
              inode, dirent.name().c_str());
     const bool result =
-      LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
+      LruCache<fuse_ino_t, catalog::DirectoryEntry,
+               hash_inode>::Insert(inode, dirent);
     /*if (result) {
       atomic_xadd64(&statistics_.allocated, sizeof(inode));
       atomic_xadd64(&statistics_.allocated, sizeof(dirent));
@@ -779,7 +793,8 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
 
   bool Lookup(const fuse_ino_t inode, catalog::DirectoryEntry *dirent) {
     const bool result =
-      LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(inode, dirent);
+      LruCache<fuse_ino_t, catalog::DirectoryEntry,
+               hash_inode>::Lookup(inode, dirent);
     LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %d (%s)",
              inode, result ? "hit" : "miss");
     return result;
@@ -787,15 +802,15 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
 
   void Drop() {
     LogCvmfs(kLogLru, kLogDebug, "dropping inode cache");
-    LruCache<fuse_ino_t, catalog::DirectoryEntry>::Drop();
+    LruCache<fuse_ino_t, catalog::DirectoryEntry, hash_inode>::Drop();
   }
 };
 
 
-class PathCache : public LruCache<fuse_ino_t, std::string> {
+class PathCache : public LruCache<fuse_ino_t, std::string, hash_inode> {
  public:
   PathCache(unsigned int cache_size) :
-    LruCache<fuse_ino_t, std::string>(cache_size)
+    LruCache<fuse_ino_t, std::string, hash_inode>(cache_size)
   {
     this->SetSpecialKeys(1000000000, 1000000001);
   }
@@ -803,7 +818,8 @@ class PathCache : public LruCache<fuse_ino_t, std::string> {
   bool Insert(const fuse_ino_t inode, const std::string &path) {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %d -> '%s'",
              inode, path.c_str());
-    const bool result = LruCache<fuse_ino_t, std::string>::Insert(inode, path);
+    const bool result = LruCache<fuse_ino_t, std::string,
+                                 hash_inode>::Insert(inode, path);
     /*if (result) {
       atomic_xadd64(&statistics_.allocated, sizeof(inode));
       atomic_xadd64(&statistics_.allocated, path.capacity());
@@ -812,7 +828,8 @@ class PathCache : public LruCache<fuse_ino_t, std::string> {
   }
 
   bool Lookup(const fuse_ino_t inode, std::string *path) {
-    const bool result = LruCache<fuse_ino_t, std::string>::Lookup(inode, path);
+    const bool result = LruCache<fuse_ino_t, std::string,
+                                 hash_inode>::Lookup(inode, path);
     LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %d (%s)",
              inode, result ? "hit" : "miss");
     return result;
@@ -820,7 +837,7 @@ class PathCache : public LruCache<fuse_ino_t, std::string> {
 
   void Drop() {
     LogCvmfs(kLogLru, kLogDebug, "dropping path cache");
-    LruCache<fuse_ino_t, std::string>::Drop();
+    LruCache<fuse_ino_t, std::string, hash_inode>::Drop();
   }
 };
 

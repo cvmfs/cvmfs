@@ -54,6 +54,7 @@ option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" 
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 set (EXTERNALS_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
 set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/sqlite3/src")
+set (MURMUR_LOCATION              "${EXTERNALS_BUILD_LOCATION}/murmur/src")
 set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/c-ares/src")
 set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libcurl/src")
 set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")

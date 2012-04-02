@@ -46,6 +46,12 @@ mkdir -p "$outOfSource/sqlite3/src"
 cp src/* "$outOfSource/sqlite3/src"
 cd ../..
 
+# Murmur
+cd externals/murmur
+mkdir -p "$outOfSource/murmur/src"
+cp src/* "$outOfSource/murmur/src"
+cd ../..
+
 # google sparse hash
 cd externals/sparsehash
 tar xfz sparsehash-${SPARSEHASH_VERSION}.tar.gz 
