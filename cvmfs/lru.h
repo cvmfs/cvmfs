@@ -163,7 +163,7 @@ class LruCache {
      */
     MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
-      unsigned int num_bytes_bitmap = num_slots / sizeof(char);
+      unsigned int num_bytes_bitmap = num_slots / 8;
       bits_per_block_ = 8 * sizeof(bitmap_[0]);
       assert((num_slots % bits_per_block_) == 0);
       assert(num_slots >= 2*bits_per_block_);
@@ -219,7 +219,6 @@ class LruCache {
         while (this->GetBit(next_free_slot_))
           next_free_slot_++;
       }
-      LogCvmfs(kLogLru, kLogDebug, "ALLOCATE, next free slot %u, num_free_slots %u, bitmap0 %llu, bitmap1 %llu", next_free_slot_, num_free_slots_, bitmap_[0], bitmap_[1]);
 
       return slot;
     }
@@ -242,7 +241,6 @@ class LruCache {
       this->UnsetBit(position);
       next_free_slot_ = position;
       ++num_free_slots_;
-      LogCvmfs(kLogLru, kLogDebug, "DEALLOCATE, next free slot %u, num_free_slots %u, bitmap0 %llu, bitmap1 %llu", next_free_slot_, num_free_slots_, bitmap_[0], bitmap_[1]);
     }
 
     uint64_t bytes_allocated() { return bytes_allocated_; }
