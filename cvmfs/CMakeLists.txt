@@ -18,9 +18,9 @@ set (CVMFS2_DEBUG_SOURCES
 	util.cc util.h
 	duplex_zlib.h compression.h compression.cc
 	download.cc download.h
-	lru.h
-  globals.h globals.cc
-  peers.h peers.cc
+	lru.h lru.cc
+	globals.h globals.cc
+	peers.h peers.cc
 	catalog_queries.h catalog_queries.cc
 	catalog.h catalog.cc
 	catalog_mgr.h catalog_mgr.cc

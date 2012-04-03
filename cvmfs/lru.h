@@ -47,8 +47,8 @@
 #include <functional>
 #include <string>
 
-//#include <google/dense_hash_map>
-#include <google/sparse_hash_map>
+#include <google/dense_hash_map>
+//#include <google/sparse_hash_map>
 #include <fuse/fuse_lowlevel.h>
 #include "MurmurHash2.h"
 
@@ -98,6 +98,83 @@ struct Statistics {
   }
 };
 
+
+template<class Key, class Value>
+class SmallHash {
+ public:
+  SmallHash() {
+    data_ = NULL;
+  }
+
+  void Init(uint32_t size, Key empty, uint32_t (*hasher)(const Key &key)) {
+    capacity_ = (size*10)/7;
+    data_ = new Entry[capacity_];
+    for (uint32_t i = 0; i < capacity_; ++i)
+      data_[i].key = empty;
+    hasher_ = hasher;
+    empty_key_ = empty;
+  }
+
+  bool Lookup(const Key &key, Value *value) const {
+    uint32_t bucket;
+    const bool found = DoLookup(key, &bucket);
+    if (found)
+      *value = data_[bucket].value;
+    return found;
+  }
+
+  void Insert(const Key &key, const Value &value) {
+    uint32_t bucket;
+    DoLookup(key, &bucket);
+    data_[bucket].key = key;
+    data_[bucket].value = value;
+  }
+
+  void Erase(const Key &key) {
+    uint32_t bucket;
+    const bool found = DoLookup(key, &bucket);
+    if (found) {
+      data_[bucket].key = empty_key_;
+      bucket = (bucket+1) % capacity_;
+      while (!(data_[bucket].key == empty_key_)) {
+        Key rehash = data_[bucket].key;
+        data_[bucket].key = empty_key_;
+        Insert(rehash, data_[bucket].value);
+        bucket = (bucket+1) % capacity_;
+      }
+    }
+  }
+
+  ~SmallHash() { delete[] data_; }
+
+ private:
+  uint32_t ScaleHash(const Key &key) const {
+    double bucket = (double(hasher_(key)) / double((uint32_t)(-1))) *
+    (double)capacity_;
+    return (uint32_t)bucket % capacity_;
+  }
+
+  bool DoLookup(const Key &key, uint32_t *bucket) const {
+    *bucket = ScaleHash(key);
+    while (!(data_[*bucket].key == empty_key_)) {
+      if (data_[*bucket].key == key)
+        return true;
+      *bucket = (*bucket+1) % capacity_;
+    }
+    return false;
+  }
+
+  struct Entry {
+    Key key;
+    Value value;
+  };
+  Entry *data_;
+  uint32_t capacity_;
+  uint32_t (*hasher_)(const Key &key);
+  Key empty_key_;
+};
+
+
 /**
  * Template class to create a LRU cache
  * @param Key type of the key values
@@ -126,7 +203,7 @@ class LruCache {
   } CacheEntry;
 
   // The actual map data structure
-  typedef google::sparse_hash_map<Key, CacheEntry, HashFunction, EqualKey> Cache;
+  typedef google::dense_hash_map<Key, CacheEntry, HashFunction, EqualKey> Cache;
 
   // Internal data fields
   unsigned int cache_gauge_;
@@ -141,7 +218,8 @@ class LruCache {
    * deleted to obtain some space.
    */
   ListEntryHead<Key> *lru_list_;
-  Cache cache_;  /**< The actual cache map. */
+  //Cache cache_;  /**< The actual cache map. */
+  SmallHash<Key, CacheEntry> cache_;
 #ifdef LRU_CACHE_THREAD_SAFE
   pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
 #endif
@@ -506,7 +584,7 @@ class LruCache {
    * Create a new LRU cache object
    * @param cache_size the maximal size of the cache
    */
-  LruCache(const unsigned int cache_size) {
+  LruCache(const unsigned int cache_size, const Key &empty_key, uint32_t (*hasher)(const Key &key)) {
     assert(cache_size > 0);
 
     LruCache<Key, Value, HashFunction, EqualKey>::allocator_ =
@@ -516,7 +594,8 @@ class LruCache {
     cache_size_ = cache_size;
     statistics_.size = cache_size_;
     atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated());
-    cache_ = Cache(cache_size_);
+    //cache_ = Cache(cache_size_);
+    cache_.Init(cache_size_, empty_key, hasher);
     lru_list_ = new ListEntryHead<Key>();
     pause_ = false;
 
@@ -556,7 +635,8 @@ class LruCache {
     if (this->DoLookup(key, entry)) {
       atomic_inc64(&statistics_.num_update);
       entry.value = value;
-      cache_[key] = entry;
+      //cache_[key] = entry;
+      cache_.Insert(key, entry);
       this->Touch(entry);
       this->Unlock();
       return false;
@@ -570,7 +650,8 @@ class LruCache {
     entry.list_entry = lru_list_->PushBack(key);
     entry.value = value;
 
-    cache_[key] = entry;
+    //cache_[key] = entry;
+    cache_.Insert(key, entry);
     cache_gauge_++;
 
     Unlock();
@@ -627,7 +708,8 @@ class LruCache {
 
       entry.list_entry->RemoveFromList();
       delete entry.list_entry;
-      cache_.erase(key);
+      //cache_.erase(key);
+      cache_.Erase(key);
       --cache_gauge_;
     }
 
@@ -646,7 +728,7 @@ class LruCache {
     cache_gauge_ = 0;
     lru_list_->clear();
     //cache_.clear_no_resize();
-    cache_.clear();
+    //cache_.clear();
     atomic_inc64(&statistics_.num_drop);
     atomic_init64(&statistics_.allocated);
     atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated());
@@ -660,7 +742,7 @@ class LruCache {
    */
   void SetSpecialKeys(const Key &empty, const Key &deleted) {
     //cache_.set_empty_key(empty);
-    cache_.set_deleted_key(deleted);
+    //cache_.set_deleted_key(deleted);
   }
 
   void Pause() {
@@ -692,16 +774,17 @@ class LruCache {
    *  @return true on successful lookup, false otherwise
    */
   inline bool DoLookup(const Key &key, CacheEntry &entry) {
-    typename Cache::iterator foundElement = cache_.find(key);
+    //typename Cache::iterator foundElement = cache_.find(key);
+    return cache_.Lookup(key, &entry);
 
-    if (foundElement == cache_.end()) {
+//    if (foundElement == cache_.end()) {
       // cache miss
-      return false;
-    }
+//      return false;
+//    }
 
     // cache hit
-    entry = foundElement->second;
-    return true;
+//    entry = foundElement->second;
+//    return true;
   }
 
   /**
@@ -722,7 +805,8 @@ class LruCache {
 
     atomic_inc64(&statistics_.num_replace);
     Key delete_me = lru_list_->PopFront();
-    cache_.erase(delete_me);
+    //cache_.erase(delete_me);
+    cache_.Erase(delete_me);
 
     --cache_gauge_;
   }
@@ -753,6 +837,11 @@ template<class Key, class Value, class HashFunction, class EqualKey >
 typename LruCache<Key, Value, HashFunction, EqualKey>::ConcreteMemoryAllocator
   *LruCache<Key, Value, HashFunction, EqualKey>::allocator_ = NULL;
 
+
+uint32_t hasher_md5(const hash::Md5 &key);
+uint32_t hasher_inode(const fuse_ino_t &inode);
+
+
 struct hash_inode {
   size_t operator() (const fuse_ino_t inode) const {
 #ifdef __x86_64__
@@ -768,10 +857,10 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry,
 {
  public:
   InodeCache(unsigned int cache_size) :
-    LruCache<fuse_ino_t, catalog::DirectoryEntry, hash_inode>(cache_size)
+    LruCache<fuse_ino_t, catalog::DirectoryEntry, hash_inode>(cache_size, 1000000000, hasher_inode)
   {
     // TODO
-    this->SetSpecialKeys(1000000000, 1000000001);
+    //this->SetSpecialKeys(1000000000, 1000000001);
   }
 
   bool Insert(const fuse_ino_t inode, const catalog::DirectoryEntry &dirent) {
@@ -808,9 +897,9 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry,
 class PathCache : public LruCache<fuse_ino_t, std::string, hash_inode> {
  public:
   PathCache(unsigned int cache_size) :
-    LruCache<fuse_ino_t, std::string, hash_inode>(cache_size)
+    LruCache<fuse_ino_t, std::string, hash_inode>(cache_size, 1000000000, hasher_inode)
   {
-    this->SetSpecialKeys(1000000000, 1000000001);
+    //this->SetSpecialKeys(1000000000, 1000000001);
   }
 
   bool Insert(const fuse_ino_t inode, const std::string &path) {
@@ -858,10 +947,10 @@ class Md5PathCache :
  public:
   Md5PathCache(unsigned int cache_size) :
     LruCache<hash::Md5, catalog::DirectoryEntry,
-             hash_md5, equal_md5>(cache_size)
+             hash_md5, equal_md5>(cache_size, hash::Md5(hash::AsciiPtr("!")), hasher_md5)
   {
-    this->SetSpecialKeys(hash::Md5(hash::AsciiPtr("!")),
-                         hash::Md5(hash::AsciiPtr("?")));
+//    this->SetSpecialKeys(hash::Md5(hash::AsciiPtr("!")),
+//                         hash::Md5(hash::AsciiPtr("?")));
     dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }
 

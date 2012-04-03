@@ -88,7 +88,7 @@ namespace cvmfs {
 
 const unsigned int kInodeCacheSize = 6400;
 const unsigned int kPathCacheSize = 6400;
-const unsigned int kMd5pathCacheSize = 12800;
+const unsigned int kMd5pathCacheSize = 25600;
 
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
