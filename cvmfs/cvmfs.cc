@@ -357,7 +357,10 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
     if (!GetPathForInode(dirent.parent_inode(), &parent_path))
       return false;
 
-    *path = parent_path + "/" + dirent.name();
+    path->reserve(parent_path.length() + dirent.name().length() + 1);
+    path->assign(parent_path);
+    path->push_back('/');
+    path->append(dirent.name());
   }
 
   path_cache_->Insert(dirent.inode(), *path);
@@ -380,6 +383,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
   string parent_path;
+  const unsigned name_len = strlen(name);
 
   if (!GetPathForInode(parent, &parent_path)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
@@ -389,7 +393,11 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   }
 
   catalog::DirectoryEntry dirent;
-  const string path = parent_path + "/" + name;
+  string path;
+  path.reserve(parent_path.length() + name_len + 1);
+  path.assign(parent_path);
+  path.push_back('/');
+  path.append(name, name_len);
   if (!GetDirentForPath(path, parent, &dirent)) {
     fuse_reply_err(req, ENOENT);
     return;
