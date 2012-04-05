@@ -24,7 +24,7 @@ set (CVMFS2_DEBUG_SOURCES
 	catalog_queries.h catalog_queries.cc
 	catalog.h catalog.cc
 	catalog_mgr.h catalog_mgr.cc
-	dirent.h
+	shortstring.h dirent.h
 
   cvmfs.h cvmfs.cc
 )

@@ -121,8 +121,8 @@ bool ManipulateDirectoryEntrySqlStatement::BindDirectoryEntryFields(const int ha
     BindInt(      mode_field,    entry.mode_) &&
     BindInt64(    mtime_field,   entry.mtime_) &&
     BindInt(      flags_field,   CreateDatabaseFlags(entry)) &&
-    BindText(     name_field,    entry.name_) &&
-    BindText(     symlink_field, entry.symlink_)
+    BindText(     name_field,    entry.name_.GetChars(), entry.name_.GetLength(), SQLITE_TRANSIENT) &&
+    BindText(     symlink_field, entry.symlink_.GetChars(), entry.symlink_.GetLength(), SQLITE_TRANSIENT)
   );
 }
 
@@ -167,8 +167,9 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.size_         = RetrieveInt64(2);
   result.mtime_        = RetrieveInt64(4);
   result.checksum_     = RetrieveSha1HashFromBlob(0);
-  result.name_         = string((char *)RetrieveText(6));
-  result.symlink_      = ExpandSymlink((char *)RetrieveText(7));
+  result.name_.Assign((char *)RetrieveText(6), strlen((char *)RetrieveText(6)));
+  //const unsigned symlink_length = ExpandSymlink((char *)RetrieveText(7)).length();
+  result.symlink_.Assign((char *)RetrieveText(7), strlen((char *)RetrieveText(7)));
 
   return result;
 }

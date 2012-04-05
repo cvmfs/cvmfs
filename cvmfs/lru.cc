@@ -1,6 +1,9 @@
-
+/**
+ * Implements hash functions for different key types
+ */
 
 #include "lru.h"
+#include "MurmurHash2.h"
 
 namespace lru {
 
@@ -9,11 +12,7 @@ uint32_t hasher_md5(const hash::Md5 &key) {
 }
 
 uint32_t hasher_inode(const fuse_ino_t &inode) {
-#ifdef __x86_64__
-  return MurmurHash64A(&inode, sizeof(inode), 0x9ce603115bba659bLLU);
-#else
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
-#endif
 }
 
-}
+}  // namespace lru

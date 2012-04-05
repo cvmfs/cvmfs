@@ -154,6 +154,17 @@ Md5::Md5(const AsciiPtr ascii) {
 }
 
 
+Md5::Md5(const char *chars, const unsigned length) {
+  algorithm = kMd5;
+
+  MD5_CTX md5_state;
+  MD5_Init(&md5_state);
+  MD5_Update(&md5_state, reinterpret_cast<const unsigned char *>(chars),
+             length);
+  MD5_Final(digest, &md5_state);
+}
+
+
 Md5::Md5(const uint64_t lo, const uint64_t hi) {
   algorithm = kMd5;
   memcpy(digest, &lo, 8);

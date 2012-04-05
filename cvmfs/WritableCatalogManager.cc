@@ -200,7 +200,8 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
 bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
                                           const std::string &parent_directory) {
   const string parent_path = RelativeToCatalogPath(parent_directory);
-  const string directory_path = parent_path + "/" + entry.name();
+  string directory_path = parent_path + "/";
+  directory_path.append(entry.name().GetChars(), entry.name().GetLength());
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -215,7 +216,8 @@ bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
 bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
                                      const std::string &parent_directory) {
   const string parent_path = RelativeToCatalogPath(parent_directory);
-  const string file_path = parent_path + "/" + entry.name();
+  string file_path = parent_path + "/";
+  file_path.append(entry.name().GetChars(), entry.name().GetLength());
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -225,7 +227,7 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
 
   // sanity checks
   if (entry.IsLink()) {
-    if (entry.symlink() == "") {
+    if (entry.symlink().IsEmpty()) {
       LogCvmfs(kLogCatalog, kLogDebug, "unable to read link destination for symlink '%s' - add failed", file_path.c_str());
   		return false;
 		}
@@ -276,7 +278,8 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
   bool result = true;
   bool successful = true;
 	for (i = entries.begin(), end = entries.end(); i != end; ++i) {
-	  string file_path = parent_path + "/" + i->name();
+	  string file_path = parent_path + "/";
+    file_path.append(i->name().GetChars(), i->name().GetLength());
     i->hardlink_group_id_ = new_group_id;
 	  successful = catalog->CheckForExistanceAndAddEntry(*i, file_path, parent_path);
 	  if (not successful) {

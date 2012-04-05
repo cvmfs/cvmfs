@@ -86,9 +86,21 @@ class AbstractCatalogManager {
 
   bool LookupInode(const inode_t inode, const LookupOptions options,
                    DirectoryEntry *entry);
-  bool LookupPath(const std::string &path, const LookupOptions options,
+  bool LookupPath(const PathString &path, const LookupOptions options,
                   DirectoryEntry *entry);
-  bool Listing(const std::string &path, DirectoryEntryList *listing);
+  bool LookupPath(const std::string &path, const LookupOptions options,
+                  DirectoryEntry *entry)
+  {
+    PathString p;
+    p.Assign(&path[0], path.length());
+    return LookupPath(p, options, entry);
+  }
+  bool Listing(const PathString &path, DirectoryEntryList *listing);
+  bool Listing(const std::string &path, DirectoryEntryList *listing) {
+    PathString p;
+    p.Assign(&path[0], path.length());
+    return Listing(p, listing);
+  }
 
   Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;

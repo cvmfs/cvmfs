@@ -158,10 +158,11 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
  * @param dirent the resulting DirectoryEntry
  * @return true if lookup succeeded otherwise false
  */
-bool AbstractCatalogManager::LookupPath(const string &path,
+bool AbstractCatalogManager::LookupPath(const PathString &p,
                                         const LookupOptions options,
                                         DirectoryEntry *dirent)
 {
+  string path(p.GetChars(), p.GetLength());  // TODO
   EnforceSqliteMemLimit();
   ReadLock();
 
@@ -237,9 +238,10 @@ bool AbstractCatalogManager::LookupPath(const string &path,
  * @param listing the resulting DirectoryEntryList
  * @return true if listing succeeded otherwise false
  */
-bool AbstractCatalogManager::Listing(const string &path,
+bool AbstractCatalogManager::Listing(const PathString &p,
                                      DirectoryEntryList *listing)
 {
+  string path(p.GetChars(), p.GetLength());  // TODO
   EnforceSqliteMemLimit();
   bool result;
   ReadLock();

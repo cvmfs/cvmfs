@@ -26,11 +26,12 @@ bool WritableCatalog::CreateNewCatalogDatabase(const std::string &file_path,
   hash::Md5 parent_hash;
   string root_path;
   if (root_catalog) {
-    root_path = root_entry.name();
+    root_path.assign(root_entry.name().GetChars(), root_entry.name().GetLength());
     path_hash = hash::Md5(hash::AsciiPtr(root_path));
     parent_hash = hash::Md5();
   } else {
-    root_path = root_entry_parent_path + "/" + root_entry.name();
+    root_path = root_entry_parent_path + "/";
+    root_path.append(root_entry.name().GetChars(), root_entry.name().GetLength());
     path_hash = hash::Md5(hash::AsciiPtr(root_path));
     parent_hash = hash::Md5(hash::AsciiPtr(root_entry_parent_path));
   }
@@ -370,7 +371,8 @@ bool WritableCatalog::MoveDirectoryStructureToNewNestedCatalogRecursively(const 
   DirectoryEntryList::const_iterator i,iend;
   string full_path;
   for (i = listing.begin(), iend = listing.end(); i != iend; ++i) {
-    full_path = dir_structure_root + "/" + i->name();
+    full_path = dir_structure_root + "/";
+    full_path.append(i->name().GetChars(), i->name().GetLength());
 
     // the entries are first inserted into the new catalog
     if (not new_nested_catalog->AddEntry(*i, full_path)) {

@@ -79,6 +79,7 @@
 #include "dirent.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
+#include "shortstring.h"
 #include "smalloc.h"
 #include "globals.h"
 
@@ -315,10 +316,11 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 }
 
 
-static bool GetDirentForPath(const string &path, const fuse_ino_t parent_inode,
+static bool GetDirentForPath(const catalog::PathString &path,
+                             const fuse_ino_t parent_inode,
                              catalog::DirectoryEntry *dirent)
 {
-  hash::Md5 md5path((hash::AsciiPtr(path)));
+  hash::Md5 md5path(path.GetChars(), path.GetLength());
   if (md5path_cache_->Lookup(md5path, dirent))
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
@@ -335,7 +337,7 @@ static bool GetDirentForPath(const string &path, const fuse_ino_t parent_inode,
 }
 
 
-static bool GetPathForInode(const fuse_ino_t ino, string *path) {
+static bool GetPathForInode(const fuse_ino_t ino, catalog::PathString *path) {
   // Check the path cache first
   if (path_cache_->Lookup(ino, path)) {
     return true;
@@ -350,17 +352,16 @@ static bool GetPathForInode(const fuse_ino_t ino, string *path) {
 
   // Check if we reached the root node
   if (dirent.inode() == catalog_manager_->GetRootInode()) {
-    *path = "";
+    path->Assign("", 0);
   } else {
     // Retrieve the parent path recursively
-    string parent_path;
+    catalog::PathString parent_path;
     if (!GetPathForInode(dirent.parent_inode(), &parent_path))
       return false;
 
-    path->reserve(parent_path.length() + dirent.name().length() + 1);
-    path->assign(parent_path);
-    path->push_back('/');
-    path->append(dirent.name());
+    path->Assign(parent_path);
+    path->Append("/", 1);
+    path->Append(dirent.name().GetChars(), dirent.name().GetLength());
   }
 
   path_cache_->Insert(dirent.inode(), *path);
@@ -382,8 +383,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
-  string parent_path;
-  const unsigned name_len = strlen(name);
+  catalog::PathString parent_path;
 
   if (!GetPathForInode(parent, &parent_path)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
@@ -393,11 +393,10 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   }
 
   catalog::DirectoryEntry dirent;
-  string path;
-  path.reserve(parent_path.length() + name_len + 1);
-  path.assign(parent_path);
-  path.push_back('/');
-  path.append(name, name_len);
+  catalog::PathString path;
+  path.Assign(parent_path);
+  path.Append("/", 1);
+  path.Append(name, strlen(name));
   if (!GetDirentForPath(path, parent, &dirent)) {
     fuse_reply_err(req, ENOENT);
     return;
@@ -469,6 +468,7 @@ static void AddToDirListing(const fuse_req_t req,
                             const char *name, const struct stat *stat_info,
                             struct DirectoryListing *listing)
 {
+  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s", name);
   size_t remaining_size = listing->capacity - listing->size;
   const size_t entry_size = fuse_add_direntry(req, NULL, 0, name, stat_info, 0);
 
@@ -493,7 +493,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
 
-  string path;
+  catalog::PathString path;
   catalog::DirectoryEntry d;
   const bool found = GetPathForInode(ino, &path) && GetDirentForInode(ino, &d);
 
@@ -632,7 +632,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
-  string path;
+  catalog::PathString path;
 
   const bool found = GetDirentForInode(ino, &dirent) &&
                      GetPathForInode(ino, &path);
@@ -660,7 +660,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  fd = cache::Fetch(dirent, path);
+  fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
   atomic_inc64(&num_open_);
 
   if (fd >= 0) {

@@ -185,6 +185,7 @@ struct Digest {
 struct Md5 : public Digest<16, kMd5> {
   Md5() : Digest<16, kMd5>() { }
   explicit Md5(const AsciiPtr ascii);
+  Md5(const char *chars, const unsigned length);
 
   /**
    * An MD5 hash can be seen as two 64bit integers.

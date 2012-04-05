@@ -15,6 +15,7 @@
 #include "platform.h"
 #include "util.h"
 #include "hash.h"
+#include "shortstring.h"
 #include "globals.h"
 
 namespace cvmfs {
@@ -30,6 +31,11 @@ enum SpecialDirents {
   kDirentNormal = 0,
   kDirentNegative,
 };
+
+const unsigned char kDefaultMaxName = 25;
+const unsigned char kDefaultMaxLink = 25;
+const unsigned char kDefaultMaxPath = 200;
+typedef ShortString<kDefaultMaxPath> PathString;
 
 class DirectoryEntry {
   friend class LookupSqlStatement;                   // simplify creation of DirectoryEntry objects
@@ -74,12 +80,12 @@ public:
   inline inode_t inode() const { return inode_; }
   inline inode_t parent_inode() const { return parent_inode_; }
   inline int linkcount() const { return linkcount_; }
-  inline std::string name() const { return name_; }
-  inline std::string symlink() const { return symlink_; }
+  inline ShortString<kDefaultMaxName> name() const { return name_; }
+  inline ShortString<kDefaultMaxLink> symlink() const { return symlink_; }
   inline hash::Any checksum() const { return checksum_; }
   inline const hash::Any *checksum_ptr() const { return &checksum_; }
   inline uint64_t size() const {
-    return (IsLink()) ? symlink().length() : size_;
+    return (IsLink()) ? symlink().GetLength() : size_;
   }
   inline time_t mtime() const { return mtime_; }
   inline time_t cached_mtime() const { return cached_mtime_; }
@@ -129,7 +135,7 @@ private:
   Catalog* catalog_;
 
   // stat like information
-  std::string name_;
+  ShortString<kDefaultMaxName> name_;
   inode_t inode_;
   inode_t parent_inode_;
   int linkcount_;
@@ -138,7 +144,8 @@ private:
   time_t mtime_;
   time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
                               need to be invalidated (file has changed) */
-  std::string symlink_;
+  // TODO: unionize
+  ShortString<kDefaultMaxLink> symlink_;
   hash::Any checksum_;
 
   // Administrative data

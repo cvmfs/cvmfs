@@ -80,14 +80,13 @@ catalog::DirectoryEntry SyncItem::CreateDirectoryEntry() const {
   dEntry.size_              = this->GetUnionStat().st_size;
   dEntry.mtime_             = this->GetUnionStat().st_mtime;
   dEntry.checksum_          = this->GetContentHash();
-  dEntry.name_              = this->GetFilename();
+  dEntry.name_.Assign(this->GetFilename().data(), this->GetFilename().length());
 
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
 		ssize_t l = readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
 		if (l >= 0) {
-			slnk[l] = '\0';
-			dEntry.symlink_ = slnk;
+      dEntry.symlink_.Assign(slnk, l);
 		}
   }
 
