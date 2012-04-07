@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "catalog_mgr.h"
+#include "shortstring.h"
 #include "atomic.h"
 
 namespace catalog {
@@ -56,11 +57,11 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   virtual ~CatalogManager() { };
 
  protected:
-  catalog::LoadError LoadCatalog(const std::string &mountpoint,
+  catalog::LoadError LoadCatalog(const PathString &mountpoint,
                                  const hash::Any &hash,
                                  std::string *catalog_path);
-  void UnloadCatalog(const std::string &mountpoint);
-  catalog::Catalog* CreateCatalog(const std::string &mountpoint,
+  void UnloadCatalog(const PathString &mountpoint);
+  catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   catalog::Catalog *parent_catalog);
 
  private:
@@ -71,8 +72,9 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   /**
    * required for unpinning
    */
-  std::map<std::string, hash::Any> loaded_catalogs_;
-  std::map<std::string, hash::Any> mounted_catalogs_;
+  std::map<PathString, hash::Any> loaded_catalogs_;
+  std::map<PathString, hash::Any> mounted_catalogs_;
+
   std::string repo_name_;
   bool ignore_signature_;
   atomic_int32 certificate_hits_;

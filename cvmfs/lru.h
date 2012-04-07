@@ -867,25 +867,24 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 };  // InodeCache
 
 
-class PathCache : public LruCache<fuse_ino_t, catalog::PathString> {
+class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
   PathCache(unsigned int cache_size) :
-    LruCache<fuse_ino_t, catalog::PathString>(cache_size, fuse_ino_t(-1),
-                                              hasher_inode)
+    LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode)
   {
   }
 
-  bool Insert(const fuse_ino_t inode, const catalog::PathString &path) {
+  bool Insert(const fuse_ino_t inode, const PathString &path) {
     LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %d -> '%s'",
              inode, path.c_str());
     const bool result =
-      LruCache<fuse_ino_t, catalog::PathString>::Insert(inode, path);
+      LruCache<fuse_ino_t, PathString>::Insert(inode, path);
     return result;
   }
 
-  bool Lookup(const fuse_ino_t inode, catalog::PathString *path) {
+  bool Lookup(const fuse_ino_t inode, PathString *path) {
     const bool found =
-      LruCache<fuse_ino_t, catalog::PathString>::Lookup(inode, path);
+      LruCache<fuse_ino_t, PathString>::Lookup(inode, path);
     LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %d (%s)",
              inode, found ? "hit" : "miss");
     return found;
@@ -893,7 +892,7 @@ class PathCache : public LruCache<fuse_ino_t, catalog::PathString> {
 
   void Drop() {
     LogCvmfs(kLogLru, kLogDebug, "dropping path cache");
-    LruCache<fuse_ino_t, catalog::PathString>::Drop();
+    LruCache<fuse_ino_t, PathString>::Drop();
   }
 };  // PathCache
 

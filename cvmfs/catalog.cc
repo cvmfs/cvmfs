@@ -16,7 +16,7 @@ namespace catalog {
 const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 
 
-Catalog::Catalog(const string &path, Catalog *parent) {
+Catalog::Catalog(const PathString &path, Catalog *parent) {
   path_ = path;
   parent_ = parent;
   max_row_id_ = 0;
@@ -93,8 +93,9 @@ bool Catalog::OpenDatabase(const string &db_path) {
     SqlStatement sql_root_prefix(database_, "SELECT value FROM properties "
                                  "WHERE key='root_prefix';");
     if (sql_root_prefix.FetchRow()) {
-      root_prefix_ =
-        string(reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0)));
+      root_prefix_.Assign(
+        reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0)),
+        strlen(reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0))));
       LogCvmfs(kLogCatalog, kLogDebug,
                "found root prefix %s in root catalog file %s",
                root_prefix_.c_str(), db_path.c_str());
@@ -283,7 +284,7 @@ Catalog::NestedCatalogList Catalog::ListNestedCatalogs() const {
 /**
  * Looks for a specific registered nested catalog based on a path.
  */
-bool Catalog::FindNested(const string &mountpoint, hash::Any *hash) const {
+bool Catalog::FindNested(const PathString &mountpoint, hash::Any *hash) const {
   pthread_mutex_lock(lock_);
   sql_lookup_nested_->BindSearchPath(mountpoint);
   bool found = sql_lookup_nested_->FetchRow();
@@ -347,28 +348,32 @@ CatalogList Catalog::GetChildren() const {
  * @param path the path to find a best fitting catalog for
  * @return a pointer to the best fitting child or NULL if it does not fit at all
  */
-Catalog* Catalog::FindSubtree(const string &path) const {
+Catalog* Catalog::FindSubtree(const PathString &path) const {
   // Check if this catalog fits the beginning of the path.
-  if (path.find(path_) == string::npos)
+  if (!path.StartsWith(path_))
     return NULL;
 
   // Tokenize the remaining string
-  string remaining = path.substr(path_.length());
-  vector<string> tokens = SplitString(remaining, '/');
+  PathString remaining(path.Suffix(path_.GetLength()));
+  remaining.Append("/", 1);
 
   // now we recombine the tokens successively
   // in order to find a child which serves a part of the path
-  string path_prefix(path_);
+  PathString path_prefix(path_);
   Catalog *result = NULL;
-  // Skip first empty token
-  for (unsigned i = 1, iEnd = tokens.size(); i < iEnd; ++i) {
-    path_prefix += "/" + tokens[i];
-    result = FindChild(path_prefix);
+  // Skip the first '/'
+  path_prefix.Append("/", 1);
+  const char *c = remaining.GetChars()+1;
+  for (unsigned i = 1; i < remaining.GetLength(); ++i, ++c) {
+    if (*c == '/') {
+      result = FindChild(path_prefix);
 
-    // If we found a child serving a part of the path we can stop searching.
-    // Remaining sub path elements are possbily served by a grand child.
-    if (result != NULL)
-      break;
+      // If we found a child serving a part of the path we can stop searching.
+      // Remaining sub path elements are possbily served by a grand child.
+      if (result != NULL)
+        break;
+    }
+    path_prefix.Append(c, 1);
   }
 
   return result;
@@ -379,7 +384,7 @@ Catalog* Catalog::FindSubtree(const string &path) const {
  * Looks for a child catalog, which is a subset of all registered nested
  * catalogs.
  */
-Catalog* Catalog::FindChild(const std::string &mountpoint) const {
+Catalog* Catalog::FindChild(const PathString &mountpoint) const {
   NestedCatalogMap::const_iterator nested_iter;
 
   pthread_mutex_lock(lock_);

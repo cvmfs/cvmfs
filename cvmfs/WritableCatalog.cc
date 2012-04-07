@@ -124,7 +124,7 @@ out_fail:
 }
 
 WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
-  Catalog(path, parent),
+  Catalog(PathString(path.data(), path.length()), parent),
   dirty_(false)
 {}
 
@@ -278,7 +278,7 @@ bool WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
 
 bool WritableCatalog::SplitContentIntoNewNestedCatalog(WritableCatalog *new_nested_catalog) {
   // create connection between parent and child catalogs
-  if (not MakeNestedCatalogMountpoint(new_nested_catalog->path())) {
+  if (not MakeNestedCatalogMountpoint(new_nested_catalog->path().ToString())) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog mountpoint in catalog '%s'", path().c_str());
     return false;
   }
@@ -291,7 +291,7 @@ bool WritableCatalog::SplitContentIntoNewNestedCatalog(WritableCatalog *new_nest
   // if we hit nested catalog mountpoints on the way, we return them through
   // the passed list
   list<string> nestedNestedCatalogMountpoints;
-  if (not MoveDirectoryStructureToNewNestedCatalog(new_nested_catalog->path(),
+  if (not MoveDirectoryStructureToNewNestedCatalog(new_nested_catalog->path().ToString(),
                                                    new_nested_catalog,
                                                    nestedNestedCatalogMountpoints)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to move directory structure in '%s' to new nested catalog", new_nested_catalog->path().c_str());
@@ -312,7 +312,7 @@ bool WritableCatalog::SplitContentIntoNewNestedCatalog(WritableCatalog *new_nest
 bool WritableCatalog::MakeNestedCatalogMountpoint(const string &mountpoint) {
   // find the directory entry to edit
   DirectoryEntry mnt_pnt_entry;
-  if (not LookupPath(mountpoint, &mnt_pnt_entry)) {
+  if (not LookupPath(PathString(mountpoint.data(), mountpoint.length()), &mnt_pnt_entry)) {
     return false;
   }
 
@@ -350,7 +350,7 @@ bool WritableCatalog::MakeNestedCatalogRootEntry() {
   root_entry.set_is_nested_catalog_root(true);
 
   // write back
-  if (not UpdateEntry(root_entry, path())) {
+  if (not UpdateEntry(root_entry, path().ToString())) {
     return false;
   }
 
@@ -363,7 +363,7 @@ bool WritableCatalog::MoveDirectoryStructureToNewNestedCatalogRecursively(const 
   // after creating a new nested catalog we have move all elements
   // now contained by the new one... list and move them recursively
   DirectoryEntryList listing;
-  if (not ListingPath(dir_structure_root, &listing)) {
+  if (not ListingPath(PathString(dir_structure_root.data(), dir_structure_root.length()), &listing)) {
     return false;
   }
 
@@ -453,7 +453,7 @@ bool WritableCatalog::RemoveNestedCatalogReference(const string &mountpoint, Cat
   // if there is also an attached reference in our in-memory data.
   // in this case we remove the child and return it through **attached_reference
   if (successful) {
-    Catalog *child = FindChild(mountpoint);
+    Catalog *child = FindChild(PathString(mountpoint.data(), mountpoint.length()));
     if (child != NULL) this->RemoveChild(child);
     if (attached_reference != NULL) *attached_reference = child;
   }
@@ -493,7 +493,7 @@ bool WritableCatalog::MergeIntoParentCatalog() {
 
   // remove the nested catalog reference for this nested catalog
   // CAUTION! from now on this catalog will be dangling!
-  if (not parent->RemoveNestedCatalogReference(this->path())) {
+  if (not parent->RemoveNestedCatalogReference(this->path().ToString())) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog reference '%s', in parent catalog '%s'", this->path().c_str(), parent->path().c_str());
     return false;
   }
@@ -516,7 +516,7 @@ bool WritableCatalog::CopyNestedCatalogReferencesToParentCatalog() {
        i != iend;
        ++i) {
     Catalog *child = FindChild(i->path);
-    parent->InsertNestedCatalogReference(i->path, child, i->hash);
+    parent->InsertNestedCatalogReference(i->path.ToString(), child, i->hash);
   }
 
   return true;
@@ -551,7 +551,7 @@ bool WritableCatalog::CopyDirectoryEntriesToParentCatalog() const {
 
   // remove the nested catalog mount point
   // it will be replaced with the nested catalog root entry when copying
-  if (not parent->RemoveEntry(this->path())) {
+  if (not parent->RemoveEntry(this->path().ToString())) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to remove mount point '%s' of nested catalog to be merged", this->path().c_str());
     return false;
   }
@@ -591,7 +591,7 @@ bool WritableCatalog::CopyDirectoryEntriesToParentCatalog() const {
 
   // remove the nested catalog root mark
   old_root_entry.set_is_nested_catalog_root(false);
-  if (not parent->UpdateEntry(old_root_entry, this->path())) {
+  if (not parent->UpdateEntry(old_root_entry, this->path().ToString())) {
     LogCvmfs(kLogCatalog, kLogDebug, "unable to remove the 'nested catalog root' mark from '%s'", this->path().c_str());
     return false;
   }

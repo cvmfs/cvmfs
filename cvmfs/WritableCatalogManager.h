@@ -24,6 +24,7 @@
 #include <set>
 #include <string>
 
+#include "shortstring.h"
 #include "WritableCatalog.h"
 
 namespace catalog {
@@ -162,7 +163,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
    *                      name of the catalog afterwards
    *  @return 0 on success, different otherwise
    */
-  LoadError LoadCatalog(const std::string &mountpoint, const hash::Any &hash,
+  LoadError LoadCatalog(const PathString &mountpoint, const hash::Any &hash,
                         std::string *catalog_path);
 
   /**
@@ -173,7 +174,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
    *  @param parent_catalog the parent of the catalog stub to create
    *  @return a pointer to the catalog stub structure created
    */
-  Catalog* CreateCatalog(const std::string &mountpoint, Catalog *parent_catalog);
+  Catalog* CreateCatalog(const PathString &mountpoint, Catalog *parent_catalog);
 
  private:
   /**

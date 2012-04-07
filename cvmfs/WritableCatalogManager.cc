@@ -56,13 +56,13 @@ bool WritableCatalogManager::Init() {
 	return true;
 }
 
-LoadError WritableCatalogManager::LoadCatalog(const std::string &mountpoint,
+LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
                                               const hash::Any &hash,
                                               std::string *catalog_path)
 {
   // actually we have nothing to load here...
   // just redirect to the appropriate catalog file on disk
-  *catalog_path = GetCatalogFilenameForPath(mountpoint);
+  *catalog_path = GetCatalogFilenameForPath(mountpoint.ToString());
 
   // check if the file exists
   // if not, the 'loading' fails
@@ -74,9 +74,9 @@ LoadError WritableCatalogManager::LoadCatalog(const std::string &mountpoint,
   return kLoadNew;
 }
 
-Catalog* WritableCatalogManager::CreateCatalog(const std::string &mountpoint,
+Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
                                                Catalog *parent_catalog) {
-  return new WritableCatalog(mountpoint, parent_catalog);
+  return new WritableCatalog(mountpoint.ToString(), parent_catalog);
 }
 
 bool WritableCatalogManager::CreateAndAttachRootCatalog() {
@@ -107,7 +107,7 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
   }
 
   // attach the just created catalog
-  if (not MountCatalog("", hash::Any(), NULL)) {
+  if (not MountCatalog(PathString("", 0), hash::Any(), NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach newly created root catalog");
     return false;
   }
@@ -117,10 +117,10 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
 
 bool WritableCatalogManager::GetCatalogByPath(const string &path,
                                               WritableCatalog **result) {
-  Catalog *best_fit = FindCatalog(path);
+  Catalog *best_fit = FindCatalog(PathString(path.data(), path.length()));
   assert (best_fit != NULL);
   Catalog *catalog = NULL;
-  bool retval = MountSubtree(path, best_fit, &catalog);
+  bool retval = MountSubtree(PathString(path.data(), path.length()), best_fit, &catalog);
   if (!retval)
     return false;
 
@@ -144,7 +144,7 @@ bool WritableCatalogManager::RemoveFile(const std::string &path) {
     return false;
   }
 
-  if (not catalog->LookupPath(file_path, NULL)) {
+  if (not catalog->LookupPath(PathString(file_path.data(), file_path.length()), NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "file '%s' does not exist and thus cannot be deleted", file_path.c_str());
     return false;
   }
@@ -168,7 +168,7 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   }
 
   DirectoryEntry dir;
-  if (not catalog->LookupPath(directory_path, &dir)) {
+  if (not catalog->LookupPath(PathString(directory_path.data(), directory_path.length()), &dir)) {
     LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' does not exist and thus cannot be deleted", directory_path.c_str());
     return false;
   }
@@ -184,7 +184,7 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   }
 
   DirectoryEntryList listing;
-  if (not catalog->ListingPath(directory_path, &listing) && listing.size() > 0) {
+  if (not catalog->ListingPath(PathString(directory_path.data(), directory_path.length()), &listing) && listing.size() > 0) {
     LogCvmfs(kLogCatalog, kLogDebug, "directory '%s' is not empty and cannot be deleted", directory_path.c_str());
     return false;
   }
@@ -305,7 +305,7 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
     return false;
   }
 
-  if (not catalog->LookupPath(entry_path, NULL)) {
+  if (not catalog->LookupPath(PathString(entry_path.data(), entry_path.length()), NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "entry '%s' does not exist and thus cannot be touched", entry_path.c_str());
     return false;
   }
@@ -332,7 +332,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   // get the DirectoryEntry for the given path, this will serve as root
   // entry for the nested catalog we are about to create
   DirectoryEntry new_root_entry;
-  old_catalog->LookupPath(nested_root_path, &new_root_entry);
+  old_catalog->LookupPath(PathString(nested_root_path.data(), nested_root_path.length()), &new_root_entry);
 
   // create the database schema and the inital root entry
   // for the new nested catalog
@@ -349,7 +349,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
 
   // attach the just created nested catalog
   Catalog *new_catalog = NULL;
-  if (!(new_catalog = MountCatalog(nested_root_path, hash::Any(), old_catalog))) {
+  if (!(new_catalog = MountCatalog(PathString(nested_root_path.data(), nested_root_path.length()), hash::Any(), old_catalog))) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': unable to attach newly created nested catalog", nested_root_path.c_str());
     return false;
   }
@@ -372,7 +372,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
 
   // add the newly created nested catalog to the references of the containing
   // catalog
-  if (not old_catalog->InsertNestedCatalogReference(new_catalog->path())) {
+  if (not old_catalog->InsertNestedCatalogReference(new_catalog->path().ToString())) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to insert new nested catalog reference '%s' in catalog '%s'", new_catalog->path().c_str(), old_catalog->path().c_str());
     return false;
   }
@@ -391,7 +391,7 @@ bool WritableCatalogManager::RemoveNestedCatalog(const std::string &mountpoint) 
   }
 
   // check if the found catalog is really the nested catalog to be deleted
-  if (nested_catalog->IsRoot() || nested_catalog->path() != nested_root_path) {
+  if (nested_catalog->IsRoot() || nested_catalog->path().ToString() != nested_root_path) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog '%s': mountpoint '%s' does not name a nested catalog", nested_catalog->path().c_str(), nested_root_path.c_str());
     return false;
   }
@@ -403,7 +403,7 @@ bool WritableCatalogManager::RemoveNestedCatalog(const std::string &mountpoint) 
   }
 
   // remove the catalog from our internal data structures
-  const string database_file = GetCatalogFilenameForPath(nested_catalog->path());
+  const string database_file = GetCatalogFilenameForPath(nested_catalog->path().ToString());
   DetachCatalog(nested_catalog);
 
   // delete the catalog database file from the working copy
@@ -480,9 +480,9 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
   //       refactoring... the knowledge about on disk handling of catalogs
   //       does definitely not belong in this class structure!
 
-  cout << "creating snapshot of catalog '" << catalog->path() << "'" << endl;
+  cout << "creating snapshot of catalog '" << catalog->path().ToString() << "'" << endl;
 
-	const string clg_path = catalog->path();
+	const string clg_path = catalog->path().ToString();
 	const string cat_path = (clg_path.empty()) ?
 	                            catalog_directory_ :
                               catalog_directory_ + clg_path;

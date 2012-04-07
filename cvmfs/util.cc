@@ -65,6 +65,24 @@ string GetParentPath(const string &path) {
 /**
  * Gets the file name part of a path.
  */
+PathString GetParentPath(const PathString &path) {
+  unsigned length = path.GetLength();
+  if (length == 0)
+    return path;
+  const char *chars  = path.GetChars();
+
+  for (unsigned i = length-1; i >= 0; --i) {
+    if (chars[i] == '/')
+      return PathString(chars, i);
+  }
+
+  return path;
+}
+
+
+/**
+ * Gets the file name part of a path.
+ */
 string GetFileName(const string &path) {
   const string::size_type idx = path.find_last_of('/');
   if (idx != string::npos)

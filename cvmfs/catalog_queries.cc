@@ -235,8 +235,8 @@ FindNestedCatalogSqlStatement::FindNestedCatalogSqlStatement(const sqlite3 *data
   Init(database, "SELECT sha1 FROM nested_catalogs WHERE path=:path;");
 }
 
-bool FindNestedCatalogSqlStatement::BindSearchPath(const std::string &path) {
-  return BindText(1, &path[0], path.length(), SQLITE_STATIC);
+bool FindNestedCatalogSqlStatement::BindSearchPath(const PathString &path) {
+  return BindText(1, path.GetChars(), path.GetLength(), SQLITE_TRANSIENT);
 }
 
 hash::Any FindNestedCatalogSqlStatement::GetContentHash() const {
@@ -254,8 +254,8 @@ ListNestedCatalogsSqlStatement::ListNestedCatalogsSqlStatement(const sqlite3 *da
   Init(database, "SELECT path, sha1 FROM nested_catalogs;");
 }
 
-string ListNestedCatalogsSqlStatement::GetMountpoint() const {
-  return string((char*)RetrieveText(0));
+PathString ListNestedCatalogsSqlStatement::GetMountpoint() const {
+  return PathString((char *)RetrieveText(0), strlen((char *)RetrieveText(0)));
 }
 
 hash::Any ListNestedCatalogsSqlStatement::GetContentHash() const {

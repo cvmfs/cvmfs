@@ -18,6 +18,7 @@
 
 #include "platform.h"
 #include "hash.h"
+#include "shortstring.h"
 
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
@@ -25,6 +26,7 @@ const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
 
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
+PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 
 int MakeSocket(const std::string &path, const int mode);

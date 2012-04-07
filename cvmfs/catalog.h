@@ -17,6 +17,7 @@
 #include "catalog_queries.h"
 #include "dirent.h"
 #include "hash.h"
+#include "shortstring.h"
 #include "duplex_sqlite3.h"
 
 namespace catalog {
@@ -58,7 +59,7 @@ class Catalog {
   friend class AbstractCatalogManager;
   friend class LookupSqlStatement;  // for mangled inode
  public:
-  Catalog(const std::string &path, Catalog *parent);
+  Catalog(const PathString &path, Catalog *parent);
   virtual ~Catalog();
 
   bool OpenDatabase(const std::string &db_path);
@@ -66,24 +67,24 @@ class Catalog {
   bool LookupInode(const inode_t inode,
                    DirectoryEntry *dirent, hash::Md5 *parent_md5path) const;
   bool LookupMd5Path(const hash::Md5 &md5path, DirectoryEntry *dirent) const;
-  inline bool LookupPath(const std::string &path, DirectoryEntry *dirent) const
+  inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const
   {
-    return LookupMd5Path(hash::Md5(hash::AsciiPtr(path)), dirent);
+    return LookupMd5Path(hash::Md5(path.GetChars(), path.GetLength()), dirent);
   }
 
   bool ListingMd5Path(const hash::Md5 &md5path,
                       DirectoryEntryList *listing) const;
-  inline bool ListingPath(const std::string &path,
+  inline bool ListingPath(const PathString &path,
                       DirectoryEntryList *listing) const
   {
-    return ListingMd5Path(hash::Md5(hash::AsciiPtr(path)), listing);
+    return ListingMd5Path(hash::Md5(path.GetChars(), path.GetLength()), listing);
   }
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
 
   inline float schema() const { return schema_; }
-  inline std::string path() const { return path_; }
+  inline PathString path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
   inline uint64_t max_row_id() const { return max_row_id_; }
   inline InodeRange inode_range() const { return inode_range_; }
@@ -96,12 +97,12 @@ class Catalog {
   inline virtual bool IsWritable() const { return false; }
 
   typedef struct {
-    std::string path;
+    PathString path;
     hash::Any hash;
   } NestedCatalog;
   typedef std::list<NestedCatalog> NestedCatalogList;
   NestedCatalogList ListNestedCatalogs() const;
-  bool FindNested(const std::string &mountpoint, hash::Any *hash) const;
+  bool FindNested(const PathString &mountpoint, hash::Any *hash) const;
 
  protected:
   /**
@@ -117,8 +118,8 @@ class Catalog {
   void AddChild(Catalog *child);
   void RemoveChild(Catalog *child);
   CatalogList GetChildren() const;
-  Catalog* FindSubtree(const std::string &path) const;
-  Catalog* FindChild(const std::string &mountpoint) const;
+  Catalog* FindSubtree(const PathString &path) const;
+  Catalog* FindChild(const PathString &mountpoint) const;
 
   inline sqlite3* database() const { return database_; }
   inline std::string database_path() const { return database_path_; }
@@ -127,7 +128,7 @@ class Catalog {
  private:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
   typedef std::map<int, inode_t> HardlinkGroupMap;
-  typedef std::map<std::string, Catalog*> NestedCatalogMap;
+  typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
   inline uint64_t GetRowIdFromInode(const inode_t inode) const {
     return inode - inode_range_.offset;
@@ -142,8 +143,8 @@ class Catalog {
   std::string database_path_;
   pthread_mutex_t *lock_;
 
-  std::string root_prefix_;
-  std::string path_;
+  PathString root_prefix_;
+  PathString path_;
   float schema_;
 
   Catalog *parent_;

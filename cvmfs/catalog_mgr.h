@@ -129,10 +129,10 @@ class AbstractCatalogManager {
    * Load the catalog and return a file name.  Derived class can decide if it
    * wants to use the hash or the path.  The hash can be 0.
    */
-  virtual LoadError LoadCatalog(const std::string &mountpoint,
+  virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const hash::Any &hash,
                                 std::string *catalog_path) = 0;
-  virtual void UnloadCatalog(const std::string &mountpoint) { }
+  virtual void UnloadCatalog(const PathString &mountpoint) { }
 
   /**
    * Create a new Catalog object.
@@ -142,12 +142,12 @@ class AbstractCatalogManager {
    * @param parent_catalog the parent of the catalog to create
    * @return a newly created (derived) Catalog
    */
-  virtual Catalog* CreateCatalog(const std::string &mountpoint,
+  virtual Catalog* CreateCatalog(const PathString &mountpoint,
                                  Catalog *parent_catalog) = 0;
 
-  Catalog *MountCatalog(const std::string &mountpoint, const hash::Any &hash,
+  Catalog *MountCatalog(const PathString &mountpoint, const hash::Any &hash,
                         Catalog *parent_catalog);
-  bool MountSubtree(const std::string &path, const Catalog *entry_point,
+  bool MountSubtree(const PathString &path, const Catalog *entry_point,
                     Catalog **leaf_catalog);
   inline bool MountAll() { return MountRecursively(GetRootCatalog()); }
 
@@ -155,11 +155,11 @@ class AbstractCatalogManager {
   void DetachCatalog(Catalog *catalog);
   void DetachSubtree(Catalog *catalog);
   inline void DetachAll() { DetachSubtree(GetRootCatalog()); }
-  bool IsAttached(const std::string &root_path,
+  bool IsAttached(const PathString &root_path,
                   Catalog **attached_catalog) const;
 
   inline Catalog* GetRootCatalog() const { return catalogs_.front(); }
-  Catalog *FindCatalog(const std::string &path) const;
+  Catalog *FindCatalog(const PathString &path) const;
 
  private:
   const static inode_t kInodeOffset = 255;

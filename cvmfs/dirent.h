@@ -32,11 +32,6 @@ enum SpecialDirents {
   kDirentNegative,
 };
 
-const unsigned char kDefaultMaxName = 25;
-const unsigned char kDefaultMaxLink = 25;
-const unsigned char kDefaultMaxPath = 200;
-typedef ShortString<kDefaultMaxPath> PathString;
-
 class DirectoryEntry {
   friend class LookupSqlStatement;                   // simplify creation of DirectoryEntry objects
   friend class ManipulateDirectoryEntrySqlStatement; // simplify write of DirectoryEntry objects in database
@@ -135,7 +130,7 @@ private:
   Catalog* catalog_;
 
   // stat like information
-  ShortString<kDefaultMaxName> name_;
+  NameString name_;
   inode_t inode_;
   inode_t parent_inode_;
   int linkcount_;
@@ -145,7 +140,7 @@ private:
   time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
                               need to be invalidated (file has changed) */
   // TODO: unionize
-  ShortString<kDefaultMaxLink> symlink_;
+  LinkString symlink_;
   hash::Any checksum_;
 
   // Administrative data

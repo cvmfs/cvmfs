@@ -8,6 +8,7 @@
 
 #include "logging.h"
 #include "smalloc.h"
+#include "shortstring.h"
 
 using namespace std;  // NOLINT
 
@@ -39,7 +40,7 @@ AbstractCatalogManager::~AbstractCatalogManager() {
 bool AbstractCatalogManager::Init() {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog");
   WriteLock();
-  bool attached = MountCatalog("", hash::Any(), NULL);
+  bool attached = MountCatalog(PathString("", 0), hash::Any(), NULL);
   Unlock();
 
   if (!attached) {
@@ -59,16 +60,17 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remounting repositories (dry run %d)", dry_run);
   if (dry_run)
-    return LoadCatalog("", hash::Any(), NULL);
+    return LoadCatalog(PathString("", 0), hash::Any(), NULL);
 
   WriteLock();
   string catalog_path;
-  const LoadError load_error = LoadCatalog("", hash::Any(), &catalog_path);
+  const LoadError load_error = LoadCatalog(PathString("", 0), hash::Any(),
+                                           &catalog_path);
   if (load_error == kLoadNew) {
     DetachAll();
     inode_gauge_ = AbstractCatalogManager::kInodeOffset;
 
-    Catalog *new_root = CreateCatalog("", NULL);
+    Catalog *new_root = CreateCatalog(PathString("", 0), NULL);
     assert(new_root);
     bool retval = AttachCatalog(catalog_path, new_root);
     assert(retval);
@@ -158,11 +160,10 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
  * @param dirent the resulting DirectoryEntry
  * @return true if lookup succeeded otherwise false
  */
-bool AbstractCatalogManager::LookupPath(const PathString &p,
+bool AbstractCatalogManager::LookupPath(const PathString &path,
                                         const LookupOptions options,
                                         DirectoryEntry *dirent)
 {
-  string path(p.GetChars(), p.GetLength());  // TODO
   EnforceSqliteMemLimit();
   ReadLock();
 
@@ -211,7 +212,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &p,
 
   // Look for parent entry
   if (options == kLookupFull) {
-    string parent_path = GetParentPath(path);
+    PathString parent_path = GetParentPath(path);
     DirectoryEntry parent;
     found = LookupPath(parent_path, kLookupSole, &parent);
     if (!found) {
@@ -238,10 +239,9 @@ bool AbstractCatalogManager::LookupPath(const PathString &p,
  * @param listing the resulting DirectoryEntryList
  * @return true if listing succeeded otherwise false
  */
-bool AbstractCatalogManager::Listing(const PathString &p,
+bool AbstractCatalogManager::Listing(const PathString &path,
                                      DirectoryEntryList *listing)
 {
-  string path(p.GetChars(), p.GetLength());  // TODO
   EnforceSqliteMemLimit();
   bool result;
   ReadLock();
@@ -333,7 +333,7 @@ void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
  * @param path the path a catalog is searched for
  * @return the catalog which is best fitting at the given path
  */
-Catalog* AbstractCatalogManager::FindCatalog(const string &path) const {
+Catalog* AbstractCatalogManager::FindCatalog(const PathString &path) const {
   assert (catalogs_.size() > 0);
 
   // Start at the root catalog and successive go down the catalog tree
@@ -356,7 +356,7 @@ Catalog* AbstractCatalogManager::FindCatalog(const string &path) const {
  * @param attached_catalog is set to the searched catalog, if not NULL
  * @return true if catalog is already present, false otherwise
  */
-bool AbstractCatalogManager::IsAttached(const string &root_path,
+bool AbstractCatalogManager::IsAttached(const PathString &root_path,
                                         Catalog **attached_catalog) const
 {
   if (catalogs_.size() == 0)
@@ -375,23 +375,27 @@ bool AbstractCatalogManager::IsAttached(const string &root_path,
  * Recursively mounts all nested catalogs required to serve a path.
  * The final leaf nested catalog is returned.
  */
-bool AbstractCatalogManager::MountSubtree(const string &path,
+bool AbstractCatalogManager::MountSubtree(const PathString &path,
                                           const Catalog *entry_point,
                                           Catalog **leaf_catalog)
 {
   bool result = true;
   Catalog *parent = (entry_point == NULL) ?
                     GetRootCatalog() : const_cast<Catalog *>(entry_point);
-  assert(path.find(parent->path()) == 0);
+  assert(path.StartsWith(parent->path()));
 
   // Try to find path as a super string of nested catalog mount points
+  PathString path_slash(path);
+  path_slash.Append("/", 1);
   const Catalog::NestedCatalogList nested_catalogs =
     parent->ListNestedCatalogs();
   for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
-    if ((path + "/").find(i->path + "/") == 0) {
+    PathString nested_path_slash(i->path);
+    nested_path_slash.Append("/", 1);
+    if (path_slash.StartsWith(nested_path_slash)) {
       Catalog *new_nested;
       LogCvmfs(kLogCatalog, kLogDebug, "load nested catalog at %s",
                i->path.c_str());
@@ -412,7 +416,7 @@ bool AbstractCatalogManager::MountSubtree(const string &path,
  * Load a catalog file and attach it to the tree of Catalog objects.
  * Loading of catalogs is implemented by derived classes.
  */
-Catalog *AbstractCatalogManager::MountCatalog(const string &mountpoint,
+Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
                                               const hash::Any &hash,
                                               Catalog *parent_catalog)
 {
@@ -448,7 +452,7 @@ Catalog *AbstractCatalogManager::MountCatalog(const string &mountpoint,
  * @param new_catalog the catalog to attach to this CatalogManager
  * @return true on success, false otherwise
  */
-bool AbstractCatalogManager::AttachCatalog(const std::string &db_path,
+bool AbstractCatalogManager::AttachCatalog(const string &db_path,
                                            Catalog *new_catalog)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "attaching catalog file %s",
@@ -567,7 +571,8 @@ string AbstractCatalogManager::PrintHierarchyRecursively(const Catalog *catalog,
   for (int i = 0; i < level; ++i)
     output += "    ";
 
-  output += "-> " + catalog->path() + "\n";
+  output += "-> " +
+    string(catalog->path().GetChars(), catalog->path().GetLength()) + "\n";
 
   CatalogList children = catalog->GetChildren();
   CatalogList::const_iterator i,iend;

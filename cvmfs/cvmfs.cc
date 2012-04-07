@@ -316,7 +316,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 }
 
 
-static bool GetDirentForPath(const catalog::PathString &path,
+static bool GetDirentForPath(const PathString &path,
                              const fuse_ino_t parent_inode,
                              catalog::DirectoryEntry *dirent)
 {
@@ -337,7 +337,7 @@ static bool GetDirentForPath(const catalog::PathString &path,
 }
 
 
-static bool GetPathForInode(const fuse_ino_t ino, catalog::PathString *path) {
+static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   // Check the path cache first
   if (path_cache_->Lookup(ino, path)) {
     return true;
@@ -355,7 +355,7 @@ static bool GetPathForInode(const fuse_ino_t ino, catalog::PathString *path) {
     path->Assign("", 0);
   } else {
     // Retrieve the parent path recursively
-    catalog::PathString parent_path;
+    PathString parent_path;
     if (!GetPathForInode(dirent.parent_inode(), &parent_path))
       return false;
 
@@ -383,7 +383,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
-  catalog::PathString parent_path;
+  PathString parent_path;
 
   if (!GetPathForInode(parent, &parent_path)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
@@ -393,7 +393,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   }
 
   catalog::DirectoryEntry dirent;
-  catalog::PathString path;
+  PathString path;
   path.Assign(parent_path);
   path.Append("/", 1);
   path.Append(name, strlen(name));
@@ -493,7 +493,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
 
-  catalog::PathString path;
+  PathString path;
   catalog::DirectoryEntry d;
   const bool found = GetPathForInode(ino, &path) && GetDirentForInode(ino, &d);
 
@@ -632,7 +632,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
-  catalog::PathString path;
+  PathString path;
 
   const bool found = GetDirentForInode(ino, &dirent) &&
                      GetPathForInode(ino, &path);

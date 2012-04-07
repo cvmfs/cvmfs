@@ -22,6 +22,7 @@
 
 #include "hash.h"
 #include "dirent.h"
+#include "shortstring.h"
 #include "duplex_sqlite3.h"
 
 namespace catalog {
@@ -418,7 +419,7 @@ class InodeLookupSqlStatement : public LookupSqlStatement {
 class FindNestedCatalogSqlStatement : public SqlStatement {
  public:
   FindNestedCatalogSqlStatement(const sqlite3 *database);
-  bool BindSearchPath(const std::string &path);
+  bool BindSearchPath(const PathString &path);
   hash::Any GetContentHash() const;
 };
 
@@ -431,7 +432,7 @@ class FindNestedCatalogSqlStatement : public SqlStatement {
 class ListNestedCatalogsSqlStatement : public SqlStatement {
  public:
   ListNestedCatalogsSqlStatement(const sqlite3 *database);
-  std::string GetMountpoint() const;
+  PathString GetMountpoint() const;
   hash::Any GetContentHash() const;
 };
 

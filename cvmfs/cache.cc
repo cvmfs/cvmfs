@@ -55,6 +55,7 @@
 #include "smalloc.h"
 #include "signature.h"
 #include "atomic.h"
+#include "shortstring.h"
 
 using namespace std;  // NOLINT
 
@@ -553,7 +554,7 @@ CatalogManager::CatalogManager(const string &repo_name,
 }
 
 
-catalog::Catalog* CatalogManager::CreateCatalog(const std::string &mountpoint,
+catalog::Catalog* CatalogManager::CreateCatalog(const PathString &mountpoint,
   catalog::Catalog *parent_catalog)
 {
   mounted_catalogs_[mountpoint] = loaded_catalogs_[mountpoint];
@@ -642,12 +643,13 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
 }
 
 
-catalog::LoadError CatalogManager::LoadCatalog(const std::string &mountpoint,
+catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
                                                const hash::Any &hash,
                                                std::string *catalog_path)
 {
   string cvmfs_path = "file catalog at " + repo_name_ + ":" +
-                      ((mountpoint == "") ? "/" : mountpoint);
+    (mountpoint.IsEmpty() ?
+      "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
   bool retval;
   if (!hash.IsNull()) {
     cvmfs_path += " (" + hash.ToString() + ")";
@@ -743,8 +745,10 @@ catalog::LoadError CatalogManager::LoadCatalog(const std::string &mountpoint,
                  "failed to pin cached root catalog");
         return catalog::kLoadFail;
       }
+      loaded_catalogs_[mountpoint] = cache_hash;
       return catalog::kLoadUp2Date;
     } else {
+      loaded_catalogs_[mountpoint] = cache_hash;
       return catalog::kLoadUp2Date;
     }
   }
@@ -921,10 +925,11 @@ catalog::LoadError CatalogManager::LoadCatalog(const std::string &mountpoint,
 }
 
 
-void CatalogManager::UnloadCatalog(const string &mountpoint) {
+void CatalogManager::UnloadCatalog(const PathString &mountpoint) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s", mountpoint.c_str());
 
-  map<string, hash::Any>::iterator iter = mounted_catalogs_.find(mountpoint);
+  map<PathString, hash::Any>::iterator iter =
+    mounted_catalogs_.find(mountpoint);
   assert(iter != mounted_catalogs_.end());
 
   quota::Unpin(iter->second);
