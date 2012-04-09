@@ -44,11 +44,13 @@ enum LoadError {
 struct Statistics {
   atomic_int64 num_lookup_inode;
   atomic_int64 num_lookup_path;
+  atomic_int64 num_lookup_path_negative;
   atomic_int64 num_listing;
 
   Statistics() {
     atomic_init64(&num_lookup_inode);
     atomic_init64(&num_lookup_path);
+    atomic_init64(&num_lookup_path_negative);
     atomic_init64(&num_listing);
   }
 
@@ -56,7 +58,10 @@ struct Statistics {
     return
       "lookup(inode): " + StringifyInt(atomic_read64(&num_lookup_inode)) +
       "    " +
-      "lookup(path): " + StringifyInt(atomic_read64(&num_lookup_path)) +
+      "lookup(path-all): " + StringifyInt(atomic_read64(&num_lookup_path)) +
+      "    " +
+      "lookup(path-negative): " +
+        StringifyInt(atomic_read64(&num_lookup_path_negative)) +
       "    " +
       "listing: " + StringifyInt(atomic_read64(&num_listing)) + "\n";
   }

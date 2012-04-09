@@ -535,6 +535,7 @@ cvmfs_stat() {
    cache_avail=`df -P . | tail -n 1 | awk '{print int($4)}'` || exit 34
    cache_max=$[$cache_use+$cache_avail]
    get_attr usedfd; usedfd=$attr_value
+   get_attr useddirp; useddirp=$attr_value
    get_attr maxfd; maxfd=$attr_value
    get_attr nioerr; nioerr=$attr_value
    get_attr host; host=$attr_value
@@ -569,7 +570,7 @@ cvmfs_stat() {
       echo "No. Active File Catalogs: $nclg"
       echo "Cache Usage: ${cache_use}k / ${cache_max}k"
       echo "File Descriptor Usage: $usedfd / $maxfd"
-      echo "No. Open Directories: $ndiropen"
+      echo "No. Open Directories: $useddirp"
       echo "No. IO Errors: $nioerr"
       echo -n "Connection: $host through proxy $proxy"
       if [ $online -eq 1 ]; then
@@ -577,7 +578,7 @@ cvmfs_stat() {
       else
          echo " (offline)"
       fi
-      echo "Usage: $nopen open() calls, hitrate ${hitrate}%"
+      echo "Usage: $nopen open() calls (hitrate ${hitrate}%), $ndiropen opendir() calls"
       echo "Transfer Statistics: ${rx}k read, avg. speed: ${speed}k/s"
    else
       echo "VERSION PID UPTIME(M) MEM(K) REVISION EXPIRES(M) NOCATALOGS CACHEUSE(K) CACHEMAX(K) NOFDUSE NOFDMAX NOIOERR NOOPEN HITRATE(%) RX(K) SPEED(K/S) HOST PROXY ONLINE"

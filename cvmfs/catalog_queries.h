@@ -282,7 +282,7 @@ class DirectoryEntrySqlStatement : public SqlStatement {
    *  @param raw_symlink the raw symlink path (may) containing place holders
    *  @return the expanded symlink
    */
-  std::string ExpandSymlink(const std::string raw_symlink) const;
+  void ExpandSymlink(LinkString *raw_symlink) const;
 
   /**
    *  retrieve the linkcount of the read DirectoryEntry from it's flags field

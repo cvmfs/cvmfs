@@ -548,6 +548,7 @@ CatalogManager::CatalogManager(const string &repo_name,
   LogCvmfs(kLogCache, kLogDebug, "constructing cache catalog manager");
   repo_name_ = repo_name;
   ignore_signature_ = ignore_signature;
+  offline_mode_ = false;
   atomic_init32(&certificate_hits_);
   atomic_init32(&certificate_misses_);
 }
@@ -706,8 +707,27 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "unable to load checksum from %s (%d)",
              checksum_url.c_str(), download_checksum.error_code);
+    if (!cache_hash.IsNull()) {
+      // TODO remove code duplication
+      if (catalog_path) {
+        *catalog_path = "." + cache_hash.MakePath(1, 2);
+        int64_t size = GetFileSize(*catalog_path);
+        assert(size >= 0);
+        retval = quota::Pin(cache_hash, uint64_t(size),
+                            cvmfs_path);
+        if (!retval) {
+          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+                   "failed to pin cached root catalog");
+          return catalog::kLoadFail;
+        }
+        loaded_catalogs_[mountpoint] = cache_hash;
+        offline_mode_ = true;
+        return catalog::kLoadUp2Date;
+      }
+    }
     return catalog::kLoadFail;
   }
+  offline_mode_ = false;
   checksum_size = download_checksum.destination_mem.size;
 
   checksum_buffer = reinterpret_cast<unsigned char *>(alloca(checksum_size));

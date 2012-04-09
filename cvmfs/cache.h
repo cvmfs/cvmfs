@@ -59,6 +59,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
     return "hits: " + StringifyInt(atomic_read32(&certificate_hits_)) + "    " +
     "misses: " + StringifyInt(atomic_read32(&certificate_misses_));
   }
+  bool offline_mode() const { return offline_mode_; }
 
  protected:
   catalog::LoadError LoadCatalog(const PathString &mountpoint,
@@ -81,6 +82,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
 
   std::string repo_name_;
   bool ignore_signature_;
+  bool offline_mode_;  /**< cached copy used because there is no network */
   atomic_int32 certificate_hits_;
   atomic_int32 certificate_misses_;
 };

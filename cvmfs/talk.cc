@@ -310,6 +310,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
         catalog::Statistics catalog_stats;
         string result;
 
+        result += "File System Call Statistics:\n  " + cvmfs::GetFsStats();
+
         cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
         result += "File Catalog Memory Cache:\n" +
                   string("  inode cache:   ") + inode_stats.Print() +

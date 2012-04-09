@@ -14,6 +14,8 @@
 #include <string>
 #include <algorithm>
 
+#include "atomic.h"
+
 const unsigned char kDefaultMaxName = 25;
 const unsigned char kDefaultMaxLink = 25;
 const unsigned char kDefaultMaxPath = 200;
@@ -166,10 +168,16 @@ class ShortString {
   std::string *long_string_;
   char stack_[StackSize+1];  // +1 to add a final '\0' if necessary
   unsigned char length_;
+  static atomic_int64 num_overflows_;
+  static atomic_int64 num_instances_;
 };  // class ShortString
 
 typedef ShortString<kDefaultMaxPath> PathString;
 typedef ShortString<kDefaultMaxName> NameString;
 typedef ShortString<kDefaultMaxLink> LinkString;
+
+//template<int StackSize>
+//typename atomic_int64 ShortString<StackSize>::num_instances_ = 0;
+
 
 #endif  // SHORTSTRING_H_

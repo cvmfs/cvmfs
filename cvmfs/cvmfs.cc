@@ -152,10 +152,15 @@ DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
-atomic_int64 num_open_;
-atomic_int64 num_dir_open_;
+atomic_int64 num_fs_open_;
+atomic_int64 num_fs_dir_open_;
+atomic_int64 num_fs_lookup_;
+atomic_int64 num_fs_stat_;
+atomic_int64 num_fs_read_;
+atomic_int64 num_fs_readlink_;
 atomic_int32 num_io_error_;
 atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
+atomic_int32 open_dirs_; /**< number of currently open directories */
 unsigned max_open_files_; /**< maximum allowed number of open files */
 const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
@@ -219,9 +224,17 @@ catalog::Statistics GetCatalogStatistics() {
   return catalog_manager_->statistics();
 }
 
-std::string GetCertificateStats() {
+string GetCertificateStats() {
   return catalog_manager_->GetCertificateStats();
+}
 
+string GetFsStats() {
+  return "lookup(): " + StringifyInt(atomic_read64(&num_fs_lookup_)) + "  " +
+    "stat(): " + StringifyInt(atomic_read64(&num_fs_stat_)) + "  " +
+    "open(): " + StringifyInt(atomic_read64(&num_fs_open_)) + "  " +
+    "diropen(): " + StringifyInt(atomic_read64(&num_fs_dir_open_)) + "  " +
+    "read(): " + StringifyInt(atomic_read64(&num_fs_read_)) + "  " +
+    "readlink(): " + StringifyInt(atomic_read64(&num_fs_readlink_)) + "\n";
 }
 
 
@@ -270,7 +283,9 @@ static void RemountFinish() {
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
-    if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
+    if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
+        catalog_manager_->offline_mode())
+    {
       LogCvmfs(kLogCvmfs, kLogDebug, "reload/finish failed, "
                "applying short term TTL");
       alarm(kShortTermTTL);
@@ -383,6 +398,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
                          const char *name)
 {
+  atomic_inc64(&num_fs_lookup_);
   RemountCheck();
 
   parent = catalog_manager_->MangleInode(parent);
@@ -426,6 +442,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
 static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
+  atomic_inc64(&num_fs_stat_);
   RemountCheck();
 
   ino = catalog_manager_->MangleInode(ino);
@@ -449,6 +466,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  * Reads a symlink from the catalog.  Environment variables are expanded.
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
+  atomic_inc64(&num_fs_readlink_);
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
   tracer::Trace(tracer::kFuseReadlink, "no path provided", "readlink() call");
@@ -548,7 +566,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   fi->fh = next_directory_handle_;
   ++next_directory_handle_;
   pthread_mutex_unlock(&lock_directory_handles_);
-  atomic_inc64(&num_dir_open_);
+  atomic_inc64(&num_fs_dir_open_);
+  atomic_inc32(&open_dirs_);
 
   fuse_reply_open(req, fi);
 }
@@ -571,7 +590,7 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
     free(iter_handle->second.buffer);
     directory_handles_->erase(iter_handle);
     pthread_mutex_unlock(&lock_directory_handles_);
-    atomic_dec64(&num_dir_open_);
+    atomic_dec32(&open_dirs_);
   } else {
     pthread_mutex_unlock(&lock_directory_handles_);
     reply = EINVAL;
@@ -668,7 +687,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
-  atomic_inc64(&num_open_);
+  atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
@@ -676,8 +695,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
       // If file has changed with a new catalog, the kernel data cache needs
-      // to be invalidated
-      fi->keep_cache = 1;
+      // to be invalidated.  Special case: 0s metadata timeout includes no page
+      // cache
+      fi->keep_cache = GetKcacheTimeout() == 0.0 ? 0 : 1;
       if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "file might be new or changed, invalidating cache (%d %d)",
@@ -732,7 +752,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_read on inode: %d reading %d bytes from offset %d fd %d",
            catalog_manager_->MangleInode(ino), size, off, fi->fh);
-  tracer::Trace(tracer::kFuseRead, "no path provided", "read() call");
+  atomic_inc64(&num_fs_read_);
 
   // Get data chunk (<=4k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
@@ -923,6 +943,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
   } else if (attr == "user.usedfd") {
     attribute_value = StringifyInt(atomic_read32(&open_files_));
+  } else if (attr == "user.useddirp") {
+    attribute_value = StringifyInt(atomic_read32(&open_dirs_));
   } else if (attr == "user.nioerr") {
     attribute_value = StringifyInt(atomic_read32(&num_io_error_));
   } else if (attr == "user.proxy") {
@@ -952,9 +974,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     const int num_catalogs = catalog_manager_->GetNumCatalogs();
     attribute_value = StringifyInt(num_catalogs);
   } else if (attr == "user.nopen") {
-    attribute_value = StringifyInt(atomic_read64(&num_open_));
+    attribute_value = StringifyInt(atomic_read64(&num_fs_open_));
   } else if (attr == "user.ndiropen") {
-    attribute_value = StringifyInt(atomic_read64(&num_dir_open_));
+    attribute_value = StringifyInt(atomic_read64(&num_fs_dir_open_));
   } else if (attr == "user.ndownload") {
     attribute_value = StringifyInt(cache::GetNumDownloads());
   } else if (attr == "user.timeout") {
@@ -1541,8 +1563,12 @@ int main(int argc, char *argv[]) {
   assert(retval == SQLITE_OK);
 
   // Runtime counters
-  atomic_init64(&cvmfs::num_open_);
-  atomic_init64(&cvmfs::num_dir_open_);
+  atomic_init64(&cvmfs::num_fs_open_);
+  atomic_init64(&cvmfs::num_fs_dir_open_);
+  atomic_init64(&cvmfs::num_fs_lookup_);
+  atomic_init64(&cvmfs::num_fs_stat_);
+  atomic_init64(&cvmfs::num_fs_read_);
+  atomic_init64(&cvmfs::num_fs_readlink_);
   atomic_init32(&cvmfs::num_io_error_);
   cvmfs::previous_io_error_.timestamp = 0;
   cvmfs::previous_io_error_.delay = 0;
@@ -1690,6 +1716,7 @@ int main(int argc, char *argv[]) {
   }
   cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
   atomic_init32(&cvmfs::open_files_);
+  atomic_init32(&cvmfs::open_dirs_);
   monitor_ready = true;
 
   // Control & command interface
@@ -1750,8 +1777,12 @@ int main(int argc, char *argv[]) {
   sigfillset(&sa.sa_mask);
   retval = sigaction(SIGALRM, &sa, NULL);
   assert(retval == 0);
-  alarm(cvmfs::GetEffectiveTTL());
-  cvmfs::catalogs_valid_until_ = time(NULL) + cvmfs::GetEffectiveTTL();
+  {
+    unsigned ttl = cvmfs::catalog_manager_->offline_mode() ?
+      cvmfs::kShortTermTTL : cvmfs::GetEffectiveTTL();
+    alarm(ttl);
+    cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
+  }
 
   // Set fuse callbacks, remove url from arguments
   LogCvmfs(kLogCvmfs, kLogSyslog,

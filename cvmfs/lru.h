@@ -70,6 +70,9 @@ struct Statistics {
   atomic_int64 num_hit;
   atomic_int64 num_miss;
   atomic_int64 num_insert;
+  atomic_int64 num_insert_negative;
+  uint64_t num_collisions;
+  uint32_t max_collisions;
   atomic_int64 num_update;
   atomic_int64 num_replace;
   atomic_int64 num_forget;
@@ -78,9 +81,12 @@ struct Statistics {
 
   Statistics() {
     size = 0;
+    num_collisions = 0;
+    max_collisions = 0;
     atomic_init64(&num_hit);
     atomic_init64(&num_miss);
     atomic_init64(&num_insert);
+    atomic_init64(&num_insert_negative);
     atomic_init64(&num_update);
     atomic_init64(&num_replace);
     atomic_init64(&num_forget);
@@ -89,14 +95,18 @@ struct Statistics {
   }
 
   std::string Print() {
-    return "size: " + StringifyInt(size) + "    " +
-      "hits: " + StringifyInt(atomic_read64(&num_hit)) + "    " +
-      "misses: " + StringifyInt(atomic_read64(&num_miss)) + "    " +
-      "inserts: " + StringifyInt(atomic_read64(&num_insert)) + "    " +
-      "updates: " + StringifyInt(atomic_read64(&num_update)) + "    " +
-      "replacements: " + StringifyInt(atomic_read64(&num_replace)) + "    " +
-      "forgets: " + StringifyInt(atomic_read64(&num_forget)) + "    " +
-      "drops: " + StringifyInt(atomic_read64(&num_drop)) + "    " +
+    return "size: " + StringifyInt(size) + "  " +
+      "hits: " + StringifyInt(atomic_read64(&num_hit)) + "  " +
+      "misses: " + StringifyInt(atomic_read64(&num_miss)) + "  " +
+      "inserts(all): " + StringifyInt(atomic_read64(&num_insert)) + "  " +
+      "inserts(negative): " + StringifyInt(atomic_read64(&num_insert_negative))
+        + "  " +
+      "collisions: " + StringifyInt(num_collisions) + "  " +
+      "collisions(max): " + StringifyInt(max_collisions) + "  " +
+      "updates: " + StringifyInt(atomic_read64(&num_update)) + "  " +
+      "replacements: " + StringifyInt(atomic_read64(&num_replace)) + "  " +
+      "forgets: " + StringifyInt(atomic_read64(&num_forget)) + "  " +
+      "drops: " + StringifyInt(atomic_read64(&num_drop)) + "  " +
       "allocated: " + StringifyInt(atomic_read64(&allocated) / 1024) + " KB\n";
   }
 };
@@ -115,6 +125,8 @@ class SmallHash {
     values_ = NULL;
     hasher_ = NULL;
     bytes_allocated_ = 0;
+    num_collisions_ = 0;
+    max_collisions_ = 0;
   }
 
   void Init(uint32_t size, Key empty, uint32_t (*hasher)(const Key &key)) {
@@ -129,7 +141,8 @@ class SmallHash {
 
   bool Lookup(const Key &key, Value *value) const {
     uint32_t bucket;
-    const bool found = DoLookup(key, &bucket);
+    uint32_t collisions;
+    const bool found = DoLookup(key, &bucket, &collisions);
     if (found)
       *value = values_[bucket];
     return found;
@@ -137,14 +150,19 @@ class SmallHash {
 
   void Insert(const Key &key, const Value &value) {
     uint32_t bucket;
-    DoLookup(key, &bucket);
+    uint32_t collisions;
+    DoLookup(key, &bucket, &collisions);
+    num_collisions_ += collisions;
+    LogCvmfs(kLogLru, kLogDebug, "LOOKUP ADDED %u to COLLISIONS, result %u", collisions, num_collisions_);
+    max_collisions_ = std::max(collisions, max_collisions_);
     keys_[bucket] = key;
     values_[bucket] = value;
   }
 
   void Erase(const Key &key) {
     uint32_t bucket;
-    const bool found = DoLookup(key, &bucket);
+    uint32_t collisions;
+    const bool found = DoLookup(key, &bucket, &collisions);
     if (found) {
       keys_[bucket] = empty_key_;
       bucket = (bucket+1) % capacity_;
@@ -164,6 +182,13 @@ class SmallHash {
 
   uint64_t bytes_allocated() const { return bytes_allocated_; }
 
+  void GetCollisionStats(uint64_t *num_collisions,
+                         uint32_t *max_collisions) const
+  {
+    *num_collisions = num_collisions_;
+    *max_collisions = max_collisions_;
+  }
+
   ~SmallHash() {
     delete[] keys_;
     delete[] values_;
@@ -176,12 +201,14 @@ class SmallHash {
     return (uint32_t)bucket % capacity_;
   }
 
-  bool DoLookup(const Key &key, uint32_t *bucket) const {
+  bool DoLookup(const Key &key, uint32_t *bucket, uint32_t *collisions) const {
     *bucket = ScaleHash(key);
+    *collisions = 0;
     while (!(keys_[*bucket] == empty_key_)) {
       if (keys_[*bucket] == key)
         return true;
       *bucket = (*bucket+1) % capacity_;
+      (*collisions)++;
     }
     return false;
   }
@@ -192,6 +219,8 @@ class SmallHash {
   uint32_t capacity_;
   uint32_t (*hasher_)(const Key &key);
   uint64_t bytes_allocated_;
+  uint64_t num_collisions_;
+  uint32_t max_collisions_;  /**< maximum collisions for a single insert */
   Key empty_key_;
 };
 
@@ -764,7 +793,13 @@ class LruCache {
   inline bool IsFull() const { return cache_gauge_ >= cache_size_; }
   inline bool IsEmpty() const { return cache_gauge_ == 0; }
 
-  Statistics statistics() { return statistics_; }
+  Statistics statistics() {
+    Lock();
+    cache_.GetCollisionStats(&statistics_.num_collisions,
+                             &statistics_.max_collisions);
+    Unlock();
+    return statistics_;
+  }
 
  protected:
   Statistics statistics_;
@@ -918,6 +953,8 @@ class Md5PathCache :
 
   bool InsertNegative(const hash::Md5 &hash) {
     const bool result = Insert(hash, dirent_negative_);
+    if (result)
+      atomic_inc64(&statistics_.num_insert_negative);
     return result;
   }
 

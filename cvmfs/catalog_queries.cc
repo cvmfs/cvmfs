@@ -74,8 +74,19 @@ unsigned int DirectoryEntrySqlStatement::CreateDatabaseFlags(const DirectoryEntr
   return database_flags;
 }
 
-std::string DirectoryEntrySqlStatement::ExpandSymlink(const std::string raw_symlink) const {
-  string result = "";
+void DirectoryEntrySqlStatement::ExpandSymlink(LinkString *raw_symlink) const {
+  const char *chars = raw_symlink->GetChars();
+  unsigned length = raw_symlink->GetLength();
+  for (unsigned i = 0; i < length;  ++i) {
+    if (chars[i] == '$')
+      goto expand_symlink;
+  }
+  return;
+
+ expand_symlink:
+  // TODO
+  return;
+  /*string result = "";
 
   for (string::size_type i = 0; i < raw_symlink.length(); i++) {
     string::size_type lpar;
@@ -86,7 +97,7 @@ std::string DirectoryEntrySqlStatement::ExpandSymlink(const std::string raw_syml
         (rpar > lpar))
     {
       string var = raw_symlink.substr(lpar + 1, rpar-lpar-1);
-      char *var_exp = getenv(var.c_str()); /* Don't free! Nothing is allocated here */
+      char *var_exp = getenv(var.c_str()); // Don't free! Nothing is allocated here
       if (var_exp) {
         result += var_exp;
       }
@@ -96,7 +107,7 @@ std::string DirectoryEntrySqlStatement::ExpandSymlink(const std::string raw_syml
     }
   }
 
-  return result;
+  return result;*/
 }
 
 //
@@ -168,8 +179,9 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.mtime_        = RetrieveInt64(4);
   result.checksum_     = RetrieveSha1HashFromBlob(0);
   result.name_.Assign((char *)RetrieveText(6), strlen((char *)RetrieveText(6)));
-  //const unsigned symlink_length = ExpandSymlink((char *)RetrieveText(7)).length();
-  result.symlink_.Assign((char *)RetrieveText(7), strlen((char *)RetrieveText(7)));
+  result.symlink_.Assign((char *)RetrieveText(7),
+                         strlen((char *)RetrieveText(7)));
+  ExpandSymlink(&result.symlink_);
 
   return result;
 }

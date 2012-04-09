@@ -229,6 +229,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
 
  lookup_path_notfound:
   Unlock();
+  atomic_inc64(&statistics_.num_lookup_path_negative);
   return false;
 }
 
