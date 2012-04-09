@@ -88,7 +88,6 @@ static void CleanupTLS(void *data) {
   delete tls;
 }
 
-
 /**
  * Initializes the cache directory with the 256 subdirectories and /txn.
  *

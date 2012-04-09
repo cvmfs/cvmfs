@@ -184,6 +184,37 @@ bool Catalog::LookupMd5Path(const hash::Md5 &md5path,
  * @param listing will be set to the resulting DirectoryEntryList
  * @return true on successful listing, false otherwise
  */
+bool Catalog::ListingMd5PathStat(const hash::Md5 &md5path,
+                                 StatEntryList *listing) const
+{
+  assert(IsInitialized());
+
+  DirectoryEntry dirent;
+  StatEntry entry;
+
+  pthread_mutex_lock(lock_);
+  sql_listing_->BindPathHash(md5path);
+  while (sql_listing_->FetchRow()) {
+    dirent = sql_listing_->GetDirectoryEntry(this);
+    FixTransitionPoint(md5path, &dirent);
+    entry.name = dirent.name();
+    entry.info = dirent.GetStatStructure();
+    listing->push_back(entry);
+  }
+  sql_listing_->Reset();
+  pthread_mutex_unlock(lock_);
+
+  return true;
+}
+
+
+/**
+ * Perform a listing of the directory with the given MD5 path hash.
+ * Returns only struct stat values
+ * @param path_hash the MD5 hash of the path of the directory to list
+ * @param listing will be set to the resulting DirectoryEntryList
+ * @return true on successful listing, false otherwise
+ */
 bool Catalog::ListingMd5Path(const hash::Md5 &md5path,
                              DirectoryEntryList *listing) const
 {
@@ -353,11 +384,10 @@ Catalog* Catalog::FindSubtree(const PathString &path) const {
   if (!path.StartsWith(path_))
     return NULL;
 
-  // Tokenize the remaining string
   PathString remaining(path.Suffix(path_.GetLength()));
   remaining.Append("/", 1);
 
-  // now we recombine the tokens successively
+  // now we recombine the path elements successively
   // in order to find a child which serves a part of the path
   PathString path_prefix(path_);
   Catalog *result = NULL;

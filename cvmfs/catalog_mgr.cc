@@ -265,6 +265,38 @@ bool AbstractCatalogManager::Listing(const PathString &path,
 }
 
 
+/**
+ * Do a listing of the specified directory, return only struct stat values.
+ * @param path the path of the directory to list
+ * @param listing the resulting StatEntryList
+ * @return true if listing succeeded otherwise false
+ */
+bool AbstractCatalogManager::ListingStat(const PathString &path,
+                                        StatEntryList *listing)
+{
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Find catalog, possibly load nested
+  Catalog *best_fit = FindCatalog(path);
+  Catalog *catalog;
+  UpgradeLock();
+  result = MountSubtree(path, best_fit, &catalog);
+  DowngradeLock();
+  if (!result) {
+    Unlock();
+    return false;
+  }
+
+  atomic_inc64(&statistics_.num_listing);
+  result = catalog->ListingPathStat(path, listing);
+
+  Unlock();
+  return result;
+}
+
+
 uint64_t AbstractCatalogManager::GetRevision() const {
   ReadLock();
   const uint64_t revision = GetRootCatalog()->GetRevision();

@@ -149,7 +149,19 @@ private:
   bool is_nested_catalog_mountpoint_;
 };
 
+/**
+ * Saves memory for large directory listings
+ */
+struct StatEntry {
+  NameString name;
+  struct stat info;
+
+  StatEntry() { }
+  StatEntry(const NameString &n, const struct stat &i) : name(n), info(i) { }
+};
+
 typedef std::vector<DirectoryEntry> DirectoryEntryList;
+typedef std::vector<StatEntry> StatEntryList;
 
 } // namespace catalog
 

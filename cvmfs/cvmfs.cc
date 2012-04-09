@@ -153,6 +153,7 @@ pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
 atomic_int64 num_open_;
+atomic_int64 num_dir_open_;
 atomic_int32 num_io_error_;
 atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
 unsigned max_open_files_; /**< maximum allowed number of open files */
@@ -216,6 +217,11 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
 
 catalog::Statistics GetCatalogStatistics() {
   return catalog_manager_->statistics();
+}
+
+std::string GetCertificateStats() {
+  return catalog_manager_->GetCertificateStats();
+
 }
 
 
@@ -524,17 +530,16 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   }
 
   // Add all names
-  catalog::DirectoryEntryList listing_from_catalog;
-  if (!catalog_manager_->Listing(path, &listing_from_catalog)) {
+  catalog::StatEntryList listing_from_catalog;
+  if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
     free(listing.buffer);
     fuse_reply_err(req, EIO);
     return;
   }
-  for (catalog::DirectoryEntryList::const_iterator i = listing_from_catalog.begin(),
+  for (catalog::StatEntryList::const_iterator i = listing_from_catalog.begin(),
        iEnd = listing_from_catalog.end(); i != iEnd; ++i)
   {
-    info = i->GetStatStructure();
-    AddToDirListing(req, i->name().c_str(), &info, &listing);
+    AddToDirListing(req, i->name.c_str(), &(i->info), &listing);
   }
 
   // Save the directory listing and return a handle to the listing
@@ -543,6 +548,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   fi->fh = next_directory_handle_;
   ++next_directory_handle_;
   pthread_mutex_unlock(&lock_directory_handles_);
+  atomic_inc64(&num_dir_open_);
 
   fuse_reply_open(req, fi);
 }
@@ -564,11 +570,12 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
   if (iter_handle != directory_handles_->end()) {
     free(iter_handle->second.buffer);
     directory_handles_->erase(iter_handle);
-    reply = 0;
+    pthread_mutex_unlock(&lock_directory_handles_);
+    atomic_dec64(&num_dir_open_);
   } else {
+    pthread_mutex_unlock(&lock_directory_handles_);
     reply = EINVAL;
   }
-  pthread_mutex_unlock(&lock_directory_handles_);
 
   fuse_reply_err(req, reply);
 }
@@ -946,6 +953,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(num_catalogs);
   } else if (attr == "user.nopen") {
     attribute_value = StringifyInt(atomic_read64(&num_open_));
+  } else if (attr == "user.ndiropen") {
+    attribute_value = StringifyInt(atomic_read64(&num_dir_open_));
   } else if (attr == "user.ndownload") {
     attribute_value = StringifyInt(cache::GetNumDownloads());
   } else if (attr == "user.timeout") {
@@ -1533,6 +1542,7 @@ int main(int argc, char *argv[]) {
 
   // Runtime counters
   atomic_init64(&cvmfs::num_open_);
+  atomic_init64(&cvmfs::num_dir_open_);
   atomic_init32(&cvmfs::num_io_error_);
   cvmfs::previous_io_error_.timestamp = 0;
   cvmfs::previous_io_error_.delay = 0;

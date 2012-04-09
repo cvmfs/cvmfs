@@ -31,6 +31,7 @@ void ResetErrorCounters();
 void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
                       lru::Statistics *md5path_stats);
 catalog::Statistics GetCatalogStatistics();
+std::string GetCertificateStats();
 
 }  // namespace cvmfs
 

@@ -101,6 +101,7 @@ class AbstractCatalogManager {
     p.Assign(&path[0], path.length());
     return Listing(p, listing);
   }
+  bool ListingStat(const PathString &path, StatEntryList *listing);
 
   Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;

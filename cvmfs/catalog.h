@@ -77,7 +77,16 @@ class Catalog {
   inline bool ListingPath(const PathString &path,
                       DirectoryEntryList *listing) const
   {
-    return ListingMd5Path(hash::Md5(path.GetChars(), path.GetLength()), listing);
+    return ListingMd5Path(hash::Md5(path.GetChars(), path.GetLength()),
+                          listing);
+  }
+  bool ListingMd5PathStat(const hash::Md5 &md5path,
+                          StatEntryList *listing) const;
+  bool ListingPathStat(const PathString &path,
+                       StatEntryList *listing) const
+  {
+    return ListingMd5PathStat(hash::Md5(path.GetChars(), path.GetLength()),
+                              listing);
   }
 
   uint64_t GetTTL() const;
