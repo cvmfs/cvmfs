@@ -57,7 +57,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   virtual ~CatalogManager() { };
   std::string GetCertificateStats() {
     return "hits: " + StringifyInt(atomic_read32(&certificate_hits_)) + "    " +
-    "misses: " + StringifyInt(atomic_read32(&certificate_misses_));
+    "misses: " + StringifyInt(atomic_read32(&certificate_misses_)) + "\n";
   }
   bool offline_mode() const { return offline_mode_; }
 

@@ -319,7 +319,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
                   string("  md5path cache: ") + md5path_stats.Print();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
-        result += "Certificate cache:  " + cvmfs::GetCertificateStats() + "\n";
+        result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
 
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
         result += "Number of allocations " + StringifyInt(current) + "\n";

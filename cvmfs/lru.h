@@ -149,14 +149,7 @@ class SmallHash {
   }
 
   void Insert(const Key &key, const Value &value) {
-    uint32_t bucket;
-    uint32_t collisions;
-    DoLookup(key, &bucket, &collisions);
-    num_collisions_ += collisions;
-    LogCvmfs(kLogLru, kLogDebug, "LOOKUP ADDED %u to COLLISIONS, result %u", collisions, num_collisions_);
-    max_collisions_ = std::max(collisions, max_collisions_);
-    keys_[bucket] = key;
-    values_[bucket] = value;
+    DoInsert(key, value, true);
   }
 
   void Erase(const Key &key) {
@@ -169,7 +162,7 @@ class SmallHash {
       while (!(keys_[bucket] == empty_key_)) {
         Key rehash = keys_[bucket];
         keys_[bucket] = empty_key_;
-        Insert(rehash, values_[bucket]);
+        DoInsert(rehash, values_[bucket], false);
         bucket = (bucket+1) % capacity_;
       }
     }
@@ -196,9 +189,23 @@ class SmallHash {
 
  private:
   uint32_t ScaleHash(const Key &key) const {
-    double bucket = (double(hasher_(key)) / double((uint32_t)(-1))) *
-                    (double)capacity_;
+    double bucket = (double(hasher_(key)) * double(capacity_) /
+                     double((uint32_t)(-1)));
     return (uint32_t)bucket % capacity_;
+  }
+
+  void DoInsert(const Key &key, const Value &value,
+                const bool count_collisions)
+  {
+    uint32_t bucket;
+    uint32_t collisions;
+    DoLookup(key, &bucket, &collisions);
+    if (count_collisions) {
+      num_collisions_ += collisions;
+      max_collisions_ = std::max(collisions, max_collisions_);
+    }
+    keys_[bucket] = key;
+    values_[bucket] = value;
   }
 
   bool DoLookup(const Key &key, uint32_t *bucket, uint32_t *collisions) const {

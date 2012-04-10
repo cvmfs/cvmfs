@@ -697,7 +697,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // If file has changed with a new catalog, the kernel data cache needs
       // to be invalidated.  Special case: 0s metadata timeout includes no page
       // cache
-      fi->keep_cache = GetKcacheTimeout() == 0.0 ? 0 : 1;
+      fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
       if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "file might be new or changed, invalidating cache (%d %d)",
