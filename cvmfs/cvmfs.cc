@@ -401,6 +401,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
                          const char *name)
 {
+  // TODO: use generation
   atomic_inc64(&num_fs_lookup_);
   RemountCheck();
 
@@ -408,35 +409,36 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
+  catalog::DirectoryEntry dirent;
+  PathString path;
   PathString parent_path;
+  struct fuse_entry_param result;
+  memset(&result, 0, sizeof(result));
+  double timeout = GetKcacheTimeout();
+  result.attr_timeout = timeout;
+  result.entry_timeout = timeout;
 
   if (!GetPathForInode(parent, &parent_path)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
-    atomic_inc64(&num_fs_lookup_negative_);
-    fuse_reply_err(req, ENOENT);
-    return;
+    goto reply_negative;
   }
 
-  catalog::DirectoryEntry dirent;
-  PathString path;
   path.Assign(parent_path);
   path.Append("/", 1);
   path.Append(name, strlen(name));
   tracer::Trace(tracer::kFuseLookup, path, "lookup()");
   if (!GetDirentForPath(path, parent, &dirent)) {
-    fuse_reply_err(req, ENOENT);
-    atomic_inc64(&num_fs_lookup_negative_);
-    return;
+    goto reply_negative;
   }
 
-  struct fuse_entry_param result;
-  memset(&result, 0, sizeof(result));
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
-  double timeout = GetKcacheTimeout();
-  result.attr_timeout = timeout;
-  result.entry_timeout = timeout;
+  fuse_reply_entry(req, &result);
+  return;
 
+ reply_negative:
+  atomic_inc64(&num_fs_lookup_negative_);
+  result.ino = 0;
   fuse_reply_entry(req, &result);
 }
 
