@@ -422,6 +422,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   path.Assign(parent_path);
   path.Append("/", 1);
   path.Append(name, strlen(name));
+  tracer::Trace(tracer::kFuseLookup, path, "lookup()");
   if (!GetDirentForPath(path, parent, &dirent)) {
     fuse_reply_err(req, ENOENT);
     atomic_inc64(&num_fs_lookup_negative_);
@@ -473,7 +474,6 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   atomic_inc64(&num_fs_readlink_);
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
-  tracer::Trace(tracer::kFuseReadlink, "no path provided", "readlink() call");
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
@@ -658,7 +658,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
-  tracer::Trace(tracer::kFuseOpen, "no path provided", "open() call");
 
   int fd = -1;
   catalog::DirectoryEntry dirent;

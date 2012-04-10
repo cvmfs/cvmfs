@@ -48,8 +48,7 @@ struct BufferEntry {
                             (using gettimeofday). */
   int code;  /*< arbitrary code, negative codes are reserved for internal
                  use. */
-  std::string id;  /**< arbitrary id, for example file name or module name
-                        which is doing the trace. */
+  PathString path;  /**< The path that is subject to the trace */
   std::string msg;
 };
 
@@ -169,7 +168,7 @@ static void *MainFlush(void *data) {
       tmp = StringifyInt(start_data->ring_buffer[pos].code);
       retval = WriteCsvFile(f, tmp);
       retval |= fputc(',', f) - ',';
-      retval |= WriteCsvFile(f, start_data->ring_buffer[pos].id);
+      retval |= WriteCsvFile(f, start_data->ring_buffer[pos].path.ToString());
       retval |= fputc(',', f) - ',';
       retval |= WriteCsvFile(f, start_data->ring_buffer[pos].msg);
       retval |= (fputc(13, f) - 13) | (fputc(10, f) - 10);
@@ -251,7 +250,7 @@ void Init(const int buffer_size, const int flush_threshold,
                           reinterpret_cast<void *> (start_data));
   assert(retval == 0 && "Could not create flush thread");
 
-  TraceInternal(-1, "cTracer", "Trace buffer created");
+  TraceInternal(-1, PathString("Tracer", 6), "Trace buffer created");
 }
 
 
@@ -271,7 +270,7 @@ void InitNull() {
 void Fini() {
   if (!active_) return;
 
-  TraceInternal(-2, "Tracer", "Destroying trace buffer...");
+  TraceInternal(-2, PathString("Tracer", 6), "Destroying trace buffer...");
 
   // Trigger flushing and wait for it
   int retval;
@@ -311,7 +310,9 @@ void Fini() {
  *            doing the trace.
  * \return The sequence number which was used to trace the record
  */
-int32_t TraceInternal(const int event, const string &id, const string &msg) {
+int32_t TraceInternal(const int event, const PathString &path,
+                      const string &msg)
+{
   int32_t my_seq_no = atomic_xadd32(&seq_no_, 1);
   timeval now;
   gettimeofday(&now, NULL);
@@ -331,7 +332,7 @@ int32_t TraceInternal(const int event, const string &id, const string &msg) {
 
   ring_buffer_[pos].time_stamp = now;
   ring_buffer_[pos].code = event;
-  ring_buffer_[pos].id = id;
+  ring_buffer_[pos].path = path;
   ring_buffer_[pos].msg = msg;
   atomic_inc32(&commit_buffer_[pos]);
 
@@ -352,7 +353,8 @@ int32_t TraceInternal(const int event, const string &id, const string &msg) {
 void Flush() {
   if (!active_) return;
 
-  int32_t save_seq_no = TraceInternal(-3, "Tracer", "flushed ring buffer");
+  int32_t save_seq_no = TraceInternal(-3, PathString("Tracer", 6),
+                                      "flushed ring buffer");
   while (atomic_read32(&flushed_) <= save_seq_no) {
     timespec timeout;
     int retval;

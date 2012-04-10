@@ -7,6 +7,7 @@
 
 #include <string>
 #include "atomic.h"
+#include "shortstring.h"
 
 namespace tracer {
 
@@ -18,6 +19,7 @@ enum TraceEvents {
   kFuseRead,
   kFuseReadlink,
   kFuseKcache,
+  kFuseLookup,
   kFuseStat,
   kFuseCrowd,
 };
@@ -28,15 +30,15 @@ void Init(const int buffer_size, const int flush_threshold,
 void InitNull();
 void Fini();
 
-int32_t TraceInternal(const int event, const std::string &id,
+int32_t TraceInternal(const int event, const PathString &path,
                       const std::string &msg);
 void Flush();
-void inline __attribute__((used)) Trace(const int event, const std::string &id,
+void inline __attribute__((used)) Trace(const int event, const PathString &path,
                                         const std::string &msg)
 {
   // TODO: could be done more elegantly by templates
   // (only 1 if when initialized)
-  if (active_) TraceInternal(event, id, msg);
+  if (active_) TraceInternal(event, path, msg);
 }
 
 }  // namespace tracer
