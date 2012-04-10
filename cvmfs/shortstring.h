@@ -20,29 +20,36 @@ const unsigned char kDefaultMaxName = 25;
 const unsigned char kDefaultMaxLink = 25;
 const unsigned char kDefaultMaxPath = 200;
 
-template<unsigned char StackSize>
+template<unsigned char StackSize, char Type>
 class ShortString {
  public:
-  ShortString() : long_string_(NULL), length_(0) { }
+  ShortString() : long_string_(NULL), length_(0) {
+    atomic_inc64(&num_instances_);
+  }
   ShortString(const ShortString &other) {
+    atomic_inc64(&num_instances_);
     long_string_ = NULL;
     Assign(other);
   }
   ShortString(const char *chars, const unsigned length) {
+    atomic_inc64(&num_instances_);
     long_string_ = NULL;
     Assign(chars, length);
   }
+
   ShortString & operator= (const ShortString & other) {
     if (this != &other)
       Assign(other);
     return *this;
   }
+
   ~ShortString() { delete long_string_; }
 
   void Assign(const char *chars, const unsigned length) {
     delete long_string_;
     long_string_ = NULL;
     if (length > StackSize) {
+      atomic_inc64(&num_overflows_);
       long_string_ = new std::string(chars, length);
     } else {
       if (length)
@@ -52,11 +59,7 @@ class ShortString {
   }
 
   void Assign(const ShortString &other) {
-    if (other.long_string_) {
-      Assign(&((*other.long_string_)[0]), other.long_string_->length());
-    } else {
-      Assign(other.stack_, other.length_);
-    }
+    Assign(other.GetChars(), other.GetLength());
   }
 
   void Append(const ShortString &other) {
@@ -71,6 +74,7 @@ class ShortString {
 
     const unsigned new_length = this->length_ + length;
     if (new_length > StackSize) {
+      atomic_inc64(&num_overflows_);
       long_string_ = new std::string();
       long_string_->reserve(new_length);
       long_string_->assign(stack_, length_);
@@ -164,6 +168,9 @@ class ShortString {
     return ShortString(this->GetChars() + start_at, length-start_at);
   }
 
+  static uint64_t num_instances() { return atomic_read64(&num_instances_); }
+  static uint64_t num_overflows() { return atomic_read64(&num_overflows_); }
+
  private:
   std::string *long_string_;
   char stack_[StackSize+1];  // +1 to add a final '\0' if necessary
@@ -172,12 +179,13 @@ class ShortString {
   static atomic_int64 num_instances_;
 };  // class ShortString
 
-typedef ShortString<kDefaultMaxPath> PathString;
-typedef ShortString<kDefaultMaxName> NameString;
-typedef ShortString<kDefaultMaxLink> LinkString;
+typedef ShortString<kDefaultMaxPath, 0> PathString;
+typedef ShortString<kDefaultMaxName, 1> NameString;
+typedef ShortString<kDefaultMaxLink, 2> LinkString;
 
-//template<int StackSize>
-//typename atomic_int64 ShortString<StackSize>::num_instances_ = 0;
-
+template<unsigned char StackSize, char Type>
+atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
+template<unsigned char StackSize, char Type>
+atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
 
 #endif  // SHORTSTRING_H_

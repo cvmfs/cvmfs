@@ -75,8 +75,8 @@ public:
   inline inode_t inode() const { return inode_; }
   inline inode_t parent_inode() const { return parent_inode_; }
   inline int linkcount() const { return linkcount_; }
-  inline ShortString<kDefaultMaxName> name() const { return name_; }
-  inline ShortString<kDefaultMaxLink> symlink() const { return symlink_; }
+  inline NameString name() const { return name_; }
+  inline LinkString symlink() const { return symlink_; }
   inline hash::Any checksum() const { return checksum_; }
   inline const hash::Any *checksum_ptr() const { return &checksum_; }
   inline uint64_t size() const {

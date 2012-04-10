@@ -38,6 +38,7 @@
 #include "logging.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
+#include "shortstring.h"
 #include "lru.h"
 
 using namespace std;  // NOLINT
@@ -301,7 +302,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         }
       } else if (line == "open catalogs") {
         Answer(con_fd, cvmfs::GetOpenCatalogs());
-      } else if (line == "sqlite memory") {
+      } else if (line == "internal affairs") {
         int current;
         int highwater;
         lru::Statistics inode_stats;
@@ -320,6 +321,16 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
         result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
+
+        result += "Path Strings:\n  instances: " +
+          StringifyInt(PathString::num_instances()) + "  overflows: " +
+          StringifyInt(PathString::num_overflows()) + "\n";
+        result += "Name Strings:\n  instances: " +
+          StringifyInt(NameString::num_instances()) + "  overflows: " +
+          StringifyInt(NameString::num_overflows()) + "\n";
+        result += "Symlink Strings:\n  instances: " +
+          StringifyInt(LinkString::num_instances()) + "  overflows: " +
+          StringifyInt(LinkString::num_overflows()) + "\n";
 
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
         result += "Number of allocations " + StringifyInt(current) + "\n";
