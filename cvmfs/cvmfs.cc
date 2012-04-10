@@ -1053,20 +1053,6 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
 
 
-static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino,
-                         unsigned long nlookup)  // NOLINT(runtime/int)
-{
-  ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_forget on inode: %d", ino);
-
-  // File system may ignore forget messages
-  //path_cache_->Forget(ino);
-  //inode_cache_->Forget(ino);
-
-  fuse_reply_none(req);
-}
-
-
 /**
  * Do after-daemon() initialization
  */
@@ -1108,7 +1094,6 @@ static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->destroy  = cvmfs_destroy;
 
   cvmfs_operations->lookup      = cvmfs_lookup;
-  cvmfs_operations->forget      = cvmfs_forget;
   cvmfs_operations->getattr     = cvmfs_getattr;
   cvmfs_operations->readlink    = cvmfs_readlink;
   cvmfs_operations->open        = cvmfs_open;
