@@ -155,6 +155,7 @@ uint64_t next_directory_handle_ = 0;
 atomic_int64 num_fs_open_;
 atomic_int64 num_fs_dir_open_;
 atomic_int64 num_fs_lookup_;
+atomic_int64 num_fs_lookup_negative_;
 atomic_int64 num_fs_stat_;
 atomic_int64 num_fs_read_;
 atomic_int64 num_fs_readlink_;
@@ -229,7 +230,9 @@ string GetCertificateStats() {
 }
 
 string GetFsStats() {
-  return "lookup(): " + StringifyInt(atomic_read64(&num_fs_lookup_)) + "  " +
+  return "lookup(all): " + StringifyInt(atomic_read64(&num_fs_lookup_)) + "  " +
+    "lookup(negative): " + StringifyInt(atomic_read64(&num_fs_lookup_negative_))
+      + "  " +
     "stat(): " + StringifyInt(atomic_read64(&num_fs_stat_)) + "  " +
     "open(): " + StringifyInt(atomic_read64(&num_fs_open_)) + "  " +
     "diropen(): " + StringifyInt(atomic_read64(&num_fs_dir_open_)) + "  " +
@@ -409,7 +412,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
 
   if (!GetPathForInode(parent, &parent_path)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
-
+    atomic_inc64(&num_fs_lookup_negative_);
     fuse_reply_err(req, ENOENT);
     return;
   }
@@ -421,6 +424,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   path.Append(name, strlen(name));
   if (!GetDirentForPath(path, parent, &dirent)) {
     fuse_reply_err(req, ENOENT);
+    atomic_inc64(&num_fs_lookup_negative_);
     return;
   }
 
@@ -1566,6 +1570,7 @@ int main(int argc, char *argv[]) {
   atomic_init64(&cvmfs::num_fs_open_);
   atomic_init64(&cvmfs::num_fs_dir_open_);
   atomic_init64(&cvmfs::num_fs_lookup_);
+  atomic_init64(&cvmfs::num_fs_lookup_negative_);
   atomic_init64(&cvmfs::num_fs_stat_);
   atomic_init64(&cvmfs::num_fs_read_);
   atomic_init64(&cvmfs::num_fs_readlink_);
