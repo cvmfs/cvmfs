@@ -168,6 +168,9 @@ fi
 if [ "x$CVMFS_DISKLESS" == "xyes" ]; then
   add_mount_option "diskless"
 fi
+if [ "x$CVMFS_KCACHE_TIMEOUT" != "x" ]; then
+  add_mount_option "kcache_timeout=$CVMFS_KCACHE_TIMEOUT"
+fi
 
 cmd="$cvmfs_exe -o ${mount_options} $mountpoint '$repository'"
 

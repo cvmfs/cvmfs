@@ -332,40 +332,41 @@ static void *MainTalk(void *data __attribute__((unused))) {
           StringifyInt(LinkString::num_instances()) + "  overflows: " +
           StringifyInt(LinkString::num_overflows()) + "\n";
 
+        result += "SQlite Statistics:\n";
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
-        result += "Number of allocations " + StringifyInt(current) + "\n";
+        result += "  Number of allocations " + StringifyInt(current) + "\n";
 
         sqlite3_status(SQLITE_STATUS_MEMORY_USED, &current, &highwater, 0);
-        result += "General purpose allocator " +StringifyInt(current/1024) +
+        result += "  General purpose allocator " +StringifyInt(current/1024) +
                   " KB / " + StringifyInt(highwater/1024) + " KB\n";
 
         sqlite3_status(SQLITE_STATUS_MALLOC_SIZE, &current, &highwater, 0);
-        result += "Largest malloc " + StringifyInt(highwater) + " Bytes\n";
+        result += "  Largest malloc " + StringifyInt(highwater) + " Bytes\n";
 
         sqlite3_status(SQLITE_STATUS_PAGECACHE_USED, &current, &highwater, 0);
-        result += "Page cache allocations " + StringifyInt(current) + " / " +
+        result += "  Page cache allocations " + StringifyInt(current) + " / " +
                   StringifyInt(highwater) + "\n";
 
         sqlite3_status(SQLITE_STATUS_PAGECACHE_OVERFLOW,
                        &current, &highwater, 0);
-        result += "Page cache overflows " + StringifyInt(current/1024) +
+        result += "  Page cache overflows " + StringifyInt(current/1024) +
                   " KB / " + StringifyInt(highwater/1024) + " KB\n";
 
         sqlite3_status(SQLITE_STATUS_PAGECACHE_SIZE, &current, &highwater, 0);
-        result += "Largest page cache allocation " + StringifyInt(highwater) +
+        result += "  Largest page cache allocation " + StringifyInt(highwater) +
                   " Bytes\n";
 
         sqlite3_status(SQLITE_STATUS_SCRATCH_USED, &current, &highwater, 0);
-        result += "Scratch allocations " + StringifyInt(current) + " / " +
+        result += "  Scratch allocations " + StringifyInt(current) + " / " +
                   StringifyInt(highwater) + "\n";
 
         sqlite3_status(SQLITE_STATUS_SCRATCH_OVERFLOW, &current, &highwater, 0);
-        result += "Scratch overflows " + StringifyInt(current) + " / " +
+        result += "  Scratch overflows " + StringifyInt(current) + " / " +
                   StringifyInt(highwater) + "\n";
 
         sqlite3_status(SQLITE_STATUS_SCRATCH_SIZE, &current, &highwater, 0);
-        result += "Largest scratch allocation " + StringifyInt(highwater/1024) +
-                  " KB\n";
+        result += "  Largest scratch allocation " + StringifyInt(highwater/1024)
+                  + " KB\n";
 
         Answer(con_fd, result);
       } else if (line == "reset error counters") {
