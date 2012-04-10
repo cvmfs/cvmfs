@@ -93,6 +93,7 @@ const unsigned int kMd5pathCacheSize = 25600;
 
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
+const time_t kIndefiniteDeadline = time_t(-1);
 
 const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
                                      backoff */
@@ -940,8 +941,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     const uint64_t revision = catalog_manager_->GetRevision();
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.expires") {
-    time_t now = time(NULL);
-    attribute_value = StringifyInt((catalogs_valid_until_-now)/60);
+    if (catalogs_valid_until_ == kIndefiniteDeadline) {
+      attribute_value = "never (fixed root catalog)";
+    } else {
+      time_t now = time(NULL);
+      attribute_value = StringifyInt((catalogs_valid_until_-now)/60);
+    }
   } else if (attr == "user.maxfd") {
     attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
   } else if (attr == "user.usedfd") {
@@ -1185,6 +1190,7 @@ struct CvmfsOptions {
   char     *blacklist;
   char     *repo_name;
   char     *interface;
+  char     *root_hash;
   int      ignore_signature;
   int      rebuild_cachedb;
   int      nofiles;
@@ -1234,6 +1240,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("kcache_timeout=%d",   kcache_timeout, 60),
   CVMFS_SWITCH("diskless",         diskless),
   CVMFS_OPT("interface=%s",        interface, 0),
+  CVMFS_OPT("root_hash=%s",        root_hash, 0),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1339,6 +1346,7 @@ static void FreeCvmfsOptions(CvmfsOptions *opts) {
   if (opts->blacklist)      free(opts->blacklist);
   if (opts->repo_name)      free(opts->repo_name);
   if (opts->interface)      free(opts->interface);
+  if (opts->root_hash)      free(opts->root_hash);
   delete cvmfs::cachedir_;
   delete cvmfs::tracefile_;
   delete cvmfs::repository_name_;
@@ -1766,7 +1774,13 @@ int main(int argc, char *argv[]) {
   cvmfs::catalog_manager_ = new
     cache::CatalogManager(*cvmfs::repository_name_,
                           g_cvmfs_opts.ignore_signature);
-  if (!cvmfs::catalog_manager_->Init()) {
+  if (g_cvmfs_opts.root_hash) {
+    retval = cvmfs::catalog_manager_->InitFixed(
+      hash::Any(hash::kSha1, hash::HexPtr(string(g_cvmfs_opts.root_hash))));
+  } else {
+    retval = cvmfs::catalog_manager_->Init();
+  }
+  if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize root file catalog");
     goto cvmfs_cleanup;
   }
@@ -1774,18 +1788,20 @@ int main(int argc, char *argv[]) {
 
   // Setup catalog reload alarm
   atomic_init32(&cvmfs::catalogs_expired_);
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_sigaction = cvmfs::AlarmReload;
-  sa.sa_flags = SA_SIGINFO;
-  sigfillset(&sa.sa_mask);
-  retval = sigaction(SIGALRM, &sa, NULL);
-  assert(retval == 0);
-  {
+  if (!g_cvmfs_opts.root_hash) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = cvmfs::AlarmReload;
+    sa.sa_flags = SA_SIGINFO;
+    sigfillset(&sa.sa_mask);
+    retval = sigaction(SIGALRM, &sa, NULL);
+    assert(retval == 0);
     unsigned ttl = cvmfs::catalog_manager_->offline_mode() ?
       cvmfs::kShortTermTTL : cvmfs::GetEffectiveTTL();
     alarm(ttl);
     cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
+  } else {
+    cvmfs::catalogs_valid_until_ = cvmfs::kIndefiniteDeadline;
   }
 
   // Set fuse callbacks, remove url from arguments

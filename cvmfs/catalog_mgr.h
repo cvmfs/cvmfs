@@ -167,19 +167,6 @@ class AbstractCatalogManager {
   inline Catalog* GetRootCatalog() const { return catalogs_.front(); }
   Catalog *FindCatalog(const PathString &path) const;
 
- private:
-  const static inode_t kInodeOffset = 255;
-  /**
-   * This list is only needed to find a catalog given an inode.
-   * This might possibly be done by walking the catalog tree, similar to
-   * finding a catalog given the path.
-   */
-  CatalogList catalogs_;
-  uint64_t inode_gauge_;  /**< highest issued inode */
-  pthread_rwlock_t *rwlock_;
-  Statistics statistics_;
-  pthread_key_t pkey_sqlitemem_;
-
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);
@@ -194,6 +181,19 @@ class AbstractCatalogManager {
   }
   inline void UpgradeLock() const { Unlock(); WriteLock(); }
   inline void DowngradeLock() const { Unlock(); ReadLock(); }
+
+ private:
+  const static inode_t kInodeOffset = 255;
+  /**
+   * This list is only needed to find a catalog given an inode.
+   * This might possibly be done by walking the catalog tree, similar to
+   * finding a catalog given the path.
+   */
+  CatalogList catalogs_;
+  uint64_t inode_gauge_;  /**< highest issued inode */
+  pthread_rwlock_t *rwlock_;
+  Statistics statistics_;
+  pthread_key_t pkey_sqlitemem_;
 
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;

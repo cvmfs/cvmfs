@@ -55,6 +55,9 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   CatalogManager(const std::string &repo_name,
                  const bool ignore_signature);
   virtual ~CatalogManager() { };
+
+  bool InitFixed(const hash::Any &root_hash);
+
   std::string GetCertificateStats() {
     return "hits: " + StringifyInt(atomic_read32(&certificate_hits_)) + "    " +
     "misses: " + StringifyInt(atomic_read32(&certificate_misses_)) + "\n";

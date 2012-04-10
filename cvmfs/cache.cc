@@ -554,6 +554,25 @@ CatalogManager::CatalogManager(const string &repo_name,
 }
 
 
+/**
+ * Specialized initialization that uses a fixed root hash.
+ */
+bool CatalogManager::InitFixed(const hash::Any &root_hash) {
+  LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog with root hash %s",
+           root_hash.ToString().c_str());
+  WriteLock();
+  bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
+  Unlock();
+
+  if (!attached) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to initialize root catalog");
+  }
+
+  return attached;
+
+}
+
+
 catalog::Catalog* CatalogManager::CreateCatalog(const PathString &mountpoint,
   catalog::Catalog *parent_catalog)
 {
