@@ -73,7 +73,6 @@
 #include "quota.h"
 #include "util.h"
 #include "atomic.h"
-#include "fuse_op_stubs.h"
 #include "lru.h"
 #include "peers.h"
 #include "dirent.h"
@@ -1068,33 +1067,6 @@ static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino,
 }
 
 
-static void cvmfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
-  ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_access on inode: %d asking for R: %s W: %s X: %s", ino,
-           ((mask & R_OK) ? "yes" : "no"),
-           ((mask & W_OK) ? "yes" : "no"),
-           ((mask & X_OK) ? "yes" : "no"));
-
-  catalog::DirectoryEntry d;
-  const bool found = GetDirentForInode(ino, &d);
-
-  if (!found) {
-    fuse_reply_err(req, ENOENT);
-    return;
-  }
-
-  // Check access rights for owner (RWX access bits shifted six to the left)
-  unsigned int mask_for_owner = mask << 6;
-  if ((mask & W_OK) || (mask_for_owner & d.mode()) != mask_for_owner) {
-    fuse_reply_err(req, EACCES);
-    return;
-  }
-
-  fuse_reply_err(req, 0);
-}
-
-
 /**
  * Do after-daemon() initialization
  */
@@ -1135,7 +1107,6 @@ static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->init     = cvmfs_init;
   cvmfs_operations->destroy  = cvmfs_destroy;
 
-  // Implemented
   cvmfs_operations->lookup      = cvmfs_lookup;
   cvmfs_operations->forget      = cvmfs_forget;
   cvmfs_operations->getattr     = cvmfs_getattr;
@@ -1149,27 +1120,6 @@ static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->statfs      = cvmfs_statfs;
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
-  cvmfs_operations->access      = cvmfs_access;
-
-  // Stubs
-  cvmfs_operations->setattr     = cvmfs_setattr;
-  cvmfs_operations->mknod       = cvmfs_mknod;
-  cvmfs_operations->mkdir       = cvmfs_mkdir;
-  cvmfs_operations->unlink      = cvmfs_unlink;
-  cvmfs_operations->rmdir       = cvmfs_rmdir;
-  cvmfs_operations->symlink     = cvmfs_symlink;
-  cvmfs_operations->rename      = cvmfs_rename;
-  cvmfs_operations->link        = cvmfs_link;
-  cvmfs_operations->write       = cvmfs_write;
-  cvmfs_operations->flush       = cvmfs_flush;
-  cvmfs_operations->fsync       = cvmfs_fsync;
-  cvmfs_operations->fsyncdir    = cvmfs_fsyncdir;
-  cvmfs_operations->setxattr    = cvmfs_setxattr;
-  cvmfs_operations->removexattr = cvmfs_removexattr;
-  cvmfs_operations->create      = cvmfs_create;
-  cvmfs_operations->getlk       = cvmfs_getlk;
-  cvmfs_operations->setlk       = cvmfs_setlk;
-  cvmfs_operations->bmap        = cvmfs_bmap;
 }
 
 }  // namespace cvmfs
