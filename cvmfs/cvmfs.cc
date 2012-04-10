@@ -940,6 +940,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.revision") {
     const uint64_t revision = catalog_manager_->GetRevision();
     attribute_value = StringifyInt(revision);
+  } else if (attr == "user.root_hash") {
+    attribute_value = catalog_manager_->GetRootHash().ToString();
   } else if (attr == "user.expires") {
     if (catalogs_valid_until_ == kIndefiniteDeadline) {
       attribute_value = "never (fixed root catalog)";

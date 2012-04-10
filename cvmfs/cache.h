@@ -58,6 +58,12 @@ class CatalogManager : public catalog::AbstractCatalogManager {
 
   bool InitFixed(const hash::Any &root_hash);
 
+  hash::Any GetRootHash() {
+    ReadLock();
+    hash::Any result = mounted_catalogs_[PathString("", 0)];
+    Unlock();
+    return result;
+  }
   std::string GetCertificateStats() {
     return "hits: " + StringifyInt(atomic_read32(&certificate_hits_)) + "    " +
     "misses: " + StringifyInt(atomic_read32(&certificate_misses_)) + "\n";

@@ -529,6 +529,7 @@ cvmfs_stat() {
    get_attr uptime; uptime=$attr_value
    memory=`ps -p $pid -o rss= | sed 's/ //g'` || exit 3
    get_attr revision; revision=$attr_value
+   get_attr root_hash; root_hash=$attr_value
    get_attr expires; expires=$attr_value
    get_attr nclg; nclg=$attr_value
    cache_use=`df -P . | tail -n 1 | awk '{print int($3)}'` || exit 34
@@ -567,6 +568,7 @@ cvmfs_stat() {
       echo "Uptime: $uptime minutes"
       echo "Memory Usage: ${memory}k"
       echo "File Catalog Revision: $revision (expires in ${expires} minutes)"
+      echo "File Catalog ID: $root_hash"
       echo "No. Active File Catalogs: $nclg"
       echo "Cache Usage: ${cache_use}k / ${cache_max}k"
       echo "File Descriptor Usage: $usedfd / $maxfd"
