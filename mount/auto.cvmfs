@@ -1,7 +1,7 @@
 #!/bin/sh
 
 fqrn=$1
-AUTO_OPTIONS="-ro -fstype=cvmfs"
+AUTO_OPTIONS="-fstype=cvmfs"
 
 echo $fqrn | grep -q \\.
 if [ $? -ne 0 ]; then
