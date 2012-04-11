@@ -1,6 +1,7 @@
 #include "catalog_queries.h"
 
 #include <cstdlib>
+#include <cstring>
 
 #include "catalog.h"
 #include "logging.h"
@@ -75,39 +76,44 @@ unsigned int DirectoryEntrySqlStatement::CreateDatabaseFlags(const DirectoryEntr
 }
 
 void DirectoryEntrySqlStatement::ExpandSymlink(LinkString *raw_symlink) const {
-  const char *chars = raw_symlink->GetChars();
-  unsigned length = raw_symlink->GetLength();
-  for (unsigned i = 0; i < length;  ++i) {
-    if (chars[i] == '$')
+  const char *c = raw_symlink->GetChars();
+  const char *cEnd = c+raw_symlink->GetLength();
+  for (; c <= cEnd; ++c) {
+    if (*c == '$')
       goto expand_symlink;
   }
   return;
 
  expand_symlink:
-  // TODO
-  return;
-  /*string result = "";
-
-  for (string::size_type i = 0; i < raw_symlink.length(); i++) {
-    string::size_type lpar;
-    string::size_type rpar;
-    if ((raw_symlink[i] == '$') &&
-        ((lpar = raw_symlink.find('(', i+1)) != string::npos) &&
-        ((rpar = raw_symlink.find(')', i+2)) != string::npos) &&
-        (rpar > lpar))
-    {
-      string var = raw_symlink.substr(lpar + 1, rpar-lpar-1);
-      char *var_exp = getenv(var.c_str()); // Don't free! Nothing is allocated here
-      if (var_exp) {
-        result += var_exp;
+  LinkString result;
+  for (; c <= cEnd; ++c) {
+    if ((*c == '$') && (c < cEnd-2) && (*(c+1) == '(')) {
+      c += 2;
+      const char *rpar = c;
+      while (rpar <= cEnd) {
+        if (*rpar == ')')
+          goto expand_symlink_getenv;
+        rpar++;
       }
-      i = rpar;
-    } else {
-      result += raw_symlink[i];
-    }
-  }
+      // right parenthesis missing
+      result.Append("$(", 2);
+      continue;
 
-  return result;*/
+     expand_symlink_getenv:
+      const unsigned environ_var_length = rpar-c;
+      char environ_var[environ_var_length+1];
+      environ_var[environ_var_length] = '\0';
+      memcpy(environ_var, c, environ_var_length);
+      const char *environ_value = getenv(environ_var);  // Don't free!
+      if (environ_value)
+        result.Append(environ_value, strlen(environ_value));
+      c = rpar+1;
+      continue;
+    }
+    result.Append(c, 1);
+  }
+  raw_symlink->Assign(result);
+  return;
 }
 
 //
