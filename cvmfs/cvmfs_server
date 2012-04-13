@@ -4,7 +4,7 @@ create_master_key() {
    local name; name=$1
    master_key="/etc/cvmfs/keys/$name.masterkey"
    master_pub="/etc/cvmfs/keys/$name.pub"
-   
+
    echo -n "Creating CernVM-FS master key for $name in $master_pub... "
    openssl genrsa -out $master_key 2048 > /dev/null 2>&1
    openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
@@ -18,7 +18,7 @@ create_cert() {
    local key; key="/etc/cvmfs/keys/$name.key"
    local csr; csr="/etc/cvmfs/keys/$name.csr"
    local crt; crt="/etc/cvmfs/keys/$name.crt"
-   
+
    # Create self-signed certificate
    echo -n "Creating self-signed certificate for $name in $crt... "
    openssl genrsa -out $key 2048 > /dev/null 2>&1
@@ -38,14 +38,14 @@ create_whitelist() {
    echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
    echo "N$name" >> ${whitelist}.unsigned
    openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
-   
+
    local sha1; sha1=`openssl sha1 < ${whitelist}.unsigned | head -c40`
    echo "--" >> ${whitelist}.unsigned
    echo $sha1 >> ${whitelist}.unsigned
    echo -n $sha1 > ${whitelist}.sha1
    openssl rsautl -inkey /etc/cvmfs/keys/${name}.masterkey -sign -in ${whitelist}.sha1 -out ${whitelist}.signature
    cat ${whitelist}.unsigned ${whitelist}.signature > $whitelist
-   
+
    rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.sha1
    echo "done"
 }
@@ -53,7 +53,7 @@ create_whitelist() {
 get_expiry() {
    local name; name=$1
    local whitelist; whitelist="/srv/cvmfs/$name/pub/catalogs/.cvmfswhitelist"
-   
+
    local expires; expires=`head -2 $whitelist| tail -1 | tail -c15`
    year=`echo $expires | head -c4`
    month=`echo $expires | head -c6 | tail -c2`
@@ -76,7 +76,7 @@ reload_apache() {
 publish() {
    local name; name=$1
    local book_keeping="/srv/cvmfs/$name/ctrl/dirty_catalogs"
-   
+
    su cvmfs -c cvmfs-sync
    for c in `cat $book_keeping`
    do
@@ -88,7 +88,7 @@ publish() {
 
 mkfs() {
    local name; name=$1
-   
+
    echo -n "Checking for cvmfs user... "
    /usr/bin/getent group cvmfs >/dev/null
    if [ $? -ne 0 ]; then
@@ -99,7 +99,7 @@ mkfs() {
       /usr/sbin/useradd -r -g cvmfs -d /srv/cvmfs/$name -s /bin/bash -c "CernVM-FS service account" cvmfs
    fi
    echo "done"
-   
+
    echo -n "Creating configuration files... "
    cat > /etc/cvmfs/server.local << EOF
 # Created by cvmfs_server.  Don't touch.
@@ -115,9 +115,9 @@ EOF
    cat > /etc/httpd/conf.d/cvmfs.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 RewriteEngine on
-# Automatically point to the catalogs 
+# Automatically point to the catalogs
 RewriteCond %{REQUEST_URI} !^/cvmfs/$name/pub/catalogs/(.*)
-RewriteRule ^/cvmfs/$name/(.*)$ /cvmfs/$name/pub/catalogs/\$1 [PT] 
+RewriteRule ^/cvmfs/$name/(.*)$ /cvmfs/$name/pub/catalogs/\$1 [PT]
 # Translation URL to real pathname
 Alias /cvmfs/$name/pub /srv/cvmfs/$name/pub
 <Directory "/srv/cvmfs/$name/pub">
@@ -128,19 +128,19 @@ Alias /cvmfs/$name/pub /srv/cvmfs/$name/pub
     EnableMMAP Off
     EnableSendFile Off
     AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
-    FileETag INode MTime Size 
+    FileETag INode MTime Size
     ExpiresActive On
     ExpiresDefault "access plus 3 days"
-    ExpiresByType text/html "access plus 5 minutes" 
-    ExpiresByType application/x-cvmfs "access plus 1 minutes" 
+    ExpiresByType text/html "access plus 5 minutes"
+    ExpiresByType application/x-cvmfs "access plus 1 minutes"
 </Directory>
 EOF
    echo "done"
-   
+
    mkdir -p /etc/cvmfs/keys
    create_master_key $name
    create_cert $name
-   
+
    echo -n "Create CernVM-FS Storage... "
    mkdir -p /srv/cvmfs/$name/pub/catalogs
    mkdir -p /srv/cvmfs/$name/pub/data
@@ -151,9 +151,9 @@ EOF
    chown -R cvmfs:cvmfs /srv/cvmfs/$name
    mount /cvmfs/$name
    echo "done"
-   
+
    create_whitelist $name
-   
+
    echo -n "Starting services... "
    service cvmfsd start > /dev/null
    chkconfig cvmfsd on
@@ -161,7 +161,7 @@ EOF
    usermod -s /bin/bash cvmfs
    publish $name > /dev/null
    echo "done"
-   
+
    reload_apache
    echo
    echo "Install your software in /cvmfs/$name as user cvmfs."
@@ -173,23 +173,23 @@ EOF
 
 rmfs() {
    local name; name=$1
-   
+
    echo -n "Stopping services... "
    usermod -s /sbin/nologin cvmfs
    service cvmfsd stop > /dev/null
    chkconfig cvmfsd off
    echo "done"
-   
+
    echo -n "Unmounting CernVM-FS Area... "
    sed -i -e "/added by CernVM-FS/d" /etc/fstab
    umount /cvmfs/$name
    echo "done"
-   
+
    echo -n "Removing shadow tree and repository... "
    rm -rf /srv/cvmfs/${name} \
           /cvmfs/$name
    echo "done"
-   
+
    echo -n "Removing keys and configuration... "
    rm -f /etc/cvmfs/keys/$name.masterkey \
          /etc/cvmfs/keys/$name.pub \
@@ -198,9 +198,9 @@ rmfs() {
          /etc/httpd/conf.d/cvmfs.conf \
          /etc/cvmfs/server.local
    echo "done"
-   
+
    reload_apache
-   
+
    echo "CernVM-FS repository $name wiped out!"
 }
 
@@ -227,7 +227,7 @@ fsck() {
 
 info() {
    local name; name=$1
-   
+
    echo "Repository name: $name"
    get_expiry $name
    echo
@@ -241,14 +241,18 @@ info() {
 
 
 usage() {
-   echo "CernVM-FS Server Tool"
-   echo "Commands:"
-   echo "  mkfs <fully qualified name>: Creates a new repository with a given name"
-   echo "  rmfs: Removes the repository"
-   echo "  resign: Re-signs the 30 day whitelist"
-   echo "  info: Prints summary about the repository"
-   echo "  publish: Makes a new repository snapshot"
-   echo "  fsck: Verifies that the meta-data of the repository and the shadow tree match"
+   echo "\
+CernVM-FS Server Tool
+Commands:
+  mkfs <fully qualified name>: Creates a new repository with a given name
+  rmfs: Removes the repository
+  resign: Re-signs the 30 day whitelist
+  info: Prints summary about the repository
+  publish: Makes a new repository snapshot
+  fsck: Verifies that the meta-data of the repository and the shadow tree match
+
+Note: If multiple repositories are maintained, the repository name must follow
+      the command."
 }
 
 
@@ -266,7 +270,7 @@ case $1 in
          usage
          exit 2
       fi
-      mkfs $CVMFS_REPOSITORY_NAME 
+      mkfs $CVMFS_REPOSITORY_NAME
    ;;
    rmfs)
       if [ "x$CVMFS_REPOSITORY_NAME" == "x" ]; then
@@ -283,7 +287,7 @@ case $1 in
          echo "There is no repository"
          exit 2
       fi
-      create_whitelist $CVMFS_REPOSITORY_NAME 
+      create_whitelist $CVMFS_REPOSITORY_NAME
    ;;
    info)
       if [ "x$CVMFS_REPOSITORY_NAME" == "x" ]; then
