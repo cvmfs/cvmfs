@@ -1,27 +1,25 @@
 cvmfs_mkfqrn() {
    local repo; repo=$1
-   
+
    if [ -z "$repo" ]; then
       echo
-      return
+      return 0
    fi
-   
-   echo $repo | grep \\.
-   if [ $? -ne 0 ]; then
-      echo "${repo}.${CVMFS_DEFAULT_DOMAIN}"
-   fi
+
+   echo $repo | grep \\. || echo "${repo}.${CVMFS_DEFAULT_DOMAIN}"
+   return 0
 }
 
 cvmfs_getorg() {
    local fqrn; fqrn=$1
-   
-   echo $fqrn | sed 's/^\([^\.]*\).*/\1/' 
+
+   echo $fqrn | sed 's/^\([^\.]*\).*/\1/'
 }
 
 cvmfs_getdomain() {
    local fqrn; fqrn=$1
-   
-   echo $fqrn | sed 's/^[^\.]*\.\(.*\)/\1/' 
+
+   echo $fqrn | sed 's/^[^\.]*\.\(.*\)/\1/'
 }
 
 
@@ -52,10 +50,10 @@ cvmfs_readconfig() {
               /etc/cernvm/site.conf
   do
     if [ -f $file ]; then
-      eval `sed 's/=\$(.*)//g' $file |  sed -n -e  '/^[^+]/s/\([^=]*\)[=]\(.*\)/\1="\2"; /gp'` 
+      eval `sed 's/=\$(.*)//g' $file |  sed -n -e  '/^[^+]/s/\([^=]*\)[=]\(.*\)/\1="\2"; /gp'`
     fi
   done
-  
+
   if [ -f /etc/cvmfs/default.local ]
   then
     . /etc/cvmfs/default.local
@@ -69,8 +67,8 @@ cvmfs_readconfig() {
       [ -f $file ] && . $file
     done
   fi
-  
-  if [ "x$fqrn" != "x" ] 
+
+  if [ "x$fqrn" != "x" ]
   then
     local found_repo; found_repo=0
     if [ "x$CVMFS_STRICT_MOUNT" != "xno" ]; then
@@ -83,12 +81,12 @@ cvmfs_readconfig() {
       done
     else
       found_repo=1
-    fi  
+    fi
     if [ $found_repo -eq 0 ]; then
       CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/$fqrn"
       return 2
-    fi 
-    
+    fi
+
     for file in  /etc/cvmfs/config.d/$fqrn.conf \
                  /etc/cvmfs/config.d/$fqrn.local
     do
@@ -96,18 +94,18 @@ cvmfs_readconfig() {
     done
 
     CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/$fqrn"
-  fi 
-    
-  
+  fi
+
+
   return 0
 }
 
 cvmfs_getorigin() {
    local fqrn; fqrn=$1
    local key; key=$2
-   
+
    local domain; domain=`cvmfs_getdomain $fqrn`
-   
+
    source=`grep -H "^[ ]*\(readonly\)\{0,1\}[ ]*${key}=" \
       /etc/cvmfs/config.d/$fqrn.local \
       /etc/cvmfs/config.d/$fqrn.conf \
@@ -123,6 +121,6 @@ cvmfs_getorigin() {
       echo $source
       return 0
    fi
-   
+
    return 1
 }
