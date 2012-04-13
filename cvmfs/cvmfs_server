@@ -62,7 +62,7 @@ get_expiry() {
    local expires_num; expires_num=`date -u -d $expires_fmt +%s`
 
    local now; now=`/bin/date -u +%s`
-   local valid_time; valid_time=$[($expires_num-$now)/(3600*24)]
+   local valid_time; valid_time=$(( ($expires_num-$now)/(3600*24) ))
    echo "Whitelist is valid for another $valid_time days"
 }
 

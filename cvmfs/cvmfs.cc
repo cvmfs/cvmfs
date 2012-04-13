@@ -1143,6 +1143,7 @@ struct CvmfsOptions {
   int      use_ino;
   int      kcache_timeout;
   int      diskless;
+  int      no_reload;
 
   int64_t  quota_limit;
   int64_t  quota_threshold;
@@ -1180,6 +1181,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("diskless",         diskless),
   CVMFS_OPT("interface=%s",        interface, 0),
   CVMFS_OPT("root_hash=%s",        root_hash, 0),
+  CVMFS_SWITCH("no_reload",        no_reload),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1257,6 +1259,8 @@ static void usage(const char *progname) {
     " -o syslog_level=NUMBER     "
       "Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
     "                            Default is NOTICE.\n"
+    " -o no_reload               "
+      "Avoids to reload catalogs when the TTL expires."
     " Note: you cannot load files greater than quota_limit-quota_threshold\n"
     "\nFuse options:\n"
     " -o allow_other             "
@@ -1727,7 +1731,7 @@ int main(int argc, char *argv[]) {
 
   // Setup catalog reload alarm
   atomic_init32(&cvmfs::catalogs_expired_);
-  if (!g_cvmfs_opts.root_hash) {
+  if (!g_cvmfs_opts.root_hash && !g_cvmfs_opts.no_reload) {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = cvmfs::AlarmReload;
