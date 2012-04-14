@@ -21,11 +21,9 @@ const string WritableCatalogManager::kCatalogFilename = ".cvmfscatalog.working";
 
 WritableCatalogManager::WritableCatalogManager(
                          const string catalog_directory,
-                         const string data_directory,
-                         const bool lazy_attaching) :
+                         const string data_directory) :
   catalog_directory_(catalog_directory),
-  data_directory_(data_directory),
-  lazy_attach_(lazy_attaching)
+  data_directory_(data_directory)
 {
   Init();
 }
@@ -43,13 +41,6 @@ bool WritableCatalogManager::Init() {
   if (not succeeded &&
       not CreateAndAttachRootCatalog()) {
     LogCvmfs(kLogCatalog, kLogDebug, "unable to init catalog manager (cannot create root catalog)");
-    return false;
-  }
-
-  // do lazy attach if asked for
-  if (not IsLazyAttaching() &&
-      not MountAll()) {
-    LogCvmfs(kLogCatalog, kLogDebug, "unable to load catalogs recursively");
     return false;
   }
 

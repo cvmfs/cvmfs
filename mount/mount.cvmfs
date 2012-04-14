@@ -79,7 +79,7 @@ if [ $retval -eq 1 ]; then
   exit 1
 fi
 if [ $retval -eq 2 ]; then
-  if [ "x$CVMFS_STRICT_MOUNT" == "xyes" ]; then
+  if [ x"$CVMFS_STRICT_MOUNT" = x"yes" ]; then
     echo "Not allowed to mount $fqrn, add it to CVMFS_REPOSITORIES"
     exit 1
   fi

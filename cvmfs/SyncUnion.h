@@ -1,7 +1,7 @@
 /**
  *  This file defines a class to abstract information retrieval from
  *  union file system components.
- *  
+ *
  *  Here you have a class UnionSync which is the base class for all
  *  supported union file systems and provides some basic principals.
  *
@@ -54,12 +54,12 @@ enum FileType {
 class SyncUnion {
  protected:
 	std::string mRepositoryPath;
-	std::string mOverlayPath;
+  std::string mOverlayPath;
 	std::string mUnionPath;
-	
+
 	SyncMediator *mMediator;
-	
- public: 
+
+ public:
  	/**
  	 *  create a new instance of SyncUnion
  	 *  @param repositoryPath the absolute path to the mounted cvmfs repository
@@ -69,24 +69,24 @@ class SyncUnion {
  	 */
  	SyncUnion(SyncMediator *mediator,
  	          const std::string &repository_path,
- 	          const std::string &union_path,
+            const std::string &union_path,
             const std::string &overlay_path);
  	virtual ~SyncUnion() {}
-   
+
 	/**
 	 *  after everything is set up properly, just call this and hold fast
 	 */
 	virtual bool DoYourMagic() = 0;
-	
+
 	/** @return the path to the CVMFS repository */
 	inline std::string GetRepositoryPath() const { return mRepositoryPath; }
-	
+
 	/** @return the path to the union volume (mounted union file system) */
 	inline std::string GetUnionPath() const { return mUnionPath; }
-	
+
 	/** @return the path to the overlay directory of the union file system (write overlay) */
 	inline std::string GetOverlayPath() const { return mOverlayPath; }
-	
+
 	/**
 	 *  whiteout files may have special naming conventions
 	 *  this method scratches them and retrieves the original file name
@@ -94,7 +94,7 @@ class SyncUnion {
 	 *  @return the original filename of the scratched out file in CVMFS repository
 	 */
 	virtual std::string UnwindWhiteoutFilename(const std::string &filename) const = 0;
-	
+
 	/**
 	 *  union file systems use opaque directories to fully support rmdir
 	 *  f.e:   $ rm -rf directory
@@ -105,7 +105,7 @@ class SyncUnion {
 	 *  @return true if directory is opaque, otherwise false
 	 */
 	virtual bool IsOpaqueDirectory(const SyncItem *directory) const = 0;
-	
+
 	/**
 	 *  checks if given file is supposed to be whiteout
 	 *  these files show the union file system, that a specific file in the read-only branch
@@ -114,16 +114,16 @@ class SyncUnion {
 	 *  @return true if filename seems to be whiteout otherwise false
 	 */
 	virtual bool IsWhiteoutEntry(const SyncItem &entry) const = 0;
-	
+
 	/**
 	 *  union file systems may use some special files for bookkeeping
 	 *  they must not show up in to repository and are ignored by the recursion
 	 *  @return a set of filenames to be ignored
 	 */
 	virtual std::set<std::string> GetIgnoredFilenames() const = 0;
-	
+
  protected:
-	
+
 	/**
 	 *  callback method for the main recursion when a regular file is found
 	 *  @param dirPath the relative directory path
@@ -131,7 +131,7 @@ class SyncUnion {
 	 */
 	virtual void ProcessFoundRegularFile(const std::string &parent_dir,
 	                                     const std::string &file_name);
-	
+
 	/**SyncItem
 	 *  callback method for the main recursion when a directory is found
 	 *  @param dirPath the relative directory path
@@ -140,7 +140,7 @@ class SyncUnion {
 	 */
 	virtual bool ProcessFoundDirectory(const std::string &parent_dir,
  	                                   const std::string &dir_name);
-	
+
 	/**
 	 *  callback method for the main recursion when a symlink is found
 	 *  @param dirPath the relative directory path
@@ -148,14 +148,14 @@ class SyncUnion {
 	 */
 	virtual void ProcessFoundSymlink(const std::string &parent_dir,
  	                                 const std::string &link_name);
-	
+
 	/**
 	 *  called if the main recursion enters a directory for further recursion
 	 *  @param entry the directory which was stepped into
 	 */
 	virtual void EnteringDirectory(const std::string &parent_dir,
  	                               const std::string &dir_name);
-	
+
 	/**
 	 *  called before the main recursion leaves the directory after recursing it
 	 *  @param entry the directory which was stepped out

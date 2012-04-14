@@ -35,8 +35,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
  public:
   WritableCatalogManager(const std::string catalog_directory,
-                         const std::string data_directory,
-                         const bool lazy_attaching);
+                         const std::string data_directory);
   virtual ~WritableCatalogManager();
 
   /**
@@ -146,12 +145,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
    */
   bool Commit();
 
-	/**
-	 *  Checks if this WritableCatalogManager is configured to be lazy attaching
-	 *  @return true if lazy attach is enabled, false otherwise
-	 */
-	inline bool IsLazyAttaching() const { return lazy_attach_; }
-
  protected:
   /**
    *  'Loads' a catalog. Actually the WritableCatalogManager assumes
@@ -242,7 +235,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
  	std::string data_directory_;
  	std::set<std::string> immutables_;
  	std::string keyfile_;
- 	bool lazy_attach_;
 };
 
 }

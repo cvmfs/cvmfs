@@ -31,14 +31,14 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
 bool SyncUnion::ProcessFoundDirectory(const std::string &parent_dir,
                                       const std::string &dir_name) {
   SyncItem entry(parent_dir, dir_name, DE_DIR, this);
-  
+
 	if (entry.IsNew()) {
 		mMediator->Add(entry);
 		return false; // <-- recursion will stop here... all content of new directory
 		              //     will be added later on by the SyncMediator
 
 	} else { // directory already existed...
-		 
+
 		if (entry.IsOpaqueDirectory()) { // was directory completely overwritten?
 			mMediator->Replace(entry);
 			return false; // <-- replace does not need any further recursion
@@ -61,14 +61,14 @@ void SyncUnion::ProcessFoundSymlink(const std::string &parent_dir,
   SyncItem entry(parent_dir, link_name, DE_SYMLINK, this);
 	ProcessFoundFile(entry);
 }
-  
+
 void SyncUnion::ProcessFoundFile(SyncItem &entry) {
 	// process whiteout prefix
 	if (IsWhiteoutEntry(entry)) {
     string actual_filename = UnwindWhiteoutFilename(entry.GetFilename());
 		entry.MarkAsWhiteout(actual_filename);
 		mMediator->Remove(entry);
-		
+
 	// process normal file
 	} else {
 		if (entry.IsNew()) {
@@ -77,7 +77,7 @@ void SyncUnion::ProcessFoundFile(SyncItem &entry) {
 		} else {
 			mMediator->Replace(entry);
 		}
-	} 
+	}
 }
 
 void SyncUnion::EnteringDirectory(const std::string &parent_dir,

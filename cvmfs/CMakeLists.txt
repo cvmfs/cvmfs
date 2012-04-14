@@ -256,7 +256,7 @@ if (BUILD_SERVER)
 #	add_executable (cvmfs_scrub		${CVMFS_SCRUB_SOURCES})
 #	add_executable (cvmfs_sign		${CVMFS_SIGN_SOURCES} ${ZLIB_ARCHIVE})
 	add_executable (cvmfs_zpipe		${CVMFS_ZPIPE_SOURCES} ${ZLIB_ARCHIVE})
-	add_executable (cvmfs_sync.bin	${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE})
+	add_executable (cvmfs_sync		${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE})
 
 #	if (LIBCURL_BUILTIN)
 #		add_dependencies (cvmfs_pull libcares libcurl)
@@ -265,7 +265,7 @@ if (BUILD_SERVER)
 	if (SQLITE3_BUILTIN)
 #		add_dependencies (cvmfs_lscat sqlite3)
 #		add_dependencies (cvmfs_pull sqlite3)
-		add_dependencies (cvmfs_sync.bin sqlite3)
+		add_dependencies (cvmfs_sync sqlite3)
 	endif (SQLITE3_BUILTIN)
 
 	if (ZLIB_BUILTIN)
@@ -273,7 +273,7 @@ if (BUILD_SERVER)
 #		add_dependencies (cvmfs_pull zlib)
 #		add_dependencies (cvmfs_sign zlib)
 		add_dependencies (cvmfs_zpipe zlib)
-		add_dependencies (cvmfs_sync.bin zlib)
+		add_dependencies (cvmfs_sync zlib)
 	endif (ZLIB_BUILTIN)
 
 	# set some properties
@@ -282,7 +282,7 @@ if (BUILD_SERVER)
 #	set_target_properties (cvmfs_scrub PROPERTIES COMPILE_FLAGS "${CVMFS_SCRUB_CFLAGS}" LINK_FLAGS "${CVMFS_SCRUB_LD_FLAGS}")
 #	set_target_properties (cvmfs_sign PROPERTIES COMPILE_FLAGS "${CVMFS_SIGN_CFLAGS}" LINK_FLAGS "${CVMFS_SIGN_LD_FLAGS}")
 	set_target_properties (cvmfs_zpipe PROPERTIES COMPILE_FLAGS "${CVMFS_ZPIPE_CFLAGS}" LINK_FLAGS "${CVMFS_ZPIPE_LD_FLAGS}")
-	set_target_properties (cvmfs_sync.bin PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}")
+	set_target_properties (cvmfs_sync PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}")
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries)
 #	target_link_libraries (cvmfs_lscat		${CVMFS_LSCAT_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
@@ -290,7 +290,7 @@ if (BUILD_SERVER)
 #	target_link_libraries (cvmfs_scrub		${CVMFS_SCRUB_LIBS} ${OPENSSL_LIBRARIES})
 #	target_link_libraries (cvmfs_sign		${CVMFS_SIGN_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE})
 	target_link_libraries (cvmfs_zpipe		${CVMFS_ZPIPE_LIBS} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE})
-	target_link_libraries (cvmfs_sync.bin	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SQLITE3_ARCHIVE} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
+	target_link_libraries (cvmfs_sync	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SQLITE3_ARCHIVE} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
 endif (BUILD_SERVER)
 
 #
@@ -312,8 +312,8 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 if (BUILD_SERVER)
 	install (
-#		TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_lscat cvmfs_pull cvmfs_scrub cvmfs_sync.bin
-    TARGETS     cvmfs_zpipe cvmfs_sync.bin
+#		TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_lscat cvmfs_pull cvmfs_scrub cvmfs_sync
+    TARGETS     cvmfs_zpipe cvmfs_sync
 		RUNTIME
 		DESTINATION		bin
 	)

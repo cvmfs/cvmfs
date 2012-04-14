@@ -1,5 +1,5 @@
 /**
- * \file cvmfs_sync.cc
+ * This file is part of the CernVM File System
  *
  * This tool figures out the changes made to a cvmfs repository by means
  * of a union file system mounted on top of a cvmfs volume.
@@ -9,125 +9,97 @@
  * On the repository side we have a catalogs directory that mimicks the
  * shadow directory structure and stores compressed and uncompressed
  * versions of all catalogs.  The raw data are stored in the data
- * subdirectory in zlib-compressed form.  They are named with their SHA1
+ * subdirectory in zlib-compressed form.  They are named with their SHA-1
  * hash of the compressed file (like in CVMFS client cache, but with a
  * 2-level cache hierarchy).  Symlinks from the catalog directory to the
  * data directory form the connection. If necessary, add a .htaccess file
  * to allow Apache to follow the symlinks.
- *
- * Developed by Jakob Blomer 2010 at CERN
- * Adapted for Union File Systems by René Meusel 2011 at CERN
- * jakob.blomer@cern.ch
- * rene@renemeusel.de
  */
-
 
 #define _FILE_OFFSET_BITS 64
 
-#include <string>
-#include <iostream>
-#include <stdlib.h>
-#include <sstream>
-#include <set>
-
-#include "SyncUnionAufs.h"
-#include "SyncMediator.h"
-
-#include "WritableCatalogManager.h"
-
 #include "cvmfs_config.h"
 #include "cvmfs_sync.h"
-#include "util.h"
-#include "monitor.h"
+
+#include <cstdlib>
+
+#include <string>
 
 #include "platform.h"
+#include "SyncUnionAufs.h"
+#include "SyncMediator.h"
+#include "WritableCatalogManager.h"
+#include "util.h"
+#include "logging.h"
+#include "monitor.h"
 
 using namespace std;
 using namespace cvmfs;
 
-static void usage() {
-   cout << "CernVM-FS sync shadow tree with repository" << endl;
-   cout << "Usage: cvmfs_sync -s <union volume> -o <overlay directory> -c <cvmfs mounted volume> -r <repository store>" << endl
-        << "                  [-p(rint change set)] [-d(ry run)] [-i <immutable dir(,dir)*>]" << endl
-        << "                  [-k(ey file)] [-z (lazy attach of catalogs)] [-b(ookkeeping of dirty catalogs)]" << endl
-        << "                  [-t <threads>] [-m(ucatalogs)]" << endl << endl
-        << "Make sure that a 'data' and a 'catalogs' subdirectory exist in your repository store." << endl
-        << "Also, your webserver must be able to follow symlinks in the catalogs subdirectory." << endl
-        << "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file."
-        << endl << endl;
+
+static void Usage() {
+  LogCvmfs(kLogCvmfs, kLogStdout,
+    "CernVM-FS push changes from scratch area back to repository\n"
+    "Version %s\n"
+    "Usage:\n"
+    "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
+    "             -r <repository store>\n"
+    "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n\n"
+    "Make sure that a 'data' and a 'catalogs' subdirectory exist in your repository store.\n"
+    "Also, your webserver must be able to follow symlinks in the catalogs subdirectory.\n"
+    "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file.\n\n", VERSION);
 }
 
 
-bool parseParameters(int argc, char **argv, SyncParameters *p) {
-	// print some help if needed
-	if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help") ||
-		(string(argv[1]) == "-v") || (string(argv[1]) == "--version")){
-		usage();
+bool ParseParameters(int argc, char **argv, SyncParameters *params) {
+	if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help")
+      || (string(argv[1]) == "-v") || (string(argv[1]) == "--version"))
+  {
+		Usage();
 		return false;
 	}
 
 	// set defaults
-	p->print_changeset = false;
-	p->dry_run = false;
-	p->lazy_attach = false;
-	p->sync_threads = 0;
-	p->mucatalogs = false;
+	params->print_changeset = false;
+	params->dry_run = false;
+	params->mucatalogs = false;
 
-	// read the parameters
+	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "s:o:c:r:pdi:k:zbt:m")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:r:pdm")) != -1) {
 		switch (c) {
+      // Directories
+      case 'u':
+        params->dir_union = MakeCanonicalPath(optarg);
+        break;
+      case 's':
+        params->dir_scratch = MakeCanonicalPath(optarg);
+        break;
+      case 'c':
+        params->dir_rdonly = MakeCanonicalPath(optarg);
+        break;
+      case 'r': {
+        const string path = MakeCanonicalPath(optarg);
+        params->dir_data = path + "/data";
+        params->dir_catalogs = path + "/catalogs";
+        break;
+      }
 
-		// directories
-		case 's':
-			p->dir_shadow = MakeCanonicalPath(optarg);
-			break;
-		case 'c':
-			p->dir_cvmfs = MakeCanonicalPath(optarg);
-			break;
-		case 'r': {
-			const string path = MakeCanonicalPath(optarg);
-			p->dir_data = path + "/data";
-			p->dir_catalogs = path + "/catalogs";
-			break;
-		}
-		case 'o':
-			p->dir_overlay = MakeCanonicalPath(optarg);
-			break;
+      // Switches
+      case 'p':
+        params->print_changeset = true;
+        break;
+      case 'd':
+        params->dry_run = true;
+        break;
+      case 'm':
+        params->mucatalogs = true;
+        break;
 
-		// switches
-		case 'p':
-			p->print_changeset = true;
-			break;
-		case 'd':
-			p->dry_run = true;
-			break;
-		case 'z':
-			p->lazy_attach = true;
-			break;
-		case 'm':
-			p->mucatalogs = true;
-			break;
-
-		// misc
-		case 'i': {
-			char *token = strtok(optarg, ",");
-			while (token != NULL) {
-				p->immutables.insert(MakeCanonicalPath(token));
-				token = strtok(NULL, ",");
-			}
-			break;
-		}
-		case 'k':
-			p->keyfile = optarg;
-			break;
-		case 't':
-			p->sync_threads = atoi(optarg);
-			break;
-		case '?':
-		default:
-			usage();
-			return false;
+      case '?':
+      default:
+        Usage();
+        return false;
 		}
 	}
 
@@ -148,30 +120,30 @@ bool initWatchdog() {
 }
 
 bool doSanityChecks(SyncParameters *p) {
-	if (not DirectoryExists(p->dir_overlay)) {
-		PrintError("overlay (copy on write) directory does not exist");
+  if (not DirectoryExists(p->dir_scratch)) {
+    PrintError("overlay (copy on write) directory does not exist");
+    return false;
+  }
+
+  if (not DirectoryExists(p->dir_union)) {
+    PrintError("union volume does not exist");
+    return false;
+  }
+
+	if (not DirectoryExists(p->dir_rdonly)) {
+		PrintError("cvmfs read/only repository does not exist");
 		return false;
 	}
 
-	if (not DirectoryExists(p->dir_shadow)) {
-		PrintError("shadow directory does not exist");
-		return false;
-	}
+  if (not DirectoryExists(p->dir_data)) {
+    PrintError("data store directory does not exist");
+    return false;
+  }
 
-	if (not DirectoryExists(p->dir_cvmfs)) {
-		PrintError("mounted cvmfs repository does not exist");
-		return false;
-	}
-
-	if (not DirectoryExists(p->dir_data)) {
-		PrintError("data store directory does not exist");
-		return false;
-	}
-
-	if (not DirectoryExists(p->dir_catalogs)) {
-		PrintError("catalog store directory does not exist");
-		return false;
-	}
+  if (not DirectoryExists(p->dir_catalogs)) {
+    PrintError("catalog store directory does not exist");
+    return false;
+  }
 
 	return true;
 }
@@ -187,8 +159,7 @@ bool createCacheDir(SyncParameters *p) {
 
 catalog::WritableCatalogManager* createWritableCatalogManager(const SyncParameters &p) {
   return new catalog::WritableCatalogManager(MakeCanonicalPath(p.dir_catalogs),
-                                    MakeCanonicalPath(p.dir_data),
-                                    p.lazy_attach);
+                                             MakeCanonicalPath(p.dir_data));
 }
 
 SyncMediator* createSyncMediator(catalog::WritableCatalogManager* catalogManager,
@@ -202,16 +173,16 @@ SyncMediator* createSyncMediator(catalog::WritableCatalogManager* catalogManager
 SyncUnion* createSynchronisationEngine(SyncMediator* mediator,
                                        const SyncParameters &p) {
   return new SyncUnionAufs(mediator,
-                           MakeCanonicalPath(p.dir_cvmfs),
-                           MakeCanonicalPath(p.dir_shadow),
-                           MakeCanonicalPath(p.dir_overlay));
+                           MakeCanonicalPath(p.dir_rdonly),
+                           MakeCanonicalPath(p.dir_union),
+                           MakeCanonicalPath(p.dir_scratch));
 }
 
 int main(int argc, char **argv) {
 	SyncParameters parameters;
 
 	// do some initialization
-	if (not parseParameters(argc, argv, &parameters)) return 1;
+	if (not ParseParameters(argc, argv, &parameters)) return 1;
 	if (not initWatchdog()) return 1;
 	if (not doSanityChecks(&parameters)) return 2;
 	if (not createCacheDir(&parameters)) return 3;
@@ -231,7 +202,7 @@ int main(int argc, char **argv) {
 	delete mediator;
 	delete catalogManager;
   delete sync;
-  
+
   std::cout << "done" << std::endl;
 
 	return 0;
