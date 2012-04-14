@@ -98,20 +98,23 @@ publish() {
   local name=$1
   local user=$2
 
-  mount -o remount,ro /cvmfs/$name
-  su cvmfs -c "cvmfs_sync -u /cvmfs/$name \
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="su $user -c"
+
+  sudo /bin/mount -o remount,ro /cvmfs/$name
+  $user_shell "cvmfs_sync -u /cvmfs/$name \
     -s /var/spool/cvmfs/${name}/scratch \
     -c /var/spool/cvmfs/${name}/rdonly \
     -r /srv/cvmfs/${name}/pub"
-  su cvmfs -c "cvmfs_sign \
+  $user_shell "cvmfs_sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     /srv/cvmfs/${name}/pub/catalogs/.cvmfspublished"
-  umount /cvmfs/$name
-  umount /var/spool/cvmfs/${name}/rdonly
-  mount /var/spool/cvmfs/${name}/rdonly > /dev/null
-  mount /cvmfs/$name
+  sudo umount /cvmfs/$name
+  sudo umount /var/spool/cvmfs/${name}/rdonly
+  sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
+  sudo mount /cvmfs/$name
 }
 
 
@@ -170,6 +173,14 @@ CVMFS_SERVER_URL=http://localhost/cvmfs/$name
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
 CVMFS_STRICT_MOUNT=no
+EOF
+  cat >> /etc/sudoers << EOF
+$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/umount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/mount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/mount /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/su $cvmfs_user * # added by CernVM-FS for $name
 EOF
   echo "done"
 
@@ -233,6 +244,7 @@ rmfs() {
         /etc/cvmfs/keys/$name.crt \
         /etc/cvmfs/config.d/${name}.conf \
         /etc/httpd/conf.d/cvmfs.${name}.conf
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
   echo "done"
 
   echo -n "Stopping services... "
