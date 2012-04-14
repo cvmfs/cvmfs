@@ -412,6 +412,7 @@ bool WritableCatalogManager::PrecalculateListings() {
 }
 
 bool WritableCatalogManager::Commit() {
+  reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetCatalogsToSnapshot(catalogs_to_snapshot);
 
@@ -570,19 +571,9 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 			ss << "could not store catalog in data store as " << cache_path;
 			PrintWarning(ss.str());
 		}
-		const string entry_path = cat_path + "/.cvmfscatalog";
-		unlink(entry_path.c_str());
-		if (symlink(("data/" + hash_name).c_str(), entry_path.c_str()) != 0) {
-			stringstream ss;
-			ss << "could not create symlink to catalog " << cache_path;
-			PrintWarning(ss.str());
-		}
 	}
 	if (fsrc) fclose(fsrc);
 	if (fdst) fclose(fdst);
-
-	/* Remove pending certificate */
-	unlink((cat_path + "/.cvmfspublisher.x509").c_str());
 
 	/* Create extended checksum */
 	FILE *fpublished = fopen((cat_path + "/.cvmfspublished").c_str(), "w");
@@ -640,19 +631,6 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	if (!zlib::CompressMem2Mem(chksum, lchksum, &compr_buf, &compr_size)) {
 		PrintWarning("could not compress catalog checksum");
 	}
-
-	FILE *fsha1 = NULL;
-	int fd_sha1;
-	if (((fd_sha1 = open((cat_path + "/.cvmfschecksum").c_str(), O_CREAT | O_TRUNC | O_RDWR, kDefaultFileMode)) < 0) ||
-		!(fsha1 = fdopen(fd_sha1, "w")) ||
-		(static_cast<int64_t>(fwrite(compr_buf, 1, compr_size, fsha1)) != compr_size))
-	{
-		stringstream ss;
-		ss << "could not store checksum at " << cat_path;
-		PrintWarning(ss.str());
-	}
-
-	if (fsha1) fclose(fsha1);
 	if (compr_buf) free(compr_buf);
 
   return true;

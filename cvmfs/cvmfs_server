@@ -45,6 +45,7 @@ create_cert() {
    echo "done"
 }
 
+
 create_whitelist() {
    local name=$1
    local user=$2
@@ -68,6 +69,7 @@ create_whitelist() {
    echo "done"
 }
 
+
 get_expiry() {
   local name=$1
   local whitelist="/srv/cvmfs/$name/pub/catalogs/.cvmfswhitelist"
@@ -84,6 +86,7 @@ get_expiry() {
   echo "Whitelist is valid for another $valid_time days"
 }
 
+
 reload_apache() {
    echo -n "Reloading Apache... "
    service httpd reload > /dev/null
@@ -92,20 +95,31 @@ reload_apache() {
 
 
 publish() {
-   local name; name=$1
-   local book_keeping="/srv/cvmfs/$name/ctrl/dirty_catalogs"
+  local name=$1
+  local user=$2
 
-   su cvmfs -c cvmfs-sync
-   for c in `cat $book_keeping`
-   do
-      su cvmfs -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt -k /etc/cvmfs/keys/$name.key -n $name $c"
-   done
-   cat /dev/null > $book_keeping
+  mount -o remount,ro /cvmfs/$name
+  su cvmfs -c "cvmfs_sync -u /cvmfs/$name \
+    -s /var/spool/cvmfs/${name}/scratch \
+    -c /var/spool/cvmfs/${name}/rdonly \
+    -r /srv/cvmfs/${name}/pub"
+  su cvmfs -c "cvmfs_sign \
+    -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    /srv/cvmfs/${name}/pub/catalogs/.cvmfspublished"
+  umount /cvmfs/$name
+  umount /var/spool/cvmfs/${name}/rdonly
+  mount /var/spool/cvmfs/${name}/rdonly > /dev/null
+  mount /cvmfs/$name
 }
 
 
 mkfs() {
   local name=$1
+  local scratch_dir="/var/spool/cvmfs/${name}/scratch"
+  local rdonly_dir="/var/spool/cvmfs/${name}/rdonly"
+  local repository_dir="/srv/cvmfs/${name}"
 
   local cvmfs_user=$(whoami)
   read -p "Owner of $name [$cvmfs_user]: " cvmfs_user
@@ -118,9 +132,9 @@ mkfs() {
 CVMFS_REPOSITORY_NAME=$name
 CVMFS_USER=$cvmfs_user
 CVMFS_SHADOW_DIR=/cvmfs/$name
-CVMFS_PUB_DIR=/srv/cvmfs/$name/pub
-CVMFS_SCRATCH_DIR=/var/spool/cvmfs/$name/scratch
-CVMFS_RDONLY_MOUNTPOINT=/var/spool/cvmfs/$name/rdonly
+CVMFS_PUB_DIR=${repository_dir}/pub
+CVMFS_SCRATCH_DIR=$scratch_dir
+CVMFS_RDONLY_MOUNTPOINT=$rdonly_dir
 EOF
   cat > /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
@@ -129,8 +143,8 @@ RewriteEngine on
 RewriteCond %{REQUEST_URI} !^/cvmfs/$name/pub/catalogs/(.*)
 RewriteRule ^/cvmfs/$name/(.*)$ /cvmfs/$name/pub/catalogs/\$1 [PT]
 # Translation URL to real pathname
-Alias /cvmfs/$name/pub /srv/cvmfs/$name/pub
-<Directory "/srv/cvmfs/$name/pub">
+Alias /cvmfs/$name/pub ${repository_dir}/pub
+<Directory "${repository_dir}/pub">
     Options -MultiViews FollowSymLinks
     AllowOverride All
     Order allow,deny
@@ -165,24 +179,26 @@ EOF
 
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name
-  mkdir -p /srv/cvmfs/$name/pub/catalogs /srv/cvmfs/$name/pub/data
-  mkdir -p /var/spool/cvmfs/$name/scratch /var/spool/cvmfs/$name/rdonly
+  mkdir -p ${repository_dir}/pub/catalogs ${repository_dir}/pub/data
+  mkdir -p $scratch_dir $rdonly_dir
   create_whitelist $name $cvmfs_user > /dev/null
-  chown -R $cvmfs_user /cvmfs/$name /srv/cvmfs/$name /var/spool/cvmfs/$name
-
-  reload_apache > /dev/null
+  cvmfs_sync -u /cvmfs/$name -s $scratch_dir -c $rdonly_dir -r ${repository_dir}/pub > /dev/null
+  cvmfs_sign -c /etc/cvmfs/keys/${name}.crt -k /etc/cvmfs/keys/${name}.key -n $name ${repository_dir}/pub/catalogs/.cvmfspublished > /dev/null
+  chown -R $cvmfs_user /cvmfs/$name $repository_dir /var/spool/cvmfs/$name
   echo "done"
+
+  reload_apache
 
   echo -n "Mounting CernVM-FS Storage... "
   echo "$name /var/spool/cvmfs/$name/rdonly cvmfs no_reload 0 0 # added by CernVM-FS" >> /etc/fstab
-  echo "aufs_$name /cvmfs/$name aufs br=/var/spool/cvmfs/$name/scratch:/var/spool/cvmfs/$name/rdonly=rr,udba=none 0 0 # added by CernVM-FS" >> /etc/fstab
-  mount /var/spool/cvmfs/$name/rdonly > /dev/null
+  echo "aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS" >> /etc/fstab
+  mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
   echo "done"
 
   echo -n "Starting services... "
-  echo "New CernVM-FS repository for $name" > /cvmfs/${name}/empty
-  #publish $name > /dev/null
+  echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
+  publish $name $cvmfs_user > /dev/null
   echo "done"
 
   echo "\
@@ -194,13 +210,14 @@ For client configuration, have a look at 'cvmfs_server info'
 If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
+
 rmfs() {
   local name=$1
 
   echo -n "Unmounting CernVM-FS Area... "
   sed -i -e "/.*${name}.*# added by CernVM-FS/d" /etc/fstab
-  mount | grep "/cvmfs/$name" && umount /cvmfs/$name
-  mount | grep "/var/spool/cvmfs/$name/rdonly" && umount /var/spool/cvmfs/$name/rdonly
+  mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
+  mount | grep -q " /var/spool/cvmfs/$name/rdonly " && umount /var/spool/cvmfs/$name/rdonly
   echo "done"
 
   echo -n "Removing repository storage... "
@@ -239,8 +256,8 @@ info() {
 Client configuration:
 Add $name to CVMFS_REPOSITORIES in /etc/cvmfs/default.local
 Create /etc/cvmfs/config.d/${name}.conf and set
-  CVMFS_SERVER_URL=http://`hostname`/cvmfs/$name"
-  CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub"
+  CVMFS_SERVER_URL=http://`hostname`/cvmfs/$name
+  CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
 Copy /etc/cvmfs/keys/${name}.pub to the client"
 }
 
@@ -317,11 +334,9 @@ case $1 in
     list_repositories
   ;;
   publish)
-    if [ "x$CVMFS_REPOSITORY_NAME" == "x" ]; then
-      echo "There is no repository"
-      exit 2
-    fi
-    publish $CVMFS_REPOSITORY_NAME
+    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
+    publish $CVMFS_REPOSITORY_NAME $CVMFS_USER
   ;;
   *)
     usage
