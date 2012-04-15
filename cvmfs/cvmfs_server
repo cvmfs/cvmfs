@@ -289,13 +289,12 @@ usage() {
    echo "\
 CernVM-FS Server Tool
 Commands:
-  mkfs <fully qualified name> : Creates a new repository with a given name
+  mkfs <fully qualified name>: Creates a new repository with a given name
   rmfs: Removes the repository
   resign: Re-signs the 30 day whitelist
   info: Prints summary about the repository
   list: List available repositories
   publish: Makes a new repository snapshot
-  fsck: Verifies that the meta-data of the repository and the shadow tree match
 
 Note: If multiple repositories are maintained, the repository name must follow
 the command."
