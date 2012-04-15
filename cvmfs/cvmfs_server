@@ -205,8 +205,8 @@ EOF
   reload_apache
 
   echo -n "Mounting CernVM-FS Storage... "
-  echo "$name /var/spool/cvmfs/$name/rdonly cvmfs no_reload 0 0 # added by CernVM-FS" >> /etc/fstab
-  echo "aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS" >> /etc/fstab
+  echo "$name /var/spool/cvmfs/$name/rdonly cvmfs no_reload 0 0 # added by CernVM-FS for $name" >> /etc/fstab
+  echo "aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS for $name" >> /etc/fstab
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
   echo "done"
@@ -232,7 +232,7 @@ rmfs() {
   [ $(id -u) -ne 0 ] && die "Only root can remove a repository"
 
   echo -n "Unmounting CernVM-FS Area... "
-  sed -i -e "/.*${name}.*# added by CernVM-FS/d" /etc/fstab
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
   mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
   mount | grep -q " /var/spool/cvmfs/$name/rdonly " && umount /var/spool/cvmfs/$name/rdonly
   echo "done"
