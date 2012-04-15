@@ -105,14 +105,16 @@ publish() {
   $user_shell "cvmfs_sync -u /cvmfs/$name \
     -s /var/spool/cvmfs/${name}/scratch \
     -c /var/spool/cvmfs/${name}/rdonly \
-    -r /srv/cvmfs/${name}/pub"
+    -r /srv/cvmfs/${name}/pub" || die "Synchronization failed"
   $user_shell "cvmfs_sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
-    /srv/cvmfs/${name}/pub/catalogs/.cvmfspublished"
+    /srv/cvmfs/${name}/pub/catalogs/.cvmfspublished" || die "Signing failed"
   sudo umount /cvmfs/$name
   sudo umount /var/spool/cvmfs/${name}/rdonly
+  sudo rm -rf /var/spool/cvmfs/${name}/scratch
+  $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
   sudo mount /cvmfs/$name
 }
@@ -123,6 +125,8 @@ mkfs() {
   local scratch_dir="/var/spool/cvmfs/${name}/scratch"
   local rdonly_dir="/var/spool/cvmfs/${name}/rdonly"
   local repository_dir="/srv/cvmfs/${name}"
+
+  [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
 
   local cvmfs_user=$(whoami)
   read -p "Owner of $name [$cvmfs_user]: " cvmfs_user
@@ -180,7 +184,7 @@ $cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS 
 $cvmfs_user localhost = NOPASSWD: /bin/umount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/mount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/mount /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/su $cvmfs_user * # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/rm -rf /var/spool/cvmfs/${name}/scratch # added by CernVM-FS for $name
 EOF
   echo "done"
 
@@ -224,6 +228,8 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 rmfs() {
   local name=$1
+
+  [ $(id -u) -ne 0 ] && die "Only root can remove a repository"
 
   echo -n "Unmounting CernVM-FS Area... "
   sed -i -e "/.*${name}.*# added by CernVM-FS/d" /etc/fstab
