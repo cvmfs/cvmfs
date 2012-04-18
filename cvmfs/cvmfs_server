@@ -128,8 +128,9 @@ mkfs() {
 
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
 
-  local cvmfs_user=$(whoami)
+  local cvmfs_user
   read -p "Owner of $name [$cvmfs_user]: " cvmfs_user
+  [ x"$cvmfs_user" = x ] && cvmfs_user=$(whoami)
   id $cvmfs_user > /dev/null 2>&1 || die "No user $cvmfs_user"
 
   echo -n "Creating configuration files... "
@@ -205,8 +206,10 @@ EOF
   reload_apache
 
   echo -n "Mounting CernVM-FS Storage... "
-  echo "$name /var/spool/cvmfs/$name/rdonly cvmfs no_reload 0 0 # added by CernVM-FS for $name" >> /etc/fstab
-  echo "aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS for $name" >> /etc/fstab
+  cat >> /etc/fstab << EOF
+$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name"
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS for $name"
+EOF
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
   echo "done"
@@ -255,9 +258,8 @@ rmfs() {
 
   echo -n "Stopping services... "
   reload_apache > /dev/null
-  echo "done"
-
   rm -rf /etc/cvmfs/repositories.d/$name
+  echo "done"
 
   echo "CernVM-FS repository $name wiped out!"
 }
@@ -302,8 +304,6 @@ the command."
 
 
 . /etc/cvmfs/config.sh
-. /etc/cvmfs/server.conf
-[ -f /etc/cvmfs/server.local ] && . /etc/cvmfs/server.local
 
 select_fqrn() {
   local given_name="$1"

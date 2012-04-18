@@ -19,7 +19,7 @@ FIND_PATH (FUSE_INCLUDE_DIR fuse.h
 SET(FUSE_NAMES fuse)
 FIND_LIBRARY(FUSE_LIBRARY
         NAMES ${FUSE_NAMES}
-        PATHS /usr/lib /usr/local/lib
+        PATHS /lib64 /lib /usr/lib64 /usr/lib /usr/local/lib64 /usr/local/lib
 )
 
 # check if lib was found and include is present
