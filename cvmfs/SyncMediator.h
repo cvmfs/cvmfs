@@ -50,11 +50,13 @@ namespace cvmfs {
 struct HardlinkGroup {
   HardlinkGroup(SyncItem &master_entry) :
     masterFile(master_entry) {
-    hardlinks.push_back(master_entry);
+    //hardlinks.push_back(master_entry);
+      hardlinks[master_entry.GetRelativePath()] = master_entry;
   }
 
   void AddHardlink(SyncItem &entry) {
-    hardlinks.push_back(entry);
+    //hardlinks.push_back(entry);
+    hardlinks[entry.GetRelativePath()] = entry;
   }
 
 	SyncItem masterFile;
@@ -80,7 +82,6 @@ private:
 
 private:
   catalog::WritableCatalogManager *mCatalogManager;
-	const std::string mDataDirectory;
   SyncUnion *mUnionEngine;
 
 	/**
@@ -99,17 +100,11 @@ private:
 	SyncItemList mFileQueue;
 	HardlinkGroupList mHardlinkQueue;
 
-	/** if dry run is set no changes to the repository will be made */
-	bool mDryRun;
-
-	/** if print changeset option is set it will print all changes to the repository to stdout */
-	bool mPrintChangeset;
+	const SyncParameters *params_;
 
 public:
 	SyncMediator(catalog::WritableCatalogManager *catalogManager,
-	             const std::string &data_directory,
-	             const bool dry_run = false,
-	             const bool print_changeset = false);
+	             const SyncParameters *params);
 
 	/**
 	 *  adding an entry to the repository

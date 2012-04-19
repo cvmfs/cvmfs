@@ -44,7 +44,8 @@ static void Usage() {
     "Usage:\n"
     "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
     "             -r <repository store>\n"
-    "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n\n"
+    "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n"
+    "             [EXPERIMENTAL: -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n"
     "Make sure that a 'data' and a 'catalogs' subdirectory exist in your repository store.\n"
     "Also, your webserver must be able to follow symlinks in the catalogs subdirectory.\n"
     "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file.\n\n", VERSION);
@@ -63,10 +64,11 @@ bool ParseParameters(int argc, char **argv, SyncParameters *params) {
 	params->print_changeset = false;
 	params->dry_run = false;
 	params->mucatalogs = false;
+  params->process_locally = false;
 
 	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "u:s:c:r:pdm")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:r:pdmx:y:z")) != -1) {
 		switch (c) {
       // Directories
       case 'u':
@@ -84,6 +86,12 @@ bool ParseParameters(int argc, char **argv, SyncParameters *params) {
         params->dir_catalogs = path + "/catalogs";
         break;
       }
+      case 'x':
+        params->paths_out = optarg;
+        break;
+      case 'y':
+        params->hashes_in = optarg;
+        break;
 
       // Switches
       case 'p':
@@ -94,6 +102,9 @@ bool ParseParameters(int argc, char **argv, SyncParameters *params) {
         break;
       case 'm':
         params->mucatalogs = true;
+        break;
+      case 'z':
+        params->process_locally = true;
         break;
 
       case '?':
@@ -163,11 +174,9 @@ catalog::WritableCatalogManager* createWritableCatalogManager(const SyncParamete
 }
 
 SyncMediator* createSyncMediator(catalog::WritableCatalogManager* catalogManager,
-                                 const SyncParameters &p) {
+                                 const SyncParameters *p) {
   return new SyncMediator(catalogManager,
-                          MakeCanonicalPath(p.dir_data),
-                          p.dry_run,
-                          p.print_changeset);
+                          p);
 }
 
 SyncUnion* createSynchronisationEngine(SyncMediator* mediator,
@@ -189,7 +198,7 @@ int main(int argc, char **argv) {
 
 	// create worker objects
   catalog::WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
-  SyncMediator *mediator = createSyncMediator(catalogManager, parameters);
+  SyncMediator *mediator = createSyncMediator(catalogManager, &parameters);
   SyncUnion *sync = createSynchronisationEngine(mediator, parameters);
 
 	// sync

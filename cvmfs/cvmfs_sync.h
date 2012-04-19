@@ -13,9 +13,12 @@ typedef struct {
 	std::string dir_rdonly;
 	std::string dir_data;
 	std::string dir_catalogs;
+  std::string paths_out;
+  std::string hashes_in;
 	bool print_changeset;
 	bool dry_run;
 	bool mucatalogs;
+  bool process_locally;
 } SyncParameters;
 
 #endif  // CVMFS_SYNC_H_

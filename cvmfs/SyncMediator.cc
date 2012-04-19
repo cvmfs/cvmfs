@@ -1,5 +1,11 @@
 #include "SyncMediator.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <cstdio>
+#include <cassert>
+
 #include <sstream>
 #include <iostream> // TODO: remove that!
 
@@ -8,18 +14,15 @@
 
 #include "hash.h"
 #include "cvmfs_sync_recursion.h"
+#include "util.h"
 
 using namespace cvmfs;
 using namespace std;
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
-                           const string &data_directory,
-                           const bool dry_run,
-                           const bool print_changeset) :
+                           const SyncParameters *params) :
   mCatalogManager(catalogManager),
-  mDataDirectory(data_directory),
-  mDryRun(dry_run),
-  mPrintChangeset(print_changeset) {}
+  params_(params) {}
 
 void SyncMediator::Add(SyncItem &entry) {
   if (entry.IsDirectory()) {
@@ -114,15 +117,107 @@ void SyncMediator::Commit() {
 	mCatalogManager->Commit();
 }
 
+
+/**** EXPERIMENTAL *****/
+
 void SyncMediator::CompressAndHashFileQueue() {
+  if (params_->paths_out != "") {
+
+  if (params_->process_locally) {
+      if (fork() == 0) {
+        FILE *pipe_paths = fopen(params_->paths_out.c_str(), "r");
+        int pipe_hashes = open(params_->hashes_in.c_str(), O_WRONLY);
+        char c;
+        string path;
+        while ((c = fgetc(pipe_paths)) != EOF) {
+          if (c == '\n') {
+            string path_compressed;
+            FILE *file_compressed =
+              CreateTempFile(params_->dir_data + "/txn/compressing",
+                             kDefaultFileMode, "w", &path_compressed);
+            assert(file_compressed);
+
+            FILE *file_source = fopen(path.c_str(), "r");
+            assert(file_source);
+            hash::Any hash(hash::kSha1);
+            int retval = zlib::CompressFile2File(file_source, file_compressed,
+                                                 &hash);
+            assert(retval);
+            fclose(file_compressed);
+            fclose(file_source);
+
+            const string path_dest = params_->dir_data + "/" +
+                                     hash.MakePath(1, 2);
+            retval = rename(path_compressed.c_str(), path_dest.c_str());
+            assert(retval == 0);
+            const string to_pipe = path + "," + hash.ToString() + "\n";
+            WritePipe(pipe_hashes, to_pipe.data(), to_pipe.length());
+
+            path = "";
+          } else {
+            path.append(1, c);
+          }
+        }
+        fclose(pipe_paths);
+        close(pipe_hashes);
+        _exit(0);
+      }
+    }
+
+    if (fork() == 0) {
+      int pipe_fd = open(params_->paths_out.c_str(), O_WRONLY);
+      assert(pipe_fd >= 0);
+      for (SyncItemList::const_iterator i = mFileQueue.begin(),
+           iEnd = mFileQueue.end(); i != iEnd; ++i)
+      {
+        const string full_path = params_->dir_union + i->second.GetParentPath() +
+          "/" + i->second.GetFilename() + "\n";
+        WritePipe(pipe_fd, full_path.data(), full_path.length());
+      }
+      close(pipe_fd);
+      _exit(0);
+    }
+
+    FILE *pipe_hashes = fopen(params_->hashes_in.c_str(), "r");
+    char c;
+    string tmp;
+    string path;
+    hash::Any hash(hash::kSha1);
+    while ((c = fgetc(pipe_hashes)) != EOF) {
+      switch (c) {
+        case ',':
+          path = tmp.substr(params_->dir_union.length()+1);
+          tmp = "";
+          break;
+        case '\n': {
+          hash = hash::Any(hash::kSha1, hash::HexPtr(tmp));
+          cout << "received: " << path << ", " << hash.ToString() << endl;
+          SyncItemList::iterator itr = mFileQueue.find(path);
+          if (itr == mFileQueue.end()) {
+            cout << path << endl;
+            for (SyncItemList::const_iterator i = mFileQueue.begin(); i != mFileQueue.end(); ++i)
+              cout << i->first << endl;
+          }
+          assert(itr != mFileQueue.end());
+          itr->second.SetContentHash(hash);
+          tmp = "";
+          break;
+        } default:
+          tmp.append(1, c);
+      }
+    }
+    fclose(pipe_hashes);
+    return;
+  }
+
 	// compressing and hashing files
 	// TODO: parallelize this!
 	SyncItemList::iterator i;
 	SyncItemList::const_iterator iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
 		hash::Any hash(hash::kSha1);
-		AddFileToDatastore(*i, hash);
-		i->SetContentHash(hash);
+		//EXP AddFileToDatastore(*i, hash);
+		//EXP i->SetContentHash(hash);
 	}
 
 	// compressing and hashing files in hardlink groups
@@ -143,21 +238,21 @@ void SyncMediator::CompressAndHashFileQueue() {
 
 		// distribute the obtained hash for every hardlink
 		for (k = j->hardlinks.begin(), kend = j->hardlinks.end(); k != kend; ++k) {
-			k->SetContentHash(hash);
+			//EXP k->SetContentHash(hash);
 		}
 	}
 }
 
 void SyncMediator::AddFileQueueToCatalogs() {
 	// don't do things you could regret later on
-	if (mDryRun) {
+	if (params_->dry_run) {
 		return;
 	}
 
 	// add singular files
 	SyncItemList::const_iterator i, iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		mCatalogManager->AddFile(i->CreateDirectoryEntry(), i->GetParentPath());
+		mCatalogManager->AddFile(i->second.CreateDirectoryEntry(), i->second.GetParentPath());
 	}
 
 	// add hardlink groups
@@ -169,13 +264,13 @@ void SyncMediator::AddFileQueueToCatalogs() {
 
 bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::Any &hash) {
 	// don't do that, would change something!
-	if (mDryRun) {
+	if (params_->dry_run) {
 		return true;
 	}
 
 	bool result = false;
 	/* Create temporary file */
-	const string templ = mDataDirectory + "/txn/compressing.XXXXXX";
+	const string templ = params_->dir_data + "/txn/compressing.XXXXXX";
 	char *tmp_path = (char *)smalloc(templ.length() + 1);
 	strncpy(tmp_path, templ.c_str(), templ.length() + 1);
 	int fd_dst = mkstemp(tmp_path);
@@ -188,7 +283,7 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
          zlib::CompressFile2File(fsrc, fdst, &hash) )
 		{
 			const string sha1str = hash.ToString();
-			const string cache_path = mDataDirectory + "/" + sha1str.substr(0, 2) + "/" +
+			const string cache_path = params_->dir_data + "/" + sha1str.substr(0, 2) + "/" +
 			sha1str.substr(2) + suffix;
 			fflush(fdst);
 			if (rename(tmp_path, cache_path.c_str()) == 0) {
@@ -253,7 +348,7 @@ void SyncMediator::InsertExistingHardlink(SyncItem &entry) {
 
 		// search for the entry in this group
 		for (i = hlGroup->second.hardlinks.begin(), end = hlGroup->second.hardlinks.end(); i != end; ++i) {
-			if (*i == entry) {
+			if (i->second == entry) {
 				alreadyThere = true;
 				break;
 			}
@@ -384,52 +479,52 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 // -----------------------------------------------------------------------------
 
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
-	if (mPrintChangeset) cout << "[add] NESTED CATALOG" << endl;
-	if (not mDryRun)     mCatalogManager->CreateNestedCatalog(requestFile.GetParentPath());
+	if (params_->print_changeset) cout << "[add] NESTED CATALOG" << endl;
+	if (not params_->dry_run)     mCatalogManager->CreateNestedCatalog(requestFile.GetParentPath());
 }
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
-	if (mPrintChangeset) cout << "[rem] NESTED CATALOG" << endl;
-	if (not mDryRun)     mCatalogManager->RemoveNestedCatalog(requestFile.GetParentPath());
+	if (params_->print_changeset) cout << "[rem] NESTED CATALOG" << endl;
+	if (not params_->dry_run)     mCatalogManager->RemoveNestedCatalog(requestFile.GetParentPath());
 }
 
 void SyncMediator::AddFile(SyncItem &entry) {
-	if (mPrintChangeset) cout << "[add] " << entry.GetRepositoryPath() << endl;
+	if (params_->print_changeset) cout << "[add] " << entry.GetRepositoryPath() << endl;
 
-	if (entry.IsSymlink() && not mDryRun) {
+	if (entry.IsSymlink() && not params_->dry_run) {
 	  // symlinks have no 'actual' file content, which would have to be compressed...
 		mCatalogManager->AddFile(entry.CreateDirectoryEntry(), entry.GetParentPath());
 	} else {
 	  // push the file in the queue for later post-processing
-		mFileQueue.push_back(entry);
+		mFileQueue[entry.GetRelativePath()] = entry;
 	}
 }
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
-	if (mPrintChangeset) cout << "[rem] " << entry.GetRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->RemoveFile(entry.GetRelativePath());
+	if (params_->print_changeset) cout << "[rem] " << entry.GetRepositoryPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->RemoveFile(entry.GetRelativePath());
 }
 
 void SyncMediator::TouchFile(SyncItem &entry) {
-	if (mPrintChangeset) cout << "[tou] " << entry.GetRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->TouchFile(entry.CreateDirectoryEntry(),
+	if (params_->print_changeset) cout << "[tou] " << entry.GetRepositoryPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->TouchFile(entry.CreateDirectoryEntry(),
 	                                                entry.GetParentPath());
 }
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
-	if (mPrintChangeset) cout << "[add] " << entry.GetRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->AddDirectory(entry.CreateDirectoryEntry(),
+	if (params_->print_changeset) cout << "[add] " << entry.GetRepositoryPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->AddDirectory(entry.CreateDirectoryEntry(),
 	                                                   entry.GetParentPath());
 }
 
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
-	if (mPrintChangeset) cout << "[rem] " << entry.GetRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->RemoveDirectory(entry.GetRelativePath());
+	if (params_->print_changeset) cout << "[rem] " << entry.GetRepositoryPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->RemoveDirectory(entry.GetRelativePath());
 }
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
-	if (mPrintChangeset) cout << "[tou] " << entry.GetRepositoryPath() << endl;
-	if (not mDryRun)     mCatalogManager->TouchDirectory(entry.CreateDirectoryEntry(),
+	if (params_->print_changeset) cout << "[tou] " << entry.GetRepositoryPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->TouchDirectory(entry.CreateDirectoryEntry(),
 	                                                     entry.GetParentPath());
 }
 
@@ -438,16 +533,16 @@ void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 	for (i = hardlinks.begin(), end = hardlinks.end(); i != end; ++i) {
 	   // currentHardlinkGroup = i->second; --> just to remind you
 
-		if (mPrintChangeset) {
+		if (params_->print_changeset) {
 			cout << "[add] hardlink group around: " << i->second.masterFile.GetRepositoryPath() << "( ";
 			SyncItemList::const_iterator j,jend;
 			for (j = i->second.hardlinks.begin(), jend = i->second.hardlinks.end(); j != jend; ++j) {
-				cout << j->GetFilename() << " ";
+				cout << j->second.GetFilename() << " ";
 			}
 			cout << ")" << endl;
 		}
 
-		if (i->second.masterFile.IsSymlink() && not mDryRun) {
+		if (i->second.masterFile.IsSymlink() && not params_->dry_run) {
 		  // symlink hardlinks just end up in the database
 		  // (see SyncMediator::addFile() same semantics here)
       AddHardlinkGroup(i->second);
@@ -465,7 +560,8 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   SyncItemList::const_iterator k, kend;
   for (k    = group.hardlinks.begin(),
        kend = group.hardlinks.end(); k != kend; ++k) {
-    hardlinks.push_back(k->CreateDirectoryEntry());
+    // EXP
+    //hardlinks[k->CreateDirectoryEntry().GetRelativePath()] = k->CreateDirectoryEntry();
   }
 	mCatalogManager->AddHardlinkGroup(hardlinks, group.masterFile.GetParentPath());
 }

@@ -62,14 +62,15 @@ class SyncItem {
   const SyncUnion *mUnionEngine;
 
  public:
-	/**
+  /**
 	 *  create a new SyncItem (is normally not required for normal usage
 	 *                         as the RecursionEngine provides you with DirEntries)
 	 *  @param dirPath the RELATIVE path to the file
 	 *  @param filename the name of the file ;-)
 	 *  @param entryType well...
 	 */
-	SyncItem(const std::string &dirPath,
+	SyncItem() { };
+  SyncItem(const std::string &dirPath,
 	         const std::string &filename,
 	         const SyncItemType entryType,
 	         const SyncUnion *syncUnionEngine);
@@ -113,7 +114,7 @@ class SyncItem {
 	void StatGeneric(const std::string &path, EntryStat *statStructure) const;
 };
 
-typedef std::list<SyncItem> SyncItemList;
+typedef std::map<std::string, SyncItem> SyncItemList;
 
 } // namespace cvmfs
 

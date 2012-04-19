@@ -1,7 +1,8 @@
 #!/bin/sh
 #
 # This file is part of the CernVM File System
-# It takes care of creating and removing repositories on a Stratum 0 server
+# This script takes care of creating and removing repositories on a
+# Stratum 0 server
 
 set -e
 
@@ -105,7 +106,10 @@ publish() {
   $user_shell "cvmfs_sync -u /cvmfs/$name \
     -s /var/spool/cvmfs/${name}/scratch \
     -c /var/spool/cvmfs/${name}/rdonly \
-    -r /srv/cvmfs/${name}/pub" || die "Synchronization failed"
+    -r /srv/cvmfs/${name}/pub \
+    -x /var/spool/cvmfs/${name}/paths_out \
+    -y /var/spool/cvmfs/${name}/hashes_in \
+    -z" || die "Synchronization failed"
   $user_shell "cvmfs_sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
@@ -127,9 +131,11 @@ mkfs() {
   local repository_dir="/srv/cvmfs/${name}"
 
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
+  modprobe aufs || die "aufs kernel module missing"
+  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
 
   local cvmfs_user
-  read -p "Owner of $name [$cvmfs_user]: " cvmfs_user
+  read -p "Owner of $name [$(whoami)]: " cvmfs_user
   [ x"$cvmfs_user" = x ] && cvmfs_user=$(whoami)
   id $cvmfs_user > /dev/null 2>&1 || die "No user $cvmfs_user"
 
@@ -194,9 +200,11 @@ EOF
   create_cert $name $cvmfs_user
 
   echo -n "Create CernVM-FS Storage... "
-  mkdir -p /cvmfs/$name
-  mkdir -p ${repository_dir}/pub/catalogs ${repository_dir}/pub/data
-  mkdir -p $scratch_dir $rdonly_dir
+  mkdir -p /cvmfs/$name \
+    ${repository_dir}/pub/catalogs ${repository_dir}/pub/data \
+    $scratch_dir $rdonly_dir
+  mkfifo -m 0660 /var/spool/cvmfs/${name}/paths_out \
+    /var/spool/cvmfs/${name}/hashes_in
   create_whitelist $name $cvmfs_user > /dev/null
   cvmfs_sync -u /cvmfs/$name -s $scratch_dir -c $rdonly_dir -r ${repository_dir}/pub > /dev/null
   cvmfs_sign -c /etc/cvmfs/keys/${name}.crt -k /etc/cvmfs/keys/${name}.key -n $name ${repository_dir}/pub/catalogs/.cvmfspublished > /dev/null
@@ -207,8 +215,8 @@ EOF
 
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF
-$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name"
-aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS for $name"
+$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
