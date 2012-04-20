@@ -1144,6 +1144,7 @@ struct CvmfsOptions {
   int      kcache_timeout;
   int      diskless;
   int      no_reload;
+  int      shared_cache;
 
   int64_t  quota_limit;
   int64_t  quota_threshold;
@@ -1182,6 +1183,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("interface=%s",        interface, 0),
   CVMFS_OPT("root_hash=%s",        root_hash, 0),
   CVMFS_SWITCH("no_reload",        no_reload),
+  CVMFS_SWITCH("shared_cache",     no_reload),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1261,6 +1263,8 @@ static void usage(const char *progname) {
     "                            Default is NOTICE.\n"
     " -o no_reload               "
       "Avoids to reload catalogs when the TTL expires."
+    " -o shared_cache            "
+      "Cache directory is shared among multiple instances"
     " Note: you cannot load files greater than quota_limit-quota_threshold\n"
     "\nFuse options:\n"
     " -o allow_other             "
@@ -1597,20 +1601,23 @@ int main(int argc, char *argv[]) {
   }
 
   // Create lock file and running sentinel
-  fd_lockfile = LockFile("lock");
+  fd_lockfile = LockFile("lock." + *cvmfs::repository_name_);
   if (fd_lockfile < 0) {
     PrintError("could not acquire lock (" + StringifyInt(errno) + ")");
     goto cvmfs_cleanup;
   }
   {
     platform_stat64 info;
-    if (platform_stat("running", &info) == 0) {
+    if (platform_stat(("running." + *cvmfs::repository_name_).c_str(),
+                      &info) == 0)
+    {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
                "crashed previously, rebuilding cache database");
       g_cvmfs_opts.rebuild_cachedb = 1;
     }
   }
-  retval = open("running", O_RDONLY | O_CREAT, 0600);
+  retval = open(("running." + *cvmfs::repository_name_).c_str(),
+                O_RDONLY | O_CREAT, 0600);
   if (retval < 0) {
     PrintError("could not open running sentinel (" + StringifyInt(errno) + ")");
     goto cvmfs_cleanup;
@@ -1807,7 +1814,7 @@ int main(int argc, char *argv[]) {
   if (monitor_ready) monitor::Fini();
   if (quota_ready) quota::Fini();
   if (cache_ready) cache::Fini();
-  if (running_created) unlink("running");
+  if (running_created) unlink(("running." + *cvmfs::repository_name_).c_str());
   if (fd_lockfile >= 0) UnlockFile(fd_lockfile);
   if (peers_ready) peers::Fini();
   if (options_ready) {

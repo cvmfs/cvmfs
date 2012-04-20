@@ -454,6 +454,7 @@ cvmfs_showconfig() {
       return $retval
    fi
 
+   echo "CVMFS_REPOSITORY_NAME=$fqrn"
    local var
    for var in $var_list
    do

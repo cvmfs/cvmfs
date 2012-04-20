@@ -18,6 +18,7 @@ namespace cvmfs {
 
 extern pid_t pid_;
 extern std::string *mountpoint_;
+extern std::string *repository_name_;
 extern int max_cache_timeout_;
 extern bool foreground_;
 

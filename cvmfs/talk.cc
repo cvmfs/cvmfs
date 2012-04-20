@@ -395,7 +395,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
 bool Init(const string &cachedir) {
   spawned_ = false;
   cachedir_ = new string(cachedir);
-  socket_path_ = new string(cachedir + "/cvmfs_io");
+  socket_path_ = new string(cachedir + "/cvmfs_io." + *cvmfs::repository_name_);
 
   socket_fd_ = MakeSocket(*socket_path_, 0660);
   if (socket_fd_ == -1)
