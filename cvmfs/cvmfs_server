@@ -95,12 +95,51 @@ reload_apache() {
 }
 
 
+transaction() {
+  local name=$1
+
+  [ -f /var/spool/cvmfs/${name}/in_transaction ] && die "Already in a transaction"
+
+  transaction_before_hook $name
+  sudo mount -o remount,rw /cvmfs/$name
+  touch /var/spool/cvmfs/${name}/in_transaction
+  transaction_after_hook $name
+}
+
+
+abort() {
+  local name=$1
+  local user=$2
+
+  [ -f /var/spool/cvmfs/${name}/in_transaction ] || die "Not in a transaction"
+
+  reply=n
+  read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION!  Are you sure (y/n)? " reply
+  [ x"$reply" != xy ] && return
+
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="su $user -c"
+
+  abort_before_hook $name
+  sudo umount /cvmfs/$name
+  sudo rm -rf /var/spool/cvmfs/${name}/scratch
+  $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
+  sudo mount /cvmfs/$name
+  rm -f /var/spool/cvmfs/${name}/in_transaction
+  abort_after_hook $name
+}
+
+
 publish() {
   local name=$1
   local user=$2
 
+  [ -f /var/spool/cvmfs/${name}/in_transaction ] || die "Not in a transaction"
+
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="su $user -c"
+
+  publish_before_hook $name
 
   sudo /bin/mount -o remount,ro /cvmfs/$name
   $user_shell "cvmfs_sync -u /cvmfs/$name \
@@ -121,6 +160,8 @@ publish() {
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
   sudo mount /cvmfs/$name
+
+  publish_after_hook $name
 }
 
 
@@ -158,6 +199,8 @@ RewriteCond %{REQUEST_URI} !^/cvmfs/$name/pub/catalogs/(.*)
 RewriteRule ^/cvmfs/$name/(.*)$ /cvmfs/$name/pub/catalogs/\$1 [PT]
 # Translation URL to real pathname
 Alias /cvmfs/$name/pub ${repository_dir}/pub
+# For pushing files to the worker nodes
+Alias /fanout/$name /cvmfs/$name
 <Directory "${repository_dir}/pub">
     Options -MultiViews FollowSymLinks
     AllowOverride All
@@ -177,6 +220,15 @@ Alias /cvmfs/$name/pub ${repository_dir}/pub
     ExpiresByType text/html "access plus 5 minutes"
     ExpiresByType application/x-cvmfs "access plus 1 minutes"
 </Directory>
+<Directory "/cvmfs/$name">
+    Options -MultiViews FollowSymLinks
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+
+    EnableMMAP Off
+    EnableSendFile Off
+</Directory>
 EOF
   cat > /etc/cvmfs/config.d/${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
@@ -187,6 +239,7 @@ CVMFS_STRICT_MOUNT=no
 EOF
   cat >> /etc/sudoers << EOF
 $cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,rw /cvmfs/$name # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/umount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/mount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
@@ -216,13 +269,14 @@ EOF
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF
 $name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
-aufs_$name /cvmfs/$name aufs br=${scratch_dir}:${rdonly_dir}=rr,udba=none 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
   echo "done"
 
   echo -n "Starting services... "
+  transaction $name > /dev/null
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   publish $name $cvmfs_user > /dev/null
   echo "done"
@@ -304,6 +358,8 @@ Commands:
   resign: Re-signs the 30 day whitelist
   info: Prints summary about the repository
   list: List available repositories
+  transaction: Start to edit a repository
+  abort: Abort transaction and return to the state before
   publish: Makes a new repository snapshot
 
 Note: If multiple repositories are maintained, the repository name must follow
@@ -312,6 +368,7 @@ the command."
 
 
 . /etc/cvmfs/config.sh
+. /etc/cvmfs/cvmfs_server_hooks.sh
 
 select_fqrn() {
   local given_name="$1"
@@ -357,6 +414,15 @@ case $1 in
   ;;
   list)
     list_repositories
+  ;;
+  transaction)
+    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    transaction $CVMFS_REPOSITORY_NAME
+  ;;
+  abort)
+    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
+    abort $CVMFS_REPOSITORY_NAME $CVMFS_USER
   ;;
   publish)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
