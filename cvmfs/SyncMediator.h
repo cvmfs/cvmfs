@@ -37,7 +37,7 @@
 #include "platform.h"
 #include "WritableCatalogManager.h"
 #include "cvmfs_sync.h"
-#include "SyncItem.h"
+#include "sync_item.h"
 
 namespace publish {
 

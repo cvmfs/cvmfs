@@ -52,7 +52,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	monitor.cc monitor.h
 	cvmfs_sync.h cvmfs_sync.cc
 	fs_traversal.h
-	SyncItem.h SyncItem.cc
+	sync_item.h sync_item.cc
 	sync_union.h sync_union.cc
 	SyncMediator.h SyncMediator.cc
 

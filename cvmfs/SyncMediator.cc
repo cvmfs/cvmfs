@@ -33,7 +33,7 @@ void SyncMediator::Add(SyncItem &entry) {
 	else if (entry.IsRegularFile() || entry.IsSymlink()) {
 
 		// create a nested catalog if we find a NEW request file
-		if (entry.IsCatalogRequestFile() && entry.IsNew()) {
+		if (entry.IsCatalogMarker() && entry.IsNew()) {
 			CreateNestedCatalog(entry);
 		}
 
@@ -78,7 +78,7 @@ void SyncMediator::Remove(SyncItem &entry) {
 		RemoveFile(entry);
 
 		// ... then the nested catalog (if needed)
-		if (entry.IsCatalogRequestFile() && not entry.IsNew()) {
+		if (entry.IsCatalogMarker() && not entry.IsNew()) {
 			RemoveNestedCatalog(entry);
 		}
 	}
@@ -171,8 +171,8 @@ void SyncMediator::CompressAndHashFileQueue() {
       for (SyncItemList::const_iterator i = mFileQueue.begin(),
            iEnd = mFileQueue.end(); i != iEnd; ++i)
       {
-        const string full_path = params_->dir_union + i->second.GetParentPath() +
-          "/" + i->second.GetFilename() + "\n";
+        const string full_path = params_->dir_union + i->second.relative_parent_path() +
+          "/" + i->second.filename() + "\n";
         WritePipe(pipe_fd, full_path.data(), full_path.length());
       }
       close(pipe_fd);
@@ -253,7 +253,7 @@ void SyncMediator::AddFileQueueToCatalogs() {
 	// add singular files
 	SyncItemList::const_iterator i, iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		mCatalogManager->AddFile(i->second.CreateDirectoryEntry(), i->second.GetParentPath());
+		mCatalogManager->AddFile(i->second.CreateCatalogDirent(), i->second.relative_parent_path());
 	}
 
 	// add hardlink groups
@@ -279,7 +279,7 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
 	if ((fd_dst >= 0) && (fchmod(fd_dst, kDefaultFileMode) == 0)) {
 		/* Compress and calculate SHA1 */
 		FILE *fsrc = NULL, *fdst = NULL;
-		if ( (fsrc = fopen(entry.GetOverlayPath().c_str(), "r")) &&
+		if ( (fsrc = fopen(entry.GetScratchPath().c_str(), "r")) &&
 		     (fdst = fdopen(fd_dst, "w")) &&
          zlib::CompressFile2File(fsrc, fdst, &hash) )
 		{
@@ -297,7 +297,7 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
 			}
 		} else {
 			stringstream ss;
-			ss << "could not compress " << entry.GetOverlayPath();
+			ss << "could not compress " << entry.GetScratchPath();
 			PrintWarning(ss.str());
 		}
 		if (fsrc) fclose(fsrc);
@@ -385,13 +385,13 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
 
 void SyncMediator::InsertExistingHardlinkFileCallback(const std::string &parent_dir,
                                                       const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, DE_FILE, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemFile, mUnionEngine);
   InsertExistingHardlink(entry);
 }
 
 void SyncMediator::InsertExistingHardlinkSymlinkCallback(const std::string &parent_dir,
                                                          const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, DE_SYMLINK, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemSymlink, mUnionEngine);
   InsertExistingHardlink(entry);
 }
 
@@ -407,37 +407,37 @@ void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
 	traversal.foundRegularFile = &SyncMediator::AddFileCallback;
 	traversal.foundDirectory = &SyncMediator::AddDirectoryCallback;
 	traversal.foundSymlink = &SyncMediator::AddSymlinkCallback;
-	traversal.Recurse(entry.GetOverlayPath());
+	traversal.Recurse(entry.GetScratchPath());
 }
 
 bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
                                         const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, DE_DIR, mUnionEngine);
+  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
 	AddDirectory(entry);
 	return true; // <-- tells the recursion engine to recurse further into this directory
 }
 
 void SyncMediator::AddFileCallback(const std::string &parent_dir,
                                    const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, DE_FILE, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemFile, mUnionEngine);
   Add(entry);
 }
 
 void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
                                       const std::string &link_name) {
-  SyncItem entry(parent_dir, link_name, DE_SYMLINK, mUnionEngine);
+  SyncItem entry(parent_dir, link_name, kItemSymlink, mUnionEngine);
   Add(entry);
 }
 
 void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, DE_DIR, mUnionEngine);
+  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
   EnterDirectory(entry);
 }
 
 void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, DE_DIR, mUnionEngine);
+  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
   bool complete_hardlinks = false; // <-- this was a NEW directory...
                                    //     there are no 'unchanged' hardlinks
   LeaveDirectory(entry, complete_hardlinks);
@@ -453,7 +453,7 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
 	traversal.foundRegularFile = &SyncMediator::RemoveFileCallback;
 	traversal.foundDirectoryAfterRecursion = &SyncMediator::RemoveDirectoryCallback;
 	traversal.foundSymlink = &SyncMediator::RemoveSymlinkCallback;
-	traversal.Recurse(entry.GetRepositoryPath());
+	traversal.Recurse(entry.GetRdOnlyPath());
 
 	// the given directory was emptied recursively and can now itself be deleted
 	RemoveDirectory(entry);
@@ -461,19 +461,19 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
 
 void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
                                       const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, DE_FILE, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemFile, mUnionEngine);
   Remove(entry);
 }
 
 void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
                                          const std::string &link_name) {
-  SyncItem entry(parent_dir, link_name, DE_SYMLINK, mUnionEngine);
+  SyncItem entry(parent_dir, link_name, kItemSymlink, mUnionEngine);
   Remove(entry);
 }
 
 void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, DE_DIR, mUnionEngine);
+  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
   RemoveDirectory(entry);
 }
 
@@ -481,20 +481,20 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
 	if (params_->print_changeset) cout << "[add] NESTED CATALOG" << endl;
-	if (not params_->dry_run)     mCatalogManager->CreateNestedCatalog(requestFile.GetParentPath());
+	if (not params_->dry_run)     mCatalogManager->CreateNestedCatalog(requestFile.relative_parent_path());
 }
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
 	if (params_->print_changeset) cout << "[rem] NESTED CATALOG" << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveNestedCatalog(requestFile.GetParentPath());
+	if (not params_->dry_run)     mCatalogManager->RemoveNestedCatalog(requestFile.relative_parent_path());
 }
 
 void SyncMediator::AddFile(SyncItem &entry) {
-	if (params_->print_changeset) cout << "[add] " << entry.GetRepositoryPath() << endl;
+	if (params_->print_changeset) cout << "[add] " << entry.GetRdOnlyPath() << endl;
 
 	if (entry.IsSymlink() && not params_->dry_run) {
 	  // symlinks have no 'actual' file content, which would have to be compressed...
-		mCatalogManager->AddFile(entry.CreateDirectoryEntry(), entry.GetParentPath());
+		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.relative_parent_path());
 	} else {
 	  // push the file in the queue for later post-processing
 		mFileQueue[entry.GetRelativePath()] = entry;
@@ -502,31 +502,31 @@ void SyncMediator::AddFile(SyncItem &entry) {
 }
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
-	if (params_->print_changeset) cout << "[rem] " << entry.GetRepositoryPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveFile(entry.GetRelativePath());
+	if (params_->print_changeset) cout << "[rem] " << entry.GetRdOnlyPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->RemoveFile(entry.relative_parent_path());
 }
 
 void SyncMediator::TouchFile(SyncItem &entry) {
-	if (params_->print_changeset) cout << "[tou] " << entry.GetRepositoryPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->TouchFile(entry.CreateDirectoryEntry(),
-	                                                entry.GetParentPath());
+	if (params_->print_changeset) cout << "[tou] " << entry.GetRdOnlyPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->TouchFile(entry.CreateCatalogDirent(),
+	                                                entry.relative_parent_path());
 }
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
-	if (params_->print_changeset) cout << "[add] " << entry.GetRepositoryPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->AddDirectory(entry.CreateDirectoryEntry(),
-	                                                   entry.GetParentPath());
+	if (params_->print_changeset) cout << "[add] " << entry.GetRdOnlyPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->AddDirectory(entry.CreateCatalogDirent(),
+	                                                   entry.relative_parent_path());
 }
 
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
-	if (params_->print_changeset) cout << "[rem] " << entry.GetRepositoryPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveDirectory(entry.GetRelativePath());
+	if (params_->print_changeset) cout << "[rem] " << entry.GetRdOnlyPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->RemoveDirectory(entry.relative_parent_path());
 }
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
-	if (params_->print_changeset) cout << "[tou] " << entry.GetRepositoryPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->TouchDirectory(entry.CreateDirectoryEntry(),
-	                                                     entry.GetParentPath());
+	if (params_->print_changeset) cout << "[tou] " << entry.GetRdOnlyPath() << endl;
+	if (not params_->dry_run)     mCatalogManager->TouchDirectory(entry.CreateCatalogDirent(),
+	                                                     entry.relative_parent_path());
 }
 
 void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
@@ -535,10 +535,10 @@ void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 	   // currentHardlinkGroup = i->second; --> just to remind you
 
 		if (params_->print_changeset) {
-			cout << "[add] hardlink group around: " << i->second.masterFile.GetRepositoryPath() << "( ";
+			cout << "[add] hardlink group around: " << i->second.masterFile.GetRdOnlyPath() << "( ";
 			SyncItemList::const_iterator j,jend;
 			for (j = i->second.hardlinks.begin(), jend = i->second.hardlinks.end(); j != jend; ++j) {
-				cout << j->second.GetFilename() << " ";
+				cout << j->second.filename() << " ";
 			}
 			cout << ")" << endl;
 		}
@@ -564,7 +564,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
     // EXP
     //hardlinks[k->CreateDirectoryEntry().GetRelativePath()] = k->CreateDirectoryEntry();
   }
-	mCatalogManager->AddHardlinkGroup(hardlinks, group.masterFile.GetParentPath());
+	mCatalogManager->AddHardlinkGroup(hardlinks, group.masterFile.relative_parent_path());
 }
 
 }  // namespace sync

@@ -6,8 +6,8 @@
 
 #include "util.h"
 #include "fs_traversal.h"
+#include "sync_item.h"
 #include "SyncMediator.h"
-#include "SyncItem.h"
 
 using namespace std;  // NOLINT
 
@@ -29,7 +29,7 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
 bool SyncUnion::ProcessDirectory(const string &parent_dir,
                                  const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, DE_DIR, this);
+  SyncItem entry(parent_dir, dir_name, kItemDir, this);
 
 	if (entry.IsNew()) {
 		mediator_->Add(entry);
@@ -52,7 +52,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 void SyncUnion::ProcessRegularFile(const string &parent_dir,
                                    const string &filename)
 {
-  SyncItem entry(parent_dir, filename, DE_FILE, this);
+  SyncItem entry(parent_dir, filename, kItemFile, this);
   ProcessFile(entry);
 }
 
@@ -60,7 +60,7 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
 void SyncUnion::ProcessSymlink(const string &parent_dir,
                                const string &link_name)
 {
-  SyncItem entry(parent_dir, link_name, DE_SYMLINK, this);
+  SyncItem entry(parent_dir, link_name, kItemSymlink, this);
 	ProcessFile(entry);
 }
 
@@ -68,7 +68,7 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 void SyncUnion::ProcessFile(SyncItem &entry) {
 	// Process whiteout prefix
 	if (IsWhiteoutEntry(entry)) {
-    string actual_filename = UnwindWhiteoutFilename(entry.GetFilename());
+    string actual_filename = UnwindWhiteoutFilename(entry.filename());
 		entry.MarkAsWhiteout(actual_filename);
 		mediator_->Remove(entry);
 
@@ -86,7 +86,7 @@ void SyncUnion::ProcessFile(SyncItem &entry) {
 void SyncUnion::EnterDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, DE_DIR, this);
+  SyncItem entry(parent_dir, dir_name, kItemDir, this);
   mediator_->EnterDirectory(entry);
 }
 
@@ -94,7 +94,7 @@ void SyncUnion::EnterDirectory(const string &parent_dir,
 void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, DE_DIR, this);
+  SyncItem entry(parent_dir, dir_name, kItemDir, this);
 	mediator_->LeaveDirectory(entry);
 }
 
@@ -118,7 +118,7 @@ SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
 
 bool SyncUnionAufs::Traverse() {
 	FileSystemTraversal<SyncUnionAufs>
-  traversal(this, scratch_path(), true, ignore_filenames_);
+    traversal(this, scratch_path(), true, ignore_filenames_);
 
 	traversal.foundRegularFile = &SyncUnionAufs::ProcessRegularFile;
 	traversal.foundDirectory = &SyncUnionAufs::ProcessDirectory;
@@ -135,12 +135,12 @@ bool SyncUnionAufs::Traverse() {
 
 
 bool SyncUnionAufs::IsWhiteoutEntry(const SyncItem &entry) const {
-  return entry.GetFilename().substr(0, whiteout_prefix_.length()) ==
+  return entry.filename().substr(0, whiteout_prefix_.length()) ==
          whiteout_prefix_;
 }
 
 bool SyncUnionAufs::IsOpaqueDirectory(const SyncItem &directory) const {
-  return FileExists(directory.GetOverlayPath() + "/.wh..wh..opq");
+  return FileExists(directory.GetScratchPath() + "/.wh..wh..opq");
 }
 
 string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {

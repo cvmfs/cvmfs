@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
- * It provides a recursion engine to abstract the traversal of directories.
+ * It provides a traversal framework to abstract the traversal of directories.
  */
 
 #ifndef CVMFS_FS_TRAVERSAL_H_
@@ -17,7 +17,7 @@
 namespace publish {
 
 /**
- * @brief a simple recursion engine to abstract the recursion of directories.
+ * @brief A simple recursion engine to abstract the recursion of directories.
  * It provides several callback hooks to instrument and control the recursion.
  * Hooks will be called on the provided delegate object of type T
  *
