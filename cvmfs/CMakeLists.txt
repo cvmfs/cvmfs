@@ -51,9 +51,9 @@ set (CVMFS_SYNC_BIN_SOURCES
 	logging.cc logging.h logging_internal.h
 	monitor.cc monitor.h
 	cvmfs_sync.h cvmfs_sync.cc
-	cvmfs_sync_recursion.h cvmfs_sync_recursion.cc
+	fs_traversal.h
 	SyncItem.h SyncItem.cc
-	SyncUnion.h SyncUnion.cc
+	sync_union.h sync_union.cc
 	SyncUnionAufs.h SyncUnionAufs.cc
 	SyncMediator.h SyncMediator.cc
 

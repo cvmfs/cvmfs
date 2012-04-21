@@ -7,9 +7,9 @@
 #include "platform.h"
 
 #include "dirent.h"
-#include "SyncUnion.h"
+#include "sync_union.h"
 
-namespace cvmfs {
+namespace publish {
 
 enum SyncItemType {
 	DE_DIR,
@@ -116,6 +116,6 @@ class SyncItem {
 
 typedef std::map<std::string, SyncItem> SyncItemList;
 
-} // namespace cvmfs
+}  // namespace sync
 
 #endif /* SYNC_ITEM_H */

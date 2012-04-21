@@ -1,7 +1,7 @@
 #include "SyncUnionAufs.h"
 
 #include "util.h"
-#include "cvmfs_sync_recursion.h"
+#include "fs_traversal.h"
 /*
 #include <iostream> // remove later
 #include <dirent.h>
@@ -11,8 +11,9 @@
 #include <sstream>
 */
 
-using namespace cvmfs;
-using namespace std;
+using namespace std;  // NOLINT
+
+namespace publish {
 
 SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
                              const std::string &repository_path,
@@ -30,21 +31,23 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
 	mWhiteoutPrefix = ".wh.";
 }
 
-bool SyncUnionAufs::DoYourMagic() {
-	RecursionEngine<SyncUnionAufs> recursion(this,
-	                                         mOverlayPath,
+bool SyncUnionAufs::Traverse() {
+	FileSystemTraversal<SyncUnionAufs> traversal(this,
+	                                         scratch_path(),
 	                                         true,
 	                                         mIgnoredFilenames);
 
-	recursion.foundRegularFile = &SyncUnionAufs::ProcessFoundRegularFile;
-	recursion.foundDirectory = &SyncUnionAufs::ProcessFoundDirectory;
-	recursion.foundSymlink = &SyncUnionAufs::ProcessFoundSymlink;
-	recursion.enteringDirectory = &SyncUnionAufs::EnteringDirectory;
-	recursion.leavingDirectory = &SyncUnionAufs::LeavingDirectory;
+	traversal.foundRegularFile = &SyncUnionAufs::ProcessRegularFile;
+	traversal.foundDirectory = &SyncUnionAufs::ProcessDirectory;
+	traversal.foundSymlink = &SyncUnionAufs::ProcessSymlink;
+	traversal.enteringDirectory = &SyncUnionAufs::EnterDirectory;
+	traversal.leavingDirectory = &SyncUnionAufs::LeaveDirectory;
 
-	recursion.Recurse(mOverlayPath);
+	traversal.Recurse(scratch_path());
 
-	mMediator->Commit();
+	mediator_->Commit();
 
 	return true;
 }
+
+}  // namespace sync

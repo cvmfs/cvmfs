@@ -7,7 +7,7 @@
 
 using namespace std;
 
-namespace cvmfs {
+namespace publish {
 
 SyncItem::SyncItem(const string &dirPath,
                    const string &filename,
@@ -69,7 +69,7 @@ bool SyncItem::IsOpaqueDirectory() const {
 		return false;
 	}
 
-	return mUnionEngine->IsOpaqueDirectory(this);
+	return mUnionEngine->IsOpaqueDirectory(*this);
 }
 
 catalog::DirectoryEntry SyncItem::CreateDirectoryEntry() const {
@@ -96,15 +96,15 @@ catalog::DirectoryEntry SyncItem::CreateDirectoryEntry() const {
 }
 
 std::string SyncItem::GetRepositoryPath() const {
- return mUnionEngine->GetRepositoryPath() + "/" + GetRelativePath();
+ return mUnionEngine->rdonly_path() + "/" + GetRelativePath();
 }
 
 std::string SyncItem::GetUnionPath() const {
- return mUnionEngine->GetUnionPath() + "/" + GetRelativePath();
+ return mUnionEngine->union_path() + "/" + GetRelativePath();
 }
 
 std::string SyncItem::GetOverlayPath() const {
- return mUnionEngine->GetOverlayPath() + "/" + GetRelativePath();
+ return mUnionEngine->scratch_path() + "/" + GetRelativePath();
 }
 
-} // namespace cvmfs
+}  // namespace sync

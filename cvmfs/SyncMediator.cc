@@ -13,11 +13,12 @@
 #include "smalloc.h"
 
 #include "hash.h"
-#include "cvmfs_sync_recursion.h"
+#include "fs_traversal.h"
 #include "util.h"
 
-using namespace cvmfs;
 using namespace std;
+
+namespace publish {
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
                            const SyncParameters *params) :
@@ -376,10 +377,10 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
 	}
 
 	// look for legacy hardlinks
-	RecursionEngine<SyncMediator> recursion(this, mUnionEngine->GetUnionPath(), false);
-	recursion.foundRegularFile = &SyncMediator::InsertExistingHardlinkFileCallback;
-	recursion.foundSymlink = &SyncMediator::InsertExistingHardlinkSymlinkCallback;
-	recursion.Recurse(entry.GetUnionPath());
+	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->union_path(), false);
+	traversal.foundRegularFile = &SyncMediator::InsertExistingHardlinkFileCallback;
+	traversal.foundSymlink = &SyncMediator::InsertExistingHardlinkSymlinkCallback;
+	traversal.Recurse(entry.GetUnionPath());
 }
 
 void SyncMediator::InsertExistingHardlinkFileCallback(const std::string &parent_dir,
@@ -400,13 +401,13 @@ void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
 	AddDirectory(entry);
 
 	// create a recursion engine, which recursively adds all entries in a newly created directory
-	RecursionEngine<SyncMediator> recursion(this, mUnionEngine->GetOverlayPath(), true, mUnionEngine->GetIgnoredFilenames());
-	recursion.enteringDirectory = &SyncMediator::EnterAddedDirectoryCallback;
-	recursion.leavingDirectory = &SyncMediator::LeaveAddedDirectoryCallback;
-	recursion.foundRegularFile = &SyncMediator::AddFileCallback;
-	recursion.foundDirectory = &SyncMediator::AddDirectoryCallback;
-	recursion.foundSymlink = &SyncMediator::AddSymlinkCallback;
-	recursion.Recurse(entry.GetOverlayPath());
+	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->scratch_path(), true, mUnionEngine->GetIgnoredFilenames());
+	traversal.enteringDirectory = &SyncMediator::EnterAddedDirectoryCallback;
+	traversal.leavingDirectory = &SyncMediator::LeaveAddedDirectoryCallback;
+	traversal.foundRegularFile = &SyncMediator::AddFileCallback;
+	traversal.foundDirectory = &SyncMediator::AddDirectoryCallback;
+	traversal.foundSymlink = &SyncMediator::AddSymlinkCallback;
+	traversal.Recurse(entry.GetOverlayPath());
 }
 
 bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
@@ -448,11 +449,11 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
 	// delete a directory AFTER it was emptied here,
 	// because it would start up another recursion
 
-	RecursionEngine<SyncMediator> recursion(this, mUnionEngine->GetRepositoryPath());
-	recursion.foundRegularFile = &SyncMediator::RemoveFileCallback;
-	recursion.foundDirectoryAfterRecursion = &SyncMediator::RemoveDirectoryCallback;
-	recursion.foundSymlink = &SyncMediator::RemoveSymlinkCallback;
-	recursion.Recurse(entry.GetRepositoryPath());
+	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->rdonly_path());
+	traversal.foundRegularFile = &SyncMediator::RemoveFileCallback;
+	traversal.foundDirectoryAfterRecursion = &SyncMediator::RemoveDirectoryCallback;
+	traversal.foundSymlink = &SyncMediator::RemoveSymlinkCallback;
+	traversal.Recurse(entry.GetRepositoryPath());
 
 	// the given directory was emptied recursively and can now itself be deleted
 	RemoveDirectory(entry);
@@ -565,3 +566,5 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   }
 	mCatalogManager->AddHardlinkGroup(hardlinks, group.masterFile.GetParentPath());
 }
+
+}  // namespace sync

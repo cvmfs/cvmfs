@@ -1,38 +1,32 @@
-#ifndef CVMFS_SYNC_RECURSION_H
-#define CVMFS_SYNC_RECURSION_H 1
+/**
+ * This file is part of the CernVM File System.
+ *
+ * It provides a recursion engine to abstract the traversal of directories.
+ */
+
+#ifndef CVMFS_FS_TRAVERSAL_H_
+#define CVMFS_FS_TRAVERSAL_H_
+
+#include <cassert>
 
 #include <string>
-#include <assert.h>
 #include <set>
-
-#include <iostream> // TODO: remove me
 
 #include "platform.h"
 
-namespace cvmfs {
+namespace publish {
 
 /**
- *  @brief a simple recursion engine to abstract the recursion of directories.
- *  It provides several callback hooks to instrument and control the recursion.
- *  Hooks will be called on the provided delegate object which has to be of type T
+ * @brief a simple recursion engine to abstract the recursion of directories.
+ * It provides several callback hooks to instrument and control the recursion.
+ * Hooks will be called on the provided delegate object of type T
  *
- *  Callbacks are called for every directory entry found by the recursion engine
- *  Furthermore the recursion can be influenced by return values of these callbacks
+ * Callbacks are called for every directory entry found by the recursion engine.
+ * The recursion can be influenced by return values of these callbacks.
  */
 template <class T>
-class RecursionEngine {
-private:
-	/** the delegate all hooks are called on */
-	T *delegate_;
-
-	/** dirPath in callbacks will be relative to this directory */
-	std::string relative_to_directory_;
-	bool recurse_;
-
-	/** if one of these files are found somewhere they are completely ignored */
-	std::set<std::string> ignored_files_;
-
-public:
+class FileSystemTraversal {
+ public:
 	typedef void (T::*VoidCallback)(const std::string &relative_path,
                                   const std::string &dir_name);
 	typedef bool (T::*BoolCallback)(const std::string &relative_path,
@@ -63,7 +57,6 @@ public:
   /** callback if a symlink was found */
   VoidCallback foundSymlink;
 
-public:
 	/**
 	 *  create a new recursion engine
 	 *  @param delegate the object which will receive the callbacks
@@ -71,20 +64,21 @@ public:
 	 *  @param ignoredFiles a list of files which the delegate DOES NOT care about (no callback calls or recursion for them)
 	 *  @param recurse should the recursion engine recurse at all? (if not, it basically just traverses the given directory)
 	 */
-	RecursionEngine(T *delegate,
+	FileSystemTraversal(T *delegate,
 	                const std::string &relativeToDirectory = "",
 	                const bool recurse = true,
-	                const std::set<std::string> &ignoredFiles = std::set<std::string>()) :
-    delegate_(delegate),
-    relative_to_directory_(relativeToDirectory),
-    recurse_(recurse),
-    ignored_files_(ignoredFiles),
-    enteringDirectory(NULL),
-    leavingDirectory(NULL),
-    foundDirectory(NULL),
-    foundDirectoryAfterRecursion(NULL),
-    foundRegularFile(NULL),
-    foundSymlink(NULL) {
+	                const std::set<std::string> &ignoredFiles = std::set<std::string>())
+  {
+    delegate_ = delegate;
+    relative_to_directory_ = relativeToDirectory;
+    recurse_ = recurse;
+    ignored_files_ = ignoredFiles;
+    enteringDirectory = NULL;
+    leavingDirectory = NULL;
+    foundDirectory = NULL;
+    foundDirectoryAfterRecursion = NULL;
+    foundRegularFile = NULL;
+    foundSymlink = NULL;
     Init();
   }
 
@@ -109,7 +103,19 @@ public:
   	DoRecursion(parent_path, dir_name);
   }
 
-private:
+ private:
+	// The delegate all hooks are called on
+	T *delegate_;
+
+	/** dirPath in callbacks will be relative to this directory */
+	std::string relative_to_directory_;
+	bool recurse_;
+
+	/** if one of these files are found somewhere they are completely ignored */
+	std::set<std::string> ignored_files_;
+
+
+
   void Init() {
     // we definitely don't care about these "virtual" directories
     ignored_files_.insert(".");
@@ -193,8 +199,8 @@ private:
       file_name   = path;
     }
   }
-};
+};  // FileSystemTraversal
 
-} // namespace cvmfs
+}  // namespace publish
 
-#endif
+#endif  // CVMFS_FS_TRAVERSAL_H_

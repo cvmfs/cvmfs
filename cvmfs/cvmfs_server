@@ -1,8 +1,8 @@
 #!/bin/sh
 #
 # This file is part of the CernVM File System
-# This script takes care of creating and removing repositories on a
-# Stratum 0 server
+# This script takes care of creating, removing, and maintaining repositories
+# on a Stratum 0 server
 
 set -e
 
@@ -10,6 +10,13 @@ die() {
   echo $1 >&2
   exit 1
 }
+
+transaction_before_hook() { :; }
+transaction_after_hook() { :; }
+abort_before_hook() { :; }
+abort_after_hook() { :; }
+publish_before_hook() { :; }
+publish_after_hook() { :; }
 
 create_master_key() {
    local name=$1
@@ -140,7 +147,6 @@ publish() {
   [ $(whoami) != $user ] && user_shell="su $user -c"
 
   publish_before_hook $name
-
   sudo /bin/mount -o remount,ro /cvmfs/$name
   $user_shell "cvmfs_sync -u /cvmfs/$name \
     -s /var/spool/cvmfs/${name}/scratch \
@@ -160,7 +166,7 @@ publish() {
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
   sudo mount /cvmfs/$name
-
+  rm -f /var/spool/cvmfs/${name}/in_transaction
   publish_after_hook $name
 }
 
@@ -368,7 +374,7 @@ the command."
 
 
 . /etc/cvmfs/config.sh
-. /etc/cvmfs/cvmfs_server_hooks.sh
+[ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
 
 select_fqrn() {
   local given_name="$1"

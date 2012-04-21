@@ -33,8 +33,7 @@
 #include "logging.h"
 #include "monitor.h"
 
-using namespace std;
-using namespace cvmfs;
+using namespace std;  // NOLINT
 
 
 static void Usage() {
@@ -52,7 +51,7 @@ static void Usage() {
 }
 
 
-bool ParseParameters(int argc, char **argv, SyncParameters *params) {
+bool ParseParams(int argc, char **argv, SyncParameters *params) {
 	if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help")
       || (string(argv[1]) == "-v") || (string(argv[1]) == "--version"))
   {
@@ -117,21 +116,9 @@ bool ParseParameters(int argc, char **argv, SyncParameters *params) {
 	return true;
 }
 
-// TODO monitor::fini
-bool initWatchdog() {
-	umask(022);
 
-	if (!monitor::Init(".", false)) {
-		PrintError("Failed to init watchdog");
-		return false;
-	}
-	monitor::Spawn();
-
-	return true;
-}
-
-bool doSanityChecks(SyncParameters *p) {
-  if (not DirectoryExists(p->dir_scratch)) {
+bool CheckParams(SyncParameters *p) {
+  if (!DirectoryExists(p->dir_scratch)) {
     PrintError("overlay (copy on write) directory does not exist");
     return false;
   }
@@ -159,60 +146,39 @@ bool doSanityChecks(SyncParameters *p) {
 	return true;
 }
 
-bool createCacheDir(SyncParameters *p) {
-	if (!MakeCacheDirectories(p->dir_data, 0755)) {
+
+// TODO: special option to create new empty repository
+int main(int argc, char **argv) {
+	SyncParameters params;
+
+  umask(022);
+
+  if (!monitor::Init(".", false)) {
+		PrintError("Failed to init watchdog");
+		return 1;
+	}
+	monitor::Spawn();
+
+	// Initialization
+	if (!ParseParams(argc, argv, &params)) return 1;
+	if (!CheckParams(&params)) return 2;
+	if (!MakeCacheDirectories(params.dir_data, 0755)) {
 		PrintError("could not initialize data store");
-		return false;
+		return 3;
 	}
 
-	return true;
-}
+  catalog::WritableCatalogManager catalog_manager(params.dir_catalogs,
+                                                  params.dir_data);
+  publish::SyncMediator mediator(&catalog_manager, &params);
+  publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
+                              params.dir_scratch);
 
-catalog::WritableCatalogManager* createWritableCatalogManager(const SyncParameters &p) {
-  return new catalog::WritableCatalogManager(MakeCanonicalPath(p.dir_catalogs),
-                                             MakeCanonicalPath(p.dir_data));
-}
-
-SyncMediator* createSyncMediator(catalog::WritableCatalogManager* catalogManager,
-                                 const SyncParameters *p) {
-  return new SyncMediator(catalogManager,
-                          p);
-}
-
-SyncUnion* createSynchronisationEngine(SyncMediator* mediator,
-                                       const SyncParameters &p) {
-  return new SyncUnionAufs(mediator,
-                           MakeCanonicalPath(p.dir_rdonly),
-                           MakeCanonicalPath(p.dir_union),
-                           MakeCanonicalPath(p.dir_scratch));
-}
-
-int main(int argc, char **argv) {
-	SyncParameters parameters;
-
-	// do some initialization
-	if (not ParseParameters(argc, argv, &parameters)) return 1;
-	if (not initWatchdog()) return 1;
-	if (not doSanityChecks(&parameters)) return 2;
-	if (not createCacheDir(&parameters)) return 3;
-
-	// create worker objects
-  catalog::WritableCatalogManager *catalogManager = createWritableCatalogManager(parameters);
-  SyncMediator *mediator = createSyncMediator(catalogManager, &parameters);
-  SyncUnion *sync = createSynchronisationEngine(mediator, parameters);
-
-	// sync
-	if (not sync->DoYourMagic()) {
+	if (!sync.Traverse()) {
 		PrintError("something went wrong during sync");
 		return 4;
 	}
 
-	// clean up
-	delete mediator;
-	delete catalogManager;
-  delete sync;
-
-  std::cout << "done" << std::endl;
+  monitor::Fini();
 
 	return 0;
 }

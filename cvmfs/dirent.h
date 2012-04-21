@@ -18,7 +18,7 @@
 #include "shortstring.h"
 #include "globals.h"
 
-namespace cvmfs {
+namespace publish {
 class SyncItem;
 }
 
@@ -35,7 +35,7 @@ enum SpecialDirents {
 class DirectoryEntry {
   friend class LookupSqlStatement;                   // simplify creation of DirectoryEntry objects
   friend class ManipulateDirectoryEntrySqlStatement; // simplify write of DirectoryEntry objects in database
-  friend class cvmfs::SyncItem;                             // simplify creation of DirectoryEntry objects for write back
+  friend class publish::SyncItem;                    // simplify creation of DirectoryEntry objects for write back
   friend class WritableCatalogManager;               // TODO: remove this dependency
 
 public:

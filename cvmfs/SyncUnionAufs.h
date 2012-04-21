@@ -17,10 +17,10 @@
 
 #include "platform.h"
 
-#include "SyncUnion.h"
+#include "sync_union.h"
 #include "SyncMediator.h"
 
-namespace cvmfs {
+namespace publish {
 
 /**
  *  syncing a CVMFS repository by the help of an overlayed AUFS 1.x read-write volume
@@ -38,15 +38,15 @@ class SyncUnionAufs :
   	            const std::string &union_path,
                 const std::string &overlay_path);
 
-	bool DoYourMagic();
+	bool Traverse();
 
  protected:
 	inline bool IsWhiteoutEntry(const SyncItem &entry) const {
 	  return (entry.GetFilename().substr(0, mWhiteoutPrefix.length()) == mWhiteoutPrefix);
 	}
 
-	inline bool IsOpaqueDirectory(const SyncItem *directory) const {
-	  return FileExists(directory->GetOverlayPath() + "/.wh..wh..opq");
+	inline bool IsOpaqueDirectory(const SyncItem &directory) const {
+	  return FileExists(directory.GetOverlayPath() + "/.wh..wh..opq");
 	}
 
 	inline std::string UnwindWhiteoutFilename(const std::string &filename) const {

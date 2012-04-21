@@ -39,7 +39,7 @@
 #include "cvmfs_sync.h"
 #include "SyncItem.h"
 
-namespace cvmfs {
+namespace publish {
 
 /**
  *  If we encounter a file with linkcount > 1 it will be added to a HardlinkGroup
@@ -216,6 +216,6 @@ private:
   }
 };
 
-}
+}  // namespace sync
 
 #endif
