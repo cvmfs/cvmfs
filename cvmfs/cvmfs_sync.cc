@@ -26,7 +26,7 @@
 #include <string>
 
 #include "platform.h"
-#include "SyncUnionAufs.h"
+#include "sync_union.h"
 #include "SyncMediator.h"
 #include "WritableCatalogManager.h"
 #include "util.h"
@@ -35,19 +35,16 @@
 
 using namespace std;  // NOLINT
 
-
 static void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "CernVM-FS push changes from scratch area back to repository\n"
     "Version %s\n"
-    "Usage:\n"
+    "Usage (normally called from cvmfs_server):\n"
     "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
     "             -r <repository store>\n"
     "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n"
-    "             [EXPERIMENTAL: -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n"
-    "Make sure that a 'data' and a 'catalogs' subdirectory exist in your repository store.\n"
-    "Also, your webserver must be able to follow symlinks in the catalogs subdirectory.\n"
-    "For Apache, you can add 'Options +FollowSymLinks' to a '.htaccess' file.\n\n", VERSION);
+    "             [EXPERIMENTAL: -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n",
+    VERSION);
 }
 
 

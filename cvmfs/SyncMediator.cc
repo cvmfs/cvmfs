@@ -401,7 +401,7 @@ void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
 	AddDirectory(entry);
 
 	// create a recursion engine, which recursively adds all entries in a newly created directory
-	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->scratch_path(), true, mUnionEngine->GetIgnoredFilenames());
+	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->scratch_path(), true, mUnionEngine->GetIgnoreFilenames());
 	traversal.enteringDirectory = &SyncMediator::EnterAddedDirectoryCallback;
 	traversal.leavingDirectory = &SyncMediator::LeaveAddedDirectoryCallback;
 	traversal.foundRegularFile = &SyncMediator::AddFileCallback;

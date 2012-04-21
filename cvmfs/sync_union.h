@@ -33,6 +33,7 @@
 #include <string>
 #include <set>
 
+
 namespace publish {
 
 class SyncItem;
@@ -101,7 +102,7 @@ class SyncUnion {
 	 * They must not show up in to repository and are ignored by the recursion.
 	 * @return a set of filenames to be ignored
 	 */
-	virtual std::set<std::string> GetIgnoredFilenames() const = 0;
+	virtual std::set<std::string> GetIgnoreFilenames() const = 0;
 
  protected:
   std::string rdonly_path_;
@@ -154,6 +155,31 @@ class SyncUnion {
  private:
    void ProcessFile(SyncItem &entry);
 };  // class SyncUnion
+
+
+/**
+ * Syncing a CVMFS repository by the help of an overlayed AUFS 1.x
+ * read-write volume.
+ */
+class SyncUnionAufs : public SyncUnion {
+ public:
+	SyncUnionAufs(SyncMediator *mediator,
+  	            const std::string &rdonly_path,
+  	            const std::string &union_path,
+                const std::string &scratch_path);
+
+	bool Traverse();
+
+ protected:
+	bool IsWhiteoutEntry(const SyncItem &entry) const;
+	bool IsOpaqueDirectory(const SyncItem &directory) const;
+	std::string UnwindWhiteoutFilename(const std::string &filename) const;
+	std::set<std::string> GetIgnoreFilenames() const;
+
+ private:
+	std::set<std::string> ignore_filenames_;
+	std::string whiteout_prefix_;
+};  // class SyncUnionAufs
 
 }  // namespace publish
 
