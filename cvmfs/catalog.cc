@@ -75,6 +75,12 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
   sqlite3_extended_result_codes(database_, 1);
 
+  // Turbo mode
+  SqlStatement transaction(database_,
+    "PRAGMA synchronous=0; PRAGMA locking_mode=EXCLUSIVE;");
+  bool retval = transaction.Execute();
+  assert(retval == true);
+
   InitPreparedStatements();
 
   // Find out the maximum row id of this database file

@@ -46,10 +46,15 @@ bool WritableCatalog::CreateNewCatalogDatabase(const std::string &file_path,
 
   // add the root entry to the new catalog
   LogCvmfs(kLogCatalog, kLogDebug, "inserting root entry '%s' into new catalog '%s'", root_path.c_str(), new_catalog->path().c_str());
-  if (not new_catalog->AddEntry(root_entry, path_hash, parent_hash)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "inserting root entry in new catalog '%s' failed", file_path.c_str());
+  bool result =
+    new_catalog->insert_statement_->BindPathHash(path_hash) &&
+    new_catalog->insert_statement_->BindParentPathHash(parent_hash) &&
+    new_catalog->insert_statement_->BindDirectoryEntry(root_entry) &&
+    new_catalog->insert_statement_->Execute();
+  new_catalog->insert_statement_->Reset();
+
+  if (!result)
     return false;
-  }
 
   // close the newly created catalog
   delete new_catalog;
@@ -134,6 +139,19 @@ WritableCatalog::~WritableCatalog() {
   FinalizePreparedStatements();
 }
 
+void WritableCatalog::Transaction() {
+  SqlStatement transaction(database(), "BEGIN;");
+  bool retval = transaction.Execute();
+  LogCvmfs(kLogCvmfs, kLogStdout, "Transaction last error %d", transaction.GetLastError());
+  assert(retval == true);
+}
+
+void WritableCatalog::Commit() {
+  SqlStatement commit(database(), "COMMIT;");
+  bool retval = commit.Execute();
+  assert(retval == true);
+}
+
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements(); // polymorphism: up call
 
@@ -165,49 +183,36 @@ int WritableCatalog::GetMaximalHardlinkGroupId() const {
   return result;
 }
 
-bool WritableCatalog::CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
-                                                   const string &entry_path,
-                                                   const string &parent_path) {
-  // check if entry already exists
 
-
-
-  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
-  if (LookupMd5Path(path_hash, NULL)) {
-
-
-
-    LogCvmfs(kLogCatalog, kLogDebug, "entry '%s' exists and thus cannot be created", entry_path.c_str());
-    return false;
-  }
-
-  // add the entry to the catalog
-  hash::Md5 parent_hash((hash::AsciiPtr(parent_path)));
-  if (not AddEntry(entry, path_hash, parent_hash)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while inserting new entry '%s'", entry_path.c_str());
-    return false;
-  }
-
-  return true;
-}
-
+/**
+ * Adds a direcotry entry.  No-op if the entry is already there.
+ * @param entry the DirectoryEntry to add to the catalog
+ * @param entry_path the full path of the DirectoryEntry to add
+ * @param parent_path the full path of the containing directory
+ * @return true if DirectoryEntry was added, false otherwise
+ */
 bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
-                               const hash::Md5 &path_hash,
-                               const hash::Md5 &parent_hash) {
+                               const string &entry_path,
+                               const string &parent_path)
+{
   SetDirty();
 
-  // perform a add operation for the given directory entry
-  bool result = (
+  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
+  hash::Md5 parent_hash((hash::AsciiPtr(parent_path)));
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Catalogs adds %s", entry_path.c_str());
+
+  bool result =
     insert_statement_->BindPathHash(path_hash) &&
     insert_statement_->BindParentPathHash(parent_hash) &&
     insert_statement_->BindDirectoryEntry(entry) &&
-    insert_statement_->Execute()
-  );
+    insert_statement_->Execute();
 
   insert_statement_->Reset();
 
   return result;
 }
+
 
 bool WritableCatalog::TouchEntry(const DirectoryEntry &entry,
                                  const std::string &entry_path) {

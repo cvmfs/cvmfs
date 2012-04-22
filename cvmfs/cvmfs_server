@@ -119,7 +119,7 @@ abort() {
   local user=$2
 
   [ -f /var/spool/cvmfs/${name}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open transactions on $name"
+  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   reply=n
   read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION!  Are you sure (y/n)? " reply
@@ -143,7 +143,7 @@ publish() {
   local user=$2
 
   [ -f /var/spool/cvmfs/${name}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open transactions on $name"
+  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="su $user -c"
@@ -305,7 +305,6 @@ rmfs() {
   local name=$1
 
   [ $(id -u) -ne 0 ] && die "Only root can remove a repository"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open transactions on $name"
 
   echo -n "Unmounting CernVM-FS Area... "
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab

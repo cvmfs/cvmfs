@@ -267,7 +267,7 @@ void SyncMediator::AddFileQueueToCatalogs() {
 	// add singular files
 	SyncItemList::const_iterator i, iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		mCatalogManager->AddFile(i->second.CreateCatalogDirent(), i->second.GetRelativePath());
+		mCatalogManager->AddFile(i->second.CreateCatalogDirent(), i->second.relative_parent_path());
 	}
 
 	// add hardlink groups
@@ -508,7 +508,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 	if (entry.IsSymlink() && not params_->dry_run) {
 	  // symlinks have no 'actual' file content, which would have to be compressed...
-		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.GetRelativePath());
+		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.relative_parent_path());
 	} else {
 	  // push the file in the queue for later post-processing
 		mFileQueue[entry.GetRelativePath()] = entry;

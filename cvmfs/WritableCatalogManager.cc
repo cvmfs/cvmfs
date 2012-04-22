@@ -66,8 +66,9 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
 }
 
 Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
-                                               Catalog *parent_catalog) {
-  return new WritableCatalog(mountpoint.ToString(), parent_catalog);
+                                               Catalog *parent_catalog)
+{
+  return new WritableCatalog(mountpoint.ToString(), parent_catalog);;
 }
 
 bool WritableCatalogManager::CreateAndAttachRootCatalog() {
@@ -202,7 +203,7 @@ bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
     return false;
   }
 
-  catalog->CheckForExistanceAndAddEntry(entry, directory_path, parent_path);
+  catalog->AddEntry(entry, directory_path, parent_path);
   return true;
 }
 
@@ -211,6 +212,8 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
   const string parent_path = RelativeToCatalogPath(parent_directory);
   string file_path = parent_path + "/";
   file_path.append(entry.name().GetChars(), entry.name().GetLength());
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "catalog manager adds %s in %s", file_path.c_str(), parent_directory.c_str());
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
@@ -231,7 +234,7 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
     }
   }
 
-  catalog->CheckForExistanceAndAddEntry(entry, file_path, parent_path);
+  catalog->AddEntry(entry, file_path, parent_path);
   return true;
 }
 
@@ -274,7 +277,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	  string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
     i->hardlink_group_id_ = new_group_id;
-	  successful = catalog->CheckForExistanceAndAddEntry(*i, file_path, parent_path);
+	  successful = catalog->AddEntry(*i, file_path, parent_path);
 	  if (not successful) {
       result = false;
 	  }
@@ -421,6 +424,7 @@ bool WritableCatalogManager::Commit() {
   WritableCatalogList::iterator i;
   WritableCatalogList::const_iterator iend;
   for (i = catalogs_to_snapshot.begin(), iend = catalogs_to_snapshot.end(); i != iend; ++i) {
+    (*i)->Commit();
     SnapshotCatalog(*i);
   }
 

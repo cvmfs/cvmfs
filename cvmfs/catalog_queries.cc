@@ -288,7 +288,7 @@ hash::Any ListNestedCatalogsSqlStatement::GetContentHash() const {
 //
 
 InsertDirectoryEntrySqlStatement::InsertDirectoryEntrySqlStatement(const sqlite3 *database) {
-  Init(database, "INSERT INTO catalog "
+  Init(database, "INSERT OR IGNORE INTO catalog "
   //                  1           2         3         4       5     6      7     8      9      10    11     12
                  "(md5path_1, md5path_2, parent_1, parent_2, hash, inode, size, mode, mtime, flags, name, symlink) "
                  "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :ino, :size, :mode, :mtime, :flags, :name, :symlink);");

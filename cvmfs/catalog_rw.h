@@ -29,6 +29,9 @@ class WritableCatalog : public Catalog {
   WritableCatalog(const std::string &path, Catalog *parent);
   virtual ~WritableCatalog();
 
+  void Transaction();
+  void Commit();
+
   inline bool IsWritable() const { return true; }
 
   /**
@@ -37,16 +40,14 @@ class WritableCatalog : public Catalog {
   inline bool IsDirty() const { return dirty_; }
 
   /**
-   *  this method checks, if the provided DirectoryEntry is already resident
-   *  in this catalog. In case not, it will add it
-   *  @param entry the DirectoryEntry to add to the catalog
-   *  @param entry_path the full path of the DirectoryEntry to add
-   *  @param parent_path the full path of the containing directory
-   *  @return true if DirectoryEntry was added, false otherwise
+   * Adds a direcotry entry.  No-op if the entry is already there
+   * @param entry the DirectoryEntry to add to the catalog
+   * @param entry_path the full path of the DirectoryEntry to add
+   * @param parent_path the full path of the containing directory
+   * @return true if DirectoryEntry was added, false otherwise
    */
-  bool CheckForExistanceAndAddEntry(const DirectoryEntry &entry,
-                                    const std::string &entry_path,
-                                    const std::string &parent_path);
+  bool AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
+                        const std::string &parent_path);
 
   /**
    *  with this method you can set the mtime of a DirectoryEntry in the catalog
@@ -98,10 +99,10 @@ class WritableCatalog : public Catalog {
    */
   bool UpdateNestedCatalogLink(const std::string &path, const hash::Any &hash);
 
-   /**
-    *  TODO: document this
-    */
-   bool SplitContentIntoNewNestedCatalog(WritableCatalog *new_nested_catalog);
+  /**
+   *  TODO: document this
+   */
+  bool SplitContentIntoNewNestedCatalog(WritableCatalog *new_nested_catalog);
 
   /**
    *  static method to create a new database file and initialize the
@@ -157,21 +158,9 @@ class WritableCatalog : public Catalog {
     return SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE;
   }
 
-  /**
-   *  actually adds a DirectoryEntry to the catalog
-   *  designed for internal use only and called by CheckForExistanceAndAddEntry
-   *  @param entry the DirectoryEntry to add to the catalog
-   *  @param path_hash the MD5 hash of the entry to add
-   *  @param parent_hash the MD5 hash of the entry to add
-   *  @return true if entry was successfully added, otherwise false
-   */
-  bool AddEntry(const DirectoryEntry &entry,
-                const hash::Md5 &path_hash,
-                const hash::Md5 &parent_hash);
-
   inline bool AddEntry(const DirectoryEntry &entry,
                        const std::string &path) {
-    return AddEntry(entry, hash::Md5(hash::AsciiPtr(path)), hash::Md5(hash::AsciiPtr(GetParentPath(path))));
+    return AddEntry(entry, path, GetParentPath(path));
   }
 
   bool UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
@@ -217,7 +206,11 @@ class WritableCatalog : public Catalog {
    *  mark this catalog as dirty
    *  meaning: something changed in this catalog, it definitely needs a new snapshot
    */
-  inline void SetDirty() { dirty_ = true; }
+  inline void SetDirty() {
+    if (!dirty_)
+      Transaction();
+    dirty_ = true;
+  }
 
  private:
   InsertDirectoryEntrySqlStatement   *insert_statement_;

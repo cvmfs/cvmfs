@@ -146,6 +146,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
   bool Commit();
 
  protected:
+  void EnforceSqliteMemLimit() { }
+
   /**
    *  'Loads' a catalog. Actually the WritableCatalogManager assumes
    *  that it runs in an environment where all catalog files are already
