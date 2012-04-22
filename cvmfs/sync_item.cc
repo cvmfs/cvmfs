@@ -27,7 +27,9 @@ SyncItem::SyncItem(const string &relative_parent_path,
 
 
 bool SyncItem::IsNew() const {
-	StatRepository();
+  PrintWarning("Is NEW " + GetRdOnlyPath());
+	StatRdOnly();
+  PrintWarning("Is NEW returns " + StringifyInt(rdonly_stat_.error_code));
 	return (rdonly_stat_.error_code == ENOENT);
 }
 
@@ -38,7 +40,7 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
 	filename_ = actual_filename;
 
 	// Find the entry in the repository
-	StatRepository();
+	StatRdOnly();
 	if (rdonly_stat_.error_code != 0) {
 		PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not"
                  "found in repository.");
@@ -65,7 +67,9 @@ uint64_t SyncItem::GetUnionInode() const {
 
 
 void SyncItem::StatGeneric(const string &path, EntryStat *info) {
-	info->error_code = platform_lstat(path.c_str(), &info->stat);
+	int retval = platform_lstat(path.c_str(), &info->stat);
+  if (retval != 0)
+    info->error_code = errno;
 	info->obtained = true;
 }
 

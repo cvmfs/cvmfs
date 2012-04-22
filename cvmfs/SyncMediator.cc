@@ -26,6 +26,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
   params_(params) {}
 
 void SyncMediator::Add(SyncItem &entry) {
+  PrintWarning("ADD entry:" + entry.GetRelativePath());
   if (entry.IsDirectory()) {
 		AddDirectoryRecursively(entry);
 	}
@@ -53,6 +54,7 @@ void SyncMediator::Add(SyncItem &entry) {
 }
 
 void SyncMediator::Touch(SyncItem &entry) {
+  PrintWarning("TOUCH entry:" + entry.GetRelativePath());
 	if (entry.IsDirectory()) {
 		TouchDirectory(entry);
 	}
@@ -69,11 +71,11 @@ void SyncMediator::Touch(SyncItem &entry) {
 }
 
 void SyncMediator::Remove(SyncItem &entry) {
+  PrintWarning("REMOVE entry:" + entry.GetRelativePath());
 	if (entry.IsDirectory()) {
+    PrintWarning("REMOVE entire directory:" + entry.GetRelativePath());
 		RemoveDirectoryRecursively(entry);
-	}
-
-	else if (entry.IsRegularFile() || entry.IsSymlink()) {
+	} else if (entry.IsRegularFile() || entry.IsSymlink()) {
 		// first remove the file...
 		RemoveFile(entry);
 
@@ -91,6 +93,7 @@ void SyncMediator::Remove(SyncItem &entry) {
 }
 
 void SyncMediator::Replace(SyncItem &entry) {
+  PrintWarning("REPLACE entry:" + entry.GetRelativePath());
 	// an entry is just a representation of a filename
 	// replacing it is as easy as that:
 	Remove(entry);
@@ -138,6 +141,7 @@ void SyncMediator::CompressAndHashFileQueue() {
                              kDefaultFileMode, "w", &path_compressed);
             assert(file_compressed);
 
+            LogCvmfs(kLogCvmfs, kLogStdout, "compressing and hashing %s", path.c_str());
             FILE *file_source = fopen(path.c_str(), "r");
             assert(file_source);
             hash::Any hash(hash::kSha1);
@@ -151,7 +155,12 @@ void SyncMediator::CompressAndHashFileQueue() {
                                      hash.MakePath(1, 2);
             retval = rename(path_compressed.c_str(), path_dest.c_str());
             assert(retval == 0);
-            const string to_pipe = path + "," + hash.ToString() + "\n";
+            string to_pipe = "0";
+            to_pipe.push_back('\0');
+            to_pipe.append(path);
+            to_pipe.push_back('\0');
+            to_pipe.append(hash.ToString());
+            to_pipe.push_back('\n');
             WritePipe(pipe_hashes, to_pipe.data(), to_pipe.length());
 
             path = "";
@@ -171,8 +180,7 @@ void SyncMediator::CompressAndHashFileQueue() {
       for (SyncItemList::const_iterator i = mFileQueue.begin(),
            iEnd = mFileQueue.end(); i != iEnd; ++i)
       {
-        const string full_path = params_->dir_union + i->second.relative_parent_path() +
-          "/" + i->second.filename() + "\n";
+        const string full_path = params_->dir_union + "/" + i->second.GetRelativePath() + "\n";
         WritePipe(pipe_fd, full_path.data(), full_path.length());
       }
       close(pipe_fd);
@@ -183,11 +191,16 @@ void SyncMediator::CompressAndHashFileQueue() {
     char c;
     string tmp;
     string path;
+    int error_code = -5000;
     hash::Any hash(hash::kSha1);
     while ((c = fgetc(pipe_hashes)) != EOF) {
       switch (c) {
-        case ',':
-          path = tmp.substr(params_->dir_union.length()+1);
+        case '\0':
+          if (error_code == -5000) {
+            error_code = 0;
+          } else {
+            path = tmp.substr(params_->dir_union.length()+1);
+          }
           tmp = "";
           break;
         case '\n': {
@@ -202,6 +215,7 @@ void SyncMediator::CompressAndHashFileQueue() {
           assert(itr != mFileQueue.end());
           itr->second.SetContentHash(hash);
           tmp = "";
+          error_code = -5000;
           break;
         } default:
           tmp.append(1, c);
@@ -253,7 +267,7 @@ void SyncMediator::AddFileQueueToCatalogs() {
 	// add singular files
 	SyncItemList::const_iterator i, iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		mCatalogManager->AddFile(i->second.CreateCatalogDirent(), i->second.relative_parent_path());
+		mCatalogManager->AddFile(i->second.CreateCatalogDirent(), i->second.GetRelativePath());
 	}
 
 	// add hardlink groups
@@ -494,7 +508,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 	if (entry.IsSymlink() && not params_->dry_run) {
 	  // symlinks have no 'actual' file content, which would have to be compressed...
-		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.relative_parent_path());
+		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.GetRelativePath());
 	} else {
 	  // push the file in the queue for later post-processing
 		mFileQueue[entry.GetRelativePath()] = entry;
@@ -503,13 +517,13 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[rem] " << entry.GetRdOnlyPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveFile(entry.relative_parent_path());
+	if (not params_->dry_run)     mCatalogManager->RemoveFile(entry.GetRelativePath());
 }
 
 void SyncMediator::TouchFile(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[tou] " << entry.GetRdOnlyPath() << endl;
 	if (not params_->dry_run)     mCatalogManager->TouchFile(entry.CreateCatalogDirent(),
-	                                                entry.relative_parent_path());
+	                                                entry.GetRelativePath());
 }
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
@@ -520,13 +534,13 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
 
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[rem] " << entry.GetRdOnlyPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveDirectory(entry.relative_parent_path());
+	if (not params_->dry_run)     mCatalogManager->RemoveDirectory(entry.GetRelativePath());
 }
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[tou] " << entry.GetRdOnlyPath() << endl;
 	if (not params_->dry_run)     mCatalogManager->TouchDirectory(entry.CreateCatalogDirent(),
-	                                                     entry.relative_parent_path());
+	                                                     entry.GetRelativePath());
 }
 
 void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {

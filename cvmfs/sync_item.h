@@ -114,7 +114,7 @@ class SyncItem {
 	mutable EntryStat scratch_stat_;
 
   // Lazy evaluation and caching of results of file stats
-	inline void StatRepository() const {
+	inline void StatRdOnly() const {
     if (rdonly_stat_.obtained) return;
     StatGeneric(GetRdOnlyPath(), &rdonly_stat_);
   }

@@ -1,4 +1,4 @@
-#include "WritableCatalog.h"
+#include "catalog_rw.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -227,6 +227,7 @@ bool WritableCatalog::TouchEntry(const DirectoryEntry &entry,
 
 bool WritableCatalog::RemoveEntry(const string &file_path) {
   SetDirty();
+  LogCvmfs(kLogCatalog, kLogStdout, "RW CATALOg REMOVES %s", file_path.c_str());
 
   // perform a delete operation for the given path
   hash::Md5 path_hash= hash::Md5(hash::AsciiPtr(file_path));

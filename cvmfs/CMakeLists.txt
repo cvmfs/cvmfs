@@ -56,11 +56,9 @@ set (CVMFS_SYNC_BIN_SOURCES
 	sync_union.h sync_union.cc
 	SyncMediator.h SyncMediator.cc
 
-
-	catalog_queries.h           catalog_queries.cc
-
-	catalog.h                   catalog.cc
-	WritableCatalog.h           WritableCatalog.cc
+	catalog_queries.h catalog_queries.cc
+	catalog.h catalog.cc
+	catalog_rw.h catalog_rw.cc
 
 	catalog_mgr.h catalog_mgr.cc
 	WritableCatalogManager.h    WritableCatalogManager.cc

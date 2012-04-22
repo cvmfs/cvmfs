@@ -1,42 +1,38 @@
 /**
- *  This class is derived from Catalog and adds write capabilities to it.
- *  It is used by the WritableCatalogManager on the server side.
+ * This file is part of the CernVM File System
  *
- *  Note: Catalogs are meant to be thread safe... keep this in mind
- *        TODO: actually keep this in mind here :o)
+ * The WritableCatalog class is derived from Catalog.
+ * It is used by the WritableCatalogManager on the server side.
  *
- *  The main functionality is in:
- *    - CheckForExistanceAndAddEntry
- *    - TouchEntry
- *    - RemoveEntry
+ * Catalogs are meant to be thread safe.
+ *
+ * The main functionality is in:
+ *  - CheckForExistanceAndAddEntry
+ *  - TouchEntry
+ *  - RemoveEntry
  */
 
-#ifndef WRITABLE_CATALOG_H
-#define WRITABLE_CATALOG_H 1
+#ifndef CVMFS_CATLOG_RW_H_
+#define CVMFS_CATLOG_RW_H_
+
+#include <vector>
+#include <string>
 
 #include "catalog.h"
-
-#include <list>
-#include <string>
 
 namespace catalog {
 
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
+
  public:
   WritableCatalog(const std::string &path, Catalog *parent);
   virtual ~WritableCatalog();
 
-  /**
-   *  checks if the catalog is actually a writable catalog
-   *  See: Catalog::IsWritable()
-   *  @return true if catalog is writable, otherwise false
-   */
   inline bool IsWritable() const { return true; }
 
   /**
-   *  checks if this catalog was changed in some way
-   *  @return true if catalog was modified, false otherwise
+   * Checks if this catalog was changed in any way.
    */
   inline bool IsDirty() const { return dirty_; }
 
@@ -157,7 +153,9 @@ class WritableCatalog : public Catalog {
    *  open flags. SQLite will use them to open the database file for this catalog
    *  @return an integer containing the specified open flags
    */
-  inline int DatabaseOpenFlags() const { return SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE; }
+  inline int DatabaseOpenFlags() const {
+    return SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE;
+  }
 
   /**
    *  actually adds a DirectoryEntry to the catalog
@@ -229,10 +227,10 @@ class WritableCatalog : public Catalog {
   GetMaximalHardlinkGroupIdStatement *max_hardlink_group_id_statement_;
 
   bool dirty_;
-};
+};  // class WritableCatalog
 
-typedef std::list<WritableCatalog*> WritableCatalogList;
+typedef std::vector<WritableCatalog *> WritableCatalogList;
 
-}
+}  // namespace catalog
 
-#endif /* CVMFS_WRITABLE_CATALOG_H */
+#endif  // CVMFS_CATLOG_RW_H_

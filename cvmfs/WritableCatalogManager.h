@@ -25,7 +25,7 @@
 #include <string>
 
 #include "shortstring.h"
-#include "WritableCatalog.h"
+#include "catalog_rw.h"
 
 namespace catalog {
 

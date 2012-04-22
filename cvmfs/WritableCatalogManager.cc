@@ -9,7 +9,7 @@
 #include <sstream>
 
 #include "compression.h"
-#include "WritableCatalog.h"
+#include "catalog_rw.h"
 #include "util.h"
 #include "logging.h"
 
@@ -126,8 +126,10 @@ bool WritableCatalogManager::GetCatalogByPath(const string &path,
 }
 
 bool WritableCatalogManager::RemoveFile(const std::string &path) {
+  LogCvmfs(kLogCatalog, kLogStdout, "RW CATALOG MANGAGER removes %s", path.c_str());
   const string file_path = RelativeToCatalogPath(path);
 	const string parent_path = GetParentPath(file_path);
+  LogCvmfs(kLogCatalog, kLogStdout, "RW CATALOG MANGAGER file path %s, parent path %s", file_path.c_str(), parent_path.c_str());
 
   WritableCatalog *catalog;
   if (not GetCatalogByPath(parent_path, &catalog)) {
