@@ -130,8 +130,6 @@ class AbstractCatalogManager {
     return (inode <= kInodeOffset) ? GetRootInode() : inode;
   }
 
-  virtual void EnforceSqliteMemLimit();
-
  protected:
   /**
    * Load the catalog and return a file name.  Derived class can decide if it
@@ -183,6 +181,7 @@ class AbstractCatalogManager {
   }
   inline void UpgradeLock() const { Unlock(); WriteLock(); }
   inline void DowngradeLock() const { Unlock(); ReadLock(); }
+  virtual void EnforceSqliteMemLimit();
 
  private:
   const static inode_t kInodeOffset = 255;

@@ -90,10 +90,10 @@ bool WritableCatalogManager::CreateAndAttachRootCatalog() {
 
   // create the database schema and the inital root entry
   const bool create_root_catalog = true;
-  if (not WritableCatalog::CreateNewCatalogDatabase(file_path,
-                                                    root_entry,
-                                                    root_entry_parent_path,
-                                                    create_root_catalog)) {
+  if (!WritableCatalog::CreateDatabase(file_path, root_entry,
+                                       root_entry_parent_path,
+                                       create_root_catalog))
+  {
     LogCvmfs(kLogCatalog, kLogDebug, "creation of catalog '%s' failed", file_path.c_str());
     return false;
   }
@@ -262,7 +262,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
   }
 
 	// get a valid hardlink group id for the catalog the group will end up in
-	int new_group_id = catalog->GetMaximalHardlinkGroupId() + 1;
+	int new_group_id = catalog->GetMaxLinkId() + 1;
 	if (new_group_id <= 0) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to retrieve a new valid hardlink group id");
 		return false;
@@ -335,10 +335,10 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   const string root_entry_parent_path = GetParentPath(nested_root_path);
   const string database_file_path = GetCatalogFilenameForPath(nested_root_path);
   const bool create_root_catalog = false;
-  if (not WritableCatalog::CreateNewCatalogDatabase(database_file_path,
-                                                    new_root_entry,
-                                                    root_entry_parent_path,
-                                                    create_root_catalog)) {
+  if (!WritableCatalog::CreateDatabase(database_file_path, new_root_entry,
+                                       root_entry_parent_path,
+                                       create_root_catalog))
+  {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': database schema creation failed", nested_root_path.c_str());
     return false;
   }
@@ -357,7 +357,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   // from now on, there are two catalogs, spanning the same directory structure
   // we have to split the overlapping directory entries from the old catalog
   // to the new catalog to re-gain a valid catalog structure
-  if (not old_catalog->SplitContentIntoNewNestedCatalog(wr_new_catalog)) {
+  if (not old_catalog->Partition(wr_new_catalog)) {
     DetachSubtree(new_catalog);
 
     // TODO: if this happens, we may have destroyed our catalog structure...
@@ -368,7 +368,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
 
   // add the newly created nested catalog to the references of the containing
   // catalog
-  if (not old_catalog->InsertNestedCatalogReference(new_catalog->path().ToString())) {
+  if (not old_catalog->InsertNestedCatalog(new_catalog->path().ToString(), NULL, hash::Any(hash::kSha1))) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to insert new nested catalog reference '%s' in catalog '%s'", new_catalog->path().c_str(), old_catalog->path().c_str());
     return false;
   }
@@ -393,7 +393,7 @@ bool WritableCatalogManager::RemoveNestedCatalog(const std::string &mountpoint) 
   }
 
   // merge all data from the nested catalog into it's parent
-  if (not nested_catalog->MergeIntoParentCatalog()) {
+  if (not nested_catalog->MergeIntoParent()) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog '%s': merging of content unsuccessful.", nested_catalog->path().c_str());
     return false;
   }
@@ -621,7 +621,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 
 		// TODO: this is fishy! but I leave it this way for the moment
 		//       (dynamic_cast<> at least dies, if something goes wrong)
-		if (not dynamic_cast<WritableCatalog*>(catalog->parent())->UpdateNestedCatalogLink(clg_path, sha1)) {
+		if (not dynamic_cast<WritableCatalog*>(catalog->parent())->UpdateNestedCatalog(clg_path, sha1)) {
 			stringstream ss;
 			ss << "failed to register modified catalog at " << clg_path << " in parent catalog";
 			PrintWarning(ss.str());
