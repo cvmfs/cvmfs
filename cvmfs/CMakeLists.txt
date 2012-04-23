@@ -59,9 +59,8 @@ set (CVMFS_SYNC_BIN_SOURCES
 	catalog_queries.h catalog_queries.cc
 	catalog.h catalog.cc
 	catalog_rw.h catalog_rw.cc
-
 	catalog_mgr.h catalog_mgr.cc
-	WritableCatalogManager.h    WritableCatalogManager.cc
+	catalog_mgr_rw.h catalog_mgr_rw.cc
 
 	dirent.h)
 

@@ -68,6 +68,7 @@ public:
     return is_nested_catalog_mountpoint_;
   }
 
+  inline bool IsRegular() const { return S_ISREG(mode_); }
   inline bool IsLink() const { return S_ISLNK(mode_); }
   inline bool IsDirectory() const { return S_ISDIR(mode_); }
   inline bool IsPartOfHardlinkGroup() const { return hardlink_group_id() > 0; }

@@ -28,7 +28,7 @@
 #include "platform.h"
 #include "sync_union.h"
 #include "SyncMediator.h"
-#include "WritableCatalogManager.h"
+#include "catalog_mgr_rw.h"
 #include "util.h"
 #include "logging.h"
 #include "monitor.h"

@@ -14,7 +14,6 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-
 /**
  * Create a new database file and initialize the database schema in it.
  * @param file_path the absolute location the file should end up in

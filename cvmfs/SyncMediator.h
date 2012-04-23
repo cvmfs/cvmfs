@@ -35,7 +35,7 @@
 #include <stack>
 
 #include "platform.h"
-#include "WritableCatalogManager.h"
+#include "catalog_mgr_rw.h"
 #include "cvmfs_sync.h"
 #include "sync_item.h"
 
