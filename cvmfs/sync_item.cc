@@ -6,7 +6,7 @@
 
 #include <errno.h>
 
-#include "SyncMediator.h"
+#include "sync_mediator.h"
 
 using namespace std;  // NOLINT
 
@@ -27,9 +27,7 @@ SyncItem::SyncItem(const string &relative_parent_path,
 
 
 bool SyncItem::IsNew() const {
-  PrintWarning("Is NEW " + GetRdOnlyPath());
 	StatRdOnly();
-  PrintWarning("Is NEW returns " + StringifyInt(rdonly_stat_.error_code));
 	return (rdonly_stat_.error_code == ENOENT);
 }
 

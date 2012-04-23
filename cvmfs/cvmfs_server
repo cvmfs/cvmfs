@@ -156,7 +156,7 @@ publish() {
     -r /srv/cvmfs/${name}/pub \
     -x /var/spool/cvmfs/${name}/paths_out \
     -y /var/spool/cvmfs/${name}/hashes_in \
-    -z" || die "Synchronization failed"
+    $CVMFS_PUBLISH_OPTIONS" || die "Synchronization failed"
   $user_shell "cvmfs_sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
@@ -267,10 +267,15 @@ EOF
   mkfifo -m 0660 /var/spool/cvmfs/${name}/paths_out \
     /var/spool/cvmfs/${name}/hashes_in
   create_whitelist $name $cvmfs_user > /dev/null
-  cvmfs_sync -u /cvmfs/$name -s $scratch_dir -c $rdonly_dir -r ${repository_dir}/pub -x /var/spool/cvmfs/${name}/paths_out \
-    -y /var/spool/cvmfs/${name}/hashes_in \
-    -z
-  cvmfs_sign -c /etc/cvmfs/keys/${name}.crt -k /etc/cvmfs/keys/${name}.key -n $name ${repository_dir}/pub/catalogs/.cvmfspublished > /dev/null
+  cvmfs_sync -u /cvmfs/$name \
+    -s $scratch_dir \
+    -c $rdonly_dir \
+    -r ${repository_dir}/pub \
+    -n > /dev/null
+  cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    ${repository_dir}/pub/catalogs/.cvmfspublished > /dev/null
   chown -R $cvmfs_user /cvmfs/$name $repository_dir /var/spool/cvmfs/$name
   echo "done"
 
@@ -288,7 +293,8 @@ EOF
   echo -n "Starting services... "
   transaction $name > /dev/null
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
-  publish $name $cvmfs_user > /dev/null
+  CVMFS_PUBLISH_OPTIONS="-z"
+  publish $name $cvmfs_user
   echo "done"
 
   echo "\

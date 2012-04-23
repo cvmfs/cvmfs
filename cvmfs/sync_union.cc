@@ -7,7 +7,7 @@
 #include "util.h"
 #include "fs_traversal.h"
 #include "sync_item.h"
-#include "SyncMediator.h"
+#include "sync_mediator.h"
 
 using namespace std;  // NOLINT
 

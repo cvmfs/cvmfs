@@ -19,6 +19,7 @@ typedef struct {
 	bool dry_run;
 	bool mucatalogs;
   bool process_locally;
+  bool new_repository;
 } SyncParameters;
 
 #endif  // CVMFS_SYNC_H_

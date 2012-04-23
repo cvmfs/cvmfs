@@ -1,33 +1,30 @@
 /**
- *  The SyncMediator is an intermediate layer between the UnionSync
- *  implementation and the CatalogHandler.
- *  It's main responsibility is to unwind file system intrinsics as
- *  deleting all files in a deleted directory. Furthermore newly
- *  created directories are recursed and all included files are
- *  added as a whole. (Performance improvement)
+ * This file is part of the CernVM File System.
  *
- *  Furthermore it keeps track of hard link relations. CVMFS defines
- *  hard links as files with the same inode pointing to the same
- *  chunk of data. As we cannot determine an appropriate inode number
- *  while synching, we just keep track of hard link relations itself.
- *  Inodes will be assigned at run time of the CVMFS client according
- *  to these relations.
+ * The SyncMediator is an intermediate layer between the UnionSync
+ * implementation and the CatalogManager.
+ * It's main responsibility is to unwind file system intrinsics as
+ * deleting all files in a deleted directory. Furthermore newly
+ * created directories are recursed and all included files are
+ * added as a whole (performance improvement).
  *
- *  Another responsibility of this class is the creation and destruction
- *  of nested catalogs. If a .cvmfscatalog magic file is encountered,
- *  either on delete or add, it will be treated as nested catalog change.
+ * Furthermore it keeps track of hard link relations.  As we cannot store the
+ * transient inode of the union file system in cvmfs, we just keep track of
+ * hard link relations itself.  Inodes will be assigned at run time of the CVMFS
+ * client taking these relations into account.
  *
- *  SyncItems containing data (e.g. not Directories or symlinks) will
- *  be accumulated and it's contents are compressed at the end of the
- *  synching process en bloc. This gives us the ability to do this
- *  computational intensive task concurrently at the end of the sync
- *  process.
+ * Another responsibility of this class is the creation and destruction
+ * of nested catalogs.  If a .cvmfscatalog magic file is encountered,
+ * either on delete or add, it will be treated as nested catalog change.
  *
- *  Developed by René Meusel 2011 at CERN
+ * New and modified files are piped to external processes for hashing and
+ * compression.  Results come back in a pipe.
  */
 
-#ifndef CVMFS_SYNC_MEDIATOR_H
-#define CVMFS_SYNC_MEDIATOR_H
+#ifndef CVMFS_SYNC_MEDIATOR_H_
+#define CVMFS_SYNC_MEDIATOR_H_
+
+#include <pthread.h>
 
 #include <list>
 #include <string>
@@ -68,6 +65,8 @@ struct HardlinkGroup {
  */
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
 
+void *MainReceive(void *data);
+
 /**
  *  The SyncMediator refines the input received from a concrete UnionSync object
  *  for example it resolves the insertion and deletion of complete directories by recursing them
@@ -76,6 +75,7 @@ typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
  *  Furthermore it handles the data compression and storage
  */
 class SyncMediator {
+  friend void *MainReceive(void *data);
 private:
 	typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
 	typedef std::list<HardlinkGroup> HardlinkGroupList;
@@ -97,10 +97,15 @@ private:
 	 *  when committing the changes after recursing the read write branch of the union file system
 	 *  the queues will processed en bloc (for parallelization purposes) and afterwards added
 	 */
+  pthread_mutex_t lock_file_queue_;
+  uint64_t num_files_process;
 	SyncItemList mFileQueue;
 	HardlinkGroupList mHardlinkQueue;
+  pthread_t thread_receive_;
 
 	const SyncParameters *params_;
+  int pipe_fanout_;
+  int pipe_hashes_;
 
 public:
 	SyncMediator(catalog::WritableCatalogManager *catalogManager,
@@ -214,8 +219,8 @@ private:
   inline void RegisterSyncUnionEngine(SyncUnion *syncUnionEngine) {
     mUnionEngine = syncUnionEngine;
   }
-};
+};  // class SyncMediator
 
 }  // namespace sync
 
-#endif
+#endif  // CVMFS_SYNC_MEDIATOR_H_

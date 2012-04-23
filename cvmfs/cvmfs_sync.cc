@@ -27,7 +27,7 @@
 
 #include "platform.h"
 #include "sync_union.h"
-#include "SyncMediator.h"
+#include "sync_mediator.h"
 #include "catalog_mgr_rw.h"
 #include "util.h"
 #include "logging.h"
@@ -43,7 +43,7 @@ static void Usage() {
     "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
     "             -r <repository store>\n"
     "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n"
-    "             [EXPERIMENTAL: -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n",
+    "             [EXPERIMENTAL: -n new -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n",
     VERSION);
 }
 
@@ -64,7 +64,7 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
 
 	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "u:s:c:r:pdmx:y:z")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:r:pdmnx:y:z")) != -1) {
 		switch (c) {
       // Directories
       case 'u':
@@ -101,6 +101,9 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
         break;
       case 'z':
         params->process_locally = true;
+        break;
+      case 'n':
+        params->new_repository = true;
         break;
 
       case '?':
@@ -166,14 +169,18 @@ int main(int argc, char **argv) {
 
   catalog::WritableCatalogManager catalog_manager(params.dir_catalogs,
                                                   params.dir_data);
-  publish::SyncMediator mediator(&catalog_manager, &params);
-  publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
-                              params.dir_scratch);
+  if (params.new_repository) {
+    catalog_manager.Commit();
+  } else {
+    publish::SyncMediator mediator(&catalog_manager, &params);
+    publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
+                                params.dir_scratch);
 
-	if (!sync.Traverse()) {
-		PrintError("something went wrong during sync");
-		return 4;
-	}
+    if (!sync.Traverse()) {
+      PrintError("something went wrong during sync");
+      return 4;
+    }
+  }
 
   monitor::Fini();
 

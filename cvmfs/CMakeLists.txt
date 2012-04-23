@@ -54,7 +54,7 @@ set (CVMFS_SYNC_BIN_SOURCES
 	fs_traversal.h
 	sync_item.h sync_item.cc
 	sync_union.h sync_union.cc
-	SyncMediator.h SyncMediator.cc
+	sync_mediator.h sync_mediator.cc
 
 	catalog_queries.h catalog_queries.cc
 	catalog.h catalog.cc

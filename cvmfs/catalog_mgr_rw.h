@@ -83,8 +83,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
       catalog_directory_ + "/" + kCatalogFilename :
       catalog_directory_ + url_path + "/" + kCatalogFilename;
   }
-
-
   bool FindCatalog(const std::string &path, WritableCatalog **result);
 
   /**

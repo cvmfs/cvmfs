@@ -1,4 +1,8 @@
-#include "SyncMediator.h"
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#include "sync_mediator.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -11,22 +15,130 @@
 
 #include "compression.h"
 #include "smalloc.h"
-
 #include "hash.h"
 #include "fs_traversal.h"
 #include "util.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace publish {
+
+void *MainReceive(void *data) {
+  SyncMediator *mediator = (SyncMediator *)data;
+
+  FILE *fpipe_hashes = fdopen(mediator->pipe_hashes_, "r");
+  char c;
+  string tmp;
+  string path;
+  int error_code = -5000;
+  hash::Any hash(hash::kSha1);
+  while ((c = fgetc(fpipe_hashes)) != EOF) {
+    switch (c) {
+      case '\0':
+        if (error_code == -5000) {
+          error_code = 0;
+        } else {
+          path = tmp.substr(mediator->params_->dir_union.length()+1);
+        }
+        tmp = "";
+        break;
+      case '\n': {
+        hash = hash::Any(hash::kSha1, hash::HexPtr(tmp));
+        cout << "received: " << path << ", " << hash.ToString() << endl;
+        pthread_mutex_lock(&mediator->lock_file_queue_);
+        SyncItemList::iterator itr = mediator->mFileQueue.find(path);
+        if (itr == mediator->mFileQueue.end()) {
+          cout << path << endl;
+          for (SyncItemList::const_iterator i = mediator->mFileQueue.begin(); i != mediator->mFileQueue.end(); ++i)
+            cout << i->first << endl;
+        }
+        assert(itr != mediator->mFileQueue.end());
+        itr->second.SetContentHash(hash);
+        mediator->num_files_process--;
+        pthread_mutex_unlock(&mediator->lock_file_queue_);
+        tmp = "";
+        error_code = -5000;
+        break;
+      } default:
+        tmp.append(1, c);
+    }
+  }
+  fclose(fpipe_hashes);
+
+  return NULL;
+}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
                            const SyncParameters *params) :
   mCatalogManager(catalogManager),
-  params_(params) {}
+  params_(params)
+{
+  int retval = pthread_mutex_init(&lock_file_queue_, NULL);
+  assert(retval == 0);
+  num_files_process = 0;
+
+  if (params_->process_locally) {
+    if (fork() == 0) {
+      FILE *pipe_paths = fopen(params_->paths_out.c_str(), "r");
+      int pipe_hashes = open(params_->hashes_in.c_str(), O_WRONLY);
+      char c;
+      string path;
+      while ((c = fgetc(pipe_paths)) != EOF) {
+        if (c == '\n') {
+          string path_compressed;
+          FILE *file_compressed =
+          CreateTempFile(params_->dir_data + "/txn/compressing",
+                         kDefaultFileMode, "w", &path_compressed);
+          assert(file_compressed);
+
+          LogCvmfs(kLogCvmfs, kLogStdout, "compressing and hashing %s", path.c_str());
+          FILE *file_source = fopen(path.c_str(), "r");
+          assert(file_source);
+          hash::Any hash(hash::kSha1);
+          int retval = zlib::CompressFile2File(file_source, file_compressed,
+                                               &hash);
+          assert(retval);
+          fclose(file_compressed);
+          fclose(file_source);
+
+          const string path_dest = params_->dir_data + "/" +
+          hash.MakePath(1, 2);
+          retval = rename(path_compressed.c_str(), path_dest.c_str());
+          assert(retval == 0);
+          string to_pipe = "0";
+          to_pipe.push_back('\0');
+          to_pipe.append(path);
+          to_pipe.push_back('\0');
+          to_pipe.append(hash.ToString());
+          to_pipe.push_back('\n');
+          WritePipe(pipe_hashes, to_pipe.data(), to_pipe.length());
+
+          path = "";
+        } else {
+          path.append(1, c);
+        }
+      }
+      fclose(pipe_paths);
+      close(pipe_hashes);
+      _exit(0);
+    }
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "connecting to %s",
+           params->paths_out.c_str());
+  pipe_fanout_ = open(params_->paths_out.c_str(), O_WRONLY);
+  LogCvmfs(kLogCvmfs, kLogStdout, "connecting to %s",
+           params->hashes_in.c_str());
+  pipe_hashes_ = open(params_->hashes_in.c_str(), O_RDONLY);
+  LogCvmfs(kLogCvmfs, kLogStdout, "starting receiver thread");
+  retval = pthread_create(&thread_receive_, NULL, MainReceive, (void *)this);
+  assert(retval == 0);
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "processing changes...");
+}
+
 
 void SyncMediator::Add(SyncItem &entry) {
-  PrintWarning("ADD entry:" + entry.GetRelativePath());
   if (entry.IsDirectory()) {
 		AddDirectoryRecursively(entry);
 	}
@@ -125,107 +237,14 @@ void SyncMediator::Commit() {
 /**** EXPERIMENTAL *****/
 
 void SyncMediator::CompressAndHashFileQueue() {
-  if (params_->paths_out != "") {
 
-  if (params_->process_locally) {
-      if (fork() == 0) {
-        FILE *pipe_paths = fopen(params_->paths_out.c_str(), "r");
-        int pipe_hashes = open(params_->hashes_in.c_str(), O_WRONLY);
-        char c;
-        string path;
-        while ((c = fgetc(pipe_paths)) != EOF) {
-          if (c == '\n') {
-            string path_compressed;
-            FILE *file_compressed =
-              CreateTempFile(params_->dir_data + "/txn/compressing",
-                             kDefaultFileMode, "w", &path_compressed);
-            assert(file_compressed);
+  close(pipe_fanout_);
+  pthread_join(thread_receive_, NULL);
 
-            LogCvmfs(kLogCvmfs, kLogStdout, "compressing and hashing %s", path.c_str());
-            FILE *file_source = fopen(path.c_str(), "r");
-            assert(file_source);
-            hash::Any hash(hash::kSha1);
-            int retval = zlib::CompressFile2File(file_source, file_compressed,
-                                                 &hash);
-            assert(retval);
-            fclose(file_compressed);
-            fclose(file_source);
+  return;
+}
 
-            const string path_dest = params_->dir_data + "/" +
-                                     hash.MakePath(1, 2);
-            retval = rename(path_compressed.c_str(), path_dest.c_str());
-            assert(retval == 0);
-            string to_pipe = "0";
-            to_pipe.push_back('\0');
-            to_pipe.append(path);
-            to_pipe.push_back('\0');
-            to_pipe.append(hash.ToString());
-            to_pipe.push_back('\n');
-            WritePipe(pipe_hashes, to_pipe.data(), to_pipe.length());
-
-            path = "";
-          } else {
-            path.append(1, c);
-          }
-        }
-        fclose(pipe_paths);
-        close(pipe_hashes);
-        _exit(0);
-      }
-    }
-
-    if (fork() == 0) {
-      int pipe_fd = open(params_->paths_out.c_str(), O_WRONLY);
-      assert(pipe_fd >= 0);
-      for (SyncItemList::const_iterator i = mFileQueue.begin(),
-           iEnd = mFileQueue.end(); i != iEnd; ++i)
-      {
-        const string full_path = params_->dir_union + "/" + i->second.GetRelativePath() + "\n";
-        WritePipe(pipe_fd, full_path.data(), full_path.length());
-      }
-      close(pipe_fd);
-      _exit(0);
-    }
-
-    FILE *pipe_hashes = fopen(params_->hashes_in.c_str(), "r");
-    char c;
-    string tmp;
-    string path;
-    int error_code = -5000;
-    hash::Any hash(hash::kSha1);
-    while ((c = fgetc(pipe_hashes)) != EOF) {
-      switch (c) {
-        case '\0':
-          if (error_code == -5000) {
-            error_code = 0;
-          } else {
-            path = tmp.substr(params_->dir_union.length()+1);
-          }
-          tmp = "";
-          break;
-        case '\n': {
-          hash = hash::Any(hash::kSha1, hash::HexPtr(tmp));
-          cout << "received: " << path << ", " << hash.ToString() << endl;
-          SyncItemList::iterator itr = mFileQueue.find(path);
-          if (itr == mFileQueue.end()) {
-            cout << path << endl;
-            for (SyncItemList::const_iterator i = mFileQueue.begin(); i != mFileQueue.end(); ++i)
-              cout << i->first << endl;
-          }
-          assert(itr != mFileQueue.end());
-          itr->second.SetContentHash(hash);
-          tmp = "";
-          error_code = -5000;
-          break;
-        } default:
-          tmp.append(1, c);
-      }
-    }
-    fclose(pipe_hashes);
-    return;
-  }
-
-	// compressing and hashing files
+/*	// compressing and hashing files
 	// TODO: parallelize this!
 	SyncItemList::iterator i;
 	SyncItemList::const_iterator iend;
@@ -256,7 +275,7 @@ void SyncMediator::CompressAndHashFileQueue() {
 			//EXP k->SetContentHash(hash);
 		}
 	}
-}
+}*/
 
 void SyncMediator::AddFileQueueToCatalogs() {
 	// don't do things you could regret later on
@@ -511,7 +530,12 @@ void SyncMediator::AddFile(SyncItem &entry) {
 		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.relative_parent_path());
 	} else {
 	  // push the file in the queue for later post-processing
+    pthread_mutex_lock(&lock_file_queue_);
+    num_files_process++;
 		mFileQueue[entry.GetRelativePath()] = entry;
+    pthread_mutex_unlock(&lock_file_queue_);
+    const string full_path = params_->dir_union + "/" + entry.GetRelativePath() + "\n";
+    WritePipe(pipe_fanout_, full_path.data(), full_path.length());
 	}
 }
 
@@ -581,4 +605,4 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
 	mCatalogManager->AddHardlinkGroup(hardlinks, group.masterFile.relative_parent_path());
 }
 
-}  // namespace sync
+}  // namespace publish
