@@ -201,7 +201,7 @@ cvmfs_chksetup()
       fi ;;
 
     Darwin )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+auto_cvmfs" /etc/auto_master 2> /dev/null; then
+      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+/etc/auto_cvmfs" /etc/auto_master 2> /dev/null; then
         echo "Warning: CernVM-FS map is not referenced from autofs master map"
         num_warnings=$[$num_warnings+1]
       fi ;;
