@@ -263,7 +263,7 @@ EOF
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name \
     ${repository_dir}/pub/catalogs ${repository_dir}/pub/data \
-    $scratch_dir $rdonly_dir
+    $scratch_dir $rdonly_dir /var/spool/cvmfs/${name}/catalogs
   mkfifo -m 0660 /var/spool/cvmfs/${name}/paths_out \
     /var/spool/cvmfs/${name}/hashes_in
   create_whitelist $name $cvmfs_user > /dev/null
