@@ -1,6 +1,6 @@
 if (MACOSX)
 	install (
-		FILES			auto.cvmfs
+		FILES			auto_cvmfs
 		DESTINATION		"/etc"
 	)
 
