@@ -121,7 +121,7 @@ sub talk {
   my $length = 256;
 
   # read the response from cvmfs-instance (maximal $length bytes)
-  while (recv(SOCKET, $response, $length, 0) && $length) {
+  while (sysread(SOCKET, $response, $length) && $response) {
     print $response;
   }
 
