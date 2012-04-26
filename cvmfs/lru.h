@@ -36,6 +36,8 @@
 #ifndef CVMFS_LRU_H_
 #define CVMFS_LRU_H_
 
+#define FUSE_USE_VERSION 26
+
 // If defined the cache is secured by a posix mutex
 #define LRU_CACHE_THREAD_SAFE
 
