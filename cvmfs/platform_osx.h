@@ -15,6 +15,9 @@
  */
 #define MSG_NOSIGNAL SO_NOSIGPIPE
 
+/**
+ * HOST_NAME_MAX does on exist on OS X
+ */
 #define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
 
 
