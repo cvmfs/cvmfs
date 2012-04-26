@@ -891,6 +891,10 @@ configure_sudoers()
       'print if !/^\%everyone\s+ALL=\(cvmfs:cvmfs\)/; 
        print "%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/local/bin/cvmfs2\n" if eof;'\
     /etc/sudoers
+    sudo perl -n -i -e \
+      'print if !/^cvmfs\s+ALL=\(ALL\)/;
+       print "cvmfs ALL=(ALL) NOPASSWD: /usr/sbin/sysctl -w\n" if eof;'\
+    /etc/sudoers
   fi
 }
 
@@ -902,6 +906,8 @@ check_fuse_config()
       return $? ;;
 
     Darwin )
+      # load fuse4x module
+      /Library/Extensions/fuse4x.kext/Support/load_fuse4x
       if [ $(sysctl vfs.generic.fuse4x.tunables.allow_other | awk {'print $NF'}) -eq 1 ]; then
         return 0
       else
@@ -922,6 +928,8 @@ configure_fuse()
       fi ;;
 
     Darwin )
+      #Load fuse4x module
+      /Library/Extensions/fuse4x.kext/Support/load_fuse4x
       if [ $(sysctl vfs.generic.fuse4x.tunables.allow_other | awk {'print $NF'}) -eq 0 ] ; then
         sysctl -w vfs.generic.fuse4x.tunables.allow_other=1
       fi ;;
