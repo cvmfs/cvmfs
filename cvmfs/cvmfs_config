@@ -924,8 +924,7 @@ get_attr()
      attr_value=$(attr -q -g $attr_name . 2>/dev/null || exit 33) ;;
 
    Darwin )
-     #attr_value=$(xattr -p $attr_name . 2>/dev/null || exit 33) ;;
-     attr_value="Not yet supported in OS X." ;;
+     attr_value=$(xattr -p user.$attr_name . 2>/dev/null || exit 33) ;;
 
    * )
      echo "Architecture $sys_arch is not supported"
