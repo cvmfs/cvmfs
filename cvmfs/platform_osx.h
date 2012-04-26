@@ -15,6 +15,8 @@
  */
 #define MSG_NOSIGNAL SO_NOSIGPIPE
 
+#define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
+
 
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.

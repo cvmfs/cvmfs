@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <netdb.h>
 
+#include "platform.h"
 #include "util.h"
 #include "logging.h"
 #include "atomic.h"
