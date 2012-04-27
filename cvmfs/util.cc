@@ -33,6 +33,7 @@
 
 #include "hash.h"
 #include "smalloc.h"
+#include "logging.h"
 
 using namespace std;  // NOLINT
 
@@ -269,13 +270,21 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
  *
  * \return file descriptor, -1 on error
  */
-int LockFile(const std::string path) {
+int LockFile(const std::string &path) {
   const int fd_lockfile = open(path.c_str(), O_RDONLY | O_CREAT, 0600);
   if (fd_lockfile < 0)
     return -1;
 
-  if (flock(fd_lockfile, LOCK_EX) != 0)
-    return -1;
+  
+  if (flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) {
+    if (errno != EWOULDBLOCK)
+      return -1;
+    LogCvmfs(kLogCvmfs, kLogSyslog, "another process holds %s, waiting.",
+             path.c_str());
+    if (flock(fd_lockfile, LOCK_EX) != 0)
+      return -1;
+    LogCvmfs(kLogCvmfs, kLogSyslog, "lock %s acquired", path.c_str());
+  }
 
   return fd_lockfile;
 }

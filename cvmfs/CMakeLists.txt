@@ -316,7 +316,7 @@ if (BUILD_SERVER)
 	)
 
 	install (
-		FILES			cvmfs_mkkey cvmfs_decrypt cvmfs_unsign cvmfs_server
+		FILES			cvmfs_server
 		DESTINATION		bin
 		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 	)

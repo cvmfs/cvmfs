@@ -76,9 +76,12 @@ cvmfs_readconfig() {
       [ -f $file ] && . $file
     done
 
-    CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/$fqrn"
+    if [ x"$CVMFS_SHARED_CACHE" = xyes ]; then
+      CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/shared"
+    else
+      CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/$fqrn"
+    fi
   fi
-
 
   return 0
 }
