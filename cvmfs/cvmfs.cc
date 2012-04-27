@@ -1449,6 +1449,9 @@ int main(int argc, char *argv[]) {
     if (strcmp(argv[1], "__peersrv__") == 0) {
       return peers::MainPeerServer(argc, argv);
     }
+    if (strcmp(argv[1], "__cachemgr__") == 0) {
+      return quota::MainCacheManager(argc, argv);
+    }
   }
 
   int retval;
@@ -1642,11 +1645,21 @@ int main(int argc, char *argv[]) {
     g_cvmfs_opts.quota_limit *= 1024*1024;
     g_cvmfs_opts.quota_threshold *= 1024*1024;
   }
-  if (!quota::Init(".", (uint64_t)g_cvmfs_opts.quota_limit,
-                 (uint64_t)g_cvmfs_opts.quota_threshold,
-                 g_cvmfs_opts.rebuild_cachedb)) {
-    PrintError("Failed to initialize lru cache");
-    goto cvmfs_cleanup;
+  if (g_cvmfs_opts.shared_cache) {
+    if (!quota::InitShared(".", (uint64_t)g_cvmfs_opts.quota_limit,
+                           (uint64_t)g_cvmfs_opts.quota_threshold)) 
+    {
+      PrintError("Failed to initialize shared lru cache");
+      goto cvmfs_cleanup;
+    }
+  } else {
+    if (!quota::Init(".", (uint64_t)g_cvmfs_opts.quota_limit,
+                     (uint64_t)g_cvmfs_opts.quota_threshold,
+                     g_cvmfs_opts.rebuild_cachedb)) 
+    {
+      PrintError("Failed to initialize lru cache");
+      goto cvmfs_cleanup;
+    }
   }
   quota_ready = true;
 

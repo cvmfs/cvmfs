@@ -18,10 +18,14 @@ namespace quota {
 
 bool Init(const std::string &cache_dir, const uint64_t limit,
           const uint64_t limit_threshold, const bool rebuild_database);
+bool InitShared(const std::string &cache_dir, const uint64_t limit,
+                const uint64_t limit_threshold);
 void Spawn();
 void Fini();
+int MainCacheManager(int argc, char **argv);
 
-  bool RebuildDatabase();
+
+bool RebuildDatabase();
 bool Cleanup(const uint64_t leave_size);
 
 void Insert(const hash::Any &hash, const uint64_t size,

@@ -87,6 +87,7 @@ const unsigned kMaxCvmfsPath = 512-sizeof(LruCommand);
 
 pthread_t thread_lru_;
 int pipe_lru_[2];
+bool shared_;
 bool spawned_;
 map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
 
@@ -594,6 +595,24 @@ bool RebuildDatabase() {
 
 
 /**
+ * Connects to a running peer server.  Creates a peer server, if necessary.
+ */
+bool InitShared(const std::string &cache_dir, const uint64_t limit,
+                const uint64_t limit_threshold)
+{
+  return false;
+}
+  
+  
+/**
+ * Entry point for the shared cache manager process
+ */
+int MainCacheManager(int argc, char **argv) {
+  return 0;
+}
+  
+  
+/**
  * Sets up parameters and SQL statements.
  * We don't check here whether cache is already too big.
  *
@@ -615,6 +634,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   string sql;
   sqlite3_stmt *stmt;
 
+  shared_ = false;
   spawned_ = false;
 
   limit_ = limit;
@@ -622,6 +642,10 @@ bool Init(const string &cache_dir, const uint64_t limit,
   cleanup_threshold_ = cleanup_threshold;
   cache_dir_ = new string(cache_dir);
   pinned_chunks_ = new map<hash::Any, uint64_t>();
+  
+  if (shared_) {
+    
+  }
 
   // Initialize cache catalog
   bool retry = false;

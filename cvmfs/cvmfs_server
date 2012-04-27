@@ -97,7 +97,7 @@ get_expiry() {
 
 reload_apache() {
    echo -n "Reloading Apache... "
-   service httpd reload > /dev/null
+   /sbin/service httpd reload > /dev/null
    echo "done"
 }
 
@@ -208,7 +208,7 @@ RewriteRule ^/cvmfs/$name/(.*)$ /cvmfs/$name/pub/catalogs/\$1 [PT]
 # Translation URL to real pathname
 Alias /cvmfs/$name/pub ${repository_dir}/pub
 # For pushing files to the worker nodes
-Alias /fanout/$name /cvmfs/$name
+Alias /fanout/cvmfs/$name /cvmfs/$name
 <Directory "${repository_dir}/pub">
     Options -MultiViews FollowSymLinks
     AllowOverride All
