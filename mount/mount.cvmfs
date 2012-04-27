@@ -150,33 +150,16 @@ if [ "x$CVMFS_DEBUGLOG" != "x" ]; then
   cvmfs_exe=$bin_path/cvmfs2_debug
   add_mount_option "logfile=$CVMFS_DEBUGLOG"
 fi
-if [ "x$CVMFS_TRACEFILE" != "x" ]; then
-  add_mount_option "tracefile=$CVMFS_TRACEFILE"
-fi
-if [ "x$CVMFS_SYSLOG_LEVEL" != "x" ]; then
-  add_mount_option "syslog_level=$CVMFS_SYSLOG_LEVEL"
-fi
-if [ "x$CVMFS_IGNORE_SIGNATURE" == "xyes" ]; then
-  add_mount_option "ignore_signature"
-fi
-if [ "x$CVMFS_PUBLIC_KEY" != "x" ]; then
-  add_mount_option "pubkey=$CVMFS_PUBLIC_KEY"
-fi
-if [ "x$CVMFS_MAX_TTL" != "x" ]; then
-  add_mount_option "max_ttl=$CVMFS_MAX_TTL"
-fi
-if [ "x$CVMFS_DISKLESS" == "xyes" ]; then
-  add_mount_option "diskless"
-fi
-if [ "x$CVMFS_KCACHE_TIMEOUT" != "x" ]; then
-  add_mount_option "kcache_timeout=$CVMFS_KCACHE_TIMEOUT"
-fi
-if [ "x$CVMFS_ROOT_HASH" != "x" ]; then
-  add_mount_option "root_hash=$CVMFS_ROOT_HASH"
-fi
-if [ "x$CVMFS_CHECK_PERMISSIONS" == "xyes" ]; then
-  add_mount_option "default_permissions"
-fi
+[ x"$CVMFS_TRACEFILE" != x ] && add_mount_option "tracefile=$CVMFS_TRACEFILE"
+[ x"$CVMFS_SYSLOG_LEVEL" != x ] && add_mount_option "syslog_level=$CVMFS_SYSLOG_LEVEL"
+[ x"$CVMFS_IGNORE_SIGNATURE" = xyes ] && add_mount_option "ignore_signature"
+[ x"$CVMFS_PUBLIC_KEY" != x ] && add_mount_option "pubkey=$CVMFS_PUBLIC_KEY"
+[ x"$CVMFS_MAX_TTL" != x ] && add_mount_option "max_ttl=$CVMFS_MAX_TTL"
+[ x"$CVMFS_DISKLESS" = xyes ] && add_mount_option "diskless"
+[ x"$CVMFS_KCACHE_TIMEOUT" != x ] && add_mount_option "kcache_timeout=$CVMFS_KCACHE_TIMEOUT"
+[ x"$CVMFS_ROOT_HASH" != x ] && add_mount_option "root_hash=$CVMFS_ROOT_HASH"
+[ x"$CVMFS_CHECK_PERMISSIONS" = xyes ] && add_mount_option "default_permissions"
+[ x"$CVMFS_SHARED_CACHE" = xyes ] && add_mount_option "shared_cache"
 
 cmd="$cvmfs_exe -o ${mount_options} $mountpoint '$repository'"
 
