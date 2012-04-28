@@ -34,6 +34,7 @@ int ConnectSocket(const std::string &path);
 void MakePipe(int pipe_fd[2]);
 void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);
+void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void Nonblock2Block(int filedes);
 
 bool FileExists(const std::string &path);

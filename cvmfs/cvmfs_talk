@@ -111,7 +111,7 @@ sub talk {
 
   socket(SOCKET, PF_UNIX, SOCK_STREAM, 0);
   if (!connect(SOCKET, $socket_name)) {
-    print "Can't connect to socket: $!\n";
+    print "Can't connect to socket $pipe_path: $!\n";
     return 1;
   }
 

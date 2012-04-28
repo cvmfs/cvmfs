@@ -80,15 +80,20 @@ static void *MainTalk(void *data __attribute__((unused))) {
       shutdown(con_fd, SHUT_RDWR);
       close(con_fd);
     }
+    LogCvmfs(kLogTalk, kLogDebug, "accepting connections on socketfd %d", 
+             socket_fd_);
     if ((con_fd = accept(socket_fd_, (struct sockaddr *)&remote, &socket_size))
          < 0)
     {
+      LogCvmfs(kLogTalk, kLogDebug, "terminating talk thead (fd %d, errno %d)",
+               con_fd, errno);
       break;
     }
 
     char buf[kMaxCommandSize];
     if (recv(con_fd, buf, sizeof(buf), 0) > 0) {
       const string line = string(buf);
+      LogCvmfs(kLogTalk, kLogDebug, "received %s", line.c_str());
 
       if (line == "flush") {
         tracer::Flush();
@@ -401,10 +406,11 @@ bool Init(const string &cachedir) {
   if (socket_fd_ == -1)
     return false;
 
-  if (listen(socket_fd_, 1) < -1)
+  if (listen(socket_fd_, 1) == -1)
     return false;
 
-  LogCvmfs(kLogTalk, kLogDebug, "socket created at %s", socket_path_->c_str());
+  LogCvmfs(kLogTalk, kLogDebug, "socket created at %s (fd %d)", 
+           socket_path_->c_str(), socket_fd_);
 
   return true;
 }

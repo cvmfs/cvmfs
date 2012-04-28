@@ -44,10 +44,13 @@
 #include "util.h"
 #include "smalloc.h"
 #include "cvmfs.h"
+#include "monitor.h"
 
 using namespace std;  // NOLINT
 
 namespace quota {
+  
+static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
 /**
  * Loaded catalogs are pinned in the LRU and have to be treated differently.
@@ -69,6 +72,7 @@ enum CommandType {
   kListPinned,
   kListCatalogs,
   kStatus,
+  kLimits,
 };
 
 struct LruCommand {
@@ -114,7 +118,62 @@ sqlite3_stmt *stmt_list_ = NULL;
 sqlite3_stmt *stmt_list_pinned_ = NULL;  /**< Loaded catalogs are pinned. */
 sqlite3_stmt *stmt_list_catalogs_ = NULL;
 
-
+ 
+static void MakeReturnPipe(int pipe[2]) {
+  if (!shared_) {
+    MakePipe(pipe);
+    return;
+  }
+  
+  // Create FIFO in cache directory, store path name (number) in pipe write end
+  int i = 0;
+  int retval;
+  do {
+    retval = mkfifo((*cache_dir_ + "/pipe" + StringifyInt(i)).c_str(), 0600);
+    pipe[1] = i;
+    i++;
+  } while ((retval == -1) && (errno == EEXIST));
+  assert(retval == 0);
+  
+  // Connect reader's end
+  pipe[0] = open((*cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str(), 
+                 O_RDONLY | O_NONBLOCK);
+  assert(pipe[0] >= 0);
+  Nonblock2Block(pipe[0]);
+}
+  
+  
+// TODO: make sure that a broken return pipe does not kill the cache manager
+static int BindReturnPipe(int pipe_wronly) {
+  if (!shared_)
+    return pipe_wronly;
+  
+  // Connect writer's end
+  int result = open((*cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(), 
+                    O_WRONLY | O_NONBLOCK);
+  assert(result >= 0);
+  Nonblock2Block(result);
+  return result;
+}
+  
+  
+static void UnbindReturnPipe(int pipe_wronly) {
+  if (shared_)
+    close(pipe_wronly);
+}
+  
+  
+static void CloseReturnPipe(int pipe[2]) {
+  if (shared_) {
+    close(pipe[0]);
+    unlink((*cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str());
+  } else {
+    close(pipe[0]);
+    close(pipe[1]);
+  }
+}
+  
+  
 static bool DoCleanup(const uint64_t leave_size) {
   if ((limit_ == 0) || (gauge_ <= leave_size))
     return true;
@@ -308,7 +367,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     // Reservations are handled immediately and "out of band"
     if (command_type == kReserve) {
       bool success = true;
-      int return_pipe = command_buffer[num_commands].return_pipe;
+      int return_pipe = 
+        BindReturnPipe(command_buffer[num_commands].return_pipe);
       const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
                            sizeof(command_buffer[num_commands].digest));
       const string hash_str(hash.ToString());
@@ -327,6 +387,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       }
 
       WritePipe(return_pipe, &success, sizeof(success));
+      UnbindReturnPipe(return_pipe);
       continue;
     }
 
@@ -349,7 +410,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     bool immediate_command = (command_type == kCleanup) ||
       (command_type == kList) || (command_type == kListPinned) ||
       (command_type == kListCatalogs) || (command_type == kRemove) ||
-      (command_type == kStatus);
+      (command_type == kStatus) || (command_type == kLimits);
     if (!immediate_command) num_commands++;
 
     if ((num_commands == kCommandBufferSize) || immediate_command)
@@ -360,7 +421,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
     if (immediate_command) {
       // Process cleanup, listings
-      int return_pipe = command_buffer[num_commands].return_pipe;
+      int return_pipe = 
+        BindReturnPipe(command_buffer[num_commands].return_pipe);
       int retval;
       sqlite3_stmt *this_stmt_list = NULL;
       switch (command_type) {
@@ -428,15 +490,21 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           WritePipe(return_pipe, &gauge_, sizeof(gauge_));
           WritePipe(return_pipe, &pinned_, sizeof(pinned_));
           break;
+        case kLimits:
+          WritePipe(return_pipe, &limit_, sizeof(limit_));
+          WritePipe(return_pipe, &cleanup_threshold_, 
+                    sizeof(cleanup_threshold_));
+          break;
         default:
           abort();  // other types are handled by the bunch processor
       }
+      UnbindReturnPipe(return_pipe);
       num_commands = 0;
     }
   }
 
+  LogCvmfs(kLogQuota, kLogDebug, "stopping cache manager (%d)", errno);
   close(pipe_lru_[0]);
-  LogCvmfs(kLogQuota, kLogDebug, "stopping cache manager");
   ProcessCommandBunch(num_commands, command_buffer, path_buffer);
 
   // Unpin
@@ -594,6 +662,184 @@ bool RebuildDatabase() {
   if (dirp) closedir(dirp);
   return result;
 }
+  
+  
+static bool InitDatabase(const bool rebuild_database) {
+  string sql;
+  sqlite3_stmt *stmt;
+  
+  bool retry = false;
+init_recover:
+  const string db_file = (*cache_dir_) + "/cvmfscatalog.cache";
+  int err = sqlite3_open(db_file.c_str(), &db_);
+  if (err != SQLITE_OK) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not open cache database (%d)", err);
+    return false;
+  }
+  sql = "PRAGMA synchronous=0; PRAGMA locking_mode=EXCLUSIVE; "
+  "PRAGMA auto_vacuum=1; "
+  "CREATE TABLE IF NOT EXISTS cache_catalog (sha1 TEXT, size INTEGER, "
+  "  acseq INTEGER, path TEXT, type INTEGER, pinned INTEGER, "
+  "CONSTRAINT pk_cache_catalog PRIMARY KEY (sha1)); "
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_cache_catalog_acseq "
+  "  ON cache_catalog (acseq); "
+  "CREATE TEMP TABLE fscache (sha1 TEXT, size INTEGER, actime INTEGER, "
+  "CONSTRAINT pk_fscache PRIMARY KEY (sha1)); "
+  "CREATE INDEX idx_fscache_actime ON fscache (actime); "
+  "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
+  "  CONSTRAINT pk_properties PRIMARY KEY(key));";
+  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
+  if (err != SQLITE_OK) {
+    if (!retry) {
+      retry = true;
+      sqlite3_close(db_);
+      unlink(db_file.c_str());
+      unlink((db_file + "-journal").c_str());
+      LogCvmfs(kLogQuota, kLogSyslog, "LRU database corrupted, re-building");
+      goto init_recover;
+    }
+    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
+             sql.c_str());
+    return false;
+  }
+  
+  // If this an old cache catalog,
+  // add and initialize new columns to cache_catalog
+  sql = "ALTER TABLE cache_catalog ADD type INTEGER; "
+  "ALTER TABLE cache_catalog ADD pinned INTEGER";
+  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
+  if (err == SQLITE_OK) {
+    sql = "UPDATE cache_catalog SET type=" + StringifyInt(kFileRegular) + ";";
+    err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
+    if (err != SQLITE_OK) {
+      LogCvmfs(kLogQuota, kLogDebug,
+               "could not init cache database (failed: %s)", sql.c_str());
+      return false;
+    }
+  }
+  
+  // Set pinned back
+  sql = "UPDATE cache_catalog SET pinned=0;";
+  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
+  if (err != SQLITE_OK) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
+             sql.c_str());
+    return false;
+  }
+  
+  // Set schema version
+  sql = "INSERT OR REPLACE INTO properties (key, value) "
+  "VALUES ('schema', '1.0')";
+  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
+  if (err != SQLITE_OK) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
+             sql.c_str());
+    return false;
+  }
+  
+  // Easy way out, no quota restrictions
+  if (limit_ == 0) {
+    gauge_ = 0;
+    return true;
+  }
+  
+  // If cache catalog is empty, recreate from file system
+  sql = "SELECT count(*) FROM cache_catalog;";
+  sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    if ((sqlite3_column_int64(stmt, 0)) == 0 || rebuild_database) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "CernVM-FS: building lru cache database...");
+      if (!RebuildDatabase()) {
+        LogCvmfs(kLogQuota, kLogDebug,
+                 "could not build cache database from file system");
+        return false;
+      }
+    }
+  } else {
+    LogCvmfs(kLogQuota, kLogDebug, "could not select on cache catalog");
+    sqlite3_finalize(stmt);
+    return false;
+  }
+  sqlite3_finalize(stmt);
+  
+  // How many bytes do we already have in cache?
+  sql = "SELECT sum(size) FROM cache_catalog;";
+  sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    gauge_ = sqlite3_column_int64(stmt, 0);
+  } else {
+    LogCvmfs(kLogQuota, kLogDebug, "could not determine cache size");
+    sqlite3_finalize(stmt);
+    return false;
+  }
+  sqlite3_finalize(stmt);
+  
+  // Highest seq-no?
+  sql = "SELECT coalesce(max(acseq), 0) FROM cache_catalog;";
+  sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    seq_ = sqlite3_column_int64(stmt, 0)+1;
+  } else {
+    LogCvmfs(kLogQuota, kLogDebug, "could not determine highest seq-no");
+    sqlite3_finalize(stmt);
+    return false;
+  }
+  sqlite3_finalize(stmt);
+  
+  // Prepare touch, new, remove statements
+  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET acseq=:seq "
+                     "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
+  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=0 "
+                     "WHERE sha1=:sha1;", -1, &stmt_unpin_, NULL);
+  sqlite3_prepare_v2(db_,
+                     "INSERT OR REPLACE INTO cache_catalog "
+                     "(sha1, size, acseq, path, type, pinned) "
+                     "VALUES (:sha1, :s, :seq, :p, :t, :pin);", -1, &stmt_new_, NULL);
+  sqlite3_prepare_v2(db_,
+                     "SELECT size, pinned FROM cache_catalog WHERE sha1=:sha1;",
+                     -1, &stmt_size_, NULL);
+  sqlite3_prepare_v2(db_, "DELETE FROM cache_catalog WHERE sha1=:sha1;",
+                     -1, &stmt_rm_, NULL);
+  sqlite3_prepare_v2(db_,
+                     "SELECT sha1, size FROM cache_catalog WHERE acseq=(SELECT min(acseq) "
+                     "FROM cache_catalog WHERE pinned=0);", -1, &stmt_lru_, NULL);
+  sqlite3_prepare_v2(db_,
+                     ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileRegular) +
+                      ";").c_str(), -1, &stmt_list_, NULL);
+  sqlite3_prepare_v2(db_, "SELECT path FROM cache_catalog WHERE pinned=1;",
+                     -1, &stmt_list_pinned_, NULL);
+  sqlite3_prepare_v2(db_,
+                     ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) +
+                      ";").c_str(), -1, &stmt_list_catalogs_, NULL);
+  return true;
+}
+  
+
+static void CloseDatabase() {
+  if (stmt_list_catalogs_) sqlite3_finalize(stmt_list_catalogs_);
+  if (stmt_list_pinned_) sqlite3_finalize(stmt_list_pinned_);
+  if (stmt_list_) sqlite3_finalize(stmt_list_);
+  if (stmt_lru_) sqlite3_finalize(stmt_lru_);
+  if (stmt_rm_) sqlite3_finalize(stmt_rm_);
+  if (stmt_size_) sqlite3_finalize(stmt_size_);
+  if (stmt_touch_) sqlite3_finalize(stmt_touch_);
+  if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
+  if (stmt_new_) sqlite3_finalize(stmt_new_);
+  if (db_) sqlite3_close(db_);
+  
+  stmt_list_catalogs_ = NULL;
+  stmt_list_pinned_ = NULL;
+  stmt_list_ = NULL;
+  stmt_rm_ = NULL;
+  stmt_size_ = NULL;
+  stmt_touch_ = NULL;
+  stmt_new_ = NULL;
+  db_ = NULL;
+  
+  delete pinned_chunks_;
+  pinned_chunks_ = NULL;
+}
 
 
 /**
@@ -603,6 +849,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
                 const uint64_t limit, const uint64_t cleanup_threshold)
 {
   shared_ = true;
+  spawned_ = true;
   cache_dir_ = new string(cache_dir);
   
   // Create lock file
@@ -621,6 +868,9 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
     Nonblock2Block(pipe_lru_[1]);
     UnlockFile(fd_lockfile);
+    GetLimits(&limit_, &cleanup_threshold_);
+    LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
+             limit_, cleanup_threshold_);
     return true;
   }
   if (errno == ENXIO) {
@@ -637,24 +887,22 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     return false;
   }
   
-  // Create new peer server
+  // Create new cache manager
+  // TODO: Make "ControlledFork" in util.cc
   int pipe_fork[2];
   int pipe_boot[2];
   int pipe_handshake[2];
   MakePipe(pipe_fork);
   MakePipe(pipe_boot);
   MakePipe(pipe_handshake);
-  
+   
   pid_t pid = fork();
   assert(pid >= 0);
   if (pid == 0) {
-    // Double fork to disconnect from parent
-    pid_t pid_cache_manager = fork();
-    assert(pid_cache_manager >= 0);
-    if (pid_cache_manager != 0) _exit(0);
-    
+    pid_t pid_cache_manager;
     int max_fd;
     int fd_flags;
+    char failed = 'U';
     const char *argv[] = {exe_path.c_str(), "__cachemgr__", 
       cache_dir_->c_str(),
       StringifyInt(pipe_boot[1]).c_str(),
@@ -663,7 +911,6 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
       StringifyInt(cleanup_threshold).c_str(),
       StringifyInt(cvmfs::foreground_).c_str(),
       GetLogDebugFile().c_str(), NULL};
-    char failed = 'U';
     
     // Child, close file descriptors
     max_fd = sysconf(_SC_OPEN_MAX);
@@ -678,6 +925,11 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
         close(fd);
       }
     }
+    
+    // Double fork to disconnect from parent
+    pid_cache_manager = fork();
+    assert(pid_cache_manager >= 0);
+    if (pid_cache_manager != 0) _exit(0);
     
     fd_flags = fcntl(pipe_fork[1], F_GETFD);
     if (fd_flags < 0) {
@@ -701,7 +953,6 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   int statloc;
   waitpid(pid, &statloc, 0);
   
-  close(pipe_lru_[0]);
   close(pipe_fork[1]);
   char buf;
   if (read(pipe_fork[0], &buf, 1) == 1) {
@@ -715,7 +966,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     return false;
   }
   close(pipe_fork[0]);
-  
+   
   // Wait for cache manager to be ready
   close(pipe_boot[1]);
   close(pipe_handshake[0]);
@@ -752,6 +1003,10 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
   
   UnlockFile(fd_lockfile);
+  
+  GetLimits(&limit_, &cleanup_threshold_);
+  LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
+           limit_, cleanup_threshold_);
   return true;
 }
   
@@ -762,6 +1017,15 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
 int MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
   int retval;
+  
+  retval = monitor::Init(".", false);
+  assert(retval);
+  monitor::Spawn();
+  
+  shared_ = true;
+  spawned_ = true;
+  pinned_ = 0;
+  pinned_chunks_ = new map<hash::Any, uint64_t>();
   
   // Process command line arguments
   cache_dir_ = new string(argv[2]);
@@ -777,7 +1041,11 @@ int MainCacheManager(int argc, char **argv) {
   if (!foreground) {
     retval = daemon(1, 0);
     assert(retval == 0);
+    LogCvmfs(kLogQuota, kLogDebug, "shared cache manager daemonized");
   }
+  
+  if (!InitDatabase(false))  // TODO: rebuild?
+    return 1;
   
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const string fifo_path = *cache_dir_ + "/cachemgr";
@@ -797,10 +1065,12 @@ int MainCacheManager(int argc, char **argv) {
   close(pipe_handshake);
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
   
-  read(pipe_lru_[0], &buf, 1);
+  MainCommandServer(NULL);
+  CloseDatabase();
   
-  LogCvmfs(kLogQuota, kLogDebug, "shared cache manager quits, unlinking fifo (%d)", errno);
   unlink(fifo_path.c_str());
+  monitor::Fini();
+  
   return 0;
 }
   
@@ -824,9 +1094,6 @@ bool Init(const string &cache_dir, const uint64_t limit,
     return false;
   }
 
-  string sql;
-  sqlite3_stmt *stmt;
-
   shared_ = false;
   spawned_ = false;
 
@@ -837,148 +1104,8 @@ bool Init(const string &cache_dir, const uint64_t limit,
   pinned_chunks_ = new map<hash::Any, uint64_t>();
 
   // Initialize cache catalog
-  bool retry = false;
- init_recover:
-  const string db_file = (*cache_dir_) + "/cvmfscatalog.cache";
-  int err = sqlite3_open(db_file.c_str(), &db_);
-  if (err != SQLITE_OK) {
-    LogCvmfs(kLogQuota, kLogDebug, "could not open cache database (%d)", err);
+  if (!InitDatabase(rebuild_database))
     return false;
-  }
-  sql = "PRAGMA synchronous=0; PRAGMA locking_mode=EXCLUSIVE; "
-        "PRAGMA auto_vacuum=1; "
-        "CREATE TABLE IF NOT EXISTS cache_catalog (sha1 TEXT, size INTEGER, "
-        "  acseq INTEGER, path TEXT, type INTEGER, pinned INTEGER, "
-        "CONSTRAINT pk_cache_catalog PRIMARY KEY (sha1)); "
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_cache_catalog_acseq "
-        "  ON cache_catalog (acseq); "
-        "CREATE TEMP TABLE fscache (sha1 TEXT, size INTEGER, actime INTEGER, "
-        "CONSTRAINT pk_fscache PRIMARY KEY (sha1)); "
-        "CREATE INDEX idx_fscache_actime ON fscache (actime); "
-        "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
-        "  CONSTRAINT pk_properties PRIMARY KEY(key));";
-  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
-  if (err != SQLITE_OK) {
-    if (!retry) {
-      retry = true;
-      sqlite3_close(db_);
-      unlink(db_file.c_str());
-      unlink((db_file + "-journal").c_str());
-      LogCvmfs(kLogQuota, kLogSyslog, "LRU database corrupted, re-building");
-      goto init_recover;
-    }
-    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
-             sql.c_str());
-    return false;
-  }
-
-  // If this an old cache catalog,
-  // add and initialize new columns to cache_catalog
-  sql = "ALTER TABLE cache_catalog ADD type INTEGER; "
-        "ALTER TABLE cache_catalog ADD pinned INTEGER";
-  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
-  if (err == SQLITE_OK) {
-    sql = "UPDATE cache_catalog SET type=" + StringifyInt(kFileRegular) + ";";
-    err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
-    if (err != SQLITE_OK) {
-      LogCvmfs(kLogQuota, kLogDebug,
-               "could not init cache database (failed: %s)", sql.c_str());
-      return false;
-    }
-  }
-
-  // Set pinned back
-  sql = "UPDATE cache_catalog SET pinned=0;";
-  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
-  if (err != SQLITE_OK) {
-    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
-             sql.c_str());
-    return false;
-  }
-
-  // Set schema version
-  sql = "INSERT OR REPLACE INTO properties (key, value) "
-        "VALUES ('schema', '1.0')";
-  err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
-  if (err != SQLITE_OK) {
-    LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
-             sql.c_str());
-    return false;
-  }
-
-  // Easy way out, no quota restrictions
-  if (limit_ == 0) {
-    gauge_ = 0;
-    return true;
-  }
-
-  // If cache catalog is empty, recreate from file system
-  if (rebuild_database) {
-    sql = "SELECT count(*) FROM cache_catalog;";
-    sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-      if ((sqlite3_column_int64(stmt, 0)) == 0 && !RebuildDatabase()) {
-        LogCvmfs(kLogQuota, kLogDebug,
-                 "could not build cache database from file system");
-        return false;
-      }
-    } else {
-      LogCvmfs(kLogQuota, kLogDebug, "could not select on cache catalog");
-      sqlite3_finalize(stmt);
-      return false;
-    }
-    sqlite3_finalize(stmt);
-  }
-
-  // How many bytes do we already have in cache?
-  sql = "SELECT sum(size) FROM cache_catalog;";
-  sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
-  if (sqlite3_step(stmt) == SQLITE_ROW) {
-    gauge_ = sqlite3_column_int64(stmt, 0);
-  } else {
-    LogCvmfs(kLogQuota, kLogDebug, "could not determine cache size");
-    sqlite3_finalize(stmt);
-    return false;
-  }
-  sqlite3_finalize(stmt);
-
-  // Highest seq-no?
-  sql = "SELECT coalesce(max(acseq), 0) FROM cache_catalog;";
-  sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
-  if (sqlite3_step(stmt) == SQLITE_ROW) {
-    seq_ = sqlite3_column_int64(stmt, 0)+1;
-  } else {
-    LogCvmfs(kLogQuota, kLogDebug, "could not determine highest seq-no");
-    sqlite3_finalize(stmt);
-    return false;
-  }
-  sqlite3_finalize(stmt);
-
-  // Prepare touch, new, remove statements
-  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET acseq=:seq "
-                     "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
-  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=0 "
-                     "WHERE sha1=:sha1;", -1, &stmt_unpin_, NULL);
-  sqlite3_prepare_v2(db_,
-    "INSERT OR REPLACE INTO cache_catalog "
-    "(sha1, size, acseq, path, type, pinned) "
-    "VALUES (:sha1, :s, :seq, :p, :t, :pin);", -1, &stmt_new_, NULL);
-  sqlite3_prepare_v2(db_,
-    "SELECT size, pinned FROM cache_catalog WHERE sha1=:sha1;",
-    -1, &stmt_size_, NULL);
-  sqlite3_prepare_v2(db_, "DELETE FROM cache_catalog WHERE sha1=:sha1;",
-                     -1, &stmt_rm_, NULL);
-  sqlite3_prepare_v2(db_,
-    "SELECT sha1, size FROM cache_catalog WHERE acseq=(SELECT min(acseq) "
-    "FROM cache_catalog WHERE pinned=0);", -1, &stmt_lru_, NULL);
-  sqlite3_prepare_v2(db_,
-    ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileRegular) +
-    ";").c_str(), -1, &stmt_list_, NULL);
-  sqlite3_prepare_v2(db_, "SELECT path FROM cache_catalog WHERE pinned=1;",
-                     -1, &stmt_list_pinned_, NULL);
-  sqlite3_prepare_v2(db_,
-    ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) +
-    ";").c_str(), -1, &stmt_list_catalogs_, NULL);
 
   MakePipe(pipe_lru_);
 
@@ -989,8 +1116,8 @@ bool Init(const string &cache_dir, const uint64_t limit,
 /**
  * Spawns the LRU thread
  */
-void Spawn() {
-  if (limit_ == 0)
+void Spawn() { 
+  if (spawned_ || (limit_ == 0))
     return;
 
   if (pthread_create(&thread_lru_, NULL, MainCommandServer, NULL) != 0) {
@@ -1006,6 +1133,15 @@ void Spawn() {
  * Cleanup, closes SQLite connections.
  */
 void Fini() {
+  delete cache_dir_;
+  cache_dir_ = NULL;
+  
+  if (shared_) {
+    // Most of cleanup is done by shared cache manager
+    close(pipe_lru_[1]);
+    return;
+  }
+
   if (spawned_) {
     char fin = 0;
     WritePipe(pipe_lru_[1], &fin, 1);
@@ -1016,30 +1152,7 @@ void Fini() {
     close(pipe_lru_[1]);
   }
 
-  if (stmt_list_catalogs_) sqlite3_finalize(stmt_list_catalogs_);
-  if (stmt_list_pinned_) sqlite3_finalize(stmt_list_pinned_);
-  if (stmt_list_) sqlite3_finalize(stmt_list_);
-  if (stmt_lru_) sqlite3_finalize(stmt_lru_);
-  if (stmt_rm_) sqlite3_finalize(stmt_rm_);
-  if (stmt_size_) sqlite3_finalize(stmt_size_);
-  if (stmt_touch_) sqlite3_finalize(stmt_touch_);
-  if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
-  if (stmt_new_) sqlite3_finalize(stmt_new_);
-  if (db_) sqlite3_close(db_);
-
-  stmt_list_catalogs_ = NULL;
-  stmt_list_pinned_ = NULL;
-  stmt_list_ = NULL;
-  stmt_rm_ = NULL;
-  stmt_size_ = NULL;
-  stmt_touch_ = NULL;
-  stmt_new_ = NULL;
-  db_ = NULL;
-
-  delete cache_dir_;
-  delete pinned_chunks_;
-  cache_dir_ = NULL;
-  pinned_chunks_ = NULL;
+  CloseDatabase();
 }
 
 
@@ -1057,7 +1170,7 @@ bool Cleanup(const uint64_t leave_size) {
   }
 
   int pipe_cleanup[2];
-  MakePipe(pipe_cleanup);
+  MakeReturnPipe(pipe_cleanup);
 
   LruCommand cmd;
   cmd.command_type = kCleanup;
@@ -1065,9 +1178,8 @@ bool Cleanup(const uint64_t leave_size) {
   cmd.return_pipe = pipe_cleanup[1];
 
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadPipe(pipe_cleanup[0], &result, sizeof(result));
-  close(pipe_cleanup[0]);
-  close(pipe_cleanup[1]);
+  ReadHalfPipe(pipe_cleanup[0], &result, sizeof(result));
+  CloseReturnPipe(pipe_cleanup);
 
   return result;
 }
@@ -1123,7 +1235,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
 
   // Has to run when not spawned yet
   if (!spawned_) {
-    // Currently code duplication here, not sure there is a more elegant way
+    // Currently code duplication here, not sure if there is a more elegant way
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
       if ((cleanup_threshold_ > 0) && (pinned_ + size > cleanup_threshold_)) {
         LogCvmfs(kLogQuota, kLogDebug, "failed to insert %s (pinned), no space",
@@ -1157,7 +1269,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
   }
 
   int pipe_reserve[2];
-  MakePipe(pipe_reserve);
+  MakeReturnPipe(pipe_reserve);
 
   LruCommand cmd;
   cmd.command_type = kReserve;
@@ -1166,9 +1278,8 @@ bool Pin(const hash::Any &hash, const uint64_t size,
   cmd.return_pipe = pipe_reserve[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
   bool result;
-  ReadPipe(pipe_reserve[0], &result, sizeof(result));
-  close(pipe_reserve[0]);
-  close(pipe_reserve[1]);
+  ReadHalfPipe(pipe_reserve[0], &result, sizeof(result));
+  CloseReturnPipe(pipe_reserve);
 
   if (!result) return false;
   DoInsert(hash, size, cvmfs_path, true);
@@ -1221,7 +1332,7 @@ void Remove(const hash::Any &hash) {
 static vector<string> DoList(const CommandType list_command) {
   vector<string> result;
   int pipe_list[2];
-  MakePipe(pipe_list);
+  MakeReturnPipe(pipe_list);
   char path_buffer[kMaxCvmfsPath];
 
   LruCommand cmd;
@@ -1231,15 +1342,14 @@ static vector<string> DoList(const CommandType list_command) {
 
   int length;
   do {
-    ReadPipe(pipe_list[0], &length, sizeof(length));
+    ReadHalfPipe(pipe_list[0], &length, sizeof(length));
     if (length > 0) {
       ReadPipe(pipe_list[0], path_buffer, length);
       result.push_back(string(path_buffer, length));
     }
   } while (length >= 0);
 
-  close(pipe_list[0]);
-  close(pipe_list[1]);
+  CloseReturnPipe(pipe_list);
   return result;
 }
 
@@ -1285,16 +1395,15 @@ uint64_t GetCapacity() {
 
 static void GetStatus(uint64_t *gauge, uint64_t *pinned) {
   int pipe_status[2];
-  MakePipe(pipe_status);
+  MakeReturnPipe(pipe_status);
 
   LruCommand cmd;
   cmd.command_type = kStatus;
   cmd.return_pipe = pipe_status[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadPipe(pipe_status[0], gauge, sizeof(*gauge));
+  ReadHalfPipe(pipe_status[0], gauge, sizeof(*gauge));
   ReadPipe(pipe_status[0], pinned, sizeof(*pinned));
-  close(pipe_status[0]);
-  close(pipe_status[1]);
+  CloseReturnPipe(pipe_status);
 }
 
 
@@ -1313,6 +1422,20 @@ uint64_t GetSizePinned() {
   uint64_t gauge, size_pinned;
   GetStatus(&gauge, &size_pinned);
   return size_pinned;
+}
+  
+
+static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold) {
+  int pipe_limits[2];
+  MakeReturnPipe(pipe_limits);
+  
+  LruCommand cmd;
+  cmd.command_type = kLimits;
+  cmd.return_pipe = pipe_limits[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  ReadHalfPipe(pipe_limits[0], limit, sizeof(*limit));
+  ReadPipe(pipe_limits[0], cleanup_threshold, sizeof(*cleanup_threshold));
+  CloseReturnPipe(pipe_limits);
 }
 
 

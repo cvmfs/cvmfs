@@ -11,7 +11,7 @@
 #include <vector>
 
 namespace hash {
-  struct Any;
+struct Any;
 }
 
 namespace quota {

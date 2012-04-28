@@ -184,6 +184,18 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
 
 
 /**
+ * Reads from a pipe where writer's end is not yet necessarily connected
+ */
+void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
+  int num_bytes;
+  do {
+    num_bytes = read(fd, buf, nbyte);
+  } while (num_bytes == 0);
+  assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+}
+
+
+/**
  * Changes a non-blocking file descriptor to a blocking one.
  */
 void Nonblock2Block(int filedes) {

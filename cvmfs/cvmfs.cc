@@ -1060,11 +1060,6 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
  */
 static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init");
-  int retval;
-
-  // Switch back to cache dir after daemon()
-  retval = chdir(cachedir_->c_str());
-  assert(retval == 0);
 
   pid_ = getpid();
   monitor::Spawn();
@@ -1663,14 +1658,6 @@ int main(int argc, char *argv[]) {
   }
   quota_ready = true;
 
-  if (g_cvmfs_opts.rebuild_cachedb) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "CernVM-FS: rebuilding lru cache database...");
-    if (!quota::RebuildDatabase()) {
-      PrintError("Failed to rebuild lru cache database");
-      goto cvmfs_cleanup;
-    }
-  }
   if (quota::GetSize() > quota::GetCapacity()) {
     PrintWarning("your cache is already beyond quota size, cleaning up");
     if (!quota::Cleanup(g_cvmfs_opts.quota_threshold)) {
@@ -1784,8 +1771,37 @@ int main(int argc, char *argv[]) {
   if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &g_fuse_args)) != NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
              cvmfs::mountpoint_->c_str());
-    if (!g_foreground)
-      daemon(0, 0);
+    if (!g_foreground) {
+      daemon(1, 0);
+      
+      /*pid_t pid;
+      int statloc;
+      if ((pid = fork()) == 0) {
+        retval = setsid();
+        assert(retval != -1);
+        if ((pid = fork()) == 0) {
+          int null_read = open("/dev/null", O_RDONLY);
+          int null_write = open("/dev/null", O_WRONLY);
+          assert((null_read >= 0) && (null_write >= 0));
+          retval = dup2(null_read, 0); 
+          assert(retval == 0);
+          retval = dup2(null_write, 1);
+          assert(retval == 1);
+          retval = dup2(null_write, 2);
+          assert(retval == 2);
+          close(null_read);
+          close(null_write);
+          LogCvmfs(kLogCvmfs, kLogDebug, "daemonized");
+        } else {
+          assert(pid > 0);
+          _exit(0);
+        }
+      } else {
+        assert(pid > 0);
+        waitpid(pid, &statloc, 0);
+        _exit(0);
+      }*/
+    }
 
     struct fuse_session *se;
     se = fuse_lowlevel_new(&g_fuse_args, &cvmfs_operations,

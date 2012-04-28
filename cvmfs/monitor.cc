@@ -319,6 +319,7 @@ void Spawn() {
       sigaction(SIGFPE, &sa, NULL) ||
       sigaction(SIGSEGV, &sa, NULL) ||
       sigaction(SIGBUS, &sa, NULL) ||
+      sigaction(SIGPIPE, &sa, NULL) ||
       sigaction(SIGXFSZ, &sa, NULL))
   {
     abort();
