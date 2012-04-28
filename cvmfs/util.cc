@@ -184,6 +184,17 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
 
 
 /**
+ * Changes a non-blocking file descriptor to a blocking one.
+ */
+void Nonblock2Block(int filedes) {
+  int flags = fcntl(filedes, F_GETFL);
+  assert(flags != -1);
+  int retval = fcntl(filedes, F_SETFL, flags & ~O_NONBLOCK);
+  assert(retval != -1);
+}
+
+
+/**
  * Checks if the regular file path exists.
  */
 bool FileExists(const string &path) {

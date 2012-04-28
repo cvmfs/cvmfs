@@ -1183,7 +1183,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("interface=%s",        interface, 0),
   CVMFS_OPT("root_hash=%s",        root_hash, 0),
   CVMFS_SWITCH("no_reload",        no_reload),
-  CVMFS_SWITCH("shared_cache",     no_reload),
+  CVMFS_SWITCH("shared_cache",     shared_cache),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1646,7 +1646,7 @@ int main(int argc, char *argv[]) {
     g_cvmfs_opts.quota_threshold *= 1024*1024;
   }
   if (g_cvmfs_opts.shared_cache) {
-    if (!quota::InitShared(".", (uint64_t)g_cvmfs_opts.quota_limit,
+    if (!quota::InitShared(argv[0], ".", (uint64_t)g_cvmfs_opts.quota_limit,
                            (uint64_t)g_cvmfs_opts.quota_threshold)) 
     {
       PrintError("Failed to initialize shared lru cache");

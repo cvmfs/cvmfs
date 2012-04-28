@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <fcntl.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -42,6 +43,7 @@
 #include "hash.h"
 #include "util.h"
 #include "smalloc.h"
+#include "cvmfs.h"
 
 using namespace std;  // NOLINT
 
@@ -597,10 +599,160 @@ bool RebuildDatabase() {
 /**
  * Connects to a running peer server.  Creates a peer server, if necessary.
  */
-bool InitShared(const std::string &cache_dir, const uint64_t limit,
-                const uint64_t limit_threshold)
+bool InitShared(const std::string &exe_path, const std::string &cache_dir, 
+                const uint64_t limit, const uint64_t cleanup_threshold)
 {
-  return false;
+  shared_ = true;
+  cache_dir_ = new string(cache_dir);
+  
+  // Create lock file
+  const int fd_lockfile = LockFile(*cache_dir_ + "/lock_cachemgr");
+  if (fd_lockfile < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
+             (*cache_dir_ + "/lock_cachemgr").c_str(), errno);
+    return false;
+  }
+  
+  // Try to connect to pipe
+  const string fifo_path = *cache_dir_ + "/cachemgr";
+  LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
+  pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
+  if (pipe_lru_[1] >= 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
+    Nonblock2Block(pipe_lru_[1]);
+    UnlockFile(fd_lockfile);
+    return true;
+  }
+  if (errno == ENXIO) {
+    LogCvmfs(kLogQuota, kLogDebug, "left-over FIFO found, unlinking");
+    unlink(fifo_path.c_str());
+  }
+  
+  // Creating a new FIFO for the cache manager (to be bound later)
+  int retval = mkfifo(fifo_path.c_str(), 0600);
+  if (retval != 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "failed to create cache manager FIFO (%d)",
+             errno);
+    UnlockFile(fd_lockfile);
+    return false;
+  }
+  
+  // Create new peer server
+  int pipe_fork[2];
+  int pipe_boot[2];
+  int pipe_handshake[2];
+  MakePipe(pipe_fork);
+  MakePipe(pipe_boot);
+  MakePipe(pipe_handshake);
+  
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    // Double fork to disconnect from parent
+    pid_t pid_cache_manager = fork();
+    assert(pid_cache_manager >= 0);
+    if (pid_cache_manager != 0) _exit(0);
+    
+    int max_fd;
+    int fd_flags;
+    const char *argv[] = {exe_path.c_str(), "__cachemgr__", 
+      cache_dir_->c_str(),
+      StringifyInt(pipe_boot[1]).c_str(),
+      StringifyInt(pipe_handshake[0]).c_str(),
+      StringifyInt(limit).c_str(),
+      StringifyInt(cleanup_threshold).c_str(),
+      StringifyInt(cvmfs::foreground_).c_str(),
+      GetLogDebugFile().c_str(), NULL};
+    char failed = 'U';
+    
+    // Child, close file descriptors
+    max_fd = sysconf(_SC_OPEN_MAX);
+    if (max_fd < 0) {
+      failed = 'C';
+      goto fork_failure;
+    }
+    for (int fd = 3; fd < max_fd; fd++) {
+      if ((fd != pipe_fork[1]) && (fd != pipe_boot[1]) && 
+          (fd != pipe_handshake[0]))
+      {
+        close(fd);
+      }
+    }
+    
+    fd_flags = fcntl(pipe_fork[1], F_GETFD);
+    if (fd_flags < 0) {
+      failed = 'G';
+      goto fork_failure;
+    }
+    fd_flags |= FD_CLOEXEC;
+    if (fcntl(pipe_fork[1], F_SETFD, fd_flags) < 0) {
+      failed = 'S';
+      goto fork_failure;
+    }
+    
+    execvp(exe_path.c_str(), const_cast<char **>(argv));
+    
+    failed = 'E';
+    
+  fork_failure:
+    write(pipe_fork[1], &failed, 1);
+    _exit(1);
+  }
+  int statloc;
+  waitpid(pid, &statloc, 0);
+  
+  close(pipe_lru_[0]);
+  close(pipe_fork[1]);
+  char buf;
+  if (read(pipe_fork[0], &buf, 1) == 1) {
+    UnlockFile(fd_lockfile);
+    close(pipe_fork[0]);
+    close(pipe_boot[1]);
+    close(pipe_boot[0]);
+    close(pipe_handshake[1]);
+    close(pipe_handshake[0]);
+    LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager (%c)", buf);
+    return false;
+  }
+  close(pipe_fork[0]);
+  
+  // Wait for cache manager to be ready
+  close(pipe_boot[1]);
+  close(pipe_handshake[0]);
+  if (read(pipe_boot[0], &buf, 1) != 1) {
+    UnlockFile(fd_lockfile);
+    close(pipe_boot[0]);
+    close(pipe_handshake[1]);
+    LogCvmfs(kLogQuota, kLogDebug, "cache manager did not start");
+    return false;
+  }
+  close(pipe_boot[0]);
+  
+  // Connect write end
+  pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
+  if (pipe_lru_[1] < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, 
+             "failed to connect to newly created FIFO (%d)", errno);
+    close(pipe_handshake[1]);
+    UnlockFile(fd_lockfile);
+    return false;
+  }
+  
+  // Finalize handshake
+  buf = 'C';
+  if (write(pipe_handshake[1], &buf, 1) != 1) {
+    UnlockFile(fd_lockfile);
+    close(pipe_handshake[1]);
+    LogCvmfs(kLogQuota, kLogDebug, "could not finalize handshake");
+    return false;
+  }
+  close(pipe_handshake[1]);
+  
+  Nonblock2Block(pipe_lru_[1]);
+  LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
+  
+  UnlockFile(fd_lockfile);
+  return true;
 }
   
   
@@ -608,6 +760,47 @@ bool InitShared(const std::string &cache_dir, const uint64_t limit,
  * Entry point for the shared cache manager process
  */
 int MainCacheManager(int argc, char **argv) {
+  LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
+  int retval;
+  
+  // Process command line arguments
+  cache_dir_ = new string(argv[2]);
+  int pipe_boot = String2Int64(argv[3]);
+  int pipe_handshake = String2Int64(argv[4]);
+  limit_ = String2Int64(argv[5]);
+  cleanup_threshold_ = String2Int64(argv[6]);
+  int foreground = String2Int64(argv[7]);
+  const string logfile = argv[8];
+  if (logfile != "")
+    SetLogDebugFile(logfile + ".cachemgr");
+  
+  if (!foreground) {
+    retval = daemon(1, 0);
+    assert(retval == 0);
+  }
+  
+  // Initialize pipe, open non-blocking as cvmfs is not yet connected
+  const string fifo_path = *cache_dir_ + "/cachemgr";
+  pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
+  if (pipe_lru_[0] < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO (%d)", errno);
+    return 1;
+  }
+  Nonblock2Block(pipe_lru_[0]);
+  LogCvmfs(kLogQuota, kLogDebug, "shared cache manager listening");
+  
+  char buf = 'C';
+  WritePipe(pipe_boot, &buf, 1);
+  close(pipe_boot);
+  
+  ReadPipe(pipe_handshake, &buf, 1);
+  close(pipe_handshake);
+  LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
+  
+  read(pipe_lru_[0], &buf, 1);
+  
+  LogCvmfs(kLogQuota, kLogDebug, "shared cache manager quits, unlinking fifo (%d)", errno);
+  unlink(fifo_path.c_str());
   return 0;
 }
   
@@ -642,10 +835,6 @@ bool Init(const string &cache_dir, const uint64_t limit,
   cleanup_threshold_ = cleanup_threshold;
   cache_dir_ = new string(cache_dir);
   pinned_chunks_ = new map<hash::Any, uint64_t>();
-  
-  if (shared_) {
-    
-  }
 
   // Initialize cache catalog
   bool retry = false;
