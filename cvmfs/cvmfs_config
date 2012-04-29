@@ -868,11 +868,15 @@ configure_autofs()
       fi ;;
 
    Darwin )
-     sudo sed -i -e "/^$(echo $CVMFS_MOUNT_DIR | sed -e "s,/,\\\\/,g")/d" /etc/auto_master
-     local cvmfs_map="$CVMFS_MOUNT_DIR\t\t\t/etc/auto_cvmfs"
-     sudo bash -c "echo -e '$cvmfs_map' >> /etc/auto_master"
+     #sudo sed -i -e "/^$(echo $CVMFS_MOUNT_DIR | sed -e "s,/,\\\\/,g")/d" /etc/auto_master
+     #local cvmfs_map="$CVMFS_MOUNT_DIR\t\t\t/etc/auto_cvmfs"
+     #sudo bash -c "echo -e '$cvmfs_map' >> /etc/auto_master"
      #reload configurations
-     sudo automount -vc &> /dev/null
+     #sudo automount -vc &> /dev/null
+     echo "Fuse4x and autofs bug" > /dev/null
+     sudo mkdir -p /cvmfs
+     sudo chown cvmfs:cvmfs /cvmfs
+     sudo chmod 777 /cvmfs
      ;;
 
    * )
