@@ -99,8 +99,9 @@ cvmfs_setup()
     fi
   fi
 
-  # set permissions if home dir exists
-  [ -d /var/cache/cvmfs2 ] && chown cvmfs:cvmfs /var/cache/cvmfs2
+  # set permissions for home dir
+  mkdir -p /var/lib/cvmfs
+  chown cvmfs:cvmfs /var/lib/cvmfs
 
   # if group fuse exists, add user cvmfs
   if check_group "fuse"; then
@@ -685,41 +686,41 @@ add_cvmfs_user()
   case $sys_arch in
     Linux )
       if ! check_cvmfs_user; then
-        /usr/sbin/useradd -r -g cvmfs -d /var/cache/cvmfs2 -s /sbin/nologin -c "CernVM-FS service account" cvmfs
-      fi ;;
-
+        /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+      fi 
+    ;;
     Darwin )
       if ! check_cvmfs_user; then
-	#find un-used user id starting from 10000
-	local uid=10000
-	local gid
-	while true; do
-	  if [ -z $(sudo dscl . search /users UniqueID $uid | cut -f1 -s) ]; then
+        #find un-used user id starting from 10000
+        local uid=10000
+        local gid
+        while true; do
+          if [ -z $(sudo dscl . search /users UniqueID $uid | cut -f1 -s) ]; then
             break
           fi
           uid=$[$uid +1]
         done
 
-	if check_group "cvmfs"; then
-    gid=$(dscl . read /groups/cvmfs PrimaryGroupID | awk {'print $NF'})
-  else
-    echo "CVMFS group does not exists."
-    exit 1
-  fi
+        if check_group "cvmfs"; then
+          gid=$(dscl . read /groups/cvmfs PrimaryGroupID | awk {'print $NF'})
+        else
+          echo "CVMFS group does not exists."
+          exit 1
+        fi
 
-	#create cvmfs user
-	sudo dscl . -create /Users/cvmfs
+        #create cvmfs user
+        sudo dscl . -create /Users/cvmfs
         sudo dscl . -create /Users/cvmfs UserShell /sbin/nologin
         sudo dscl . -create /Users/cvmfs RealName "CVMFS User"
         sudo dscl . -create /Users/cvmfs UniqueID $uid
         sudo dscl . -create /Users/cvmfs PrimaryGroupID $gid
-        sudo dscl . -create /Users/cvmfs NFSHomeDirectory "/var/cache/cvmfs2"
+        sudo dscl . -create /Users/cvmfs NFSHomeDirectory "/var/lib/cvmfs"
         sudo dscl . -passwd /Users/cvmfs "*"
 
         #Hide user from login screen
         sudo defaults write /Library/Preferences/com.apple.loginwindow HiddenUsersList -array-add cvmfs
-      fi ;;
-
+      fi 
+    ;;
     * )
       echo "Architecture $sys_arch is not supported"
       exit 1 ;;
@@ -884,14 +885,17 @@ configure_autofs()
 configure_sudoers()
 {
   if [ $sys_arch == 'Darwin' ]; then
-    sudo perl -n -i -e \
-      'print if !/^\%everyone\s+ALL=\(cvmfs:cvmfs\)/; 
-       print "%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/local/bin/cvmfs2\n" if eof;'\
-    /etc/sudoers
-    sudo perl -n -i -e \
-      'print if !/^cvmfs\s+ALL=\(ALL\)/;
-       print "cvmfs ALL=(ALL) NOPASSWD: /usr/sbin/sysctl -w\n" if eof;'\
-    /etc/sudoers
+    sudo sed -i .cvmfs_backup -e "/# added by CernVM-FS/d" /etc/sudoers
+    sudo cat >> /etc/sudoers << EOF
+%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/cvmfs2 # added by CernVM-FS
+%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/cvmfs2_debug # added by CernVM-FS
+%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/cvmfs_talk -i * mountpoint # added by CernVM-FS
+%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /bin/mkdir # added by CernVM-FS
+%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/sudo sysctl -w kern.maxfilesperproc=* kern.maxfiles=* # added by CernVM-FS
+%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/sudo sysctl -w vfs.generic.fuse4x.tunables.allow_other=1 # added by CernVM-FS
+cvmfs ALL= NOPASSWD: /usr/sbin/sysctl -w vfs.generic.fuse4x.tunables.allow_other=1 # added by CernVM-FS
+cvmfs ALL= NOPASSWD: /usr/sbin/sysctl -w kern.maxfilesperproc=* kern.maxfiles=* # added by CernVM-FS
+EOF
   fi
 }
 
