@@ -290,11 +290,7 @@ void Spawn() {
         case -1: exit(1);
         case 0: {
           close(pipe_wd_[1]);
-          if (daemon(1, 1) == -1) {
-            LogCvmfs(kLogMonitor, kLogSyslog,
-                     "watchdog failed to deamonize");
-            exit(1);
-          }
+          Daemonize();
           Watchdog();
           exit(0);
         }

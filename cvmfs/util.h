@@ -35,6 +35,7 @@ void MakePipe(int pipe_fd[2]);
 void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);
 void ReadHalfPipe(int fd, void *buf, size_t nbyte);
+void ClosePipe(int pipe_fd[2]);
 void Nonblock2Block(int filedes);
 
 bool FileExists(const std::string &path);
@@ -69,5 +70,9 @@ bool ParseKeyvalPath(const std::string &filename,
 bool ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
                     int *start_of_signature,
                     hash::Any *hash, std::map<char, std::string> *content);
+
+void Daemonize();
+bool ManagedExec(const std::vector<std::string> &command_line,
+                 const std::vector<int> &preserve_fildes);
 
 #endif  // CVMFS_UTIL_H_

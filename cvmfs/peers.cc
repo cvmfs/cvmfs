@@ -29,6 +29,9 @@
 #include <unistd.h>
 #include <netdb.h>
 
+#include <string>
+#include <vector>
+
 #include "platform.h"
 #include "util.h"
 #include "logging.h"
@@ -96,81 +99,39 @@ bool Init(const string &cachedir, const string &exe_path,
   int retval = socketpair(AF_UNIX, SOCK_STREAM, 0, socket_pair);
   assert(retval == 0);
   socket_fd_ = socket_pair[0];
-
-  // Create new peer server
-  int pipe_fork[2];
   int pipe_boot[2];
-  MakePipe(pipe_fork);
   MakePipe(pipe_boot);
 
-  pid_t pid = fork();
-  assert(pid >= 0);
-  if (pid == 0) {
-    // Double fork to disconnect from parent
-    pid_t pid_peer_server = fork();
-    assert(pid_peer_server >= 0);
-    if (pid_peer_server != 0) _exit(0);
-
-    int max_fd;
-    int fd_flags;
-    const char *argv[] = {exe_path.c_str(), "__peersrv__", cachedir_->c_str(),
-                          StringifyInt(pipe_boot[1]).c_str(),
-                          StringifyInt(socket_pair[1]).c_str(),
-                          StringifyInt(cvmfs::foreground_).c_str(),
-                          GetLogDebugFile().c_str(), interface.c_str(), NULL};
-    char failed = 'U';
-
-    // Child, close file descriptors
-    max_fd = sysconf(_SC_OPEN_MAX);
-    if (max_fd < 0) {
-      failed = 'C';
-      goto fork_failure;
-    }
-    for (int fd = 3; fd < max_fd; fd++) {
-      if ((fd != pipe_fork[1]) && (fd != pipe_boot[1]) &&
-          (fd != socket_pair[1]))
-      {
-        close(fd);
-      }
-    }
-
-    fd_flags = fcntl(pipe_fork[1], F_GETFD);
-    if (fd_flags < 0) {
-      failed = 'G';
-      goto fork_failure;
-    }
-    fd_flags |= FD_CLOEXEC;
-    if (fcntl(pipe_fork[1], F_SETFD, fd_flags) < 0) {
-      failed = 'S';
-      goto fork_failure;
-    }
-
-    execvp(exe_path.c_str(), const_cast<char **>(argv));
-
-    failed = 'E';
-
-   fork_failure:
-    write(pipe_fork[1], &failed, 1);
-    _exit(1);
-  }
-  int statloc;
-  waitpid(pid, &statloc, 0);
-
+  // Create new peer server
+  vector<string> command_line;
+  command_line.push_back(exe_path);
+  command_line.push_back("__peersrv__");
+  command_line.push_back(*cachedir_);
+  command_line.push_back(StringifyInt(pipe_boot[1]));
+  command_line.push_back(StringifyInt(socket_pair[1]));
+  command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(GetLogDebugFile());
+  
+  vector<int> preserve_filedes;
+  preserve_filedes.push_back(0);
+  preserve_filedes.push_back(1);
+  preserve_filedes.push_back(2);
+  preserve_filedes.push_back(pipe_boot[1]);
+  preserve_filedes.push_back(socket_pair[1]);
+  
+  retval = ManagedExec(command_line, preserve_filedes);
   close(socket_pair[1]);
-  close(pipe_fork[1]);
-  char buf;
-  if (read(pipe_fork[0], &buf, 1) == 1) {
+  
+  if (!retval) {
     UnlockFile(fd_lockfile);
-    close(pipe_fork[0]);
-    close(pipe_boot[1]);
-    close(pipe_boot[0]);
-    LogCvmfs(kLogPeers, kLogDebug, "failed to start peer server (%c)", buf);
+    ClosePipe(pipe_boot);
+    LogCvmfs(kLogPeers, kLogDebug, "failed to start peer server");
     return false;
   }
-  close(pipe_fork[0]);
 
   // Wait for peer server to be ready
   close(pipe_boot[1]);
+  char buf;
   if (read(pipe_boot[0], &buf, 1) != 1) {
     UnlockFile(fd_lockfile);
     close(pipe_boot[0]);

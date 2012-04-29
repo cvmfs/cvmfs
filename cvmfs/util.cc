@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <inttypes.h>
 #include <dirent.h>
@@ -192,6 +193,15 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
     num_bytes = read(fd, buf, nbyte);
   } while (num_bytes == 0);
   assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+}
+
+
+/**
+ * Closes both ends of a pipe
+ */
+void ClosePipe(int pipe_fd[2]) {
+  close(pipe_fd[0]);
+  close(pipe_fd[1]);
 }
 
 
@@ -549,4 +559,117 @@ bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
   hash::Any hash;
   return ParseKeyvalMem(buffer, unsigned(num_bytes),
                         &start_of_signature, &hash, content);
+}
+
+
+/**
+ * Makes a daemon.  The daemon() call is deprecated on OS X
+ */
+void Daemonize() {
+  pid_t pid;
+  int statloc;
+  if ((pid = fork()) == 0) {
+    int retval = setsid();
+    assert(retval != -1);
+    if ((pid = fork()) == 0) {
+      int null_read = open("/dev/null", O_RDONLY);
+      int null_write = open("/dev/null", O_WRONLY);
+      assert((null_read >= 0) && (null_write >= 0));
+      retval = dup2(null_read, 0); 
+      assert(retval == 0);
+      retval = dup2(null_write, 1);
+      assert(retval == 1);
+      retval = dup2(null_write, 2);
+      assert(retval == 2);
+      close(null_read);
+      close(null_write);
+      LogCvmfs(kLogCvmfs, kLogDebug, "daemonized");
+    } else {
+      assert(pid > 0);
+      _exit(0);
+    }
+  } else {
+    assert(pid > 0);
+    waitpid(pid, &statloc, 0);
+    _exit(0);
+  }
+}
+
+
+/**
+ * Execve to the given command line, preserving the given file descriptors.
+ * If stdin, stdout, stderr should be preserved, add 0, 1, 2.
+ * Does a double fork to detach child.
+ * The command_line parameter contains the binary at index 0 and the arguments
+ * in the rest of the vector.
+ */
+bool ManagedExec(const vector<string> &command_line, 
+                 const vector<int> &preserve_fildes)
+{
+  assert(command_line.size() >= 1);
+  int pipe_fork[2];
+  MakePipe(pipe_fork);
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    pid_t pid_grand_child;
+    int max_fd;
+    int fd_flags;
+    char failed = 'U';
+    const char *argv[command_line.size() + 1];
+    for (unsigned i = 0; i < command_line.size(); ++i)
+      argv[i] = command_line[i].c_str();
+    argv[command_line.size()] = NULL;
+    
+    // Child, close file descriptors
+    max_fd = sysconf(_SC_OPEN_MAX);
+    if (max_fd < 0) {
+      failed = 'C';
+      goto fork_failure;
+    }
+    for (int fd = 0; fd < max_fd; fd++) {
+      for (unsigned i = 0; i < preserve_fildes.size(); ++i) {
+        if (fd == preserve_fildes[i])
+          continue;
+      }
+      if (fd != pipe_fork[1]) {
+        close(fd);
+      }
+    }
+    
+    // Double fork to disconnect from parent
+    pid_grand_child = fork();
+    assert(pid_grand_child >= 0);
+    if (pid_grand_child != 0) _exit(0);
+    
+    fd_flags = fcntl(pipe_fork[1], F_GETFD);
+    if (fd_flags < 0) {
+      failed = 'G';
+      goto fork_failure;
+    }
+    fd_flags |= FD_CLOEXEC;
+    if (fcntl(pipe_fork[1], F_SETFD, fd_flags) < 0) {
+      failed = 'S';
+      goto fork_failure;
+    }
+    
+    execvp(command_line[0].c_str(), const_cast<char **>(argv));
+    
+    failed = 'E';
+    
+  fork_failure:
+    write(pipe_fork[1], &failed, 1);
+    _exit(1);
+  }
+  int statloc;
+  waitpid(pid, &statloc, 0);
+  
+  close(pipe_fork[1]);
+  char buf;
+  if (read(pipe_fork[0], &buf, 1) == 1) {
+    LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%c)", buf);
+    return false;
+  }
+  close(pipe_fork[0]);
+  return true;
 }

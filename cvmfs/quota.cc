@@ -34,6 +34,7 @@
 #include <cstdio>
 
 #include <string>
+#include <vector>
 #include <map>
 #include <set>
 
@@ -168,8 +169,7 @@ static void CloseReturnPipe(int pipe[2]) {
     close(pipe[0]);
     unlink((*cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str());
   } else {
-    close(pipe[0]);
-    close(pipe[1]);
+    ClosePipe(pipe);
   }
 }
   
@@ -888,88 +888,43 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   }
   
   // Create new cache manager
-  // TODO: Make "ControlledFork" in util.cc
-  int pipe_fork[2];
   int pipe_boot[2];
   int pipe_handshake[2];
-  MakePipe(pipe_fork);
   MakePipe(pipe_boot);
   MakePipe(pipe_handshake);
-   
-  pid_t pid = fork();
-  assert(pid >= 0);
-  if (pid == 0) {
-    pid_t pid_cache_manager;
-    int max_fd;
-    int fd_flags;
-    char failed = 'U';
-    const char *argv[] = {exe_path.c_str(), "__cachemgr__", 
-      cache_dir_->c_str(),
-      StringifyInt(pipe_boot[1]).c_str(),
-      StringifyInt(pipe_handshake[0]).c_str(),
-      StringifyInt(limit).c_str(),
-      StringifyInt(cleanup_threshold).c_str(),
-      StringifyInt(cvmfs::foreground_).c_str(),
-      GetLogDebugFile().c_str(), NULL};
-    
-    // Child, close file descriptors
-    max_fd = sysconf(_SC_OPEN_MAX);
-    if (max_fd < 0) {
-      failed = 'C';
-      goto fork_failure;
-    }
-    for (int fd = 3; fd < max_fd; fd++) {
-      if ((fd != pipe_fork[1]) && (fd != pipe_boot[1]) && 
-          (fd != pipe_handshake[0]))
-      {
-        close(fd);
-      }
-    }
-    
-    // Double fork to disconnect from parent
-    pid_cache_manager = fork();
-    assert(pid_cache_manager >= 0);
-    if (pid_cache_manager != 0) _exit(0);
-    
-    fd_flags = fcntl(pipe_fork[1], F_GETFD);
-    if (fd_flags < 0) {
-      failed = 'G';
-      goto fork_failure;
-    }
-    fd_flags |= FD_CLOEXEC;
-    if (fcntl(pipe_fork[1], F_SETFD, fd_flags) < 0) {
-      failed = 'S';
-      goto fork_failure;
-    }
-    
-    execvp(exe_path.c_str(), const_cast<char **>(argv));
-    
-    failed = 'E';
-    
-  fork_failure:
-    write(pipe_fork[1], &failed, 1);
-    _exit(1);
-  }
-  int statloc;
-  waitpid(pid, &statloc, 0);
   
-  close(pipe_fork[1]);
-  char buf;
-  if (read(pipe_fork[0], &buf, 1) == 1) {
+  vector<string> command_line;
+  command_line.push_back(exe_path);  
+  command_line.push_back("__cachemgr__");
+  command_line.push_back(*cache_dir_);
+  command_line.push_back(StringifyInt(pipe_boot[1]));
+  command_line.push_back(StringifyInt(pipe_handshake[0]));
+  command_line.push_back(StringifyInt(limit));
+  command_line.push_back(StringifyInt(cleanup_threshold));
+  command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(GetLogDebugFile());
+  
+  vector<int> preserve_filedes;
+  preserve_filedes.push_back(0);
+  preserve_filedes.push_back(1);
+  preserve_filedes.push_back(2);
+  preserve_filedes.push_back(2);
+  preserve_filedes.push_back(pipe_boot[1]);
+  preserve_filedes.push_back(pipe_handshake[0]);
+   
+  retval = ManagedExec(command_line, preserve_filedes);
+  if (!retval) {
     UnlockFile(fd_lockfile);
-    close(pipe_fork[0]);
-    close(pipe_boot[1]);
-    close(pipe_boot[0]);
-    close(pipe_handshake[1]);
-    close(pipe_handshake[0]);
-    LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager (%c)", buf);
+    ClosePipe(pipe_boot);
+    ClosePipe(pipe_handshake);
+    LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
     return false;
   }
-  close(pipe_fork[0]);
    
   // Wait for cache manager to be ready
   close(pipe_boot[1]);
   close(pipe_handshake[0]);
+  char buf;
   if (read(pipe_boot[0], &buf, 1) != 1) {
     UnlockFile(fd_lockfile);
     close(pipe_boot[0]);
@@ -1148,8 +1103,7 @@ void Fini() {
     close(pipe_lru_[1]);
     pthread_join(thread_lru_, NULL);
   } else {
-    close(pipe_lru_[0]);
-    close(pipe_lru_[1]);
+    ClosePipe(pipe_lru_);
   }
 
   CloseDatabase();
