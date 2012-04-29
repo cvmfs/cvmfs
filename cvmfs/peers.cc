@@ -507,10 +507,8 @@ int MainPeerServer(int argc, char **argv) {
   peers_ = new Peers(*address_self_);
   SendMulticast(MessageMoin(address_self_->port));
 
-  if (!foreground) {
-    retval = daemon(1, 0);
-    assert(retval == 0);
-  }
+  if (!foreground)
+    Daemonize();
   char buf = 'C';
   WritePipe(pipe_boot, &buf, 1);
   close(pipe_boot);
