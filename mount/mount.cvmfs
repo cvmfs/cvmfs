@@ -161,7 +161,12 @@ fi
 [ x"$CVMFS_CHECK_PERMISSIONS" = xyes ] && add_mount_option "default_permissions"
 [ x"$CVMFS_SHARED_CACHE" = xyes ] && add_mount_option "shared_cache"
 
-cmd="$cvmfs_exe -o ${mount_options} $mountpoint '$repository'"
+# Single threaded, hack around a fuse4x problem with unnamed semaphores
+if [[ "$unamestr" = 'Darwin' ]]; then
+  cmd="$cvmfs_exe -s -o ${mount_options} $mountpoint '$repository'"
+else
+  cmd="$cvmfs_exe -o ${mount_options} $mountpoint '$repository'"
+fi
 
 #check if group fuse exists
 if [[ "$unamestr" == 'Linux' ]]; then
