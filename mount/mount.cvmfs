@@ -133,7 +133,8 @@ if [[ "$unamestr" == 'Darwin' ]]; then
   fi
 
   MAXFILES_OVERALL=$[$CVMFS_NFILES + 512]
-  sysctl -w kern.maxfilesperproc=$CVMFS_NFILES kern.maxfiles=$MAXFILES_OVERALL > /dev/null
+  # TODO: make the change as a normal user
+  # sysctl -w kern.maxfilesperproc=$CVMFS_NFILES kern.maxfiles=$MAXFILES_OVERALL > /dev/null
 fi
 ulimit -n $CVMFS_NFILES
 add_mount_option "nofiles=$CVMFS_NFILES"
