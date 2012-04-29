@@ -119,6 +119,12 @@ cvmfs_setup()
       echo "Cannot configure fuse!"
       exit 1
     fi
+    
+    # configure sudoers on Mac OS
+    if ! configure_sudoers; then
+      echo "Cannot configure sudoers"
+      exit 1
+    fi
   fi
 
   if [ $noservice -eq 0 ]; then
@@ -646,12 +652,12 @@ add_cvmfs_group()
 {
   case $sys_arch in
     Linux )
-     if ! check_group cvmfs; then
+     if ! check_group "cvmfs"; then
        /usr/sbin/groupadd -r cvmfs
      fi ;;
 
     Darwin )
-      if ! check_group cvmfs; then
+      if ! check_group "cvmfs"; then
         #find un-used group id starting from 10000
         local gid=10000
         while true; do
@@ -694,7 +700,7 @@ add_cvmfs_user()
           uid=$[$uid +1]
         done
 
-	if check_group cvmfs; then
+	if check_group "cvmfs"; then
     gid=$(dscl . read /groups/cvmfs PrimaryGroupID | awk {'print $NF'})
   else
     echo "CVMFS group does not exists."
@@ -875,6 +881,20 @@ configure_autofs()
   esac
 }
 
+configure_sudoers()
+{
+  if [ $sys_arch == 'Darwin' ]; then
+    sudo perl -n -i -e \
+      'print if !/^\%everyone\s+ALL=\(cvmfs:cvmfs\)/; 
+       print "%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/local/bin/cvmfs2\n" if eof;'\
+    /etc/sudoers
+    sudo perl -n -i -e \
+      'print if !/^cvmfs\s+ALL=\(ALL\)/;
+       print "cvmfs ALL=(ALL) NOPASSWD: /usr/sbin/sysctl -w\n" if eof;'\
+    /etc/sudoers
+  fi
+}
+
 check_fuse_config()
 {
   case $sys_arch in
@@ -883,6 +903,8 @@ check_fuse_config()
       return $? ;;
 
     Darwin )
+      # load fuse4x module
+      /Library/Extensions/fuse4x.kext/Support/load_fuse4x
       if [ $(sysctl vfs.generic.fuse4x.tunables.allow_other | awk {'print $NF'}) -eq 1 ]; then
         return 0
       else
@@ -903,6 +925,8 @@ configure_fuse()
       fi ;;
 
     Darwin )
+      #Load fuse4x module
+      /Library/Extensions/fuse4x.kext/Support/load_fuse4x
       if [ $(sysctl vfs.generic.fuse4x.tunables.allow_other | awk {'print $NF'}) -eq 0 ] ; then
         sysctl -w vfs.generic.fuse4x.tunables.allow_other=1
       fi ;;
