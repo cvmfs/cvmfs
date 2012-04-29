@@ -607,6 +607,7 @@ bool ManagedExec(const vector<string> &command_line,
                  const vector<int> &preserve_fildes)
 {
   assert(command_line.size() >= 1);
+  
   int pipe_fork[2];
   MakePipe(pipe_fork);
   pid_t pid = fork();
@@ -628,13 +629,15 @@ bool ManagedExec(const vector<string> &command_line,
       goto fork_failure;
     }
     for (int fd = 0; fd < max_fd; fd++) {
+      bool close_fd = true;
       for (unsigned i = 0; i < preserve_fildes.size(); ++i) {
-        if (fd == preserve_fildes[i])
-          continue;
+        if (fd == preserve_fildes[i]) {
+          close_fd = false;
+          break;
+        }
       }
-      if (fd != pipe_fork[1]) {
+      if (close_fd && (fd != pipe_fork[1]))
         close(fd);
-      }
     }
     
     // Double fork to disconnect from parent
@@ -657,7 +660,7 @@ bool ManagedExec(const vector<string> &command_line,
     
     failed = 'E';
     
-  fork_failure:
+   fork_failure:
     write(pipe_fork[1], &failed, 1);
     _exit(1);
   }
@@ -671,5 +674,6 @@ bool ManagedExec(const vector<string> &command_line,
     return false;
   }
   close(pipe_fork[0]);
+  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
   return true;
 }

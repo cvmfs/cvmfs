@@ -908,7 +908,6 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   preserve_filedes.push_back(0);
   preserve_filedes.push_back(1);
   preserve_filedes.push_back(2);
-  preserve_filedes.push_back(2);
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(pipe_handshake[0]);
    
