@@ -992,11 +992,8 @@ int MainCacheManager(int argc, char **argv) {
   if (logfile != "")
     SetLogDebugFile(logfile + ".cachemgr");
   
-  if (!foreground) {
-    retval = daemon(1, 0);
-    assert(retval == 0);
-    LogCvmfs(kLogQuota, kLogDebug, "shared cache manager daemonized");
-  }
+  if (!foreground)
+    Daemonize();
   
   if (!InitDatabase(false))  // TODO: rebuild?
     return 1;
