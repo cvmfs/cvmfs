@@ -97,6 +97,7 @@ int pipe_lru_[2];
 bool shared_;
 bool spawned_;
 map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
+int fd_lock_cachedb_;
 
 uint64_t limit_;  /**< If the cache grows above this size,
                       we clean up until cleanup_threshold. */
@@ -668,13 +669,19 @@ static bool InitDatabase(const bool rebuild_database) {
   string sql;
   sqlite3_stmt *stmt;
   
+  fd_lock_cachedb_ = LockFile(*cache_dir_ + "/lock_cachedb");
+  if (fd_lock_cachedb_ < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to create cachedb lock");
+    return false;
+  }
+  
   bool retry = false;
 init_recover:
-  const string db_file = (*cache_dir_) + "/cvmfscatalog.cache";
+  const string db_file = (*cache_dir_) + "/cachedb";
   int err = sqlite3_open(db_file.c_str(), &db_);
   if (err != SQLITE_OK) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open cache database (%d)", err);
-    return false;
+    goto init_database_fail;
   }
   sql = "PRAGMA synchronous=0; PRAGMA locking_mode=EXCLUSIVE; "
   "PRAGMA auto_vacuum=1; "
@@ -700,7 +707,7 @@ init_recover:
     }
     LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
              sql.c_str());
-    return false;
+    goto init_database_fail;
   }
   
   // If this an old cache catalog,
@@ -714,6 +721,7 @@ init_recover:
     if (err != SQLITE_OK) {
       LogCvmfs(kLogQuota, kLogDebug,
                "could not init cache database (failed: %s)", sql.c_str());
+      UnlockFile(fd_lock_cachedb_);
       return false;
     }
   }
@@ -724,7 +732,7 @@ init_recover:
   if (err != SQLITE_OK) {
     LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
              sql.c_str());
-    return false;
+    goto init_database_fail;
   }
   
   // Set schema version
@@ -734,7 +742,7 @@ init_recover:
   if (err != SQLITE_OK) {
     LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
              sql.c_str());
-    return false;
+    goto init_database_fail;
   }
   
   // Easy way out, no quota restrictions
@@ -753,13 +761,13 @@ init_recover:
       if (!RebuildDatabase()) {
         LogCvmfs(kLogQuota, kLogDebug,
                  "could not build cache database from file system");
-        return false;
+        goto init_database_fail;
       }
     }
   } else {
     LogCvmfs(kLogQuota, kLogDebug, "could not select on cache catalog");
     sqlite3_finalize(stmt);
-    return false;
+    goto init_database_fail;
   }
   sqlite3_finalize(stmt);
   
@@ -771,7 +779,7 @@ init_recover:
   } else {
     LogCvmfs(kLogQuota, kLogDebug, "could not determine cache size");
     sqlite3_finalize(stmt);
-    return false;
+    goto init_database_fail;
   }
   sqlite3_finalize(stmt);
   
@@ -783,7 +791,7 @@ init_recover:
   } else {
     LogCvmfs(kLogQuota, kLogDebug, "could not determine highest seq-no");
     sqlite3_finalize(stmt);
-    return false;
+    goto init_database_fail;
   }
   sqlite3_finalize(stmt);
   
@@ -813,6 +821,11 @@ init_recover:
                      ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) +
                       ";").c_str(), -1, &stmt_list_catalogs_, NULL);
   return true;
+  
+ init_database_fail:
+  UnlockFile(fd_lock_cachedb_);
+  sqlite3_close(db_);
+  return false;
 }
   
 
@@ -827,6 +840,7 @@ static void CloseDatabase() {
   if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
   if (stmt_new_) sqlite3_finalize(stmt_new_);
   if (db_) sqlite3_close(db_);
+  UnlockFile(fd_lock_cachedb_);
   
   stmt_list_catalogs_ = NULL;
   stmt_list_pinned_ = NULL;

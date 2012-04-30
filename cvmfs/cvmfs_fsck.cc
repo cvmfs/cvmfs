@@ -331,7 +331,7 @@ int main(int argc, char **argv) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Temorary file catalogs were found.");
 
   if (atomic_read32(&g_force_rebuild)) {
-    if (unlink("cvmfscatalog.cache") == 0) {
+    if (unlink("cachedb") == 0) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Fix: managed cache db unlinked, will be rebuilt on next mount");
       atomic_inc32(&g_num_err_fixed);
