@@ -1031,9 +1031,9 @@ int MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
   
   MainCommandServer(NULL);
+  unlink(fifo_path.c_str());
   CloseDatabase();
   
-  unlink(fifo_path.c_str());
   monitor::Fini();
   
   return 0;
@@ -1102,7 +1102,7 @@ void Fini() {
   cache_dir_ = NULL;
   
   if (shared_) {
-    // Most of cleanup is done by shared cache manager
+    // Most of cleanup is done elsewhen by shared cache manager
     close(pipe_lru_[1]);
     return;
   }
