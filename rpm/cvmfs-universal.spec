@@ -105,12 +105,12 @@ popd
   fi
   /usr/bin/getent passwd cvmfs >/dev/null
   if [ $? -ne 0 ]; then
-    /usr/sbin/useradd -r -g cvmfs -d /var/cache/cvmfs2 -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+    /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
   fi
 %else 
   /usr/bin/getent passwd cvmfs >/dev/null
   if [ $? -ne 0 ]; then
-     /usr/sbin/useradd -r -d /var/cache/cvmfs2 -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+     /usr/sbin/useradd -r -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
   fi
 
   # The useradd command will add a cvmfs group too - but we're in trouble if
@@ -130,7 +130,7 @@ fi
 rm -rf $RPM_BUILD_ROOT
 
 make DESTDIR=$RPM_BUILD_ROOT install
-mkdir -p $RPM_BUILD_ROOT/var/cache/cvmfs2
+mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 
@@ -221,7 +221,7 @@ fi
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
 %dir /cvmfs
-%attr(700,cvmfs,cvmfs) %dir /var/cache/cvmfs2
+%attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %config %{_sysconfdir}/cvmfs/default.conf 
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %doc COPYING AUTHORS README ChangeLog
