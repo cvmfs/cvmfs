@@ -32,6 +32,7 @@ Requires: sudo
 Requires: psmisc
 Requires: autofs
 Requires: fuse
+Requires: fuse-libs
 Requires: curl
 Requires: attr 
 # Account for different package names
