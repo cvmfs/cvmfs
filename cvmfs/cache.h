@@ -74,7 +74,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   catalog::LoadError LoadCatalog(const PathString &mountpoint,
                                  const hash::Any &hash,
                                  std::string *catalog_path);
-  void UnloadCatalog(const PathString &mountpoint);
+  void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   catalog::Catalog *parent_catalog);
 

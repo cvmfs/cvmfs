@@ -3,6 +3,7 @@
 if [ -f /bin/rpm ]; then
   sudo rpm -e cvmfs-auto-setup || true
   sudo rpm -e cvmfs-init-scripts || true
+  sudo rpm -e cvmfs-replica || true
   sudo rpm -e cvmfs-selinux || true
   sudo rpm -e cvmfs || true
   sudo rpm -e cvmfs-keys || true

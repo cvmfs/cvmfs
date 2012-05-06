@@ -90,7 +90,7 @@ class SqlStatement {
    */
   inline bool Execute() {
     last_error_code_ = sqlite3_step(statement_);
-    return SQLITE_DONE == last_error_code_ || SQLITE_OK == last_error_code_;
+    return Successful();
   }
 
   /**

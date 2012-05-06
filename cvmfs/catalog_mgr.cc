@@ -471,7 +471,7 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
   if (!AttachCatalog(catalog_path, attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
-    UnloadCatalog(attached_catalog->path());
+    UnloadCatalog(attached_catalog);
     return NULL;
   }
 
@@ -529,7 +529,7 @@ void AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
     catalog->parent()->RemoveChild(catalog);
 
   ReleaseInodes(catalog->inode_range());
-  UnloadCatalog(catalog->path());
+  UnloadCatalog(catalog);
 
   // Delete catalog from internal lists
   CatalogList::iterator i;

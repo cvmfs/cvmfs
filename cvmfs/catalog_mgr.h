@@ -88,6 +88,7 @@ class AbstractCatalogManager {
 
   virtual bool Init();
   LoadError Remount(const bool dry_run);
+  void DetachAll() { DetachSubtree(GetRootCatalog()); }
 
   bool LookupInode(const inode_t inode, const LookupOptions options,
                    DirectoryEntry *entry);
@@ -138,7 +139,7 @@ class AbstractCatalogManager {
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const hash::Any &hash,
                                 std::string *catalog_path) = 0;
-  virtual void UnloadCatalog(const PathString &mountpoint) { }
+  virtual void UnloadCatalog(const Catalog *catalog) { };
 
   /**
    * Create a new Catalog object.
@@ -160,7 +161,6 @@ class AbstractCatalogManager {
   bool AttachCatalog(const std::string &db_path, Catalog *new_catalog);
   void DetachCatalog(Catalog *catalog);
   void DetachSubtree(Catalog *catalog);
-  inline void DetachAll() { DetachSubtree(GetRootCatalog()); }
   bool IsAttached(const PathString &root_path,
                   Catalog **attached_catalog) const;
 

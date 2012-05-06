@@ -32,6 +32,7 @@
 #include "util.h"
 #include "logging.h"
 #include "monitor.h"
+#include "download.h"
 
 using namespace std;  // NOLINT
 
@@ -42,6 +43,7 @@ static void Usage() {
     "Usage (normally called from cvmfs_server):\n"
     "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
     "             -t <temporary storage> -b <base hash> -r <upstream storage>\n"
+    "             -w <stratum 0 base url>\n"
     "             -n(new, requires only -t and -u)\n"
     "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n"
     "             [EXPERIMENTAL: -n new -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n"
@@ -60,15 +62,9 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
 		return false;
 	}
 
-	// set defaults
-	params->print_changeset = false;
-	params->dry_run = false;
-	params->mucatalogs = false;
-  params->process_locally = false;
-
 	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "u:s:c:t:b:r:pdmnx:y:z")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:t:b:r:w:pdmnx:y:z")) != -1) {
 		switch (c) {
       // Directories
       case 'u':
@@ -94,6 +90,9 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
           Usage();
           return false;
         }
+        break;
+      case 'w':
+        params->stratum0 = optarg;
         break;
       case 'x':
         params->paths_out = optarg;
@@ -144,6 +143,10 @@ bool CheckParams(SyncParameters *p) {
       PrintError("cvmfs read/only repository does not exist");
       return false;
     }
+    if (p->stratum0 == "") {
+      PrintError("Stratum0 url missing");
+      return false;
+    }
   }
   
   if (!p->forklift) {
@@ -177,10 +180,10 @@ int main(int argc, char **argv) {
 	// Initialization
 	if (!ParseParams(argc, argv, &params)) return 1;
 	if (!CheckParams(&params)) return 2;
-  
+   
   if (params.new_repository) {
     bool retval = 
-      catalog::WritableCatalogManager::CreateRepository(params.dir_temp, 
+      catalog::WritableCatalogManager::CreateRepository(params.dir_temp,
                                                         *params.forklift);
     if (!retval) {
       PrintError("Failed to create new repository");
@@ -190,10 +193,11 @@ int main(int argc, char **argv) {
   }
   
   monitor::Spawn();
+  download::Init(1);
   
   catalog::WritableCatalogManager 
     catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
-                    params.dir_temp);
+                    params.stratum0, params.dir_temp, params.forklift);
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
                               params.dir_scratch);
@@ -202,7 +206,8 @@ int main(int argc, char **argv) {
     PrintError("something went wrong during sync");
     return 4;
   }
-
+  
+  download::Fini();
   monitor::Fini();
 
 	return 0;

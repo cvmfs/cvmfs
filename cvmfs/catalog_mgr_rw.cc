@@ -23,14 +23,15 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-const string WritableCatalogManager::kCatalogFilename = ".cvmfscatalog.working";
-
-
 WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
-                                               const string &dir_temp) :
-  base_hash_(base_hash),
-  dir_temp_(dir_temp)
+                                               const std::string &stratum0,
+                                               const string &dir_temp,
+                                               const upload::Forklift *forklift)
 {
+  base_hash_ = base_hash;
+  stratum0_ = stratum0;
+  dir_temp_ = dir_temp;
+  forklift_ = forklift;
   Init();
 }
 
@@ -43,8 +44,6 @@ WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
 bool WritableCatalogManager::Init() {
   bool succeeded = AbstractCatalogManager::Init();
 
-  // If the abstract initialization fails, we have a fresh repository here
-  // create a root catalog
   if (!succeeded) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "unable to init catalog manager (cannot create root catalog)");
@@ -56,10 +55,7 @@ bool WritableCatalogManager::Init() {
 
 
 /**
- * 'Loads' a catalog. Actually the WritableCatalogManager assumes
- * that it runs in an environment where all catalog files are already
- * accessible.  Therefore it does not actually load the catalog.
- * TODO: Load from HTTP
+ * Loads a catalog via HTTP from Statum 0 into a temporary file.
  * @param url_path the url of the catalog to load
  * @param mount_point the file system path where the catalog should be mounted
  * @param catalog_file a pointer to the string containing the full qualified
@@ -70,16 +66,19 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
                                               const hash::Any &hash,
                                               std::string *catalog_path)
 {
-  LogCvmfs(kLogCatalog, kLogStdout, "MOUNTPOINT: %s", mountpoint.c_str());
-  LogCvmfs(kLogCatalog, kLogStdout, "HASH: %s", hash.ToString().c_str());
-  *catalog_path = GetCatalogPath(mountpoint.ToString());
-
-  // Check if the file exists
-  // if not, the 'loading' fails
-  if (!FileExists(*catalog_path)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
-             "failed to load catalog file: catalog file '%s' not found",
-             catalog_path->c_str());
+  hash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
+  const string url = stratum0_ + "/data" + effective_hash.MakePath(1, 2) + "C";
+  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", 
+                                  catalog_path);
+  download::JobInfo download_catalog(&url, true, false, fcatalog, 
+                                     &effective_hash);
+  
+  download::Failures retval = download::Fetch(&download_catalog);
+  fclose(fcatalog);
+  
+  if (retval != download::kFailOk) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to load %s from Stratum 0 (%d)", url.c_str(), retval);
     return kLoadFail;
   }
 
@@ -427,12 +426,13 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
 
 
 /**
- * Create a new nested catalog.  Involves to creating a new catalog and moveing
- * all entries belonging there from it's parent catalog.
+ * Create a new nested catalog.  Includes moving all entries belonging there 
+ * from it's parent catalog.
  * @param mountpoint the path of the directory to become a nested root
  * @return true on success, false otherwise
  */
-bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) {
+bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
+{
   const string nested_root_path = MakeRelativePath(mountpoint);
 
   // Find the catalog currently containing the directory structure, which
@@ -454,7 +454,8 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   // Create the database schema and the inital root entry
   // for the new nested catalog
   const string root_parent_path = GetParentPath(nested_root_path);
-  const string database_file_path = GetCatalogPath(nested_root_path);
+  const string database_file_path = CreateTempPath(dir_temp_ + "/catalog", 
+                                                   0666);
   const bool new_repository = false;
   if (!WritableCatalog::CreateDatabase(database_file_path, new_root_entry,
                                        root_parent_path, new_repository))
@@ -465,13 +466,13 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
   }
 
   // Attach the just created nested catalog
-  Catalog *new_catalog =
-    MountCatalog(PathString(nested_root_path.data(), nested_root_path.length()),
-                 hash::Any(), old_catalog);
-  if (!new_catalog) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': "
+  Catalog *new_catalog = 
+    CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()), 
+                  old_catalog);
+  if (!AttachCatalog(database_file_path, new_catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
              "unable to attach newly created nested catalog",
-             nested_root_path.c_str());
+             mountpoint.c_str());
     return false;
   }
 
@@ -527,26 +528,24 @@ bool WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
 
   // Check if the found catalog is really the nested catalog to be deleted
   assert(!nested_catalog->IsRoot() &&
-         (nested_catalog->path().ToString() != nested_root_path));
+         (nested_catalog->path().ToString() == nested_root_path));
 
   // Merge all data from the nested catalog into it's parent
   if (!nested_catalog->MergeIntoParent()) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog '%s': "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to remove nested catalog '%s': "
              "merging of content unsuccessful.",
              nested_catalog->path().c_str());
     return false;
   }
 
   // Remove the catalog from internal data structures
-  const string database_file =
-    GetCatalogPath(nested_catalog->path().ToString());
   DetachCatalog(nested_catalog);
 
   // Delete the catalog database file from the working copy
-  if (unlink(database_file.c_str()) != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+  if (unlink(nested_catalog->database_path().c_str()) != 0) {
+    LogCvmfs(kLogCatalog, kLogStderr,
              "unable to delete the removed nested catalog database file '%s'",
-             database_file.c_str());
+             nested_catalog->database_path().c_str());
     return false;
   }
 
@@ -569,7 +568,24 @@ bool WritableCatalogManager::Commit() {
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
   {
     (*i)->Commit();
-    SnapshotCatalog(*i);
+    hash::Any hash = SnapshotCatalog(*i);
+    if ((*i)->IsRoot()) {
+      base_hash_ = hash;
+      // .cvmfspublished
+      LogCvmfs(kLogCatalog, kLogStdout, "Committing repository manifest");
+      Manifest manifest(hash, "");
+      manifest.set_ttl((*i)->GetTTL());
+      manifest.set_revision((*i)->GetRevision());
+      if (!manifest.Export(dir_temp_ + "/manifest")) {
+        PrintError("failed to write manifest");
+        return false;
+      }
+      if (!forklift_->Move(dir_temp_ + "/manifest", "/.cvmfspublished")) {
+        PrintError("failed to commit manifest");
+        unlink((dir_temp_ + "/manifest").c_str());
+        return false;
+      }
+    }
   }
 
   return true;
@@ -608,164 +624,67 @@ int WritableCatalogManager::GetModifiedCatalogsRecursively(
   return dirty_catalogs;
 }
 
-bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
-
-  // TODO: this method needs a revision!!
-  //       I (René) don't understand all bits and pieces of this stuff
-  //       and just adapted it to work in this environment.
-  //       It might be useful if a WritableCatalog is capable of doing
-  //       most of the stuff going on here. Especially the parent-
-  //       catalog bookkeeping.
-
-  // TODO: We are creating a variety of files here, which are probably
-  //       read somewhere else in the client. It seems important to me,
-  //       to aggregate the knowledge of this file intrinsics in one place!
-
-  // TODO: The mechanics around the data store might also be a candidate for
-  //       refactoring... the knowledge about on disk handling of catalogs
-  //       does definitely not belong in this class structure!
-
+  
+/**
+ * Makes a new catalog revision.  Compresses and uploads catalog.  Returns
+ * content hash.
+ */
+hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) 
+  const 
+{
   LogCvmfs(kLogCvmfs, kLogStdout, "creating snapshot of catalog '%s'",
            catalog->path().c_str());
-
-	const string clg_path = catalog->path().ToString();
-	const string cat_path = (clg_path.empty()) ?
-	                            "TODO - CATALOG DIRECTORY" :
-                              "TODO - CATALOG DIRECTORY" + clg_path;
-
-	/* Data symlink, whitelist symlink */
-	string backlink = "../";
-	string parent = GetParentPath(cat_path);
-	while (parent != GetParentPath("TODO - DATA DIRECTORY")) {
-		if (parent == "") {
-			PrintWarning("cannot find data dir");
-			break;
-		}
-		parent = GetParentPath(parent);
-		backlink += "../";
-	}
-
-	const string lnk_path_data = cat_path + "/data";
-	const string lnk_path_whitelist = cat_path + "/.cvmfswhitelist";
-	const string backlink_data = backlink + GetFileName("TODO - DATA DIRECTORY");
-	const string backlink_whitelist = backlink + GetFileName("TODO - CATALOG DIRECTORY") + "/.cvmfswhitelist";
-
-	platform_stat64 info;
-	if (platform_lstat(lnk_path_data.c_str(), &info) != 0)
-	{
-		if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
-			PrintWarning("cannot create catalog store -> data store symlink");
-		}
-	}
-
-	/* Don't make the symlink for the root catalog */
-	if ((platform_lstat(lnk_path_whitelist.c_str(), &info) != 0) && (GetParentPath(cat_path) != GetParentPath("TODO - DATA DIRECTORY")))
-	{
-		if (symlink(backlink_whitelist.c_str(), lnk_path_whitelist.c_str()) != 0) {
-			PrintWarning("cannot create whitelist symlink");
-		}
-	}
-
-	if (!catalog->UpdateLastModified()) {
-		PrintWarning("failed to update last modified time stamp");
+  
+  if (!catalog->UpdateLastModified()) {
+		PrintError("failed to update last modified time stamp");
+    return hash::Any();
 	}
 	if (!catalog->IncrementRevision()) {
-		PrintWarning("failed to increase revision");
+		PrintError("failed to increase revision");
+    return hash::Any();
 	}
 
-	/* Previous revision */
-	map<char, string> ext_chksum;
-	if (ParseKeyvalPath(cat_path + "/.cvmfspublished", &ext_chksum)) {
-		map<char, string>::const_iterator i = ext_chksum.find('C');
-		if (i != ext_chksum.end()) {
-			hash::Any sha1_previous(hash::kSha1, hash::HexPtr(i->second));
+	// Previous revision
+  if (catalog->IsRoot()) {
+    catalog->SetPreviousRevision(base_hash_);
+  } else {
+    hash::Any hash_previous;
+    catalog->parent()->FindNested(catalog->path(), &hash_previous);
+    catalog->SetPreviousRevision(hash_previous);
+  }
 
-			if (!catalog->SetPreviousRevision(sha1_previous)) {
-				PrintWarning("failed store previous catalog revision " +
-                     sha1_previous.ToString());
-			}
-		} else {
-			PrintWarning("failed to find catalog SHA1 key in .cvmfspublished");
-		}
+	// Compress catalog
+  hash::Any hash_catalog(hash::kSha1);
+  if (!zlib::CompressPath2Path(catalog->database_path(), 
+                               catalog->database_path() + ".compressed",
+                               &hash_catalog))
+  {
+		PrintError("could not compress catalog " + catalog->path().ToString());
+    return hash::Any();
 	}
-
-	/* Compress catalog */
-	const string src_path = cat_path + "/.cvmfscatalog.working";
-	const string dst_path = "TODO - DATA DIRECTORY/txn/compressing.catalog";
-	//const string dst_path = cat_path + "/.cvmfscatalog";
-	hash::Any sha1(hash::kSha1);
-	FILE *fsrc = NULL, *fdst = NULL;
-	int fd_dst;
-
-	if ( !(fsrc = fopen(src_path.c_str(), "r")) ||
-	     (fd_dst = open(dst_path.c_str(), O_CREAT | O_TRUNC | O_RDWR, kDefaultFileMode)) < 0 ||
-	     !(fdst = fdopen(fd_dst, "w")) ||
-       !zlib::CompressFile2File(fsrc, fdst, &sha1) )
-	{
-		PrintWarning("could not compress catalog '" + src_path + "'");
-
-	} else {
-		const string sha1str = sha1.ToString();
-		const string hash_name = sha1str.substr(0, 2) + "/" + sha1str.substr(2) + "C";
-		const string cache_path = "TODO - DATA DIRECTORY/" + hash_name;
-		if (rename(dst_path.c_str(), cache_path.c_str()) != 0) {
-			PrintWarning("could not store catalog in data store as " + cache_path);
-		}
-	}
-	if (fsrc) fclose(fsrc);
-	if (fdst) fclose(fdst);
-
-	/* Create extended checksum */
-	FILE *fpublished = fopen((cat_path + "/.cvmfspublished").c_str(), "w");
-	if (fpublished) {
-		string fields = "C" + sha1.ToString() + "\n";
-		fields += "R" + hash::Md5(hash::AsciiPtr(clg_path)).ToString() + "\n";
-
-		/* Extra fields */
-		DirectoryEntry d;
-		if (not catalog->LookupPath(catalog->path(), &d)) {
-			PrintWarning("failed to find root entry");
-		}
-		fields += "L" + d.checksum().ToString() + "\n";
-		fields += "D" + StringifyInt(catalog->GetTTL()) + "\n";
-		fields += "S" + StringifyInt(catalog->GetRevision()) + "\n";
-
-		if (fwrite(&(fields[0]), 1, fields.length(), fpublished) != fields.length()) {
-			PrintWarning("failed to write extended checksum");
-		}
-		fclose(fpublished);
-
-	} else {
-		PrintWarning("failed to write extended checksum");
-	}
-
+  
+  // Upload catalog
+  if (!forklift_->Move(catalog->database_path() + ".compressed",
+                       "/data" + hash_catalog.MakePath(1, 2) + "C"))
+  {
+    PrintError("could not commit catalog " + catalog->path().ToString());
+    unlink((catalog->database_path() + ".compressed").c_str());
+    return hash::Any();
+  }
+  
 	/* Update registered catalog SHA1 in nested catalog */
-	// TODO: revision hint
-	//       this might be done implicitly when snapshoting a nested catalog
-	//       Catalogs know about their parent catalog!
-	if (not catalog->IsRoot()) {
+	if (!catalog->IsRoot()) {
 		LogCvmfs(kLogCvmfs, kLogStdout, "updating nested catalog link");
-
-		// TODO: this is fishy! but I leave it this way for the moment
-		//       (dynamic_cast<> at least dies, if something goes wrong)
-		if (not dynamic_cast<WritableCatalog*>(catalog->parent())->UpdateNestedCatalog(clg_path, sha1)) {
-			PrintWarning("failed to register modified catalog at " + clg_path +
-                   " in parent catalog");
+    WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());
+		if (!parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog)) 
+    {
+			PrintError("failed to register modified catalog at " + 
+                 catalog->path().ToString() + " in parent catalog");
+      return hash::Any();
 		}
 	}
 
-	/* Compress and write SHA1 checksum */
-	char chksum[40];
-	int lchksum = 40;
-	memcpy(chksum, &((sha1.ToString())[0]), 40);
-	void *compr_buf = NULL;
-	int64_t compr_size;
-	if (!zlib::CompressMem2Mem(chksum, lchksum, &compr_buf, &compr_size)) {
-		PrintWarning("could not compress catalog checksum");
-	}
-	if (compr_buf) free(compr_buf);
-
-  return true;
+  return hash_catalog;
 }
 
 }

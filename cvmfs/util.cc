@@ -358,6 +358,19 @@ FILE *CreateTempFile(const string &path_prefix, const int mode,
 }
 
 
+/**
+ * Create the file but don't open.  Use only in non-public tmp directories.
+ */
+string CreateTempPath(const std::string &path_prefix, const int mode) {
+  string result;
+  FILE *f = CreateTempFile(path_prefix, mode, "w", &result);
+  if (!f)
+    return "";
+  fclose(f);
+  return result;
+}
+
+
 string StringifyInt(const int64_t value) {
   char buffer[48];
   snprintf(buffer, sizeof(buffer), "%"PRId64, value);

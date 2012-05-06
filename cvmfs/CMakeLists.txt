@@ -42,7 +42,7 @@ set (CVMFS_FSCK_SOURCES
   cvmfs_fsck.cc)
 
 set (CVMFS_SYNC_BIN_SOURCES
-	smalloc.h
+	smalloc.h atomic.h
   globals.h globals.cc
 	duplex_zlib.h compression.h compression.cc
   hash.h hash.cc
@@ -50,21 +50,22 @@ set (CVMFS_SYNC_BIN_SOURCES
 	util.cc util.h
 	logging.cc logging.h logging_internal.h
 	monitor.cc monitor.h
-	cvmfs_sync.h cvmfs_sync.cc
 	fs_traversal.h
 	sync_item.h sync_item.cc
 	sync_union.h sync_union.cc
 	sync_mediator.h sync_mediator.cc
+  duplex_curl.h download.h download.cc
   upload.h upload.cc
   manifest.h manifest.cc
 
-	catalog_queries.h catalog_queries.cc
+  dirent.h
+  catalog_queries.h catalog_queries.cc
 	catalog.h catalog.cc
 	catalog_rw.h catalog_rw.cc
 	catalog_mgr.h catalog_mgr.cc
 	catalog_mgr_rw.h catalog_mgr_rw.cc
 
-	dirent.h)
+  cvmfs_sync.h cvmfs_sync.cc)
 
 #set (CVMFS_LSCAT_SOURCES
 #	smalloc.h
@@ -259,6 +260,7 @@ if (BUILD_SERVER)
 	add_executable (cvmfs_sync		${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE})
 
 	if (LIBCURL_BUILTIN)
+    add_dependencies (cvmfs_sync libcares libcurl)
     add_dependencies (cvmfs_sign libcares libcurl)
 		#add_dependencies (cvmfs_pull libcares libcurl)
 	endif (LIBCURL_BUILTIN)
@@ -291,7 +293,7 @@ if (BUILD_SERVER)
 #	target_link_libraries (cvmfs_scrub		${CVMFS_SCRUB_LIBS} ${OPENSSL_LIBRARIES})
 	target_link_libraries (cvmfs_sign		${CVMFS_SIGN_LIBS} ${CURL_LIBRARIES} ${RT_LIBRARY} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
 	target_link_libraries (cvmfs_zpipe		${CVMFS_ZPIPE_LIBS} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE})
-	target_link_libraries (cvmfs_sync	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SQLITE3_ARCHIVE} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
+	target_link_libraries (cvmfs_sync	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}  ${RT_LIBRARY} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
 endif (BUILD_SERVER)
 
 #

@@ -36,7 +36,9 @@ namespace catalog {
 class WritableCatalogManager : public AbstractCatalogManager {
  public:
   WritableCatalogManager(const hash::Any &base_hash,
-                         const std::string &dir_temp);
+                         const std::string &stratum0,
+                         const std::string &dir_temp,
+                         const upload::Forklift *forklift);
   static bool CreateRepository(const std::string &dir_temp, 
                                const upload::Forklift &forklift);
 
@@ -81,18 +83,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
   Catalog* CreateCatalog(const PathString &mountpoint, Catalog *parent_catalog);
 
  private:
-  /**
-   * Creates a fully qualified catalog path which can be loaded and attached
-   * afterwards.
-   * @param url_path the absolute path of the directory for which a catalog
-   *                 name should be obtained
-   * @return the name of the catalog file to load
-   */
-  std::string GetCatalogPath(const std::string &url_path) const {
-    return (url_path.empty()) ?
-      "TODO - CATALOG DIRECTORY/" + kCatalogFilename :
-      "TODO - CATALOG DIRECTORY" + url_path + "/" + kCatalogFilename;
-  }
   bool FindCatalog(const std::string &path, WritableCatalog **result);
 
   /**
@@ -118,20 +108,16 @@ class WritableCatalogManager : public AbstractCatalogManager {
   int GetModifiedCatalogsRecursively(const Catalog *catalog,
                                      WritableCatalogList *result) const;
 
-  /**
-   * TODO!!
-   * This method is basically the same function used before the last major
-   * refactoring. I (René) have no idea about the bits and pieces it does
-   * This should definitely be revised.
-   */
-  bool SnapshotCatalog(WritableCatalog *catalog) const;
+  hash::Any SnapshotCatalog(WritableCatalog *catalog) const;
 
  private:
   // defined in catalog_mgr_rw.cc
   const static std::string kCatalogFilename;
 
   hash::Any base_hash_;
+  std::string stratum0_;
   std::string dir_temp_;
+  const upload::Forklift *forklift_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

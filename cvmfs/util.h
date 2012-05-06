@@ -45,6 +45,7 @@ bool MkdirDeep(const std::string &path, const mode_t mode);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
+std::string CreateTempPath(const std::string &path_prefix, const int mode);
 int LockFile(const std::string &path);
 void UnlockFile(const int filedes);
 

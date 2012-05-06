@@ -185,6 +185,7 @@ void WritableCatalog::Commit() {
   SqlStatement commit(database(), "COMMIT;");
   bool retval = commit.Execute();
   assert(retval == true);
+  dirty_ = false;
 }
 
 
@@ -598,7 +599,7 @@ bool WritableCatalog::MergeIntoParent() {
 
   // Copy all DirectoryEntries to the parent catalog
   if (!CopyToParent()) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to copy directory entries from "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to copy directory entries from "
              "'%s' to parent '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
@@ -606,7 +607,7 @@ bool WritableCatalog::MergeIntoParent() {
 
   // Copy the nested catalog references
   if (!CopyCatalogsToParent()) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to merge nested catalog references"
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to merge nested catalog references"
              " from '%s' to parent '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
@@ -615,7 +616,7 @@ bool WritableCatalog::MergeIntoParent() {
   // Remove the nested catalog reference for this nested catalog.
   // From now on this catalog will be dangling!
   if (!parent->RemoveNestedCatalog(this->path().ToString(), NULL)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog reference"
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to remove nested catalog reference"
              "'%s', in parent catalog '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
@@ -667,7 +668,7 @@ bool WritableCatalog::CopyToParent() {
 
   SqlStatement sql_update_link_ids(database(), update_link_ids);
   if (!sql_update_link_ids.Execute()) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "failed to harmonize the hardlink group IDs in '%s'",
              this->path().c_str());
     return false;
@@ -676,7 +677,7 @@ bool WritableCatalog::CopyToParent() {
   // Remove the nested catalog mount point.
   // It will be replaced with the nested catalog root entry when copying.
   if (!parent->RemoveEntry(this->path().ToString())) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "failed to remove mount point '%s' of nested catalog to be merged",
              this->path().c_str());
     return false;
@@ -684,10 +685,11 @@ bool WritableCatalog::CopyToParent() {
 
   // Now copy all DirectoryEntries to the 'other' catalog.
   // There will be no data collisions, as we resolved them beforehand
+  // TODO
   if (!SqlStatement(database(), "ATTACH '" + parent->database_path() +
                     "' AS other;").Execute())
   {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "failed to attach database of catalog '%s' in catalog '%s'",
              parent->path().c_str(), this->path().c_str());
     return false;
@@ -695,13 +697,13 @@ bool WritableCatalog::CopyToParent() {
   if (!SqlStatement(database(), "INSERT INTO other.catalog "
                     "SELECT * FROM main.catalog;").Execute())
   {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to copy DirectoryEntries from "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to copy DirectoryEntries from "
              "catalog '%s' to catalog '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
   }
   if (!SqlStatement(database(), "DETACH other;").Execute()) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "failed to detach database of catalog '%s' from catalog '%s'",
              parent->path().c_str(), this->path().c_str());
     return false;
@@ -711,7 +713,7 @@ bool WritableCatalog::CopyToParent() {
   // (the nested catalog is merged into it's parent)
   DirectoryEntry old_root_entry;
   if (!parent->LookupPath(this->path(), &old_root_entry)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "root entry of removed nested catalog '%s'"
+    LogCvmfs(kLogCatalog, kLogStderr, "root entry of removed nested catalog '%s'"
              " not found in parent catalog '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
@@ -723,7 +725,7 @@ bool WritableCatalog::CopyToParent() {
   // Remove the nested catalog root mark
   old_root_entry.set_is_nested_catalog_root(false);
   if (!parent->UpdateEntry(old_root_entry, this->path().ToString())) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "unable to remove the 'nested catalog root' mark from '%s'",
              this->path().c_str());
     return false;

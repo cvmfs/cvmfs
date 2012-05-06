@@ -33,6 +33,8 @@ class Manifest {
   std::string ExportString() const;
   bool Export(const std::string &path) const;
   
+  void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
+  void set_revision(const uint64_t revision) { revision_ = revision; }
   void set_certificate(const hash::Any &certificate) { 
     certificate_ = certificate;
   }

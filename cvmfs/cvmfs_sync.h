@@ -9,13 +9,21 @@
 #include "upload.h"
 
 struct SyncParameters {
-  SyncParameters() { forklift = NULL; }
+  SyncParameters() { 
+    forklift = NULL; 
+    print_changeset = false;
+    dry_run = false;
+    mucatalogs = false;
+    process_locally = false;
+    new_repository = false;
+  }
   
 	std::string dir_union;
   std::string dir_scratch;
 	std::string dir_rdonly;
   std::string dir_temp;
   std::string base_hash;
+  std::string stratum0;
   std::string paths_out;
   std::string hashes_in;
   upload::Forklift *forklift;

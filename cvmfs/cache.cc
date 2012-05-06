@@ -963,11 +963,12 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
 }
 
 
-void CatalogManager::UnloadCatalog(const PathString &mountpoint) {
-  LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s", mountpoint.c_str());
+void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
+  LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s", 
+           catalog->path().c_str());
 
   map<PathString, hash::Any>::iterator iter =
-    mounted_catalogs_.find(mountpoint);
+    mounted_catalogs_.find(catalog->path());
   assert(iter != mounted_catalogs_.end());
 
   quota::Unpin(iter->second);

@@ -100,6 +100,7 @@ class Catalog {
   inline uint64_t max_row_id() const { return max_row_id_; }
   inline InodeRange inode_range() const { return inode_range_; }
   inline void set_inode_range(const InodeRange value) { inode_range_ = value; }
+  inline std::string database_path() const { return database_path_; }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && (max_row_id_ > 0);
@@ -133,7 +134,6 @@ class Catalog {
   Catalog* FindChild(const PathString &mountpoint) const;
 
   inline sqlite3* database() const { return database_; }
-  inline std::string database_path() const { return database_path_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
  private:

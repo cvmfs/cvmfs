@@ -101,10 +101,9 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
           fclose(file_compressed);
           fclose(file_source);
 
-          const string path_dest = "TODO - DATA DIRECTORY/" +
-          hash.MakePath(1, 2);
-          retval = rename(path_compressed.c_str(), path_dest.c_str());
-          assert(retval == 0);
+          const string path_dest = "/data" + hash.MakePath(1, 2);
+          retval = params->forklift->Move(path_compressed, path_dest);
+          assert(retval);
           string to_pipe = "0";
           to_pipe.push_back('\0');
           to_pipe.append(path);
@@ -144,7 +143,6 @@ void SyncMediator::Add(SyncItem &entry) {
 	}
 
 	else if (entry.IsRegularFile() || entry.IsSymlink()) {
-
 		// create a nested catalog if we find a NEW request file
 		if (entry.IsCatalogMarker() && entry.IsNew()) {
 			CreateNestedCatalog(entry);
