@@ -59,6 +59,8 @@ class Catalog {
   friend class AbstractCatalogManager;
   friend class LookupSqlStatement;  // for mangled inode
  public:
+  static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
+  
   Catalog(const PathString &path, Catalog *parent);
   virtual ~Catalog();
 
@@ -135,7 +137,6 @@ class Catalog {
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
  private:
-  static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
   typedef std::map<int, inode_t> HardlinkGroupMap;
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 

@@ -55,6 +55,8 @@ set (CVMFS_SYNC_BIN_SOURCES
 	sync_item.h sync_item.cc
 	sync_union.h sync_union.cc
 	sync_mediator.h sync_mediator.cc
+  upload.h upload.cc
+  manifest.h manifest.cc
 
 	catalog_queries.h catalog_queries.cc
 	catalog.h catalog.cc

@@ -12,6 +12,10 @@
  * and the WritableCatalogManager may (and will) be screwed.  This is not an
  * issue in the current implementation, as they are not used in the synching
  * process.  Just keep in mind.
+ *
+ * The WritableCatalogManager starts with a base repository (given by the
+ * root hash), and downloads and uncompresses all required catalogs into
+ * temporary storage.
  */
 
 #ifndef CVMFS_CATALOG_MGR_RW_H_
@@ -23,12 +27,18 @@
 #include "catalog_rw.h"
 #include "catalog_mgr.h"
 
+namespace upload {
+class Forklift;
+}
+
 namespace catalog {
 
 class WritableCatalogManager : public AbstractCatalogManager {
  public:
-  WritableCatalogManager(const std::string catalog_directory,
-                         const std::string data_directory);
+  WritableCatalogManager(const hash::Any &base_hash,
+                         const std::string &dir_temp);
+  static bool CreateRepository(const std::string &dir_temp, 
+                               const upload::Forklift &forklift);
 
   bool Init();
 
@@ -80,8 +90,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
    */
   std::string GetCatalogPath(const std::string &url_path) const {
     return (url_path.empty()) ?
-      catalog_directory_ + "/" + kCatalogFilename :
-      catalog_directory_ + url_path + "/" + kCatalogFilename;
+      "TODO - CATALOG DIRECTORY/" + kCatalogFilename :
+      "TODO - CATALOG DIRECTORY" + url_path + "/" + kCatalogFilename;
   }
   bool FindCatalog(const std::string &path, WritableCatalog **result);
 
@@ -91,7 +101,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
    * @param relativePath the path to be mangled
    * @return the mangled path
    */
-  bool CreateRepository();
 	inline std::string MakeRelativePath(const std::string &relative_path) const {
     return (relative_path == "") ? "" : "/" + relative_path;
   }
@@ -121,8 +130,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
   // defined in catalog_mgr_rw.cc
   const static std::string kCatalogFilename;
 
-  std::string catalog_directory_;
- 	std::string data_directory_;
+  hash::Any base_hash_;
+  std::string dir_temp_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

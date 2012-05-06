@@ -87,7 +87,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
         if (c == '\n') {
           string path_compressed;
           FILE *file_compressed =
-          CreateTempFile(params_->dir_data + "/txn/compressing",
+          CreateTempFile(params_->dir_temp + "/compressing",
                          kDefaultFileMode, "w", &path_compressed);
           assert(file_compressed);
 
@@ -101,7 +101,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
           fclose(file_compressed);
           fclose(file_source);
 
-          const string path_dest = params_->dir_data + "/" +
+          const string path_dest = "TODO - DATA DIRECTORY/" +
           hash.MakePath(1, 2);
           retval = rename(path_compressed.c_str(), path_dest.c_str());
           assert(retval == 0);
@@ -304,7 +304,7 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
 
 	bool result = false;
 	/* Create temporary file */
-	const string templ = params_->dir_data + "/txn/compressing.XXXXXX";
+	const string templ = params_->dir_temp + "/compressing.XXXXXX";
 	char *tmp_path = (char *)smalloc(templ.length() + 1);
 	strncpy(tmp_path, templ.c_str(), templ.length() + 1);
 	int fd_dst = mkstemp(tmp_path);
@@ -317,7 +317,7 @@ bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix
          zlib::CompressFile2File(fsrc, fdst, &hash) )
 		{
 			const string sha1str = hash.ToString();
-			const string cache_path = params_->dir_data + "/" + sha1str.substr(0, 2) + "/" +
+			const string cache_path = "TODO - DATA DIRECTORY/" + sha1str.substr(0, 2) + "/" +
 			sha1str.substr(2) + suffix;
 			fflush(fdst);
 			if (rename(tmp_path, cache_path.c_str()) == 0) {

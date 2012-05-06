@@ -41,9 +41,13 @@ static void Usage() {
     "Version %s\n"
     "Usage (normally called from cvmfs_server):\n"
     "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
-    "             -r <repository store>\n"
+    "             -t <temporary storage> -b <base hash> -r <upstream storage>\n"
+    "             -n(new, requires only -t and -u)\n"
     "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n"
-    "             [EXPERIMENTAL: -n new -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n",
+    "             [EXPERIMENTAL: -n new -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n"
+    "  Upstream storage might be:\n"
+    "    local:<local path>\n"
+    "    pipe:<pipe for the cvmfs distributed backend>\n\n",       
     VERSION);
 }
 
@@ -64,7 +68,7 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
 
 	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "u:s:c:r:pdmnx:y:z")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:t:b:r:pdmnx:y:z")) != -1) {
 		switch (c) {
       // Directories
       case 'u':
@@ -76,12 +80,21 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
       case 'c':
         params->dir_rdonly = MakeCanonicalPath(optarg);
         break;
-      case 'r': {
+      case 't': {
         const string path = MakeCanonicalPath(optarg);
-        params->dir_data = path + "/data";
-        params->dir_catalogs = path + "/catalogs";
+        params->dir_temp = path;
         break;
       }
+      case 'b':
+        params->base_hash = optarg;
+        break;
+      case 'r':
+        params->forklift = upload::CreateForklift(optarg);
+        if (!params->forklift) {
+          Usage();
+          return false;
+        }
+        break;
       case 'x':
         params->paths_out = optarg;
         break;
@@ -118,28 +131,32 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
 
 
 bool CheckParams(SyncParameters *p) {
-  if (!DirectoryExists(p->dir_scratch)) {
-    PrintError("overlay (copy on write) directory does not exist");
+  if (!p->new_repository) {
+    if (!DirectoryExists(p->dir_scratch)) {
+      PrintError("overlay (copy on write) directory does not exist");
+      return false;
+    }
+    if (!DirectoryExists(p->dir_union)) {
+      PrintError("union volume does not exist");
+      return false;
+    }
+    if (!DirectoryExists(p->dir_rdonly)) {
+      PrintError("cvmfs read/only repository does not exist");
+      return false;
+    }
+  }
+  
+  if (!p->forklift) {
+    PrintError("no upstream storage defined");
     return false;
   }
-
-  if (not DirectoryExists(p->dir_union)) {
-    PrintError("union volume does not exist");
+  if (!p->forklift->Connect()) {
+    PrintError("failed to connect to upstream storage (" + 
+               p->forklift->GetLastError() + ")");
     return false;
   }
-
-	if (not DirectoryExists(p->dir_rdonly)) {
-		PrintError("cvmfs read/only repository does not exist");
-		return false;
-	}
-
-  if (not DirectoryExists(p->dir_data)) {
+  if (!DirectoryExists(p->dir_temp)) {
     PrintError("data store directory does not exist");
-    return false;
-  }
-
-  if (not DirectoryExists(p->dir_catalogs)) {
-    PrintError("catalog store directory does not exist");
     return false;
   }
 
@@ -147,7 +164,6 @@ bool CheckParams(SyncParameters *p) {
 }
 
 
-// TODO: special option to create new empty repository
 int main(int argc, char **argv) {
 	SyncParameters params;
 
@@ -157,29 +173,34 @@ int main(int argc, char **argv) {
 		PrintError("Failed to init watchdog");
 		return 1;
 	}
-	monitor::Spawn();
 
 	// Initialization
 	if (!ParseParams(argc, argv, &params)) return 1;
 	if (!CheckParams(&params)) return 2;
-	if (!MakeCacheDirectories(params.dir_data, 0755)) {
-		PrintError("could not initialize data store");
-		return 3;
-	}
-
-  catalog::WritableCatalogManager catalog_manager(params.dir_catalogs,
-                                                  params.dir_data);
+  
   if (params.new_repository) {
-    catalog_manager.Commit();
-  } else {
-    publish::SyncMediator mediator(&catalog_manager, &params);
-    publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
-                                params.dir_scratch);
-
-    if (!sync.Traverse()) {
-      PrintError("something went wrong during sync");
-      return 4;
+    bool retval = 
+      catalog::WritableCatalogManager::CreateRepository(params.dir_temp, 
+                                                        *params.forklift);
+    if (!retval) {
+      PrintError("Failed to create new repository");
+      return 1;
     }
+    return 0;
+  }
+  
+  monitor::Spawn();
+  
+  catalog::WritableCatalogManager 
+    catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
+                    params.dir_temp);
+  publish::SyncMediator mediator(&catalog_manager, &params);
+  publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
+                              params.dir_scratch);
+
+  if (!sync.Traverse()) {
+    PrintError("something went wrong during sync");
+    return 4;
   }
 
   monitor::Fini();

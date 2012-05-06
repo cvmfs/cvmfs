@@ -18,6 +18,7 @@ abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
 
+
 create_master_key() {
    local name=$1
    local user=$2
@@ -57,7 +58,7 @@ create_cert() {
 create_whitelist() {
    local name=$1
    local user=$2
-   local whitelist="/srv/cvmfs/$name/pub/catalogs/.cvmfswhitelist"
+   local whitelist="/srv/cvmfs/$name/.cvmfswhitelist"
 
    echo -n "Signing 30 day whitelist with master key... "
    echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
@@ -80,7 +81,7 @@ create_whitelist() {
 
 get_expiry() {
   local name=$1
-  local whitelist="/srv/cvmfs/$name/pub/catalogs/.cvmfswhitelist"
+  local whitelist="/srv/cvmfs/$name/.cvmfswhitelist"
 
   local expires=$(head -2 $whitelist| tail -1 | tail -c15)
   local year=$(echo $expires | head -c4)
@@ -130,7 +131,7 @@ abort() {
 
   abort_before_hook $name
   sudo umount /cvmfs/$name
-  sudo rm -rf /var/spool/cvmfs/${name}/scratch
+  rm -rf /var/spool/cvmfs/${name}/scratch
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /cvmfs/$name
   rm -f /var/spool/cvmfs/${name}/in_transaction
@@ -150,12 +151,14 @@ publish() {
 
   publish_before_hook $name
   sudo /bin/mount -o remount,ro /cvmfs/$name
+  local base_hash=$(attr -qg root_hash /var/spool/cvmfs/${name}/rdonly)
   $user_shell "cvmfs_sync -p -u /cvmfs/$name \
     -s /var/spool/cvmfs/${name}/scratch \
     -c /var/spool/cvmfs/${name}/rdonly \
-    -r /srv/cvmfs/${name}/pub \
-    -x /var/spool/cvmfs/${name}/paths_out \
-    -y /var/spool/cvmfs/${name}/hashes_in \
+    -r /var/spool/cvmfs/${name}/tmp \
+    -b $base_hash \
+    -x /var/spool/cvmfs/${name}/paths \
+    -y /var/spool/cvmfs/${name}/hashes \
     $CVMFS_PUBLISH_OPTIONS" || die "Synchronization failed"
   $user_shell "cvmfs_sign \
     -c /etc/cvmfs/keys/${name}.crt \
@@ -164,7 +167,7 @@ publish() {
     /srv/cvmfs/${name}/pub/catalogs/.cvmfspublished" || die "Signing failed"
   sudo umount /cvmfs/$name
   sudo umount /var/spool/cvmfs/${name}/rdonly
-  sudo rm -rf /var/spool/cvmfs/${name}/scratch
+  rm -rf /var/spool/cvmfs/${name}/scratch
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
   sudo mount /cvmfs/$name
@@ -177,6 +180,7 @@ mkfs() {
   local name=$1
   local scratch_dir="/var/spool/cvmfs/${name}/scratch"
   local rdonly_dir="/var/spool/cvmfs/${name}/rdonly"
+  local temp_dir="/var/spool/cvmfs/${name}/tmp"
   local repository_dir="/srv/cvmfs/${name}"
 
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
@@ -194,23 +198,20 @@ mkfs() {
 # Created by cvmfs_server.  Don't touch.
 CVMFS_REPOSITORY_NAME=$name
 CVMFS_USER=$cvmfs_user
-CVMFS_SHADOW_DIR=/cvmfs/$name
-CVMFS_PUB_DIR=${repository_dir}/pub
+CVMFS_UNION_DIR=/cvmfs/$name
+CVMFS_REPOSITORY_DIR=$repository_dir
 CVMFS_SCRATCH_DIR=$scratch_dir
 CVMFS_RDONLY_MOUNTPOINT=$rdonly_dir
+CVMFS_TEMP_DIR=$repository_dir
 EOF
   cat > /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
-RewriteEngine on
-# Automatically point to the catalogs
-RewriteCond %{REQUEST_URI} !^/cvmfs/$name/pub/catalogs/(.*)
-RewriteRule ^/cvmfs/$name/(.*)$ /cvmfs/$name/pub/catalogs/\$1 [PT]
 # Translation URL to real pathname
-Alias /cvmfs/$name/pub ${repository_dir}/pub
+Alias /cvmfs/$name ${repository_dir}
 # For pushing files to the worker nodes
 Alias /fanout/cvmfs/$name /cvmfs/$name
-<Directory "${repository_dir}/pub">
-    Options -MultiViews FollowSymLinks
+<Directory "${repository_dir}">
+    Options -MultiViews
     AllowOverride All
     Order allow,deny
     Allow from all
@@ -229,7 +230,7 @@ Alias /fanout/cvmfs/$name /cvmfs/$name
     ExpiresByType application/x-cvmfs "access plus 1 minutes"
 </Directory>
 <Directory "/cvmfs/$name">
-    Options -MultiViews FollowSymLinks
+    Options -MultiViews
     AllowOverride All
     Order allow,deny
     Allow from all
@@ -252,7 +253,6 @@ $cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS 
 $cvmfs_user localhost = NOPASSWD: /bin/umount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/mount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/mount /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/rm -rf /var/spool/cvmfs/${name}/scratch # added by CernVM-FS for $name
 EOF
   echo "done"
 
@@ -262,20 +262,26 @@ EOF
 
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name \
-    ${repository_dir}/pub/catalogs ${repository_dir}/pub/data \
-    $scratch_dir $rdonly_dir /var/spool/cvmfs/${name}/catalogs
-  mkfifo -m 0660 /var/spool/cvmfs/${name}/paths_out \
-    /var/spool/cvmfs/${name}/hashes_in
+    ${repository_dir}/data \
+    $scratch_dir $rdonly_dir $temp_dir
+  local i=0
+  while [ $i -lt 256 ]
+  do
+    mkdir ${repository_dir}/data/$(printf "%02x" $i)
+    i=$(($i+1))
+  done
+  mkfifo -m 0660 /var/spool/cvmfs/${name}/paths \
+    /var/spool/cvmfs/${name}/hashes
   create_whitelist $name $cvmfs_user > /dev/null
   cvmfs_sync -u /cvmfs/$name \
     -s $scratch_dir \
     -c $rdonly_dir \
-    -r ${repository_dir}/pub \
+    -t $temp_dir \
     -n > /dev/null
   cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
-    ${repository_dir}/pub/catalogs/.cvmfspublished > /dev/null
+    ${repository_dir}/.cvmfspublished > /dev/null
   chown -R $cvmfs_user /cvmfs/$name $repository_dir /var/spool/cvmfs/$name
   echo "done"
 

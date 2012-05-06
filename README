@@ -7,21 +7,11 @@ sees all available files.  On first access, a file is downloaded and
 cached locally.  All downloaded pieces are verified with SHA-1.
  
 To do so, a directory hive has to be transformed into a CVMFS
-"repository".  This can be done by cvmfs_journald, which let 
-inotify keep track of changes to the hive, processes the
-resulting journal and synchronized it with a repository 
-directory.  This repository directory will be served.  
+"repository", a form of content-addressable storage. 
 
 This preparation of directories is transparent to web servers and
 web proxies.  They just serve static content, i.e. arbitrary files.
-Any HTTP server should do the job.  We use Apache + Squid.  Serving
-files from the memory of a web proxy brings significant performance
-improvement.
+Any HTTP server should do the job.
 
-                   _________________
-
-
-Developed by Jakob Blomer and Predreag Buncic at CERN (2009).
-The previous CVMFS version was developed by Leandro Franco
-and Predrag Buncic at CERN (2008).
-We follow a BSD-style license.
+Developed for the delivery of analysis software of LHC experiments
+at CERN.

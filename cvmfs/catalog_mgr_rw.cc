@@ -15,6 +15,9 @@
 #include "catalog_rw.h"
 #include "util.h"
 #include "logging.h"
+#include "download.h"
+#include "manifest.h"
+#include "upload.h"
 
 using namespace std;  // NOLINT
 
@@ -23,11 +26,10 @@ namespace catalog {
 const string WritableCatalogManager::kCatalogFilename = ".cvmfscatalog.working";
 
 
-WritableCatalogManager::WritableCatalogManager(
-                         const string catalog_directory,
-                         const string data_directory) :
-  catalog_directory_(catalog_directory),
-  data_directory_(data_directory)
+WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
+                                               const string &dir_temp) :
+  base_hash_(base_hash),
+  dir_temp_(dir_temp)
 {
   Init();
 }
@@ -43,7 +45,7 @@ bool WritableCatalogManager::Init() {
 
   // If the abstract initialization fails, we have a fresh repository here
   // create a root catalog
-  if (!succeeded && !CreateRepository()) {
+  if (!succeeded) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "unable to init catalog manager (cannot create root catalog)");
     return false;
@@ -68,6 +70,8 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
                                               const hash::Any &hash,
                                               std::string *catalog_path)
 {
+  LogCvmfs(kLogCatalog, kLogStdout, "MOUNTPOINT: %s", mountpoint.c_str());
+  LogCvmfs(kLogCatalog, kLogStdout, "HASH: %s", hash.ToString().c_str());
   *catalog_path = GetCatalogPath(mountpoint.ToString());
 
   // Check if the file exists
@@ -100,13 +104,15 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
 
 /**
  * This method is invoked if we create a completely new repository.
- * It initializes a new root catalog and attaches it afterwards.
  * The new root catalog will already contain a root entry.
+ * It is uploaded by a Forklift to the upstream storage.
  * @return true on success, false otherwise
  */
-bool WritableCatalogManager::CreateRepository() {
+bool WritableCatalogManager::CreateRepository(const string &dir_temp,
+                                              const upload::Forklift &forklift) 
+{
   // Create a new root catalog at file_path
-  string file_path = GetCatalogPath("");
+  string file_path = dir_temp + "/new_root_catalog";
 
   // A newly created catalog always needs a root entry
   // we create and configure this here
@@ -118,7 +124,6 @@ bool WritableCatalogManager::CreateRepository() {
   root_entry.mtime_             = time(NULL);
   root_entry.checksum_          = hash::Any(hash::kSha1);
   root_entry.linkcount_         = 1;
-
   string root_parent_path = "";
 
   // Create the database schema and the inital root entry
@@ -130,14 +135,49 @@ bool WritableCatalogManager::CreateRepository() {
              file_path.c_str());
     return false;
   }
-
-  // Attach the just created catalog
-  if (!MountCatalog(PathString("", 0), hash::Any(), NULL)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
-             "failed to attach newly created root catalog");
+  
+  // Compress root catalog;
+  string file_path_compressed = file_path + ".compressed";
+  hash::Any hash_catalog(hash::kSha1);
+  bool retval = zlib::CompressPath2Path(file_path, file_path_compressed, 
+                                        &hash_catalog);
+  if (!retval) {
+    LogCvmfs(kLogCatalog, kLogDebug, "compression of catalog '%s' failed",
+             file_path.c_str());
+    unlink(file_path.c_str());
     return false;
   }
+  unlink(file_path.c_str());
 
+  // Create manifest
+  const string manifest_path = dir_temp + "/manifest";
+  Manifest manifest(hash_catalog, "");
+  retval = manifest.Export(manifest_path);
+  if (!retval) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to create manifest %s",
+             manifest_path.c_str());
+    unlink(file_path_compressed.c_str());
+    return false;
+  }
+  
+  // Upload
+  retval = forklift.Move(manifest_path, "/.cvmfspublished");
+  if (!retval) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to commit manifest %s (%s)",
+             manifest_path.c_str(), forklift.GetLastError().c_str());
+    unlink(file_path_compressed.c_str());
+    unlink(manifest_path.c_str());
+    return false;
+  }
+  retval = forklift.Move(file_path_compressed, 
+                         "/data" + hash_catalog.MakePath(1, 2) + "C");
+  if (!retval) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to commit catalog %s (%s)",
+             file_path_compressed.c_str(), forklift.GetLastError().c_str());
+    unlink(file_path_compressed.c_str());
+    return false;
+  }
+  
   return true;
 }
 
@@ -590,13 +630,13 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 
 	const string clg_path = catalog->path().ToString();
 	const string cat_path = (clg_path.empty()) ?
-	                            catalog_directory_ :
-                              catalog_directory_ + clg_path;
+	                            "TODO - CATALOG DIRECTORY" :
+                              "TODO - CATALOG DIRECTORY" + clg_path;
 
 	/* Data symlink, whitelist symlink */
 	string backlink = "../";
 	string parent = GetParentPath(cat_path);
-	while (parent != GetParentPath(data_directory_)) {
+	while (parent != GetParentPath("TODO - DATA DIRECTORY")) {
 		if (parent == "") {
 			PrintWarning("cannot find data dir");
 			break;
@@ -607,8 +647,8 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 
 	const string lnk_path_data = cat_path + "/data";
 	const string lnk_path_whitelist = cat_path + "/.cvmfswhitelist";
-	const string backlink_data = backlink + GetFileName(data_directory_);
-	const string backlink_whitelist = backlink + GetFileName(catalog_directory_) + "/.cvmfswhitelist";
+	const string backlink_data = backlink + GetFileName("TODO - DATA DIRECTORY");
+	const string backlink_whitelist = backlink + GetFileName("TODO - CATALOG DIRECTORY") + "/.cvmfswhitelist";
 
 	platform_stat64 info;
 	if (platform_lstat(lnk_path_data.c_str(), &info) != 0)
@@ -619,7 +659,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	}
 
 	/* Don't make the symlink for the root catalog */
-	if ((platform_lstat(lnk_path_whitelist.c_str(), &info) != 0) && (GetParentPath(cat_path) != GetParentPath(data_directory_)))
+	if ((platform_lstat(lnk_path_whitelist.c_str(), &info) != 0) && (GetParentPath(cat_path) != GetParentPath("TODO - DATA DIRECTORY")))
 	{
 		if (symlink(backlink_whitelist.c_str(), lnk_path_whitelist.c_str()) != 0) {
 			PrintWarning("cannot create whitelist symlink");
@@ -651,7 +691,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 
 	/* Compress catalog */
 	const string src_path = cat_path + "/.cvmfscatalog.working";
-	const string dst_path = data_directory_ + "/txn/compressing.catalog";
+	const string dst_path = "TODO - DATA DIRECTORY/txn/compressing.catalog";
 	//const string dst_path = cat_path + "/.cvmfscatalog";
 	hash::Any sha1(hash::kSha1);
 	FILE *fsrc = NULL, *fdst = NULL;
@@ -667,7 +707,7 @@ bool WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) const {
 	} else {
 		const string sha1str = sha1.ToString();
 		const string hash_name = sha1str.substr(0, 2) + "/" + sha1str.substr(2) + "C";
-		const string cache_path = data_directory_ + "/" + hash_name;
+		const string cache_path = "TODO - DATA DIRECTORY/" + hash_name;
 		if (rename(dst_path.c_str(), cache_path.c_str()) != 0) {
 			PrintWarning("could not store catalog in data store as " + cache_path);
 		}
