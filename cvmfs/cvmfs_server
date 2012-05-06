@@ -272,20 +272,20 @@ EOF
   done
   mkfifo -m 0660 /var/spool/cvmfs/${name}/paths \
     /var/spool/cvmfs/${name}/hashes
+  chown -R $cvmfs_user /cvmfs/$name $repository_dir /var/spool/cvmfs/$name
+  reload_apache > /dev/null
+  echo "done"
+  
+  echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user > /dev/null
-  cvmfs_sync -u /cvmfs/$name \
-    -s $scratch_dir \
-    -c $rdonly_dir \
+  cvmfs_sync -n \
     -t $temp_dir \
-    -n > /dev/null
+    -r local:$repository_dir > /dev/null
   cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     ${repository_dir}/.cvmfspublished > /dev/null
-  chown -R $cvmfs_user /cvmfs/$name $repository_dir /var/spool/cvmfs/$name
   echo "done"
-
-  reload_apache
 
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF

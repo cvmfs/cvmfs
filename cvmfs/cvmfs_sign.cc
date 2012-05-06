@@ -1,8 +1,7 @@
 /**
  * This file is part of the CernVM File System
  *
- * This tool signs a CernVM-FS file catalog and its nested catalogs
- * with an X.509 certificate.
+ * This tool signs a CernVM-FS manifest with an X.509 certificate.
  */
 
 #include "cvmfs_config.h"
@@ -28,6 +27,9 @@
 #include "util.h"
 #include "compression.h"
 #include "logging.h"
+#include "upload.h"
+#include "download.h"
+#include "manifest.h"
 
 using namespace std;
 
@@ -37,7 +39,8 @@ static void Usage() {
     "Version %s\n"
     "Usage:\n"
     "  cvmfs_sign [-c <x509 certificate>] [-k <private key>] [-p <password>]\n"
-    "             [-n <repository name>] <catalog>",
+    "             [-n <repository name>] -t <temp directory>\n"
+    "             -r <upstream storage> -u <base url>\n",
     VERSION);
 }
 
@@ -47,14 +50,16 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string dir_catalogs = "";
+  string dir_temp = "";
   string certificate = "";
   string priv_key = "";
   string pwd = "";
   string repo_name = "";
+  string base_url = "";
+  upload::Forklift *forklift;
 
   char c;
-  while ((c = getopt(argc, argv, "c:k:p:n:h")) != -1) {
+  while ((c = getopt(argc, argv, "c:k:p:n:t:r:u:h")) != -1) {
     switch (c) {
       case 'c':
         certificate = optarg;
@@ -68,6 +73,15 @@ int main(int argc, char **argv) {
       case 'n':
         repo_name = optarg;
         break;
+      case 't':
+        dir_temp = optarg;
+        break;
+      case 'r':
+        forklift = upload::CreateForklift(optarg);
+        break;
+      case 'u':
+        base_url = optarg;
+        break;
       case 'h':
         Usage();
         return 0;
@@ -76,14 +90,24 @@ int main(int argc, char **argv) {
         abort();
     }
   }
-  if (optind >= argc) {
+  
+  // Sanity checks
+  if ((base_url == "") || (dir_temp == "") || !forklift) {
     Usage();
     return 1;
   }
+  if (!forklift->Connect()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, 
+             "failed to connect to upstream storage (%s)",
+             forklift->GetLastError().c_str());
+    return 2;
+  }
+  if (!DirectoryExists(dir_temp)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "temporary directory %s does not exist", 
+             dir_temp.c_str());
+    return 2;
+  }
 
-  dir_catalogs = MakeCanonicalPath(GetParentPath(string(argv[optind])));
-  const string clg_path = dir_catalogs + "/.cvmfscatalog.working";
-  const string snapshot_path = dir_catalogs + "/.cvmfscatalog";
   signature::Init();
 
   // Load certificate
@@ -147,8 +171,26 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", snapshot_path.c_str());
+  
+  const string manifest_url = base_url + "/.cvmfspublished";
+  const string manifest_path = dir_temp + "/manifest";
+  download::Init(1);
+  LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_url.c_str());
   {
+    // Retrieve Manifest
+    download::JobInfo download_manifest(&manifest_url, false, false, 
+                                        &manifest_path, NULL);    
+    download::Failures retval = download::Fetch(&download_manifest);
+    if (retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to fetch manifest");
+      goto sign_fail;
+    }
+    Manifest *manifest = Manifest::LoadFile(manifest_path);
+    if (!manifest) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
+      goto sign_fail;
+    }
+    
     // Safe certificate
     void *compr_buf;
     int64_t compr_size;
@@ -160,99 +202,80 @@ int main(int argc, char **argv) {
     }
     hash::Any certificate_hash(hash::kSha1);
     hash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
-    const string cert_path_tmp = dir_catalogs + "/data/txn/cvmfspublisher.tmp";
-    int fd_cert;
-    FILE *fcert;
-    if ( ((fd_cert = open(cert_path_tmp.c_str(), O_CREAT | O_TRUNC | O_RDWR,
-                          kDefaultFileMode)) < 0)
-        ||
-        !(fcert = fdopen(fd_cert, "w")) )
-    {
+    const string cert_path_tmp = dir_temp + "/cvmfspublisher.tmp";
+    if (!CopyMem2Path((unsigned char *)compr_buf, compr_size, cert_path_tmp)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to save certificate");
       goto sign_fail;
     }
-    if (static_cast<int64_t>(fwrite(compr_buf, 1, compr_size, fcert)) <
-        compr_size)
-    {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to save certificate");
-      goto sign_fail;
-    }
-    fclose(fcert);
     free(compr_buf);
 
-    const string cert_hash_path = certificate_hash.MakePath(1, 2) + "X";
-    const string cert_path = dir_catalogs + "/data/" + cert_hash_path;
-    if (rename(cert_path_tmp.c_str(), cert_path.c_str()) != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to store certificate in %s",
-               cert_path.c_str());
+    const string cert_hash_path = "/data" + certificate_hash.MakePath(1, 2) 
+                                  + "X";
+    if (!forklift->Move(cert_path_tmp, cert_hash_path)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit certificate (%s)",
+               forklift->GetLastError().c_str());
+      unlink(cert_path_tmp.c_str());
       goto sign_fail;
     }
 
-    // Write extended checksum
-    map<char, string> content;
-    if (!ParseKeyvalPath(dir_catalogs + "/.cvmfspublished", &content) ||
-        (content.find('C') == content.end()))
+    // Update manifest
+    manifest->set_certificate(certificate_hash);
+    manifest->set_repository_name(repo_name);
+    manifest->set_publish_timestamp(time(NULL));
+    
+    string signed_manifest = manifest->ExportString();
+    hash::Any published_hash(hash::kSha1);
+    hash::HashMem(
+      reinterpret_cast<const unsigned char *>(signed_manifest.data()),
+      signed_manifest.length(), &published_hash);
+    signed_manifest += "--\n" + published_hash.ToString() + "\n";
+
+    // Sign manifest
+    unsigned char *sig;
+    unsigned sig_size;
+    if (!signature::Sign(reinterpret_cast<const unsigned char *>(
+                         published_hash.ToString().data()),
+                         2*published_hash.GetDigestSize(), &sig, &sig_size))
     {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read extended cvmfspublished");
-    } else {
-      content['X'] = certificate_hash.ToString();
-      content['T'] = StringifyInt(time(NULL));
-      if (repo_name != "")
-        content['N'] = repo_name;
-
-      string rest;
-      rest = 'C' + content['C'] + "\n";
-      for (map<char, string>::const_iterator itr = content.begin(),
-           itrEnd = content.end(); itr != itrEnd; ++itr)
-      {
-        if (itr->first == 'C')
-          continue;
-        rest += itr->first + itr->second + "\n";
-      }
-      hash::Any published_hash(hash::kSha1);
-      hash::HashMem(reinterpret_cast<const unsigned char *>(rest.data()),
-                    rest.length(), &published_hash);
-      rest += "--\n" + published_hash.ToString() + "\n";
-
-      FILE *fext = fopen((dir_catalogs + "/.cvmfspublished").c_str(), "w");
-      if (!fext) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write .cvmfspublished");
-        goto sign_fail;
-      }
-      if (fwrite(rest.data(), 1, rest.length(), fext) != rest.length()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write .cvmfspublished");
-        fclose(fext);
-        goto sign_fail;
-      }
-
-      // Sign checksum and write signature
-      unsigned char *sig;
-      unsigned sig_size;
-      if (!signature::Sign(reinterpret_cast<const unsigned char *>(
-                             published_hash.ToString().data()),
-                           2*published_hash.GetDigestSize(), &sig, &sig_size))
-      {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign extended checksum");
-        fclose(fext);
-        goto sign_fail;
-      }
-      if (fwrite(sig, 1, sig_size, fext) != sig_size) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write .cvmfspublished");
-        free(sig);
-        fclose(fext);
-        goto sign_fail;
-      }
-      free(sig);
-
-      fclose(fext);
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
+      goto sign_fail;
+    }
+    
+    // Write new manifest
+    FILE *fmanifest = fopen(manifest_path.c_str(), "w");
+    if (!fmanifest) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      goto sign_fail;
+    }
+    if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest) 
+         != signed_manifest.length()) ||
+        (fwrite(sig, 1, sig_size, fmanifest) != sig_size)) 
+    {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      fclose(fmanifest);
+      goto sign_fail;
+    }
+    free(sig);
+    fclose(fmanifest);
+    
+    // Upload manifest
+    if (!forklift->Move(manifest_path, "/.cvmfspublished")) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest");
+      unlink(manifest_path.c_str());
+      goto sign_fail;
     }
   }
 
+  delete forklift;
   signature::Fini();
+  download::Fini();
   return 0;
 
  sign_fail:
+  delete forklift;
   signature::Fini();
+  download::Fini();
+  unlink(manifest_path.c_str());
   return 1;
 }
 
