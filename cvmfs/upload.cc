@@ -55,15 +55,17 @@ bool ForkliftLocal::Move(const string &local_path,
   if (retval == 0) {
     last_error_ = "OK";
     return true;
-  } else if (retval == EXDEV) {
+  }
+  
+  if (errno == EXDEV) {
     retval = Put(local_path, remote_path);
     if (retval)
       unlink(local_path.c_str());
     return retval;
-  } else {
-    last_error_ = "failed to rename (" + StringifyInt(errno) + ")";
-    return false;
   }
+  
+  last_error_ = "failed to rename (" + StringifyInt(errno) + ")";
+  return false;
 }   
    
 }  // namespace upload
