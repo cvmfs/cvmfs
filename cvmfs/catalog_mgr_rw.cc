@@ -130,7 +130,7 @@ bool WritableCatalogManager::CreateRepository(const string &dir_temp,
   if (!WritableCatalog::CreateDatabase(file_path, root_entry, root_parent_path,
                                        new_repository))
   {
-    LogCvmfs(kLogCatalog, kLogDebug, "creation of catalog '%s' failed",
+    LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
              file_path.c_str());
     return false;
   }
@@ -141,7 +141,7 @@ bool WritableCatalogManager::CreateRepository(const string &dir_temp,
   bool retval = zlib::CompressPath2Path(file_path, file_path_compressed, 
                                         &hash_catalog);
   if (!retval) {
-    LogCvmfs(kLogCatalog, kLogDebug, "compression of catalog '%s' failed",
+    LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
              file_path.c_str());
     unlink(file_path.c_str());
     return false;
@@ -153,7 +153,7 @@ bool WritableCatalogManager::CreateRepository(const string &dir_temp,
   Manifest manifest(hash_catalog, "");
   retval = manifest.Export(manifest_path);
   if (!retval) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to create manifest %s",
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to create manifest %s",
              manifest_path.c_str());
     unlink(file_path_compressed.c_str());
     return false;
@@ -162,7 +162,7 @@ bool WritableCatalogManager::CreateRepository(const string &dir_temp,
   // Upload
   retval = forklift.Move(manifest_path, "/.cvmfspublished");
   if (!retval) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to commit manifest %s (%s)",
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to commit manifest %s (%s)",
              manifest_path.c_str(), forklift.GetLastError().c_str());
     unlink(file_path_compressed.c_str());
     unlink(manifest_path.c_str());
@@ -171,7 +171,7 @@ bool WritableCatalogManager::CreateRepository(const string &dir_temp,
   retval = forklift.Move(file_path_compressed, 
                          "/data" + hash_catalog.MakePath(1, 2) + "C");
   if (!retval) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to commit catalog %s (%s)",
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s (%s)",
              file_path_compressed.c_str(), forklift.GetLastError().c_str());
     unlink(file_path_compressed.c_str());
     return false;

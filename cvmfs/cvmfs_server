@@ -173,7 +173,7 @@ publish() {
   sudo umount /cvmfs/$name
   sudo umount /var/spool/cvmfs/${name}/rdonly
   rm -rf /var/spool/cvmfs/${name}/scratch
-  rm -rf /var/spool/cvmfs/${name}/tmp/*
+  #rm -rf /var/spool/cvmfs/${name}/tmp/*
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
   sudo mount /cvmfs/$name

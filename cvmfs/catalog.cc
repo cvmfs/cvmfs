@@ -76,9 +76,9 @@ bool Catalog::OpenDatabase(const string &db_path) {
   sqlite3_extended_result_codes(database_, 1);
 
   // Turbo mode
-  SqlStatement transaction(database_, "PRAGMA locking_mode=EXCLUSIVE;");
-  bool retval = transaction.Execute();
-  assert(retval == true);
+  //SqlStatement transaction(database_, "PRAGMA locking_mode=EXCLUSIVE;");
+  //bool retval = transaction.Execute();
+  //assert(retval == true);
 
   InitPreparedStatements();
 
