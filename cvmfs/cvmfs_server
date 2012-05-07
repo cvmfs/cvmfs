@@ -131,7 +131,7 @@ abort() {
 
   abort_before_hook $name
   sudo umount /cvmfs/$name
-  rm -rf /var/spool/cvmfs/${name}/scratch
+  sudo rm -rf /var/spool/cvmfs/${name}/scratch
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /cvmfs/$name
   rm -f /var/spool/cvmfs/${name}/in_transaction
@@ -172,7 +172,7 @@ publish() {
     -u http://localhost/cvmfs/$name" || die "Signing failed"
   sudo umount /cvmfs/$name
   sudo umount /var/spool/cvmfs/${name}/rdonly
-  rm -rf /var/spool/cvmfs/${name}/scratch
+  sudo rm -rf /var/spool/cvmfs/${name}/scratch
   rm -rf /var/spool/cvmfs/${name}/tmp/*
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
@@ -259,6 +259,7 @@ $cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS 
 $cvmfs_user localhost = NOPASSWD: /bin/umount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/mount /var/spool/cvmfs/${name}/rdonly # added by CernVM-FS for $name
 $cvmfs_user localhost = NOPASSWD: /bin/mount /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/rm -rf /var/spool/cvmfs/${name}/scratch # added by CernVM-FS for $name
 EOF
   echo "done"
 
