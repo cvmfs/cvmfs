@@ -173,7 +173,7 @@ publish() {
   sudo umount /cvmfs/$name
   sudo umount /var/spool/cvmfs/${name}/rdonly
   rm -rf /var/spool/cvmfs/${name}/scratch
-  #rm -rf /var/spool/cvmfs/${name}/tmp/*
+  rm -rf /var/spool/cvmfs/${name}/tmp/*
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /var/spool/cvmfs/${name}/rdonly > /dev/null
   sudo mount /cvmfs/$name
@@ -293,6 +293,7 @@ EOF
     -t $temp_dir \
     -r local:$repository_dir \
     -u http://localhost/cvmfs/$name > /dev/null
+  chown -R $cvmfs_user $repository_dir
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
