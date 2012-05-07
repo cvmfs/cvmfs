@@ -52,11 +52,18 @@ bool ForkliftLocal::Move(const string &local_path,
 {
   int retval = rename(local_path.c_str(), 
                       (base_directory_+remote_path).c_str());
-  if (retval == 0)
+  if (retval == 0) {
     last_error_ = "OK";
-  else
+    return true;
+  } else if (retval == EXDEV) {
+    retval = Put(local_path, remote_path);
+    if (retval)
+      unlink(local_path.c_str());
+    return retval;
+  } else {
     last_error_ = "failed to rename (" + StringifyInt(errno) + ")";
-  return retval == 0;
+    return false;
+  }
 }   
    
 }  // namespace upload
