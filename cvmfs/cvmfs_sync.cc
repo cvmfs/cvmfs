@@ -33,6 +33,7 @@
 #include "logging.h"
 #include "monitor.h"
 #include "download.h"
+#include "manifest.h"
 
 using namespace std;  // NOLINT
 
@@ -43,8 +44,8 @@ static void Usage() {
     "Usage (normally called from cvmfs_server):\n"
     "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
     "             -t <temporary storage> -b <base hash> -r <upstream storage>\n"
-    "             -w <stratum 0 base url>\n"
-    "             -n(new, requires only -t and -u)\n"
+    "             -w <stratum 0 base url> -o <manifest output>\n"
+    "             -n(new, requires only -t, -u, and -o)\n"
     "             [-p(rint change set)] [-d(ry run)] [-m(ucatalogs)\n"
     "             [EXPERIMENTAL: -n new -x paths_out (pipe)  -y hashes_in (pipe) -z (compress locally)]\n\n"
     "  Upstream storage might be:\n"
@@ -64,7 +65,7 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
 
 	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "u:s:c:t:b:r:w:pdmnx:y:z")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:t:b:r:w:pdmno:x:y:z")) != -1) {
 		switch (c) {
       // Directories
       case 'u':
@@ -90,6 +91,9 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
           Usage();
           return false;
         }
+        break;
+      case 'o':
+        params->manifest_path = optarg;
         break;
       case 'w':
         params->stratum0 = optarg;
@@ -149,6 +153,10 @@ bool CheckParams(SyncParameters *p) {
     }
   }
   
+  if (p->manifest_path == "") {
+    PrintError("manifest output required");
+    return false;
+  }
   if (!p->forklift) {
     PrintError("no upstream storage defined");
     return false;
@@ -181,31 +189,42 @@ int main(int argc, char **argv) {
 	if (!ParseParams(argc, argv, &params)) return 1;
 	if (!CheckParams(&params)) return 2;
    
+  Manifest *manifest = NULL;
   if (params.new_repository) {
-    bool retval = 
+    manifest = 
       catalog::WritableCatalogManager::CreateRepository(params.dir_temp,
                                                         *params.forklift);
-    if (!retval) {
+    if (!manifest) {
       PrintError("Failed to create new repository");
       return 1;
     }
-    return 0;
-  }
+    if (!manifest->Export(params.manifest_path)) {
+      PrintError("Failed to create new repository");
+      return 1;
+    }
+  } else {
+    monitor::Spawn();
+    download::Init(1);
   
-  monitor::Spawn();
-  download::Init(1);
-  
-  catalog::WritableCatalogManager 
-    catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
-                    params.stratum0, params.dir_temp, params.forklift);
-  publish::SyncMediator mediator(&catalog_manager, &params);
-  publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
-                              params.dir_scratch);
+    catalog::WritableCatalogManager 
+      catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
+                      params.stratum0, params.dir_temp, params.forklift);
+    publish::SyncMediator mediator(&catalog_manager, &params);
+    publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
+                                params.dir_scratch);
 
-  if (!sync.Traverse()) {
-    PrintError("something went wrong during sync");
-    return 4;
+    manifest = sync.Traverse(); 
+    if (!manifest) {
+      PrintError("something went wrong during sync");
+      return 4;
+    }
   }
+  
+  if (!manifest->Export(params.manifest_path)) {
+    PrintError("Failed to create new repository");
+    return 5;
+  }
+  delete manifest;
   
   download::Fini();
   monitor::Fini();

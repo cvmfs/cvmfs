@@ -11,8 +11,8 @@ namespace upload {
 
 class Forklift {
  public:
-  Forklift(const std::string &base_directory) : 
-    base_directory_(base_directory), last_error_("OK") { }
+  Forklift(const std::string &entry_point) : 
+    entry_point_(entry_point), last_error_("OK") { }
   virtual ~Forklift() { }
   
   virtual bool Connect() = 0;
@@ -22,21 +22,37 @@ class Forklift {
                     const std::string &remote_path) const = 0;
   virtual std::string GetLastError() const { return last_error_; };
  protected:  
-  std::string base_directory_;
+  std::string entry_point_;
   mutable std::string last_error_;
 };  // class Forklift
    
 
 class ForkliftLocal : public Forklift {
  public:
-  ForkliftLocal(const std::string &base_directory) : 
-    Forklift(base_directory) { }
+  ForkliftLocal(const std::string &entry_point) : 
+    Forklift(entry_point) { }
   virtual ~ForkliftLocal() { }
 
   bool Connect();
   bool Put(const std::string &local_path, const std::string &remote_path) const;
   bool Move(const std::string &local_path, 
             const std::string &remote_path) const;
+};  // class ForkliftLocal
+  
+  
+class ForkliftPathPipe : public Forklift {
+ public:
+  ForkliftPathPipe(const std::string &entry_point) : 
+    Forklift(entry_point) { pipe_fd_ = -1; }
+  virtual ~ForkliftPathPipe() { if (pipe_fd_ >= 0) close(pipe_fd_); }
+  
+  bool Connect();
+  bool Put(const std::string &local_path, const std::string &remote_path) const;
+  bool Move(const std::string &local_path, 
+            const std::string &remote_path) const;
+
+ private:
+  int pipe_fd_; 
 };  // class Forklift
   
   

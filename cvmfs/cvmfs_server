@@ -52,7 +52,7 @@ create_cert() {
    chmod 444 $key $crt
    chown $user $master_key $master_pub
    echo "done"
-}
+} 
 
 
 create_whitelist() {
@@ -67,6 +67,7 @@ create_whitelist() {
     whitelist=${repository_dir}/.cvmfswhitelist
   else
     whitelist=${temp_dir}/whitelist
+    local upload_pipe=$(get_pipe_upstream $upstream)
   fi
 
   echo -n "Signing 30 day whitelist with master key... "
@@ -86,7 +87,9 @@ create_whitelist() {
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.sha1
   echo "done"
   
-  [ x"$repository_dir" == x ] && echo "Move $whitelist to ${upstream}/.cvmfswhitelist" || true
+  if [ x"$upload_pipe" != x ]; then
+    echo "$whitelist, /.cvmfswhitelist" > $upload_pipe
+  fi
 }
 
 
@@ -111,6 +114,17 @@ get_local_upstream() {
   local upstream=$1
   
   if [ x$(echo "$upstream" | cut -d: -f1) = x"local" ]; then
+    echo "$(echo $upstream | cut -d: -f2)"
+  else
+    echo ""
+  fi
+}
+
+
+get_pipe_upstream() {
+  local upstream=$1
+  
+  if [ x$(echo "$upstream" | cut -d: -f1) = x"pipe" ]; then
     echo "$(echo $upstream | cut -d: -f2)"
   else
     echo ""
@@ -155,6 +169,7 @@ abort() {
 
   abort_before_hook $name
   sudo umount /cvmfs/$name
+  rm -rf ${spool_dir}/tmp/*
   sudo rm -rf ${spool_dir}/scratch
   $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
   sudo mount /cvmfs/$name
@@ -189,6 +204,7 @@ publish() {
     -x ${spool_dir}/paths \
     -y ${spool_dir}/hashes \
     -w $stratum0 \
+    -o ${spool_dir}/tmp/manifest \
     $CVMFS_PUBLISH_OPTIONS" || die "Synchronization failed"
   $user_shell "cvmfs_sign \
     -c /etc/cvmfs/keys/${name}.crt \
@@ -196,7 +212,7 @@ publish() {
     -n $name \
     -t ${spool_dir}/tmp \
     -r $upstream \
-    -u $stratum0" || die "Signing failed"
+    -m ${spool_dir}/tmp/manifest" || die "Signing failed"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
   sudo rm -rf ${spool_dir}/scratch
@@ -206,6 +222,23 @@ publish() {
   sudo mount /cvmfs/$name
   rm -f ${spool_dir}/in_transaction
   publish_after_hook $name
+}
+
+
+create_repository_skeleton() {
+  local directory=$1
+  local user=$2
+  
+  echo -n "Creating repository skeleton in ${directory}..."
+  mkdir -p ${directory}/data
+  local i=0
+  while [ $i -lt 256 ]
+  do
+    mkdir ${directory}/data/$(printf "%02x" $i)
+    i=$(($i+1))
+  done
+  chown -R $user $directory
+  echo "done"
 }
 
 
@@ -220,7 +253,14 @@ mkfs() {
   local temp_dir="${spool_dir}/tmp"
   local pipe_paths="${spool_dir}/paths"
   local pipe_hashes="${spool_dir}/hashes"
+  local pipe_cset_ready="${spool_dir}/cset_ready"
+  local pipe_root_hash="${spool_dir}/new_root_hash"
   local repository_dir=$(get_local_upstream $upstream)
+  local repository_pipe=$(get_pipe_upstream $upstream)
+  if [ x"$repository_pipe" = x"DEFAULT" ]; then
+    repository_pipe=${spool_dir}/upload
+    upstream="pipe:$repository_pipe"
+  fi
 
   # Sanity checks
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
@@ -252,7 +292,16 @@ Alias /fanout/cvmfs/$name /cvmfs/$name
     AllowOverride All
     Order allow,deny
     Allow from all
-
+    EnableMMAP Off
+    EnableSendFile Off
+</Directory>
+# For pushing catalogs to upstream storage
+Alias /fanout/$temp_dir $temp_dir
+<Directory "$temp_dir">
+    Options -MultiViews
+    AllowOverride All
+    Order allow,deny
+    Allow from all
     EnableMMAP Off
     EnableSendFile Off
 </Directory>
@@ -306,32 +355,34 @@ EOF
 
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir
-  mkfifo -m 0660 $pipe_paths $pipe_hashes
-  if [ x"$repository_dir" != x ]; then
-    mkdir -p ${repository_dir}/data
-    local i=0
-    while [ $i -lt 256 ]
-    do
-      mkdir ${repository_dir}/data/$(printf "%02x" $i)
-      i=$(($i+1))
-    done
+  mkfifo -m 0660 $pipe_paths $pipe_hashes $pipe_cset_ready $pipe_root_hash
+  chown -R $cvmfs_user /cvmfs/$name $spool_dir
+  if [ x"$repository_pipe" != x ]; then
+    [ -p $repository_pipe ] || mkfifo -m 0660 $repository_pipe
+    chown -R $cvmfs_user $repository_pipe
   fi
-  chown -R $cvmfs_user /cvmfs/$name $spool_dir $repository_dir
+  if [ x"$repository_dir" != x ]; then
+    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
+  fi
   reload_apache > /dev/null
   echo "done"
   
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
-  cvmfs_sync -n \
+  su $cvmfs_user -c "cvmfs_sync -n \
     -t $temp_dir \
-    -r $upstream > /dev/null
-  cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
+    -r $upstream \
+    -o ${temp_dir}/new_manifest" > /dev/null
+  su $cvmfs_user -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -t $temp_dir \
     -r $upstream \
-    -u $stratum0 > /dev/null
-  chown -R $cvmfs_user $repository_dir
+    -m ${temp_dir}/new_manifest" > /dev/null
+  echo "done"
+  
+  echo -n "Waiting for inital repository to become available on Stratum 0..."
+  # TODO
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
@@ -434,6 +485,8 @@ CernVM-FS Server Tool
 Commands:
   mkfs <fully qualified name> [-w stratum0 url] [-u upstream storage]: 
                Create a new repository with a given name
+  skeleton <directory>:    
+               Create repository skeleton in directory
   rmfs:        Remove the repository
   resign:      Re-sign the 30 day whitelist
   info:        Print summary about the repository
@@ -530,6 +583,14 @@ case $1 in
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
     publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE
+  ;;
+  skeleton)
+    SKELETON_DIR=$2
+    [ x"$SKELETON_DIR" = x ] && die "skeleton directory missing"
+    read -p "Owner of $SKELETON_DIR [$(whoami)]: " SKELETON_USER
+    [ x"$SKELETON_USER" = x ] && SKELETON_USER=$(whoami)
+    id $SKELETON_USER > /dev/null 2>&1 || die "No user $SKELETON_USER"
+    create_repository_skeleton $SKELETON_DIR $SKELETON_USER
   ;;
   *)
     usage

@@ -26,6 +26,7 @@ struct SyncParameters {
   std::string stratum0;
   std::string paths_out;
   std::string hashes_in;
+  std::string manifest_path;
   upload::Forklift *forklift;
 	bool print_changeset;
 	bool dry_run;

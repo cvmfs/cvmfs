@@ -224,11 +224,11 @@ void SyncMediator::LeaveDirectory(SyncItem &entry,
 	mHardlinkStack.pop();
 }
 
-void SyncMediator::Commit() {
+Manifest *SyncMediator::Commit() {
 	CompressAndHashFileQueue();
 	AddFileQueueToCatalogs();
 	mCatalogManager->PrecalculateListings();
-	mCatalogManager->Commit();
+	return mCatalogManager->Commit();
 }
 
 

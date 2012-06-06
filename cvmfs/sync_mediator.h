@@ -36,6 +36,8 @@
 #include "cvmfs_sync.h"
 #include "sync_item.h"
 
+class Manifest;
+
 namespace publish {
 
 /**
@@ -155,7 +157,7 @@ public:
 	 *  do any pending processing and commit all changes to the catalogs
 	 *  to be called AFTER all recursions are finished
 	 */
-	void Commit();
+	Manifest *Commit();
 
 private:
   // -------------------------------------------------------------

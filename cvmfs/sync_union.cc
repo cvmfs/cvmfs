@@ -116,7 +116,7 @@ SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
 }
 
 
-bool SyncUnionAufs::Traverse() {
+Manifest *SyncUnionAufs::Traverse() {
 	FileSystemTraversal<SyncUnionAufs>
     traversal(this, scratch_path(), true, ignore_filenames_);
 
@@ -128,9 +128,7 @@ bool SyncUnionAufs::Traverse() {
 
 	traversal.Recurse(scratch_path());
 
-	mediator_->Commit();
-
-	return true;
+	return mediator_->Commit();
 }
 
 

@@ -30,6 +30,7 @@
 namespace upload {
 class Forklift;
 }
+class Manifest;
 
 namespace catalog {
 
@@ -39,8 +40,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
                          const std::string &stratum0,
                          const std::string &dir_temp,
                          const upload::Forklift *forklift);
-  static bool CreateRepository(const std::string &dir_temp, 
-                               const upload::Forklift &forklift);
+  static Manifest *CreateRepository(const std::string &dir_temp, 
+                                    const upload::Forklift &forklift);
 
   bool Init();
 
@@ -73,7 +74,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
 	 */
   bool PrecalculateListings();
 
-  bool Commit();
+  Manifest *Commit();
 
  protected:
   void EnforceSqliteMemLimit() { }

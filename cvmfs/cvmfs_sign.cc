@@ -28,7 +28,6 @@
 #include "compression.h"
 #include "logging.h"
 #include "upload.h"
-#include "download.h"
 #include "manifest.h"
 
 using namespace std;
@@ -40,7 +39,7 @@ static void Usage() {
     "Usage:\n"
     "  cvmfs_sign [-c <x509 certificate>] [-k <private key>] [-p <password>]\n"
     "             [-n <repository name>] -t <temp directory>\n"
-    "             -r <upstream storage> -u <base url>\n",
+    "             -r <upstream storage> -m <manifest>\n",
     VERSION);
 }
 
@@ -55,11 +54,11 @@ int main(int argc, char **argv) {
   string priv_key = "";
   string pwd = "";
   string repo_name = "";
-  string base_url = "";
+  string manifest_path = "";
   upload::Forklift *forklift;
 
   char c;
-  while ((c = getopt(argc, argv, "c:k:p:n:t:r:u:h")) != -1) {
+  while ((c = getopt(argc, argv, "c:k:p:n:t:r:m:h")) != -1) {
     switch (c) {
       case 'c':
         certificate = optarg;
@@ -79,8 +78,8 @@ int main(int argc, char **argv) {
       case 'r':
         forklift = upload::CreateForklift(optarg);
         break;
-      case 'u':
-        base_url = optarg;
+      case 'm':
+        manifest_path = optarg;
         break;
       case 'h':
         Usage();
@@ -92,7 +91,7 @@ int main(int argc, char **argv) {
   }
   
   // Sanity checks
-  if ((base_url == "") || (dir_temp == "") || !forklift) {
+  if ((dir_temp == "") || (manifest_path == "") || !forklift) {
     Usage();
     return 1;
   }
@@ -172,19 +171,9 @@ int main(int argc, char **argv) {
   }
 
   
-  const string manifest_url = base_url + "/.cvmfspublished";
-  const string manifest_path = dir_temp + "/manifest";
-  download::Init(1);
-  LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_url.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
-    // Retrieve Manifest
-    download::JobInfo download_manifest(&manifest_url, false, false, 
-                                        &manifest_path, NULL);    
-    download::Failures retval = download::Fetch(&download_manifest);
-    if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to fetch manifest");
-      goto sign_fail;
-    }
+    // Load Manifest
     Manifest *manifest = Manifest::LoadFile(manifest_path);
     if (!manifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
@@ -268,14 +257,11 @@ int main(int argc, char **argv) {
 
   delete forklift;
   signature::Fini();
-  download::Fini();
   return 0;
 
  sign_fail:
   delete forklift;
   signature::Fini();
-  download::Fini();
-  unlink(manifest_path.c_str());
   return 1;
 }
 
