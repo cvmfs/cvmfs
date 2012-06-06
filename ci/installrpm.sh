@@ -6,8 +6,8 @@ cvmfsrpm=$2
 [ -z $cvmfsrpm ] && exit 2
 selinuxrpm=$3
 
-initScriptsVersion=1.0.15-1
-keysVersion=1.2-1
+initScriptsVersion=1.0.18-2
+keysVersion=1.4-1
 
 curl -k https://cernvm.cern.ch/project/trac/downloads/cernvm/cvmfs-init-scripts-${initScriptsVersion}.noarch.rpm > $tmpdir/cvmfs-init-scripts-${initScriptsVersion}.noarch.rpm
 curl -k https://cernvm.cern.ch/project/trac/downloads/cernvm/cvmfs-keys-${keysVersion}.noarch.rpm > $tmpdir/cvmfs-keys-${keysVersion}.noarch.rpm
