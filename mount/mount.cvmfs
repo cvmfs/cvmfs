@@ -1,6 +1,6 @@
 #!/bin/bash
 
-bin_path=/usr/bin
+bin_path=/usr/local/bin
 
 function usage()
 {
