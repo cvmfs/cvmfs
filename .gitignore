@@ -1,0 +1,56 @@
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+*_C.d
+*.swp
+
+# Packages #
+############
+# it's better to unpack these files and commit the raw source
+# git has its own built in compression methods
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+externals/*
+*CMakeFile*
+*Makefile
+*.cmake
+
+cvmfs/Makefile
+cvmfs/cvmfs2
+cvmfs/cvmfs2_debug
+cvmfs/cvmfs_fsck
+cvmfs/cvmfs_sign
+cvmfs/cvmfs_sync
+cvmfs/cvmfs_zpipe
+cvmfs_config.h
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+*.save
+*.txt
+
+# Output Files #
+################
+*.root
+
+# OS generated files #
+######################
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
