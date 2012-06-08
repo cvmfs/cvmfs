@@ -101,43 +101,6 @@ bool Init(const string &cache_path) {
   if (!MakeCacheDirectories(cache_path, 0700))
     return false;
 
-  // Cleanup dangling checksums
-  DIR *dirp = NULL;
-  platform_dirent64 *d;
-  if ((dirp = opendir(cache_path.c_str())) == NULL) {
-    LogCvmfs(kLogCache, kLogDebug, "failed to open directory %s",
-             cache_path.c_str());
-    return false;
-  }
-  while ((d = platform_readdir(dirp)) != NULL) {
-    if (d->d_type != DT_REG) continue;
-
-    const string name(d->d_name);
-    if (name.substr(0, 14) == "cvmfs.checksum") {
-      const string current_path = cache_path + "/" + name;
-      FILE *f = fopen(current_path.c_str(), "r");
-      if (f != NULL) {
-        char sha1[40];
-        if (fread(sha1, 1, 40, f) == 40) {
-          const string sha1_str = string(sha1, 40);
-          LogCvmfs(kLogCache, kLogDebug, "found checksum %s", sha1_str.c_str());
-          const string sha1_path = cache_path + "/" + sha1_str.substr(0,2) +
-                                   "/" + sha1_str.substr(2);
-
-          if (!FileExists(sha1_path))
-            unlink(current_path.c_str());
-        } else {
-          unlink(current_path.c_str());
-        }
-        fclose(f);
-      } else {
-        closedir(dirp);
-        return false;
-      }
-    }
-  }
-  closedir(dirp);
-
   int retval = pthread_key_create(&thread_local_storage_, CleanupTLS);
   assert(retval == 0);
 

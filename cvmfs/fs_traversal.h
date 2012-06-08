@@ -122,44 +122,45 @@ class FileSystemTraversal {
     ignored_files_.insert("..");
   }
 
-	void DoRecursion(const std::string &parent_path, const std::string &dir_name) const
+  void DoRecursion(const std::string &parent_path, const std::string &dir_name) 
+    const
 	{
-  DIR *dip;
-  platform_dirent64 *dit;
-  const std::string path = parent_path + "/" + dir_name;
+    DIR *dip;
+    platform_dirent64 *dit;
+    const std::string path = parent_path + "/" + dir_name;
 
-  // get into directory and notify the user
-  if ((dip = opendir(path.c_str())) == NULL) { return; }
-  Notify(enteringDirectory, parent_path, dir_name);
+    // get into directory and notify the user
+    if ((dip = opendir(path.c_str())) == NULL) { return; }
+    Notify(enteringDirectory, parent_path, dir_name);
 
-  // go through the open directory notifying the user at specific positions
-  while ((dit = platform_readdir(dip)) != NULL) {
-    // check if filename is included in the ignored files list
-    if (ignored_files_.find(dit->d_name) != ignored_files_.end()) {
-      continue;
-    }
+    // go through the open directory notifying the user at specific positions
+    while ((dit = platform_readdir(dip)) != NULL) {
+      // check if filename is included in the ignored files list
+      if (ignored_files_.find(dit->d_name) != ignored_files_.end()) {
+        continue;
+      }
 
-    // notify user about found directory entry
-    switch (dit->d_type) {
-      case DT_DIR:
+      // notify user about found directory entry
+      platform_stat64 info;
+      int retval = platform_stat((path + dit->d_name).c_str(), &info);
+      assert(retval == 0);
+      if (S_ISDIR(info.st_mode)) {
         if (Notify(foundDirectory, path, dit->d_name) && recurse_) {
           DoRecursion(path, dit->d_name);
         }
         Notify(foundDirectoryAfterRecursion, path, dit->d_name);
         break;
-      case DT_REG:
+      } else if (S_ISREG(info.st_mode)) {
         Notify(foundRegularFile, path, dit->d_name);
-        break;
-      case DT_LNK:
+      } else if (S_ISLNK(info.st_mode)) {
         Notify(foundSymlink, path, dit->d_name);
-        break;
+      }
     }
-  }
 
-  // close directory and notify user
-  if (closedir(dip) != 0) { return; }
-  Notify(leavingDirectory, parent_path, dir_name);
-}
+    // close directory and notify user
+    if (closedir(dip) != 0) { return; }
+    Notify(leavingDirectory, parent_path, dir_name);
+  }
 
   inline bool Notify(const BoolCallback callback,
         	           const std::string &parent_path,

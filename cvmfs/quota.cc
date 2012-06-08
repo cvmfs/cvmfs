@@ -554,6 +554,7 @@ bool RebuildDatabase() {
   gauge_ = 0;
 
   // Gather file catalog hash values
+  // TODO: distiction does not exist anymore
   if ((dirp = opendir(cache_dir_->c_str())) == NULL) {
     LogCvmfs(kLogQuota, kLogDebug, "failed to open directory %s", path.c_str());
     goto build_return;
