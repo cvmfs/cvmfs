@@ -67,4 +67,8 @@ inline void platform_disable_kcache(int filedes) {
   posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
 
+inline int platform_readahead(int filedes) {
+  return readahead(filedes, 0, static_cast<size_t>(-1));
+}
+
 #endif  // CVMFS_PLATFORM_LINUX_H_

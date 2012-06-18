@@ -366,6 +366,18 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest) {
   return result;
 }
 
+bool CompressPath2File(const string &src, FILE *fdest, 
+                       hash::Any *compressed_hash)
+{
+  FILE *fsrc = fopen(src.c_str(), "r");
+  if (!fsrc)
+    return false;
+  
+  bool retval = CompressFile2File(fsrc, fdest, compressed_hash);
+  fclose(fsrc);
+  return retval;
+}
+
 
 bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash) {
   int z_ret, flush;

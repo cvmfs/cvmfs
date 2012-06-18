@@ -41,9 +41,10 @@ class Manifest;
 namespace publish {
 
 /**
- *  If we encounter a file with linkcount > 1 it will be added to a HardlinkGroup
- *  After processing all files, the HardlinkGroups are populated with related hardlinks
- *  Assertion: linkcount == HardlinkGroup::hardlinks.size() at the end!!
+ * If we encounter a file with linkcount > 1 it will be added to a HardlinkGroup
+ * After processing all files, the HardlinkGroups are populated with 
+ * related hardlinks
+ * Assertion: linkcount == HardlinkGroup::hardlinks.size() at the end!!
  */
 
 struct HardlinkGroup {

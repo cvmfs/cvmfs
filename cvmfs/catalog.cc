@@ -4,6 +4,9 @@
 
 #include "catalog.h"
 
+#include <errno.h>
+
+#include "platform.h"
 #include "catalog_mgr.h"
 #include "util.h"
 #include "logging.h"
@@ -74,6 +77,22 @@ bool Catalog::OpenDatabase(const string &db_path) {
     return false;
   }
   sqlite3_extended_result_codes(database_, 1);
+  
+  // Read-ahead into file system buffers
+  int fd_readahead = open(db_path.c_str(), O_RDONLY);
+  if (fd_readahead < 0) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to open %s for read-ahead (%d)",
+             db_path.c_str(), errno);
+    return false;
+  }
+  int retval = platform_readahead(fd_readahead);
+  if (retval != 0) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to read-ahead %s (%d)",
+             db_path.c_str(), errno);
+    close(fd_readahead);
+    return false;
+  }
+  close(fd_readahead);
 
   // Turbo mode
   //SqlStatement transaction(database_, "PRAGMA locking_mode=EXCLUSIVE;");

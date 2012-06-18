@@ -21,7 +21,10 @@
 #include "cvmfs_config.h"
 #include "cvmfs_sync.h"
 
+#include <fcntl.h>
+
 #include <cstdlib>
+#include <cstdio>
 
 #include <string>
 
@@ -179,6 +182,23 @@ int main(int argc, char **argv) {
 	SyncParameters params;
 
   umask(022);
+  
+  int pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    return upload::MainLocalSpooler("spool", "digests", "/tmp/dest");
+  }
+  
+  upload::Spooler *myspooler = new upload::Spooler("spool", "digests");
+  bool retval = myspooler->Connect();
+  printf("spooler connected: %d\n", retval);
+  myspooler->Spool("/tmp/spool/bla", "", true);
+  while (!myspooler->IsIdle()) {
+    sleep(1);
+  }
+  
+  delete myspooler;  
+  return 0;
 
   if (!monitor::Init(".", false)) {
 		PrintError("Failed to init watchdog");
@@ -189,16 +209,13 @@ int main(int argc, char **argv) {
 	if (!ParseParams(argc, argv, &params)) return 1;
 	if (!CheckParams(&params)) return 2;
    
+  // Create a new root hash.  As a side effect, upload new files and catalogs.
   Manifest *manifest = NULL;
   if (params.new_repository) {
     manifest = 
       catalog::WritableCatalogManager::CreateRepository(params.dir_temp,
                                                         *params.forklift);
     if (!manifest) {
-      PrintError("Failed to create new repository");
-      return 1;
-    }
-    if (!manifest->Export(params.manifest_path)) {
       PrintError("Failed to create new repository");
       return 1;
     }
@@ -213,7 +230,12 @@ int main(int argc, char **argv) {
     publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
                                 params.dir_scratch);
 
-    manifest = sync.Traverse(); 
+    sync.Traverse();
+    manifest = mediator.Commit();
+
+    download::Fini();
+    monitor::Fini();
+    
     if (!manifest) {
       PrintError("something went wrong during sync");
       return 4;
@@ -225,9 +247,6 @@ int main(int argc, char **argv) {
     return 5;
   }
   delete manifest;
-  
-  download::Fini();
-  monitor::Fini();
 
 	return 0;
 }

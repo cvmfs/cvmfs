@@ -82,6 +82,11 @@ inline void platform_disable_kcache(int filedes) {
   fcntl(filedes, F_NOCACHE, 1);
 }
 
+inline int platform_readahead(int filedes) {
+  // TODO: is there a readahead equivalent?
+  return 0;
+}
+
 /**
  * strdupa does not exist on OSX
  */
