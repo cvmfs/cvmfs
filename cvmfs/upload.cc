@@ -113,6 +113,7 @@ int MainLocalSpooler(const string &fifo_paths,
   
 Spooler::Spooler(const string &fifo_paths, const string &fifo_digests) {
   atomic_init64(&num_pending_);
+  atomic_init64(&num_errors_);
   fifo_paths_ = fifo_paths;
   fifo_digests_ = fifo_digests;
   spooler_callback_ = NULL;
@@ -137,7 +138,7 @@ void *Spooler::MainReceive(void *caller) {
   string local_path;
   int result = -1;
   int retval;
-  while ((retval = getc_unlocked(spooler->fdigests_)) != EOF) {
+  while ((retval = getc(spooler->fdigests_)) != EOF) {
     char next_char = retval;
     
     if (next_char == '\0') {
@@ -148,6 +149,8 @@ void *Spooler::MainReceive(void *caller) {
       line.clear();
     } else if (next_char == '\n') {
       printf("received: %s %d %s\n", local_path.c_str(), result, line.c_str());
+      if (result != 0)
+        atomic_inc64(&spooler->num_errors_);
       if (spooler->spooler_callback())
         (*spooler->spooler_callback())(local_path, result, line);
       
@@ -189,19 +192,33 @@ bool Spooler::Connect() {
 }
 
   
-void Spooler::Spool(const string &local_path, const string &remote_path,
-                    const bool compress)
+void Spooler::SpoolProcess(const string &local_path, const string &remote_dir,
+                           const string &file_postfix)
 {
+  string line = local_path;
+  line.push_back('\0');
+  line.append(remote_dir);
+  line.push_back('\0');
+  line.append(file_postfix);
+  line.push_back('\0');
+  line.append(StringifyInt(1));
+  line.push_back('\n');
+  WritePipe(fd_paths_, line.data(), line.size());
+  atomic_inc64(&num_pending_);
+}
+  
+
+void Spooler::SpoolCopy(const string &local_path, const string &remote_path) {
   string line = local_path;
   line.push_back('\0');
   line.append(remote_path);
   line.push_back('\0');
   line.push_back('\0');
-  line.append(StringifyInt(compress));
+  line.append(StringifyInt(0));
   line.push_back('\n');
   WritePipe(fd_paths_, line.data(), line.size());
   atomic_inc64(&num_pending_);
-} 
+}
 
   
 Forklift *CreateForklift(const std::string &upstream) {

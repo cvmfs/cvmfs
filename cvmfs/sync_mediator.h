@@ -101,15 +101,10 @@ private:
 	 *  the queues will processed en bloc (for parallelization purposes) and afterwards added
 	 */
   pthread_mutex_t lock_file_queue_;
-  uint64_t num_files_process;
 	SyncItemList mFileQueue;
 	HardlinkGroupList mHardlinkQueue;
-  pthread_t thread_receive_;
 
 	const SyncParameters *params_;
-  int pipe_fanout_;
-  int pipe_hashes_;
-
 public:
 	SyncMediator(catalog::WritableCatalogManager *catalogManager,
 	             const SyncParameters *params);
@@ -206,12 +201,6 @@ private:
 
 	void CreateNestedCatalog(SyncItem &requestFile);
 	void RemoveNestedCatalog(SyncItem &requestFile);
-
-	void CompressAndHashFileQueue();
-	void AddFileQueueToCatalogs();
-
-	inline bool AddFileToDatastore(SyncItem &entry, hash::Any &hash) { return AddFileToDatastore(entry, "", hash); }
-	bool AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::Any &hash);
 
 	inline HardlinkGroupMap& GetHardlinkMap() { return mHardlinkStack.top(); }
 
