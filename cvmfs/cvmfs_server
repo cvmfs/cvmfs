@@ -373,28 +373,30 @@ EOF
     -d $pipe_digests \
     -l $repository_dir \
     -o ${temp_dir}/new_manifest" > /dev/null
-  #su $cvmfs_user -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
-  #  -k /etc/cvmfs/keys/${name}.key \
-  #  -n $name \
-  #  -t $temp_dir \
-  #  -r $upstream \
-  #  -m ${temp_dir}/new_manifest" > /dev/null
-  #echo "done"
+  su $cvmfs_user -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    -m ${temp_dir}/new_manifest \
+    -t $temp_dir \
+    -p $pipe_paths \
+    -d $pipe_digests \
+    -l $repository_dir" > /dev/null
+  echo "done"
   
   #echo -n "Waiting for inital repository to become available on Stratum 0..."
   # TODO
   #echo "done"
 
-  #echo -n "Mounting CernVM-FS Storage... "
-  #cat >> /etc/fstab << EOF
-#$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
-#aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
-#EOF
-  #mount $rdonly_dir > /dev/null
-  #mount /cvmfs/$name
-  #echo "done"
+  echo -n "Mounting CernVM-FS Storage... "
+  cat >> /etc/fstab << EOF
+$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
+EOF
+  mount $rdonly_dir > /dev/null
+  mount /cvmfs/$name
+  echo "done"
 
-  #echo -n "Starting services... "
+  echo -n "Starting services... "
   #transaction $name $spool_dir > /dev/null
   #echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   #CVMFS_PUBLISH_OPTIONS="-z"

@@ -158,10 +158,10 @@ Manifest *WritableCatalogManager::CreateRepository(
                      "/data" + hash_catalog.MakePath(1, 2) + "C");
   while (!spooler->IsIdle())
     sleep(1);
+  unlink(file_path_compressed.c_str());
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
              file_path_compressed.c_str());
-    unlink(file_path_compressed.c_str());
     return false;
   }
   
