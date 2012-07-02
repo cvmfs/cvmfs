@@ -251,8 +251,6 @@ mkfs() {
   local temp_dir="${spool_dir}/tmp"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
-  local pipe_cset_ready="${spool_dir}/cset_ready"
-  local pipe_root_hash="${spool_dir}/new_root_hash"
   local repository_dir=$(get_local_upstream $upstream)
   local repository_pipe=$(get_pipe_upstream $upstream)
   if [ x"$repository_pipe" = x"DEFAULT" ]; then
@@ -353,7 +351,7 @@ EOF
 
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir
-  mkfifo -m 0660 $pipe_paths $pipe_digests $pipe_cset_ready $pipe_root_hash
+  mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user /cvmfs/$name $spool_dir
   if [ x"$repository_pipe" != x ]; then
     [ -p $repository_pipe ] || mkfifo -m 0660 $repository_pipe
@@ -383,9 +381,9 @@ EOF
     -l $repository_dir" > /dev/null
   echo "done"
   
-  #echo -n "Waiting for inital repository to become available on Stratum 0..."
+  echo -n "Waiting for inital repository to become available on Stratum 0..."
   # TODO
-  #echo "done"
+  echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF

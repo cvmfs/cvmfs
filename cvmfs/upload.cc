@@ -48,7 +48,6 @@ int MainLocalSpooler(const string &fifo_paths,
     char next_char = retval;
 
     if (next_char == '\0') {
-      // Read error code
       if (local_path.empty())
         local_path = line;
       else if (remote_path.empty())
@@ -57,6 +56,17 @@ int MainLocalSpooler(const string &fifo_paths,
         path_postfix = line;
       line.clear();
     } else if (next_char == '\n') {
+      // End of Transaction?
+      if (local_path.empty()) {
+        printf("sending transaction ack back\n");
+        string return_line = "0";
+        return_line.push_back('\0');
+        return_line.push_back('\0');
+        return_line.push_back('\n');
+        WritePipe(fd_digests, return_line.data(), return_line.length());
+        break;
+      }
+      
       carbon_copy = (line == "0");
       remote_path = upstream_basedir + "/" + remote_path;
       printf("Spooler received line: local %s remote %s postfix %s carbon copy %d\n", local_path.c_str(), remote_path.c_str(), path_postfix.c_str(), carbon_copy);
@@ -153,11 +163,15 @@ void *Spooler::MainReceive(void *caller) {
         atomic_inc64(&spooler->num_errors_);
       if (spooler->spooler_callback())
         (*spooler->spooler_callback())(local_path, result, line);
+      atomic_dec64(&(spooler->num_pending_));
+      
+      // End of transaction
+      if (local_path.empty())
+        break;
       
       result = -1;
       local_path.clear();
       line.clear();
-      atomic_dec64(&(spooler->num_pending_));
     } else {
       line.push_back(next_char);
     }
@@ -201,7 +215,7 @@ void Spooler::SpoolProcess(const string &local_path, const string &remote_dir,
   line.push_back('\0');
   line.append(file_postfix);
   line.push_back('\0');
-  line.append(StringifyInt(1));
+  line.push_back('1');
   line.push_back('\n');
   WritePipe(fd_paths_, line.data(), line.size());
   atomic_inc64(&num_pending_);
@@ -214,7 +228,18 @@ void Spooler::SpoolCopy(const string &local_path, const string &remote_path) {
   line.append(remote_path);
   line.push_back('\0');
   line.push_back('\0');
-  line.append(StringifyInt(0));
+  line.push_back('0');
+  line.push_back('\n');
+  WritePipe(fd_paths_, line.data(), line.size());
+  atomic_inc64(&num_pending_);
+}
+  
+void Spooler::EndOfTransaction() {
+  string line = "";
+  line.push_back('\0');
+  line.push_back('\0');
+  line.push_back('\0');
+  line.push_back('0');
   line.push_back('\n');
   WritePipe(fd_paths_, line.data(), line.size());
   atomic_inc64(&num_pending_);

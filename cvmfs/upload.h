@@ -36,6 +36,7 @@ class Spooler {
                     const std::string &remote_dir,
                     const std::string &file_postfix);
   void SpoolCopy(const std::string &local_path, const std::string &remote_path);
+  void EndOfTransaction();
   
   bool IsIdle() { return atomic_read64(&num_pending_) == 0; }
   uint64_t num_errors() { return atomic_read64(&num_errors_); }

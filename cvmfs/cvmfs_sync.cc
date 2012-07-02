@@ -100,7 +100,7 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
         break;
       case 'l':
         params->local_spooler = true;
-        params->local_upstream = optarg;
+        params->local_upstream = MakeCanonicalPath(optarg);
         break;
 
       // Switches

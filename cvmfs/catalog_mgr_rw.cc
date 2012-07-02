@@ -155,7 +155,8 @@ Manifest *WritableCatalogManager::CreateRepository(
   
   // Upload catalog
   spooler->SpoolCopy(file_path_compressed, 
-                     "/data" + hash_catalog.MakePath(1, 2) + "C");
+                     "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler->EndOfTransaction();
   while (!spooler->IsIdle())
     sleep(1);
   unlink(file_path_compressed.c_str());

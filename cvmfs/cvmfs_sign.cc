@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
     }
     free(compr_buf);
 
-    const string cert_hash_path = "/data" + certificate_hash.MakePath(1, 2) 
+    const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2) 
                                   + "X";
     spooler->SpoolCopy(cert_path_tmp, cert_hash_path);
 
@@ -273,8 +273,9 @@ int main(int argc, char **argv) {
     fclose(fmanifest);
     
     // Upload manifest
-    spooler->SpoolCopy(manifest_path, "/.cvmfspublished");
+    spooler->SpoolCopy(manifest_path, ".cvmfspublished");
     
+    spooler->EndOfTransaction();
     while (!spooler->IsIdle()) {
       sleep(1);
     }
