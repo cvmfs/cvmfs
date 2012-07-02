@@ -1,0 +1,14 @@
+#!/bin/bash
+
+cvmfs_cfg=/usr/local/bin/cvmfs_config
+
+if [ -f $cvmfs_cfg ]; then
+  $cvmfs_cfg setup &> /tmp/cvmfs_postinstall
+  if [ $? -ne 0 ]; then
+    echo "Configuring cvmfs failed." >> /tmp/cvmfs_postinstall
+    exit 1
+  fi
+else
+  echo "Could not find cvmfs_config script in $cvmfs_config!" >> /tmp/cvmfs_postinstall
+  exit 2
+fi
