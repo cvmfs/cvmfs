@@ -23,7 +23,7 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-void *MainReceive(void *data) {
+/*void *MainReceive(void *data) {
   SyncMediator *mediator = (SyncMediator *)data;
 
   FILE *fpipe_hashes = fdopen(mediator->pipe_hashes_, "r");
@@ -66,7 +66,7 @@ void *MainReceive(void *data) {
   fclose(fpipe_hashes);
 
   return NULL;
-}
+}*/
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
                            const SyncParameters *params) :
@@ -74,63 +74,6 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
   params_(params)
 {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
-  assert(retval == 0);
-  num_files_process = 0;
-
-  if (params_->process_locally) {
-    if (fork() == 0) {
-      FILE *pipe_paths = fopen(params_->paths_out.c_str(), "r");
-      int pipe_hashes = open(params_->hashes_in.c_str(), O_WRONLY);
-      char c;
-      string path;
-      while ((c = fgetc(pipe_paths)) != EOF) {
-        if (c == '\n') {
-          string path_compressed;
-          FILE *file_compressed =
-          CreateTempFile(params_->dir_temp + "/compressing",
-                         kDefaultFileMode, "w", &path_compressed);
-          assert(file_compressed);
-
-          LogCvmfs(kLogCvmfs, kLogStdout, "compressing and hashing %s", path.c_str());
-          FILE *file_source = fopen(path.c_str(), "r");
-          assert(file_source);
-          hash::Any hash(hash::kSha1);
-          int retval = zlib::CompressFile2File(file_source, file_compressed,
-                                               &hash);
-          assert(retval);
-          fclose(file_compressed);
-          fclose(file_source);
-
-          const string path_dest = "/data" + hash.MakePath(1, 2);
-          retval = params->forklift->Move(path_compressed, path_dest);
-          assert(retval);
-          string to_pipe = "0";
-          to_pipe.push_back('\0');
-          to_pipe.append(path);
-          to_pipe.push_back('\0');
-          to_pipe.append(hash.ToString());
-          to_pipe.push_back('\n');
-          WritePipe(pipe_hashes, to_pipe.data(), to_pipe.length());
-
-          path = "";
-        } else {
-          path.append(1, c);
-        }
-      }
-      fclose(pipe_paths);
-      close(pipe_hashes);
-      _exit(0);
-    }
-  }
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "connecting to %s",
-           params->paths_out.c_str());
-  pipe_fanout_ = open(params_->paths_out.c_str(), O_WRONLY);
-  LogCvmfs(kLogCvmfs, kLogStdout, "connecting to %s",
-           params->hashes_in.c_str());
-  pipe_hashes_ = open(params_->hashes_in.c_str(), O_RDONLY);
-  LogCvmfs(kLogCvmfs, kLogStdout, "starting receiver thread");
-  retval = pthread_create(&thread_receive_, NULL, MainReceive, (void *)this);
   assert(retval == 0);
 
   LogCvmfs(kLogCvmfs, kLogStdout, "processing changes...");
@@ -163,6 +106,7 @@ void SyncMediator::Add(SyncItem &entry) {
 	}
 }
 
+  
 void SyncMediator::Touch(SyncItem &entry) {
   PrintWarning("TOUCH entry:" + entry.GetRelativePath());
 	if (entry.IsDirectory()) {
@@ -180,6 +124,7 @@ void SyncMediator::Touch(SyncItem &entry) {
 	}
 }
 
+  
 void SyncMediator::Remove(SyncItem &entry) {
   PrintWarning("REMOVE entry:" + entry.GetRelativePath());
 	if (entry.IsDirectory()) {
@@ -202,6 +147,7 @@ void SyncMediator::Remove(SyncItem &entry) {
 	}
 }
 
+  
 void SyncMediator::Replace(SyncItem &entry) {
   PrintWarning("REPLACE entry:" + entry.GetRelativePath());
 	// an entry is just a representation of a filename
@@ -213,6 +159,7 @@ void SyncMediator::Replace(SyncItem &entry) {
 void SyncMediator::EnterDirectory(SyncItem &entry) {
 	HardlinkGroupMap newMap;
 	mHardlinkStack.push(newMap);
+
 }
 
 void SyncMediator::LeaveDirectory(SyncItem &entry,
@@ -224,58 +171,21 @@ void SyncMediator::LeaveDirectory(SyncItem &entry,
 	mHardlinkStack.pop();
 }
 
+  
 Manifest *SyncMediator::Commit() {
-	CompressAndHashFileQueue();
-	AddFileQueueToCatalogs();
+  while (!params_->spooler->IsIdle()) {
+    sleep(1);
+  }
+  
 	mCatalogManager->PrecalculateListings();
 	return mCatalogManager->Commit();
 }
 
 
 /**** EXPERIMENTAL *****/
+  
 
-void SyncMediator::CompressAndHashFileQueue() {
-
-  close(pipe_fanout_);
-  pthread_join(thread_receive_, NULL);
-
-  return;
-}
-
-/*	// compressing and hashing files
-	// TODO: parallelize this!
-	SyncItemList::iterator i;
-	SyncItemList::const_iterator iend;
-	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		hash::Any hash(hash::kSha1);
-		//EXP AddFileToDatastore(*i, hash);
-		//EXP i->SetContentHash(hash);
-	}
-
-	// compressing and hashing files in hardlink groups
-	// (hardlinks point to the same "data", therefore we only have to compress it once)
-	HardlinkGroupList::iterator j;
-	HardlinkGroupList::const_iterator jend;
-	SyncItemList::iterator k;
-	SyncItemList::const_iterator kend;
-	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
-		// hardlinks to anything else (mostly symlinks) do not have to be compressed
-		if (not j->masterFile.IsRegularFile()) {
-			continue;
-		}
-
-		// compress the master file
-		hash::Any hash(hash::kSha1);
-		AddFileToDatastore(j->masterFile, hash);
-
-		// distribute the obtained hash for every hardlink
-		for (k = j->hardlinks.begin(), kend = j->hardlinks.end(); k != kend; ++k) {
-			//EXP k->SetContentHash(hash);
-		}
-	}
-}*/
-
-void SyncMediator::AddFileQueueToCatalogs() {
+/*void SyncMediator::AddFileQueueToCatalogs() {
 	// don't do things you could regret later on
 	if (params_->dry_run) {
 		return;
@@ -292,57 +202,8 @@ void SyncMediator::AddFileQueueToCatalogs() {
 	for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
     AddHardlinkGroup(*j);
 	}
-}
+}*/
 
-bool SyncMediator::AddFileToDatastore(SyncItem &entry, const std::string &suffix, hash::Any &hash) {
-	// don't do that, would change something!
-	if (params_->dry_run) {
-		return true;
-	}
-
-	bool result = false;
-	/* Create temporary file */
-	const string templ = params_->dir_temp + "/compressing.XXXXXX";
-	char *tmp_path = (char *)smalloc(templ.length() + 1);
-	strncpy(tmp_path, templ.c_str(), templ.length() + 1);
-	int fd_dst = mkstemp(tmp_path);
-
-	if ((fd_dst >= 0) && (fchmod(fd_dst, kDefaultFileMode) == 0)) {
-		/* Compress and calculate SHA1 */
-		FILE *fsrc = NULL, *fdst = NULL;
-		if ( (fsrc = fopen(entry.GetScratchPath().c_str(), "r")) &&
-		     (fdst = fdopen(fd_dst, "w")) &&
-         zlib::CompressFile2File(fsrc, fdst, &hash) )
-		{
-			const string sha1str = hash.ToString();
-			const string cache_path = "TODO - DATA DIRECTORY/" + sha1str.substr(0, 2) + "/" +
-			sha1str.substr(2) + suffix;
-			fflush(fdst);
-			if (rename(tmp_path, cache_path.c_str()) == 0) {
-				result = true;
-			} else {
-				unlink(tmp_path);
-				stringstream ss;
-				ss << "could not rename " << tmp_path << " to " << cache_path;
-				PrintWarning(ss.str());
-			}
-		} else {
-			stringstream ss;
-			ss << "could not compress " << entry.GetScratchPath();
-			PrintWarning(ss.str());
-		}
-		if (fsrc) fclose(fsrc);
-		if (fdst) fclose(fdst);
-	} else {
-		stringstream ss;
-		ss << "could not create temporary file " << templ;
-		PrintWarning(ss.str());
-		result = false;
-	}
-	free(tmp_path);
-
-	return result;
-}
 
 void SyncMediator::InsertHardlink(SyncItem &entry) {
 	uint64_t inode = entry.GetUnionInode();
@@ -527,13 +388,13 @@ void SyncMediator::AddFile(SyncItem &entry) {
 	  // symlinks have no 'actual' file content, which would have to be compressed...
 		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.relative_parent_path());
 	} else {
-	  // push the file in the queue for later post-processing
+	  // Push the file in the queue for later post-processing
     pthread_mutex_lock(&lock_file_queue_);
-    num_files_process++;
 		mFileQueue[entry.GetRelativePath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
-    const string full_path = params_->dir_union + "/" + entry.GetRelativePath() + "\n";
-    WritePipe(pipe_fanout_, full_path.data(), full_path.length());
+    // Spool the file
+    params_->spooler->SpoolProcess(
+      params_->dir_union + "/" + entry.GetRelativePath(), "/data", "");
 	}
 }
 

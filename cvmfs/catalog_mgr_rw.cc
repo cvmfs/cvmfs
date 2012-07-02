@@ -26,12 +26,12 @@ namespace catalog {
 WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
                                                const std::string &stratum0,
                                                const string &dir_temp,
-                                               const upload::Forklift *forklift)
+                                               const upload::Spooler *spooler)
 {
   base_hash_ = base_hash;
   stratum0_ = stratum0;
   dir_temp_ = dir_temp;
-  forklift_ = forklift;
+  spooler_ = spooler;
   Init();
 }
 
@@ -107,8 +107,9 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  * It is uploaded by a Forklift to the upstream storage.
  * @return true on success, false otherwise
  */
-Manifest *WritableCatalogManager::CreateRepository(const string &dir_temp,
-                                              const upload::Forklift &forklift) 
+Manifest *WritableCatalogManager::CreateRepository(
+  const string &dir_temp,
+  upload::Spooler *spooler) 
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
@@ -151,28 +152,15 @@ Manifest *WritableCatalogManager::CreateRepository(const string &dir_temp,
   // Create manifest
   const string manifest_path = dir_temp + "/manifest";
   Manifest *manifest = new Manifest(hash_catalog, "");
-  /*retval = manifest.Export(manifest_path);
-  if (!retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to create manifest %s",
-             manifest_path.c_str());
-    unlink(file_path_compressed.c_str());
-    return NULL;
-  }
   
-  // Upload
-  retval = forklift.Move(manifest_path, "/.cvmfspublished");
-  if (!retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to commit manifest %s (%s)",
-             manifest_path.c_str(), forklift.GetLastError().c_str());
-    unlink(file_path_compressed.c_str());
-    unlink(manifest_path.c_str());
-    return false;
-  }*/
-  retval = forklift.Move(file_path_compressed, 
-                         "/data" + hash_catalog.MakePath(1, 2) + "C");
-  if (!retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s (%s)",
-             file_path_compressed.c_str(), forklift.GetLastError().c_str());
+  // Upload catalog
+  spooler->SpoolCopy(file_path_compressed, 
+                     "/data" + hash_catalog.MakePath(1, 2) + "C");
+  while (!spooler->IsIdle())
+    sleep(1);
+  if (spooler->num_errors() > 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
+             file_path_compressed.c_str());
     unlink(file_path_compressed.c_str());
     return false;
   }
@@ -665,13 +653,13 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 	}
   
   // Upload catalog
-  if (!forklift_->Move(catalog->database_path() + ".compressed",
-                       "/data" + hash_catalog.MakePath(1, 2) + "C"))
+  /*if (!spooler_->Spool(catalog->database_path() + ".compressed", 
+                       "/data" + hash_catalog.MakePath(1, 2) + "C", false))
   {
     PrintError("could not commit catalog " + catalog->path().ToString());
     unlink((catalog->database_path() + ".compressed").c_str());
     return hash::Any();
-  }
+  }*/
   
 	/* Update registered catalog SHA1 in nested catalog */
 	if (!catalog->IsRoot()) {

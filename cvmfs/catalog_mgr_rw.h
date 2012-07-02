@@ -28,7 +28,7 @@
 #include "catalog_mgr.h"
 
 namespace upload {
-class Forklift;
+class Spooler;
 }
 class Manifest;
 
@@ -39,9 +39,9 @@ class WritableCatalogManager : public AbstractCatalogManager {
   WritableCatalogManager(const hash::Any &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
-                         const upload::Forklift *forklift);
+                         const upload::Spooler *spooler);
   static Manifest *CreateRepository(const std::string &dir_temp, 
-                                    const upload::Forklift &forklift);
+                                    upload::Spooler *spooler);
 
   bool Init();
 
@@ -118,7 +118,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
   hash::Any base_hash_;
   std::string stratum0_;
   std::string dir_temp_;
-  const upload::Forklift *forklift_;
+  const upload::Spooler *spooler_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

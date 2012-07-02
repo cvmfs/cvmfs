@@ -6,6 +6,8 @@
 #define CVMFS_UPLOAD_H_
 
 #include <pthread.h>
+#include <stdint.h>
+
 #include <cstdio>
 #include <string>
 #include "atomic.h"
@@ -30,14 +32,19 @@ class Spooler {
   bool Connect();
   void SetCallback(SpoolerCallback *value) { spooler_callback_ = value; }
   SpoolerCallback *spooler_callback() { return spooler_callback_; }
-  void Spool(const std::string &local_path, const std::string &remote_path,
-             const bool compress);
+  void SpoolProcess(const std::string &local_path, 
+                    const std::string &remote_dir,
+                    const std::string &file_postfix);
+  void SpoolCopy(const std::string &local_path, const std::string &remote_path);
+  
   bool IsIdle() { return atomic_read64(&num_pending_) == 0; }
+  uint64_t num_errors() { return atomic_read64(&num_errors_); }
 
  private:
   static void *MainReceive(void *caller);
   
   atomic_int64 num_pending_;
+  atomic_int64 num_errors_;
   std::string fifo_paths_;
   std::string fifo_digests_;
   SpoolerCallback *spooler_callback_;

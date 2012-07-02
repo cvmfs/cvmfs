@@ -10,14 +10,15 @@
 
 struct SyncParameters {
   SyncParameters() { 
-    forklift = NULL; 
     print_changeset = false;
     dry_run = false;
     mucatalogs = false;
-    process_locally = false;
     new_repository = false;
+    local_spooler = false;
+    spooler = NULL;
   }
   
+  upload::Spooler *spooler;
 	std::string dir_union;
   std::string dir_scratch;
 	std::string dir_rdonly;
@@ -25,14 +26,14 @@ struct SyncParameters {
   std::string base_hash;
   std::string stratum0;
   std::string paths_out;
-  std::string hashes_in;
+  std::string digests_in;
   std::string manifest_path;
-  upload::Forklift *forklift;
+  std::string local_upstream;
 	bool print_changeset;
 	bool dry_run;
 	bool mucatalogs;
-  bool process_locally;
   bool new_repository;
+  bool local_spooler;
 };
 
 #endif  // CVMFS_SYNC_H_
