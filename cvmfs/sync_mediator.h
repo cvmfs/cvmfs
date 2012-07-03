@@ -67,8 +67,21 @@ struct HardlinkGroup {
  *  a mapping of inode number to the related HardlinkGroup
  */
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
-
-void *MainReceive(void *data);
+  
+  
+/**
+ * Callback object for newly added files.  The callback sets the hash.
+ */
+class SyncMediator;
+class PublishFilesCallback : public upload::SpoolerCallback {
+ public:
+  PublishFilesCallback(SyncMediator *mediator);
+  void Callback(const std::string &path, int retval, 
+                const std::string &digest);
+ private:
+  SyncMediator *mediator_;
+};
+  
 
 /**
  *  The SyncMediator refines the input received from a concrete UnionSync object
@@ -78,12 +91,11 @@ void *MainReceive(void *data);
  *  Furthermore it handles the data compression and storage
  */
 class SyncMediator {
-  friend void *MainReceive(void *data);
-private:
+  friend class PublishFilesCallback;
+ private:
 	typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
 	typedef std::list<HardlinkGroup> HardlinkGroupList;
 
-private:
   catalog::WritableCatalogManager *mCatalogManager;
   SyncUnion *mUnionEngine;
 
@@ -105,7 +117,7 @@ private:
 	HardlinkGroupList mHardlinkQueue;
 
 	const SyncParameters *params_;
-public:
+ public:
 	SyncMediator(catalog::WritableCatalogManager *catalogManager,
 	             const SyncParameters *params);
 
@@ -213,6 +225,6 @@ private:
   }
 };  // class SyncMediator
 
-}  // namespace sync
+}  // namespace publish
 
 #endif  // CVMFS_SYNC_MEDIATOR_H_

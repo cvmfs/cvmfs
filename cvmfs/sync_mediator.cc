@@ -67,6 +67,10 @@ namespace publish {
 
   return NULL;
 }*/
+  
+void CallbackFiles(const string &path, int retval, const string &digest) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "callback for %s, digest %s, retval %d", path.c_str(), digest.c_str(), retval);  
+}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
                            const SyncParameters *params) :
@@ -76,6 +80,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
+  params->spooler->SetCallback(&CallbackFiles);
   LogCvmfs(kLogCvmfs, kLogStdout, "processing changes...");
 }
 
@@ -394,7 +399,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
     params_->spooler->SpoolProcess(
-      params_->dir_union + "/" + entry.GetRelativePath(), "/data", "");
+      params_->dir_union + "/" + entry.GetRelativePath(), "data", "");
 	}
 }
 
