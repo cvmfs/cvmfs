@@ -80,7 +80,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
-  params->spooler->SetCallback(&CallbackFiles);
+  // TODO: params->spooler->SetCallback(&CallbackFiles);
   LogCvmfs(kLogCvmfs, kLogStdout, "processing changes...");
 }
 
