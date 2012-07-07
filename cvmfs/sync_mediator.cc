@@ -68,10 +68,34 @@ namespace publish {
   return NULL;
 }*/
   
-void CallbackFiles(const string &path, int retval, const string &digest) {
-  LogCvmfs(kLogCvmfs, kLogStdout, "callback for %s, digest %s, retval %d", path.c_str(), digest.c_str(), retval);  
+PublishFilesCallback::PublishFilesCallback(SyncMediator *mediator) {
+  assert(mediator);
+  mediator_ = mediator;
 }
-
+  
+void PublishFilesCallback::Callback(const std::string &path, int retval, 
+                                    const std::string &digest)
+{
+  LogCvmfs(kLogCvmfs, kLogStdout, "callback for %s, digest %s, retval %d", path.c_str(), digest.c_str(), retval);
+  if (retval != 0)
+    return;
+  hash::Any hash(hash::kSha1, hash::HexPtr(digest));
+  
+  pthread_mutex_lock(&mediator_->lock_file_queue_);
+  SyncItemList::iterator itr = mediator_->mFileQueue.find(path);
+  if (itr == mediator_->mFileQueue.end()) {
+    cout << "IN FILE QUEUE" << endl;
+    cout << path << endl;
+    for (SyncItemList::const_iterator i = mediator_->mFileQueue.begin(); i != mediator_->mFileQueue.end(); ++i)
+      cout << "  " << i->first << endl;
+  }
+  assert(itr != mediator_->mFileQueue.end());
+  itr->second.SetContentHash(hash);
+  pthread_mutex_unlock(&mediator_->lock_file_queue_);
+  
+}
+  
+  
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
                            const SyncParameters *params) :
   mCatalogManager(catalogManager),
@@ -80,7 +104,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
-  // TODO: params->spooler->SetCallback(&CallbackFiles);
+  params->spooler->SetCallback(new PublishFilesCallback(this));
   LogCvmfs(kLogCvmfs, kLogStdout, "processing changes...");
 }
 
@@ -181,6 +205,7 @@ Manifest *SyncMediator::Commit() {
   while (!params_->spooler->IsIdle()) {
     sleep(1);
   }
+  params_->spooler->UnsetCallback();
   
 	mCatalogManager->PrecalculateListings();
 	return mCatalogManager->Commit();
@@ -395,7 +420,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
 	} else {
 	  // Push the file in the queue for later post-processing
     pthread_mutex_lock(&lock_file_queue_);
-		mFileQueue[entry.GetRelativePath()] = entry;
+		mFileQueue[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
     params_->spooler->SpoolProcess(

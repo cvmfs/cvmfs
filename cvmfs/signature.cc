@@ -65,6 +65,8 @@ void Fini() {
   }
   delete public_keys_;
   delete blacklisted_certificates_;
+  private_key_ = NULL;
+  certificate_ = NULL;
   public_keys_ = NULL;
   blacklisted_certificates_ = NULL;
 }

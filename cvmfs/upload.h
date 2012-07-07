@@ -40,6 +40,7 @@ class Spooler {
   ~Spooler();
   bool Connect();
   void SetCallback(SpoolerCallback *value) { spooler_callback_ = value; }
+  void UnsetCallback() { delete spooler_callback_; spooler_callback_ = NULL; }
   SpoolerCallback *spooler_callback() { return spooler_callback_; }
   void SpoolProcess(const std::string &local_path, 
                     const std::string &remote_dir,
