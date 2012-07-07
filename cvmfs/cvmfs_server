@@ -190,12 +190,12 @@ publish() {
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="su $user -c"
+  local repository_dir=$(get_local_upstream $upstream)
 
   publish_before_hook $name
   sudo /bin/mount -o remount,ro /cvmfs/$name
   local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
    
-  
   $user_shell "cvmfs_sync -x -u /cvmfs/$name \
     -s ${spool_dir}/scratch \
     -c ${spool_dir}/rdonly \
@@ -205,7 +205,7 @@ publish() {
     -d ${spool_dir}/digests \
     -l $repository_dir \
     -w $stratum0 \
-    -o ${temp_dir}/new_manifest" || die "Synchronization failed"
+    -o ${spool_dir}/tmp/manifest" || die "Synchronization failed"
   $user_shell "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \

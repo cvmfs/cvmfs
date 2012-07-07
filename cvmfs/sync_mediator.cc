@@ -23,56 +23,13 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-/*void *MainReceive(void *data) {
-  SyncMediator *mediator = (SyncMediator *)data;
-
-  FILE *fpipe_hashes = fdopen(mediator->pipe_hashes_, "r");
-  char c;
-  string tmp;
-  string path;
-  int error_code = -5000;
-  hash::Any hash(hash::kSha1);
-  while ((c = fgetc(fpipe_hashes)) != EOF) {
-    switch (c) {
-      case '\0':
-        if (error_code == -5000) {
-          error_code = 0;
-        } else {
-          path = tmp.substr(mediator->params_->dir_union.length()+1);
-        }
-        tmp = "";
-        break;
-      case '\n': {
-        hash = hash::Any(hash::kSha1, hash::HexPtr(tmp));
-        cout << "received: " << path << ", " << hash.ToString() << endl;
-        pthread_mutex_lock(&mediator->lock_file_queue_);
-        SyncItemList::iterator itr = mediator->mFileQueue.find(path);
-        if (itr == mediator->mFileQueue.end()) {
-          cout << path << endl;
-          for (SyncItemList::const_iterator i = mediator->mFileQueue.begin(); i != mediator->mFileQueue.end(); ++i)
-            cout << i->first << endl;
-        }
-        assert(itr != mediator->mFileQueue.end());
-        itr->second.SetContentHash(hash);
-        mediator->num_files_process--;
-        pthread_mutex_unlock(&mediator->lock_file_queue_);
-        tmp = "";
-        error_code = -5000;
-        break;
-      } default:
-        tmp.append(1, c);
-    }
-  }
-  fclose(fpipe_hashes);
-
-  return NULL;
-}*/
   
 PublishFilesCallback::PublishFilesCallback(SyncMediator *mediator) {
   assert(mediator);
   mediator_ = mediator;
 }
   
+
 void PublishFilesCallback::Callback(const std::string &path, int retval, 
                                     const std::string &digest)
 {
@@ -83,16 +40,11 @@ void PublishFilesCallback::Callback(const std::string &path, int retval,
   
   pthread_mutex_lock(&mediator_->lock_file_queue_);
   SyncItemList::iterator itr = mediator_->mFileQueue.find(path);
-  if (itr == mediator_->mFileQueue.end()) {
-    cout << "IN FILE QUEUE" << endl;
-    cout << path << endl;
-    for (SyncItemList::const_iterator i = mediator_->mFileQueue.begin(); i != mediator_->mFileQueue.end(); ++i)
-      cout << "  " << i->first << endl;
-  }
   assert(itr != mediator_->mFileQueue.end());
   itr->second.SetContentHash(hash);
   pthread_mutex_unlock(&mediator_->lock_file_queue_);
-  
+  mediator_->mCatalogManager->AddFile(itr->second.CreateCatalogDirent(), 
+                                      itr->second.relative_parent_path());
 }
   
   

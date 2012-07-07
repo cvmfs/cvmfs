@@ -26,7 +26,7 @@ namespace catalog {
 WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
                                                const std::string &stratum0,
                                                const string &dir_temp,
-                                               const upload::Spooler *spooler)
+                                               upload::Spooler *spooler)
 {
   base_hash_ = base_hash;
   stratum0_ = stratum0;
@@ -561,20 +561,19 @@ Manifest *WritableCatalogManager::Commit() {
     hash::Any hash = SnapshotCatalog(*i);
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
+      LogCvmfs(kLogCatalog, kLogStdout, "Wait for upload of catalogs");
+      while (!spooler_->IsIdle())
+        sleep(1);
+      if (spooler_->num_errors() > 0) {
+        LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
+        return false;
+      }
+      
       // .cvmfspublished
-      //LogCvmfs(kLogCatalog, kLogStdout, "Committing repository manifest");
+      LogCvmfs(kLogCatalog, kLogStdout, "Committing repository manifest");
       result = new Manifest(hash, "");
       result->set_ttl((*i)->GetTTL());
       result->set_revision((*i)->GetRevision());
-      //if (!manifest.Export(dir_temp_ + "/manifest")) {
-      //  PrintError("failed to write manifest");
-      //  return NULL;
-      //}
-      //if (!forklift_->Move(dir_temp_ + "/manifest", "/.cvmfspublished")) {
-      //  PrintError("failed to commit manifest");
-      //  unlink((dir_temp_ + "/manifest").c_str());
-      //  return NULL;
-      //}
     }
   }
 
@@ -654,13 +653,8 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 	}
   
   // Upload catalog
-  /*if (!spooler_->Spool(catalog->database_path() + ".compressed", 
-                       "/data" + hash_catalog.MakePath(1, 2) + "C", false))
-  {
-    PrintError("could not commit catalog " + catalog->path().ToString());
-    unlink((catalog->database_path() + ".compressed").c_str());
-    return hash::Any();
-  }*/
+  spooler_->SpoolCopy(catalog->database_path() + ".compressed",
+                      "data" + hash_catalog.MakePath(1, 2) + "C");
   
 	/* Update registered catalog SHA1 in nested catalog */
 	if (!catalog->IsRoot()) {
