@@ -226,6 +226,7 @@ int main(int argc, char **argv) {
     }
   }
   
+  
   delete params.spooler;
   
   if (!manifest->Export(params.manifest_path)) {

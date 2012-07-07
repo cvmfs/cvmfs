@@ -34,8 +34,10 @@ void PublishFilesCallback::Callback(const std::string &path, int retval,
                                     const std::string &digest)
 {
   LogCvmfs(kLogCvmfs, kLogStdout, "callback for %s, digest %s, retval %d", path.c_str(), digest.c_str(), retval);
-  if (retval != 0)
-    return;
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "FAILURE!");
+    abort();
+  }
   hash::Any hash(hash::kSha1, hash::HexPtr(digest));
   
   pthread_mutex_lock(&mediator_->lock_file_queue_);
@@ -154,10 +156,14 @@ void SyncMediator::LeaveDirectory(SyncItem &entry,
 
   
 Manifest *SyncMediator::Commit() {
-  while (!params_->spooler->IsIdle()) {
+  LogCvmfs(kLogCatalog, kLogStdout, "Wait for upload of files");
+  while (!params_->spooler->IsIdle())
     sleep(1);
-  }
   params_->spooler->UnsetCallback();
+  if (params_->spooler->num_errors() > 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to commit files");
+    return NULL;
+  }
   
 	mCatalogManager->PrecalculateListings();
 	return mCatalogManager->Commit();

@@ -142,7 +142,7 @@ class FileSystemTraversal {
 
       // notify user about found directory entry
       platform_stat64 info;
-      int retval = platform_stat((path + "/" + dit->d_name).c_str(), &info);
+      int retval = platform_lstat((path + "/" + dit->d_name).c_str(), &info);
       assert(retval == 0);
       if (S_ISDIR(info.st_mode)) {
         if (Notify(foundDirectory, path, dit->d_name) && recurse_) {
