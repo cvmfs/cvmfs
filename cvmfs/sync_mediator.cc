@@ -23,14 +23,14 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-  
+
 PublishFilesCallback::PublishFilesCallback(SyncMediator *mediator) {
   assert(mediator);
   mediator_ = mediator;
 }
-  
 
-void PublishFilesCallback::Callback(const std::string &path, int retval, 
+
+void PublishFilesCallback::Callback(const std::string &path, int retval,
                                     const std::string &digest)
 {
   LogCvmfs(kLogCvmfs, kLogStdout, "callback for %s, digest %s, retval %d", path.c_str(), digest.c_str(), retval);
@@ -39,20 +39,20 @@ void PublishFilesCallback::Callback(const std::string &path, int retval,
     abort();
   }
   hash::Any hash(hash::kSha1, hash::HexPtr(digest));
-  
+
   pthread_mutex_lock(&mediator_->lock_file_queue_);
-  SyncItemList::iterator itr = mediator_->mFileQueue.find(path);
-  assert(itr != mediator_->mFileQueue.end());
+  SyncItemList::iterator itr = mediator_->file_queue_.find(path);
+  assert(itr != mediator_->file_queue_.end());
   itr->second.SetContentHash(hash);
   pthread_mutex_unlock(&mediator_->lock_file_queue_);
-  mediator_->mCatalogManager->AddFile(itr->second.CreateCatalogDirent(), 
+  mediator_->catalog_manager_->AddFile(itr->second.CreateCatalogDirent(),
                                       itr->second.relative_parent_path());
 }
-  
-  
+
+
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
                            const SyncParameters *params) :
-  mCatalogManager(catalogManager),
+  catalog_manager_(catalogManager),
   params_(params)
 {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
@@ -63,6 +63,10 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
 }
 
 
+/**
+ * Add an entry to the repository.
+ * Added directories will be traversed in order to add the complete subtree.
+ */
 void SyncMediator::Add(SyncItem &entry) {
   if (entry.IsDirectory()) {
 		AddDirectoryRecursively(entry);
@@ -89,7 +93,10 @@ void SyncMediator::Add(SyncItem &entry) {
 	}
 }
 
-  
+
+/**
+ * Touch an entry in the repository.
+ */
 void SyncMediator::Touch(SyncItem &entry) {
   PrintWarning("TOUCH entry:" + entry.GetRelativePath());
 	if (entry.IsDirectory()) {
@@ -107,7 +114,10 @@ void SyncMediator::Touch(SyncItem &entry) {
 	}
 }
 
-  
+
+/**
+ * Remove an entry from the repository. Directories will be recursively removed.
+ */
 void SyncMediator::Remove(SyncItem &entry) {
   PrintWarning("REMOVE entry:" + entry.GetRelativePath());
 	if (entry.IsDirectory()) {
@@ -130,7 +140,10 @@ void SyncMediator::Remove(SyncItem &entry) {
 	}
 }
 
-  
+
+/**
+ * Remove the old entry and add the new one.
+ */
 void SyncMediator::Replace(SyncItem &entry) {
   PrintWarning("REPLACE entry:" + entry.GetRelativePath());
 	// an entry is just a representation of a filename
@@ -139,22 +152,25 @@ void SyncMediator::Replace(SyncItem &entry) {
 	Add(entry);
 }
 
+
 void SyncMediator::EnterDirectory(SyncItem &entry) {
 	HardlinkGroupMap newMap;
-	mHardlinkStack.push(newMap);
-
+	hardlink_stack_.push(newMap);
 }
 
-void SyncMediator::LeaveDirectory(SyncItem &entry,
-                                  const bool complete_hardlinks) {
-	if (complete_hardlinks) {
-	  CompleteHardlinks(entry);
-  }
+
+void SyncMediator::LeaveDirectory(SyncItem &entry)
+{
+  CompleteHardlinks(entry);
 	AddHardlinkGroups(GetHardlinkMap());
-	mHardlinkStack.pop();
+	hardlink_stack_.pop();
 }
 
-  
+
+/**
+ * Do any pending processing and commit all changes to the catalogs.
+ * To be called after change set traversal is finished.
+ */
 Manifest *SyncMediator::Commit() {
   LogCvmfs(kLogCatalog, kLogStdout, "Wait for upload of files");
   while (!params_->spooler->IsIdle())
@@ -164,14 +180,14 @@ Manifest *SyncMediator::Commit() {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit files");
     return NULL;
   }
-  
-	mCatalogManager->PrecalculateListings();
-	return mCatalogManager->Commit();
+
+	catalog_manager_->PrecalculateListings();
+	return catalog_manager_->Commit();
 }
 
 
 /**** EXPERIMENTAL *****/
-  
+
 
 /*void SyncMediator::AddFileQueueToCatalogs() {
 	// don't do things you could regret later on
@@ -182,7 +198,7 @@ Manifest *SyncMediator::Commit() {
 	// add singular files
 	SyncItemList::const_iterator i, iend;
 	for (i = mFileQueue.begin(), iend = mFileQueue.end(); i != iend; ++i) {
-		mCatalogManager->AddFile(i->second.CreateCatalogDirent(), i->second.relative_parent_path());
+		catalog_manager_->AddFile(i->second.CreateCatalogDirent(), i->second.relative_parent_path());
 	}
 
 	// add hardlink groups
@@ -257,7 +273,7 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
 	}
 
 	// look for legacy hardlinks
-	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->union_path(), false);
+	FileSystemTraversal<SyncMediator> traversal(this, union_engine_->union_path(), false);
 	traversal.foundRegularFile = &SyncMediator::InsertExistingHardlinkFileCallback;
 	traversal.foundSymlink = &SyncMediator::InsertExistingHardlinkSymlinkCallback;
 	traversal.Recurse(entry.GetUnionPath());
@@ -265,13 +281,13 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
 
 void SyncMediator::InsertExistingHardlinkFileCallback(const std::string &parent_dir,
                                                       const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, kItemFile, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
   InsertExistingHardlink(entry);
 }
 
 void SyncMediator::InsertExistingHardlinkSymlinkCallback(const std::string &parent_dir,
                                                          const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, kItemSymlink, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemSymlink, union_engine_);
   InsertExistingHardlink(entry);
 }
 
@@ -281,7 +297,7 @@ void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
 	AddDirectory(entry);
 
 	// create a recursion engine, which recursively adds all entries in a newly created directory
-	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->scratch_path(), true, mUnionEngine->GetIgnoreFilenames());
+	FileSystemTraversal<SyncMediator> traversal(this, union_engine_->scratch_path(), true, union_engine_->GetIgnoreFilenames());
 	traversal.enteringDirectory = &SyncMediator::EnterAddedDirectoryCallback;
 	traversal.leavingDirectory = &SyncMediator::LeaveAddedDirectoryCallback;
 	traversal.foundRegularFile = &SyncMediator::AddFileCallback;
@@ -292,35 +308,33 @@ void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
 
 bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
                                         const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
+  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
 	AddDirectory(entry);
 	return true; // <-- tells the recursion engine to recurse further into this directory
 }
 
 void SyncMediator::AddFileCallback(const std::string &parent_dir,
                                    const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, kItemFile, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
   Add(entry);
 }
 
 void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
                                       const std::string &link_name) {
-  SyncItem entry(parent_dir, link_name, kItemSymlink, mUnionEngine);
+  SyncItem entry(parent_dir, link_name, kItemSymlink, union_engine_);
   Add(entry);
 }
 
 void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
+  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   EnterDirectory(entry);
 }
 
 void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
-  bool complete_hardlinks = false; // <-- this was a NEW directory...
-                                   //     there are no 'unchanged' hardlinks
-  LeaveDirectory(entry, complete_hardlinks);
+  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
+  LeaveDirectory(entry);
 }
 
 // -----------------------------------------------------------------------------
@@ -329,7 +343,7 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
 	// delete a directory AFTER it was emptied here,
 	// because it would start up another recursion
 
-	FileSystemTraversal<SyncMediator> traversal(this, mUnionEngine->rdonly_path());
+	FileSystemTraversal<SyncMediator> traversal(this, union_engine_->rdonly_path());
 	traversal.foundRegularFile = &SyncMediator::RemoveFileCallback;
 	traversal.foundDirectoryAfterRecursion = &SyncMediator::RemoveDirectoryCallback;
 	traversal.foundSymlink = &SyncMediator::RemoveSymlinkCallback;
@@ -341,19 +355,19 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
 
 void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
                                       const std::string &file_name) {
-  SyncItem entry(parent_dir, file_name, kItemFile, mUnionEngine);
+  SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
   Remove(entry);
 }
 
 void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
                                          const std::string &link_name) {
-  SyncItem entry(parent_dir, link_name, kItemSymlink, mUnionEngine);
+  SyncItem entry(parent_dir, link_name, kItemSymlink, union_engine_);
   Remove(entry);
 }
 
 void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name) {
-  SyncItem entry(parent_dir, dir_name, kItemDir, mUnionEngine);
+  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   RemoveDirectory(entry);
 }
 
@@ -361,12 +375,12 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
 	if (params_->print_changeset) cout << "[add] NESTED CATALOG" << endl;
-	if (not params_->dry_run)     mCatalogManager->CreateNestedCatalog(requestFile.relative_parent_path());
+	if (not params_->dry_run)     catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path());
 }
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
 	if (params_->print_changeset) cout << "[rem] NESTED CATALOG" << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveNestedCatalog(requestFile.relative_parent_path());
+	if (not params_->dry_run)     catalog_manager_->RemoveNestedCatalog(requestFile.relative_parent_path());
 }
 
 void SyncMediator::AddFile(SyncItem &entry) {
@@ -374,11 +388,11 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 	if (entry.IsSymlink() && not params_->dry_run) {
 	  // symlinks have no 'actual' file content, which would have to be compressed...
-		mCatalogManager->AddFile(entry.CreateCatalogDirent(), entry.relative_parent_path());
+		catalog_manager_->AddFile(entry.CreateCatalogDirent(), entry.relative_parent_path());
 	} else {
 	  // Push the file in the queue for later post-processing
     pthread_mutex_lock(&lock_file_queue_);
-		mFileQueue[entry.GetUnionPath()] = entry;
+		file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
     params_->spooler->SpoolProcess(
@@ -388,29 +402,29 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[rem] " << entry.GetRdOnlyPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveFile(entry.GetRelativePath());
+	if (not params_->dry_run)     catalog_manager_->RemoveFile(entry.GetRelativePath());
 }
 
 void SyncMediator::TouchFile(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[tou] " << entry.GetRdOnlyPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->TouchFile(entry.CreateCatalogDirent(),
+	if (not params_->dry_run)     catalog_manager_->TouchFile(entry.CreateCatalogDirent(),
 	                                                entry.GetRelativePath());
 }
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[add] " << entry.GetRdOnlyPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->AddDirectory(entry.CreateCatalogDirent(),
+	if (not params_->dry_run)     catalog_manager_->AddDirectory(entry.CreateCatalogDirent(),
 	                                                   entry.relative_parent_path());
 }
 
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[rem] " << entry.GetRdOnlyPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->RemoveDirectory(entry.GetRelativePath());
+	if (not params_->dry_run)     catalog_manager_->RemoveDirectory(entry.GetRelativePath());
 }
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
 	if (params_->print_changeset) cout << "[tou] " << entry.GetRdOnlyPath() << endl;
-	if (not params_->dry_run)     mCatalogManager->TouchDirectory(entry.CreateCatalogDirent(),
+	if (not params_->dry_run)     catalog_manager_->TouchDirectory(entry.CreateCatalogDirent(),
 	                                                     entry.GetRelativePath());
 }
 
@@ -420,7 +434,7 @@ void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 	   // currentHardlinkGroup = i->second; --> just to remind you
 
 		if (params_->print_changeset) {
-			cout << "[add] hardlink group around: " << i->second.masterFile.GetRdOnlyPath() << "( ";
+			cout << "[add] hardlink group around: " << i->second.master.GetRdOnlyPath() << "( ";
 			SyncItemList::const_iterator j,jend;
 			for (j = i->second.hardlinks.begin(), jend = i->second.hardlinks.end(); j != jend; ++j) {
 				cout << j->second.filename() << " ";
@@ -428,7 +442,7 @@ void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 			cout << ")" << endl;
 		}
 
-		if (i->second.masterFile.IsSymlink() && not params_->dry_run) {
+		if (i->second.master.IsSymlink() && not params_->dry_run) {
 		  // symlink hardlinks just end up in the database
 		  // (see SyncMediator::addFile() same semantics here)
       AddHardlinkGroup(i->second);
@@ -449,7 +463,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
     // EXP
     //hardlinks[k->CreateDirectoryEntry().GetRelativePath()] = k->CreateDirectoryEntry();
   }
-	mCatalogManager->AddHardlinkGroup(hardlinks, group.masterFile.relative_parent_path());
+	catalog_manager_->AddHardlinkGroup(hardlinks, group.master.relative_parent_path());
 }
 
 }  // namespace publish
