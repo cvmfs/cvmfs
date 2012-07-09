@@ -5,8 +5,8 @@
  * not to be exposed to the code using the library.
  */
 
-#ifndef CVMFS_CVMFS_H_
-#define CVMFS_CVMFS_H_
+#ifndef CVMFS_LIBCVMFS_INT_H_
+#define CVMFS_LIBCVMFS_INT_H_
 
 #include <time.h>
 #include <unistd.h>
@@ -46,7 +46,7 @@ int cvmfs_getattr(const char *c_path, struct stat *info);
 int cvmfs_listdir(const char *path,char ***buf,size_t *buflen);
 
 int cvmfs_int_init(
-  const std::string &cvmfs_opts_hostname, /* url of repository */
+  const std::string &cvmfs_opts_hostname,  // url of repository
   const std::string &cvmfs_opts_proxies,
   const std::string &cvmfs_opts_repo_name,
   const std::string &cvmfs_opts_mountpoint,
@@ -65,7 +65,6 @@ int cvmfs_int_init(
   const std::string &cvmfs_opts_tracefile,
   const std::string &cvmfs_opts_deep_mount,
   const std::string &cvmfs_opts_blacklist,
-  const std::string &cvmfs_opts_whitelist,
   int cvmfs_opts_nofiles,
   bool cvmfs_opts_enable_talk,
   bool cvmfs_opts_enable_monitor
@@ -76,4 +75,4 @@ void cvmfs_int_fini();
 
 }  // namespace cvmfs
 
-#endif  // CVMFS_CVMFS_H_
+#endif  // CVMFS_LIBCVMFS_INT_H_
