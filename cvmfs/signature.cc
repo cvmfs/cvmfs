@@ -57,7 +57,9 @@ void Init() {
 void Fini() {
   EVP_cleanup();
   if (certificate_) X509_free(certificate_);
+  certificate_ = NULL;
   if (private_key_) EVP_PKEY_free(private_key_);
+  private_key_ = NULL;
   if (!public_keys_->empty()) {
     for (unsigned i = 0; i < public_keys_->size(); ++i)
       RSA_free((*public_keys_)[i]);
