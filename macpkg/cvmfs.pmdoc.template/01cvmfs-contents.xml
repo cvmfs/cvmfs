@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+<pkg-contents spec="1.12">
+  <f n="CVMFS_Package" o="root" g="wheel" p="16877" pt="@PackageInput@" m="false" t="file">
+    <f n="etc" o="root" g="wheel" p="16877">
+      <f n="auto_cvmfs" o="root" g="wheel" p="33188">
+        <mod>group</mod>
+        <mod>owner</mod>
+      </f>
+      <f n="cvmfs" o="root" g="wheel" p="16877">
+        <f n="config.sh" o="root" g="wheel" p="33188">
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <f n="cvmfs_server_hooks.sh.demo" o="root" g="wheel" p="33277">
+          <mod>mode</mod>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <f n="default.conf" o="root" g="wheel" p="33188">
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <f n="domain.d" o="root" g="wheel" p="16877">
+          <f n="cern.ch.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <f n="keys" o="root" g="wheel" p="16877">
+          <f n="cern.ch.pub" o="root" g="wheel" p="33060">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <f n="replica.conf" o="root" g="wheel" p="33204">
+          <mod>mode</mod>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <mod>group</mod>
+        <mod>owner</mod>
+      </f>
+      <mod>group</mod>
+      <mod>owner</mod>
+    </f>
+    <f n="sbin" o="root" g="wheel" p="16877">
+      <f n="mount_cvmfs" o="root" g="wheel" p="33133">
+        <mod>group</mod>
+        <mod>owner</mod>
+      </f>
+      <mod>group</mod>
+      <mod>owner</mod>
+    </f>
+    <f n="usr" o="root" g="wheel" p="16877">
+      <f n="local" o="root" g="wheel" p="16877">
+        <f n="bin" o="root" g="wheel" p="16877">
+          <f n="cvmfs2" o="root" g="wheel" p="33261">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs2_debug" o="root" g="wheel" p="33261">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_config" o="root" g="wheel" p="33133">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_fsck" o="root" g="wheel" p="33261">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_server" o="root" g="wheel" p="33133">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_sign" o="root" g="wheel" p="33261">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_snapshot" o="root" g="wheel" p="33277">
+            <mod>mode</mod>
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_sync" o="root" g="wheel" p="33277">
+            <mod>mode</mod>
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_talk" o="root" g="wheel" p="33133">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cvmfs_zpipe" o="root" g="wheel" p="33261">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <f n="share" o="root" g="wheel" p="16877">
+          <f n="doc" o="root" g="wheel" p="16893">
+            <f n="cvmfs-2.1.0" o="root" g="wheel" p="16893">
+              <f n="AUTHORS" o="root" g="wheel" p="33204">
+                <mod>mode</mod>
+                <mod>group</mod>
+                <mod>owner</mod>
+              </f>
+              <f n="ChangeLog" o="root" g="wheel" p="33204">
+                <mod>mode</mod>
+                <mod>group</mod>
+                <mod>owner</mod>
+              </f>
+              <f n="COPYING" o="root" g="wheel" p="33204">
+                <mod>mode</mod>
+                <mod>group</mod>
+                <mod>owner</mod>
+              </f>
+              <f n="README" o="root" g="wheel" p="33204">
+                <mod>mode</mod>
+                <mod>group</mod>
+                <mod>owner</mod>
+              </f>
+              <mod>mode</mod>
+              <mod>group</mod>
+              <mod>owner</mod>
+            </f>
+            <mod>mode</mod>
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <mod>group</mod>
+        <mod>owner</mod>
+      </f>
+      <mod>group</mod>
+      <mod>owner</mod>
+    </f>
+    <mod>group</mod>
+    <mod>owner</mod>
+  </f>
+</pkg-contents>
