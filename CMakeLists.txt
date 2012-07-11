@@ -26,6 +26,11 @@ set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MI
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 #
+# force install path to /usr incase system defaults to /usr/local
+#
+set(CMAKE_INSTALL_PREFIX "/usr")
+
+#
 # check if we are on Mac OS X
 #
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
