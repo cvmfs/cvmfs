@@ -30,6 +30,9 @@ set (CPACK_SOURCE_IGNORE_FILES
 
 set (CPACK_GENERATOR TGZ)
 
+set (CPACK_SET_DESTDIR true)
+set (CPACK_INSTALL_PREFIX "/usr")
+
 if (MACOSX)
 	set (CPACK_GENERATOR ${CPACK_GENERATOR} PackageMaker) # Mac OS X pkg-package
 else (MACOSX)
