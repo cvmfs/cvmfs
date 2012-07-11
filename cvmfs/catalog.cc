@@ -77,7 +77,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
     return false;
   }
   sqlite3_extended_result_codes(database_, 1);
-  
+
   // Read-ahead into file system buffers
   int fd_readahead = open(db_path.c_str(), O_RDONLY);
   if (fd_readahead < 0) {

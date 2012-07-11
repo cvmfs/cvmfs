@@ -22,7 +22,7 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
   union_path_(union_path),
   mediator_(mediator)
 {
-  mediator_->RegisterSyncUnionEngine(this);
+  mediator_->RegisterUnionEngine(this);
 }
 
 

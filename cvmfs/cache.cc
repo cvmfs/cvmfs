@@ -644,7 +644,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
 
-  const string checksum_path = "cvmfschecksum." + repo_name_;
+  const string checksum_path = (*cache_path_) + "/cvmfschecksum." + repo_name_;
   const string checksum_url = "/.cvmfspublished";
   map<char, string> checksum_keyval;
   size_t checksum_size;

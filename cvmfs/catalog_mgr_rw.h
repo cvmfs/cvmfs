@@ -39,7 +39,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
   WritableCatalogManager(const hash::Any &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
-                         const upload::Spooler *spooler);
+                         upload::Spooler *spooler);
   static Manifest *CreateRepository(const std::string &dir_temp, 
                                     upload::Spooler *spooler);
 
@@ -118,7 +118,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
   hash::Any base_hash_;
   std::string stratum0_;
   std::string dir_temp_;
-  const upload::Spooler *spooler_;
+  upload::Spooler *spooler_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

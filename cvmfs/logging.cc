@@ -42,6 +42,7 @@ const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
 #endif
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
+static void (*alt_log_func)(const LogSource source, const int mask, const char *msg) = NULL;
 
 }  // namespace
 
@@ -116,6 +117,9 @@ string GetLogDebugFile() {
 }
 #endif
 
+void SetAltLogFunc( void (*fn)(const LogSource source, const int mask, const char *msg) ) {
+  alt_log_func = fn;
+}
 
 /**
  * Logs a message to one or multiple facilities specified by mask.
@@ -134,6 +138,11 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   vasprintf(&msg, format, variadic_list);
   assert(msg != NULL);  // else: out of memory
   va_end(variadic_list);
+
+  if( alt_log_func ) {
+    (*alt_log_func)(source,mask,msg);
+    return;
+  }
 
 #ifdef DEBUGMSG
   if (mask & kLogDebug) {

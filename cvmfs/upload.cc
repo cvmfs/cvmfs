@@ -48,7 +48,6 @@ int MainLocalSpooler(const string &fifo_paths,
     char next_char = retval;
 
     if (next_char == '\0') {
-      // Read error code
       if (local_path.empty())
         local_path = line;
       else if (remote_path.empty())
@@ -57,6 +56,17 @@ int MainLocalSpooler(const string &fifo_paths,
         path_postfix = line;
       line.clear();
     } else if (next_char == '\n') {
+      // End of Transaction?
+      if (local_path.empty()) {
+        printf("sending transaction ack back\n");
+        string return_line = "0";
+        return_line.push_back('\0');
+        return_line.push_back('\0');
+        return_line.push_back('\n');
+        WritePipe(fd_digests, return_line.data(), return_line.length());
+        break;
+      }
+      
       carbon_copy = (line == "0");
       remote_path = upstream_basedir + "/" + remote_path;
       printf("Spooler received line: local %s remote %s postfix %s carbon copy %d\n", local_path.c_str(), remote_path.c_str(), path_postfix.c_str(), carbon_copy);
@@ -152,12 +162,16 @@ void *Spooler::MainReceive(void *caller) {
       if (result != 0)
         atomic_inc64(&spooler->num_errors_);
       if (spooler->spooler_callback())
-        (*spooler->spooler_callback())(local_path, result, line);
+        spooler->spooler_callback()->Callback(local_path, result, line);
+      atomic_dec64(&(spooler->num_pending_));
+      
+      // End of transaction
+      if (local_path.empty())
+        break;
       
       result = -1;
       local_path.clear();
       line.clear();
-      atomic_dec64(&(spooler->num_pending_));
     } else {
       line.push_back(next_char);
     }
@@ -201,7 +215,7 @@ void Spooler::SpoolProcess(const string &local_path, const string &remote_dir,
   line.push_back('\0');
   line.append(file_postfix);
   line.push_back('\0');
-  line.append(StringifyInt(1));
+  line.push_back('1');
   line.push_back('\n');
   WritePipe(fd_paths_, line.data(), line.size());
   atomic_inc64(&num_pending_);
@@ -214,104 +228,21 @@ void Spooler::SpoolCopy(const string &local_path, const string &remote_path) {
   line.append(remote_path);
   line.push_back('\0');
   line.push_back('\0');
-  line.append(StringifyInt(0));
+  line.push_back('0');
+  line.push_back('\n');
+  WritePipe(fd_paths_, line.data(), line.size());
+  atomic_inc64(&num_pending_);
+}
+  
+void Spooler::EndOfTransaction() {
+  string line = "";
+  line.push_back('\0');
+  line.push_back('\0');
+  line.push_back('\0');
+  line.push_back('0');
   line.push_back('\n');
   WritePipe(fd_paths_, line.data(), line.size());
   atomic_inc64(&num_pending_);
 }
 
-  
-Forklift *CreateForklift(const std::string &upstream) {
-  if (upstream.find("local:") == 0) {
-    return new upload::ForkliftLocal(upstream.substr(6 /* length "local:" */));
-  } else if (upstream.find("pipe:") == 0) {
-    return new upload::ForkliftPathPipe(upstream.substr(5 /* cut "pipe:" */));
-  }
-  return NULL;
-}
-   
-  
-bool ForkliftLocal::Connect() {
-  bool retval = DirectoryExists(entry_point_);
-  if (!retval)
-    last_error_ = "directory " + entry_point_ + " does not exist";
-  else
-    last_error_ = "OK";
-  return retval;
-}
-  
-  
-bool ForkliftLocal::Put(const string &local_path, 
-                        const string &remote_path) const 
-{
-  bool retval = CopyPath2Path(local_path, entry_point_+remote_path);
-  if (retval)
-    last_error_ = "OK";
-  else
-    last_error_ = "copy failure";
-  return retval;
-}
-  
-  
-bool ForkliftLocal::Move(const string &local_path, 
-                         const string &remote_path) const 
-{
-  int retval = rename(local_path.c_str(), 
-                      (entry_point_+remote_path).c_str());
-  if (retval == 0) {
-    last_error_ = "OK";
-    return true;
-  }
-  
-  if (errno == EXDEV) {
-    retval = Put(local_path, remote_path);
-    if (retval)
-      unlink(local_path.c_str());
-    return retval;
-  }
-  
-  last_error_ = "failed to rename (" + StringifyInt(errno) + ")";
-  return false;
-}   
-  
-  
-bool ForkliftPathPipe::Connect() {
-  pipe_fd_ = open(entry_point_.c_str(), O_WRONLY);
-  
-  if (pipe_fd_ == -1) {
-    last_error_ = "failed to connect to pipe (" + StringifyInt(errno) + ")";
-    return false;
-  } else {
-    last_error_ = "OK";
-    return true;
-  }
-}
-
-
-bool ForkliftPathPipe::Put(const string &local_path, 
-                           const string &remote_path) const 
-{
-  const string command = local_path + ", " + remote_path + "\n";
-  int written = write(pipe_fd_, command.data(), command.length());
-  if ((written == -1) || (static_cast<unsigned>(written) != command.length())) {
-    last_error_ = "failed to upload file (" + StringifyInt(errno) + ")";
-    return false;
-  } else {
-    last_error_ = "OK";
-    return true;
-  }
-}
-
-
-bool ForkliftPathPipe::Move(const string &local_path, 
-                            const string &remote_path) const 
-{
-  int retval = Put(local_path, remote_path);
-  // TODO: When delete?
-  //if (retval)
-  //  unlink(local_path.c_str());
-  return retval;
-}   
-
-   
 }  // namespace upload

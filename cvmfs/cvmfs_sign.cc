@@ -37,9 +37,10 @@ static void Usage() {
     "This tool signs a CernVM-FS file catalog.\n"
     "Version %s\n"
     "Usage:\n"
-    "  cvmfs_sign [-c <x509 certificate>] [-k <private key>] [-p <password>]\n"
-    "             [-n <repository name>] -t <temp directory>\n"
-    "             -r <upstream storage> -m <manifest>\n",
+    "  cvmfs_sign [-c <x509 certificate>] [-k <private key>] [-s <password>]\n"
+    "             [-n <repository name>] -m <manifest> -t <temp storage>\n"
+    "             -p <paths_out (pipe)> -d <digests_in (pipe)>\n"
+    "             [-l(ocal spooler) <local upstream path>]\n",
     VERSION);
 }
 
@@ -48,6 +49,8 @@ int main(int argc, char **argv) {
     Usage();
     return 1;
   }
+  
+  umask(022);
 
   string dir_temp = "";
   string certificate = "";
@@ -55,10 +58,15 @@ int main(int argc, char **argv) {
   string pwd = "";
   string repo_name = "";
   string manifest_path = "";
-  upload::Forklift *forklift;
+  string temp_dir = "";
+  string paths_out = "";
+  string digests_in = "";
+  string local_upstream = "";
+  bool local_spooler = false;
+  upload::Spooler *spooler = NULL;  
 
   char c;
-  while ((c = getopt(argc, argv, "c:k:p:n:t:r:m:h")) != -1) {
+  while ((c = getopt(argc, argv, "c:k:s:n:m:t:p:d:l:h")) != -1) {
     switch (c) {
       case 'c':
         certificate = optarg;
@@ -66,20 +74,27 @@ int main(int argc, char **argv) {
       case 'k':
         priv_key = optarg;
         break;
-      case 'p':
+      case 's':
         pwd = optarg;
         break;
       case 'n':
         repo_name = optarg;
         break;
-      case 't':
-        dir_temp = optarg;
-        break;
-      case 'r':
-        forklift = upload::CreateForklift(optarg);
-        break;
       case 'm':
         manifest_path = optarg;
+        break;
+      case 't':
+        temp_dir = MakeCanonicalPath(optarg);
+        break;
+      case 'p':
+        paths_out = optarg;
+        break;
+      case 'd':
+        digests_in = optarg;
+        break;
+      case 'l':
+        local_spooler = true;
+        local_upstream = MakeCanonicalPath(optarg);
         break;
       case 'h':
         Usage();
@@ -91,20 +106,33 @@ int main(int argc, char **argv) {
   }
   
   // Sanity checks
-  if ((dir_temp == "") || (manifest_path == "") || !forklift) {
+  if ((manifest_path == "") || (paths_out == "") || (digests_in == "") ||
+      (temp_dir == "")) 
+  {
     Usage();
     return 1;
   }
-  if (!forklift->Connect()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, 
-             "failed to connect to upstream storage (%s)",
-             forklift->GetLastError().c_str());
-    return 2;
+  
+  if (!DirectoryExists(temp_dir)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
+    return 1;
   }
-  if (!DirectoryExists(dir_temp)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "temporary directory %s does not exist", 
-             dir_temp.c_str());
-    return 2;
+  
+  // Optionally start the local "mini spooler"
+  if (local_spooler) {
+    int pid = fork();
+    assert(pid >= 0);
+    if (pid == 0) {
+      return upload::MainLocalSpooler(paths_out, digests_in, local_upstream);
+    }
+  }
+  
+  // Connect to the spooler
+  spooler = new upload::Spooler(paths_out, digests_in);
+  bool retval = spooler->Connect();
+  if (!retval) {
+    PrintError("Failed to connect to spooler");
+    return 1;
   }
 
   signature::Init();
@@ -191,21 +219,16 @@ int main(int argc, char **argv) {
     }
     hash::Any certificate_hash(hash::kSha1);
     hash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
-    const string cert_path_tmp = dir_temp + "/cvmfspublisher.tmp";
+    const string cert_path_tmp = temp_dir + "/cvmfspublisher.tmp";
     if (!CopyMem2Path((unsigned char *)compr_buf, compr_size, cert_path_tmp)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to save certificate");
       goto sign_fail;
     }
     free(compr_buf);
 
-    const string cert_hash_path = "/data" + certificate_hash.MakePath(1, 2) 
+    const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2) 
                                   + "X";
-    if (!forklift->Move(cert_path_tmp, cert_hash_path)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit certificate (%s)",
-               forklift->GetLastError().c_str());
-      unlink(cert_path_tmp.c_str());
-      goto sign_fail;
-    }
+    spooler->SpoolCopy(cert_path_tmp, cert_hash_path);
 
     // Update manifest
     manifest->set_certificate(certificate_hash);
@@ -227,6 +250,7 @@ int main(int argc, char **argv) {
                          2*published_hash.GetDigestSize(), &sig, &sig_size))
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
+      unlink(cert_path_tmp.c_str());
       goto sign_fail;
     }
     
@@ -242,25 +266,33 @@ int main(int argc, char **argv) {
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
       fclose(fmanifest);
+      unlink(cert_path_tmp.c_str());
       goto sign_fail;
     }
     free(sig);
     fclose(fmanifest);
     
     // Upload manifest
-    if (!forklift->Move(manifest_path, "/.cvmfspublished")) {
+    spooler->SpoolCopy(manifest_path, ".cvmfspublished");
+    
+    spooler->EndOfTransaction();
+    while (!spooler->IsIdle()) {
+      sleep(1);
+    }
+    unlink(cert_path_tmp.c_str());
+    unlink(manifest_path.c_str());
+    if (spooler->num_errors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest");
-      unlink(manifest_path.c_str());
       goto sign_fail;
     }
   }
 
-  delete forklift;
+  delete spooler;
   signature::Fini();
   return 0;
 
  sign_fail:
-  delete forklift;
+  delete spooler;
   signature::Fini();
   return 1;
 }

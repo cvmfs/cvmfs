@@ -26,7 +26,7 @@ namespace catalog {
 WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
                                                const std::string &stratum0,
                                                const string &dir_temp,
-                                               const upload::Spooler *spooler)
+                                               upload::Spooler *spooler)
 {
   base_hash_ = base_hash;
   stratum0_ = stratum0;
@@ -68,14 +68,14 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
 {
   hash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
   const string url = stratum0_ + "/data" + effective_hash.MakePath(1, 2) + "C";
-  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", 
+  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
                                   catalog_path);
-  download::JobInfo download_catalog(&url, true, false, fcatalog, 
+  download::JobInfo download_catalog(&url, true, false, fcatalog,
                                      &effective_hash);
-  
+
   download::Failures retval = download::Fetch(&download_catalog);
   fclose(fcatalog);
-  
+
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load %s from Stratum 0 (%d)", url.c_str(), retval);
@@ -109,7 +109,7 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  */
 Manifest *WritableCatalogManager::CreateRepository(
   const string &dir_temp,
-  upload::Spooler *spooler) 
+  upload::Spooler *spooler)
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
@@ -135,11 +135,11 @@ Manifest *WritableCatalogManager::CreateRepository(
              file_path.c_str());
     return NULL;
   }
-  
+
   // Compress root catalog;
   string file_path_compressed = file_path + ".compressed";
   hash::Any hash_catalog(hash::kSha1);
-  bool retval = zlib::CompressPath2Path(file_path, file_path_compressed, 
+  bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
                                         &hash_catalog);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
@@ -152,19 +152,20 @@ Manifest *WritableCatalogManager::CreateRepository(
   // Create manifest
   const string manifest_path = dir_temp + "/manifest";
   Manifest *manifest = new Manifest(hash_catalog, "");
-  
+
   // Upload catalog
-  spooler->SpoolCopy(file_path_compressed, 
-                     "/data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler->SpoolCopy(file_path_compressed,
+                     "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler->EndOfTransaction();
   while (!spooler->IsIdle())
     sleep(1);
+  unlink(file_path_compressed.c_str());
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
              file_path_compressed.c_str());
-    unlink(file_path_compressed.c_str());
     return false;
   }
-  
+
   return manifest;
 }
 
@@ -414,12 +415,12 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
 
 
 /**
- * Create a new nested catalog.  Includes moving all entries belonging there 
+ * Create a new nested catalog.  Includes moving all entries belonging there
  * from it's parent catalog.
  * @param mountpoint the path of the directory to become a nested root
  * @return true on success, false otherwise
  */
-bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint) 
+bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 {
   const string nested_root_path = MakeRelativePath(mountpoint);
 
@@ -442,7 +443,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Create the database schema and the inital root entry
   // for the new nested catalog
   const string root_parent_path = GetParentPath(nested_root_path);
-  const string database_file_path = CreateTempPath(dir_temp_ + "/catalog", 
+  const string database_file_path = CreateTempPath(dir_temp_ + "/catalog",
                                                    0666);
   const bool new_repository = false;
   if (!WritableCatalog::CreateDatabase(database_file_path, new_root_entry,
@@ -454,8 +455,8 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   }
 
   // Attach the just created nested catalog
-  Catalog *new_catalog = 
-    CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()), 
+  Catalog *new_catalog =
+    CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()),
                   old_catalog);
   if (!AttachCatalog(database_file_path, new_catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
@@ -526,9 +527,6 @@ bool WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
     return false;
   }
 
-  // Remove the catalog from internal data structures
-  DetachCatalog(nested_catalog);
-
   // Delete the catalog database file from the working copy
   if (unlink(nested_catalog->database_path().c_str()) != 0) {
     LogCvmfs(kLogCatalog, kLogStderr,
@@ -536,6 +534,9 @@ bool WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
              nested_catalog->database_path().c_str());
     return false;
   }
+
+  // Remove the catalog from internal data structures
+  DetachCatalog(nested_catalog);
 
   return true;
 }
@@ -560,20 +561,19 @@ Manifest *WritableCatalogManager::Commit() {
     hash::Any hash = SnapshotCatalog(*i);
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
+      LogCvmfs(kLogCatalog, kLogStdout, "Wait for upload of catalogs");
+      while (!spooler_->IsIdle())
+        sleep(1);
+      if (spooler_->num_errors() > 0) {
+        LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
+        return false;
+      }
+
       // .cvmfspublished
-      //LogCvmfs(kLogCatalog, kLogStdout, "Committing repository manifest");
+      LogCvmfs(kLogCatalog, kLogStdout, "Committing repository manifest");
       result = new Manifest(hash, "");
       result->set_ttl((*i)->GetTTL());
       result->set_revision((*i)->GetRevision());
-      //if (!manifest.Export(dir_temp_ + "/manifest")) {
-      //  PrintError("failed to write manifest");
-      //  return NULL;
-      //}
-      //if (!forklift_->Move(dir_temp_ + "/manifest", "/.cvmfspublished")) {
-      //  PrintError("failed to commit manifest");
-      //  unlink((dir_temp_ + "/manifest").c_str());
-      //  return NULL;
-      //}
     }
   }
 
@@ -605,25 +605,24 @@ int WritableCatalogManager::GetModifiedCatalogsRecursively(
 
   // If we found a dirty catalog in the checked sub tree, the root (*catalog)
   // must be snapshot and ends up in the result list
-  if (dirty_catalogs > 0) {
+  if (dirty_catalogs > 0)
     result->push_back(const_cast<WritableCatalog *>(wr_catalog));
-  }
 
   // tell the upper layer about number of catalogs
   return dirty_catalogs;
 }
 
-  
+
 /**
  * Makes a new catalog revision.  Compresses and uploads catalog.  Returns
  * content hash.
  */
-hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog) 
-  const 
+hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
+  const
 {
   LogCvmfs(kLogCvmfs, kLogStdout, "creating snapshot of catalog '%s'",
            catalog->path().c_str());
-  
+
   if (!catalog->UpdateLastModified()) {
 		PrintError("failed to update last modified time stamp");
     return hash::Any();
@@ -644,30 +643,25 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 
 	// Compress catalog
   hash::Any hash_catalog(hash::kSha1);
-  if (!zlib::CompressPath2Path(catalog->database_path(), 
+  if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_catalog))
   {
 		PrintError("could not compress catalog " + catalog->path().ToString());
     return hash::Any();
 	}
-  
+
   // Upload catalog
-  /*if (!spooler_->Spool(catalog->database_path() + ".compressed", 
-                       "/data" + hash_catalog.MakePath(1, 2) + "C", false))
-  {
-    PrintError("could not commit catalog " + catalog->path().ToString());
-    unlink((catalog->database_path() + ".compressed").c_str());
-    return hash::Any();
-  }*/
-  
+  spooler_->SpoolCopy(catalog->database_path() + ".compressed",
+                      "data" + hash_catalog.MakePath(1, 2) + "C");
+
 	/* Update registered catalog SHA1 in nested catalog */
 	if (!catalog->IsRoot()) {
 		LogCvmfs(kLogCvmfs, kLogStdout, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());
-		if (!parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog)) 
+		if (!parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog))
     {
-			PrintError("failed to register modified catalog at " + 
+			PrintError("failed to register modified catalog at " +
                  catalog->path().ToString() + " in parent catalog");
       return hash::Any();
 		}

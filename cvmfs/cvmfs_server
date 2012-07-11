@@ -190,36 +190,40 @@ publish() {
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="su $user -c"
+  local repository_dir=$(get_local_upstream $upstream)
 
   publish_before_hook $name
   sudo /bin/mount -o remount,ro /cvmfs/$name
   local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
    
-  $user_shell "cvmfs_sync -p -u /cvmfs/$name \
+  $user_shell "cvmfs_sync -x -u /cvmfs/$name \
     -s ${spool_dir}/scratch \
     -c ${spool_dir}/rdonly \
     -t ${spool_dir}/tmp \
     -b $base_hash \
-    -x ${spool_dir}/paths \
-    -y ${spool_dir}/digests \
+    -p ${spool_dir}/paths \
+    -d ${spool_dir}/digests \
+    -l $repository_dir \
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest" || die "Synchronization failed"
-  #$user_shell "cvmfs_sign \
-  #  -c /etc/cvmfs/keys/${name}.crt \
-  #  -k /etc/cvmfs/keys/${name}.key \
-  #  -n $name \
-  #  -t ${spool_dir}/tmp \
-  #  -r $upstream \
-  #  -m ${spool_dir}/tmp/manifest" || die "Signing failed"
-  #sudo umount /cvmfs/$name
-  #sudo umount ${spool_dir}/rdonly
-  #sudo rm -rf ${spool_dir}/scratch
-  #rm -rf ${spool_dir}/tmp/*
-  #$user_shell "mkdir ${spool_dir}/scratch"
-  #sudo mount ${spool_dir}/rdonly > /dev/null
-  #sudo mount /cvmfs/$name
-  #rm -f ${spool_dir}/in_transaction
-  #publish_after_hook $name
+  $user_shell "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    -m ${spool_dir}/tmp/manifest \
+    -t ${spool_dir}/tmp \
+    -p ${spool_dir}/paths \
+    -d ${spool_dir}/digests \
+    -l $repository_dir" || die "Signing failed"
+  echo "Remounting newly created repository revision"
+  sudo umount /cvmfs/$name
+  sudo umount ${spool_dir}/rdonly
+  sudo rm -rf ${spool_dir}/scratch
+  rm -rf ${spool_dir}/tmp/*
+  $user_shell "mkdir ${spool_dir}/scratch"
+  sudo mount ${spool_dir}/rdonly > /dev/null
+  sudo mount /cvmfs/$name
+  rm -f ${spool_dir}/in_transaction
+  publish_after_hook $name
 }
 
 
@@ -251,8 +255,6 @@ mkfs() {
   local temp_dir="${spool_dir}/tmp"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
-  local pipe_cset_ready="${spool_dir}/cset_ready"
-  local pipe_root_hash="${spool_dir}/new_root_hash"
   local repository_dir=$(get_local_upstream $upstream)
   local repository_pipe=$(get_pipe_upstream $upstream)
   if [ x"$repository_pipe" = x"DEFAULT" ]; then
@@ -353,7 +355,7 @@ EOF
 
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir
-  mkfifo -m 0660 $pipe_paths $pipe_digests $pipe_cset_ready $pipe_root_hash
+  mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user /cvmfs/$name $spool_dir
   if [ x"$repository_pipe" != x ]; then
     [ -p $repository_pipe ] || mkfifo -m 0660 $repository_pipe
@@ -373,33 +375,30 @@ EOF
     -d $pipe_digests \
     -l $repository_dir \
     -o ${temp_dir}/new_manifest" > /dev/null
-  #su $cvmfs_user -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
-  #  -k /etc/cvmfs/keys/${name}.key \
-  #  -n $name \
-  #  -t $temp_dir \
-  #  -r $upstream \
-  #  -m ${temp_dir}/new_manifest" > /dev/null
-  #echo "done"
+  su $cvmfs_user -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    -m ${temp_dir}/new_manifest \
+    -t $temp_dir \
+    -p $pipe_paths \
+    -d $pipe_digests \
+    -l $repository_dir" > /dev/null
+  echo "done"
   
-  #echo -n "Waiting for inital repository to become available on Stratum 0..."
-  # TODO
-  #echo "done"
+  echo -n "Mounting CernVM-FS Storage... "
+  cat >> /etc/fstab << EOF
+$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
+EOF
+  mount $rdonly_dir > /dev/null
+  mount /cvmfs/$name
+  echo "done"
 
-  #echo -n "Mounting CernVM-FS Storage... "
-  #cat >> /etc/fstab << EOF
-#$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
-#aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
-#EOF
-  #mount $rdonly_dir > /dev/null
-  #mount /cvmfs/$name
-  #echo "done"
-
-  #echo -n "Starting services... "
-  #transaction $name $spool_dir > /dev/null
-  #echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
-  #CVMFS_PUBLISH_OPTIONS="-z"
-  #publish $name $cvmfs_user $spool_dir $stratum0 $upstream
-  #cat $rdonly_dir/new_repository
+  echo -n "Initial commit... "
+  transaction $name $spool_dir > /dev/null
+  echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
+  publish $name $cvmfs_user $spool_dir $stratum0 $upstream
+  cat $rdonly_dir/new_repository
 
   echo "\
 
