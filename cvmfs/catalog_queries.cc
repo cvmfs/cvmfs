@@ -12,6 +12,7 @@ namespace catalog {
 
 SqlStatement::SqlStatement(const sqlite3 *database, const std::string &statement) {
   Init(database, statement);
+  database_ = (sqlite3 *)database;
 }
 
 SqlStatement::~SqlStatement() {

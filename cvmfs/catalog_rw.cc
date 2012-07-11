@@ -164,7 +164,7 @@ bool WritableCatalog::CreateSchema(const std::string &file_path) {
 WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   Catalog(PathString(path.data(), path.length()), parent),
   dirty_(false)
-{}
+{ }
 
 
 WritableCatalog::~WritableCatalog() {
@@ -685,14 +685,16 @@ bool WritableCatalog::CopyToParent() {
 
   // Now copy all DirectoryEntries to the 'other' catalog.
   // There will be no data collisions, as we resolved them beforehand
+  if (dirty_)
+    Commit();
   if (parent->dirty_)
     parent->Commit();
   SqlStatement sql_attach(database(), "ATTACH '" + parent->database_path() +
                           "' AS other;");
   if (!sql_attach.Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "failed to attach database of catalog '%s' in catalog '%s' (%d)",
-             parent->database_path().c_str(), this->path().c_str(), 
+             "failed to attach catalog '%s' in nested path '%s' (%d)",
+             parent->database_path().c_str(), this->path().c_str(),
              sql_attach.GetLastError());
     return false;
   }
@@ -710,7 +712,7 @@ bool WritableCatalog::CopyToParent() {
              parent->path().c_str(), this->path().c_str());
     return false;
   }
-  parent->Transaction();
+  parent->SetDirty();
 
   // Change the just copied nested catalog root to an ordinary directory
   // (the nested catalog is merged into it's parent)

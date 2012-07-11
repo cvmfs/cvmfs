@@ -235,6 +235,7 @@ class SqlStatement {
   }
 
  private:
+  sqlite3 *database_;
   sqlite3_stmt *statement_;
   int last_error_code_;
 };

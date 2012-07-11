@@ -51,7 +51,7 @@ static void Usage() {
     "             -p <paths_out (pipe)> -d <digests_in (pipe)>\n"
     "             [-l(ocal spooler) <local upstream path>]\n"
     "             [-n(new, requires only -t, -u, -o, -p, and -d)]\n"
-    "             [-x (print change set)] [-y (dry run)] [-m(ucatalogs)\n\n",       
+    "             [-x (print change set)] [-y (dry run)] [-m(ucatalogs)\n\n",
     VERSION);
 }
 
@@ -147,7 +147,7 @@ bool CheckParams(SyncParameters *p) {
       return false;
     }
   }
-  
+
   if (p->manifest_path == "") {
     PrintError("manifest output required");
     return false;
@@ -174,17 +174,17 @@ int main(int argc, char **argv) {
 	// Initialization
 	if (!ParseParams(argc, argv, &params)) return 1;
 	if (!CheckParams(&params)) return 2;
-  
+
   // Optionally start the local "mini spooler"
   if (params.local_spooler) {
     int pid = fork();
     assert(pid >= 0);
     if (pid == 0) {
-      return upload::MainLocalSpooler(params.paths_out, params.digests_in, 
+      return upload::MainLocalSpooler(params.paths_out, params.digests_in,
                                       params.local_upstream);
     }
   }
-  
+
   // Connect to the spooler
   params.spooler = new upload::Spooler(params.paths_out, params.digests_in);
   bool retval = params.spooler->Connect();
@@ -192,11 +192,11 @@ int main(int argc, char **argv) {
     PrintError("Failed to connect to spooler");
     return 1;
   }
-  
+
   // Create a new root hash.  As a side effect, upload new files and catalogs.
   Manifest *manifest = NULL;
   if (params.new_repository) {
-    manifest = 
+    manifest =
       catalog::WritableCatalogManager::CreateRepository(params.dir_temp,
                                                         params.spooler);
     if (!manifest) {
@@ -206,8 +206,8 @@ int main(int argc, char **argv) {
   } else {
     monitor::Spawn();
     download::Init(1);
-  
-    catalog::WritableCatalogManager 
+
+    catalog::WritableCatalogManager
       catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
                       params.stratum0, params.dir_temp, params.spooler);
     publish::SyncMediator mediator(&catalog_manager, &params);
@@ -219,16 +219,17 @@ int main(int argc, char **argv) {
 
     download::Fini();
     monitor::Fini();
-    
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
     if (!manifest) {
       PrintError("something went wrong during sync");
       return 4;
     }
   }
-  
-  
+
+
   delete params.spooler;
-  
+
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Failed to create new repository");
     return 5;

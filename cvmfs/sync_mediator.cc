@@ -376,16 +376,22 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
     LogCvmfs(kLogCvmfs, kLogStdout, "[add] NESTED CATALOG");
-	if (!params_->dry_run)
-    catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path());
+	if (!params_->dry_run) {
+    bool retval = catalog_manager_->CreateNestedCatalog(
+                    requestFile.relative_parent_path());
+    assert(retval);
+  }
 }
 
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
     LogCvmfs(kLogCvmfs, kLogStdout, "[rem] NESTED CATALOG");
-	if (!params_->dry_run)
-    catalog_manager_->RemoveNestedCatalog(requestFile.relative_parent_path());
+	if (!params_->dry_run) {
+    bool retval = catalog_manager_->RemoveNestedCatalog(
+                    requestFile.relative_parent_path());
+    assert(retval);
+  }
 }
 
 
