@@ -147,11 +147,11 @@ class FileSystemTraversal {
       int retval = platform_lstat((path + "/" + dit->d_name).c_str(), &info);
       assert(retval == 0);
       if (S_ISDIR(info.st_mode)) {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing directory %s/%s",
+                 path.c_str(), dit->d_name);
         if (Notify(foundDirectory, path, dit->d_name) && recurse_) {
           DoRecursion(path, dit->d_name);
         }
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing directory %s/%s",
-                 path.c_str(), dit->d_name);
         Notify(foundDirectoryAfterRecursion, path, dit->d_name);
         break;
       } else if (S_ISREG(info.st_mode)) {
