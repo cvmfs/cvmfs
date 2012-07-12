@@ -120,11 +120,11 @@ void SyncUnionAufs::Traverse() {
 	FileSystemTraversal<SyncUnionAufs>
     traversal(this, scratch_path(), true, ignore_filenames_);
 
-	traversal.foundRegularFile = &SyncUnionAufs::ProcessRegularFile;
-	traversal.foundDirectory = &SyncUnionAufs::ProcessDirectory;
-	traversal.foundSymlink = &SyncUnionAufs::ProcessSymlink;
-	traversal.enteringDirectory = &SyncUnionAufs::EnterDirectory;
-	traversal.leavingDirectory = &SyncUnionAufs::LeaveDirectory;
+  traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
+	traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
+	traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
+	traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
+	traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
 
 	traversal.Recurse(scratch_path());
 }
