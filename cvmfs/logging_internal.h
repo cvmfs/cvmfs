@@ -47,6 +47,7 @@ std::string GetLogDebugFile();
 #define GetLogDebugFile() (std::string(""))
 #endif
 
-void SetAltLogFunc( void (*fn)(const LogSource source, const int mask, const char *msg) );
+void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
+                              const char *msg));
 
 #endif  // CVMFS_LOGGING_INTERNAL_H_

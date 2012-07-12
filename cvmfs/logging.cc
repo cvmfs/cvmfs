@@ -42,7 +42,8 @@ const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
 #endif
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
-static void (*alt_log_func)(const LogSource source, const int mask, const char *msg) = NULL;
+static void (*alt_log_func)(const LogSource source, const int mask,
+                            const char *msg) = NULL;
 
 }  // namespace
 
@@ -117,7 +118,10 @@ string GetLogDebugFile() {
 }
 #endif
 
-void SetAltLogFunc( void (*fn)(const LogSource source, const int mask, const char *msg) ) {
+
+void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
+                              const char *msg))
+{
   alt_log_func = fn;
 }
 
@@ -139,8 +143,8 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   assert(msg != NULL);  // else: out of memory
   va_end(variadic_list);
 
-  if( alt_log_func ) {
-    (*alt_log_func)(source,mask,msg);
+  if (alt_log_func) {
+    (*alt_log_func)(source, mask, msg);
     return;
   }
 
