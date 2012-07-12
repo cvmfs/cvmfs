@@ -19,6 +19,7 @@ enum LogFacilities {
 
 enum LogFlags {
   kLogNoLinebreak = 16,
+  kLogShowSource = 32,
 };
 
 enum LogLevels {
@@ -44,7 +45,10 @@ enum LogSource {
   kLogFuse,
   kLogSignature,
   kLogPeers,
+  kLogFsTraversal,
 };
+
+const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 
 void SetLogSyslogLevel(const int level);
 void SetLogSyslogPrefix(const std::string &prefix);

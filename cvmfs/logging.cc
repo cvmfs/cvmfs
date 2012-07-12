@@ -36,10 +36,10 @@ pthread_mutex_t lock_stderr = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t lock_debug = PTHREAD_MUTEX_INITIALIZER;
 FILE *file_debug = NULL;
 string *path_debug = NULL;
+#endif
 const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
-  "fuse stub", "signature", "peers" };
-#endif
+  "fuse stub", "signature", "peers", "fs traversal" };
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
 LogLevels min_log_level = kLogNormal;
@@ -192,6 +192,8 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
   if (mask & kLogStdout) {
     pthread_mutex_lock(&lock_stdout);
+    if (mask & kLogShowSource)
+      printf("(%s) ", module_names[source]);
     printf("%s", msg);
     if (!(mask & kLogNoLinebreak))
       printf("\n");
@@ -202,6 +204,8 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
   if (mask & kLogStderr) {
     pthread_mutex_lock(&lock_stderr);
+    if (mask & kLogShowSource)
+      printf("(%s) ", module_names[source]);
     fprintf(stderr, "%s", msg);
     if (!(mask & kLogNoLinebreak))
       printf("\n");

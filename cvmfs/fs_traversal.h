@@ -13,6 +13,7 @@
 #include <set>
 
 #include "platform.h"
+#include "logging.h"
 
 namespace publish {
 
@@ -98,7 +99,8 @@ class FileSystemTraversal {
     CutPathIntoParentAndFileName(dir_path, parent_path, dir_name);
 
     assert(relative_to_directory_.length() == 0 ||
-           dir_path.substr(0, relative_to_directory_.length()) == relative_to_directory_);
+           dir_path.substr(0, relative_to_directory_.length()) ==
+             relative_to_directory_);
 
   	DoRecursion(parent_path, dir_name);
   }
@@ -115,14 +117,13 @@ class FileSystemTraversal {
 	std::set<std::string> ignored_files_;
 
 
-
   void Init() {
     // we definitely don't care about these "virtual" directories
     ignored_files_.insert(".");
     ignored_files_.insert("..");
   }
 
-  void DoRecursion(const std::string &parent_path, const std::string &dir_name) 
+  void DoRecursion(const std::string &parent_path, const std::string &dir_name)
     const
 	{
     DIR *dip;
@@ -131,6 +132,7 @@ class FileSystemTraversal {
 
     // get into directory and notify the user
     if ((dip = opendir(path.c_str())) == NULL) { return; }
+    LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "entering %s", path.c_str());
     Notify(enteringDirectory, parent_path, dir_name);
 
     // go through the open directory notifying the user at specific positions
@@ -148,17 +150,24 @@ class FileSystemTraversal {
         if (Notify(foundDirectory, path, dit->d_name) && recurse_) {
           DoRecursion(path, dit->d_name);
         }
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing directory %s/%s",
+                 path.c_str(), dit->d_name);
         Notify(foundDirectoryAfterRecursion, path, dit->d_name);
         break;
       } else if (S_ISREG(info.st_mode)) {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing regular file %s/%s",
+                 path.c_str(), dit->d_name);
         Notify(foundRegularFile, path, dit->d_name);
       } else if (S_ISLNK(info.st_mode)) {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing symlink %s/%s",
+                 path.c_str(), dit->d_name);
         Notify(foundSymlink, path, dit->d_name);
       }
     }
 
     // close directory and notify user
     if (closedir(dip) != 0) { return; }
+    LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "leaving %s", path.c_str());
     Notify(leavingDirectory, parent_path, dir_name);
   }
 

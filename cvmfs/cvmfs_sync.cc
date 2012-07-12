@@ -51,7 +51,8 @@ static void Usage() {
     "             -p <paths_out (pipe)> -d <digests_in (pipe)>\n"
     "             [-l(ocal spooler) <local upstream path>]\n"
     "             [-n(new, requires only -t, -u, -o, -p, and -d)]\n"
-    "             [-x (print change set)] [-y (dry run)] [-m(ucatalogs)\n\n",
+    "             [-x (print change set)] [-y (dry run)] [-m(ucatalogs)]\n"
+    "             [-z <log level (0-4, default: 2)>]\n\n",
     VERSION);
 }
 
@@ -66,7 +67,7 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
 
 	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "u:s:c:t:b:w:o:p:d:l:nxym")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:t:b:w:o:p:d:l:nxymz:")) != -1) {
 		switch (c) {
       // Directories
       case 'u':
@@ -102,6 +103,15 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
         params->local_spooler = true;
         params->local_upstream = MakeCanonicalPath(optarg);
         break;
+      case 'z': {
+        unsigned log_level = 1 << (kLogLevel0 + String2Uint64(optarg));
+        if (log_level > kLogNone) {
+          Usage();
+          return false;
+        }
+        SetLogVerbosity(static_cast<LogLevels>(log_level));
+        break;
+      }
 
       // Switches
       case 'n':
