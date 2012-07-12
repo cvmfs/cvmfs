@@ -317,6 +317,11 @@ static void RemountCheck() {
       LogCvmfs(kLogCvmfs, kLogDebug, "reload failed, applying short term TTL");
       alarm(kShortTermTTL);
       catalogs_valid_until_ = time(NULL) + kShortTermTTL;
+    } else if (retval == catalog::kLoadUp2Date) {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "catalog up to date, applying effective TTL");
+      alarm(GetEffectiveTTL());
+      catalogs_valid_until_ = time(NULL) + GetEffectiveTTL();
     }
   }
 }
@@ -474,6 +479,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   atomic_inc64(&num_fs_readlink_);
+
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
 
@@ -520,6 +526,7 @@ static void AddToDirListing(const fuse_req_t req,
  */
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
+  RemountCheck();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
 
@@ -1438,7 +1445,7 @@ int main(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
   // We want to allow group write access for the talk-socket.
   umask(007);
-  
+
   // Jump into alternative process flavors
   if (argc > 1) {
     if (strcmp(argv[1], "__peersrv__") == 0) {
@@ -1642,7 +1649,7 @@ int main(int argc, char *argv[]) {
   }
   if (g_cvmfs_opts.shared_cache) {
     if (!quota::InitShared(argv[0], ".", (uint64_t)g_cvmfs_opts.quota_limit,
-                           (uint64_t)g_cvmfs_opts.quota_threshold)) 
+                           (uint64_t)g_cvmfs_opts.quota_threshold))
     {
       PrintError("Failed to initialize shared lru cache");
       goto cvmfs_cleanup;
@@ -1650,7 +1657,7 @@ int main(int argc, char *argv[]) {
   } else {
     if (!quota::Init(".", (uint64_t)g_cvmfs_opts.quota_limit,
                      (uint64_t)g_cvmfs_opts.quota_threshold,
-                     g_cvmfs_opts.rebuild_cachedb)) 
+                     g_cvmfs_opts.rebuild_cachedb))
     {
       PrintError("Failed to initialize lru cache");
       goto cvmfs_cleanup;
@@ -1771,7 +1778,7 @@ int main(int argc, char *argv[]) {
   if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &g_fuse_args)) != NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
              cvmfs::mountpoint_->c_str());
-    if (!g_foreground)     
+    if (!g_foreground)
       Daemonize();
 
     struct fuse_session *se;
