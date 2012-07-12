@@ -1743,24 +1743,6 @@ int main(int argc, char *argv[]) {
   }
   catalog_ready = true;
 
-  // Setup catalog reload alarm
-  atomic_init32(&cvmfs::catalogs_expired_);
-  if (!g_cvmfs_opts.root_hash && !g_cvmfs_opts.no_reload) {
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_sigaction = cvmfs::AlarmReload;
-    sa.sa_flags = SA_SIGINFO;
-    sigfillset(&sa.sa_mask);
-    retval = sigaction(SIGALRM, &sa, NULL);
-    assert(retval == 0);
-    unsigned ttl = cvmfs::catalog_manager_->offline_mode() ?
-      cvmfs::kShortTermTTL : cvmfs::GetEffectiveTTL();
-    alarm(ttl);
-    cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
-  } else {
-    cvmfs::catalogs_valid_until_ = cvmfs::kIndefiniteDeadline;
-  }
-
   // Set fuse callbacks, remove url from arguments
   LogCvmfs(kLogCvmfs, kLogSyslog,
            "CernVM-FS: linking %s to repository %s",
@@ -1780,6 +1762,24 @@ int main(int argc, char *argv[]) {
              cvmfs::mountpoint_->c_str());
     if (!g_foreground)
       Daemonize();
+
+    // Setup catalog reload alarm (_after_ fork())
+    atomic_init32(&cvmfs::catalogs_expired_);
+    if (!g_cvmfs_opts.root_hash && !g_cvmfs_opts.no_reload) {
+      struct sigaction sa;
+      memset(&sa, 0, sizeof(sa));
+      sa.sa_sigaction = cvmfs::AlarmReload;
+      sa.sa_flags = SA_SIGINFO;
+      sigfillset(&sa.sa_mask);
+      retval = sigaction(SIGALRM, &sa, NULL);
+      assert(retval == 0);
+      unsigned ttl = cvmfs::catalog_manager_->offline_mode() ?
+      cvmfs::kShortTermTTL : cvmfs::GetEffectiveTTL();
+      alarm(ttl);
+      cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
+    } else {
+      cvmfs::catalogs_valid_until_ = cvmfs::kIndefiniteDeadline;
+    }
 
     struct fuse_session *se;
     se = fuse_lowlevel_new(&g_fuse_args, &cvmfs_operations,
