@@ -15,8 +15,18 @@ enum LogFacilities {
   kLogStdout = 2,
   kLogStderr = 4,
   kLogSyslog = 8,
-  // Flags
+};
+
+enum LogFlags {
   kLogNoLinebreak = 16,
+};
+
+enum LogLevels {
+  kLogLevel0 = 128,
+  kLogVerbose = 256,
+  kLogNormal = 512,
+  kLogDiscrete = 1024,
+  kLogNone = 2048,
 };
 
 enum LogSource {
@@ -38,6 +48,7 @@ enum LogSource {
 
 void SetLogSyslogLevel(const int level);
 void SetLogSyslogPrefix(const std::string &prefix);
+void SetLogVerbosity(const LogLevels min_level);
 
 #ifdef DEBUGMSG
 void SetLogDebugFile(const std::string &filename);
