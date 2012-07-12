@@ -6,6 +6,7 @@
 #define CVMFS_UPLOAD_H_
 
 #include <string>
+#include <unistd.h>
 
 namespace upload {
 
