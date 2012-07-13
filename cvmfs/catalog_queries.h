@@ -4,8 +4,7 @@
  * This file provides classes to wrap often used catalog SQL statements.
  * In particular, it wraps around sqlite3 prepared statement syntax.
  *
- *  Usage example:
- *
+ * Usage example:
  *   LookupSqlStatement statement(<database>);
  *   statement.BindPathHash(<hash>);
  *   if (statement.FetchRow()) {
@@ -14,8 +13,8 @@
  *   statement.Reset();
  */
 
-#ifndef CATALOG_QUERIES_H
-#define CATALOG_QUERIES_H 1
+#ifndef CVMFS_CATALOG_QUERIES_H_
+#define CVMFS_CATALOG_QUERIES_H_
 
 #include <string>
 #include <sstream>
@@ -30,77 +29,28 @@ namespace catalog {
 class Catalog;
 
 /**
- *  Base class for all SQL statement classes
- *  wraps a single SQL statement and all neccessary calls
- *  of the sqlite3 API to deal with this statement
+ * Base class for all SQL statement classes.  It wraps a single SQL statement
+ * and all neccessary calls of the sqlite3 API to deal with this statement.
  */
 class SqlStatement {
- protected:
-  SqlStatement() {};
-
  public:
   /**
-   *  basic constructor to use this class for different (not wrapped)
-   *  statements, which is highly encouraged.
-   *  @param database the database to use the query on
-   *  @param statement the statement to prepare
+   * Basic constructor to use this class for a specific statement.
+   * @param database the database to use the query on
+   * @param statement the statement to prepare
    */
   SqlStatement(const sqlite3 *database, const std::string &statement);
   virtual ~SqlStatement();
 
- protected:
-  bool Init(const sqlite3 *database, const std::string &statement);
-
-  /**
-   *  checks the last action for success
-   *  @return true if last action succeeded otherwise false
-   */
-  inline bool Successful() const {
-    return SQLITE_OK   == last_error_code_ ||
-           SQLITE_ROW  == last_error_code_ ||
-           SQLITE_DONE == last_error_code_;
-  }
-
- public:
-  /**
-   *  resets a prepared statement to make it reusable
-   *  @return true on success otherwise false
-   */
-  inline bool Reset() {
-    last_error_code_ = sqlite3_reset(statement_);
-    return Successful();
-  }
-
-  /**
-   *  execute the prepared statement or fetch it's next row.
-   *  (this method is intended to step through the result)
-   *  if it returns false this does NOT neccessarily mean, that the actual
-   *  statement execution failed, but that NO row was fetched.
-   *  @return true if a new row was fetched otherwise false
-   */
-  inline bool FetchRow() {
-    last_error_code_ = sqlite3_step(statement_);
-    return SQLITE_ROW == last_error_code_;
-  }
-
-  /**
-   *  executes the prepared statement
-   *  (this method should be used for modifying statements like DELETE or INSERT)
-   *  @return true on success otherwise false
-   */
-  inline bool Execute() {
-    last_error_code_ = sqlite3_step(statement_);
-    return Successful();
-  }
-
-  /**
-   *  return the error code of the last performed action
-   *  @return the error code of the last action
-   */
+  bool Execute();
+  bool FetchRow();
+  bool Reset();
   inline int GetLastError() const { return last_error_code_; }
 
-  inline bool BindBlob(const int index, const void* value, const int size, void (*destructor)(void*)) {
-    last_error_code_ = sqlite3_bind_blob(statement_, index, value, size, destructor);
+  inline bool BindBlob(const int index, const void* value, const int size)
+  {
+    last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
+                                         SQLITE_STATIC);
     return Successful();
   }
   inline bool BindDouble(const int index, const double value) {
@@ -120,118 +70,117 @@ class SqlStatement {
     return Successful();
   }
   inline bool BindText(const int index, const std::string &value) {
-    return BindText(index, value.c_str(), value.length(), NULL);
-  }
-  inline bool BindText(const int index, const char* value, const int size, void (*destructor)(void*)) {
-    last_error_code_ = sqlite3_bind_text(statement_, index, value, size, destructor);
+    last_error_code_ = sqlite3_bind_text(statement_, index,
+                                         value.data(), value.length(), NULL);
     return Successful();
   }
-  inline bool BindText16(const int index, const void* value, const int size, void (*destructor)(void*)) {
-    last_error_code_ = sqlite3_bind_text16(statement_, index, value, size, destructor);
+  inline bool BindText(const int index, const char* value, const int size,
+                       void (*destructor)(void*))
+  {
+    last_error_code_ = sqlite3_bind_text(statement_, index, value, size,
+                                         destructor);
     return Successful();
   }
-  inline bool BindValue(const int index, const sqlite3_value* value) {
-    last_error_code_ = sqlite3_bind_value(statement_, index, value);
-    return Successful();
+
+
+  inline int RetrieveType(const int idx_column) const {
+    return sqlite3_column_type(statement_, idx_column);
   }
-  inline bool BindZeroblob(const int index, const int size) {
-    last_error_code_ = sqlite3_bind_zeroblob(statement_, index, size);
-    return Successful();
+  inline int RetrieveBytes(const int idx_column) const {
+    return sqlite3_column_bytes(statement_, idx_column);
   }
+  inline const void *RetrieveBlob(const int idx_column) const {
+    return sqlite3_column_blob(statement_, idx_column);
+  }
+  inline double RetrieveDouble(const int idx_column) const {
+    return sqlite3_column_double(statement_, idx_column);
+  }
+  inline int RetrieveInt(const int idx_column) const {
+    return sqlite3_column_int(statement_, idx_column);
+  }
+  inline sqlite3_int64 RetrieveInt64(const int idx_column) const {
+    return sqlite3_column_int64(statement_, idx_column);
+  }
+  inline const unsigned char *RetrieveText(const int idx_column) const {
+    return sqlite3_column_text(statement_, idx_column);
+  }
+
+  /**
+   * Wrapper for retrieving MD5 hashes.
+   * @param idx_high offset of most significant bits in database query
+   * @param idx_low offset of least significant bits in database query
+   * @result the retrieved MD5 hash
+   */
+  inline hash::Md5 RetrieveMd5Hash(const int idx_high,
+                                   const int idx_low) const
+  {
+    return hash::Md5(RetrieveInt64(idx_high), RetrieveInt64(idx_low));
+  }
+
+  /**
+   * Wrapper for retrieving a SHA1 hash from a blob field.
+   */
+  inline hash::Any RetrieveSha1HashFromBlob(const int idx_column) const {
+    if (RetrieveBytes(idx_column) > 0) {
+      return hash::Any(hash::kSha1,
+        static_cast<const unsigned char *>(RetrieveBlob(idx_column)),
+        RetrieveBytes(idx_column));
+    }
+    return hash::Any(hash::kSha1);
+  }
+
+  /**
+   * Wrapper for retrieving a SHA1 hash from a text field.
+   */
+  inline hash::Any RetrieveSha1HashFromText(const int idx_column) const {
+    const std::string hash_string = std::string(
+      reinterpret_cast<const char *>(RetrieveText(idx_column)));
+    return hash::Any(hash::kSha1, hash::HexPtr(hash_string));
+  }
+
 
  protected:
+  SqlStatement() { }
+  bool Init(const sqlite3 *database, const std::string &statement);
+
   /**
-   *  convenience wrapper for binding a MD5 hash
-   *  @param iCol1 offset of most significant bits in database query
-   *  @param iCol2 offset of least significant bits in database query
-   *  @param hash the hash to bind in the query
-   *  @result true on success, false otherwise
+   * Checks the last action for success
+   * @return true if last action succeeded otherwise false
    */
-  inline bool BindMd5Hash(const int iCol1, const int iCol2, const struct hash::Md5 &hash) {
-    uint64_t lo, hi;
-    hash.ToIntPair(&lo, &hi);
-    return (
-      BindInt64(iCol1, lo) &&
-      BindInt64(iCol2, hi)
-    );
+  inline bool Successful() const {
+    return SQLITE_OK   == last_error_code_ ||
+           SQLITE_ROW  == last_error_code_ ||
+           SQLITE_DONE == last_error_code_;
   }
 
   /**
-   *  convenience wrapper for binding a SHA1 hash
-   *  @param iCol offset of the blob field in database query
-   *  @param hash the hash to bind in the query
-   *  @result true on success, false otherwise
+   * Wrapper for binding a MD5 hash.
+   * @param idx_high offset of most significant bits in database query
+   * @param idx_low offset of least significant bits in database query
+   * @param hash the hash to bind in the query
+   * @result true on success, false otherwise
    */
-  inline bool BindSha1Hash(const int iCol, const struct hash::Any &hash) {
+  inline bool BindMd5Hash(const int idx_high, const int idx_low,
+                          const hash::Md5 &hash)
+  {
+    uint64_t high, low;
+    hash.ToIntPair(&high, &low);
+    bool retval = BindInt64(idx_high, high) && BindInt64(idx_low, low);
+    return retval;
+  }
+
+  /**
+   * Wrapper for binding a SHA1 hash.
+   * @param idx_column offset of the blob field in database query
+   * @param hash the hash to bind in the query
+   * @result true on success, false otherwise
+   */
+  inline bool BindSha1Hash(const int idx_column, const struct hash::Any &hash) {
     if (hash.IsNull()) {
-      return BindNull(iCol);
+      return BindNull(idx_column);
     } else {
-      return BindBlob(iCol, hash.digest, hash.GetDigestSize(), SQLITE_STATIC);
+      return BindBlob(idx_column, hash.digest, hash.GetDigestSize());
     }
-  }
-
- public:
-
-  inline const void *RetrieveBlob(const int iCol) const {
-    return sqlite3_column_blob(statement_, iCol);
-  }
-  inline int RetrieveBytes(const int iCol) const {
-    return sqlite3_column_bytes(statement_, iCol);
-  }
-  inline int RetrieveBytes16(const int iCol) const {
-    return sqlite3_column_bytes16(statement_, iCol);
-  }
-  inline double RetrieveDouble(const int iCol) const {
-    return sqlite3_column_double(statement_, iCol);
-  }
-  inline int RetrieveInt(const int iCol) const {
-    return sqlite3_column_int(statement_, iCol);
-  }
-  inline sqlite3_int64 RetrieveInt64(const int iCol) const {
-    return sqlite3_column_int64(statement_, iCol);
-  }
-  inline const unsigned char *RetrieveText(const int iCol) const {
-    return sqlite3_column_text(statement_, iCol);
-  }
-  inline const void *RetrieveText16(const int iCol) const {
-    return sqlite3_column_text16(statement_, iCol);
-  }
-  inline int RetrieveType(const int iCol) const {
-    return sqlite3_column_type(statement_, iCol);
-  }
-  inline sqlite3_value *RetriveValue(const int iCol) const {
-    return sqlite3_column_value(statement_, iCol);
-  }
-
-  /**
-   *  convenience wrapper for retrieving MD5 hashes
-   *  @param iCol1 offset of most significant bits in database query
-   *  @param iCol2 offset of least significant bits in database query
-   *  @result the retrieved MD5 hash
-   */
-  inline hash::Md5 RetrieveMd5Hash(const int iCol1, const int iCol2) const {
-    return hash::Md5(RetrieveInt64(iCol1), RetrieveInt64(iCol2));
-  }
-
-  /**
-   *  convenience wrapper for retrieving a SHA1 hash from a blob field
-   *  @param iCol offset of the blob field in database query
-   *  @result the retrieved SHA1 hash
-   */
-  inline hash::Any RetrieveSha1HashFromBlob(const int iCol) const {
-    return (RetrieveBytes(iCol) > 0) ?
-                    hash::Any(hash::kSha1, (unsigned char *)RetrieveBlob(iCol), RetrieveBytes(iCol)) :
-                    hash::Any(hash::kSha1);
-  }
-
-  /**
-   *  convenience wrapper for retrieving a SHA1 hash from a text field
-   *  @param iCol offset of the text field in the database query
-   *  @result the retrieved SHA1 hash
-   */
-  inline hash::Any RetrieveSha1HashFromText(const int iCol) const {
-    const std::string hash_string = std::string((char *)RetrieveText(iCol));
-    return hash::Any(hash::kSha1, hash::HexPtr(hash_string));
   }
 
  private:
@@ -240,15 +189,9 @@ class SqlStatement {
   int last_error_code_;
 };
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
 
 class DirectoryEntrySqlStatement : public SqlStatement {
  protected:
-
   // definition of bit positions for the flags field of a DirectoryEntry
   // all not specified bit positions are currently not in use
   const static int kFlagDir                 = 1;
@@ -268,7 +211,6 @@ class DirectoryEntrySqlStatement : public SqlStatement {
   const static int kFlagLinkCount_7         = kFlagLinkCount_0 << 7;
   const static int kFlagLinkCount           = kFlagLinkCount_0 | kFlagLinkCount_1 | kFlagLinkCount_2 | kFlagLinkCount_3 | kFlagLinkCount_4 | kFlagLinkCount_5 | kFlagLinkCount_6 | kFlagLinkCount_7;
 
- protected:
   /**
    *  take the meta data from the DirectoryEntry and transform it
    *  into a valid flags field ready to be safed in the database
@@ -501,6 +443,6 @@ class GetMaximalHardlinkGroupIdStatement : public SqlStatement {
   int GetMaximalGroupId() const;
 };
 
-} // namespace cvmfs
+}  // namespace cvmfs
 
-#endif /* CATALOG_QUERIES_H */
+#endif  // CVMFS_CATALOG_QUERIES_H_

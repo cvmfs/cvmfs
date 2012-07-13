@@ -6,7 +6,7 @@
 #include "catalog.h"
 #include "logging.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace catalog {
 
@@ -15,16 +15,53 @@ SqlStatement::SqlStatement(const sqlite3 *database, const std::string &statement
   database_ = (sqlite3 *)database;
 }
 
+
 SqlStatement::~SqlStatement() {
   last_error_code_ = sqlite3_finalize(statement_);
 
-  if (not Successful()) {
+  if (!Successful()) {
     LogCvmfs(kLogSql, kLogDebug,
-             "FAILED to finalize statement - error code: %d", last_error_code_);
+             "failed to finalize statement - error code: %d", last_error_code_);
   }
 
   LogCvmfs(kLogSql, kLogDebug, "successfully finalized statement");
 }
+
+
+/**
+ * Executes the prepared statement.
+ * (this method should be used for modifying statements like DELETE or INSERT)
+ * @return true on success otherwise false
+ */
+bool SqlStatement::Execute() {
+  last_error_code_ = sqlite3_step(statement_);
+  return Successful();
+}
+
+
+/**
+ * Execute the prepared statement or fetch its next row.
+ * This method is intended to step through the result set.
+ * If it returns false this does not neccessarily mean, that the actual
+ * statement execution failed, but that no row was fetched.
+ * @return true if a new row was fetched otherwise false
+ */
+bool SqlStatement::FetchRow() {
+  last_error_code_ = sqlite3_step(statement_);
+  return SQLITE_ROW == last_error_code_;
+}
+
+
+/**
+ * Reset a prepared statement to make it reusable.
+ * @return true on success otherwise false
+ */
+bool SqlStatement::Reset() {
+  last_error_code_ = sqlite3_reset(statement_);
+  return Successful();
+}
+
+
 
 bool SqlStatement::Init(const sqlite3 *database, const std::string &statement) {
   last_error_code_ = sqlite3_prepare_v2((sqlite3*)database,
