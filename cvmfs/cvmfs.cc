@@ -1471,6 +1471,7 @@ int main(int argc, char *argv[]) {
   bool options_ready = false;
   bool download_ready = false;
   bool cache_ready = false;
+  bool nfs_maps_ready = false;
   bool peers_ready = false;
   bool monitor_ready = false;
   bool signature_ready = false;
@@ -1642,16 +1643,22 @@ int main(int argc, char *argv[]) {
                ": " + strerror(errno));
     goto cvmfs_cleanup;
   }
+  cache_ready = true;
+
   // Start NFS maps module, if necessary
   if (g_cvmfs_opts.nfs_source) {
     cvmfs::nfs_maps_ = true;
-    if (!MkdirDeep("./nfs_maps", 0700)) {
+    const string leveldb_cache = "./nfs_maps." + (*cvmfs::repository_name_);
+    if (!MkdirDeep(leveldb_cache, 0700)) {
       PrintError("Failed to initialize NFS maps");
-      cache::Fini();
       goto cvmfs_cleanup;
     }
+    if (!nfs_maps::Init(leveldb_cache)) {
+      PrintError("Failed to initialize NFS maps");
+      goto cvmfs_cleanup;
+    }
+    nfs_maps_ready = true;
   }
-  cache_ready = true;
 
   // Init quota / managed cache
   if (g_cvmfs_opts.quota_limit < 0) {
@@ -1835,11 +1842,8 @@ int main(int argc, char *argv[]) {
   if (talk_ready) talk::Fini();
   if (monitor_ready) monitor::Fini();
   if (quota_ready) quota::Fini();
-  if (cache_ready) {
-    if (cvmfs::nfs_maps_) {
-    }
-    cache::Fini();
-  }
+  if (nfs_maps_ready) nfs_maps::Fini();
+  if (cache_ready) cache::Fini();
   if (running_created) unlink(("running." + *cvmfs::repository_name_).c_str());
   if (fd_lockfile >= 0) UnlockFile(fd_lockfile);
   if (peers_ready) peers::Fini();

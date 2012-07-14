@@ -48,7 +48,7 @@ bool Init(const string &leveldb_dir) {
              status.ToString().c_str());
     return false;
   }
-  LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path opened");
+  LogCvmfs(kLogNfsMaps, kLogDebug, "path2inode opened");
 
   return true;
 }
@@ -56,7 +56,9 @@ bool Init(const string &leveldb_dir) {
 
 void Fini() {
   delete db_inode2path_;
+  LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path closed");
   delete db_path2inode_;
+  LogCvmfs(kLogNfsMaps, kLogDebug, "path2inode closed");
   db_inode2path_ = NULL;
   db_path2inode_ = NULL;
 }
