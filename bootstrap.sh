@@ -4,6 +4,7 @@ CARES_VERSION=1.7.5
 CURL_VERSION=7.24.0
 ZLIB_VERSION=1.2.5
 SPARSEHASH_VERSION=1.11
+LEVELDB_VERSION=1.5.0
 
 # put the extracted stuff out of source for compilation (location given by cmake)
 outOfSource=$1
@@ -59,6 +60,15 @@ mkdir -p "$outOfSource/sparsehash/src"
 mv sparsehash-${SPARSEHASH_VERSION}/* "$outOfSource/sparsehash/src"
 cp src/* "$outOfSource/sparsehash/src"
 rm -rf sparsehash-${SPARSEHASH_VERSION}
+cd ../..
+
+# leveldb
+cd externals/leveldb
+tar xvfz leveldb-${LEVELDB_VERSION}.tar.gz
+mkdir -p "$outOfSource/leveldb/src"
+mv leveldb-${LEVELDB_VERSION}/* "$outOfSource/leveldb/src"
+cp src/* "$outOfSource/leveldb/src"
+rm -rf leveldb-${LEVELDB_VERSION}
 cd ../..
 
 # create a hint that bootstrapping is already done
