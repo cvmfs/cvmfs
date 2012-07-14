@@ -66,6 +66,7 @@
 #include "tracer.h"
 #include "download.h"
 #include "cache.h"
+#include "nfs_maps.h"
 #include "hash.h"
 #include "talk.h"
 #include "monitor.h"
@@ -1644,7 +1645,11 @@ int main(int argc, char *argv[]) {
   // Start NFS maps module, if necessary
   if (g_cvmfs_opts.nfs_source) {
     cvmfs::nfs_maps_ = true;
-    LogCvmfs(kLogCvmfs, kLogDebug, "starting NFS maps");
+    if (!MkdirDeep("./nfs_maps", 0700)) {
+      PrintError("Failed to initialize NFS maps");
+      cache::Fini();
+      goto cvmfs_cleanup;
+    }
   }
   cache_ready = true;
 

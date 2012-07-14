@@ -15,3 +15,51 @@
  */
 
 #include "nfs_maps.h"
+
+#include <cassert>
+#include "leveldb/db.h"
+#include "logging.h"
+
+using namespace std;  // NOLINT
+
+namespace nfs_maps {
+
+leveldb::DB *db_inode2path_;
+leveldb::DB *db_path2inode_;
+leveldb::Options leveldb_options_;
+
+bool Init(const string &leveldb_dir) {
+  leveldb::Status status;
+  leveldb_options_.create_if_missing = true;
+
+  status = leveldb::DB::Open(leveldb_options_, leveldb_dir + "/inode2path",
+                             &db_inode2path_);
+  if (!status.ok()) {
+    LogCvmfs(kLogNfsMaps, kLogDebug, "failed to create inode2path db: %s",
+             status.ToString().c_str());
+    return false;
+  }
+  LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path opened");
+
+  status = leveldb::DB::Open(leveldb_options_, leveldb_dir + "/path2inode",
+                             &db_path2inode_);
+  if (!status.ok()) {
+    LogCvmfs(kLogNfsMaps, kLogDebug, "failed to create path2inode db: %s",
+             status.ToString().c_str());
+    return false;
+  }
+  LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path opened");
+
+  return true;
+}
+
+
+void Fini() {
+  delete db_inode2path_;
+  delete db_path2inode_;
+  db_inode2path_ = NULL;
+  db_path2inode_ = NULL;
+}
+
+
+}  // namespace nfs_maps
