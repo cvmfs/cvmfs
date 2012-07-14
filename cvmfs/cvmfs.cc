@@ -118,6 +118,7 @@ struct DirectoryListing {
 };
 
 bool foreground_ = false;
+bool nfs_maps_ = false;
 string *mountpoint_ = NULL;
 string *cachedir_ = NULL;
 string *tracefile_ = NULL;
@@ -1147,6 +1148,7 @@ struct CvmfsOptions {
   int      diskless;
   int      no_reload;
   int      shared_cache;
+  int      nfs_source;
 
   int64_t  quota_limit;
   int64_t  quota_threshold;
@@ -1186,6 +1188,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("root_hash=%s",        root_hash, 0),
   CVMFS_SWITCH("no_reload",        no_reload),
   CVMFS_SWITCH("shared_cache",     shared_cache),
+  CVMFS_SWITCH("nfs_source",       nfs_source),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1267,6 +1270,8 @@ static void usage(const char *progname) {
       "Avoids to reload catalogs when the TTL expires.\n"
     " -o shared_cache            "
       "Cache directory is shared among multiple instances\n"
+    " -o nfs_source              "
+      "The CernVM-FS mountpoint is exported by NFS\n"
     " Note: you cannot load files greater than quota_limit-quota_threshold\n"
     "\nFuse options:\n"
     " -o allow_other             "
@@ -1636,6 +1641,11 @@ int main(int argc, char *argv[]) {
                ": " + strerror(errno));
     goto cvmfs_cleanup;
   }
+  // Start NFS maps module, if necessary
+  if (g_cvmfs_opts.nfs_source) {
+    cvmfs::nfs_maps_ = true;
+    LogCvmfs(kLogCvmfs, kLogDebug, "starting NFS maps");
+  }
   cache_ready = true;
 
   // Init quota / managed cache
@@ -1820,7 +1830,11 @@ int main(int argc, char *argv[]) {
   if (talk_ready) talk::Fini();
   if (monitor_ready) monitor::Fini();
   if (quota_ready) quota::Fini();
-  if (cache_ready) cache::Fini();
+  if (cache_ready) {
+    if (cvmfs::nfs_maps_) {
+    }
+    cache::Fini();
+  }
   if (running_created) unlink(("running." + *cvmfs::repository_name_).c_str());
   if (fd_lockfile >= 0) UnlockFile(fd_lockfile);
   if (peers_ready) peers::Fini();

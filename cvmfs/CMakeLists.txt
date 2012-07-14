@@ -29,12 +29,13 @@ set (CVMFS_CLIENT_SOURCES
 
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
+
+  nfs_maps.h nfs_maps.cc
   cvmfs.h cvmfs.cc
 )
 
 set (CVMFS2_SOURCES
-  ${CVMFS_CLIENT_SOURCES}
-  cvmfs.h cvmfs.cc
+  ${CVMFS2_DEBUG_SOURCES}
 )
 
 set (LIBCVMFS_SOURCES
@@ -189,7 +190,7 @@ if (LEVELDB_BUILTIN)
 else (LEVELDB_BUILTIN)
   find_package(leveldb)
 	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
-endif (SPARSEHASH_BUILTIN)
+endif (LEVELDB_BUILTIN)
 
 if (NOT MACOSX)
 	set (HAVE_LIB_RT TRUE)
@@ -257,7 +258,7 @@ if (BUILD_CVMFS)
   if (LEVELDB_BUILTIN)
 		add_dependencies (cvmfs2_debug libleveldb)
 		add_dependencies (cvmfs2 libleveldb)
-	endif (SPARSEHASH_BUILTIN)
+	endif (LEVELDB_BUILTIN)
 
   add_dependencies (cvmfs2_debug libmurmur)
   add_dependencies (cvmfs2 libmurmur)

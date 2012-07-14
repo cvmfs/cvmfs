@@ -64,10 +64,10 @@ unamestr=`uname`
 
 # Check for fuse
 if [ ! -c /dev/fuse ]; then
-  if [ "$unamestr" = 'Darwin' ]; then  
+  if [ "$unamestr" = 'Darwin' ]; then
     /Library/Extensions/fuse4x.kext/Support/load_fuse4x   # has the sticky bit
     sudo -u cvmfs sudo sysctl -w vfs.generic.fuse4x.tunables.allow_other=1 > /dev/null
-  else  
+  else
     echo "Fuse not loaded"
     exit 1
   fi
@@ -167,6 +167,7 @@ fi
 [ x"$CVMFS_ROOT_HASH" != x ] && add_mount_option "root_hash=$CVMFS_ROOT_HASH"
 [ x"$CVMFS_CHECK_PERMISSIONS" = xyes ] && add_mount_option "default_permissions"
 [ x"$CVMFS_SHARED_CACHE" = xyes ] && add_mount_option "shared_cache"
+[ x"$CVMFS_NFS_SOURCE" = xyes ] && add_mount_option "nfs_source"
 
 # Single threaded, hack around a fuse4x problem with unnamed semaphores
 if [[ "$unamestr" = 'Darwin' ]]; then

@@ -39,7 +39,7 @@ string *path_debug = NULL;
 #endif
 const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
-  "fuse stub", "signature", "peers", "fs traversal" };
+  "fuse stub", "signature", "peers", "fs traversal", "nfs maps" };
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
 LogLevels min_log_level = kLogNormal;
