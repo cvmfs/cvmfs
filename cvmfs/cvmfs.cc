@@ -1136,6 +1136,9 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
     tracer::InitNull();
 
   atomic_init32(&drainout_mode_);
+
+  // NFS support
+  conn->want |= FUSE_CAP_EXPORT_SUPPORT;
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
