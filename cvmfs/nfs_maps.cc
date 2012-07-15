@@ -29,6 +29,7 @@
 #include "leveldb/db.h"
 
 #include "logging.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -39,6 +40,7 @@ leveldb::DB *db_path2inode_;
 leveldb::Options leveldb_options_;
 leveldb::ReadOptions leveldb_read_options_;
 leveldb::WriteOptions leveldb_write_options_;
+uint64_t root_inode_;
 uint64_t seq_;
 pthread_mutex_t lock_ = PTHREAD_MUTEX_INITIALIZER;
 
@@ -159,8 +161,24 @@ void GetPath(const uint64_t inode, PathString *path) {
 }
 
 
+string GetStatistics() {
+  string result = "Total number of issued inodes: " +
+                  StringifyInt(seq_-root_inode_) + "\n";
+
+  string stats;
+  db_inode2path_->GetProperty(leveldb::Slice("leveldb.stats"), &stats);
+  result += "inode --> path database:\n" + stats + "\n";
+
+  db_path2inode_->GetProperty(leveldb::Slice("leveldb.stats"), &stats);
+  result += "path --> inode database:\n" + stats + "\n";
+
+  return result;
+}
+
+
 bool Init(const string &leveldb_dir, const uint64_t root_inode) {
   assert(root_inode > 0);
+  root_inode_ = root_inode;
   leveldb::Status status;
   leveldb_options_.create_if_missing = true;
 

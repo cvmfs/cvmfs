@@ -17,6 +17,8 @@ void Fini();
 uint64_t GetInode(const PathString &path);
 void GetPath(const uint64_t inode, PathString *path);
 
+std::string GetStatistics();
+
 }  // namespace nfs_maps
 
 #endif  // CVMFS_NFS_MAPS_H_

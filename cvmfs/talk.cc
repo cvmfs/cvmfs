@@ -40,6 +40,7 @@
 #include "duplex_sqlite3.h"
 #include "shortstring.h"
 #include "lru.h"
+#include "nfs_maps.h"
 
 using namespace std;  // NOLINT
 
@@ -80,7 +81,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       shutdown(con_fd, SHUT_RDWR);
       close(con_fd);
     }
-    LogCvmfs(kLogTalk, kLogDebug, "accepting connections on socketfd %d", 
+    LogCvmfs(kLogTalk, kLogDebug, "accepting connections on socketfd %d",
              socket_fd_);
     if ((con_fd = accept(socket_fd_, (struct sockaddr *)&remote, &socket_size))
          < 0)
@@ -337,6 +338,11 @@ static void *MainTalk(void *data __attribute__((unused))) {
           StringifyInt(LinkString::num_instances()) + "  overflows: " +
           StringifyInt(LinkString::num_overflows()) + "\n";
 
+        if (cvmfs::nfs_maps_) {
+          result += "\nLEVELDB Statistics:\n";
+          result += nfs_maps::GetStatistics();
+        }
+
         result += "SQlite Statistics:\n";
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
         result += "  Number of allocations " + StringifyInt(current) + "\n";
@@ -409,7 +415,7 @@ bool Init(const string &cachedir) {
   if (listen(socket_fd_, 1) == -1)
     return false;
 
-  LogCvmfs(kLogTalk, kLogDebug, "socket created at %s (fd %d)", 
+  LogCvmfs(kLogTalk, kLogDebug, "socket created at %s (fd %d)",
            socket_path_->c_str(), socket_fd_);
 
   return true;

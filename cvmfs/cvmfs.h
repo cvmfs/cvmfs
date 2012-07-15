@@ -21,6 +21,7 @@ extern std::string *mountpoint_;
 extern std::string *repository_name_;
 extern int max_cache_timeout_;
 extern bool foreground_;
+extern bool nfs_maps_;
 
 int ClearFile(const std::string &path);
 catalog::LoadError RemountStart();

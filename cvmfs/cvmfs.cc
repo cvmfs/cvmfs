@@ -1707,6 +1707,8 @@ int main(int argc, char *argv[]) {
 
   // Start NFS maps module, if necessary
   if (g_cvmfs_opts.nfs_source) {
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+             "CernVM-FS: loading NFS maps... ");
     cvmfs::nfs_maps_ = true;
     const string leveldb_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
     if (!MkdirDeep(leveldb_cache_dir, 0700)) {
@@ -1719,6 +1721,7 @@ int main(int argc, char *argv[]) {
       PrintError("Failed to initialize NFS maps");
       goto cvmfs_cleanup;
     }
+    LogCvmfs(kLogCvmfs, kLogStdout, "done");
     nfs_maps_ready = true;
   }
 
