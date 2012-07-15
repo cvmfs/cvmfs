@@ -120,7 +120,7 @@ class AbstractCatalogManager {
    * ('root' means the root of the whole file system)
    * @return the root inode number
    */
-  inline inode_t GetRootInode() const { return kInodeOffset + 1; }
+  static inline inode_t GetRootInode() { return kInodeOffset + 1; }
   /**
    * Inodes are ambiquitous under some circumstances, to prevent problems
    * they must be passed through this method first

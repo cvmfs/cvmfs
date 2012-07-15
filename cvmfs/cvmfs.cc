@@ -337,9 +337,39 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
 
   // Lookup inode in catalog
-  if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
-    inode_cache_->Insert(ino, *dirent);
-    return true;
+  if (nfs_maps_) {
+    // NFS mode
+    PathString path;
+    if (ino == catalog::AbstractCatalogManager::GetRootInode()) {
+      // We need a starting point
+      uint64_t root_inode = nfs_maps::GetInode(path);
+      assert(root_inode == ino);
+    } else {
+      nfs_maps::GetPath(ino, &path);
+    }
+    if (catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent)) {
+      // Fix inodes
+      dirent->set_inode(ino);
+      catalog::DirectoryEntry parent_dirent;
+      const PathString parent_path = GetParentPath(path);
+      if (md5path_cache_->Lookup(hash::Md5(parent_path.GetChars(),
+                                           parent_path.GetLength()),
+                                 &parent_dirent))
+      {
+        dirent->set_parent_inode(parent_dirent.inode());
+      } else {
+        dirent->set_parent_inode(nfs_maps::GetInode(parent_path));
+      }
+
+      inode_cache_->Insert(ino, *dirent);
+      return true;
+    }
+  } else {
+    // Normal mode
+    if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
+      inode_cache_->Insert(ino, *dirent);
+      return true;
+    }
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode, no entry");
@@ -357,6 +387,10 @@ static bool GetDirentForPath(const PathString &path,
 
   // Lookup inode in catalog TODO: not twice md5 calculation
   if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+    if (nfs_maps_) {
+      // Fix inode
+      dirent->set_inode(nfs_maps::GetInode(path));
+    }
     dirent->set_parent_inode(parent_inode);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
@@ -371,6 +405,14 @@ static bool GetDirentForPath(const PathString &path,
 static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   // Check the path cache first
   if (path_cache_->Lookup(ino, path)) {
+    return true;
+  }
+
+  if (nfs_maps_) {
+    // NFS mode, just a lookup
+    LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - lookup in NFS maps", ino);
+    nfs_maps::GetPath(ino, path);
+    path_cache_->Insert(ino, *path);
     return true;
   }
 
@@ -408,7 +450,6 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
                          const char *name)
 {
-  // TODO: use generation
   atomic_inc64(&num_fs_lookup_);
   RemountCheck();
 
@@ -572,7 +613,26 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   for (catalog::StatEntryList::const_iterator i = listing_from_catalog.begin(),
        iEnd = listing_from_catalog.end(); i != iEnd; ++i)
   {
-    AddToDirListing(req, i->name.c_str(), &(i->info), &listing);
+    if (nfs_maps_) {
+      // Fix inodes
+      PathString entry_path;
+      entry_path.Assign(path);
+      entry_path.Append("/", 1);
+      entry_path.Append(i->name.GetChars(), i->name.GetLength());
+
+      catalog::DirectoryEntry entry_dirent;
+      if (!GetDirentForPath(entry_path, ino, &entry_dirent)) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
+                 entry_path.c_str());
+        continue;
+      }
+
+      struct stat fixed_info = i->info;
+      fixed_info.st_ino = entry_dirent.inode();
+      AddToDirListing(req, i->name.c_str(), &fixed_info, &listing);
+    } else {
+      AddToDirListing(req, i->name.c_str(), &(i->info), &listing);
+    }
   }
 
   // Save the directory listing and return a handle to the listing
@@ -1648,12 +1708,14 @@ int main(int argc, char *argv[]) {
   // Start NFS maps module, if necessary
   if (g_cvmfs_opts.nfs_source) {
     cvmfs::nfs_maps_ = true;
-    const string leveldb_cache = "./nfs_maps." + (*cvmfs::repository_name_);
-    if (!MkdirDeep(leveldb_cache, 0700)) {
+    const string leveldb_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
+    if (!MkdirDeep(leveldb_cache_dir, 0700)) {
       PrintError("Failed to initialize NFS maps");
       goto cvmfs_cleanup;
     }
-    if (!nfs_maps::Init(leveldb_cache)) {
+    if (!nfs_maps::Init(leveldb_cache_dir,
+                        catalog::AbstractCatalogManager::GetRootInode()))
+    {
       PrintError("Failed to initialize NFS maps");
       goto cvmfs_cleanup;
     }
