@@ -451,14 +451,35 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
 
-  catalog::DirectoryEntry dirent;
   PathString path;
   PathString parent_path;
+  catalog::DirectoryEntry dirent;
   struct fuse_entry_param result;
+
   memset(&result, 0, sizeof(result));
   double timeout = GetKcacheTimeout();
   result.attr_timeout = timeout;
   result.entry_timeout = timeout;
+
+  // Special NFS lookups
+  if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
+    if (GetDirentForInode(parent, &dirent)) {
+      if (strcmp(name, ".") == 0) {
+        goto reply_positive;
+      } else {
+        if (dirent.inode() == catalog_manager_->GetRootInode()) {
+          dirent.set_inode(1);
+          goto reply_positive;
+        }
+        if (GetDirentForInode(dirent.parent_inode(), &dirent))
+          goto reply_positive;
+        else
+          goto reply_negative;
+      }
+    } else {
+      goto reply_negative;
+    }
+  }
 
   if (!GetPathForInode(parent, &parent_path)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
@@ -473,6 +494,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
     goto reply_negative;
   }
 
+ reply_positive:
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
   fuse_reply_entry(req, &result);
@@ -592,7 +614,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != catalog_manager_->GetRootInode() &&
-      GetDirentForInode(d.parent_inode(), &p)) {
+      GetDirentForInode(d.parent_inode(), &p))
+  {
     info = p.GetStatStructure();
     AddToDirListing(req, "..", &info, &listing);
   }
