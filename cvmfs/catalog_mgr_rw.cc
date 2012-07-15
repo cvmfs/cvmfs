@@ -379,7 +379,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
       result = false;
 	}
 
-	if (result = false) {
+	if (result == false) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "something went wrong while adding a hardlink group");
 	}
