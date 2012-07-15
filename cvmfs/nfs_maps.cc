@@ -221,8 +221,12 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
 
   // Fetch highest issued inode
   seq_ = FindInode(hash::Md5(hash::AsciiPtr("?seq")));
-  if (seq_ == 0)
+  if (seq_ == 0) {
     seq_ = root_inode;
+    // Insert root inode
+    PathString root_path;
+    nfs_maps::GetInode(root_path);
+  }
 
   return true;
 }

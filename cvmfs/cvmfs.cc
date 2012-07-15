@@ -340,13 +340,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (nfs_maps_) {
     // NFS mode
     PathString path;
-    if (ino == catalog::AbstractCatalogManager::GetRootInode()) {
-      // We need a starting point
-      uint64_t root_inode = nfs_maps::GetInode(path);
-      assert(root_inode == ino);
-    } else {
-      nfs_maps::GetPath(ino, &path);
-    }
+    nfs_maps::GetPath(ino, &path);
     if (catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent)) {
       // Fix inodes
       dirent->set_inode(ino);
