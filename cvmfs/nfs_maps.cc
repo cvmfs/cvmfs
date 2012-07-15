@@ -27,6 +27,8 @@
 #include <cstdlib>
 
 #include "leveldb/db.h"
+#include "leveldb/cache.h"
+#include "leveldb/filter_policy.h"
 
 #include "logging.h"
 #include "util.h"
@@ -35,9 +37,12 @@ using namespace std;  // NOLINT
 
 namespace nfs_maps {
 
-leveldb::DB *db_inode2path_;
-leveldb::DB *db_path2inode_;
-leveldb::Options leveldb_options_;
+leveldb::DB *db_inode2path_ = NULL;
+leveldb::DB *db_path2inode_ = NULL;
+leveldb::Cache *cache_inode2path_ = NULL;
+leveldb::Cache *cache_path2inode_ = NULL;
+const leveldb::FilterPolicy *filter_inode2path_ = NULL;
+const leveldb::FilterPolicy *filter_path2inode_ = NULL;
 leveldb::ReadOptions leveldb_read_options_;
 leveldb::WriteOptions leveldb_write_options_;
 uint64_t root_inode_;
@@ -180,10 +185,15 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
   assert(root_inode > 0);
   root_inode_ = root_inode;
   leveldb::Status status;
-  leveldb_options_.create_if_missing = true;
+  leveldb::Options leveldb_options;
+  leveldb_options.create_if_missing = true;
 
   // Open databases
-  status = leveldb::DB::Open(leveldb_options_, leveldb_dir + "/inode2path",
+  cache_inode2path_ = leveldb::NewLRUCache(32 * 1024*1024);
+  leveldb_options.block_cache = cache_inode2path_;
+  filter_inode2path_ = leveldb::NewBloomFilterPolicy(10);
+  leveldb_options.filter_policy = filter_inode2path_;
+  status = leveldb::DB::Open(leveldb_options, leveldb_dir + "/inode2path",
                              &db_inode2path_);
   if (!status.ok()) {
     LogCvmfs(kLogNfsMaps, kLogDebug, "failed to create inode2path db: %s",
@@ -192,7 +202,15 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
   }
   LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path opened");
 
-  status = leveldb::DB::Open(leveldb_options_, leveldb_dir + "/path2inode",
+  // Hashes and inodes, no compression here
+  leveldb_options.compression = leveldb::kNoCompression;
+  // Random order, small block size to not trash caches
+  leveldb_options.block_size = 512;
+  cache_path2inode_ = leveldb::NewLRUCache(8 * 1024*1024);
+  leveldb_options.block_cache = cache_path2inode_;
+  filter_path2inode_ = leveldb::NewBloomFilterPolicy(10);
+  leveldb_options.filter_policy = filter_path2inode_;
+  status = leveldb::DB::Open(leveldb_options, leveldb_dir + "/path2inode",
                              &db_path2inode_);
   if (!status.ok()) {
     LogCvmfs(kLogNfsMaps, kLogDebug, "failed to create path2inode db: %s",
@@ -215,11 +233,19 @@ void Fini() {
   PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_-1);
 
   delete db_inode2path_;
+  delete cache_inode2path_;
+  delete filter_inode2path_;
   LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path closed");
   delete db_path2inode_;
+  delete cache_path2inode_;
+  delete filter_path2inode_;
   LogCvmfs(kLogNfsMaps, kLogDebug, "path2inode closed");
   db_inode2path_ = NULL;
   db_path2inode_ = NULL;
+  cache_inode2path_ = NULL;
+  cache_path2inode_ = NULL;
+  filter_inode2path_ = NULL;
+  filter_path2inode_ = NULL;
 }
 
 
