@@ -83,6 +83,12 @@
 #include "smalloc.h"
 #include "globals.h"
 
+#ifdef FUSE_CAP_EXPORT_SUPPORT
+#define CVMFS_NFS_SUPPORT
+#else
+#warning "No NFS support, Fuse too old"
+#endif
+
 using namespace std;  // NOLINT
 
 namespace cvmfs {
@@ -1161,7 +1167,9 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   atomic_init32(&drainout_mode_);
 
   // NFS support
+#ifdef CVMFS_NFS_SUPPORT
   conn->want |= FUSE_CAP_EXPORT_SUPPORT;
+#endif
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
@@ -1229,7 +1237,9 @@ struct CvmfsOptions {
   int      diskless;
   int      no_reload;
   int      shared_cache;
+#ifdef CVMFS_NFS_SUPPORT
   int      nfs_source;
+#endif
 
   int64_t  quota_limit;
   int64_t  quota_threshold;
@@ -1269,7 +1279,9 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("root_hash=%s",        root_hash, 0),
   CVMFS_SWITCH("no_reload",        no_reload),
   CVMFS_SWITCH("shared_cache",     shared_cache),
+#ifdef CVMFS_NFS_SUPPORT
   CVMFS_SWITCH("nfs_source",       nfs_source),
+#endif
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -1351,8 +1363,10 @@ static void usage(const char *progname) {
       "Avoids to reload catalogs when the TTL expires.\n"
     " -o shared_cache            "
       "Cache directory is shared among multiple instances\n"
+#ifdef CVMFS_NFS_SUPPORT
     " -o nfs_source              "
       "The CernVM-FS mountpoint is exported by NFS\n"
+#endif
     " Note: you cannot load files greater than quota_limit-quota_threshold\n"
     "\nFuse options:\n"
     " -o allow_other             "
@@ -1726,6 +1740,7 @@ int main(int argc, char *argv[]) {
   cache_ready = true;
 
   // Start NFS maps module, if necessary
+#ifdef CVMFS_NFS_SUPPORT
   if (g_cvmfs_opts.nfs_source) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "CernVM-FS: loading NFS maps... ");
@@ -1744,6 +1759,7 @@ int main(int argc, char *argv[]) {
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
     nfs_maps_ready = true;
   }
+#endif
 
   // Init quota / managed cache
   if (g_cvmfs_opts.quota_limit < 0) {
