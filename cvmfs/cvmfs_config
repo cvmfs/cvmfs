@@ -120,7 +120,7 @@ cvmfs_setup()
       echo "Cannot configure fuse!"
       exit 1
     fi
-    
+
     # configure sudoers on Mac OS
     if ! configure_sudoers; then
       echo "Cannot configure sudoers"
@@ -687,7 +687,7 @@ add_cvmfs_user()
     Linux )
       if ! check_cvmfs_user; then
         /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
-      fi 
+      fi
     ;;
     Darwin )
       if ! check_cvmfs_user; then
@@ -719,7 +719,7 @@ add_cvmfs_user()
 
         #Hide user from login screen
         sudo defaults write /Library/Preferences/com.apple.loginwindow HiddenUsersList -array-add cvmfs
-      fi 
+      fi
     ;;
     * )
       echo "Architecture $sys_arch is not supported"
@@ -864,7 +864,7 @@ configure_autofs()
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
       if ! grep -q "^$cvmfs_map" /etc/auto.master; then
         echo "$cvmfs_map" >> /etc/auto.master
-        [ -f /var/lock/subsys/autofs ] && $service autofs reload > /dev/null
+        [ -f /var/lock/subsys/autofs ] && $service autofs reload > /dev/null || true
       fi ;;
 
    Darwin )
