@@ -79,12 +79,11 @@ cp %{SOURCE1} SELinux
 
 %build
 %ifarch x86_64
-%cmake -DBUILD_SERVER=no .
 %else
 export CFLAGS="-march=i686" 
 export CXXFLAGS="-march=i686"
-%cmake -DBUILD_SERVER=no .
 %endif
+%cmake -DBUILD_SERVER=no -DBUILD_LIBCVMFS=no .
 make %{?_smp_mflags}
 
 %if 0%{?selinux_cvmfs}
