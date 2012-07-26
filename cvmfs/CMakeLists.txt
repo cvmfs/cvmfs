@@ -276,27 +276,52 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
-	add_library (cvmfs STATIC ${LIBCVMFS_SOURCES})
+	# libcvmfs_only.a is a static lib of cvmfs without externals
+	# libcvmfs.a includes the externals as well
+	add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
+	set (LIBCVMFS_LIBS ${LIBCVMFS_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
 	if (LIBCURL_BUILTIN)
-		add_dependencies (cvmfs libcares libcurl)
+		add_dependencies (cvmfs_only libcares libcurl)
+		set (LIBCVMFS_LIBS ${CARES_ARCHIVE} ${LIBCVMFS_LIBS} )
+		set (LIBCVMFS_LIBS ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
 	endif (LIBCURL_BUILTIN)
 
 	if (SQLITE3_BUILTIN)
-		add_dependencies (cvmfs sqlite3)
+		add_dependencies (cvmfs_only sqlite3)
+		set (LIBCVMFS_LIBS ${SQLITE3_ARCHIVE}  ${LIBCVMFS_LIBS} )
 	endif (SQLITE3_BUILTIN)
 
 	if (ZLIB_BUILTIN)
-		add_dependencies (cvmfs zlib)
+		add_dependencies (cvmfs_only zlib)
+		set (LIBCVMFS_LIBS ${ZLIB_ARCHIVE} ${LIBCVMFS_LIBS} )
 	endif (ZLIB_BUILTIN)
 
 	if (SPARSEHASH_BUILTIN)
-		add_dependencies (cvmfs sparsehash)
+		add_dependencies (cvmfs_only sparsehash)
 	endif (SPARSEHASH_BUILTIN)
 
-  add_dependencies (cvmfs murmur)
+	add_dependencies (cvmfs_only murmur)
+	set (LIBCVMFS_LIBS ${MURMUR_ARCHIVE} ${LIBCVMFS_LIBS} )
 
-	set_target_properties (cvmfs PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}")
+	set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}")
+
+	if (NOT MACOSX)
+		# We do not (yet) have a recipe for localizing private symbols
+		# in Mac OS X, so skip that step on Mac
+		set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
+	endif (MACOSX)
+
+	add_custom_command(
+		OUTPUT libcvmfs.a
+		COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+		DEPENDS ${LIBCVMFS_LIBS}
+	)
+
+	# dummy target to cause merged libcvmfs to be produced
+	add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
+
 endif (BUILD_LIBCVMFS)
 
 if (BUILD_SERVER)
@@ -366,49 +391,15 @@ endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
 	install (
-		TARGETS			cvmfs
+		FILES			libcvmfs.a
 		DESTINATION		lib
 	)
-
 	install (
-		FILES			libcvmfs.h
-		DESTINATION		include
+		FILES                   libcvmfs.h
+		DESTINATION             include
 	)
-
-       if (LIBCURL_BUILTIN)
-               install (
-                       FILES           ${CARES_ARCHIVE} ${LIBCURL_ARCHIVE}
-                       DESTINATION     lib
-               )
-       endif (LIBCURL_BUILTIN)
-
-       if (SQLITE3_BUILTIN)
-               install (
-                       FILES           ${SQLITE3_ARCHIVE}
-                       DESTINATION     lib
-               )
-       endif (SQLITE3_BUILTIN)
-
-       if (ZLIB_BUILTIN)
-               install (
-                       FILES           ${ZLIB_ARCHIVE}
-                       DESTINATION     lib
-               )
-       endif (ZLIB_BUILTIN)
-
-       if (SPARSEHASH_BUILTIN)
-               install (
-                       FILES           ${SPARSEHASH_ARCHIVE}
-                       DESTINATION     lib
-               )
-       endif (SPARSEHASH_BUILTIN)
-
-       install (
-               FILES                   ${MURMUR_ARCHIVE}
-               DESTINATION             lib
-       )
-
 endif (BUILD_LIBCVMFS)
+
 if (BUILD_SERVER)
 	install (
 #		TARGETS			cvmfs_zpipe cvmfs_sign cvmfs_lscat cvmfs_pull cvmfs_scrub cvmfs_sync

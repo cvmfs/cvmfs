@@ -5,6 +5,11 @@
 #ifndef CVMFS_LIBCVMFS_H_
 #define CVMFS_LIBCVMFS_H_ 1
 
+/*
+ * NOTE: when adding or removing public symbols, you must also update
+ * the list in libcvmfs_public_syms.txt.
+ */
+
 extern "C" {
 
 /**
