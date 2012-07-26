@@ -67,7 +67,6 @@
 #include "download.h"
 #include "cache.h"
 #include "hash.h"
-#include "talk.h"
 #include "monitor.h"
 #include "signature.h"
 #include "quota.h"
@@ -301,7 +300,6 @@ static bool monitor_ready;
 static bool signature_ready;
 static bool quota_ready;
 static bool catalog_ready;
-static bool talk_ready;
 static bool running_created;
 
 
@@ -329,9 +327,7 @@ int cvmfs_int_init(
   const std::string &cvmfs_opts_tracefile,
   const std::string &cvmfs_opts_deep_mount,
   const std::string &cvmfs_opts_blacklist,
-  const std::string &cvmfs_opts_whitelist,
   int cvmfs_opts_nofiles,
-  bool cvmfs_opts_enable_talk,
   bool cvmfs_opts_enable_monitor
 ) {
 
@@ -348,7 +344,6 @@ int cvmfs_int_init(
   signature_ready = false;
   quota_ready = false;
   catalog_ready = false;
-  talk_ready = false;
   running_created = false;
 
   cvmfs::boot_time_ = time(NULL);
@@ -512,16 +507,6 @@ int cvmfs_int_init(
   atomic_init32(&cvmfs::open_files_);
   atomic_init32(&cvmfs::open_dirs_);
 
-  // Control & command interface
-  if (cvmfs_opts_enable_talk) {
-    if (!talk::Init(relative_cachedir)) {
-      PrintError("failed to initialize talk socket (" + StringifyInt(errno) +
-                 ")");
-      goto cvmfs_cleanup;
-    }
-    talk_ready = true;
-  }
-
   // Network initialization
   download::Init(16);
   download::SetHostChain(string(cvmfs_opts_hostname));
@@ -590,9 +575,6 @@ void cvmfs_int_spawn() {
   }
   download::Spawn();
   quota::Spawn();
-  if (talk_ready) {
-    talk::Spawn();
-  }
 
   if (*tracefile_ != "")
     tracer::Init(8192, 7000, *tracefile_);
@@ -611,7 +593,6 @@ void cvmfs_int_fini() {
 
   if (signature_ready) signature::Fini();
   if (download_ready) download::Fini();
-  if (talk_ready) talk::Fini();
   if (monitor_ready) monitor::Fini();
   if (quota_ready) quota::Fini();
   if (cache_ready) cache::Fini();

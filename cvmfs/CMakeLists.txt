@@ -12,7 +12,6 @@ set (CVMFS_CLIENT_SOURCES
 	quota.h quota.cc
 	hash.h hash.cc
 	cache.h cache.cc
-	talk.h talk.cc
 	platform.h platform_osx.h platform_linux.h
 	monitor.h monitor.cc
 	util.cc util.h
@@ -30,6 +29,7 @@ set (CVMFS_CLIENT_SOURCES
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
+  talk.h talk.cc
   nfs_maps.h nfs_maps.cc
   cvmfs.h cvmfs.cc
 )
