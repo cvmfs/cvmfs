@@ -310,7 +310,7 @@ if (BUILD_LIBCVMFS)
 		# We do not (yet) have a recipe for localizing private symbols
 		# in Mac OS X, so skip that step on Mac
 		set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
-	endif (MACOSX)
+	endif (NOT MACOSX)
 
 	add_custom_command(
 		OUTPUT libcvmfs.a
@@ -391,7 +391,7 @@ endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
 	install (
-		FILES			libcvmfs.a
+		FILES			${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
 		DESTINATION		lib
 	)
 	install (
