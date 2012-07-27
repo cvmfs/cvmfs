@@ -1,1 +1,10 @@
-mysymbol
+cvmfs_init
+cvmfs_fini
+cvmfs_remount
+cvmfs_set_log_fn
+cvmfs_open
+cvmfs_close
+cvmfs_readlink
+cvmfs_stat
+cvmfs_lstat
+cvmfs_listdir
