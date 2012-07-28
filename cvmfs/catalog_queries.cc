@@ -217,7 +217,8 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.inode_        = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
                           (catalog->schema() < 2.0) ? 0 : RetrieveInt64(1));
   result.parent_inode_ = DirectoryEntry::kInvalidInode; // must be set later by a second catalog lookup
-  result.linkcount_    = GetLinkcountFromFlags(database_flags);
+  result.linkcount_    = (catalog->schema() < 2.0) ?
+                          1 : GetLinkcountFromFlags(database_flags);
   result.mode_         = RetrieveInt(3);
   result.size_         = RetrieveInt64(2);
   result.mtime_        = RetrieveInt64(4);
