@@ -221,6 +221,7 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
 
   // Fetch highest issued inode
   seq_ = FindInode(hash::Md5(hash::AsciiPtr("?seq")));
+  LogCvmfs(kLogNfsMaps, kLogDebug, "Sequence number is %"PRIu64, seq_);
   if (seq_ == 0) {
     seq_ = root_inode;
     // Insert root inode
@@ -234,7 +235,7 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
 
 void Fini() {
   // Write highst issued sequence number
-  PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_-1);
+  PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_);
 
   delete db_inode2path_;
   delete cache_inode2path_;
