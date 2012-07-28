@@ -829,7 +829,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
       cert_data = (unsigned char *)download_certificate.destination_mem.data;
       cert_size = download_certificate.destination_mem.size;
       CommitFromMem(cert_hash, cert_data, cert_size,
-                    "certificate of " + signature::Whois());
+                    "certificate for " + repo_name_);
     }
 
     // Load certificate
