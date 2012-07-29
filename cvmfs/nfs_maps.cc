@@ -29,6 +29,7 @@
 #include "leveldb/db.h"
 #include "leveldb/cache.h"
 #include "leveldb/filter_policy.h"
+#include "leveldb/env.h"
 
 #include "logging.h"
 #include "util.h"
@@ -48,6 +49,71 @@ leveldb::WriteOptions leveldb_write_options_;
 uint64_t root_inode_;
 uint64_t seq_;
 pthread_mutex_t lock_ = PTHREAD_MUTEX_INITIALIZER;
+bool spawned_ = false;  // Set to true after fork()
+
+
+// Leveldb's background threads must not be started before cvmfs has forked.
+// Before forking, we run the processes in specially created threads.
+// We make sure, these threads are terminated before forking.
+
+struct FuncArg {
+  void (*function)(void*);
+  void *arg;
+};
+
+static void *MainFakeThread(void *data) {
+  FuncArg *funcarg = reinterpret_cast<FuncArg *>(data);
+  funcarg->function(funcarg->arg);
+  delete funcarg;
+  return NULL;
+}
+
+class ForkAwareEnv : public leveldb::EnvWrapper {
+ public:
+  ForkAwareEnv() : leveldb::EnvWrapper(leveldb::Env::Default()) {
+    fake_thread_running_ = false;
+  }
+
+  void StartThread(void (*f)(void*), void* a) {
+    if (spawned_) {
+      leveldb::Env::Default()->StartThread(f, a);
+      return;
+    }
+    LogCvmfs(kLogNfsMaps, kLogDebug,
+             "single threaded leveldb::StartThread called");
+    // Unclear how to handle this because caller assumes that thread is started
+    abort();
+  }
+
+  void Schedule(void (*function)(void*), void* arg) {
+    if (spawned_) {
+      leveldb::Env::Default()->Schedule(function, arg);
+      return;
+    }
+    LogCvmfs(kLogNfsMaps, kLogDebug,
+             "single threaded leveldb::Schedule called");
+    WaitForBGThreads();
+
+    FuncArg *funcarg = new FuncArg();
+    funcarg->function = function;
+    funcarg->arg = arg;
+    int retval = pthread_create(&fake_thread_, NULL, MainFakeThread, funcarg);
+    assert(retval == 0);
+    fake_thread_running_ = true;
+  }
+
+  void WaitForBGThreads() {
+    if (fake_thread_running_)
+      pthread_join(fake_thread_, NULL);
+    fake_thread_running_ = false;
+  }
+
+ private:
+  pthread_t fake_thread_;  // A real thread is required to prevent deadlocks.
+  bool fake_thread_running_;
+};
+
+ForkAwareEnv *fork_aware_env_ = NULL;
 
 
 static void PutPath2Inode(const hash::Md5 &path, const uint64_t inode) {
@@ -184,9 +250,11 @@ string GetStatistics() {
 bool Init(const string &leveldb_dir, const uint64_t root_inode) {
   assert(root_inode > 0);
   root_inode_ = root_inode;
+  fork_aware_env_ = new ForkAwareEnv();
   leveldb::Status status;
   leveldb::Options leveldb_options;
   leveldb_options.create_if_missing = true;
+  leveldb_options.env = fork_aware_env_;
 
   // Open databases
   cache_inode2path_ = leveldb::NewLRUCache(32 * 1024*1024);
@@ -219,14 +287,6 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
   }
   LogCvmfs(kLogNfsMaps, kLogDebug, "path2inode opened");
 
-  return true;
-}
-
-
-/**
- * Start real work only after fork() because leveldb has background threads.
- */
-void Spawn() {
   // Fetch highest issued inode
   seq_ = FindInode(hash::Md5(hash::AsciiPtr("?seq")));
   LogCvmfs(kLogNfsMaps, kLogDebug, "Sequence number is %"PRIu64, seq_);
@@ -236,11 +296,23 @@ void Spawn() {
     PathString root_path;
     nfs_maps::GetInode(root_path);
   }
+
+  fork_aware_env_->WaitForBGThreads();
+
+  return true;
+}
+
+
+/**
+ * Start real work only after fork() because leveldb has background threads.
+ */
+void Spawn() {
+  spawned_ = true;
 }
 
 
 void Fini() {
-  // Write highst issued sequence number
+  // Write highest issued sequence number
   PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_);
 
   delete db_path2inode_;
@@ -251,13 +323,14 @@ void Fini() {
   delete cache_inode2path_;
   delete filter_inode2path_;
   LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path closed");
+  delete fork_aware_env_;
   db_inode2path_ = NULL;
   db_path2inode_ = NULL;
   cache_inode2path_ = NULL;
   cache_path2inode_ = NULL;
   filter_inode2path_ = NULL;
   filter_path2inode_ = NULL;
+  fork_aware_env_ = NULL;
 }
-
 
 }  // namespace nfs_maps
