@@ -251,6 +251,7 @@ mkfs() {
   local name=$1
   local stratum0=$2
   local upstream=$3
+  local owner=$4
 
   local spool_dir="/var/spool/cvmfs/${name}"
   local scratch_dir="${spool_dir}/scratch"
@@ -271,8 +272,12 @@ mkfs() {
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
 
   local cvmfs_user
-  read -p "Owner of $name [$(whoami)]: " cvmfs_user
-  [ x"$cvmfs_user" = x ] && cvmfs_user=$(whoami)
+  if [ "x$owner" == "x" ]; then
+    read -p "Owner of $name [$(whoami)]: " cvmfs_user
+    [ x"$cvmfs_user" = x ] && cvmfs_user=$(whoami)
+  else
+    cvmfs_user=$owner
+  fi
   id $cvmfs_user > /dev/null 2>&1 || die "No user $cvmfs_user"
 
   echo -n "Creating configuration files... "
@@ -485,7 +490,8 @@ usage() {
    echo "\
 CernVM-FS Server Tool
 Commands:
-  mkfs <fully qualified name> [-w stratum0 url] [-u upstream storage]:
+  mkfs <fully qualified name> [-w stratum0 url] [-u upstream storage]
+                              [-o owner]:
                Create a new repository with a given name
   skeleton <directory>:
                Create repository skeleton in directory
@@ -532,7 +538,7 @@ case $1 in
     STRATUM0="http://localhost/cvmfs/$CVMFS_REPOSITORY_NAME"
     UPSTREM="local:/srv/cvmfs/$CVMFS_REPOSITORY_NAME"
     shift 2
-    while getopts "w:u:" OPTION
+    while getopts "w:u:o:" OPTION
     do
       case $OPTION in
         w)
@@ -541,13 +547,16 @@ case $1 in
         u)
           UPSTREM=$OPTARG
         ;;
+        o)
+          OWNER=$OPTARG
+        ;;
         ?)
           echo "Invalid option"
           exit 1
         ;;
       esac
     done
-    mkfs $CVMFS_REPOSITORY_NAME $STRATUM0 $UPSTREM
+    mkfs $CVMFS_REPOSITORY_NAME $STRATUM0 $UPSTREM $OWNER
     ;;
   rmfs)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
