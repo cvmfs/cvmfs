@@ -7,6 +7,7 @@ require {
 	type mount_t;
 	type shadow_t;
 	type var_t;
+	type var_lib_t;
 	type file_t;
 	class sock_file { create unlink };
 	class capability fowner;
