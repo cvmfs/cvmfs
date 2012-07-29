@@ -246,5 +246,5 @@ int main(int argc, char **argv) {
   }
   delete manifest;
 
-	return 0;
+  return 0;
 }
