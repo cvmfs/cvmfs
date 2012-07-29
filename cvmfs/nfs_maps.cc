@@ -219,17 +219,23 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
   }
   LogCvmfs(kLogNfsMaps, kLogDebug, "path2inode opened");
 
+  return true;
+}
+
+
+/**
+ * Start real work only after fork() because leveldb has background threads.
+ */
+void Spawn() {
   // Fetch highest issued inode
   seq_ = FindInode(hash::Md5(hash::AsciiPtr("?seq")));
   LogCvmfs(kLogNfsMaps, kLogDebug, "Sequence number is %"PRIu64, seq_);
   if (seq_ == 0) {
-    seq_ = root_inode;
+    seq_ = root_inode_;
     // Insert root inode
     PathString root_path;
     nfs_maps::GetInode(root_path);
   }
-
-  return true;
 }
 
 
@@ -237,14 +243,14 @@ void Fini() {
   // Write highst issued sequence number
   PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_);
 
-  delete db_inode2path_;
-  delete cache_inode2path_;
-  delete filter_inode2path_;
-  LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path closed");
   delete db_path2inode_;
   delete cache_path2inode_;
   delete filter_path2inode_;
   LogCvmfs(kLogNfsMaps, kLogDebug, "path2inode closed");
+  delete db_inode2path_;
+  delete cache_inode2path_;
+  delete filter_inode2path_;
+  LogCvmfs(kLogNfsMaps, kLogDebug, "inode2path closed");
   db_inode2path_ = NULL;
   db_path2inode_ = NULL;
   cache_inode2path_ = NULL;

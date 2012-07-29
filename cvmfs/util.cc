@@ -308,7 +308,7 @@ int LockFile(const std::string &path) {
   if (fd_lockfile < 0)
     return -1;
 
-  
+
   if (flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) {
     if (errno != EWOULDBLOCK)
       return -1;
@@ -588,7 +588,7 @@ void Daemonize() {
       int null_read = open("/dev/null", O_RDONLY);
       int null_write = open("/dev/null", O_WRONLY);
       assert((null_read >= 0) && (null_write >= 0));
-      retval = dup2(null_read, 0); 
+      retval = dup2(null_read, 0);
       assert(retval == 0);
       retval = dup2(null_write, 1);
       assert(retval == 1);
@@ -616,11 +616,11 @@ void Daemonize() {
  * The command_line parameter contains the binary at index 0 and the arguments
  * in the rest of the vector.
  */
-bool ManagedExec(const vector<string> &command_line, 
+bool ManagedExec(const vector<string> &command_line,
                  const vector<int> &preserve_fildes)
 {
   assert(command_line.size() >= 1);
-  
+
   int pipe_fork[2];
   MakePipe(pipe_fork);
   pid_t pid = fork();
@@ -634,7 +634,7 @@ bool ManagedExec(const vector<string> &command_line,
     for (unsigned i = 0; i < command_line.size(); ++i)
       argv[i] = command_line[i].c_str();
     argv[command_line.size()] = NULL;
-    
+
     // Child, close file descriptors
     max_fd = sysconf(_SC_OPEN_MAX);
     if (max_fd < 0) {
@@ -652,12 +652,12 @@ bool ManagedExec(const vector<string> &command_line,
       if (close_fd && (fd != pipe_fork[1]))
         close(fd);
     }
-    
+
     // Double fork to disconnect from parent
     pid_grand_child = fork();
     assert(pid_grand_child >= 0);
     if (pid_grand_child != 0) _exit(0);
-    
+
     fd_flags = fcntl(pipe_fork[1], F_GETFD);
     if (fd_flags < 0) {
       failed = 'G';
@@ -668,18 +668,18 @@ bool ManagedExec(const vector<string> &command_line,
       failed = 'S';
       goto fork_failure;
     }
-    
+
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
-    
+
     failed = 'E';
-    
+
    fork_failure:
     write(pipe_fork[1], &failed, 1);
     _exit(1);
   }
   int statloc;
   waitpid(pid, &statloc, 0);
-  
+
   close(pipe_fork[1]);
   char buf;
   if (read(pipe_fork[0], &buf, 1) == 1) {

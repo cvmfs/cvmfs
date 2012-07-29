@@ -13,6 +13,7 @@ namespace nfs_maps {
 
 bool Init(const std::string &leveldb_dir, const uint64_t root_inode);
 void Fini();
+void Spawn();
 
 uint64_t GetInode(const PathString &path);
 void GetPath(const uint64_t inode, PathString *path);

@@ -1158,6 +1158,8 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   download::Spawn();
   quota::Spawn();
   talk::Spawn();
+  if (nfs_maps_)
+    nfs_maps::Spawn();
 
   if (*tracefile_ != "")
     tracer::Init(8192, 7000, *tracefile_);
