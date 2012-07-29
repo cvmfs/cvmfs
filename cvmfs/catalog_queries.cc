@@ -176,8 +176,8 @@ bool ManipulateDirectoryEntrySqlStatement::BindDirectoryEntryFields(const int ha
     BindInt(      mode_field,    entry.mode_) &&
     BindInt64(    mtime_field,   entry.mtime_) &&
     BindInt(      flags_field,   CreateDatabaseFlags(entry)) &&
-    BindText(     name_field,    entry.name_.GetChars(), entry.name_.GetLength(), SQLITE_TRANSIENT) &&
-    BindText(     symlink_field, entry.symlink_.GetChars(), entry.symlink_.GetLength(), SQLITE_TRANSIENT)
+    BindText(     name_field,    entry.name_.GetChars(), entry.name_.GetLength(), SQLITE_STATIC) &&
+    BindText(     symlink_field, entry.symlink_.GetChars(), entry.symlink_.GetLength(), SQLITE_STATIC)
   );
 }
 

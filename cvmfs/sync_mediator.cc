@@ -169,11 +169,12 @@ Manifest *SyncMediator::Commit() {
   //  AddHardlinkGroup(*j);
   //}
 
-  LogCvmfs(kLogPublish, kLogVerboseMsg,
+  LogCvmfs(kLogPublish, kLogStdout,
            "Waiting for upload of files before committing...");
   while (!params_->spooler->IsIdle())
     sleep(1);
   params_->spooler->UnsetCallback();
+  LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
   if (params_->spooler->num_errors() > 0) {
     LogCvmfs(kLogPublish, kLogStderr, "failed to commit files");
     return NULL;
