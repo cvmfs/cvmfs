@@ -30,7 +30,7 @@ bool WritableCatalog::CreateDatabase(const string &file_path,
 {
   // Create schema for new catalog
   if (!WritableCatalog::CreateSchema(file_path)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "failed to create database schema for new catalog '%s'",
              file_path.c_str());
     return false;
@@ -56,14 +56,14 @@ bool WritableCatalog::CreateDatabase(const string &file_path,
   // Open the new catalog temporarily to insert the root entry
   WritableCatalog *new_catalog = new WritableCatalog(root_path, NULL);
   if (!new_catalog->OpenDatabase(file_path)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "opening new catalog '%s' for the first time failed.",
              file_path.c_str());
     return false;
   }
 
   // Add the root entry to the new catalog
-  LogCvmfs(kLogCatalog, kLogDebug,
+  LogCvmfs(kLogCatalog, kLogVerboseMsg,
            "inserting root entry '%s' into new catalog '%s'",
            root_path.c_str(), new_catalog->path().c_str());
   bool result =
@@ -94,18 +94,18 @@ bool WritableCatalog::CreateSchema(const std::string &file_path) {
 
   // Create the directory structure for this catalog
   if (!MkdirDeep(GetParentPath(file_path), kDefaultDirMode)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot create pseudo directory structure "
-             "for new nested catalog database file '%s'", file_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr, "cannot create pseudo directory structure"
+             " for new nested catalog database file '%s'", file_path.c_str());
     return false;
   }
 
   // Create the new catalog file and open it
-  LogCvmfs(kLogCatalog, kLogDebug, "creating new catalog at '%s'",
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new catalog at '%s'",
            file_path.c_str());
   if (sqlite3_open_v2(file_path.c_str(), &database, open_flags, NULL) !=
       SQLITE_OK)
   {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "Cannot create and open catalog database file '%s'",
              file_path.c_str());
     return false;
@@ -242,7 +242,7 @@ bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
   hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
   hash::Md5 parent_hash((hash::AsciiPtr(parent_path)));
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Catalogs adds %s", entry_path.c_str());
+  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "add entry %s", entry_path.c_str());
 
   bool result =
     sql_insert_->BindPathHash(path_hash) &&
@@ -356,13 +356,13 @@ bool WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
 bool WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
   // Create connection between parent and child catalogs
   if (!MakeTransitionPoint(new_nested_catalog->path().ToString())) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "failed to create nested catalog mountpoint in catalog '%s'",
              path().c_str());
     return false;
   }
   if (!new_nested_catalog->MakeNestedRoot()) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog root "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog root "
              "entry in new nested catalog '%s'",
              new_nested_catalog->path().c_str());
     return false;
@@ -375,7 +375,7 @@ bool WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
   if (!MoveToNested(new_nested_catalog->path().ToString(),
                     new_nested_catalog, &GrandChildMountpoints))
   {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to move directory structure in "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to move directory structure in "
              "'%s' to new nested catalog", new_nested_catalog->path().c_str());
     return false;
   }
@@ -384,8 +384,8 @@ bool WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
   // links to nested catalogs of the newly created nested catalog.
   // Move these references into the new nested catalog
   if (!MoveCatalogsToNested(GrandChildMountpoints, new_nested_catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to move nested catalog references "
-             "into new nested catalog '%s'",
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to move nested catalog references"
+             " into new nested catalog '%s'",
              new_nested_catalog->path().c_str());
     return false;
   }
@@ -417,7 +417,7 @@ bool WritableCatalog::MakeTransitionPoint(const string &mountpoint) {
 bool WritableCatalog::MakeNestedRoot() {
   DirectoryEntry root_entry;
   if (!LookupPath(path(), &root_entry)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "no root entry found in catalog '%s'",
+    LogCvmfs(kLogCatalog, kLogStderr, "no root entry found in catalog '%s'",
              path().c_str());
     return false;
   }

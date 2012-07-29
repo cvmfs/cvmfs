@@ -45,7 +45,7 @@ bool WritableCatalogManager::Init() {
   bool succeeded = AbstractCatalogManager::Init();
 
   if (!succeeded) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "unable to init catalog manager (cannot create root catalog)");
     return false;
   }
@@ -211,14 +211,14 @@ bool WritableCatalogManager::RemoveFile(const std::string &path) {
 
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "catalog for file '%s' cannot be found",
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
              file_path.c_str());
     return false;
   }
 
   if (!catalog->RemoveEntry(file_path)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while deleting '%s'",
-             file_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "something went wrong while deleting '%s'", file_path.c_str());
     return false;
   }
 
@@ -237,7 +237,7 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
 
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found",
              directory_path.c_str());
     return false;
@@ -247,7 +247,7 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   if (!catalog->LookupPath(PathString(directory_path.data(),
                                       directory_path.length()), &dir))
   {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "directory '%s' does not exist and thus cannot be deleted",
              directory_path.c_str());
     return false;
@@ -260,7 +260,8 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
   assert(retval && (listing.size() == 0));
 
   if (!catalog->RemoveEntry(directory_path)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "something went wrong while deleting '%s'",
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "something went wrong while deleting '%s'",
              directory_path.c_str());
     return false;
   }
@@ -285,7 +286,7 @@ bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
 
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found",
              directory_path.c_str());
     return false;
@@ -311,7 +312,7 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
 
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "catalog for file '%s' cannot be found",
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
              file_path.c_str());
     return false;
   }
@@ -335,11 +336,11 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 {
   // Sanity checks
 	if (entries.size() == 0) {
-    LogCvmfs(kLogCatalog, kLogDebug, "tried to add an empty hardlink group");
+    LogCvmfs(kLogCatalog, kLogStderr, "tried to add an empty hardlink group");
 		return false;
 	}
 	if (entries.size() == 1) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogVerboseMsg,
              "tried to add a hardlink group with just one member... "
              "added as normal file instead");
     return AddFile(entries.front(), parent_directory);
@@ -351,7 +352,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for hardlink group containing '%s' cannot be found",
              parent_path.c_str());
     return false;
@@ -360,7 +361,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	// Get a valid hardlink group id for the catalog the group will end up in
 	int new_group_id = catalog->GetMaxLinkId() + 1;
 	if (new_group_id <= 0) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "failed to retrieve a new valid hardlink group id");
 		return false;
 	}
@@ -380,7 +381,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	}
 
 	if (result == false) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "something went wrong while adding a hardlink group");
 	}
 
@@ -398,13 +399,13 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
 
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "catalog for entry '%s' cannot be found",
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
              entry_path.c_str());
     return false;
   }
 
   if (!catalog->TouchEntry(entry, entry_path)) {
-    LogCvmfs(kLogCatalog, kLogDebug,
+    LogCvmfs(kLogCatalog, kLogStderr,
              "something went wrong while touching entry '%s'",
              entry_path.c_str());
     return false;
@@ -428,7 +429,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // will be represented as a new nested catalog from now on
   WritableCatalog *old_catalog = NULL;
   if (!FindCatalog(nested_root_path, &old_catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
              "mountpoint was not found in current catalog structure",
              nested_root_path.c_str());
     return false;
@@ -449,7 +450,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   if (!WritableCatalog::CreateDatabase(database_file_path, new_root_entry,
                                        root_parent_path, new_repository))
   {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
              "database schema creation failed", nested_root_path.c_str());
     return false;
   }
@@ -476,7 +477,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
     // TODO: if this happens, we may have destroyed our catalog structure...
     //       it might be a good idea to take some counter measures here
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to create nested catalog '%s': "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
              "splitting of catalog content failed", nested_root_path.c_str());
     return false;
   }
@@ -486,7 +487,7 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   if (!old_catalog->InsertNestedCatalog(new_catalog->path().ToString(), NULL,
                                         hash::Any(hash::kSha1)))
   {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to insert new nested catalog "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to insert new nested catalog "
              "reference '%s' in catalog '%s'",
              new_catalog->path().c_str(), old_catalog->path().c_str());
     return false;
@@ -509,7 +510,7 @@ bool WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
   // Find the catalog which should be removed
   WritableCatalog *nested_catalog = NULL;
   if (!FindCatalog(nested_root_path, &nested_catalog)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to remove nested catalog '%s': "
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to remove nested catalog '%s': "
              "mountpoint was not found in current catalog structure",
              nested_root_path.c_str());
     return false;
@@ -561,7 +562,7 @@ Manifest *WritableCatalogManager::Commit() {
     hash::Any hash = SnapshotCatalog(*i);
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
-      LogCvmfs(kLogCatalog, kLogStdout, "Wait for upload of catalogs");
+      LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
       while (!spooler_->IsIdle())
         sleep(1);
       if (spooler_->num_errors() > 0) {
@@ -570,7 +571,7 @@ Manifest *WritableCatalogManager::Commit() {
       }
 
       // .cvmfspublished
-      LogCvmfs(kLogCatalog, kLogStdout, "Committing repository manifest");
+      LogCvmfs(kLogCatalog, kLogVerboseMsg, "Committing repository manifest");
       result = new Manifest(hash, "");
       result->set_ttl((*i)->GetTTL());
       result->set_revision((*i)->GetRevision());
@@ -620,7 +621,7 @@ int WritableCatalogManager::GetModifiedCatalogsRecursively(
 hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   const
 {
-  LogCvmfs(kLogCvmfs, kLogStdout, "creating snapshot of catalog '%s'",
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
            catalog->path().c_str());
 
   if (!catalog->UpdateLastModified()) {

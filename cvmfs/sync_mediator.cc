@@ -30,9 +30,12 @@ PublishFilesCallback::PublishFilesCallback(SyncMediator *mediator) {
 void PublishFilesCallback::Callback(const std::string &path, int retval,
                                     const std::string &digest)
 {
-  LogCvmfs(kLogCvmfs, kLogStdout, "callback for %s, digest %s, retval %d", path.c_str(), digest.c_str(), retval);
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for %s, digest %s, retval %d",
+           path.c_str(), digest.c_str(), retval);
   if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "FAILURE!");
+    LogCvmfs(kLogCvmfs, kLogStderr, "Spool failure for %s (%d)",
+             path.c_str(), retval);
     abort();
   }
   hash::Any hash(hash::kSha1, hash::HexPtr(digest));
@@ -56,7 +59,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
   assert(retval == 0);
 
   params->spooler->SetCallback(new PublishFilesCallback(this));
-  LogCvmfs(kLogCvmfs, kLogStdout, "processing changes...");
+  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 }
 
 
@@ -166,12 +169,13 @@ Manifest *SyncMediator::Commit() {
   //  AddHardlinkGroup(*j);
   //}
 
-  LogCvmfs(kLogCatalog, kLogStdout, "Waiting for upload of files...");
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Waiting for upload of files before committing...");
   while (!params_->spooler->IsIdle())
     sleep(1);
   params_->spooler->UnsetCallback();
   if (params_->spooler->num_errors() > 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to commit files");
+    LogCvmfs(kLogPublish, kLogStderr, "failed to commit files");
     return NULL;
   }
 
@@ -378,7 +382,8 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[add] NESTED CATALOG");
+    LogCvmfs(kLogCvmfs, kLogStdout, "[add] Nested catalog at %s",
+             GetParentPath(requestFile.GetRdOnlyPath()).c_str());
 	if (!params_->dry_run) {
     bool retval = catalog_manager_->CreateNestedCatalog(
                     requestFile.relative_parent_path());
@@ -389,7 +394,8 @@ void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] NESTED CATALOG");
+    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] Nested catalog at %s",
+             GetParentPath(requestFile.GetRdOnlyPath()).c_str());
 	if (!params_->dry_run) {
     bool retval = catalog_manager_->RemoveNestedCatalog(
                     requestFile.relative_parent_path());
