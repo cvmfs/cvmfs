@@ -22,7 +22,7 @@ sub usage {
   print "  $0 -i atlas.cern.ch pid                                       \n";
   print "\n";
   print "Commands:                                                       \n";
-  print "  flush                  flushes the trace buffer to disk       \n";
+  print "  tracebuffer flush      flushes the trace buffer to disk       \n";
   print "  cache size             gets current size of file cache        \n";
   print "  cache list             gets files in cache                    \n";
   print "  cache list pinned      gets pinned file catalogs in cache     \n";

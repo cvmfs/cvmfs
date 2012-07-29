@@ -96,7 +96,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       const string line = string(buf);
       LogCvmfs(kLogTalk, kLogDebug, "received %s", line.c_str());
 
-      if (line == "flush") {
+      if (line == "tracebuffer flush") {
         tracer::Flush();
         Answer(con_fd, "OK\n");
       } else if (line == "cache size") {
