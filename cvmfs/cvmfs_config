@@ -129,7 +129,7 @@ cvmfs_setup()
   fi
 
   if [ $noservice -eq 0 ]; then
-    if [ $sys_arch == 'Linux' ]; then
+    if [ "$sys_arch" == 'Linux' ]; then
       if ! /sbin/chkconfig --list cvmfs > /dev/null 2>&1; then
          /sbin/chkconfig --add cvmfs
       fi
@@ -137,7 +137,7 @@ cvmfs_setup()
   fi
 
   if [ $nostart -eq 0 ]; then
-    if [ $sys_arch == 'Linux' ]; then
+    if [ "$sys_arch" == 'Linux' ]; then
       $service cvmfs start
     fi
   fi
@@ -167,9 +167,9 @@ cvmfs_chksetup()
 
   # Check /sbin/mount.cvmfs /sbin/umount.cvmfs /etc/auto.cvmfs, service
   local tools
-  if [ $sys_arch == 'Darwin' ]; then
+  if [ "$sys_arch" == 'Darwin' ]; then
     tools="/sbin/mount_cvmfs"
-  elif [ $sys_arch == 'Linux' ]; then
+  elif [ "$sys_arch" == 'Linux' ]; then
     tools="/sbin/mount.cvmfs /etc/init.d/cvmfs"
   fi
 
@@ -183,7 +183,7 @@ cvmfs_chksetup()
   done
 
   # Fusermount (not necessary user under Mac OS X)
-  if [ $sys_arch == 'Linux' ]; then
+  if [ "$sys_arch" == 'Linux' ]; then
     if [ ! -x /usr/bin/fusermount -a ! -x /bin/fusermount ]; then
       echo "Warning: failed to locate fusermount"
       num_errors=$[$num_errors+1]
@@ -246,7 +246,7 @@ cvmfs_chksetup()
   fi
 
   # Check fuse configuration
-  if [ $CVMFS_USER != "root" ]; then
+  if [ "$CVMFS_USER" != "root" ]; then
     if ! check_fuse_config; then
       case $sys_arch in
         Linux )
@@ -341,24 +341,24 @@ cvmfs_chksetup()
       fi
 
       # Syntax check for switches
-      if [ ! -z $CVMFS_FORCE_SIGNING ] && [ $CVMFS_FORCE_SIGNING != "yes" ] && [ $CVMFS_FORCE_SIGNING != "no" ]; then
+      if [ ! -z $CVMFS_FORCE_SIGNING ] && [ "$CVMFS_FORCE_SIGNING" != "yes" ] && [ "$CVMFS_FORCE_SIGNING" != "no" ]; then
         echo "Error: invalid value for CVMFS_FORCE_SIGNING (valid values: yes/no) for $fqrn"
         num_errors=$[$num_errors+1]
       fi
 
-      if [ ! -z $CVMFS_STRICT_MOUNT ] && [ $CVMFS_STRICT_MOUNT != "yes" ] && [ $CVMFS_STRICT_MOUNT != "no" ]; then
+      if [ ! -z $CVMFS_STRICT_MOUNT ] && [ "$CVMFS_STRICT_MOUNT" != "yes" ] && [ "$CVMFS_STRICT_MOUNT" != "no" ]; then
         echo "Error: invalid value for CVMFS_STRICT_MOUNT (valid values: yes/no) for $fqrn"
         num_errors=$[$num_errors+1]
       fi
 
       # Check CVMFS_OPTIONS
-      if [ -z $CVMFS_OPTIONS ] || [ $CVMFS_OPTIONS != "ro,allow_other" ]; then
+      if [ -z $CVMFS_OPTIONS ] || [ "$CVMFS_OPTIONS" != "ro,allow_other" ]; then
         echo "Warning: tampered with CVMFS_OPTIONS"
         num_warnings=$[$num_warnings+1]
       fi
 
       # Check CVMFS_MOUNT_DIR
-      if [ -z $CVMFS_MOUNT_DIR ] || [ ! -d $CVMFS_MOUNT_DIR ] || [ $global_mount_dir != $CVMFS_MOUNT_DIR ]; then
+      if [ -z $CVMFS_MOUNT_DIR ] || [ ! -d $CVMFS_MOUNT_DIR ] || [ "$global_mount_dir" != "$CVMFS_MOUNT_DIR" ]; then
         echo "Error: invalid CVMFS_MOUNT_DIR for $fqrn"
         num_errors=$[$num_errors+1]
       fi
@@ -398,7 +398,7 @@ cvmfs_chksetup()
           proxy_list=`echo "$CVMFS_HTTP_PROXY" | sed -e 's/;/ /g' -e 's/|/ /g'`
           for proxy in $proxy_list
           do
-            if [ $proxy != "DIRECT" ]; then
+            if [ "$proxy" != "DIRECT" ]; then
               proxy_param="env http_proxy=$proxy"
               timeout=$CVMFS_TIMEOUT
             else
@@ -538,7 +538,7 @@ cvmfs_stat()
   get_attr timeout_direct; timeout_direct=$attr_value
   timeout_effective=$timeout
   proxy_effective=$proxy
-  if [ $proxy == "DIRECT" ]; then
+  if [ "$proxy" == "DIRECT" ]; then
     proxy_effective=
     timeout_effective=$timeout_direct
   fi
@@ -888,7 +888,7 @@ configure_autofs()
 
 configure_sudoers()
 {
-  if [ $sys_arch == 'Darwin' ]; then
+  if [ "$sys_arch" == 'Darwin' ]; then
     sudo sed -i .cvmfs_backup -e "/# added by CernVM-FS/d" /etc/sudoers
     sudo cat >> /etc/sudoers << EOF
 %everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/sudo # added by CernVM-FS
