@@ -90,10 +90,10 @@ class ForkAwareEnv : public leveldb::EnvWrapper {
       leveldb::Env::Default()->Schedule(function, arg);
       return;
     }
+
     LogCvmfs(kLogNfsMaps, kLogDebug,
              "single threaded leveldb::Schedule called");
     WaitForBGThreads();
-
     FuncArg *funcarg = new FuncArg();
     funcarg->function = function;
     funcarg->arg = arg;
