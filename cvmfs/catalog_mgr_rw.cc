@@ -334,17 +334,10 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
 bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
                                           const std::string &parent_directory)
 {
-  // Sanity checks
-	if (entries.size() == 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "tried to add an empty hardlink group");
-		return false;
-	}
-	if (entries.size() == 1) {
-    LogCvmfs(kLogCatalog, kLogVerboseMsg,
-             "tried to add a hardlink group with just one member... "
-             "added as normal file instead");
-    return AddFile(entries.front(), parent_directory);
-	}
+  assert(entries.size() > 1);
+
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
+           parent_directory.c_str(), entries[0].name().c_str());
 
 	// Hardlink groups have to reside in the same directory.
 	// Therefore we only have one parent directory here
@@ -359,7 +352,10 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
   }
 
 	// Get a valid hardlink group id for the catalog the group will end up in
-	int new_group_id = catalog->GetMaxLinkId() + 1;
+  // TODO: Compaction
+	uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "hardlink group id %u issued",
+           new_group_id);
 	if (new_group_id <= 0) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to retrieve a new valid hardlink group id");
@@ -367,6 +363,8 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	}
 
 	// Add the file entries to the catalog
+  inode_t hardlink_inode = (static_cast<inode_t>(new_group_id) << 32) |
+                           entries.size();
   bool result = true;
   bool successful = true;
 	for (DirectoryEntryList::iterator i = entries.begin(), iEnd = entries.end();
@@ -374,10 +372,12 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
   {
 	  string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
-    i->hardlink_group_id_ = new_group_id;
+    i->set_inode(hardlink_inode);
 	  successful = catalog->AddEntry(*i, file_path, parent_path);
-	  if (!successful)
+	  if (!successful) {
       result = false;
+      break;
+    }
 	}
 
 	if (result == false) {

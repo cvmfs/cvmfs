@@ -103,15 +103,21 @@ catalog::DirectoryEntry SyncItem::CreateCatalogDirent() const {
 }
 
 std::string SyncItem::GetRdOnlyPath() const {
- return union_engine_->rdonly_path() + "/" + GetRelativePath();
+  const string relative_path = GetRelativePath().empty() ?
+                               "" : "/" + GetRelativePath();
+  return union_engine_->rdonly_path() + relative_path;
 }
 
 std::string SyncItem::GetUnionPath() const {
- return union_engine_->union_path() + "/" + GetRelativePath();
+  const string relative_path = GetRelativePath().empty() ?
+                               "" : "/" + GetRelativePath();
+  return union_engine_->union_path() + relative_path;
 }
 
 std::string SyncItem::GetScratchPath() const {
- return union_engine_->scratch_path() + "/" + GetRelativePath();
+  const string relative_path = GetRelativePath().empty() ?
+                               "" : "/" + GetRelativePath();
+  return union_engine_->scratch_path() + relative_path;
 }
 
 }  // namespace sync

@@ -5,6 +5,7 @@
 
 #include "catalog.h"
 #include "logging.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -171,7 +172,7 @@ bool ManipulateDirectoryEntrySqlStatement::BindDirectoryEntryFields(const int ha
                                                                     const DirectoryEntry &entry) {
   return (
     BindSha1Hash( hash_field,    entry.checksum_) &&
-    BindInt64(    inode_field,   entry.hardlink_group_id_) && // quirky database layout here ( legacy ;-) )
+    BindInt64(    inode_field,   entry.inode_) && // quirky database layout here ( legacy ;-) )
     BindInt64(    size_field,    entry.size_) &&
     BindInt(      mode_field,    entry.mode_) &&
     BindInt64(    mtime_field,   entry.mtime_) &&
@@ -210,15 +211,14 @@ DirectoryEntry LookupSqlStatement::GetDirectoryEntry(const Catalog *catalog) con
   result.catalog_                      = (Catalog*)catalog;
   result.is_nested_catalog_root_       = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ = (database_flags & kFlagDirNestedMountpoint);
-  result.hardlink_group_id_            = (catalog->schema() < 2.0) ?
-                                         0 : RetrieveInt64(1); // quirky database layout here ( legacy ;-) )
+  uint64_t hardlinks = RetrieveInt64(1);
 
   // read the usual file information
   result.inode_        = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                          (catalog->schema() < 2.0) ? 0 : RetrieveInt64(1));
+                          (catalog->schema() < 2.0) ? 0 : hardlinks >> 32);
   result.parent_inode_ = DirectoryEntry::kInvalidInode; // must be set later by a second catalog lookup
   result.linkcount_    = (catalog->schema() < 2.0) ?
-                          1 : GetLinkcountFromFlags(database_flags);
+                          1 : Hardlinks2Linkcount(hardlinks);
   result.mode_         = RetrieveInt(3);
   result.size_         = RetrieveInt64(2);
   result.mtime_        = RetrieveInt64(4);
@@ -410,11 +410,12 @@ bool UnlinkSqlStatement::BindPathHash(const hash::Md5 &hash) {
 //
 
 GetMaximalHardlinkGroupIdStatement::GetMaximalHardlinkGroupIdStatement(const sqlite3 *database) {
-  Init(database, "SELECT max(inode) FROM catalog;");
+  Init(database, "SELECT max(inode) FROM catalog WHERE not (flags & "
+                  + StringifyInt(DirectoryEntrySqlStatement::kFlagDir) + ");");
 }
 
-int GetMaximalHardlinkGroupIdStatement::GetMaximalGroupId() const {
-  return RetrieveInt64(0);
+uint32_t GetMaximalHardlinkGroupIdStatement::GetMaximalGroupId() const {
+  return RetrieveInt64(0) >> 32;
 }
 
 

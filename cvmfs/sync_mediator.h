@@ -26,10 +26,10 @@
 
 #include <pthread.h>
 
-#include <list>
 #include <string>
 #include <map>
 #include <stack>
+#include <vector>
 
 #include "platform.h"
 #include "catalog_mgr_rw.h"
@@ -77,6 +77,14 @@ class PublishFilesCallback : public upload::SpoolerCallback {
  private:
   SyncMediator *mediator_;
 };
+class PublishHardlinksCallback : public upload::SpoolerCallback {
+ public:
+  PublishHardlinksCallback(SyncMediator *mediator);
+  void Callback(const std::string &path, int retval,
+                const std::string &digest);
+ private:
+  SyncMediator *mediator_;
+};
 
 
 /**
@@ -90,6 +98,7 @@ class PublishFilesCallback : public upload::SpoolerCallback {
  */
 class SyncMediator {
   friend class PublishFilesCallback;
+  friend class PublishHardlinksCallback;
   friend class SyncUnion;
  public:
   SyncMediator(catalog::WritableCatalogManager *catalogManager,
@@ -107,7 +116,7 @@ class SyncMediator {
 
  private:
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
-  typedef std::list<HardlinkGroup> HardlinkGroupList;
+  typedef std::vector<HardlinkGroup> HardlinkGroupList;
 
   void RegisterUnionEngine(SyncUnion *engine) {
     union_engine_ = engine;
@@ -150,15 +159,15 @@ class SyncMediator {
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
   HardlinkGroupMap& GetHardlinkMap() { return hardlink_stack_.top(); }
-	void InsertExistingHardlinkFileCallback(const std::string &parent_dir,
-                                          const std::string &file_name);
-  void InsertExistingHardlinkSymlinkCallback(const std::string &parent_dir,
-                                             const std::string &file_name);
-  void InsertExistingHardlink(SyncItem &entry);
+	void LegacyRegularHardlinkCallback(const std::string &parent_dir,
+                                     const std::string &file_name);
+  void LegacySymlinkHardlinkCallback(const std::string &parent_dir,
+                                      const std::string &file_name);
+  void InsertLegacyHardlink(SyncItem &entry);
   uint64_t GetTemporaryHardlinkGroupNumber(SyncItem &entry) const;
   void InsertHardlink(SyncItem &entry);
 
-  void AddHardlinkGroups(const HardlinkGroupMap &hardlinks);
+  void AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks);
   void AddHardlinkGroup(const HardlinkGroup &group);
 
   catalog::WritableCatalogManager *catalog_manager_;
@@ -179,7 +188,7 @@ class SyncMediator {
 	 */
   pthread_mutex_t lock_file_queue_;
 	SyncItemList file_queue_;
-	HardlinkGroupList mHardlinkQueue;
+	HardlinkGroupList hardlink_queue_;
 
 	const SyncParameters *params_;
 };  // class SyncMediator

@@ -2,8 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "sync_mediator.h"
 
+#include <inttypes.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -48,6 +51,45 @@ void PublishFilesCallback::Callback(const std::string &path, int retval,
   mediator_->catalog_manager_->AddFile(itr->second.CreateCatalogDirent(),
                                        itr->second.relative_parent_path());
 }
+
+
+PublishHardlinksCallback::PublishHardlinksCallback(SyncMediator *mediator) {
+  assert(mediator);
+  mediator_ = mediator;
+}
+
+
+void PublishHardlinksCallback::Callback(const std::string &path, int retval,
+                                        const std::string &digest)
+{
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for hardlink %s, digest %s, retval %d",
+           path.c_str(), digest.c_str(), retval);
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Spool failure for %s (%d)",
+             path.c_str(), retval);
+    abort();
+  }
+  hash::Any hash(hash::kSha1, hash::HexPtr(digest));
+
+  bool found = false;
+  for (unsigned i = 0; i < mediator_->hardlink_queue_.size(); ++i) {
+    if (mediator_->hardlink_queue_[i].master.GetUnionPath() == path) {
+      found = true;
+      mediator_->hardlink_queue_[i].master.SetContentHash(hash);
+      SyncItemList::iterator j;
+      j = mediator_->hardlink_queue_[i].hardlinks.begin();
+      for (j = mediator_->hardlink_queue_[i].hardlinks.begin();
+           j != mediator_->hardlink_queue_[i].hardlinks.end(); ++j)
+      {
+        j->second.SetContentHash(hash);
+      }
+      break;
+    }
+  }
+  assert(found);
+}
+
 
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
@@ -145,15 +187,15 @@ void SyncMediator::Replace(SyncItem &entry) {
 
 
 void SyncMediator::EnterDirectory(SyncItem &entry) {
-	HardlinkGroupMap newMap;
-	hardlink_stack_.push(newMap);
+	HardlinkGroupMap new_map;
+	hardlink_stack_.push(new_map);
 }
 
 
 void SyncMediator::LeaveDirectory(SyncItem &entry)
 {
   CompleteHardlinks(entry);
-	AddHardlinkGroups(GetHardlinkMap());
+	AddLocalHardlinkGroups(GetHardlinkMap());
 	hardlink_stack_.pop();
 }
 
@@ -163,17 +205,37 @@ void SyncMediator::LeaveDirectory(SyncItem &entry)
  * To be called after change set traversal is finished.
  */
 Manifest *SyncMediator::Commit() {
-  // TODO: add hardlink groups
-	//HardlinkGroupList::const_iterator j, jend;
-	//for (j = mHardlinkQueue.begin(), jend = mHardlinkQueue.end(); j != jend; ++j) {
-  //  AddHardlinkGroup(*j);
-  //}
-
   LogCvmfs(kLogPublish, kLogStdout,
            "Waiting for upload of files before committing...");
   while (!params_->spooler->IsIdle())
     sleep(1);
+
+  if (!hardlink_queue_.empty()) {
+    LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
+    params_->spooler->UnsetCallback();
+    params_->spooler->SetCallback(new PublishHardlinksCallback(this));
+    for (HardlinkGroupList::const_iterator i = hardlink_queue_.begin(),
+         iEnd = hardlink_queue_.end(); i != iEnd; ++i)
+    {
+      LogCvmfs(kLogPublish, kLogVerboseMsg, "Spooling hardlink group %s",
+               i->master.GetUnionPath().c_str());
+      params_->spooler->SpoolProcess(i->master.GetUnionPath(), "data", "");
+    }
+
+    while (!params_->spooler->IsIdle())
+      sleep(1);
+
+    for (HardlinkGroupList::const_iterator i = hardlink_queue_.begin(),
+         iEnd = hardlink_queue_.end(); i != iEnd; ++i)
+    {
+      LogCvmfs(kLogPublish, kLogVerboseMsg, "Processing hardlink group %s",
+               i->master.GetUnionPath().c_str());
+      AddHardlinkGroup(*i);
+    }
+  }
+
   params_->spooler->UnsetCallback();
+
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
   if (params_->spooler->num_errors() > 0) {
     LogCvmfs(kLogPublish, kLogStderr, "failed to commit files");
@@ -187,22 +249,24 @@ Manifest *SyncMediator::Commit() {
 
 void SyncMediator::InsertHardlink(SyncItem &entry) {
   uint64_t inode = entry.GetUnionInode();
+  LogCvmfs(kLogPublish, kLogVerboseMsg, "found hardlink %"PRIu64" at %s",
+           inode, entry.GetUnionPath().c_str());
 
   // Find the hard link group in the lists
-  HardlinkGroupMap::iterator hardlinkGroup = GetHardlinkMap().find(inode);
+  HardlinkGroupMap::iterator hardlink_group = GetHardlinkMap().find(inode);
 
-  if (hardlinkGroup == GetHardlinkMap().end()) {
+  if (hardlink_group == GetHardlinkMap().end()) {
     // Create a new hardlink group
     GetHardlinkMap().insert(
       HardlinkGroupMap::value_type(inode, HardlinkGroup(entry)));
   } else {
     // Append the file to the appropriate hardlink group
-    hardlinkGroup->second.AddHardlink(entry);
+    hardlink_group->second.AddHardlink(entry);
   }
 }
 
 
-void SyncMediator::InsertExistingHardlink(SyncItem &entry) {
+void SyncMediator::InsertLegacyHardlink(SyncItem &entry) {
   // Check if found file has hardlinks (nlink > 1)
   // As we are looking through all files in one directory here, there might be
   // completely untouched hardlink groups, which we can safely skip.
@@ -234,6 +298,8 @@ void SyncMediator::InsertExistingHardlink(SyncItem &entry) {
       // If one element of a hardlink group is edited, all elements must be
       // replaced.  Here, we remove an untouched hardlink and add it to its
       // hardlink group for re-adding later
+      LogCvmfs(kLogPublish, kLogVerboseMsg, "Picked up legacy hardlink %s",
+               entry.GetUnionPath().c_str());
       Remove(entry);
       hl_group->second.AddHardlink(entry);
     }
@@ -252,31 +318,33 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
 	if (GetHardlinkMap().size() == 0)
     return;
 
+  LogCvmfs(kLogPublish, kLogVerboseMsg, "Post-processing hard links in %s",
+           entry.GetUnionPath().c_str());
+
   // Look for legacy hardlinks
   const set<string> ignore;
   FileSystemTraversal<SyncMediator> traversal(this, union_engine_->union_path(),
                                               false, ignore);
   traversal.fn_new_file =
-    &SyncMediator::InsertExistingHardlinkFileCallback;
-  traversal.fn_new_symlink = &SyncMediator::InsertExistingHardlinkSymlinkCallback;
+    &SyncMediator::LegacyRegularHardlinkCallback;
+  traversal.fn_new_symlink = &SyncMediator::LegacySymlinkHardlinkCallback;
   traversal.Recurse(entry.GetUnionPath());
 }
 
 
-void SyncMediator::InsertExistingHardlinkFileCallback(const string &parent_dir,
-                                                      const string &file_name)
+void SyncMediator::LegacyRegularHardlinkCallback(const string &parent_dir,
+                                                 const string &file_name)
 {
   SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
-  InsertExistingHardlink(entry);
+  InsertLegacyHardlink(entry);
 }
 
 
-void SyncMediator::InsertExistingHardlinkSymlinkCallback(
-  const string &parent_dir,
-  const string &file_name)
+void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
+                                                  const string &file_name)
 {
   SyncItem entry(parent_dir, file_name, kItemSymlink, union_engine_);
-  InsertExistingHardlink(entry);
+  InsertLegacyHardlink(entry);
 }
 
 
@@ -384,7 +452,7 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
     LogCvmfs(kLogCvmfs, kLogStdout, "[add] Nested catalog at %s",
-             GetParentPath(requestFile.GetRdOnlyPath()).c_str());
+             GetParentPath(requestFile.GetUnionPath()).c_str());
 	if (!params_->dry_run) {
     bool retval = catalog_manager_->CreateNestedCatalog(
                     requestFile.relative_parent_path());
@@ -396,7 +464,7 @@ void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
     LogCvmfs(kLogCvmfs, kLogStdout, "[rem] Nested catalog at %s",
-             GetParentPath(requestFile.GetRdOnlyPath()).c_str());
+             GetParentPath(requestFile.GetUnionPath()).c_str());
 	if (!params_->dry_run) {
     bool retval = catalog_manager_->RemoveNestedCatalog(
                     requestFile.relative_parent_path());
@@ -407,7 +475,7 @@ void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
 
 void SyncMediator::AddFile(SyncItem &entry) {
   if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[add] %s", entry.GetRdOnlyPath().c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
 
 	if (entry.IsSymlink() && !params_->dry_run) {
     // Symlinks are completely stored in the catalog
@@ -419,15 +487,14 @@ void SyncMediator::AddFile(SyncItem &entry) {
     file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->SpoolProcess(
-      params_->dir_union + "/" + entry.GetRelativePath(), "data", "");
+    params_->spooler->SpoolProcess(entry.GetUnionPath(), "data", "");
   }
 }
 
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] %s", entry.GetRdOnlyPath().c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run)
     catalog_manager_->RemoveFile(entry.GetRelativePath());
 }
@@ -435,7 +502,7 @@ void SyncMediator::RemoveFile(SyncItem &entry) {
 
 void SyncMediator::TouchFile(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogDebug, "[tou] %s", entry.GetRdOnlyPath().c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "[tou] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run) {
     catalog_manager_->TouchFile(entry.CreateCatalogDirent(),
                                 entry.GetRelativePath());
@@ -445,7 +512,7 @@ void SyncMediator::TouchFile(SyncItem &entry) {
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[add] %s", entry.GetRdOnlyPath().c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run) {
     catalog_manager_->AddDirectory(entry.CreateCatalogDirent(),
                                    entry.relative_parent_path());
@@ -455,7 +522,7 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
 
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] %s", entry.GetRdOnlyPath().c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run)
     catalog_manager_->RemoveDirectory(entry.GetRelativePath());
 }
@@ -463,38 +530,47 @@ void SyncMediator::RemoveDirectory(SyncItem &entry) {
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[tou] %s", entry.GetRdOnlyPath().c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run)
     catalog_manager_->TouchDirectory(entry.CreateCatalogDirent(),
                                      entry.GetRelativePath());
 }
 
 
-void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
+/**
+ * All hardlinks in the current directory have been picked up.  Now they are
+ * added to the catalogs.
+ */
+void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 	for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
-    // Reminder: CurrentHardlinkGroup == i->second
+    if (i->second.hardlinks.size() != i->second.master.GetUnionLinkcount()) {
+      LogCvmfs(kLogPublish, kLogStderr, "Hardlinks across directories (%s)",
+               i->second.master.GetUnionPath().c_str());
+      abort();
+    }
+
     if (params_->print_changeset) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-               "[add] hardlink group around: (%s",
-               i->second.master.GetRdOnlyPath().c_str());
+               "[add] hardlink group around: (%s)",
+               i->second.master.GetUnionPath().c_str());
 			for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
       {
-				LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s ",
+				LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, " %s",
                  j->second.filename().c_str());
 			}
-			LogCvmfs(kLogCvmfs, kLogStdout, ")");
+			LogCvmfs(kLogCvmfs, kLogStdout, "");
 		}
 
-		if (i->second.master.IsSymlink() && !params_->dry_run) {
-		  // Hardlinks to symlinks just end up in the database
-		  // (see SyncMediator::addFile() same semantics here)
+		if (params_->dry_run)
+      continue;
+
+    if (i->second.master.IsSymlink())
       AddHardlinkGroup(i->second);
-    } else {
-      mHardlinkQueue.push_back(i->second);
-    }
+    else
+      hardlink_queue_.push_back(i->second);
   }
 }
 
@@ -502,12 +578,10 @@ void SyncMediator::AddHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   // Create a DirectoryEntry list out of the hardlinks
   catalog::DirectoryEntryList hardlinks;
-  SyncItemList::const_iterator k, kend;
-  for (SyncItemList::const_iterator k = group.hardlinks.begin(),
-       kEnd = group.hardlinks.end(); k != kEnd; ++k)
+  for (SyncItemList::const_iterator i = group.hardlinks.begin(),
+       iEnd = group.hardlinks.end(); i != iEnd; ++i)
   {
-    // EXP
-    //hardlinks[k->CreateDirectoryEntry().GetRelativePath()] = k->CreateDirectoryEntry();
+    hardlinks.push_back(i->second.CreateCatalogDirent());
   }
   catalog_manager_->AddHardlinkGroup(hardlinks,
                                      group.master.relative_parent_path());

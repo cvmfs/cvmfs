@@ -16,6 +16,8 @@
 #ifndef CVMFS_CATALOG_QUERIES_H_
 #define CVMFS_CATALOG_QUERIES_H_
 
+#include <inttypes.h>
+
 #include <string>
 #include <sstream>
 
@@ -191,7 +193,7 @@ class SqlStatement {
 
 
 class DirectoryEntrySqlStatement : public SqlStatement {
- protected:
+ public:
   // definition of bit positions for the flags field of a DirectoryEntry
   // all not specified bit positions are currently not in use
   const static int kFlagDir                 = 1;
@@ -211,6 +213,7 @@ class DirectoryEntrySqlStatement : public SqlStatement {
   const static int kFlagLinkCount_7         = kFlagLinkCount_0 << 7;
   const static int kFlagLinkCount           = kFlagLinkCount_0 | kFlagLinkCount_1 | kFlagLinkCount_2 | kFlagLinkCount_3 | kFlagLinkCount_4 | kFlagLinkCount_5 | kFlagLinkCount_6 | kFlagLinkCount_7;
 
+ protected:
   /**
    *  take the meta data from the DirectoryEntry and transform it
    *  into a valid flags field ready to be safed in the database
@@ -227,13 +230,11 @@ class DirectoryEntrySqlStatement : public SqlStatement {
    */
   void ExpandSymlink(LinkString *raw_symlink) const;
 
-  /**
-   *  retrieve the linkcount of the read DirectoryEntry from it's flags field
-   *  @param flags the integer containing the flags bitmap
-   *  @return the linkcount of the DirectoryEntry to create
-   */
-  inline int GetLinkcountFromFlags(const unsigned int flags) const {
-    return (flags & kFlagLinkCount) / kFlagLinkCount_0;
+
+  inline uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) const {
+    if (hardlinks == 0)
+      return 1;
+    return (hardlinks << 32) >> 32;
   }
 
   /**
@@ -440,7 +441,7 @@ class UnlinkSqlStatement : public SqlStatement {
 class GetMaximalHardlinkGroupIdStatement : public SqlStatement {
  public:
   GetMaximalHardlinkGroupIdStatement(const sqlite3 *database);
-  int GetMaximalGroupId() const;
+  uint32_t GetMaximalGroupId() const;
 };
 
 }  // namespace cvmfs

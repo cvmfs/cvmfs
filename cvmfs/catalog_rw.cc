@@ -214,7 +214,7 @@ void WritableCatalog::FinalizePreparedStatements() {
 /**
  * Find out the maximal hardlink group id in this catalog.
  */
-int WritableCatalog::GetMaxLinkId() const {
+uint32_t WritableCatalog::GetMaxLinkId() const {
   int result = -1;
 
   if (sql_max_link_id_->FetchRow()) {
@@ -242,7 +242,7 @@ bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
   hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
   hash::Md5 parent_hash((hash::AsciiPtr(parent_path)));
 
-  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "add entry %s", entry_path.c_str());
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry %s", entry_path.c_str());
 
   bool result =
     sql_insert_->BindPathHash(path_hash) &&

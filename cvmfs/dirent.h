@@ -53,7 +53,6 @@ public:
     size_(0),
     mtime_(0),
     cached_mtime_(0),
-    hardlink_group_id_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) { }
 
@@ -71,7 +70,6 @@ public:
   inline bool IsRegular() const { return S_ISREG(mode_); }
   inline bool IsLink() const { return S_ISLNK(mode_); }
   inline bool IsDirectory() const { return S_ISDIR(mode_); }
-  inline bool IsPartOfHardlinkGroup() const { return hardlink_group_id() > 0; }
 
   inline inode_t inode() const { return inode_; }
   inline inode_t parent_inode() const { return parent_inode_; }
@@ -86,7 +84,6 @@ public:
   inline time_t mtime() const { return mtime_; }
   inline time_t cached_mtime() const { return cached_mtime_; }
   inline unsigned int mode() const { return mode_; }
-  inline int hardlink_group_id() const { return hardlink_group_id_; }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
@@ -145,7 +142,6 @@ private:
   hash::Any checksum_;
 
   // Administrative data
-  int hardlink_group_id_;
   bool is_nested_catalog_root_;
   bool is_nested_catalog_mountpoint_;
 };

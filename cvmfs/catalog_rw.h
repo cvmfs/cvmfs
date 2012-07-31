@@ -15,6 +15,8 @@
 #ifndef CVMFS_CATALOG_RW_H_
 #define CVMFS_CATALOG_RW_H_
 
+#include <stdint.h>
+
 #include <vector>
 #include <string>
 
@@ -38,7 +40,7 @@ class WritableCatalog : public Catalog {
 
   inline bool IsDirty() const { return dirty_; }
   inline bool IsWritable() const { return true; }
-  int GetMaxLinkId() const;
+  uint32_t GetMaxLinkId() const;
 
   bool AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
                 const std::string &parent_path);

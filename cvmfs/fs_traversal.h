@@ -85,7 +85,7 @@ class FileSystemTraversal {
   }
 
   /**
-   * start the recursion
+   * Start the recursion.
    * @param dir_path The directory to start the recursion at
    */
   void Recurse(const std::string &dir_path) const {
@@ -95,14 +95,11 @@ class FileSystemTraversal {
            fn_new_symlink != NULL ||
            fn_new_dir_prefix != NULL);
 
-    const std::string parent_path = GetParentPath(dir_path);
-    const std::string dir_name = GetFileName(dir_path);
-
     assert(relative_to_directory_.length() == 0 ||
            dir_path.substr(0, relative_to_directory_.length()) ==
              relative_to_directory_);
 
-    DoRecursion(parent_path, dir_name);
+    DoRecursion(dir_path, "");
   }
 
  private:
@@ -127,12 +124,13 @@ class FileSystemTraversal {
 	{
     DIR *dip;
     platform_dirent64 *dit;
-    const std::string path = parent_path + "/" + dir_name;
+    const std::string path = parent_path + ((!dir_name.empty()) ?
+                                           ("/" + dir_name) : "");
 
     // Change into directory and notify the user
+    LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "entering %s", path.c_str());
     dip = opendir(path.c_str());
     assert(dip);
-    LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "entering %s", path.c_str());
     Notify(fn_enter_dir, parent_path, dir_name);
 
     // Walk through the open directory notifying the about contents
