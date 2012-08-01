@@ -354,7 +354,7 @@ class InodeLookupSqlStatement : public LookupSqlStatement {
   bool BindRowId(const uint64_t inode);
 };
 
-//
+
 // ###########################################################################
 // ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
 // ###########################################################################
@@ -430,6 +430,14 @@ class UnlinkSqlStatement : public SqlStatement {
  public:
   UnlinkSqlStatement(const sqlite3 *database);
   bool BindPathHash(const hash::Md5 &hash);
+};
+
+
+class IncLinkcountStatement : public SqlStatement {
+ public:
+  IncLinkcountStatement(const sqlite3 *database);
+  bool BindPathHash(const hash::Md5 &hash);
+  bool BindDelta(const int delta);
 };
 
 //

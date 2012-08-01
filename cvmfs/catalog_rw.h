@@ -46,6 +46,7 @@ class WritableCatalog : public Catalog {
                 const std::string &parent_path);
   bool TouchEntry(const DirectoryEntry &entry, const std::string &entry_path);
   bool RemoveEntry(const std::string &entry_path);
+  bool IncLinkcount(const std::string &path_within_group, const int delta);
 
   // Creation and removal of catalogs
   bool Partition(WritableCatalog *new_nested_catalog);
@@ -93,6 +94,7 @@ class WritableCatalog : public Catalog {
   UnlinkSqlStatement                 *sql_unlink_;
   UpdateDirectoryEntrySqlStatement   *sql_update_;
   GetMaximalHardlinkGroupIdStatement *sql_max_link_id_;
+  IncLinkcountStatement              *sql_inc_linkcount_;
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 

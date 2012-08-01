@@ -21,6 +21,8 @@
 #ifndef CVMFS_CATALOG_MGR_RW_H_
 #define CVMFS_CATALOG_MGR_RW_H_
 
+#include <stdint.h>
+
 #include <set>
 #include <string>
 
@@ -40,7 +42,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
                          const std::string &stratum0,
                          const std::string &dir_temp,
                          upload::Spooler *spooler);
-  static Manifest *CreateRepository(const std::string &dir_temp, 
+  static Manifest *CreateRepository(const std::string &dir_temp,
                                     upload::Spooler *spooler);
 
   bool Init();
@@ -65,6 +67,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
 	bool AddHardlinkGroup(DirectoryEntryList &entries,
                         const std::string &parent_directory);
+  bool ShrinkHardlinkGroup(const std::string &remove_path);
 
   bool CreateNestedCatalog(const std::string &mountpoint);
   bool RemoveNestedCatalog(const std::string &mountpoint);

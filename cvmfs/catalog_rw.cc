@@ -2,8 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "catalog_rw.h"
 
+#include <inttypes.h>
 #include <cstdio>
 #include <cstdlib>
 
@@ -197,6 +200,7 @@ void WritableCatalog::InitPreparedStatements() {
   sql_unlink_ = new UnlinkSqlStatement(database());
   sql_update_ = new UpdateDirectoryEntrySqlStatement(database());
   sql_max_link_id_ = new GetMaximalHardlinkGroupIdStatement(database());
+  sql_inc_linkcount_ = new IncLinkcountStatement(database());
 }
 
 
@@ -208,6 +212,7 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_unlink_;
   delete sql_update_;
   delete sql_max_link_id_;
+  delete sql_inc_linkcount_;
 }
 
 
@@ -290,12 +295,30 @@ bool WritableCatalog::TouchEntry(const DirectoryEntry &entry,
 bool WritableCatalog::RemoveEntry(const string &file_path) {
   SetDirty();
 
-  hash::Md5 path_hash= hash::Md5(hash::AsciiPtr(file_path));
+  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(file_path));
   bool result =
     sql_unlink_->BindPathHash(path_hash) &&
     sql_unlink_->Execute();
 
   sql_unlink_->Reset();
+
+  return result;
+}
+
+
+bool WritableCatalog::IncLinkcount(const string &path_within_group,
+                                   const int delta)
+{
+  SetDirty();
+
+  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(path_within_group));
+
+  bool result =
+    sql_inc_linkcount_->BindPathHash(path_hash) &&
+    sql_inc_linkcount_->BindDelta(delta) &&
+    sql_inc_linkcount_->Execute();
+
+  sql_inc_linkcount_->Reset();
 
   return result;
 }

@@ -2,9 +2,12 @@
  * This file is part of the CernVM file system.
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "catalog_mgr_rw.h"
 
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -334,7 +337,9 @@ bool WritableCatalogManager::AddFile(const DirectoryEntry &entry,
 bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
                                           const std::string &parent_directory)
 {
-  assert(entries.size() > 1);
+  assert(entries.size() >= 1);
+  if (entries.size() == 1)
+    return AddFile(entries[0], parent_directory);
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
            parent_directory.c_str(), entries[0].name().c_str());
@@ -386,6 +391,28 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	}
 
 	return result;
+}
+
+
+bool WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
+
+  const string relative_path = MakeRelativePath(remove_path);
+
+  WritableCatalog *catalog;
+  if (!FindCatalog(relative_path, &catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for hardlink group containing '%s' cannot be found",
+             remove_path.c_str());
+    return false;
+  }
+
+  if (!catalog->IncLinkcount(relative_path, -1)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to shring hardlink group of %s",
+             remove_path.c_str());
+    return false;
+  }
+
+  return true;
 }
 
 

@@ -52,6 +52,18 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
 }
 
 
+unsigned int SyncItem::GetRdOnlyLinkcount() const {
+  StatRdOnly();
+  return rdonly_stat_.stat.st_nlink;
+}
+
+
+uint64_t SyncItem::GetRdOnlyInode() const {
+  StatRdOnly();
+  return rdonly_stat_.stat.st_ino;
+}
+
+
 unsigned int SyncItem::GetUnionLinkcount() const {
 	StatUnion();
 	return union_stat_.stat.st_nlink;

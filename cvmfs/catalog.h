@@ -60,7 +60,7 @@ class Catalog {
   friend class LookupSqlStatement;  // for mangled inode
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
-  
+
   Catalog(const PathString &path, Catalog *parent);
   virtual ~Catalog();
 
@@ -117,6 +117,9 @@ class Catalog {
   bool FindNested(const PathString &mountpoint, hash::Any *hash) const;
 
  protected:
+  typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
+  HardlinkGroupMap hardlink_groups_;
+
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
    */
@@ -137,7 +140,6 @@ class Catalog {
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
  private:
-  typedef std::map<int, inode_t> HardlinkGroupMap;
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
   inline uint64_t GetRowIdFromInode(const inode_t inode) const {
@@ -162,8 +164,6 @@ class Catalog {
 
   InodeRange inode_range_;
   uint64_t max_row_id_;
-
-  HardlinkGroupMap hardlink_groups_;
 
   ListingLookupSqlStatement *sql_listing_;
   PathHashLookupSqlStatement *sql_lookup_md5path_;

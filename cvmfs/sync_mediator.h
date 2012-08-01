@@ -30,6 +30,7 @@
 #include <map>
 #include <stack>
 #include <vector>
+#include <set>
 
 #include "platform.h"
 #include "catalog_mgr_rw.h"
@@ -158,7 +159,7 @@ class SyncMediator {
 
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
-  HardlinkGroupMap& GetHardlinkMap() { return hardlink_stack_.top(); }
+  HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
 	void LegacyRegularHardlinkCallback(const std::string &parent_dir,
                                      const std::string &file_name);
   void LegacySymlinkHardlinkCallback(const std::string &parent_dir,

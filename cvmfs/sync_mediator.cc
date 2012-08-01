@@ -37,7 +37,7 @@ void PublishFilesCallback::Callback(const std::string &path, int retval,
            "Spooler callback for %s, digest %s, retval %d",
            path.c_str(), digest.c_str(), retval);
   if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Spool failure for %s (%d)",
+    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
              path.c_str(), retval);
     abort();
   }
@@ -66,7 +66,7 @@ void PublishHardlinksCallback::Callback(const std::string &path, int retval,
            "Spooler callback for hardlink %s, digest %s, retval %d",
            path.c_str(), digest.c_str(), retval);
   if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Spool failure for %s (%d)",
+    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
              path.c_str(), retval);
     abort();
   }
@@ -89,7 +89,6 @@ void PublishHardlinksCallback::Callback(const std::string &path, int retval,
   }
   assert(found);
 }
-
 
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
@@ -169,6 +168,7 @@ void SyncMediator::Remove(SyncItem &entry) {
     if (entry.IsCatalogMarker() && !entry.IsNew()) {
       RemoveNestedCatalog(entry);
     }
+
     return;
 	}
 
@@ -272,8 +272,7 @@ void SyncMediator::InsertLegacyHardlink(SyncItem &entry) {
   // completely untouched hardlink groups, which we can safely skip.
   // Finally we have to see if the hardlink is already part of this group
 
-  // check if we have a hard link here
-  if (entry.GetUnionLinkcount() <= 1)
+  if (entry.GetUnionLinkcount() < 2)
     return;
 
   uint64_t inode = entry.GetUnionInode();
@@ -315,7 +314,7 @@ void SyncMediator::InsertLegacyHardlink(SyncItem &entry) {
  */
 void SyncMediator::CompleteHardlinks(SyncItem &entry) {
   // If no hardlink in this directory was changed, we can skip this
-	if (GetHardlinkMap().size() == 0)
+	if (GetHardlinkMap().empty())
     return;
 
   LogCvmfs(kLogPublish, kLogVerboseMsg, "Post-processing hard links in %s",
@@ -451,7 +450,7 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[add] Nested catalog at %s",
+    LogCvmfs(kLogPublish, kLogStdout, "[add] Nested catalog at %s",
              GetParentPath(requestFile.GetUnionPath()).c_str());
 	if (!params_->dry_run) {
     bool retval = catalog_manager_->CreateNestedCatalog(
@@ -463,7 +462,7 @@ void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] Nested catalog at %s",
+    LogCvmfs(kLogPublish, kLogStdout, "[rem] Nested catalog at %s",
              GetParentPath(requestFile.GetUnionPath()).c_str());
 	if (!params_->dry_run) {
     bool retval = catalog_manager_->RemoveNestedCatalog(
@@ -475,7 +474,7 @@ void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
 
 void SyncMediator::AddFile(SyncItem &entry) {
   if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
 
 	if (entry.IsSymlink() && !params_->dry_run) {
     // Symlinks are completely stored in the catalog
@@ -494,15 +493,23 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
-	if (!params_->dry_run)
+    LogCvmfs(kLogPublish, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
+	if (!params_->dry_run) {
+    if (entry.GetRdOnlyLinkcount() > 1) {
+      LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
+               entry.GetUnionPath().c_str());
+      bool retval =
+        catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
+      assert(retval);
+    }
     catalog_manager_->RemoveFile(entry.GetRelativePath());
+  }
 }
 
 
 void SyncMediator::TouchFile(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogDebug, "[tou] %s", entry.GetUnionPath().c_str());
+    LogCvmfs(kLogPublish, kLogDebug, "[tou] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run) {
     catalog_manager_->TouchFile(entry.CreateCatalogDirent(),
                                 entry.GetRelativePath());
@@ -512,7 +519,7 @@ void SyncMediator::TouchFile(SyncItem &entry) {
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run) {
     catalog_manager_->AddDirectory(entry.CreateCatalogDirent(),
                                    entry.relative_parent_path());
@@ -522,7 +529,7 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
 
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run)
     catalog_manager_->RemoveDirectory(entry.GetRelativePath());
 }
@@ -530,7 +537,7 @@ void SyncMediator::RemoveDirectory(SyncItem &entry) {
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
-    LogCvmfs(kLogCvmfs, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run)
     catalog_manager_->TouchDirectory(entry.CreateCatalogDirent(),
                                      entry.GetRelativePath());
@@ -552,16 +559,16 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     }
 
     if (params_->print_changeset) {
-      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+      LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak,
                "[add] hardlink group around: (%s)",
                i->second.master.GetUnionPath().c_str());
 			for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
       {
-				LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, " %s",
+				LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, " %s",
                  j->second.filename().c_str());
 			}
-			LogCvmfs(kLogCvmfs, kLogStdout, "");
+			LogCvmfs(kLogPublish, kLogStdout, "");
 		}
 
 		if (params_->dry_run)

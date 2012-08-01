@@ -403,6 +403,23 @@ bool UnlinkSqlStatement::BindPathHash(const hash::Md5 &hash) {
   return BindMd5Hash(1, 2, hash);
 }
 
+
+IncLinkcountStatement::IncLinkcountStatement(const sqlite3 *database) {
+  Init(database,
+    "UPDATE catalog SET inode="
+      "CASE (inode << 32) >> 32 WHEN 2 THEN 0 ELSE inode+1*(:delta) END "
+      "WHERE inode = (SELECT inode from catalog WHERE md5path_1 = :md5_1 AND "
+      "md5path_2 = :md5_2);");
+}
+
+bool IncLinkcountStatement::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5Hash(2, 3, hash);
+}
+
+bool IncLinkcountStatement::BindDelta(const int delta) {
+  return BindInt(1, delta);
+}
+
 //
 // ###########################################################################
 // ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###

@@ -72,7 +72,9 @@ class SyncItem {
 
   void MarkAsWhiteout(const std::string &actual_filename);
 
-	unsigned int GetUnionLinkcount() const;
+	unsigned int GetRdOnlyLinkcount() const;
+  uint64_t GetRdOnlyInode() const;
+  unsigned int GetUnionLinkcount() const;
 	uint64_t GetUnionInode() const;
 	inline platform_stat64 GetUnionStat() const {
     StatUnion();
