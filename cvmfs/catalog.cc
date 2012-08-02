@@ -43,11 +43,11 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_ = new ListingLookupSqlStatement(database_);
-  sql_lookup_md5path_ = new PathHashLookupSqlStatement(database_);
-  sql_lookup_inode_ = new InodeLookupSqlStatement(database_);
-  sql_lookup_nested_ = new FindNestedCatalogSqlStatement(database_);
-  sql_list_nested_ = new ListNestedCatalogsSqlStatement(database_);
+  sql_listing_ = new SqlListing(database_);
+  sql_lookup_md5path_ = new SqlLookupPathHash(database_);
+  sql_lookup_inode_ = new SqlLookupInode(database_);
+  sql_lookup_nested_ = new SqlNestedCatalogLookup(database_);
+  sql_list_nested_ = new SqlNestedCatalogListing(database_);
 }
 
 
@@ -102,7 +102,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
   InitPreparedStatements();
 
   // Find out the maximum row id of this database file
-  SqlStatement sql_max_row_id(database_, "SELECT MAX(rowid) FROM catalog;");
+  Sql sql_max_row_id(database_, "SELECT MAX(rowid) FROM catalog;");
   if (!sql_max_row_id.FetchRow()) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "Cannot retrieve maximal row id for database file %s "
@@ -114,8 +114,8 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   // Get root prefix
   if (IsRoot()) {
-    SqlStatement sql_root_prefix(database_, "SELECT value FROM properties "
-                                 "WHERE key='root_prefix';");
+    Sql sql_root_prefix(database_, "SELECT value FROM properties "
+                                   "WHERE key='root_prefix';");
     if (sql_root_prefix.FetchRow()) {
       root_prefix_.Assign(
         reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0)),
@@ -130,8 +130,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   // Get schema version
-  SqlStatement sql_schema(database_, "SELECT value FROM properties "
-                                     "WHERE key='schema';");
+  Sql sql_schema(database_, "SELECT value FROM properties WHERE key='schema';");
   if (sql_schema.FetchRow()) {
     schema_ = sql_schema.RetrieveDouble(0);
   } else {
@@ -164,7 +163,7 @@ bool Catalog::LookupInode(const inode_t inode, DirectoryEntry *dirent,
 
   // Retrieve the DirectoryEntry if needed
   if (found && (dirent != NULL))
-      *dirent = sql_lookup_inode_->GetDirectoryEntry(this);
+      *dirent = sql_lookup_inode_->GetDirent(this);
 
   // Retrieve the path_hash of the parent path if needed
   if (parent_md5path != NULL)
@@ -192,7 +191,7 @@ bool Catalog::LookupMd5Path(const hash::Md5 &md5path,
   sql_lookup_md5path_->BindPathHash(md5path);
   bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
-    *dirent = sql_lookup_md5path_->GetDirectoryEntry(this);
+    *dirent = sql_lookup_md5path_->GetDirent(this);
     FixTransitionPoint(md5path, dirent);
   }
   sql_lookup_md5path_->Reset();
@@ -219,7 +218,7 @@ bool Catalog::ListingMd5PathStat(const hash::Md5 &md5path,
   pthread_mutex_lock(lock_);
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
-    dirent = sql_listing_->GetDirectoryEntry(this);
+    dirent = sql_listing_->GetDirent(this);
     FixTransitionPoint(md5path, &dirent);
     entry.name = dirent.name();
     entry.info = dirent.GetStatStructure();
@@ -247,7 +246,7 @@ bool Catalog::ListingMd5Path(const hash::Md5 &md5path,
   pthread_mutex_lock(lock_);
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
-    DirectoryEntry dirent = sql_listing_->GetDirectoryEntry(this);
+    DirectoryEntry dirent = sql_listing_->GetDirent(this);
     FixTransitionPoint(md5path, &dirent);
     listing->push_back(dirent);
   }
@@ -262,7 +261,7 @@ uint64_t Catalog::GetTTL() const {
   const string sql = "SELECT value FROM properties WHERE key='TTL';";
 
   pthread_mutex_lock(lock_);
-  SqlStatement stmt(database(), sql);
+  Sql stmt(database(), sql);
   const uint64_t result =
     (stmt.FetchRow()) ?  stmt.RetrieveInt64(0) : kDefaultTTL;
   pthread_mutex_unlock(lock_);
@@ -275,7 +274,7 @@ uint64_t Catalog::GetRevision() const {
   const string sql = "SELECT value FROM properties WHERE key='revision';";
 
   pthread_mutex_lock(lock_);
-  SqlStatement stmt(database(), sql);
+  Sql stmt(database(), sql);
   const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
   pthread_mutex_unlock(lock_);
 

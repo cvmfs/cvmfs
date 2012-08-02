@@ -89,12 +89,12 @@ class WritableCatalog : public Catalog {
   }
 
  private:
-  InsertDirectoryEntrySqlStatement   *sql_insert_;
-  TouchSqlStatement                  *sql_touch_;
-  UnlinkSqlStatement                 *sql_unlink_;
-  UpdateDirectoryEntrySqlStatement   *sql_update_;
-  GetMaximalHardlinkGroupIdStatement *sql_max_link_id_;
-  IncLinkcountStatement              *sql_inc_linkcount_;
+  SqlDirentInsert     *sql_insert_;
+  SqlDirentTouch      *sql_touch_;
+  SqlDirentUnlink     *sql_unlink_;
+  SqlDirentUpdate     *sql_update_;
+  SqlMaxHardlinkGroup *sql_max_link_id_;
+  SqlIncLinkcount     *sql_inc_linkcount_;
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 

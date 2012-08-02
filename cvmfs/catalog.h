@@ -57,7 +57,7 @@ struct InodeRange {
  */
 class Catalog {
   friend class AbstractCatalogManager;
-  friend class LookupSqlStatement;  // for mangled inode
+  friend class SqlLookup;  // for mangled inode
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
 
@@ -165,11 +165,11 @@ class Catalog {
   InodeRange inode_range_;
   uint64_t max_row_id_;
 
-  ListingLookupSqlStatement *sql_listing_;
-  PathHashLookupSqlStatement *sql_lookup_md5path_;
-  InodeLookupSqlStatement *sql_lookup_inode_;
-  FindNestedCatalogSqlStatement *sql_lookup_nested_;
-  ListNestedCatalogsSqlStatement *sql_list_nested_;
+  SqlListing *sql_listing_;
+  SqlLookupPathHash *sql_lookup_md5path_;
+  SqlLookupInode *sql_lookup_inode_;
+  SqlNestedCatalogLookup *sql_lookup_nested_;
+  SqlNestedCatalogListing *sql_list_nested_;
 };  // class Catalog
 
 }  // namespace catalog

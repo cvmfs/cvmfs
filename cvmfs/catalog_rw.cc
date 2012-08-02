@@ -72,7 +72,7 @@ bool WritableCatalog::CreateDatabase(const string &file_path,
   bool result =
     new_catalog->sql_insert_->BindPathHash(path_hash) &&
     new_catalog->sql_insert_->BindParentPathHash(parent_hash) &&
-    new_catalog->sql_insert_->BindDirectoryEntry(root_entry) &&
+    new_catalog->sql_insert_->BindDirent(root_entry) &&
     new_catalog->sql_insert_->Execute();
   new_catalog->sql_insert_->Reset();
 
@@ -118,7 +118,7 @@ bool WritableCatalog::CreateSchema(const std::string &file_path) {
   // TODO: move to catalog_queries
   bool retval;
   string sql;
-  retval = SqlStatement(database,
+  retval = Sql(database,
     "CREATE TABLE IF NOT EXISTS catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " inode INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
@@ -127,30 +127,30 @@ bool WritableCatalog::CreateSchema(const std::string &file_path) {
   if (!retval)
     goto create_schema_fail;
 
-  retval = SqlStatement(database,
+  retval = Sql(database,
     "CREATE INDEX IF NOT EXISTS idx_catalog_parent "
     "ON catalog (parent_1, parent_2);").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = SqlStatement(database,
+  retval = Sql(database,
     "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
     "CONSTRAINT pk_properties PRIMARY KEY (key));").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = SqlStatement(database,
+  retval = Sql(database,
     "CREATE TABLE IF NOT EXISTS nested_catalogs (path TEXT, sha1 TEXT, "
     "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = SqlStatement(database, "INSERT OR IGNORE INTO properties "
+  retval = Sql(database, "INSERT OR IGNORE INTO properties "
     "(key, value) VALUES ('revision', 0);").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = SqlStatement(database, "INSERT OR REPLACE INTO properties "
+  retval = Sql(database, "INSERT OR REPLACE INTO properties "
     "(key, value) VALUES ('schema', '2.0');").Execute();
   if (!retval)
     goto create_schema_fail;
@@ -178,14 +178,14 @@ WritableCatalog::~WritableCatalog() {
 
 
 void WritableCatalog::Transaction() {
-  SqlStatement transaction(database(), "BEGIN;");
+  Sql transaction(database(), "BEGIN;");
   bool retval = transaction.Execute();
   assert(retval == true);
 }
 
 
 void WritableCatalog::Commit() {
-  SqlStatement commit(database(), "COMMIT;");
+  Sql commit(database(), "COMMIT;");
   bool retval = commit.Execute();
   assert(retval == true);
   dirty_ = false;
@@ -195,12 +195,12 @@ void WritableCatalog::Commit() {
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements(); // polymorphism: up call
 
-  sql_insert_ = new InsertDirectoryEntrySqlStatement(database());
-  sql_touch_ = new TouchSqlStatement(database());
-  sql_unlink_ = new UnlinkSqlStatement(database());
-  sql_update_ = new UpdateDirectoryEntrySqlStatement(database());
-  sql_max_link_id_ = new GetMaximalHardlinkGroupIdStatement(database());
-  sql_inc_linkcount_ = new IncLinkcountStatement(database());
+  sql_insert_ = new SqlDirentInsert(database());
+  sql_touch_ = new SqlDirentTouch(database());
+  sql_unlink_ = new SqlDirentUnlink(database());
+  sql_update_ = new SqlDirentUpdate(database());
+  sql_max_link_id_ = new SqlMaxHardlinkGroup(database());
+  sql_inc_linkcount_ = new SqlIncLinkcount(database());
 }
 
 
@@ -223,7 +223,7 @@ uint32_t WritableCatalog::GetMaxLinkId() const {
   int result = -1;
 
   if (sql_max_link_id_->FetchRow()) {
-    result = sql_max_link_id_->GetMaximalGroupId();
+    result = sql_max_link_id_->GetMaxGroupId();
   }
   sql_max_link_id_->Reset();
 
@@ -252,7 +252,7 @@ bool WritableCatalog::AddEntry(const DirectoryEntry &entry,
   bool result =
     sql_insert_->BindPathHash(path_hash) &&
     sql_insert_->BindParentPathHash(parent_hash) &&
-    sql_insert_->BindDirectoryEntry(entry) &&
+    sql_insert_->BindDirent(entry) &&
     sql_insert_->Execute();
 
   sql_insert_->Reset();
@@ -330,7 +330,7 @@ bool WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
 
   bool result =
     sql_update_->BindPathHash(path_hash) &&
-    sql_update_->BindDirectoryEntry(entry) &&
+    sql_update_->BindDirent(entry) &&
     sql_update_->Execute();
 
   sql_update_->Reset();
@@ -347,7 +347,7 @@ bool WritableCatalog::UpdateLastModified() {
   const time_t now = time(NULL);
   const string sql = "INSERT OR REPLACE INTO properties "
      "(key, value) VALUES ('last_modified', '" + StringifyInt(now) + "');";
-  return SqlStatement(database(), sql).Execute();
+  return Sql(database(), sql).Execute();
 }
 
 
@@ -358,7 +358,7 @@ bool WritableCatalog::UpdateLastModified() {
 bool WritableCatalog::IncrementRevision() {
   const string sql =
     "UPDATE properties SET value=value+1 WHERE key='revision';";
-  return SqlStatement(database(), sql).Execute();
+  return Sql(database(), sql).Execute();
 }
 
 
@@ -369,7 +369,7 @@ bool WritableCatalog::IncrementRevision() {
 bool WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
   const string sql = "INSERT OR REPLACE INTO properties "
     "(key, value) VALUES ('previous_revision', '" + hash.ToString() + "');";
-  return SqlStatement(database(), sql).Execute();
+  return Sql(database(), sql).Execute();
 }
 
 
@@ -545,7 +545,7 @@ bool WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   const string sha1_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
 
-  SqlStatement stmt(database(),
+  Sql stmt(database(),
     "INSERT INTO nested_catalogs (path, sha1) VALUES (:p, :sha1);");
   bool successful =
     stmt.BindText(1, mountpoint) &&
@@ -574,7 +574,7 @@ bool WritableCatalog::InsertNestedCatalog(const string &mountpoint,
 bool WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                                           Catalog **attached_reference)
 {
-  SqlStatement stmt(database(), "DELETE FROM nested_catalogs WHERE path = :p;");
+  Sql stmt(database(), "DELETE FROM nested_catalogs WHERE path = :p;");
   bool successful =
     stmt.BindText(1, mountpoint) &&
   stmt.Execute();
@@ -606,7 +606,7 @@ bool WritableCatalog::UpdateNestedCatalog(const string &path,
 {
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 "
     "WHERE path = :path;";
-  SqlStatement stmt(database(), sql);
+  Sql stmt(database(), sql);
 
   stmt.BindText(1, hash.ToString());
   stmt.BindText(2, path);
@@ -689,7 +689,7 @@ bool WritableCatalog::CopyToParent() {
     "UPDATE catalog SET inode = inode + " + StringifyInt(offset) +
     " WHERE inode > 0;";
 
-  SqlStatement sql_update_link_ids(database(), update_link_ids);
+  Sql sql_update_link_ids(database(), update_link_ids);
   if (!sql_update_link_ids.Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to harmonize the hardlink group IDs in '%s'",
@@ -712,7 +712,7 @@ bool WritableCatalog::CopyToParent() {
     Commit();
   if (parent->dirty_)
     parent->Commit();
-  SqlStatement sql_attach(database(), "ATTACH '" + parent->database_path() +
+  Sql sql_attach(database(), "ATTACH '" + parent->database_path() +
                           "' AS other;");
   if (!sql_attach.Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
@@ -721,15 +721,15 @@ bool WritableCatalog::CopyToParent() {
              sql_attach.GetLastError());
     return false;
   }
-  if (!SqlStatement(database(), "INSERT INTO other.catalog "
-                    "SELECT * FROM main.catalog;").Execute())
+  if (!Sql(database(), "INSERT INTO other.catalog "
+                       "SELECT * FROM main.catalog;").Execute())
   {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to copy DirectoryEntries from "
              "catalog '%s' to catalog '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
   }
-  if (!SqlStatement(database(), "DETACH other;").Execute()) {
+  if (!Sql(database(), "DETACH other;").Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to detach database of catalog '%s' from catalog '%s'",
              parent->path().c_str(), this->path().c_str());
