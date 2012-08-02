@@ -214,7 +214,7 @@ class SqlDirent : public Sql {
    *  @param entry the DirectoryEntry to encode
    *  @return an integer containing the bitmap of the flags field
    */
-  unsigned int CreateDatabaseFlags(const DirectoryEntry &entry) const;
+  unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
 
   /**
    *  replaces place holder variables in a symbolic link by actual

@@ -28,7 +28,6 @@ Sql::~Sql() {
     LogCvmfs(kLogSql, kLogDebug,
              "failed to finalize statement - error code: %d", last_error_code_);
   }
-
   LogCvmfs(kLogSql, kLogDebug, "successfully finalized statement");
 }
 
@@ -67,7 +66,6 @@ bool Sql::Reset() {
 }
 
 
-
 bool Sql::Init(const sqlite3 *database, const std::string &statement) {
   last_error_code_ = sqlite3_prepare_v2((sqlite3*)database,
                                         statement.c_str(),
@@ -75,11 +73,9 @@ bool Sql::Init(const sqlite3 *database, const std::string &statement) {
                                         &statement_,
                                         NULL);
 
-  if (not Successful()) {
-    LogCvmfs(kLogSql, kLogDebug,
-             "FAILED to prepare statement '%s' - error code: %d",
-             statement.c_str(), GetLastError());
-    LogCvmfs(kLogSql, kLogDebug, "Error message: '%s'",
+  if (!Successful()) {
+    LogCvmfs(kLogSql, kLogDebug, "failed to prepare statement '%s' (%d: %s)",
+             statement.c_str(), GetLastError(),
              sqlite3_errmsg((sqlite3*)database));
     return false;
   }
@@ -89,34 +85,33 @@ bool Sql::Init(const sqlite3 *database, const std::string &statement) {
   return true;
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
 
-unsigned int SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
+//------------------------------------------------------------------------------
+
+
+unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   unsigned int database_flags = 0;
 
-  if (entry.IsNestedCatalogRoot()) {
+  if (entry.IsNestedCatalogRoot())
     database_flags |= kFlagDirNestedRoot;
-  }
-
-  if (entry.IsNestedCatalogMountpoint()) {
+  else if (entry.IsNestedCatalogMountpoint())
     database_flags |= kFlagDirNestedMountpoint;
-  }
 
-  if (entry.IsDirectory()) {
+  if (entry.IsDirectory())
     database_flags |= kFlagDir;
-  } else if (entry.IsLink()) {
+  else if (entry.IsLink())
     database_flags |= kFlagFile | kFlagLink;
-  } else {
+  else
     database_flags |= kFlagFile;
-  }
 
   return database_flags;
 }
 
+
+/**
+ * Expands variant symlinks containing $(VARIABLE) string.  Uses the environment
+ * variables of the current process (cvmfs2)
+ */
 void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
   const char *c = raw_symlink->GetChars();
   const char *cEnd = c+raw_symlink->GetLength();
@@ -158,11 +153,9 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
   return;
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                                       const int inode_idx,
@@ -175,228 +168,238 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                                       const DirectoryEntry &entry)
 {
   return (
-    BindSha1Blob( hash_idx,    entry.checksum_) &&
-    BindInt64(    inode_idx,   entry.inode_) && // quirky database layout here ( legacy ;-) )
-    BindInt64(    size_idx,    entry.size_) &&
-    BindInt(      mode_idx,    entry.mode_) &&
-    BindInt64(    mtime_idx,   entry.mtime_) &&
-    BindInt(      flags_idx,   CreateDatabaseFlags(entry)) &&
-    BindText(     name_idx,    entry.name_.GetChars(), entry.name_.GetLength()) &&
-    BindText(     symlink_idx, entry.symlink_.GetChars(), entry.symlink_.GetLength())
+    BindSha1Blob(hash_idx, entry.checksum_) &&
+    BindInt64(inode_idx, entry.inode_) && // quirky database layout here ( legacy ;-) )
+    BindInt64(size_idx, entry.size_) &&
+    BindInt(mode_idx, entry.mode_) &&
+    BindInt64(mtime_idx, entry.mtime_) &&
+    BindInt(flags_idx, CreateDatabaseFlags(entry)) &&
+    BindText(name_idx, entry.name_.GetChars(), entry.name_.GetLength()) &&
+    BindText(symlink_idx, entry.symlink_.GetChars(), entry.symlink_.GetLength())
   );
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
 
-std::string SqlLookup::GetFieldsToSelect() const {
-  return "hash, inode, size, mode, mtime, flags, name, symlink, md5path_1, md5path_2, parent_1, parent_2, rowid";
-      //    0     1      2     3     4      5      6      7        8          9           10        11       12
+//------------------------------------------------------------------------------
+
+
+string SqlLookup::GetFieldsToSelect() const {
+  return "hash, inode, size, mode, mtime, flags, name, symlink, "
+      //    0     1      2     3     4      5      6      7
+         "md5path_1, md5path_2, parent_1, parent_2, rowid";
+      //    8          9           10        11       12
 }
+
 
 hash::Md5 SqlLookup::GetPathHash() const {
   return RetrieveMd5(8, 9);
 }
 
+
 hash::Md5 SqlLookup::GetParentPathHash() const {
   return RetrieveMd5(10, 11);
 }
 
+
+/**
+ * This method is a friend of DirectoryEntry.
+ */
 DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
-  // fill the directory entry
-  // (this method is a friend of DirectoryEntry ;-) )
   DirectoryEntry result;
 
-  // read administrative stuff from the result
-  int database_flags                   = RetrieveInt(5);
-  result.catalog_                      = (Catalog*)catalog;
-  result.is_nested_catalog_root_       = (database_flags & kFlagDirNestedRoot);
-  result.is_nested_catalog_mountpoint_ = (database_flags & kFlagDirNestedMountpoint);
+  const unsigned database_flags = RetrieveInt(5);
+  result.catalog_ = (Catalog*)catalog;
+  result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
+  result.is_nested_catalog_mountpoint_ =
+    (database_flags & kFlagDirNestedMountpoint);
   uint64_t hardlinks = RetrieveInt64(1);
+  const char *name = reinterpret_cast<const char *>(RetrieveText(6));
+  const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
-  // read the usual file information
-  result.inode_        = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                          (catalog->schema() < 2.0) ? 0 : hardlinks >> 32);
-  result.parent_inode_ = DirectoryEntry::kInvalidInode; // must be set later by a second catalog lookup
-  result.linkcount_    = (catalog->schema() < 2.0) ?
+  // must be set later by a second catalog lookup
+  result.parent_inode_ = DirectoryEntry::kInvalidInode;
+  result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
+                  (catalog->schema() < 2.0) ?
+                    0 : Hardlinks2HardlinkGroup(hardlinks));
+  result.linkcount_ = (catalog->schema() < 2.0) ?
                           1 : Hardlinks2Linkcount(hardlinks);
-  result.mode_         = RetrieveInt(3);
-  result.size_         = RetrieveInt64(2);
-  result.mtime_        = RetrieveInt64(4);
-  result.checksum_     = RetrieveSha1Blob(0);
-  result.name_.Assign((char *)RetrieveText(6), strlen((char *)RetrieveText(6)));
-  result.symlink_.Assign((char *)RetrieveText(7),
-                         strlen((char *)RetrieveText(7)));
+  result.mode_ = RetrieveInt(3);
+  result.size_ = RetrieveInt64(2);
+  result.mtime_ = RetrieveInt64(4);
+  result.checksum_ = RetrieveSha1Blob(0);
+  result.name_.Assign(name, strlen(name));
+  result.symlink_.Assign(symlink, strlen(symlink));
   ExpandSymlink(&result.symlink_);
 
   return result;
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlListing::SqlListing(const sqlite3 *database) {
-  std::ostringstream statement;
-  statement << "SELECT " << GetFieldsToSelect() << " FROM catalog "
-               "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
-  Init(database, statement.str());
+  const string statement =
+    "SELECT " + GetFieldsToSelect() + " FROM catalog "
+    "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
+  Init(database, statement);
 }
+
 
 bool SqlListing::BindPathHash(const struct hash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlLookupPathHash::SqlLookupPathHash(const sqlite3 *database) {
-  std::ostringstream statement;
-  statement << "SELECT " << GetFieldsToSelect() << " FROM catalog "
-               "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
-  Init(database, statement.str());
+  const string statement =
+    "SELECT " + GetFieldsToSelect() + " FROM catalog "
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+  Init(database, statement);
 }
 
 bool SqlLookupPathHash::BindPathHash(const struct hash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlLookupInode::SqlLookupInode(const sqlite3 *database) {
-  std::ostringstream statement;
-  statement << "SELECT " << GetFieldsToSelect() << " FROM catalog "
-               "WHERE rowid = :rowid;";
-  Init(database, statement.str());
+  const string statement =
+    "SELECT " + GetFieldsToSelect() + " FROM catalog WHERE rowid = :rowid;";
+  Init(database, statement);
 }
+
 
 bool SqlLookupInode::BindRowId(const uint64_t inode) {
   return BindInt64(1, inode);
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlNestedCatalogLookup::SqlNestedCatalogLookup(const sqlite3 *database) {
   Init(database, "SELECT sha1 FROM nested_catalogs WHERE path=:path;");
 }
 
+
 bool SqlNestedCatalogLookup::BindSearchPath(const PathString &path) {
   return BindText(1, path.GetChars(), path.GetLength());
 }
 
+
 hash::Any SqlNestedCatalogLookup::GetContentHash() const {
-  const std::string sha1_str = std::string((char *)RetrieveText(0));
-  return (sha1_str.empty()) ? hash::Any(hash::kSha1) : hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
+  const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(0)));
+  return (sha1.empty()) ? hash::Any(hash::kSha1) :
+                          hash::Any(hash::kSha1, hash::HexPtr(sha1));
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlNestedCatalogListing::SqlNestedCatalogListing(const sqlite3 *database) {
   Init(database, "SELECT path, sha1 FROM nested_catalogs;");
 }
 
+
 PathString SqlNestedCatalogListing::GetMountpoint() const {
-  return PathString((char *)RetrieveText(0), strlen((char *)RetrieveText(0)));
+  const char *mountpoint = reinterpret_cast<const char *>(RetrieveText(0));
+  return PathString(mountpoint, strlen(mountpoint));
 }
+
 
 hash::Any SqlNestedCatalogListing::GetContentHash() const {
-  const std::string sha1_str = std::string((char *)RetrieveText(1));
-  return (sha1_str.empty()) ? hash::Any(hash::kSha1) : hash::Any(hash::kSha1, hash::HexPtr(sha1_str));
+  const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(1)));
+  return (sha1.empty()) ? hash::Any(hash::kSha1) :
+                          hash::Any(hash::kSha1, hash::HexPtr(sha1));
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlDirentInsert::SqlDirentInsert(const sqlite3 *database) {
-  Init(database, "INSERT OR IGNORE INTO catalog "
-  //                  1           2         3         4       5     6      7     8      9      10    11     12
-                 "(md5path_1, md5path_2, parent_1, parent_2, hash, inode, size, mode, mtime, flags, name, symlink) "
-                 "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :ino, :size, :mode, :mtime, :flags, :name, :symlink);");
+  const string statement =
+    "INSERT OR IGNORE INTO catalog "
+    "(md5path_1, md5path_2, parent_1, parent_2, hash, inode, size, mode, mtime,"
+//       1           2         3         4       5     6      7     8      9
+    " flags, name, symlink) "
+//      10    11     12
+    "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :ino, :size, :mode, :mtime,"
+    " :flags, :name, :symlink);";
+  Init(database, statement);
 }
+
 
 bool SqlDirentInsert::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
+
 bool SqlDirentInsert::BindParentPathHash(const hash::Md5 &hash) {
   return BindMd5(3, 4, hash);
 }
 
+
 bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
-  return BindDirentFields(5,6,7,8,9,10,11,12, entry);
+  return BindDirentFields(5, 6, 7, 8, 9, 10, 11, 12, entry);
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlDirentUpdate::SqlDirentUpdate(const sqlite3 *database) {
-  Init(database, "UPDATE catalog "
-                 //            1             2             3               4
-                 "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
-                 //          5             6                  7                8
-                 "flags = :flags, name = :name, symlink = :symlink, inode = :inode "
-                 //                     9                        10
-                 "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
+  const string statement =
+    "UPDATE catalog "
+    "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
+//            1             2             3               4
+    "flags = :flags, name = :name, symlink = :symlink, inode = :inode "
+//          5             6                  7                8
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+//                     9                       10
+  Init(database, statement);
 }
+
 
 bool SqlDirentUpdate::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(9, 10, hash);
 }
 
+
 bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
-  return BindDirentFields(1,8,2,3,4,5,6,7, entry);
+  return BindDirentFields(1, 8, 2, 3, 4, 5, 6, 7, entry);
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlDirentTouch::SqlDirentTouch(const sqlite3 *database) {
   Init(database, "UPDATE catalog SET mtime = :mtime "
                  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
+
 bool SqlDirentTouch::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(2, 3, hash);
 }
+
 
 bool SqlDirentTouch::BindTimestamp(const time_t timestamp) {
   return BindInt64(1, timestamp);
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlDirentUnlink::SqlDirentUnlink(const sqlite3 *database) {
   Init(database, "DELETE FROM catalog "
@@ -408,27 +411,31 @@ bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
 SqlIncLinkcount::SqlIncLinkcount(const sqlite3 *database) {
-  Init(database,
+  const string statememt =
     "UPDATE catalog SET inode="
-      "CASE (inode << 32) >> 32 WHEN 2 THEN 0 ELSE inode+1*(:delta) END "
-      "WHERE inode = (SELECT inode from catalog WHERE md5path_1 = :md5_1 AND "
-      "md5path_2 = :md5_2);");
+    "CASE (inode << 32) >> 32 WHEN 2 THEN 0 ELSE inode+1*(:delta) END "
+    "WHERE inode = (SELECT inode from catalog WHERE md5path_1 = :md5_1 AND "
+    "md5path_2 = :md5_2);";
+  Init(database, statememt);
 }
+
 
 bool SqlIncLinkcount::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(2, 3, hash);
 }
 
+
 bool SqlIncLinkcount::BindDelta(const int delta) {
   return BindInt(1, delta);
 }
 
-//
-// ###########################################################################
-// ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-// ###########################################################################
-//
+
+//------------------------------------------------------------------------------
+
 
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const sqlite3 *database) {
   Init(database, "SELECT max(inode) FROM catalog;");
@@ -437,6 +444,5 @@ SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const sqlite3 *database) {
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
   return RetrieveInt64(0) >> 32;
 }
-
 
 } // namespace catalog
