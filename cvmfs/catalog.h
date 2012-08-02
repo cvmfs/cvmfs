@@ -14,7 +14,7 @@
 #include <list>
 #include <map>
 
-#include "catalog_queries.h"
+#include "catalog_sql.h"
 #include "dirent.h"
 #include "hash.h"
 #include "shortstring.h"

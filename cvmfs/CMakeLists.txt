@@ -20,7 +20,7 @@ set (CVMFS_CLIENT_SOURCES
 	lru.h lru.cc
 	globals.h globals.cc
 	peers.h peers.cc
-	catalog_queries.h catalog_queries.cc
+	catalog_sql.h catalog_sql.cc
 	catalog.h catalog.cc
 	catalog_mgr.h catalog_mgr.cc
 	shortstring.h dirent.h
@@ -72,7 +72,7 @@ set (CVMFS_SYNC_BIN_SOURCES
   manifest.h manifest.cc
 
   dirent.h
-  catalog_queries.h catalog_queries.cc
+  catalog_sql.h catalog_sql.cc
 	catalog.h catalog.cc
 	catalog_rw.h catalog_rw.cc
 	catalog_mgr.h catalog_mgr.cc

@@ -1,4 +1,8 @@
-#include "catalog_queries.h"
+/**
+ * This file is part of the CernVM file system.
+ */
+
+#include "catalog_sql.h"
 
 #include <cstdlib>
 #include <cstring>
