@@ -93,10 +93,7 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-const unsigned int kInodeCacheSize = 4800;
-const unsigned int kPathCacheSize = 4800;
-const unsigned int kMd5pathCacheSize = 32000;
-
+const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
@@ -133,6 +130,7 @@ string *repository_name_ = NULL;  /**< Expected repository name,
                                        e.g. atlas.cern.ch */
 pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
+uint64_t mem_cache_size_;
 unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 cache::CatalogManager *catalog_manager_;
@@ -1227,6 +1225,7 @@ struct CvmfsOptions {
   char     *repo_name;
   char     *interface;
   char     *root_hash;
+  int      memcache;
   int      ignore_signature;
   int      rebuild_cachedb;
   int      nofiles;
@@ -1264,6 +1263,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("timeout=%u",          timeout, 2),
   CVMFS_OPT("timeout_direct=%u",   timeout_direct, 2),
   CVMFS_OPT("max_ttl=%u",          max_ttl, 0),
+  CVMFS_OPT("memcache=%u",         memcache, 0),
   CVMFS_OPT("cachedir=%s",         cachedir, 0),
   CVMFS_OPT("proxies=%s",          proxies, 0),
   CVMFS_OPT("tracefile=%s",        tracefile, 0),
@@ -1333,6 +1333,8 @@ static void usage(const char *progname) {
       "Maximum TTL for file catalogs (default: take from catalog)\n"
     " -o kcache_timeout=SECONDS  "
       "Timeout of the kernel meta-data cache (default %d, turn off with -1)\n"
+    " -o memcache=<MB>           "
+      "Memory in MB reserved for the meta-data memory cache (default: %u)\n"
     " -o cachedir=DIR            Where to store disk cache\n"
     " -o proxies=HTTP_PROXIES    "
       "Set the HTTP proxy list, such as 'proxy1|proxy2;DIRECT'\n"
@@ -1382,7 +1384,7 @@ static void usage(const char *progname) {
       "allow mounts over non-empty file/dir\n"
     " -o default_permissions     "
       "enable permission checking by kernel\n",
-    2, 2, int(cvmfs::kcache_timeout_));
+    2, 2, int(cvmfs::kcache_timeout_), cvmfs::kDefaultMemcache/(1024*1024));
 }
 
 
@@ -1595,6 +1597,10 @@ int main(int argc, char *argv[]) {
   }
 
   // Default options
+  if (g_cvmfs_opts.memcache == 0)
+    g_cvmfs_opts.memcache = cvmfs::kDefaultMemcache;
+  else
+    g_cvmfs_opts.memcache *= 1024*1024;
   if (g_cvmfs_opts.timeout == 0) g_cvmfs_opts.timeout = 2;
   if (g_cvmfs_opts.timeout_direct == 0) g_cvmfs_opts.timeout_direct = 2;
   if (g_cvmfs_opts.syslog_level == 0) g_cvmfs_opts.syslog_level = 3;
@@ -1605,6 +1611,7 @@ int main(int argc, char *argv[]) {
     g_cvmfs_opts.cachedir = strdup("/var/lib/cvmfs/default");
 
   // Fill cvmfs option variables from Fuse options
+  cvmfs::mem_cache_size_ = g_cvmfs_opts.memcache;
   cvmfs::cachedir_ = new string(g_cvmfs_opts.cachedir);
   cvmfs::tracefile_ = new string(g_cvmfs_opts.tracefile);
   cvmfs::repository_name_ = new string(g_cvmfs_opts.repo_name);
@@ -1878,9 +1885,19 @@ int main(int argc, char *argv[]) {
   struct fuse_lowlevel_ops cvmfs_operations;
   cvmfs::set_cvmfs_ops(&cvmfs_operations);
 
-  cvmfs::inode_cache_ = new lru::InodeCache(cvmfs::kInodeCacheSize);
-  cvmfs::path_cache_ = new lru::PathCache(cvmfs::kPathCacheSize);
-  cvmfs::md5path_cache_ = new lru::Md5PathCache(cvmfs::kMd5pathCacheSize);
+  { // memcache
+    const double memcache_unit_size =
+      7.0 * lru::Md5PathCache::GetEntrySize() +
+      lru::InodeCache::GetEntrySize() + lru::PathCache::GetEntrySize();
+    const unsigned memcache_num_units =
+      cvmfs::mem_cache_size_ / static_cast<unsigned>(memcache_unit_size);
+    // Number of cache entries must be a multiple of 64
+    const unsigned mask_64 = ~((1 << 6) - 1);
+    cvmfs::inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64);
+    cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
+    cvmfs::md5path_cache_ =
+      new lru::Md5PathCache((memcache_num_units*7) & mask_64);
+  }
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));

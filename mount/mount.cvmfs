@@ -168,6 +168,7 @@ fi
 [ x"$CVMFS_CHECK_PERMISSIONS" = xyes ] && add_mount_option "default_permissions"
 [ x"$CVMFS_SHARED_CACHE" = xyes ] && add_mount_option "shared_cache"
 [ x"$CVMFS_NFS_SOURCE" = xyes ] && add_mount_option "nfs_source"
+[ x"$CVMFS_MEMCACHE_SIZE" != x ] && add_mount_option "memcache=$CVMFS_MEMCACHE_SIZE"
 
 # Single threaded, hack around a fuse4x problem with unnamed semaphores
 if [[ "$unamestr" = 'Darwin' ]]; then

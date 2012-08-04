@@ -122,6 +122,8 @@ struct Statistics {
 template<class Key, class Value>
 class SmallHash {
  public:
+  static const double kLoadFactor = 0.7;
+
   SmallHash() {
     keys_ = NULL;
     values_ = NULL;
@@ -132,7 +134,7 @@ class SmallHash {
   }
 
   void Init(uint32_t size, Key empty, uint32_t (*hasher)(const Key &key)) {
-    capacity_ = (size*10)/7;
+    capacity_ = static_cast<uint32_t>(static_cast<double>(size)/kLoadFactor);
     keys_ = new Key[capacity_];
     values_ = new Value[capacity_];
     bytes_allocated_ = (sizeof(Key) + sizeof(Value)) * capacity_;
@@ -176,6 +178,10 @@ class SmallHash {
   }
 
   uint64_t bytes_allocated() const { return bytes_allocated_; }
+  static double GetEntrySize() {
+    const double unit = sizeof(Key) + sizeof(Value);
+    return unit/kLoadFactor;
+  }
 
   void GetCollisionStats(uint64_t *num_collisions,
                          uint32_t *max_collisions) const
@@ -260,6 +266,8 @@ class LruCache {
     Value value;
   } CacheEntry;
 
+  //static uint64_t GetEntrySize() { return sizeof(Key) + sizeof(Value); }
+
   // Internal data fields
   unsigned int cache_gauge_;
   unsigned int cache_size_;
@@ -312,6 +320,13 @@ class LruCache {
       num_free_slots_ = num_slots;
       next_free_slot_ = 0;
       bytes_allocated_ = num_bytes_bitmap + num_bytes_memory;
+    }
+
+    /**
+     * Number of bytes for a single entry
+     */
+    static double GetEntrySize() {
+      return static_cast<double>(sizeof(T)) + 1.0/8.0;
     }
 
     /**
@@ -638,7 +653,9 @@ class LruCache {
    * Create a new LRU cache object
    * @param cache_size the maximal size of the cache
    */
-  LruCache(const unsigned int cache_size, const Key &empty_key, uint32_t (*hasher)(const Key &key)) {
+  LruCache(const unsigned cache_size, const Key &empty_key,
+           uint32_t (*hasher)(const Key &key))
+  {
     assert(cache_size > 0);
 
     LruCache<Key, Value>::allocator_ = new ConcreteMemoryAllocator(cache_size);
@@ -657,6 +674,11 @@ class LruCache {
     int retval = pthread_mutex_init(&lock_, NULL);
     assert(retval == 0);
 #endif
+  }
+
+  static double GetEntrySize() {
+    return SmallHash<Key, CacheEntry>::GetEntrySize() +
+           ConcreteMemoryAllocator::GetEntrySize();
   }
 
   virtual ~LruCache() {
