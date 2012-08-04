@@ -30,6 +30,30 @@ namespace catalog {
 
 class Catalog;
 
+
+/**
+ * Encapsulates an SQlite connection.  Abstracts the schema.
+ */
+class Database {
+ public:
+  enum OpenMode {
+    kOpenReadOnly,
+    kOpenReadWrite
+  };
+
+  Database(const std::string filename, const OpenMode open_mode);
+  static bool Create(const std::string filename,
+                     const DirectoryEntry &root_entry);
+
+  sqlite3 *sqlite_db() const { return sqlite_db_; }
+  float schema_version() const { return schema_version_; }
+ private:
+  sqlite3 *sqlite_db_;
+  float schema_version_;
+  bool read_write_;
+};
+
+
 /**
  * Base class for all SQL statement classes.  It wraps a single SQL statement
  * and all neccessary calls of the sqlite3 API to deal with this statement.

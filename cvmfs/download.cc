@@ -107,7 +107,8 @@ static string EscapeUrl(const string &url) {
         ((url[i] >= 'A') && (url[i] <= 'Z')) ||
         ((url[i] >= 'a') && (url[i] <= 'z')) ||
         (url[i] == '/') || (url[i] == ':') || (url[i] == '.') ||
-        (url[i] == '+') || (url[i] == '-'))
+        (url[i] == '+') || (url[i] == '-') ||
+        (url[i] == '[') || (url[i] == ']'))
     {
       escaped += url[i];
     } else {
