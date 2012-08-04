@@ -212,13 +212,20 @@ uint64_t GetInode(const PathString &path) {
  * Finds the path that belongs to an inode.  This must be successful.  The
  * inode input comes from the file system, i.e. it must have been issued
  * before.
+ * \return false if not found
  */
-void GetPath(const uint64_t inode, PathString *path) {
+bool GetPath(const uint64_t inode, PathString *path) {
   leveldb::Status status;
   leveldb::Slice key(reinterpret_cast<const char *>(&inode), sizeof(inode));
   string result;
 
   status = db_inode2path_->Get(leveldb_read_options_, key, &result);
+  if (status.IsNotFound()) {
+    LogCvmfs(kLogNfsMaps, kLogDebug,
+             "failed to find inode %"PRIu64" in NFS maps, returning ESTALE",
+             inode);
+    return false;
+  }
   if (!status.ok()) {
     LogCvmfs(kLogNfsMaps, kLogSyslog,
              "failed to read from inode2path db inode %"PRIu64": %s",
@@ -229,6 +236,7 @@ void GetPath(const uint64_t inode, PathString *path) {
   path->Assign(result.data(), result.length());
   LogCvmfs(kLogNfsMaps, kLogDebug, "inode %"PRIu64" maps to path %s",
            inode, path->c_str());
+  return true;
 }
 
 

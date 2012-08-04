@@ -346,8 +346,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (nfs_maps_) {
     // NFS mode
     PathString path;
-    nfs_maps::GetPath(ino, &path);
-    if (catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent)) {
+    if (nfs_maps::GetPath(ino, &path) &&
+        catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent))
+    {
       // Fix inodes
       dirent->set_inode(ino);
       catalog::DirectoryEntry parent_dirent;
@@ -411,9 +412,11 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   if (nfs_maps_) {
     // NFS mode, just a lookup
     LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - lookup in NFS maps", ino);
-    nfs_maps::GetPath(ino, path);
-    path_cache_->Insert(ino, *path);
-    return true;
+    if (nfs_maps::GetPath(ino, path)) {
+      path_cache_->Insert(ino, *path);
+      return true;
+    }
+    return false;
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - recursively building path", ino);

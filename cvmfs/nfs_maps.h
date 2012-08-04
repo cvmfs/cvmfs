@@ -16,7 +16,7 @@ void Fini();
 void Spawn();
 
 uint64_t GetInode(const PathString &path);
-void GetPath(const uint64_t inode, PathString *path);
+bool GetPath(const uint64_t inode, PathString *path);
 
 std::string GetStatistics();
 
