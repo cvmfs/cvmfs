@@ -71,8 +71,7 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
   close(fd_readahead);
 
   {  // Get schema version
-    Sql sql_schema(sqlite_db_,
-                   "SELECT value FROM properties WHERE key='schema';");
+    Sql sql_schema(*this, "SELECT value FROM properties WHERE key='schema';");
     if (sql_schema.FetchRow()) {
       schema_version_ = sql_schema.RetrieveDouble(0);
     } else {
@@ -89,8 +88,17 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
 }
 
 
+Database::Database(sqlite3 *sqlite_db, const float schema, const bool rw) {
+  sqlite_db_ = sqlite_db;
+  filename_ = "TMP";
+  schema_version_ = schema;
+  read_write_ = rw;
+  ready_ = false;  // Don't close on delete
+}
+
+
 Database::~Database() {
-  if (sqlite_db_)
+  if (ready_)
     sqlite3_close(sqlite_db_);
 }
 
@@ -127,10 +135,11 @@ bool Database::Create(const string &filename,
     return false;
   }
   sqlite3_extended_result_codes(sqlite_db, 1);
+  Database database(sqlite_db, kLatestSchema, true);
 
   bool retval;
   string sql;
-  retval = Sql(sqlite_db,
+  retval = Sql(database,
     "CREATE TABLE IF NOT EXISTS catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " inode INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
@@ -139,36 +148,36 @@ bool Database::Create(const string &filename,
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(sqlite_db,
+  retval = Sql(database,
                "CREATE INDEX IF NOT EXISTS idx_catalog_parent "
                "ON catalog (parent_1, parent_2);").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(sqlite_db,
+  retval = Sql(database,
                "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
                "CONSTRAINT pk_properties PRIMARY KEY (key));").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(sqlite_db,
+  retval = Sql(database,
                "CREATE TABLE IF NOT EXISTS nested_catalogs (path TEXT, sha1 TEXT, "
                "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(sqlite_db, "INSERT OR IGNORE INTO properties "
+  retval = Sql(database, "INSERT OR IGNORE INTO properties "
                "(key, value) VALUES ('revision', 0);").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(sqlite_db, "INSERT OR REPLACE INTO properties "
+  retval = Sql(database, "INSERT OR REPLACE INTO properties "
                "(key, value) VALUES ('schema', '2.0');").Execute();
   if (!retval)
     goto create_schema_fail;
 
   // Insert root entry
-  sql_insert = new SqlDirentInsert(sqlite_db);
+  sql_insert = new SqlDirentInsert(database);
   retval = sql_insert->BindPathHash(root_path_hash) &&
            sql_insert->BindParentPathHash(root_parent_hash) &&
            sql_insert->BindDirent(root_entry) &&
@@ -178,7 +187,7 @@ bool Database::Create(const string &filename,
     goto create_schema_fail;
 
   if (root_path != "") {
-    retval = Sql(sqlite_db, "INSERT OR REPLACE INTO properties "
+    retval = Sql(database, "INSERT OR REPLACE INTO properties "
       "(key, value) VALUES ('root_prefix', '" + root_path + "');").Execute();
     if (!retval)
       goto create_schema_fail;
@@ -196,9 +205,8 @@ create_schema_fail:
 //------------------------------------------------------------------------------
 
 
-Sql::Sql(const sqlite3 *database, const std::string &statement) {
-  Init(database, statement);
-  database_ = (sqlite3 *)database;
+Sql::Sql(const Database &database, const std::string &statement) {
+  Init(database.sqlite_db(), statement);
 }
 
 
@@ -419,11 +427,11 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 //------------------------------------------------------------------------------
 
 
-SqlListing::SqlListing(const sqlite3 *database) {
+SqlListing::SqlListing(const Database &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect() + " FROM catalog "
     "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
-  Init(database, statement);
+  Init(database.sqlite_db(), statement);
 }
 
 
@@ -435,11 +443,11 @@ bool SqlListing::BindPathHash(const struct hash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlLookupPathHash::SqlLookupPathHash(const sqlite3 *database) {
+SqlLookupPathHash::SqlLookupPathHash(const Database &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect() + " FROM catalog "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
-  Init(database, statement);
+  Init(database.sqlite_db(), statement);
 }
 
 bool SqlLookupPathHash::BindPathHash(const struct hash::Md5 &hash) {
@@ -450,10 +458,10 @@ bool SqlLookupPathHash::BindPathHash(const struct hash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlLookupInode::SqlLookupInode(const sqlite3 *database) {
+SqlLookupInode::SqlLookupInode(const Database &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect() + " FROM catalog WHERE rowid = :rowid;";
-  Init(database, statement);
+  Init(database.sqlite_db(), statement);
 }
 
 
@@ -465,8 +473,9 @@ bool SqlLookupInode::BindRowId(const uint64_t inode) {
 //------------------------------------------------------------------------------
 
 
-SqlNestedCatalogLookup::SqlNestedCatalogLookup(const sqlite3 *database) {
-  Init(database, "SELECT sha1 FROM nested_catalogs WHERE path=:path;");
+SqlNestedCatalogLookup::SqlNestedCatalogLookup(const Database &database) {
+  Init(database.sqlite_db(),
+       "SELECT sha1 FROM nested_catalogs WHERE path=:path;");
 }
 
 
@@ -485,8 +494,8 @@ hash::Any SqlNestedCatalogLookup::GetContentHash() const {
 //------------------------------------------------------------------------------
 
 
-SqlNestedCatalogListing::SqlNestedCatalogListing(const sqlite3 *database) {
-  Init(database, "SELECT path, sha1 FROM nested_catalogs;");
+SqlNestedCatalogListing::SqlNestedCatalogListing(const Database &database) {
+  Init(database.sqlite_db(), "SELECT path, sha1 FROM nested_catalogs;");
 }
 
 
@@ -506,7 +515,7 @@ hash::Any SqlNestedCatalogListing::GetContentHash() const {
 //------------------------------------------------------------------------------
 
 
-SqlDirentInsert::SqlDirentInsert(const sqlite3 *database) {
+SqlDirentInsert::SqlDirentInsert(const Database &database) {
   const string statement =
     "INSERT OR IGNORE INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, inode, size, mode, mtime,"
@@ -515,7 +524,7 @@ SqlDirentInsert::SqlDirentInsert(const sqlite3 *database) {
 //      10    11     12
     "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :ino, :size, :mode, :mtime,"
     " :flags, :name, :symlink);";
-  Init(database, statement);
+  Init(database.sqlite_db(), statement);
 }
 
 
@@ -537,7 +546,7 @@ bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentUpdate::SqlDirentUpdate(const sqlite3 *database) {
+SqlDirentUpdate::SqlDirentUpdate(const Database &database) {
   const string statement =
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
@@ -546,7 +555,7 @@ SqlDirentUpdate::SqlDirentUpdate(const sqlite3 *database) {
 //          5             6                  7                8
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
 //                     9                       10
-  Init(database, statement);
+  Init(database.sqlite_db(), statement);
 }
 
 
@@ -563,9 +572,10 @@ bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentTouch::SqlDirentTouch(const sqlite3 *database) {
-  Init(database, "UPDATE catalog SET mtime = :mtime "
-                 "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
+SqlDirentTouch::SqlDirentTouch(const Database &database) {
+  Init(database.sqlite_db(),
+       "UPDATE catalog SET mtime = :mtime "
+       "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
 
@@ -582,9 +592,10 @@ bool SqlDirentTouch::BindTimestamp(const time_t timestamp) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentUnlink::SqlDirentUnlink(const sqlite3 *database) {
-  Init(database, "DELETE FROM catalog "
-                 "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
+SqlDirentUnlink::SqlDirentUnlink(const Database &database) {
+  Init(database.sqlite_db(),
+       "DELETE FROM catalog "
+       "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
 bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
@@ -595,13 +606,13 @@ bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlIncLinkcount::SqlIncLinkcount(const sqlite3 *database) {
+SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
   const string statememt =
     "UPDATE catalog SET inode="
     "CASE (inode << 32) >> 32 WHEN 2 THEN 0 ELSE inode+1*(:delta) END "
     "WHERE inode = (SELECT inode from catalog WHERE md5path_1 = :md5_1 AND "
     "md5path_2 = :md5_2);";
-  Init(database, statememt);
+  Init(database.sqlite_db(), statememt);
 }
 
 
@@ -618,8 +629,8 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
-SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const sqlite3 *database) {
-  Init(database, "SELECT max(inode) FROM catalog;");
+SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
+  Init(database.sqlite_db(), "SELECT max(inode) FROM catalog;");
 }
 
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {

@@ -40,6 +40,7 @@ class Database {
     kOpenReadOnly,
     kOpenReadWrite
   };
+  static const float kLatestSchema = 2.0;
 
   Database(const std::string filename, const OpenMode open_mode);
   ~Database();
@@ -52,6 +53,8 @@ class Database {
   float schema_version() const { return schema_version_; }
   bool ready() const { return ready_; }
  private:
+  Database(sqlite3 *sqlite_db, const float schema, const bool rw);
+
   sqlite3 *sqlite_db_;
   std::string filename_;
   float schema_version_;
@@ -74,7 +77,7 @@ class Sql {
    * @param database the database to use the query on
    * @param statement the statement to prepare
    */
-  Sql(const sqlite3 *database, const std::string &statement);
+  Sql(const Database &database, const std::string &statement);
   virtual ~Sql();
 
   bool Execute();
@@ -214,7 +217,6 @@ class Sql {
   }
 
  private:
-  sqlite3 *database_;
   sqlite3_stmt *statement_;
   int last_error_code_;
 };
@@ -346,7 +348,7 @@ class SqlLookup : public SqlDirent {
 
 class SqlListing : public SqlLookup {
  public:
-  SqlListing(const sqlite3 *database);
+  SqlListing(const Database &database);
   bool BindPathHash(const struct hash::Md5 &hash);
 };
 
@@ -356,7 +358,7 @@ class SqlListing : public SqlLookup {
 
 class SqlLookupPathHash : public SqlLookup {
  public:
-  SqlLookupPathHash(const sqlite3 *database);
+  SqlLookupPathHash(const Database &database);
   bool BindPathHash(const struct hash::Md5 &hash);
 };
 
@@ -366,7 +368,7 @@ class SqlLookupPathHash : public SqlLookup {
 
 class SqlLookupInode : public SqlLookup {
  public:
-  SqlLookupInode(const sqlite3 *database);
+  SqlLookupInode(const Database &database);
   bool BindRowId(const uint64_t inode);
 };
 
@@ -376,7 +378,7 @@ class SqlLookupInode : public SqlLookup {
 
 class SqlNestedCatalogLookup : public Sql {
  public:
-  SqlNestedCatalogLookup(const sqlite3 *database);
+  SqlNestedCatalogLookup(const Database &database);
   bool BindSearchPath(const PathString &path);
   hash::Any GetContentHash() const;
 };
@@ -387,7 +389,7 @@ class SqlNestedCatalogLookup : public Sql {
 
 class SqlNestedCatalogListing : public Sql {
  public:
-  SqlNestedCatalogListing(const sqlite3 *database);
+  SqlNestedCatalogListing(const Database &database);
   PathString GetMountpoint() const;
   hash::Any GetContentHash() const;
 };
@@ -398,7 +400,7 @@ class SqlNestedCatalogListing : public Sql {
 
 class SqlDirentInsert : public SqlDirentWrite {
  public:
-  SqlDirentInsert(const sqlite3 *database);
+  SqlDirentInsert(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   bool BindParentPathHash(const hash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
@@ -410,7 +412,7 @@ class SqlDirentInsert : public SqlDirentWrite {
 
 class SqlDirentUpdate : public SqlDirentWrite {
  public:
-  SqlDirentUpdate(const sqlite3 *database);
+  SqlDirentUpdate(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
 };
@@ -421,7 +423,7 @@ class SqlDirentUpdate : public SqlDirentWrite {
 
 class SqlDirentTouch : public Sql {
  public:
-  SqlDirentTouch(const sqlite3 *database);
+  SqlDirentTouch(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   bool BindTimestamp(time_t timestamp);
 };
@@ -432,7 +434,7 @@ class SqlDirentTouch : public Sql {
 
 class SqlDirentUnlink : public Sql {
  public:
-  SqlDirentUnlink(const sqlite3 *database);
+  SqlDirentUnlink(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
 };
 
@@ -445,7 +447,7 @@ class SqlDirentUnlink : public Sql {
  */
 class SqlIncLinkcount : public Sql {
  public:
-  SqlIncLinkcount(const sqlite3 *database);
+  SqlIncLinkcount(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   bool BindDelta(const int delta);
 };
@@ -456,7 +458,7 @@ class SqlIncLinkcount : public Sql {
 
 class SqlMaxHardlinkGroup : public Sql {
  public:
-  SqlMaxHardlinkGroup(const sqlite3 *database);
+  SqlMaxHardlinkGroup(const Database &database);
   uint32_t GetMaxGroupId() const;
 };
 

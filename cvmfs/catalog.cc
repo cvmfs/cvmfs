@@ -44,11 +44,11 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_ = new SqlListing(database()->sqlite_db());
-  sql_lookup_md5path_ = new SqlLookupPathHash(database()->sqlite_db());
-  sql_lookup_inode_ = new SqlLookupInode(database()->sqlite_db());
-  sql_lookup_nested_ = new SqlNestedCatalogLookup(database()->sqlite_db());
-  sql_list_nested_ = new SqlNestedCatalogListing(database()->sqlite_db());
+  sql_listing_ = new SqlListing(database());
+  sql_lookup_md5path_ = new SqlLookupPathHash(database());
+  sql_lookup_inode_ = new SqlLookupInode(database());
+  sql_lookup_nested_ = new SqlNestedCatalogLookup(database());
+  sql_list_nested_ = new SqlNestedCatalogListing(database());
 }
 
 
@@ -77,7 +77,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
   InitPreparedStatements();
 
   // Find out the maximum row id of this database file
-  Sql sql_max_row_id(database()->sqlite_db(), "SELECT MAX(rowid) FROM catalog;");
+  Sql sql_max_row_id(database(), "SELECT MAX(rowid) FROM catalog;");
   if (!sql_max_row_id.FetchRow()) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "Cannot retrieve maximal row id for database file %s "
@@ -89,8 +89,8 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   // Get root prefix
   if (IsRoot()) {
-    Sql sql_root_prefix(database()->sqlite_db(), "SELECT value FROM properties "
-                                                 "WHERE key='root_prefix';");
+    Sql sql_root_prefix(database(), "SELECT value FROM properties "
+                                    "WHERE key='root_prefix';");
     if (sql_root_prefix.FetchRow()) {
       root_prefix_.Assign(
         reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0)),
@@ -228,7 +228,7 @@ uint64_t Catalog::GetTTL() const {
   const string sql = "SELECT value FROM properties WHERE key='TTL';";
 
   pthread_mutex_lock(lock_);
-  Sql stmt(database()->sqlite_db(), sql);
+  Sql stmt(database(), sql);
   const uint64_t result =
     (stmt.FetchRow()) ?  stmt.RetrieveInt64(0) : kDefaultTTL;
   pthread_mutex_unlock(lock_);
@@ -241,7 +241,7 @@ uint64_t Catalog::GetRevision() const {
   const string sql = "SELECT value FROM properties WHERE key='revision';";
 
   pthread_mutex_lock(lock_);
-  Sql stmt(database()->sqlite_db(), sql);
+  Sql stmt(database(), sql);
   const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
   pthread_mutex_unlock(lock_);
 

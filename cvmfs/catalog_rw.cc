@@ -31,14 +31,14 @@ WritableCatalog::~WritableCatalog() {
 
 
 void WritableCatalog::Transaction() {
-  Sql transaction(database()->sqlite_db(), "BEGIN;");
+  Sql transaction(database(), "BEGIN;");
   bool retval = transaction.Execute();
   assert(retval == true);
 }
 
 
 void WritableCatalog::Commit() {
-  Sql commit(database()->sqlite_db(), "COMMIT;");
+  Sql commit(database(), "COMMIT;");
   bool retval = commit.Execute();
   assert(retval == true);
   dirty_ = false;
@@ -48,12 +48,12 @@ void WritableCatalog::Commit() {
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements(); // polymorphism: up call
 
-  sql_insert_ = new SqlDirentInsert(database()->sqlite_db());
-  sql_touch_ = new SqlDirentTouch(database()->sqlite_db());
-  sql_unlink_ = new SqlDirentUnlink(database()->sqlite_db());
-  sql_update_ = new SqlDirentUpdate(database()->sqlite_db());
-  sql_max_link_id_ = new SqlMaxHardlinkGroup(database()->sqlite_db());
-  sql_inc_linkcount_ = new SqlIncLinkcount(database()->sqlite_db());
+  sql_insert_ = new SqlDirentInsert(database());
+  sql_touch_ = new SqlDirentTouch(database());
+  sql_unlink_ = new SqlDirentUnlink(database());
+  sql_update_ = new SqlDirentUpdate(database());
+  sql_max_link_id_ = new SqlMaxHardlinkGroup(database());
+  sql_inc_linkcount_ = new SqlIncLinkcount(database());
 }
 
 
@@ -200,7 +200,7 @@ bool WritableCatalog::UpdateLastModified() {
   const time_t now = time(NULL);
   const string sql = "INSERT OR REPLACE INTO properties "
      "(key, value) VALUES ('last_modified', '" + StringifyInt(now) + "');";
-  return Sql(database()->sqlite_db(), sql).Execute();
+  return Sql(database(), sql).Execute();
 }
 
 
@@ -211,7 +211,7 @@ bool WritableCatalog::UpdateLastModified() {
 bool WritableCatalog::IncrementRevision() {
   const string sql =
     "UPDATE properties SET value=value+1 WHERE key='revision';";
-  return Sql(database()->sqlite_db(), sql).Execute();
+  return Sql(database(), sql).Execute();
 }
 
 
@@ -222,7 +222,7 @@ bool WritableCatalog::IncrementRevision() {
 bool WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
   const string sql = "INSERT OR REPLACE INTO properties "
     "(key, value) VALUES ('previous_revision', '" + hash.ToString() + "');";
-  return Sql(database()->sqlite_db(), sql).Execute();
+  return Sql(database(), sql).Execute();
 }
 
 
@@ -398,7 +398,7 @@ bool WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   const string sha1_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
 
-  Sql stmt(database()->sqlite_db(),
+  Sql stmt(database(),
     "INSERT INTO nested_catalogs (path, sha1) VALUES (:p, :sha1);");
   bool successful =
     stmt.BindText(1, mountpoint) &&
@@ -427,7 +427,7 @@ bool WritableCatalog::InsertNestedCatalog(const string &mountpoint,
 bool WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                                           Catalog **attached_reference)
 {
-  Sql stmt(database()->sqlite_db(),
+  Sql stmt(database(),
            "DELETE FROM nested_catalogs WHERE path = :p;");
   bool successful =
     stmt.BindText(1, mountpoint) &&
@@ -460,7 +460,7 @@ bool WritableCatalog::UpdateNestedCatalog(const string &path,
 {
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 "
     "WHERE path = :path;";
-  Sql stmt(database()->sqlite_db(), sql);
+  Sql stmt(database(), sql);
 
   stmt.BindText(1, hash.ToString());
   stmt.BindText(2, path);
@@ -543,7 +543,7 @@ bool WritableCatalog::CopyToParent() {
     "UPDATE catalog SET inode = inode + " + StringifyInt(offset) +
     " WHERE inode > 0;";
 
-  Sql sql_update_link_ids(database()->sqlite_db(), update_link_ids);
+  Sql sql_update_link_ids(database(), update_link_ids);
   if (!sql_update_link_ids.Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to harmonize the hardlink group IDs in '%s'",
@@ -566,8 +566,8 @@ bool WritableCatalog::CopyToParent() {
     Commit();
   if (parent->dirty_)
     parent->Commit();
-  Sql sql_attach(database()->sqlite_db(), "ATTACH '" + parent->database_path() +
-                                          "' AS other;");
+  Sql sql_attach(database(), "ATTACH '" + parent->database_path() +
+                             "' AS other;");
   if (!sql_attach.Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to attach catalog '%s' in nested path '%s' (%d)",
@@ -575,15 +575,15 @@ bool WritableCatalog::CopyToParent() {
              sql_attach.GetLastError());
     return false;
   }
-  if (!Sql(database()->sqlite_db(), "INSERT INTO other.catalog "
-                                    "SELECT * FROM main.catalog;").Execute())
+  if (!Sql(database(), "INSERT INTO other.catalog "
+                       "SELECT * FROM main.catalog;").Execute())
   {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to copy DirectoryEntries from "
              "catalog '%s' to catalog '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
   }
-  if (!Sql(database()->sqlite_db(), "DETACH other;").Execute()) {
+  if (!Sql(database(), "DETACH other;").Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to detach database of catalog '%s' from catalog '%s'",
              parent->path().c_str(), this->path().c_str());

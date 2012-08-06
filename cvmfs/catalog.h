@@ -94,7 +94,7 @@ class Catalog {
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
 
-  inline float schema() const { return database()->schema_version(); }
+  inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
   inline uint64_t max_row_id() const { return max_row_id_; }
@@ -136,7 +136,7 @@ class Catalog {
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
 
-  inline Database *database() const { return database_; }
+  inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
  private:
