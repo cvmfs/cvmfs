@@ -148,11 +148,13 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   va_list variadic_list;
 
   // Log level check, no flag set in mask means kLogNormal
+#ifndef DEBUGMSG
   int log_level = mask & ((2*kLogNone - 1) ^ (kLogLevel0 - 1));
   if (!log_level)
     log_level = kLogNormal;
   if (log_level < min_log_level)
     return;
+#endif
 
   // Format the message string
   va_start(variadic_list, format);

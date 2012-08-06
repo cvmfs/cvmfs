@@ -48,6 +48,7 @@ FILE *CreateTempFile(const std::string &path_prefix, const int mode,
 std::string CreateTempPath(const std::string &path_prefix, const int mode);
 int LockFile(const std::string &path);
 void UnlockFile(const int filedes);
+bool RemoveTree(const std::string &path);
 
 std::string StringifyInt(const int64_t value);
 std::string StringifyTime(const time_t seconds, const bool utc);

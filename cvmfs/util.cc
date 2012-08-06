@@ -31,10 +31,12 @@
 
 #include <string>
 #include <map>
+#include <set>
 
 #include "hash.h"
 #include "smalloc.h"
 #include "logging.h"
+#include "fs_traversal.h"
 
 using namespace std;  // NOLINT
 
@@ -367,6 +369,54 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
   if (!f)
     return "";
   fclose(f);
+  return result;
+}
+
+
+/**
+ * Helper class that provides callback funtions for the file system traversal.
+ */
+class RemoveTreeHelper {
+ public:
+  bool success;
+  RemoveTreeHelper() {
+    success = true;
+  }
+  void RemoveFile(const string &parent_path, const string &name) {
+    int retval = unlink((parent_path + "/" + name).c_str());
+    if (retval != 0)
+      success = false;
+  }
+  void RemoveDir(const string &parent_path, const string &name) {
+    int retval = rmdir((parent_path + "/" + name).c_str());
+    if (retval != 0)
+      success = false;
+  }
+};
+
+
+/**
+ * Does rm -rf on path.
+ */
+bool RemoveTree(const string &path) {
+  platform_stat64 info;
+  platform_lstat(path.c_str(), &info);
+  if (errno == ENOENT)
+    return true;
+  if (!S_ISDIR(info.st_mode))
+    return false;
+
+  RemoveTreeHelper *remove_tree_helper = new RemoveTreeHelper();
+  set<string> ignore_files;
+  FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "",
+                                                  true, ignore_files);
+  traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
+  traversal.Recurse(path);
+  bool result = remove_tree_helper->success;
+  delete remove_tree_helper;
+
   return result;
 }
 

@@ -4,9 +4,14 @@
 
 #include "catalog_sql.h"
 
+#include <fcntl.h>
+#include <errno.h>
+
 #include <cstdlib>
 #include <cstring>
+#include <cstdlib>
 
+#include "platform.h"
 #include "catalog.h"
 #include "logging.h"
 #include "util.h"
@@ -14,6 +19,76 @@
 using namespace std;  // NOLINT
 
 namespace catalog {
+
+Database::Database(const std::string filename, const OpenMode open_mode) {
+  int retval;
+
+  filename_ = filename;
+  ready_ = false;
+  schema_version_ = 0.0;
+  sqlite_db_ = NULL;
+
+  int flags = SQLITE_OPEN_NOMUTEX;
+  switch (open_mode) {
+    case kOpenReadOnly:
+      flags |= SQLITE_OPEN_READONLY;
+      read_write_ = false;
+      break;
+    case kOpenReadWrite:
+      flags |= SQLITE_OPEN_READWRITE;
+      read_write_ = true;
+      break;
+    default:
+      abort();
+  }
+
+  // Open database file (depending on the flags read-only or read-write)
+  LogCvmfs(kLogCatalog, kLogDebug, "opening database file %s",
+           filename_.c_str());
+  if (SQLITE_OK != sqlite3_open_v2(filename_.c_str(), &sqlite_db_, flags, NULL))
+  {
+    LogCvmfs(kLogCatalog, kLogDebug, "cannot open catalog database file %s",
+             filename_.c_str());
+    return;
+  }
+  sqlite3_extended_result_codes(sqlite_db_, 1);
+
+  // Read-ahead into file system buffers
+  int fd_readahead = open(filename_.c_str(), O_RDONLY);
+  if (fd_readahead < 0) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to open %s for read-ahead (%d)",
+             filename_.c_str(), errno);
+    goto database_failure;
+    return;
+  }
+  retval = platform_readahead(fd_readahead);
+  if (retval != 0) {
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to read-ahead %s (%d)",
+             filename_.c_str(), errno);
+    close(fd_readahead);
+    goto database_failure;
+  }
+  close(fd_readahead);
+
+  {  // Get schema version
+    Sql sql_schema(sqlite_db_,
+                   "SELECT value FROM properties WHERE key='schema';");
+    if (sql_schema.FetchRow()) {
+      schema_version_ = sql_schema.RetrieveDouble(0);
+    } else {
+      schema_version_ = 1.0;
+    }
+  }
+
+  ready_ = true;
+  return;
+
+ database_failure:
+  sqlite3_close(sqlite_db_);
+  sqlite_db_ = NULL;
+}
+
+
 
 Sql::Sql(const sqlite3 *database, const std::string &statement) {
   Init(database, statement);

@@ -1763,7 +1763,8 @@ int main(int argc, char *argv[]) {
       goto cvmfs_cleanup;
     }
     if (!nfs_maps::Init(leveldb_cache_dir,
-                        catalog::AbstractCatalogManager::GetRootInode()))
+                        catalog::AbstractCatalogManager::GetRootInode(),
+                        g_cvmfs_opts.rebuild_cachedb))
     {
       PrintError("Failed to initialize NFS maps");
       goto cvmfs_cleanup;

@@ -12,7 +12,6 @@
  * cvmfs restarts.  Also, leveldb allows for restricting the memory consumption.
  *
  * The maps are not accounted for by the cache quota.
- * TODO: recreate database if previous crash is detected.
  */
 
 #define __STDC_FORMAT_MACROS
@@ -255,7 +254,9 @@ string GetStatistics() {
 }
 
 
-bool Init(const string &leveldb_dir, const uint64_t root_inode) {
+bool Init(const string &leveldb_dir, const uint64_t root_inode,
+          const bool rebuild)
+{
   assert(root_inode > 0);
   root_inode_ = root_inode;
   fork_aware_env_ = new ForkAwareEnv();
@@ -263,6 +264,18 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode) {
   leveldb::Options leveldb_options;
   leveldb_options.create_if_missing = true;
   leveldb_options.env = fork_aware_env_;
+
+  // Remove previous database traces
+  if (rebuild) {
+    LogCvmfs(kLogNfsMaps, kLogSyslog,
+             "rebuilding NFS maps, might result in stale entries");
+    bool retval = RemoveTree(leveldb_dir + "/inode2path") &&
+                  RemoveTree(leveldb_dir + "/path2inode");
+    if (!retval) {
+      LogCvmfs(kLogNfsMaps, kLogDebug, "failed to remove previous databases");
+      return false;
+    }
+  }
 
   // Open databases
   cache_inode2path_ = leveldb::NewLRUCache(32 * 1024*1024);

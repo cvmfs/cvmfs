@@ -11,7 +11,8 @@
 
 namespace nfs_maps {
 
-bool Init(const std::string &leveldb_dir, const uint64_t root_inode);
+bool Init(const std::string &leveldb_dir, const uint64_t root_inode,
+          const bool rebuild);
 void Fini();
 void Spawn();
 

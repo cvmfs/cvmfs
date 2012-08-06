@@ -17,7 +17,6 @@
 #include "logging.h"
 #include "util.h"
 
-namespace publish {
 
 /**
  * @brief A simple recursion engine to abstract the recursion of directories.
@@ -198,7 +197,5 @@ class FileSystemTraversal {
     else return "";
   }
 };  // FileSystemTraversal
-
-}  // namespace publish
 
 #endif  // CVMFS_FS_TRAVERSAL_H_

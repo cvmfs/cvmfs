@@ -24,6 +24,7 @@ set (CVMFS_CLIENT_SOURCES
 	catalog.h catalog.cc
 	catalog_mgr.h catalog_mgr.cc
 	shortstring.h dirent.h
+  fs_traversal.h
 )
 
 set (CVMFS2_DEBUG_SOURCES

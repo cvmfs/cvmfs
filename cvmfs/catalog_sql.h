@@ -46,11 +46,15 @@ class Database {
                      const DirectoryEntry &root_entry);
 
   sqlite3 *sqlite_db() const { return sqlite_db_; }
+  std::string filename() const { return filename_; }
   float schema_version() const { return schema_version_; }
+  bool ready() const { return ready_; }
  private:
   sqlite3 *sqlite_db_;
+  std::string filename_;
   float schema_version_;
   bool read_write_;
+  bool ready_;
 };
 
 
