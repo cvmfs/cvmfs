@@ -17,153 +17,6 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-/**
- * Create a new database file and initialize the database schema in it.
- * @param file_path the absolute location the file should end up in
- * @param root_entry a DirectoryEntry which should serve as root entry
- *                   of the newly created catalog
- * @param root_entry_parent_path the path of the parent directory of the
- *        root entry (i.e. the nested catalog mount point or "" if it is
- *        a root catalog)
- */
-bool WritableCatalog::CreateDatabase(const string &file_path,
-                                     const DirectoryEntry &root_entry,
-                                     const std::string &root_entry_parent_path,
-                                     const bool root_catalog)
-{
-  // Create schema for new catalog
-  if (!WritableCatalog::CreateSchema(file_path)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "failed to create database schema for new catalog '%s'",
-             file_path.c_str());
-    return false;
-  }
-
-  // Build the root entry
-  hash::Md5 path_hash;
-  hash::Md5 parent_hash;
-  string root_path;
-  if (root_catalog) {
-    root_path.assign(root_entry.name().GetChars(),
-                     root_entry.name().GetLength());
-    path_hash = hash::Md5(hash::AsciiPtr(root_path));
-    parent_hash = hash::Md5();
-  } else {
-    root_path = root_entry_parent_path + "/";
-    root_path.append(root_entry.name().GetChars(),
-                     root_entry.name().GetLength());
-    path_hash = hash::Md5(hash::AsciiPtr(root_path));
-    parent_hash = hash::Md5(hash::AsciiPtr(root_entry_parent_path));
-  }
-
-  // Open the new catalog temporarily to insert the root entry
-  WritableCatalog *new_catalog = new WritableCatalog(root_path, NULL);
-  if (!new_catalog->OpenDatabase(file_path)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "opening new catalog '%s' for the first time failed.",
-             file_path.c_str());
-    return false;
-  }
-
-  // Add the root entry to the new catalog
-  LogCvmfs(kLogCatalog, kLogVerboseMsg,
-           "inserting root entry '%s' into new catalog '%s'",
-           root_path.c_str(), new_catalog->path().c_str());
-  bool result =
-    new_catalog->sql_insert_->BindPathHash(path_hash) &&
-    new_catalog->sql_insert_->BindParentPathHash(parent_hash) &&
-    new_catalog->sql_insert_->BindDirent(root_entry) &&
-    new_catalog->sql_insert_->Execute();
-  new_catalog->sql_insert_->Reset();
-
-  if (!result)
-    return false;
-
-  // Close the newly created catalog
-  delete new_catalog;
-
-  return true;
-}
-
-/**
- * This method creates a new database file and initializes the database schema.
- * @param file_path the absolute path to the file to create
- * @return true on success, false otherwise
- */
-bool WritableCatalog::CreateSchema(const std::string &file_path) {
-  sqlite3 *database;
-  int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
-                   SQLITE_OPEN_CREATE;
-
-  // Create the directory structure for this catalog
-  if (!MkdirDeep(GetParentPath(file_path), kDefaultDirMode)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "cannot create pseudo directory structure"
-             " for new nested catalog database file '%s'", file_path.c_str());
-    return false;
-  }
-
-  // Create the new catalog file and open it
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new catalog at '%s'",
-           file_path.c_str());
-  if (sqlite3_open_v2(file_path.c_str(), &database, open_flags, NULL) !=
-      SQLITE_OK)
-  {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "Cannot create and open catalog database file '%s'",
-             file_path.c_str());
-    return false;
-  }
-  sqlite3_extended_result_codes(database, 1);
-
-  // TODO: move to catalog_queries
-  bool retval;
-  string sql;
-  retval = Sql(database,
-    "CREATE TABLE IF NOT EXISTS catalog "
-    "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
-    " inode INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
-    " flags INTEGER, name TEXT, symlink TEXT,"
-    " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database,
-    "CREATE INDEX IF NOT EXISTS idx_catalog_parent "
-    "ON catalog (parent_1, parent_2);").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database,
-    "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
-    "CONSTRAINT pk_properties PRIMARY KEY (key));").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database,
-    "CREATE TABLE IF NOT EXISTS nested_catalogs (path TEXT, sha1 TEXT, "
-    "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database, "INSERT OR IGNORE INTO properties "
-    "(key, value) VALUES ('revision', 0);").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database, "INSERT OR REPLACE INTO properties "
-    "(key, value) VALUES ('schema', '2.0');").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  sqlite3_close(database);
-  return true;
-
- create_schema_fail:
-  sqlite3_close(database);
-  return false;
-}
-
-
 WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   Catalog(PathString(path.data(), path.length()), parent),
   dirty_(false)
@@ -178,14 +31,14 @@ WritableCatalog::~WritableCatalog() {
 
 
 void WritableCatalog::Transaction() {
-  Sql transaction(database(), "BEGIN;");
+  Sql transaction(database()->sqlite_db(), "BEGIN;");
   bool retval = transaction.Execute();
   assert(retval == true);
 }
 
 
 void WritableCatalog::Commit() {
-  Sql commit(database(), "COMMIT;");
+  Sql commit(database()->sqlite_db(), "COMMIT;");
   bool retval = commit.Execute();
   assert(retval == true);
   dirty_ = false;
@@ -195,12 +48,12 @@ void WritableCatalog::Commit() {
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements(); // polymorphism: up call
 
-  sql_insert_ = new SqlDirentInsert(database());
-  sql_touch_ = new SqlDirentTouch(database());
-  sql_unlink_ = new SqlDirentUnlink(database());
-  sql_update_ = new SqlDirentUpdate(database());
-  sql_max_link_id_ = new SqlMaxHardlinkGroup(database());
-  sql_inc_linkcount_ = new SqlIncLinkcount(database());
+  sql_insert_ = new SqlDirentInsert(database()->sqlite_db());
+  sql_touch_ = new SqlDirentTouch(database()->sqlite_db());
+  sql_unlink_ = new SqlDirentUnlink(database()->sqlite_db());
+  sql_update_ = new SqlDirentUpdate(database()->sqlite_db());
+  sql_max_link_id_ = new SqlMaxHardlinkGroup(database()->sqlite_db());
+  sql_inc_linkcount_ = new SqlIncLinkcount(database()->sqlite_db());
 }
 
 
@@ -347,7 +200,7 @@ bool WritableCatalog::UpdateLastModified() {
   const time_t now = time(NULL);
   const string sql = "INSERT OR REPLACE INTO properties "
      "(key, value) VALUES ('last_modified', '" + StringifyInt(now) + "');";
-  return Sql(database(), sql).Execute();
+  return Sql(database()->sqlite_db(), sql).Execute();
 }
 
 
@@ -358,7 +211,7 @@ bool WritableCatalog::UpdateLastModified() {
 bool WritableCatalog::IncrementRevision() {
   const string sql =
     "UPDATE properties SET value=value+1 WHERE key='revision';";
-  return Sql(database(), sql).Execute();
+  return Sql(database()->sqlite_db(), sql).Execute();
 }
 
 
@@ -369,7 +222,7 @@ bool WritableCatalog::IncrementRevision() {
 bool WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
   const string sql = "INSERT OR REPLACE INTO properties "
     "(key, value) VALUES ('previous_revision', '" + hash.ToString() + "');";
-  return Sql(database(), sql).Execute();
+  return Sql(database()->sqlite_db(), sql).Execute();
 }
 
 
@@ -545,7 +398,7 @@ bool WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   const string sha1_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
 
-  Sql stmt(database(),
+  Sql stmt(database()->sqlite_db(),
     "INSERT INTO nested_catalogs (path, sha1) VALUES (:p, :sha1);");
   bool successful =
     stmt.BindText(1, mountpoint) &&
@@ -574,7 +427,8 @@ bool WritableCatalog::InsertNestedCatalog(const string &mountpoint,
 bool WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                                           Catalog **attached_reference)
 {
-  Sql stmt(database(), "DELETE FROM nested_catalogs WHERE path = :p;");
+  Sql stmt(database()->sqlite_db(),
+           "DELETE FROM nested_catalogs WHERE path = :p;");
   bool successful =
     stmt.BindText(1, mountpoint) &&
   stmt.Execute();
@@ -606,7 +460,7 @@ bool WritableCatalog::UpdateNestedCatalog(const string &path,
 {
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 "
     "WHERE path = :path;";
-  Sql stmt(database(), sql);
+  Sql stmt(database()->sqlite_db(), sql);
 
   stmt.BindText(1, hash.ToString());
   stmt.BindText(2, path);
@@ -689,7 +543,7 @@ bool WritableCatalog::CopyToParent() {
     "UPDATE catalog SET inode = inode + " + StringifyInt(offset) +
     " WHERE inode > 0;";
 
-  Sql sql_update_link_ids(database(), update_link_ids);
+  Sql sql_update_link_ids(database()->sqlite_db(), update_link_ids);
   if (!sql_update_link_ids.Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to harmonize the hardlink group IDs in '%s'",
@@ -712,8 +566,8 @@ bool WritableCatalog::CopyToParent() {
     Commit();
   if (parent->dirty_)
     parent->Commit();
-  Sql sql_attach(database(), "ATTACH '" + parent->database_path() +
-                          "' AS other;");
+  Sql sql_attach(database()->sqlite_db(), "ATTACH '" + parent->database_path() +
+                                          "' AS other;");
   if (!sql_attach.Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to attach catalog '%s' in nested path '%s' (%d)",
@@ -721,15 +575,15 @@ bool WritableCatalog::CopyToParent() {
              sql_attach.GetLastError());
     return false;
   }
-  if (!Sql(database(), "INSERT INTO other.catalog "
-                       "SELECT * FROM main.catalog;").Execute())
+  if (!Sql(database()->sqlite_db(), "INSERT INTO other.catalog "
+                                    "SELECT * FROM main.catalog;").Execute())
   {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to copy DirectoryEntries from "
              "catalog '%s' to catalog '%s'",
              this->path().c_str(), parent->path().c_str());
     return false;
   }
-  if (!Sql(database(), "DETACH other;").Execute()) {
+  if (!Sql(database()->sqlite_db(), "DETACH other;").Execute()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to detach database of catalog '%s' from catalog '%s'",
              parent->path().c_str(), this->path().c_str());

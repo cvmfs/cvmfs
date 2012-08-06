@@ -30,10 +30,6 @@ class WritableCatalog : public Catalog {
  public:
   WritableCatalog(const std::string &path, Catalog *parent);
   virtual ~WritableCatalog();
-  static bool CreateDatabase(const std::string &file_path,
-                             const DirectoryEntry &root_entry,
-                             const std::string &root_entry_parent_path,
-                             const bool root_catalog);
 
   void Transaction();
   void Commit();
@@ -65,8 +61,8 @@ class WritableCatalog : public Catalog {
   bool SetPreviousRevision(const hash::Any &hash);
 
  protected:
-  inline int DatabaseOpenFlags() const {
-    return SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE;
+  Database::OpenMode DatabaseOpenMode() const {
+    return Database::kOpenReadWrite;
   }
 
   inline bool AddEntry(const DirectoryEntry &entry, const std::string &path) {
@@ -103,7 +99,6 @@ class WritableCatalog : public Catalog {
       Transaction();
     dirty_ = true;
   }
-  static bool CreateSchema(const std::string &file_path);
 
   // Helpers for nested catalog creation and removal
   bool MakeTransitionPoint(const std::string &mountpoint);

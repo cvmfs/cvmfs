@@ -42,8 +42,10 @@ class Database {
   };
 
   Database(const std::string filename, const OpenMode open_mode);
-  static bool Create(const std::string filename,
-                     const DirectoryEntry &root_entry);
+  ~Database();
+  static bool Create(const std::string &filename,
+                     const DirectoryEntry &root_entry,
+                     const std::string &root_path);
 
   sqlite3 *sqlite_db() const { return sqlite_db_; }
   std::string filename() const { return filename_; }
@@ -56,6 +58,9 @@ class Database {
   bool read_write_;
   bool ready_;
 };
+
+
+//------------------------------------------------------------------------------
 
 
 /**

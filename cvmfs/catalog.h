@@ -94,13 +94,13 @@ class Catalog {
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
 
-  inline float schema() const { return schema_; }
+  inline float schema() const { return database()->schema_version(); }
   inline PathString path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
   inline uint64_t max_row_id() const { return max_row_id_; }
   inline InodeRange inode_range() const { return inode_range_; }
   inline void set_inode_range(const InodeRange value) { inode_range_ = value; }
-  inline std::string database_path() const { return database_path_; }
+  inline std::string database_path() const { return database_->filename(); }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && (max_row_id_ > 0);
@@ -123,8 +123,8 @@ class Catalog {
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
    */
-  virtual inline int DatabaseOpenFlags() const {
-    return SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
+  virtual Database::OpenMode DatabaseOpenMode() const {
+    return Database::kOpenReadOnly;
   }
 
   virtual void InitPreparedStatements();
@@ -136,7 +136,7 @@ class Catalog {
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
 
-  inline sqlite3* database() const { return database_; }
+  inline Database *database() const { return database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
  private:
@@ -151,13 +151,11 @@ class Catalog {
   void FixTransitionPoint(const hash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
-  sqlite3 *database_;
-  std::string database_path_;
+  Database *database_;
   pthread_mutex_t *lock_;
 
   PathString root_prefix_;
   PathString path_;
-  float schema_;
 
   Catalog *parent_;
   NestedCatalogMap children_;

@@ -23,6 +23,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   path_ = path;
   parent_ = parent;
   max_row_id_ = 0;
+  database_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
@@ -33,7 +34,7 @@ Catalog::~Catalog() {
   pthread_mutex_destroy(lock_);
   free(lock_);
   FinalizePreparedStatements();
-  sqlite3_close(database_);
+  delete database_;
 }
 
 /**
@@ -43,11 +44,11 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_ = new SqlListing(database_);
-  sql_lookup_md5path_ = new SqlLookupPathHash(database_);
-  sql_lookup_inode_ = new SqlLookupInode(database_);
-  sql_lookup_nested_ = new SqlNestedCatalogLookup(database_);
-  sql_list_nested_ = new SqlNestedCatalogListing(database_);
+  sql_listing_ = new SqlListing(database()->sqlite_db());
+  sql_lookup_md5path_ = new SqlLookupPathHash(database()->sqlite_db());
+  sql_lookup_inode_ = new SqlLookupInode(database()->sqlite_db());
+  sql_lookup_nested_ = new SqlNestedCatalogLookup(database()->sqlite_db());
+  sql_list_nested_ = new SqlNestedCatalogListing(database()->sqlite_db());
 }
 
 
@@ -66,43 +67,17 @@ void Catalog::FinalizePreparedStatements() {
  * @return true on successful initialization otherwise false
  */
 bool Catalog::OpenDatabase(const string &db_path) {
-  const int flags = DatabaseOpenFlags();
-  database_path_ = db_path;
-
-  // Open database file (depending on the flags read-only or read-write)
-  LogCvmfs(kLogCatalog, kLogDebug, "opening database file %s", db_path.c_str());
-  if (SQLITE_OK != sqlite3_open_v2(db_path.c_str(), &database_, flags, NULL)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot open catalog database file %s",
-             db_path.c_str());
+  database_ = new Database(db_path, DatabaseOpenMode());
+  if (!database_->ready()) {
+    delete database_;
+    database_ = NULL;
     return false;
   }
-  sqlite3_extended_result_codes(database_, 1);
-
-  // Read-ahead into file system buffers
-  int fd_readahead = open(db_path.c_str(), O_RDONLY);
-  if (fd_readahead < 0) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to open %s for read-ahead (%d)",
-             db_path.c_str(), errno);
-    return false;
-  }
-  int retval = platform_readahead(fd_readahead);
-  if (retval != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to read-ahead %s (%d)",
-             db_path.c_str(), errno);
-    close(fd_readahead);
-    return false;
-  }
-  close(fd_readahead);
-
-  // Turbo mode
-  //SqlStatement transaction(database_, "PRAGMA locking_mode=EXCLUSIVE;");
-  //bool retval = transaction.Execute();
-  //assert(retval == true);
 
   InitPreparedStatements();
 
   // Find out the maximum row id of this database file
-  Sql sql_max_row_id(database_, "SELECT MAX(rowid) FROM catalog;");
+  Sql sql_max_row_id(database()->sqlite_db(), "SELECT MAX(rowid) FROM catalog;");
   if (!sql_max_row_id.FetchRow()) {
     LogCvmfs(kLogCatalog, kLogDebug,
              "Cannot retrieve maximal row id for database file %s "
@@ -114,8 +89,8 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   // Get root prefix
   if (IsRoot()) {
-    Sql sql_root_prefix(database_, "SELECT value FROM properties "
-                                   "WHERE key='root_prefix';");
+    Sql sql_root_prefix(database()->sqlite_db(), "SELECT value FROM properties "
+                                                 "WHERE key='root_prefix';");
     if (sql_root_prefix.FetchRow()) {
       root_prefix_.Assign(
         reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0)),
@@ -127,14 +102,6 @@ bool Catalog::OpenDatabase(const string &db_path) {
       LogCvmfs(kLogCatalog, kLogDebug,
                "no root prefix for root catalog file %s", db_path.c_str());
     }
-  }
-
-  // Get schema version
-  Sql sql_schema(database_, "SELECT value FROM properties WHERE key='schema';");
-  if (sql_schema.FetchRow()) {
-    schema_ = sql_schema.RetrieveDouble(0);
-  } else {
-    schema_ = 1.0;
   }
 
   if (!IsRoot()) {
@@ -261,7 +228,7 @@ uint64_t Catalog::GetTTL() const {
   const string sql = "SELECT value FROM properties WHERE key='TTL';";
 
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
+  Sql stmt(database()->sqlite_db(), sql);
   const uint64_t result =
     (stmt.FetchRow()) ?  stmt.RetrieveInt64(0) : kDefaultTTL;
   pthread_mutex_unlock(lock_);
@@ -274,7 +241,7 @@ uint64_t Catalog::GetRevision() const {
   const string sql = "SELECT value FROM properties WHERE key='revision';";
 
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
+  Sql stmt(database()->sqlite_db(), sql);
   const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
   pthread_mutex_unlock(lock_);
 

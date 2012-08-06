@@ -127,13 +127,10 @@ Manifest *WritableCatalogManager::CreateRepository(
   root_entry.mtime_             = time(NULL);
   root_entry.checksum_          = hash::Any(hash::kSha1);
   root_entry.linkcount_         = 1;
-  string root_parent_path = "";
+  string root_path = "";
 
   // Create the database schema and the inital root entry
-  const bool new_repository = true;
-  if (!WritableCatalog::CreateDatabase(file_path, root_entry, root_parent_path,
-                                       new_repository))
-  {
+  if (!Database::Create(file_path, root_entry, root_path)) {
     LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
              file_path.c_str());
     return NULL;
@@ -470,13 +467,9 @@ bool WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
   // Create the database schema and the inital root entry
   // for the new nested catalog
-  const string root_parent_path = GetParentPath(nested_root_path);
   const string database_file_path = CreateTempPath(dir_temp_ + "/catalog",
                                                    0666);
-  const bool new_repository = false;
-  if (!WritableCatalog::CreateDatabase(database_file_path, new_root_entry,
-                                       root_parent_path, new_repository))
-  {
+  if (!Database::Create(database_file_path, new_root_entry, nested_root_path)) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
              "database schema creation failed", nested_root_path.c_str());
     return false;
