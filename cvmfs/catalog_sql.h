@@ -40,7 +40,9 @@ class Database {
     kOpenReadOnly,
     kOpenReadWrite
   };
-  static const float kLatestSchema = 2.0;
+  static const float kLatestSchema = 2.1;
+  static const float kLatestSupportedSchema = 2.1;  // + 1.X catalogs (r/o)
+  static const float kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
 
   Database(const std::string filename, const OpenMode open_mode);
   ~Database();
@@ -258,27 +260,6 @@ class SqlDirent : public Sql {
    *  @return the expanded symlink
    */
   void ExpandSymlink(LinkString *raw_symlink) const;
-
-
-  // The hardlinks field encodes the number of links in the first 32 bit
-  // and the hardlink group id in the second 32 bit.
-  // A value of 0 means: 1 link, normal file
-
-  inline uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) const {
-    if (hardlinks == 0)
-      return 1;
-    return (hardlinks << 32) >> 32;
-  }
-
-  inline uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) const {
-    return hardlinks >> 32;
-  }
-
-  inline uint64_t CreateHardlinks(const uint32_t linkcount,
-                                  const uint32_t hardlink_group)
-  {
-    return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
-  }
 };
 
 
@@ -288,15 +269,15 @@ class SqlDirent : public Sql {
 class SqlDirentWrite : public SqlDirent {
  public:
    /**
-    *  To bind an entire DirectoryEntry
-    *  @param entry the DirectoryEntry to bind in the SQL statement
-    *  @return true on success, false otherwise
+    * To bind an entire DirectoryEntry
+    * @param entry the DirectoryEntry to bind in the SQL statement
+    * @return true on success, false otherwise
     */
   virtual bool BindDirent(const DirectoryEntry &entry) = 0;
 
  protected:
   bool BindDirentFields(const int hash_idx,
-                        const int inode_idx,
+                        const int hardlinks_idx,
                         const int size_idx,
                         const int mode_idx,
                         const int mtime_idx,
@@ -317,7 +298,7 @@ class SqlLookup : public SqlDirent {
    * elements to load
    * @return a list of sql fields to query for DirectoryEntry
    */
-  std::string GetFieldsToSelect() const;
+  std::string GetFieldsToSelect(const Database &database) const;
 
  public:
   /**

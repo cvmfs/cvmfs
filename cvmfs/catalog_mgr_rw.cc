@@ -365,8 +365,6 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	}
 
 	// Add the file entries to the catalog
-  inode_t hardlink_inode = (static_cast<inode_t>(new_group_id) << 32) |
-                           entries.size();
   bool result = true;
   bool successful = true;
 	for (DirectoryEntryList::iterator i = entries.begin(), iEnd = entries.end();
@@ -374,7 +372,7 @@ bool WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
   {
 	  string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
-    i->set_inode(hardlink_inode);
+    i->set_hardlinks(new_group_id, entries.size());
 	  successful = catalog->AddEntry(*i, file_path, parent_path);
 	  if (!successful) {
       result = false;

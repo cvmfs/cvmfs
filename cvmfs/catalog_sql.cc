@@ -78,6 +78,15 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
       schema_version_ = 1.0;
     }
   }
+  LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f",
+           schema_version_);
+  if ((schema_version_ >= 2.0-kSchemaEpsilon) &&
+      (schema_version_ < kLatestSupportedSchema-kSchemaEpsilon))
+  {
+    LogCvmfs(kLogCatalog, kLogDebug, "schema version %f not supported (%s)",
+             schema_version_, filename.c_str());
+    goto database_failure;
+  }
 
   ready_ = true;
   return;
@@ -88,6 +97,9 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
 }
 
 
+/**
+ * Private constructor.  Used to create a new sqlite database.
+ */
 Database::Database(sqlite3 *sqlite_db, const float schema, const bool rw) {
   sqlite_db_ = sqlite_db;
   filename_ = "TMP";
@@ -112,6 +124,7 @@ bool Database::Create(const string &filename,
 {
   sqlite3 *sqlite_db;
   SqlDirentInsert *sql_insert;
+  Sql *sql_schema;
   int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
                    SQLITE_OPEN_CREATE;
 
@@ -140,39 +153,40 @@ bool Database::Create(const string &filename,
   bool retval;
   string sql;
   retval = Sql(database,
-    "CREATE TABLE IF NOT EXISTS catalog "
+    "CREATE TABLE catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
-    " inode INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
+    " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT,"
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute();
   if (!retval)
     goto create_schema_fail;
 
   retval = Sql(database,
-               "CREATE INDEX IF NOT EXISTS idx_catalog_parent "
+               "CREATE INDEX idx_catalog_parent "
                "ON catalog (parent_1, parent_2);").Execute();
   if (!retval)
     goto create_schema_fail;
 
   retval = Sql(database,
-               "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
+               "CREATE TABLE properties (key TEXT, value TEXT, "
                "CONSTRAINT pk_properties PRIMARY KEY (key));").Execute();
   if (!retval)
     goto create_schema_fail;
 
   retval = Sql(database,
-               "CREATE TABLE IF NOT EXISTS nested_catalogs (path TEXT, sha1 TEXT, "
+               "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, "
                "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(database, "INSERT OR IGNORE INTO properties "
+  retval = Sql(database, "INSERT INTO properties "
                "(key, value) VALUES ('revision', 0);").Execute();
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(database, "INSERT OR REPLACE INTO properties "
-               "(key, value) VALUES ('schema', '2.0');").Execute();
+  sql_schema = new Sql(database, "INSERT INTO properties "
+                                 "(key, value) VALUES ('schema', :schema);");
+  retval = sql_schema->BindDouble(1, kLatestSchema) && sql_schema->Execute();
   if (!retval)
     goto create_schema_fail;
 
@@ -187,7 +201,7 @@ bool Database::Create(const string &filename,
     goto create_schema_fail;
 
   if (root_path != "") {
-    retval = Sql(database, "INSERT OR REPLACE INTO properties "
+    retval = Sql(database, "INSERT INTO properties "
       "(key, value) VALUES ('root_prefix', '" + root_path + "');").Execute();
     if (!retval)
       goto create_schema_fail;
@@ -347,7 +361,7 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
 
 
 bool SqlDirentWrite::BindDirentFields(const int hash_idx,
-                                      const int inode_idx,
+                                      const int hardlinks_idx,
                                       const int size_idx,
                                       const int mode_idx,
                                       const int mtime_idx,
@@ -358,7 +372,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 {
   return (
     BindSha1Blob(hash_idx, entry.checksum_) &&
-    BindInt64(inode_idx, entry.inode_) && // quirky database layout here ( legacy ;-) )
+    BindInt64(hardlinks_idx, entry.hardlinks_) &&
     BindInt64(size_idx, entry.size_) &&
     BindInt(mode_idx, entry.mode_) &&
     BindInt64(mtime_idx, entry.mtime_) &&
@@ -372,11 +386,18 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 //------------------------------------------------------------------------------
 
 
-string SqlLookup::GetFieldsToSelect() const {
-  return "hash, inode, size, mode, mtime, flags, name, symlink, "
-      //    0     1      2     3     4      5      6      7
-         "md5path_1, md5path_2, parent_1, parent_2, rowid";
-      //    8          9           10        11       12
+string SqlLookup::GetFieldsToSelect(const Database &database) const {
+  if (database.schema_version() < 2.1-Database::kSchemaEpsilon) {
+    return "hash, inode, size, mode, mtime, flags, name, symlink, "
+        //    0     1      2     3     4      5      6      7
+           "md5path_1, md5path_2, parent_1, parent_2, rowid";
+        //    8          9           10        11       12
+  } else {
+    return "hash, hardlinks, size, mode, mtime, flags, name, symlink, "
+        //    0        1      2     3     4      5      6      7
+           "md5path_1, md5path_2, parent_1, parent_2, rowid";
+        //    8          9           10        11       12
+  }
 }
 
 
@@ -408,10 +429,10 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   // must be set later by a second catalog lookup
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
   result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                  (catalog->schema() < 2.0) ?
-                    0 : Hardlinks2HardlinkGroup(hardlinks));
-  result.linkcount_ = (catalog->schema() < 2.0) ?
-                          1 : Hardlinks2Linkcount(hardlinks);
+                   (catalog->schema() < 2.1-Database::kSchemaEpsilon) ?
+                    0 : DirectoryEntry::Hardlinks2HardlinkGroup(hardlinks));
+  result.linkcount_ = (catalog->schema() < 2.1-Database::kSchemaEpsilon) ?
+                       1 : DirectoryEntry::Hardlinks2Linkcount(hardlinks);
   result.mode_ = RetrieveInt(3);
   result.size_ = RetrieveInt64(2);
   result.mtime_ = RetrieveInt64(4);
@@ -429,7 +450,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
 SqlListing::SqlListing(const Database &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect() + " FROM catalog "
+    "SELECT " + GetFieldsToSelect(database) + " FROM catalog "
     "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
   Init(database.sqlite_db(), statement);
 }
@@ -445,7 +466,7 @@ bool SqlListing::BindPathHash(const struct hash::Md5 &hash) {
 
 SqlLookupPathHash::SqlLookupPathHash(const Database &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect() + " FROM catalog "
+    "SELECT " + GetFieldsToSelect(database) + " FROM catalog "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statement);
 }
@@ -460,7 +481,8 @@ bool SqlLookupPathHash::BindPathHash(const struct hash::Md5 &hash) {
 
 SqlLookupInode::SqlLookupInode(const Database &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect() + " FROM catalog WHERE rowid = :rowid;";
+    "SELECT " + GetFieldsToSelect(database) + " FROM catalog "
+    "WHERE rowid = :rowid;";
   Init(database.sqlite_db(), statement);
 }
 
@@ -516,13 +538,12 @@ hash::Any SqlNestedCatalogListing::GetContentHash() const {
 
 
 SqlDirentInsert::SqlDirentInsert(const Database &database) {
-  const string statement =
-    "INSERT OR IGNORE INTO catalog "
-    "(md5path_1, md5path_2, parent_1, parent_2, hash, inode, size, mode, mtime,"
-//       1           2         3         4       5     6      7     8      9
-    " flags, name, symlink) "
-//      10    11     12
-    "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :ino, :size, :mode, :mtime,"
+  const string statement = "INSERT INTO catalog "
+    "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
+    //    1           2         3         4       5       6        7     8
+    "mtime, flags, name, symlink) "
+    // 9,     10    11     12
+    "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :links, :size, :mode, :mtime,"
     " :flags, :name, :symlink);";
   Init(database.sqlite_db(), statement);
 }
@@ -551,7 +572,7 @@ SqlDirentUpdate::SqlDirentUpdate(const Database &database) {
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
 //            1             2             3               4
-    "flags = :flags, name = :name, symlink = :symlink, inode = :inode "
+    "flags = :flags, name = :name, symlink = :symlink, hardlinks = :hardlinks "
 //          5             6                  7                8
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
 //                     9                       10
@@ -609,9 +630,9 @@ bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
 SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
   const string statememt =
     "UPDATE catalog SET inode="
-    "CASE (inode << 32) >> 32 WHEN 2 THEN 0 ELSE inode+1*(:delta) END "
-    "WHERE inode = (SELECT inode from catalog WHERE md5path_1 = :md5_1 AND "
-    "md5path_2 = :md5_2);";
+    "CASE (hardlinks << 32) >> 32 WHEN 2 THEN 0 ELSE hardlinks+1*(:delta) END "
+    "WHERE hardlinks = (SELECT hardlinks from catalog "
+    "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statememt);
 }
 
@@ -630,7 +651,7 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 
 
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
-  Init(database.sqlite_db(), "SELECT max(inode) FROM catalog;");
+  Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
 
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {

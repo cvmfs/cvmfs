@@ -110,6 +110,23 @@ public:
     return s;
   }
 
+  // The hardlinks field encodes the number of links in the first 32 bit
+  // and the hardlink group id in the second 32 bit.
+  // A value of 0 means: 1 link, normal file
+  inline void set_hardlinks(const uint32_t hardlink_group,
+                            const uint32_t linkcount)
+  {
+    hardlinks_ = (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
+  }
+  static inline uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) {
+    if (hardlinks == 0)
+      return 1;
+    return (hardlinks << 32) >> 32;
+  }
+  static inline uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) {
+    return hardlinks >> 32;
+  }
+
   inline void set_cached_mtime(const time_t value) { cached_mtime_ = value; }
   inline void set_inode(const inode_t inode) { inode_ = inode; }
   inline const Catalog *catalog() const { return catalog_; }
@@ -129,7 +146,10 @@ private:
 
   // stat like information
   NameString name_;
-  inode_t inode_;
+  union {
+    inode_t inode_;  // When reading: the inode (rowid)
+    uint64_t hardlinks_;  // When writing, lincount and hardlink group
+  };
   inode_t parent_inode_;
   int linkcount_;
   unsigned int mode_;
