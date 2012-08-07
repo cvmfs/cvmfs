@@ -379,7 +379,6 @@ static CURL *AcquireCurlHandle() {
 
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
-    curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
     curl_easy_setopt(handle, CURLOPT_LOW_SPEED_LIMIT, 100);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlData);
