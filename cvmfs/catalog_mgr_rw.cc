@@ -126,7 +126,7 @@ Manifest *WritableCatalogManager::CreateRepository(
   root_entry.size_              = 4096;
   root_entry.mtime_             = time(NULL);
   root_entry.checksum_          = hash::Any(hash::kSha1);
-  root_entry.linkcount_         = 1;
+  root_entry.set_hardlinks(0, 2);
   string root_path = "";
 
   // Create the database schema and the inital root entry
@@ -243,23 +243,20 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
     return false;
   }
 
-  DirectoryEntry dir;
-  if (!catalog->LookupPath(PathString(directory_path.data(),
-                                      directory_path.length()), &dir))
+  DirectoryEntry parent_entry;
+  if (!catalog->LookupPath(PathString(parent_path.data(), parent_path.length()),
+                           &parent_entry))
   {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "directory '%s' does not exist and thus cannot be deleted",
+             "parent directory of directory '%s' not found",
              directory_path.c_str());
     return false;
   }
 
-  assert(!dir.IsNestedCatalogMountpoint() && !dir.IsNestedCatalogRoot());
-  DirectoryEntryList listing;
-  bool retval = catalog->ListingPath(PathString(directory_path.data(),
-                                     directory_path.length()), &listing);
-  assert(retval && (listing.size() == 0));
-
-  if (!catalog->RemoveEntry(directory_path)) {
+  parent_entry.set_hardlinks(0, parent_entry.linkcount()-1);
+  if (!catalog->RemoveEntry(directory_path) ||
+      !catalog->UpdateEntry(parent_entry, parent_path))
+  {
     LogCvmfs(kLogCatalog, kLogStderr,
              "something went wrong while deleting '%s'",
              directory_path.c_str());
@@ -291,8 +288,21 @@ bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
              directory_path.c_str());
     return false;
   }
+  DirectoryEntry parent_entry;
+  if (!catalog->LookupPath(PathString(parent_path.data(), parent_path.length()),
+                           &parent_entry))
+  {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "parent directory for directory '%s' cannot be found",
+             directory_path.c_str());
+    return false;
+  }
 
-  catalog->AddEntry(entry, directory_path, parent_path);
+  DirectoryEntry FixedHardlinkCount = entry;
+  FixedHardlinkCount.set_hardlinks(0, 2);
+  parent_entry.set_hardlinks(0, parent_entry.linkcount()+1);
+  catalog->AddEntry(FixedHardlinkCount, directory_path, parent_path);
+  catalog->UpdateEntry(parent_entry, parent_path);
   return true;
 }
 

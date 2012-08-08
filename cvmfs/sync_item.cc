@@ -97,8 +97,8 @@ catalog::DirectoryEntry SyncItem::CreateCatalogDirent() const {
   // inode and parent inode is determined at runtime of client
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
   dirent.parent_inode_ = catalog::DirectoryEntry::kInvalidInode;
+  dirent.linkcount_ = 0;  // Set by catalog manager
 
-  dirent.linkcount_ = this->GetUnionLinkcount();
   dirent.mode_ = this->GetUnionStat().st_mode;
   dirent.size_ = this->GetUnionStat().st_size;
   dirent.mtime_ = this->GetUnionStat().st_mtime;
