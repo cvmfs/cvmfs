@@ -293,7 +293,7 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
     catalog->ListNestedCatalogs();
   if (nested_catalogs.size() != counters->num_transition_points) {
     LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
-             " expected %s, got %s", counters->num_transition_points,
+             " expected %lu, got %lu", counters->num_transition_points,
              nested_catalogs.size());
     retval = false;
   }

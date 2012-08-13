@@ -262,7 +262,15 @@ bool WritableCatalogManager::RemoveDirectory(const std::string &path) {
              directory_path.c_str());
     return false;
   }
-
+  if (parent_entry.IsNestedCatalogRoot()) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating transition point %s",
+             parent_path.c_str());
+    WritableCatalog *parent_catalog =
+      reinterpret_cast<WritableCatalog *>(catalog->parent());
+    parent_entry.set_is_nested_catalog_mountpoint(true);
+    parent_entry.set_is_nested_catalog_root(false);
+    parent_catalog->UpdateEntry(parent_entry, parent_path);
+  }
   return true;
 }
 
@@ -300,9 +308,20 @@ bool WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
 
   DirectoryEntry FixedHardlinkCount = entry;
   FixedHardlinkCount.set_hardlinks(0, 2);
-  parent_entry.set_hardlinks(0, parent_entry.linkcount()+1);
   catalog->AddEntry(FixedHardlinkCount, directory_path, parent_path);
+
+  parent_entry.set_hardlinks(0, parent_entry.linkcount()+1);
   catalog->UpdateEntry(parent_entry, parent_path);
+  if (parent_entry.IsNestedCatalogRoot()) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating transition point %s",
+             parent_path.c_str());
+    WritableCatalog *parent_catalog =
+      reinterpret_cast<WritableCatalog *>(catalog->parent());
+    parent_entry.set_is_nested_catalog_mountpoint(true);
+    parent_entry.set_is_nested_catalog_root(false);
+    parent_catalog->UpdateEntry(parent_entry, parent_path);
+  }
+
   return true;
 }
 
@@ -442,6 +461,27 @@ bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
              "something went wrong while touching entry '%s'",
              entry_path.c_str());
     return false;
+  }
+
+  if (entry.IsDirectory()) {
+    catalog::DirectoryEntry potential_transition_point;
+    PathString transition_path(entry_path.data(), entry_path.length());
+    bool retval = catalog->LookupPath(transition_path,
+                                      &potential_transition_point);
+    assert(retval);
+    if (potential_transition_point.IsNestedCatalogMountpoint()) {
+      LogCvmfs(kLogCatalog, kLogVerboseMsg,
+               "updating transition point at %s", entry_path.c_str());
+      hash::Any nested_hash;
+      retval = catalog->FindNested(transition_path, &nested_hash);
+      assert(retval);
+      Catalog *nested_catalog;
+      nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
+      assert(nested_catalog != NULL);
+      retval = reinterpret_cast<WritableCatalog *>(nested_catalog)->
+        TouchEntry(entry, entry_path);
+      assert(retval);
+    }
   }
 
   return true;
@@ -687,7 +727,7 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 
 	/* Update registered catalog SHA1 in nested catalog */
 	if (!catalog->IsRoot()) {
-		LogCvmfs(kLogCvmfs, kLogStdout, "updating nested catalog link");
+		LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());
 		if (!parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog))
     {
