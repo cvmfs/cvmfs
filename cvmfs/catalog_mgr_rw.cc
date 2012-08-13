@@ -425,7 +425,8 @@ bool WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
  * Updated time stamp (utime / 'touch' utility).
  */
 bool WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
-                                        const std::string &path) {
+                                        const std::string &path)
+{
   const string entry_path = MakeRelativePath(path);
   const string parent_path = GetParentPath(entry_path);
 

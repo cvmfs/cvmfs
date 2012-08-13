@@ -6,9 +6,12 @@
  * it will be rebuilt on next mount.
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "cvmfs_config.h"
 
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <string>
 #include <queue>
@@ -50,8 +53,57 @@ static void Usage() {
 }
 
 
-static bool find(const catalog::Catalog *catalog, PathString path,
-                 Counters *counters)
+static bool CompareEntries(const catalog::DirectoryEntry &a,
+                           const catalog::DirectoryEntry &b)
+{
+  bool retval = true;
+  if (a.name() != b.name()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s",
+             a.name().c_str(), b.name().c_str());
+    retval = false;
+  }
+  if (a.linkcount() != b.linkcount()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %lu / %lu",
+             a.linkcount(), b.linkcount());
+    retval = false;
+  }
+  if (a.hardlink_group() != b.hardlink_group()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %lu / %lu",
+             a.hardlink_group(), b.hardlink_group());
+    retval = false;
+  }
+  if (a.size() != b.size()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %"PRIu64" / %"PRIu64,
+             a.size(), b.size());
+    retval = false;
+  }
+  if (a.mode() != b.mode()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %lu / %lu",
+             a.mode(), b.mode());
+    retval = false;
+  }
+  if (a.mtime() != b.mtime()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "timestamps differ: %lu / %lu",
+             a.mtime(), b.mtime());
+    retval = false;
+  }
+  if (a.checksum() != b.checksum()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "content hashes differ: %s / %s",
+             a.checksum().ToString().c_str(), b.checksum().ToString().c_str());
+    retval = false;
+  }
+  if (a.symlink() != b.symlink()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "symlinks differ: %s / %s",
+             a.symlink().c_str(), b.symlink().c_str());
+    retval = false;
+  }
+
+  return retval;
+}
+
+
+static bool Find(const catalog::Catalog *catalog,
+                 PathString path, Counters *counters)
 {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
@@ -93,13 +145,19 @@ static bool find(const catalog::Catalog *catalog, PathString path,
     // Checks depending of entry type
     if (entries[i].IsDirectory()) {
       counters->num_dirs++;
+      num_subdirs++;
       // Directory size
       if (entries[i].size() != 4096) {
         LogCvmfs(kLogCvmfs, kLogStderr, "invalid file size for %s",
                  full_path.c_str());
         retval = false;
       }
-      num_subdirs++;
+      // No directory hardlinks
+      if (entries[i].hardlink_group() != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "directory hardlink found at %s",
+                 full_path.c_str());
+        retval = false;
+      }
       // Recurse
       if (entries[i].IsNestedCatalogMountpoint()) {
         counters->num_transition_points++;
@@ -110,7 +168,7 @@ static bool find(const catalog::Catalog *catalog, PathString path,
           retval = false;
         }
       } else {
-        if (!find(catalog, full_path, counters))
+        if (!Find(catalog, full_path, counters))
           retval = false;
       }
     } else if (entries[i].IsLink()) {
@@ -172,7 +230,9 @@ static catalog::Catalog *DecompressCatalog(const string &path,
 }
 
 
-static bool InspectTree(const string &path, const hash::Any &catalog_hash) {
+static bool InspectTree(const string &path, const hash::Any &catalog_hash,
+                        const catalog::DirectoryEntry *transition_point)
+{
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
@@ -192,9 +252,40 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash) {
     retval = false;
   }
 
+  // Check transition point
+  catalog::DirectoryEntry root_entry;
+  if (!catalog->LookupPath(catalog->root_prefix(), &root_entry)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup root entry (%s)",
+             path.c_str());
+    retval = false;
+  }
+  if (!root_entry.IsDirectory()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "root entry not a directory (%s)",
+             path.c_str());
+    retval = false;
+  }
+  if (transition_point != NULL) {
+    if (!CompareEntries(*transition_point, root_entry)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "transition point and root entry differ (%s)", path.c_str());
+      retval = false;
+    }
+    if (!root_entry.IsNestedCatalogRoot()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "nested catalog root expected but not found (%s)", path.c_str());
+      retval = false;
+    }
+  } else {
+    if (root_entry.IsNestedCatalogRoot()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "nested catalog root found but not expected (%s)", path.c_str());
+      retval = false;
+    }
+  }
+
   // Traverse the catalog
   Counters *counters = new Counters();
-  if (!find(catalog, PathString(path.data(), path.length()), counters))
+  if (!Find(catalog, PathString(path.data(), path.length()), counters))
     retval = false;
 
   // Recurse into nested catalogs
@@ -209,8 +300,15 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash) {
   for (catalog::Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
-    if (!InspectTree(i->path.ToString(), i->hash))
+    catalog::DirectoryEntry nested_transition_point;
+    if (!catalog->LookupPath(i->path, &nested_transition_point)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup transition point %s",
+               i->path.c_str());
       retval = false;
+    } else {
+      if (!InspectTree(i->path.ToString(), i->hash, &nested_transition_point))
+        retval = false;
+    }
   }
 
   delete counters;
@@ -269,7 +367,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  bool retval = InspectTree("", manifest->catalog_hash());
+  bool retval = InspectTree("", manifest->catalog_hash(), NULL);
 
   return retval ? 0 : 1;
 }

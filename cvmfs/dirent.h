@@ -74,6 +74,9 @@ public:
   inline inode_t inode() const { return inode_; }
   inline inode_t parent_inode() const { return parent_inode_; }
   inline uint32_t linkcount() const { return Hardlinks2Linkcount(hardlinks_); }
+  inline uint32_t hardlink_group() const {
+    return Hardlinks2HardlinkGroup(hardlinks_);
+  }
   inline NameString name() const { return name_; }
   inline LinkString symlink() const { return symlink_; }
   inline hash::Any checksum() const { return checksum_; }
