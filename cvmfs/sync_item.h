@@ -63,7 +63,7 @@ class SyncItem {
 
 	inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ? filename_ :
-      relative_parent_path_ + "/" + filename_;
+      relative_parent_path_ + (filename_.empty() ? "" : ("/" + filename_));
   }
 
   std::string GetRdOnlyPath() const;

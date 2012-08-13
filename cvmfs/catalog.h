@@ -101,6 +101,7 @@ class Catalog {
   inline InodeRange inode_range() const { return inode_range_; }
   inline void set_inode_range(const InodeRange value) { inode_range_ = value; }
   inline std::string database_path() const { return database_->filename(); }
+  inline PathString root_prefix() const { return root_prefix_; }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && (max_row_id_ > 0);

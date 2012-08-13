@@ -127,7 +127,8 @@ class FileSystemTraversal {
                                            ("/" + dir_name) : "");
 
     // Change into directory and notify the user
-    LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "entering %s", path.c_str());
+    LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "entering %s (%s -- %s)",
+             path.c_str(), parent_path.c_str(), dir_name.c_str());
     dip = opendir(path.c_str());
     assert(dip);
     Notify(fn_enter_dir, parent_path, dir_name);

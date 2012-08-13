@@ -422,17 +422,20 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
-  uint64_t hardlinks = RetrieveInt64(1);
   const char *name = reinterpret_cast<const char *>(RetrieveText(6));
   const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
   // must be set later by a second catalog lookup
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
-  result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                   (catalog->schema() < 2.1-Database::kSchemaEpsilon) ?
-                    0 : DirectoryEntry::Hardlinks2HardlinkGroup(hardlinks));
-  result.linkcount_ = (catalog->schema() < 2.1-Database::kSchemaEpsilon) ?
-                       1 : DirectoryEntry::Hardlinks2Linkcount(hardlinks);
+  result.hardlinks_ = RetrieveInt64(1);
+  if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
+    result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
+  } else {
+    const uint32_t hardlink_group =
+      DirectoryEntry::Hardlinks2HardlinkGroup(result.hardlinks_);
+    result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
+                                                         hardlink_group);
+  }
   result.mode_ = RetrieveInt(3);
   result.size_ = RetrieveInt64(2);
   result.mtime_ = RetrieveInt64(4);

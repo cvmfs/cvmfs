@@ -48,7 +48,7 @@ public:
     catalog_(NULL),
     inode_(kInvalidInode),
     parent_inode_(kInvalidInode),
-    linkcount_(0),
+    hardlinks_(0),
     mode_(0),
     size_(0),
     mtime_(0),
@@ -73,7 +73,7 @@ public:
 
   inline inode_t inode() const { return inode_; }
   inline inode_t parent_inode() const { return parent_inode_; }
-  inline int linkcount() const { return linkcount_; }
+  inline uint32_t linkcount() const { return Hardlinks2Linkcount(hardlinks_); }
   inline NameString name() const { return name_; }
   inline LinkString symlink() const { return symlink_; }
   inline hash::Any checksum() const { return checksum_; }
@@ -96,7 +96,7 @@ public:
     s.st_dev = 1;
     s.st_ino = inode_;
     s.st_mode = mode_;
-    s.st_nlink = linkcount_;
+    s.st_nlink = linkcount();
     s.st_uid = g_uid;
     s.st_gid = g_gid;
     s.st_rdev = 1;
@@ -146,12 +146,9 @@ private:
 
   // stat like information
   NameString name_;
-  union {
-    inode_t inode_;  // When reading: the inode (rowid)
-    uint64_t hardlinks_;  // When writing, lincount and hardlink group
-  };
+  inode_t inode_;
   inode_t parent_inode_;
-  int linkcount_;
+  uint64_t hardlinks_;  // Hardlink group id + linkcount
   unsigned int mode_;
   uint64_t size_;
   time_t mtime_;

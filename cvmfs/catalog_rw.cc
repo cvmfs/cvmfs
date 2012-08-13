@@ -538,10 +538,10 @@ bool WritableCatalog::CopyToParent() {
   // To avoid collisions we add the maximal present hardlink group ID in parent
   // to all hardlink group IDs in the nested catalog.
   // (CAUTION: hardlink group ID is saved in the inode field --> legacy :-) )
-  const int offset = parent->GetMaxLinkId();
+  const uint64_t offset = static_cast<uint64_t>(parent->GetMaxLinkId()) << 32;
   const string update_link_ids =
-    "UPDATE catalog SET inode = inode + " + StringifyInt(offset) +
-    " WHERE inode > 0;";
+    "UPDATE catalog SET hardlinks = hardlinks + " + StringifyInt(offset) +
+    " WHERE hardlinks > 1 << 32;";
 
   Sql sql_update_link_ids(database(), update_link_ids);
   if (!sql_update_link_ids.Execute()) {
@@ -616,4 +616,4 @@ bool WritableCatalog::CopyToParent() {
   return true;
 }
 
-}
+}  // namespace catalog

@@ -17,7 +17,7 @@ class Manifest {
  public:
   static Manifest *LoadFile(const std::string &path);
   Manifest(const hash::Any &catalog_hash, const std::string &root_path);
-  Manifest(const hash::Any &catalog_hash, 
+  Manifest(const hash::Any &catalog_hash,
            const hash::Md5 &root_path,
            const uint32_t ttl,
            const uint64_t revision,
@@ -25,17 +25,17 @@ class Manifest {
            const std::string &repository_name,
            const hash::Any certificate,
            const uint64_t publish_timestamp) :
-    catalog_hash_(catalog_hash), root_path_(root_path), ttl_(ttl), 
-    revision_(revision), micro_catalog_hash_(micro_catalog_hash), 
+    catalog_hash_(catalog_hash), root_path_(root_path), ttl_(ttl),
+    revision_(revision), micro_catalog_hash_(micro_catalog_hash),
     repository_name_(repository_name), certificate_(certificate),
     publish_timestamp_(publish_timestamp) { };
-  
+
   std::string ExportString() const;
   bool Export(const std::string &path) const;
-  
+
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
-  void set_certificate(const hash::Any &certificate) { 
+  void set_certificate(const hash::Any &certificate) {
     certificate_ = certificate;
   }
   void set_repository_name(const std::string &repository_name) {
@@ -44,6 +44,9 @@ class Manifest {
   void set_publish_timestamp(const uint32_t publish_timestamp) {
     publish_timestamp_ = publish_timestamp;
   }
+
+  hash::Any catalog_hash() const { return catalog_hash_; }
+  hash::Any certificate() const { return certificate_; }
  private:
   hash::Any catalog_hash_;
   hash::Md5 root_path_;
