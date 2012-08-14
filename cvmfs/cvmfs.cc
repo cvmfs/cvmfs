@@ -1622,7 +1622,7 @@ int main(int argc, char *argv[]) {
     cvmfs::kcache_timeout_ = (g_cvmfs_opts.kcache_timeout == -1) ?
                              0.0 : double(g_cvmfs_opts.kcache_timeout);
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expires after %d seconds",
+  LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            int(cvmfs::kcache_timeout_));
   options_ready = true;
 
