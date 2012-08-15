@@ -199,7 +199,7 @@ bool Database::Create(const string &filename,
   retval = Sql(database,
     "INSERT INTO statistics (counter, value) "
     "SELECT 'self_regular', 0 UNION ALL SELECT 'self_symlink', 0 UNION ALL "
-    "SELECT 'self_dir', 0 UNION ALL SELECT 'self_nested', 0 UNION ALL "
+    "SELECT 'self_dir', 1 UNION ALL SELECT 'self_nested', 0 UNION ALL "
     "SELECT 'subtree_regular', 0 UNION ALL SELECT 'subtree_symlink', 0 UNION ALL "
     "SELECT 'subtree_dir', 0 UNION ALL SELECT 'subtree_nested', 0;").Execute();
   if (!retval)
@@ -686,6 +686,44 @@ SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
 
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
   return RetrieveInt64(0) >> 32;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlGetCounter::SqlGetCounter(const Database &database) {
+  Init(database.sqlite_db(),
+       "SELECT value from statistics WHERE counter = :counter;");
+}
+
+
+bool SqlGetCounter::BindCounter(const std::string &counter) {
+  return BindText(1, counter);
+}
+
+
+uint64_t SqlGetCounter::GetCounter() const {
+  return RetrieveInt64(0);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlSetCounter::SqlSetCounter(const Database &database) {
+  Init(database.sqlite_db(),
+       "UPDATE statistics SET value=:val WHERE counter=:counter;");
+}
+
+
+bool SqlSetCounter::BindCounter(const std::string &counter) {
+  return BindText(2, counter);
+}
+
+
+bool SqlSetCounter::BindValue(const uint64_t value) {
+  return BindInt64(1, value);
 }
 
 } // namespace catalog

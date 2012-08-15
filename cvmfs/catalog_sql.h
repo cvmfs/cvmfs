@@ -445,6 +445,28 @@ class SqlMaxHardlinkGroup : public Sql {
   uint32_t GetMaxGroupId() const;
 };
 
+
+//------------------------------------------------------------------------------
+
+
+class SqlGetCounter : public Sql {
+ public:
+  SqlGetCounter(const Database &database);
+  bool BindCounter(const std::string &counter);
+  uint64_t GetCounter() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlSetCounter : public Sql {
+ public:
+  SqlSetCounter(const Database &database);
+  bool BindCounter(const std::string &counter);
+  bool BindValue(const uint64_t value);
+};
+
 }  // namespace catalog
 
 #endif  // CVMFS_CATALOG_SQL_H_
