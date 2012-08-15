@@ -125,6 +125,8 @@ Manifest *WritableCatalogManager::CreateRepository(
   root_entry.mode_              = 16877;
   root_entry.size_              = 4096;
   root_entry.mtime_             = time(NULL);
+  root_entry.uid_               = getuid();
+  root_entry.gid_               = getgid();
   root_entry.checksum_          = hash::Any(hash::kSha1);
   root_entry.set_hardlinks(0, 2);
   string root_path = "";

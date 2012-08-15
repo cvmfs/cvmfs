@@ -100,6 +100,8 @@ catalog::DirectoryEntry SyncItem::CreateCatalogDirent() const {
   dirent.hardlinks_ = 0;  // Set by catalog manager
 
   dirent.mode_ = this->GetUnionStat().st_mode;
+  dirent.uid_ = this->GetUnionStat().st_uid;
+  dirent.gid_ = this->GetUnionStat().st_gid;
   dirent.size_ = this->GetUnionStat().st_size;
   dirent.mtime_ = this->GetUnionStat().st_mtime;
   dirent.checksum_ = this->GetContentHash();

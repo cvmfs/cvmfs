@@ -156,7 +156,7 @@ bool Database::Create(const string &filename,
     "CREATE TABLE catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
-    " flags INTEGER, name TEXT, symlink TEXT,"
+    " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute();
   if (!retval)
     goto create_schema_fail;
@@ -190,6 +190,21 @@ bool Database::Create(const string &filename,
   if (!retval)
     goto create_schema_fail;
 
+  retval = Sql(database,
+               "CREATE TABLE statistics (counter TEXT, value INTEGER, "
+               "CONSTRAINT pk_statistics PRIMARY KEY (counter));").Execute();
+  if (!retval)
+    goto create_schema_fail;
+
+  retval = Sql(database,
+    "INSERT INTO statistics (counter, value) "
+    "SELECT 'self_regular', 0 UNION ALL SELECT 'self_symlink', 0 UNION ALL "
+    "SELECT 'self_dir', 0 UNION ALL SELECT 'self_nested', 0 UNION ALL "
+    "SELECT 'subtree_regular', 0 UNION ALL SELECT 'subtree_symlink', 0 UNION ALL "
+    "SELECT 'subtree_dir', 0 UNION ALL SELECT 'subtree_nested', 0;").Execute();
+  if (!retval)
+    goto create_schema_fail;
+
   // Insert root entry
   sql_insert = new SqlDirentInsert(database);
   retval = sql_insert->BindPathHash(root_path_hash) &&
@@ -211,6 +226,8 @@ bool Database::Create(const string &filename,
   return true;
 
 create_schema_fail:
+  LogCvmfs(kLogSql, kLogVerboseMsg, "sql failure %s",
+           sqlite3_errmsg(sqlite_db));
   sqlite3_close(sqlite_db);
   return false;
 }
@@ -368,6 +385,8 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                                       const int flags_idx,
                                       const int name_idx,
                                       const int symlink_idx,
+                                      const int uid_idx,
+                                      const int gid_idx,
                                       const DirectoryEntry &entry)
 {
   return (
@@ -375,6 +394,8 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
     BindInt64(hardlinks_idx, entry.hardlinks_) &&
     BindInt64(size_idx, entry.size_) &&
     BindInt(mode_idx, entry.mode_) &&
+    BindInt64(uid_idx, entry.uid_) &&
+    BindInt64(gid_idx, entry.gid_) &&
     BindInt64(mtime_idx, entry.mtime_) &&
     BindInt(flags_idx, CreateDatabaseFlags(entry)) &&
     BindText(name_idx, entry.name_.GetChars(), entry.name_.GetLength()) &&
@@ -395,8 +416,8 @@ string SqlLookup::GetFieldsToSelect(const Database &database) const {
   } else {
     return "hash, hardlinks, size, mode, mtime, flags, name, symlink, "
         //    0        1      2     3     4      5      6      7
-           "md5path_1, md5path_2, parent_1, parent_2, rowid";
-        //    8          9           10        11       12
+           "md5path_1, md5path_2, parent_1, parent_2, rowid, uid, gid";
+        //    8          9           10        11       12    13   14
   }
 }
 
@@ -430,11 +451,15 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.hardlinks_ = RetrieveInt64(1);
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
+    result.uid_ = g_uid;
+    result.gid_ = g_gid;
   } else {
     const uint32_t hardlink_group =
       DirectoryEntry::Hardlinks2HardlinkGroup(result.hardlinks_);
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
                                                          hardlink_group);
+    result.uid_ = RetrieveInt64(13);
+    result.gid_ = RetrieveInt64(14);
   }
   result.mode_ = RetrieveInt(3);
   result.size_ = RetrieveInt64(2);
@@ -544,10 +569,10 @@ SqlDirentInsert::SqlDirentInsert(const Database &database) {
   const string statement = "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
-    "mtime, flags, name, symlink) "
-    // 9,     10    11     12
+    "mtime, flags, name, symlink, uid, gid) "
+    // 9,     10    11     12     13   14
     "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :links, :size, :mode, :mtime,"
-    " :flags, :name, :symlink);";
+    " :flags, :name, :symlink, :uid, :gid);";
   Init(database.sqlite_db(), statement);
 }
 
@@ -563,7 +588,7 @@ bool SqlDirentInsert::BindParentPathHash(const hash::Md5 &hash) {
 
 
 bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
-  return BindDirentFields(5, 6, 7, 8, 9, 10, 11, 12, entry);
+  return BindDirentFields(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, entry);
 }
 
 
@@ -575,21 +600,23 @@ SqlDirentUpdate::SqlDirentUpdate(const Database &database) {
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
 //            1             2             3               4
-    "flags = :flags, name = :name, symlink = :symlink, hardlinks = :hardlinks "
+    "flags = :flags, name = :name, symlink = :symlink, hardlinks = :hardlinks, "
 //          5             6                  7                8
+    "uid = :uid, gid = :gid "
+//          9           10
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
-//                     9                       10
+//                     11                       12
   Init(database.sqlite_db(), statement);
 }
 
 
 bool SqlDirentUpdate::BindPathHash(const hash::Md5 &hash) {
-  return BindMd5(9, 10, hash);
+  return BindMd5(11, 12, hash);
 }
 
 
 bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
-  return BindDirentFields(1, 8, 2, 3, 4, 5, 6, 7, entry);
+  return BindDirentFields(1, 8, 2, 3, 4, 5, 6, 7, 9, 10, entry);
 }
 
 

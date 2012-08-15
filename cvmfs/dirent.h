@@ -9,6 +9,8 @@
 #ifndef CVMFS_DIRENT_H_
 #define CVMFS_DIRENT_H_
 
+#include <sys/types.h>
+
 #include <list>
 #include <string>
 
@@ -50,6 +52,8 @@ public:
     parent_inode_(kInvalidInode),
     hardlinks_(0),
     mode_(0),
+    uid_(0),
+    gid_(0),
     size_(0),
     mtime_(0),
     cached_mtime_(0),
@@ -87,6 +91,8 @@ public:
   inline time_t mtime() const { return mtime_; }
   inline time_t cached_mtime() const { return cached_mtime_; }
   inline unsigned int mode() const { return mode_; }
+  inline uid_t uid() const { return uid_; }
+  inline gid_t gid() const { return gid_; }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
@@ -100,8 +106,8 @@ public:
     s.st_ino = inode_;
     s.st_mode = mode_;
     s.st_nlink = linkcount();
-    s.st_uid = g_uid;
-    s.st_gid = g_gid;
+    s.st_uid = uid();
+    s.st_gid = gid();
     s.st_rdev = 1;
     s.st_size = size();
     s.st_blksize = 4096;  // will be ignored by Fuse
@@ -153,6 +159,8 @@ private:
   inode_t parent_inode_;
   uint64_t hardlinks_;  // Hardlink group id + linkcount
   unsigned int mode_;
+  uid_t uid_;
+  gid_t gid_;
   uint64_t size_;
   time_t mtime_;
   time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches

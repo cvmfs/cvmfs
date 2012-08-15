@@ -40,8 +40,8 @@ class Database {
     kOpenReadOnly,
     kOpenReadWrite
   };
-  static const float kLatestSchema = 2.1;
-  static const float kLatestSupportedSchema = 2.1;  // + 1.X catalogs (r/o)
+  static const float kLatestSchema = 2.3;
+  static const float kLatestSupportedSchema = 2.3;  // + 1.X catalogs (r/o)
   static const float kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
 
   Database(const std::string filename, const OpenMode open_mode);
@@ -284,6 +284,8 @@ class SqlDirentWrite : public SqlDirent {
                         const int flags_idx,
                         const int name_idx,
                         const int symlink_idx,
+                        const int uid_idx,
+                        const int gid_idx,
                         const DirectoryEntry &entry);
 };
 
