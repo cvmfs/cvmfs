@@ -1,9 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
- * This tool checks a cvmfs cache directory for consistency.
- * If necessary, the managed cache db is removed so that
- * it will be rebuilt on next mount.
+ * This tool checks a cvmfs repository for file catalog errors.
  */
 
 #define __STDC_FORMAT_MACROS
@@ -15,6 +13,8 @@
 
 #include <string>
 #include <queue>
+#include <vector>
+#include <map>
 
 #include "logging.h"
 #include "manifest.h"
@@ -54,13 +54,16 @@ static void Usage() {
 
 
 static bool CompareEntries(const catalog::DirectoryEntry &a,
-                           const catalog::DirectoryEntry &b)
+                           const catalog::DirectoryEntry &b,
+                           const bool compare_names)
 {
   bool retval = true;
-  if (a.name() != b.name()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s",
-             a.name().c_str(), b.name().c_str());
-    retval = false;
+  if (compare_names) {
+    if (a.name() != b.name()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s",
+               a.name().c_str(), b.name().c_str());
+      retval = false;
+    }
   }
   if (a.linkcount() != b.linkcount()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %lu / %lu",
@@ -121,6 +124,8 @@ static bool Find(const catalog::Catalog *catalog,
 
   uint32_t num_subdirs = 0;
   bool retval = true;
+  typedef map< uint32_t, vector<catalog::DirectoryEntry> > HardlinkMap;
+  HardlinkMap hardlinks;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
     PathString full_path(path);
@@ -142,6 +147,29 @@ static bool Find(const catalog::Catalog *catalog,
       }
     }
 
+    // Add hardlinks to counting map
+    if ((entries[i].linkcount() > 1) && !entries[i].IsDirectory()) {
+      if (entries[i].hardlink_group() == 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "invalid hardlink group for %s",
+                 full_path.c_str());
+        retval = false;
+      } else {
+        HardlinkMap::iterator hardlink_group =
+          hardlinks.find(entries[i].hardlink_group());
+        if (hardlink_group == hardlinks.end()) {
+          hardlinks[entries[i].hardlink_group()];
+          hardlinks[entries[i].hardlink_group()].push_back(entries[i]);
+        } else {
+          if (!CompareEntries(entries[i], (hardlink_group->second)[0], false)) {
+            LogCvmfs(kLogCvmfs, kLogStderr, "hardlink %s doesn't match",
+                     full_path.c_str());
+            retval = false;
+          }
+          hardlink_group->second.push_back(entries[i]);
+        }  // Hardlink added to map
+      }  // Hardlink group > 0
+    }  // Hardlink found
+
     // Checks depending of entry type
     if (entries[i].IsDirectory()) {
       counters->num_dirs++;
@@ -158,8 +186,8 @@ static bool Find(const catalog::Catalog *catalog,
                  full_path.c_str());
         retval = false;
       }
-      // Recurse
       if (entries[i].IsNestedCatalogMountpoint()) {
+        // Find transition point
         counters->num_transition_points++;
         hash::Any tmp;
         if (!catalog->FindNested(full_path, &tmp)) {
@@ -168,6 +196,7 @@ static bool Find(const catalog::Catalog *catalog,
           retval = false;
         }
       } else {
+        // Recurse
         if (!Find(catalog, full_path, counters))
           retval = false;
       }
@@ -200,6 +229,19 @@ static bool Find(const catalog::Catalog *catalog,
     LogCvmfs(kLogCvmfs, kLogStderr, "wrong linkcount for %s; "
              "expected %lu, got %lu",
              path.c_str(), num_subdirs + 2, this_directory.linkcount());
+  }
+
+  // Check hardlink linkcounts
+  for (HardlinkMap::const_iterator i = hardlinks.begin(),
+       iEnd = hardlinks.end(); i != iEnd; ++i)
+  {
+    if (i->second[0].linkcount() != i->second.size()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "hardlink linkcount wrong for %s, "
+               "expected %lu, got %lu",
+               (path.ToString() + "/" + i->second[0].name().ToString()).c_str(),
+               i->second.size(), i->second[0].linkcount());
+      retval = false;
+    }
   }
 
   return retval;
@@ -265,7 +307,7 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
     retval = false;
   }
   if (transition_point != NULL) {
-    if (!CompareEntries(*transition_point, root_entry)) {
+    if (!CompareEntries(*transition_point, root_entry, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "transition point and root entry differ (%s)", path.c_str());
       retval = false;
