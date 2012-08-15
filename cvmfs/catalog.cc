@@ -249,6 +249,18 @@ uint64_t Catalog::GetRevision() const {
 }
 
 
+uint64_t Catalog::GetNumEntries() const {
+  const string sql = "SELECT count(*) FROM catalog;";
+
+  pthread_mutex_lock(lock_);
+  Sql stmt(database(), sql);
+  const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
+  pthread_mutex_unlock(lock_);
+
+  return result;
+}
+
+
 /**
  * Determine the actual inode of a DirectoryEntry.
  * The first used entry from a hardlink group deterimines the inode of the

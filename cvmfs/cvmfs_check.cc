@@ -330,6 +330,16 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
   if (!Find(catalog, PathString(path.data(), path.length()), counters))
     retval = false;
 
+  // Check number of entries
+  const uint64_t num_found_entries =
+    1 + counters->num_files + counters->num_symlinks + counters->num_dirs;
+  if (num_found_entries != catalog->GetNumEntries()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "dangling entries in catalog, "
+             "expected %"PRIu64", got %"PRIu64,
+             catalog->GetNumEntries(), num_found_entries);
+    retval = false;
+  }
+
   // Recurse into nested catalogs
   catalog::Catalog::NestedCatalogList nested_catalogs =
     catalog->ListNestedCatalogs();
