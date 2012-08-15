@@ -168,6 +168,16 @@ bool Database::Create(const string &filename,
     goto create_schema_fail;
 
   retval = Sql(database,
+    "CREATE TABLE chunks "
+    "(md5path_1 INTEGER, md5path_2 INTEGER, offset INTEGER, size INTEGER, "
+    " hash BLOB, "
+    " CONSTRAINT pk_chunks PRIMARY KEY (md5path_1, md5path_2, offset, size), "
+    " FOREIGN KEY (md5path_1, md5path_2) REFERENCES "
+    "   catalog(md5path_1, md5path_2));").Execute();
+  if (!retval)
+    goto create_schema_fail;
+
+  retval = Sql(database,
                "CREATE TABLE properties (key TEXT, value TEXT, "
                "CONSTRAINT pk_properties PRIMARY KEY (key));").Execute();
   if (!retval)

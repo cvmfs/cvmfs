@@ -19,6 +19,33 @@ namespace catalog {
 const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 
 
+void Counters::ApplyDelta(const DeltaCounters &delta) {
+  self_regular += delta.d_self_regular;
+  self_symlink += delta.d_self_symlink;
+  self_dir += delta.d_self_dir;
+  self_nested += delta.d_self_nested;
+  subtree_regular += delta.d_subtree_regular;
+  subtree_symlink += delta.d_subtree_symlink;
+  subtree_dir += delta.d_subtree_dir;
+  subtree_nested += delta.d_subtree_nested;
+}
+
+
+uint64_t Counters::GetSelfEntries() const {
+  return self_regular + self_symlink + self_dir - self_nested;
+}
+
+
+uint64_t Counters::GetSubtreeEntries() const {
+  return subtree_regular + subtree_symlink + subtree_dir - subtree_nested;
+}
+
+
+uint64_t Counters::GetAllEntries() const {
+  return GetSelfEntries() + GetSubtreeEntries();
+}
+
+
 Catalog::Catalog(const PathString &path, Catalog *parent) {
   path_ = path;
   parent_ = parent;

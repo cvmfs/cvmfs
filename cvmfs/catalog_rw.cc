@@ -48,6 +48,8 @@ void WritableCatalog::Commit() {
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements(); // polymorphism: up call
 
+  bool retval = Sql(database(), "PRAGMA foreign_keys = ON").Execute();
+  assert(retval);
   sql_insert_ = new SqlDirentInsert(database());
   sql_touch_ = new SqlDirentTouch(database());
   sql_unlink_ = new SqlDirentUnlink(database());

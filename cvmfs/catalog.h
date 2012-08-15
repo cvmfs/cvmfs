@@ -47,28 +47,11 @@ struct InodeRange {
 };
 
 
-struct Counters {
-  Counters() {
-    self_regular = self_symlink = self_dir = self_nested =
-      subtree_regular = subtree_symlink = subtree_dir = subtree_nested = 0;
-  }
-
-  uint64_t self_regular;
-  uint64_t self_symlink;
-  uint64_t self_dir;
-  uint64_t self_nested;
-  uint64_t subtree_regular;
-  uint64_t subtree_symlink;
-  uint64_t subtree_dir;
-  uint64_t subtree_nested;
-};
-
-
 struct DeltaCounters {
   DeltaCounters() {
     d_self_regular = d_self_symlink = d_self_dir = d_self_nested =
-      d_subtree_regular = d_subtree_symlink = d_subtree_dir =
-      d_subtree_nested = 0;
+    d_subtree_regular = d_subtree_symlink = d_subtree_dir =
+    d_subtree_nested = 0;
   }
 
   int64_t d_self_regular;
@@ -79,6 +62,28 @@ struct DeltaCounters {
   int64_t d_subtree_symlink;
   int64_t d_subtree_dir;
   int64_t d_subtree_nested;
+};
+
+
+struct Counters {
+  Counters() {
+    self_regular = self_symlink = self_dir = self_nested =
+      subtree_regular = subtree_symlink = subtree_dir = subtree_nested = 0;
+  }
+
+  void ApplyDelta(const DeltaCounters &delta);
+  uint64_t GetSelfEntries() const;
+  uint64_t GetSubtreeEntries() const;
+  uint64_t GetAllEntries() const;
+
+  uint64_t self_regular;
+  uint64_t self_symlink;
+  uint64_t self_dir;
+  uint64_t self_nested;
+  uint64_t subtree_regular;
+  uint64_t subtree_symlink;
+  uint64_t subtree_dir;
+  uint64_t subtree_nested;
 };
 
 
