@@ -1,0 +1,1 @@
+Short:  ipv6_fallback	Checks if cvmfs fall back to ipv4 on bad ipv6.
