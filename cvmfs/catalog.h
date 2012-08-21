@@ -53,6 +53,7 @@ struct DeltaCounters {
     d_subtree_regular = d_subtree_symlink = d_subtree_dir =
     d_subtree_nested = 0;
   }
+  void PopulateToParent(DeltaCounters *parent);
 
   int64_t d_self_regular;
   int64_t d_self_symlink;

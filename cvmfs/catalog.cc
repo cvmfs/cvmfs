@@ -19,6 +19,14 @@ namespace catalog {
 const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 
 
+void DeltaCounters::PopulateToParent(DeltaCounters *parent) {
+  parent->d_subtree_regular += d_self_regular + d_subtree_regular;
+  parent->d_subtree_symlink += d_self_symlink + d_subtree_symlink;
+  parent->d_subtree_dir += d_self_dir + d_subtree_dir;
+  parent->d_subtree_nested += d_self_nested + d_subtree_nested;
+}
+
+
 void Counters::ApplyDelta(const DeltaCounters &delta) {
   self_regular += delta.d_self_regular;
   self_symlink += delta.d_self_symlink;
