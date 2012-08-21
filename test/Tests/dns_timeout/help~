@@ -1,0 +1,14 @@
+Short:  dns_timeout	Runs a test to verify cvmfs timeout settings.
+
+dns_timeout:
+dns_timeout:dns_timeout
+dns_timeout:	Runs a test to verify cvmfs timeout settings.
+dns_timeout:	Usage: dns_timeout <options>
+dns_timeout:
+dns_timeout:	Available options:
+dns_timeout:	  --stdout FILE	Redirect STDOUT to FILE.
+dns_timeout:			Default to /var/log/cvmfs-test/dns_timeout.out.
+dns_timeout:	  --stderr FILE Redirect STDERR to FILE.
+dns_timeout:			Default to /var/log/cvmfs-test/dns_timeout.err.
+dns_timeout:	  --no-clean	Skip environment cleaning.
+dns_timeout:
