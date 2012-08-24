@@ -158,10 +158,12 @@ install (
 
 # Test system
 if (INSTALL_TEST_SYSTEM)
-  execute_process (
-		COMMAND ${CMAKE_SOURCE_DIR}/test/Install.pl --prefix=${INSTALL_TEST_SYSTEM}
-		WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}/test
-	)
+  install (
+    CODE "execute_process (
+      COMMAND ${CMAKE_SOURCE_DIR}/test/Install.pl --prefix=${INSTALL_TEST_SYSTEM}
+      WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}/test
+    )"
+  )
 endif (INSTALL_TEST_SYSTEM)
 
 #
