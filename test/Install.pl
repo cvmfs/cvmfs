@@ -15,11 +15,13 @@ my $prefix = '/opt';
 my $manpath = '/usr/local/man';
 my $bindir = '/usr/local/bin';
 my $bin_name = 'cvmfs-test';
+my $force = undef;
 
 my $ret = GetOptions ("bindir=s" => \$bindir,
 					   "manpath=s" => \$manpath,
 					   "prefix=s" => \$prefix,
-					   "bin-name=s" => \$bin_name );
+					   "bin-name=s" => \$bin_name,
+					   "force" => \$force );
 
 
 # This functions accept an absolute path and will recursive
@@ -37,6 +39,14 @@ sub recursive_rm {
 	};
 	if (-e $path) {
 		finddepth ( { wanted => $remove }, $path );
+	}
+}
+
+unless(defined($force)) {
+	if (-e "$prefix/cvmfs-test/.installed") {
+		print "\ncvmfs-test seems to be already installed.\n";
+		print "You can force a reinstallation with --force option.\n\n";
+		exit 0;
 	}
 }
 
@@ -80,7 +90,7 @@ unlink($zmq_source);
 
 
 print 'Installing cpanminus... ';
-system('curl -L http://cpanmin.us | perl - --self-upgrade');
+system('curl --cacert cacert.pem -L http://cpanmin.us | perl - --self-upgrade');
 print "Done.\n";
 
 print 'Installing ZeroMQ perl modules... ';
@@ -102,5 +112,8 @@ unlink("$bindir/$bin_name");
 symlink "$prefix/cvmfs-test/cvmfs-testshell.pl", "$bindir/$bin_name";
 
 system('cvmfs-test --setup');
+
+open(my $create_sentinel, '>', "$prefix/cvmfs-test/.installed");
+close($create_sentinel);
 
 exit 0;
