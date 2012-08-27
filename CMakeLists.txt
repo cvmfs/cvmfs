@@ -46,6 +46,7 @@ option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
+set (INSTALL_TEST_SYSTEM "OFF" CACHE STRING "Install CernVM-FS test tools in the specified path")
 
 #
 # define where to find the external dependencies
@@ -85,7 +86,6 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 #
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
-#set (CVMFS_LIBS "${LDFLAGS} -ldl -lm") ??
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
@@ -155,6 +155,16 @@ install (
 		DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
 		PERMISSIONS             OWNER_READ GROUP_READ WORLD_READ
         )
+
+# Test system
+if (INSTALL_TEST_SYSTEM)
+  install (
+    CODE "execute_process (
+      COMMAND ${CMAKE_SOURCE_DIR}/test/Install.pl --prefix=${INSTALL_TEST_SYSTEM}
+      WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}/test
+    )"
+  )
+endif (INSTALL_TEST_SYSTEM)
 
 #
 # configure the packaging stuff
