@@ -135,6 +135,7 @@ class Catalog {
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetNumEntries() const;
+  bool GetCounters(Counters *counters) const;
 
   inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }

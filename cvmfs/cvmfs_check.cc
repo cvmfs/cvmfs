@@ -26,20 +26,6 @@
 
 using namespace std;  // NOLINT
 
-struct Counters {
-  Counters() {
-    num_files = 0;
-    num_symlinks = 0;
-    num_dirs = 0;
-    num_transition_points = 0;
-  }
-
-  uint64_t num_files;
-  uint64_t num_symlinks;
-  uint64_t num_dirs;
-  uint64_t num_transition_points;
-};
-
 
 static void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
@@ -105,8 +91,74 @@ static bool CompareEntries(const catalog::DirectoryEntry &a,
 }
 
 
+static bool CompareCounters(const catalog::Counters &a,
+                            const catalog::Counters &b)
+{
+  bool retval = true;
+  if (a.self_regular != b.self_regular) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of regular files differs (%"PRIu64" / %"PRIu64")",
+             a.self_regular, b.self_regular);
+    retval = false;
+  }
+  if (a.self_symlink != b.self_symlink) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of symlinks differs (%"PRIu64" / %"PRIu64")",
+             a.self_symlink, b.self_symlink);
+    retval = false;
+  }
+  if (a.self_dir != b.self_dir) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of directories differs (%"PRIu64" / %"PRIu64")",
+             a.self_dir, b.self_dir);
+    retval = false;
+  }
+  if (a.self_nested != b.self_nested) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of nested_catalogs differs (%"PRIu64" / %"PRIu64")",
+             a.self_nested, b.self_nested);
+    retval = false;
+  }
+  if (a.subtree_regular != b.subtree_regular) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of subtree regular files differs (%"PRIu64" / %"PRIu64")",
+             a.subtree_regular, b.subtree_regular);
+    retval = false;
+  }
+  if (a.subtree_symlink != b.subtree_symlink) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of subtree symlinks differs (%"PRIu64" / %"PRIu64")",
+             a.subtree_symlink, b.subtree_symlink);
+    retval = false;
+  }
+  if (a.subtree_symlink != b.subtree_symlink) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of subtree symlinks differs (%"PRIu64" / %"PRIu64")",
+             a.subtree_symlink, b.subtree_symlink);
+    retval = false;
+  }
+  if (a.subtree_dir != b.subtree_dir) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of subtree directories differs (%"PRIu64" / %"PRIu64")",
+             a.subtree_dir, b.subtree_dir);
+    retval = false;
+  }
+  if (a.subtree_nested != b.subtree_nested) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of subtree nested catalogs differs (%"PRIu64" / %"PRIu64")",
+             a.subtree_nested, b.subtree_nested);
+    retval = false;
+  }
+
+  return retval;
+}
+
+
+/**
+ * Recursive catalog walk-through
+ */
 static bool Find(const catalog::Catalog *catalog,
-                 PathString path, Counters *counters)
+                 PathString path, catalog::DeltaCounters *computed_counters)
 {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
@@ -172,7 +224,7 @@ static bool Find(const catalog::Catalog *catalog,
 
     // Checks depending of entry type
     if (entries[i].IsDirectory()) {
-      counters->num_dirs++;
+      computed_counters->d_self_dir++;
       num_subdirs++;
       // Directory size
       if (entries[i].size() != 4096) {
@@ -188,7 +240,7 @@ static bool Find(const catalog::Catalog *catalog,
       }
       if (entries[i].IsNestedCatalogMountpoint()) {
         // Find transition point
-        counters->num_transition_points++;
+        computed_counters->d_self_nested++;
         hash::Any tmp;
         if (!catalog->FindNested(full_path, &tmp)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
@@ -197,11 +249,11 @@ static bool Find(const catalog::Catalog *catalog,
         }
       } else {
         // Recurse
-        if (!Find(catalog, full_path, counters))
+        if (!Find(catalog, full_path, computed_counters))
           retval = false;
       }
     } else if (entries[i].IsLink()) {
-      counters->num_symlinks++;
+      computed_counters->d_self_symlink++;
       // No hash for symbolics links
       if (!entries[i].checksum().IsNull()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "symbolic links with hash at %s",
@@ -216,7 +268,7 @@ static bool Find(const catalog::Catalog *catalog,
         retval = false;
       }
     } else if (entries[i].IsRegular()) {
-      counters->num_files++;
+      computed_counters->d_self_regular++;
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "unknown file type %s",
                full_path.c_str());
@@ -272,8 +324,12 @@ static catalog::Catalog *DecompressCatalog(const string &path,
 }
 
 
+/**
+ * Recursion on nested catalog level.  No ownership of computed_counters.
+ */
 static bool InspectTree(const string &path, const hash::Any &catalog_hash,
-                        const catalog::DirectoryEntry *transition_point)
+                        const catalog::DirectoryEntry *transition_point,
+                        catalog::DeltaCounters *computed_counters)
 {
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
@@ -326,13 +382,12 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
   }
 
   // Traverse the catalog
-  Counters *counters = new Counters();
-  if (!Find(catalog, PathString(path.data(), path.length()), counters))
+  if (!Find(catalog, PathString(path.data(), path.length()), computed_counters))
     retval = false;
 
   // Check number of entries
-  const uint64_t num_found_entries =
-    1 + counters->num_files + counters->num_symlinks + counters->num_dirs;
+  const uint64_t num_found_entries = 1 + computed_counters->d_self_regular +
+    computed_counters->d_self_symlink + computed_counters->d_self_dir;
   if (num_found_entries != catalog->GetNumEntries()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "dangling entries in catalog, "
              "expected %"PRIu64", got %"PRIu64,
@@ -343,9 +398,11 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
   // Recurse into nested catalogs
   catalog::Catalog::NestedCatalogList nested_catalogs =
     catalog->ListNestedCatalogs();
-  if (nested_catalogs.size() != counters->num_transition_points) {
+  if (nested_catalogs.size() !=
+      static_cast<uint64_t>(computed_counters->d_self_nested))
+  {
     LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
-             " expected %lu, got %lu", counters->num_transition_points,
+             " expected %lu, got %lu", computed_counters->d_self_nested,
              nested_catalogs.size());
     retval = false;
   }
@@ -358,12 +415,28 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
                i->path.c_str());
       retval = false;
     } else {
-      if (!InspectTree(i->path.ToString(), i->hash, &nested_transition_point))
+      catalog::DeltaCounters nested_counters;
+      if (!InspectTree(i->path.ToString(), i->hash, &nested_transition_point,
+                       &nested_counters))
         retval = false;
+      nested_counters.PopulateToParent(computed_counters);
     }
   }
 
-  delete counters;
+  catalog::Counters compare_counters;
+  compare_counters.ApplyDelta(*computed_counters);
+  catalog::Counters stored_counters;
+  if (!catalog->GetCounters(&stored_counters)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to get counters (%s)",
+             path.c_str());
+    retval = false;
+  } else {
+    if (!CompareCounters(compare_counters, stored_counters)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch");
+      retval = false;
+    }
+  }
+
   delete catalog;
   return retval;
 }
@@ -419,7 +492,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  bool retval = InspectTree("", manifest->catalog_hash(), NULL);
+  catalog::DeltaCounters computed_counters;
+  bool retval = InspectTree("", manifest->catalog_hash(), NULL,
+                            &computed_counters);
 
   return retval ? 0 : 1;
 }

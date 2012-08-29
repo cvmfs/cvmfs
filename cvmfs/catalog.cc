@@ -317,6 +317,57 @@ uint64_t Catalog::GetNumEntries() const {
 
 
 /**
+ * Receive catalog statistics
+ */
+bool Catalog::GetCounters(Counters *counters) const {
+  SqlGetCounter sql_counter(database());
+  bool retval;
+
+  retval = sql_counter.BindCounter("self_regular") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->self_regular = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  retval = sql_counter.BindCounter("self_symlink") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->self_symlink = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  retval = sql_counter.BindCounter("self_dir") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->self_dir = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  retval = sql_counter.BindCounter("self_nested") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->self_nested = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  retval = sql_counter.BindCounter("subtree_regular") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->subtree_regular = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  retval = sql_counter.BindCounter("subtree_symlink") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->subtree_symlink = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  retval = sql_counter.BindCounter("subtree_dir") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->subtree_dir = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  retval = sql_counter.BindCounter("subtree_nested") && sql_counter.Execute();
+  if (!retval) return false;
+  counters->subtree_nested = sql_counter.GetCounter();
+  sql_counter.Reset();
+
+  return true;
+}
+
+
+/**
  * Determine the actual inode of a DirectoryEntry.
  * The first used entry from a hardlink group deterimines the inode of the
  * others.
