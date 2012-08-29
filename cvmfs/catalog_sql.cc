@@ -670,7 +670,7 @@ bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
 SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
   const string statememt =
     "UPDATE catalog SET inode="
-    "CASE (hardlinks << 32) >> 32 WHEN 2 THEN 0 ELSE hardlinks+1*(:delta) END "
+    "CASE (hardlinks << 32) >> 32 WHEN 2 THEN 0 ELSE hardlinks + :delta END "
     "WHERE hardlinks = (SELECT hardlinks from catalog "
     "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statememt);

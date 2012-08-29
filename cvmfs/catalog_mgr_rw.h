@@ -47,35 +47,35 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
   bool Init();
 
-  bool AddFile(const DirectoryEntry &entry,
+  void AddFile(const DirectoryEntry &entry,
                const std::string &parent_directory);
-  bool RemoveFile(const std::string &file_path);
-  bool AddDirectory(const DirectoryEntry &entry,
+  void RemoveFile(const std::string &file_path);
+  void AddDirectory(const DirectoryEntry &entry,
                     const std::string &parent_directory);
-  bool RemoveDirectory(const std::string &directory_path);
+  void RemoveDirectory(const std::string &directory_path);
 
-  bool TouchEntry(const DirectoryEntry entry, const std::string &path);
-  bool TouchFile(const DirectoryEntry entry, const std::string &file_path)
+  void TouchEntry(const DirectoryEntry entry, const std::string &path);
+  void TouchFile(const DirectoryEntry entry, const std::string &file_path)
   {
-    return TouchEntry(entry, file_path);
+    TouchEntry(entry, file_path);
   }
-  bool TouchDirectory(const DirectoryEntry entry,
+  void TouchDirectory(const DirectoryEntry entry,
                       const std::string &directory_path)
   {
-    return TouchEntry(entry, directory_path);
+    TouchEntry(entry, directory_path);
   }
 
-	bool AddHardlinkGroup(DirectoryEntryList &entries,
+	void AddHardlinkGroup(DirectoryEntryList &entries,
                         const std::string &parent_directory);
-  bool ShrinkHardlinkGroup(const std::string &remove_path);
+  void ShrinkHardlinkGroup(const std::string &remove_path);
 
-  bool CreateNestedCatalog(const std::string &mountpoint);
-  bool RemoveNestedCatalog(const std::string &mountpoint);
+  void CreateNestedCatalog(const std::string &mountpoint);
+  void RemoveNestedCatalog(const std::string &mountpoint);
 
 	/**
 	 * TODO
 	 */
-  bool PrecalculateListings();
+  void PrecalculateListings();
 
   Manifest *Commit();
 

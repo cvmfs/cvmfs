@@ -38,41 +38,41 @@ class WritableCatalog : public Catalog {
   inline bool IsWritable() const { return true; }
   uint32_t GetMaxLinkId() const;
 
-  bool AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
+  void AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
                 const std::string &parent_path);
-  bool TouchEntry(const DirectoryEntry &entry, const std::string &entry_path);
-  bool RemoveEntry(const std::string &entry_path);
-  bool IncLinkcount(const std::string &path_within_group, const int delta);
+  void TouchEntry(const DirectoryEntry &entry, const std::string &entry_path);
+  void RemoveEntry(const std::string &entry_path);
+  void IncLinkcount(const std::string &path_within_group, const int delta);
 
   // Creation and removal of catalogs
-  bool Partition(WritableCatalog *new_nested_catalog);
-  bool MergeIntoParent();
+  void Partition(WritableCatalog *new_nested_catalog);
+  void MergeIntoParent();
 
   // Nested catalog references
-  bool InsertNestedCatalog(const std::string &mountpoint,
+  void InsertNestedCatalog(const std::string &mountpoint,
                            Catalog *attached_reference,
                            const hash::Any content_hash);
-  bool UpdateNestedCatalog(const std::string &path, const hash::Any &hash);
-  bool RemoveNestedCatalog(const std::string &mountpoint,
+  void UpdateNestedCatalog(const std::string &path, const hash::Any &hash);
+  void RemoveNestedCatalog(const std::string &mountpoint,
                            Catalog **attached_reference);
 
-  bool UpdateLastModified();
-  bool IncrementRevision();
-  bool SetPreviousRevision(const hash::Any &hash);
+  void UpdateLastModified();
+  void IncrementRevision();
+  void SetPreviousRevision(const hash::Any &hash);
 
  protected:
   Database::OpenMode DatabaseOpenMode() const {
     return Database::kOpenReadWrite;
   }
 
-  inline bool AddEntry(const DirectoryEntry &entry, const std::string &path) {
-    return AddEntry(entry, path, GetParentPath(path));
+  inline void AddEntry(const DirectoryEntry &entry, const std::string &path) {
+    AddEntry(entry, path, GetParentPath(path));
   }
 
-  bool UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
-  inline bool UpdateEntry(const DirectoryEntry &entry, const std::string &path)
+  void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
+  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path)
   {
-    return UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
+    UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
   }
 
   void InitPreparedStatements();
@@ -94,6 +94,8 @@ class WritableCatalog : public Catalog {
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 
+  DeltaCounters delta_counters_;
+
   inline void SetDirty() {
     if (!dirty_)
       Transaction();
@@ -101,23 +103,23 @@ class WritableCatalog : public Catalog {
   }
 
   // Helpers for nested catalog creation and removal
-  bool MakeTransitionPoint(const std::string &mountpoint);
-  bool MakeNestedRoot();
-  inline bool MoveToNested(const std::string dir_structure_root,
+  void MakeTransitionPoint(const std::string &mountpoint);
+  void MakeNestedRoot();
+  inline void MoveToNested(const std::string dir_structure_root,
                            WritableCatalog *new_nested_catalog,
                            std::vector<std::string> *grand_child_mountpoints) {
-    return MoveToNestedRecursively(dir_structure_root,
-                                   new_nested_catalog,
-                                   grand_child_mountpoints);
+    MoveToNestedRecursively(dir_structure_root,
+                            new_nested_catalog,
+                            grand_child_mountpoints);
   }
-  bool MoveToNestedRecursively(const std::string dir_structure_root,
+  void MoveToNestedRecursively(const std::string dir_structure_root,
                              WritableCatalog *new_nested_catalog,
                              std::vector<std::string> *grand_child_mountpoints);
-  bool MoveCatalogsToNested(const std::vector<std::string> &nested_catalogs,
+  void MoveCatalogsToNested(const std::vector<std::string> &nested_catalogs,
                             WritableCatalog *new_nested_catalog);
 
-  bool CopyToParent();
-  bool CopyCatalogsToParent();
+  void CopyToParent();
+  void CopyCatalogsToParent();
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;

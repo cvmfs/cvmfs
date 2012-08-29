@@ -453,9 +453,7 @@ void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
     LogCvmfs(kLogPublish, kLogStdout, "[add] Nested catalog at %s",
              GetParentPath(requestFile.GetUnionPath()).c_str());
 	if (!params_->dry_run) {
-    bool retval = catalog_manager_->CreateNestedCatalog(
-                    requestFile.relative_parent_path());
-    assert(retval);
+    catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path());
   }
 }
 
@@ -465,9 +463,7 @@ void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
     LogCvmfs(kLogPublish, kLogStdout, "[rem] Nested catalog at %s",
              GetParentPath(requestFile.GetUnionPath()).c_str());
 	if (!params_->dry_run) {
-    bool retval = catalog_manager_->RemoveNestedCatalog(
-                    requestFile.relative_parent_path());
-    assert(retval);
+    catalog_manager_->RemoveNestedCatalog(requestFile.relative_parent_path());
   }
 }
 
@@ -498,9 +494,7 @@ void SyncMediator::RemoveFile(SyncItem &entry) {
     if (entry.GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
                entry.GetUnionPath().c_str());
-      bool retval =
-        catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
-      assert(retval);
+      catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
     }
     catalog_manager_->RemoveFile(entry.GetRelativePath());
   }

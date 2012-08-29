@@ -49,11 +49,11 @@ struct InodeRange {
 
 struct DeltaCounters {
   DeltaCounters() {
-    d_self_regular = d_self_symlink = d_self_dir = d_self_nested =
-    d_subtree_regular = d_subtree_symlink = d_subtree_dir =
-    d_subtree_nested = 0;
+    SetZero();
   }
+  void SetZero();
   void PopulateToParent(DeltaCounters *parent);
+  void DeltaDirent(const DirectoryEntry &dirent, const int delta);
 
   int64_t d_self_regular;
   int64_t d_self_symlink;
