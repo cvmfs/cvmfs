@@ -21,6 +21,7 @@
 #ifndef CVMFS_CATALOG_MGR_RW_H_
 #define CVMFS_CATALOG_MGR_RW_H_
 
+#include <pthread.h>
 #include <stdint.h>
 
 #include <set>
@@ -42,6 +43,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
                          const std::string &stratum0,
                          const std::string &dir_temp,
                          upload::Spooler *spooler);
+  ~WritableCatalogManager();
   static Manifest *CreateRepository(const std::string &dir_temp,
                                     upload::Spooler *spooler);
 
@@ -115,9 +117,13 @@ class WritableCatalogManager : public AbstractCatalogManager {
   hash::Any SnapshotCatalog(WritableCatalog *catalog) const;
 
  private:
+  inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
+  inline void SyncUnlock() { pthread_mutex_unlock(sync_lock_); }
+
   // defined in catalog_mgr_rw.cc
   const static std::string kCatalogFilename;
 
+  pthread_mutex_t *sync_lock_;  // private lock of WritableCatalogManager
   hash::Any base_hash_;
   std::string stratum0_;
   std::string dir_temp_;

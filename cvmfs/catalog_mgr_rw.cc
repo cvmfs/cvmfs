@@ -22,6 +22,7 @@
 #include "download.h"
 #include "manifest.h"
 #include "upload.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -32,11 +33,21 @@ WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
                                                const string &dir_temp,
                                                upload::Spooler *spooler)
 {
+  sync_lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(sync_lock_, NULL);
+  assert(retval == 0);
   base_hash_ = base_hash;
   stratum0_ = stratum0;
   dir_temp_ = dir_temp;
   spooler_ = spooler;
   Init();
+}
+
+
+WritableCatalogManager::~WritableCatalogManager() {
+  pthread_mutex_destroy(sync_lock_);
+  free(sync_lock_);
 }
 
 
@@ -70,7 +81,7 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load %s from Stratum 0 (%d)", url.c_str(), retval);
-    return kLoadFail;
+    assert(false);
   }
 
   return kLoadNew;
@@ -199,6 +210,7 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   const string file_path = MakeRelativePath(path);
 	const string parent_path = GetParentPath(file_path);
 
+  SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
@@ -207,6 +219,7 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   }
 
   catalog->RemoveEntry(file_path);
+  SyncUnlock();
 }
 
 
@@ -219,6 +232,7 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
   const string directory_path = MakeRelativePath(path);
 	const string parent_path = GetParentPath(directory_path);
 
+  SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr,
@@ -249,6 +263,7 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
     parent_entry.set_is_nested_catalog_root(false);
     parent_catalog->UpdateEntry(parent_entry, parent_path);
   }
+  SyncUnlock();
 }
 
 
@@ -266,6 +281,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
   string directory_path = parent_path + "/";
   directory_path.append(entry.name().GetChars(), entry.name().GetLength());
 
+  SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr,
@@ -298,6 +314,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
     parent_entry.set_is_nested_catalog_root(false);
     parent_catalog->UpdateEntry(parent_entry, parent_path);
   }
+  SyncUnlock();
 }
 
 
@@ -314,6 +331,7 @@ void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
   string file_path = parent_path + "/";
   file_path.append(entry.name().GetChars(), entry.name().GetLength());
 
+  SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
@@ -323,6 +341,7 @@ void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
   catalog->AddEntry(entry, file_path, parent_path);
+  SyncUnlock();
 }
 
 
@@ -347,6 +366,7 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	// Therefore we only have one parent directory here
 	const string parent_path = MakeRelativePath(parent_directory);
 
+  SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr,
@@ -371,13 +391,14 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
     i->set_hardlinks(new_group_id, entries.size());
 	  catalog->AddEntry(*i, file_path, parent_path);
 	}
+  SyncUnlock();
 }
 
 
 void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
-
   const string relative_path = MakeRelativePath(remove_path);
 
+  SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(relative_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr,
@@ -387,6 +408,7 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
   }
 
   catalog->IncLinkcount(relative_path, -1);
+  SyncUnlock();
 }
 
 
@@ -399,6 +421,7 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
   const string entry_path = MakeRelativePath(path);
   const string parent_path = GetParentPath(entry_path);
 
+  SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
@@ -428,6 +451,7 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
       assert(retval);
     }
   }
+  SyncUnlock();
 }
 
 
@@ -441,6 +465,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 {
   const string nested_root_path = MakeRelativePath(mountpoint);
 
+  SyncLock();
   // Find the catalog currently containing the directory structure, which
   // will be represented as a new nested catalog from now on
   WritableCatalog *old_catalog = NULL;
@@ -486,6 +511,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // catalog
   old_catalog->InsertNestedCatalog(new_catalog->path().ToString(), NULL,
                                    hash::Any(hash::kSha1));
+  SyncUnlock();
 }
 
 
@@ -499,6 +525,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
   const string nested_root_path = MakeRelativePath(mountpoint);
 
+  SyncLock();
   // Find the catalog which should be removed
   WritableCatalog *nested_catalog = NULL;
   if (!FindCatalog(nested_root_path, &nested_catalog)) {
@@ -525,6 +552,7 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
 
   // Remove the catalog from internal data structures
   DetachCatalog(nested_catalog);
+  SyncUnlock();
 }
 
 
@@ -608,6 +636,13 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
            catalog->path().c_str());
 
+  catalog->UpdateCounters();
+  if (catalog->parent()) {
+    catalog->delta_counters_.PopulateToParent(
+      &catalog->GetWritableParent()->delta_counters_);
+  }
+  catalog->delta_counters_.SetZero();
+
   catalog->UpdateLastModified();
   catalog->IncrementRevision();
 
@@ -634,7 +669,7 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   spooler_->SpoolCopy(catalog->database_path() + ".compressed",
                       "data" + hash_catalog.MakePath(1, 2) + "C");
 
-	/* Update registered catalog SHA1 in nested catalog */
+	// Update registered catalog SHA1 in nested catalog
 	if (!catalog->IsRoot()) {
 		LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());
