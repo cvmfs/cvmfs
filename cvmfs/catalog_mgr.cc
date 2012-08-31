@@ -432,11 +432,16 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
       Catalog *new_nested;
       LogCvmfs(kLogCatalog, kLogDebug, "load nested catalog at %s",
                i->path.c_str());
+      // prevent endless recursion with corrupted catalogs
+      // (due to reloading root)
+      if (i->hash.IsNull())
+        return false;
       new_nested = MountCatalog(i->path, i->hash, parent);
       if (!new_nested)
         return false;
 
       result = MountSubtree(path, new_nested, &parent);
+      break;
     }
   }
 
