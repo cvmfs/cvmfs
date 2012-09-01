@@ -278,7 +278,9 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
     }
   }
 
-  buf += "/";
+  if( buf.length() == 0 || buf[buf.length()-1] != '/' ) {
+	  buf += "/";
+  }
   buf += fname;
 
   struct stat st;
@@ -321,6 +323,9 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
        && (ln_buf[len] == '/' || ln_buf[len] == '\0'))
     {
       buf = ln_buf+len;
+	  if( ln_buf[len] == '\0' ) {
+		  buf += "/";
+	  }
     }
     else {
       LogCvmfs(kLogCvmfs,kLogDebug,"libcvmfs cannot resolve symlinks to paths outside of the repository: %s --> %s (mountpoint=%s)",
