@@ -721,19 +721,19 @@ uint64_t SqlGetCounter::GetCounter() const {
 //------------------------------------------------------------------------------
 
 
-SqlSetCounter::SqlSetCounter(const Database &database) {
+SqlUpdateCounter::SqlUpdateCounter(const Database &database) {
   Init(database.sqlite_db(),
-       "UPDATE statistics SET value=:val WHERE counter=:counter;");
+       "UPDATE statistics SET value=value+:val WHERE counter=:counter;");
 }
 
 
-bool SqlSetCounter::BindCounter(const std::string &counter) {
+bool SqlUpdateCounter::BindCounter(const std::string &counter) {
   return BindText(2, counter);
 }
 
 
-bool SqlSetCounter::BindValue(const uint64_t value) {
-  return BindInt64(1, value);
+bool SqlUpdateCounter::BindDelta(const int64_t delta) {
+  return BindInt64(1, delta);
 }
 
 } // namespace catalog

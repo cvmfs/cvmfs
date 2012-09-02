@@ -91,9 +91,9 @@ void PublishHardlinksCallback::Callback(const std::string &path, int retval,
 }
 
 
-SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalogManager,
+SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
-  catalog_manager_(catalogManager),
+  catalog_manager_(catalog_manager),
   params_(params)
 {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);

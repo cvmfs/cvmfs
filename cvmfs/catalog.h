@@ -73,6 +73,8 @@ struct Counters {
   }
 
   void ApplyDelta(const DeltaCounters &delta);
+  void AddAsSubtree(DeltaCounters *delta);
+  void MergeIntoParent(DeltaCounters *parent_delta);
   uint64_t GetSelfEntries() const;
   uint64_t GetSubtreeEntries() const;
   uint64_t GetAllEntries() const;

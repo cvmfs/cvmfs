@@ -18,9 +18,10 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
-  Catalog(PathString(path.data(), path.length()), parent),
-  dirty_(false)
-{ }
+  Catalog(PathString(path.data(), path.length()), parent)
+{
+  dirty_ = false;
+}
 
 
 WritableCatalog::~WritableCatalog() {
@@ -237,6 +238,7 @@ void WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
   // Create connection between parent and child catalogs
   MakeTransitionPoint(new_nested_catalog->path().ToString());
   new_nested_catalog->MakeNestedRoot();
+  delta_counters_.d_subtree_dir++;  // Root directory in nested catalog
 
   // Move the present directory tree into the newly created nested catalog
   // if we hit nested catalog mountpoints on the way, we return them through
@@ -324,12 +326,16 @@ void WritableCatalog::MoveCatalogsToNested(
   for (vector<string>::const_iterator i = nested_catalogs.begin(),
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
-    // TODO: only fitting nested catalogs
+    hash::Any hash_nested;
+    bool retval = FindNested(PathString(i->data(), i->length()),
+                             &hash_nested);
+    assert(retval);
+
     Catalog *attached_reference = NULL;
     RemoveNestedCatalog(*i, &attached_reference);
 
     new_nested_catalog->InsertNestedCatalog(*i, attached_reference,
-                                            hash::Any(hash::kSha1));
+                                            hash_nested);
   }
 }
 
@@ -433,12 +439,20 @@ void WritableCatalog::UpdateNestedCatalog(const string &path,
 
 void WritableCatalog::MergeIntoParent() {
   assert(!IsRoot());
-
   WritableCatalog *parent = GetWritableParent();
+
   CopyToParent();
 
   // Copy the nested catalog references
   CopyCatalogsToParent();
+
+  // Fix counters in parent
+  delta_counters_.PopulateToParent(&parent->delta_counters_);
+  Counters counters;
+  bool retval = GetCounters(&counters);
+  assert(retval);
+  counters.ApplyDelta(delta_counters_);
+  counters.MergeIntoParent(&parent->delta_counters_);
 
   // Remove the nested catalog reference for this nested catalog.
   // From now on this catalog will be dangling!
@@ -460,6 +474,7 @@ void WritableCatalog::CopyCatalogsToParent() {
   {
     Catalog *child = FindChild(i->path);
     parent->InsertNestedCatalog(i->path.ToString(), child, i->hash);
+    parent->delta_counters_.d_self_nested--;  // Will be fixed later
   }
 }
 
@@ -488,9 +503,9 @@ void WritableCatalog::CopyToParent() {
   bool retval = sql_update_link_ids.Execute();
   assert(retval);
 
-  // Remove the nested catalog mount point.
-  // It will be replaced with the nested catalog root entry when copying.
-  parent->RemoveEntry(this->path().ToString());
+  // Remove the nested catalog root.
+  // It is already present in the parent.
+  RemoveEntry(this->path().ToString());
 
   // Now copy all DirectoryEntries to the 'other' catalog.
   // There will be no data collisions, as we resolved them beforehand
@@ -515,12 +530,94 @@ void WritableCatalog::CopyToParent() {
   retval = parent->LookupPath(this->path(), &old_root_entry);
   assert(retval);
 
-  assert(old_root_entry.IsDirectory() && old_root_entry.IsNestedCatalogRoot() &&
-         !old_root_entry.IsNestedCatalogMountpoint());
+  assert(old_root_entry.IsDirectory() &&
+         old_root_entry.IsNestedCatalogMountpoint() &&
+         !old_root_entry.IsNestedCatalogRoot());
 
   // Remove the nested catalog root mark
-  old_root_entry.set_is_nested_catalog_root(false);
+  old_root_entry.set_is_nested_catalog_mountpoint(false);
   parent->UpdateEntry(old_root_entry, this->path().ToString());
+}
+
+
+/**
+ * Writes delta_counters_ to the database.
+ */
+void WritableCatalog::UpdateCounters() {
+  SqlUpdateCounter sql_counter(database());
+  bool retval;
+
+  if (delta_counters_.d_self_regular != 0) {
+    retval =
+      sql_counter.BindCounter("self_regular") &&
+      sql_counter.BindDelta(delta_counters_.d_self_regular) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
+
+  if (delta_counters_.d_self_symlink != 0) {
+    retval =
+      sql_counter.BindCounter("self_symlink") &&
+      sql_counter.BindDelta(delta_counters_.d_self_symlink) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
+
+  if (delta_counters_.d_self_dir != 0) {
+    retval =
+      sql_counter.BindCounter("self_dir") &&
+      sql_counter.BindDelta(delta_counters_.d_self_dir) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
+
+  if (delta_counters_.d_self_nested != 0) {
+    retval =
+      sql_counter.BindCounter("self_nested") &&
+      sql_counter.BindDelta(delta_counters_.d_self_nested) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
+
+  if (delta_counters_.d_subtree_regular != 0) {
+    retval =
+      sql_counter.BindCounter("subtree_regular") &&
+      sql_counter.BindDelta(delta_counters_.d_subtree_regular) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
+
+  if (delta_counters_.d_subtree_symlink != 0) {
+    retval =
+      sql_counter.BindCounter("subtree_symlink") &&
+      sql_counter.BindDelta(delta_counters_.d_subtree_symlink) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
+
+  if (delta_counters_.d_subtree_dir != 0) {
+    retval =
+      sql_counter.BindCounter("subtree_dir") &&
+      sql_counter.BindDelta(delta_counters_.d_subtree_dir) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
+
+  if (delta_counters_.d_subtree_nested != 0) {
+    retval =
+      sql_counter.BindCounter("subtree_nested") &&
+      sql_counter.BindDelta(delta_counters_.d_subtree_nested) &&
+      sql_counter.Execute();
+    assert(retval);
+    sql_counter.Reset();
+  }
 }
 
 }  // namespace catalog

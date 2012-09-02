@@ -102,7 +102,7 @@ class SyncMediator {
   friend class PublishHardlinksCallback;
   friend class SyncUnion;
  public:
-  SyncMediator(catalog::WritableCatalogManager *catalogManager,
+  SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                const SyncParameters *params);
 
   void Add(SyncItem &entry);

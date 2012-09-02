@@ -511,6 +511,28 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // catalog
   old_catalog->InsertNestedCatalog(new_catalog->path().ToString(), NULL,
                                    hash::Any(hash::kSha1));
+
+  // Fix subtree counters in new nested catalogs: subtree is the sum of all
+  // entries of all "grand-nested" catalogs
+  Catalog::NestedCatalogList grand_nested =
+    wr_new_catalog->ListNestedCatalogs();
+  DeltaCounters fix_subtree_counters;
+  for (Catalog::NestedCatalogList::const_iterator i = grand_nested.begin(),
+       iEnd = grand_nested.end(); i != iEnd; ++i)
+  {
+    WritableCatalog *grand_catalog;
+    retval = FindCatalog(i->path.ToString(), &grand_catalog);
+    assert(retval);
+    Counters grand_counters;
+    retval = grand_catalog->GetCounters(&grand_counters);
+    assert(retval);
+    grand_counters.AddAsSubtree(&fix_subtree_counters);
+  }
+  DeltaCounters save_counters = wr_new_catalog->delta_counters_;
+  wr_new_catalog->delta_counters_ = fix_subtree_counters;
+  wr_new_catalog->UpdateCounters();
+  wr_new_catalog->delta_counters_ = save_counters;
+
   SyncUnlock();
 }
 

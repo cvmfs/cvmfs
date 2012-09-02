@@ -423,16 +423,19 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
     }
   }
 
+  // Check statistics counters
+  computed_counters->d_self_dir++;  // Additionally account for root directory
   catalog::Counters compare_counters;
   compare_counters.ApplyDelta(*computed_counters);
   catalog::Counters stored_counters;
   if (!catalog->GetCounters(&stored_counters)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to get counters (%s)",
-             path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to get counters (%s) [%s]",
+             path.c_str(), catalog_hash.ToString().c_str());
     retval = false;
   } else {
     if (!CompareCounters(compare_counters, stored_counters)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch");
+      LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
+               catalog_hash.ToString().c_str());
       retval = false;
     }
   }

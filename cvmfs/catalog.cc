@@ -59,6 +59,26 @@ void Counters::ApplyDelta(const DeltaCounters &delta) {
 }
 
 
+void Counters::AddAsSubtree(DeltaCounters *delta) {
+  delta->d_subtree_regular += self_regular + subtree_regular;
+  delta->d_subtree_symlink += self_symlink + subtree_symlink;
+  delta->d_subtree_dir += self_dir + subtree_dir;
+  delta->d_subtree_nested += self_nested + subtree_nested;
+}
+
+
+void Counters::MergeIntoParent(DeltaCounters *parent_delta) {
+  parent_delta->d_self_regular += self_regular;
+  parent_delta->d_subtree_regular -= self_regular;
+  parent_delta->d_self_symlink += self_symlink;
+  parent_delta->d_subtree_symlink -= self_symlink;
+  parent_delta->d_self_dir += self_dir;
+  parent_delta->d_subtree_dir -= self_dir;
+  parent_delta->d_self_nested += self_nested;
+  parent_delta->d_subtree_nested -= self_nested;
+}
+
+
 uint64_t Counters::GetSelfEntries() const {
   return self_regular + self_symlink + self_dir - self_nested;
 }

@@ -460,11 +460,11 @@ class SqlGetCounter : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlSetCounter : public Sql {
+class SqlUpdateCounter : public Sql {
  public:
-  SqlSetCounter(const Database &database);
+  SqlUpdateCounter(const Database &database);
   bool BindCounter(const std::string &counter);
-  bool BindValue(const uint64_t value);
+  bool BindDelta(const int64_t delta);
 };
 
 }  // namespace catalog

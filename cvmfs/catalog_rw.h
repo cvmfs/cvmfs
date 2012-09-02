@@ -24,6 +24,8 @@
 
 namespace catalog {
 
+class WritableCatalogManager;
+
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
 
@@ -94,6 +96,7 @@ class WritableCatalog : public Catalog {
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 
+  const WritableCatalogManager *catalog_mgr_;
   DeltaCounters delta_counters_;
 
   inline void SetDirty() {
@@ -120,6 +123,8 @@ class WritableCatalog : public Catalog {
 
   void CopyToParent();
   void CopyCatalogsToParent();
+
+  void UpdateCounters();
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
