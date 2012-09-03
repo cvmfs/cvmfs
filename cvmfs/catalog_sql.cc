@@ -703,17 +703,24 @@ uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
 
 
 SqlGetCounter::SqlGetCounter(const Database &database) {
-  Init(database.sqlite_db(),
-       "SELECT value from statistics WHERE counter = :counter;");
+  if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
+    compat_ = false;
+    Init(database.sqlite_db(),
+         "SELECT value from statistics WHERE counter = :counter;");
+  } else {
+    compat_ = true;
+  }
 }
 
 
 bool SqlGetCounter::BindCounter(const std::string &counter) {
+  if (compat_) return true;
   return BindText(1, counter);
 }
 
 
 uint64_t SqlGetCounter::GetCounter() const {
+  if (compat_) return 0;
   return RetrieveInt64(0);
 }
 

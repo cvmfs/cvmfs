@@ -454,6 +454,8 @@ class SqlGetCounter : public Sql {
   SqlGetCounter(const Database &database);
   bool BindCounter(const std::string &counter);
   uint64_t GetCounter() const;
+ private:
+  bool compat_;
 };
 
 

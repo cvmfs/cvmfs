@@ -549,14 +549,12 @@ catalog::Catalog *CatalogManager::CreateCatalog(const PathString &mountpoint,
  * Triggered when the catalog is attached (db file opened)
  */
 void CatalogManager::ActivateCatalog(const catalog::Catalog *catalog) {
-  if (catalog->schema() > 2.4 - catalog::Database::kSchemaEpsilon) {
-    catalog::Counters counters;
-    catalog->GetCounters(&counters);
-    if (catalog->IsRoot()) {
-      all_inodes_ = counters.GetAllEntries();
-    }
-    loaded_inodes_ += counters.GetSelfEntries();
+  catalog::Counters counters;
+  catalog->GetCounters(&counters);
+  if (catalog->IsRoot()) {
+    all_inodes_ = counters.GetAllEntries();
   }
+  loaded_inodes_ += counters.GetSelfEntries();
 }
 
 
