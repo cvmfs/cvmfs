@@ -6,22 +6,32 @@
 #define CVMFS_CIPHER_H_
 
 #include <string>
-#include <cstdio>
+
 
 namespace cipher{
 
-  bool LoadCertificatePath(const std::string &file_pem);
+void Init();
 
-  bool LoadPrivateKeyPath(const std::string &file_pem, const std::string &password);
+void Fini();
 
-  bool LoadAESKey();
+bool LoadCertificatePath(const std::string &file_pem);
 
-  bool LoadIV(const std::string &iv);
+bool LoadPrivateKeyPath(const std::string &file_pem, const std::string &password);
 
-bool Decrypt(const unsigned char *buffer,
-	     const unsigned buffer_size);
+bool LoadAESKey();
 
+bool LoadIV(const char *iv, unsigned ivlen);
+
+int UnHexlify(char* str, unsigned len, char** buf);
+
+int Decrypt(const unsigned char *buffer,
+	    const unsigned buffer_size,
+	    const unsigned char **ptr);
+
+char *unbase64(const char *input, int length);
 }
+
+
 
 
 #endif

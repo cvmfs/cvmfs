@@ -1,3 +1,10 @@
+/**
+ * This file is part of the CernVM File System.
+ *
+ * It is needed to load a crypted symmetric key in PKCS7 format, using private keys in PEM.
+ * The symmetric key is then used to decrypt files.
+ */
+
 #include <openssl/pkcs7.h>
 #include <openssl/bio.h>
 
@@ -26,14 +33,20 @@ namespace cipher {
 
 X509 *certificate_ = NULL;
 EVP_PKEY *private_key_ = NULL;
-EVP_CIPHER_CTX ctx;
+EVP_CIPHER_CTX *ctx_;
 unsigned char* aes_key_ = NULL;
-char iv_[33];
+unsigned char* iv_;
 
+void Init(){
+  OpenSSL_add_all_algorithms();
+  ERR_load_crypto_strings();
+}
 
+void Fini(){
+}
 /**
- * Loads a certificate.  This certificate is used for the following
- * signature verifications
+ * Loads a certificate.  The certificate is needed
+ * to decrypt data in PKCS7, together with the private key.
  *
  * \return True on success, false otherwise
  */
@@ -77,8 +90,8 @@ bool LoadPrivateKeyPath(const string &file_pem, const string &password) {
 bool LoadAESKey() {
   // Decrypt the key from PKCS7
 
-  OpenSSL_add_all_algorithms();
-  ERR_load_crypto_strings();
+
+
 
   BIO *bio_out;
  
@@ -90,7 +103,6 @@ bool LoadAESKey() {
   int buffer_size;
 
   BIO *cont = NULL;
-  CMS_ContentInfo *cms = NULL;
   const char *data =
     "-----BEGIN PKCS7-----\n"
 "MIIBUAYJKoZIhvcNAQcDoIIBQTCCAT0CAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
@@ -102,6 +114,30 @@ bool LoadAESKey() {
 "MwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAj+1YCEOx7a2IAQuXyrZfgQGHOmK1+R\n"
 "xBsTLg==\n"
 "-----END PKCS7-----\n";  // TODO: retrieve the real key
+
+data = "-----BEGIN PKCS7-----\n"
+"MIIBWAYJKoZIhvcNAQcDoIIBSTCCAUUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
+"JomT8ixkARkWAmNoMRQwEgYKCZImiZPyLGQBGRYEY2VybjEtMCsGA1UEAxMkQ0VS\n"
+"TiBUcnVzdGVkIENlcnRpZmljYXRpb24gQXV0aG9yaXR5AgoW9OwmAAIAATqqMA0G\n"
+"CSqGSIb3DQEBAQUABIGAhwjfNqjD0qFJc+ZXmEAESLh9kRt5Lq0Vb/nF6UbnUGQ/\n"
+"iwN5BNqPV7o1GXcqzJREhAuV3vYSDmfKEGdDurBVjHYuyhrMjvqmyh9i499+qpQB\n"
+"n+T3YYypxclwzzeTNEkmtJket5bmMJmNayqP3DM7LjlgWtgAhWsBL0sJq07pAYsw\n"
+"OwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAhe6BfmzBtzpoAYXVyuMAUwfSxG/16q\n"
+"Qb6mmzKNAnyztayL\n"
+  "-----END PKCS7-----\n"; //real key example
+
+data = "-----BEGIN PKCS7-----\n"
+"MIIBaAYJKoZIhvcNAQcDoIIBWTCCAVUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
+"JomT8ixkARkWAmNoMRQwEgYKCZImiZPyLGQBGRYEY2VybjEtMCsGA1UEAxMkQ0VS\n"
+"TiBUcnVzdGVkIENlcnRpZmljYXRpb24gQXV0aG9yaXR5AgoW9OwmAAIAATqqMA0G\n"
+"CSqGSIb3DQEBAQUABIGAZnhJdqPXzoadVY9wQ8uGC6bDgwJlc4p7DfpYduErRMgz\n"
+"7dY07WAosEDDw5RDMaCVqCNn3hvDctGAjbxkeTF1YaHOUEwn0rogfRsI+xmHf+rR\n"
+"mBIHguMjmd79rfoOl2yfA63J1Vm9LP50XNC17jr49wxTijaSIOntyH/DpOra69ow\n"
+"SwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAibDJAdGOagXoAoQEbuQ7uNYM7lIfr6\n"
+"za+Ya4AMj17TaqT6OrgIVK4xXrphOpnyYLJObQ==\n"
+  "-----END PKCS7-----\n"; // hex string key example
+
+
 
 
   bio_out = BIO_new(BIO_s_mem());
@@ -119,46 +155,146 @@ bool LoadAESKey() {
     return false;
   }
 
+  char* hex_key;
+
   //  Store the key
   buffer_size = BIO_get_mem_data(bio_out, &bio_buffer);
-  aes_key_ = (unsigned char *)malloc(buffer_size);
-  memcpy(aes_key_, bio_buffer, buffer_size);
+  hex_key = (char *)malloc(buffer_size);
+  memcpy(hex_key, bio_buffer, buffer_size);
   BIO_free(bio_out);
 
-  //  printf("%s", aes_key_);
+  //UnHexlify(hex_key, buffer_size,(char**) &aes_key_); // TODO: CHECK IF IT IS NEEDED
+  aes_key_ = (unsigned char*)malloc(buffer_size);
+  memcpy(aes_key_, hex_key, buffer_size);
 
   return true;
+}
+
+bool LoadIV(const char* iv, unsigned ivlen) {
+
+ 
+  int nread;
+  unsigned iv_strtol;
+
+  iv_strtol =  strtol(iv, NULL, 16);
+
+  //  Convert hex string to binary
+  //UnHexlify((char*)iv, ivlen,(char**) &iv_);
+
+
+  iv_ = (unsigned char*)malloc(ivlen);
+  memcpy(iv_, iv, ivlen);
+
+  return true;
+ 
+}
+
+int UnHexlify(char* str, unsigned len, char** buf) {
+
+  int i;
+  char* buff = (char*) malloc(sizeof(char)*len/2);
+  char* pos = str;
+  *buf = buff;
+
+  for(i = 0; i < len/2; i++) {
+    sscanf(pos, "%2hhx", &buff[i]);
+    pos += 2;
   }
 
-bool LoadIV(const string &iv) { 
+  return i;
 
-  strcpy(iv_ , iv.c_str());
- } 
 
-bool Decrypt(const unsigned char *buffer,
-              const unsigned buffer_size)
+} 
+
+int Decrypt(const unsigned char *buffer,
+	    const unsigned buffer_size,
+	     const unsigned char **ptr)
 {
-  /*  
+  
   //char* key;
-  char* iv;
+  //char* iv;
 
-  char* buf_out; //buffer for clear-text string
+  unsigned char* buf_out; //buffer for clear-text string
   int byte_out; //decoded bytes
   int byte_outF; //last decoded bytes
 
-  buf_out = (char*)malloc(sizeof(char)*(buffer_size + EVP_CIPHER_CTX_block_size())); //alloc enough space for padding
+  BIO *b64, *bio; //  bio to base64decode the buffer
+  unsigned decoded_bytes; //  total number of base64 decoded bytes
+  void* buff_tmp; //  temp pointer to  decoded bytes
+  char* buff; //  buffer to store decoded bytes
 
-  // Initialize decryption
-  EVP_DecryptInit(&ctx, EVP_aes_cbc(), aes_key_, iv_);
+  if(ctx_) free(ctx_);
+  ctx_ = (EVP_CIPHER_CTX*)malloc(sizeof(EVP_CIPHER_CTX));
+
+ 
+  ERR_load_crypto_strings();
+  /*
+  buff = (unsigned char*)malloc(sizeof(unsigned char)*buffer_size);
+
+  // Base64 decode the buffer
+  b64 = BIO_new(BIO_f_base64());
+  //bio = BIO_new(BIO_s_mem());
+  bio = BIO_new_mem_buf((void*)buffer, buffer_size);
+  if(!b64 || !bio) { 
+    printf("BIO error\n");
+    return false;
+  }
+
+
+  //BIO_puts(bio,(const char*) buffer);
+  bio = BIO_push(b64, bio);
+  //decoded_bytes = BIO_get_mem_data(bio, &buff_tmp);
+  //buff = (unsigned char*)malloc(decoded_bytes);
+  //memcpy(buff, buff_tmp, decoded_bytes);
+  
+  BIO_read(bio, buff, buffer_size);*/
+  buff = (char*) buffer;
+  buff = unbase64((const char*)buff, buffer_size);
+
+  printf("The message, base64decoded, is:\n%s\nand its length is %d\n", buff, buffer_size);
+
+  // TODO: Non-working (yet) code follows:
+
+  // Initialize decryption 
+  if (!EVP_DecryptInit(ctx_, EVP_aes_256_cbc(), aes_key_, iv_))
+    ERR_print_errors_fp(stderr);
+
+  buf_out = (unsigned char*)malloc(sizeof(char)*(decoded_bytes + EVP_CIPHER_CTX_block_size(ctx_))); //alloc enough space for padding
 
   // Decrypt
-  EVP_DecryptUpdate(ctx, buf_out, &byte_out, buffer, buffer_size);
-
+  if (!EVP_DecryptUpdate(ctx_, buf_out, &byte_out,(const unsigned char*) buff, decoded_bytes))
+    ERR_print_errors_fp(stderr);
+ 
   // Finalize
-  if(!EVP_DecryptFinal(ctx, &buf_out[byte_out], &byte_outF))
+  if(!EVP_DecryptFinal(ctx_, buf_out + byte_out, &byte_outF)){
     printf("Padding incorrect\n");
-  */
+    ERR_print_errors_fp(stderr);
+  }
+  printf("%s", buf_out);
 
+
+  *ptr = buf_out;
+  return(byte_out + byte_outF);
+
+}
+
+char *unbase64(const char *input, int length)
+{
+  BIO *b64, *bmem;
+
+  char *buffer = (char *)malloc(length);
+  memset(buffer, 0, length);
+
+  b64 = BIO_new(BIO_f_base64());
+  BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+  bmem = BIO_new_mem_buf((void*)input, length);
+  bmem = BIO_push(b64, bmem);
+
+  BIO_read(bmem, buffer, length);
+
+  BIO_free_all(bmem);
+
+  return buffer;
 }
 
 
