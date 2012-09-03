@@ -968,6 +968,11 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
 
   info.f_bfree = info.f_bavail = available;
 
+  // Inodes / entries
+  info.f_files = catalog_manager_->all_inodes();
+  info.f_ffree = info.f_favail =
+    catalog_manager_->all_inodes() - catalog_manager_->loaded_inodes();
+
   fuse_reply_statfs(req, &info);
 }
 

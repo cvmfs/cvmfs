@@ -140,6 +140,7 @@ class AbstractCatalogManager {
                                 const hash::Any &hash,
                                 std::string *catalog_path) = 0;
   virtual void UnloadCatalog(const Catalog *catalog) { };
+  virtual void ActivateCatalog(const Catalog *catalog) { };
 
   /**
    * Create a new Catalog object.

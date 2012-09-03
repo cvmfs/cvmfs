@@ -512,6 +512,7 @@ CatalogManager::CatalogManager(const string &repo_name,
   repo_name_ = repo_name;
   ignore_signature_ = ignore_signature;
   offline_mode_ = false;
+  loaded_inodes_ = all_inodes_ = 0;
   atomic_init32(&certificate_hits_);
   atomic_init32(&certificate_misses_);
 }
@@ -532,16 +533,30 @@ bool CatalogManager::InitFixed(const hash::Any &root_hash) {
   }
 
   return attached;
-
 }
 
 
-catalog::Catalog* CatalogManager::CreateCatalog(const PathString &mountpoint,
+catalog::Catalog *CatalogManager::CreateCatalog(const PathString &mountpoint,
   catalog::Catalog *parent_catalog)
 {
   mounted_catalogs_[mountpoint] = loaded_catalogs_[mountpoint];
   loaded_catalogs_.erase(mountpoint);
   return new catalog::Catalog(mountpoint, parent_catalog);
+}
+
+
+/**
+ * Triggered when the catalog is attached (db file opened)
+ */
+void CatalogManager::ActivateCatalog(const catalog::Catalog *catalog) {
+  if (catalog->schema() > 2.4 - catalog::Database::kSchemaEpsilon) {
+    catalog::Counters counters;
+    catalog->GetCounters(&counters);
+    if (catalog->IsRoot()) {
+      all_inodes_ = counters.GetAllEntries();
+    }
+    loaded_inodes_ += counters.GetSelfEntries();
+  }
 }
 
 
@@ -927,7 +942,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
 
 
 void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
-  LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s", 
+  LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
            catalog->path().c_str());
 
   map<PathString, hash::Any>::iterator iter =
@@ -936,6 +951,9 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
 
   quota::Unpin(iter->second);
   mounted_catalogs_.erase(iter);
+  catalog::Counters counters;
+  catalog->GetCounters(&counters);
+  loaded_inodes_ -= counters.GetSelfEntries();
 }
 
 }  // namespace cache

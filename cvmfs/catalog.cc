@@ -80,12 +80,12 @@ void Counters::MergeIntoParent(DeltaCounters *parent_delta) {
 
 
 uint64_t Counters::GetSelfEntries() const {
-  return self_regular + self_symlink + self_dir - self_nested;
+  return self_regular + self_symlink + self_dir;
 }
 
 
 uint64_t Counters::GetSubtreeEntries() const {
-  return subtree_regular + subtree_symlink + subtree_dir - subtree_nested;
+  return subtree_regular + subtree_symlink + subtree_dir;
 }
 
 

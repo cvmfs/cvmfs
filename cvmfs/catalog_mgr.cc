@@ -472,7 +472,7 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
 
   attached_catalog = CreateCatalog(mountpoint, parent_catalog);
 
-  // Attach loaded catalog (end of virtual behavior)
+  // Attach loaded catalog
   if (!AttachCatalog(catalog_path, attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
@@ -517,6 +517,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   }
 
   catalogs_.push_back(new_catalog);
+  ActivateCatalog(new_catalog);
   return true;
 }
 

@@ -69,6 +69,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
     "misses: " + StringifyInt(atomic_read32(&certificate_misses_)) + "\n";
   }
   bool offline_mode() const { return offline_mode_; }
+  uint64_t all_inodes() const { return all_inodes_; }
+  uint64_t loaded_inodes() const { return loaded_inodes_; }
 
  protected:
   catalog::LoadError LoadCatalog(const PathString &mountpoint,
@@ -77,6 +79,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   catalog::Catalog *parent_catalog);
+  void ActivateCatalog(const catalog::Catalog *catalog);
 
  private:
   catalog::LoadError LoadCatalogCas(const hash::Any &hash,
@@ -94,6 +97,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   bool offline_mode_;  /**< cached copy used because there is no network */
   atomic_int32 certificate_hits_;
   atomic_int32 certificate_misses_;
+  uint64_t all_inodes_;
+  uint64_t loaded_inodes_;
 };
 
 }  // namespace cache
