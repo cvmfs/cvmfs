@@ -38,7 +38,11 @@ endif ()
 # provide some options to the user
 #
 option (BUILD_CVMFS "Build the CernVM-FS FUSE module" ON)
-option (BUILD_LIBCVMFS "Build the CernVM-FS client library" ON)
+if (MACOSX)
+	option (BUILD_LIBCVMFS "Build the CernVM-FS client library" OFF)
+else ()
+	option (BUILD_LIBCVMFS "Build the CernVM-FS client library" ON)
+endif()
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
