@@ -40,9 +40,9 @@ class Database {
     kOpenReadOnly,
     kOpenReadWrite
   };
-  static const float kLatestSchema = 2.4;
-  static const float kLatestSupportedSchema = 2.4;  // + 1.X catalogs (r/o)
-  static const float kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
+  static const float kLatestSchema;
+  static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
+  static const float kSchemaEpsilon;  // floats get imprecise in SQlite
 
   Database(const std::string filename, const OpenMode open_mode);
   ~Database();

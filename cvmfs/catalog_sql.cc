@@ -20,6 +20,11 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+const float Database::kLatestSchema = 2.4;
+const float Database::kLatestSupportedSchema = 2.4;  // + 1.X catalogs (r/o)
+const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
+
+
 Database::Database(const std::string filename, const OpenMode open_mode) {
   int retval;
 

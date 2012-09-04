@@ -122,7 +122,7 @@ struct Statistics {
 template<class Key, class Value>
 class SmallHash {
  public:
-  static const double kLoadFactor = 0.7;
+  static const double kLoadFactor;
 
   SmallHash() {
     keys_ = NULL;
@@ -238,6 +238,12 @@ class SmallHash {
   uint32_t max_collisions_;  /**< maximum collisions for a single insert */
   Key empty_key_;
 };
+
+
+// initialize the static load factor field
+template<class Key, class Value>
+const double SmallHash<Key, Value>::kLoadFactor = 0.7;
+
 
 
 /**

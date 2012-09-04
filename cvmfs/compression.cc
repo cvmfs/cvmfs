@@ -89,8 +89,7 @@ bool CopyPath2Mem(const string &path,
   *buffer = reinterpret_cast<unsigned char *>(smalloc(*buffer_size));
   unsigned total_bytes = 0;
   while (true) {
-    unsigned num_bytes = read(fd, *buffer + total_bytes,
-                              *buffer_size - total_bytes);
+    int num_bytes = read(fd, *buffer + total_bytes, *buffer_size - total_bytes);
     if (num_bytes == 0)
       break;
     if (num_bytes < 0) {
@@ -366,13 +365,13 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest) {
   return result;
 }
 
-bool CompressPath2File(const string &src, FILE *fdest, 
+bool CompressPath2File(const string &src, FILE *fdest,
                        hash::Any *compressed_hash)
 {
   FILE *fsrc = fopen(src.c_str(), "r");
   if (!fsrc)
     return false;
-  
+
   bool retval = CompressFile2File(fsrc, fdest, compressed_hash);
   fclose(fsrc);
   return retval;

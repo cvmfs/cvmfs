@@ -75,7 +75,7 @@ PathString GetParentPath(const PathString &path) {
     return path;
   const char *chars  = path.GetChars();
 
-  for (unsigned i = length-1; i >= 0; --i) {
+  for (int i = length-1; i >= 0; --i) {
     if (chars[i] == '/')
       return PathString(chars, i);
   }
