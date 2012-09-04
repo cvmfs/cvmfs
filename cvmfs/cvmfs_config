@@ -85,7 +85,7 @@ cvmfs_setup()
 
   if [ $nouser -eq 0 ]; then
     if ! check_group "cvmfs"; then
-      if add_cvmfs_group; then
+      if ! add_cvmfs_group; then
         echo "Cannot create a cvmfs group"
         exit 1
       fi
