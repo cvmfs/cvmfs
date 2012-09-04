@@ -713,6 +713,7 @@ SqlGetCounter::SqlGetCounter(const Database &database) {
     Init(database.sqlite_db(),
          "SELECT value from statistics WHERE counter = :counter;");
   } else {
+    Init(database.sqlite_db(), "SELECT 0;");
     compat_ = true;
   }
 }
