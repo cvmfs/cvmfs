@@ -164,7 +164,7 @@ Manifest *WritableCatalogManager::CreateRepository(
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
              file_path_compressed.c_str());
-    return false;
+    return NULL;
   }
 
   return manifest;
@@ -601,7 +601,7 @@ Manifest *WritableCatalogManager::Commit() {
         sleep(1);
       if (spooler_->num_errors() > 0) {
         LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
-        return false;
+        return NULL;
       }
 
       // .cvmfspublished

@@ -749,4 +749,4 @@ bool SqlUpdateCounter::BindDelta(const int64_t delta) {
   return BindInt64(1, delta);
 }
 
-} // namespace catalog
+}  // namespace catalog
