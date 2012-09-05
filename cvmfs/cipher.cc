@@ -114,7 +114,7 @@ bool LoadAESKey() {
 "+EsJra2u5/1JhJxHaDtSZt1tluomWOUEmqKStiDx/VPGEExMjvENq61yh86spZow\n"
 "MwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAj+1YCEOx7a2IAQuXyrZfgQGHOmK1+R\n"
 "xBsTLg==\n"
-"-----END PKCS7-----\n";  // TODO: retrieve the real key
+"-----END PKCS7-----\n";  // string "password"
 
 data = "-----BEGIN PKCS7-----\n"
 "MIIBWAYJKoZIhvcNAQcDoIIBSTCCAUUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
@@ -125,7 +125,7 @@ data = "-----BEGIN PKCS7-----\n"
 "n+T3YYypxclwzzeTNEkmtJket5bmMJmNayqP3DM7LjlgWtgAhWsBL0sJq07pAYsw\n"
 "OwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAhe6BfmzBtzpoAYXVyuMAUwfSxG/16q\n"
 "Qb6mmzKNAnyztayL\n"
-  "-----END PKCS7-----\n"; //real key example
+  "-----END PKCS7-----\n"; //binary key example
 
 data = "-----BEGIN PKCS7-----\n"
 "MIIBaAYJKoZIhvcNAQcDoIIBWTCCAVUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
@@ -149,7 +149,6 @@ data = "-----BEGIN PKCS7-----\n"
   BIO_puts(in, data);  //  load the pkcs7 file in the bio
  
   if (!PEM_read_bio_PKCS7(in, &p7, 0, NULL)){
-    //printf("error reading pkcs7\n");
     LogCvmfs(kLogCipher, kLogDebug, "error reading pkcs7\n");
     return false;
   }
@@ -174,13 +173,19 @@ data = "-----BEGIN PKCS7-----\n"
   return true;
 }
 
+/**
+ * Loads Initialization Vector.
+ * It should be 128 bits, taken from the last but one 32 hex characters
+ * of the id of the encrypted file, that is to say [-33:-1].
+ *
+ * \param iv Hex string in ascii
+ * \return True on success, false otherwise
+ */
 bool LoadIV(const char* iv, unsigned ivlen) {
 
  
   int nread;
   unsigned iv_strtol;
-
-  //iv_strtol =  strtol(iv, NULL, 16);
 
   //  Convert hex string to binary
   // UnHexlify((char*)iv, ivlen,(char**) &iv_);
@@ -210,85 +215,59 @@ int UnHexlify(char* str, unsigned len, char** buf) {
 
 } 
 
+
+/**
+ * Decrypt buffer using symmetric key.
+ * Key and initialization vector (iv) must be loaded with
+ * LoadAESKey() and LoadIV(), first; they are hexadecimal strings (in ASCII).
+ * Buffer is base64 encoded.
+ *
+ * \return the length of decrypted data
+ */
 int Decrypt(const unsigned char *buffer,
 	    const unsigned buffer_size,
 	     const unsigned char **ptr)
 {
-  
-  //char* key;
-  //char* iv;
+
 
   unsigned char* buf_out; //buffer for clear-text string
   int byte_out; //decoded bytes
   int byte_outF; //last decoded bytes
 
   BIO *b64, *bio; //  bio to base64decode the buffer
-  unsigned decoded_bytes; //  total number of base64 decoded bytes
+  int buff_size; //  total number of base64 decoded bytes
   void* buff_tmp; //  temp pointer to  decoded bytes
   char* buff; //  buffer to store decoded bytes
 
   // Prepare the context
-
   if(ctx_) free(ctx_);
   ctx_ = (EVP_CIPHER_CTX*)malloc(sizeof(EVP_CIPHER_CTX));
-
   EVP_CIPHER_CTX_init(ctx_);
-
   EVP_CIPHER_CTX_set_padding(ctx_, 1);
 
- 
-  ERR_load_crypto_strings();
-  /*
-  buff = (unsigned char*)malloc(sizeof(unsigned char)*buffer_size);
-
-  // Base64 decode the buffer
-  b64 = BIO_new(BIO_f_base64());
-  //bio = BIO_new(BIO_s_mem());
-  bio = BIO_new_mem_buf((void*)buffer, buffer_size);
-  if(!b64 || !bio) { 
-    printf("BIO error\n");
-    return false;
-  }
-
-
-  //BIO_puts(bio,(const char*) buffer);
-  bio = BIO_push(b64, bio);
-  //decoded_bytes = BIO_get_mem_data(bio, &buff_tmp);
-  //buff = (unsigned char*)malloc(decoded_bytes);
-  //memcpy(buff, buff_tmp, decoded_bytes);
-  
-  BIO_read(bio, buff, buffer_size);*/
+  // Base64 decode
   buff = (char*) buffer;
   buff = unbase64((const char*)buff, buffer_size);
-
-  printf("The message, base64decoded, is:\n%s\nand its length is %d\n", buff, buffer_size);
+  buff_size = strlen(buff);
 
   // Initialize decryption 
   if (!EVP_DecryptInit(ctx_, EVP_aes_256_cbc(), aes_key_, iv_))
     ERR_print_errors_fp(stderr);
 
-  buf_out = (unsigned char*)malloc(sizeof(char)*(buffer_size + EVP_CIPHER_CTX_block_size(ctx_))); //alloc enough space for padding
-  memset(buf_out, 0, buffer_size + EVP_CIPHER_CTX_block_size(ctx_));  //init to 0
-
-  printf("Allocated %d + %d bytes.\n", buffer_size, EVP_CIPHER_CTX_block_size(ctx_));
+  buf_out = (unsigned char*)malloc(sizeof(char)*(buff_size + EVP_CIPHER_CTX_block_size(ctx_))); //alloc enough space for padding
+  memset(buf_out, 0, buff_size + EVP_CIPHER_CTX_block_size(ctx_));  //init to 0
 
   // Decrypt
-  if (!EVP_DecryptUpdate(ctx_, buf_out, &byte_out,(const unsigned char*) buff, buffer_size)){
+  if (!EVP_DecryptUpdate(ctx_, buf_out, &byte_out,(const unsigned char*) buff, buff_size)){
     LogCvmfs(kLogCipher, kLogDebug, "Decryption error\n");
     ERR_print_errors_fp(stderr);
   }
-  printf("%s", buf_out);
- 
 
-  // TODO: fix bug with wrong length of final block
   // Finalize
   if(!EVP_DecryptFinal_ex(ctx_, buf_out + byte_out, &byte_outF)){
-    //printf("Padding incorrect\n");
     LogCvmfs(kLogCipher, kLogStderr, "Padding incorrect or wrong key/iv\n");
     ERR_print_errors_fp(stderr);
   }
-  
-  printf("%s", buf_out);
 
   *ptr = buf_out;
   return(byte_out + byte_outF);
