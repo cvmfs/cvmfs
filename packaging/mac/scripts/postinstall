@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cvmfs_cfg=/usr/local/bin/cvmfs_config
+cvmfs_cfg=/usr/bin/cvmfs_config
 
 if [ -f $cvmfs_cfg ]; then
   $cvmfs_cfg setup &> /tmp/cvmfs_postinstall
