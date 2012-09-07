@@ -46,12 +46,14 @@ struct Statistics {
   atomic_int64 num_lookup_path;
   atomic_int64 num_lookup_path_negative;
   atomic_int64 num_listing;
+  atomic_int64 num_nested_listing;
 
   Statistics() {
     atomic_init64(&num_lookup_inode);
     atomic_init64(&num_lookup_path);
     atomic_init64(&num_lookup_path_negative);
     atomic_init64(&num_listing);
+    atomic_init64(&num_nested_listing);
   }
 
   std::string Print() {
@@ -63,7 +65,10 @@ struct Statistics {
       "lookup(path-negative): " +
         StringifyInt(atomic_read64(&num_lookup_path_negative)) +
       "    " +
-      "listing: " + StringifyInt(atomic_read64(&num_listing)) + "\n";
+      "listing: " + StringifyInt(atomic_read64(&num_listing)) +
+      "    " +
+      "listing nested catalogs: " +
+        StringifyInt(atomic_read64(&num_nested_listing)) + "\n";
   }
 };
 
@@ -157,7 +162,6 @@ class AbstractCatalogManager {
                         Catalog *parent_catalog);
   bool MountSubtree(const PathString &path, const Catalog *entry_point,
                     Catalog **leaf_catalog);
-  inline bool MountAll() { return MountRecursively(GetRootCatalog()); }
 
   bool AttachCatalog(const std::string &db_path, Catalog *new_catalog);
   void DetachCatalog(Catalog *catalog);
@@ -180,7 +184,7 @@ class AbstractCatalogManager {
     int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
-  // inline void DowngradeLock() const { Unlock(); ReadLock(); } TODO
+  // inline void DowngradeLock() const {  } TODO
   virtual void EnforceSqliteMemLimit();
 
  private:

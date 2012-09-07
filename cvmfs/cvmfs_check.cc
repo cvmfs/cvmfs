@@ -396,18 +396,18 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
   }
 
   // Recurse into nested catalogs
-  catalog::Catalog::NestedCatalogList nested_catalogs =
+  catalog::Catalog::NestedCatalogList *nested_catalogs =
     catalog->ListNestedCatalogs();
-  if (nested_catalogs.size() !=
+  if (nested_catalogs->size() !=
       static_cast<uint64_t>(computed_counters->d_self_nested))
   {
     LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
              " expected %lu, got %lu", computed_counters->d_self_nested,
-             nested_catalogs.size());
+             nested_catalogs->size());
     retval = false;
   }
-  for (catalog::Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
-       iEnd = nested_catalogs.end(); i != iEnd; ++i)
+  for (catalog::Catalog::NestedCatalogList::const_iterator i =
+       nested_catalogs->begin(), iEnd = nested_catalogs->end(); i != iEnd; ++i)
   {
     catalog::DirectoryEntry nested_transition_point;
     if (!catalog->LookupPath(i->path, &nested_transition_point)) {

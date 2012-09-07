@@ -443,10 +443,11 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
   // Try to find path as a super string of nested catalog mount points
   PathString path_slash(path);
   path_slash.Append("/", 1);
-  const Catalog::NestedCatalogList nested_catalogs =
+  atomic_inc64(&statistics_.num_nested_listing);
+  const Catalog::NestedCatalogList *nested_catalogs =
     parent->ListNestedCatalogs();
-  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
-       iEnd = nested_catalogs.end(); i != iEnd; ++i)
+  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs->begin(),
+       iEnd = nested_catalogs->end(); i != iEnd; ++i)
   {
     // Next nesting level
     PathString nested_path_slash(i->path);
@@ -598,31 +599,6 @@ void AbstractCatalogManager::DetachSubtree(Catalog *catalog) {
 
   DetachCatalog(catalog);
 }
-
-
-/**
- * Attaches all catalogs of the repository recursively.
- * This is useful when updating small repositories on the server.
- * @return true on success, false otherwise
- */
-bool AbstractCatalogManager::MountRecursively(Catalog *catalog) {
-  bool success = true;
-
-  // Go through all children of the given parent catalog and attach them
-  Catalog::NestedCatalogList children = catalog->ListNestedCatalogs();
-  for (Catalog::NestedCatalogList::const_iterator i = children.begin(),
-       iEnd = children.end(); i != iEnd; ++i)
-  {
-    Catalog *new_catalog = MountCatalog(i->path, hash::Any(), catalog);
-    if (new_catalog)
-      success = MountRecursively(new_catalog);
-    else
-      success = false;
-  }
-
-  return success;
-}
-
 
 
 /**

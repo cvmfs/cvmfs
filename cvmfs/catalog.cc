@@ -95,6 +95,8 @@ uint64_t Counters::GetAllEntries() const {
 
 
 Catalog::Catalog(const PathString &path, Catalog *parent) {
+  read_only_ = true;
+  nested_catalog_cache_ = NULL;
   path_ = path;
   parent_ = parent;
   max_row_id_ = 0;
@@ -110,6 +112,7 @@ Catalog::~Catalog() {
   free(lock_);
   FinalizePreparedStatements();
   delete database_;
+  delete nested_catalog_cache_;
 }
 
 /**
@@ -421,18 +424,30 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
 
 /**
  * Get a list of all registered nested catalogs in this catalog.
- * @return a list of all nested catalog references of this catalog
+ * @return a list of all nested catalog references of this catalog.
+ *         The potinter's ownership remains at the catalog object
  */
-Catalog::NestedCatalogList Catalog::ListNestedCatalogs() const {
-  NestedCatalogList result;
+Catalog::NestedCatalogList *Catalog::ListNestedCatalogs() const {
+  NestedCatalogList *result;
 
-  // TODO: cache nested catalog list (careful with read-write version)
   pthread_mutex_lock(lock_);
+  if (read_only_) {
+    if (nested_catalog_cache_) {
+      pthread_mutex_unlock(lock_);
+      return nested_catalog_cache_;
+    }
+    nested_catalog_cache_ = new NestedCatalogList();
+  } else {
+    delete nested_catalog_cache_;
+    nested_catalog_cache_ = new NestedCatalogList();
+  }
+  result = nested_catalog_cache_;
+
   while (sql_list_nested_->FetchRow()) {
     NestedCatalog nested;
     nested.path = sql_list_nested_->GetMountpoint();
     nested.hash = sql_list_nested_->GetContentHash();
-    result.push_back(nested);
+    result->push_back(nested);
   }
   sql_list_nested_->Reset();
   pthread_mutex_unlock(lock_);

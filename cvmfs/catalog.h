@@ -11,8 +11,8 @@
 #include <cassert>
 
 #include <string>
-#include <list>
 #include <map>
+#include <vector>
 
 #include "catalog_sql.h"
 #include "dirent.h"
@@ -139,6 +139,7 @@ class Catalog {
   uint64_t GetNumEntries() const;
   bool GetCounters(Counters *counters) const;
 
+  inline bool read_only() const { return read_only_; }
   inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
@@ -158,8 +159,8 @@ class Catalog {
     PathString path;
     hash::Any hash;
   } NestedCatalog;
-  typedef std::list<NestedCatalog> NestedCatalogList;
-  NestedCatalogList ListNestedCatalogs() const;
+  typedef std::vector<NestedCatalog> NestedCatalogList;
+  NestedCatalogList *ListNestedCatalogs() const;
   bool FindNested(const PathString &mountpoint, hash::Any *hash) const;
 
  protected:
@@ -185,6 +186,8 @@ class Catalog {
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
+  bool read_only_;
+
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
@@ -205,6 +208,7 @@ class Catalog {
 
   Catalog *parent_;
   NestedCatalogMap children_;
+  mutable NestedCatalogList *nested_catalog_cache_;
 
   InodeRange inode_range_;
   uint64_t max_row_id_;

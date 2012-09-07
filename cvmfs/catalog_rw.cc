@@ -20,6 +20,7 @@ namespace catalog {
 WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   Catalog(PathString(path.data(), path.length()), parent)
 {
+  read_only_ = false;
   dirty_ = false;
 }
 
@@ -464,13 +465,13 @@ void WritableCatalog::CopyCatalogsToParent() {
   WritableCatalog *parent = GetWritableParent();
 
   // Obtain a list of all nested catalog references
-  NestedCatalogList nested_catalog_references = ListNestedCatalogs();
+  NestedCatalogList *nested_catalog_references = ListNestedCatalogs();
 
   // Go through the list and update the databases
   // simultaneously we are checking if the referenced catalogs are currently
   // attached and update the in-memory data structures as well
-  for (NestedCatalogList::const_iterator i = nested_catalog_references.begin(),
-       iEnd = nested_catalog_references.end(); i != iEnd; ++i)
+  for (NestedCatalogList::const_iterator i = nested_catalog_references->begin(),
+       iEnd = nested_catalog_references->end(); i != iEnd; ++i)
   {
     Catalog *child = FindChild(i->path);
     parent->InsertNestedCatalog(i->path.ToString(), child, i->hash);
