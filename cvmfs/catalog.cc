@@ -431,6 +431,7 @@ Catalog::NestedCatalogList *Catalog::ListNestedCatalogs() const {
   NestedCatalogList *result;
 
   pthread_mutex_lock(lock_);
+  // Ideally, the list of nested catalogs is already cached
   if (read_only_) {
     if (nested_catalog_cache_) {
       pthread_mutex_unlock(lock_);
