@@ -227,7 +227,7 @@ static bool Find(const catalog::Catalog *catalog,
       computed_counters->d_self_dir++;
       num_subdirs++;
       // Directory size
-      if (entries[i].size() != 4096) {
+      if (entries[i].size() < 4096) {
         LogCvmfs(kLogCvmfs, kLogStderr, "invalid file size for %s",
                  full_path.c_str());
         retval = false;
