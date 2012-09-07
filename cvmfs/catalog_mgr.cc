@@ -176,35 +176,46 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   bool found = best_fit->LookupPath(path, dirent);
 
   // Possibly in a nested catalog
-  if (!found) {
-    LogCvmfs(kLogCatalog, kLogDebug,
-             "entry not found, we may have to load nested catalogs");
+  if (!found && MountSubtree(path, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(path);
+    assert(best_fit != NULL);
+    atomic_inc64(&statistics_.num_lookup_path);
+    bool found = best_fit->LookupPath(path, dirent);
 
-    Catalog *nested_catalog;
-    UpgradeLock();
-    found = MountSubtree(path, best_fit, &nested_catalog);
-    DowngradeLock();
-
-    if (!found) {
+    if (found) {
+      // DowngradeLock(); TODO
+    } else {
       LogCvmfs(kLogCatalog, kLogDebug,
-               "failed to load nested catalog for '%s'", path.c_str());
-      goto lookup_path_notfound;
-    }
+               "entry not found, we may have to load nested catalogs");
 
-    if (nested_catalog != best_fit) {
-      atomic_inc64(&statistics_.num_lookup_path);
-      found = nested_catalog->LookupPath(path, dirent);
+      Catalog *nested_catalog;
+      found = MountSubtree(path, best_fit, &nested_catalog);
+      // DowngradeLock(); TODO
+
       if (!found) {
         LogCvmfs(kLogCatalog, kLogDebug,
-                 "nested catalogs loaded but entry '%s' was still not found",
-                 path.c_str());
+                 "failed to load nested catalog for '%s'", path.c_str());
         goto lookup_path_notfound;
-      } else {
-        best_fit = nested_catalog;
       }
-    } else {
-      LogCvmfs(kLogCatalog, kLogDebug, "no nested catalog fits");
-      goto lookup_path_notfound;
+
+      if (nested_catalog != best_fit) {
+        atomic_inc64(&statistics_.num_lookup_path);
+        found = nested_catalog->LookupPath(path, dirent);
+        if (!found) {
+          LogCvmfs(kLogCatalog, kLogDebug,
+                   "nested catalogs loaded but entry '%s' was still not found",
+                   path.c_str());
+          goto lookup_path_notfound;
+        } else {
+          best_fit = nested_catalog;
+        }
+      } else {
+        LogCvmfs(kLogCatalog, kLogDebug, "no nested catalog fits");
+        goto lookup_path_notfound;
+      }
     }
   }
   LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s",
@@ -249,13 +260,18 @@ bool AbstractCatalogManager::Listing(const PathString &path,
 
   // Find catalog, possibly load nested
   Catalog *best_fit = FindCatalog(path);
-  Catalog *catalog;
-  UpgradeLock();
-  result = MountSubtree(path, best_fit, &catalog);
-  DowngradeLock();
-  if (!result) {
+  Catalog *catalog = best_fit;
+  if (MountSubtree(path, best_fit, NULL)) {
     Unlock();
-    return false;
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(path);
+    result = MountSubtree(path, best_fit, &catalog);
+    // DowngradeLock(); TODO
+    if (!result) {
+      Unlock();
+      return false;
+    }
   }
 
   atomic_inc64(&statistics_.num_listing);
@@ -281,13 +297,18 @@ bool AbstractCatalogManager::ListingStat(const PathString &path,
 
   // Find catalog, possibly load nested
   Catalog *best_fit = FindCatalog(path);
-  Catalog *catalog;
-  UpgradeLock();
-  result = MountSubtree(path, best_fit, &catalog);
-  DowngradeLock();
-  if (!result) {
+  Catalog *catalog = best_fit;
+  if (MountSubtree(path, best_fit, NULL)) {
     Unlock();
-    return false;
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(path);
+    result = MountSubtree(path, best_fit, &catalog);
+    // DowngradeLock(); TODO
+    if (!result) {
+      Unlock();
+      return false;
+    }
   }
 
   atomic_inc64(&statistics_.num_listing);
@@ -406,6 +427,8 @@ bool AbstractCatalogManager::IsAttached(const PathString &root_path,
 
 /**
  * Recursively mounts all nested catalogs required to serve a path.
+ * If leaf_catalog is NULL, just indicate if it is necessary to load a
+ * nested catalog for the given path.
  * The final leaf nested catalog is returned.
  */
 bool AbstractCatalogManager::MountSubtree(const PathString &path,
@@ -429,6 +452,8 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
     PathString nested_path_slash(i->path);
     nested_path_slash.Append("/", 1);
     if (path_slash.StartsWith(nested_path_slash)) {
+      if (leaf_catalog == NULL)
+        return true;
       Catalog *new_nested;
       LogCvmfs(kLogCatalog, kLogDebug, "load nested catalog at %s",
                i->path.c_str());
@@ -445,6 +470,8 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
     }
   }
 
+  if (leaf_catalog == NULL)
+    return false;
   *leaf_catalog = parent;
   return result;
 }

@@ -180,8 +180,7 @@ class AbstractCatalogManager {
     int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
-  inline void UpgradeLock() const { Unlock(); WriteLock(); }
-  inline void DowngradeLock() const { Unlock(); ReadLock(); }
+  // inline void DowngradeLock() const { Unlock(); ReadLock(); } TODO
   virtual void EnforceSqliteMemLimit();
 
  private:

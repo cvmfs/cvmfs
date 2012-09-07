@@ -426,6 +426,7 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
 Catalog::NestedCatalogList Catalog::ListNestedCatalogs() const {
   NestedCatalogList result;
 
+  // TODO: cache nested catalog list (careful with read-write version)
   pthread_mutex_lock(lock_);
   while (sql_list_nested_->FetchRow()) {
     NestedCatalog nested;
