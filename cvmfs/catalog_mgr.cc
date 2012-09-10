@@ -164,16 +164,32 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
                                         const LookupOptions options,
                                         DirectoryEntry *dirent)
 {
+  DirectoryEntry parent;
+  Catalog *best_fit = NULL;
+  bool found = false;
+
   EnforceSqliteMemLimit();
   ReadLock();
 
-  Catalog *best_fit = FindCatalog(path);
+  // Look for parent entry before we acquire a write lock
+  if (options == kLookupFull) {
+    PathString parent_path = GetParentPath(path);
+    bool found = LookupPath(parent_path, kLookupSole, &parent);
+    if (!found) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+               "cannot find parent '%s' for entry '%s' --> data corrupt?",
+               parent_path.c_str(), path.c_str());
+      goto lookup_path_notfound;
+    }
+  }
+
+  best_fit = FindCatalog(path);
   assert(best_fit != NULL);
 
   atomic_inc64(&statistics_.num_lookup_path);
   LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
            path.c_str(), best_fit->path().c_str());
-  bool found = best_fit->LookupPath(path, dirent);
+  found = best_fit->LookupPath(path, dirent);
 
   // Possibly in a nested catalog
   if (!found && MountSubtree(path, best_fit, NULL)) {
@@ -226,26 +242,14 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
     LogCvmfs(kLogCatalog, kLogDebug, "ENOENT: %s", path.c_str());
     goto lookup_path_notfound;
   }
-  LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s",
-           path.c_str(), best_fit->path().c_str());
-
-  // Look for parent entry
-  if (options == kLookupFull) {
-    PathString parent_path = GetParentPath(path);
-    DirectoryEntry parent;
-    found = LookupPath(parent_path, kLookupSole, &parent);
-    if (!found) {
-      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
-               "cannot find parent '%s' for entry '%s' --> data corrupt?",
-               parent_path.c_str(), path.c_str());
-      Unlock();
-      return false;
-    } else {
-      dirent->set_parent_inode(parent.inode());
-    }
-  }
 
   Unlock();
+  if (options == kLookupFull)
+    dirent->set_parent_inode(parent.inode());
+
+  LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s (name %s)",
+           path.c_str(), best_fit->path().c_str());
+
   return true;
 
  lookup_path_notfound:
