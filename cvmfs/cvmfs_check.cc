@@ -187,6 +187,13 @@ static bool Find(const catalog::Catalog *catalog,
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[path] %s",
              full_path.c_str());
 
+    // Name must not be empty
+    if (entries[i].name().IsEmpty()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "empty path at %s",
+               full_path.c_str());
+      retval = false;
+    }
+
     // Check if the chunk is there
     if (!entries[i].checksum().IsNull()) {
       string chunk_path = "data" + entries[i].checksum().MakePath(1, 2);
