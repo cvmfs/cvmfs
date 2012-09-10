@@ -164,32 +164,16 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
                                         const LookupOptions options,
                                         DirectoryEntry *dirent)
 {
-  DirectoryEntry parent;
-  Catalog *best_fit = NULL;
-  bool found = false;
-
   EnforceSqliteMemLimit();
   ReadLock();
 
-  // Look for parent entry before we acquire a write lock
-  if (options == kLookupFull) {
-    PathString parent_path = GetParentPath(path);
-    bool found = LookupPath(parent_path, kLookupSole, &parent);
-    if (!found) {
-      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
-               "cannot find parent '%s' for entry '%s' --> data corrupt?",
-               parent_path.c_str(), path.c_str());
-      goto lookup_path_notfound;
-    }
-  }
-
-  best_fit = FindCatalog(path);
+  Catalog *best_fit = FindCatalog(path);
   assert(best_fit != NULL);
 
   atomic_inc64(&statistics_.num_lookup_path);
   LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
            path.c_str(), best_fit->path().c_str());
-  found = best_fit->LookupPath(path, dirent);
+  bool found = best_fit->LookupPath(path, dirent);
 
   // Possibly in a nested catalog
   if (!found && MountSubtree(path, best_fit, NULL)) {
@@ -243,13 +227,31 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
     goto lookup_path_notfound;
   }
 
-  Unlock();
-  if (options == kLookupFull)
-    dirent->set_parent_inode(parent.inode());
-
   LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s (name %s)",
            path.c_str(), best_fit->path().c_str());
 
+  // Look for parent entry
+  if (options == kLookupFull) {
+    DirectoryEntry parent;
+    PathString parent_path = GetParentPath(path);
+    if (dirent->IsNestedCatalogRoot()) {
+      if (best_fit->parent())
+        found = best_fit->parent()->LookupPath(parent_path, &parent);
+      else
+        found = false;
+    } else {
+      found = best_fit->LookupPath(parent_path, &parent);
+    }
+    if (!found) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+               "cannot find parent '%s' for entry '%s' --> data corrupt?",
+               parent_path.c_str(), path.c_str());
+      goto lookup_path_notfound;
+    }
+    dirent->set_parent_inode(parent.inode());
+  }
+
+  Unlock();
   return true;
 
  lookup_path_notfound:
