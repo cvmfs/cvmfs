@@ -177,13 +177,15 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
 
   // Possibly in a nested catalog
   if (!found && MountSubtree(path, best_fit, NULL)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in a nested catalog",
+             path.c_str());
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
     assert(best_fit != NULL);
     atomic_inc64(&statistics_.num_lookup_path);
-    bool found = best_fit->LookupPath(path, dirent);
+    found = best_fit->LookupPath(path, dirent);
 
     if (found) {
       // DowngradeLock(); TODO
@@ -217,6 +219,12 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
         goto lookup_path_notfound;
       }
     }
+    assert(found);
+  }
+  // Not in a nested catalog, ENOENT
+  if (!found) {
+    LogCvmfs(kLogCatalog, kLogDebug, "ENOENT: %s", path.c_str());
+    goto lookup_path_notfound;
   }
   LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s",
            path.c_str(), best_fit->path().c_str());
@@ -230,6 +238,8 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
       LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
                "cannot find parent '%s' for entry '%s' --> data corrupt?",
                parent_path.c_str(), path.c_str());
+      Unlock();
+      return false;
     } else {
       dirent->set_parent_inode(parent.inode());
     }
