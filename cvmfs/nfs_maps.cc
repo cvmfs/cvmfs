@@ -145,7 +145,7 @@ static void PutInode2Path(const uint64_t inode, const PathString &path) {
              inode, path.c_str(), status.ToString().c_str());
     abort();
   }
-  LogCvmfs(kLogNfsMaps, kLogDebug, "stored inode %"PRIu64" --> path  %s",
+  LogCvmfs(kLogNfsMaps, kLogDebug, "stored inode %"PRIu64" --> path %s",
            inode, path.c_str());
 }
 
