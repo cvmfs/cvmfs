@@ -23,7 +23,7 @@
     <mod>scripts.preinstall.path</mod>
   </config>
   <scripts>
-    <preinstall relative="true" mod="true">scripts/postinstall</preinstall>
+    <preinstall relative="true" mod="true">scripts/preinstall</preinstall>
     <postinstall relative="true" mod="true">scripts/postinstall</postinstall>
     <scripts-dir relative="true" mod="true">scripts</scripts-dir>
   </scripts>
