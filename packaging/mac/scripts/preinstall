@@ -1,0 +1,30 @@
+#!/bin/bash
+
+FUSE4X_DIR="/Library/Filesystems/fuse4x.fs"
+
+function display_msg()
+{
+  (/usr/bin/osascript) << ENDOFSCRIPT
+property fuse4xurl : "https://github.com/fuse4x/fuse4x/downloads"
+tell application "System Events"
+  display dialog "$1" buttons {"OK", "Go to Fuse4X"} default button 1 with title "CVMFS MacOS X Installer" with icon 0
+  if button returned of result is "Go to Fuse4X" then
+    open location fuse4xurl
+  end if
+end tell
+ENDOFSCRIPT
+}
+
+### check if Fuse4X is installed
+
+if [ -d $FUSE4X_DIR ];then
+  exit 0
+else
+  display_msg "A Fuse4X installation is required to use cvmfs.
+Please, download the latest Fuse4X version from\n
+https://github.com/fuse4x/fuse4x/downloads\n
+Please, follow the instructions
+provided by Fuse4X to install the 
+package, before you retry the installation of cvmfs." &> /dev/null  
+  exit 1
+fi
