@@ -1,3 +1,9 @@
+2.1.1:
+  * Start of 2.1 ChangeLog
+
+2.1.0:
+  see write-up at https://cernvm.cern.ch/portal/release-2.1
+
 2.0.5:
   * Warn in cvmfs_config chksetup if no cache quota is set
   * Create cvmfs user in cvmfs_server if necessary
