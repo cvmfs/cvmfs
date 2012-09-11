@@ -17,6 +17,8 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+BuildRequires: gcc
+BuildRequires: gcc-c++
 BuildRequires: cmake
 BuildRequires: fuse-devel
 BuildRequires: pkgconfig 
@@ -32,11 +34,11 @@ Requires: sudo
 Requires: psmisc
 Requires: autofs
 Requires: fuse
-Requires: fuse-libs
 Requires: curl
 Requires: attr 
 # Account for different package names
 %if 0%{?suse_version}
+Requires: libfuse2
 Requires: aaa_base
 Requires: glibc
 Requires: insserv
@@ -44,6 +46,7 @@ Requires: util-linux
 Requires: pwdutils
 Requires(preun): aaa_base insserv
 %else
+Requires: fuse-libs
 Requires: chkconfig
 Requires: glibc-common
 Requires: initscripts
@@ -83,7 +86,11 @@ cp %{SOURCE1} SELinux
 export CFLAGS="-march=i686" 
 export CXXFLAGS="-march=i686"
 %endif
+%if 0%{?suse_version}
+cmake -DBUILD_SERVER=no -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+%else
 %cmake -DBUILD_SERVER=no -DBUILD_LIBCVMFS=no .
+%endif
 make %{?_smp_mflags}
 
 %if 0%{?selinux_cvmfs}
