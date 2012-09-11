@@ -111,7 +111,7 @@ system("sudo chown -R cvmfs-test:cvmfs-test $prefix/cvmfs-test");
 unlink("$bindir/$bin_name");
 symlink "$prefix/cvmfs-test/cvmfs-testshell.pl", "$bindir/$bin_name";
 
-system('cvmfs-test --setup');
+system("$bin_name --setup");
 
 open(my $create_sentinel, '>', "$prefix/cvmfs-test/.installed");
 close($create_sentinel);
