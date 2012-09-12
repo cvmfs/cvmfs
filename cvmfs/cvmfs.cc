@@ -1582,7 +1582,6 @@ int main(int argc, char *argv[]) {
   bool monitor_ready = false;
   bool signature_ready = false;
   bool quota_ready = false;
-  bool catalog_ready = false;
   bool talk_ready = false;
   bool running_created = false;
 
@@ -1882,7 +1881,6 @@ int main(int argc, char *argv[]) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize root file catalog");
     goto cvmfs_cleanup;
   }
-  catalog_ready = true;
 
   // Set fuse callbacks, remove url from arguments
   LogCvmfs(kLogCvmfs, kLogSyslog,
