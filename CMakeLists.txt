@@ -157,7 +157,7 @@ endif (INSTALL_MOUNT_SCRIPTS)
 install (
 		FILES                   README AUTHORS ChangeLog COPYING
 		DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
-		PERMISSIONS             OWNER_READ GROUP_READ WORLD_READ
+		PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
         )
 
 # Test system

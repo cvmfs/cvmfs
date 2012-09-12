@@ -234,6 +234,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Sep 11 2012 Jakob Blomer <jblomer@cern.ch>
+- Compatibility fixes for OpenSuSE 
 * Mon Feb 20 2012 Jakob Blomer <jblomer@cern.ch>
 - Brought selinux back into main package
 * Fri Feb 18 2012 Jakob Blomer <jblomer@cern.ch>
