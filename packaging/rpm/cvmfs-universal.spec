@@ -54,6 +54,11 @@ Requires: which
 Requires: shadow-utils
 Requires(preun): chkconfig initscripts
 %endif
+%if 0%{?el5}
+Requires: SysVinit
+%else
+Requires: sysvinit-tools
+%endif
 Requires: cvmfs-keys >= 1.2
 
 # SELinux integration
@@ -234,6 +239,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Wed Sep 12 2012 Jakob Blomer <jblomer@cern.ch>
+- Add sysvinit-tools for /sbin/pidof
 * Tue Sep 11 2012 Jakob Blomer <jblomer@cern.ch>
 - Compatibility fixes for OpenSuSE 
 * Mon Feb 20 2012 Jakob Blomer <jblomer@cern.ch>

@@ -10,6 +10,7 @@ fi
 
 sys_arch=$(uname)
 
+# Paths to tools
 case $sys_arch in
   Linux )
     if [ -x /sbin/service ]; then
@@ -17,7 +18,14 @@ case $sys_arch in
     else
       # Ubuntu
       service="/usr/sbin/service"
-    fi ;;
+    fi
+    if [ -x /sbin/pidof ]; then
+      pidof="/sbin/pidof"
+    else
+      # Ubuntu
+      pidof="/bin/pidof"
+    fi
+    ;;
 
   Darwin )
     ;;
@@ -581,6 +589,7 @@ cvmfs_stat()
   fi
 }
 
+
 cvmfs_bugreport()
 {
   tmpdir=`mktemp -d -t cvmfs-bugreport.XXXXXX` || exit 1
@@ -649,6 +658,7 @@ cvmfs_bugreport()
 }
 
 
+
 add_cvmfs_group()
 {
   case $sys_arch in
@@ -680,6 +690,7 @@ add_cvmfs_group()
      exit 1 ;;
   esac
 }
+
 
 add_cvmfs_user()
 {
@@ -727,6 +738,7 @@ add_cvmfs_user()
   esac
 }
 
+
 add_user_to_group_fuse()
 {
   case $sys_arch in
@@ -748,6 +760,7 @@ add_user_to_group_fuse()
   esac
 }
 
+
 check_auto_mounter()
 {
   case $sys_arch in
@@ -764,6 +777,7 @@ check_auto_mounter()
      exit 1 ;;
   esac
 }
+
 
 check_group()
 {
@@ -799,6 +813,7 @@ check_cvmfs_user()
       exit 1 ;;
   esac
 }
+
 
 check_dev_fuse()
 {
@@ -836,6 +851,7 @@ check_dev_fuse()
   return $return_code
 }
 
+
 check_user_in_group()
 {
   local user=$1
@@ -856,6 +872,7 @@ check_user_in_group()
   esac
 }
 
+
 configure_autofs()
 {
   case $sys_arch in
@@ -864,7 +881,7 @@ configure_autofs()
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
       if ! grep -q "^$cvmfs_map" /etc/auto.master; then
         echo "$cvmfs_map" >> /etc/auto.master
-        [ -f /var/lock/subsys/autofs ] && $service autofs reload > /dev/null || true
+        $pidof automount > /dev/null && $service autofs reload > /dev/null || true
       fi ;;
 
    Darwin )
@@ -885,6 +902,7 @@ configure_autofs()
 
   esac
 }
+
 
 configure_sudoers()
 {
