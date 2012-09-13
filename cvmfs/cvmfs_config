@@ -10,7 +10,6 @@ fi
 
 sys_arch=$(uname)
 
-# Paths to tools
 case $sys_arch in
   Linux )
     if [ -x /sbin/service ]; then
@@ -25,9 +24,11 @@ case $sys_arch in
       # Ubuntu
       pidof="/bin/pidof"
     fi
+    fuse_fs_type="fuse"
     ;;
 
   Darwin )
+    fuse_fs_type="fuse4x"
     ;;
 
   * )
@@ -50,6 +51,11 @@ cvmfs_config_usage()
  echo "  chksetup"
  echo "  showconfig [<repository>]"
  echo "  stat [-v] [<repository>]"
+ echo "  status"
+ echo "  probe"
+ echo "  reload"
+ echo "  umount"
+ echo "  restartclean"
  echo "  bugreport"
 }
 
@@ -658,6 +664,55 @@ cvmfs_bugreport()
 }
 
 
+cvmfs_status() {
+  local list
+  list=""
+
+  RETVAL=0
+
+  local mounted_repos
+  local processed
+  mounted_repos=`list_mounts | awk '{print $3}'`
+  for mountpoint in $mounted_repos
+  do
+    cd $mountpoint
+    get_attr fqrn; fqrn=$attr_value
+    get_attr pid; pid=$attr_value
+    echo "$fqrn mounted on $mountpoint with pid $pid"
+  done
+
+  return $RETVAL
+}
+
+
+cvmfs_umount() {
+  local mount_list
+  mount_list=`list_mounts | awk '{print $3}'`
+
+  RETVAL=0
+
+  local m
+  for m in $mount_list
+  do
+    echo -n "Unmounting ${m}: "
+    umount $m 2>/dev/null
+    if [ $? -ne 0 ]; then
+      RETVAL=1
+      echo "Failed!"
+      fuser -m -a -v $m
+    else
+      echo "OK"
+    fi
+  done
+
+  return $RETVAL
+}
+
+
+list_mounts() {
+  mount -t $fuse_fs_type | grep "^cvmfs2[[:space:]]"
+}
+
 
 add_cvmfs_group()
 {
@@ -1011,7 +1066,23 @@ case "$1" in
     RETVAL=$?
     ;;
 
-   bugreport)
+  status)
+    shift 1
+    cvmfs_status $@
+    RETVAL=$?
+    ;;
+
+  umount)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    shift 1
+    cvmfs_umount $@
+    RETVAL=$?
+    ;;
+
+  bugreport)
      if [ `id -u` -ne 0 ]; then
        echo "root privileges required"
        exit 1
