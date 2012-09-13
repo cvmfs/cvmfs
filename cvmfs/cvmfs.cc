@@ -1106,6 +1106,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       attribute_value = "n/a";
     else
       attribute_value = StringifyInt((rx/1024)/time);
+  } else if (attr == "user.fqrn") {
+    attribute_value = *repository_name_;
   } else {
     fuse_reply_err(req, ENOATTR);
     return;
@@ -1136,7 +1138,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   const char base_list[] = "user.pid\0user.version\0user.revision\0"
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
-    "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0";
+    "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0";
   string attribute_list(base_list, sizeof(base_list));
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
