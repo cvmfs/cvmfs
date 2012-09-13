@@ -59,6 +59,7 @@ sub check_command {
 		elsif ($_ eq 'setup' ) { setup(); $executed = 1 }
 		elsif ($_ eq 'fixperm') { fixperm(); $executed = 1 }
 		elsif ($_ =~ m/^restart\s*.*/ ) { ($socket, $ctxt) = restart_daemon($socket, $ctxt, $daemon_path, $command); $executed = 1 }
+		elsif ($_ =~ m/^wait-daemon\s*.*/ ) { ($socket, $ctxt) = wait_daemon($socket, $ctxt); $executed = 1 }
 	}
 	
 	# If the daemon is not running and no command was executed, print on screen a message
@@ -69,6 +70,38 @@ sub check_command {
 	
 	# Returning the value of $executed to check if the command was found and executed
 	return ($executed, $socket, $ctxt);
+}
+
+sub wait_daemon {
+	my $socket = shift;
+	my $ctxt = shift;
+	
+	# Closing old socket and context
+	if (defined($socket) and defined($ctxt)) {
+		close_shell_socket($socket);
+		term_shell_ctxt($ctxt);
+	}
+	
+	# Opening the socket to wait for the daemon to send its ip
+	my ($shell_socket, $shell_ctxt) = bind_shell_socket();
+	
+	# Wait fo the daemon message
+	my $answer = receive_shell_msg($shell_socket);
+	
+	# Splitting the message and assigning it to variables
+	my @ip_port = split /:/, $answer;
+	my ($daemon_ip, $daemon_port) = ($ip_port[0], $ip_port[1]);
+	my $daemon_path = "$daemon_ip:$daemon_port";
+	
+	# Closing the socket. The same socket will be used to receive tests output.
+	$shell_socket = close_shell_socket($shell_socket);
+	$shell_ctxt = term_shell_ctxt($shell_ctxt);
+	
+	# Opening the socket to communicate with the server
+	($socket, $ctxt) = connect_shell_socket($daemon_path);
+	
+	# Returning new socket and context
+	return ($socket, $ctxt);
 }
 
 # This function will print the current status of the daemon
