@@ -180,7 +180,7 @@ sub loading_animation {
 	system('tput cnorm');
 }
 
-# This function will be use to get test output from the FIFO.
+# This function will be use to get test output from the socket.
 sub get_test_output {
 	# Opening the socket to retrieve output
 	my ($shell_socket, $shell_ctxt) = bind_shell_socket();
