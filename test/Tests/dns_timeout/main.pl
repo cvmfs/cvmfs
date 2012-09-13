@@ -13,7 +13,6 @@ my $repo_pub = $tmp_repo . 'pub';
 my $outputfile = '/var/log/cvmfs-test/dns_timeout.out';
 my $errorfile = '/var/log/cvmfs-test/dns_timeout.err';
 my $no_clean = undef;
-my $outputfifo = '/tmp/returncode.fifo';
 
 # Socket name is set to let the server to select
 # the socket where to send its response.
@@ -33,8 +32,7 @@ my @pids;
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
-					   "no-clean" => \$no_clean,
-					   "fifo=s" => \$outputfifo );
+					   "no-clean" => \$no_clean );
 
 
 # Forking the process so the daemon can come back in listening mode.
@@ -210,7 +208,7 @@ if (defined ($pid) and $pid != 0) {
 	print "PROCESSING:$testname\n";
 	# This is the line that makes the shell waiting for test output.
 	# Change whatever you want, but don't change this line or the shell will ignore exit status.
-	print "READ_RETURN_CODE:$outputfifo\n";
+	print "READ_RETURN_CODE\n";
 }
 
 exit 0;

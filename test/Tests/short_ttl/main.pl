@@ -1,7 +1,6 @@
 use strict;
 use warnings;
 use ZeroMQ qw/:all/;
-use Functions::FIFOHandle qw(print_to_fifo);
 use Tests::Common qw(get_daemon_output killing_services check_repo setup_environment restart_cvmfs_services find_files recursive_mkdir open_test_socket close_test_socket set_stdout_stderr open_shellout_socket);
 use File::Copy;
 use File::Find;
@@ -15,7 +14,6 @@ my $repo_pub = $tmp_repo . 'pub';
 # Variables for GetOpt
 my $outputfile = '/var/log/cvmfs-test/short_ttl.out';
 my $errorfile = '/var/log/cvmfs-test/short_ttl.err';
-my $outputfifo = '/tmp/returncode.fifo';
 my $no_clean = undef;
 my $no_remount = undef;
 
@@ -39,8 +37,7 @@ my @pids;
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "no-remount" => \$no_remount,
-					   "fifo=s" => \$outputfifo );
+					   "no-remount" => \$no_remount );
 					   
 # Forking the process so the daemon can come back in listening mode.
 my $pid = fork();
@@ -200,7 +197,7 @@ if (defined ($pid) and $pid != 0) {
 	print "PROCESSING:$testname\n";
 	# This is the line that makes the shell waiting for test output.
 	# Change whatever you want, but don't change this line or the shell will ignore exit status.
-	print "READ_RETURN_CODE:$outputfifo\n";
+	print "READ_RETURN_CODE\n";
 }
 
 exit 0;
