@@ -47,7 +47,7 @@ cvmfs_config_usage()
  echo "Common configuration tasks for CernVM-FS"
  echo "Usage: $0 <command>"
  echo "Commands are"
- echo "  setup [nouser] [nocfgmod] [noservice] [nostart]"
+ echo "  setup [nouser] [nocfgmod]"
  echo "  chksetup"
  echo "  showconfig [<repository>]"
  echo "  stat [-v] [<repository>]"
@@ -141,21 +141,8 @@ cvmfs_setup()
       exit 1
     fi
   fi
-
-  if [ $noservice -eq 0 ]; then
-    if [ "$sys_arch" == 'Linux' ]; then
-      if ! /sbin/chkconfig --list cvmfs > /dev/null 2>&1; then
-         /sbin/chkconfig --add cvmfs
-      fi
-    fi
-  fi
-
-  if [ $nostart -eq 0 ]; then
-    if [ "$sys_arch" == 'Linux' ]; then
-      $service cvmfs start
-    fi
-  fi
 }
+
 
 cvmfs_chksetup()
 {
@@ -179,12 +166,12 @@ cvmfs_chksetup()
     fi
   done
 
-  # Check /sbin/mount.cvmfs /sbin/umount.cvmfs /etc/auto.cvmfs, service
+  # Check mount helper
   local tools
   if [ "$sys_arch" == 'Darwin' ]; then
     tools="/sbin/mount_cvmfs"
   elif [ "$sys_arch" == 'Linux' ]; then
-    tools="/sbin/mount.cvmfs /etc/init.d/cvmfs"
+    tools="/sbin/mount.cvmfs"
   fi
 
   local tool

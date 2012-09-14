@@ -1,6 +1,6 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?fc16}
+%if 0%{?el6} || 0%{?fc17}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -44,7 +44,6 @@ Requires: glibc
 Requires: insserv
 Requires: util-linux
 Requires: pwdutils
-Requires(preun): aaa_base insserv
 %else
 Requires: fuse-libs
 Requires: chkconfig
@@ -52,7 +51,6 @@ Requires: glibc-common
 Requires: initscripts
 Requires: which
 Requires: shadow-utils
-Requires(preun): chkconfig initscripts
 %endif
 %if 0%{?el5}
 Requires: SysVinit
@@ -172,8 +170,6 @@ popd
 rm -rf $RPM_BUILD_ROOT
 
 %post
-/sbin/chkconfig --add cvmfs >/dev/null 2>&1 || :
-
 %if 0%{?selinux_cvmfs}
 # Install SELinux policy modules
 for selinuxvariant in %{selinux_variants}
@@ -184,11 +180,6 @@ done
 %endif
 
 %preun
-if [ $1 = 0 ] ; then
-   /sbin/service cvmfs stop >/dev/null 2>&1
-   /sbin/chkconfig --del cvmfs || :
-fi
-
 %if 0%{?selinux_cvmfs}
 if [ $1 = 0 ] ; then
     for variant in %{selinux_variants} ; do
@@ -221,7 +212,6 @@ fi
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
-%{_sysconfdir}/init.d/cvmfs
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
@@ -240,6 +230,7 @@ fi
 
 %changelog
 * Wed Sep 12 2012 Jakob Blomer <jblomer@cern.ch>
+- Enabled selinux for FC17
 - Add sysvinit-tools for /sbin/pidof
 * Tue Sep 11 2012 Jakob Blomer <jblomer@cern.ch>
 - Compatibility fixes for OpenSuSE 
