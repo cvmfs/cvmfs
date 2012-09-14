@@ -115,39 +115,6 @@ bool LoadAESKey() {
 "xBsTLg==\n"
 "-----END PKCS7-----\n";  // string "password"
 
-data = "-----BEGIN PKCS7-----\n"
-"MIIBWAYJKoZIhvcNAQcDoIIBSTCCAUUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
-"JomT8ixkARkWAmNoMRQwEgYKCZImiZPyLGQBGRYEY2VybjEtMCsGA1UEAxMkQ0VS\n"
-"TiBUcnVzdGVkIENlcnRpZmljYXRpb24gQXV0aG9yaXR5AgoW9OwmAAIAATqqMA0G\n"
-"CSqGSIb3DQEBAQUABIGAhwjfNqjD0qFJc+ZXmEAESLh9kRt5Lq0Vb/nF6UbnUGQ/\n"
-"iwN5BNqPV7o1GXcqzJREhAuV3vYSDmfKEGdDurBVjHYuyhrMjvqmyh9i499+qpQB\n"
-"n+T3YYypxclwzzeTNEkmtJket5bmMJmNayqP3DM7LjlgWtgAhWsBL0sJq07pAYsw\n"
-"OwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAhe6BfmzBtzpoAYXVyuMAUwfSxG/16q\n"
-"Qb6mmzKNAnyztayL\n"
-  "-----END PKCS7-----\n"; //binary key example
-
-data = "-----BEGIN PKCS7-----\n"
-"MIIBaAYJKoZIhvcNAQcDoIIBWTCCAVUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
-"JomT8ixkARkWAmNoMRQwEgYKCZImiZPyLGQBGRYEY2VybjEtMCsGA1UEAxMkQ0VS\n"
-"TiBUcnVzdGVkIENlcnRpZmljYXRpb24gQXV0aG9yaXR5AgoW9OwmAAIAATqqMA0G\n"
-"CSqGSIb3DQEBAQUABIGAZnhJdqPXzoadVY9wQ8uGC6bDgwJlc4p7DfpYduErRMgz\n"
-"7dY07WAosEDDw5RDMaCVqCNn3hvDctGAjbxkeTF1YaHOUEwn0rogfRsI+xmHf+rR\n"
-"mBIHguMjmd79rfoOl2yfA63J1Vm9LP50XNC17jr49wxTijaSIOntyH/DpOra69ow\n"
-"SwYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAibDJAdGOagXoAoQEbuQ7uNYM7lIfr6\n"
-"za+Ya4AMj17TaqT6OrgIVK4xXrphOpnyYLJObQ==\n"
-  "-----END PKCS7-----\n"; // hex string key example
-
-data = "-----BEGIN PKCS7-----\n"
-"MIIBiAYJKoZIhvcNAQcDoIIBeTCCAXUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
-"JomT8ixkARkWAmNoMRQwEgYKCZImiZPyLGQBGRYEY2VybjEtMCsGA1UEAxMkQ0VS\n"
-"TiBUcnVzdGVkIENlcnRpZmljYXRpb24gQXV0aG9yaXR5AgoW9OwmAAIAATqqMA0G\n"
-"CSqGSIb3DQEBAQUABIGAWNGKHE6H7OFU9c90uAjiiRP4mR6DFB5cCahKyuBA3lec\n"
-"XpbhgOkkA9q+U6LZaT+K0Z31FzIr3gO+zvbp13sPFeqDz1oYpymlGaRe+1DXPNDF\n"
-"OtMpsm/c0JK/vxKewzsBjQfOPKkod6tz0sulJMl1X70y4xHSWMw9jfRPt9ZVWuow\n"
-"awYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAi+fRwENHFhXoBInrqjv5YuQ2IrxC4A\n"
-"5nSBExAMN+Tsc33g9NSTHNFQLdJlX7/Rwq6lt0UtnguytxMJV6zjriAPpZVJ5drP\n"
-"P1bW82ZTeHxIVwlW\n"
-  "-----END PKCS7-----\n"; // 32byte key
 
 data = "-----BEGIN PKCS7-----\n"
 "MIIBiAYJKoZIhvcNAQcDoIIBeTCCAXUCAQAxggEBMIH+AgEAMGcwWTESMBAGCgmS\n"
@@ -160,7 +127,7 @@ data = "-----BEGIN PKCS7-----\n"
 "5ylJG6oYT1AOqSB1k68Tooml9bcW2yfLee4UnL4Ma4sFeGZlgdN1/VtS+KbfUMv9\n"
 "HcWOnet68daOM5X4\n"
   "-----END PKCS7-----\n";
- //another 32 byte key
+ //a real 32 byte key
 
 
 
