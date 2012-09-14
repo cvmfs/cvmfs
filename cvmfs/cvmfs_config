@@ -55,7 +55,7 @@ cvmfs_config_usage()
  echo "  probe"
  echo "  reload"
  echo "  umount"
- echo "  restartclean"
+ echo "  wipecache"
  echo "  bugreport"
 }
 
@@ -596,6 +596,146 @@ cvmfs_stat()
 }
 
 
+cvmfs_status()
+{
+  local list
+  list=""
+
+  RETVAL=0
+
+  local mounted_repos
+  local processed
+  mounted_repos=`list_mounts | awk '{print $3}'`
+  for mountpoint in $mounted_repos
+  do
+    cd $mountpoint
+    get_attr fqrn; fqrn=$attr_value
+    get_attr pid; pid=$attr_value
+    echo "$fqrn mounted on $mountpoint with pid $pid"
+  done
+
+  return $RETVAL
+}
+
+
+cvmfs_reload()
+{
+  RETVAL=0
+  echo "TBD"
+  return $RETVAL
+}
+
+
+cvmfs_probe()
+{
+  RETVAL=0
+  local list
+  list=""
+
+  if ! cvmfs_readconfig; then
+    echo "Failed to read CernVM-FS configuration"
+    return 1
+  fi
+  if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
+    list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+  fi
+
+  local org
+  for org in $list
+  do
+    case $org in
+      none)
+      ;;
+      *)
+        . /etc/cvmfs/config.sh # start with fresh repository_... functions
+        cvmfs_readconfig
+        fqrn=`cvmfs_mkfqrn $org`
+        cvmfs_readconfig $fqrn
+        echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
+        df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
+        if [ $? -ne 0 ]; then
+          echo "Failed!"
+          RETVAL=1
+        else
+          echo "OK"
+        fi
+      ;;
+    esac
+  done
+
+  return $RETVAL
+}
+
+
+cvmfs_umount() {
+  local mount_list
+  mount_list=`list_mounts | awk '{print $3}'`
+
+  RETVAL=0
+
+  local m
+  for m in $mount_list
+  do
+    echo -n "Unmounting ${m}: "
+    umount $m 2>/dev/null
+    if [ $? -ne 0 ]; then
+      RETVAL=1
+      echo "Failed!"
+      fuser -m -a -v $m
+    else
+      echo "OK"
+    fi
+  done
+
+  return $RETVAL
+}
+
+
+cvmfs_wipecache()
+{
+  if ! cvmfs_readconfig; then
+    echo "Failed to read CernVM-FS configuration"
+    return 1
+  fi
+
+  cvmfs_umount
+  RETVAL=$?
+  if [ $RETVAL -eq 0 ]; then
+    local list
+    list=""
+
+    if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
+       list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+    fi
+
+    local org
+    for org in $list
+    do
+      case $org in
+        none)
+        ;;
+        *)
+          . /etc/cvmfs/config.sh # start with fresh repository_... functions
+          cvmfs_readconfig
+          fqrn=`cvmfs_mkfqrn $org`
+          cvmfs_readconfig $fqrn
+          echo -n "Wiping out $CVMFS_CACHE_BASE/$fqrn... "
+          [ ! -d "$CVMFS_CACHE_BASE/$fqrn" ] || rm -rf "$CVMFS_CACHE_BASE/$fqrn"
+          if [ $? -ne 0 ]; then
+            echo "Failed!"
+            RETVAL=1
+          else
+            echo "OK"
+          fi
+        ;;
+      esac
+    done
+   fi
+
+   return $RETVAL
+}
+
+
 cvmfs_bugreport()
 {
   tmpdir=`mktemp -d -t cvmfs-bugreport.XXXXXX` || exit 1
@@ -661,51 +801,6 @@ cvmfs_bugreport()
    echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
    echo "Please attach this file to your problem describtion and send it as a"
    echo "Savannah bug report to https://savannah.cern.ch/projects/cernvm"
-}
-
-
-cvmfs_status() {
-  local list
-  list=""
-
-  RETVAL=0
-
-  local mounted_repos
-  local processed
-  mounted_repos=`list_mounts | awk '{print $3}'`
-  for mountpoint in $mounted_repos
-  do
-    cd $mountpoint
-    get_attr fqrn; fqrn=$attr_value
-    get_attr pid; pid=$attr_value
-    echo "$fqrn mounted on $mountpoint with pid $pid"
-  done
-
-  return $RETVAL
-}
-
-
-cvmfs_umount() {
-  local mount_list
-  mount_list=`list_mounts | awk '{print $3}'`
-
-  RETVAL=0
-
-  local m
-  for m in $mount_list
-  do
-    echo -n "Unmounting ${m}: "
-    umount $m 2>/dev/null
-    if [ $? -ne 0 ]; then
-      RETVAL=1
-      echo "Failed!"
-      fuser -m -a -v $m
-    else
-      echo "OK"
-    fi
-  done
-
-  return $RETVAL
 }
 
 
@@ -851,6 +946,7 @@ check_group()
       exit 1 ;;
   esac
 }
+
 
 check_cvmfs_user()
 {
@@ -1072,6 +1168,22 @@ case "$1" in
     RETVAL=$?
     ;;
 
+  reload)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    shift 1
+    cvmfs_reload
+    RETVAL=$?
+    ;;
+
+  probe)
+    shift 1
+    cvmfs_probe
+    RETVAL=$?
+    ;;
+
   umount)
     if [ `id -u` -ne 0 ]; then
       echo "root privileges required"
@@ -1079,6 +1191,16 @@ case "$1" in
     fi
     shift 1
     cvmfs_umount $@
+    RETVAL=$?
+    ;;
+
+  wipecache)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    shift 1
+    cvmfs_wipecache $@
     RETVAL=$?
     ;;
 
