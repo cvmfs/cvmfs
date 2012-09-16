@@ -18,8 +18,6 @@ short_ttl:	  --stdout FILE	Redirect STDOUT to FILE.
 short_ttl:			Default to /var/log/cvmfs-test/short_ttl.out.
 short_ttl:	  --stderr FILE Redirect STDERR to FILE.
 short_ttl:			Default to /var/log/cvmfs-test/short_ttl.err.
-short_ttl:	  --fifo FIFO	Change path to FIFO with return status.
-short_ttl:			Default to /tmp/returncode.fifo
 short_ttl:	  --no-clean	Skip environment cleaning.
 short_ttl:	  --no-remount	Skip remount after ttl expires.
 short_ttl:

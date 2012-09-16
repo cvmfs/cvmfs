@@ -15,8 +15,6 @@ full_cache:	  --stdout FILE	Redirect STDOUT to FILE.
 full_cache:			Default to /var/log/cvmfs-test/full_cache.out.
 full_cache:	  --stderr FILE Redirect STDERR to FILE.
 full_cache:			Default to /var/log/cvmfs-test/full_cache.err.
-full_cache:	  --fifo FIFO	Change path to FIFO with return status.
-full_cache:			Default to /tmp/returncode.fifo
 full_cache:	  --no-clean	Skip environment cleaning.
-full_cache:	  --setup		Compile zpipe, needed for this test.
+full_cache:	  --setup	Compile zpipe, needed for this test.
 full_cache:
