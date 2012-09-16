@@ -27,6 +27,8 @@
 using namespace std;  // NOLINT
 
 
+bool check_chunks;
+
 static void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "CernVM File System repository sanity checker, version %s\n\n"
@@ -34,7 +36,8 @@ static void Usage() {
     "\n\n"
     "Usage: cvmfs_check [options] <repository directory>\n"
     "Options:\n"
-    "  -l  log level (0-4, default: 2)>\n",
+    "  -l  log level (0-4, default: 2)>\n"
+    "  -c  check availability of data chunks\n",
     VERSION);
 }
 
@@ -195,7 +198,7 @@ static bool Find(const catalog::Catalog *catalog,
     }
 
     // Check if the chunk is there
-    if (!entries[i].checksum().IsNull()) {
+    if (!entries[i].checksum().IsNull() && check_chunks) {
       string chunk_path = "data" + entries[i].checksum().MakePath(1, 2);
       if (entries[i].IsDirectory())
         chunk_path += "L";
@@ -453,8 +456,10 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
 
 
 int main(int argc, char **argv) {
+  check_chunks = false;
+
   char c;
-  while ((c = getopt(argc, argv, "l:h")) != -1) {
+  while ((c = getopt(argc, argv, "l:ch")) != -1) {
     switch (c) {
       case 'l': {
         unsigned log_level = 1 << (kLogLevel0 + String2Uint64(optarg));
@@ -465,6 +470,9 @@ int main(int argc, char **argv) {
         SetLogVerbosity(static_cast<LogLevels>(log_level));
         break;
       }
+      case 'c':
+        check_chunks = true;
+        break;
       case 'h':
         Usage();
         return 0;
