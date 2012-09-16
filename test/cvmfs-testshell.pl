@@ -32,8 +32,6 @@ my $continue = undef;
 # Variables for socket managing
 my $socket = undef;
 my $ctxt = undef;
-my $shell_socket = undef;
-my $shell_ctxt = undef;
 
 my $ret = GetOptions ( "c|command=s" => \$command,
 					   "wait-daemon" => \$wait_daemon,
@@ -62,20 +60,7 @@ if (defined($setup)) {
 }
 
 if (defined($wait_daemon)) {
-	# Opening the socket to wait for the daemon to send its ip
-	($shell_socket, $shell_ctxt) = bind_shell_socket();
-	
-	# Wait fo the daemon message
-	my $answer = receive_shell_msg($shell_socket);
-	
-	# Splitting the message and assigning it to variables
-	my @ip_port = split /:/, $answer;
-	($daemon_ip, $daemon_port) = ($ip_port[0], $ip_port[1]);
-	$daemon_path = "$daemon_ip:$daemon_port";
-	
-	# Closing the socket. The same socket will be used to receive tests output.
-	$socket = close_shell_socket($socket);
-	$ctxt = term_shell_ctxt($ctxt);
+	($continue, $socket, $ctxt) = check_command(undef, undef, undef, 'wait-daemon');
 }
 
 if (defined($command)) {
@@ -100,7 +85,7 @@ if ($interactive) {
 	print "Type 'help' for a list of available commands.\n";
 	print '#'x80 . "\n";
 
-	# If the daemon is not running, the shell will ask the use if run it
+	# If the daemon is not running, the shell will ask the user if it has to start it
 	if (!check_daemon()) {
 		print 'The daemon is not running. Would you like to run it now? [Y/n]';
 		my $answer = <STDIN>;
@@ -109,8 +94,11 @@ if ($interactive) {
 		}
 	}
 	else {
-		# Starting the socket to communicate with the server
-		($socket, $ctxt) = connect_shell_socket($daemon_path);
+		# Starting the socket to communicate with the server unless the connection
+		# was already done
+		unless(defined($socket) and defined($ctxt)) {
+			($socket, $ctxt) = connect_shell_socket($daemon_path);
+		}
 	}
 
 	# Infinite loop for the shell. It will switch between two shells: the first one

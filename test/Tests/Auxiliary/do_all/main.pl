@@ -1,6 +1,5 @@
 use strict;
 use warnings;
-use Functions::FIFOHandle qw(make_fifo unlink_fifo print_to_fifo open_rfifo close_fifo);
 use Tests::Common qw(set_stdout_stderr open_test_socket close_test_socket open_shellout_socket);
 use ZeroMQ qw/:all/;
 use File::Find;
@@ -9,13 +8,11 @@ use Getopt::Long;
 # Variables for command line options
 my $outputfile = '/var/log/cvmfs-test/do_all.out';
 my $errorfile = '/var/log/cvmfs-test/do_all.err';
-my $outputfifo = '/tmp/returncode.fifo';
 my $no_clean = undef;
 
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
-					   "fifo=s" => \$outputfifo,
 					   "no-clean" => \$no_clean );
 					   
 # Test name used for socket identity
@@ -82,12 +79,8 @@ if (defined ($pid) and $pid == 0) {
 	
 	# Sending a command to the daemon for each main.pl file found to start different test
 	foreach (@main_pl) {
-		# Generating a random file name to pass it as --fifo options for all tests
-		my $test_fifo = `mktemp /tmp/test_fifo.XXXXXX`;
-		chomp($test_fifo);
-		
 		my $command = (split /\//, $_)[-2];
-		$socket->send("$command --fifo $test_fifo");
+		$socket->send("$command");
 		get_daemon_output($socket, $shell_socket);
 	}
 	
@@ -107,7 +100,7 @@ if (defined ($pid) and $pid != 0) {
 	print "PROCESSING:$testname\n";
 	# This is the line that makes the shell waiting for test output.
 	# Change whatever you want, but don't change this line or the shell will ignore exit status.
-	print "READ_RETURN_CODE:$outputfifo\n";
+	print "READ_RETURN_CODE\n";
 }
 
 exit 0;
