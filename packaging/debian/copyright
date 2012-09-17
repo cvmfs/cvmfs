@@ -1,0 +1,26 @@
+This work was packaged for Ubuntu by:
+
+    Frederik Wagner <Frederik.Wagner@lmu.de> on Tue, 08 Feb 2011 14:12:54 +0100
+
+It was downloaded from <http://cernvm.cern.ch/portal/downloads>
+
+Upstream Author(s):
+
+    CernVM Administrator (cvmadmin) <cernvm.administrator@cern.ch>
+
+Copyright:
+
+    Copyright (c) 2009, CERN.
+    
+License:
+
+    Distributed unter the BSD License.
+
+The Debian packaging is:
+
+    Copyright (C) 2011 Frederik Wagner <Frederik.Wagner@lmu.de>
+
+You are free to distribute this software under the terms of
+the BSD License.
+On Debian systems, the complete text of the BSD License can be 
+found in the file `/usr/share/common-licenses/BSD'.
