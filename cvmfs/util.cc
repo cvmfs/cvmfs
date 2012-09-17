@@ -724,7 +724,7 @@ bool ManagedExec(const vector<string> &command_line,
     failed = 'E';
 
    fork_failure:
-    write(pipe_fork[1], &failed, 1);
+    (void)write(pipe_fork[1], &failed, 1);
     _exit(1);
   }
   int statloc;

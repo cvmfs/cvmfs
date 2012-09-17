@@ -433,7 +433,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash) {
 
 bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
   bool result = false;
-  StreamStates stream_state;
+  StreamStates stream_state = kStreamError;
   z_stream strm;
   size_t have;
   unsigned char buf[kBufferSize];
