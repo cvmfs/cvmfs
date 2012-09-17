@@ -39,14 +39,12 @@ Requires: attr
 # Account for different package names
 %if 0%{?suse_version}
 Requires: libfuse2
-Requires: aaa_base
 Requires: glibc
 Requires: insserv
 Requires: util-linux
 Requires: pwdutils
 %else
 Requires: fuse-libs
-Requires: chkconfig
 Requires: glibc-common
 Requires: initscripts
 Requires: which
