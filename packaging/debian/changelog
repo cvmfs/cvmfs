@@ -1,4 +1,4 @@
-cvmfs (2.1.1git79785d5ba1c2912f) lucid; urgency=low
+cvmfs (2.1.0) lucid; urgency=low
 
   * Adopted package for cvmfs build and test servers
 
