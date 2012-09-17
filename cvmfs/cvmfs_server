@@ -165,7 +165,7 @@ abort() {
   [ x"$reply" != xy ] && return
 
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="su $user -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
 
   abort_before_hook $name
   sudo umount /cvmfs/$name
@@ -189,7 +189,7 @@ publish() {
   fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="su $user -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
   local repository_dir=$(get_local_upstream $upstream)
 
   publish_before_hook $name
@@ -378,13 +378,13 @@ EOF
 
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
-  su $cvmfs_user -c "cvmfs_sync -n \
+  sudo -H -u $cvmfs_user sh -c "cvmfs_sync -n \
     -t $temp_dir \
     -p $pipe_paths \
     -d $pipe_digests \
     -l $repository_dir \
     -o ${temp_dir}/new_manifest" > /dev/null
-  su $cvmfs_user -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
+  sudo -H -u $cvmfs_user sh -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${temp_dir}/new_manifest \
