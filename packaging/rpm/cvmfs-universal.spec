@@ -40,13 +40,11 @@ Requires: attr
 %if 0%{?suse_version}
 Requires: libfuse2
 Requires: glibc
-Requires: insserv
 Requires: util-linux
 Requires: pwdutils
 %else
 Requires: fuse-libs
 Requires: glibc-common
-Requires: initscripts
 Requires: which
 Requires: shadow-utils
 %endif
