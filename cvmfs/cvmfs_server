@@ -268,7 +268,7 @@ mkfs() {
 
   # Sanity checks
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
-  modprobe aufs || die "aufs kernel module missing"
+  /sbin/modprobe aufs || die "aufs kernel module missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
 
   local cvmfs_user
@@ -339,6 +339,7 @@ Alias /cvmfs/$name ${repository_dir}
 </Directory>
 EOF
   fi
+  [ -d /etc/cvmfs/config.d ] || mkdir -p /etc/cvmfs/config.d
   cat > /etc/cvmfs/config.d/${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 CVMFS_SERVER_URL=$stratum0
