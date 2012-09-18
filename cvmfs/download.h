@@ -22,7 +22,8 @@ namespace download {
 enum Destination {
   kDestinationMem = 1,
   kDestinationFile,
-  kDestinationPath
+  kDestinationPath,
+  kDestinationNone
 };
 
 /**
@@ -45,6 +46,7 @@ struct JobInfo {
   const std::string *url;
   bool compressed;
   bool probe_hosts;
+  bool head_request;
   Destination destination;
   struct {
     size_t size;
@@ -55,20 +57,25 @@ struct JobInfo {
   const std::string *destination_path;
   const hash::Any *expected_hash;
 
-  // One constructor per destination
+  // One constructor per destination + head request
   JobInfo() { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph,
           const std::string *p, const hash::Any *h) : url(u), compressed(c),
-          probe_hosts(ph), destination(kDestinationPath), destination_path(p),
-          expected_hash(h)
+          probe_hosts(ph), head_request(false),
+          destination(kDestinationPath), destination_path(p), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
           const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
+          head_request(false),
           destination(kDestinationFile), destination_file(f), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph,
           const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
-          destination(kDestinationMem), expected_hash(h)
+          head_request(false), destination(kDestinationMem), expected_hash(h)
+          { wait_at[0] = wait_at[1] = -1; }
+  JobInfo(const std::string *u, const bool ph) :
+          url(u), compressed(false), probe_hosts(ph), head_request(true),
+          destination(kDestinationNone), expected_hash(NULL)
           { wait_at[0] = wait_at[1] = -1; }
   ~JobInfo() {
     if (wait_at[0] >= 0) {
@@ -94,6 +101,7 @@ void Init(const unsigned max_pool_handles);
 void Fini();
 void Spawn();
 Failures Fetch(JobInfo *info);
+Failures Head(const std::string *url);
 
 void SetDnsServer(const std::string &address);
 void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);

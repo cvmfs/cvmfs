@@ -23,8 +23,12 @@
 #include "catalog.h"
 #include "compression.h"
 #include "shortstring.h"
+#include "download.h"
 
 using namespace std;  // NOLINT
+
+bool check_chunks;
+string *remote_repository;
 
 
 static void Usage() {
@@ -32,9 +36,10 @@ static void Usage() {
     "CernVM File System repository sanity checker, version %s\n\n"
     "This tool checks the consisteny of the file catalogs of a cvmfs repository."
     "\n\n"
-    "Usage: cvmfs_check [options] <repository directory>\n"
+    "Usage: cvmfs_check [options] <repository directory / url>\n"
     "Options:\n"
-    "  -l  log level (0-4, default: 2)>\n",
+    "  -l  log level (0-4, default: 2)>\n"
+    "  -c  check availability of data chunks\n",
     VERSION);
 }
 
@@ -155,6 +160,20 @@ static bool CompareCounters(const catalog::Counters &a,
 
 
 /**
+ * Checks for existance of a file either locally or via HTTP head
+ */
+static bool Exists(const string &file) {
+  if (remote_repository == NULL)
+    return FileExists(file);
+  else {
+    const string url = *remote_repository + "/" + file;
+    download::JobInfo head(&url, false);
+    return download::Fetch(&head) == download::kFailOk;
+  }
+}
+
+
+/**
  * Recursive catalog walk-through
  */
 static bool Find(const catalog::Catalog *catalog,
@@ -195,11 +214,11 @@ static bool Find(const catalog::Catalog *catalog,
     }
 
     // Check if the chunk is there
-    if (!entries[i].checksum().IsNull()) {
+    if (!entries[i].checksum().IsNull() && check_chunks) {
       string chunk_path = "data" + entries[i].checksum().MakePath(1, 2);
       if (entries[i].IsDirectory())
         chunk_path += "L";
-      if (!FileExists(chunk_path)) {
+      if (!Exists(chunk_path)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "data chunk %s (%s) missing",
                  entries[i].checksum().ToString().c_str(), full_path.c_str());
         retval = false;
@@ -307,18 +326,43 @@ static bool Find(const catalog::Catalog *catalog,
 }
 
 
-static catalog::Catalog *DecompressCatalog(const string &path,
-                                           const hash::Any catalog_hash)
+static std::string DownloadCatalog(const string &path,
+                                   const hash::Any catalog_hash)
+{
+  const string source = "data" + catalog_hash.MakePath(1,2) + "C";
+  const string dest = "/tmp/" + catalog_hash.ToString();
+  const string url = *remote_repository + "/" + source;
+  download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
+  download::Failures retval = download::Fetch(&download_catalog);
+  if (retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "failed to download catalog %s (%d)",
+             catalog_hash.ToString().c_str(), retval);
+    return "";
+  }
+
+  return dest;
+}
+
+
+static std::string DecompressCatalog(const string &path,
+                                     const hash::Any catalog_hash)
 {
   const string source = "data" + catalog_hash.MakePath(1,2) + "C";
   const string dest = "/tmp/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
-    return NULL;
+    return "";
 
+  return dest;
+}
+
+
+static catalog::Catalog *AttachCatalog(const string &path,
+                                       const string &tmp_file)
+{
   catalog::Catalog *catalog =
     new catalog::Catalog(PathString(path.data(), path.length()), NULL);
-  bool retval = catalog->OpenDatabase(dest);
-  unlink(dest.c_str());
+  bool retval = catalog->OpenDatabase(tmp_file);
+  unlink(tmp_file.c_str());
   if (!retval) {
     delete catalog;
     return NULL;
@@ -341,7 +385,18 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
-  catalog::Catalog *catalog = DecompressCatalog(path, catalog_hash);
+  string tmp_file;
+  if (remote_repository == NULL)
+    tmp_file = DecompressCatalog(path, catalog_hash);
+  else
+    tmp_file = DownloadCatalog(path, catalog_hash);
+  if (tmp_file == "") {
+    LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
+             catalog_hash.ToString().c_str());
+    return false;
+  }
+
+  catalog::Catalog *catalog = AttachCatalog(path, tmp_file);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
@@ -453,8 +508,10 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
 
 
 int main(int argc, char **argv) {
+  check_chunks = false;
+
   char c;
-  while ((c = getopt(argc, argv, "l:h")) != -1) {
+  while ((c = getopt(argc, argv, "l:ch")) != -1) {
     switch (c) {
       case 'l': {
         unsigned log_level = 1 << (kLogLevel0 + String2Uint64(optarg));
@@ -465,6 +522,9 @@ int main(int argc, char **argv) {
         SetLogVerbosity(static_cast<LogLevels>(log_level));
         break;
       }
+      case 'c':
+        check_chunks = true;
+        break;
       case 'h':
         Usage();
         return 0;
@@ -480,14 +540,40 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  const string repo_dir = MakeCanonicalPath(argv[optind]);
-  if (chdir(repo_dir.c_str()) != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
-             repo_dir.c_str());
-    return 1;
+  // Repository can be HTTP address or on local file system
+  const string repository = MakeCanonicalPath(argv[optind]);
+  if (repository.substr(0, 7) == "http://") {
+    remote_repository = new string(repository);
+    download::Init(1);
+  } else {
+    remote_repository = NULL;
   }
 
-  Manifest *manifest = Manifest::LoadFile(".cvmfspublished");
+  // Load Manifest
+  Manifest *manifest = NULL;
+  if (remote_repository == NULL) {
+    if (chdir(repository.c_str()) != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
+               repository.c_str());
+      return 1;
+    }
+    manifest = Manifest::LoadFile(".cvmfspublished");
+  } else {
+    const string url = repository + "/.cvmfspublished";
+    download::JobInfo download_manifest(&url, false, false, NULL);
+    download::Failures retval = download::Fetch(&download_manifest);
+    if (retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d)",
+               retval);
+      return 1;
+    }
+    char *buffer = download_manifest.destination_mem.data;
+    const unsigned length = download_manifest.destination_mem.size;
+    manifest = Manifest::LoadMem(
+      reinterpret_cast<const unsigned char *>(buffer), length);
+    free(download_manifest.destination_mem.data);
+  }
+
   if (!manifest) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
@@ -496,7 +582,7 @@ int main(int argc, char **argv) {
   // Validate Manifest
   const string certificate_path =
     "data" + manifest->certificate().MakePath(1, 2) + "X";
-  if (!FileExists(certificate_path)) {
+  if (!Exists(certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());
     return 1;
