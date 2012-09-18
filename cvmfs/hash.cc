@@ -38,7 +38,7 @@ void Init(ContextPtr context) {
       break;
     case kSha1:
       assert(context.size == sizeof(SHA_CTX));
-      SHA_Init(reinterpret_cast<SHA_CTX *>(context.buffer));
+      SHA1_Init(reinterpret_cast<SHA_CTX *>(context.buffer));
       break;
     default:
       abort();  // Undefined hash

@@ -512,7 +512,10 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
         hash::Any match_hash;
         hash::Final(info->hash_context, &match_hash);
         if (match_hash != *(info->expected_hash)) {
-          // TODO(jakob): Logging
+          LogCvmfs(kLogDownload, kLogDebug,
+                   "hash verification of %s failed (expected %s, got %s)",
+                   info->url->c_str(), info->expected_hash->ToString().c_str(),
+                   match_hash.ToString().c_str());
           info->error_code = kFailBadData;
           break;
         }
@@ -522,14 +525,17 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       if ((info->destination == kDestinationMem) && info->compressed) {
         void *buf;
         int64_t size;
-        int retval = zlib::DecompressMem2Mem(info->destination_mem.data,
-                                             info->destination_mem.size,
-                                             &buf, &size);
-        if (retval == 0) {
+        bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
+                                              info->destination_mem.size,
+                                              &buf, &size);
+        if (retval) {
           free(info->destination_mem.data);
           info->destination_mem.data = static_cast<char *>(buf);
           info->destination_mem.size = size;
         } else {
+          LogCvmfs(kLogDownload, kLogDebug,
+                   "decompression (memory) of url %s failed",
+                   info->url->c_str());
           info->error_code = kFailBadData;
           break;
         }
