@@ -346,10 +346,12 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   } else {
     // Write to file
     if (info->compressed) {
-      int retval = zlib::DecompressZStream2File(&info->zstream,
-                                                info->destination_file,
-                                                ptr, num_bytes);
-      if (retval < 0) {
+      bool retval = zlib::DecompressZStream2File(&info->zstream,
+                                                 info->destination_file,
+                                                 ptr, num_bytes);
+      if (!retval) {
+        LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
+                 info->url->c_str());
         info->error_code = kFailBadData;
         return 0;
       }
