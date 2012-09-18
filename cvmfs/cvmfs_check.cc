@@ -23,6 +23,7 @@
 #include "catalog.h"
 #include "compression.h"
 #include "shortstring.h"
+#include "download.h"
 
 using namespace std;  // NOLINT
 
@@ -487,6 +488,8 @@ int main(int argc, char **argv) {
     Usage();
     return 1;
   }
+
+  download::Init(1);
 
   const string repo_dir = MakeCanonicalPath(argv[optind]);
   if (chdir(repo_dir.c_str()) != 0) {

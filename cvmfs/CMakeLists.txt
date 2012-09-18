@@ -82,7 +82,7 @@ set (CVMFS_SYNC_BIN_SOURCES
   cvmfs_sync.h cvmfs_sync.cc)
 
 set (CVMFS_CHECK_SOURCES
-	smalloc.h
+	smalloc.h atomic.h
   logging.cc logging.h logging_internal.h
   globals.cc globals.h
   manifest.h manifest.cc
@@ -93,6 +93,7 @@ set (CVMFS_CHECK_SOURCES
 	catalog.h catalog.cc
   dirent.h shortstring.h
 	util.h util.cc
+  duplex_curl.h download.h download.cc
   cvmfs_check.cc)
 
 set (CVMFS_SIGN_SOURCES
@@ -345,6 +346,7 @@ if (BUILD_SERVER)
 	if (LIBCURL_BUILTIN)
     add_dependencies (cvmfs_sync libcares libcurl)
 		add_dependencies (cvmfs_pull libcares libcurl)
+    add_dependencies (cvmfs_check libcares libcurl)
 	endif (LIBCURL_BUILTIN)
 
 	if (SQLITE3_BUILTIN)
@@ -370,7 +372,7 @@ if (BUILD_SERVER)
 	set_target_properties (cvmfs_sync PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}")
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries)
-	target_link_libraries (cvmfs_check		${CVMFS_CHECK_LIBS} ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES} pthread dl)
+	target_link_libraries (cvmfs_check		${CVMFS_CHECK_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} pthread dl)
 	target_link_libraries (cvmfs_pull		${CVMFS_PULL_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
 #	target_link_libraries (cvmfs_scrub		${CVMFS_SCRUB_LIBS} ${OPENSSL_LIBRARIES})
 	target_link_libraries (cvmfs_sign		${CVMFS_SIGN_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
