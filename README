@@ -13,5 +13,5 @@ This preparation of directories is transparent to web servers and
 web proxies.  They just serve static content, i.e. arbitrary files.
 Any HTTP server should do the job.
 
-Developed for the delivery of experiment software stacks of of the
+Developed for the delivery of experiment software stacks of the
 LHC experiments at CERN.
