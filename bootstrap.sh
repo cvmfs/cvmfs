@@ -1,9 +1,9 @@
 #!/bin/sh
 
-CARES_VERSION=1.7.5
-CURL_VERSION=7.24.0
-ZLIB_VERSION=1.2.5
-SPARSEHASH_VERSION=1.11
+CARES_VERSION=1.9.1
+CURL_VERSION=7.27.0
+ZLIB_VERSION=1.2.7
+SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.5.0
 
 # put the extracted stuff out of source for compilation (location given by cmake)
@@ -18,7 +18,7 @@ fi
 cd externals/c-ares
 tar xvfz c-ares-${CARES_VERSION}.tar.gz
 mkdir -p "$outOfSource/c-ares/src"
-mv c-ares-1.7.5/* "$outOfSource/c-ares/src"
+mv c-ares-${CARES_VERSION}/* "$outOfSource/c-ares/src"
 cp src/* "$outOfSource/c-ares/src"
 rm -rf c-ares-${CARES_VERSION}
 cd ../..

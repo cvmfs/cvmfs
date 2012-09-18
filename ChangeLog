@@ -1,4 +1,6 @@
 2.1.2:
+  * Bumped external versions: libcurl 7.27.0, c-ares 1.9.1,
+    sqlite 3.7.14, sparsehash 1.12, zlib 1.2.7
   * Support for remote checking of repositories
   * Added Ubuntu (deb) packaging specs
   * Change default values: strict mount to no, shared cache
