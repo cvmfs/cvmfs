@@ -438,6 +438,10 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
                    static_cast<void *>(info));
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, static_cast<void *>(info));
   curl_easy_setopt(handle, CURLOPT_HTTPHEADER, http_headers_);
+  if (info->head_request)
+    curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
+  else
+    curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
 }
 
 
@@ -701,16 +705,17 @@ Failures Fetch(JobInfo *info) {
     ReleaseCurlHandle(info->curl_handle);
   }
 
-  if ((info->destination == kDestinationPath) && (result != kFailOk))
-    unlink(info->destination_path->c_str());
-  if ((info->destination_mem.data) && (result != kFailOk)) {
-    free(info->destination_mem.data);
-    info->destination_mem.data = NULL;
-    info->destination_mem.size = 0;
-  }
-
   if (result != kFailOk) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d)", result);
+
+    if (info->destination == kDestinationPath)
+      unlink(info->destination_path->c_str());
+
+    if (info->destination_mem.data) {
+      free(info->destination_mem.data);
+      info->destination_mem.data = NULL;
+      info->destination_mem.size = 0;
+    }
   }
 
   return result;
