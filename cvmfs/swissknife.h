@@ -11,6 +11,8 @@
 
 namespace swissknife {
 
+void Usage();
+
 class Parameter {
  public:
   Parameter(const char key, const std::string &desc, const bool opt,

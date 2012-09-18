@@ -15,12 +15,13 @@
 
 #include "logging.h"
 #include "swissknife_zpipe.h"
+#include "swissknife_check.h"
 
 using namespace std;  // NOLINT
 
 vector<swissknife::Command *> command_list;
 
-static void Usage() {
+void swissknife::Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "CernVM-FS repository storage management commands\n"
     "Version %s\n"
@@ -43,8 +44,8 @@ static void Usage() {
       LogCvmfs(kLogCvmfs, kLogStdout, "Options:");
       for (unsigned j = 0; j < params.size(); ++j) {
         LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "  -%c    %s",
-                 params[i].key(), params[i].description().c_str());
-        if (params[i].optional())
+                 params[j].key(), params[j].description().c_str());
+        if (params[j].optional())
           LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, " (optional)");
         LogCvmfs(kLogCvmfs, kLogStdout, "");
       }
@@ -56,14 +57,15 @@ static void Usage() {
 
 
 int main(int argc, char **argv) {
+  command_list.push_back(new swissknife::CommandCheck());
   command_list.push_back(new swissknife::CommandZpipe());
 
   if (argc < 2) {
-    Usage();
+    swissknife::Usage();
     return 1;
   }
   if ((string(argv[1]) == "--help") || (string(argv[1]) == "--version")) {
-		Usage();
+    swissknife::Usage();
 		return 0;
 	}
 
@@ -75,17 +77,17 @@ int main(int argc, char **argv) {
       swissknife::ParameterList params = command_list[i]->GetParams();
       for (unsigned j = 0; j < params.size(); ++j) {
         option_string.push_back(params[j].key());
-        if (!params[j].optional())
+        if (!params[j].switch_only())
           option_string.push_back(':');
       }
       char c;
       while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
         bool valid_option = false;
         for (unsigned j = 0; j < params.size(); ++j) {
-          if (c == params[i].key()) {
+          if (c == params[j].key()) {
             valid_option = true;
             string *argument = NULL;
-            if (!params[i].switch_only()) {
+            if (!params[j].switch_only()) {
               argument = new string(optarg);
             }
             args[c] = argument;
@@ -93,14 +95,23 @@ int main(int argc, char **argv) {
           }
         }
         if (!valid_option) {
-          Usage();
+          swissknife::Usage();
           return 1;
+        }
+      }
+      for (unsigned j = 0; j < params.size(); ++j) {
+        if (!params[j].optional()) {
+          if (args.find(params[j].key()) == args.end()) {
+            LogCvmfs(kLogCvmfs, kLogStderr, "parameter %c missing",
+                     params[j].key());
+            return 1;
+          }
         }
       }
       return command_list[i]->Main(args);
     }
   }
 
-  Usage();
+  swissknife::Usage();
   return 1;
 }
