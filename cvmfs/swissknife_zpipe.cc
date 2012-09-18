@@ -1,3 +1,7 @@
+/**
+ * Slightly adapted for the use within the CernVM File System
+ */
+
 /* zpipe.c: example of proper use of zlib's inflate() and deflate()
    Not copyrighted -- provided to the public domain
    Version 1.4  11 December 2005  Mark Adler */
@@ -16,6 +20,7 @@
 #include <string.h>
 #include <assert.h>
 #include "duplex_zlib.h"
+#include "swissknife_zpipe.h"
 
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(__CYGWIN__)
 #  include <fcntl.h>
@@ -173,8 +178,7 @@ void zerr(int ret)
 }
 
 /* compress or decompress from stdin to stdout */
-int main(int argc, char **argv)
-{
+int swissknife::CommandZpipe::Main(const swissknife::ArgumentList &args) {
     int ret;
 
     /* avoid end-of-line conversions */
@@ -182,7 +186,7 @@ int main(int argc, char **argv)
     SET_BINARY_MODE(stdout);
 
     /* do compression if no arguments */
-    if (argc == 1) {
+    if (args.find('d') == args.end()) {
         ret = def(stdin, stdout, Z_DEFAULT_COMPRESSION);
         if (ret != Z_OK)
             zerr(ret);
@@ -190,16 +194,10 @@ int main(int argc, char **argv)
     }
 
     /* do decompression if -d specified */
-    else if (argc == 2 && strcmp(argv[1], "-d") == 0) {
+    else {
         ret = inf(stdin, stdout);
         if (ret != Z_OK)
             zerr(ret);
         return ret;
-    }
-
-    /* otherwise, report usage */
-    else {
-        fputs("zpipe usage: zpipe [-d] < source > dest\n", stderr);
-        return 1;
     }
 }
