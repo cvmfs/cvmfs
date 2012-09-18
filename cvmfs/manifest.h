@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <map>
 #include "hash.h"
 
 /**
@@ -16,6 +17,7 @@
 class Manifest {
  public:
   static Manifest *LoadFile(const std::string &path);
+  static Manifest *LoadMem(const unsigned char *buffer, const unsigned length);
   Manifest(const hash::Any &catalog_hash, const std::string &root_path);
   Manifest(const hash::Any &catalog_hash,
            const hash::Md5 &root_path,
@@ -48,6 +50,7 @@ class Manifest {
   hash::Any catalog_hash() const { return catalog_hash_; }
   hash::Any certificate() const { return certificate_; }
  private:
+  static Manifest *Load(const std::map<char, std::string> &content);
   hash::Any catalog_hash_;
   hash::Md5 root_path_;
   uint32_t ttl_;
