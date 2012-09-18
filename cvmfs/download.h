@@ -58,7 +58,7 @@ struct JobInfo {
   const hash::Any *expected_hash;
 
   // One constructor per destination + head request
-  JobInfo() { wait_at[0] = wait_at[1] = -1; }
+  JobInfo() { wait_at[0] = wait_at[1] = -1; head_request = false; }
   JobInfo(const std::string *u, const bool c, const bool ph,
           const std::string *p, const hash::Any *h) : url(u), compressed(c),
           probe_hosts(ph), head_request(false),

@@ -482,7 +482,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
   if (fd >= 0) {
     if (f) fclose(f);
     else close(fd);
-    //AbortTransaction(temp_path);
+    AbortTransaction(temp_path);
   }
 
   // Signal the waiting threads and remove the queue

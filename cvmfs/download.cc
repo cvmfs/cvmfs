@@ -278,8 +278,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   const string header_line(static_cast<const char *>(ptr), num_bytes);
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
-  LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: Header callback with line %s",
-           header_line.c_str());
+  //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: Header callback with line %s",
+  //         header_line.c_str());
 
   // Check for http status code errors
   if (HasPrefix(header_line, "HTTP/1.", false)) {
@@ -346,7 +346,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   } else {
     // Write to file
     if (info->compressed) {
-      LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s", num_bytes, info->url->c_str());
+      //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
+      //         num_bytes, info->url->c_str());
       bool retval = zlib::DecompressZStream2File(&info->zstream,
                                                  info->destination_file,
                                                  ptr, num_bytes);
