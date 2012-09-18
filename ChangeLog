@@ -1,4 +1,5 @@
 2.1.2:
+  * Support for remote checking of repositories
   * Added Ubuntu (deb) packaging specs
   * Change default values: strict mount to no, shared cache
     to yes
