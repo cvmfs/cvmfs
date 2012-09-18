@@ -1,0 +1,25 @@
+cvmfs (2.1.0) lucid; urgency=low
+
+  * Adopted package for cvmfs build and test servers
+
+ -- Jakob Blomer <jblomer@cern.ch>  Mon, 17 Sep 2012 12:12:00 +0100
+
+cvmfs (2.0.8~lmu0) lucid; urgency=low
+
+  * packaged for Ubuntu (no changes necessary)
+
+ -- Frederik Wagner <Frederik.Wagner@lmu.de>  Mon, 23 Jan 2012 17:43:24 +0100
+
+cvmfs (0.2.61-1~lmu0ubuntu1) lucid; urgency=low
+
+  * build version 0.2.61 as debian package
+  * made init script debian compatible
+  * adjusted mount/umount scripts
+
+ -- Frederik Wagner <Frederik.Wagner@lmu.de>  Wed, 16 Mar 2011 16:42:13 +0100
+
+cvmfs (0.2.55-1~lmu0) lucid; urgency=low
+
+  * Build Version 0.2.55 as debian package.
+
+ -- Frederik Wagner <Frederik.Wagner@lmu.de>  Tue, 08 Feb 2011 14:12:54 +0100

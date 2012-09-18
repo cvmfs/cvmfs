@@ -21,7 +21,7 @@ use lib $RealBin;
 # We'll explain what this functions do when we'll use it in our test.
 # We're including here just the fundamental function, you should have a look
 # to Tests/Common.pm for a complete reference to offered function.
-use Tests::Common qw(setup_environment set_stdout_stderr open_test_socket close_test_socket);
+use Tests::Common qw(setup_environment set_stdout_stderr open_test_socket close_test_socket open_shellout_socket);
 
 # If you want your test to be able to launch other services (or test as well)
 # you need to be able to speak with the server. So you want probably include
@@ -29,9 +29,6 @@ use Tests::Common qw(setup_environment set_stdout_stderr open_test_socket close_
 # function included above open_test_socket() and close_test_socket().
 use ZeroMQ qw/:all/;
 
-# If your test will have a long elaboration and at the end has to send a result to
-# the shell, this will likely happen through a FIFO.
-use Functions::FIFOHandle qw(print_to_fifo);
 
 ############################
 # TEST NAME  AND REPO NAME #
@@ -56,13 +53,13 @@ use Getopt::Long;
 # Every test can accept any options, but some options has to be supported.
 # Next two options are needed to redirect STDOUT and STDERR after forking the
 # process, you'll see in a few line why we're doing it.
+
 my $outputfile = '/var/log/cvmfs-test/skeleton.out';
 my $errorfile = '/var/log/cvmfs-test/skeleton.err';
-# This option is needed to set a FIFO to return test output. Some test, for
-# example do_all need to overwrite the default value.
-my $outputfifo = '/tmp/returncode.fifo';
+
 # Next option is probably useless as far as I dind't find yet a test that needs
 # an unclean environment, but it's better to have it.
+
 my $no_clean = undef;
 
 # After setting all variables, here we're parsing command line options that
@@ -70,8 +67,7 @@ my $no_clean = undef;
 # for a reference on how tu use this module.
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
-					   "no-clean" => \$no_clean,
-					   "fifo=s" => \$outputfifo );
+					   "no-clean" => \$no_clean );
 ###########					   
 # FORKING #
 ###########
@@ -113,6 +109,14 @@ if (defined($pid) and $pid == 0) {
 	# it properly at the end of your script.
 	
 	##my ($socket, $ctxt) = open_test_socket($testname);
+
+	# We cannot use the same socket to speak with the daemon and send output to the shell,
+	# so we have to open a new socket. This function return two object: the socket
+	# object and the context obkect. This time, we don't need to set any identity for our
+	# socket as we don't need to get any data from the shell. We're not commenting it as
+	# we'll need to send output to the shell before the end of the script.
+
+	my ($shell_socket, $shell_ctxt) = open_shellout_socket();
 	
 	# It's a good idea to have your script to work in a clean environment. Every test,
 	# before starting, should send to the daemon a 'clean' command.
@@ -179,38 +183,29 @@ if (defined($pid) and $pid == 0) {
 	
 	# Almost everything is said now.
 	# There's a last important part: the output from the test.
-	# The function that will realize this is print_to_fifo(). This function accepts three arguments.
-	# The first one is the path to the FIFO, it has to be the same specified with the
-	# special signal READ_RETURN_CODE at the end of this script, since the shell will wait
-	# for output to be printed there. The second argument is the string you want to send. The third
-	# argument is optional and will represent options accepted by the function. By now, only one option
-	# is accepted and it's "SNDMORE\n": this option will print an extra line to the FIFO. When the shell
-	# will read it, it will start again to read the same FIFO and you can send multiple output lines.
+	# We have a socket object stored in the variable $shell_socket and we have a method called 'send'
+	# to send message through this socket.
 	
 	# We're not commenting these lines since they need very little time and since we need to send
 	# something to shell after it receives the READ_RETURN_CODE signal, otherwise it will hang forever.
 	
-	# This sleep isn't needed, but without this, the skeleton test will fail because it will try to
-	# write output before the shell open a fifo.
-	sleep 5;
+	$shell_socket->send("This is just a test output.\n");
+	$shell_socket->send("Shell will print in green line with a capitalized OK.\n");
+	$shell_socket->send("Shell will print in red lines with a capitalized WRONG.\n");
+	$shell_socket->send("You could find all skeleton file to build a test in $RealBin.\n");
 	
-	print_to_fifo($outputfifo, "This is just a test output.\n", "SNDMORE\n");
-	print_to_fifo($outputfifo, "Shell will print in green line with a capitalized OK.\n", "SNDMORE\n");
-	print_to_fifo($outputfifo, "Shell will print in red lines with a capitalized WRONG.\n", "SNDMORE\n");
+	# When we are finished with the output, we have to send the shell an ending message.
+	# This is not different from sending it another message, just the content has to be "END\n".
+	# If we forgot to do it, the shell will continue waiting for test output and will hang forever.
+
+	$shell_socket->send("END\n");	
 	
-	# When we want to send the last output line, we should use the same function but without the SNDMORE option.
-	# If we forget to send an output line without that option, the shell will hang forever waiting for more output.
-	# If you have many output lines very close between them, you should probably have to add a sleep
-	# before the closing line. Otherwise the test will write this line before the shell reads all the SNDMORE signal
-	# and because of the FIFO stack, the shell will hang forever because will read a SNDMORE after the last line.
-	
-	sleep 5;
-	print_to_fifo($outputfifo, "You could find all skeleton file to build a test in $RealBin.\n");
-	
-	
-	# As last thing, when your script is finished, you need to close the socket and the context.
+	# As last thing, when your script is finished, you need to close the socket and the context of both
+	# daemon and shell socket.
 	# This is to avoid future crash for multiple socket connecting simultaneusly.
+
 	##close_test_socket($socket, $ctxt);
+	close_test_socket($shell_socket, $shell_ctxt);
 }
 
 #################################
@@ -238,10 +233,11 @@ if (defined($pid) and $pid != 0) {
 	
 	# Next line is needed to tell the shell that an output is going to
 	# be sent by the started test. Once the shell will read this special command
-	# it will start waiting for an output on the specified FIFO.
+	# it will start waiting for an output.
 	# Be careful because the shell will wait for this output and if you don't
-	# print any output on the FIFO, the shell will hang forever after receiving this signal.
-	print "READ_RETURN_CODE:$outputfifo\n";
+	# print any output to it and if you forget about the ending message,
+	# the shell will hang forever after receiving this signal.
+	print "READ_RETURN_CODE";
 }
 
 exit 0;

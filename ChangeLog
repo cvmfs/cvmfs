@@ -1,4 +1,5 @@
 2.1.2:
+  * Added Ubuntu (deb) packaging specs
   * Change default values: strict mount to no, shared cache
     to yes
   * Check for Fuse4X installation on Mac OS

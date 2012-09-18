@@ -16,7 +16,7 @@ my $shell_path = undef;
 my $ret = GetOptions ("shell-path=s" => \$shell_path );
 
 if (defined($shell_path)) {
-	send_ip($shell_path, 'tcp://', 'wlan0');
+	send_ip($shell_path, 'tcp://', 'eth0');
 }
 
 # Opening the socket and dying if fail

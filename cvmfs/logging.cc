@@ -158,8 +158,8 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
   // Format the message string
   va_start(variadic_list, format);
-  vasprintf(&msg, format, variadic_list);
-  assert(msg != NULL);  // else: out of memory
+  int retval = vasprintf(&msg, format, variadic_list);
+  assert(retval != -1);  // else: out of memory
   va_end(variadic_list);
 
   if (alt_log_func) {

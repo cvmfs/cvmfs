@@ -16,7 +16,6 @@ my $datachunk_backup = '/tmp/cvmfs_backup/datachunk';
 # Variables for GetOpt
 my $outputfile = '/var/log/cvmfs-test/repo_signature.out';
 my $errorfile = '/var/log/cvmfs-test/repo_signature.err';
-my $outputfifo = '/tmp/returncode.fifo';
 my $no_clean = undef;
 my $setup = undef;
 
@@ -37,8 +36,7 @@ my @pids;
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "setup" => \$setup,
-					   "fifo=s" => \$outputfifo );
+					   "setup" => \$setup );
 
 # If setup option was invoked, compile zpipe and exit.
 if (defined($setup)) {
@@ -231,7 +229,7 @@ if (defined ($pid) and $pid != 0) {
 	print "PROCESSING:$testname\n";
 	# This is the line that makes the shell waiting for test output.
 	# Change whatever you want, but don't change this line or the shell will ignore exit status.
-	print "READ_RETURN_CODE:$outputfifo\n";
+	print "READ_RETURN_CODE\n";
 }
 
 exit 0;
