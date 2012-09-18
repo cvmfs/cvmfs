@@ -165,7 +165,7 @@ abort() {
   [ x"$reply" != xy ] && return
 
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="su $user -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
 
   abort_before_hook $name
   sudo umount /cvmfs/$name
@@ -189,7 +189,7 @@ publish() {
   fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="su $user -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
   local repository_dir=$(get_local_upstream $upstream)
 
   publish_before_hook $name
@@ -268,8 +268,9 @@ mkfs() {
 
   # Sanity checks
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
-  modprobe aufs || die "aufs kernel module missing"
+  /sbin/modprobe aufs || die "aufs kernel module missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
+  [ -d /etc/httpd ] && /sbin/service httpd status >/dev/null || die "Apache must be installed and running"
 
   local cvmfs_user
   if [ "x$owner" == "x" ]; then
@@ -339,6 +340,7 @@ Alias /cvmfs/$name ${repository_dir}
 </Directory>
 EOF
   fi
+  [ -d /etc/cvmfs/config.d ] || mkdir -p /etc/cvmfs/config.d
   cat > /etc/cvmfs/config.d/${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 CVMFS_SERVER_URL=$stratum0
@@ -377,13 +379,13 @@ EOF
 
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
-  su $cvmfs_user -c "cvmfs_sync -n \
+  sudo -H -u $cvmfs_user sh -c "cvmfs_sync -n \
     -t $temp_dir \
     -p $pipe_paths \
     -d $pipe_digests \
     -l $repository_dir \
     -o ${temp_dir}/new_manifest" > /dev/null
-  su $cvmfs_user -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
+  sudo -H -u $cvmfs_user sh -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${temp_dir}/new_manifest \
