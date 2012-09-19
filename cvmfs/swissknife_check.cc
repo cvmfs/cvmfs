@@ -7,6 +7,7 @@
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
+#include "swissknife_check.h"
 
 #include <unistd.h>
 #include <inttypes.h>
@@ -27,20 +28,9 @@
 
 using namespace std;  // NOLINT
 
+namespace {
 bool check_chunks;
-string *remote_repository;
-
-
-static void Usage() {
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "CernVM File System repository sanity checker, version %s\n\n"
-    "This tool checks the consisteny of the file catalogs of a cvmfs repository."
-    "\n\n"
-    "Usage: cvmfs_check [options] <repository directory / url>\n"
-    "Options:\n"
-    "  -l  log level (0-4, default: 2)>\n"
-    "  -c  check availability of data chunks\n",
-    VERSION);
+std::string *remote_repository;
 }
 
 
@@ -507,41 +497,22 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
 }
 
 
-int main(int argc, char **argv) {
+int swissknife::CommandCheck::Main(const swissknife::ArgumentList &args) {
   check_chunks = false;
-
-  char c;
-  while ((c = getopt(argc, argv, "l:ch")) != -1) {
-    switch (c) {
-      case 'l': {
-        unsigned log_level = 1 << (kLogLevel0 + String2Uint64(optarg));
-        if (log_level > kLogNone) {
-          Usage();
-          return false;
-        }
-        SetLogVerbosity(static_cast<LogLevels>(log_level));
-        break;
-      }
-      case 'c':
-        check_chunks = true;
-        break;
-      case 'h':
-        Usage();
-        return 0;
-      case '?':
-      default:
-        Usage();
-        return 1;
+  if (args.find('c') != args.end())
+    check_chunks = true;
+  if (args.find('l') != args.end()) {
+    unsigned log_level =
+      1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+    if (log_level > kLogNone) {
+      swissknife::Usage();
+      return 1;
     }
+    SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
-
-  if (optind >= argc) {
-    Usage();
-    return 1;
-  }
+  const string repository = MakeCanonicalPath(*args.find('r')->second);
 
   // Repository can be HTTP address or on local file system
-  const string repository = MakeCanonicalPath(argv[optind]);
   if (repository.substr(0, 7) == "http://") {
     remote_repository = new string(repository);
     download::Init(1);

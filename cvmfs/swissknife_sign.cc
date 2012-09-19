@@ -5,6 +5,7 @@
  */
 
 #include "cvmfs_config.h"
+#include "swissknife_sign.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -30,110 +31,31 @@
 #include "upload.h"
 #include "manifest.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
-static void Usage() {
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "This tool signs a CernVM-FS file catalog.\n"
-    "Version %s\n"
-    "Usage:\n"
-    "  cvmfs_sign [-c <x509 certificate>] [-k <private key>] [-s <password>]\n"
-    "             [-n <repository name>] -m <manifest> -t <temp storage>\n"
-    "             -p <paths_out (pipe)> -d <digests_in (pipe)>\n"
-    "             [-l(ocal spooler) <local upstream path>]\n",
-    VERSION);
-}
 
-int main(int argc, char **argv) {
-  if (argc < 2) {
-    Usage();
-    return 1;
-  }
-  
-  umask(022);
+int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
+  string manifest_path = *args.find('m')->second;
+  string spooler_definition = *args.find('r')->second;
+  string temp_dir = *args.find('t')->second;
 
-  string dir_temp = "";
   string certificate = "";
+  if (args.find('c') != args.end()) certificate = *args.find('c')->second;
   string priv_key = "";
-  string pwd = "";
+  if (args.find('k') != args.end()) priv_key = *args.find('k')->second;
   string repo_name = "";
-  string manifest_path = "";
-  string temp_dir = "";
-  string paths_out = "";
-  string digests_in = "";
-  string local_upstream = "";
-  bool local_spooler = false;
-  upload::Spooler *spooler = NULL;  
+  if (args.find('n') != args.end()) repo_name = *args.find('n')->second;
+  string pwd = "";
+  if (args.find('s') != args.end()) pwd = *args.find('s')->second;
+  upload::Spooler *spooler = NULL;
 
-  char c;
-  while ((c = getopt(argc, argv, "c:k:s:n:m:t:p:d:l:h")) != -1) {
-    switch (c) {
-      case 'c':
-        certificate = optarg;
-        break;
-      case 'k':
-        priv_key = optarg;
-        break;
-      case 's':
-        pwd = optarg;
-        break;
-      case 'n':
-        repo_name = optarg;
-        break;
-      case 'm':
-        manifest_path = optarg;
-        break;
-      case 't':
-        temp_dir = MakeCanonicalPath(optarg);
-        break;
-      case 'p':
-        paths_out = optarg;
-        break;
-      case 'd':
-        digests_in = optarg;
-        break;
-      case 'l':
-        local_spooler = true;
-        local_upstream = MakeCanonicalPath(optarg);
-        break;
-      case 'h':
-        Usage();
-        return 0;
-      case '?':
-      default:
-        abort();
-    }
-  }
-  
-  // Sanity checks
-  if ((manifest_path == "") || (paths_out == "") || (digests_in == "") ||
-      (temp_dir == "")) 
-  {
-    Usage();
-    return 1;
-  }
-  
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
     return 1;
   }
-  
-  // Optionally start the local "mini spooler"
-  if (local_spooler) {
-    int pid = fork();
-    assert(pid >= 0);
-    if (pid == 0) {
-      return upload::MainLocalSpooler(paths_out, digests_in, local_upstream);
-    }
-  }
-  
+
   // Connect to the spooler
-  spooler = new upload::Spooler(paths_out, digests_in);
-  bool retval = spooler->Connect();
-  if (!retval) {
-    PrintError("Failed to connect to spooler");
-    return 1;
-  }
+  spooler = upload::MakeSpoolerEnsemble(spooler_definition);
 
   signature::Init();
 
@@ -198,7 +120,7 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  
+
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
     // Load Manifest
@@ -207,7 +129,7 @@ int main(int argc, char **argv) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
       goto sign_fail;
     }
-    
+
     // Safe certificate
     void *compr_buf;
     int64_t compr_size;
@@ -226,7 +148,7 @@ int main(int argc, char **argv) {
     }
     free(compr_buf);
 
-    const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2) 
+    const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2)
                                   + "X";
     spooler->SpoolCopy(cert_path_tmp, cert_hash_path);
 
@@ -234,7 +156,7 @@ int main(int argc, char **argv) {
     manifest->set_certificate(certificate_hash);
     manifest->set_repository_name(repo_name);
     manifest->set_publish_timestamp(time(NULL));
-    
+
     string signed_manifest = manifest->ExportString();
     hash::Any published_hash(hash::kSha1);
     hash::HashMem(
@@ -253,16 +175,16 @@ int main(int argc, char **argv) {
       unlink(cert_path_tmp.c_str());
       goto sign_fail;
     }
-    
+
     // Write new manifest
     FILE *fmanifest = fopen(manifest_path.c_str(), "w");
     if (!fmanifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
       goto sign_fail;
     }
-    if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest) 
+    if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
          != signed_manifest.length()) ||
-        (fwrite(sig, 1, sig_size, fmanifest) != sig_size)) 
+        (fwrite(sig, 1, sig_size, fmanifest) != sig_size))
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
       fclose(fmanifest);
@@ -271,10 +193,10 @@ int main(int argc, char **argv) {
     }
     free(sig);
     fclose(fmanifest);
-    
+
     // Upload manifest
     spooler->SpoolCopy(manifest_path, ".cvmfspublished");
-    
+
     spooler->EndOfTransaction();
     while (!spooler->IsIdle()) {
       sleep(1);

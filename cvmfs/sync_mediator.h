@@ -34,7 +34,7 @@
 
 #include "platform.h"
 #include "catalog_mgr_rw.h"
-#include "cvmfs_sync.h"
+#include "swissknife_sync.h"
 #include "sync_item.h"
 
 class Manifest;

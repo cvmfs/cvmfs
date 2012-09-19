@@ -1,4 +1,5 @@
 2.1.2:
+  * Combined server binaries into cvmfs_swissknife
   * Bumped external versions: libcurl 7.27.0, c-ares 1.9.1,
     sqlite 3.7.14, sparsehash 1.12, zlib 1.2.7
   * Support for remote checking of repositories

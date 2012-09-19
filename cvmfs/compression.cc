@@ -571,9 +571,9 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
     *out_buf = NULL;
     *out_size = 0;
     return false;
-  } else {
-    return 0;
   }
+
+  return true;
 }
 
 }  // namespace zlib
