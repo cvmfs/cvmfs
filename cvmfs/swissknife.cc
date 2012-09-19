@@ -17,6 +17,7 @@
 #include "swissknife_zpipe.h"
 #include "swissknife_check.h"
 #include "swissknife_pull.h"
+#include "swissknife_sign.h"
 
 using namespace std;  // NOLINT
 
@@ -58,6 +59,7 @@ void swissknife::Usage() {
 
 
 int main(int argc, char **argv) {
+  command_list.push_back(new swissknife::CommandSign());
   command_list.push_back(new swissknife::CommandCheck());
   command_list.push_back(new swissknife::CommandPull());
   command_list.push_back(new swissknife::CommandZpipe());
@@ -104,7 +106,7 @@ int main(int argc, char **argv) {
       for (unsigned j = 0; j < params.size(); ++j) {
         if (!params[j].optional()) {
           if (args.find(params[j].key()) == args.end()) {
-            LogCvmfs(kLogCvmfs, kLogStderr, "parameter %c missing",
+            LogCvmfs(kLogCvmfs, kLogStderr, "parameter -%c missing",
                      params[j].key());
             return 1;
           }

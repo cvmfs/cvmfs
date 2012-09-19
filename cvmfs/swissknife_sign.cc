@@ -5,6 +5,7 @@
  */
 
 #include "cvmfs_config.h"
+#include "swissknife_sign.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -30,75 +31,28 @@
 #include "upload.h"
 #include "manifest.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
-static void Usage() {
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "This tool signs a CernVM-FS file catalog.\n"
-    "Version %s\n"
-    "Usage:\n"
-    "  cvmfs_sign [-c <x509 certificate>] [-k <private key>] [-s <password>]\n"
-    "             [-n <repository name>] -m <manifest> -t <temp storage>\n"
-    "             -r <spooler definition>\n",
-    VERSION);
-}
 
-int main(int argc, char **argv) {
-  if (argc < 2) {
-    Usage();
-    return 1;
-  }
+int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
+  string manifest_path = *args.find('m')->second;
+  string spooler_definition = *args.find('r')->second;
+  string temp_dir = *args.find('t')->second;
 
-  umask(022);
-
-  string dir_temp = "";
   string certificate = "";
+  if (args.find('c') != args.end()) certificate = *args.find('c')->second;
   string priv_key = "";
-  string pwd = "";
+  if (args.find('k') != args.end()) priv_key = *args.find('k')->second;
   string repo_name = "";
-  string manifest_path = "";
-  string temp_dir = "";
-  string spooler_definition = "";
+  if (args.find('n') != args.end()) repo_name = *args.find('n')->second;
+  string pwd = "";
+  if (args.find('s') != args.end()) pwd = *args.find('s')->second;
   upload::Spooler *spooler = NULL;
-
-  char c;
-  while ((c = getopt(argc, argv, "c:k:s:n:m:t:r:h")) != -1) {
-    switch (c) {
-      case 'c':
-        certificate = optarg;
-        break;
-      case 'k':
-        priv_key = optarg;
-        break;
-      case 's':
-        pwd = optarg;
-        break;
-      case 'n':
-        repo_name = optarg;
-        break;
-      case 'm':
-        manifest_path = optarg;
-        break;
-      case 't':
-        temp_dir = MakeCanonicalPath(optarg);
-        break;
-      case 'r':
-        spooler_definition = optarg;
-        break;
-      case 'h':
-        Usage();
-        return 0;
-      case '?':
-      default:
-        abort();
-    }
-  }
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
     return 1;
   }
-
 
   // Connect to the spooler
   spooler = upload::MakeSpoolerEnsemble(spooler_definition);
