@@ -16,6 +16,7 @@
 #include "logging.h"
 #include "swissknife_zpipe.h"
 #include "swissknife_check.h"
+#include "swissknife_pull.h"
 
 using namespace std;  // NOLINT
 
@@ -58,6 +59,7 @@ void swissknife::Usage() {
 
 int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandCheck());
+  command_list.push_back(new swissknife::CommandPull());
   command_list.push_back(new swissknife::CommandZpipe());
 
   if (argc < 2) {

@@ -56,7 +56,8 @@ set (CVMFS_FSCK_SOURCES
   cvmfs_fsck.cc)
 
 set (CVMFS_SWISSKNIFE_SOURCES
-  smalloc.h
+  smalloc.h atomic.h
+  platform.h platform_linux.h platform_osx.h
   duplex_zlib.h duplex_sqlite3.h
   logging.cc logging.h logging_internal.h
   globals.cc globals.h
@@ -67,9 +68,11 @@ set (CVMFS_SWISSKNIFE_SOURCES
 	catalog.h catalog.cc
   dirent.h shortstring.h
 	util.h util.cc
+  upload.h upload.cc
   duplex_curl.h download.h download.cc
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
+  swissknife_pull.h swissknife_pull.cc
   swissknife.h swissknife.cc)
 
 set (CVMFS_SYNC_BIN_SOURCES
@@ -108,19 +111,6 @@ set (CVMFS_SIGN_SOURCES
 	signature.cc signature.h
   manifest.h manifest.cc
   cvmfs_sign.cc)
-
-set (CVMFS_PULL_SOURCES
-  smalloc.h
-  logging.cc logging.h logging_internal.h
-  atomic.h
-  platform.h platform_linux.h platform_osx.h
-  duplex_zlib.h
-  compression.h compression.cc
-  shortstring.h
-  hash.h hash.cc
-  util.h util.cc
-  upload.h upload.cc
-	cvmfs_pull.cc)
 
 #set (CVMFS_SCRUB_SOURCES
 #	smalloc.h
@@ -337,40 +327,31 @@ if (BUILD_SERVER)
 
 	# create targets with according sources and static link libraries
 	add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
-	add_executable (cvmfs_pull		${CVMFS_PULL_SOURCES} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-#	add_executable (cvmfs_scrub		${CVMFS_SCRUB_SOURCES})
 	add_executable (cvmfs_sign		${CVMFS_SIGN_SOURCES} ${ZLIB_ARCHIVE})
 	add_executable (cvmfs_sync		${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE})
 
 	if (LIBCURL_BUILTIN)
     add_dependencies (cvmfs_swissknife libcares libcurl)
     add_dependencies (cvmfs_sync libcares libcurl)
-		add_dependencies (cvmfs_pull libcares libcurl)
 	endif (LIBCURL_BUILTIN)
 
 	if (SQLITE3_BUILTIN)
     add_dependencies (cvmfs_swissknife sqlite3)
-		add_dependencies (cvmfs_pull sqlite3)
 		add_dependencies (cvmfs_sync sqlite3)
 	endif (SQLITE3_BUILTIN)
 
 	if (ZLIB_BUILTIN)
     add_dependencies (cvmfs_swissknife zlib)
-		add_dependencies (cvmfs_pull zlib)
 		add_dependencies (cvmfs_sign zlib)
 		add_dependencies (cvmfs_sync zlib)
 	endif (ZLIB_BUILTIN)
 
 	set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
-	set_target_properties (cvmfs_pull PROPERTIES COMPILE_FLAGS "${CVMFS_PULL_CFLAGS}" LINK_FLAGS "${CVMFS_PULL_LD_FLAGS}")
-#	set_target_properties (cvmfs_scrub PROPERTIES COMPILE_FLAGS "${CVMFS_SCRUB_CFLAGS}" LINK_FLAGS "${CVMFS_SCRUB_LD_FLAGS}")
 	set_target_properties (cvmfs_sign PROPERTIES COMPILE_FLAGS "${CVMFS_SIGN_CFLAGS}" LINK_FLAGS "${CVMFS_SIGN_LD_FLAGS}")
 	set_target_properties (cvmfs_sync PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}")
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife	${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} pthread dl)
-	target_link_libraries (cvmfs_pull		${CVMFS_PULL_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} pthread)
-#	target_link_libraries (cvmfs_scrub		${CVMFS_SCRUB_LIBS} ${OPENSSL_LIBRARIES})
 	target_link_libraries (cvmfs_sign		${CVMFS_SIGN_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
 	target_link_libraries (cvmfs_sync	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
 endif (BUILD_SERVER)
@@ -407,7 +388,7 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_SERVER)
 	install (
-    TARGETS     cvmfs_swissknife cvmfs_sign cvmfs_pull cvmfs_sync
+    TARGETS     cvmfs_swissknife cvmfs_sign cvmfs_sync
 		RUNTIME
 		DESTINATION		bin
 	)

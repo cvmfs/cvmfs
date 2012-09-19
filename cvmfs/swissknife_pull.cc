@@ -8,6 +8,7 @@
 #define _FILE_OFFSET_BITS 64
 
 #include "cvmfs_config.h"
+#include "swissknife_pull.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -331,7 +332,7 @@ static bool recursive_pull(const string &path)
 
 */
 
-static void Usage() {
+/*static void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
            "CernVM-FS repository replication tool, version %s\n\n"
            "Usage: cvmfs_pull -u <repository url> [-t timeout]\n"
@@ -342,45 +343,10 @@ static void Usage() {
            "         [-q <fault chunks output>] [-w(rite only difference set)]\n"
            "         [-l(ocal spooler)] <pub_dir>\n",
            VERSION);
-}
+}*/
 
 
-int main(int argc, char **argv) {
-  if ((argc < 2) || (string(argv[1]) == "-h") || (string(argv[1]) == "--help")
-      || (string(argv[1]) == "-v") || (string(argv[1]) == "--version"))
-  {
-    Usage();
-    return 0;
-  }
-
-  umask(022);
-  string local_repodir = "";
-  bool local_spooler = false;
-
-  char c;
-  while ((c = getopt(argc, argv, "d:u:t:r:k:b:n:m:s:ieo:q:wl")) != -1) {
-    switch (c) {
-      case 'd':
-        local_repodir = MakeCanonicalPath(optarg);
-        local_spooler = true;
-        break;
-      case '?':
-      default:
-        Usage();
-        return 1;
-    }
-  }
-
-  // Optionally start the local "mini spooler"
-  if (local_spooler) {
-    int pid = fork();
-    assert(pid >= 0);
-    if (pid == 0) {
-      return 0;
-      //return upload::MainLocalSpooler(params.paths_out, params.digests_in,
-      //                                params.local_upstream);
-    }
-  }
+int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   // Connect to the spooler
   //params.spooler = new upload::Spooler(params.paths_out, params.digests_in);
