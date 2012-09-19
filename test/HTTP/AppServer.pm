@@ -29,13 +29,18 @@ sub init
 	my ($self, %opts) = @_;
 
 	# server options defaults
-	my %defaults = (StartBackground => 0, ServerPort => 3000);
+	my %defaults = (StartBackground => 0, ServerPort => 3000, IPV6 => 0);
 	
 	# set options or use defaults
 	map { $self->{$_} = (exists $opts{$_} ? $opts{$_} : $defaults{$_}) }
 		keys %defaults;
 	
-	$self->{'server'} = HTTP::AppServer::Base->new($self->{'ServerPort'}, Socket::AF_INET6);
+	if ($self->{'IPV6'}) {
+		$self->{'server'} = HTTP::AppServer::Base->new($self->{'ServerPort'}, Socket::AF_INET6);
+	}
+	else {
+		$self->{'server'} = HTTP::AppServer::Base->new($self->{'ServerPort'});
+	}
 
 	return $self;
 }
