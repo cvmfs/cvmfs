@@ -10,9 +10,14 @@
 
 #include <fcntl.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <cstdio>
 #include <cassert>
+#include <cstdlib>
+
+#include <vector>
+#include <string>
 
 #include "compression.h"
 #include "util.h"
@@ -254,6 +259,47 @@ void Spooler::EndOfTransaction() {
   line.push_back('\n');
   WritePipe(fd_paths_, line.data(), line.size());
   atomic_inc64(&num_pending_);
+}
+
+
+Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition) {
+  string upstream_driver;
+  string upstream_path;
+  string paths_out;
+  string digests_in;
+
+  vector<string> components = SplitString(spooler_definition, ',');
+  if (components.size() != 3) {
+    PrintError("Invalid spooler definition");
+    return NULL;
+  }
+  vector<string> upstream = SplitString(components[0], ':');
+  if ((upstream.size() != 2) || (upstream[0] != "local")) {
+    PrintError("Invalid spooler driver");
+    return NULL;
+  }
+  upstream_driver = upstream[0];
+  upstream_path = upstream[1];
+  paths_out = components[1];
+  digests_in = components[2];
+
+  int pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    int retval = 1;
+    if (upstream_driver == "local")
+      retval = upload::MainLocalSpooler(paths_out, digests_in, upstream_path);
+    exit(retval);
+  }
+
+  Spooler *spooler = new Spooler(paths_out, digests_in);
+  bool retval = spooler->Connect();
+  if (!retval) {
+    PrintError("Failed to connect to spooler");
+    return NULL;
+  }
+
+  return spooler;
 }
 
 }  // namespace upload

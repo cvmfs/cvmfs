@@ -73,6 +73,12 @@ int MainLocalSpooler(const std::string &fifo_paths,
                      const std::string &fifo_digests,
                      const std::string &upstream_basedir);
 
+/**
+ * Starts a spooler process and the creates the corresponding object
+ * from a definition string like "local:/dir/to/repo,/path/pipe,/digest/pipe"
+ */
+Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition);
+
 }  // namespace upload
 
 #endif  // CVMFS_UPLOAD_H_

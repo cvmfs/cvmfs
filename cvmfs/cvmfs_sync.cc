@@ -48,9 +48,8 @@ static void Usage() {
     "  cvmfs_sync -u <union volume> -s <scratch directory> -c <r/o volume>\n"
     "             -t <temporary storage> -b <base hash>\n"
     "             -w <stratum 0 base url> -o <manifest output>\n"
-    "             -p <paths_out (pipe)> -d <digests_in (pipe)>\n"
-    "             [-l(ocal spooler) <local upstream path>]\n"
-    "             [-n(new, requires only -t, -u, -o, -p, and -d)]\n"
+    "             -r <spooler definition>\n"
+    "             [-n(new, requires only -t, -u, -o, -r)]\n"
     "             [-x (print change set)] [-y (dry run)] [-m(ucatalogs)]\n"
     "             [-z <log level (0-4, default: 2)>]\n\n",
     VERSION);
@@ -67,7 +66,7 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
 
 	// Parse the parameters
 	char c;
-	while ((c = getopt(argc, argv, "u:s:c:t:b:w:o:p:d:l:nxymz:")) != -1) {
+	while ((c = getopt(argc, argv, "u:s:c:t:b:w:o:r:nxymz:")) != -1) {
 		switch (c) {
       // Directories
       case 'u':
@@ -93,15 +92,8 @@ bool ParseParams(int argc, char **argv, SyncParameters *params) {
       case 'w':
         params->stratum0 = optarg;
         break;
-      case 'p':
-        params->paths_out = optarg;
-        break;
-      case 'd':
-        params->digests_in = optarg;
-        break;
-      case 'l':
-        params->local_spooler = true;
-        params->local_upstream = MakeCanonicalPath(optarg);
+      case 'r':
+        params->spooler_definition = optarg;
         break;
       case 'z': {
         unsigned log_level = 1 << (kLogLevel0 + String2Uint64(optarg));
@@ -185,23 +177,8 @@ int main(int argc, char **argv) {
 	if (!ParseParams(argc, argv, &params)) return 1;
 	if (!CheckParams(&params)) return 2;
 
-  // Optionally start the local "mini spooler"
-  if (params.local_spooler) {
-    int pid = fork();
-    assert(pid >= 0);
-    if (pid == 0) {
-      return upload::MainLocalSpooler(params.paths_out, params.digests_in,
-                                      params.local_upstream);
-    }
-  }
-
-  // Connect to the spooler
-  params.spooler = new upload::Spooler(params.paths_out, params.digests_in);
-  bool retval = params.spooler->Connect();
-  if (!retval) {
-    PrintError("Failed to connect to spooler");
-    return 1;
-  }
+  // Start spooler
+  params.spooler = upload::MakeSpoolerEnsemble(params.spooler_definition);
 
   // Create a new root hash.  As a side effect, upload new files and catalogs.
   Manifest *manifest = NULL;

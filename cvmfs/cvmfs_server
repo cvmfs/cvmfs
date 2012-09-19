@@ -190,7 +190,6 @@ publish() {
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
-  local repository_dir=$(get_local_upstream $upstream)
 
   publish_before_hook $name
   sudo /bin/mount -o remount,ro /cvmfs/$name
@@ -203,9 +202,7 @@ publish() {
     -c ${spool_dir}/rdonly \
     -t ${spool_dir}/tmp \
     -b $base_hash \
-    -p ${spool_dir}/paths \
-    -d ${spool_dir}/digests \
-    -l $repository_dir \
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
     $log_level" || die "Synchronization failed"
@@ -214,9 +211,7 @@ publish() {
     -n $name \
     -m ${spool_dir}/tmp/manifest \
     -t ${spool_dir}/tmp \
-    -p ${spool_dir}/paths \
-    -d ${spool_dir}/digests \
-    -l $repository_dir" || die "Signing failed"
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests" || die "Signing failed"
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
@@ -381,18 +376,14 @@ EOF
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
   sudo -H -u $cvmfs_user sh -c "cvmfs_sync -n \
     -t $temp_dir \
-    -p $pipe_paths \
-    -d $pipe_digests \
-    -l $repository_dir \
+    -r ${upstream},${pipe_paths},${pipe_digests} \
     -o ${temp_dir}/new_manifest" > /dev/null
   sudo -H -u $cvmfs_user sh -c "cvmfs_sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${temp_dir}/new_manifest \
     -t $temp_dir \
-    -p $pipe_paths \
-    -d $pipe_digests \
-    -l $repository_dir" > /dev/null
+    -r ${upstream},${pipe_paths},${pipe_digests}" > /dev/null
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
