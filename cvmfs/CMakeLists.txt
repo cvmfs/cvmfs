@@ -64,44 +64,29 @@ set (CVMFS_SWISSKNIFE_SOURCES
   manifest.h manifest.cc
   hash.h hash.cc
   compression.h compression.cc
-  catalog_sql.h catalog_sql.cc
-	catalog.h catalog.cc
-  dirent.h shortstring.h
 	util.h util.cc
   upload.h upload.cc
   duplex_curl.h download.h download.cc
   signature.cc signature.h
-  swissknife_zpipe.h swissknife_zpipe.cc
-  swissknife_check.h swissknife_check.cc
-  swissknife_pull.h swissknife_pull.cc
-  swissknife_sign.h swissknife_sign.cc
-  swissknife.h swissknife.cc)
 
-set (CVMFS_SYNC_BIN_SOURCES
-	smalloc.h atomic.h
-  globals.h globals.cc
-	duplex_zlib.h compression.h compression.cc
-  hash.h hash.cc
-	duplex_sqlite3.h
-	util.cc util.h
-	logging.cc logging.h logging_internal.h
-	monitor.cc monitor.h
-	fs_traversal.h
-	sync_item.h sync_item.cc
+  fs_traversal.h
+  sync_item.h sync_item.cc
 	sync_union.h sync_union.cc
 	sync_mediator.h sync_mediator.cc
-  duplex_curl.h download.h download.cc
-  upload.h upload.cc
-  manifest.h manifest.cc
 
   dirent.h shortstring.h
   catalog_sql.h catalog_sql.cc
 	catalog.h catalog.cc
-	catalog_rw.h catalog_rw.cc
+  catalog_rw.h catalog_rw.cc
 	catalog_mgr.h catalog_mgr.cc
 	catalog_mgr_rw.h catalog_mgr_rw.cc
 
-  cvmfs_sync.h cvmfs_sync.cc)
+  swissknife_zpipe.h swissknife_zpipe.cc
+  swissknife_check.h swissknife_check.cc
+  swissknife_pull.h swissknife_pull.cc
+  swissknife_sign.h swissknife_sign.cc
+  swissknife_sync.h swissknife_sync.cc
+  swissknife.h swissknife.cc)
 
 
 #
@@ -313,29 +298,23 @@ if (BUILD_SERVER)
 
 	# create targets with according sources and static link libraries
 	add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
-	add_executable (cvmfs_sync		${CVMFS_SYNC_BIN_SOURCES} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE})
 
 	if (LIBCURL_BUILTIN)
     add_dependencies (cvmfs_swissknife libcares libcurl)
-    add_dependencies (cvmfs_sync libcares libcurl)
 	endif (LIBCURL_BUILTIN)
 
 	if (SQLITE3_BUILTIN)
     add_dependencies (cvmfs_swissknife sqlite3)
-		add_dependencies (cvmfs_sync sqlite3)
 	endif (SQLITE3_BUILTIN)
 
 	if (ZLIB_BUILTIN)
     add_dependencies (cvmfs_swissknife zlib)
-		add_dependencies (cvmfs_sync zlib)
 	endif (ZLIB_BUILTIN)
 
 	set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
-	set_target_properties (cvmfs_sync PROPERTIES COMPILE_FLAGS "${CVMFS_SYNC_BIN_CFLAGS}" LINK_FLAGS "${CVMFS_SYNC_BIN_LD_FLAGS}")
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife	${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} pthread dl)
-	target_link_libraries (cvmfs_sync	${CVMFS_SYNC_BIN_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
 endif (BUILD_SERVER)
 
 #
@@ -370,7 +349,7 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_SERVER)
 	install (
-    TARGETS     cvmfs_swissknife cvmfs_sync
+    TARGETS     cvmfs_swissknife
 		RUNTIME
 		DESTINATION		bin
 	)
