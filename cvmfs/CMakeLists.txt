@@ -112,11 +112,6 @@ set (CVMFS_SIGN_SOURCES
   manifest.h manifest.cc
   cvmfs_sign.cc)
 
-#set (CVMFS_SCRUB_SOURCES
-#	smalloc.h
-#	hash.h hash.cc
-#	util.h util.cc
-#	cvmfs_scrub.cc)
 
 #
 # configure some compiler flags for proper build
