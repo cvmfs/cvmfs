@@ -10,19 +10,18 @@ use warnings;
 use Functions::ServerSocket qw(send_msg close_socket term_ctxt end_msg);
 use Scalar::Util qw(looks_like_number);
 use Socket;
+use IO::Socket::IP;
 require 'sys/ioctl.ph';
 
 # Next lines are needed to export subroutine to the main package
 use base 'Exporter';
 use vars qw/ @EXPORT_OK /;
-@EXPORT_OK = qw(stop_daemon get_interface_address);
+@EXPORT_OK = qw(stop_daemon get_interface_address supports_ipv6);
 
 # This function will close the socket, the context and unlink the file.
 sub remove_socket {	
 	close_socket();
 	term_ctxt();
-	
-	unlink('/tmp/server.ipc');	
 }
 
 
@@ -99,6 +98,25 @@ sub get_interface_address {
 		return join('.', @address);
 	}
 	return undef;
+}
+
+# This functions checks if the system that is running the daemon supports ipv6
+sub supports_ipv6 {
+	my $has_ipv6;
+	
+	eval {
+		$has_ipv6 = IO::Socket::IP->new (
+			Domain => PF_INET6,
+			LocalHost => '::1',
+			Listen => 1 ) or die;
+	};
+	
+	if ($@) {
+		return 0;
+	}
+	else {
+		return 1;
+	}
 }
 
 1;
