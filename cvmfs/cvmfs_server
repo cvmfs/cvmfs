@@ -476,6 +476,18 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 }
 
 
+check() {
+  local name=$1
+  local upstream=$2
+  local repository_dir=$(get_local_upstream $upstream)
+
+  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
+
+  echo "Verifying $name"
+  cvmfs_swissknife check -c $log_level -r $repository_dir
+}
+
+
 list_repositories() {
   ls -1 /etc/cvmfs/repositories.d 2> /dev/null
 }
@@ -492,8 +504,9 @@ Commands:
                Create repository skeleton in directory
   rmfs:        Remove the repository
   resign:      Re-sign the 30 day whitelist
-  info:        Print summary about the repository
   list:        List available repositories
+  info:        Print summary about the repository
+  check:       Checks if the repository is sane
   transaction: Start to edit a repository
   abort:       Abort transaction and return to the state before
   publish:     Make a new repository snapshot
@@ -567,13 +580,18 @@ case $1 in
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
     create_whitelist $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_STRATUM0 ${CVMFS_SPOOL_DIR}/tmp
   ;;
+  list)
+    list_repositories
+  ;;
   info)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
     info $CVMFS_REPOSITORY_NAME $CVMFS_STRATUM0
   ;;
-  list)
-    list_repositories
+  check)
+    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
+    check $CVMFS_REPOSITORY_NAME $CVMFS_UPSTREAM_STORAGE
   ;;
   transaction)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
