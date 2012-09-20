@@ -36,7 +36,7 @@ namespace swissknife {
 
 
 class CommandCreate : public Command {
-public:
+ public:
   ~CommandCreate() { };
   std::string GetName() { return "create"; };
   std::string GetDescription() {
@@ -54,8 +54,26 @@ public:
 };
 
 
+class CommandUpload : public Command {
+ public:
+  ~CommandUpload() { };
+  std::string GetName() { return "upload"; };
+  std::string GetDescription() {
+    return "Uploads a local file to the repository.";
+  };
+  ParameterList GetParams() {
+    ParameterList result;
+    result.push_back(Parameter('i', "local file", false, false));
+    result.push_back(Parameter('o', "destination path", false, false));
+    result.push_back(Parameter('r', "spooler definition", false, false));
+    return result;
+  }
+  int Main(const ArgumentList &args);
+};
+
+
 class CommandSync : public Command {
-public:
+ public:
   ~CommandSync() { };
   std::string GetName() { return "sync"; };
   std::string GetDescription() {

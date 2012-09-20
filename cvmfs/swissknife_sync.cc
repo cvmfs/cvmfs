@@ -97,6 +97,26 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 }
 
 
+int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
+  const string source = *args.find('i')->second;
+  const string dest = *args.find('o')->second;
+  const string spooler_definition = *args.find('r')->second;
+
+  upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  assert(spooler);
+  spooler->SpoolCopy(source, dest);
+  spooler->EndOfTransaction();
+  while (!spooler->IsIdle())
+    sleep(1);
+  if (spooler->num_errors() > 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
+    return 1;
+  }
+
+  return 0;
+}
+
+
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 	SyncParameters params;
 
