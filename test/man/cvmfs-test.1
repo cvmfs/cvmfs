@@ -5,7 +5,7 @@
 .SH NAME
 cvmfs-test \- Test cvmfs features.
 .SH SYNOPSIS
-.B cvmfs-test [--i] [--setup] [--wait-daemon] [--c | --command
+.B cvmfs-test [--i] [--setup] [--start] [--wait-daemon] [--c | --command
 .I command
 .B ]
 .br
@@ -28,15 +28,17 @@ to find a list of available commands. This is the
 default behaviour when
 .B cvmfs-test
 is invoked without any option.
+.IP --setup
+Fix permission and setup the environment for the
+daemon. It's automatically executed during installation,
+run it manually only if the shell explicitly asks you to do it.
+.IP --start
+Start the daemon and exit.
 .IP --wait-daemon
 When invoked with this option, the shell will wait for the daemon
 to send its own ip address before trying to connect the
 socket. It's used when the daemon isn't on the same
 machine as the shell.
-.IP --setup
-Fix permission and setup the environment for the
-daemon. It's automatically executed during installation,
-run it manually only if the shell explicitly asks you to do it.
 .IP "--c command | --command command"
 Execute 
 .B command
@@ -99,7 +101,7 @@ option.
 .IP "cvmfs-test --c \[lq]help faulty_proxy\[rq]"
 Retrieve options for faulty_proxy test.
 .SH BUG
-No bug known.
+No bug known. If you find any, please report to the author.
 .SH AUTHOR
 Francesco Ruvolo <ruvolof
 .B at

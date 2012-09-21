@@ -17,6 +17,7 @@ use Getopt::Long;
 my $command = undef;
 my $wait_daemon = undef;
 my $setup = undef;
+my $start = undef;
 my $help_message = undef;
 my $interactive = 1;
 
@@ -36,6 +37,7 @@ my $ctxt = undef;
 my $ret = GetOptions ( "c|command=s" => \$command,
 					   "wait-daemon" => \$wait_daemon,
 					   "setup" => \$setup,
+					   "start" => \$start,
 					   "h|help" => \$help_message );
 
 if (defined($help_message)) {
@@ -45,6 +47,7 @@ Usage: cvmfs-test [--i] [--setup] [--wait-daemon] [--c command]
 -h|--help	Print this help and exit.
 --i		Start the interactive shell. Default.
 --setup		Setup the environment.
+--start		Start the daemon.
 --wait-daemon	Wait for the daemon to send its ip.
 --c command	Executes command and exit.
 
@@ -61,6 +64,11 @@ if (defined($setup)) {
 
 if (defined($wait_daemon)) {
 	($continue, $socket, $ctxt) = check_command(undef, undef, undef, 'wait-daemon');
+}
+
+if (defined($start)) {
+	($socket, $ctxt) = start_daemon($daemon_path);
+	exit_shell($socket, $ctxt, 2);
 }
 
 if (defined($command)) {
