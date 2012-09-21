@@ -4,7 +4,7 @@ use FindBin qw($RealBin);
 use lib "$RealBin";
 use HTTP::AppServer;
 use Getopt::Long;
-use IO::Socket::IP;
+use Functions::Testd qw(supports_ipv6);
 
 my $not_found = undef;
 my $forbidden = undef;
@@ -52,20 +52,11 @@ if (defined ($deliver_crap)) {
 	$retriever = 'CrapDeliver';
 }
 
-# Checking wether the system supports ipv6 addresses
-eval {
-	my $ipv6_socket = IO::Socket::IP->new (
-											Domain => PF_INET6,
-											LocalHost => '::1',
-											Listen => 1
-										  ) or die;
-};
-
 # Variable to handle the server
 my $server;
 
 # Create server instance at localhost:$port depending on the result of previous check with ipv6
-if ($@) {
+unless (supports_ipv6()) {
 	print "Your system doesn't seem to support ipv6.\n";
 	print "Starting a web server without ipv6 support.\n";
 	$server = HTTP::AppServer->new( StartBackground => 0, ServerPort => $port );
