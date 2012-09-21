@@ -367,17 +367,21 @@ sub exit_shell {
 			get_daemon_output($socket, $ctxt);
 		}
 		else {
+			print 'Closing the socket... ';
 			$socket = close_shell_socket($socket);
 			$ctxt = term_shell_ctxt($ctxt);
+			print "Done.\n";
 		}
 	}
 	else {
-		if ($force) {
+		if ($force == 1) {
 			send_shell_msg($socket, 'stop');
 			get_daemon_output($socket, $ctxt);
 		}
+		print 'Closing the socket... ';
 		$socket = close_shell_socket($socket);
 		$ctxt = term_shell_ctxt($ctxt);
+		print "Done.\n";
 	}
 	
 	exit 0;
