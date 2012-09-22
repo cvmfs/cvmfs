@@ -583,12 +583,12 @@ void WritableCatalogManager::PrecalculateListings() {
 }
 
 
-Manifest *WritableCatalogManager::Commit() {
+manifest::Manifest *WritableCatalogManager::Commit() {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
 
-  Manifest *result = NULL;
+  manifest::Manifest *result = NULL;
   for (WritableCatalogList::iterator i = catalogs_to_snapshot.begin(),
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
   {
@@ -606,7 +606,7 @@ Manifest *WritableCatalogManager::Commit() {
 
       // .cvmfspublished
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "Committing repository manifest");
-      result = new Manifest(hash, "");
+      result = new manifest::Manifest(hash, "");
       result->set_ttl((*i)->GetTTL());
       result->set_revision((*i)->GetRevision());
     }

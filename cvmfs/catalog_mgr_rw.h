@@ -33,7 +33,9 @@
 namespace upload {
 class Spooler;
 }
+namespace manifest {
 class Manifest;
+}
 
 namespace catalog {
 
@@ -79,7 +81,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
 	 */
   void PrecalculateListings();
 
-  Manifest *Commit();
+  manifest::Manifest *Commit();
 
  protected:
   void EnforceSqliteMemLimit() { }
