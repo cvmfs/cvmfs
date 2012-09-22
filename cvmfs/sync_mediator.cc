@@ -204,7 +204,7 @@ void SyncMediator::LeaveDirectory(SyncItem &entry)
  * Do any pending processing and commit all changes to the catalogs.
  * To be called after change set traversal is finished.
  */
-Manifest *SyncMediator::Commit() {
+manifest::Manifest *SyncMediator::Commit() {
   LogCvmfs(kLogPublish, kLogStdout,
            "Waiting for upload of files before committing...");
   while (!params_->spooler->IsIdle())

@@ -10,6 +10,17 @@
 #include <map>
 #include "hash.h"
 
+namespace manifest {
+
+enum Failures {
+  kFailOk = 0,
+  kFailIncomplete,
+  kFailNameMismatch,
+  kFailRootMismatch,
+  kFailOutdated,
+};
+
+
 /**
  * The Manifest is the bootstrap snippet for a repository.  It is stored in
  * .cvmfspublished.
@@ -34,6 +45,9 @@ class Manifest {
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
+  Failures IsSane(const std::string &expected_name,
+                  const std::string &expected_root,
+                  const uint64_t minimum_timestamp) const;
 
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
@@ -60,5 +74,7 @@ class Manifest {
   hash::Any certificate_;
   uint64_t publish_timestamp_;
 };  // class Manifest
+
+}  // namespace manifest
 
 #endif  // CVMFS_MANIFEST_H_

@@ -79,7 +79,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
   assert(spooler);
 
-  Manifest *manifest =
+  manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(dir_temp, spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
@@ -157,7 +157,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                               params.dir_scratch);
 
   sync.Traverse();
-  Manifest *manifest = mediator.Commit();
+  manifest::Manifest *manifest = mediator.Commit();
 
   download::Fini();
 

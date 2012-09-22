@@ -44,8 +44,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
                          const std::string &dir_temp,
                          upload::Spooler *spooler);
   ~WritableCatalogManager();
-  static Manifest *CreateRepository(const std::string &dir_temp,
-                                    upload::Spooler *spooler);
+  static manifest::Manifest *CreateRepository(const std::string &dir_temp,
+                                              upload::Spooler *spooler);
 
   bool Init();
 

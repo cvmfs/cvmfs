@@ -12,6 +12,7 @@
 
 using namespace std;  // NOLINT
 
+namespace manifest {
 
 Manifest *Manifest::LoadMem(const unsigned char *buffer,
                             const unsigned length)
@@ -112,6 +113,24 @@ string Manifest::ExportString() const {
 
 
 /**
+ * Manifest validation  TODO: ManifestErrors
+ */
+Failures Manifest::IsSane(const string &expected_name,
+                          const string &expected_root,
+                          const uint64_t minimum_timestamp) const
+{
+  if (repository_name_ != expected_name)
+    return kFailNameMismatch;
+  if (root_path_ != hash::Md5(hash::AsciiPtr(expected_root)))
+    return kFailRootMismatch;
+  if (publish_timestamp_ < minimum_timestamp)
+    return kFailOutdated;
+  return kFailOk;
+}
+
+
+
+/**
  * Writes the .cvmfspublished file (unsigned).
  */
 bool Manifest::Export(const std::string &path) const {
@@ -132,3 +151,5 @@ bool Manifest::Export(const std::string &path) const {
 
   return true;
 }
+
+}  // namespace manifest

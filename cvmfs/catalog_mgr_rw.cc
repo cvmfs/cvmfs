@@ -109,7 +109,7 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  * It is uploaded by a Forklift to the upstream storage.
  * @return true on success, false otherwise
  */
-Manifest *WritableCatalogManager::CreateRepository(
+manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string &dir_temp,
   upload::Spooler *spooler)
 {
@@ -152,7 +152,7 @@ Manifest *WritableCatalogManager::CreateRepository(
 
   // Create manifest
   const string manifest_path = dir_temp + "/manifest";
-  Manifest *manifest = new Manifest(hash_catalog, "");
+  manifest::Manifest *manifest = new manifest::Manifest(hash_catalog, "");
 
   // Upload catalog
   spooler->SpoolCopy(file_path_compressed,
