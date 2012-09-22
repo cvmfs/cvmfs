@@ -242,6 +242,13 @@ bool LoadBlacklist(const std::string &path_blacklist) {
 }
 
 
+vector<string> GetBlacklistedCertificates() {
+  if (blacklisted_certificates_)
+    return *blacklisted_certificates_;
+  return vector<string>();
+}
+
+
 /**
  * Returns SHA-1 hash from DER encoded certificate, encoded the same way
  * OpenSSL does (01:AB:...).
@@ -397,6 +404,62 @@ bool Verify(const unsigned char *buffer, const unsigned buffer_size,
 
   return result;
 }
+
+
+/**
+ * Checks a document of the form
+ *  <ASCII LINES>
+ *  --
+ *  <hash>
+ *  <signature>
+ */
+bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
+                  const bool by_rsa)
+{
+  unsigned pos = 0;
+  unsigned letter_length = 0;
+  do {
+    if (pos > buffer_size-3)
+      return false;
+    if ((buffer[pos] == '-') && (buffer[pos+1] == '-') &&
+        (buffer[pos+2] == '\n'))
+    {
+      letter_length = pos;
+      pos += 3;
+      break;
+    }
+    pos++;
+  } while (true);
+
+  string hash_str = "";
+  unsigned hash_pos = pos;
+  do {
+    if (pos == buffer_size)
+      return false;
+    if (buffer[pos] == '\n') {
+      pos++;
+      break;
+    }
+    hash_str.push_back(buffer[pos++]);
+  } while (true);
+  // TODO: more hashes
+  if (hash_str.length() != 2*hash::kDigestSizes[hash::kSha1])
+    return false;
+  hash::Any hash_printed(hash::kSha1, hash::HexPtr(hash_str));
+  hash::Any hash_computed(hash_printed.algorithm);
+  hash::HashMem(buffer, letter_length, &hash_computed);
+  if (hash_printed != hash_computed)
+    return false;
+
+  if (by_rsa) {
+    return VerifyRsa(&buffer[hash_pos], hash_str.length(),
+                     &buffer[pos], buffer_size-pos);
+  } else {
+    return Verify(&buffer[hash_pos], hash_str.length(),
+                  &buffer[pos], buffer_size-pos);
+  }
+}
+
 
 
 /**

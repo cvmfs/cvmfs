@@ -12,15 +12,6 @@
 
 namespace manifest {
 
-enum Failures {
-  kFailOk = 0,
-  kFailIncomplete,
-  kFailNameMismatch,
-  kFailRootMismatch,
-  kFailOutdated,
-};
-
-
 /**
  * The Manifest is the bootstrap snippet for a repository.  It is stored in
  * .cvmfspublished.
@@ -45,9 +36,6 @@ class Manifest {
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
-  Failures IsSane(const std::string &expected_name,
-                  const std::string &expected_root,
-                  const uint64_t minimum_timestamp) const;
 
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
@@ -61,8 +49,11 @@ class Manifest {
     publish_timestamp_ = publish_timestamp;
   }
 
+  std::string repository_name() const { return repository_name_; }
+  hash::Md5 root_path() const { return root_path_; }
   hash::Any catalog_hash() const { return catalog_hash_; }
   hash::Any certificate() const { return certificate_; }
+  uint64_t publish_timestamp() const { return publish_timestamp_; }
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
   hash::Any catalog_hash_;

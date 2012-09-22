@@ -56,6 +56,8 @@
 #include "signature.h"
 #include "atomic.h"
 #include "shortstring.h"
+#include "manifest.h"
+#include "manifest_fetch.h"
 
 using namespace std;  // NOLINT
 
@@ -646,6 +648,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
     (mountpoint.IsEmpty() ?
       "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
   bool retval;
+
+  // Load a particular catalog
   if (!hash.IsNull()) {
     cvmfs_path += " (" + hash.ToString() + ")";
     catalog::LoadError load_error = LoadCatalogCas(hash, cvmfs_path,
@@ -656,17 +660,9 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   }
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
-
   const string checksum_path = (*cache_path_) + "/cvmfschecksum." + repo_name_;
-  const string checksum_url = "/.cvmfspublished";
-  map<char, string> checksum_keyval;
-  size_t checksum_size;
-  unsigned char *checksum_buffer;
-  hash::Any checksum_hash;
   hash::Any cache_hash;
-  hash::Any remote_hash;
   uint64_t cache_last_modified = 0;
-  int signature_start = 0;
 
   // Load local checksum
   FILE *file_checksum = fopen(checksum_path.c_str(), "r");
@@ -695,13 +691,19 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   }
   if (file_checksum) fclose(file_checksum);
 
-  // Load remote checksum
-  download::JobInfo download_checksum(&checksum_url, false, true, NULL);
-  download::Fetch(&download_checksum);
-  if (download_checksum.error_code != download::kFailOk) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "unable to load checksum from %s (%d)",
-             checksum_url.c_str(), download_checksum.error_code);
+  // Load and verify remote checksum
+  manifest::Failures manifest_failure;
+  unsigned char *cert_buf;
+  unsigned char *whitelist_buf;
+  unsigned cert_size;
+  unsigned whitelist_size;
+  manifest::Manifest *manifest;
+  manifest_failure = manifest::Fetch("", repo_name_, cache_last_modified,
+                                     &manifest,
+                                     &cert_buf, &cert_size,
+                                     &whitelist_buf, &whitelist_size);
+  if (manifest_failure != manifest::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to fetch manifest (%d)", retval);
     if (!cache_hash.IsNull()) {
       // TODO remove code duplication
       if (catalog_path) {
@@ -722,31 +724,14 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
     }
     return catalog::kLoadFail;
   }
+
   offline_mode_ = false;
-  checksum_size = download_checksum.destination_mem.size;
-
-  checksum_buffer = reinterpret_cast<unsigned char *>(alloca(checksum_size));
-  memcpy(checksum_buffer, download_checksum.destination_mem.data,
-         checksum_size);
-  free(download_checksum.destination_mem.data);
-
-  // Parse remote checksum
-  ParseKeyvalMem(checksum_buffer, checksum_size,
-                 &signature_start, &checksum_hash, &checksum_keyval);
-
-  map<char, string>::const_iterator key_catalog = checksum_keyval.find('C');
-  if (key_catalog == checksum_keyval.end()) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "failed to find catalog key in checksum");
-    return catalog::kLoadFail;
-  }
-  remote_hash = hash::Any(hash::kSha1, hash::HexPtr(key_catalog->second));
-  cvmfs_path += " (" + remote_hash.ToString() + ")";
+  cvmfs_path += " (" + manifest->catalog_hash().ToString() + ")";
   LogCvmfs(kLogCache, kLogDebug, "remote checksum is %s",
-           remote_hash.ToString().c_str());
+           manifest->catalog_hash().ToString().c_str());
 
   // Short way out, use cached copy
-  if (remote_hash == cache_hash) {
+  if (manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
       *catalog_path = "." + cache_hash.MakePath(1, 2);
       // quota::Pin is only effective on first load, afterwards it is a NOP
@@ -769,156 +754,21 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   if (!catalog_path)
     return catalog::kLoadNew;
 
-  // Sanity check, last modified (if available, i.e. if signed)
-  map<char, string>::const_iterator key_published = checksum_keyval.find('T');
-  if (key_published != checksum_keyval.end()) {
-    if (cache_last_modified > String2Uint64(key_published->second)) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "cached copy of %s newer than remote copy",
-               checksum_url.c_str());
-      return catalog::kLoadFail;
-    }
-  }
-
-  // Sanity check: repository name
-  if (repo_name_ != "") {
-    map<char, string>::const_iterator key_name = checksum_keyval.find('N');
-    if (key_name == checksum_keyval.end()) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "failed to find repository name in checksum");
-      return catalog::kLoadFail;
-    }
-    if (key_name->second != repo_name_) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "expected repository name does not match in %s",
-               checksum_url.c_str());
-      return catalog::kLoadFail;
-    }
-  }
-
-  // Sanity check: empty root prefix
-  map<char, string>::const_iterator key_root_prefix = checksum_keyval.find('R');
-  if (key_root_prefix == checksum_keyval.end()) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "failed to find root prefix in checksum");
-    return catalog::kLoadFail;
-  }
-  if (key_root_prefix->second != hash::Md5(hash::AsciiPtr("")).ToString()) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "expected mount point does not match in %s",
-             checksum_url.c_str());
-    return catalog::kLoadFail;
-  }
-
-  // Verify signature of remote checksum signature
-  if (signature_start > 0) {
-    // Download certificate
-    map<char, string>::const_iterator key_cert = checksum_keyval.find('X');
-    if ((key_cert == checksum_keyval.end()) || (key_cert->second.length() < 40))
-    {
-      LogCvmfs(kLogCache, kLogDebug, "invalid certificate in checksum");
-      return catalog::kLoadFail;
-    }
-    hash::Any cert_hash(hash::kSha1,
-                        hash::HexPtr(key_cert->second.substr(0, 40)));
-
-    unsigned char *cert_data;
-    uint64_t cert_size;
-    if (Open2Mem(cert_hash, &cert_data, &cert_size)) {
-      atomic_inc32(&certificate_hits_);
-    } else {
-      atomic_inc32(&certificate_misses_);
-
-      const string cert_url = "/data" + cert_hash.MakePath(1, 2) + "X";
-      download::JobInfo download_certificate(&cert_url, true, true, &cert_hash);
-      download::Fetch(&download_certificate);
-      if (download_certificate.error_code != download::kFailOk) {
-        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-                 "unable to load certificate from %s (%d)",
-                 cert_url.c_str(), download_certificate.error_code);
-        return catalog::kLoadFail;
-      }
-
-      cert_data = (unsigned char *)download_certificate.destination_mem.data;
-      cert_size = download_certificate.destination_mem.size;
-      CommitFromMem(cert_hash, cert_data, cert_size,
-                    "certificate for " + repo_name_);
-    }
-
-    // Load certificate
-    retval = signature::LoadCertificateMem(cert_data, cert_size);
-    free(cert_data);
-    if (!retval) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "could not read certificate");
-      return catalog::kLoadFail;
-    }
-
-    // Verify certificate against whitelist
-    const string whitelist_url = "/.cvmfswhitelist";
-    download::JobInfo download_whitelist(&whitelist_url, false, true, NULL);
-    download::Fetch(&download_whitelist);
-    if (download_whitelist.error_code != download::kFailOk) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "unable to load whitelist from %s (%d)",
-               whitelist_url.c_str(), download_whitelist.error_code);
-      return catalog::kLoadFail;
-    }
-    retval = signature::VerifyWhitelist(download_whitelist.destination_mem.data,
-                                        download_whitelist.destination_mem.size,
-                                        repo_name_);
-    free(download_whitelist.destination_mem.data);
-    if (!retval) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "whitelist verification failed");
-      return catalog::kLoadFail;
-    }
-
-    // Verify checksum signature
-    unsigned char *signature_buffer;
-    unsigned signature_size;
-    retval = signature::ReadSignatureTail(checksum_buffer, checksum_size,
-                                          signature_start,
-                                          &signature_buffer, &signature_size);
-    if (!retval) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "cannot read signature");
-      return catalog::kLoadFail;
-    }
-    retval = signature::Verify(
-      reinterpret_cast<const unsigned char *>(&((checksum_hash.ToString())[0])),
-      40, signature_buffer, signature_size);
-    free(signature_buffer);
-    if (!retval) {
-      LogCvmfs(kLogCache, kLogDebug,
-               "catalog signature verification failed against %s",
-               checksum_hash.ToString().c_str());
-      return catalog::kLoadFail;
-    }
-    LogCvmfs(kLogCache, kLogSyslog,
-             "catalog signature verification passed, signed by %s",
-             signature::Whois().c_str());
-  } else {
-    LogCvmfs(kLogCache, kLogDebug, "remote checksum is not signed");
-    if (!ignore_signature_) {
-      LogCvmfs(kLogCache, kLogSyslog, "remote checksum %s is not signed",
-               checksum_url.c_str());
-      return catalog::kLoadFail;
-    }
-  }
-
-  catalog::LoadError load_retval = LoadCatalogCas(remote_hash, cvmfs_path,
-                                                  catalog_path);
+  // Load new catalog
+  catalog::LoadError load_retval =
+    LoadCatalogCas(manifest->catalog_hash(), cvmfs_path, catalog_path);
   if (load_retval != catalog::kLoadNew)
     return load_retval;
+  loaded_catalogs_[mountpoint] = manifest->catalog_hash();
 
-  loaded_catalogs_[mountpoint] = remote_hash;
-
-  // Store checksum
+  // Store new manifest and certificate
+  CommitFromMem(manifest->certificate(), cert_buf, cert_size,
+                "certificate for " + repo_name_);
   int fdchksum = open(checksum_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (fdchksum >= 0) {
-    string cache_checksum = remote_hash.ToString();
-    map<char, string>::const_iterator key_published = checksum_keyval.find('T');
-    if (key_published != checksum_keyval.end())
-      cache_checksum += "T" + key_published->second;
+    string cache_checksum =
+      manifest->catalog_hash().ToString() +
+      "T" + StringifyInt(manifest->publish_timestamp());
 
     file_checksum = fdopen(fdchksum, "w");
     if (file_checksum) {

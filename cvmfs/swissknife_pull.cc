@@ -17,11 +17,18 @@
 
 #include "upload.h"
 #include "logging.h"
+#include "download.h"
 #include "util.h"
+#include "manifest.h"
+#include "manifest_fetch.h"
+#include "signature.h"
 
 using namespace std;  // NOLINT
 
-string url = "";
+namespace {
+string *url = NULL;
+string *temp_dir = NULL;
+unsigned num_parallel = 1;
 /*string dir_target = "";
 string dir_data = "";
 string dir_catalogs = "";
@@ -30,7 +37,6 @@ string blacklist = "/etc/cvmfs/blacklist";
 string pubkey = "/etc/cvmfs/keys/cern.ch.pub";
 string repo_name = "";
 bool dont_load_chunks = false;
-unsigned num_parallel = 1;
 unsigned retries = 2;
 unsigned overall_retries = 0;
 bool initial = false;
@@ -40,6 +46,7 @@ set<string> download_bucket;
 set<string> diff_set;
 bool keep_log = false;
 */
+}
 
 /*static bool fetch_deprecated_catalog(const hash::t_sha1 &snapshot_id, string &tmp_path) {
   FILE *tmp_fp = temp_file(dir_data + "/txn/cvmfs.catalog", plain_file_mode, "w", tmp_path);
@@ -347,6 +354,68 @@ static bool recursive_pull(const string &path)
 
 
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
+  int retval;
+  unsigned timeout = 10;
+  manifest::Manifest *manifest = NULL;
+  upload::Spooler *spooler = NULL;
+
+  url = args.find('u')->second;
+  temp_dir = args.find('x')->second;
+  spooler = upload::MakeSpoolerEnsemble(*args.find('r')->second);
+  assert(spooler);
+  const string master_keys = *args.find('k')->second;
+  const string repository_name = *args.find('m')->second;
+  if (args.find('n') != args.end())
+    num_parallel = String2Uint64(*args.find('n')->second);
+  if (args.find('t') != args.end())
+    timeout = String2Uint64(*args.find('t')->second);
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
+           url->c_str());
+
+  int result = 1;
+  download::Init(num_parallel);
+  download::SetTimeout(timeout, timeout);
+  download::Spawn();
+  signature::Init();
+  if (!signature::LoadPublicRsaKeys(master_keys)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "cvmfs public master key could not be loaded.");
+    goto fini;
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: using public key(s) %s",
+             JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
+  }
+
+  unsigned char *cert_buf;
+  unsigned char *whitelist_buf;
+  unsigned cert_size;
+  unsigned whitelist_size;
+  retval = manifest::Fetch(*url, repository_name, 0, &manifest,
+                           &cert_buf, &cert_size,
+                           &whitelist_buf, &whitelist_size);
+  if (retval != manifest::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
+    goto fini;
+  }
+
+  result = 0;
+
+
+  // Check if we have a replica-ready server
+  //if (!override_master_test && (curl_download_path("/.cvmfs_master_replica", "/dev/null", dummy.digest, 1, 0) != CURLE_OK)) {
+  //  cerr << "This is not a CernVM-FS server for replication, try http://cernvm-bkp.cern.ch" << endl;
+  //  goto pull_cleanup;
+  //}
+
+ fini:
+  delete spooler;
+  delete manifest;
+  signature::Fini();
+  download::Fini();
+  return result;
+
 
   // Connect to the spooler
   //params.spooler = new upload::Spooler(params.paths_out, params.digests_in);
@@ -356,7 +425,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   //  return 1;
   //}
 
-  return 0;
   /*int timeout = 10;
 
   bool curl_ready = false;
@@ -381,10 +449,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
         dir_data = dir_target + "/data";
         dir_catalogs = dir_target + "/catalogs";
         break;
-      case 'u': {
-        url = optarg;
-        break;
-      }
       case 't':
         timeout = atoi(optarg);
         break;
@@ -453,10 +517,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   // Sanity checks
-  if ((dir_target == "") || (url == "")) {
-    usage();
-    return 1;
-  }
   if (!mkdir_deep(dir_data, plain_dir_mode)) {
     cerr << "failed to create data store directory" << endl;
     return 2;
@@ -484,13 +544,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  curl_set_host_chain(url.c_str());
-  cout << "CernVM-FS Pull: synchronizing with " << url << endl;
-  if (proxies != "")
-    curl_set_proxy_chain(proxies.c_str());
-  curl_set_timeout(timeout, timeout);
-
-  curl_ready = true;
 
   signature::init();
   if (!signature::load_public_keys(pubkey)) {
@@ -508,17 +561,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   catalog_ready = true;
 
-  // Check for server availability
-  if (curl_download_path("/.cvmfspublished", "/dev/null", dummy.digest, 1, 0) != CURLE_OK) {
-    cerr << "Host unavailable (cannot download " << url << "/.cvmfspublished)" << endl;
-    goto pull_cleanup;
-  }
-
-  // Check if we have a replica-ready server
-  if (!override_master_test && (curl_download_path("/.cvmfs_master_replica", "/dev/null", dummy.digest, 1, 0) != CURLE_OK)) {
-    cerr << "This is not a CernVM-FS server for replication, try http://cernvm-bkp.cern.ch" << endl;
-    goto pull_cleanup;
-  }
 
   // Check if we have a valid starting point
   if (!initial && exit_on_error && !file_exists(dir_catalogs + "/.cvmfs_replica")) {

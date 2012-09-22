@@ -6,6 +6,7 @@
 #define CVMFS_SIGNATURE_H_
 
 #include <string>
+#include <vector>
 #include <cstdio>
 #include "hash.h"
 
@@ -29,6 +30,7 @@ std::string FingerprintCertificate();
 
 bool LoadPublicRsaKeys(const std::string &path_list);
 bool LoadBlacklist(const std::string &path_blacklist);
+std::vector<std::string> GetBlacklistedCertificates();
 
 bool Sign(const unsigned char *buffer, const unsigned buffer_size,
           unsigned char **signature, unsigned *signature_size);
@@ -36,6 +38,8 @@ bool Verify(const unsigned char *buffer, const unsigned buffer_size,
             const unsigned char *signature, unsigned signature_size);
 bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
                const unsigned char *signature, unsigned signature_size);
+bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
+                  const bool by_rsa);
 bool ReadSignatureTail(const unsigned char *buffer, const unsigned buffer_size,
                        const unsigned skip_bytes,
                        unsigned char **signature, unsigned *signature_size);
