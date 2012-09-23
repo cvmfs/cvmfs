@@ -189,12 +189,12 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     ensemble->cert_buf =
       reinterpret_cast<unsigned char *>(download_certificate.destination_mem.data);
     ensemble->cert_size = download_certificate.destination_mem.size;
-    retval = signature::LoadCertificateMem(ensemble->cert_buf,
-                                           ensemble->cert_size);
-    if (!retval) {
-      result = kFailBadCertificate;
-      goto cleanup;
-    }
+  }
+  retval = signature::LoadCertificateMem(ensemble->cert_buf,
+                                         ensemble->cert_size);
+  if (!retval) {
+    result = kFailBadCertificate;
+    goto cleanup;
   }
 
   // Verify manifest

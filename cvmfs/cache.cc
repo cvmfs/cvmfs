@@ -167,7 +167,7 @@ int Open(const hash::Any &id) {
 
 
 /**
- * Tries to open a catalog and copies its contents into a newly malloced
+ * Tries to open a file and copies its contents into a newly malloced
  * memory area.  User of the function has to free buffer (if successful).
  *
  * @param[in] id content hash of the catalog entry.
@@ -693,11 +693,12 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
 
   // Load and verify remote checksum
   manifest::Failures manifest_failure;
-  manifest::ManifestEnsemble ensemble;
+  cache::ManifestEnsemble ensemble;
   manifest_failure = manifest::Fetch("", repo_name_, cache_last_modified,
                                      &cache_hash, &ensemble);
   if (manifest_failure != manifest::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "failed to fetch manifest (%d)", retval);
+    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d)",
+             manifest_failure);
     if (!cache_hash.IsNull()) {
       // TODO remove code duplication
       if (catalog_path) {
@@ -797,6 +798,13 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
   catalog::Counters counters;
   catalog->GetCounters(&counters);
   loaded_inodes_ -= counters.GetSelfEntries();
+}
+
+
+void ManifestEnsemble::FetchCertificate(const hash::Any &hash) {
+  uint64_t size;
+  Open2Mem(hash, &cert_buf, &size);
+  cert_size = size;
 }
 
 }  // namespace cache
