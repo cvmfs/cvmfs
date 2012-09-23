@@ -19,6 +19,7 @@ class CommandPull : public Command {
   ParameterList GetParams() {
     ParameterList result;
     result.push_back(Parameter('u', "repository url", false, false));
+    result.push_back(Parameter('w', "stratum 1 url", false, false));
     result.push_back(Parameter('m', "repository name", false, false));
     result.push_back(Parameter('r', "spooler definition", false, false));
     result.push_back(Parameter('k', "repository master key(s)", false, false));

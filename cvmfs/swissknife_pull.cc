@@ -27,7 +27,8 @@
 using namespace std;  // NOLINT
 
 namespace {
-string *url = NULL;
+string *stratum0_url = NULL;
+string *stratum1_url = NULL;
 string *temp_dir = NULL;
 unsigned num_parallel = 1;
 bool pull_history = false;
@@ -359,6 +360,15 @@ static bool recursive_pull(const string &path)
 static bool Pull(const hash::Any &catalog_hash) {
   int retval;
 
+  // Check if the catalog already exists
+  const string url_exists = *stratum1_url + "/data" +
+                            catalog_hash.MakePath(1, 2) + "C";
+  download::JobInfo download_exists(&url_exists, false);
+  retval = download::Fetch(&download_exists);
+  if (retval == download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Catalog up to date");
+    return true;
+  }
 
   string path_catalog;
   FILE *fcatalog = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
@@ -367,7 +377,8 @@ static bool Pull(const hash::Any &catalog_hash) {
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
     return false;
   }
-  const string url_catalog = *url + "/data" + catalog_hash.MakePath(1, 2) + "C";
+  const string url_catalog = *stratum0_url + "/data" +
+                             catalog_hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url_catalog, true, false, fcatalog,
                                      &catalog_hash);
   retval = download::Fetch(&download_catalog);
@@ -377,6 +388,8 @@ static bool Pull(const hash::Any &catalog_hash) {
     unlink(path_catalog.c_str());
     return false;
   }
+
+
 
   spooler->SpoolProcess(path_catalog, "data", "C");
 
@@ -389,7 +402,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   unsigned timeout = 10;
   manifest::ManifestEnsemble ensemble;
 
-  url = args.find('u')->second;
+  stratum0_url = args.find('u')->second;
+  stratum1_url = args.find('w')->second;
   temp_dir = args.find('x')->second;
   spooler = upload::MakeSpoolerEnsemble(*args.find('r')->second);
   assert(spooler);
@@ -404,10 +418,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
-           url->c_str());
+           stratum0_url->c_str());
 
   int result = 1;
-  const string url_sentinel = *url + "/.cvmfs_master_replica";
+  const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
   download::JobInfo download_sentinel(&url_sentinel, false);
 
   download::Init(num_parallel+1);
@@ -425,7 +439,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
 
-  retval = manifest::Fetch(*url, repository_name, 0, NULL, &ensemble);
+  retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL, &ensemble);
   if (retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
     goto fini;

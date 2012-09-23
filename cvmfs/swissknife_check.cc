@@ -346,25 +346,6 @@ static std::string DecompressCatalog(const string &path,
 }
 
 
-static catalog::Catalog *AttachCatalog(const string &path,
-                                       const string &tmp_file)
-{
-  catalog::Catalog *catalog =
-    new catalog::Catalog(PathString(path.data(), path.length()), NULL);
-  bool retval = catalog->OpenDatabase(tmp_file);
-  unlink(tmp_file.c_str());
-  if (!retval) {
-    delete catalog;
-    return NULL;
-  }
-  catalog::InodeRange inode_range;
-  inode_range.offset = 256;
-  inode_range.size = 256 + catalog->max_row_id();
-  catalog->set_inode_range(inode_range);
-  return catalog;
-}
-
-
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
@@ -386,7 +367,8 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
     return false;
   }
 
-  catalog::Catalog *catalog = AttachCatalog(path, tmp_file);
+  catalog::Catalog *catalog = catalog::Catalog::AttachFreely(path, tmp_file);
+  unlink(tmp_file.c_str());
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
