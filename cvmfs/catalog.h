@@ -104,9 +104,6 @@ class Catalog {
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
 
-  static Catalog *AttachFreely(const std::string &root_path,
-                               const std::string &file);
-
   Catalog(const PathString &path, Catalog *parent);
   virtual ~Catalog();
 
@@ -222,6 +219,8 @@ class Catalog {
   SqlNestedCatalogLookup *sql_lookup_nested_;
   SqlNestedCatalogListing *sql_list_nested_;
 };  // class Catalog
+
+Catalog *AttachFreely(const std::string &root_path, const std::string &file);
 
 }  // namespace catalog
 

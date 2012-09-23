@@ -97,9 +97,7 @@ uint64_t Counters::GetAllEntries() const {
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *Catalog::AttachFreely(const std::string &root_path,
-                               const std::string &file)
-{
+Catalog *AttachFreely(const string &root_path, const string &file) {
   Catalog *catalog =
     new Catalog(PathString(root_path.data(), root_path.length()), NULL);
   bool retval = catalog->OpenDatabase(file);
