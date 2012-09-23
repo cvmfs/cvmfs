@@ -693,15 +693,9 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
 
   // Load and verify remote checksum
   manifest::Failures manifest_failure;
-  unsigned char *cert_buf;
-  unsigned char *whitelist_buf;
-  unsigned cert_size;
-  unsigned whitelist_size;
-  manifest::Manifest *manifest;
+  manifest::ManifestEnsemble ensemble;
   manifest_failure = manifest::Fetch("", repo_name_, cache_last_modified,
-                                     &manifest,
-                                     &cert_buf, &cert_size,
-                                     &whitelist_buf, &whitelist_size);
+                                     &cache_hash, &ensemble);
   if (manifest_failure != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed to fetch manifest (%d)", retval);
     if (!cache_hash.IsNull()) {
@@ -726,12 +720,12 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   }
 
   offline_mode_ = false;
-  cvmfs_path += " (" + manifest->catalog_hash().ToString() + ")";
+  cvmfs_path += " (" + ensemble.manifest->catalog_hash().ToString() + ")";
   LogCvmfs(kLogCache, kLogDebug, "remote checksum is %s",
-           manifest->catalog_hash().ToString().c_str());
+           ensemble.manifest->catalog_hash().ToString().c_str());
 
   // Short way out, use cached copy
-  if (manifest->catalog_hash() == cache_hash) {
+  if (ensemble.manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
       *catalog_path = "." + cache_hash.MakePath(1, 2);
       // quota::Pin is only effective on first load, afterwards it is a NOP
@@ -756,19 +750,20 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
 
   // Load new catalog
   catalog::LoadError load_retval =
-    LoadCatalogCas(manifest->catalog_hash(), cvmfs_path, catalog_path);
+    LoadCatalogCas(ensemble.manifest->catalog_hash(), cvmfs_path, catalog_path);
   if (load_retval != catalog::kLoadNew)
     return load_retval;
-  loaded_catalogs_[mountpoint] = manifest->catalog_hash();
+  loaded_catalogs_[mountpoint] = ensemble.manifest->catalog_hash();
 
   // Store new manifest and certificate
-  CommitFromMem(manifest->certificate(), cert_buf, cert_size,
+  CommitFromMem(ensemble.manifest->certificate(),
+                ensemble.cert_buf, ensemble.cert_size,
                 "certificate for " + repo_name_);
   int fdchksum = open(checksum_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (fdchksum >= 0) {
     string cache_checksum =
-      manifest->catalog_hash().ToString() +
-      "T" + StringifyInt(manifest->publish_timestamp());
+      ensemble.manifest->catalog_hash().ToString() +
+      "T" + StringifyInt(ensemble.manifest->publish_timestamp());
 
     file_checksum = fdopen(fdchksum, "w");
     if (file_checksum) {

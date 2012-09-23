@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include <cassert>
+
 #include "manifest.h"
 #include "download.h"
 #include "signature.h"
@@ -15,7 +17,6 @@
 using namespace std;  // NOLINT
 
 namespace manifest {
-
 
 /**
  * Checks whether the fingerprint of the loaded PEM certificate is listed on the
@@ -126,76 +127,79 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
  * If base_url is empty, uses the probe_hosts feature from download module.
  */
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
-               const uint64_t minimum_timestamp,
-               Manifest **manifest,
-               unsigned char **cert_buf, unsigned *cert_size,
-               unsigned char **whitelist_buf, unsigned *whitelist_size)
+               const uint64_t minimum_timestamp, const hash::Any *base_catalog,
+               ManifestEnsemble *ensemble)
 {
+  assert(ensemble);
   const bool probe_hosts = base_url == "";
   Failures result = kFailUnknown;
-  *cert_buf = NULL;
-  *cert_size = 0;
-  *whitelist_buf = NULL;
-  *whitelist_size = 0;
   int retval;
 
   const string manifest_url = base_url + string("/.cvmfspublished");
   download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
   const string whitelist_url = base_url + string("/.cvmfswhitelist");
   download::JobInfo download_whitelist(&whitelist_url, false, probe_hosts, NULL);
+  hash::Any certificate_hash;
+  string certificate_url = base_url + "/data";  // rest is in manifest
+  download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
+                                         &certificate_hash);
 
   retval = download::Fetch(&download_manifest);
   if (retval != download::kFailOk)
     return kFailLoad;
 
   // Load Manifest
-  const char *manifest_buf = download_manifest.destination_mem.data;
-  *manifest = manifest::Manifest::LoadMem(
-    reinterpret_cast<const unsigned char *>(manifest_buf),
-    download_manifest.destination_mem.size);
-  if (!manifest)
+  ensemble->raw_manifest_buf =
+    reinterpret_cast<unsigned char *>(download_manifest.destination_mem.data);
+  ensemble->raw_manifest_size = download_manifest.destination_mem.size;
+  ensemble->manifest =
+    manifest::Manifest::LoadMem(ensemble->raw_manifest_buf,
+                                ensemble->raw_manifest_size);
+  if (!ensemble->manifest)
     return kFailIncomplete;
 
-  // Prepare certificate parameters
-  hash::Any certificate_hash = (*manifest)->certificate();
-  string certificate_url = base_url + "/data" +
-  certificate_hash.MakePath(1, 2) + "X";
-  download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
-                                         &certificate_hash);
-
   // Basic manifest sanity check
-  if ((*manifest)->repository_name() != repository_name) {
+  if (ensemble->manifest->repository_name() != repository_name) {
     result = kFailNameMismatch;
     goto cleanup;
   }
-  if ((*manifest)->root_path() != hash::Md5(hash::AsciiPtr(""))) {
+  if (ensemble->manifest->root_path() != hash::Md5(hash::AsciiPtr(""))) {
     result = kFailRootMismatch;
     goto cleanup;
   }
-  if ((*manifest)->publish_timestamp() < minimum_timestamp) {
+  if (ensemble->manifest->publish_timestamp() < minimum_timestamp) {
     result = kFailOutdated;
     goto cleanup;
   }
 
+  // Quick way out: hash matches base catalog
+  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog))
+    return kFailOk;
+
   // Load certificate
-  retval = download::Fetch(&download_certificate);
-  if (retval != download::kFailOk) {
-    result = kFailLoad;
-    goto cleanup;
-  }
-  *cert_buf =
-    reinterpret_cast<unsigned char *>(download_certificate.destination_mem.data);
-  *cert_size = download_certificate.destination_mem.size;
-  retval = signature::LoadCertificateMem(*cert_buf, *cert_size);
-  if (!retval) {
-    result = kFailBadCertificate;
-    goto cleanup;
+  certificate_hash = ensemble->manifest->certificate();
+  ensemble->FetchCertificate(certificate_hash);
+  if (!ensemble->cert_buf) {
+    certificate_url += certificate_hash.MakePath(1, 2) + "X";
+    retval = download::Fetch(&download_certificate);
+    if (retval != download::kFailOk) {
+      result = kFailLoad;
+        goto cleanup;
+    }
+    ensemble->cert_buf =
+      reinterpret_cast<unsigned char *>(download_certificate.destination_mem.data);
+    ensemble->cert_size = download_certificate.destination_mem.size;
+    retval = signature::LoadCertificateMem(ensemble->cert_buf,
+                                           ensemble->cert_size);
+    if (!retval) {
+      result = kFailBadCertificate;
+      goto cleanup;
+    }
   }
 
   // Verify manifest
-  retval = signature::VerifyLetter(
-    reinterpret_cast<unsigned char *>(download_manifest.destination_mem.data),
-    download_manifest.destination_mem.size, false);
+  retval = signature::VerifyLetter(ensemble->raw_manifest_buf,
+                                   ensemble->raw_manifest_size, false);
   if (!retval) {
     result = kFailBadSignature;
     goto cleanup;
@@ -207,15 +211,17 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     result = kFailLoad;
     goto cleanup;
   }
-  *whitelist_buf =
+  ensemble->whitelist_buf =
     reinterpret_cast<unsigned char *>(download_whitelist.destination_mem.data);
-  *whitelist_size = download_whitelist.destination_mem.size;
-  retval = signature::VerifyLetter(*whitelist_buf, *whitelist_size, true);
+  ensemble->whitelist_size = download_whitelist.destination_mem.size;
+  retval = signature::VerifyLetter(ensemble->whitelist_buf,
+                                   ensemble->whitelist_size, true);
   if (!retval) {
     result = kFailBadWhitelist;
     goto cleanup;
   }
-  retval = VerifyWhitelist(*whitelist_buf, *whitelist_size, repository_name);
+  retval = VerifyWhitelist(ensemble->whitelist_buf, ensemble->whitelist_size,
+                           repository_name);
   if (!retval) {
     result = kFailBadWhitelist;
     goto cleanup;
@@ -224,16 +230,17 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   return kFailOk;
 
  cleanup:
-  delete *manifest;
-  *manifest = NULL;
-  if (*cert_buf)
-    free(*cert_buf);
-  if (*whitelist_buf)
-    free(*whitelist_buf);
-  *cert_buf = NULL;
-  *cert_size = 0;
-  *whitelist_buf = NULL;
-  *whitelist_size = 0;
+  delete ensemble->manifest;
+  ensemble->manifest = NULL;
+  if (ensemble->raw_manifest_buf) free(ensemble->raw_manifest_buf);
+  if (ensemble->cert_buf) free(ensemble->cert_buf);
+  if (ensemble->whitelist_buf) free(ensemble->whitelist_buf);
+  ensemble->raw_manifest_buf = NULL;
+  ensemble->cert_buf = NULL;
+  ensemble->whitelist_buf = NULL;
+  ensemble->raw_manifest_size = 0;
+  ensemble->cert_size = 0;
+  ensemble->whitelist_size = 0;
   return result;
 }
 

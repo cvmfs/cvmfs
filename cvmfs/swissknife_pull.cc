@@ -356,7 +356,7 @@ static bool recursive_pull(const string &path)
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   unsigned timeout = 10;
-  manifest::Manifest *manifest = NULL;
+  manifest::ManifestEnsemble ensemble;
   upload::Spooler *spooler = NULL;
 
   url = args.find('u')->second;
@@ -388,13 +388,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
   }
 
-  unsigned char *cert_buf;
-  unsigned char *whitelist_buf;
-  unsigned cert_size;
-  unsigned whitelist_size;
-  retval = manifest::Fetch(*url, repository_name, 0, &manifest,
-                           &cert_buf, &cert_size,
-                           &whitelist_buf, &whitelist_size);
+  retval = manifest::Fetch(*url, repository_name, 0, NULL, &ensemble);
   if (retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
     goto fini;
@@ -411,7 +405,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
  fini:
   delete spooler;
-  delete manifest;
   signature::Fini();
   download::Fini();
   return result;

@@ -14,14 +14,54 @@ using namespace std;  // NOLINT
 
 namespace manifest {
 
+static void ParseKeyvalMem(const unsigned char *buffer,
+                           const unsigned buffer_size,
+                           map<char, string> *content)
+{
+  string line;
+  unsigned pos = 0;
+  while (pos < buffer_size) {
+    if (static_cast<char>(buffer[pos]) == '\n') {
+      if (line == "--")
+        return;
+
+      if (line != "") {
+        const string tail = (line.length() == 1) ? "" : line.substr(1);
+        (*content)[line[0]] = tail;
+      }
+      line = "";
+    } else {
+      line += static_cast<char>(buffer[pos]);
+    }
+    pos++;
+  }
+}
+
+
+static bool ParseKeyvalPath(const string &filename,
+                            map<char, string> *content)
+{
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd < 0)
+    return false;
+
+  unsigned char buffer[4096];
+  int num_bytes = read(fd, buffer, sizeof(buffer));
+  close(fd);
+
+  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
+    return false;
+
+  ParseKeyvalMem(buffer, unsigned(num_bytes), content);
+  return true;
+}
+
+
 Manifest *Manifest::LoadMem(const unsigned char *buffer,
                             const unsigned length)
 {
   map<char, string> content;
-  int start_of_signature;
-  hash::Any hash;
-  if (!ParseKeyvalMem(buffer, length, &start_of_signature, &hash, &content))
-    return NULL;
+  ParseKeyvalMem(buffer, length, &content);
 
   return Load(content);
 }

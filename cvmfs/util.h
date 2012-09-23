@@ -67,11 +67,6 @@ std::string JoinStrings(const std::vector<std::string> &strings,
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
 std::string GetLine(const char *text, const int text_size);
-bool ParseKeyvalPath(const std::string &filename,
-                     std::map<char, std::string> *content);
-bool ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
-                    int *start_of_signature,
-                    hash::Any *hash, std::map<char, std::string> *content);
 
 void Daemonize();
 bool ManagedExec(const std::vector<std::string> &command_line,
