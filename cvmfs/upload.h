@@ -16,6 +16,7 @@
 
 namespace upload {
 
+
 /**
  * Encapsulates the callback function that handles responses from the external
  * Spooler.
@@ -50,6 +51,8 @@ class Spooler {
   void SpoolCopy(const std::string &local_path, const std::string &remote_path);
   void EndOfTransaction();
 
+  void set_move_mode(const bool mode) { move_mode_ = mode; }
+
   bool IsIdle() { return atomic_read64(&num_pending_) == 0; }
   uint64_t num_errors() { return atomic_read64(&num_errors_); }
 
@@ -62,6 +65,7 @@ class Spooler {
   std::string fifo_digests_;
   SpoolerCallback *spooler_callback_;
   bool connected_;
+  bool move_mode_;
   int fd_paths_;
   int fd_digests_;
   FILE *fdigests_;

@@ -75,6 +75,15 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const string manifest_path = *args.find('o')->second;
   const string dir_temp = *args.find('t')->second;
   const string spooler_definition = *args.find('r')->second;
+  if (args.find('l') != args.end()) {
+    unsigned log_level =
+      1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+    if (log_level > kLogNone) {
+      swissknife::Usage();
+      return 1;
+    }
+    SetLogVerbosity(static_cast<LogLevels>(log_level));
+  }
 
   upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
   assert(spooler);

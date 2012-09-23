@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <vector>
 
 #include "upload.h"
 #include "logging.h"
@@ -29,6 +30,8 @@ namespace {
 string *url = NULL;
 string *temp_dir = NULL;
 unsigned num_parallel = 1;
+bool pull_history = false;
+upload::Spooler *spooler = NULL;
 /*string dir_target = "";
 string dir_data = "";
 string dir_catalogs = "";
@@ -353,28 +356,61 @@ static bool recursive_pull(const string &path)
 }*/
 
 
+static bool Pull(const hash::Any &catalog_hash) {
+  int retval;
+
+
+  string path_catalog;
+  FILE *fcatalog = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
+                                  &path_catalog);
+  if (!fcatalog) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
+    return false;
+  }
+  const string url_catalog = *url + "/data" + catalog_hash.MakePath(1, 2) + "C";
+  download::JobInfo download_catalog(&url_catalog, true, false, fcatalog,
+                                     &catalog_hash);
+  retval = download::Fetch(&download_catalog);
+  if (retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s",
+             catalog_hash.ToString().c_str());
+    unlink(path_catalog.c_str());
+    return false;
+  }
+
+  spooler->SpoolProcess(path_catalog, "data", "C");
+
+  return true;
+}
+
+
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   unsigned timeout = 10;
   manifest::ManifestEnsemble ensemble;
-  upload::Spooler *spooler = NULL;
 
   url = args.find('u')->second;
   temp_dir = args.find('x')->second;
   spooler = upload::MakeSpoolerEnsemble(*args.find('r')->second);
   assert(spooler);
+  spooler->set_move_mode(true);
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
   if (args.find('n') != args.end())
     num_parallel = String2Uint64(*args.find('n')->second);
   if (args.find('t') != args.end())
     timeout = String2Uint64(*args.find('t')->second);
+  if (args.find('p') != args.end())
+    pull_history = true;
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            url->c_str());
 
   int result = 1;
-  download::Init(num_parallel);
+  const string url_sentinel = *url + "/.cvmfs_master_replica";
+  download::JobInfo download_sentinel(&url_sentinel, false);
+
+  download::Init(num_parallel+1);
   download::SetTimeout(timeout, timeout);
   download::Spawn();
   signature::Init();
@@ -388,20 +424,25 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
   }
 
+
   retval = manifest::Fetch(*url, repository_name, 0, NULL, &ensemble);
   if (retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
     goto fini;
   }
 
-  result = 0;
-
-
   // Check if we have a replica-ready server
-  //if (!override_master_test && (curl_download_path("/.cvmfs_master_replica", "/dev/null", dummy.digest, 1, 0) != CURLE_OK)) {
-  //  cerr << "This is not a CernVM-FS server for replication, try http://cernvm-bkp.cern.ch" << endl;
-  //  goto pull_cleanup;
-  //}
+  retval = download::Fetch(&download_sentinel);
+  if (retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "This is not a CernVM-FS server for replication");
+    goto fini;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Replicating chunks from catalog at /");
+  Pull(ensemble.manifest->catalog_hash());
+
+  result = 0;
 
  fini:
   delete spooler;

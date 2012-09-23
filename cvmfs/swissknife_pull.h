@@ -26,6 +26,7 @@ class CommandPull : public Command {
                                false, false));
     result.push_back(Parameter('n', "number of download threads", true, false));
     result.push_back(Parameter('t', "timeout (s)", true, false));
+    result.push_back(Parameter('p', "pull catalog history, too", true, true));
     return result;
   }
   int Main(const ArgumentList &args);
