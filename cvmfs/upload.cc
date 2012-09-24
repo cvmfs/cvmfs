@@ -33,7 +33,6 @@ namespace upload {
 enum Commands {
   kCmdProcess = 1,
   kCmdCopy,
-  kCmdConditionalCopy,
   kCmdEndOfTransaction,
   kCmdMoveFlag = 128,
 };
@@ -76,7 +75,6 @@ int MainLocalSpooler(const string &fifo_paths,
   int retval;
   while ((retval = getc_unlocked(fpaths)) != EOF) {
     bool move_file = false;
-    bool conditional_copy = false;
     if (retval & kCmdMoveFlag) {
       retval -= kCmdMoveFlag;
       move_file = true;
@@ -98,31 +96,19 @@ int MainLocalSpooler(const string &fifo_paths,
         return_line.push_back('\n');
         WritePipe(fd_digests, return_line.data(), return_line.length());
         goto tear_down;
-      case kCmdConditionalCopy:
-        conditional_copy = true;
       case kCmdCopy:
         GetString(fpaths, &local_path);
         GetString(fpaths, &remote_path);
         remote_path = upstream_basedir + "/" + remote_path;
         LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Default spooler received 'copy': source %s, dest %s, "
-                 "conditional %d, move %d", local_path.c_str(),
-                 remote_path.c_str(), conditional_copy, move_file);
-        if (conditional_copy && FileExists(remote_path)) {
-          if (move_file) {
-            int retval = unlink(local_path.c_str());
-            return_line = (retval == 0) ? "0" : "102";
-          } else {
-            return_line = "0";
-          }
+                 "Default spooler received 'copy': source %s, dest %s move %d",
+                 local_path.c_str(), remote_path.c_str(), move_file);
+        if (move_file) {
+          int retval = rename(local_path.c_str(), remote_path.c_str());
+          return_line = (retval == 0) ? "0" : StringifyInt(errno);
         } else {
-          if (move_file) {
-            int retval = rename(local_path.c_str(), remote_path.c_str());
-            return_line = (retval == 0) ? "0" : StringifyInt(errno);
-          } else {
-            int retval = CopyPath2Path(local_path, remote_path);
-            return_line = retval ? "0" : "100";
-          }
+          int retval = CopyPath2Path(local_path, remote_path);
+          return_line = retval ? "0" : "100";
         }
         return_line.push_back('\0');
         return_line.append(local_path);
