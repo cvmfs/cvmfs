@@ -158,8 +158,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   spooler->SpoolCopy(file_path_compressed,
                      "data" + hash_catalog.MakePath(1, 2) + "C");
   spooler->EndOfTransaction();
-  while (!spooler->IsIdle())
-    sleep(1);
+  spooler->WaitFor();
   unlink(file_path_compressed.c_str());
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
@@ -597,8 +596,7 @@ manifest::Manifest *WritableCatalogManager::Commit() {
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
-      while (!spooler_->IsIdle())
-        sleep(1);
+      spooler_->WaitFor();
       if (spooler_->num_errors() > 0) {
         LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
         return NULL;

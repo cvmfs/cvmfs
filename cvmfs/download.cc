@@ -981,6 +981,8 @@ void Fini() {
     // All handles are removed from the multi stack
     close(pipe_terminate_[1]);
     close(pipe_terminate_[0]);
+    close(pipe_jobs_[1]);
+    close(pipe_jobs_[0]);
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),

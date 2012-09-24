@@ -207,8 +207,7 @@ void SyncMediator::LeaveDirectory(SyncItem &entry)
 manifest::Manifest *SyncMediator::Commit() {
   LogCvmfs(kLogPublish, kLogStdout,
            "Waiting for upload of files before committing...");
-  while (!params_->spooler->IsIdle())
-    sleep(1);
+  params_->spooler->WaitFor();
 
   if (!hardlink_queue_.empty()) {
     LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
@@ -222,8 +221,7 @@ manifest::Manifest *SyncMediator::Commit() {
       params_->spooler->SpoolProcess(i->master.GetUnionPath(), "data", "");
     }
 
-    while (!params_->spooler->IsIdle())
-      sleep(1);
+    params_->spooler->WaitFor();
 
     for (HardlinkGroupList::const_iterator i = hardlink_queue_.begin(),
          iEnd = hardlink_queue_.end(); i != iEnd; ++i)

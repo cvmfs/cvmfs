@@ -67,8 +67,10 @@ int MainLocalSpooler(const string &fifo_paths,
   LogCvmfs(kLogSpooler, kLogVerboseMsg,
            "Default spooler connected to paths pipe");
   int fd_digests = open(fifo_digests.c_str(), O_WRONLY);
-  if (fd_digests < 0)
+  if (fd_digests < 0) {
+    fclose(fpaths);
     return 1;
+  }
   LogCvmfs(kLogSpooler, kLogVerboseMsg,
            "Default spooler connected to digests pipe");
 
@@ -174,6 +176,8 @@ int MainLocalSpooler(const string &fifo_paths,
 
  tear_down:
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Default spooler terminates");
+  fclose(fpaths);
+  close(fd_digests);
   return 0;
 }
 
@@ -304,6 +308,12 @@ void Spooler::EndOfTransaction() {
   char command = kCmdEndOfTransaction;
   WritePipe(fd_paths_, &command, 1);
   atomic_inc64(&num_pending_);
+}
+
+
+void Spooler::WaitFor() {
+  while (!IsIdle())
+    usleep(100000);  // 100 milliseconds
 }
 
 

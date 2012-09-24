@@ -47,6 +47,7 @@ X509 *certificate_ = NULL;
 vector<RSA *> *public_keys_;  /**< Contains cvmfs public master keys */
 vector<string> *blacklisted_certificates_ = NULL;
 
+
 void Init() {
   OpenSSL_add_all_algorithms();
   public_keys_ = new vector<RSA *>();
@@ -55,7 +56,6 @@ void Init() {
 
 
 void Fini() {
-  EVP_cleanup();
   if (certificate_) X509_free(certificate_);
   certificate_ = NULL;
   if (private_key_) EVP_PKEY_free(private_key_);
@@ -65,6 +65,7 @@ void Fini() {
       RSA_free((*public_keys_)[i]);
     public_keys_->clear();
   }
+  EVP_cleanup();
   delete public_keys_;
   delete blacklisted_certificates_;
   private_key_ = NULL;

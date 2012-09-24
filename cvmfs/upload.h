@@ -54,6 +54,7 @@ class Spooler {
   void set_move_mode(const bool mode) { move_mode_ = mode; }
 
   bool IsIdle() { return atomic_read64(&num_pending_) == 0; }
+  void WaitFor();
   uint64_t num_errors() { return atomic_read64(&num_errors_); }
 
  private:

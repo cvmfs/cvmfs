@@ -23,6 +23,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "signature.h"
+#include "catalog.h"
 
 using namespace std;  // NOLINT
 
@@ -357,7 +358,7 @@ static bool recursive_pull(const string &path)
 }*/
 
 
-static bool Pull(const hash::Any &catalog_hash) {
+static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
   int retval;
 
   // Check if the catalog already exists
@@ -370,9 +371,12 @@ static bool Pull(const hash::Any &catalog_hash) {
     return true;
   }
 
-  string path_catalog;
+  hash::Any chunk_hash;
+  catalog::ChunkTypes chunk_type;
+  catalog::Catalog *catalog = NULL;
+  string file_catalog;
   FILE *fcatalog = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
-                                  &path_catalog);
+                                  &file_catalog);
   if (!fcatalog) {
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
     return false;
@@ -382,18 +386,43 @@ static bool Pull(const hash::Any &catalog_hash) {
   download::JobInfo download_catalog(&url_catalog, true, false, fcatalog,
                                      &catalog_hash);
   retval = download::Fetch(&download_catalog);
+  fclose(fcatalog);
   if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s",
-             catalog_hash.ToString().c_str());
-    unlink(path_catalog.c_str());
-    return false;
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
+             catalog_hash.ToString().c_str(), retval);
+    goto pull_cleanup;
   }
 
+  catalog = catalog::AttachFreely(path, file_catalog);
+  if (catalog == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to attach catalog %s",
+             catalog_hash.ToString().c_str());
+    goto pull_cleanup;
+  }
 
+  // Traverse the chunks
+  retval = catalog->AllChunksBegin();
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
+    goto pull_cleanup;
+  }
+  while (catalog->AllChunksNext(&chunk_hash, &chunk_type)) {
 
-  spooler->SpoolProcess(path_catalog, "data", "C");
+  }
+  catalog->AllChunksEnd();
 
+  // Previous catalogs
+
+  // Nested catalogs
+
+  delete catalog;
+  spooler->SpoolProcess(file_catalog, "data", "C");
   return true;
+
+ pull_cleanup:
+  delete catalog;
+  unlink(file_catalog.c_str());
+  return false;
 }
 
 
@@ -438,7 +467,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
   }
 
-
   retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL, &ensemble);
   if (retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
@@ -454,14 +482,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating chunks from catalog at /");
-  Pull(ensemble.manifest->catalog_hash());
+  Pull(ensemble.manifest->catalog_hash(), "");
 
+  spooler->WaitFor();
   result = 0;
 
  fini:
-  delete spooler;
   signature::Fini();
   download::Fini();
+  delete spooler;
   return result;
 
 
