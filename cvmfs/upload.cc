@@ -52,6 +52,11 @@ static bool GetString(FILE *f, std::string *str) {
 }
 
 
+bool LocalStat::Stat(const string &path) {
+  return FileExists(base_path_ + "/" + path);
+}
+
+
 /**
  * A simple spooler in case upstream storage is local.
  * Compresses and hashes files and stores them on the upstream path.
@@ -124,7 +129,7 @@ int MainLocalSpooler(const string &fifo_paths,
         LogCvmfs(kLogSpooler, kLogVerboseMsg,
                  "Default spooler received 'process': source %s, dest %s, "
                  "postfix %s, move %d", local_path.c_str(),
-                 remote_path.c_str(), file_suffix.c_str(), move_file);
+                 remote_dir.c_str(), file_suffix.c_str(), move_file);
 
         hash::Any compressed_hash(hash::kSha1);
         remote_path = upstream_basedir + "/" + remote_dir;
@@ -355,6 +360,17 @@ Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition) {
   }
 
   return spooler;
+}
+
+
+BackendStat *GetBackendStat(const string &spooler_definition) {
+  vector<string> components = SplitString(spooler_definition, ',');
+  vector<string> upstream = SplitString(components[0], ':');
+  if ((upstream.size() != 2) || (upstream[0] != "local")) {
+    PrintError("Invalid upstream");
+    return NULL;
+  }
+  return new LocalStat(upstream[1]);
 }
 
 }  // namespace upload

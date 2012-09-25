@@ -12,9 +12,12 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <string>
 #include <vector>
+
+#include <cstring>
 
 #include "upload.h"
 #include "logging.h"
@@ -24,349 +27,89 @@
 #include "manifest_fetch.h"
 #include "signature.h"
 #include "catalog.h"
+#include "smalloc.h"
+#include "hash.h"
 
 using namespace std;  // NOLINT
 
 namespace {
+
+struct ChunkJob {
+  unsigned char type;
+  unsigned char digest[hash::kMaxDigestSize];
+};
+
+
+class AbortSpoolerOnError : public upload::SpoolerCallback {
+ public:
+  void Callback(const string &path, int retval, const string &digest) {
+    if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
+               retval, path.c_str(), digest.c_str());
+      abort();
+    }
+  }
+};
+
+
 string *stratum0_url = NULL;
-string *stratum1_url = NULL;
 string *temp_dir = NULL;
 unsigned num_parallel = 1;
 bool pull_history = false;
 upload::Spooler *spooler = NULL;
-/*string dir_target = "";
-string dir_data = "";
-string dir_catalogs = "";
-string url = "";
-string blacklist = "/etc/cvmfs/blacklist";
-string pubkey = "/etc/cvmfs/keys/cern.ch.pub";
-string repo_name = "";
-bool dont_load_chunks = false;
-unsigned retries = 2;
-unsigned overall_retries = 0;
-bool initial = false;
-bool exit_on_error = false;
-set<string> faulty_chunks;
-set<string> download_bucket;
-set<string> diff_set;
-bool keep_log = false;
-*/
-}
+int pipe_chunks[2];
+// required for concurrent reading
+pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
+upload::BackendStat *backend_stat = NULL;
+// TODO:: retries
 
-/*static bool fetch_deprecated_catalog(const hash::t_sha1 &snapshot_id, string &tmp_path) {
-  FILE *tmp_fp = temp_file(dir_data + "/txn/cvmfs.catalog", plain_file_mode, "w", tmp_path);
-  if (!tmp_fp)
-    return false;
-
-  hash::t_sha1 sha1_rcvd;
-  const string sha1_clg_str = snapshot_id.to_string();
-  const string url_clg = "/data/" + sha1_clg_str.substr(0, 2) + "/" +
-  sha1_clg_str.substr(2) + "C";
-  if ((curl_download_stream(url_clg.c_str(), tmp_fp, sha1_rcvd.digest, 1, 1) != CURLE_OK) ||
-      (sha1_rcvd != snapshot_id))
-  {
-    cerr << "Warning: failed to load deprecated catalog from " << url_clg << endl;
-  }
-  fclose(tmp_fp);
-  if (sha1_rcvd != snapshot_id) {
-    unlink(tmp_path.c_str());
-    return false;
-  }
-*/
-  /* write catalog */
-  /*const string clg_data_path = dir_catalogs + "/data/" + sha1_clg_str.substr(0, 2) + "/" +
-  sha1_clg_str.substr(2) + "C";
-  if (!file_exists(clg_data_path)) {
-    cout << "Writing catalog to " << clg_data_path << endl;
-    if (compress_file(tmp_path.c_str(), clg_data_path.c_str()) != 0) {
-      cerr << "Warning: failed to store catalog" << endl;
-    }
-  }
-
-  return true;
-}*/
-
-
-/**
- * Returns number of successful downloads
- */
-/*static int download_bunch(const bool ignore_errors = false) {
-  unsigned num = download_bucket.size();
-  int *curl_result = (int *)alloca(num * sizeof(int));
-  vector<char *> tmp_path_cstr;
-  vector<char *> rpath_cstr;
-  vector<string> final_path;
-  unsigned char *digest = (unsigned char *)alloca(num * hash::t_sha1::BIT_SIZE / 8);
-  vector<hash::t_sha1> expected;
-  vector<unsigned> remaining;
-
-  for (set<string>::const_iterator i = download_bucket.begin(), iEnd = download_bucket.end();
-       i != iEnd; ++i)
-  {
-    const string tmp_path = dir_data + "/txn/" + (*i);
-    tmp_path_cstr.push_back(strdupa(tmp_path.c_str()));
-    const string sha1_str = "/" + i->substr(0, 2) + "/" + i->substr(2);
-    const string rpath = url + "/data" + sha1_str;
-    rpath_cstr.push_back(strdupa(rpath.c_str()));
-    final_path.push_back(dir_data + sha1_str);
-    hash::t_sha1 expected_sha1;
-    expected_sha1.from_hash_str(*i);
-    expected.push_back(expected_sha1);
-  }
-  download_bucket.clear();
-
-  //cout << "WE GOT " << string(rpath_cstr[0]) << " AND " << string(tmp_path_cstr[0]) << " AND " << final_path[0] << endl;
-  curl_download_parallel(num, &(rpath_cstr[0]), &(tmp_path_cstr[0]), digest, curl_result);
-
-  for (unsigned i = 0; i < num; ++i) {
-    if ((curl_result[i] == CURLE_OK) && (expected[i] == hash::t_sha1(digest+i*20, 20))) {
-      if (rename(tmp_path_cstr[i], final_path[i].c_str()) != 0) {
-        remaining.push_back(i);
-      }
-    } else {
-      remaining.push_back(i);
-    }
-  }
-
-  int faulty = 0;
-  if (!remaining.empty()) {
-    cerr << "Parallel download failures " << remaining.size() << "/" << num << endl;
-    for (vector<unsigned>::const_iterator i = remaining.begin(), iEnd = remaining.end();
-         i != iEnd; ++i)
-    {
-      hash::t_sha1 sha1;
-      unsigned again = 1;
-      bool result;
-      do {
-        result = (curl_download_path_nocache(rpath_cstr[*i], tmp_path_cstr[*i], sha1.digest, 0, 0) == CURLE_OK) &&
-        (sha1 == expected[*i]);
-        if (!result)
-          unlink(tmp_path_cstr[*i]);
-        again++;
-      } while (!result && (again < retries));
-      overall_retries += again-1;
-
-      if (result) {
-        if ((rename(tmp_path_cstr[*i], (final_path[*i]).c_str()) != 0) && !ignore_errors) {
-          cerr << "Warning: rename to " << final_path[*i] << " failed" << endl;
-          faulty++;
-          faulty_chunks.insert(rpath_cstr[*i]);
-          unlink(tmp_path_cstr[*i]);
-        }
-      } else {
-        cerr << "Warning: failed to download " << final_path[*i] << endl;
-        if (!ignore_errors) {
-          faulty++;
-          faulty_chunks.insert(string(rpath_cstr[*i]));
-        }
-      }
-    }
-  }
-
-  return num-faulty;
-}
-
-static void recursive_ls(const hash::t_md5 dir, const string &path,
-                         uint64_t &no_entries, uint64_t &no_regular, uint64_t &no_prels, uint64_t &no_downloads,
-                         const bool ignore_errors = false)
-{
-  vector<catalog::t_dirent> entries;
-  entries = catalog::ls_unprotected(dir);
-
-  for (unsigned i = 0; i < entries.size(); ++i) {
-    if ((no_entries++ % 1000) == 0)
-      cout << "." << flush;
-
-    const string full_path = path + "/" + entries[i].name;
-    if (entries[i].flags & catalog::DIR) {
-      recursive_ls(hash::t_md5(full_path), full_path,
-                   no_entries, no_regular, no_prels, no_downloads);
-    }
-    if (entries[i].checksum != hash::t_sha1()) {
-      string suffix = "";
-      if (entries[i].flags & catalog::FILE) {
-        no_regular++;
-      } else if (entries[i].flags & catalog::DIR) {
-        no_prels++;
-        suffix = "L";
-      }
-      const string sha1_str = entries[i].checksum.to_string() + suffix;
-      const string chunk_path = "/" + sha1_str.substr(0, 2) + "/" + sha1_str.substr(2);
-      if (!file_exists(dir_data + chunk_path)) {
-        if (keep_log)
-          diff_set.insert(url + "/data" + chunk_path);
-        if (!dont_load_chunks)
-          download_bucket.insert(sha1_str);
-
-        if (download_bucket.size() == num_parallel)
-          no_downloads += download_bunch(ignore_errors);
-      }
-    }
-  }
 }
 
 
+static void *MainWorker(void *data) {
+  while (1) {
+    ChunkJob next_chunk;
+    pthread_mutex_lock(&lock_pipe);
+    ReadPipe(pipe_chunks[0], &next_chunk, sizeof(next_chunk));
+    pthread_mutex_unlock(&lock_pipe);
+    if (next_chunk.type == 255)
+      break;
 
-static bool recursive_pull(const string &path)
-{
-  hash::t_md5 md5(path);
+    hash::Any chunk_hash(hash::kSha1, next_chunk.digest,
+                         hash::kDigestSizes[hash::kSha1]);
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
+             chunk_hash.ToString().c_str());
+    string chunk_path = "data" + chunk_hash.MakePath(1, 2);
+    if (next_chunk.type != 0)
+      chunk_path.push_back(next_chunk.type);
 
-  cout << "Pulling catalog at " << ((path == "") ? "/" : path) << endl;
-  if (!mkdir_deep(dir_catalogs + path, plain_dir_mode)) {
-    cerr << "Warning: failed to create " << dir_catalogs + path << endl;
-    return false;
-  }
-
-  string backlink = "../";
-  string parent = get_parent_path(dir_catalogs + path);
-  while (parent != get_parent_path(dir_data)) {
-    if (parent == "") {
-      cerr << "Warning: cannot find data dir" << endl;
-      return false;
-    }
-    parent = get_parent_path(parent);
-    backlink += "../";
-  }
-
-  const string lnk_path_data = dir_catalogs + path + "/data";
-  const string backlink_data = backlink + get_file_name(dir_data);
-
-  struct stat64 info;
-  if (lstat64(lnk_path_data.c_str(), &info) != 0)  {
-    if (symlink(backlink_data.c_str(), lnk_path_data.c_str()) != 0) {
-      cerr << "Warning: cannot create catalog store -> data store symlink" << endl;
-      if (exit_on_error) return false;
-    }
-  }
-
-  // Save current checksum if available
-  map<char, string> ext_chksum;
-  hash::t_sha1 current_snapshot;
-  if (parse_keyval(dir_catalogs + path + "/.cvmfspublished", ext_chksum)) {
-    current_snapshot.from_hash_str(ext_chksum['C']);
-    cout << "Found local catalog with snapshot id " << ext_chksum['C'] << endl;
-  }
-
-  string tmp_path;
-  unsigned again = 0;
-  int result;
-  do {
-    result = fetch_catalog(path, false, md5, tmp_path);
-    if (result == 0) {
-      cout << "Catalog up to date" << endl;
-      return true;
-    }
-    again++;
-  } while ((result == -1)  && (again < retries));
-  overall_retries += again-1;
-  if (result != 1)
-    return false;
-
-  // New catalog, go on
-  if (!catalog::attach(tmp_path, "", true, false)) {
-    cerr << "Warning: failed to attach " << tmp_path;
-    return false;
-  }
-  unlink(tmp_path.c_str());
-
-  // Recursive listing
-  uint64_t no_entries = 0;
-  uint64_t no_regular = 0;
-  uint64_t no_prels = 0;
-  uint64_t no_downloads = 0;
-  cout << "Pulling data chunks: " << flush;
-  recursive_ls(md5, path, no_entries, no_regular, no_prels, no_downloads);
-  if (!download_bucket.empty())
-    no_downloads += download_bunch();
-  cout << " fetched " << no_downloads <<  " new files and " << no_prels << " mucro catalogs out of "
-  << no_regular << " regular files out of " << no_entries << " catalog entries" << endl;
-
-  // Store nested catalogs
-  vector<string> nested;
-  if (!catalog::ls_nested(catalog::get_num_catalogs()-1, nested)) {
-    cerr << "Warning: failed to get nested catalogs" << endl;
-    if (exit_on_error) return false;
-  }
-
-  // Walk through the linked list of previous revisions, best effort
-  if (!initial && (current_snapshot != hash::t_sha1())) {
-    hash::t_sha1 previous;
-    do {
-      previous = catalog::get_previous_revision(catalog::get_num_catalogs()-1);
-      cout << "Previous catalog snapshot id " << previous.to_string() << endl;
-      if ((previous != hash::t_sha1()) && (previous != current_snapshot)) {
-        // Pull previous catalog
-        cout << "Pulling previous catalog..." << endl;
-        unsigned again = 0;
-        bool result;
-        string prev_clg_path;
-        do {
-          result = fetch_deprecated_catalog(previous, prev_clg_path);
-          again++;
-        } while (!result && (again < retries));
-        overall_retries += again-1;
-        if (!result) {
-          break;
-        }
-
-        // Attach / detach
-        catalog::detach(catalog::get_num_catalogs()-1);
-        if (!catalog::attach(prev_clg_path, "", true, false)) {
-          cerr << "Warning: failed to attach " << prev_clg_path;
-          break;
-        }
-        unlink(tmp_path.c_str());
-
-        // Recursive ls
-        uint64_t no_entries = 0;
-        uint64_t no_regular = 0;
-        uint64_t no_prels = 0;
-        uint64_t no_downloads = 0;
-        cout << "Pulling data chunks: " << flush;
-        recursive_ls(md5, path, no_entries, no_regular, no_prels, no_downloads, true);
-        if (!download_bucket.empty())
-          no_downloads += download_bunch(true);
-        cout << " fetched " << no_downloads <<  " new files and " << no_prels << " mucro catalogs out of "
-        << no_regular << " regular files out of " << no_entries << " catalog entries" << endl;
+    if (!backend_stat->Stat(chunk_path)) {
+      string tmp_file;
+      FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
+                                    &tmp_file);
+      assert(fchunk);
+      const string url_chunk = *stratum0_url + "/" + chunk_path;
+      download::JobInfo download_chunk(&url_chunk, false, false, fchunk,
+                                       &chunk_hash);
+      download::Failures retval = download::Fetch(&download_chunk);
+      if (retval != download::kFailOk) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
+                 url_chunk.c_str(), retval);
+        abort();
       }
-    } while ((previous != hash::t_sha1()) && (previous != current_snapshot));
+      fclose(fchunk);
+      spooler->SpoolCopy(tmp_file, chunk_path);
+    }
   }
-  catalog::detach(catalog::get_num_catalogs()-1);
-
-  // Nested catalogs
-  for (unsigned i = 0; i < nested.size(); ++i) {
-    if (!recursive_pull(nested[i]) && exit_on_error)
-      return false;
-  }
-
-  return true;
+  return NULL;
 }
-
-*/
-
-/*static void Usage() {
-  LogCvmfs(kLogCvmfs, kLogStdout,
-           "CernVM-FS repository replication tool, version %s\n\n"
-           "Usage: cvmfs_pull -u <repository url> [-t timeout]\n"
-           "         [-r retries] [-k <CernVM public key>]\n"
-           "         [-b <certificate blacklist>] [-n <parallel downloads>]\n"
-           "         [-m <repository name>] [-s <snapshot name>] [-i(inital)]\n"
-           "         [-e(xit on errors)] [-o <difference set output>]\n"
-           "         [-q <fault chunks output>] [-w(rite only difference set)]\n"
-           "         [-l(ocal spooler)] <pub_dir>\n",
-           VERSION);
-}*/
 
 
 static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
   int retval;
 
   // Check if the catalog already exists
-  const string url_exists = *stratum1_url + "/data" +
-                            catalog_hash.MakePath(1, 2) + "C";
-  download::JobInfo download_exists(&url_exists, false);
-  retval = download::Fetch(&download_exists);
-  if (retval == download::kFailOk) {
+  if (backend_stat->Stat("data" + catalog_hash.MakePath(1, 2) + "C")) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Catalog up to date");
     return true;
   }
@@ -407,7 +150,19 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
     goto pull_cleanup;
   }
   while (catalog->AllChunksNext(&chunk_hash, &chunk_type)) {
-
+    ChunkJob next_chunk;
+    switch (chunk_type) {
+      case catalog::kChunkMicroCatalog:
+        next_chunk.type = 'L';
+        break;
+      case catalog::kChunkPiece:
+        next_chunk.type = 'C';
+        break;
+      default:
+        next_chunk.type = '\0';
+    }
+    memcpy(next_chunk.digest, chunk_hash.digest, sizeof(chunk_hash.digest));
+    WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
   }
   catalog->AllChunksEnd();
 
@@ -416,6 +171,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
   // Nested catalogs
 
   delete catalog;
+  spooler->WaitFor();
   spooler->SpoolProcess(file_catalog, "data", "C");
   return true;
 
@@ -431,12 +187,24 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   unsigned timeout = 10;
   manifest::ManifestEnsemble ensemble;
 
+  // Option parsing
+  if (args.find('l') != args.end()) {
+    unsigned log_level =
+    1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+    if (log_level > kLogNone) {
+      swissknife::Usage();
+      return 1;
+    }
+    SetLogVerbosity(static_cast<LogLevels>(log_level));
+  }
   stratum0_url = args.find('u')->second;
-  stratum1_url = args.find('w')->second;
   temp_dir = args.find('x')->second;
   spooler = upload::MakeSpoolerEnsemble(*args.find('r')->second);
   assert(spooler);
+  backend_stat = upload::GetBackendStat(*args.find('r')->second);
+  assert(backend_stat);
   spooler->set_move_mode(true);
+  spooler->SetCallback(new AbortSpoolerOnError());
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
   if (args.find('n') != args.end())
@@ -445,6 +213,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     timeout = String2Uint64(*args.find('t')->second);
   if (args.find('p') != args.end())
     pull_history = true;
+  pthread_t *workers =
+    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
@@ -453,6 +223,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
   download::JobInfo download_sentinel(&url_sentinel, false);
 
+  // Initialization
   download::Init(num_parallel+1);
   download::SetTimeout(timeout, timeout);
   download::Spawn();
@@ -481,15 +252,38 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     goto fini;
   }
 
+  // Starting threads
+  MakePipe(pipe_chunks);
+  LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
+  for (unsigned i = 0; i < num_parallel; ++i) {
+    int retval = pthread_create(&workers[i], NULL, MainWorker, NULL);
+    assert(retval == 0);
+  }
+
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating chunks from catalog at /");
   Pull(ensemble.manifest->catalog_hash(), "");
+
+  // Stopping threads
+  LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
+  for (unsigned i = 0; i < num_parallel; ++i) {
+    ChunkJob terminate_workers;
+    terminate_workers.type = 255;
+    WritePipe(pipe_chunks[1], &terminate_workers, sizeof(terminate_workers));
+  }
+  for (unsigned i = 0; i < num_parallel; ++i) {
+    int retval = pthread_join(workers[i], NULL);
+    assert(retval == 0);
+  }
+  ClosePipe(pipe_chunks);
 
   spooler->WaitFor();
   result = 0;
 
  fini:
+  free(workers);
   signature::Fini();
   download::Fini();
+  delete backend_stat;
   delete spooler;
   return result;
 

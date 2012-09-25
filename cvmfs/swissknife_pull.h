@@ -19,13 +19,13 @@ class CommandPull : public Command {
   ParameterList GetParams() {
     ParameterList result;
     result.push_back(Parameter('u', "repository url", false, false));
-    result.push_back(Parameter('w', "stratum 1 url", false, false));
     result.push_back(Parameter('m', "repository name", false, false));
     result.push_back(Parameter('r', "spooler definition", false, false));
     result.push_back(Parameter('k', "repository master key(s)", false, false));
     result.push_back(Parameter('x', "directory for temporary files",
                                false, false));
     result.push_back(Parameter('n', "number of download threads", true, false));
+    result.push_back(Parameter('l', "log level (0-4, default: 2)", true, false));
     result.push_back(Parameter('t', "timeout (s)", true, false));
     result.push_back(Parameter('p', "pull catalog history, too", true, true));
     return result;
