@@ -202,6 +202,19 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
 }
 
 
+static void UploadBuffer(const unsigned char *buffer, const unsigned size,
+                         const std::string dest_path)
+{
+  string tmp_file;
+  FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
+  assert(ftmp);
+  int retval = CopyMem2File(buffer, size, ftmp);
+  assert(retval);
+  fclose(ftmp);
+  spooler->SpoolCopy(tmp_file, dest_path);
+}
+
+
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   unsigned timeout = 10;
@@ -305,8 +318,19 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   // Upload manifest ensemble
-  spooler->WaitFor();
-  // TODO
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
+    spooler->WaitFor();
+    const string certificate_path =
+      "data" + ensemble.manifest->certificate().MakePath(1, 2) + "X";
+    if (!backend_stat->Stat(certificate_path)) {
+      UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path);
+    }
+    UploadBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
+                 ".cvmfswhitelist");
+    UploadBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
+                 ".cvmfspublished");
+  }
 
   spooler->WaitFor();
   result = 0;
