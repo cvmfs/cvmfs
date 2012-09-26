@@ -510,6 +510,8 @@ Commands:
   transaction: Start to edit a repository
   abort:       Abort transaction and return to the state before
   publish:     Make a new repository snapshot
+  add-replica: Creates a Stratum 1 replica of a repository
+  snapshot:    Synchronize a Stratum 1 replica with the Stratum 0 source
 
 Note: If multiple repositories are maintained, the repository name must follow
 the command."
@@ -615,6 +617,12 @@ case $1 in
     [ x"$SKELETON_USER" = x ] && SKELETON_USER=$(whoami)
     id $SKELETON_USER > /dev/null 2>&1 || die "No user $SKELETON_USER"
     create_repository_skeleton $SKELETON_DIR $SKELETON_USER
+  ;;
+  add-replica)
+    echo "TBD"
+  ;;
+  snapshot)
+    echo "TBD"
   ;;
   *)
     usage

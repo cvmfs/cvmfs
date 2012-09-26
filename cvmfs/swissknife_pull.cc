@@ -134,25 +134,38 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
     return true;
   }
 
+  // Download and uncompress catalog
   hash::Any chunk_hash;
   catalog::ChunkTypes chunk_type;
   catalog::Catalog *catalog = NULL;
   string file_catalog;
+  string file_catalog_vanilla;
   FILE *fcatalog = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                   &file_catalog);
-  if (!fcatalog) {
+  FILE *fcatalog_vanilla = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
+                                          &file_catalog_vanilla);
+  if (!fcatalog || !fcatalog_vanilla) {
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
     return false;
   }
   const string url_catalog = *stratum0_url + "/data" +
                              catalog_hash.MakePath(1, 2) + "C";
-  download::JobInfo download_catalog(&url_catalog, true, false, fcatalog,
-                                     &catalog_hash);
+  download::JobInfo download_catalog(&url_catalog, false, false,
+                                     fcatalog_vanilla, &catalog_hash);
   retval = download::Fetch(&download_catalog);
-  fclose(fcatalog);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);
+    fclose(fcatalog);
+    fclose(fcatalog_vanilla);
+    goto pull_cleanup;
+  }
+  rewind(fcatalog_vanilla);
+  retval = zlib::DecompressFile2File(fcatalog_vanilla, fcatalog);
+  fclose(fcatalog);
+  fclose(fcatalog_vanilla);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure");
     goto pull_cleanup;
   }
 
@@ -191,13 +204,16 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
   // Nested catalogs
 
   delete catalog;
+  unlink(file_catalog.c_str());
   spooler->WaitFor();
-  spooler->SpoolProcess(file_catalog, "data", "C");
+  spooler->SpoolCopy(file_catalog_vanilla,
+                     "data" + catalog_hash.MakePath(1, 2) + "C");
   return true;
 
  pull_cleanup:
   delete catalog;
   unlink(file_catalog.c_str());
+  unlink(file_catalog_vanilla.c_str());
   return false;
 }
 
@@ -297,7 +313,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating chunks from catalog at /");
-  Pull(ensemble.manifest->catalog_hash(), "");
+  retval = Pull(ensemble.manifest->catalog_hash(), "");
 
   // Stopping threads
   LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
@@ -311,6 +327,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     assert(retval == 0);
   }
   ClosePipe(pipe_chunks);
+
+  if (!retval)
+    goto fini;
 
   if (atomic_read64(&overall_retries) > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Overall number of retries: %"PRId64,
