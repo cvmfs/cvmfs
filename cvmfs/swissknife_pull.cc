@@ -6,6 +6,7 @@
  */
 
 #define _FILE_OFFSET_BITS 64
+#define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
 #include "swissknife_pull.h"
@@ -13,11 +14,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <inttypes.h>
 
 #include <string>
 #include <vector>
 
 #include <cstring>
+#include <cstdlib>
 
 #include "upload.h"
 #include "logging.h"
@@ -29,6 +32,7 @@
 #include "catalog.h"
 #include "smalloc.h"
 #include "hash.h"
+#include "atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -61,7 +65,8 @@ int pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 upload::BackendStat *backend_stat = NULL;
-// TODO:: retries
+unsigned retries = 3;
+atomic_int64 overall_retries;
 
 }
 
@@ -91,12 +96,27 @@ static void *MainWorker(void *data) {
       const string url_chunk = *stratum0_url + "/" + chunk_path;
       download::JobInfo download_chunk(&url_chunk, false, false, fchunk,
                                        &chunk_hash);
-      download::Failures retval = download::Fetch(&download_chunk);
-      if (retval != download::kFailOk) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
-                 url_chunk.c_str(), retval);
-        abort();
-      }
+
+      unsigned attempts = 0;
+      download::Failures retval;
+      do {
+        retval = download::Fetch(&download_chunk);
+        if (retval != download::kFailOk) {
+          if (attempts < retries) {
+            // Backoff
+            atomic_inc64(&overall_retries);
+            usleep((100 + random()%100) * 1000);
+            rewind(fchunk);
+            int retval = ftruncate(fileno(fchunk), 0);
+            assert(retval == 0);
+          } else {
+            LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
+                     url_chunk.c_str(), retval);
+            abort();
+          }
+        }
+        attempts++;
+      } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
       spooler->SpoolCopy(tmp_file, chunk_path);
     }
@@ -211,6 +231,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     num_parallel = String2Uint64(*args.find('n')->second);
   if (args.find('t') != args.end())
     timeout = String2Uint64(*args.find('t')->second);
+  if (args.find('a') != args.end())
+    retries = String2Uint64(*args.find('a')->second);
+  atomic_init64(&overall_retries);
   if (args.find('p') != args.end())
     pull_history = true;
   pthread_t *workers =
@@ -276,6 +299,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   ClosePipe(pipe_chunks);
 
+  if (atomic_read64(&overall_retries) > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Overall number of retries: %"PRId64,
+             atomic_read64(&overall_retries));
+  }
+
+  // Upload manifest ensemble
+  spooler->WaitFor();
+  // TODO
+
   spooler->WaitFor();
   result = 0;
 
@@ -286,201 +318,4 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   delete backend_stat;
   delete spooler;
   return result;
-
-
-  // Connect to the spooler
-  //params.spooler = new upload::Spooler(params.paths_out, params.digests_in);
-  //bool retval = params.spooler->Connect();
-  //if (!retval) {
-  //  PrintError("Failed to connect to spooler");
-  //  return 1;
-  //}
-
-  /*int timeout = 10;
-
-  bool curl_ready = false;
-  bool signature_ready = false;
-  bool catalog_ready = false;
-  bool override_master_test = false;
-  string proxies = "";
-  string snapshot_name = "";
-  hash::t_sha1 dummy;
-  string faulty_file = "";
-  string diff_file = "";
-  ofstream ffaulty;
-  ofstream fdiff;
-
-  int result = 3;
-
-  char c;
-  while ((c = getopt(argc, argv, "d:u:p:t:b:k:n:r:m:s:ieo:q:wz")) != -1) {
-    switch (c) {
-      case 'd':
-        dir_target = canonical_path(optarg);
-        dir_data = dir_target + "/data";
-        dir_catalogs = dir_target + "/catalogs";
-        break;
-      case 't':
-        timeout = atoi(optarg);
-        break;
-      case 'b':
-        blacklist = optarg;
-        break;
-      case 'k':
-        pubkey = optarg;
-        break;
-      case 'n': {
-        int tmp = atoi(optarg);
-        if (tmp < 1) {
-          usage();
-          return 1;
-        }
-        num_parallel = (unsigned)tmp;
-        break;
-      }
-      case 'r': {
-        int tmp = atoi(optarg);
-        if (tmp < 2) {
-          cout << "Set number of retries at least to 2" << endl;
-          usage();
-          return 1;
-        }
-        retries = (unsigned)tmp;
-        break;
-      }
-      case 'p':
-        proxies = optarg;
-        break;
-      case 's':
-        snapshot_name = optarg;
-        break;
-      case 'm':
-        repo_name = optarg;
-        break;
-      case 'i':
-        initial = true;
-        break;
-      case 'e':
-        exit_on_error = true;
-        break;
-      case 'o':
-        diff_file = optarg;
-        keep_log = true;
-        break;
-      case 'q':
-        faulty_file = optarg;
-        break;
-      case 'w':
-        dont_load_chunks = true;
-        break;
-      case 'z':
-        override_master_test = true;
-        break;
-      case '?':
-      default:
-        usage();
-        return 1;
-    }
-  }
-
-  if (snapshot_name != "") {
-    dir_catalogs = dir_target + "/" + snapshot_name;
-  }
-
-  // Sanity checks
-  if (!mkdir_deep(dir_data, plain_dir_mode)) {
-    cerr << "failed to create data store directory" << endl;
-    return 2;
-  }
-  if (!mkdir_deep(dir_catalogs, plain_dir_mode)) {
-    cerr << "failed to create catalog store directory" << endl;
-    return 2;
-  }
-  if (!make_cache_dir(dir_data, plain_dir_mode)) {
-    cerr << "failed to initialize data store" << endl;
-    return 2;
-  }
-  if (faulty_file != "") {
-    ffaulty.open(faulty_file.c_str());
-    if (!ffaulty.is_open()) {
-      cerr << "failed to open faulty chunks output file" << endl;
-      return 2;
-    }
-  }
-  if (diff_file != "") {
-    fdiff.open(diff_file.c_str());
-    if (!fdiff.is_open()) {
-      cerr << "failed to open difference set output file" << endl;
-      return 2;
-    }
-  }
-
-
-  signature::init();
-  if (!signature::load_public_keys(pubkey)) {
-    cout << "Warning: cvmfs public master key could not be loaded." << endl;
-    goto pull_cleanup;
-  } else {
-    cout << "CernVM-FS Pull: using public key(s) "
-    <<  join_strings(split_string(pubkey, ':'), ", ") << endl;
-  }
-  signature_ready = true;
-
-  if (!catalog::init(getuid(), getgid())) {
-    cerr << "Failed to initialize catalog" << endl;
-    goto pull_cleanup;
-  }
-  catalog_ready = true;
-
-
-  // Check if we have a valid starting point
-  if (!initial && exit_on_error && !file_exists(dir_catalogs + "/.cvmfs_replica")) {
-    cerr << "This is not a consistent repository replica to start with" << endl;
-    goto pull_cleanup;
-  }
-
-  // start work
-  if (!recursive_pull("") && exit_on_error)
-    goto pull_cleanup;
-
-  cout << endl << "Overall number of retries required: " << overall_retries << endl;
-  if (!faulty_chunks.empty()) {
-    cout << "Failed to download: " << endl;
-    for (set<string>::const_iterator i = faulty_chunks.begin(), iEnd = faulty_chunks.end();
-         i != iEnd; ++i)
-    {
-      cout << *i << endl;
-      ffaulty << *i << endl;
-    }
-    result = 4;
-  } else {
-    if (!dont_load_chunks) {
-      int fd = open((dir_catalogs + "/.cvmfs_replica").c_str(), O_WRONLY | O_CREAT, plain_file_mode);
-      if (fd >= 0) {
-        close(fd);
-        result = 0;
-      } else {
-        cout << "Failed to mark replica as consistent" << endl;
-        result = 5;
-      }
-    } else {
-      result = 5;
-    }
-  }
-
-  if (keep_log) {
-    for (set<string>::const_iterator i = diff_set.begin(), iEnd = diff_set.end();
-         i != iEnd; ++i)
-    {
-      fdiff << (*i) << endl;
-    }
-  }
-
-pull_cleanup:
-  if (catalog_ready) catalog::fini();
-  if (signature_ready) signature::fini();
-  if (ffaulty.is_open()) ffaulty.close();
-  if (fdiff.is_open()) fdiff.close();
-  return result;
-*/
 }

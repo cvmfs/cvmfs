@@ -27,6 +27,7 @@ class CommandPull : public Command {
     result.push_back(Parameter('n', "number of download threads", true, false));
     result.push_back(Parameter('l', "log level (0-4, default: 2)", true, false));
     result.push_back(Parameter('t', "timeout (s)", true, false));
+    result.push_back(Parameter('a', "number of retries", true, false));
     result.push_back(Parameter('p', "pull catalog history, too", true, true));
     return result;
   }
