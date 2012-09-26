@@ -140,6 +140,7 @@ class Catalog {
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetNumEntries() const;
+  hash::Any GetPreviousRevision() const;
   bool GetCounters(Counters *counters) const;
 
   inline bool read_only() const { return read_only_; }

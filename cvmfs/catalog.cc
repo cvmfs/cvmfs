@@ -382,6 +382,21 @@ uint64_t Catalog::GetNumEntries() const {
 }
 
 
+hash::Any Catalog::GetPreviousRevision() const {
+  const string sql =
+    "SELECT value FROM properties WHERE key='previous_revision';";
+
+  hash::Any result(hash::kSha1);
+  pthread_mutex_lock(lock_);
+  Sql stmt(database(), sql);
+  if (stmt.FetchRow())
+    result = stmt.RetrieveSha1Hex(0);
+  pthread_mutex_unlock(lock_);
+
+  return result;
+}
+
+
 /**
  * Receive catalog statistics
  */

@@ -125,7 +125,9 @@ static void *MainWorker(void *data) {
 }
 
 
-static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
+static bool Pull(const hash::Any &catalog_hash, const std::string &path,
+                 const bool with_nested)
+{
   int retval;
 
   // Check if the catalog already exists
@@ -200,8 +202,21 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path) {
   catalog->AllChunksEnd();
 
   // Previous catalogs
+  if (pull_history) {
+    hash::Any previous_catalog = catalog->GetPreviousRevision();
+    if (previous_catalog.IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Start of catalog, no more history");
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
+               previous_catalog.ToString().c_str());
+      Pull(previous_catalog, path, false);
+    }
+  }
+
 
   // Nested catalogs
+  if (with_nested) {
+  }
 
   delete catalog;
   unlink(file_catalog.c_str());
@@ -313,7 +328,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating chunks from catalog at /");
-  retval = Pull(ensemble.manifest->catalog_hash(), "");
+  retval = Pull(ensemble.manifest->catalog_hash(), "", true);
 
   // Stopping threads
   LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
