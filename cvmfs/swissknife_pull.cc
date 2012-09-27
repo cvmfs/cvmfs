@@ -67,6 +67,9 @@ pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 upload::BackendStat *backend_stat = NULL;
 unsigned retries = 3;
 atomic_int64 overall_retries;
+atomic_int64 overall_chunks;
+atomic_int64 overall_new;
+atomic_int64 chunk_queue;
 
 }
 
@@ -119,7 +122,11 @@ static void *MainWorker(void *data) {
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
       spooler->SpoolCopy(tmp_file, chunk_path);
+      atomic_inc64(&overall_new);
     }
+    if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
+    atomic_dec64(&chunk_queue);
   }
   return NULL;
 }
@@ -132,9 +139,12 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
   // Check if the catalog already exists
   if (backend_stat->Stat("data" + catalog_hash.MakePath(1, 2) + "C")) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Catalog up to date");
+    LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
     return true;
   }
+
+  int64_t gauge_chunks = atomic_read64(&overall_chunks);
+  int64_t gauge_new = atomic_read64(&overall_new);
 
   // Download and uncompress catalog
   hash::Any chunk_hash;
@@ -179,6 +189,8 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   }
 
   // Traverse the chunks
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+           "  Processing chunks: ");
   retval = catalog->AllChunksBegin();
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
@@ -198,8 +210,16 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     }
     memcpy(next_chunk.digest, chunk_hash.digest, sizeof(chunk_hash.digest));
     WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
+    atomic_inc64(&chunk_queue);
   }
   catalog->AllChunksEnd();
+  while (atomic_read64(&chunk_queue) != 0) {
+    usleep(100000);
+  }
+  LogCvmfs(kLogCvmfs, kLogStdout, " fetched %"PRId64" new chunks out of "
+           "%"PRId64" processed chunks",
+           atomic_read64(&overall_new)-gauge_new,
+           atomic_read64(&overall_chunks)-gauge_chunks);
 
   // Previous catalogs
   if (pull_history) {
@@ -216,6 +236,17 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
   // Nested catalogs
   if (with_nested) {
+    catalog::Catalog::NestedCatalogList *nested_catalogs =
+      catalog->ListNestedCatalogs();
+    assert(nested_catalogs);
+    for (catalog::Catalog::NestedCatalogList::const_iterator i =
+         nested_catalogs->begin(), iEnd = nested_catalogs->end();
+         i != iEnd; ++i)
+    {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
+               i->path.c_str());
+      Pull(i->hash, i->path.ToString(), true);
+    }
   }
 
   delete catalog;
@@ -291,6 +322,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download::JobInfo download_sentinel(&url_sentinel, false);
 
   // Initialization
+  atomic_init64(&overall_chunks);
+  atomic_init64(&overall_new);
+  atomic_init64(&chunk_queue);
   download::Init(num_parallel+1);
   download::SetTimeout(timeout, timeout);
   download::Spawn();
@@ -327,7 +361,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     assert(retval == 0);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Replicating chunks from catalog at /");
+  LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "", true);
 
   // Stopping threads
@@ -367,6 +401,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   spooler->WaitFor();
+  LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %"PRId64" new chunks out of %"
+           PRId64" processed chunks",
+           atomic_read64(&overall_new), atomic_read64(&overall_chunks));
   result = 0;
 
  fini:
