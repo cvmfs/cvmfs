@@ -16,6 +16,7 @@ my $outputfile = '/var/log/cvmfs-test/short_ttl.out';
 my $errorfile = '/var/log/cvmfs-test/short_ttl.err';
 my $no_clean = undef;
 my $no_remount = undef;
+my $do_all = undef;
 
 # Socket path and socket name. Socket name is set to let the server to select
 # the socket where to send its response.
@@ -37,7 +38,8 @@ my @pids;
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "no-remount" => \$no_remount );
+					   "no-remount" => \$no_remount,
+					   "do-all" => \$do_all );
 					   
 # Forking the process so the daemon can come back in listening mode.
 my $pid = fork();

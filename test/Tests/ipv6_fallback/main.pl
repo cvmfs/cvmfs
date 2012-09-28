@@ -13,6 +13,7 @@ my $repo_pub = $tmp_repo . 'pub';
 my $outputfile = '/var/log/cvmfs-test/ipv6_fallback.out';
 my $errorfile = '/var/log/cvmfs-test/ipv6_fallback.err';
 my $no_clean = undef;
+my $do_all = undef;
 
 # Test name used for output and socket identity
 my $testname = 'IPV6_FALLBACK';
@@ -32,7 +33,8 @@ my @pids;
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
-					   "no-clean" => \$no_clean );
+					   "no-clean" => \$no_clean,
+					   "do-all" => \$do_all );
 
 
 # Forking the process so the daemon can come back in listening mode.

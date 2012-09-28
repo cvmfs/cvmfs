@@ -14,6 +14,7 @@ my $outputfile = '/var/log/cvmfs-test/full_cache.out';
 my $errorfile = '/var/log/cvmfs-test/full_cache.err';
 my $setup = undef;
 my $no_clean = undef;
+my $do_all = undef;
 
 # Socket name is set to let the server to select
 # the socket where to send its response.
@@ -33,7 +34,8 @@ my @pids;
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "setup" => \$setup );
+					   "setup" => \$setup,
+					   "do-all" => \$do_all );
 
 
 # If setup option was invoked, compile zpipe and exit.
@@ -50,6 +52,9 @@ if (defined($setup)) {
 unless (-e "Tests/Common/zpipe.run") {
 	print "zpipe has to be compiled in order to run this test.\n";
 	print "Run 'repo_signature --setup' to compile it.\n";
+	if (defined($do_all)) {
+		print "RUN_SETUP\n";
+	}
 	exit 0;
 }
 
