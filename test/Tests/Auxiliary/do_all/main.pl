@@ -9,11 +9,13 @@ use Getopt::Long;
 my $outputfile = '/var/log/cvmfs-test/do_all.out';
 my $errorfile = '/var/log/cvmfs-test/do_all.err';
 my $no_clean = undef;
+my %options;
 
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
-					   "no-clean" => \$no_clean );
+					   "no-clean" => \$no_clean,
+					   "option=s" => \%options );
 					   
 # Test name used for socket identity
 my $testname = 'DO_ALL';
@@ -83,10 +85,20 @@ if (defined ($pid) and $pid == 0) {
 	# Sending a command to the daemon for each main.pl file found to start different test
 	foreach (@main_pl) {
 		my $command = (split /\//, $_)[-2];
-		$socket->send("$command --do-all");
+		if (exists $options{$command}) {
+			$socket->send("$command --do-all $options{$command}");
+		}
+		else {
+			$socket->send("$command --do-all");
+		}
 		my $ret_value = get_daemon_output($socket, $shell_socket);
 		if ($ret_value eq "RUN_SETUP") {
-			$socket->send("$command --do-all --setup");
+			if (exists $options{$command}) {
+				$socket->send("$command --setup --do-all $options{$command}");
+			}
+			else {
+				$socket->send("$command --setup --do-all");
+			}
 		}
 	}
 	
