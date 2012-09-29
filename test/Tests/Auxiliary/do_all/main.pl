@@ -98,6 +98,7 @@ if (defined ($pid) and $pid == 0) {
 			else {
 				$socket->send("$command --setup --do-all");
 			}
+			get_daemon_output($socket, $shell_socket);
 		}
 	}
 	
