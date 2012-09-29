@@ -44,7 +44,6 @@ if (defined($setup)) {
 	system("gcc -o Tests/Common/zpipe.run Tests/Common/zpipe.c -lz");
 	print "Done.\n";
 	print "Setup complete. You're now able to run the test.\n";
-	exit 0;
 }
 					   
 # This test need zpipe to be compiled. If it's not compiled yet, exiting and asking for
