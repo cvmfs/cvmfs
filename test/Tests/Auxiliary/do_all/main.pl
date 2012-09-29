@@ -23,7 +23,6 @@ my $testname = 'DO_ALL';
 sub check_process {
 	my $process_name = shift;
 	my $running = `ps -fu cvmfs-test | grep -i $process_name | grep -i perl | grep -v do_all | grep -v grep`;
-	print $running . "\n";
 	return $running;
 }
 
