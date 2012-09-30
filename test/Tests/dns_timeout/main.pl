@@ -13,6 +13,7 @@ my $repo_pub = $tmp_repo . 'pub';
 my $outputfile = '/var/log/cvmfs-test/dns_timeout.out';
 my $errorfile = '/var/log/cvmfs-test/dns_timeout.err';
 my $no_clean = undef;
+my $do_all = undef;
 
 # Socket name is set to let the server to select
 # the socket where to send its response.
@@ -32,7 +33,8 @@ my @pids;
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
-					   "no-clean" => \$no_clean );
+					   "no-clean" => \$no_clean,
+					   "do-all" => \$do_all );
 
 
 # Forking the process so the daemon can come back in listening mode.
