@@ -144,8 +144,6 @@ include_directories (${INCLUDE_DIRECTORIES})
 # go for the actual compilation
 #
 add_subdirectory (cvmfs)
-add_subdirectory (cvmfsd)
-add_subdirectory (replica)
 
 if (INSTALL_MOUNT_SCRIPTS)
 	add_subdirectory (mount)

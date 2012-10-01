@@ -362,4 +362,11 @@ if (BUILD_SERVER)
 		DESTINATION		bin
 		PERMISSIONS		OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 	)
+
+        install(
+                FILES           cvmfs_server_hooks.sh.demo
+                DESTINATION     "/etc/cvmfs"
+                PERMISSIONS     OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        )
+
 endif (BUILD_SERVER)
