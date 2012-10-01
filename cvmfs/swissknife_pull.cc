@@ -160,24 +160,22 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
     return false;
   }
+  fclose(fcatalog);
   const string url_catalog = *stratum0_url + "/data" +
                              catalog_hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url_catalog, false, false,
                                      fcatalog_vanilla, &catalog_hash);
   retval = download::Fetch(&download_catalog);
+  fclose(fcatalog_vanilla);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);
-    fclose(fcatalog);
-    fclose(fcatalog_vanilla);
     goto pull_cleanup;
   }
-  rewind(fcatalog_vanilla);
-  retval = zlib::DecompressFile2File(fcatalog_vanilla, fcatalog);
-  fclose(fcatalog);
-  fclose(fcatalog_vanilla);
+  retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure");
+    LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure (file %s, hash %s)",
+             file_catalog_vanilla.c_str(), catalog_hash.ToString().c_str());
     goto pull_cleanup;
   }
 

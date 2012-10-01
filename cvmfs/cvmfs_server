@@ -244,7 +244,7 @@ snapshot() {
     -n $num_workers \
     -t $timeout \
     -a $retries $with_history $log_level"
-  date > /etc/cvmfs/repository.d/{$name}/last_snapshot
+  date > /etc/cvmfs/repositories.d/${name}/last_snapshot
 }
 
 
