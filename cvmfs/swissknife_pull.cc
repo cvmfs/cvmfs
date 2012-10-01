@@ -229,7 +229,9 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
                previous_catalog.ToString().c_str());
-      Pull(previous_catalog, path, false);
+      retval = Pull(previous_catalog, path, false);
+      if (!retval)
+        return false;
     }
   }
 
@@ -245,7 +247,9 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
                i->path.c_str());
-      Pull(i->hash, i->path.ToString(), true);
+      retval = Pull(i->hash, i->path.ToString(), true);
+      if (!retval)
+        return false;
     }
   }
 
