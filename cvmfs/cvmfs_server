@@ -229,6 +229,12 @@ snapshot() {
 
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+  local with_history=
+  if [ -f /etc/cvmfs/repository.d/{$name}/last_snapshot ]; then
+    with_history="-p"
+  else
+    echo "Initial snaphot"
+  fi
 
   $user_shell "cvmfs_swissknife pull -m $name \
     -u $stratum0 \
@@ -237,8 +243,8 @@ snapshot() {
     -k $public_key \
     -n $num_workers \
     -t $timeout \
-    -a $retries \
-    -p $log_level"
+    -a $retries $with_history $log_level"
+  date > /etc/cvmfs/repository.d/{$name}/last_snapshot
 }
 
 
