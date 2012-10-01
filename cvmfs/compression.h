@@ -19,6 +19,8 @@ namespace hash {
 bool CopyPath2Path(const std::string &src, const std::string &dest);
 bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
                   const std::string &path);
+bool CopyMem2File(const unsigned char *buffer, const unsigned buffer_size,
+                  FILE *fdest);
 bool CopyPath2Mem(const std::string &path,
                   unsigned char **buffer, unsigned *buffer_size);
 
@@ -46,7 +48,7 @@ bool DecompressPath2Path(const std::string &src, const std::string &dest);
 bool CompressFile2Null(FILE *fsrc, hash::Any *compressed_hash);
 bool CompressFile2File(FILE *fsrc, FILE *fdest);
 bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash);
-bool CompressPath2File(const std::string &src, FILE *fdest, 
+bool CompressPath2File(const std::string &src, FILE *fdest,
                        hash::Any *compressed_hash);
 bool DecompressFile2File(FILE *fsrc, FILE *fdest);
 

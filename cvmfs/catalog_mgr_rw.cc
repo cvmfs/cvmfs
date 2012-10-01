@@ -109,7 +109,7 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  * It is uploaded by a Forklift to the upstream storage.
  * @return true on success, false otherwise
  */
-Manifest *WritableCatalogManager::CreateRepository(
+manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string &dir_temp,
   upload::Spooler *spooler)
 {
@@ -152,14 +152,13 @@ Manifest *WritableCatalogManager::CreateRepository(
 
   // Create manifest
   const string manifest_path = dir_temp + "/manifest";
-  Manifest *manifest = new Manifest(hash_catalog, "");
+  manifest::Manifest *manifest = new manifest::Manifest(hash_catalog, "");
 
   // Upload catalog
   spooler->SpoolCopy(file_path_compressed,
                      "data" + hash_catalog.MakePath(1, 2) + "C");
   spooler->EndOfTransaction();
-  while (!spooler->IsIdle())
-    sleep(1);
+  spooler->WaitFor();
   unlink(file_path_compressed.c_str());
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
@@ -583,12 +582,12 @@ void WritableCatalogManager::PrecalculateListings() {
 }
 
 
-Manifest *WritableCatalogManager::Commit() {
+manifest::Manifest *WritableCatalogManager::Commit() {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
 
-  Manifest *result = NULL;
+  manifest::Manifest *result = NULL;
   for (WritableCatalogList::iterator i = catalogs_to_snapshot.begin(),
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
   {
@@ -597,8 +596,7 @@ Manifest *WritableCatalogManager::Commit() {
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
-      while (!spooler_->IsIdle())
-        sleep(1);
+      spooler_->WaitFor();
       if (spooler_->num_errors() > 0) {
         LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
         return NULL;
@@ -606,7 +604,7 @@ Manifest *WritableCatalogManager::Commit() {
 
       // .cvmfspublished
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "Committing repository manifest");
-      result = new Manifest(hash, "");
+      result = new manifest::Manifest(hash, "");
       result->set_ttl((*i)->GetTTL());
       result->set_revision((*i)->GetRevision());
     }

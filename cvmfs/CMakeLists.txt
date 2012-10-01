@@ -17,6 +17,8 @@ set (CVMFS_CLIENT_SOURCES
 	util.cc util.h
 	duplex_zlib.h compression.h compression.cc
 	download.cc download.h
+  manifest.h manifest.cc
+  manifest_fetch.h manifest_fetch.cc
 	lru.h lru.cc
 	globals.h globals.cc
 	peers.h peers.cc
@@ -62,6 +64,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   logging.cc logging.h logging_internal.h
   globals.cc globals.h
   manifest.h manifest.cc
+  manifest_fetch.h manifest_fetch.cc
   hash.h hash.cc
   compression.h compression.cc
 	util.h util.cc

@@ -16,6 +16,24 @@
 
 namespace upload {
 
+
+class BackendStat {
+ public:
+  BackendStat(const std::string &base_path) { base_path_ = base_path; }
+  virtual ~BackendStat() { }
+  virtual bool Stat(const std::string &path) = 0;
+ protected:
+  std::string base_path_;
+};
+
+
+class LocalStat : public BackendStat {
+ public:
+  LocalStat(const std::string &base_path) : BackendStat(base_path) { }
+  bool Stat(const std::string &path);
+};
+
+
 /**
  * Encapsulates the callback function that handles responses from the external
  * Spooler.
@@ -50,7 +68,10 @@ class Spooler {
   void SpoolCopy(const std::string &local_path, const std::string &remote_path);
   void EndOfTransaction();
 
+  void set_move_mode(const bool mode) { move_mode_ = mode; }
+
   bool IsIdle() { return atomic_read64(&num_pending_) == 0; }
+  void WaitFor();
   uint64_t num_errors() { return atomic_read64(&num_errors_); }
 
  private:
@@ -62,6 +83,7 @@ class Spooler {
   std::string fifo_digests_;
   SpoolerCallback *spooler_callback_;
   bool connected_;
+  bool move_mode_;
   int fd_paths_;
   int fd_digests_;
   FILE *fdigests_;
@@ -78,6 +100,7 @@ int MainLocalSpooler(const std::string &fifo_paths,
  * from a definition string like "local:/dir/to/repo,/path/pipe,/digest/pipe"
  */
 Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition);
+BackendStat *GetBackendStat(const std::string &spooler_definition);
 
 }  // namespace upload
 

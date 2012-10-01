@@ -14,6 +14,7 @@
 #include "catalog_mgr.h"
 #include "shortstring.h"
 #include "atomic.h"
+#include "manifest_fetch.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -99,6 +100,14 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   atomic_int32 certificate_misses_;
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
+};
+
+
+/**
+ * Tries to fetch the certificate from cache
+ */
+struct ManifestEnsemble : public manifest::ManifestEnsemble {
+  void FetchCertificate(const hash::Any &hash);
 };
 
 }  // namespace cache

@@ -94,16 +94,42 @@ uint64_t Counters::GetAllEntries() const {
 }
 
 
+/**
+ * Open a catalog outside the framework of a catalog manager.
+ */
+Catalog *AttachFreely(const string &root_path, const string &file) {
+  Catalog *catalog =
+    new Catalog(PathString(root_path.data(), root_path.length()), NULL);
+  bool retval = catalog->OpenDatabase(file);
+  if (!retval) {
+    delete catalog;
+    return NULL;
+  }
+  InodeRange inode_range;
+  inode_range.offset = 256;
+  inode_range.size = 256 + catalog->max_row_id();
+  catalog->set_inode_range(inode_range);
+  return catalog;
+}
+
+
 Catalog::Catalog(const PathString &path, Catalog *parent) {
   read_only_ = true;
-  nested_catalog_cache_ = NULL;
   path_ = path;
   parent_ = parent;
   max_row_id_ = 0;
-  database_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
+
+  database_ = NULL;
+  nested_catalog_cache_ = NULL;
+  sql_listing_ = NULL;
+  sql_lookup_md5path_ = NULL;
+  sql_lookup_inode_ = NULL;
+  sql_lookup_nested_ = NULL;
+  sql_list_nested_ = NULL;
+  sql_all_chunks_ = NULL;
 }
 
 
@@ -127,10 +153,12 @@ void Catalog::InitPreparedStatements() {
   sql_lookup_inode_ = new SqlLookupInode(database());
   sql_lookup_nested_ = new SqlNestedCatalogLookup(database());
   sql_list_nested_ = new SqlNestedCatalogListing(database());
+  sql_all_chunks_ = new SqlAllChunks(database());
 }
 
 
 void Catalog::FinalizePreparedStatements() {
+  delete sql_all_chunks_;
   delete sql_listing_;
   delete sql_lookup_md5path_;
   delete sql_lookup_inode_;
@@ -302,6 +330,21 @@ bool Catalog::ListingMd5Path(const hash::Md5 &md5path,
 }
 
 
+bool Catalog::AllChunksBegin() {
+  return sql_all_chunks_->Open();
+}
+
+
+bool Catalog::AllChunksNext(hash::Any *hash, ChunkTypes *type) {
+  return sql_all_chunks_->Next(hash, type);
+}
+
+
+bool Catalog::AllChunksEnd() {
+  return sql_all_chunks_->Close();
+}
+
+
 uint64_t Catalog::GetTTL() const {
   const string sql = "SELECT value FROM properties WHERE key='TTL';";
 
@@ -333,6 +376,21 @@ uint64_t Catalog::GetNumEntries() const {
   pthread_mutex_lock(lock_);
   Sql stmt(database(), sql);
   const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
+  pthread_mutex_unlock(lock_);
+
+  return result;
+}
+
+
+hash::Any Catalog::GetPreviousRevision() const {
+  const string sql =
+    "SELECT value FROM properties WHERE key='previous_revision';";
+
+  hash::Any result(hash::kSha1);
+  pthread_mutex_lock(lock_);
+  Sql stmt(database(), sql);
+  if (stmt.FetchRow())
+    result = stmt.RetrieveSha1Hex(0);
   pthread_mutex_unlock(lock_);
 
   return result;

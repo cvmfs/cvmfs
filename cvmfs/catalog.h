@@ -133,10 +133,14 @@ class Catalog {
     return ListingMd5PathStat(hash::Md5(path.GetChars(), path.GetLength()),
                               listing);
   }
+  bool AllChunksBegin();
+  bool AllChunksNext(hash::Any *hash, ChunkTypes *type);
+  bool AllChunksEnd();
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetNumEntries() const;
+  hash::Any GetPreviousRevision() const;
   bool GetCounters(Counters *counters) const;
 
   inline bool read_only() const { return read_only_; }
@@ -218,7 +222,10 @@ class Catalog {
   SqlLookupInode *sql_lookup_inode_;
   SqlNestedCatalogLookup *sql_lookup_nested_;
   SqlNestedCatalogListing *sql_list_nested_;
+  SqlAllChunks *sql_all_chunks_;
 };  // class Catalog
+
+Catalog *AttachFreely(const std::string &root_path, const std::string &file);
 
 }  // namespace catalog
 
