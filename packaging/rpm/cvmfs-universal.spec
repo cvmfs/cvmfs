@@ -21,7 +21,7 @@ BuildRequires: gcc
 BuildRequires: gcc-c++
 BuildRequires: cmake
 BuildRequires: fuse-devel
-BuildRequires: pkgconfig 
+BuildRequires: pkgconfig
 BuildRequires: openssl-devel
 %{?el5:BuildRequires: buildsys-macros}
 Requires: bash
@@ -35,7 +35,7 @@ Requires: psmisc
 Requires: autofs
 Requires: fuse
 Requires: curl
-Requires: attr 
+Requires: attr
 # Account for different package names
 %if 0%{?suse_version}
 Requires: libfuse2
@@ -76,7 +76,7 @@ Summary: CernVM-FS static client library
 Group: Applications/System
 Requires: openssl
 %description lib
-CernVM-FS static client library for pure user-space use 
+CernVM-FS static client library for pure user-space use
 
 %package server
 Summary: CernVM-FS server tools
@@ -107,7 +107,7 @@ cp %{SOURCE1} SELinux
 %build
 %ifarch x86_64
 %else
-export CFLAGS="-march=i686" 
+export CFLAGS="-march=i686"
 export CXXFLAGS="-march=i686"
 %endif
 %if 0%{?suse_version}
@@ -138,7 +138,7 @@ popd
   if [ $? -ne 0 ]; then
     /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
   fi
-%else 
+%else
   /usr/bin/getent passwd cvmfs >/dev/null
   if [ $? -ne 0 ]; then
      /usr/sbin/useradd -r -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
@@ -151,7 +151,7 @@ popd
     /usr/sbin/groupadd -r cvmfs
   fi
 %endif
-  
+
 /usr/bin/getent group fuse | grep -q cvmfs
 if [ $? -ne 0 ]; then
   /usr/sbin/usermod -aG fuse cvmfs > /dev/null 2>&1 || :
@@ -164,6 +164,9 @@ make DESTDIR=$RPM_BUILD_ROOT install
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
+%if ! 0%{?suse_version}
+mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
+%endif
 
 # Keys are in cvmfs-keys
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -245,7 +248,7 @@ fi
 %dir %{_sysconfdir}/cvmfs/domain.d
 %dir /cvmfs
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
-%config %{_sysconfdir}/cvmfs/default.conf 
+%config %{_sysconfdir}/cvmfs/default.conf
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %doc COPYING AUTHORS README ChangeLog
 
@@ -255,7 +258,7 @@ fi
 %{_includedir}/libcvmfs.h
 %doc COPYING AUTHORS README ChangeLog
 
-%if ! 0%{?suse_version} 
+%if ! 0%{?suse_version}
 %files server
 %defattr(-,root,root)
 %{_bindir}/cvmfs_swissknife
@@ -272,7 +275,7 @@ fi
 - Enabled selinux for FC17
 - Add sysvinit-tools for /sbin/pidof
 * Tue Sep 11 2012 Jakob Blomer <jblomer@cern.ch>
-- Compatibility fixes for OpenSuSE 
+- Compatibility fixes for OpenSuSE
 * Mon Feb 20 2012 Jakob Blomer <jblomer@cern.ch>
 - Brought selinux back into main package
 * Fri Feb 18 2012 Jakob Blomer <jblomer@cern.ch>
