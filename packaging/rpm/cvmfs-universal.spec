@@ -71,6 +71,31 @@ HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch
 Copyright (c) CERN
 
+%package lib
+Summary: CernVM-FS static client library
+Group: Applications/System
+Requires: openssl
+%description lib
+CernVM-FS static client library for pure user-space use 
+
+%package server
+Summary: CernVM-FS server tools
+Group: Application/System
+Requires: bash
+Requires: coreutils
+Requires: grep
+Requires: sed
+Requires: sudo
+Requires: psmisc
+Requires: curl
+Requires: attr
+Requires: initscripts
+Requires: openssl
+Requires: httpd
+Requires: cvmfs-keys >= 1.2
+%description server
+CernVM-FS tools to maintain Stratum 0/1 repositories
+
 %prep
 %setup -q
 
@@ -86,9 +111,9 @@ export CFLAGS="-march=i686"
 export CXXFLAGS="-march=i686"
 %endif
 %if 0%{?suse_version}
-cmake -DBUILD_SERVER=no -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=no -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
-%cmake -DBUILD_SERVER=no -DBUILD_LIBCVMFS=no .
+%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes .
 %endif
 make %{?_smp_mflags}
 
@@ -224,7 +249,25 @@ fi
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %doc COPYING AUTHORS README ChangeLog
 
+%files lib
+%defattr(-,root,root)
+%{_libdir}/libcvmfs.a
+%{_includedir}/libcvmfs.h
+%doc COPYING AUTHORS README ChangeLog
+
+%if ! 0%{?suse_version} 
+%files server
+%defattr(-,root,root)
+%{_bindir}/cvmfs_swissknife
+%{_bindir}/cvmfs_server
+%{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
+%dir %{_sysconfdir}/cvmfs/repositories.d
+%doc COPYING AUTHORS README ChangeLog
+%endif
+
 %changelog
+* Tue Oct 02 2012 Jakob Blomer <jblomer@cern.ch>
+- Added sub packages for server and library
 * Wed Sep 12 2012 Jakob Blomer <jblomer@cern.ch>
 - Enabled selinux for FC17
 - Add sysvinit-tools for /sbin/pidof

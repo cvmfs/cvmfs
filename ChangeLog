@@ -1,4 +1,6 @@
 2.1.2:
+  * Added sub packages for the server tools and the
+    library
   * Added Stratum1 (replication) tools
   * Combined server binaries into cvmfs_swissknife
   * Bumped external versions: libcurl 7.27.0, c-ares 1.9.1,

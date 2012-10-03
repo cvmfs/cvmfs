@@ -230,7 +230,7 @@ snapshot() {
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
   local with_history=
-  if [ -f /etc/cvmfs/repository.d/{$name}/last_snapshot ]; then
+  if [ -f /etc/cvmfs/repositories.d/{$name}/last_snapshot ]; then
     with_history="-p"
   else
     echo "Initial snaphot"

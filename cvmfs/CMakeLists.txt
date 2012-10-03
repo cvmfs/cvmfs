@@ -340,7 +340,7 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
-	install (
+  install (
 		FILES			${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
 		DESTINATION		${CMAKE_INSTALL_LIBDIR}
 	)
