@@ -342,7 +342,7 @@ endif (BUILD_CVMFS)
 if (BUILD_LIBCVMFS)
 	install (
 		FILES			${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-		DESTINATION		lib
+		DESTINATION		${CMAKE_INSTALL_LIBDIR}
 	)
 	install (
 		FILES                   libcvmfs.h
