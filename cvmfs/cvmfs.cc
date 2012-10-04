@@ -591,7 +591,8 @@ static void AddToDirListing(const fuse_req_t req,
  * Open a directory for listing.
  */
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
-                          struct fuse_file_info *fi) {
+                          struct fuse_file_info *fi)
+{
   RemountCheck();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
@@ -676,7 +677,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
  * Release a directory.
  */
 static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
-                             struct fuse_file_info *fi) {
+                             struct fuse_file_info *fi)
+{
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode: %d",
            catalog_manager_->MangleInode(ino));
 

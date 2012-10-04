@@ -3,6 +3,17 @@
 # executables in this directory
 #
 
+set (CVMFS_STUB_SOURCES
+  fuse_stub.cc
+)
+set (CVMFS_STUB_CFLAGS "${CVMFS_STUB_CFLAGS} -DCVMFS_CLIENT")
+set (CVMFS_STUB_LD_FLAGS "${CVMFS_STUB_LD_FLAGS} -ldl -lm")
+include_directories (${INCLUDE_DIRECTORIES})
+add_executable (fuse_stub ${CVMFS_STUB_SOURCES})
+set_target_properties (fuse_stub PROPERTIES COMPILE_FLAGS "${CVMFS_STUB_CFLAGS}" LINK_FLAGS "${CVMFS_STUB_LD_FLAGS}")
+target_link_libraries (fuse_stub ${CVMFS_STUB_LIBS} fuse rt pthread dl)
+
+
 set (CVMFS_CLIENT_SOURCES
   smalloc.h
 	logging.cc logging.h logging_internal.h
@@ -28,6 +39,7 @@ set (CVMFS_CLIENT_SOURCES
 	shortstring.h dirent.h
   fs_traversal.h
 )
+
 
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
