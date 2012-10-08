@@ -1755,11 +1755,18 @@ int main(int argc, char *argv[]) {
                ": " + strerror(errno));
     goto cvmfs_cleanup;
   }
+  CreateFile("./.cvmfscache", 0600);
   cache_ready = true;
 
   // Start NFS maps module, if necessary
 #ifdef CVMFS_NFS_SUPPORT
   if (g_cvmfs_opts.nfs_source) {
+    if (FileExists("./no_nfs_maps." + (*cvmfs::repository_name_))) {
+      PrintError("Cache was used without NFS maps before. "
+                 "It has to be wiped out.");
+      goto cvmfs_cleanup;
+    }
+
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "CernVM-FS: loading NFS maps... ");
     cvmfs::nfs_maps_ = true;
@@ -1777,6 +1784,8 @@ int main(int argc, char *argv[]) {
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
     nfs_maps_ready = true;
+  } else {
+    CreateFile("./no_nfs_maps." + (*cvmfs::repository_name_), 0600);
   }
 #endif
 
