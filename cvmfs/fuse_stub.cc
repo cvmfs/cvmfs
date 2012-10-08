@@ -1,5 +1,6 @@
 /**
  * This file is part of the CernVM File System.
+ *
  * Implements stub callback functions for Fuse.  Their purpose is to
  * redirect calls to the cvmfs shared library and to block calls during the
  * update of the library.

@@ -44,6 +44,7 @@ set (CVMFS_CLIENT_SOURCES
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
+  options.cc options.h
   talk.h talk.cc
   nfs_maps.h nfs_maps.cc
   cvmfs.h cvmfs.cc
