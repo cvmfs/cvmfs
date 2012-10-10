@@ -2,7 +2,7 @@
 #
 # This file is part of the CernVM File System
 # This script takes care of creating, removing, and maintaining repositories
-# on a Stratum 0 server
+# on a Stratum 0/1 server
 
 set -e
 
@@ -20,55 +20,49 @@ publish_after_hook() { :; }
 
 
 create_master_key() {
-   local name=$1
-   local user=$2
+  local name=$1
+  local user=$2
 
-   master_key="/etc/cvmfs/keys/$name.masterkey"
-   master_pub="/etc/cvmfs/keys/$name.pub"
+  master_key="/etc/cvmfs/keys/$name.masterkey"
+  master_pub="/etc/cvmfs/keys/$name.pub"
 
-   echo -n "Creating CernVM-FS master key for $name in $master_pub... "
-   openssl genrsa -out $master_key 2048 > /dev/null 2>&1
-   openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
-   chmod 444 $master_key $master_pub
-   chown $user $master_key $master_pub
-   echo "done"
+  echo -n "Creating CernVM-FS master key for $name in $master_pub... "
+  openssl genrsa -out $master_key 2048 > /dev/null 2>&1
+  openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
+  chmod 444 $master_key $master_pub
+  chown $user $master_key $master_pub
+  echo "done"
 }
 
 
 create_cert() {
-   local name=$1
-   local user=$2
+  local name=$1
+  local user=$2
 
-   local key; key="/etc/cvmfs/keys/$name.key"
-   local csr; csr="/etc/cvmfs/keys/$name.csr"
-   local crt; crt="/etc/cvmfs/keys/$name.crt"
+  local key; key="/etc/cvmfs/keys/$name.key"
+  local csr; csr="/etc/cvmfs/keys/$name.csr"
+  local crt; crt="/etc/cvmfs/keys/$name.crt"
 
-   # Create self-signed certificate
-   echo -n "Creating self-signed certificate for $name in $crt... "
-   openssl genrsa -out $key 2048 > /dev/null 2>&1
-   openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$name CernVM-FS Release Managers" -key $key -out $csr > /dev/null 2>&1
-   openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
-   rm -f $csr
-   chmod 444 $key $crt
-   chown $user $master_key $master_pub
-   echo "done"
+  # Create self-signed certificate
+  echo -n "Creating self-signed certificate for $name in $crt... "
+  openssl genrsa -out $key 2048 > /dev/null 2>&1
+  openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$name CernVM-FS Release Managers" -key $key -out $csr > /dev/null 2>&1
+  openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
+  rm -f $csr
+  chmod 444 $key $crt
+  chown $user $master_key $master_pub
+  echo "done"
 }
 
 
 create_whitelist() {
   local name=$1
   local user=$2
-  local upstream=$3
+  local spooler_definition=$3
   local temp_dir=$4
 
   local whitelist
-  local repository_dir=$(get_local_upstream $upstream)
-  if [ x"$repository_dir" != x ]; then
-    whitelist=${repository_dir}/.cvmfswhitelist
-  else
-    whitelist=${temp_dir}/whitelist
-    local upload_pipe=$(get_pipe_upstream $upstream)
-  fi
+  whitelist=${temp_dir}/whitelist.$name
 
   echo -n "Signing 30 day whitelist with master key... "
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
@@ -85,11 +79,9 @@ create_whitelist() {
   chown $user $whitelist
 
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.sha1
+  cvmfs_swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
+  rm -f $whitelist
   echo "done"
-
-  if [ x"$upload_pipe" != x ]; then
-    echo "$whitelist, /.cvmfswhitelist" > $upload_pipe
-  fi
 }
 
 
@@ -110,25 +102,21 @@ get_expiry() {
 }
 
 
-get_local_upstream() {
+is_local_upstream() {
   local upstream=$1
 
   if [ x$(echo "$upstream" | cut -d: -f1) = x"local" ]; then
-    echo "$(echo $upstream | cut -d: -f2)"
+    return 0
   else
-    echo ""
+    return 1
   fi
 }
 
 
-get_pipe_upstream() {
+get_local_upstream() {
   local upstream=$1
 
-  if [ x$(echo "$upstream" | cut -d: -f1) = x"pipe" ]; then
-    echo "$(echo $upstream | cut -d: -f2)"
-  else
-    echo ""
-  fi
+  echo "$upstream" | cut -d: -f2
 }
 
 
@@ -225,6 +213,41 @@ publish() {
 }
 
 
+snapshot() {
+  local name=$1
+  local user=$2
+  local spool_dir=$3
+  local stratum0=$4
+  local upstream=$5
+  local num_workers=$6
+  local public_key=$7
+  local timeout=$8
+  local retries=$9
+
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+
+  local log_level=
+  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+  local with_history=
+  if [ -f /etc/cvmfs/repositories.d/{$name}/last_snapshot ]; then
+    with_history="-p"
+  else
+    echo "Initial snapshot"
+  fi
+
+  $user_shell "cvmfs_swissknife pull -m $name \
+    -u $stratum0 \
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
+    -x ${spool_dir}/tmp \
+    -k $public_key \
+    -n $num_workers \
+    -t $timeout \
+    -a $retries $with_history $log_level"
+  date > /etc/cvmfs/repositories.d/${name}/last_snapshot
+}
+
+
 create_repository_skeleton() {
   local directory=$1
   local user=$2
@@ -242,45 +265,53 @@ create_repository_skeleton() {
 }
 
 
+get_cvmfs_owner() {
+  local name=$1
+  local owner=$2
+  local cvmfs_owner
+
+  if [ "x$owner" == "x" ]; then
+    read -p "Owner of $name [$(whoami)]: " cvmfs_owner
+    [ x"$cvmfs_owner" = x ] && cvmfs_owner=$(whoami)
+  else
+    cvmfs_owner=$owner
+  fi
+  id $cvmfs_owner > /dev/null 2>&1 || die "No user $cvmfs_owner"
+  echo $cvmfs_owner
+}
+
+
 mkfs() {
   local name=$1
   local stratum0=$2
   local upstream=$3
   local owner=$4
 
+  local cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local scratch_dir="${spool_dir}/scratch"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
-  local repository_dir=$(get_local_upstream $upstream)
-  local repository_pipe=$(get_pipe_upstream $upstream)
-  if [ x"$repository_pipe" = x"DEFAULT" ]; then
-    repository_pipe=${spool_dir}/upload
-    upstream="pipe:$repository_pipe"
+  local repository_dir;
+  if is_local_upstream $upstream; then
+    repository_dir=$(get_local_upstream $upstream)
   fi
 
   # Sanity checks
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
   /sbin/modprobe aufs || die "aufs kernel module missing"
+  [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
   [ -d /etc/httpd ] && /sbin/service httpd status >/dev/null || die "Apache must be installed and running"
-
-  local cvmfs_user
-  if [ "x$owner" == "x" ]; then
-    read -p "Owner of $name [$(whoami)]: " cvmfs_user
-    [ x"$cvmfs_user" = x ] && cvmfs_user=$(whoami)
-  else
-    cvmfs_user=$owner
-  fi
-  id $cvmfs_user > /dev/null 2>&1 || die "No user $cvmfs_user"
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
   cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 CVMFS_REPOSITORY_NAME=$name
+CVMFS_REPOSITORY_TYPE=stratum0
 CVMFS_USER=$cvmfs_user
 CVMFS_UNION_DIR=/cvmfs/$name
 CVMFS_SPOOL_DIR=$spool_dir
@@ -310,7 +341,7 @@ Alias /fanout/$temp_dir $temp_dir
     EnableSendFile Off
 </Directory>
 EOF
-  if [ x"$stratum0" = x"http://localhost/cvmfs/$name" ]; then
+  if is_local_upstream $upstream; then
     cat >> /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
@@ -362,21 +393,18 @@ EOF
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir
   mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user /cvmfs/$name $spool_dir
-  if [ x"$repository_pipe" != x ]; then
-    [ -p $repository_pipe ] || mkfifo -m 0660 $repository_pipe
-    chown -R $cvmfs_user $repository_pipe
-  fi
-  if [ x"$repository_dir" != x ]; then
+  if is_local_upstream $upstream; then
     create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
   fi
   reload_apache > /dev/null
   echo "done"
 
+  local spooler_definition="${upstream},${pipe_paths},${pipe_digests}"
   echo -n "Create Initial Repository... "
-  create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+  create_whitelist $name $cvmfs_user $spooler_definition $temp_dir > /dev/null
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
     -t $temp_dir \
-    -r ${upstream},${pipe_paths},${pipe_digests} \
+    -r $spooler_definition \
     -o ${temp_dir}/new_manifest" > /dev/null
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \
@@ -384,7 +412,7 @@ EOF
     -n $name \
     -m ${temp_dir}/new_manifest \
     -t $temp_dir \
-    -r ${upstream},${pipe_paths},${pipe_digests}" > /dev/null
+    -r $spooler_definition" > /dev/null
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
@@ -413,44 +441,142 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
+add_replica() {
+  local name=$1
+  local stratum0=$2
+  local public_key=$3
+  local upstream=$4
+  local owner=$5
+
+  local cvmfs_user=`get_cvmfs_owner $name $owner`
+  local spool_dir="/var/spool/cvmfs/${name}"
+  local pipe_paths="${spool_dir}/paths"
+  local pipe_digests="${spool_dir}/digests"
+  local temp_dir="${spool_dir}/tmp"
+  local repository_dir;
+  if is_local_upstream $upstream; then
+    repository_dir=$(get_local_upstream $upstream)
+  fi
+
+  # Sanity checks
+  [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
+  if is_local_upstream $upstream; then
+    [ -d /etc/httpd ] && /sbin/service httpd status >/dev/null || die "Apache must be installed and running"
+  fi
+
+  echo -n "Creating configuration files... "
+  mkdir -p /etc/cvmfs/repositories.d/${name}
+  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+# Created by cvmfs_server.
+CVMFS_REPOSITORY_NAME=$name
+CVMFS_REPOSITORY_TYPE=stratum1
+CVMFS_USER=$cvmfs_user
+CVMFS_SPOOL_DIR=$spool_dir
+CVMFS_STRATUM0=$stratum0
+CVMFS_UPSTREAM_STORAGE=$upstream
+EOF
+  cat > /etc/cvmfs/repositories.d/${name}/replica.conf << EOF
+# Created by cvmfs_server.
+CVMFS_NUM_WORKERS=16
+CVMFS_PUBLIC_KEY=$public_key
+CVMFS_HTTP_TIMEOUT=10
+CVMFS_HTTP_RETRIES=3
+EOF
+  if is_local_upstream $upstream; then
+    cat > /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
+# Translation URL to real pathname
+Alias /cvmfs/$name ${repository_dir}
+<Directory "${repository_dir}">
+    Options -MultiViews
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+
+    EnableMMAP Off
+    EnableSendFile Off
+
+    AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
+
+    Header unset Last-Modified
+    FileETag None
+
+    ExpiresActive On
+    ExpiresDefault "access plus 3 days"
+    ExpiresByType text/html "access plus 5 minutes"
+    ExpiresByType application/x-cvmfs "access plus 1 minutes"
+</Directory>
+EOF
+  fi
+  echo "done"
+
+  echo -n "Create CernVM-FS Storage... "
+  mkdir -p $spool_dir
+  if [ x"$repository_dir" != x ]; then
+    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
+    mkdir $repository_dir/data/txn
+    chown $cvmfs_user $repository_dir/data/txn
+    ln -s $repository_dir/data/txn $temp_dir
+  else
+    mkdir -p $temp_dir
+  fi
+  mkfifo -m 0660 $pipe_paths $pipe_digests
+  chown -R $cvmfs_user $spool_dir
+  reload_apache > /dev/null
+  echo "done"
+
+  echo "\
+
+Use 'cvmfs_server snapshot' to replicate $name.
+Make sure to install the repository public key in /etc/cvmfs/keys/
+You might have to add the key in /etc/cvmfs/repositories.d/${name}/replica.conf"
+}
+
+
 rmfs() {
   local name=$1
   local spool_dir=$2
   local upstream=$3
+  local type=$4
 
   [ $(id -u) -ne 0 ] && die "Only root can remove a repository"
   [ x"$spool_dir" = x ] && die "Spool directory undefined"
   [ x"$upstream" = x ] && die "Upstream storage undefined"
+  [ x"$type" = x ] && die "Repository type undefined"
 
-  echo -n "Unmounting CernVM-FS Area... "
-  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
-  mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
-  mount | grep -q " ${spool_dir}/rdonly " && umount ${spool_dir}/rdonly
-  echo "done"
-
-  echo -n "Removing spool area... "
-  rm -rf $spool_dir /cvmfs/$name
-  echo done
-
-  local repository_dir=$(get_local_upstream $upstream)
-  if [ "x"$repository_dir != x ]; then
-    echo -n "Removing repository storage... "
-    rm -rf $repository_dir
+  if [ "$type" == "stratum0" ]; then
+    echo -n "Unmounting CernVM-FS Area... "
+    sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
+    mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
+    mount | grep -q " ${spool_dir}/rdonly " && umount ${spool_dir}/rdonly
+    rmdir /cvmfs/$name
     echo "done"
   fi
 
+  echo -n "Removing spool area... "
+  rm -rf $spool_dir
+  echo done
+
+  if is_local_upstream $upstream; then
+    local repository_dir=$(get_local_upstream $upstream)
+    if [ "x"$repository_dir != x ]; then
+      echo -n "Removing repository storage... "
+      rm -rf $repository_dir
+      echo "done"
+    fi
+  fi
+
   echo -n "Removing keys and configuration... "
-  rm -f /etc/cvmfs/keys/$name.masterkey \
+  if [ "$type" == stratum0 ]; then
+    rm -f /etc/cvmfs/keys/$name.masterkey \
         /etc/cvmfs/keys/$name.pub \
         /etc/cvmfs/keys/$name.key \
-        /etc/cvmfs/keys/$name.crt \
-        /etc/cvmfs/config.d/${name}.conf \
-        /etc/httpd/conf.d/cvmfs.${name}.conf
+        /etc/cvmfs/keys/$name.crt
+  fi
+  if is_local_upstream $upstream; then
+    rm -f /etc/httpd/conf.d/cvmfs.${name}.conf
+    reload_apache > /dev/null
+  fi
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
-  echo "done"
-
-  echo -n "Stopping services... "
-  reload_apache > /dev/null
   rm -rf /etc/cvmfs/repositories.d/$name
   echo "done"
 
@@ -489,7 +615,14 @@ check() {
 
 
 list_repositories() {
-  ls -1 /etc/cvmfs/repositories.d 2> /dev/null
+  for repository in /etc/cvmfs/repositories.d/*; do
+    if [ "x$repository" = "x/etc/cvmfs/repositories.d/*" ]; then
+      return 0
+    fi
+    . ${repository}/server.conf
+    local name=$(basename $repository)
+    echo "$name ($CVMFS_REPOSITORY_TYPE)"
+  done
 }
 
 
@@ -500,8 +633,9 @@ Commands:
   mkfs <fully qualified name> [-w stratum0 url] [-u upstream storage]
                               [-o owner]:
                Create a new repository with a given name
-  skeleton <directory>:
-               Create repository skeleton in directory
+  add-replica <fully qualified name> <stratum 0 url> <public key>
+               [-o owner] [-u stratum1 upstram storage]
+               Create a Stratum 1 replica of a repository
   rmfs:        Remove the repository
   resign:      Re-sign the 30 day whitelist
   list:        List available repositories
@@ -510,6 +644,7 @@ Commands:
   transaction: Start to edit a repository
   abort:       Abort transaction and return to the state before
   publish:     Make a new repository snapshot
+  snapshot:    Synchronize a Stratum 1 replica with the Stratum 0 source
 
 Note: If multiple repositories are maintained, the repository name must follow
 the command."
@@ -527,7 +662,7 @@ select_fqrn() {
     [ -d /etc/cvmfs/repositories.d/$given_name ] && echo $given_name
   else
     # Check if only one repository active
-    [ $(list_repositories | wc -l) -eq 1 ] && list_repositories
+    [ $(list_repositories | wc -l) -eq 1 ] && list_repositories | cut -d" " -f1
   fi
   return 0
 }
@@ -544,7 +679,7 @@ case $1 in
     fi
     # Stratum 0, upstream storage
     STRATUM0="http://localhost/cvmfs/$CVMFS_REPOSITORY_NAME"
-    UPSTREM="local:/srv/cvmfs/$CVMFS_REPOSITORY_NAME"
+    UPSTREAM="local:/srv/cvmfs/$CVMFS_REPOSITORY_NAME"
     shift 2
     while getopts "w:u:o:" OPTION
     do
@@ -553,7 +688,7 @@ case $1 in
           STRATUM0=$OPTARG
         ;;
         u)
-          UPSTREM=$OPTARG
+          UPSTREAM=$OPTARG
         ;;
         o)
           OWNER=$OPTARG
@@ -564,27 +699,59 @@ case $1 in
         ;;
       esac
     done
-    mkfs $CVMFS_REPOSITORY_NAME $STRATUM0 $UPSTREM $OWNER
+    mkfs $CVMFS_REPOSITORY_NAME $STRATUM0 $UPSTREAM $OWNER
     ;;
+  add-replica)
+    [ x"$CVMFS_REPOSITORY_NAME" != x ] && die "There is already an active repository $CVMFS_REPOSITORY_NAME"
+    CVMFS_REPOSITORY_NAME=$(cvmfs_mkfqrn $2)
+    CVMFS_STRATUM0=$3
+    CVMFS_PUBLIC_KEY=$4
+    if [ x"$CVMFS_REPOSITORY_NAME" = x -o x"$CVMFS_STRATUM0" = x -o x"$CVMFS_PUBLIC_KEY" = x ]; then
+      usage
+      exit 2
+    fi
+    UPSTREAM="local:/srv/cvmfs/$CVMFS_REPOSITORY_NAME"
+    shift 4
+    while getopts "o:u:" OPTION
+    do
+      case $OPTION in
+        u)
+          UPSTREAM=$OPTARG
+        ;;
+        o)
+          OWNER=$OPTARG
+        ;;
+        ?)
+          echo "Invalid option"
+          exit 1
+        ;;
+      esac
+    done
+    add_replica $CVMFS_REPOSITORY_NAME $CVMFS_STRATUM0 $CVMFS_PUBLIC_KEY $UPSTREAM $OWNER
+  ;;
   rmfs)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
     reply=n
     read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY INCLUDING SIGNING KEYS!  Are you sure (y/n)? " reply
     if [ "$reply" = "y" ]; then
       . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-      rmfs $CVMFS_REPOSITORY_NAME $CVMFS_SPOOL_DIR $CVMFS_UPSTREAM_STORAGE
+      rmfs $CVMFS_REPOSITORY_NAME $CVMFS_SPOOL_DIR $CVMFS_UPSTREAM_STORAGE $CVMFS_REPOSITORY_TYPE
     fi
   ;;
   resign)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
+    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    create_whitelist $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_STRATUM0 ${CVMFS_SPOOL_DIR}/tmp
+    create_whitelist $CVMFS_REPOSITORY_NAME $CVMFS_USER \
+      ${CVMFS_UPSTREAM_STORAGE},${CVMFS_SPOOL_DIR}/paths,${CVMFS_SPOOL_DIR}/digests \
+      ${CVMFS_SPOOL_DIR}/tmp
   ;;
   list)
     list_repositories
   ;;
   info)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
     info $CVMFS_REPOSITORY_NAME $CVMFS_STRATUM0
   ;;
@@ -595,18 +762,30 @@ case $1 in
   ;;
   transaction)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
     transaction $CVMFS_REPOSITORY_NAME $CVMFS_SPOOL_DIR
   ;;
   abort)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
     abort $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR
   ;;
   publish)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
     publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE
+  ;;
+  snapshot)
+    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
+    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] || die "This is not a stratum 1 repository"
+    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
+    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf
+    snapshot $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 \
+      $CVMFS_UPSTREAM_STORAGE $CVMFS_NUM_WORKERS $CVMFS_PUBLIC_KEY \
+      $CVMFS_HTTP_TIMEOUT $CVMFS_HTTP_RETRIES
   ;;
   skeleton)
     SKELETON_DIR=$2
@@ -615,6 +794,9 @@ case $1 in
     [ x"$SKELETON_USER" = x ] && SKELETON_USER=$(whoami)
     id $SKELETON_USER > /dev/null 2>&1 || die "No user $SKELETON_USER"
     create_repository_skeleton $SKELETON_DIR $SKELETON_USER
+  ;;
+  snapshot)
+    echo "TBD"
   ;;
   *)
     usage

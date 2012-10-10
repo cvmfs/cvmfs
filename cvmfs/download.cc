@@ -598,7 +598,8 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
   if (try_again) {
     // Reset internal state and destination
     if ((info->destination == kDestinationMem) && info->destination_mem.data) {
-      free(info->destination_mem.data);
+      if (info->destination_mem.data)
+        free(info->destination_mem.data);
       info->destination_mem.data = NULL;
       info->destination_mem.size = 0;
       info->destination_mem.pos = 0;
@@ -981,6 +982,8 @@ void Fini() {
     // All handles are removed from the multi stack
     close(pipe_terminate_[1]);
     close(pipe_terminate_[0]);
+    close(pipe_jobs_[1]);
+    close(pipe_jobs_[0]);
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),

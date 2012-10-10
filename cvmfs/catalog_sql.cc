@@ -749,4 +749,43 @@ bool SqlUpdateCounter::BindDelta(const int64_t delta) {
   return BindInt64(1, delta);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+SqlAllChunks::SqlAllChunks(const Database &database) {
+  string sql = "SELECT DISTINCT hash, "
+  "CASE WHEN flags & " + StringifyInt(SqlDirent::kFlagFile) + " THEN " +
+    StringifyInt(kChunkFile) + " " +
+  "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
+    StringifyInt(kChunkMicroCatalog) + " END " +
+  "AS chunk_type FROM catalog WHERE hash IS NOT NULL";
+  if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
+    sql += " UNION SELECT DISTINCT hash, " + StringifyInt(kChunkPiece) + " " +
+      "FROM chunks";
+  }
+  sql += ";";
+  Init(database.sqlite_db(), sql);
+}
+
+
+bool SqlAllChunks::Open() {
+  return true;
+}
+
+
+bool SqlAllChunks::Next(hash::Any *hash, ChunkTypes *type) {
+  if (FetchRow()) {
+    *hash = RetrieveSha1Blob(0);
+    *type = static_cast<ChunkTypes>(RetrieveInt(1));
+    return true;
+  }
+  return false;
+}
+
+
+bool SqlAllChunks::Close() {
+  return Reset();
+}
+
 }  // namespace catalog

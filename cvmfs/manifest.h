@@ -10,6 +10,8 @@
 #include <map>
 #include "hash.h"
 
+namespace manifest {
+
 /**
  * The Manifest is the bootstrap snippet for a repository.  It is stored in
  * .cvmfspublished.
@@ -47,8 +49,11 @@ class Manifest {
     publish_timestamp_ = publish_timestamp;
   }
 
+  std::string repository_name() const { return repository_name_; }
+  hash::Md5 root_path() const { return root_path_; }
   hash::Any catalog_hash() const { return catalog_hash_; }
   hash::Any certificate() const { return certificate_; }
+  uint64_t publish_timestamp() const { return publish_timestamp_; }
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
   hash::Any catalog_hash_;
@@ -60,5 +65,7 @@ class Manifest {
   hash::Any certificate_;
   uint64_t publish_timestamp_;
 };  // class Manifest
+
+}  // namespace manifest
 
 #endif  // CVMFS_MANIFEST_H_

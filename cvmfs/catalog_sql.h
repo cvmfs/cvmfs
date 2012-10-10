@@ -30,6 +30,16 @@ namespace catalog {
 
 class Catalog;
 
+/**
+ * Content-addressable chunks can be entire files, micro catalogs (ending L) or
+ * pieces of large files (ending C)
+ */
+enum ChunkTypes {
+  kChunkFile = 0,
+  kChunkMicroCatalog,
+  kChunkPiece,
+};
+
 
 /**
  * Encapsulates an SQlite connection.  Abstracts the schema.
@@ -467,6 +477,18 @@ class SqlUpdateCounter : public Sql {
   SqlUpdateCounter(const Database &database);
   bool BindCounter(const std::string &counter);
   bool BindDelta(const int64_t delta);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlAllChunks : public Sql {
+ public:
+  SqlAllChunks(const Database &database);
+  bool Open();
+  bool Next(hash::Any *hash, ChunkTypes *type);
+  bool Close();
 };
 
 }  // namespace catalog

@@ -48,6 +48,8 @@ class CommandCreate : public Command {
     result.push_back(Parameter('t', "directory for temporary storage",
                                false, false));
     result.push_back(Parameter('r', "spooler definition", false, false));
+    result.push_back(Parameter('l', "log level (0-4, default: 2)",
+                               true, false));
     return result;
   }
   int Main(const ArgumentList &args);

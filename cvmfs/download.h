@@ -6,7 +6,10 @@
 #define CVMFS_DOWNLOAD_H_
 
 #include <stdint.h>
+#include <unistd.h>
+
 #include <cstdio>
+
 #include <string>
 #include <vector>
 

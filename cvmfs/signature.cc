@@ -47,6 +47,7 @@ X509 *certificate_ = NULL;
 vector<RSA *> *public_keys_;  /**< Contains cvmfs public master keys */
 vector<string> *blacklisted_certificates_ = NULL;
 
+
 void Init() {
   OpenSSL_add_all_algorithms();
   public_keys_ = new vector<RSA *>();
@@ -55,7 +56,6 @@ void Init() {
 
 
 void Fini() {
-  EVP_cleanup();
   if (certificate_) X509_free(certificate_);
   certificate_ = NULL;
   if (private_key_) EVP_PKEY_free(private_key_);
@@ -65,6 +65,7 @@ void Fini() {
       RSA_free((*public_keys_)[i]);
     public_keys_->clear();
   }
+  EVP_cleanup();
   delete public_keys_;
   delete blacklisted_certificates_;
   private_key_ = NULL;
@@ -239,6 +240,13 @@ bool LoadBlacklist(const std::string &path_blacklist) {
   free(buffer);
 
   return true;
+}
+
+
+vector<string> GetBlacklistedCertificates() {
+  if (blacklisted_certificates_)
+    return *blacklisted_certificates_;
+  return vector<string>();
 }
 
 
@@ -434,163 +442,57 @@ bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
 
 
 /**
- * Reads after skip bytes in memory, looks for a line break and saves
- * the rest into sig_buf, which will be allocated.
+ * Checks a document of the form
+ *  <ASCII LINES>
+ *  --
+ *  <hash>
+ *  <signature>
  */
-bool ReadSignatureTail(const unsigned char *buffer, const unsigned buffer_size,
-                       const unsigned skip_bytes,
-                       unsigned char **signature, unsigned *signature_size)
+bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
+                  const bool by_rsa)
 {
-  unsigned i;
-  for (i = skip_bytes; i < buffer_size; ++i) {
-    if (((char *)buffer)[i] == '\n') break;
-  }
-  i++;
-  /* at least one byte after \n required */
-  if (i >= buffer_size) {
-    *signature = NULL;
-    *signature_size = 0;
-    return false;
-  } else {
-    *signature_size = buffer_size-i;
-    *signature = reinterpret_cast<unsigned char *>(smalloc(*signature_size));
-    memcpy(*signature, ((char *)buffer)+i, *signature_size);
-    return true;
-  }
-}
-
-
-/**
- * Checks whether the fingerprint of the loaded PEM certificate is listed on the
- * whitelist stored in a memory chunk.
- */
-bool VerifyWhitelist(const char *whitelist, const unsigned whitelist_size,
-                     const string &expected_repository)
-{
-  const string fingerprint = FingerprintCertificate();
-  if (fingerprint == "") {
-    LogCvmfs(kLogSignature, kLogDebug, "invalid fingerprint");
-    return false;
-  }
-  LogCvmfs(kLogSignature, kLogDebug,
-           "checking certificate with fingerprint %s against whitelist",
-           fingerprint.c_str());
-
-  time_t local_timestamp = time(NULL);
-  string line;
-  unsigned payload_bytes = 0;
-
-  // Check timestamp (UTC), ignore issue date (legacy)
-  line = GetLine(whitelist, whitelist_size);
-  if (line.length() != 14) {
-    LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
-    return false;
-  }
-  payload_bytes += 15;
-
-  // Expiry date
-  line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
-  if (line.length() != 15) {
-    LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
-    return false;
-  }
-  struct tm tm_wl;
-  memset(&tm_wl, 0, sizeof(struct tm));
-  tm_wl.tm_year = String2Int64(line.substr(1, 4))-1900;
-  tm_wl.tm_mon = String2Int64(line.substr(5, 2)) - 1;
-  tm_wl.tm_mday = String2Int64(line.substr(7, 2));
-  tm_wl.tm_hour = String2Int64(line.substr(9, 2));
-  tm_wl.tm_min = tm_wl.tm_sec = 0;  // exact on hours level
-  time_t timestamp = timegm(&tm_wl);
-  LogCvmfs(kLogSignature, kLogDebug,
-           "whitelist UTC expiry timestamp in localtime: %s",
-           StringifyTime(timestamp, false).c_str());
-  if (timestamp < 0) {
-    LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp");
-    return false;
-  }
-  LogCvmfs(kLogSignature, kLogDebug,  "local time: %s",
-           StringifyTime(local_timestamp, true).c_str());
-  if (local_timestamp > timestamp) {
-    LogCvmfs(kLogSignature, kLogDebug,
-             "whitelist lifetime verification failed, expired");
-    return false;
-  }
-  payload_bytes += 16;
-
-  // Check repository name
-  line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
-  if ((expected_repository != "") && ("N" + expected_repository != line)) {
-    LogCvmfs(kLogSignature, kLogDebug,
-             "repository name does not match (found %s, expected %s)",
-             line.c_str(), expected_repository.c_str());
-    return false;
-  }
-  payload_bytes += line.length() + 1;
-
-  // Search the fingerprint
-  bool found = false;
+  unsigned pos = 0;
+  unsigned letter_length = 0;
   do {
-    line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
-    if (line == "--") break;
-    if (line.substr(0, 59) == fingerprint)
-      found = true;
-    payload_bytes += line.length() + 1;
-  } while (payload_bytes < whitelist_size);
-  payload_bytes += line.length() + 1;
-
-  if (!found) {
-    LogCvmfs(kLogSignature, kLogDebug,
-             "the certificate's fingerprint is not on the whitelist");
-    return false;
-  }
-
-  // Check whitelist signature
-  line = GetLine(whitelist+payload_bytes, whitelist_size-payload_bytes);
-  if (line.length() < 40) {
-    LogCvmfs(kLogSignature, kLogDebug,
-             "no checksum at the end of whitelist found");
-    return false;
-  }
-  hash::Any hash(hash::kSha1, hash::HexPtr(line.substr(0, 40)));
-  hash::Any compare(hash::kSha1);
-  hash::HashMem((const unsigned char *)whitelist, payload_bytes-3, &compare);
-  if (hash != compare) {
-    LogCvmfs(kLogSignature, kLogDebug, "whitelist checksum does not match");
-    return false;
-  }
-
-  // Check local blacklist
-  for (unsigned i = 0; i < blacklisted_certificates_->size(); ++i) {
-    if ((*blacklisted_certificates_)[i].substr(0, 59) == fingerprint) {
-      LogCvmfs(kLogSignature, kLogDebug | kLogSyslog,
-               "blacklisted fingerprint (%s)", fingerprint.c_str());
+    if (pos > buffer_size-3)
       return false;
+    if ((buffer[pos] == '-') && (buffer[pos+1] == '-') &&
+        (buffer[pos+2] == '\n'))
+    {
+      letter_length = pos;
+      pos += 3;
+      break;
     }
-  }
+    pos++;
+  } while (true);
 
-  // Verify signature
-  unsigned char *signature;
-  unsigned signature_size;
-  if (!ReadSignatureTail((const unsigned char *)whitelist, whitelist_size,
-                         payload_bytes, &signature, &signature_size))
-  {
-    LogCvmfs(kLogSignature, kLogDebug,
-             "no signature at the end of whitelist found");
+  string hash_str = "";
+  unsigned hash_pos = pos;
+  do {
+    if (pos == buffer_size)
+      return false;
+    if (buffer[pos] == '\n') {
+      pos++;
+      break;
+    }
+    hash_str.push_back(buffer[pos++]);
+  } while (true);
+  // TODO: more hashes
+  if (hash_str.length() != 2*hash::kDigestSizes[hash::kSha1])
     return false;
-  }
-  const string hash_str = hash.ToString();
-  bool result = VerifyRsa((const unsigned char *)&hash_str[0],
-                          hash_str.length(), signature, signature_size);
-  free(signature);
-  if (!result)
-    LogCvmfs(kLogSignature, kLogDebug,
-             "whitelist signature verification failed (hash %s), %s",
-             hash_str.c_str(), GetCryptoError().c_str());
-  else
-    LogCvmfs(kLogSignature, kLogDebug, "whitelist signature verification passed");
+  hash::Any hash_printed(hash::kSha1, hash::HexPtr(hash_str));
+  hash::Any hash_computed(hash_printed.algorithm);
+  hash::HashMem(buffer, letter_length, &hash_computed);
+  if (hash_printed != hash_computed)
+    return false;
 
-  return result;
+  if (by_rsa) {
+    return VerifyRsa(&buffer[hash_pos], hash_str.length(),
+                     &buffer[pos], buffer_size-pos);
+  } else {
+    return Verify(&buffer[hash_pos], hash_str.length(),
+                  &buffer[pos], buffer_size-pos);
+  }
 }
 
 }  // namespace signature

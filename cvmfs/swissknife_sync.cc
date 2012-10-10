@@ -75,11 +75,20 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const string manifest_path = *args.find('o')->second;
   const string dir_temp = *args.find('t')->second;
   const string spooler_definition = *args.find('r')->second;
+  if (args.find('l') != args.end()) {
+    unsigned log_level =
+      1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+    if (log_level > kLogNone) {
+      swissknife::Usage();
+      return 1;
+    }
+    SetLogVerbosity(static_cast<LogLevels>(log_level));
+  }
 
   upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
   assert(spooler);
 
-  Manifest *manifest =
+  manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(dir_temp, spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
@@ -106,8 +115,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   assert(spooler);
   spooler->SpoolCopy(source, dest);
   spooler->EndOfTransaction();
-  while (!spooler->IsIdle())
-    sleep(1);
+  spooler->WaitFor();
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
     return 1;
@@ -157,7 +165,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                               params.dir_scratch);
 
   sync.Traverse();
-  Manifest *manifest = mediator.Commit();
+  manifest::Manifest *manifest = mediator.Commit();
 
   download::Fini();
 

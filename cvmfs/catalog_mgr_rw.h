@@ -33,7 +33,9 @@
 namespace upload {
 class Spooler;
 }
+namespace manifest {
 class Manifest;
+}
 
 namespace catalog {
 
@@ -44,8 +46,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
                          const std::string &dir_temp,
                          upload::Spooler *spooler);
   ~WritableCatalogManager();
-  static Manifest *CreateRepository(const std::string &dir_temp,
-                                    upload::Spooler *spooler);
+  static manifest::Manifest *CreateRepository(const std::string &dir_temp,
+                                              upload::Spooler *spooler);
 
   bool Init();
 
@@ -79,7 +81,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
 	 */
   void PrecalculateListings();
 
-  Manifest *Commit();
+  manifest::Manifest *Commit();
 
  protected:
   void EnforceSqliteMemLimit() { }

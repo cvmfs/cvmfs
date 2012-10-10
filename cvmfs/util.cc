@@ -97,6 +97,16 @@ string GetFileName(const string &path) {
 
 
 /**
+ * Abort() on failure
+ */
+void CreateFile(const std::string &path, const int mode) {
+  int fd = open(path.c_str(), O_CREAT, mode);
+  assert(fd >= 0);
+  close(fd);
+}
+
+
+/**
  * Creates and binds to a named socket.
  */
 int MakeSocket(const string &path, const int mode) {
@@ -563,65 +573,6 @@ string GetLine(const char *text, const int text_size) {
   while ((pos < text_size) && (text[pos] != '\n'))
     pos++;
   return string(text, pos);
-}
-
-
-bool ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
-                    int *start_of_signature,
-                    hash::Any *hash, map<char, string> *content)
-{
-  string line;
-  unsigned pos = 0;
-  while (pos < buffer_size) {
-    if (static_cast<char>(buffer[pos]) == '\n') {
-      if (line == "--") {
-        pos++;
-        break;
-      }
-      if (line != "") {
-        const string tail = (line.length() == 1) ? "" : line.substr(1);
-        (*content)[line[0]] = tail;
-      }
-      line = "";
-    } else {
-      line += static_cast<char>(buffer[pos]);
-    }
-    pos++;
-  }
-
-  *start_of_signature = pos;
-  line = "";
-  while ((pos < buffer_size) && (buffer[pos] != '\n')) {
-    line += static_cast<char>(buffer[pos]);
-    pos++;
-  }
-  if (line.length() == 2*hash::kDigestSizes[hash::kSha1]) {
-    *hash = hash::Any(hash::kSha1, hash::HexPtr(line));
-  } else {
-    *start_of_signature = -1;
-    *hash = hash::Any();
-  }
-
-  return true;
-}
-
-
-bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
-  int fd = open(filename.c_str(), O_RDONLY);
-  if (fd < 0)
-    return false;
-
-  unsigned char buffer[4096];
-  int num_bytes = read(fd, buffer, sizeof(buffer));
-  close(fd);
-
-  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
-    return false;
-
-  int start_of_signature;
-  hash::Any hash;
-  return ParseKeyvalMem(buffer, unsigned(num_bytes),
-                        &start_of_signature, &hash, content);
 }
 
 

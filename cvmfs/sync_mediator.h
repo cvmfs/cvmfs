@@ -37,7 +37,9 @@
 #include "swissknife_sync.h"
 #include "sync_item.h"
 
+namespace manifest {
 class Manifest;
+}
 
 namespace publish {
 
@@ -113,7 +115,7 @@ class SyncMediator {
 	void EnterDirectory(SyncItem &entry);
   void LeaveDirectory(SyncItem &entry);
 
-  Manifest *Commit();
+  manifest::Manifest *Commit();
 
  private:
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;

@@ -64,6 +64,14 @@ bool CopyPath2Path(const string &src, const string &dest) {
 }
 
 
+bool CopyMem2File(const unsigned char *buffer, const unsigned buffer_size,
+                  FILE *fdest)
+{
+  int written = fwrite(buffer, 1, buffer_size, fdest);
+  return (written >=0) && (unsigned(written) == buffer_size);
+}
+
+
 bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
                   const string &path)
 {
