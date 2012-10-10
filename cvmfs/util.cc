@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include <cctype>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -563,6 +564,38 @@ string GetLine(const char *text, const int text_size) {
   while ((pos < text_size) && (text[pos] != '\n'))
     pos++;
   return string(text, pos);
+}
+
+
+/**
+ * Removes leading and trailing whitespaces.
+ */
+string Trim(const string &raw) {
+  if (raw.empty())
+    return "";
+
+  unsigned start_pos = 0;
+  for (; (start_pos < raw.length()) &&
+         (raw[start_pos] == ' ' || raw[start_pos] == '\t');
+         ++start_pos) { }
+  unsigned end_pos = raw.length()-1;  // at least one character in raw
+  for (; (end_pos >= start_pos) &&
+         (raw[end_pos] == ' ' || raw[end_pos] == '\t');
+         --end_pos) { }
+
+  return raw.substr(start_pos, end_pos-start_pos + 1);
+}
+
+
+/**
+ * Converts all characters to upper case
+ */
+string ToUpper(const string &mixed_case) {
+  string result(mixed_case);
+  for (unsigned i = 0, l = result.length(); i < l; ++i) {
+    result[i] = toupper(result[i]);
+  }
+  return result;
 }
 
 

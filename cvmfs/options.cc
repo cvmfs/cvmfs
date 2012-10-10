@@ -10,6 +10,8 @@
 #include "options.h"
 
 #include <cstdio>
+#include <cassert>
+
 #include <map>
 
 #include "util.h"
@@ -36,40 +38,171 @@ void Fini() {
 }
 
 
-void ParsePath(const string config_file) {
+static string UnescapeShell(const std::string &raw) {
+  string result;
+
+  char opening_quote = '\0';
+  for (unsigned i = 0, l = raw.length(); i < l; ++i) {
+    const char c = raw[i];
+    if (c == '\0')
+      return "NULL character in value";
+    if (c == opening_quote) {
+      opening_quote = '\0';
+      continue;
+    }
+    if (c == '"' || c == '\'') {
+      opening_quote = c;
+      continue;
+    }
+    if (c == '\\')
+      continue;
+    result.push_back(c);
+  }
+  return result;
+}
+
+
+static string EscapeShell(const std::string &raw) {
+  for (unsigned i = 0, l = raw.length(); i < l; ++i) {
+    if (not (((raw[i] >= '0') && (raw[i] <= '9')) ||
+             ((raw[i] >= 'A') && (raw[i] <= 'Z')) ||
+             ((raw[i] >= 'a') && (raw[i] <= 'z')) ||
+             (raw[i] == '/') || (raw[i] == ':') || (raw[i] == '.') ||
+             (raw[i] == '_') || (raw[i] == '-') || (raw[i] == ',')))
+    {
+      goto escape_shell_quote;
+    }
+  }
+  return raw;
+
+escape_shell_quote:
+  string result = "'";
+  for (unsigned i = 0, l = raw.length(); i < l; ++i) {
+    if (raw[i] == '\'')
+      result += "\\";
+    result += raw[i];
+  }
+  result += "'";
+  return result;
+}
+
+
+void ParsePath(const string &config_file) {
   FILE *fconfig = fopen(config_file.c_str(), "r");
   if (!fconfig)
     return;
 
   // Read line by line
   int retval;
+  string line;
   while ((retval = fgetc(fconfig)) != EOF) {
     char c = retval;
-    if (c == '\n') {}
-    //fgets
-  }
+    if (c == '\n') {
+      line = Trim(line);
+      if (line.empty() || line[0] == '#')
+        continue;
+      vector<string> tokens = SplitString(line, '=');
+      if (tokens.size() < 2)
+        continue;
 
+      string parameter = tokens[0];
+      tokens.erase(tokens.begin());
+      ConfigValue value;
+      value.source = config_file;
+      value.value = UnescapeShell(JoinStrings(tokens, "="));
+      (*config_)[parameter] = value;
+      line = "";
+    } else {
+      line.push_back(c);
+    }
+  }
 
   fclose(fconfig);
 }
 
 
+void ParseDefault(const string &repository_name) {
+  ParsePath("/etc/cvmfs/default.conf");
+  ParsePath("/etc/cernvm/default.conf");
+  ParsePath("/etc/cvmfs/site.conf");
+  ParsePath("/etc/cernvm/site.conf");
+  ParsePath("/etc/cvmfs/default.local");
+
+  string domain;
+  vector<string> tokens = SplitString(repository_name, '.');
+  if (tokens.size() > 1) {
+    tokens.erase(tokens.begin());
+    domain = JoinStrings(tokens, ".");
+  } else {
+    GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+  }
+  ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf");
+  ParsePath("/etc/cvmfs/domain.d/" + domain + ".local");
+
+  ParsePath("/etc/cvmfs/config.d/" + repository_name + ".conf");
+  ParsePath("/etc/cvmfs/config.d/" + repository_name + ".local");
+}
+
+
 void ClearConfig() {
+  config_->clear();
 }
 
 
-string *GetValue(string *key) {
-  return NULL;
+bool GetValue(const string &key, string *value) {
+  map<string, ConfigValue>::const_iterator iter = config_->find(key);
+  if (iter != config_->end()) {
+    *value = iter->second.value;
+    return true;
+  }
+  *value = "";
+  return false;
 }
 
 
-string *GetSource(string *key) {
-  return NULL;
+bool GetSource(const string &key, string *value) {
+  map<string, ConfigValue>::const_iterator iter = config_->find(key);
+  if (iter != config_->end()) {
+    *value = iter->second.source;
+    return true;
+  }
+  *value = "";
+  return false;
+}
+
+
+bool IsOn(const std::string &param_value) {
+  const string uppercase = ToUpper(param_value);
+  return ((uppercase == "YES") || (uppercase == "ON") || (uppercase == "1"));
 }
 
 
 vector<string> GetAllKeys() {
   vector<string> result;
+  for (map<string, ConfigValue>::const_iterator i = config_->begin(),
+       iEnd = config_->end(); i != iEnd; ++i)
+  {
+    result.push_back(i->first);
+  }
+  return result;
+}
+
+
+string Dump() {
+  string result;
+  vector<string> keys = GetAllKeys();
+  for (unsigned i = 0, l = keys.size(); i < l; ++i) {
+    bool retval;
+    string value;
+    string source;
+
+    retval = GetValue(keys[i], &value);
+    assert(retval);
+    retval = GetSource(keys[i], &source);
+    assert(retval);
+    result += keys[i] + "=" + EscapeShell(value) +
+              "    # from " + source + "\n";
+  }
   return result;
 }
 

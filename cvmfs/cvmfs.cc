@@ -82,6 +82,7 @@
 #include "shortstring.h"
 #include "smalloc.h"
 #include "globals.h"
+#include "options.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -1633,6 +1634,11 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            int(cvmfs::kcache_timeout_));
   options_ready = true;
+
+  options::Init();
+  options::ParseDefault(*cvmfs::repository_name_);
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s", options::Dump().c_str());
+
 
   // Tune SQlite3 memory
   sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)

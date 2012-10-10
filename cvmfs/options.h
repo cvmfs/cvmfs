@@ -13,11 +13,14 @@ namespace options {
 void Init();
 void Fini();
 
-void ParsePath(const std::string config_file);
+void ParsePath(const std::string &config_file);
+void ParseDefault(const std::string &repository_name);
 void ClearConfig();
-std::string *GetValue(std::string *key);
-std::string *GetSource(std::string *key);
+bool GetValue(const std::string &key, std::string *value);
+bool GetSource(const std::string &key, std::string *value);
+bool IsOn(const std::string &param_value);
 std::vector<std::string> GetAllKeys();
+std::string Dump();
 
 }  // namespace options
 

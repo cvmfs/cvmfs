@@ -67,6 +67,8 @@ std::string JoinStrings(const std::vector<std::string> &strings,
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
 std::string GetLine(const char *text, const int text_size);
+std::string Trim(const std::string &raw);
+std::string ToUpper(const std::string &mixed_case);
 
 void Daemonize();
 bool ManagedExec(const std::vector<std::string> &command_line,
