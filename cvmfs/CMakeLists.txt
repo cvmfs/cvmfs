@@ -6,13 +6,6 @@
 set (CVMFS_STUB_SOURCES
   fuse_stub.cc
 )
-set (CVMFS_STUB_CFLAGS "${CVMFS_STUB_CFLAGS} -DCVMFS_CLIENT")
-set (CVMFS_STUB_LD_FLAGS "${CVMFS_STUB_LD_FLAGS} -ldl -lm")
-include_directories (${INCLUDE_DIRECTORIES})
-add_executable (fuse_stub ${CVMFS_STUB_SOURCES})
-set_target_properties (fuse_stub PROPERTIES COMPILE_FLAGS "${CVMFS_STUB_CFLAGS}" LINK_FLAGS "${CVMFS_STUB_LD_FLAGS}")
-target_link_libraries (fuse_stub ${CVMFS_STUB_LIBS} fuse rt pthread dl)
-
 
 set (CVMFS_CLIENT_SOURCES
   smalloc.h
@@ -109,9 +102,10 @@ set (CVMFS_SWISSKNIFE_SOURCES
 # configure some compiler flags for proper build
 #
 
+set (CVMFS_STUB_CFLAGS "${CVMFS_STUB_CFLAGS} -DCVMFS_CLIENT")
+
 set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DCVMFS_CLIENT -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS2_DEBUG_CFLAGS "${CVMFS2_DEBUG_CFLAGS} ${CVMFS2_CFLAGS} -D_FILE_OFFSET_BITS=64 -O0 -DDEBUGMSG")
-set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS}")
 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
@@ -210,53 +204,56 @@ endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
 
 if (BUILD_CVMFS)
 
-	# create targets with according sources and static link libraries
-	add_executable (cvmfs2_debug	${CVMFS2_DEBUG_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-	add_executable (cvmfs2			${CVMFS2_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-	add_executable (cvmfs_fsck		${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
+	add_executable (cvmfs2 ${CVMFS_STUB_SOURCES})
+  add_library (cvmfs_fuse_debug SHARED	${CVMFS2_DEBUG_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
+	add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
+  add_executable (cvmfs_fsck		${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
 
 	if (LIBFUSE_BUILTIN)
-		add_dependencies (cvmfs2_debug libfuse) # here it does not matter if libfuse or libfuse4x
-		add_dependencies (cvmfs2 libfuse)       # at this point only the appropriate one is defined
+		add_dependencies (cvmfs_fuse_debug libfuse) # here it does not matter if libfuse or libfuse4x
+		add_dependencies (cvmfs_fuse libfuse)       # at this point only the appropriate one is defined
 	endif (LIBFUSE_BUILTIN)
 
 	if (LIBCURL_BUILTIN)
-		add_dependencies (cvmfs2_debug libcares libcurl)
-		add_dependencies (cvmfs2 libcares libcurl)
+		add_dependencies (cvmfs_fuse_debug libcares libcurl)
+		add_dependencies (cvmfs_fuse libcares libcurl)
 	endif (LIBCURL_BUILTIN)
 
 	if (SQLITE3_BUILTIN)
-		add_dependencies (cvmfs2_debug sqlite3)
-		add_dependencies (cvmfs2 sqlite3)
+		add_dependencies (cvmfs_fuse_debug sqlite3)
+		add_dependencies (cvmfs_fuse sqlite3)
 	endif (SQLITE3_BUILTIN)
 
 	if (ZLIB_BUILTIN)
-		add_dependencies (cvmfs2_debug zlib)
-		add_dependencies (cvmfs2 zlib)
+		add_dependencies (cvmfs_fuse_debug zlib)
+		add_dependencies (cvmfs_fuse zlib)
 		add_dependencies (cvmfs_fsck zlib)
 	endif (ZLIB_BUILTIN)
 
 	if (SPARSEHASH_BUILTIN)
-		add_dependencies (cvmfs2_debug sparsehash)
-		add_dependencies (cvmfs2 sparsehash)
+		add_dependencies (cvmfs_fuse_debug sparsehash)
+		add_dependencies (cvmfs_fuse sparsehash)
 	endif (SPARSEHASH_BUILTIN)
 
   if (LEVELDB_BUILTIN)
-		add_dependencies (cvmfs2_debug libleveldb)
-		add_dependencies (cvmfs2 libleveldb)
+		add_dependencies (cvmfs_fuse_debug libleveldb)
+		add_dependencies (cvmfs_fuse libleveldb)
 	endif (LEVELDB_BUILTIN)
 
-  add_dependencies (cvmfs2_debug libmurmur)
-  add_dependencies (cvmfs2 libmurmur)
+  add_dependencies (cvmfs_fuse_debug libmurmur)
+  add_dependencies (cvmfs_fuse libmurmur)
 
 	# set some properties
-	set_target_properties (cvmfs2_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_DEBUG_LD_FLAGS}")
-	set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS}")
+  set (CVMFS_STUB_LD_FLAGS "${CVMFS_STUB_LD_FLAGS} -ldl -lm")
+  set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_STUB_CFLAGS}" LINK_FLAGS "${CVMFS_STUB_LD_FLAGS}")
+	set_target_properties (cvmfs_fuse_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_DEBUG_LD_FLAGS}")
+	set_target_properties (cvmfs_fuse PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS}")
 	set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}" LINK_FLAGS "${CVMFS_FSCK_LD_FLAGS}")
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
-	target_link_libraries (cvmfs2_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
-	target_link_libraries (cvmfs2			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+	target_link_libraries (cvmfs2 ${CVMFS_STUB_LIBS} fuse rt pthread dl)
+  target_link_libraries (cvmfs_fuse_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+	target_link_libraries (cvmfs_fuse			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
 	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
 
 endif (BUILD_CVMFS)
@@ -337,11 +334,21 @@ endif (BUILD_SERVER)
 # installation
 #
 
+if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
+  set(CMAKE_INSTALL_LIBDIR "lib")
+endif()
+
 if (BUILD_CVMFS)
 	install (
-		TARGETS			cvmfs2_debug cvmfs2 cvmfs_fsck
+		TARGETS			cvmfs2 cvmfs_fsck
 		RUNTIME
 		DESTINATION		bin
+	)
+
+  install (
+		TARGETS			cvmfs_fuse cvmfs_fuse_debug
+		LIBRARY
+		DESTINATION		${CMAKE_INSTALL_LIBDIR}
 	)
 
 	install (
@@ -353,10 +360,6 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 
 if (BUILD_LIBCVMFS)
-  if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-    set(CMAKE_INSTALL_LIBDIR "lib")
-  endif()
-
 	install (
 		FILES			${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
 		DESTINATION		${CMAKE_INSTALL_LIBDIR}
