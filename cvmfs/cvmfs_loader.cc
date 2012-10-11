@@ -4,22 +4,28 @@
  * Implements stub callback functions for Fuse.  Their purpose is to
  * redirect calls to the cvmfs shared library and to block calls during the
  * update of the library.
+ *
+ * The main executable and the cvmfs shared library _must not_ share any
+ * symbols.
  */
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
-//#include "cvmfs_config.h"
+#include "cvmfs_config.h"
 
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
+#include <dlfcn.h>
 
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
 using namespace std;  // NOLINT
+
+namespace loader {
 
 
 static void stub_lookup(fuse_req_t req, fuse_ino_t parent,
@@ -93,6 +99,8 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
+
+}  // namespace loader
 
 
 struct CvmfsOptions {
@@ -177,6 +185,21 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
 
 
 int main(int argc, char *argv[]) {
+  printf("start\n");
+  void *dl_cvmfs = dlopen("libcvmfs_fuse.so", RTLD_NOW | RTLD_LOCAL);
+  if (!dl_cvmfs)
+    printf("ERROR: %s\n", dlerror());
+  if (dlclose(dl_cvmfs) != 0)
+    printf("ERROR: %s\n", dlerror());
+  dl_cvmfs = dlopen("libcvmfs_fuse.so", RTLD_NOW | RTLD_LOCAL);
+  if (!dl_cvmfs)
+    printf("ERROR: %s\n", dlerror());
+  if (dlclose(dl_cvmfs) != 0)
+    printf("ERROR: %s\n", dlerror());
+  printf("stop\n");
+  return 0;
+
+
   struct fuse_args fuse_args;
   CvmfsOptions cvmfs_opts;
   struct fuse_lowlevel_ops cvmfs_operations;
@@ -193,18 +216,18 @@ int main(int argc, char *argv[]) {
   }
 
   memset(&cvmfs_operations, 0, sizeof(cvmfs_operations));
-  cvmfs_operations.lookup      = stub_lookup;
-  cvmfs_operations.getattr     = stub_getattr;
-  cvmfs_operations.readlink    = stub_readlink;
-  cvmfs_operations.open        = stub_open;
-  cvmfs_operations.read        = stub_read;
-  cvmfs_operations.release     = stub_release;
-  cvmfs_operations.opendir     = stub_opendir;
-  cvmfs_operations.readdir     = stub_readdir;
-  cvmfs_operations.releasedir  = stub_releasedir;
-  cvmfs_operations.statfs      = stub_statfs;
-  cvmfs_operations.getxattr    = stub_getxattr;
-  cvmfs_operations.listxattr   = stub_listxattr;
+  cvmfs_operations.lookup      = loader::stub_lookup;
+  cvmfs_operations.getattr     = loader::stub_getattr;
+  cvmfs_operations.readlink    = loader::stub_readlink;
+  cvmfs_operations.open        = loader::stub_open;
+  cvmfs_operations.read        = loader::stub_read;
+  cvmfs_operations.release     = loader::stub_release;
+  cvmfs_operations.opendir     = loader::stub_opendir;
+  cvmfs_operations.readdir     = loader::stub_readdir;
+  cvmfs_operations.releasedir  = loader::stub_releasedir;
+  cvmfs_operations.statfs      = loader::stub_statfs;
+  cvmfs_operations.getxattr    = loader::stub_getxattr;
+  cvmfs_operations.listxattr   = loader::stub_listxattr;
 
   struct fuse_chan *ch;
   if ((ch = fuse_mount(g_mountpoint->c_str(), &fuse_args)) != NULL) {
