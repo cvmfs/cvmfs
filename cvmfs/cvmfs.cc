@@ -141,6 +141,7 @@ lru::Md5PathCache *md5path_cache_ = NULL;
 double kcache_timeout_ = 60.0;  /**< TTL (s) of meta data in the kernel cache */
 atomic_int32 catalogs_expired_;
 atomic_int32 drainout_mode_;
+atomic_int32 reload_critical_section_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
@@ -274,12 +275,16 @@ catalog::LoadError RemountStart() {
 
 
 /**
- * If the cached are drained out, a new catalog revision is applied and
+ * If the caches are drained out, a new catalog revision is applied and
  * kernel caches are activated again.
  */
 static void RemountFinish() {
-  if (!atomic_cas32(&drainout_mode_, 1, 0))
+  if (!atomic_cas32(&reload_critical_section_, 0, 1))
     return;
+  if (!atomic_read32(&drainout_mode_)) {
+    atomic_cas32(&reload_critical_section_, 1, 0);
+    return;
+  }
 
   if (time(NULL) > drainout_deadline_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
@@ -293,6 +298,7 @@ static void RemountFinish() {
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
+    atomic_cas32(&drainout_mode_, 1, 0);
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
         catalog_manager_->offline_mode())
     {
@@ -304,9 +310,9 @@ static void RemountFinish() {
       alarm(GetEffectiveTTL());
       catalogs_valid_until_ = time(NULL) + GetEffectiveTTL();
     }
-  } else {
-    atomic_cas32(&drainout_mode_, 0, 1);
   }
+
+  atomic_cas32(&reload_critical_section_, 1, 0);
 }
 
 
@@ -1178,6 +1184,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
     tracer::InitNull();
 
   atomic_init32(&drainout_mode_);
+  atomic_init32(&reload_critical_section_);
 
   // NFS support
 #ifdef CVMFS_NFS_SUPPORT
@@ -1758,11 +1765,18 @@ int main(int argc, char *argv[]) {
                ": " + strerror(errno));
     goto cvmfs_cleanup;
   }
+  CreateFile("./.cvmfscache", 0600);
   cache_ready = true;
 
   // Start NFS maps module, if necessary
 #ifdef CVMFS_NFS_SUPPORT
   if (g_cvmfs_opts.nfs_source) {
+    if (FileExists("./no_nfs_maps." + (*cvmfs::repository_name_))) {
+      PrintError("Cache was used without NFS maps before. "
+                 "It has to be wiped out.");
+      goto cvmfs_cleanup;
+    }
+
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "CernVM-FS: loading NFS maps... ");
     cvmfs::nfs_maps_ = true;
@@ -1780,6 +1794,8 @@ int main(int argc, char *argv[]) {
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
     nfs_maps_ready = true;
+  } else {
+    CreateFile("./no_nfs_maps." + (*cvmfs::repository_name_), 0600);
   }
 #endif
 

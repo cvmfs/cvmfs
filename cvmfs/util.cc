@@ -98,6 +98,16 @@ string GetFileName(const string &path) {
 
 
 /**
+ * Abort() on failure
+ */
+void CreateFile(const std::string &path, const int mode) {
+  int fd = open(path.c_str(), O_CREAT, mode);
+  assert(fd >= 0);
+  close(fd);
+}
+
+
+/**
  * Creates and binds to a named socket.
  */
 int MakeSocket(const string &path, const int mode) {

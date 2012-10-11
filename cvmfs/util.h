@@ -29,6 +29,7 @@ std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 
+void CreateFile(const std::string &path, const int mode);
 int MakeSocket(const std::string &path, const int mode);
 int ConnectSocket(const std::string &path);
 void MakePipe(int pipe_fd[2]);
