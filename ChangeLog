@@ -1,4 +1,5 @@
 2.1.3:
+  * Added -H "Pragma:" to uses of curl command line tool
   * Added /etc/exports to the bugreport
   * Added .cvmfscache and no_nfs_maps sentinel files
 
