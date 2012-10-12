@@ -20,6 +20,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sched.h>
 
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
@@ -33,6 +34,7 @@
 #include "logging.h"
 #include "options.h"
 #include "util.h"
+#include "atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -82,6 +84,7 @@ bool single_threaded_ = false;
 bool foreground_ = false;
 bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
+atomic_int32 blocking_;
 
 
 static void Usage(const std::string &exename) {
@@ -106,61 +109,87 @@ static void Usage(const std::string &exename) {
 }
 
 
+static inline void FileSystemFence() {
+  while (atomic_read32(&blocking_)) {
+    // Don't sleep, interferes with alarm()
+    sched_yield();
+  }
+}
+
+
+static void stub_init(void *userdata, struct fuse_conn_info *conn) {
+  FileSystemFence();
+}
+
+
+static void stub_destroy(void *userdata) {
+  FileSystemFence();
+}
+
+
 static void stub_lookup(fuse_req_t req, fuse_ino_t parent,
                         const char *name)
 {
-
+  FileSystemFence();
 }
 
 
 static void stub_getattr(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
-
+  FileSystemFence();
 }
 
 
 static void stub_readlink(fuse_req_t req, fuse_ino_t ino) {
+  FileSystemFence();
 }
 
 
 static void stub_opendir(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
+  FileSystemFence();
 }
 
 
 static void stub_releasedir(fuse_req_t req, fuse_ino_t ino,
                             struct fuse_file_info *fi)
 {
+  FileSystemFence();
 }
 
 
 static void stub_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                          off_t off, struct fuse_file_info *fi)
 {
+  FileSystemFence();
 }
 
 
 static void stub_open(fuse_req_t req, fuse_ino_t ino,
                       struct fuse_file_info *fi)
 {
+  FileSystemFence();
 }
 
 
 static void stub_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi)
 {
+  FileSystemFence();
 }
 
 
 static void stub_release(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
+  FileSystemFence();
 }
 
 
 static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
+  FileSystemFence();
 }
 
 
@@ -172,10 +201,12 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                           size_t size)
 #endif
 {
+  FileSystemFence();
 }
 
 
 static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+  FileSystemFence();
 }
 
 
@@ -270,9 +301,8 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
 static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   memset(loader_operations, 0, sizeof(*loader_operations));
 
-  // Init/Fini
-  //cvmfs_operations->init     = cvmfs_init;
-  //cvmfs_operations->destroy  = cvmfs_destroy;
+  loader_operations->init        = stub_init;
+  loader_operations->destroy     = stub_destroy;
 
   loader_operations->lookup      = stub_lookup;
   loader_operations->getattr     = stub_getattr;
@@ -393,6 +423,8 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogSyslog,
            "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
+  atomic_init32(&blocking_);
+  atomic_cas32(&blocking_, 0, 1);
 
   struct fuse_chan *channel;
   channel = fuse_mount(mount_point_->c_str(), mount_options);
