@@ -18,6 +18,10 @@
 
 using namespace std;  // NOLINT
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 namespace options {
 
 struct ConfigValue {
@@ -207,3 +211,7 @@ string Dump() {
 }
 
 }  // namespace options
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif

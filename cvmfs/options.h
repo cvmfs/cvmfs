@@ -8,6 +8,10 @@
 #include <string>
 #include <vector>
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 namespace options {
 
 void Init();
@@ -23,5 +27,9 @@ std::vector<std::string> GetAllKeys();
 std::string Dump();
 
 }  // namespace options
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_OPTIONS_H_

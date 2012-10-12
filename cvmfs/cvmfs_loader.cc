@@ -23,6 +23,8 @@
 #include <cstring>
 #include <string>
 
+#include "smalloc.h"
+
 using namespace std;  // NOLINT
 
 namespace loader {
@@ -185,6 +187,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
 
 
 int main(int argc, char *argv[]) {
+  loader::smalloc(60);
   printf("start\n");
   void *dl_cvmfs = dlopen("libcvmfs_fuse.so", RTLD_NOW | RTLD_LOCAL);
   if (!dl_cvmfs)

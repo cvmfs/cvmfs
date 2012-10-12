@@ -41,6 +41,10 @@
 
 using namespace std;  // NOLINT
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 
 /**
  * Removes a trailing "/" from a path.
@@ -724,3 +728,7 @@ bool ManagedExec(const vector<string> &command_line,
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
   return true;
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif

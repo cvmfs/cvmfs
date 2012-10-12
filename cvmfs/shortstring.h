@@ -16,6 +16,10 @@
 
 #include "atomic.h"
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 const unsigned char kDefaultMaxName = 25;
 const unsigned char kDefaultMaxLink = 25;
 const unsigned char kDefaultMaxPath = 200;
@@ -187,5 +191,9 @@ template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
 template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // SHORTSTRING_H_

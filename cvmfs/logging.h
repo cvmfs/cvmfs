@@ -8,6 +8,10 @@
 // Shared declarations of debug and non-debug logging
 #include "logging_internal.h"
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 void LogCvmfs(const LogSource source, const int mask, const char *format, ...);
 // Ensure that pure debug messages are not compiled except in DEBUGMSG mode
 #ifndef DEBUGMSG
@@ -17,5 +21,9 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...);
 
 void PrintWarning(const std::string &message);
 void PrintError(const std::string &message);
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_LOGGING_H_

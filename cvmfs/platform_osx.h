@@ -7,6 +7,20 @@
 #ifndef CVMFS_PLATFORM_OSX_H_
 #define CVMFS_PLATFORM_OSX_H_
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
+#include <libkern/OSAtomic.h>
+#include <mach/mach.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <alloca.h>
+
+#include <cstring>
+#include <cassert>
+
 /**
  * UNIX domain sockets:
  * MSG_NOSIGNAL prevents send() from sending SIGPIPE
@@ -24,9 +38,6 @@
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.
  */
-
-#include <libkern/OSAtomic.h>
-
 typedef OSSpinLock platform_spinlock;
 
 inline int platform_spinlock_init(platform_spinlock *lock, int pshared) {
@@ -44,8 +55,6 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
 /**
  * pthread_self() is not necessarily an unsigned long.
  */
-#include <mach/mach.h>
-
 inline unsigned long platform_gettid() {
   return mach_thread_self();
 }
@@ -54,11 +63,6 @@ inline unsigned long platform_gettid() {
 /**
  * File system functions, Mac OS X has 64bit functions by default.
  */
-#include <fcntl.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <cassert>
-
 typedef struct dirent platform_dirent64;
 
 inline platform_dirent64 *platform_readdir(DIR *dirp) { return readdir(dirp); }
@@ -90,9 +94,11 @@ inline int platform_readahead(int filedes) {
 /**
  * strdupa does not exist on OSX
  */
-#include <alloca.h>
-#include <cstring>
 #define strdupa(s) strcpy(reinterpret_cast<char *> \
   (alloca(strlen((s)) + 1)), (s))
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_PLATFORM_OSX_H_
