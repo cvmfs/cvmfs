@@ -1566,19 +1566,7 @@ static void CleanupLibcryptoMt(void) {
  * Off we go
  */
 int main(int argc, char *argv[]) {
-  // Set a decent umask for new files (no write access to group/everyone).
-  // We want to allow group write access for the talk-socket.
-  umask(007);
 
-  // Jump into alternative process flavors
-  if (argc > 1) {
-    if (strcmp(argv[1], "__peersrv__") == 0) {
-      return peers::MainPeerServer(argc, argv);
-    }
-    if (strcmp(argv[1], "__cachemgr__") == 0) {
-      return quota::MainCacheManager(argc, argv);
-    }
-  }
 
   int retval;
   int result = -1;

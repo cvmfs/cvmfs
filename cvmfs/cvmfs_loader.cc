@@ -23,7 +23,7 @@
 #include <cstring>
 #include <string>
 
-#include "smalloc.h"
+#include "cvmfs_loader.h"
 
 using namespace std;  // NOLINT
 
@@ -100,6 +100,12 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 
 static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+}
+
+
+static bool ParseOptions(int argc, char *argv[]) {
+  struct fuse_args fuse_args;
+  return false;
 }
 
 }  // namespace loader
@@ -187,7 +193,32 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
 
 
 int main(int argc, char *argv[]) {
-  loader::smalloc(60);
+  // Set a decent umask for new files (no write access to group/everyone).
+  // We want to allow group write access for the talk-socket.
+  umask(007);
+
+  int retval;
+
+  // Jump into alternative process flavors
+  if (argc > 1) {
+    if (strcmp(argv[1], "__peersrv__") == 0) {
+      //return peers::MainPeerServer(argc, argv);
+      // TODO
+      return 1;
+    }
+    if (strcmp(argv[1], "__cachemgr__") == 0) {
+      //return quota::MainCacheManager(argc, argv);
+      // TODO
+      return 1;
+    }
+  }
+
+  retval = loader::ParseOptions(argc, argv);
+  if (!retval)
+    return loader::kFailOptions;
+
+  return loader::kFailOk;
+
   printf("start\n");
   void *dl_cvmfs = dlopen("libcvmfs_fuse.so", RTLD_NOW | RTLD_LOCAL);
   if (!dl_cvmfs)
