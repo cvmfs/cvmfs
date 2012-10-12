@@ -12,6 +12,9 @@ namespace loader {
 enum Failures {
   kFailOk = 0,
   kFailOptions,
+  kFailPermission,
+  kFailMount,
+  kFailFuseLoop,
 };
 
 
@@ -21,6 +24,11 @@ enum Failures {
  * A global CvmfsExports struct is looked up by the loader via dlsym.
  */
 struct CvmfsExports {
+  CvmfsExports() {
+    version = 1;
+    size = sizeof(CvmfsExports);
+  }
+
   uint32_t version;
   uint32_t size;
 };
