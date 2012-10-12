@@ -21,6 +21,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 #include <cstring>
 #include <cassert>
 
+#include <string>
+
 /**
  * UNIX domain sockets:
  * MSG_NOSIGNAL prevents send() from sending SIGPIPE
@@ -96,6 +98,11 @@ inline int platform_readahead(int filedes) {
  */
 #define strdupa(s) strcpy(reinterpret_cast<char *> \
   (alloca(strlen((s)) + 1)), (s))
+
+
+inline std::string platform_libname(const std::string &base_name) {
+  return "lib" + base_name + ".dylib";
+}
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }

@@ -14,6 +14,8 @@
 
 #include <cassert>
 
+#include <string>
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
@@ -73,6 +75,11 @@ inline void platform_disable_kcache(int filedes) {
 
 inline int platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
+}
+
+
+inline std::string platform_libname(const std::string &base_name) {
+  return "lib" + base_name + ".so";
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

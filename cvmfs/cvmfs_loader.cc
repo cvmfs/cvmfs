@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <sched.h>
 
+#include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
 
@@ -86,6 +87,9 @@ bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
 atomic_int32 blocking_;
 atomic_int64 num_operations_;
+void *library_handle_;
+CvmfsExports *cvmfs_exports_;
+LoaderExports *loader_exports_;
 
 
 static void Usage(const std::string &exename) {
@@ -121,6 +125,7 @@ static inline void FileSystemFence() {
 static void stub_init(void *userdata, struct fuse_conn_info *conn) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.init(userdata, conn);
   atomic_dec64(&num_operations_);
 }
 
@@ -128,6 +133,7 @@ static void stub_init(void *userdata, struct fuse_conn_info *conn) {
 static void stub_destroy(void *userdata) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.destroy(userdata);
   // Unmounting, don't decrease num_operations_ counter
 }
 
@@ -137,6 +143,7 @@ static void stub_lookup(fuse_req_t req, fuse_ino_t parent,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.lookup(req, parent, name);
   atomic_dec64(&num_operations_);
 }
 
@@ -146,6 +153,7 @@ static void stub_getattr(fuse_req_t req, fuse_ino_t ino,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.getattr(req, ino, fi);
   atomic_dec64(&num_operations_);
 }
 
@@ -153,6 +161,7 @@ static void stub_getattr(fuse_req_t req, fuse_ino_t ino,
 static void stub_readlink(fuse_req_t req, fuse_ino_t ino) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.readlink(req, ino);
   atomic_dec64(&num_operations_);
 }
 
@@ -162,6 +171,7 @@ static void stub_opendir(fuse_req_t req, fuse_ino_t ino,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.opendir(req, ino, fi);
   atomic_dec64(&num_operations_);
 }
 
@@ -171,6 +181,7 @@ static void stub_releasedir(fuse_req_t req, fuse_ino_t ino,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.releasedir(req, ino, fi);
   atomic_dec64(&num_operations_);
 }
 
@@ -180,6 +191,7 @@ static void stub_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.readdir(req, ino, size, off, fi);
   atomic_dec64(&num_operations_);
 }
 
@@ -189,6 +201,7 @@ static void stub_open(fuse_req_t req, fuse_ino_t ino,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.open(req, ino, fi);
   atomic_dec64(&num_operations_);
 }
 
@@ -198,6 +211,7 @@ static void stub_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.read(req, ino, size, off, fi);
   atomic_dec64(&num_operations_);
 }
 
@@ -207,6 +221,7 @@ static void stub_release(fuse_req_t req, fuse_ino_t ino,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.release(req, ino, fi);
   atomic_dec64(&num_operations_);
 }
 
@@ -214,6 +229,7 @@ static void stub_release(fuse_req_t req, fuse_ino_t ino,
 static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.statfs(req, ino);
   atomic_dec64(&num_operations_);
 }
 
@@ -228,6 +244,11 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+#ifdef __APPLE__
+  cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size, position);
+#else
+  cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size);
+#endif
   atomic_dec64(&num_operations_);
 }
 
@@ -235,6 +256,7 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.listxattr(req, ino, size);
   atomic_dec64(&num_operations_);
 }
 
@@ -347,10 +369,73 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   loader_operations->listxattr   = stub_listxattr;
 }
 
+
+static bool LoadLibrary() {
+  string library_name = "cvmfs_fuse";
+  if (debug_mode_)
+    library_name += "_debug";
+  library_name = platform_libname(library_name);
+
+  library_handle_ = dlopen(library_name.c_str(), RTLD_NOW | RTLD_LOCAL);
+  if (!library_handle_)
+    return false;
+
+  CvmfsExports **exports_ptr =
+    reinterpret_cast<CvmfsExports **>(dlsym(library_handle_, "g_cvmfs_exports"));
+  if (!exports_ptr)
+    return false;
+  cvmfs_exports_ = *exports_ptr;
+
+  return true;
+}
+
 }  // namespace loader
 
 
 using namespace loader;
+
+// Making OpenSSL (libcrypto) thread-safe
+pthread_mutex_t *gLibcryptoLocks;
+
+static void CallbackLibcryptoLock(int mode, int type,
+                                  const char *file, int line) {
+  (void)file;
+  (void)line;
+
+  int retval;
+
+  if (mode & CRYPTO_LOCK) {
+    retval = pthread_mutex_lock(&(gLibcryptoLocks[type]));
+  } else {
+    retval = pthread_mutex_unlock(&(gLibcryptoLocks[type]));
+  }
+  assert(retval == 0);
+}
+
+static unsigned long CallbackLibcryptoThreadId() {
+  return platform_gettid();
+}
+
+static void SetupLibcryptoMt() {
+  gLibcryptoLocks = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
+                                                                  CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
+  for (int i = 0; i < CRYPTO_num_locks(); ++i) {
+    int retval = pthread_mutex_init(&(gLibcryptoLocks[i]), NULL);
+    assert(retval == 0);
+  }
+
+  CRYPTO_set_id_callback(CallbackLibcryptoThreadId);
+  CRYPTO_set_locking_callback(CallbackLibcryptoLock);
+}
+
+static void CleanupLibcryptoMt(void) {
+  CRYPTO_set_locking_callback(NULL);
+  for (int i = 0; i < CRYPTO_num_locks(); ++i)
+    pthread_mutex_destroy(&(gLibcryptoLocks[i]));
+
+  OPENSSL_free(gLibcryptoLocks);
+}
+
 
 int main(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
@@ -373,6 +458,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  SetupLibcryptoMt();
+
   // Option parsing
   struct fuse_args *mount_options;
   mount_options = ParseCmdLine(argc, argv);
@@ -389,6 +476,15 @@ int main(int argc, char *argv[]) {
   } else {
     options::ParseDefault(*repository_name_);
   }
+  loader_exports_ = new LoaderExports();
+  loader_exports_->program_name = argv[0];
+  loader_exports_->foreground = foreground_;
+  loader_exports_->repository_name = *repository_name_;
+  loader_exports_->mount_point = *mount_point_;
+  if (config_files_)
+    loader_exports_->config_files = *config_files_;
+  else
+    loader_exports_->config_files = "";
 
   string parameter;
 
@@ -448,13 +544,28 @@ int main(int argc, char *argv[]) {
   // Options are not needed anymore
   options::Fini();
 
+  // Load and initialize cvmfs library
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+           "CernVM-FS: loading Fuse module... ");
+  if (!LoadLibrary()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load cvmfs library: %s",
+             dlerror());
+    return kFailLoadLibrary;
+  }
+  retval = cvmfs_exports_->fnInit(loader_exports_);
+  if (retval != kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "%s (%d)",
+             cvmfs_exports_->fnGetErrorMsg().c_str(), retval);
+    return retval;
+  }
+  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+
   // Mount
   LogCvmfs(kLogCvmfs, kLogSyslog,
            "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
   atomic_init64(&num_operations_);
   atomic_init32(&blocking_);
-  atomic_cas32(&blocking_, 0, 1);
 
   struct fuse_chan *channel;
   channel = fuse_mount(mount_point_->c_str(), mount_options);
@@ -492,25 +603,19 @@ int main(int argc, char *argv[]) {
   fuse_session_destroy(session);
   fuse_unmount(mount_point_->c_str(), channel);
   fuse_opt_free_args(mount_options);
+  channel = NULL;
+  session = NULL;
+  mount_options = NULL;
+
+  dlclose(library_handle_);
+  library_handle_ = NULL;
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
 
+  CleanupLibcryptoMt();
+
   if (retval != 0)
     return kFailFuseLoop;
   return kFailOk;
-
-  printf("start\n");
-  void *dl_cvmfs = dlopen("libcvmfs_fuse.so", RTLD_NOW | RTLD_LOCAL);
-  if (!dl_cvmfs)
-    printf("ERROR: %s\n", dlerror());
-  if (dlclose(dl_cvmfs) != 0)
-    printf("ERROR: %s\n", dlerror());
-  dl_cvmfs = dlopen("libcvmfs_fuse.so", RTLD_NOW | RTLD_LOCAL);
-  if (!dl_cvmfs)
-    printf("ERROR: %s\n", dlerror());
-  if (dlclose(dl_cvmfs) != 0)
-    printf("ERROR: %s\n", dlerror());
-  printf("stop\n");
-  return 0;
 }

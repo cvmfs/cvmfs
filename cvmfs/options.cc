@@ -103,11 +103,15 @@ void ParsePath(const string &config_file) {
     char c = retval;
     if (c == '\n') {
       line = Trim(line);
-      if (line.empty() || line[0] == '#')
+      if (line.empty() || line[0] == '#') {
+        line = "";
         continue;
+      }
       vector<string> tokens = SplitString(line, '=');
-      if (tokens.size() < 2)
+      if (tokens.size() < 2) {
+        line = "";
         continue;
+      }
 
       string parameter = tokens[0];
       tokens.erase(tokens.begin());
