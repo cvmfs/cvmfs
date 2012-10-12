@@ -85,6 +85,7 @@ bool foreground_ = false;
 bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
 atomic_int32 blocking_;
+atomic_int64 num_operations_;
 
 
 static void Usage(const std::string &exename) {
@@ -119,11 +120,15 @@ static inline void FileSystemFence() {
 
 static void stub_init(void *userdata, struct fuse_conn_info *conn) {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_destroy(void *userdata) {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  // Unmounting, don't decrease num_operations_ counter
 }
 
 
@@ -131,6 +136,8 @@ static void stub_lookup(fuse_req_t req, fuse_ino_t parent,
                         const char *name)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -138,11 +145,15 @@ static void stub_getattr(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_readlink(fuse_req_t req, fuse_ino_t ino) {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -150,6 +161,8 @@ static void stub_opendir(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -157,6 +170,8 @@ static void stub_releasedir(fuse_req_t req, fuse_ino_t ino,
                             struct fuse_file_info *fi)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -164,6 +179,8 @@ static void stub_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                          off_t off, struct fuse_file_info *fi)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -171,6 +188,8 @@ static void stub_open(fuse_req_t req, fuse_ino_t ino,
                       struct fuse_file_info *fi)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -178,6 +197,8 @@ static void stub_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -185,11 +206,15 @@ static void stub_release(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi)
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -202,11 +227,15 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 #endif
 {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
 static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   FileSystemFence();
+  atomic_inc64(&num_operations_);
+  atomic_dec64(&num_operations_);
 }
 
 
@@ -423,6 +452,7 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogSyslog,
            "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
+  atomic_init64(&num_operations_);
   atomic_init32(&blocking_);
   atomic_cas32(&blocking_, 0, 1);
 
