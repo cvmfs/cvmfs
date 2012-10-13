@@ -16,6 +16,7 @@ use Functions::Setup qw(setup fixperm);
 use Functions::ShellSocket qw(connect_shell_socket send_shell_msg receive_shell_msg close_shell_socket term_shell_ctxt bind_shell_socket);
 use Term::ANSIColor;
 use Time::HiRes qw(sleep);
+use Functions::Virtualization qw(start_distributed);
 
 # Next lines are needed to export subroutines to the main package
 use base 'Exporter';
@@ -285,13 +286,25 @@ sub start_daemon {
 	# Setting default values for options
 	my $daemon_output = '/var/log/cvmfs-test/daemon.output';
 	my $daemon_error = '/var/log/cvmfs-test/daemon.error';
+	my $distributed = undef;
+	
+	# Parsing options
+	my $ret = GetOptions ( "stdout=s" => \$daemon_output,
+						   "stderr=s" => \$daemon_error,
+						   "distributed" => \$distributed );
+						   
+	# If a distributed environment is requested, pass everything to start_distributed()
+	if (defined($distributed)){
+		my $error = Functions::Virtualization::start_distributed(@ARGV);
+		if ($error) {
+			my ($socket, $ctxt) = wait_daemon();
+			return ($socket, $ctxt);
+		}
+		return;
+	}
 	
 	if (!check_daemon()){
-		if(check_permission()){				
-			# Parsing options
-			my $ret = GetOptions ( "stdout=s" => \$daemon_output,
-								   "stderr=s" => \$daemon_error );								  
-			
+		if(check_permission()){									  
 			my ($daempid, $daemin, $daemout, $daemerr);
 			print 'Starting daemon... ';
 			my $daemonpid = Proc::Daemon::Init( { 
