@@ -288,10 +288,14 @@ sub start_daemon {
 	my $daemon_error = '/var/log/cvmfs-test/daemon.error';
 	my $distributed = undef;
 	
+	# Options that works only with --distributed but are here to avoid warnings
+	my $force = undef;
+	
 	# Parsing options
 	my $ret = GetOptions ( "stdout=s" => \$daemon_output,
 						   "stderr=s" => \$daemon_error,
-						   "distributed" => \$distributed );
+						   "distributed" => \$distributed,
+						   "force" => \$force );
 						   
 	# If a distributed environment is requested, pass everything to start_distributed()
 	if (defined($distributed)){
