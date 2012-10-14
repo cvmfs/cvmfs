@@ -12,6 +12,7 @@ use Functions::Help qw(help);
 use Proc::Daemon;
 use Fcntl ':mode';
 use Getopt::Long;
+use IO::Interface::Simple;
 use Functions::Setup qw(setup fixperm);
 use Functions::ShellSocket qw(connect_shell_socket send_shell_msg receive_shell_msg close_shell_socket term_shell_ctxt bind_shell_socket);
 use Term::ANSIColor;
@@ -37,6 +38,13 @@ sub check_process {
 	my $process_name = shift;
 	my $running = `ps -fu cvmfs-test | grep -i $process_name | grep -v grep`;
 	return $running;
+}
+
+# This function will accept a network interface and will retrieve the network ip for that interface
+sub get_interface_address {
+	my $iface = shift;
+	my $if = IO::Interface::Simple->new($iface);
+	return $if->address;
 }
 
 # This function is used to check if the command typed has to be ran by the shell

@@ -103,8 +103,12 @@ system('curl --cacert cacert.pem -L http://cpanmin.us | perl - --self-upgrade');
 print "Done.\n";
 
 if (-f '/usr/bin/cpanm') {
-	print 'Installing ZeroMQ perl modules... ';
+	print 'Installing ZeroMQ perl module... ';
 	system('sudo cpanm ZeroMQ');
+	print "Done.\n";
+	
+	print 'Installing IO::Interface perl module... ';
+	system('sudo cpanm IO::Interface';
 	print "Done.\n";
 
 	print 'Upgrading Socket.pm version... ';
