@@ -12,11 +12,13 @@ use Functions::ServerSocket qw(start_socket receive_msg end_msg send_ip);
 use Getopt::Long;
 
 my $shell_path = undef;
+my $iface = 'eth0';
 
-my $ret = GetOptions ("shell-path=s" => \$shell_path );
+my $ret = GetOptions ("shell-path=s" => \$shell_path,
+					  "iface=s" => \$iface );
 
 if (defined($shell_path)) {
-	send_ip($shell_path, 'tcp://', 'eth0');
+	send_ip($shell_path, 'tcp://', $iface);
 }
 
 # Opening the socket and dying if fail

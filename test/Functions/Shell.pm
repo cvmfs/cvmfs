@@ -63,7 +63,7 @@ sub check_command {
 	for ($command){
 		if ($_ eq 'exit' or $_ eq 'quit' or $_ eq 'q') { exit_shell($socket, $ctxt) }
 		elsif ($_ eq 'status') { print_status(); $executed = 1 }
-		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, $command); $executed = 1 }
+		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, undef, undef, $command); $executed = 1 }
 		elsif ($_ =~ m/^help\s*.*/ or $_ =~ m/^h\s.*/) { help($command), $executed = 1 }
 		elsif ($_ eq 'setup' ) { setup(); $executed = 1 }
 		elsif ($_ eq 'fixperm') { fixperm(); $executed = 1 }
@@ -278,6 +278,8 @@ sub get_daemon_output {
 # This function will start the daemon if it's not already running
 sub start_daemon {
 	my $daemon_path = shift;
+	my $shell_path = shift;
+	my $iface = shift;
 	if (defined (@_) and scalar(@_) > 0) {
 		# Retrieving arguments
 		my $line = shift;
@@ -315,6 +317,14 @@ sub start_daemon {
 		return;
 	}
 	
+	# If we are here, we don't have any other command line processing to do, so here we
+	# join @ARGV content to pass it as a string to the daemon.
+	my $daemon_options = "";
+	if (defined($shell_path) and defined($iface)) {
+		$daemon_options = '--shell-path ' . $shell_path . ' --iface ' . $iface;
+		print $daemon_options . "\n";
+	}
+		
 	if (!check_daemon()){
 		if(check_permission()){									  
 			my ($daempid, $daemin, $daemout, $daemerr);
@@ -324,7 +334,7 @@ sub start_daemon {
 													pid_file => '/tmp/daemon.pid',
 													child_STDOUT => $daemon_output,
 													child_STDERR => $daemon_error,
-													exec_command => "./cvmfs-testdwrapper ./cvmfs-testd.pl",
+													exec_command => "./cvmfs-testdwrapper ./cvmfs-testd.pl $daemon_options",
 												} );
 			# Sleep and wait for the daemon to start or fail
 			sleep 1;

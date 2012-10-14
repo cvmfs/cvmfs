@@ -34,11 +34,17 @@ my $continue = undef;
 my $socket = undef;
 my $ctxt = undef;
 
+# Variables for daemon, passed with --start option
+my $shell_path = undef;
+my $iface = undef;
+
 my $ret = GetOptions ( "c|command=s" => \$command,
 					   "wait-daemon" => \$wait_daemon,
 					   "setup" => \$setup,
 					   "start" => \$start,
-					   "h|help" => \$help_message );
+					   "h|help" => \$help_message,
+					   "shell-path=s" => \$shell_path,
+					   "iface=s" => \$iface );
 
 if (defined($help_message)) {
 	my $help = <<'END';
@@ -67,7 +73,7 @@ if (defined($wait_daemon)) {
 }
 
 if (defined($start)) {
-	($socket, $ctxt) = start_daemon($daemon_path);
+	($socket, $ctxt) = start_daemon($daemon_path, $shell_path, $iface);
 	exit_shell($socket, $ctxt, 2);
 }
 
