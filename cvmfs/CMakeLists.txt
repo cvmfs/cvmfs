@@ -10,7 +10,7 @@ set (CVMFS_LOADER_SOURCES
   util.h util.cc
   options.h options.cc
   globals.h globals.cc
-  cvmfs_loader.h cvmfs_loader.cc
+  loader.h loader.cc
 )
 
 set (CVMFS_CLIENT_SOURCES
@@ -46,6 +46,7 @@ set (CVMFS2_DEBUG_SOURCES
   options.cc options.h
   talk.h talk.cc
   nfs_maps.h nfs_maps.cc
+  loader.h
   cvmfs.h cvmfs.cc
 )
 

@@ -83,7 +83,7 @@
 #include "smalloc.h"
 #include "globals.h"
 #include "options.h"
-#include "cvmfs_loader.h"
+#include "loader.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -1669,4 +1669,3 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
-

@@ -23,6 +23,7 @@ enum Failures {
   kFailMount,
   kFailFuseLoop,
   kFailLoadLibrary,
+  lFailIncompatibleVersions,  // TODO
   kFailCacheDir,
   kFailPeers,
   kFailNfsMaps,
@@ -33,6 +34,9 @@ enum Failures {
   kFailCatalog,
   kFailUnknown,
 };
+
+
+// TODO SaveState
 
 
 /**

@@ -14,7 +14,7 @@
 #define _FILE_OFFSET_BITS 64
 
 #include "cvmfs_config.h"
-#include "cvmfs_loader.h"
+#include "loader.h"
 
 #include <sys/resource.h>
 #include <dlfcn.h>
