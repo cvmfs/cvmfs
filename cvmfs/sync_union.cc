@@ -109,6 +109,7 @@ SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
 	ignore_filenames_.insert(".wh..wh..tmp");
 	ignore_filenames_.insert(".wh..wh.plnk");
 	ignore_filenames_.insert(".wh..wh.aufs");
+  ignore_filenames_.insert(".wh..wh.orph");
 	ignore_filenames_.insert(".wh..wh..opq");
 
 	// set the whiteout prefix AUFS preceeds for every whiteout file

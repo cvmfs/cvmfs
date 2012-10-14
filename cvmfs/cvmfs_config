@@ -409,7 +409,7 @@ cvmfs_chksetup()
             org=`cvmfs_getorg $fqrn`
             url=`echo $server | sed s/@org@/$org/g | sed s/@fqrn@/$fqrn/g`
             url="${url}/.cvmfspublished"
-            $proxy_param curl -f --connect-timeout $timeout $url > /dev/null 2>&1
+            $proxy_param curl -H "Pragma:" -f --connect-timeout $timeout $url > /dev/null 2>&1
             if [ $? -ne 0 ]; then
               echo "Warning: failed to access $url through proxy $proxy"
               num_warnings=$[$num_warnings+1]
@@ -543,7 +543,7 @@ cvmfs_stat()
     proxy_effective=
     timeout_effective=$timeout_direct
   fi
-  env http_proxy=$proxy_effective curl -f --connect-timeout $timeout_effective ${host}/.cvmfspublished >/dev/null 2>&1
+  env http_proxy=$proxy_effective curl -H "Pragma:" -f --connect-timeout $timeout_effective ${host}/.cvmfspublished >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     online=1
   else
