@@ -6,8 +6,8 @@ package Functions::Virtualization;
 
 use strict;
 use warnings;
-use FindBin($RealBin);
-use Tests::Common qw(recursive_rm stop_vmtest);
+use FindBin qw($RealBin);
+use Tests::Common qw(recursive_rm);
 use Getopt::Long;
 use Sys::Detect::Virtualization;
 use File::Copy;
@@ -24,7 +24,7 @@ my $vbm = '/usr/bin/VBoxManage';
 # Next lines are needed to export subroutine to the main package
 use base 'Exporter';
 use vars qw/ @EXPORT_OK /;
-@EXPORT_OK = qw(start_distributed);
+@EXPORT_OK = qw(start_distributed stop_vmtest);
 
 # Next function will detect if cvmfs-test is running on a VM. It returns true or false.
 sub detect_virtualization {
@@ -66,11 +66,11 @@ sub check_vmtest {
 sub download_cernvm {
 	my $http_code = getstore('http://cernvm.cern.ch/releases/17/$cernvmgz', "$distributed/$cernvmgz");
 	
-	if ($http_code = 200) {
+	if ($http_code == 200) {
 		return 1;
 	}
 	else {
-		print "\nERROR: Something went wrong while trying to download CernVM image for VirtualBox.\n"
+		print "\nERROR: Something went wrong while trying to download CernVM image for VirtualBox.\n";
 		return 0;
 	}
 }
@@ -83,7 +83,7 @@ sub in_context {
 	system("ssh-keygen -q -t rsa -N \"\" -f $home/.ssh/id_rsa_$vmname");
 	print "Done.\n";
 	
-	print 'Copying RSA key... '
+	print 'Copying RSA key... ';
 	copy("$home/.ssh/id_rsa_$vmname.pub", "$distributed/iso/root.pub");
 	print "Done.\n";
 	
@@ -143,7 +143,7 @@ sub start_distributed {
 	
 	if (detect_virtualization() and !defined($force)) {
 		# Exiting if we're running on a virtual machine
-		print "It seems you're on a virtual machine already.\n"
+		print "It seems you're on a virtual machine already.\n";
 		print "I won't boot a virtual machine inside another one...\n";
 		print "However, if you really want to try, you can use the --force option.\n";
 		return 0;
