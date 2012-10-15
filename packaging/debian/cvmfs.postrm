@@ -25,6 +25,7 @@ case "$1" in
         echo "removing cvmfs user/group..."
 	getent passwd cvmfs > /dev/null && deluser cvmfs
         getent group cvmfs >/dev/null && delgroup cvmfs
+        [ -d /cvmfs ] && rmdir /cvmfs
     ;;
 
     *)
