@@ -22,7 +22,7 @@ case "$1" in
     configure)
         # Create cvmfs user/group
         echo "creating cvmfs user/group..."
-        mkdir /cvmfs
+        mkdir -p /cvmfs
         getent group cvmfs >/dev/null || getent passwd cvmfs > /dev/null || \
 	      adduser --system --group --no-create-home --home /cvmfs cvmfs
 
