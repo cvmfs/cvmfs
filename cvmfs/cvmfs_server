@@ -70,7 +70,7 @@ create_whitelist() {
   echo "N$name" >> ${whitelist}.unsigned
   openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
 
-  local sha1; sha1=`openssl sha1 < ${whitelist}.unsigned | head -c40`
+  local sha1; sha1=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
   echo "--" >> ${whitelist}.unsigned
   echo $sha1 >> ${whitelist}.unsigned
   echo -n $sha1 > ${whitelist}.sha1
@@ -122,7 +122,7 @@ get_local_upstream() {
 
 reload_apache() {
    echo -n "Reloading Apache... "
-   /sbin/service httpd reload > /dev/null
+   ${SERVICE_BIN} ${APACHE} reload > /dev/null
    echo "done"
 }
 
@@ -270,7 +270,7 @@ get_cvmfs_owner() {
   local owner=$2
   local cvmfs_owner
 
-  if [ "x$owner" = "x" ]; then
+  if [ "x$owner" == "x" ]; then
     read -p "Owner of $name [$(whoami)]: " cvmfs_owner
     [ x"$cvmfs_owner" = x ] && cvmfs_owner=$(whoami)
   else
@@ -304,7 +304,7 @@ mkfs() {
   /sbin/modprobe aufs || die "aufs kernel module missing"
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
-  [ -d /etc/httpd ] && /sbin/service httpd status >/dev/null || die "Apache must be installed and running"
+  [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
@@ -318,7 +318,7 @@ CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_UPSTREAM_STORAGE=$upstream
 EOF
-  cat > /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
+  cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 # For pushing files to the worker nodes
 Alias /fanout/cvmfs/$name /cvmfs/$name
@@ -342,7 +342,7 @@ Alias /fanout/$temp_dir $temp_dir
 </Directory>
 EOF
   if is_local_upstream $upstream; then
-    cat >> /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
+    cat >> /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
@@ -461,7 +461,7 @@ add_replica() {
   # Sanity checks
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
   if is_local_upstream $upstream; then
-    [ -d /etc/httpd ] && /sbin/service httpd status >/dev/null || die "Apache must be installed and running"
+    [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
   fi
 
   echo -n "Creating configuration files... "
@@ -483,7 +483,7 @@ CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
   if is_local_upstream $upstream; then
-    cat > /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
+    cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
@@ -543,7 +543,7 @@ rmfs() {
   [ x"$upstream" = x ] && die "Upstream storage undefined"
   [ x"$type" = x ] && die "Repository type undefined"
 
-  if [ "$type" = "stratum0" ]; then
+  if [ "$type" == "stratum0" ]; then
     echo -n "Unmounting CernVM-FS Area... "
     sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
     mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
@@ -566,14 +566,14 @@ rmfs() {
   fi
 
   echo -n "Removing keys and configuration... "
-  if [ "$type" = stratum0 ]; then
+  if [ "$type" == stratum0 ]; then
     rm -f /etc/cvmfs/keys/$name.masterkey \
         /etc/cvmfs/keys/$name.pub \
         /etc/cvmfs/keys/$name.key \
         /etc/cvmfs/keys/$name.crt
   fi
   if is_local_upstream $upstream; then
-    rm -f /etc/httpd/conf.d/cvmfs.${name}.conf
+    rm -f /etc/${APACHE}/conf.d/cvmfs.${name}.conf
     reload_apache > /dev/null
   fi
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
@@ -653,6 +653,12 @@ the command."
 
 . /etc/cvmfs/config.sh
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
+
+# Setup environment
+APACHE="httpd"
+[ ! -z "$(which apache2)" ] && APACHE="apache2"
+SERVICE_BIN=$(which service)
+[ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
 
 select_fqrn() {
   local given_name="$1"
