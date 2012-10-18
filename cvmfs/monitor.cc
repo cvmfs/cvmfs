@@ -264,6 +264,18 @@ bool Init(const string cache_dir, const bool check_max_open_files) {
 
 
 void Fini() {
+  // Reset signal handlers
+  if (spawned_) {
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGILL, SIG_DFL);
+    signal(SIGABRT, SIG_DFL);
+    signal(SIGFPE, SIG_DFL);
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    signal(SIGPIPE, SIG_DFL);
+    signal(SIGXFSZ, SIG_DFL);
+  }
+  
   delete cache_dir_;
   cache_dir_ = NULL;
   if (spawned_) {

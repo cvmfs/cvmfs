@@ -1622,6 +1622,7 @@ static string GetErrorMsg() {
 
 
 static void Fini() {
+  signal(SIGALRM, SIG_DFL);
   tracer::Fini();
   if (g_signature_ready) signature::Fini();
   if (g_download_ready) download::Fini();
