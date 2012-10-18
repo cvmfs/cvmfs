@@ -127,6 +127,7 @@ struct DirectoryListing {
   DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
 };
 
+const loader::LoaderExports *loader_exports_ = NULL;
 bool foreground_ = false;
 bool nfs_maps_ = false;
 string *mountpoint_ = NULL;
@@ -1235,6 +1236,7 @@ loader::CvmfsExports *g_cvmfs_exports = NULL;
 static int Init(const loader::LoaderExports *loader_exports) {
   int retval;
   g_boot_error = new string("unknown error");
+  cvmfs::loader_exports_ = loader_exports;
 
   uint64_t mem_cache_size = cvmfs::kDefaultMemcache;
   unsigned timeout = cvmfs::kDefaultTimeout;
@@ -1254,7 +1256,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool ignore_signature = false;
   string root_hash = "";
 
-  cvmfs::boot_time_ = time(NULL);
+  cvmfs::boot_time_ = loader_exports->boot_time;
 
   // Option parsing
   options::Init();
@@ -1657,6 +1659,7 @@ static void Fini() {
 
 static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports = new loader::CvmfsExports();
+  g_cvmfs_exports->so_version = PACKAGE_VERSION;
   g_cvmfs_exports->fnInit = Init;
   g_cvmfs_exports->fnSpawn = Spawn;
   g_cvmfs_exports->fnFini = Fini;

@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sched.h>
+#include <time.h>
 
 #include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
@@ -385,6 +386,10 @@ static bool LoadLibrary() {
   if (!exports_ptr)
     return false;
   cvmfs_exports_ = *exports_ptr;
+  LoadEvent *load_event = new LoadEvent();
+  load_event->timestamp = time(NULL);
+  load_event->so_version = cvmfs_exports_->so_version;
+  loader_exports_->history.push_back(load_event);
 
   return true;
 }
@@ -477,6 +482,8 @@ int main(int argc, char *argv[]) {
     options::ParseDefault(*repository_name_);
   }
   loader_exports_ = new LoaderExports();
+  loader_exports_->loader_version = PACKAGE_VERSION;
+  loader_exports_->boot_time = time(NULL);
   loader_exports_->program_name = argv[0];
   loader_exports_->foreground = foreground_;
   loader_exports_->repository_name = *repository_name_;
@@ -589,6 +596,8 @@ int main(int argc, char *argv[]) {
   if (!foreground_)
     Daemonize();
 
+  cvmfs_exports_->fnSpawn();
+
   retval = fuse_set_signal_handlers(session);
   assert(retval == 0);
   fuse_session_add_chan(session, channel);
@@ -596,6 +605,8 @@ int main(int argc, char *argv[]) {
     retval = fuse_session_loop(session);
   else
     retval = fuse_session_loop_mt(session);
+
+  cvmfs_exports_->fnFini();
 
   // Unmount
   fuse_session_remove_chan(channel);

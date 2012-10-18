@@ -9,10 +9,12 @@
 #define _FILE_OFFSET_BITS 64
 
 #include <stdint.h>
+#include <time.h>
 #include <fuse/fuse_lowlevel.h>
 
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace loader {
 
@@ -39,24 +41,44 @@ enum Failures {
 // TODO SaveState
 
 
+struct LoadEvent {
+  LoadEvent() {
+    version = 1;
+    size = sizeof(LoadEvent);
+    timestamp = 0;
+  }
+
+  uint32_t version;
+  uint32_t size;
+  time_t timestamp;
+  std::string so_version;
+};
+
+
 /**
  * This contains the public interface of the cvmfs loader.
  * Whenever something changes, change the version number.
  */
 struct LoaderExports {
+  typedef std::vector<LoadEvent *> EventList;
+
   LoaderExports() {
     version = 1;
     size = sizeof(LoaderExports);
     foreground = false;
+    boot_time = 0;
   }
 
   uint32_t version;
   uint32_t size;
+  time_t boot_time;
+  std::string loader_version;
   bool foreground;
   std::string repository_name;
   std::string mount_point;
   std::string config_files;
   std::string program_name;
+  EventList history;
 };
 
 
@@ -78,6 +100,7 @@ struct CvmfsExports {
 
   uint32_t version;
   uint32_t size;
+  std::string so_version;
 
   int (*fnInit)(const LoaderExports *loader_exports);
   void (*fnSpawn)();
