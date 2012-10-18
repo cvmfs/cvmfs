@@ -91,6 +91,7 @@ struct CvmfsExports {
   CvmfsExports() {
     version = 1;
     size = sizeof(CvmfsExports);
+    fnAltProcessFlavor = NULL;
     fnInit = NULL;
     fnSpawn = NULL;
     fnFini = NULL;
@@ -102,6 +103,7 @@ struct CvmfsExports {
   uint32_t size;
   std::string so_version;
 
+  int (*fnAltProcessFlavor)(int argc, char **argv);
   int (*fnInit)(const LoaderExports *loader_exports);
   void (*fnSpawn)();
   void (*fnFini)();

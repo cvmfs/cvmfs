@@ -371,27 +371,31 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
 }
 
 
-static bool LoadLibrary() {
+static CvmfsExports *LoadLibrary(const bool debug_mode,
+                                 LoaderExports *loader_exports)
+{
   string library_name = "cvmfs_fuse";
-  if (debug_mode_)
+  if (debug_mode)
     library_name += "_debug";
   library_name = platform_libname(library_name);
 
   library_handle_ = dlopen(library_name.c_str(), RTLD_NOW | RTLD_LOCAL);
   if (!library_handle_)
-    return false;
+    return NULL;
 
   CvmfsExports **exports_ptr =
     reinterpret_cast<CvmfsExports **>(dlsym(library_handle_, "g_cvmfs_exports"));
   if (!exports_ptr)
-    return false;
-  cvmfs_exports_ = *exports_ptr;
-  LoadEvent *load_event = new LoadEvent();
-  load_event->timestamp = time(NULL);
-  load_event->so_version = cvmfs_exports_->so_version;
-  loader_exports_->history.push_back(load_event);
+    return NULL;
 
-  return true;
+  if (loader_exports) {
+    LoadEvent *load_event = new LoadEvent();
+    load_event->timestamp = time(NULL);
+    load_event->so_version = (*exports_ptr)->so_version;
+    loader_exports->history.push_back(load_event);
+  }
+
+  return *exports_ptr;
 }
 
 }  // namespace loader
@@ -448,19 +452,15 @@ int main(int argc, char *argv[]) {
   umask(007);
 
   int retval;
-
-  // Jump into alternative process flavors
-  if (argc > 1) {
-    if (strcmp(argv[1], "__peersrv__") == 0) {
-      //return peers::MainPeerServer(argc, argv);
-      // TODO
-      return 1;
-    }
-    if (strcmp(argv[1], "__cachemgr__") == 0) {
-      //return quota::MainCacheManager(argc, argv);
-      // TODO
-      return 1;
-    }
+  
+  // Jump into alternative process flavors (e.g. shared cache manager)
+  // We are here due to a fork+execve (ManagedExec in util.cc)
+  if ((argc > 1) && (strstr(argv[1], "__") == argv[1])) {
+    debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
+    cvmfs_exports_ = LoadLibrary(debug_mode_, NULL);
+    if (!cvmfs_exports_)
+      return kFailLoadLibrary;
+    return cvmfs_exports_->fnAltProcessFlavor(argc, argv);
   }
 
   SetupLibcryptoMt();
@@ -492,7 +492,7 @@ int main(int argc, char *argv[]) {
     loader_exports_->config_files = *config_files_;
   else
     loader_exports_->config_files = "";
-
+  
   string parameter;
 
   // Logging
@@ -554,7 +554,8 @@ int main(int argc, char *argv[]) {
   // Load and initialize cvmfs library
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "CernVM-FS: loading Fuse module... ");
-  if (!LoadLibrary()) {
+  cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
+  if (!cvmfs_exports_) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load cvmfs library: %s",
              dlerror());
     return kFailLoadLibrary;

@@ -647,6 +647,17 @@ void Daemonize() {
 }
 
 
+bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
+  int pipe_stdin[2];
+  int pipe_stdout[2];
+  int pipe_stderr[2];
+  MakePipe(pipe_stdin);
+  MakePipe(pipe_stdout);
+  MakePipe(pipe_stderr);
+  return false;
+}
+
+
 /**
  * Execve to the given command line, preserving the given file descriptors.
  * If stdin, stdout, stderr should be preserved, add 0, 1, 2.
@@ -707,6 +718,9 @@ bool ManagedExec(const vector<string> &command_line,
       goto fork_failure;
     }
 
+#ifdef DEBUGMSG
+    assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
+#endif
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = 'E';
