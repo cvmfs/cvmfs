@@ -56,6 +56,7 @@ enum {
   KEY_FOREGROUND,
   KEY_SINGLETHREAD,
   KEY_DEBUG,
+  KEY_OPTIONS_PARSE,
 };
 #define CVMFS_OPT(t, p, v) { t, offsetof(struct CvmfsOptions, p), v }
 #define CVMFS_SWITCH(t, p) { t, offsetof(struct CvmfsOptions, p), 1 }
@@ -73,6 +74,8 @@ static struct fuse_opt cvmfs_array_opts[] = {
   FUSE_OPT_KEY("-d",            KEY_DEBUG),
   FUSE_OPT_KEY("debug",         KEY_DEBUG),
   FUSE_OPT_KEY("-s",            KEY_SINGLETHREAD),
+  FUSE_OPT_KEY("parse",            KEY_OPTIONS_PARSE),
+  FUSE_OPT_KEY("-k",            KEY_OPTIONS_PARSE),
   {0, 0, 0},
 };
 
@@ -86,6 +89,7 @@ bool single_threaded_ = false;
 bool foreground_ = false;
 bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
+bool parse_options_only_ = false;
 atomic_int32 blocking_;
 atomic_int64 num_operations_;
 void *library_handle_;
@@ -99,13 +103,14 @@ static void Usage(const std::string &exename) {
     "Version %s\n"
     "Copyright (c) 2009- CERN, all rights reserved\n\n"
     "Please visit http://cernvm.cern.ch for details.\n\n"
-    "Usage: %s [-s] [-d] [-o mount options] <repository name> <mount point>\n"
+    "Usage: %s [-s] [-d] [-k] [-o mount options] <repository name> <mount point>\n"
     "CernVM-FS mount options:\n"
     "  -o config=FILES      colon-separated path list of config files\n"
     "  -o uid=UID           Drop credentials to another user\n"
     "  -o gid=GID           Drop credentials to another group\n"
     "  -o grab_mountpoint   give ownership of the mountpoint to the user "
-                            "before mounting (required for autofs)\n\n"
+                            "before mounting (required for autofs)\n"
+    "  -o parse             Parse and print cvmfs parameters\n\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -316,6 +321,9 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       fuse_opt_add_arg(outargs, "-d");
       debug_mode_ = true;
       return 0;
+    case KEY_OPTIONS_PARSE:
+      parse_options_only_ = true;
+      return 0;
     default:
       LogCvmfs(kLogCvmfs, kLogStderr, "internal option parsing error");
       abort();
@@ -492,6 +500,12 @@ int main(int argc, char *argv[]) {
     loader_exports_->config_files = *config_files_;
   else
     loader_exports_->config_files = "";
+
+  if (parse_options_only_) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "# CernVM-FS parameters:\n%s",
+             options::Dump().c_str());
+    return 0;
+  }
   
   string parameter;
 

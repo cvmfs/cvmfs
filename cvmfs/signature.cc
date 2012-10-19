@@ -232,8 +232,8 @@ bool LoadBlacklist(const std::string &path_blacklist) {
 
   unsigned num_bytes = 0;
   while (num_bytes < buffer_size) {
-    const string fingerprint = GetLine(buffer + num_bytes,
-                                       buffer_size - num_bytes);
+    const string fingerprint = GetLineMem(buffer + num_bytes,
+                                          buffer_size - num_bytes);
     blacklisted_certificates_->push_back(fingerprint);
     num_bytes += fingerprint.length() + 1;
   }

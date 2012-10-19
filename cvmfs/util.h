@@ -71,14 +71,17 @@ std::string JoinStrings(const std::vector<std::string> &strings,
 
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
-std::string GetLine(const char *text, const int text_size);
+std::string GetLineMem(const char *text, const int text_size);
+bool GetLineFile(FILE *f, std::string *line);
+bool GetLineFd(const int fd, std::string *line);
 std::string Trim(const std::string &raw);
 std::string ToUpper(const std::string &mixed_case);
 
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ManagedExec(const std::vector<std::string> &command_line,
-                 const std::vector<int> &preserve_fildes);
+                 const std::vector<int> &preserve_fildes,
+                 const std::map<int, int> &map_fildes);
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }

@@ -573,11 +573,37 @@ double DiffTimeSeconds(struct timeval start, struct timeval end) {
 }
 
 
-string GetLine(const char *text, const int text_size) {
+string GetLineMem(const char *text, const int text_size) {
   int pos = 0;
   while ((pos < text_size) && (text[pos] != '\n'))
     pos++;
   return string(text, pos);
+}
+
+
+bool GetLineFile(FILE *f, std::string *line) {
+  int retval;
+  line->clear();
+  while ((retval = fgetc(f)) != EOF) {
+    char c = retval;
+    if (c == '\n')
+      break;
+    line->push_back(c);
+  }
+  return retval != EOF;
+}
+
+
+bool GetLineFd(const int fd, std::string *line) {
+  int retval;
+  char c;
+  line->clear();
+  while ((retval = read(fd, &c, 1)) == 1) {
+    if (c == '\n')
+      break;
+    line->push_back(c);
+  }
+  return retval == 1;
 }
 
 
@@ -647,6 +673,10 @@ void Daemonize() {
 }
 
 
+/**
+ * Opens /bin/sh and provides file descriptors to write into stdin and
+ * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
+ */
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   int pipe_stdin[2];
   int pipe_stdout[2];
@@ -654,19 +684,49 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   MakePipe(pipe_stdin);
   MakePipe(pipe_stdout);
   MakePipe(pipe_stderr);
-  return false;
+  
+  vector<int> preserve_fildes;
+  preserve_fildes.push_back(0);
+  preserve_fildes.push_back(1);
+  preserve_fildes.push_back(2);
+  map<int, int> map_fildes;
+  map_fildes[pipe_stdin[0]] = 0;  // Reading end of pipe_stdin
+  map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
+  map_fildes[pipe_stderr[1]] = 2;  // Writing end of pipe_stderr
+  vector<string> cmd_line;
+  cmd_line.push_back("/bin/sh");
+
+  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes)) {
+    ClosePipe(pipe_stdin);
+    ClosePipe(pipe_stdout);
+    ClosePipe(pipe_stderr);
+    return false;
+  }
+
+  close(pipe_stdin[0]);
+  close(pipe_stdout[1]);
+  close(pipe_stderr[1]);
+  *fd_stdin = pipe_stdin[1];
+  *fd_stdout = pipe_stdout[0];
+  *fd_stderr = pipe_stderr[0];
+  return true;
 }
 
 
 /**
  * Execve to the given command line, preserving the given file descriptors.
  * If stdin, stdout, stderr should be preserved, add 0, 1, 2.
+ * File descriptors from the parent process can also be mapped to the new
+ * process (dup2) using map_fildes.  Can be useful for
+ * stdout/in/err redirection.
+ * NOTE: The destination fildes have to be preserved!
  * Does a double fork to detach child.
  * The command_line parameter contains the binary at index 0 and the arguments
  * in the rest of the vector.
  */
 bool ManagedExec(const vector<string> &command_line,
-                 const vector<int> &preserve_fildes)
+                 const vector<int> &preserve_fildes,
+                 const map<int, int> &map_fildes)
 {
   assert(command_line.size() >= 1);
 
@@ -683,6 +743,17 @@ bool ManagedExec(const vector<string> &command_line,
     for (unsigned i = 0; i < command_line.size(); ++i)
       argv[i] = command_line[i].c_str();
     argv[command_line.size()] = NULL;
+
+    // Child, map file descriptors
+    for (map<int, int>::const_iterator i = map_fildes.begin(),
+         iEnd = map_fildes.end(); i != iEnd; ++i)
+    {
+      int retval = dup2(i->first, i->second);
+      if (retval == -1) {
+        failed = 'D';
+        goto fork_failure;
+      }
+    }
 
     // Child, close file descriptors
     max_fd = sysconf(_SC_OPEN_MAX);

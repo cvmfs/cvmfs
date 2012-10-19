@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <cassert>
+#include <cstdlib>
 
 #include <map>
 
@@ -39,30 +40,6 @@ void Init() {
 
 void Fini() {
   delete config_;
-}
-
-
-static string UnescapeShell(const std::string &raw) {
-  string result;
-
-  char opening_quote = '\0';
-  for (unsigned i = 0, l = raw.length(); i < l; ++i) {
-    const char c = raw[i];
-    if (c == '\0')
-      return "NULL character in value";
-    if (c == opening_quote) {
-      opening_quote = '\0';
-      continue;
-    }
-    if (c == '"' || c == '\'') {
-      opening_quote = c;
-      continue;
-    }
-    if (c == '\\')
-      continue;
-    result.push_back(c);
-  }
-  return result;
 }
 
 
@@ -96,35 +73,57 @@ void ParsePath(const string &config_file) {
   if (!fconfig)
     return;
 
-  // Read line by line
   int retval;
-  string line;
-  while ((retval = fgetc(fconfig)) != EOF) {
-    char c = retval;
-    if (c == '\n') {
-      line = Trim(line);
-      if (line.empty() || line[0] == '#') {
-        line = "";
-        continue;
-      }
-      vector<string> tokens = SplitString(line, '=');
-      if (tokens.size() < 2) {
-        line = "";
-        continue;
-      }
+  
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  retval = Shell(&fd_stdin, &fd_stdout, &fd_stderr);
+  assert(retval);
 
-      string parameter = tokens[0];
-      tokens.erase(tokens.begin());
-      ConfigValue value;
-      value.source = config_file;
-      value.value = UnescapeShell(JoinStrings(tokens, "="));
-      (*config_)[parameter] = value;
-      line = "";
-    } else {
-      line.push_back(c);
+  // Let the shell read the file
+  string line;
+  const string newline = "\n";
+  while (GetLineFile(fconfig, &line)) {
+    WritePipe(fd_stdin, line.data(), line.length());
+    WritePipe(fd_stdin, newline.data(), newline.length());
+  }
+  rewind(fconfig);
+  
+  // Read line by line and extract parameters
+  while (GetLineFile(fconfig, &line)) {
+    line = Trim(line);
+    if (line.empty() || line[0] == '#' || line.find("if ") == 0)
+      continue;
+    vector<string> tokens = SplitString(line, '=');
+    if (tokens.size() < 2)
+      continue;
+
+    ConfigValue value;
+    value.source = config_file;
+    string parameter = tokens[0];
+    // Strip "readonly"
+    if (parameter.find("readonly") == 0) {
+      parameter = parameter.substr(8);
+      parameter = Trim(parameter);
     }
+    // Strip export
+    if (parameter.find("export") == 0) {
+      parameter = parameter.substr(6);
+      parameter = Trim(parameter);
+    }
+    
+    const string sh_echo = "echo $" + parameter + "\n";
+    WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
+    GetLineFd(fd_stdout, &value.value);
+    (*config_)[parameter] = value;
+    retval = setenv(parameter.c_str(), value.value.c_str(), 1);
+    assert(retval == 0);
   }
 
+  close(fd_stderr);
+  close(fd_stdout);
+  close(fd_stdin);
   fclose(fconfig);
 }
 

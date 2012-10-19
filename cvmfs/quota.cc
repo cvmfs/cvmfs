@@ -926,7 +926,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(pipe_handshake[0]);
 
-  retval = ManagedExec(command_line, preserve_filedes);
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>());
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
