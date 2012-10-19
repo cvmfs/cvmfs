@@ -55,7 +55,8 @@ enum {
   KEY_VERSION,
   KEY_FOREGROUND,
   KEY_SINGLETHREAD,
-  KEY_DEBUG,
+  KEY_FUSE_DEBUG,
+  KEY_CVMFS_DEBUG,
   KEY_OPTIONS_PARSE,
 };
 #define CVMFS_OPT(t, p, v) { t, offsetof(struct CvmfsOptions, p), v }
@@ -71,10 +72,10 @@ static struct fuse_opt cvmfs_array_opts[] = {
   FUSE_OPT_KEY("-h",            KEY_HELP),
   FUSE_OPT_KEY("--help",        KEY_HELP),
   FUSE_OPT_KEY("-f",            KEY_FOREGROUND),
-  FUSE_OPT_KEY("-d",            KEY_DEBUG),
-  FUSE_OPT_KEY("debug",         KEY_DEBUG),
+  FUSE_OPT_KEY("-d",            KEY_FUSE_DEBUG),
+  FUSE_OPT_KEY("debug",         KEY_CVMFS_DEBUG),
   FUSE_OPT_KEY("-s",            KEY_SINGLETHREAD),
-  FUSE_OPT_KEY("parse",            KEY_OPTIONS_PARSE),
+  FUSE_OPT_KEY("parse",         KEY_OPTIONS_PARSE),
   FUSE_OPT_KEY("-k",            KEY_OPTIONS_PARSE),
   {0, 0, 0},
 };
@@ -317,8 +318,9 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
     case KEY_SINGLETHREAD:
       single_threaded_ = true;
       return 0;
-    case KEY_DEBUG:
+    case KEY_FUSE_DEBUG:
       fuse_opt_add_arg(outargs, "-d");
+    case KEY_CVMFS_DEBUG:
       debug_mode_ = true;
       return 0;
     case KEY_OPTIONS_PARSE:
@@ -435,7 +437,7 @@ static unsigned long CallbackLibcryptoThreadId() {
 
 static void SetupLibcryptoMt() {
   gLibcryptoLocks = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
-                                                                  CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
+    CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
   for (int i = 0; i < CRYPTO_num_locks(); ++i) {
     int retval = pthread_mutex_init(&(gLibcryptoLocks[i]), NULL);
     assert(retval == 0);
