@@ -76,6 +76,8 @@ bool GetLineFile(FILE *f, std::string *line);
 bool GetLineFd(const int fd, std::string *line);
 std::string Trim(const std::string &raw);
 std::string ToUpper(const std::string &mixed_case);
+std::string ReplaceAll(const std::string &haystack, const std::string &needle,
+                       const std::string &replace_by);
 
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);

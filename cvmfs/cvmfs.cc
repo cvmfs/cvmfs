@@ -1297,8 +1297,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     kcache_timeout = String2Int64(parameter);
   if (options::GetValue("CVMFS_QUOTA_LIMIT", &parameter))
     quota_limit = String2Int64(parameter) * 1024*1024;
-  if (options::GetValue("CVMFS_SERVER_URL", &parameter))
-    hostname = parameter;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
@@ -1321,6 +1319,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       options::IsOn(parameter))
   {
     ignore_signature = true;
+  }
+  if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
+    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
+    const string org = tokens[0];
+    hostname = ReplaceAll(parameter, "@org@", org);
   }
   if (options::GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);

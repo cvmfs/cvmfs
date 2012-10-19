@@ -639,6 +639,18 @@ string ToUpper(const string &mixed_case) {
 }
 
 
+string ReplaceAll(const string &haystack, const string &needle,
+                  const string &replace_by)
+{
+  string result(haystack);
+  size_t pos = 0;
+  const unsigned needle_size = needle.size();
+  while ((pos = result.find(needle, pos)) != string::npos)
+    result.replace(pos, needle_size, replace_by);
+  return result;
+}
+
+
 /**
  * Makes a daemon.  The daemon() call is deprecated on OS X
  */
