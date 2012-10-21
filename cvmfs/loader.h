@@ -25,7 +25,7 @@ enum Failures {
   kFailMount,
   kFailFuseLoop,
   kFailLoadLibrary,
-  lFailIncompatibleVersions,  // TODO
+  kFailIncompatibleVersions,  // TODO
   kFailCacheDir,
   kFailPeers,
   kFailNfsMaps,

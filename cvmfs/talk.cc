@@ -42,6 +42,7 @@
 #include "lru.h"
 #include "nfs_maps.h"
 #include "loader.h"
+#include "options.h"
 
 using namespace std;  // NOLINT
 
@@ -387,6 +388,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "pid") {
         const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
+      } else if (line == "parameters") {
+        Answer(con_fd, options::Dump());
       } else if (line == "hotpatch history") {
         string history_str =
           StringifyTime(cvmfs::loader_exports_->boot_time, false) +

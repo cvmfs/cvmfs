@@ -10,6 +10,7 @@ set (CVMFS_LOADER_SOURCES
   util.h util.cc
   options.h options.cc
   globals.h globals.cc
+  loader_talk.h loader_talk.cc
   loader.h loader.cc
 )
 
