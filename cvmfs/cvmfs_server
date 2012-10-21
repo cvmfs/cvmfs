@@ -657,7 +657,7 @@ the command."
 
 # Setup environment
 APACHE="httpd"
-[ ! -z "$(which apache2)" ] && APACHE="apache2"
+[ which apache2 >/dev/null 2>&1 ] && APACHE="apache2"
 SERVICE_BIN=$(which service)
 [ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
 
