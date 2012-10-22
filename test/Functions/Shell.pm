@@ -40,13 +40,6 @@ sub check_process {
 	return $running;
 }
 
-# This function will accept a network interface and will retrieve the network ip for that interface
-sub get_interface_address {
-	my $iface = shift;
-	my $if = IO::Interface::Simple->new($iface);
-	return $if->address;
-}
-
 # This function is used to check if the command typed has to be ran by the shell
 # or by the daemon. If the command is bundled in the shell, it launches the
 # corresponding function.
@@ -303,9 +296,9 @@ sub start_daemon {
 	
 	# Parsing options
 	my $ret = GetOptions ( "stdout=s" => \$daemon_output,
-						   "stderr=s" => \$daemon_error,
-						   "distributed" => \$distributed,
-						   "force" => \$force );
+						    "stderr=s" => \$daemon_error,
+						    "distributed" => \$distributed,
+						    "force" => \$force );
 						   
 	# If a distributed environment is requested, pass everything to start_distributed()
 	if (defined($distributed)){

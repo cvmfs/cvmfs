@@ -10,6 +10,7 @@ use FindBin qw($RealBin);
 use Tests::Common qw(recursive_rm);
 use Getopt::Long;
 use Sys::Detect::Virtualization;
+use IO::Interface::Simple;
 use File::Copy;
 use LWP::Simple;
 
@@ -37,6 +38,13 @@ sub detect_virtualization {
     else {
 		return 0;
 	}
+}
+
+# This function will accept a network interface and will retrieve the network ip for that interface
+sub get_interface_address {
+	my $iface = shift;
+	my $if = IO::Interface::Simple->new($iface);
+	return $if->address;
 }
 
 # Next funxtion checks if $vbm is installed
@@ -77,6 +85,8 @@ sub download_cernvm {
 
 # This function will create the file to import ssh keys to newly generated machine
 sub in_context {
+	my $shell_address = shift;
+	
 	mkdir("$distributed/iso");
 	
 	print 'Generating RSA keys... ';
@@ -94,9 +104,18 @@ sub in_context {
 	print "Done.\n";
 	
 	print 'Creating prolog.sh... ';
-	open(my $prologsh, '>', "$distributed/iso/prolog.sh");
+	open (my $prologsh, '<', "$distributed/prolog.sh");
+	open (my $newprolog, '>', "$distributed/iso/prolog.sh");
+	while (my $line = $prologsh->getline) {
+		if($line =~ m/^SHELLPATH/ ) {
+			print $newprolog "SHELLPATH=\"$shell_address\"";
+		}
+		else {
+			print $newprolog $line;
+		}
+	}
+	close($newprolog);
 	close($prologsh);
-	print "Done.\n";
 	
 	print 'Generating context.iso... ';
 	system("mkisofs -o $distributed/context.iso $distributed/iso");
@@ -135,11 +154,20 @@ sub start_distributed {
 	my $daemon_output = undef;
 	my $daemon_error = undef;
 	my $force = undef;
+	my $shell_iface = 'eth0';
 	
 	my $ret = GetOptions ( "distributed" => \$distributed,
 						   "stdout=s" => \$daemon_output,
 						   "stderr=s" => \$daemon_error,
-						   "force" => \$force );
+						   "force" => \$force,
+						   "shell-iface=s" => \$shell_iface );
+						   
+	my $shell_address = get_interface_address($shell_iface);
+	unless ($shell_address) {
+		print "The system was unable to retrieve an ip address for the interface $shell_iface.\n";
+		print "Please, set an ip address for $shell_iface or select another interface with the command '--shell-iface INTERFACE.\n";
+		return 0;
+	}
 	
 	if (detect_virtualization() and !defined($force)) {
 		# Exiting if we're running on a virtual machine
@@ -175,10 +203,10 @@ sub start_distributed {
 			print 'Erasing $distributed/cernvm.vdi.gz... ';
 			unlink("$distributed/$cernvmgz");
 			print "Done.\n";
-			
-			# Generating the contextualization iso
-			in_context();
 		}
+		
+		# Generating the contextualization iso
+		in_context($shell_address);
 		
 		# Generating the VirtualBox machine
 		if (!check_vmtest()) {
