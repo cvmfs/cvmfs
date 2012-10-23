@@ -53,7 +53,6 @@ void WritableCatalog::InitPreparedStatements() {
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
   sql_insert_ = new SqlDirentInsert(database());
-  sql_touch_ = new SqlDirentTouch(database());
   sql_unlink_ = new SqlDirentUnlink(database());
   sql_update_ = new SqlDirentUpdate(database());
   sql_max_link_id_ = new SqlMaxHardlinkGroup(database());
@@ -65,7 +64,6 @@ void WritableCatalog::FinalizePreparedStatements() {
   // no polymorphism: no up call (see Catalog.h -
   // near the definition of this method)
   delete sql_insert_;
-  delete sql_touch_;
   delete sql_unlink_;
   delete sql_update_;
   delete sql_max_link_id_;
@@ -115,28 +113,6 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
   sql_insert_->Reset();
 
   delta_counters_.DeltaDirent(entry, 1);
-}
-
-
-/**
- * Set the mtime of a DirectoryEntry in the catalog to the current time
- * (utime or what the 'touch' command does)
- * @param entry the entry structure which will be touched
- * @param entry_path the full path of the entry to touch
- * @return true on successful touching, false otherwise
- */
-void WritableCatalog::TouchEntry(const DirectoryEntry &entry,
-                                 const std::string &entry_path) {
-  SetDirty();
-
-  // perform a touch operation for the given path
-  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(entry_path));
-  bool retval =
-    sql_touch_->BindPathHash(path_hash) &&
-    sql_touch_->BindTimestamp(entry.mtime()) &&
-    sql_touch_->Execute();
-  assert(retval);
-  sql_touch_->Reset();
 }
 
 

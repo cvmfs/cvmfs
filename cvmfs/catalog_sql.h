@@ -414,17 +414,6 @@ class SqlDirentUpdate : public SqlDirentWrite {
 //------------------------------------------------------------------------------
 
 
-class SqlDirentTouch : public Sql {
- public:
-  SqlDirentTouch(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
-  bool BindTimestamp(time_t timestamp);
-};
-
-
-//------------------------------------------------------------------------------
-
-
 class SqlDirentUnlink : public Sql {
  public:
   SqlDirentUnlink(const Database &database);
