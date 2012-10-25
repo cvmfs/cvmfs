@@ -17,8 +17,8 @@ use LWP::Simple;
 my $distributed = "$RealBin/Distributed";
 my $home = $ENV{"HOME"};
 my $cernvmurl = 'http://cernvm.cern.ch/releases/17/cernvm-basic-2.6.0-4-1-x86_64.vdi.gz';
-my $cernvmgz = 'cernvm-basic-2.6.0-4-1-x86_64.vdi.gz';
-my $cernvmvdi = 'cernvm-basic-2.6.0-4-1-x86_64.vdi';
+my $cernvmgz = 'cernvm-desktop-2.6.0-4-1-x86_64.vdi.gz';
+my $cernvmvdi = 'cernvm-desktop-2.6.0-4-1-x86_64.vdi';
 my $vmname = 'CVMFSTEST';
 my $vbm = '/usr/bin/VBoxManage';
 
@@ -49,7 +49,7 @@ sub get_interface_address {
 
 # Next funxtion checks if $vbm is installed
 sub check_vbm {
-	if (-f '$vbm') {
+	if (-f $vbm) {
 		return 1;
 	}
 	else {
@@ -72,13 +72,13 @@ sub check_vmtest {
 
 # Next function will download CernVM image for VirtualBox
 sub download_cernvm {
-	my $http_code = getstore('http://cernvm.cern.ch/releases/17/$cernvmgz', "$distributed/$cernvmgz");
+	my $http_code = getstore("http://cernvm.cern.ch/releases/17/$cernvmgz", "$distributed/$cernvmgz");
 	
 	if ($http_code == 200) {
 		return 1;
 	}
 	else {
-		print "\nERROR: Something went wrong while trying to download CernVM image for VirtualBox.\n";
+		print "\nERROR: Something went wrong while trying to download CernVM image for VirtualBox: $!.\n";
 		return 0;
 	}
 }
@@ -88,10 +88,15 @@ sub in_context {
 	my $shell_address = shift;
 	
 	mkdir("$distributed/iso");
-	
-	print 'Generating RSA keys... ';
-	system("ssh-keygen -q -t rsa -N \"\" -f $home/.ssh/id_rsa_$vmname");
-	print "Done.\n";
+
+	if (!-f "$home/.ssh/id_rsa_$vmname" ) {
+		print 'Generating RSA keys... ';
+		system("ssh-keygen -q -t rsa -N \"\" -f $home/.ssh/id_rsa_$vmname");
+		print "Done.\n";
+	}
+	else {
+		print "RSA keys already created.\n";
+	}
 	
 	print 'Copying RSA key... ';
 	copy("$home/.ssh/id_rsa_$vmname.pub", "$distributed/iso/root.pub");
@@ -104,18 +109,19 @@ sub in_context {
 	print "Done.\n";
 	
 	print 'Creating prolog.sh... ';
-	open (my $prologsh, '<', "$distributed/prolog.sh");
-	open (my $newprolog, '>', "$distributed/iso/prolog.sh");
-	while (my $line = $prologsh->getline) {
+	open (my $epilogsh, '<', "$distributed/epilog.sh");
+	open (my $newepilog, '>', "$distributed/iso/epilog.sh");
+	while (my $line = $epilogsh->getline) {
 		if($line =~ m/^SHELLPATH/ ) {
-			print $newprolog "SHELLPATH=\"$shell_address\"";
+			print $newepilog "SHELLPATH=\"$shell_address\"";
 		}
 		else {
-			print $newprolog $line;
+			print $newepilog $line;
 		}
 	}
-	close($newprolog);
-	close($prologsh);
+	close($newepilog);
+	close($epilogsh);
+	print "Done.\n";
 	
 	print 'Generating context.iso... ';
 	system("mkisofs -o $distributed/context.iso $distributed/iso");
@@ -128,16 +134,25 @@ sub in_context {
 
 # This function will create the virtualbox machine
 sub vbox_create_vmtest {
-	system("$vbm createvm --name $vmname --ostype Linux26_64");
+	system("$vbm createvm --name $vmname --ostype Linux26_64 --register");
 	system("$vbm storagectl $vmname --name \"Controller IDE\" --add ide");
 	system("$vbm storageattach $vmname --storagectl \"Controller IDE\" --port 1 --device 0 --type hdd --medium $distributed/$cernvmvdi --mtype normal");
 	system("$vbm storageattach $vmname --storagectl \"Controller IDE\" --port 1 --device 1 --type dvddrive --medium $distributed/context.iso");
 	system("$vbm modifyvm $vmname --nic2 hostonly");
+	system("$vbm modifyvm $vmname --hostonlyadapter2 vboxnet0");
 }
 
 # This fuction will start the virtual machine
 sub start_vmtest {
-	system("$vbm startvm $vmname --type headless");
+	system("$vbm startvm $vmname");
+	sleep 2;
+	my $started = `VBoxManage list runningvms | grep $vmname`;
+	if ($started) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
 }
 
 # This function will shutdown the virtual machine
@@ -150,13 +165,13 @@ sub start_distributed {
 	# Retrieving all parameters
 	@ARGV = @_;
 	
-	my $distributed = undef;
+	my $distributed_ch = undef;
 	my $daemon_output = undef;
 	my $daemon_error = undef;
 	my $force = undef;
 	my $shell_iface = 'eth0';
 	
-	my $ret = GetOptions ( "distributed" => \$distributed,
+	my $ret = GetOptions ( "distributed" => \$distributed_ch,
 						   "stdout=s" => \$daemon_output,
 						   "stderr=s" => \$daemon_error,
 						   "force" => \$force,
@@ -185,18 +200,21 @@ sub start_distributed {
 		if (!-f "$distributed/$cernvmvdi") {
 			print "This is the first time you're running the distributed test.\n";
 			print "At the end of the setup process, you'll have new virtual machine called $vmname in your VirtualBox profile.\n";
-			print "The preparation of the test will take a lot of time...\n";
-			print "Downloading CernVM image for VirtualBox...";
-			if (!download_CernVM()) {
-				return 0;
-			}
-			else {
-				print "Done.\n";
+			
+			if (!-f "$distributed/$cernvmgz" ) {
+				print "The preparation of the test will take a lot of time...\n";
+				print "Downloading CernVM image for VirtualBox...\n";
+				if (!download_cernvm()) {
+					return 0;
+				}
+				else {
+					print "Done.\n";
+				}
 			}
 			
 			# Extracting CernVM
 			print "Extracting CernVM image from $distributed/cernvm.vdi.gz... ";
-			system("tar -xzf $distributed/$cernvmgz -C $distributed");
+			system("zcat $distributed/$cernvmgz > $distributed/$cernvmvdi");
 			print "Done.\n";
 			
 			# Erasing archive
@@ -213,7 +231,9 @@ sub start_distributed {
 			vbox_create_vmtest();
 		}
 		
-		start_vmtest();
+		my $started = start_vmtest();
+		
+		return $started;
 	}
 }
 

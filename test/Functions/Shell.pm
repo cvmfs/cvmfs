@@ -293,16 +293,21 @@ sub start_daemon {
 	
 	# Options that works only with --distributed but are here to avoid warnings
 	my $force = undef;
+	my $shell_iface = undef;
+	
+	# I need this line as get options will destroy @ARGV
+	my @backup_argv = @ARGV;
 	
 	# Parsing options
-	my $ret = GetOptions ( "stdout=s" => \$daemon_output,
+	my $ret = GetOptions (  "stdout=s" => \$daemon_output,
 						    "stderr=s" => \$daemon_error,
 						    "distributed" => \$distributed,
-						    "force" => \$force );
+						    "force" => \$force,
+						    "shell-iface=s" => \$shell_iface );
 						   
 	# If a distributed environment is requested, pass everything to start_distributed()
 	if (defined($distributed)){
-		my $error = Functions::Virtualization::start_distributed(@ARGV);
+		my $error = Functions::Virtualization::start_distributed(@backup_argv);
 		if ($error) {
 			my ($socket, $ctxt) = wait_daemon();
 			return ($socket, $ctxt);
