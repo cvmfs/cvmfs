@@ -87,8 +87,10 @@ sub wait_daemon {
 	# Opening the socket to wait for the daemon to send its ip
 	my ($shell_socket, $shell_ctxt) = bind_shell_socket();
 	
-	# Wait fo the daemon message
+	# Wait for the daemon message
+	print "Waiting for the daemon...\n";
 	my $answer = receive_shell_msg($shell_socket);
+	print "Received a connection from $answer.\n";
 	
 	# Splitting the message and assigning it to variables
 	my @ip_port = split /:/, $answer;
