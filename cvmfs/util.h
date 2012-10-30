@@ -79,6 +79,8 @@ std::string ToUpper(const std::string &mixed_case);
 std::string ReplaceAll(const std::string &haystack, const std::string &needle,
                        const std::string &replace_by);
 
+void BlockSignal(int signum);
+void WaitForSignal(int signum);
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ManagedExec(const std::vector<std::string> &command_line,

@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <sched.h>
 #include <time.h>
+#include <signal.h>
 
 #include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
@@ -410,7 +411,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 }
 
 
-Failures Reload(const int fd_progress) {
+Failures Reload(const int fd_progress, const bool stop_and_go) {
   int retval;
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
@@ -435,6 +436,12 @@ Failures Reload(const int fd_progress) {
   dlclose(library_handle_);
   library_handle_ = NULL;
 
+  if (stop_and_go) {
+    loader_talk::SendProgress(fd_progress,
+                              "Waiting for the delivery of SIGUSR1... ");
+    WaitForSignal(SIGUSR1);
+  }
+
   loader_talk::SendProgress(fd_progress, "Re-Loading Fuse module\n");
   cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
   if (!cvmfs_exports_)
@@ -451,7 +458,7 @@ Failures Reload(const int fd_progress) {
                                           loader_exports_->saved_states);
   if (!retval)
     return kFailRestoreState;
-  cvmfs_exports_->fnFreeSavedStates(fd_progress, loader_exports_->saved_states);
+  cvmfs_exports_->fnFreeSavedState(fd_progress, loader_exports_->saved_states);
   for (unsigned i = 0, l = loader_exports_->saved_states.size(); i < l; ++i) {
     delete loader_exports_->saved_states[i];
   }
@@ -516,6 +523,8 @@ int main(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
   // We want to allow group write access for the talk-socket.
   umask(007);
+  // SIGUSR1 is used for the stop_and_go mode during reload
+  BlockSignal(SIGUSR1);
 
   int retval;
   
@@ -525,7 +534,10 @@ int main(int argc, char *argv[]) {
     if (string(argv[1]) == string("__RELOAD__")) {
       if (argc < 3)
         return 1;
-      return loader_talk::MainReload(argv[2]);      
+      bool stop_and_go = false;
+      if ((argc > 3) && (string(argv[3]) == "stop_and_go"))
+        stop_and_go = true;
+      return loader_talk::MainReload(argv[2], stop_and_go);
     }
     
     debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;

@@ -59,12 +59,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
     char command;
     if (recv(con_fd, &command, 1, 0) > 0) {
-      if (command != 'R') {
+      if ((command != 'R') && (command != 'S')) {
         SendProgress(con_fd, "unknown command\n");
         continue;
       }
 
-      int retval = Reload(con_fd);
+      int retval = Reload(con_fd, command == 'S');
       SendProgress(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk)
@@ -100,7 +100,7 @@ void Fini() {
 /**
  * Connects to a loader socket and triggers the reload
  */
-int MainReload(const std::string &socket_path) {
+int MainReload(const std::string &socket_path, const bool stop_and_go) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Connecting to CernVM-FS loader... ");
   int socket_fd = ConnectSocket(socket_path);
@@ -110,7 +110,7 @@ int MainReload(const std::string &socket_path) {
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-  char command = 'R';
+  const char command = stop_and_go ? 'S' : 'R';
   WritePipe(socket_fd, &command, 1);
   char buf;
   int retval;

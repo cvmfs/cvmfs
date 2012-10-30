@@ -1729,8 +1729,8 @@ static bool RestoreState(const int fd_progress,
 }
 
 
-static void FreeSavedStates(const int fd_progress,
-                            const loader::StateList &saved_states)
+static void FreeSavedState(const int fd_progress,
+                           const loader::StateList &saved_states)
 {
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     if (saved_states[i]->state_id == loader::kStateOpenDirs) {
@@ -1753,7 +1753,7 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->fnMaintenanceMode = MaintenanceMode;
   g_cvmfs_exports->fnSaveState = SaveState;
   g_cvmfs_exports->fnRestoreState = RestoreState;
-  g_cvmfs_exports->fnFreeSavedStates = FreeSavedStates;
+  g_cvmfs_exports->fnFreeSavedState = FreeSavedState;
   cvmfs::SetCvmfsOperations(&g_cvmfs_exports->cvmfs_operations);
 }
 

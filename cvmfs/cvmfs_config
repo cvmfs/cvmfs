@@ -608,7 +608,18 @@ cvmfs_status()
 cvmfs_reload()
 {
   RETVAL=0
-  echo "TBD"
+  local mount_list
+  mount_list=`list_mounts | awk '{print $3}'`
+
+  RETVAL=0
+
+  local m
+  for m in $mount_list
+  do
+    echo "Pausing ${m}"
+    
+  done
+
   return $RETVAL
 }
 

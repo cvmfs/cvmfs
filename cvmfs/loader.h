@@ -123,7 +123,7 @@ struct CvmfsExports {
     fnMaintenanceMode = NULL;
     fnSaveState = NULL;
     fnRestoreState = NULL;
-    fnFreeSavedStates = NULL;
+    fnFreeSavedState = NULL;
     memset(&cvmfs_operations, 0, sizeof(cvmfs_operations));
   }
 
@@ -139,12 +139,12 @@ struct CvmfsExports {
   bool (*fnMaintenanceMode)(const int fd_progress);
   bool (*fnSaveState)(const int fd_progress, StateList *saved_states);
   bool (*fnRestoreState)(const int fd_progress, const StateList &saved_states);
-  void (*fnFreeSavedStates)(const int fd_progress,
-                            const StateList &saved_states);
+  void (*fnFreeSavedState)(const int fd_progress,
+                           const StateList &saved_states);
   struct fuse_lowlevel_ops cvmfs_operations;
 };
 
-Failures Reload(const int fd_progress);
+Failures Reload(const int fd_progress, const bool stop_and_go);
 
 }  // namespace loader
 

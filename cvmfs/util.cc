@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include <cctype>
 #include <cstdlib>
@@ -649,6 +650,36 @@ string ReplaceAll(const string &haystack, const string &needle,
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
   return result;
+}
+
+
+/**
+ * Blocks a signal for the calling thread.
+ */
+void BlockSignal(int signum) {
+  sigset_t sigset;
+  int retval = sigemptyset(&sigset);
+  assert(retval == 0);
+  retval = sigaddset(&sigset, signum);
+  assert(retval == 0);
+  retval = pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+  assert(retval == 0);
+}
+
+
+/**
+ * Waits for a signal.  The signal should be blocked before for all threads.
+ * Threads inherit their parent's signal mask.
+ */
+void WaitForSignal(int signum) {
+  // Now let's block SIGUSR1
+  sigset_t sigset;
+  int retval = sigemptyset(&sigset);
+  assert(retval == 0);
+  retval = sigaddset(&sigset, signum);
+  assert(retval == 0);
+  retval = sigwaitinfo(&sigset, NULL);
+  assert(retval == signum);
 }
 
 

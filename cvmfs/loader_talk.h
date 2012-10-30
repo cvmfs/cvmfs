@@ -15,7 +15,7 @@ void Spawn();
 void Fini();
 void SendProgress(const int con_fd, const std::string &msg);
 
-int MainReload(const std::string &socket_path);
+int MainReload(const std::string &socket_path, const bool stop_and_go);
 
 }  // namespace loader_talk
 }  // namespace loader
