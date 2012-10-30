@@ -8,11 +8,16 @@
 #include <string>
 
 namespace loader {
+namespace loader_talk {
 
 bool Init(const std::string &socket_path);
 void Spawn();
 void Fini();
+void SendProgress(const int con_fd, const std::string &msg);
 
+int MainReload(const std::string &socket_path);
+
+}  // namespace loader_talk
 }  // namespace loader
 
 #endif  // CVMFS_LOADER_TALK_H_

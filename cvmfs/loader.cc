@@ -37,6 +37,7 @@
 #include "options.h"
 #include "util.h"
 #include "atomic.h"
+#include "loader_talk.h"
 
 using namespace std;  // NOLINT
 
@@ -408,6 +409,61 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   return *exports_ptr;
 }
 
+
+Failures Reload(const int fd_progress) {
+  int retval;
+  retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
+  if (!retval)
+    return kFailMaintenanceMode;
+
+  loader_talk::SendProgress(fd_progress, "Blocking new file system calls\n");
+  atomic_cas32(&blocking_, 0, 1);
+
+  retval = cvmfs_exports_->fnSaveState(fd_progress,
+                                       &loader_exports_->saved_states);
+  if (!retval)
+    return kFailSaveState;
+  
+  loader_talk::SendProgress(fd_progress,
+                            "Waiting for active file system calls\n");
+  while (atomic_read64(&num_operations_)) {
+    sched_yield();
+  }
+
+  loader_talk::SendProgress(fd_progress, "Unloading Fuse module\n");
+  cvmfs_exports_->fnFini();
+  dlclose(library_handle_);
+  library_handle_ = NULL;
+
+  loader_talk::SendProgress(fd_progress, "Re-Loading Fuse module\n");
+  cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
+  if (!cvmfs_exports_)
+    return kFailLoadLibrary;
+  retval = cvmfs_exports_->fnInit(loader_exports_);
+  if (retval != kFailOk) {
+    string msg_progress = cvmfs_exports_->fnGetErrorMsg() + " (" +
+                          StringifyInt(retval) + ")\n";
+    loader_talk::SendProgress(fd_progress, msg_progress);
+    return (Failures)retval;
+  }
+
+  retval = cvmfs_exports_->fnRestoreState(fd_progress,
+                                          loader_exports_->saved_states);
+  if (!retval)
+    return kFailRestoreState;
+  cvmfs_exports_->fnFreeSavedStates(fd_progress, loader_exports_->saved_states);
+  for (unsigned i = 0, l = loader_exports_->saved_states.size(); i < l; ++i) {
+    delete loader_exports_->saved_states[i];
+  }
+  loader_exports_->saved_states.clear();
+
+  loader_talk::SendProgress(fd_progress, "Activating Fuse module\n");
+  cvmfs_exports_->fnSpawn();
+  
+  atomic_cas32(&blocking_, 1, 0);
+  return kFailOk;
+}
+
 }  // namespace loader
 
 
@@ -466,6 +522,12 @@ int main(int argc, char *argv[]) {
   // Jump into alternative process flavors (e.g. shared cache manager)
   // We are here due to a fork+execve (ManagedExec in util.cc)
   if ((argc > 1) && (strstr(argv[1], "__") == argv[1])) {
+    if (string(argv[1]) == string("__RELOAD__")) {
+      if (argc < 3)
+        return 1;
+      return loader_talk::MainReload(argv[2]);      
+    }
+    
     debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
     cvmfs_exports_ = LoadLibrary(debug_mode_, NULL);
     if (!cvmfs_exports_)
@@ -482,6 +544,9 @@ int main(int argc, char *argv[]) {
     Usage(argv[0]);
     return kFailOptions;
   }
+  fuse_opt_add_arg(mount_options, "-ofsname=cvmfs2");
+  fuse_opt_add_arg(mount_options, "-oro");
+  fuse_opt_add_arg(mount_options, "-onodev");
   options::Init();
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
@@ -517,6 +582,13 @@ int main(int argc, char *argv[]) {
   else
     SetLogSyslogLevel(3);
   SetLogSyslogPrefix(*repository_name_);
+
+  // Permissions check
+  if (options::GetValue("CVMFS_CHECK_PERMISSIONS", &parameter)) {
+    if (options::IsOn(parameter)) {
+      fuse_opt_add_arg(mount_options, "-odefault_permissions");
+    }
+  }
 
   // Number of file descriptors
   if (options::GetValue("CVMFS_NFILES", &parameter)) {
@@ -562,6 +634,17 @@ int main(int argc, char *argv[]) {
   if (debug_mode_) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: running in debug mode");
+  }
+
+  // Initialize the loader socket, connections are not accepted until Spawn()
+  string reload_socket = "/var/run/cvmfs";
+  if (options::GetValue("CVMFS_RELOAD_SOCKETS", &parameter))
+    reload_socket = MakeCanonicalPath(parameter);
+  reload_socket += "/cvmfs." + *repository_name_; 
+  retval = loader_talk::Init(reload_socket);
+  if (!retval) {
+    PrintError("Failed to initialize loader socket");
+    return kFailLoaderTalk;
   }
 
   // Options are not needed anymore
@@ -614,6 +697,7 @@ int main(int argc, char *argv[]) {
     Daemonize();
 
   cvmfs_exports_->fnSpawn();
+  loader_talk::Spawn();
 
   retval = fuse_set_signal_handlers(session);
   assert(retval == 0);
@@ -623,6 +707,7 @@ int main(int argc, char *argv[]) {
   else
     retval = fuse_session_loop_mt(session);
 
+  loader_talk::Fini();
   cvmfs_exports_->fnFini();
 
   // Unmount

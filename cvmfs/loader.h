@@ -20,9 +20,11 @@ namespace loader {
 
 enum Failures {
   kFailOk = 0,
+  kFailUnknown,
   kFailOptions,
   kFailPermission,
   kFailMount,
+  kFailLoaderTalk,
   kFailFuseLoop,
   kFailLoadLibrary,
   kFailIncompatibleVersions,  // TODO
@@ -34,11 +36,33 @@ enum Failures {
   kFailTalk,
   kFailSignature,
   kFailCatalog,
-  kFailUnknown,
+  kFailMaintenanceMode,
+  kFailSaveState,
+  kFailRestoreState,
 };
 
 
-// TODO SaveState
+enum StateId {
+  kStateUnknown = 0,
+  kStateOpenDirs,
+  kStateOpenFiles,
+};
+
+
+struct SavedState {
+  SavedState() {
+    version = 1;
+    size = sizeof(SavedState);
+    state_id = kStateUnknown;
+    state = NULL;
+  }
+  
+  uint32_t version;
+  uint32_t size;
+  StateId state_id;
+  void *state;
+};
+typedef std::vector<SavedState *> StateList;
 
 
 struct LoadEvent {
@@ -53,6 +77,7 @@ struct LoadEvent {
   time_t timestamp;
   std::string so_version;
 };
+typedef std::vector<LoadEvent *> EventList;
 
 
 /**
@@ -60,8 +85,6 @@ struct LoadEvent {
  * Whenever something changes, change the version number.
  */
 struct LoaderExports {
-  typedef std::vector<LoadEvent *> EventList;
-
   LoaderExports() {
     version = 1;
     size = sizeof(LoaderExports);
@@ -79,6 +102,7 @@ struct LoaderExports {
   std::string config_files;
   std::string program_name;
   EventList history;
+  StateList saved_states;
 };
 
 
@@ -96,6 +120,10 @@ struct CvmfsExports {
     fnSpawn = NULL;
     fnFini = NULL;
     fnGetErrorMsg = NULL;
+    fnMaintenanceMode = NULL;
+    fnSaveState = NULL;
+    fnRestoreState = NULL;
+    fnFreeSavedStates = NULL;
     memset(&cvmfs_operations, 0, sizeof(cvmfs_operations));
   }
 
@@ -108,8 +136,15 @@ struct CvmfsExports {
   void (*fnSpawn)();
   void (*fnFini)();
   std::string (*fnGetErrorMsg)();
+  bool (*fnMaintenanceMode)(const int fd_progress);
+  bool (*fnSaveState)(const int fd_progress, StateList *saved_states);
+  bool (*fnRestoreState)(const int fd_progress, const StateList &saved_states);
+  void (*fnFreeSavedStates)(const int fd_progress,
+                            const StateList &saved_states);
   struct fuse_lowlevel_ops cvmfs_operations;
 };
+
+Failures Reload(const int fd_progress);
 
 }  // namespace loader
 

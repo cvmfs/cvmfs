@@ -166,7 +166,8 @@ int ConnectSocket(const string &path) {
   if (connect(socket_fd, (struct sockaddr *)&sock_addr,
               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
-    close (socket_fd);
+    //LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
+    close(socket_fd);
     return -1;
   }
 
@@ -456,7 +457,7 @@ string StringifyTime(const time_t seconds, const bool utc) {
 
   const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
     "Aug", "Sep", "Oct", "Nov", "Dec"};
-  char buffer[20];
+  char buffer[21];
   snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d", timestamp.tm_mday,
            months[timestamp.tm_mon], timestamp.tm_year + 1900,
            timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec);

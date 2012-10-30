@@ -395,7 +395,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           StringifyTime(cvmfs::loader_exports_->boot_time, false) +
           "    (start of CernVM-FS loader " +
           cvmfs::loader_exports_->loader_version + ")\n";
-        for (loader::LoaderExports::EventList::const_iterator i =
+        for (loader::EventList::const_iterator i =
              cvmfs::loader_exports_->history.begin(),
              iEnd = cvmfs::loader_exports_->history.end(); i != iEnd; ++i)
         {

@@ -84,6 +84,7 @@
 #include "globals.h"
 #include "options.h"
 #include "loader.h"
+#include "loader_talk.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -146,6 +147,10 @@ lru::Md5PathCache *md5path_cache_ = NULL;
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
 
+/**
+ * in maintenance mode, cache timeout is 0 and catalogs are not reloaded
+ */
+atomic_int32 maintenance_mode_;
 atomic_int32 catalogs_expired_;
 atomic_int32 drainout_mode_;
 atomic_int32 reload_critical_section_;
@@ -207,7 +212,8 @@ static unsigned GetEffectiveTTL() {
 
 
 static inline double GetKcacheTimeout() {
-  if (atomic_read32(&drainout_mode_)) return 0.0;
+  if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_))
+    return 0.0;
   return kcache_timeout_;
 }
 
@@ -328,6 +334,8 @@ static void RemountFinish() {
  * to be finished or starts a new remount if the TTL timer has been fired.
  */
 static void RemountCheck() {
+  if (atomic_read32(&maintenance_mode_) == 1)
+    return;
   RemountFinish();
 
   if (atomic_cas32(&catalogs_expired_, 1, 0)) {
@@ -1583,6 +1591,7 @@ static void Spawn() {
   int retval;
 
   // Setup catalog reload alarm (_after_ fork())
+  atomic_init32(&cvmfs::maintenance_mode_);
   atomic_init32(&cvmfs::drainout_mode_);
   atomic_init32(&cvmfs::reload_critical_section_);
   atomic_init32(&cvmfs::catalogs_expired_);
@@ -1672,6 +1681,67 @@ static int AltProcessFlavor(int argc, char **argv) {
 }
 
 
+static bool MaintenanceMode(const int fd_progress) {
+  loader::loader_talk::SendProgress(fd_progress, "Entering maintenance mode\n");
+  signal(SIGALRM, SIG_DFL);
+  atomic_cas32(&cvmfs::maintenance_mode_, 0, 1);
+  string msg_progress = "Draining out kernel caches (" +
+                        StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
+  loader::loader_talk::SendProgress(fd_progress, msg_progress);
+  sleep((int)cvmfs::kcache_timeout_);
+  return true;
+}
+
+
+static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
+  string msg_progress = "Saving open directory handles (" +
+    StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
+  loader::loader_talk::SendProgress(fd_progress, msg_progress);
+  
+  cvmfs::DirectoryHandles *saved_handles =
+    new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
+  loader::SavedState *save_open_dirs = new loader::SavedState();
+  save_open_dirs->state_id = loader::kStateOpenDirs;
+  save_open_dirs->state = saved_handles;
+  saved_states->push_back(save_open_dirs);
+  
+  return true;
+}
+
+
+static bool RestoreState(const int fd_progress,
+                         const loader::StateList &saved_states)
+{
+  for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
+    if (saved_states[i]->state_id == loader::kStateOpenDirs) {
+      loader::loader_talk::SendProgress(fd_progress,
+                                        "Restoring open directory handles... ");
+      delete cvmfs::directory_handles_;
+      cvmfs::DirectoryHandles *saved_handles =
+        (cvmfs::DirectoryHandles *)saved_states[i]->state;
+      cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
+
+      loader::loader_talk::SendProgress(fd_progress,
+        StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
+    }
+  }
+  return true;
+}
+
+
+static void FreeSavedStates(const int fd_progress,
+                            const loader::StateList &saved_states)
+{
+  for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
+    if (saved_states[i]->state_id == loader::kStateOpenDirs) {
+      loader::loader_talk::SendProgress(fd_progress,
+        "Releasing saved open directory handles\n");
+      delete (cvmfs::DirectoryHandles *)saved_states[i]->state;
+    }
+  }
+}
+
+
 static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports = new loader::CvmfsExports();
   g_cvmfs_exports->so_version = PACKAGE_VERSION;
@@ -1680,6 +1750,10 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->fnSpawn = Spawn;
   g_cvmfs_exports->fnFini = Fini;
   g_cvmfs_exports->fnGetErrorMsg = GetErrorMsg;
+  g_cvmfs_exports->fnMaintenanceMode = MaintenanceMode;
+  g_cvmfs_exports->fnSaveState = SaveState;
+  g_cvmfs_exports->fnRestoreState = RestoreState;
+  g_cvmfs_exports->fnFreeSavedStates = FreeSavedStates;
   cvmfs::SetCvmfsOperations(&g_cvmfs_exports->cvmfs_operations);
 }
 
