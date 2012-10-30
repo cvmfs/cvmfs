@@ -616,7 +616,9 @@ cvmfs_reload()
   local m
   for m in $mount_list
   do
+    get_attr fqrn ${m}; pid=$attr_value
     echo "Pausing ${m}"
+    #get_attr pid ${m}; pid=$attr_value
     
   done
 
@@ -1115,18 +1117,23 @@ configure_fuse()
 
 get_attr()
 {
- attr_name=$1
- case $sys_arch in
-   Linux )
-     attr_value=$(attr -q -g $attr_name . 2>/dev/null || exit 33) ;;
+  attr_name=$1
+  path=$2
+  if [ "x$path" = "x" ]; then
+    path=.
+  fi
+ 
+  case $sys_arch in
+    Linux )
+      attr_value=$(attr -q -g $attr_name $path 2>/dev/null || exit 33) ;;
 
-   Darwin )
-     attr_value=$(xattr -p user.$attr_name . 2>/dev/null || exit 33) ;;
+    Darwin )
+      attr_value=$(xattr -p user.$attr_name $path 2>/dev/null || exit 33) ;;
 
-   * )
-     echo "Architecture $sys_arch is not supported"
-     exit 1 ;;
-  esac
+    * )
+      echo "Architecture $sys_arch is not supported"
+      exit 1 ;;
+   esac
 }
 
 case "$1" in

@@ -32,6 +32,8 @@ bool Init(const string &socket_path) {
     return false;
   if (listen(socket_fd_, 1) == -1)
     return false;
+
+  unlink((socket_path + ".paused").c_str());
   
   return true;
 }

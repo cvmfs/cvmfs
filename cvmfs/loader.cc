@@ -86,6 +86,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
 string *repository_name_ = NULL;
 string *mount_point_ = NULL;
 string *config_files_ = NULL;
+string *socket_path_ = NULL;
 uid_t uid_ = 0;
 gid_t gid_ = 0;
 bool single_threaded_ = false;
@@ -437,9 +438,11 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   library_handle_ = NULL;
 
   if (stop_and_go) {
+    CreateFile(*socket_path_ + ".paused", 0600);
     loader_talk::SendProgress(fd_progress,
-                              "Waiting for the delivery of SIGUSR1... ");
+                              "Waiting for the delivery of SIGUSR1...\n");
     WaitForSignal(SIGUSR1);
+    unlink((*socket_path_ + ".paused").c_str());
   }
 
   loader_talk::SendProgress(fd_progress, "Re-Loading Fuse module\n");
@@ -649,11 +652,11 @@ int main(int argc, char *argv[]) {
   }
 
   // Initialize the loader socket, connections are not accepted until Spawn()
-  string reload_socket = "/var/run/cvmfs";
+  socket_path_ = new string("/var/run/cvmfs");
   if (options::GetValue("CVMFS_RELOAD_SOCKETS", &parameter))
-    reload_socket = MakeCanonicalPath(parameter);
-  reload_socket += "/cvmfs." + *repository_name_; 
-  retval = loader_talk::Init(reload_socket);
+    *socket_path_ = MakeCanonicalPath(parameter);
+  *socket_path_ += "/cvmfs." + *repository_name_;
+  retval = loader_talk::Init(*socket_path_);
   if (!retval) {
     PrintError("Failed to initialize loader socket");
     return kFailLoaderTalk;
