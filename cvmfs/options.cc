@@ -9,6 +9,8 @@
 #include "cvmfs_config.h"
 #include "options.h"
 
+#include <unistd.h>
+
 #include <cstdio>
 #include <cassert>
 #include <cstdlib>
