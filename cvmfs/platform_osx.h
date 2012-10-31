@@ -7,10 +7,6 @@
 #ifndef CVMFS_PLATFORM_OSX_H_
 #define CVMFS_PLATFORM_OSX_H_
 
-#ifdef CVMFS_NAMESPACE_GUARD
-namespace CVMFS_NAMESPACE_GUARD {
-#endif
-
 #include <libkern/OSAtomic.h>
 #include <mach/mach.h>
 #include <fcntl.h>
@@ -23,6 +19,10 @@ namespace CVMFS_NAMESPACE_GUARD {
 #include <cassert>
 
 #include <string>
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
 
 /**
  * UNIX domain sockets:
