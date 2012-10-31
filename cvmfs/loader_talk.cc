@@ -66,11 +66,15 @@ static void *MainTalk(void *data __attribute__((unused))) {
         continue;
       }
 
+      LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module");
       int retval = Reload(con_fd, command == 'S');
       SendProgress(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
-      if (retval != kFailOk)
+      if (retval != kFailOk) {
+        LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module failed (%d)",
+                 retval);
         abort();
+      }
     }
   }
   

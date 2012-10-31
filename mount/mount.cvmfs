@@ -56,6 +56,15 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+if [ "x$dryrun" != "xtrue" ]; then
+  if [ -f "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" ]; then
+    echo "Waiting for CernVM-FS reload..."
+    while [ -f "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" ]; do
+      sleep 1
+    done
+  fi
+fi
+
 device=`echo $1 | sed 's/\/cvmfs\///'` # sed is for Ubuntu 8.04 automounter
 fqrn=`cvmfs_mkfqrn $device`
 org=`cvmfs_getorg $fqrn`

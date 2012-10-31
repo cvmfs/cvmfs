@@ -50,10 +50,10 @@ cvmfs_config_usage()
  echo "  setup [nouser] [nocfgmod]"
  echo "  chksetup"
  echo "  showconfig [<repository>]"
- echo "  stat [-v] [<repository>]"
+ echo "  stat [-v | <repository>]"
  echo "  status"
  echo "  probe"
- echo "  reload"
+ echo "  reload [-c | <repository>]"
  echo "  umount"
  echo "  wipecache"
  echo "  bugreport"
@@ -607,20 +607,53 @@ cvmfs_status()
 
 cvmfs_reload()
 {
+  if ! cvmfs_readconfig; then
+    echo "Failed to read CernVM-FS configuration"
+    return 1
+  fi
+  local clean_cache; clean_cache=0
+  if [ "x$1" = "x-c" ]; then
+    clean_cache=1
+    shift
+  elif [ "x$1" != "x" ]; then
+    org=$1
+    fqrn=$(cvmfs_mkfqrn $org)
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn
+    return $?
+  fi
+  
+  # Organized reload of all repositories
+  touch "$CVMFS_RELOAD_SOCKETS/cvmfs.pause"
+  trap "rm -f $CVMFS_RELOAD_SOCKETS/cvmfs.pause" EXIT
+
   RETVAL=0
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
 
-  RETVAL=0
-
   local m
   for m in $mount_list
   do
-    get_attr fqrn ${m}; pid=$attr_value
-    echo "Pausing ${m}"
-    #get_attr pid ${m}; pid=$attr_value
-    
+    get_attr fqrn ${m}; fqrn=$attr_value
+    get_attr pid ${m}; pid=$attr_value
+    echo "Pausing ${fqrn} on ${m}"
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go &
+    all_pids="$all_pids $pid"
+    all_guard_files="$all_guard_files ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused"
   done
+  for guard_file in $all_guard_files; do
+    while [ ! -f $guard_file ]; do
+      sleep 1
+    done
+  done
+
+  if [ $clean_cache -eq 1 ]; then
+    cvmfs_wipecache
+  fi
+
+  for pid in $all_pids; do
+    kill -SIGUSR1 $pid
+  done
+  wait
 
   return $RETVAL
 }
@@ -698,7 +731,6 @@ cvmfs_wipecache()
     return 1
   fi
 
-  cvmfs_umount
   RETVAL=$?
   if [ $RETVAL -eq 0 ]; then
     local list
@@ -719,7 +751,7 @@ cvmfs_wipecache()
           cvmfs_readconfig
           fqrn=`cvmfs_mkfqrn $org`
           cvmfs_readconfig $fqrn
-          echo -n "Wiping out $CVMFS_CACHE_BASE/$fqrn... "
+          echo -n "Wiping out $CVMFS_CACHE_BASE/$fqrn ... "
           [ ! -d "$CVMFS_CACHE_BASE/$fqrn" ] || rm -rf "$CVMFS_CACHE_BASE/$fqrn"
           if [ $? -ne 0 ]; then
             echo "Failed!"
@@ -730,9 +762,17 @@ cvmfs_wipecache()
         ;;
       esac
     done
-   fi
+  fi
+  echo -n "Wiping out $CVMFS_CACHE_BASE/shared ... "
+  [ ! -d "$CVMFS_CACHE_BASE/shared" ] || rm -rf "$CVMFS_CACHE_BASE/shared"
+  if [ $? -ne 0 ]; then
+    echo "Failed!"
+    RETVAL=1
+  else
+    echo "OK"
+  fi
 
-   return $RETVAL
+  return $RETVAL
 }
 
 
@@ -1181,7 +1221,7 @@ case "$1" in
       exit 1
     fi
     shift 1
-    cvmfs_reload
+    cvmfs_reload $@
     RETVAL=$?
     ;;
 
@@ -1207,6 +1247,7 @@ case "$1" in
       exit 1
     fi
     shift 1
+    cvmfs_umount $@
     cvmfs_wipecache $@
     RETVAL=$?
     ;;
