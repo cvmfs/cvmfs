@@ -247,6 +247,28 @@ void SendMsg2Socket(const int fd, const string &msg) {
 
 
 /**
+ * set(e){g/u}id wrapper.
+ */
+bool SwitchCredentials(const uid_t uid, const gid_t gid,
+                       const bool temporarily)
+{
+  int retval;
+  if (temporarily) {
+    retval = setegid(gid) || seteuid(uid);
+  } else {
+    // If effective uid is not root, we must first gain root access back
+    if ((getuid() == 0) && (getuid() != geteuid())) {
+      retval = SwitchCredentials(0, getgid(), true);
+      if (!retval)
+        return false;
+    }
+    retval = setgid(gid) || setuid(uid);
+  }
+  return retval == 0;
+}
+
+
+/**
  * Checks if the regular file path exists.
  */
 bool FileExists(const string &path) {
@@ -841,6 +863,10 @@ bool ManagedExec(const vector<string> &command_line,
 #ifdef DEBUGMSG
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
+    if (!SwitchCredentials(geteuid(), getegid(), false)) {
+      failed = 'X';
+      goto fork_failure;
+    }
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = 'E';

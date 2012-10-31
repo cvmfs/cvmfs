@@ -419,7 +419,7 @@ EOF
 
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF
-$name $rdonly_dir cvmfs defaults 0 0 # added by CernVM-FS for $name
+$name $rdonly_dir cvmfs cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null

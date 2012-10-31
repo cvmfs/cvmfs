@@ -1356,8 +1356,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::tracefile_ = new string(tracefile);
   cvmfs::repository_name_ = new string(loader_exports->repository_name);
   cvmfs::mountpoint_ = new string(loader_exports->mount_point);
-  g_uid = getuid();
-  g_gid = getgid();
+  g_uid = geteuid();
+  g_gid = getegid();
   cvmfs::max_ttl_ = max_ttl;
   if (kcache_timeout) {
     cvmfs::kcache_timeout_ =

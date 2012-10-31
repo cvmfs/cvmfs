@@ -7,6 +7,8 @@
 
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <time.h>
 #include <fcntl.h>
 
@@ -43,6 +45,9 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void ClosePipe(int pipe_fd[2]);
 void Nonblock2Block(int filedes);
 void SendMsg2Socket(const int fd, const std::string &msg);
+
+bool SwitchCredentials(const uid_t uid, const gid_t gid,
+                       const bool temporarily);
 
 bool FileExists(const std::string &path);
 int64_t GetFileSize(const std::string &path);

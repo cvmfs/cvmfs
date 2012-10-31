@@ -1,4 +1,5 @@
 2.1.4:
+  * Added cvmfs_suid mount option
   * Added cvmfs_talk commands "hotpatch history", "parameters"
   * Hotpatch functionality added (cvmfs_config reload)
   * Most parameters read by the cvmfs process

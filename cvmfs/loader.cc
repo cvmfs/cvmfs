@@ -52,6 +52,7 @@ struct CvmfsOptions {
   int uid;
   int gid;
   int grab_mountpoint;
+  int cvmfs_suid;
 };
 
 enum {
@@ -70,6 +71,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("uid=%d",             uid, 0),
   CVMFS_OPT("gid=%d",             gid, 0),
   CVMFS_SWITCH("grab_mountpoint", grab_mountpoint),
+  CVMFS_SWITCH("cvmfs_suid",      cvmfs_suid),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -96,6 +98,7 @@ bool foreground_ = false;
 bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
+bool suid_mode_ = false;
 atomic_int32 blocking_;
 atomic_int64 num_operations_;
 void *library_handle_;
@@ -116,7 +119,8 @@ static void Usage(const std::string &exename) {
     "  -o gid=GID           Drop credentials to another group\n"
     "  -o grab_mountpoint   give ownership of the mountpoint to the user "
                             "before mounting (required for autofs)\n"
-    "  -o parse             Parse and print cvmfs parameters\n\n"
+    "  -o parse             Parse and print cvmfs parameters\n"
+    "  -o cvmfs_suid        Enable suid mode\n\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -360,6 +364,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   uid_ = cvmfs_options.uid;
   gid_ = cvmfs_options.gid;
   grab_mountpoint_ = cvmfs_options.grab_mountpoint;
+  suid_mode_ = cvmfs_options.cvmfs_suid;
 
   return mount_options;
 }
@@ -562,6 +567,14 @@ int main(int argc, char *argv[]) {
   fuse_opt_add_arg(mount_options, "-ofsname=cvmfs2");
   fuse_opt_add_arg(mount_options, "-oro");
   fuse_opt_add_arg(mount_options, "-onodev");
+  if (suid_mode_) {
+    if (getuid() != 0) {
+      PrintError("must be root to mount with suid option");
+      abort();
+    }
+    fuse_opt_add_arg(mount_options, "-osuid");
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
+  }
   options::Init();
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
@@ -636,7 +649,7 @@ int main(int argc, char *argv[]) {
   if ((uid_ != 0) || (gid_ != 0)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
              uid_, gid_);
-    if ((setgid(gid_) != 0) || (setuid(uid_) != 0)) {
+    if (!SwitchCredentials(uid_, gid_, suid_mode_)) {
       PrintError("Failed to drop credentials");
       return kFailPermission;
     }
@@ -689,6 +702,13 @@ int main(int argc, char *argv[]) {
   atomic_init64(&num_operations_);
   atomic_init32(&blocking_);
 
+  if (suid_mode_) {
+    if (!SwitchCredentials(0, getgid(), true)) {
+      PrintError("failed to re-gain root permissions for mounting");
+      return kFailPermission;
+    }
+  }
+
   struct fuse_chan *channel;
   channel = fuse_mount(mount_point_->c_str(), mount_options);
   if (!channel) {
@@ -698,6 +718,14 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
            mount_point_->c_str());
 
+  // Ultimately drop credentials
+  if (suid_mode_) {
+    if (!SwitchCredentials(uid_, gid_, false)) {
+      PrintError("failed to drop permissions after mounting");
+      return kFailPermission;
+    }
+  }
+
   struct fuse_lowlevel_ops loader_operations;
   SetFuseOperations(&loader_operations);
   struct fuse_session *session;
@@ -705,6 +733,7 @@ int main(int argc, char *argv[]) {
                               sizeof(loader_operations), NULL);
   if (!session) {
     PrintError("Failed to create Fuse session");
+    fuse_unmount(mount_point_->c_str(), channel);
     return kFailMount;
   }
 
