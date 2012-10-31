@@ -1327,6 +1327,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   {
     ignore_signature = true;
   }
+  if (options::GetValue("CVMFS_AUTO_UPDATE", &parameter) &&
+      !options::IsOn(parameter))
+  {
+    cvmfs::fixed_catalog_ = true;
+  }
   if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
     const string org = tokens[0];
