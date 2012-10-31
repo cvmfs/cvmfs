@@ -23,6 +23,7 @@
 #include <sched.h>
 #include <time.h>
 #include <signal.h>
+#include <stddef.h>
 
 #include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
