@@ -35,6 +35,7 @@
 #include <map>
 #include <set>
 
+#include "platform.h"
 #include "hash.h"
 #include "smalloc.h"
 #include "logging.h"
@@ -672,13 +673,7 @@ void BlockSignal(int signum) {
  * Threads inherit their parent's signal mask.
  */
 void WaitForSignal(int signum) {
-  // Now let's block SIGUSR1
-  sigset_t sigset;
-  int retval = sigemptyset(&sigset);
-  assert(retval == 0);
-  retval = sigaddset(&sigset, signum);
-  assert(retval == 0);
-  retval = sigwaitinfo(&sigset, NULL);
+  int retval = platform_sigwait(signum);
   assert(retval == signum);
 }
 
@@ -728,7 +723,7 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   MakePipe(pipe_stdin);
   MakePipe(pipe_stdout);
   MakePipe(pipe_stderr);
-  
+
   vector<int> preserve_fildes;
   preserve_fildes.push_back(0);
   preserve_fildes.push_back(1);

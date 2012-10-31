@@ -17,6 +17,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 #include <dirent.h>
 #include <sys/stat.h>
 #include <alloca.h>
+#include <signal.h>
 
 #include <cstring>
 #include <cassert>
@@ -59,6 +60,19 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
  */
 inline unsigned long platform_gettid() {
   return mach_thread_self();
+}
+
+
+inline int platform_sigwait(const int signum) {
+  sigset_t sigset;
+  int retval = sigemptyset(&sigset);
+  assert(retval == 0);
+  retval = sigaddset(&sigset, signum);
+  assert(retval == 0);
+  int result;
+  retval = sigwait(&sigset, &result);
+  assert(retval == 0);
+  return result;
 }
 
 
