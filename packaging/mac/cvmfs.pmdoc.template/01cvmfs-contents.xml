@@ -57,12 +57,18 @@
     </f>
     <f n="usr" o="root" g="wheel" p="16877">
       <f n="local" o="root" g="wheel" p="16877">
-        <f n="bin" o="root" g="wheel" p="16877">
-          <f n="cvmfs2" o="root" g="wheel" p="33261">
+        <f n="lib" o="root" g="wheel" p="16877">
+          <f n="libcvmfs_fuse.dylib" o="root" g="wheel" p="33261">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
-          <f n="cvmfs2_debug" o="root" g="wheel" p="33261">
+          <f n="libcvmfs_fuse_debug.dylib" o="root" g="wheel" p="33261">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+        </f>
+        <f n="bin" o="root" g="wheel" p="16877">
+          <f n="cvmfs2" o="root" g="wheel" p="33261">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
