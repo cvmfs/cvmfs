@@ -42,6 +42,7 @@ void ReadPipe(int fd, void *buf, size_t nbyte);
 void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void ClosePipe(int pipe_fd[2]);
 void Nonblock2Block(int filedes);
+void SendMsg2Socket(const int fd, const std::string &msg);
 
 bool FileExists(const std::string &path);
 int64_t GetFileSize(const std::string &path);

@@ -41,11 +41,6 @@ bool Init(const string &socket_path) {
 }
 
 
-void SendProgress(const int con_fd, const string &msg) {
-  (void)send(con_fd, &msg[0], msg.length(), MSG_NOSIGNAL);
-}
-
-
 static void *MainTalk(void *data __attribute__((unused))) {
   struct sockaddr_un remote;
   socklen_t socket_size = sizeof(remote);
@@ -64,13 +59,13 @@ static void *MainTalk(void *data __attribute__((unused))) {
     char command;
     if (recv(con_fd, &command, 1, 0) > 0) {
       if ((command != 'R') && (command != 'S')) {
-        SendProgress(con_fd, "unknown command\n");
+        SendMsg2Socket(con_fd, "unknown command\n");
         continue;
       }
 
       LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module");
       int retval = Reload(con_fd, command == 'S');
-      SendProgress(con_fd, "~");
+      SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk) {
         LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module failed (%d)",

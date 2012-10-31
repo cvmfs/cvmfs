@@ -420,7 +420,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   if (!retval)
     return kFailMaintenanceMode;
 
-  loader_talk::SendProgress(fd_progress, "Blocking new file system calls\n");
+  SendMsg2Socket(fd_progress, "Blocking new file system calls\n");
   atomic_cas32(&blocking_, 0, 1);
 
   retval = cvmfs_exports_->fnSaveState(fd_progress,
@@ -428,26 +428,24 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   if (!retval)
     return kFailSaveState;
   
-  loader_talk::SendProgress(fd_progress,
-                            "Waiting for active file system calls\n");
+  SendMsg2Socket(fd_progress, "Waiting for active file system calls\n");
   while (atomic_read64(&num_operations_)) {
     sched_yield();
   }
 
-  loader_talk::SendProgress(fd_progress, "Unloading Fuse module\n");
+  SendMsg2Socket(fd_progress, "Unloading Fuse module\n");
   cvmfs_exports_->fnFini();
   dlclose(library_handle_);
   library_handle_ = NULL;
 
   if (stop_and_go) {
     CreateFile(*socket_path_ + ".paused", 0600);
-    loader_talk::SendProgress(fd_progress,
-                              "Waiting for the delivery of SIGUSR1...\n");
+    SendMsg2Socket(fd_progress, "Waiting for the delivery of SIGUSR1...\n");
     WaitForSignal(SIGUSR1);
     unlink((*socket_path_ + ".paused").c_str());
   }
 
-  loader_talk::SendProgress(fd_progress, "Re-Loading Fuse module\n");
+  SendMsg2Socket(fd_progress, "Re-Loading Fuse module\n");
   cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
   if (!cvmfs_exports_)
     return kFailLoadLibrary;
@@ -455,7 +453,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   if (retval != kFailOk) {
     string msg_progress = cvmfs_exports_->fnGetErrorMsg() + " (" +
                           StringifyInt(retval) + ")\n";
-    loader_talk::SendProgress(fd_progress, msg_progress);
+    SendMsg2Socket(fd_progress, msg_progress);
     return (Failures)retval;
   }
 
@@ -469,7 +467,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   }
   loader_exports_->saved_states.clear();
 
-  loader_talk::SendProgress(fd_progress, "Activating Fuse module\n");
+  SendMsg2Socket(fd_progress, "Activating Fuse module\n");
   cvmfs_exports_->fnSpawn();
   
   atomic_cas32(&blocking_, 1, 0);

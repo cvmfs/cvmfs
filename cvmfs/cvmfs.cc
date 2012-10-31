@@ -84,7 +84,6 @@
 #include "globals.h"
 #include "options.h"
 #include "loader.h"
-#include "loader_talk.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -1682,12 +1681,12 @@ static int AltProcessFlavor(int argc, char **argv) {
 
 
 static bool MaintenanceMode(const int fd_progress) {
-  loader::loader_talk::SendProgress(fd_progress, "Entering maintenance mode\n");
+  SendMsg2Socket(fd_progress, "Entering maintenance mode\n");
   signal(SIGALRM, SIG_DFL);
   atomic_cas32(&cvmfs::maintenance_mode_, 0, 1);
   string msg_progress = "Draining out kernel caches (" +
                         StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
-  loader::loader_talk::SendProgress(fd_progress, msg_progress);
+  SendMsg2Socket(fd_progress, msg_progress);
   sleep((int)cvmfs::kcache_timeout_);
   return true;
 }
@@ -1696,7 +1695,7 @@ static bool MaintenanceMode(const int fd_progress) {
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress = "Saving open directory handles (" +
     StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
-  loader::loader_talk::SendProgress(fd_progress, msg_progress);
+  SendMsg2Socket(fd_progress, msg_progress);
   
   cvmfs::DirectoryHandles *saved_handles =
     new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
@@ -1714,14 +1713,13 @@ static bool RestoreState(const int fd_progress,
 {
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     if (saved_states[i]->state_id == loader::kStateOpenDirs) {
-      loader::loader_talk::SendProgress(fd_progress,
-                                        "Restoring open directory handles... ");
+      SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
       delete cvmfs::directory_handles_;
       cvmfs::DirectoryHandles *saved_handles =
         (cvmfs::DirectoryHandles *)saved_states[i]->state;
       cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
 
-      loader::loader_talk::SendProgress(fd_progress,
+      SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
     }
   }
@@ -1734,8 +1732,7 @@ static void FreeSavedState(const int fd_progress,
 {
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     if (saved_states[i]->state_id == loader::kStateOpenDirs) {
-      loader::loader_talk::SendProgress(fd_progress,
-        "Releasing saved open directory handles\n");
+      SendMsg2Socket(fd_progress, "Releasing saved open directory handles\n");
       delete (cvmfs::DirectoryHandles *)saved_states[i]->state;
     }
   }

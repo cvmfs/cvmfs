@@ -13,7 +13,6 @@ namespace loader_talk {
 bool Init(const std::string &socket_path);
 void Spawn();
 void Fini();
-void SendProgress(const int con_fd, const std::string &msg);
 
 int MainReload(const std::string &socket_path, const bool stop_and_go);
 

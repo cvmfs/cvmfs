@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/file.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
@@ -233,6 +234,15 @@ void Nonblock2Block(int filedes) {
   assert(flags != -1);
   int retval = fcntl(filedes, F_SETFL, flags & ~O_NONBLOCK);
   assert(retval != -1);
+}
+
+
+/**
+ * Drops the characters of string to a socket.  It doesn't matter
+ * if the other side has hung up.
+ */
+void SendMsg2Socket(const int fd, const string &msg) {
+  (void)send(fd, &msg[0], msg.length(), MSG_NOSIGNAL);
 }
 
 
