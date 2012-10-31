@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <cassert>
 
 #include "logging.h"
 #include "util.h"
