@@ -245,7 +245,7 @@ bool Init(const string cache_dir, const bool check_max_open_files) {
 #endif
 
     if (soft_limit < kMinOpenFiles) {
-      LogCvmfs(kLogMonitor, kLogSyslog | kLogStdout,
+      LogCvmfs(kLogMonitor, kLogSyslog | kLogDebug,
                "Warning: current limits for number of open files are "
                "(%lu/%lu)\n"
                "CernVM-FS is likely to run out of file descriptors, "
