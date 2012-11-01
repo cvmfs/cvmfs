@@ -400,9 +400,13 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   library_name = platform_libname(library_name);
 
   library_handle_ = dlopen(library_name.c_str(), RTLD_NOW | RTLD_LOCAL);
-  if (!library_handle_)
-    return NULL;
-
+  if (!library_handle_) {
+    library_handle_ = dlopen(("/usr/lib/" + library_name).c_str(),
+                             RTLD_NOW | RTLD_LOCAL);
+    if (!library_handle_)
+      return NULL;
+  }
+    
   CvmfsExports **exports_ptr =
     reinterpret_cast<CvmfsExports **>(dlsym(library_handle_, "g_cvmfs_exports"));
   if (!exports_ptr)
