@@ -139,7 +139,7 @@ fi
 mkdir -p /var/run/cvmfs
 chown $CVMFS_USER /var/run/cvmfs
 
-add_mount_option "allow_other,grab_mountpoint"
+add_mount_option "fsname=cvmfs2,allow_other,grab_mountpoint"
 add_mount_option "$CVMFS_ID"
 
 # set the number of open file handles per process

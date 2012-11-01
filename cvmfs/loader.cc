@@ -568,7 +568,6 @@ int main(int argc, char *argv[]) {
     Usage(argv[0]);
     return kFailOptions;
   }
-  fuse_opt_add_arg(mount_options, "-ofsname=cvmfs2");
   fuse_opt_add_arg(mount_options, "-oro");
   fuse_opt_add_arg(mount_options, "-onodev");
   if (suid_mode_) {
