@@ -621,7 +621,7 @@ cvmfs_reload()
     cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn
     return $?
   fi
-  
+
   # Organized reload of all repositories
   touch "$CVMFS_RELOAD_SOCKETS/cvmfs.pause"
   trap "rm -f $CVMFS_RELOAD_SOCKETS/cvmfs.pause" EXIT
@@ -780,6 +780,8 @@ cvmfs_bugreport()
 {
   tmpdir=`mktemp -d -t cvmfs-bugreport.XXXXXX` || exit 1
   cd $tmpdir
+  mkdir bugreport
+  cd bugreport
 
   [ -f /etc/cvmfs/default.conf ] && . /etc/cvmfs/default.conf
   [ -f /etc/cvmfs/default.local ] && . /etc/cvmfs/default.local
@@ -836,8 +838,9 @@ cvmfs_bugreport()
       $cmd >> $out 2>$err
    done
 
-   tar cfz bugreport.tar.gz *
-   rm -rf etc *.stdout *.stderr quarantaine-*
+   cd ..
+   tar cfz cvmfs-bugreport.tar.gz *
+   rm -rf bugreport
 
    echo
    echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
@@ -1162,7 +1165,7 @@ get_attr()
   if [ "x$path" = "x" ]; then
     path=.
   fi
- 
+
   case $sys_arch in
     Linux )
       attr_value=$(attr -q -g $attr_name $path 2>/dev/null || exit 33) ;;
