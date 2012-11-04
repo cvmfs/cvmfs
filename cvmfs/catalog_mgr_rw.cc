@@ -412,7 +412,7 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
 
 
 /**
- * Updated time stamp (utime / 'touch' utility).
+ * Update entry meta data (mode, owner, ...).
  */
 void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
                                         const std::string &path)
@@ -428,7 +428,7 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
     assert(false);
   }
 
-  catalog->TouchEntry(entry, entry_path);
+  catalog->UpdateEntry(entry, entry_path);
 
   if (entry.IsDirectory()) {
     catalog::DirectoryEntry potential_transition_point;
@@ -446,7 +446,7 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
       nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
       assert(nested_catalog != NULL);
       reinterpret_cast<WritableCatalog *>(nested_catalog)->
-        TouchEntry(entry, entry_path);
+        UpdateEntry(entry, entry_path);
       assert(retval);
     }
   }

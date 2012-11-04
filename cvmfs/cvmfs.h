@@ -13,9 +13,11 @@
 
 #include "catalog_mgr.h"
 #include "lru.h"
+#include "loader.h"
 
 namespace cvmfs {
 
+extern const loader::LoaderExports *loader_exports_;
 extern pid_t pid_;
 extern std::string *mountpoint_;
 extern std::string *repository_name_;

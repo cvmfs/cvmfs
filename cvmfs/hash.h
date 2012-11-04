@@ -20,6 +20,10 @@
 #include <string>
 #include "logging.h"
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 namespace hash {
 
 enum Algorithms {
@@ -250,5 +254,9 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 }  // namespace hash
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_HASH_H_

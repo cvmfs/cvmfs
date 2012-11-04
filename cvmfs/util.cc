@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/file.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
@@ -23,7 +24,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
+#include <cctype>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -33,12 +36,17 @@
 #include <map>
 #include <set>
 
+#include "platform.h"
 #include "hash.h"
 #include "smalloc.h"
 #include "logging.h"
 #include "fs_traversal.h"
 
 using namespace std;  // NOLINT
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
 
 
 /**
@@ -161,7 +169,8 @@ int ConnectSocket(const string &path) {
   if (connect(socket_fd, (struct sockaddr *)&sock_addr,
               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
-    close (socket_fd);
+    //LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
+    close(socket_fd);
     return -1;
   }
 
@@ -225,6 +234,37 @@ void Nonblock2Block(int filedes) {
   assert(flags != -1);
   int retval = fcntl(filedes, F_SETFL, flags & ~O_NONBLOCK);
   assert(retval != -1);
+}
+
+
+/**
+ * Drops the characters of string to a socket.  It doesn't matter
+ * if the other side has hung up.
+ */
+void SendMsg2Socket(const int fd, const string &msg) {
+  (void)send(fd, &msg[0], msg.length(), MSG_NOSIGNAL);
+}
+
+
+/**
+ * set(e){g/u}id wrapper.
+ */
+bool SwitchCredentials(const uid_t uid, const gid_t gid,
+                       const bool temporarily)
+{
+  int retval;
+  if (temporarily) {
+    retval = setegid(gid) || seteuid(uid);
+  } else {
+    // If effective uid is not root, we must first gain root access back
+    if ((getuid() == 0) && (getuid() != geteuid())) {
+      retval = SwitchCredentials(0, getgid(), true);
+      if (!retval)
+        return false;
+    }
+    retval = setgid(gid) || setuid(uid);
+  }
+  return retval == 0;
 }
 
 
@@ -451,7 +491,7 @@ string StringifyTime(const time_t seconds, const bool utc) {
 
   const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
     "Aug", "Sep", "Oct", "Nov", "Dec"};
-  char buffer[20];
+  char buffer[21];
   snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d", timestamp.tm_mday,
            months[timestamp.tm_mon], timestamp.tm_year + 1900,
            timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec);
@@ -568,11 +608,105 @@ double DiffTimeSeconds(struct timeval start, struct timeval end) {
 }
 
 
-string GetLine(const char *text, const int text_size) {
+string GetLineMem(const char *text, const int text_size) {
   int pos = 0;
   while ((pos < text_size) && (text[pos] != '\n'))
     pos++;
   return string(text, pos);
+}
+
+
+bool GetLineFile(FILE *f, std::string *line) {
+  int retval;
+  line->clear();
+  while ((retval = fgetc(f)) != EOF) {
+    char c = retval;
+    if (c == '\n')
+      break;
+    line->push_back(c);
+  }
+  return retval != EOF;
+}
+
+
+bool GetLineFd(const int fd, std::string *line) {
+  int retval;
+  char c;
+  line->clear();
+  while ((retval = read(fd, &c, 1)) == 1) {
+    if (c == '\n')
+      break;
+    line->push_back(c);
+  }
+  return retval == 1;
+}
+
+
+/**
+ * Removes leading and trailing whitespaces.
+ */
+string Trim(const string &raw) {
+  if (raw.empty())
+    return "";
+
+  unsigned start_pos = 0;
+  for (; (start_pos < raw.length()) &&
+         (raw[start_pos] == ' ' || raw[start_pos] == '\t');
+         ++start_pos) { }
+  unsigned end_pos = raw.length()-1;  // at least one character in raw
+  for (; (end_pos >= start_pos) &&
+         (raw[end_pos] == ' ' || raw[end_pos] == '\t');
+         --end_pos) { }
+
+  return raw.substr(start_pos, end_pos-start_pos + 1);
+}
+
+
+/**
+ * Converts all characters to upper case
+ */
+string ToUpper(const string &mixed_case) {
+  string result(mixed_case);
+  for (unsigned i = 0, l = result.length(); i < l; ++i) {
+    result[i] = toupper(result[i]);
+  }
+  return result;
+}
+
+
+string ReplaceAll(const string &haystack, const string &needle,
+                  const string &replace_by)
+{
+  string result(haystack);
+  size_t pos = 0;
+  const unsigned needle_size = needle.size();
+  while ((pos = result.find(needle, pos)) != string::npos)
+    result.replace(pos, needle_size, replace_by);
+  return result;
+}
+
+
+/**
+ * Blocks a signal for the calling thread.
+ */
+void BlockSignal(int signum) {
+  sigset_t sigset;
+  int retval = sigemptyset(&sigset);
+  assert(retval == 0);
+  retval = sigaddset(&sigset, signum);
+  assert(retval == 0);
+  retval = pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+  assert(retval == 0);
+}
+
+
+/**
+ * Waits for a signal.  The signal should be blocked before for all threads.
+ * Threads inherit their parent's signal mask.
+ */
+void WaitForSignal(int signum) {
+  int retval = platform_sigwait(signum);
+  assert(retval == signum);
 }
 
 
@@ -611,14 +745,59 @@ void Daemonize() {
 
 
 /**
+ * Opens /bin/sh and provides file descriptors to write into stdin and
+ * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
+ */
+bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
+  int pipe_stdin[2];
+  int pipe_stdout[2];
+  int pipe_stderr[2];
+  MakePipe(pipe_stdin);
+  MakePipe(pipe_stdout);
+  MakePipe(pipe_stderr);
+
+  vector<int> preserve_fildes;
+  preserve_fildes.push_back(0);
+  preserve_fildes.push_back(1);
+  preserve_fildes.push_back(2);
+  map<int, int> map_fildes;
+  map_fildes[pipe_stdin[0]] = 0;  // Reading end of pipe_stdin
+  map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
+  map_fildes[pipe_stderr[1]] = 2;  // Writing end of pipe_stderr
+  vector<string> cmd_line;
+  cmd_line.push_back("/bin/sh");
+
+  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes)) {
+    ClosePipe(pipe_stdin);
+    ClosePipe(pipe_stdout);
+    ClosePipe(pipe_stderr);
+    return false;
+  }
+
+  close(pipe_stdin[0]);
+  close(pipe_stdout[1]);
+  close(pipe_stderr[1]);
+  *fd_stdin = pipe_stdin[1];
+  *fd_stdout = pipe_stdout[0];
+  *fd_stderr = pipe_stderr[0];
+  return true;
+}
+
+
+/**
  * Execve to the given command line, preserving the given file descriptors.
  * If stdin, stdout, stderr should be preserved, add 0, 1, 2.
+ * File descriptors from the parent process can also be mapped to the new
+ * process (dup2) using map_fildes.  Can be useful for
+ * stdout/in/err redirection.
+ * NOTE: The destination fildes have to be preserved!
  * Does a double fork to detach child.
  * The command_line parameter contains the binary at index 0 and the arguments
  * in the rest of the vector.
  */
 bool ManagedExec(const vector<string> &command_line,
-                 const vector<int> &preserve_fildes)
+                 const vector<int> &preserve_fildes,
+                 const map<int, int> &map_fildes)
 {
   assert(command_line.size() >= 1);
 
@@ -635,6 +814,17 @@ bool ManagedExec(const vector<string> &command_line,
     for (unsigned i = 0; i < command_line.size(); ++i)
       argv[i] = command_line[i].c_str();
     argv[command_line.size()] = NULL;
+
+    // Child, map file descriptors
+    for (map<int, int>::const_iterator i = map_fildes.begin(),
+         iEnd = map_fildes.end(); i != iEnd; ++i)
+    {
+      int retval = dup2(i->first, i->second);
+      if (retval == -1) {
+        failed = 'D';
+        goto fork_failure;
+      }
+    }
 
     // Child, close file descriptors
     max_fd = sysconf(_SC_OPEN_MAX);
@@ -670,6 +860,13 @@ bool ManagedExec(const vector<string> &command_line,
       goto fork_failure;
     }
 
+#ifdef DEBUGMSG
+    assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
+#endif
+    if (!SwitchCredentials(geteuid(), getegid(), false)) {
+      failed = 'X';
+      goto fork_failure;
+    }
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = 'E';
@@ -691,3 +888,7 @@ bool ManagedExec(const vector<string> &command_line,
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
   return true;
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif

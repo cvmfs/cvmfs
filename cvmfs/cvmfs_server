@@ -373,6 +373,8 @@ CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
 CVMFS_STRICT_MOUNT=no
+CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_AUTO_UPDATE=no
 EOF
   cat >> /etc/sudoers << EOF
 $cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
@@ -417,7 +419,7 @@ EOF
 
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF
-$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
+$name $rdonly_dir cvmfs cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
@@ -656,7 +658,7 @@ the command."
 
 # Setup environment
 APACHE="httpd"
-[ ! -z "$(which apache2)" ] && APACHE="apache2"
+[ which apache2 >/dev/null 2>&1 ] && APACHE="apache2"
 SERVICE_BIN=$(which service)
 [ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
 

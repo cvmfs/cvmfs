@@ -638,26 +638,6 @@ bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentTouch::SqlDirentTouch(const Database &database) {
-  Init(database.sqlite_db(),
-       "UPDATE catalog SET mtime = :mtime "
-       "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
-}
-
-
-bool SqlDirentTouch::BindPathHash(const hash::Md5 &hash) {
-  return BindMd5(2, 3, hash);
-}
-
-
-bool SqlDirentTouch::BindTimestamp(const time_t timestamp) {
-  return BindInt64(1, timestamp);
-}
-
-
-//------------------------------------------------------------------------------
-
-
 SqlDirentUnlink::SqlDirentUnlink(const Database &database) {
   Init(database.sqlite_db(),
        "DELETE FROM catalog "

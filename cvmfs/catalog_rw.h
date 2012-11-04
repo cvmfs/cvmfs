@@ -8,7 +8,7 @@
  *
  * The main functionality is in:
  *  - AddEntry
- *  - TouchEntry
+ *  - UpdateEntry
  *  - RemoveEntry
  */
 
@@ -42,7 +42,11 @@ class WritableCatalog : public Catalog {
 
   void AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
                 const std::string &parent_path);
-  void TouchEntry(const DirectoryEntry &entry, const std::string &entry_path);
+  void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
+  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path)
+  {
+    UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
+  }
   void RemoveEntry(const std::string &entry_path);
   void IncLinkcount(const std::string &path_within_group, const int delta);
 
@@ -71,12 +75,6 @@ class WritableCatalog : public Catalog {
     AddEntry(entry, path, GetParentPath(path));
   }
 
-  void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
-  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path)
-  {
-    UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
-  }
-
   void InitPreparedStatements();
   void FinalizePreparedStatements();
 
@@ -88,7 +86,6 @@ class WritableCatalog : public Catalog {
 
  private:
   SqlDirentInsert     *sql_insert_;
-  SqlDirentTouch      *sql_touch_;
   SqlDirentUnlink     *sql_unlink_;
   SqlDirentUpdate     *sql_update_;
   SqlMaxHardlinkGroup *sql_max_link_id_;

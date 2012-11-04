@@ -40,7 +40,7 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
   unsigned payload_bytes = 0;
 
   // Check timestamp (UTC), ignore issue date (legacy)
-  line = GetLine(reinterpret_cast<const char *>(whitelist), whitelist_size);
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist), whitelist_size);
   if (line.length() != 14) {
     LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
     return false;
@@ -48,8 +48,8 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
   payload_bytes += 15;
 
   // Expiry date
-  line = GetLine(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                 whitelist_size-payload_bytes);
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
+                    whitelist_size-payload_bytes);
   if (line.length() != 15) {
     LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
     return false;
@@ -79,8 +79,8 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
   payload_bytes += 16;
 
   // Check repository name
-  line = GetLine(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                 whitelist_size-payload_bytes);
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
+                    whitelist_size-payload_bytes);
   if ((expected_repository != "") && ("N" + expected_repository != line)) {
     LogCvmfs(kLogSignature, kLogDebug,
              "repository name does not match (found %s, expected %s)",
@@ -92,8 +92,8 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
   // Search the fingerprint
   bool found = false;
   do {
-    line = GetLine(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                   whitelist_size-payload_bytes);
+    line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
+                      whitelist_size-payload_bytes);
     if (line == "--") break;
     if (line.substr(0, 59) == fingerprint)
       found = true;

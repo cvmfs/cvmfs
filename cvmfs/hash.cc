@@ -14,6 +14,10 @@
 
 using namespace std;  // NOLINT
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 namespace hash {
 
 /**
@@ -177,3 +181,7 @@ void Md5::ToIntPair(uint64_t *lo, uint64_t *hi) const {
 }
 
 }  // namespace hash
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif

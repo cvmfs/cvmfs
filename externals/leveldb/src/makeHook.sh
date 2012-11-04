@@ -1,4 +1,4 @@
 #!/bin/sh
 
 make clean
-make
+CXXFLAGS=-fPIC CFLAGS=-fPIC make

@@ -1,5 +1,5 @@
 all:
-	g++ -I. -I../.. -g -O2 -Wall -c -o murmur.o MurmurHash2.cpp
+	g++ -I. -I../.. -g -O2 -fPIC -Wall -c -o murmur.o MurmurHash2.cpp
 	ar cru libmurmur.a murmur.o
 	ranlib libmurmur.a
 

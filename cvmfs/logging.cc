@@ -28,6 +28,10 @@
 
 using namespace std;  // NOLINT
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 namespace {
 
 pthread_mutex_t lock_stdout = PTHREAD_MUTEX_INITIALIZER;
@@ -236,3 +240,7 @@ void PrintError(const string &message) {
 void PrintWarning(const string &message) {
   LogCvmfs(kLogCvmfs, kLogStderr, "[WARNING] %s", message.c_str());
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif

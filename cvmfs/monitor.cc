@@ -37,6 +37,7 @@
 #include "platform.h"
 #include "util.h"
 #include "logging.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -45,12 +46,14 @@ namespace monitor {
 const unsigned kMinOpenFiles = 8192;  /**< minmum threshold for the maximum
                                        number of open files */
 const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
+const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 
 string *cache_dir_ = NULL;
 bool spawned_ = false;
 unsigned max_open_files_;
 int pipe_wd_[2];
 platform_spinlock lock_handler_;
+stack_t sighandler_stack_;
 
 
 /**
@@ -242,7 +245,7 @@ bool Init(const string cache_dir, const bool check_max_open_files) {
 #endif
 
     if (soft_limit < kMinOpenFiles) {
-      LogCvmfs(kLogMonitor, kLogSyslog | kLogStdout,
+      LogCvmfs(kLogMonitor, kLogSyslog | kLogDebug,
                "Warning: current limits for number of open files are "
                "(%lu/%lu)\n"
                "CernVM-FS is likely to run out of file descriptors, "
@@ -264,6 +267,20 @@ bool Init(const string cache_dir, const bool check_max_open_files) {
 
 
 void Fini() {
+  // Reset signal handlers
+  if (spawned_) {
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGILL, SIG_DFL);
+    signal(SIGABRT, SIG_DFL);
+    signal(SIGFPE, SIG_DFL);
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    signal(SIGPIPE, SIG_DFL);
+    signal(SIGXFSZ, SIG_DFL);
+    free(sighandler_stack_.ss_sp);
+    sighandler_stack_.ss_size = 0;
+  }
+  
   delete cache_dir_;
   cache_dir_ = NULL;
   if (spawned_) {
@@ -303,10 +320,18 @@ void Spawn() {
       if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
   }
 
+  // Extra stack for signal handlers
+  int stack_size = kSignalHandlerStacksize;  // 2 MB
+  sighandler_stack_.ss_sp = smalloc(stack_size);
+  sighandler_stack_.ss_size = stack_size;
+  sighandler_stack_.ss_flags = 0;
+  if (sigaltstack(&sighandler_stack_, NULL) != 0)
+    abort();
+  
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_sigaction = SendTrace;
-  sa.sa_flags = SA_SIGINFO;
+  sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
   sigfillset(&sa.sa_mask);
 
   if (sigaction(SIGQUIT, &sa, NULL) ||

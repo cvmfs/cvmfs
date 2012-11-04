@@ -119,7 +119,7 @@ bool Init(const string &cachedir, const string &exe_path,
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(socket_pair[1]);
   
-  retval = ManagedExec(command_line, preserve_filedes);
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>());
   close(socket_pair[1]);
   
   if (!retval) {

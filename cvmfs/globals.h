@@ -7,7 +7,15 @@
 
 #include <unistd.h>
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 extern uid_t g_uid;
 extern gid_t g_gid;
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_GLOBALS_H_
