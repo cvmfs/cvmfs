@@ -158,7 +158,7 @@ cvmfs_chksetup()
 
   # Check binaries
   local binary
-  for binary in cvmfs2 cvmfs_fsck cvmfs_talk
+  for binary in cvmfs2 cvmfs_fsck cvmfs_talk cvmfs_server cvmfs_swissknife
   do
     if ! which $binary > /dev/null 2>&1; then
       echo "Error: $binary not found"
