@@ -10,7 +10,7 @@ UNION=/cvmfs/dev.cern.ch
 echo "recreate the repo first..."
 sh recreateRepo.sh
 echo "now run test1 to create a testbed..."
-sh test1.sh
+sh testCreateSimpleToyRepository.sh
 
 echo "start transaction... "
 cvmfs_server transaction || die "fail"
