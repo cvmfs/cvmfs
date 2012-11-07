@@ -15,9 +15,9 @@
 namespace publish {
 
 enum SyncItemType {
-    kItemDir,
-    kItemFile,
-    kItemSymlink
+  kItemDir,
+  kItemFile,
+  kItemSymlink
 };
 
 
