@@ -10,7 +10,7 @@ VERSION="$(echo $VERSION | cut -d. -f1).$(echo $VERSION | cut -d. -f2).$MINOR_VE
 echo "New version: $VERSION"
 
 echo "Patching CMakeLists.txt"
-sed -i -e "s/^## CVMFS_VERSION (.*)/## CVMFS_VERSION $VERSION/" CMakeLists.txt
+sed -i -e "s/^## CVMFS_VERSION \(.*\)/## CVMFS_VERSION $VERSION/" CMakeLists.txt
 sed -i -e "s/^set (CernVM-FS_VERSION_PATCH \(.*\)/set (CernVM-FS VERSION_PATCH $MINOR_VERSION)/" CMakeLists.txt
 grep VERSION CMakeLists.txt
 
