@@ -151,7 +151,7 @@ void WritableCatalog::IncLinkcount(const string &path_within_group,
 
   bool retval =
     sql_inc_linkcount_->BindPathHash(path_hash) &&
-    sql_inc_linkcount_->BindDelta(delta) &&
+    sql_inc_linkcount_->BindDelta(delta)        &&
     sql_inc_linkcount_->Execute();
   assert(retval);
   sql_inc_linkcount_->Reset();

@@ -64,6 +64,7 @@ class Database {
   std::string filename() const { return filename_; }
   float schema_version() const { return schema_version_; }
   bool ready() const { return ready_; }
+  std::string GetLastErrorMsg() const;
  private:
   Database(sqlite3 *sqlite_db, const float schema, const bool rw);
 
@@ -96,6 +97,7 @@ class Sql {
   bool FetchRow();
   bool Reset();
   inline int GetLastError() const { return last_error_code_; }
+  std::string GetLastErrorMsg() const;
 
   bool BindBlob(const int index, const void* value, const int size) {
     last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
@@ -185,6 +187,13 @@ class Sql {
     return hash::Any(hash::kSha1, hash::HexPtr(hash_string));
   }
 
+  /**
+   * Checks if a statement is currently busy with a transaction
+   * i.e. Reset() was not yet called on it.
+   */
+  inline bool IsBusy() const {
+    return (bool)sqlite3_stmt_busy(statement_);
+  }
 
  protected:
   Sql() { }
@@ -207,11 +216,10 @@ class Sql {
    * @param hash the hash to bind in the query
    * @result true on success, false otherwise
    */
-  bool BindMd5(const int idx_high, const int idx_low, const hash::Md5 &hash) {
+  inline bool BindMd5(const int idx_high, const int idx_low, const hash::Md5 &hash) {
     uint64_t high, low;
     hash.ToIntPair(&high, &low);
-    bool retval = BindInt64(idx_high, high) && BindInt64(idx_low, low);
-    return retval;
+    return BindInt64(idx_high, high) && BindInt64(idx_low, low);
   }
 
   /**
