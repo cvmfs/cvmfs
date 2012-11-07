@@ -17,7 +17,7 @@ project (${PROJECT_NAME})
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 1)
-set (CernVM-FS VERSION_PATCH 4)
+set (CernVM-FS_VERSION_PATCH 4)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #

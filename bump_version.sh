@@ -11,7 +11,7 @@ echo "New version: $VERSION"
 
 echo "Patching CMakeLists.txt"
 sed -i -e "s/^## CVMFS_VERSION \(.*\)/## CVMFS_VERSION $VERSION/" CMakeLists.txt
-sed -i -e "s/^set (CernVM-FS_VERSION_PATCH \(.*\)/set (CernVM-FS VERSION_PATCH $MINOR_VERSION)/" CMakeLists.txt
+sed -i -e "s/^set (CernVM-FS_VERSION_PATCH \(.*\)/set (CernVM-FS_VERSION_PATCH $MINOR_VERSION)/" CMakeLists.txt
 grep VERSION CMakeLists.txt
 
 echo "Patching RPM"
