@@ -1,3 +1,5 @@
+2.1.5:
+
 2.1.4:
   * Check permissions by default
   * Added cvmfs_suid mount option
