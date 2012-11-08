@@ -158,11 +158,19 @@ cvmfs_chksetup()
 
   # Check binaries
   local binary
-  for binary in cvmfs2 cvmfs2_debug cvmfs_fsck cvmfs_talk
+  for binary in cvmfs2 cvmfs_fsck cvmfs_talk
   do
-    if ! which $binary > /dev/null 2>&1; then
+    if ! test -f /usr/bin/$binary; then
       echo "Error: $binary not found"
       num_errors=$[$num_errors+1]
+    fi
+  done
+
+  for library in libcvmfs_fuse.so libcvmfs_fuse_debug.so
+  do
+    if ! test -f /usr/lib/$library && ! test -f /usr/lib64/$library; then
+      echo "Error: $library not found"
+      num_errors=$[$num_errors+1] 
     fi
   done
 
