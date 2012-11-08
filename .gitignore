@@ -1,2 +1,5 @@
 test/cvmfs-testdwrapper
 test/Tests/Common/zpipe.run
+*.DS_Store
+*._.DS_Store
+build/

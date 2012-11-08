@@ -247,6 +247,11 @@ create_schema_fail:
   return false;
 }
 
+std::string Database::GetLastErrorMsg() const {
+  std::string msg = sqlite3_errmsg(sqlite_db_);
+  return msg;
+}
+
 
 //------------------------------------------------------------------------------
 
@@ -318,6 +323,12 @@ bool Sql::Init(const sqlite3 *database, const std::string &statement) {
   LogCvmfs(kLogSql, kLogDebug, "successfully prepared statement '%s'",
            statement.c_str());
   return true;
+}
+
+std::string Sql::GetLastErrorMsg() const {
+  sqlite3* db     = sqlite3_db_handle(statement_);
+  std::string msg = sqlite3_errmsg(db);
+  return msg;
 }
 
 
@@ -654,7 +665,7 @@ bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
 
 SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
   const string statememt =
-    "UPDATE catalog SET inode="
+    "UPDATE catalog SET hardlinks="
     "CASE (hardlinks << 32) >> 32 WHEN 2 THEN 0 ELSE hardlinks + :delta END "
     "WHERE hardlinks = (SELECT hardlinks from catalog "
     "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2);";
