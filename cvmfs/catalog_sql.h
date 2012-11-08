@@ -64,6 +64,14 @@ class Database {
   std::string filename() const { return filename_; }
   float schema_version() const { return schema_version_; }
   bool ready() const { return ready_; }
+
+  /**
+   * Returns the english language error description of the last error
+   * happened in the context of the encapsulated sqlite3 database object.
+   * Note: In a multithreaded context it might be unpredictable which
+   *       the actual last error is.
+   * @return   english language error description of last error
+   */
   std::string GetLastErrorMsg() const;
  private:
   Database(sqlite3 *sqlite_db, const float schema, const bool rw);
@@ -97,6 +105,15 @@ class Sql {
   bool FetchRow();
   bool Reset();
   inline int GetLastError() const { return last_error_code_; }
+
+  /**
+   * Returns the english language error description of the last error
+   * happened in the context of the sqlite3 database object this statement is
+   * registered to.
+   * Note: In a multithreaded context it might be unpredictable which
+   *       the actual last error is.
+   * @return   english language error description of last error
+   */
   std::string GetLastErrorMsg() const;
 
   bool BindBlob(const int index, const void* value, const int size) {
