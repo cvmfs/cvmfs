@@ -219,7 +219,8 @@ class Sql {
   inline bool BindMd5(const int idx_high, const int idx_low, const hash::Md5 &hash) {
     uint64_t high, low;
     hash.ToIntPair(&high, &low);
-    return BindInt64(idx_high, high) && BindInt64(idx_low, low);
+    const bool retval = BindInt64(idx_high, high) && BindInt64(idx_low, low);
+    return retval;
   }
 
   /**
