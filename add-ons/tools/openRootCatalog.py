@@ -30,7 +30,7 @@ def openCatalog(filename):
 	subprocess.call(['sqlite3', filename])
 
 def usage():
-	print sys.argv[0] + " <cvmfs/pub path>"
+	print sys.argv[0] + " <repository name>"
 	print "This script decompresses the root catalog file to a temporary storage"
 	print "and opens this directly with sqlite3."
 	print "WARNING: changes to this database will not persist, as it is only a temp"
@@ -39,11 +39,12 @@ def main():
 	if len(sys.argv) != 2:
 		usage()
 		sys.exit(1)
-		
-	rootCatalog = getRootCatalogName(sys.argv[1] + "/catalogs/.cvmfspublished")
+	
+	repoDir = "/srv/cvmfs/" + sys.argv[1] + "/";
+	rootCatalog = getRootCatalogName(repoDir + ".cvmfspublished")
 	
 	myTmpFile = tempfile.NamedTemporaryFile('wb')
-	decompressCatalog(sys.argv[1] + "/data/" + rootCatalog[:2] + "/" + rootCatalog[2:] + "C", myTmpFile.name)
+	decompressCatalog(repoDir + "data/" + rootCatalog[:2] + "/" + rootCatalog[2:] + "C", myTmpFile.name)
 	openCatalog(myTmpFile.name)
 	myTmpFile.close()
 	

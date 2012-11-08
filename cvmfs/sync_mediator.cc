@@ -442,7 +442,7 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name)
 {
   SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
-  RemoveDirectory(entry);
+  RemoveDirectoryRecursively(entry);
 }
 
 
