@@ -7,7 +7,7 @@
 set -e
 
 die() {
-  echo $1 >&2
+  echo -e $1 >&2
   exit 1
 }
 
@@ -172,6 +172,20 @@ publish() {
   local spool_dir=$3
   local stratum0=$4
   local upstream=$5
+  local debug=$6
+
+  local swissknife="cvmfs_swissknife"
+  if [ x"$debug" = x"1" ]
+  then
+    if test -f /usr/bin/cvmfs_swissknife_debug; then
+      # run the debug version of cvmfs_swissknife with gdb attached to it
+      # in case something breaks we are provided with a GDB prompt.
+      swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+    else
+      swissknife="cvmfs_swissknife"
+      echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+    fi
+  fi
 
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
   fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
@@ -185,7 +199,7 @@ publish() {
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-  $user_shell "cvmfs_swissknife sync -x -u /cvmfs/$name \
+  local sync_command="$swissknife sync -x -u /cvmfs/$name \
     -s ${spool_dir}/scratch \
     -c ${spool_dir}/rdonly \
     -t ${spool_dir}/tmp \
@@ -193,13 +207,16 @@ publish() {
     -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
-    $log_level" || die "Synchronization failed"
-  $user_shell "cvmfs_swissknife sign -c /etc/cvmfs/keys/${name}.crt \
+    $log_level"
+  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${spool_dir}/tmp/manifest \
     -t ${spool_dir}/tmp \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests" || die "Signing failed"
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests"
+
+  $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
+  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
@@ -787,7 +804,15 @@ case $1 in
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
     [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE
+
+    DEBUG=0
+    for last; do true; done
+    if [ "$last" = "-d" ]
+    then
+      DEBUG=1
+    fi
+
+    publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE $DEBUG
   ;;
   snapshot)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
