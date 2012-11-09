@@ -658,6 +658,8 @@ Commands:
   add-replica <fully qualified name> <stratum 0 url> <public key>
                [-o owner] [-u stratum1 upstram storage]
                Create a Stratum 1 replica of a repository
+  publish <fully qualified name> [-d debug_mode]:
+               Make a new repository snapshot
   rmfs:        Remove the repository
   resign:      Re-sign the 30 day whitelist
   list:        List available repositories
@@ -665,7 +667,6 @@ Commands:
   check:       Checks if the repository is sane
   transaction: Start to edit a repository
   abort:       Abort transaction and return to the state before
-  publish:     Make a new repository snapshot
   snapshot:    Synchronize a Stratum 1 replica with the Stratum 0 source
 
 Note: If multiple repositories are maintained, the repository name must follow
@@ -806,7 +807,7 @@ case $1 in
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
 
     DEBUG=0
-    for last; do true; done
+    for last; do true; done # Shell-KungFu: find last command-line parameter of cvmfs_server invocation
     if [ "$last" = "-d" ]
     then
       DEBUG=1
