@@ -268,7 +268,7 @@ bool Spooler::Connect() {
   assert(fdigests_);
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected to digests pipe (read)");
 
-  // Start reveiver thread
+  // Start receiver thread
   int retval = pthread_create(&thread_receive_, NULL, MainReceive, this);
   assert(retval == 0);
 
