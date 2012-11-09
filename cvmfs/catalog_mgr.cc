@@ -227,7 +227,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
     goto lookup_path_notfound;
   }
 
-  LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s (name %s)",
+  LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s",
            path.c_str(), best_fit->path().c_str());
 
   // Look for parent entry
