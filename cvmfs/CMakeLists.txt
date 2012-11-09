@@ -81,22 +81,22 @@ set (CVMFS_SWISSKNIFE_SOURCES
   manifest_fetch.h manifest_fetch.cc
   hash.h hash.cc
   compression.h compression.cc
-	util.h util.cc
+  util.h util.cc
   upload.h upload.cc
   duplex_curl.h download.h download.cc
   signature.cc signature.h
 
   fs_traversal.h
   sync_item.h sync_item.cc
-	sync_union.h sync_union.cc
-	sync_mediator.h sync_mediator.cc
+  sync_union.h sync_union.cc
+  sync_mediator.h sync_mediator.cc
 
   dirent.h shortstring.h
   catalog_sql.h catalog_sql.cc
-	catalog.h catalog.cc
+  catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc
-	catalog_mgr.h catalog_mgr.cc
-	catalog_mgr_rw.h catalog_mgr_rw.cc
+  catalog_mgr.h catalog_mgr.cc
+  catalog_mgr_rw.h catalog_mgr_rw.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
@@ -106,6 +106,10 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife.h swissknife.cc)
 
 
+set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
+  ${CVMFS_SWISSKNIFE_SOURCES}
+)
+
 #
 # configure some compiler flags for proper build
 #
@@ -114,6 +118,8 @@ set (CVMFS_LOADER_CFLAGS "${CVMFS_LOADER_CFLAGS} -DCVMFS_CLIENT -DCVMFS_NAMESPAC
 
 set (CVMFS2_CFLAGS "${CVMFS2_CFLAGS} -DCVMFS_CLIENT -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS2_DEBUG_CFLAGS "${CVMFS2_DEBUG_CFLAGS} ${CVMFS2_CFLAGS} -D_FILE_OFFSET_BITS=64 -O0 -DDEBUGMSG")
+
+set (CVMFS_SWISSKNIFE_DEBUG_CFLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS} -DDEBUGMSG -g")
 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
@@ -336,6 +342,27 @@ if (BUILD_SERVER)
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife	${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+
+  if (BUILD_SERVER_DEBUG)
+    add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
+
+    if (LIBCURL_BUILTIN)
+			add_dependencies (cvmfs_swissknife_debug libcares libcurl)
+			endif (LIBCURL_BUILTIN)
+
+		if (SQLITE3_BUILTIN)
+    	add_dependencies (cvmfs_swissknife_debug sqlite3)
+		endif (SQLITE3_BUILTIN)
+
+		if (ZLIB_BUILTIN)
+    	add_dependencies (cvmfs_swissknife_debug zlib)
+		endif (ZLIB_BUILTIN)
+
+    set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
+
+    # link the stuff (*_LIBRARIES are dynamic link libraries)
+  	target_link_libraries (cvmfs_swissknife_debug	${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+  endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
 #
@@ -384,6 +411,14 @@ if (BUILD_SERVER)
 		RUNTIME
 		DESTINATION		bin
 	)
+
+  if (BUILD_SERVER_DEBUG)
+		install (
+			TARGETS     cvmfs_swissknife_debug
+			RUNTIME
+			DESTINATION   bin
+		)
+	endif (BUILD_SERVER_DEBUG)
 
 	install (
 		FILES			cvmfs_server
