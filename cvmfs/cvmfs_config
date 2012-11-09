@@ -37,7 +37,7 @@ case $sys_arch in
 esac
 
 var_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_DIR CVMFS_QUOTA_LIMIT \
-          CVMFS_SERVER_URL CVMFS_OPTIONS CVMFS_DEBUGLOG CVMFS_HTTP_PROXY CERNVM_CDN_HOST \
+          CVMFS_SERVER_URL CVMFS_DEBUGLOG CVMFS_HTTP_PROXY CERNVM_CDN_HOST \
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_TRACEFILE CVMFS_DEFAULT_DOMAIN \
           CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_FORCE_SIGNING CVMFS_STRICT_MOUNT \
           CVMFS_MAX_TTL CVMFS_SHARED_CACHE CVMFS_DISKLESS CVMFS_REPOSITORIES"
@@ -360,12 +360,6 @@ cvmfs_chksetup()
         num_errors=$[$num_errors+1]
       fi
 
-      # Check CVMFS_OPTIONS
-      if [ -z $CVMFS_OPTIONS ] || [ "$CVMFS_OPTIONS" != "ro,allow_other" ]; then
-        echo "Warning: tampered with CVMFS_OPTIONS"
-        num_warnings=$[$num_warnings+1]
-      fi
-
       # Check CVMFS_MOUNT_DIR
       if [ -z $CVMFS_MOUNT_DIR ] || [ ! -d $CVMFS_MOUNT_DIR ] || [ "$global_mount_dir" != "$CVMFS_MOUNT_DIR" ]; then
         echo "Error: invalid CVMFS_MOUNT_DIR for $fqrn"
@@ -387,7 +381,7 @@ cvmfs_chksetup()
       fi
 
       # Check for required variables
-      for reqvar in CVMFS_USER CVMFS_NFILES CVMFS_OPTIONS CVMFS_MOUNT_DIR \
+      for reqvar in CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR \
                     CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
                     CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT
       do
