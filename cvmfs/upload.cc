@@ -23,20 +23,15 @@
 #include "util.h"
 #include "logging.h"
 
+#include "upload_backend.h"
+
 using namespace std;  // NOLINT
 
 namespace upload {
 
-/**
- * Commands to the spooler
- */
-enum Commands {
-  kCmdProcess = 1,
-  kCmdCopy,
-  kCmdEndOfTransaction,
-  kCmdMoveFlag = 128,
-};
-
+bool LocalStat::Stat(const string &path) {
+  return FileExists(base_path_ + "/" + path);
+}
 
 static bool GetString(FILE *f, std::string *str) {
   str->clear();
@@ -49,11 +44,6 @@ static bool GetString(FILE *f, std::string *str) {
       return true;
     str->push_back(c);
   } while (true);
-}
-
-
-bool LocalStat::Stat(const string &path) {
-  return FileExists(base_path_ + "/" + path);
 }
 
 
@@ -183,6 +173,33 @@ int MainLocalSpooler(const string &fifo_paths,
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Default spooler terminates");
   fclose(fpaths);
   close(fd_digests);
+  return 0;
+}
+
+/**
+ * A simple spooler in case upstream storage is local.
+ * Compresses and hashes files and stores them on the upstream path.
+ * Meant to be forked.
+ */
+int MainRiakSpooler(const string &fifo_paths,
+                    const string &fifo_digests)
+{
+  FILE *fpaths = fopen(fifo_paths.c_str(), "r");
+  if (!fpaths)
+    return 1;
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Default spooler connected to paths pipe");
+  int fd_digests = open(fifo_digests.c_str(), O_WRONLY);
+  if (fd_digests < 0) {
+    fclose(fpaths);
+    return 1;
+  }
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Default spooler connected to digests pipe");
+
+  // create connection to riak
+  
+
   return 0;
 }
 
@@ -349,6 +366,8 @@ Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition) {
     int retval = 1;
     if (upstream_driver == "local")
       retval = upload::MainLocalSpooler(paths_out, digests_in, upstream_path);
+    if (upstream_driver == "riak")
+      retval = upload::MainRiakSpooler(paths_out, digests_in);
     exit(retval);
   }
 

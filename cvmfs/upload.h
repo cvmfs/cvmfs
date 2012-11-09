@@ -95,6 +95,9 @@ int MainLocalSpooler(const std::string &fifo_paths,
                      const std::string &fifo_digests,
                      const std::string &upstream_basedir);
 
+int MainRiakSpooler(const std::string &fifo_paths,
+                    const std::string &fifo_digests);
+
 /**
  * Starts a spooler process and the creates the corresponding object
  * from a definition string like "local:/dir/to/repo,/path/pipe,/digest/pipe"

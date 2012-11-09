@@ -83,6 +83,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   compression.h compression.cc
   util.h util.cc
   upload.h upload.cc
+  upload_backend.h upload_backend.cc
   duplex_curl.h download.h download.cc
   signature.cc signature.h
 
