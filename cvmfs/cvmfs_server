@@ -177,7 +177,7 @@ publish() {
   local swissknife="cvmfs_swissknife"
   if [ x"$debug" = x"1" ]
   then
-    if test -f /usr/bin/cvmfs_swissknife_debug; then
+    if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
       # run the debug version of cvmfs_swissknife with gdb attached to it
       # in case something breaks we are provided with a GDB prompt.
       swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
