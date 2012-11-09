@@ -5,10 +5,9 @@ die() {
   exit 1
 }
 
-UNION=/cvmfs/dev.cern.ch
+REPO=dev.cern.ch
+UNION=/cvmfs/$REPO
 
-echo "recreate the repo first..."
-sh recreateRepo.sh
 echo "now run test1 to create a testbed..."
 sh testCreateSimpleToyRepository.sh
 
@@ -36,7 +35,7 @@ cd
 
 if [ $# -eq 0 ]
 then
-  cvmfs_server publish || die "failed to publish"
+  cvmfs_server publish $REPO -d || die "failed to publish"
 fi
 
 echo "all done"
