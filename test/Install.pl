@@ -95,6 +95,7 @@ else {
 	print "Something went wrong while trying to download $zmq_retrieve.\n";
 	print "Check your internet connection and retry.\n";
 	print color 'reset';
+	exit 0;
 }
 
 
@@ -120,6 +121,7 @@ else {
 	print "Something went wrong while trying to download cpanm.\n";
 	print "Check your internet connection and retry.\n";
 	print color 'reset';
+	exit 0;
 }
 
 
