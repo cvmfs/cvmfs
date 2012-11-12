@@ -172,17 +172,26 @@ publish() {
   local spool_dir=$3
   local stratum0=$4
   local upstream=$5
-  local debug=$6
+  local debug=${6:-0}
 
   local swissknife="cvmfs_swissknife"
-  if [ x"$debug" = x"1" ]
+
+
+  # enable the debug mode?
+  if [ "$debug" -ne "0" ]
   then
     if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
-      # run the debug version of cvmfs_swissknife with gdb attached to it
-      # in case something breaks we are provided with a GDB prompt.
-      swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+      case $debug in
+        1)
+          # in case something breaks we are provided with a GDB prompt.
+          swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+        ;;
+        2)
+          # attach gdb and provide a prompt WITHOUT actual running the program
+          swissknife="gdb --quiet --args cvmfs_swissknife_debug"
+        ;;
+      esac
     else
-      swissknife="cvmfs_swissknife"
       echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
     fi
   fi
@@ -658,7 +667,7 @@ Commands:
   add-replica <fully qualified name> <stratum 0 url> <public key>
                [-o owner] [-u stratum1 upstram storage]
                Create a Stratum 1 replica of a repository
-  publish <fully qualified name> [-d debug_mode]:
+  publish <fully qualified name> [-d debug mode | -D blocking debug mode]:
                Make a new repository snapshot
   rmfs:        Remove the repository
   resign:      Re-sign the 30 day whitelist
@@ -806,12 +815,17 @@ case $1 in
     [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
 
-    DEBUG=0
     for last; do true; done # Shell-KungFu: find last command-line parameter of cvmfs_server invocation
-    if [ "$last" = "-d" ]
-    then
-      DEBUG=1
-    fi
+    case $last in
+      -d)
+        DEBUG=1
+      ;;
+      -D)
+        DEBUG=2
+      ;;
+      *)
+        DEBUG=0
+    esac
 
     publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE $DEBUG
   ;;
