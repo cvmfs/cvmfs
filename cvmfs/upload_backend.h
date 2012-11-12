@@ -20,14 +20,14 @@ namespace upload
     bool Connect(const std::string &fifo_paths,
                  const std::string &fifo_digests);
     virtual bool Initialize();
-    void Run();
+    int Run();
 
     virtual bool IsReady() const;
 
    protected:
     AbstractSpoolerBackend();
 
-    virtual void EndOfTransaction(std::string &response) = 0;
+    virtual void EndOfTransaction(std::string &response);
     virtual void Copy(const std::string &local_path,
                       const std::string &remote_path,
                       const bool move,
@@ -52,7 +52,7 @@ namespace upload
     bool initialized_;
   };
 
-  class LocalSpoolerBackend : AbstractSpoolerBackend
+  class LocalSpoolerBackend : public AbstractSpoolerBackend
   {
    public:
     LocalSpoolerBackend();
@@ -70,7 +70,6 @@ namespace upload
     void set_upstream_path(const std::string &upstream_path);
    
    protected:
-    void EndOfTransaction(std::string &response);
     void Copy(const std::string &local_path,
               const std::string &remote_path,
               const bool move,
@@ -86,7 +85,7 @@ namespace upload
     bool initialized_;
   };
 
-  class RiakSpoolerBackend : AbstractSpoolerBackend
+  class RiakSpoolerBackend : public AbstractSpoolerBackend
   {
    public:
     RiakSpoolerBackend();
@@ -96,7 +95,6 @@ namespace upload
     bool IsReady() const;
 
    protected:
-    void EndOfTransaction(std::string &response);
     void Copy(const std::string &local_path,
               const std::string &remote_path,
               const bool move,

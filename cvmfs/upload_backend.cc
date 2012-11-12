@@ -15,7 +15,11 @@ AbstractSpoolerBackend::AbstractSpoolerBackend() :
 {}
 
 AbstractSpoolerBackend::~AbstractSpoolerBackend()
-{}
+{
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler backend terminates");
+  fclose(fpathes_);
+  close(fd_digests_);
+}
 
 bool AbstractSpoolerBackend::Connect(const std::string &fifo_paths,
                                      const std::string &fifo_digests)
@@ -31,7 +35,7 @@ bool AbstractSpoolerBackend::Connect(const std::string &fifo_paths,
            "Spooler Backend connected to pathes pipe");
   
   // open a pipe for outgoing digest hashes
-  int fd_digests_ = open(fifo_digests.c_str(), O_WRONLY);
+  fd_digests_ = open(fifo_digests.c_str(), O_WRONLY);
   if (fd_digests_ < 0) {
     fclose(fpathes_);
     LogCvmfs(kLogSpooler, kLogStderr,
@@ -58,7 +62,7 @@ bool AbstractSpoolerBackend::Initialize()
   return true;
 }
 
-void AbstractSpoolerBackend::Run()
+int AbstractSpoolerBackend::Run()
 {
   int retval;
   bool running = true;
@@ -84,7 +88,7 @@ void AbstractSpoolerBackend::Run()
     switch (command) {
       case kCmdEndOfTransaction:
         LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Spooler sends transaction ack back");
+                 "Spooler received 'end of transaction'");
 
         EndOfTransaction(return_line);
         running = false;
@@ -113,7 +117,7 @@ void AbstractSpoolerBackend::Run()
         break;
 
       default:
-        LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler received 'unknown command': %d",
+        LogCvmfs(kLogSpooler, kLogWarning, "Spooler received 'unknown command': %d",
                  command);
 
         Unknown(return_line);
@@ -123,8 +127,19 @@ void AbstractSpoolerBackend::Run()
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "Spooler sends back result %s",
              return_line.c_str());
+
     WritePipe(fd_digests_, return_line.data(), return_line.length());
   }
+
+  return 0;
+}
+
+void AbstractSpoolerBackend::EndOfTransaction(std::string &response)
+{
+  response = "0";
+  response.push_back('\0');
+  response.push_back('\0');
+  response.push_back('\n');
 }
 
 void AbstractSpoolerBackend::Unknown(std::string &response)
@@ -175,7 +190,8 @@ LocalSpoolerBackend::~LocalSpoolerBackend()
 void LocalSpoolerBackend::set_upstream_path(const std::string &upstream_path)
 {
   if (IsReady())
-    LogCvmfs(kLogSpooler, kLogWarning, "Setting upstream path in a running spooler backend might be harmful!");
+    LogCvmfs(kLogSpooler, kLogWarning, "Setting upstream path in a running "
+                                       "spooler backend might be harmful!");
 
   upstream_path_ = upstream_path;
 }
@@ -196,24 +212,18 @@ bool LocalSpoolerBackend::Initialize()
   return true;
 }
 
-void LocalSpoolerBackend::EndOfTransaction(std::string &response)
-{
-  response = "0";
-  response.push_back('\0');
-  response.push_back('\0');
-  response.push_back('\n');
-}
-
 void LocalSpoolerBackend::Copy(const std::string &local_path,
                                const std::string &remote_path,
                                const bool move,
                                std::string &response)
 {
+  const std::string destination_path = upstream_path_ + "/" + remote_path;
+
   if (move) {
-    int retval = rename(local_path.c_str(), remote_path.c_str());
+    int retval = rename(local_path.c_str(), destination_path.c_str());
     response = (retval == 0) ? "0" : StringifyInt(errno);
   } else {
-    int retval = CopyPath2Path(local_path, remote_path);
+    int retval = CopyPath2Path(local_path, destination_path);
     response = retval ? "0" : "100";
   }
   response.push_back('\0');
@@ -286,11 +296,6 @@ bool RiakSpoolerBackend::Initialize()
     return false;
 
   return true;
-}
-
-void RiakSpoolerBackend::EndOfTransaction(std::string &response)
-{
-
 }
 
 void RiakSpoolerBackend::Copy(const std::string &local_path,

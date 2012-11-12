@@ -33,177 +33,6 @@ bool LocalStat::Stat(const string &path) {
   return FileExists(base_path_ + "/" + path);
 }
 
-static bool GetString(FILE *f, std::string *str) {
-  str->clear();
-  do {
-    int retval = getc_unlocked(f);
-    if (retval == EOF)
-      return false;
-    char c = retval;
-    if (c == '\0')
-      return true;
-    str->push_back(c);
-  } while (true);
-}
-
-
-/**
- * A simple spooler in case upstream storage is local.
- * Compresses and hashes files and stores them on the upstream path.
- * Meant to be forked.
- */
-int MainLocalSpooler(const string &fifo_paths,
-                     const string &fifo_digests,
-                     const string &upstream_basedir)
-{
-  FILE *fpaths = fopen(fifo_paths.c_str(), "r");
-  if (!fpaths)
-    return 1;
-  LogCvmfs(kLogSpooler, kLogVerboseMsg,
-           "Default spooler connected to paths pipe");
-  int fd_digests = open(fifo_digests.c_str(), O_WRONLY);
-  if (fd_digests < 0) {
-    fclose(fpaths);
-    return 1;
-  }
-  LogCvmfs(kLogSpooler, kLogVerboseMsg,
-           "Default spooler connected to digests pipe");
-
-  int retval;
-  while ((retval = getc_unlocked(fpaths)) != EOF) {
-    bool move_file = false;
-    if (retval & kCmdMoveFlag) {
-      retval -= kCmdMoveFlag;
-      move_file = true;
-    }
-    unsigned char command = retval;
-
-    string local_path;
-    string remote_path;
-    string remote_dir;
-    string file_suffix;
-    string return_line = "";
-    switch (command) {
-      case kCmdEndOfTransaction:
-        LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Default spooler sends transaction ack back");
-        return_line = "0";
-        return_line.push_back('\0');
-        return_line.push_back('\0');
-        return_line.push_back('\n');
-        WritePipe(fd_digests, return_line.data(), return_line.length());
-        goto tear_down;
-      case kCmdCopy:
-        GetString(fpaths, &local_path);
-        GetString(fpaths, &remote_path);
-        remote_path = upstream_basedir + "/" + remote_path;
-        LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Default spooler received 'copy': source %s, dest %s move %d",
-                 local_path.c_str(), remote_path.c_str(), move_file);
-        if (move_file) {
-          int retval = rename(local_path.c_str(), remote_path.c_str());
-          return_line = (retval == 0) ? "0" : StringifyInt(errno);
-        } else {
-          int retval = CopyPath2Path(local_path, remote_path);
-          return_line = retval ? "0" : "100";
-        }
-        return_line.push_back('\0');
-        return_line.append(local_path);
-        return_line.push_back('\0');
-        return_line.push_back('\n');
-        break;
-      case kCmdProcess: {
-        GetString(fpaths, &local_path);
-        GetString(fpaths, &remote_dir);
-        GetString(fpaths, &file_suffix);
-        LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Default spooler received 'process': source %s, dest %s, "
-                 "postfix %s, move %d", local_path.c_str(),
-                 remote_dir.c_str(), file_suffix.c_str(), move_file);
-
-        hash::Any compressed_hash(hash::kSha1);
-        remote_path = upstream_basedir + "/" + remote_dir;
-        string tmp_path;
-        FILE *fcas = CreateTempFile(remote_path + "/cvmfs", 0777, "w",
-                                    &tmp_path);
-        if (fcas == NULL) {
-          return_line = "103";
-        } else {
-          int retval = zlib::CompressPath2File(local_path, fcas,
-                                               &compressed_hash);
-          return_line = retval ? "0" : "103";
-          fclose(fcas);
-          if (retval) {
-            const string cas_path = remote_path + compressed_hash.MakePath(1, 2)
-                                    + file_suffix;
-            retval = rename(tmp_path.c_str(), cas_path.c_str());
-            if (retval != 0) {
-              unlink(tmp_path.c_str());
-              return_line = "104";
-            }
-          }
-        }
-        if (move_file) {
-          if (unlink(local_path.c_str()) != 0)
-            return_line = "105";
-        }
-        return_line.push_back('\0');
-        return_line.append(local_path);
-        return_line.push_back('\0');
-        return_line.append(compressed_hash.ToString());
-        return_line.push_back('\n');
-        break;
-      }
-      default:
-        LogCvmfs(kLogSpooler, kLogVerboseMsg, "unknown command %d",
-                 command);
-        return_line = "1";
-        return_line.push_back('\0');
-        return_line.push_back('\0');
-        return_line.push_back('\n');
-        break;
-    }
-    LogCvmfs(kLogSpooler, kLogVerboseMsg,
-             "Default spooler sends back result %s",
-             return_line.c_str());
-    WritePipe(fd_digests, return_line.data(), return_line.length());
-  }
-
- tear_down:
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Default spooler terminates");
-  fclose(fpaths);
-  close(fd_digests);
-  return 0;
-}
-
-/**
- * A simple spooler in case upstream storage is local.
- * Compresses and hashes files and stores them on the upstream path.
- * Meant to be forked.
- */
-int MainRiakSpooler(const string &fifo_paths,
-                    const string &fifo_digests)
-{
-  FILE *fpaths = fopen(fifo_paths.c_str(), "r");
-  if (!fpaths)
-    return 1;
-  LogCvmfs(kLogSpooler, kLogVerboseMsg,
-           "Default spooler connected to paths pipe");
-  int fd_digests = open(fifo_digests.c_str(), O_WRONLY);
-  if (fd_digests < 0) {
-    fclose(fpaths);
-    return 1;
-  }
-  LogCvmfs(kLogSpooler, kLogVerboseMsg,
-           "Default spooler connected to digests pipe");
-
-  // create connection to riak
-  
-
-  return 0;
-}
-
-
 Spooler::Spooler(const string &fifo_paths, const string &fifo_digests) {
   atomic_init64(&num_pending_);
   atomic_init64(&num_errors_);
@@ -364,10 +193,37 @@ Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition) {
   assert(pid >= 0);
   if (pid == 0) {
     int retval = 1;
+
+    AbstractSpoolerBackend *backend;
+
     if (upstream_driver == "local")
-      retval = upload::MainLocalSpooler(paths_out, digests_in, upstream_path);
-    if (upstream_driver == "riak")
-      retval = upload::MainRiakSpooler(paths_out, digests_in);
+    {
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "creating local spooler backend");
+      LocalSpoolerBackend *local_backend = new LocalSpoolerBackend();
+      local_backend->set_upstream_path(upstream_path);
+      backend = local_backend;
+    }
+
+    if (! backend->Connect(paths_out, digests_in))
+    {
+      PrintError("failed to connect to spooler backend");
+      delete backend;
+      exit(2);
+    } else
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected local spooler backend");
+
+
+    if (! backend->Initialize())
+    {
+      PrintError("failed to initialize spooler backend");
+      delete backend;
+      exit(3);
+    } else
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "initialized local spooler backend");
+
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "spooler backend is up and running...");
+    retval = backend->Run();
+    delete backend;
     exit(retval);
   }
 
