@@ -41,6 +41,11 @@ namespace upload
 
     virtual bool Compress();
 
+    void CreateResponseMessage(std::string &response,
+                               const int error_code,
+                               const std::string &local_path,
+                               const std::string &compressed_hash) const;
+
    private:
     bool OpenPipes();
     bool GetString(FILE *f, std::string *str) const;

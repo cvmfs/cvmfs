@@ -134,20 +134,28 @@ int AbstractSpoolerBackend::Run()
   return 0;
 }
 
+void AbstractSpoolerBackend::CreateResponseMessage(
+                                    std::string &response,
+                                    const int error_code,
+                                    const std::string &local_path,
+                                    const std::string &compressed_hash) const
+{
+  response = StringifyInt(error_code);
+  response.push_back('\0');
+  response.append(local_path);
+  response.push_back('\0');
+  response.append(compressed_hash);
+  response.push_back('\n');
+}
+
 void AbstractSpoolerBackend::EndOfTransaction(std::string &response)
 {
-  response = "0";
-  response.push_back('\0');
-  response.push_back('\0');
-  response.push_back('\n');
+  CreateResponseMessage(response, 0, "", "");
 }
 
 void AbstractSpoolerBackend::Unknown(std::string &response)
 {
-  response = "1";
-  response.push_back('\0');
-  response.push_back('\0');
-  response.push_back('\n');
+  CreateResponseMessage(response, 1, "", "");
 }
 
 bool AbstractSpoolerBackend::IsReady() const
@@ -219,17 +227,17 @@ void LocalSpoolerBackend::Copy(const std::string &local_path,
 {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
+  int retcode = 0;
+
   if (move) {
     int retval = rename(local_path.c_str(), destination_path.c_str());
-    response = (retval == 0) ? "0" : StringifyInt(errno);
+    retcode    = (retval == 0) ? 0 : errno;
   } else {
     int retval = CopyPath2Path(local_path, destination_path);
-    response = retval ? "0" : "100";
+    retcode    = retval ? 0 : 100;
   }
-  response.push_back('\0');
-  response.append(local_path);
-  response.push_back('\0');
-  response.push_back('\n');
+
+  CreateResponseMessage(response, retcode, local_path, "");
 }
 
 void LocalSpoolerBackend::Process(const std::string &local_path,
@@ -244,12 +252,15 @@ void LocalSpoolerBackend::Process(const std::string &local_path,
   std::string tmp_path;
   FILE *fcas = CreateTempFile(remote_path + "/cvmfs", 0777, "w",
                               &tmp_path);
+
+  int retcode = 0;
+
   if (fcas == NULL) {
-    response = "103";
+    retcode = 103;
   } else {
     int retval = zlib::CompressPath2File(local_path, fcas,
                                          &compressed_hash);
-    response = retval ? "0" : "103";
+    retcode = retval ? 0 : 103;
     fclose(fcas);
     if (retval) {
       const std::string cas_path = remote_path + compressed_hash.MakePath(1, 2)
@@ -257,19 +268,16 @@ void LocalSpoolerBackend::Process(const std::string &local_path,
       retval = rename(tmp_path.c_str(), cas_path.c_str());
       if (retval != 0) {
         unlink(tmp_path.c_str());
-        response = "104";
+        retcode = 104;
       }
     }
   }
   if (move) {
     if (unlink(local_path.c_str()) != 0)
-      response = "105";
+      retcode = 105;
   }
-  response.push_back('\0');
-  response.append(local_path);
-  response.push_back('\0');
-  response.append(compressed_hash.ToString());
-  response.push_back('\n');
+
+  CreateResponseMessage(response, retcode, local_path, compressed_hash.ToString());
 }
 
 bool LocalSpoolerBackend::IsReady() const
