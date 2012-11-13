@@ -18,9 +18,9 @@ cd $UNION
 
 echo "creating some directories"
 mkdir test1
-mkdir test1/test
-mkdir test1/test/test
-mkdir test1/test/test/test
+mkdir test1/nested
+mkdir test1/nested/test
+mkdir test1/nested/test/test
 
 mkdir test2/
 mkdir test2/test
@@ -32,13 +32,13 @@ mkdir test2/tset/test/test
 
 echo "creating some files"
 echo "lol" > test1/lol
-echo "rofl" > test1/test/test/rofl
-echo "lol" > test1/test/lol
-echo "lol" > test1/test/test/lol
-echo "rofl" > test1/test/roflcopter
+echo "rofl" > test1/nested/test/rofl
+echo "lol" > test1/nested/lol
+echo "lol" > test1/nested/test/lol
+echo "rofl" > test1/nested/roflcopter
 
 echo "create a nested catalog mark at test1/test/.cvmfscatalog"
-touch test1/test/.cvmfscatalog
+touch test1/nested/.cvmfscatalog
 
 cd
 
@@ -49,7 +49,7 @@ cvmfs_server transaction || die "failed to open new transaction"
 
 cd $UNION
 
-rm test1/test/.cvmfscatalog || die "no catalog found at expected position"
+rm test1/nested/.cvmfscatalog || die "no catalog found at expected position"
 
 cd
 
