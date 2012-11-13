@@ -473,14 +473,11 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
       reinterpret_cast<WritableCatalog *>(nested_catalog)->
         UpdateEntry(nested_root, entry_path);
       assert(retval);
-    }
-    else {
+    } else {
       // a normal directory contains no cvmfs-specific meta data... just update
       catalog->UpdateEntry(entry, entry_path);
     }
-  }
-  else
-  {
+  } else {
     // currently normal files do not have cvmfs-specifc meta data... just update
     catalog->UpdateEntry(entry, entry_path);
   }
