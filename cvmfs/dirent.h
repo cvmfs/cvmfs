@@ -34,20 +34,18 @@ enum SpecialDirents {
   kDirentNegative,
 };
 
-class DirectoryEntry {
-  friend class SqlLookup;               // simplify creation of DirectoryEntry objects
-  friend class SqlDirentWrite;          // simplify write of DirectoryEntry objects in database
-  friend class publish::SyncItem;       // simplify creation of DirectoryEntry objects for write back
-  friend class WritableCatalogManager;  // TODO: remove this dependency
-
-public:
+/**
+ * This class is a thin wrapper around struct dirent.
+ * It only contains file system related meta data for a directory entry
+ */
+class DirectoryEntryBase {
+ public:
   const static inode_t kInvalidInode = 0;
 
   /**
    * Zero-constructed DirectoryEntry objects are unusable as such.
    */
-  inline DirectoryEntry() :
-    catalog_(NULL),
+  inline DirectoryEntryBase() :
     inode_(kInvalidInode),
     parent_inode_(kInvalidInode),
     hardlinks_(0),
@@ -55,21 +53,7 @@ public:
     uid_(0),
     gid_(0),
     size_(0),
-    mtime_(0),
-    cached_mtime_(0),
-    is_nested_catalog_root_(false),
-    is_nested_catalog_mountpoint_(false) { }
-
-  inline explicit DirectoryEntry(SpecialDirents special_type) :
-    catalog_((Catalog *)(-1)) { };
-
-  inline SpecialDirents GetSpecial() {
-    return (catalog_ == (Catalog *)(-1)) ? kDirentNegative : kDirentNormal;
-  }
-  inline bool IsNestedCatalogRoot() const { return is_nested_catalog_root_; }
-  inline bool IsNestedCatalogMountpoint() const {
-    return is_nested_catalog_mountpoint_;
-  }
+    mtime_(0) { }
 
   inline bool IsRegular() const { return S_ISREG(mode_); }
   inline bool IsLink() const { return S_ISLNK(mode_); }
@@ -83,16 +67,36 @@ public:
   }
   inline NameString name() const { return name_; }
   inline LinkString symlink() const { return symlink_; }
-  inline hash::Any checksum() const { return checksum_; }
-  inline const hash::Any *checksum_ptr() const { return &checksum_; }
+
   inline uint64_t size() const {
     return (IsLink()) ? symlink().GetLength() : size_;
   }
   inline time_t mtime() const { return mtime_; }
-  inline time_t cached_mtime() const { return cached_mtime_; }
   inline unsigned int mode() const { return mode_; }
   inline uid_t uid() const { return uid_; }
   inline gid_t gid() const { return gid_; }
+
+  inline void set_inode(const inode_t inode) { inode_ = inode; }
+  inline void set_parent_inode(const inode_t parent_inode) {
+    parent_inode_ = parent_inode;
+  }
+
+  // The hardlinks field encodes the number of links in the first 32 bit
+  // and the hardlink group id in the second 32 bit.
+  // A value of 0 means: 1 link, normal file
+  inline void set_hardlinks(const uint32_t hardlink_group,
+                            const uint32_t linkcount)
+  {
+    hardlinks_ = (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
+  }
+  static inline uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) {
+    if (hardlinks == 0)
+      return 1;
+    return (hardlinks << 32) >> 32;
+  }
+  static inline uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) {
+    return hardlinks >> 32;
+  }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
@@ -119,29 +123,58 @@ public:
     return s;
   }
 
-  // The hardlinks field encodes the number of links in the first 32 bit
-  // and the hardlink group id in the second 32 bit.
-  // A value of 0 means: 1 link, normal file
-  inline void set_hardlinks(const uint32_t hardlink_group,
-                            const uint32_t linkcount)
-  {
-    hardlinks_ = (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
-  }
-  static inline uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) {
-    if (hardlinks == 0)
-      return 1;
-    return (hardlinks << 32) >> 32;
-  }
-  static inline uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) {
-    return hardlinks >> 32;
+ protected:
+  // stat like information
+  NameString name_;
+  inode_t inode_;
+  inode_t parent_inode_;
+  uint64_t hardlinks_;  // Hardlink group id + linkcount
+  unsigned int mode_;
+  uid_t uid_;
+  gid_t gid_;
+  uint64_t size_;
+  time_t mtime_;
+  LinkString symlink_;
+};
+
+/**
+ * DirectoryEntries might contain cvmfs-specific meta data
+ * Currently these are the following things:
+ *  // TODO
+ */
+class DirectoryEntry : public DirectoryEntryBase {
+  friend class SqlLookup;               // simplify creation of DirectoryEntry objects
+  friend class SqlDirentWrite;          // simplify write of DirectoryEntry objects in database
+  friend class publish::SyncItem;       // simplify creation of DirectoryEntry objects for write back
+  friend class WritableCatalogManager;  // TODO: remove this dependency
+
+ public:
+  inline DirectoryEntry() : 
+    catalog_(NULL), 
+    cached_mtime_(0),
+    is_nested_catalog_root_(false),
+    is_nested_catalog_mountpoint_(false) {}
+
+  inline explicit DirectoryEntry(SpecialDirents special_type) :
+    catalog_((Catalog *)(-1)) { };
+
+  inline SpecialDirents GetSpecial() {
+    return (catalog_ == (Catalog *)(-1)) ? kDirentNegative : kDirentNormal;
   }
 
-  inline void set_cached_mtime(const time_t value) { cached_mtime_ = value; }
-  inline void set_inode(const inode_t inode) { inode_ = inode; }
-  inline const Catalog *catalog() const { return catalog_; }
-  inline void set_parent_inode(const inode_t parent_inode) {
-    parent_inode_ = parent_inode;
+  inline bool IsNestedCatalogRoot() const { return is_nested_catalog_root_; }
+  inline bool IsNestedCatalogMountpoint() const {
+    return is_nested_catalog_mountpoint_;
   }
+
+  inline time_t cached_mtime() const { return cached_mtime_; }
+
+  inline hash::Any checksum() const { return checksum_; }
+  inline const hash::Any *checksum_ptr() const { return &checksum_; }
+  inline void set_cached_mtime(const time_t value) { cached_mtime_ = value; }
+
+  inline const Catalog *catalog() const { return catalog_; }
+
   inline void set_is_nested_catalog_mountpoint(const bool val) {
     is_nested_catalog_mountpoint_ = val;
   }
@@ -153,20 +186,9 @@ private:
   // Associated cvmfs catalog
   Catalog* catalog_;
 
-  // stat like information
-  NameString name_;
-  inode_t inode_;
-  inode_t parent_inode_;
-  uint64_t hardlinks_;  // Hardlink group id + linkcount
-  unsigned int mode_;
-  uid_t uid_;
-  gid_t gid_;
-  uint64_t size_;
-  time_t mtime_;
   time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
                               need to be invalidated (file has changed) */
   // TODO: unionize
-  LinkString symlink_;
   hash::Any checksum_;
 
   // Administrative data
