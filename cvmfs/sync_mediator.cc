@@ -518,7 +518,11 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
   }
 }
 
-
+/**
+ * this method deletes a single directory entry! Make sure to empty it
+ * before you call this method or simply use 
+ * SyncMediator::RemoveDirectoryRecursively instead.
+ */
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
