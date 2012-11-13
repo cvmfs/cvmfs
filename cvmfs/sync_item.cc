@@ -92,8 +92,8 @@ bool SyncItem::IsOpaqueDirectory() const {
 }
 
 
-catalog::DirectoryEntry SyncItem::CreateCatalogDirent() const {
-  catalog::DirectoryEntry dirent;
+catalog::DirectoryEntryBase SyncItem::CreateCatalogDirent() const {
+  catalog::DirectoryEntryBase dirent;
   // inode and parent inode is determined at runtime of client
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
   dirent.parent_inode_ = catalog::DirectoryEntry::kInvalidInode;

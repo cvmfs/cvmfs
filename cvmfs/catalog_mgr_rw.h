@@ -51,25 +51,26 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
   bool Init();
 
-  void AddFile(const DirectoryEntry &entry,
+  void AddFile(const DirectoryEntryBase &entry,
                const std::string &parent_directory);
   void RemoveFile(const std::string &file_path);
-  void AddDirectory(const DirectoryEntry &entry,
+
+  void AddDirectory(const DirectoryEntryBase &entry,
                     const std::string &parent_directory);
   void RemoveDirectory(const std::string &directory_path);
 
-  void TouchEntry(const DirectoryEntry entry, const std::string &path);
-  void TouchFile(const DirectoryEntry entry, const std::string &file_path)
+  void TouchEntry(const DirectoryEntryBase &entry, const std::string &path);
+  void TouchFile(const DirectoryEntryBase &entry, const std::string &file_path)
   {
     TouchEntry(entry, file_path);
   }
-  void TouchDirectory(const DirectoryEntry entry,
+  void TouchDirectory(const DirectoryEntryBase &entry,
                       const std::string &directory_path)
   {
     TouchEntry(entry, directory_path);
   }
 
-	void AddHardlinkGroup(DirectoryEntryList &entries,
+	void AddHardlinkGroup(DirectoryEntryBaseList &entries,
                         const std::string &parent_directory);
   void ShrinkHardlinkGroup(const std::string &remove_path);
 

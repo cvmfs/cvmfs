@@ -273,7 +273,7 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
  *                         directory to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
+void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
                                           const std::string &parent_directory)
 {
   const string parent_path = MakeRelativePath(parent_directory);
@@ -298,9 +298,9 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
     assert(false);
   }
 
-  DirectoryEntry FixedHardlinkCount = entry;
-  FixedHardlinkCount.set_hardlinks(0, 2);
-  catalog->AddEntry(FixedHardlinkCount, directory_path, parent_path);
+  DirectoryEntry fixedHardlinkCount(entry);
+  fixedHardlinkCount.set_hardlinks(0, 2);
+  catalog->AddEntry(fixedHardlinkCount, directory_path, parent_path);
 
   parent_entry.set_hardlinks(0, parent_entry.linkcount()+1);
   catalog->UpdateEntry(parent_entry, parent_path);
@@ -324,7 +324,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
  *                         file to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
+void WritableCatalogManager::AddFile(const DirectoryEntryBase &entry,
                                      const std::string &parent_directory) {
   const string parent_path = MakeRelativePath(parent_directory);
   string file_path = parent_path + "/";
@@ -339,7 +339,7 @@ void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
   }
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
-  catalog->AddEntry(entry, file_path, parent_path);
+  catalog->AddEntry(DirectoryEntry(entry), file_path, parent_path);
   SyncUnlock();
 }
 
@@ -351,8 +351,8 @@ void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
  *                         files to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
-                                          const std::string &parent_directory)
+void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
+                                              const std::string &parent_directory)
 {
   assert(entries.size() >= 1);
   if (entries.size() == 1)
@@ -382,13 +382,13 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	assert(new_group_id > 0);
 
 	// Add the file entries to the catalog
-	for (DirectoryEntryList::iterator i = entries.begin(), iEnd = entries.end();
+	for (DirectoryEntryBaseList::iterator i = entries.begin(), iEnd = entries.end();
        i != iEnd; ++i)
   {
 	  string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
     i->set_hardlinks(new_group_id, entries.size());
-	  catalog->AddEntry(*i, file_path, parent_path);
+	  catalog->AddEntry(DirectoryEntry(*i), file_path, parent_path);
 	}
   SyncUnlock();
 }
@@ -424,7 +424,7 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
  * NOT contain this CVMFS-specific information.
  * !! TAKE CARE !!
  */
-void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
+void WritableCatalogManager::TouchEntry(const DirectoryEntryBase &entry,
                                         const std::string &path)
 {
   const string entry_path = MakeRelativePath(path);
@@ -454,7 +454,7 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
                "updating transition point at %s", entry_path.c_str());
 
       // update mountpoint of nested catalog
-      catalog::DirectoryEntry mountpoint = entry;
+      catalog::DirectoryEntry mountpoint(entry);
       mountpoint.set_is_nested_catalog_mountpoint(true);
       catalog->UpdateEntry(mountpoint, entry_path);
 
@@ -467,7 +467,7 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
       assert(nested_catalog != NULL);
 
       // update nested catalog root
-      catalog::DirectoryEntry nested_root = entry;
+      catalog::DirectoryEntry nested_root(entry);
       nested_root.set_is_nested_catalog_root(true);
 
       reinterpret_cast<WritableCatalog *>(nested_catalog)->
@@ -475,11 +475,11 @@ void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
       assert(retval);
     } else {
       // a normal directory contains no cvmfs-specific meta data... just update
-      catalog->UpdateEntry(entry, entry_path);
+      catalog->UpdateEntry(DirectoryEntry(entry), entry_path);
     }
   } else {
     // currently normal files do not have cvmfs-specifc meta data... just update
-    catalog->UpdateEntry(entry, entry_path);
+    catalog->UpdateEntry(DirectoryEntry(entry), entry_path);
   }
 
   SyncUnlock();

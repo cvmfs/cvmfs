@@ -39,6 +39,8 @@ enum SpecialDirents {
  * It only contains file system related meta data for a directory entry
  */
 class DirectoryEntryBase {
+  friend class publish::SyncItem;       // simplify creation of DirectoryEntry objects for write back
+
  public:
   const static inode_t kInvalidInode = 0;
 
@@ -98,6 +100,9 @@ class DirectoryEntryBase {
     return hardlinks >> 32;
   }
 
+  inline hash::Any checksum() const { return checksum_; }
+  inline const hash::Any *checksum_ptr() const { return &checksum_; }
+
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
    * @return the struct stat for this DirectoryEntry
@@ -135,6 +140,10 @@ class DirectoryEntryBase {
   uint64_t size_;
   time_t mtime_;
   LinkString symlink_;
+
+  // checksum is not part of the file system intrinsics, though can be computed
+  // just using the file contents... we therefore put it in this base class.
+  hash::Any checksum_;
 };
 
 /**
@@ -145,10 +154,23 @@ class DirectoryEntryBase {
 class DirectoryEntry : public DirectoryEntryBase {
   friend class SqlLookup;               // simplify creation of DirectoryEntry objects
   friend class SqlDirentWrite;          // simplify write of DirectoryEntry objects in database
-  friend class publish::SyncItem;       // simplify creation of DirectoryEntry objects for write back
   friend class WritableCatalogManager;  // TODO: remove this dependency
 
  public:
+  /**
+   * This is _kind of_ a copy constructor allowing us to create
+   * DirectoryEntries directly from DirectoryEntryBase objects. Though we
+   * make this explicit, to disallow black magic from happening. It uses the 
+   * copy constructor of DirectoryEntryBase and initializes the additional
+   * fields of DirectoryEntry.
+   */
+  inline explicit DirectoryEntry(const DirectoryEntryBase& base) :
+    DirectoryEntryBase(base),
+    catalog_(NULL),
+    cached_mtime_(0),
+    is_nested_catalog_root_(false),
+    is_nested_catalog_mountpoint_(false) {}
+
   inline DirectoryEntry() : 
     catalog_(NULL), 
     cached_mtime_(0),
@@ -168,9 +190,6 @@ class DirectoryEntry : public DirectoryEntryBase {
   }
 
   inline time_t cached_mtime() const { return cached_mtime_; }
-
-  inline hash::Any checksum() const { return checksum_; }
-  inline const hash::Any *checksum_ptr() const { return &checksum_; }
   inline void set_cached_mtime(const time_t value) { cached_mtime_ = value; }
 
   inline const Catalog *catalog() const { return catalog_; }
@@ -188,8 +207,6 @@ private:
 
   time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
                               need to be invalidated (file has changed) */
-  // TODO: unionize
-  hash::Any checksum_;
 
   // Administrative data
   bool is_nested_catalog_root_;
@@ -207,7 +224,8 @@ struct StatEntry {
   StatEntry(const NameString &n, const struct stat &i) : name(n), info(i) { }
 };
 
-typedef std::vector<DirectoryEntry> DirectoryEntryList;
+typedef std::vector<DirectoryEntry> DirectoryEntryList;         // TODO: rename!
+typedef std::vector<DirectoryEntryBase> DirectoryEntryBaseList; //       these are NOT lists.
 typedef std::vector<StatEntry> StatEntryList;
 
 } // namespace catalog

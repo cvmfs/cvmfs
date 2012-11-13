@@ -580,7 +580,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
 void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   // Create a DirectoryEntry list out of the hardlinks
-  catalog::DirectoryEntryList hardlinks;
+  catalog::DirectoryEntryBaseList hardlinks;
   for (SyncItemList::const_iterator i = group.hardlinks.begin(),
        iEnd = group.hardlinks.end(); i != iEnd; ++i)
   {
