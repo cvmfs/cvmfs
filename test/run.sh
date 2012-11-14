@@ -28,7 +28,7 @@ for t in $testsuite
 do
   cvmfs_clean || exit 2
   workdir="${CVMFS_TEST_SCRATCH}/workdir"
-  rm -rf $workdir && mkdir $workdir || exit 3
+  rm -rf "$workdir" && mkdir -p "$workdir" || exit 3
   . $t/main || exit 4
   echo "-- Testing $t" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
