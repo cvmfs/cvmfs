@@ -28,10 +28,13 @@ use vars qw/ @EXPORT_OK /;
 # if you have a better method, let me know.
 use FindBin qw($RealBin);
 
+# This variable will be set to 1 if the shell is speaking to a daemon on a remote machine
+my $remote = 0;
+
 # This function will check whether the daemon is running.
 sub check_daemon {
 	my $running = `ps -ef | grep cvmfs-testdwrapper | grep -v grep | grep -v defunct`;
-	return $running and $main::daemon_ip ne "127.0.0.1";
+	return ($running or $remote);
 }
 
 sub check_process {
@@ -103,6 +106,11 @@ sub wait_daemon {
 	
 	# Opening the socket to communicate with the server
 	($socket, $ctxt) = connect_shell_socket($daemon_path);
+	
+	# Setting $remote = 1 if the connection was successfull
+	if ($socket) {
+		$remote = 1;
+	}
 	
 	# Returning new socket and context
 	return ($socket, $ctxt);
@@ -236,7 +244,7 @@ sub get_daemon_output {
 			# Most of special signal will not be printed as output part.
 			my $processed = 0;
 			# This case if the daemon has stopped itself
-			if ($_ =~ m/DAEMON_STOPPED/) { $socket = close_shell_socket($socket); $ctxt = term_shell_ctxt($ctxt); $processed = 1 }
+			if ($_ =~ m/DAEMON_STOPPED/) { $socket = close_shell_socket($socket); $ctxt = term_shell_ctxt($ctxt); $remote = 0 if $remote; $processed = 1 }
 			elsif ($_ =~ m/PROCESSING/) {
 				my $process_name = (split /:/, $_)[-1];
 				chomp($process_name);
@@ -322,7 +330,6 @@ sub start_daemon {
 	my $daemon_options = "";
 	if (defined($shell_path) and defined($iface)) {
 		$daemon_options = '--shell-path ' . $shell_path . ' --iface ' . $iface;
-		print $daemon_options . "\n";
 	}
 		
 	if (!check_daemon()){

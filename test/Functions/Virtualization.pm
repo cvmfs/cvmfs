@@ -17,8 +17,8 @@ use LWP::Simple;
 my $distributed = "$RealBin/Distributed";
 my $home = $ENV{"HOME"};
 my $cernvmurl = 'http://cernvm.cern.ch/releases/17/cernvm-basic-2.6.0-4-1-x86_64.vdi.gz';
-my $cernvmgz = 'cernvm-desktop-2.6.0-4-1-x86_64.vdi.gz';
-my $cernvmvdi = 'cernvm-desktop-2.6.0-4-1-x86_64.vdi';
+my $cernvmgz = 'cernvm-basic-2.6.0-4-1-x86_64.vdi.gz';
+my $cernvmvdi = 'cernvm-basic-2.6.0-4-1-x86_64.vdi';
 my $vmname = 'CVMFSTEST';
 my $vbm = '/usr/bin/VBoxManage';
 
