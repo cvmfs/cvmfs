@@ -6,6 +6,14 @@
  * All nested catalog loading functionality is inherited from
  * AbstractCatalogManager.
  *
+ * The WritableCatalogManager is provided with DirectoryEntryBase objects from
+ * the underlying sync infrastructure (namely SyncMediator) on the server side
+ * of CVMFS. In contrast to a full DirectoryEntry object DirectoryEntryBase con-
+ * tains only pure file system specific meta data (i.e. mtime, mode, filename).
+ * WritableCatalogManager is responsible for the addition and management of all
+ * CVMFS-specific meta data in a full DirectoryEntry, which is then saved into
+ * the actual Catalog databases.
+ *
  * The inode assignment is based on the fact that the number of entries in a
  * catalog do not change (expect on reload). As we do exactly that with the
  * WritableCatalogManager here, inode numbers derived from WritableCatalogs
