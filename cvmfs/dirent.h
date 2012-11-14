@@ -132,9 +132,12 @@ class DirectoryEntryBase {
  protected:
   // stat like information
   NameString name_;
-  inode_t inode_;
-  inode_t parent_inode_;
-  uint64_t hardlinks_;  // Hardlink group id + linkcount
+  
+  inode_t inode_;        // inodes are generated on the fly by the cvmfs client.
+  inode_t parent_inode_; // since they are file system stuff, we have them here
+                         // Though, they are NOT written to any catalog.
+
+  uint64_t hardlinks_;   // Hardlink group id + linkcount
   unsigned int mode_;
   uid_t uid_;
   gid_t gid_;
