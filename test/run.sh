@@ -9,7 +9,9 @@ if [ -z $logfile ]; then
   usage
   exit 1
 fi
-logfile=$(pwd)/$(basename $logfile)
+if ! echo "$logfile" | grep -q ^/; then
+  logfile=$(pwd)/$(basename $logfile)
+fi
 
 shift
 testsuite=$@
@@ -25,11 +27,12 @@ num_failures=0
 for t in $testsuite
 do
   cvmfs_clean || exit 2
-  rm -rf scratch && mkdir scratch || exit 3
+  workdir="${CVMFS_TEST_SCRATCH}/workdir"
+  rm -rf $workdir && mkdir $workdir || exit 3
   . $t/main || exit 4
   echo "-- Testing $t" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
-  sh -c ". ./test_functions && . $t/main && cd scratch && cvmfs_run_test $logfile && exit $?"
+  sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && exit $?"
   RETVAL=$?
   if [ $RETVAL -eq 0 ]; then
     echo "OK"
