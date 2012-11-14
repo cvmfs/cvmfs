@@ -170,6 +170,12 @@ sub check_permission {
 
 # This function will print a loading animation while waiting for test output
 sub loading_animation {
+	# This function will immediatily return if the daemon is running remotely since I didn't
+	# find a way to check if the process is running remotely
+	if ($remote) {
+		return;
+	}
+	
 	my $process_name = shift;
 	$process_name = lc($process_name);
 	

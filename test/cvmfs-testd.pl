@@ -68,7 +68,7 @@ while(1) {
 			elsif ($_ eq 'jobs') { jobs() }
 			
 			# The default case will try to launch the appropriate plugin
-			else { launch($command, @options) }
+			else { launch($command, $shell_path, @options) }
 		}
 	}
 	

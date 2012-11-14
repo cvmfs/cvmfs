@@ -26,6 +26,7 @@ use vars qw/ @EXPORT_OK /;
 sub launch {
 	# Retrieving argument: command, output file handler and options
 	my $test = shift;
+	my $shell_path = shift;
 	my @options = @_;
 	
 	# Declaring variables used for the fork
@@ -46,7 +47,7 @@ sub launch {
 	# Executing the script, if found
 	if(defined ($mainfile)){
 		my $error_found = 0;
-		($pid, $infh, $outfh, $errfh) = spawn('perl ' . $mainfile . ' ' . $options);
+		($pid, $infh, $outfh, $errfh) = spawn("perl $mainfile --shell-path $shell_path $options");
 		while (defined(my $err = $errfh->getline)){
 			$error_found = 1;
 			send_msg($err);
