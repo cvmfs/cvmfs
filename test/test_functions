@@ -1,0 +1,36 @@
+
+CVMFS_TEST_DEBUGLOG=
+CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
+
+cvmfs_clean() {
+  sudo cvmfs_config umount > /dev/null || return 100
+  sudo rm -rf /var/lib/cvmfs/*
+  sudo rm -f /etc/cvmfs/default.local
+  sudo rm -f /etc/cvmfs/config.d/*
+  
+  timeout=5
+  while $(pgrep cvmfs2 > /dev/null); do
+    if [ $timeout -eq 0 ]; then
+      return 101
+    fi
+    timeout=$(($timeout-1))
+    sleep 1
+  done
+
+  return 0
+}
+
+
+cvmfs_mount() {
+  repositories=$1
+
+  sudo sh -c "echo \"CVMFS_REPOSITORIES=$repositories\" > /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo \"CVMFS_HTTP_PROXY=${CVMFS_TEST_PROXY}\" >> /etc/cvmfs/default.local" || return 100
+  if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
+    sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
+  fi
+  cvmfs_config probe > /dev/null 2>&1 || return 101
+  
+  return 0
+}
+
