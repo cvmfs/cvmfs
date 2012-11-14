@@ -39,7 +39,8 @@ enum SpecialDirents {
  * It only contains file system related meta data for a directory entry
  */
 class DirectoryEntryBase {
-  friend class publish::SyncItem;       // simplify creation of DirectoryEntry objects for write back
+  friend class publish::SyncItem; // simplify creation of DirectoryEntry objects for write back
+  friend class SqlDirentTouch;    // simplify file system like _touch_ of DirectoryEntry objects
 
  public:
   const static inode_t kInvalidInode = 0;
