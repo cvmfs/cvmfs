@@ -388,9 +388,14 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
   {
 	  string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
-    i->set_hardlink_group(new_group_id);
-    i->set_linkcount(entries.size());
-	  catalog->AddEntry(DirectoryEntry(*i), file_path, parent_path);
+
+    // create a full fledged DirectoryEntry to add the hardlink group to it
+    // which is CVMFS specific meta data.
+    DirectoryEntry hardlink(*i);
+    hardlink.set_hardlink_group(new_group_id);
+    hardlink.set_linkcount(entries.size());
+
+	  catalog->AddEntry(hardlink, file_path, parent_path);
 	}
   SyncUnlock();
 }
