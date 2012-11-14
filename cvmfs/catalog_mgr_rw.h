@@ -51,29 +51,25 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
   bool Init();
 
+  // DirectoryEntry handling
   void AddFile(const DirectoryEntryBase &entry,
                const std::string &parent_directory);
+  void TouchFile(const DirectoryEntryBase &entry,
+                 const std::string &file_path);
   void RemoveFile(const std::string &file_path);
 
   void AddDirectory(const DirectoryEntryBase &entry,
                     const std::string &parent_directory);
+  void TouchDirectory(const DirectoryEntryBase &entry,
+                      const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
 
-  void TouchEntry(const DirectoryEntryBase &entry, const std::string &path);
-  void TouchFile(const DirectoryEntryBase &entry, const std::string &file_path)
-  {
-    TouchEntry(entry, file_path);
-  }
-  void TouchDirectory(const DirectoryEntryBase &entry,
-                      const std::string &directory_path)
-  {
-    TouchEntry(entry, directory_path);
-  }
-
-	void AddHardlinkGroup(DirectoryEntryBaseList &entries,
+  // Hardlink group handling
+  void AddHardlinkGroup(DirectoryEntryBaseList &entries,
                         const std::string &parent_directory);
   void ShrinkHardlinkGroup(const std::string &remove_path);
 
+  // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
 

@@ -413,73 +413,85 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
 
 /**
  * Update entry meta data (mode, owner, ...).
- *
- * !! BE CAREFUL !!
- * The DirectoryEntry you get here is NOT necessarily compatible with the one
- * present in the catalogs. In particular administrative data (i.e. info about
- * nested catalog transition points) is NOT set in the DirectoryEntry provided
- * to this method.
- * This is because the method is usually called from withhin the sync process
- * that gathers its data solely from the underlying sync file systems which DO
- * NOT contain this CVMFS-specific information.
- * !! TAKE CARE !!
+ * CVMFS specific meta data are NOT changed by this method.
+ * @param entry      the directory entry to be touched
+ * @param path       the path of the directory entry to be touched
  */
-void WritableCatalogManager::TouchEntry(const DirectoryEntryBase &entry,
-                                        const std::string &path)
-{
-  const string entry_path = MakeRelativePath(path);
+void WritableCatalogManager::TouchFile(const DirectoryEntryBase &entry,
+                                       const std::string &file_path) {
+  assert (!entry.IsDirectory());
+
+  const string entry_path = MakeRelativePath(file_path);
   const string parent_path = GetParentPath(entry_path);
 
   SyncLock();
+  // find the catalog to be updated
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
              entry_path.c_str());
     assert(false);
   }
+  
+  catalog->TouchEntry(entry, entry_path);
+  SyncUnlock();
+}
 
-  // TODO: Replace this hotfix with a reasonable redesign!
-  //   --> ::TouchEntry should ONLY change file system specific meta data
-  //       and NOT alter cvmfs specific administrative data like transition
-  //       point intrinsics. Otherwise this is definitely an accident waiting
-  //       to happen.
-  if (entry.IsDirectory()) {
-    catalog::DirectoryEntry potential_transition_point;
-    PathString transition_path(entry_path.data(), entry_path.length());
-    bool retval = catalog->LookupPath(transition_path,
-                                      &potential_transition_point);
+
+/**
+ * Update entry meta data (mode, owner, ...).
+ * CVMFS specific meta data (i.e. nested catalog transition points) are NOT
+ * changed by this method, although transition points intrinsics are taken into
+ * account, to keep nested catalogs consistent.
+ * @param entry      the directory entry to be touched
+ * @param path       the path of the directory entry to be touched
+ */
+void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
+                                            const std::string &directory_path)
+{
+  assert(entry.IsDirectory());
+
+  const string entry_path = MakeRelativePath(directory_path);
+  const string parent_path = GetParentPath(entry_path);
+
+  SyncLock();
+  // find the catalog to be updated
+  WritableCatalog *catalog;
+  if (!FindCatalog(parent_path, &catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
+             entry_path.c_str());
+    assert(false);
+  }
+  
+  catalog->TouchEntry(entry, entry_path);
+
+  // since we deal with a directory here, we might just touch a
+  // nested catalog transition point. If this is the case we would need to
+  // update two catalog entries:
+  //   * the nested catalog MOUNTPOINT in the parent catalog
+  //   * the nested catalog ROOT in the nested catalog
+
+  // first check if we really have a nested catalog transition point
+  catalog::DirectoryEntry potential_transition_point;
+  PathString transition_path(entry_path.data(), entry_path.length());
+  bool retval = catalog->LookupPath(transition_path,
+                                    &potential_transition_point);
+  assert(retval);
+  if (potential_transition_point.IsNestedCatalogMountpoint()) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg,
+             "updating transition point at %s", entry_path.c_str());
+
+    // find and mount nested catalog assciated to this transition point
+    hash::Any nested_hash;
+    retval = catalog->FindNested(transition_path, &nested_hash);
     assert(retval);
-    if (potential_transition_point.IsNestedCatalogMountpoint()) {
-      LogCvmfs(kLogCatalog, kLogVerboseMsg,
-               "updating transition point at %s", entry_path.c_str());
+    Catalog *nested_catalog;
+    nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
+    assert(nested_catalog != NULL);
 
-      // update mountpoint of nested catalog
-      catalog::DirectoryEntry mountpoint(entry);
-      mountpoint.set_is_nested_catalog_mountpoint(true);
-      catalog->UpdateEntry(mountpoint, entry_path);
-
-      // find and mount nested catalog assciated to this transition point
-      hash::Any nested_hash;
-      retval = catalog->FindNested(transition_path, &nested_hash);
-      assert(retval);
-      Catalog *nested_catalog;
-      nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
-      assert(nested_catalog != NULL);
-
-      // update nested catalog root
-      catalog::DirectoryEntry nested_root(entry);
-      nested_root.set_is_nested_catalog_root(true);
-
-      reinterpret_cast<WritableCatalog *>(nested_catalog)->
-        UpdateEntry(nested_root, entry_path);
-      assert(retval);
-    } else {
-      // a normal directory contains no cvmfs-specific meta data... just update
-      catalog->UpdateEntry(DirectoryEntry(entry), entry_path);
-    }
-  } else {
-    // currently normal files do not have cvmfs-specifc meta data... just update
-    catalog->UpdateEntry(DirectoryEntry(entry), entry_path);
+    // update nested catalog root in the child catalog
+    reinterpret_cast<WritableCatalog *>(nested_catalog)->
+      TouchEntry(entry, entry_path);
   }
 
   SyncUnlock();

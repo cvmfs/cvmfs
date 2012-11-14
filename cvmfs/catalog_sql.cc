@@ -314,7 +314,7 @@ bool Sql::Init(const sqlite3 *database, const std::string &statement) {
                                         NULL);
 
   if (!Successful()) {
-    LogCvmfs(kLogSql, kLogDebug, "failed to prepare statement '%s' (%d: %s)",
+    LogCvmfs(kLogSql, kLogStderr, "failed to prepare statement '%s' (%d: %s)",
              statement.c_str(), GetLastError(),
              sqlite3_errmsg((sqlite3*)database));
     return false;
@@ -554,7 +554,7 @@ SqlDirentTouch::SqlDirentTouch(const Database &database) {
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
 //            1             2             3               4
-    "name = :name, symlink = :symlink, uid = :uid, gid = :gid"
+    "name = :name, symlink = :symlink, uid = :uid, gid = :gid "
 //        5                6               7           8
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
 //                    9                       10
