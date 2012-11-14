@@ -156,7 +156,11 @@ class DirectoryEntryBase {
 /**
  * DirectoryEntries might contain cvmfs-specific meta data
  * Currently these are the following things:
- *  // TODO
+ *  - Pointer to the originating catalog
+ *  - Markers for nested catalog transition points (mountpoint and root entry)
+ *  - Transient marker storing the time of caching (Fuse page caches).
+ *    This is required to invalidate caches after a catalog update
+ *  - Hardlink group used to emulate hardlinks in cvmfs
  */
 class DirectoryEntry : public DirectoryEntryBase {
   friend class SqlLookup;               // simplify creation of DirectoryEntry objects
