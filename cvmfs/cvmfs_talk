@@ -102,7 +102,7 @@ sub talk {
   }
 
   if (! -S "$pipe_path") {
-    print "Seems like CernVM-FS is not running in $cache_dir\n";
+    print "Seems like CernVM-FS is not running in $cache_dir (not found: $pipe_path)\n";
     return 1;
   }
   if (! -w "$pipe_path") {
