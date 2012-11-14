@@ -32,14 +32,28 @@ do
   . $t/main || exit 4
   echo "-- Testing $t" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
-  sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && exit $?"
-  RETVAL=$?
-  if [ $RETVAL -eq 0 ]; then
-    echo "OK"
+  
+  exclude=0
+  if [ "x$CVMFS_TEST_EXCLUDE" != "x" ]; then
+    for testcase in $CVMFS_TEST_EXCLUDE; do
+      if echo $t | grep -q $testcase; then
+        exclude=1
+      fi
+    done
+  fi
+
+  if [ $exclude -eq 0 ]; then
+    sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && exit $?"
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+      echo "OK"
+    else
+      echo "Failed!"
+      echo "Test failed with RETVAL $RETVAL" >> $logfile
+      num_failures=$(($num_failures+1))
+    fi
   else
-    echo "Failed!"
-    echo "Test failed with RETVAL $RETVAL" >> $logfile
-    num_failures=$(($num_failures+1))
+    echo "Skipped"
   fi
 done
 
