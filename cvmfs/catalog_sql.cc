@@ -314,7 +314,7 @@ bool Sql::Init(const sqlite3 *database, const std::string &statement) {
                                         NULL);
 
   if (!Successful()) {
-    LogCvmfs(kLogSql, kLogStderr, "failed to prepare statement '%s' (%d: %s)",
+    LogCvmfs(kLogSql, kLogDebug, "failed to prepare statement '%s' (%d: %s)",
              statement.c_str(), GetLastError(),
              sqlite3_errmsg((sqlite3*)database));
     return false;
