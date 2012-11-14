@@ -14,7 +14,7 @@ cvmfs_run_test() {
   export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
   export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase
   . ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh >> $logfile 2>&1 || return 10
-  ${AtlasSetup}/scripts/asetup.sh -cmtconfig=x86_64-slc5-gcc43-opt 17.4.0 >> $logfile 2>&1 || return 11
+  ${AtlasSetup}/python/asetup.py --debugprint 17.4.0 >> $logfile 2>&1 || return 11
   athena.py AthExHelloWorld/HelloWorldOptions.py >> $logfile 2>&1 || return 12
   check_memory atlas.cern.ch 25000 || return 13
 
