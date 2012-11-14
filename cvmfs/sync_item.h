@@ -59,7 +59,7 @@ class SyncItem {
   inline void SetContentHash(const hash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() { return !content_hash_.IsNull(); }
 
-  catalog::DirectoryEntryBase CreateCatalogDirent() const;
+  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
   inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ? 
