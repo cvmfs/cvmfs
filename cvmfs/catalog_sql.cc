@@ -549,6 +549,41 @@ bool SqlLookupInode::BindRowId(const uint64_t inode) {
 //------------------------------------------------------------------------------
 
 
+SqlDirentTouch::SqlDirentTouch(const Database &database) {
+  const string statement =
+    "UPDATE catalog "
+    "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
+//            1             2             3               4
+    "name = :name, symlink = :symlink, uid = :uid, gid = :gid "
+//        5                6               7           8
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+//                    9                       10
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
+  return (
+    BindSha1Blob(1, entry.checksum_)                                       &&
+    BindInt64   (2, entry.size_)                                           &&
+    BindInt     (3, entry.mode_)                                           &&
+    BindInt64   (4, entry.mtime_)                                          &&
+    BindText    (5, entry.name_.GetChars(),    entry.name_.GetLength())    &&
+    BindText    (6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
+    BindInt64   (7, entry.uid_)                                            &&
+    BindInt64   (8, entry.gid_)
+  );
+}
+
+
+bool SqlDirentTouch::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(9, 10, hash);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlNestedCatalogLookup::SqlNestedCatalogLookup(const Database &database) {
   Init(database.sqlite_db(),
        "SELECT sha1 FROM nested_catalogs WHERE path=:path;");
