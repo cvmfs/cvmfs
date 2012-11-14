@@ -6,6 +6,14 @@
  * All nested catalog loading functionality is inherited from
  * AbstractCatalogManager.
  *
+ * The WritableCatalogManager is provided with DirectoryEntryBase objects from
+ * the underlying sync infrastructure (namely SyncMediator) on the server side
+ * of CVMFS. In contrast to a full DirectoryEntry object DirectoryEntryBase con-
+ * tains only pure file system specific meta data (i.e. mtime, mode, filename).
+ * WritableCatalogManager is responsible for the addition and management of all
+ * CVMFS-specific meta data in a full DirectoryEntry, which is then saved into
+ * the actual Catalog databases.
+ *
  * The inode assignment is based on the fact that the number of entries in a
  * catalog do not change (expect on reload). As we do exactly that with the
  * WritableCatalogManager here, inode numbers derived from WritableCatalogs
@@ -51,28 +59,25 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
   bool Init();
 
-  void AddFile(const DirectoryEntry &entry,
+  // DirectoryEntry handling
+  void AddFile(const DirectoryEntryBase &entry,
                const std::string &parent_directory);
+  void TouchFile(const DirectoryEntryBase &entry,
+                 const std::string &file_path);
   void RemoveFile(const std::string &file_path);
-  void AddDirectory(const DirectoryEntry &entry,
+
+  void AddDirectory(const DirectoryEntryBase &entry,
                     const std::string &parent_directory);
+  void TouchDirectory(const DirectoryEntryBase &entry,
+                      const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
 
-  void TouchEntry(const DirectoryEntry entry, const std::string &path);
-  void TouchFile(const DirectoryEntry entry, const std::string &file_path)
-  {
-    TouchEntry(entry, file_path);
-  }
-  void TouchDirectory(const DirectoryEntry entry,
-                      const std::string &directory_path)
-  {
-    TouchEntry(entry, directory_path);
-  }
-
-	void AddHardlinkGroup(DirectoryEntryList &entries,
+  // Hardlink group handling
+  void AddHardlinkGroup(DirectoryEntryBaseList &entries,
                         const std::string &parent_directory);
   void ShrinkHardlinkGroup(const std::string &remove_path);
 
+  // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
 

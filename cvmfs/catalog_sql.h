@@ -395,6 +395,24 @@ class SqlLookupInode : public SqlLookup {
 //------------------------------------------------------------------------------
 
 
+/**
+ * Filesystem like _touch_ of a DirectoryEntry. Only file system specific meta
+ * data will be modified. All CVMFS-specific administrative data stays unchanged.
+ * NOTE: This is not a subclass of SqlDirent since it works on DirectoryEntryBase
+ *       objects, which are restricted to file system meta data.
+ */
+class SqlDirentTouch : public Sql {
+ public:
+  SqlDirentTouch(const Database &database);
+
+  bool BindDirentBase(const DirectoryEntryBase &entry);
+  bool BindPathHash(const hash::Md5 &hash);
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlNestedCatalogLookup : public Sql {
  public:
   SqlNestedCatalogLookup(const Database &database);

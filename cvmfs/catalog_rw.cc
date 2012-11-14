@@ -52,11 +52,12 @@ void WritableCatalog::InitPreparedStatements() {
 
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
-  sql_insert_ = new SqlDirentInsert(database());
-  sql_unlink_ = new SqlDirentUnlink(database());
-  sql_update_ = new SqlDirentUpdate(database());
-  sql_max_link_id_ = new SqlMaxHardlinkGroup(database());
-  sql_inc_linkcount_ = new SqlIncLinkcount(database());
+  sql_insert_        = new SqlDirentInsert     (database());
+  sql_unlink_        = new SqlDirentUnlink     (database());
+  sql_touch_         = new SqlDirentTouch      (database());
+  sql_update_        = new SqlDirentUpdate     (database());
+  sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
+  sql_inc_linkcount_ = new SqlIncLinkcount     (database());
 }
 
 
@@ -65,6 +66,7 @@ void WritableCatalog::FinalizePreparedStatements() {
   // near the definition of this method)
   delete sql_insert_;
   delete sql_unlink_;
+  delete sql_touch_;
   delete sql_update_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
@@ -158,13 +160,26 @@ void WritableCatalog::IncLinkcount(const string &path_within_group,
 }
 
 
+void WritableCatalog::TouchEntry(const DirectoryEntryBase &entry,
+                                 const hash::Md5 &path_hash) {
+  SetDirty();
+
+  bool retval =
+    sql_touch_->BindPathHash(path_hash) &&
+    sql_touch_->BindDirentBase(entry)   &&
+    sql_touch_->Execute();
+  assert(retval);
+  sql_touch_->Reset();
+}
+
+
 void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
                                   const hash::Md5 &path_hash) {
   SetDirty();
 
   bool retval =
     sql_update_->BindPathHash(path_hash) &&
-    sql_update_->BindDirent(entry) &&
+    sql_update_->BindDirent(entry)       &&
     sql_update_->Execute();
   assert(retval);
   sql_update_->Reset();
