@@ -48,7 +48,7 @@ void PublishFilesCallback::Callback(const std::string &path, int retval,
   assert(itr != mediator_->file_queue_.end());
   itr->second.SetContentHash(hash);
   pthread_mutex_unlock(&mediator_->lock_file_queue_);
-  mediator_->catalog_manager_->AddFile(itr->second.CreateCatalogDirent(),
+  mediator_->catalog_manager_->AddFile(itr->second.CreateBasicCatalogDirent(),
                                        itr->second.relative_parent_path());
 }
 
@@ -472,7 +472,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 	if (entry.IsSymlink() && !params_->dry_run) {
     // Symlinks are completely stored in the catalog
-    catalog_manager_->AddFile(entry.CreateCatalogDirent(),
+    catalog_manager_->AddFile(entry.CreateBasicCatalogDirent(),
                               entry.relative_parent_path());
 	} else {
 	  // Push the file to the spooler, remember the entry for the path
@@ -503,7 +503,7 @@ void SyncMediator::TouchFile(SyncItem &entry) {
 	if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogDebug, "[tou] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run) {
-    catalog_manager_->TouchFile(entry.CreateCatalogDirent(),
+    catalog_manager_->TouchFile(entry.CreateBasicCatalogDirent(),
                                 entry.GetRelativePath());
   }
 }
@@ -513,7 +513,7 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run) {
-    catalog_manager_->AddDirectory(entry.CreateCatalogDirent(),
+    catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());
   }
 }
@@ -535,7 +535,7 @@ void SyncMediator::TouchDirectory(SyncItem &entry) {
 	if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
 	if (!params_->dry_run)
-    catalog_manager_->TouchDirectory(entry.CreateCatalogDirent(),
+    catalog_manager_->TouchDirectory(entry.CreateBasicCatalogDirent(),
                                      entry.GetRelativePath());
 }
 
@@ -580,11 +580,11 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
 void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   // Create a DirectoryEntry list out of the hardlinks
-  catalog::DirectoryEntryList hardlinks;
+  catalog::DirectoryEntryBaseList hardlinks;
   for (SyncItemList::const_iterator i = group.hardlinks.begin(),
        iEnd = group.hardlinks.end(); i != iEnd; ++i)
   {
-    hardlinks.push_back(i->second.CreateCatalogDirent());
+    hardlinks.push_back(i->second.CreateBasicCatalogDirent());
   }
   catalog_manager_->AddHardlinkGroup(hardlinks,
                                      group.master.relative_parent_path());
