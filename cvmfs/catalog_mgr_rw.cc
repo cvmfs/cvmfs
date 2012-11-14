@@ -298,9 +298,9 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
     assert(false);
   }
 
-  DirectoryEntry fixedHardlinkCount(entry);
+  DirectoryEntry fixed_hardlink_count(entry);
   fixed_hardlink_count.set_hardlinks(0, 2);
-  catalog->AddEntry(fixedHardlinkCount, directory_path, parent_path);
+  catalog->AddEntry(fixed_hardlink_count, directory_path, parent_path);
 
   parent_entry.set_hardlinks(0, parent_entry.linkcount()+1);
   catalog->UpdateEntry(parent_entry, parent_path);
