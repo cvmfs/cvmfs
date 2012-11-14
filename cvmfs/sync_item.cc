@@ -94,17 +94,20 @@ bool SyncItem::IsOpaqueDirectory() const {
 
 catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   catalog::DirectoryEntryBase dirent;
-  // inode and parent inode is determined at runtime of client
-  dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
-  dirent.parent_inode_ = catalog::DirectoryEntry::kInvalidInode;
-  dirent.hardlinks_ = 0;  // Set by catalog manager
 
-  dirent.mode_     = this->GetUnionStat().st_mode;
-  dirent.uid_      = this->GetUnionStat().st_uid;
-  dirent.gid_      = this->GetUnionStat().st_gid;
-  dirent.size_     = this->GetUnionStat().st_size;
-  dirent.mtime_    = this->GetUnionStat().st_mtime;
-  dirent.checksum_ = this->GetContentHash();
+  // inode and parent inode is determined at runtime of client
+  dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
+  dirent.parent_inode_   = catalog::DirectoryEntry::kInvalidInode;
+  dirent.hardlink_group_ = 0;  // Set by catalog manager
+  dirent.linkcount_      = this->GetUnionStat().st_nlink; // TODO: is this a good idea here?
+
+  dirent.mode_           = this->GetUnionStat().st_mode;
+  dirent.uid_            = this->GetUnionStat().st_uid;
+  dirent.gid_            = this->GetUnionStat().st_gid;
+  dirent.size_           = this->GetUnionStat().st_size;
+  dirent.mtime_          = this->GetUnionStat().st_mtime;
+  dirent.checksum_       = this->GetContentHash();
+  
   dirent.name_.Assign(filename_.data(), filename_.length());
 
   if (this->IsSymlink()) {

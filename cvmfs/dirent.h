@@ -51,58 +51,46 @@ class DirectoryEntryBase {
   inline DirectoryEntryBase() :
     inode_(kInvalidInode),
     parent_inode_(kInvalidInode),
-    hardlinks_(0),
+    linkcount_(0),
+    hardlink_group_(0),
     mode_(0),
     uid_(0),
     gid_(0),
     size_(0),
     mtime_(0) { }
 
-  inline bool IsRegular() const { return S_ISREG(mode_); }
-  inline bool IsLink() const { return S_ISLNK(mode_); }
-  inline bool IsDirectory() const { return S_ISDIR(mode_); }
+  // accessors
+  inline bool IsRegular() const                { return S_ISREG(mode_); }
+  inline bool IsLink() const                   { return S_ISLNK(mode_); }
+  inline bool IsDirectory() const              { return S_ISDIR(mode_); }
 
-  inline inode_t inode() const { return inode_; }
-  inline inode_t parent_inode() const { return parent_inode_; }
-  inline uint32_t linkcount() const { return Hardlinks2Linkcount(hardlinks_); }
-  inline uint32_t hardlink_group() const {
-    return Hardlinks2HardlinkGroup(hardlinks_);
-  }
-  inline NameString name() const { return name_; }
-  inline LinkString symlink() const { return symlink_; }
+  inline inode_t inode() const                 { return inode_; }
+  inline inode_t parent_inode() const          { return parent_inode_; }
+  inline uint32_t linkcount() const            { return linkcount_; }
+  inline uint32_t hardlink_group() const       { return hardlink_group_; }
+  inline NameString name() const               { return name_; }
+  inline LinkString symlink() const            { return symlink_; }
+
+  inline time_t mtime() const                  { return mtime_; }
+  inline unsigned int mode() const             { return mode_; }
+  inline uid_t uid() const                     { return uid_; }
+  inline gid_t gid() const                     { return gid_; }
+
+  inline hash::Any checksum() const            { return checksum_; }
+  inline const hash::Any *checksum_ptr() const { return &checksum_; }
 
   inline uint64_t size() const {
     return (IsLink()) ? symlink().GetLength() : size_;
   }
-  inline time_t mtime() const { return mtime_; }
-  inline unsigned int mode() const { return mode_; }
-  inline uid_t uid() const { return uid_; }
-  inline gid_t gid() const { return gid_; }
 
+  // some reasonable setters
   inline void set_inode(const inode_t inode) { inode_ = inode; }
   inline void set_parent_inode(const inode_t parent_inode) {
     parent_inode_ = parent_inode;
   }
 
-  // The hardlinks field encodes the number of links in the first 32 bit
-  // and the hardlink group id in the second 32 bit.
-  // A value of 0 means: 1 link, normal file
-  inline void set_hardlinks(const uint32_t hardlink_group,
-                            const uint32_t linkcount)
-  {
-    hardlinks_ = (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
-  }
-  static inline uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) {
-    if (hardlinks == 0)
-      return 1;
-    return (hardlinks << 32) >> 32;
-  }
-  static inline uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) {
-    return hardlinks >> 32;
-  }
-
-  inline hash::Any checksum() const { return checksum_; }
-  inline const hash::Any *checksum_ptr() const { return &checksum_; }
+  inline void set_linkcount(const uint32_t linkcount) { linkcount_ = linkcount; }
+  inline void set_hardlink_group(const uint32_t group) { hardlink_group_ = group; }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
@@ -130,14 +118,17 @@ class DirectoryEntryBase {
   }
 
  protected:
-  // stat like information
-  NameString name_;
   
   inode_t inode_;        // inodes are generated on the fly by the cvmfs client.
   inode_t parent_inode_; // since they are file system stuff, we have them here
                          // Though, they are NOT written to any catalog.
 
-  uint64_t hardlinks_;   // Hardlink group id + linkcount
+  uint32_t linkcount_;      // Hardlink handling is a bit unsual in CVMFS, since
+  uint32_t hardlink_group_; // inodes are allocated on demand we only save hard-
+                            // link relationships using a `hardlink_group`
+
+  // stat like information
+  NameString name_;
   unsigned int mode_;
   uid_t uid_;
   gid_t gid_;

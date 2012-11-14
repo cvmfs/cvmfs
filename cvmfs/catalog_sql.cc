@@ -353,6 +353,21 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   return database_flags;
 }
 
+uint32_t SqlDirent::HardlinksField2Linkcount(const uint64_t hardlinks) const {
+  if (hardlinks == 0)
+    return 1;
+  return (hardlinks << 32) >> 32;
+}
+
+uint32_t SqlDirent::HardlinksField2HardlinkGroup(const uint64_t hardlinks) const {
+  return hardlinks >> 32;
+}
+
+uint64_t SqlDirent::HardlinkGroupAndLinkcount2HardlinksField(const uint32_t hardlink_group,
+                                                             const uint32_t linkcount) const {
+  return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
+}
+
 
 /**
  * Expands variant symlinks containing $(VARIABLE) string.  Uses the environment
@@ -415,9 +430,13 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                                       const int gid_idx,
                                       const DirectoryEntry &entry)
 {
+  const uint64_t hardlinks =
+    HardlinkGroupAndLinkcount2HardlinksField(entry.hardlink_group_,
+                                             entry.linkcount_);
+
   return (
     BindSha1Blob(hash_idx, entry.checksum_) &&
-    BindInt64(hardlinks_idx, entry.hardlinks_) &&
+    BindInt64(hardlinks_idx, hardlinks) &&
     BindInt64(size_idx, entry.size_) &&
     BindInt(mode_idx, entry.mode_) &&
     BindInt64(uid_idx, entry.uid_) &&
@@ -474,16 +493,19 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
   // must be set later by a second catalog lookup
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
-  result.hardlinks_ = RetrieveInt64(1);
+
+  // retrieve the hardlink information from the hardlinks database field
+  const uint64_t hardlinks = RetrieveInt64(1);
+  result.linkcount_ = HardlinksField2Linkcount(hardlinks);
+  result.hardlink_group_ = HardlinksField2HardlinkGroup(hardlinks);
+
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
     result.uid_ = g_uid;
     result.gid_ = g_gid;
   } else {
-    const uint32_t hardlink_group =
-      DirectoryEntry::Hardlinks2HardlinkGroup(result.hardlinks_);
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                                                         hardlink_group);
+                                                         result.hardlink_group_);
     result.uid_ = RetrieveInt64(13);
     result.gid_ = RetrieveInt64(14);
   }

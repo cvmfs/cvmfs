@@ -288,6 +288,10 @@ class SqlDirent : public Sql {
    *  @return an integer containing the bitmap of the flags field
    */
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
+  uint32_t HardlinksField2Linkcount(const uint64_t hardlinks) const;
+  uint32_t HardlinksField2HardlinkGroup(const uint64_t hardlinks) const;
+  uint64_t HardlinkGroupAndLinkcount2HardlinksField(const uint32_t hardlink_group,
+                                                    const uint32_t linkcount) const;
 
   /**
    *  replaces place holder variables in a symbolic link by actual

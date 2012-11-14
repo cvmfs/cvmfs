@@ -127,7 +127,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   root_entry.uid_               = getuid();
   root_entry.gid_               = getgid();
   root_entry.checksum_          = hash::Any(hash::kSha1);
-  root_entry.set_hardlinks(0, 2);
+  root_entry.linkcount_         = 2;
   string root_path = "";
 
   // Create the database schema and the inital root entry
@@ -250,7 +250,8 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
     assert(false);
   }
 
-  parent_entry.set_hardlinks(0, parent_entry.linkcount()-1);
+  parent_entry.set_linkcount(parent_entry.linkcount() - 1);
+
   catalog->RemoveEntry(directory_path);
   catalog->UpdateEntry(parent_entry, parent_path);
   if (parent_entry.IsNestedCatalogRoot()) {
@@ -299,10 +300,10 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   }
 
   DirectoryEntry fixedHardlinkCount(entry);
-  fixedHardlinkCount.set_hardlinks(0, 2);
+  fixedHardlinkCount.set_linkcount(2);
   catalog->AddEntry(fixedHardlinkCount, directory_path, parent_path);
 
-  parent_entry.set_hardlinks(0, parent_entry.linkcount()+1);
+  parent_entry.set_linkcount(parent_entry.linkcount() + 1);
   catalog->UpdateEntry(parent_entry, parent_path);
   if (parent_entry.IsNestedCatalogRoot()) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating transition point %s",
@@ -387,7 +388,8 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
   {
 	  string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
-    i->set_hardlinks(new_group_id, entries.size());
+    i->set_hardlink_group(new_group_id);
+    i->set_linkcount(entries.size());
 	  catalog->AddEntry(DirectoryEntry(*i), file_path, parent_path);
 	}
   SyncUnlock();
