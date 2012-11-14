@@ -43,8 +43,7 @@ class WritableCatalog : public Catalog {
   void AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
                 const std::string &parent_path);
   void TouchEntry(const DirectoryEntryBase &entry, const hash::Md5 &path_hash);
-  inline void TouchEntry(const DirectoryEntryBase &entry, const std::string &path)
-  {
+  inline void TouchEntry(const DirectoryEntryBase &entry, const std::string &path) {
     TouchEntry(entry, hash::Md5(hash::AsciiPtr(path)));
   }
   void RemoveEntry(const std::string &entry_path);
@@ -72,8 +71,7 @@ class WritableCatalog : public Catalog {
   }
   
   void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
-  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path)
-  {
+  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path) {
     UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
   }
 
