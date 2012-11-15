@@ -323,6 +323,7 @@ mkfs() {
   local scratch_dir="${spool_dir}/scratch"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
+  local cache_dir="${spool_dir}/cache"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
   local repository_dir;
@@ -397,15 +398,18 @@ Alias /cvmfs/$name ${repository_dir}
 </Directory>
 EOF
   fi
-  [ -d /etc/cvmfs/config.d ] || mkdir -p /etc/cvmfs/config.d
-  cat > /etc/cvmfs/config.d/${name}.conf << EOF
+  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
 # Created by cvmfs_server.  Don't touch.
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_QUOTA_LIMIT=4000
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_STRICT_MOUNT=no
 CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
+CVMFS_NFS_SOURCE=no
 EOF
   cat >> /etc/sudoers << EOF
 $cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
@@ -423,7 +427,7 @@ EOF
   create_cert $name $cvmfs_user
 
   echo -n "Create CernVM-FS Storage... "
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir
+  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
   mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user /cvmfs/$name $spool_dir
   if is_local_upstream $upstream; then
@@ -449,8 +453,16 @@ EOF
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
+  local cvmfs_uid
+  cvmfs_uid=$(id -u $cvmfs_user)
+  local cvmfs_gid
+  if getent group fuse >/dev/null; then
+    cvmfs_gid=$(getent group fuse | cut -d: -f3)  
+  else
+    cvmfs_gid=$(id -g $cvmfs_user)
+  fi
   cat >> /etc/fstab << EOF
-$name $rdonly_dir cvmfs cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid,uid=$cvmfs_uid,gid=$cvmfs_gid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
