@@ -313,12 +313,16 @@ get_cvmfs_owner() {
 
 
 mkfs() {
+  local cvmfs_user # TL;DR: prevent return code sorcery when assigning
+                   # Long: local cvmfs_user=`get_cvmfs_owner $name $owner`
+                   #       would not abort execution if `get_cvmfs_owner` fails
+
   local name=$1
   local stratum0=$2
   local upstream=$3
   local owner=$4
 
-  local cvmfs_user=`get_cvmfs_owner $name $owner`
+        cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local scratch_dir="${spool_dir}/scratch"
   local rdonly_dir="${spool_dir}/rdonly"
@@ -478,13 +482,14 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 
 add_replica() {
+  local cvmfs_user
   local name=$1
   local stratum0=$2
   local public_key=$3
   local upstream=$4
   local owner=$5
 
-  local cvmfs_user=`get_cvmfs_owner $name $owner`
+        cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
