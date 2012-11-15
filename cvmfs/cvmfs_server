@@ -18,6 +18,12 @@ abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
 
+if [ -x /sbin/fuser ]; then
+  fuser="/sbin/fuser"  # RHEL
+else
+  fuser="/bin/fuser"  # Ubuntu, SuSe
+fi
+
 
 create_master_key() {
   local name=$1
@@ -146,7 +152,7 @@ abort() {
   local spool_dir=$3
 
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   reply=n
   read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION!  Are you sure (y/n)? " reply
@@ -176,7 +182,6 @@ publish() {
 
   local swissknife="cvmfs_swissknife"
 
-
   # enable the debug mode?
   if [ "$debug" -ne "0" ]
   then
@@ -197,7 +202,7 @@ publish() {
   fi
 
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
