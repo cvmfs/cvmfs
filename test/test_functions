@@ -4,20 +4,24 @@ CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
 
+CVMFS_TEST_REPO=test.cern.ch
+CVMFS_TEST_USER=rene
+CVMFS_TEST_GROUP=rene
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo rm -rf /var/lib/cvmfs/*
   sudo rm -f /etc/cvmfs/default.local
   sudo rm -f /etc/cvmfs/config.d/*
   
-  timeout=5
-  while $(pgrep cvmfs2 > /dev/null); do
-    if [ $timeout -eq 0 ]; then
-      return 101
-    fi
-    timeout=$(($timeout-1))
-    sleep 1
-  done
+#  timeout=5
+#  while $(pgrep cvmfs2 > /dev/null); do
+#    if [ $timeout -eq 0 ]; then
+#      return 101
+#    fi
+#    timeout=$(($timeout-1))
+#    sleep 1
+#  done
 
   return 0
 }
@@ -70,3 +74,102 @@ check_memory() {
   return 0
 }
 
+
+create_repo() {
+  repo=$1
+  uid=$2
+
+  if [ `cvmfs_server list | grep $repo | wc -l` -ne 0 ]; then
+    echo "Repository $repo is already present... removing it"
+    echo "y" | sudo cvmfs_server rmfs $repo || return 100
+  fi
+
+  echo "Creating new repository $repo..."
+  sudo cvmfs_server mkfs $repo -o $uid || return 101
+}
+
+
+create_empty_repo() {
+  repo=$1
+  uid=$2
+
+  # check if someone tries to go upwards in the directory tree to safeguard
+  # harmful things might happen with `rm -fR *` :o)
+  if [ x"$repo" != x`echo $repo | sed -e 's/\/\.\.//' -e 's/\.\.\///' -e 's/\.\.//'` ];
+  then
+    return 100
+  fi
+
+  create_repo $repo $uid || return 101
+
+  sudo cvmfs_server transaction || return 102
+  rm -fR /cvmfs/$repo/new_repository
+  sudo cvmfs_server publish || return 103
+}
+
+
+# generate a custom style recursive listing with only the following infos:
+# - file name
+# - linkcount
+# - file mode
+# - file size
+# - parent directory
+# - symlink destination (when applicable)
+# - uid and gid can be specified
+#
+# @param directory          the directory to be listed
+# @param uid                specify a UID for the file owner (optional)
+# @param gid                specify a GID for the file owner (optional)
+# @return                   a custom directory listing
+create_listing()
+{
+  directory=$1
+  uid=$2
+  gid=$3
+
+  lst=`ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
+  awk '
+  {
+    # skipt the tatal file count, ls prints at the end of each directory listing
+    if(substr($1, 0, 5) == "total") next;
+
+    # length of base directory path
+    base_dir_length = length(base_dir)
+
+    # truncate base path from the path printed before each new listing
+    if(substr($0, 0, base_dir_length) == base_dir) {
+      print substr($0, base_dir_length + 1, length($0)-1)
+      next;
+    }
+
+    # first character
+    first = substr($0, 0, 1);
+
+    # print file meta information
+    # $1    => file mode (rwx bits, ...)
+    # $2    => linkcount
+    # $3,$4 => owner, group (might also be provided from outside)
+    # $5    => file size (skipped for directories)
+    # $6    => file name
+    # $7,$8 => symlink destination (only for symlinks :o) )
+
+    if (first != "-" && first != "d" && first != "l")
+    {
+      printf "\n"
+      next;
+    }
+
+    # print out file information
+    printf $1                     " ";
+    printf $2                     " ";
+    printf (uid == "" ? $3 : uid) " ";
+    printf (gid == "" ? $4 : gid) " ";
+    printf $6;
+
+    if(first == "l") printf " " $7 " " $8;
+    if(first != "d") printf " " $5;
+    printf "\n"
+  }' uid=$uid gid=$gid base_dir=$directory`
+
+  echo -e "$lst"
+}
