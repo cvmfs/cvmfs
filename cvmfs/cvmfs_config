@@ -24,10 +24,16 @@ case $sys_arch in
       # Ubuntu
       pidof="/bin/pidof"
     fi
+    if [ -x /sbin/fuser ]; then
+      fuser="/sbin/fuser"  # RHEL
+    else
+      fuser="/bin/fuser"  # Ubuntu, SuSE
+    fi
     fuse_fs_type="fuse"
     ;;
 
   Darwin )
+    fuser="/usr/bin/fuser"
     fuse_fs_type="fuse4x"
     ;;
 
@@ -716,7 +722,7 @@ cvmfs_umount() {
     if [ $? -ne 0 ]; then
       RETVAL=1
       echo "Failed!"
-      fuser -m -a -v $m
+      $fuser -m -a -v $m
     else
       echo "OK"
     fi
