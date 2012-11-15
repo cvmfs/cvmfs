@@ -11,12 +11,13 @@ cvmfs_run_test() {
   gaudirun.py ${BRUNELSYSROOT}/tests/options/testBrunel.py >> $logfile 2>&1 || return 4
   check_memory lhcb.cern.ch 35000 || return 5
 
-  export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
-  export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase
-  . ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh >> $logfile 2>&1 || return 10
-  ${AtlasSetup}/python/asetup.py --debugprint 17.4.0 >> $logfile 2>&1 || return 11
-  athena.py AthExHelloWorld/HelloWorldOptions.py >> $logfile 2>&1 || return 12
-  check_memory atlas.cern.ch 25000 || return 13
+  # TODO: ask for current version
+  #export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
+  #export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase
+  #. ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh >> $logfile 2>&1 || return 10
+  #${AtlasSetup}/python/asetup.py --debugprint 17.4.0 >> $logfile 2>&1 || return 11
+  #athena.py AthExHelloWorld/HelloWorldOptions.py >> $logfile 2>&1 || return 12
+  #check_memory atlas.cern.ch 25000 || return 13
 
   . /cvmfs/cms.cern.ch/cmsset_default.sh >> $logfile 2>&1 || return 20
   scramv1 project CMSSW_5_2_3 >> $logfile 2>&1 || return 21

@@ -51,7 +51,6 @@ option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
-set (INSTALL_TEST_SYSTEM "OFF" CACHE STRING "Install CernVM-FS test tools in the specified path")
 
 #
 # define where to find the external dependencies
@@ -158,16 +157,6 @@ install (
 		DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
 		PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
         )
-
-# Test system
-if (INSTALL_TEST_SYSTEM)
-  install (
-    CODE "execute_process (
-      COMMAND ${CMAKE_SOURCE_DIR}/test/Install.pl --prefix=${INSTALL_TEST_SYSTEM}
-      WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}/test
-    )"
-  )
-endif (INSTALL_TEST_SYSTEM)
 
 #
 # configure the packaging stuff
