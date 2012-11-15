@@ -18,6 +18,12 @@ abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
 
+if [ -x /sbin/fuser ]; then
+  fuser="/sbin/fuser"  # RHEL
+else
+  fuser="/bin/fuser"  # Ubuntu, SuSe
+fi
+
 
 create_master_key() {
   local name=$1
@@ -146,7 +152,7 @@ abort() {
   local spool_dir=$3
 
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   reply=n
   read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION!  Are you sure (y/n)? " reply
@@ -176,7 +182,6 @@ publish() {
 
   local swissknife="cvmfs_swissknife"
 
-
   # enable the debug mode?
   if [ "$debug" -ne "0" ]
   then
@@ -197,7 +202,7 @@ publish() {
   fi
 
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
@@ -308,16 +313,21 @@ get_cvmfs_owner() {
 
 
 mkfs() {
+  local cvmfs_user # TL;DR: prevent return code sorcery when assigning
+                   # Long: local cvmfs_user=`get_cvmfs_owner $name $owner`
+                   #       would not abort execution if `get_cvmfs_owner` fails
+
   local name=$1
   local stratum0=$2
   local upstream=$3
   local owner=$4
 
-  local cvmfs_user=`get_cvmfs_owner $name $owner`
+        cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local scratch_dir="${spool_dir}/scratch"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
+  local cache_dir="${spool_dir}/cache"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
   local repository_dir;
@@ -392,15 +402,18 @@ Alias /cvmfs/$name ${repository_dir}
 </Directory>
 EOF
   fi
-  [ -d /etc/cvmfs/config.d ] || mkdir -p /etc/cvmfs/config.d
-  cat > /etc/cvmfs/config.d/${name}.conf << EOF
+  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
 # Created by cvmfs_server.  Don't touch.
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_QUOTA_LIMIT=4000
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_STRICT_MOUNT=no
 CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
+CVMFS_NFS_SOURCE=no
 EOF
   cat >> /etc/sudoers << EOF
 $cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
@@ -418,7 +431,7 @@ EOF
   create_cert $name $cvmfs_user
 
   echo -n "Create CernVM-FS Storage... "
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir
+  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
   mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user /cvmfs/$name $spool_dir
   if is_local_upstream $upstream; then
@@ -444,8 +457,16 @@ EOF
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
+  local cvmfs_uid
+  cvmfs_uid=$(id -u $cvmfs_user)
+  local cvmfs_gid
+  if getent group fuse >/dev/null; then
+    cvmfs_gid=$(getent group fuse | cut -d: -f3)  
+  else
+    cvmfs_gid=$(id -g $cvmfs_user)
+  fi
   cat >> /etc/fstab << EOF
-$name $rdonly_dir cvmfs cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid,uid=$cvmfs_uid,gid=$cvmfs_gid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
@@ -473,13 +494,14 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 
 add_replica() {
+  local cvmfs_user
   local name=$1
   local stratum0=$2
   local public_key=$3
   local upstream=$4
   local owner=$5
 
-  local cvmfs_user=`get_cvmfs_owner $name $owner`
+        cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"

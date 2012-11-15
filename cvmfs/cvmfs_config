@@ -24,10 +24,16 @@ case $sys_arch in
       # Ubuntu
       pidof="/bin/pidof"
     fi
+    if [ -x /sbin/fuser ]; then
+      fuser="/sbin/fuser"  # RHEL
+    else
+      fuser="/bin/fuser"  # Ubuntu, SuSE
+    fi
     fuse_fs_type="fuse"
     ;;
 
   Darwin )
+    fuser="/usr/bin/fuser"
     fuse_fs_type="fuse4x"
     ;;
 
@@ -76,8 +82,8 @@ cvmfs_setup()
   fi
 
   while [ $# -ne 0 ]
-   do
-      case "$1" in
+  do
+    case "$1" in
       nouser)
          shift 1
          nouser=1
@@ -86,16 +92,10 @@ cvmfs_setup()
          shift 1
          nocfgmod=1
       ;;
-      noservice)
-         shift 1
-         noservice=1
-      ;;
-      nostart)
-         shift 1
-         nostart=1
-      ;;
-      esac
-   done
+    esac
+  done
+
+  mkdir -p /cvmfs
 
   if [ $nouser -eq 0 ]; then
     if ! check_group "cvmfs"; then
@@ -716,7 +716,7 @@ cvmfs_umount() {
     if [ $? -ne 0 ]; then
       RETVAL=1
       echo "Failed!"
-      fuser -m -a -v $m
+      $fuser -m -a -v $m
     else
       echo "OK"
     fi
