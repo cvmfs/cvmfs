@@ -353,6 +353,19 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   return database_flags;
 }
 
+uint32_t SqlDirent::Hardlinks2Linkcount(const uint64_t hardlinks) const {
+  return (hardlinks << 32) >> 32;
+}
+
+uint32_t SqlDirent::Hardlinks2HardlinkGroup(const uint64_t hardlinks) const {
+  return hardlinks >> 32;
+}
+
+uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
+                                  const uint32_t linkcount) const {
+  return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
+}
+
 
 /**
  * Expands variant symlinks containing $(VARIABLE) string.  Uses the environment
@@ -415,9 +428,13 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                                       const int gid_idx,
                                       const DirectoryEntry &entry)
 {
+  const uint64_t hardlinks =
+    MakeHardlinks(entry.hardlink_group_,
+                  entry.linkcount_);
+
   return (
     BindSha1Blob(hash_idx, entry.checksum_) &&
-    BindInt64(hardlinks_idx, entry.hardlinks_) &&
+    BindInt64(hardlinks_idx, hardlinks) &&
     BindInt64(size_idx, entry.size_) &&
     BindInt(mode_idx, entry.mode_) &&
     BindInt64(uid_idx, entry.uid_) &&
@@ -474,16 +491,19 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
   // must be set later by a second catalog lookup
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
-  result.hardlinks_ = RetrieveInt64(1);
+
+  // retrieve the hardlink information from the hardlinks database field
+  const uint64_t hardlinks = RetrieveInt64(1);
+  result.linkcount_ = Hardlinks2Linkcount(hardlinks);
+  result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
+
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
     result.uid_ = g_uid;
     result.gid_ = g_gid;
   } else {
-    const uint32_t hardlink_group =
-      DirectoryEntry::Hardlinks2HardlinkGroup(result.hardlinks_);
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                                                         hardlink_group);
+                                                         result.hardlink_group_);
     result.uid_ = RetrieveInt64(13);
     result.gid_ = RetrieveInt64(14);
   }
@@ -699,9 +719,15 @@ bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
 
 
 SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
+  // This command changes the linkcount of a whole hardlink group at once!
+  // We can do this, since the 'hardlinks'-field contains the hardlink group ID
+  // in the higher 32bit as well as the 'linkcount' in the lower 32bit.
+  // This field will be equal for all entries belonging to the same hardlink
+  // group while adding/subtracting small values from it will only effect the
+  // linkcount in the lower 32bit.
+  // Take a deep breath!
   const string statememt =
-    "UPDATE catalog SET hardlinks="
-    "CASE (hardlinks << 32) >> 32 WHEN 2 THEN 0 ELSE hardlinks + :delta END "
+    "UPDATE catalog SET hardlinks = hardlinks + :delta "
     "WHERE hardlinks = (SELECT hardlinks from catalog "
     "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statememt);
