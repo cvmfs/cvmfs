@@ -54,58 +54,47 @@ class DirectoryEntryBase {
   inline DirectoryEntryBase() :
     inode_(kInvalidInode),
     parent_inode_(kInvalidInode),
-    hardlinks_(0),
     mode_(0),
     uid_(0),
     gid_(0),
     size_(0),
-    mtime_(0) { }
+    mtime_(0),
+    linkcount_(1) // generally a normal file has linkcount 1 -> default
+    { }
 
-  inline bool IsRegular() const { return S_ISREG(mode_); }
-  inline bool IsLink() const { return S_ISLNK(mode_); }
-  inline bool IsDirectory() const { return S_ISDIR(mode_); }
+  // accessors
+  inline bool IsRegular() const                { return S_ISREG(mode_); }
+  inline bool IsLink() const                   { return S_ISLNK(mode_); }
+  inline bool IsDirectory() const              { return S_ISDIR(mode_); }
 
-  inline inode_t inode() const { return inode_; }
-  inline inode_t parent_inode() const { return parent_inode_; }
-  inline uint32_t linkcount() const { return Hardlinks2Linkcount(hardlinks_); }
-  inline uint32_t hardlink_group() const {
-    return Hardlinks2HardlinkGroup(hardlinks_);
-  }
-  inline NameString name() const { return name_; }
-  inline LinkString symlink() const { return symlink_; }
+  inline inode_t inode() const                 { return inode_; }
+  inline inode_t parent_inode() const          { return parent_inode_; }
+  inline uint32_t linkcount() const            { return linkcount_; }
+  inline NameString name() const               { return name_; }
+  inline LinkString symlink() const            { return symlink_; }
+
+  inline time_t mtime() const                  { return mtime_; }
+  inline unsigned int mode() const             { return mode_; }
+  inline uid_t uid() const                     { return uid_; }
+  inline gid_t gid() const                     { return gid_; }
+
+  inline hash::Any checksum() const            { return checksum_; }
+  inline const hash::Any *checksum_ptr() const { return &checksum_; }
 
   inline uint64_t size() const {
     return (IsLink()) ? symlink().GetLength() : size_;
   }
-  inline time_t mtime() const { return mtime_; }
-  inline unsigned int mode() const { return mode_; }
-  inline uid_t uid() const { return uid_; }
-  inline gid_t gid() const { return gid_; }
 
+  // some reasonable setters
   inline void set_inode(const inode_t inode) { inode_ = inode; }
   inline void set_parent_inode(const inode_t parent_inode) {
     parent_inode_ = parent_inode;
   }
 
-  // The hardlinks field encodes the number of links in the first 32 bit
-  // and the hardlink group id in the second 32 bit.
-  // A value of 0 means: 1 link, normal file
-  inline void set_hardlinks(const uint32_t hardlink_group,
-                            const uint32_t linkcount)
-  {
-    hardlinks_ = (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
+  inline void set_linkcount(const uint32_t linkcount) {
+    assert(linkcount > 0);
+    linkcount_ = linkcount;
   }
-  static inline uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) {
-    if (hardlinks == 0)
-      return 1;
-    return (hardlinks << 32) >> 32;
-  }
-  static inline uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) {
-    return hardlinks >> 32;
-  }
-
-  inline hash::Any checksum() const { return checksum_; }
-  inline const hash::Any *checksum_ptr() const { return &checksum_; }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
@@ -133,20 +122,20 @@ class DirectoryEntryBase {
   }
 
  protected:
-  // stat like information
-  NameString name_;
   
   inode_t inode_;        // inodes are generated on the fly by the cvmfs client.
   inode_t parent_inode_; // since they are file system stuff, we have them here
                          // Though, they are NOT written to any catalog.
 
-  uint64_t hardlinks_;   // Hardlink group id + linkcount
+  // stat like information
+  NameString name_;
   unsigned int mode_;
   uid_t uid_;
   gid_t gid_;
   uint64_t size_;
   time_t mtime_;
   LinkString symlink_;
+  uint32_t linkcount_;
 
   // checksum is not part of the file system intrinsics, though can be computed
   // just using the file contents... we therefore put it in this base class.
@@ -179,12 +168,14 @@ class DirectoryEntry : public DirectoryEntryBase {
     DirectoryEntryBase(base),
     catalog_(NULL),
     cached_mtime_(0),
+    hardlink_group_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) {}
 
   inline DirectoryEntry() : 
     catalog_(NULL), 
     cached_mtime_(0),
+    hardlink_group_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) {}
 
@@ -200,10 +191,12 @@ class DirectoryEntry : public DirectoryEntryBase {
     return is_nested_catalog_mountpoint_;
   }
 
-  inline time_t cached_mtime() const { return cached_mtime_; }
-  inline void set_cached_mtime(const time_t value) { cached_mtime_ = value; }
+  inline const Catalog *catalog() const  { return catalog_; }
+  inline uint32_t hardlink_group() const { return hardlink_group_; }
+  inline time_t cached_mtime() const     { return cached_mtime_; }
 
-  inline const Catalog *catalog() const { return catalog_; }
+  inline void set_hardlink_group(const uint32_t group) { hardlink_group_ = group; }
+  inline void set_cached_mtime(const time_t value)     { cached_mtime_ = value; }
 
   inline void set_is_nested_catalog_mountpoint(const bool val) {
     is_nested_catalog_mountpoint_ = val;
@@ -218,6 +211,10 @@ private:
 
   time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
                               need to be invalidated (file has changed) */
+
+  // Hardlink handling is a bit unsual in CVMFS. Since inodes are allocated
+  // on demand we only save hardlink relationships using a `hardlink_group`
+  uint32_t hardlink_group_;
 
   // Administrative data
   bool is_nested_catalog_root_;

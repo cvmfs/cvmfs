@@ -16,14 +16,14 @@ cvmfs_clean() {
   sudo rm -f /etc/cvmfs/default.local
   sudo rm -f /etc/cvmfs/config.d/*
   
-#  timeout=5
-#  while $(pgrep cvmfs2 > /dev/null); do
-#    if [ $timeout -eq 0 ]; then
-#      return 101
-#    fi
-#    timeout=$(($timeout-1))
-#    sleep 1
-#  done
+  timeout=5
+  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
+    if [ $timeout -eq 0 ]; then
+      return 101
+    fi
+    timeout=$(($timeout-1))
+    sleep 1
+  done
 
   return 0
 }
@@ -36,6 +36,7 @@ cvmfs_mount() {
   sudo sh -c "echo \"CVMFS_HTTP_PROXY=${CVMFS_TEST_PROXY}\" >> /etc/cvmfs/default.local" || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
+  sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
   if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
