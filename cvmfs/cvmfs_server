@@ -313,16 +313,12 @@ get_cvmfs_owner() {
 
 
 mkfs() {
-  local cvmfs_user # TL;DR: prevent return code sorcery when assigning
-                   # Long: local cvmfs_user=`get_cvmfs_owner $name $owner`
-                   #       would not abort execution if `get_cvmfs_owner` fails
-
   local name=$1
   local stratum0=$2
   local upstream=$3
   local owner=$4
 
-        cvmfs_user=`get_cvmfs_owner $name $owner`
+  local cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local scratch_dir="${spool_dir}/scratch"
   local rdonly_dir="${spool_dir}/rdonly"
@@ -457,16 +453,8 @@ EOF
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  local cvmfs_uid
-  cvmfs_uid=$(id -u $cvmfs_user)
-  local cvmfs_gid
-  if getent group fuse >/dev/null; then
-    cvmfs_gid=$(getent group fuse | cut -d: -f3)  
-  else
-    cvmfs_gid=$(id -g $cvmfs_user)
-  fi
   cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid,uid=$cvmfs_uid,gid=$cvmfs_gid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
@@ -494,14 +482,13 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 
 
 add_replica() {
-  local cvmfs_user
   local name=$1
   local stratum0=$2
   local public_key=$3
   local upstream=$4
   local owner=$5
 
-        cvmfs_user=`get_cvmfs_owner $name $owner`
+  local cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
