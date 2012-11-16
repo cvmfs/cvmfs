@@ -12,7 +12,7 @@ echo "now run test1 to create a testbed..."
 sh testCreateSimpleToyRepository.sh
 
 echo "start transaction... "
-cvmfs_server transaction || die "fail"
+cvmfs_server transaction $REPO || die "fail"
 
 cd $UNION
 
@@ -35,7 +35,7 @@ cd
 
 if [ $# -eq 0 ]
 then
-  cvmfs_server publish $REPO -d || die "failed to publish"
+  cvmfs_server publish $REPO -D || die "failed to publish"
 fi
 
 echo "all done"

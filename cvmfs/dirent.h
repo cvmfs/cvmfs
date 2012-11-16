@@ -59,7 +59,8 @@ class DirectoryEntryBase {
     gid_(0),
     size_(0),
     mtime_(0),
-    linkcount_(0) { }
+    linkcount_(1) // generally a normal file has linkcount 1 -> default
+    { }
 
   // accessors
   inline bool IsRegular() const                { return S_ISREG(mode_); }
@@ -90,7 +91,10 @@ class DirectoryEntryBase {
     parent_inode_ = parent_inode;
   }
 
-  inline void set_linkcount(const uint32_t linkcount) { linkcount_ = linkcount; }
+  inline void set_linkcount(const uint32_t linkcount) {
+    assert(linkcount > 0);
+    linkcount_ = linkcount;
+  }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.

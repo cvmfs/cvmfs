@@ -354,8 +354,6 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 }
 
 uint32_t SqlDirent::Hardlinks2Linkcount(const uint64_t hardlinks) const {
-  if (hardlinks == 0)
-    return 1;
   return (hardlinks << 32) >> 32;
 }
 
@@ -721,9 +719,15 @@ bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
 
 
 SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
+  // This command changes the linkcount of a whole hardlink group at once!
+  // We can do this, since the 'hardlinks'-field contains the hardlink group ID
+  // in the higher 32bit as well as the 'linkcount' in the lower 32bit.
+  // This field will be equal for all entries belonging to the same hardlink
+  // group while adding/subtracting small values from it will only effect the
+  // linkcount in the lower 32bit.
+  // Take a deep breath!
   const string statememt =
-    "UPDATE catalog SET hardlinks="
-    "CASE (hardlinks << 32) >> 32 WHEN 2 THEN 0 ELSE hardlinks + :delta END "
+    "UPDATE catalog SET hardlinks = hardlinks + :delta "
     "WHERE hardlinks = (SELECT hardlinks from catalog "
     "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statememt);
