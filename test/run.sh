@@ -27,7 +27,7 @@ num_failures=0
 for t in $testsuite
 do
   cvmfs_clean || exit 2
-  workdir="${CVMFS_TEST_SCRATCH}/workdir"
+  workdir="${CVMFS_TEST_SCRATCH}/workdir/$t"
   rm -rf "$workdir" && mkdir -p "$workdir" || exit 3
   . $t/main || exit 4
   echo "-- Testing $t" >> $logfile
@@ -46,6 +46,7 @@ do
     sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && exit $?"
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
+      rm -rf "$workdir"
       echo "OK"
     else
       echo "Failed!"
@@ -53,6 +54,7 @@ do
       num_failures=$(($num_failures+1))
     fi
   else
+    rm -rf "$workdir"
     echo "Skipped"
   fi
 done
