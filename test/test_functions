@@ -8,6 +8,8 @@ CVMFS_TEST_REPO=test.cern.ch
 CVMFS_TEST_USER=rene
 CVMFS_TEST_GROUP=rene
 
+CVMFS_TEST_DEBUG=startup
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo rm -rf /var/lib/cvmfs/*
@@ -198,4 +200,34 @@ compare_directories()
   diff -ruN $dir1 $dir2 2>&1 || return 102
 
   return 0
+}
+
+# wrapper function to start a new repository update transaction
+# @param repo    the repository you want to start the transaction for
+start_transaction()
+{
+  repo=$1
+  cvmfs_server transaction $repo
+}
+
+# wrapper function to publish an repository after its contents were updated.
+# @param repo    the repository name to start the transaction in
+publish_repo()
+{
+  repo=$1
+
+  # enable the debug mode?
+  # in debug mode we redirect output directly to the interactive shell,
+  # overriding any redirections to logfiles or whatever... We want to hack!
+  case $CVMFS_TEST_DEBUG in
+    fail)
+      cvmfs_server publish $repo -d > /dev/tty 2>&1
+    ;;
+    startup)
+      cvmfs_server publish $repo -D > /dev/tty 2>&1
+    ;;
+    *)
+      cvmfs_server publish $repo
+    ;;
+  esac
 }

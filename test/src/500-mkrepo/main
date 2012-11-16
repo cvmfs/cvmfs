@@ -34,7 +34,7 @@ cvmfs_run_test() {
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return 1
 
   echo "starting transaction to edit repository" >> $logfile
-  cvmfs_server transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return 2
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return 2
 
   echo "putting some stuff in the new repository" >> $logfile
   produce_files_in $repo_dir >> $logfile 2>&1 || return 3
@@ -43,7 +43,7 @@ cvmfs_run_test() {
   produce_files_in $reference_dir >> $logfile 2>&1 || return 4
 
   echo "creating CVMFS snapshot" >> $logfile
-  cvmfs_server publish $CVMFS_TEST_REPO >> $logfile 2>&1 || return 5
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy" >> $logfile
   compare_directories $repo_dir $reference_dir >> $logfile || return $?
