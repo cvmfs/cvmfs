@@ -8,7 +8,7 @@ CVMFS_TEST_REPO=test.cern.ch
 CVMFS_TEST_USER=rene
 CVMFS_TEST_GROUP=rene
 
-CVMFS_TEST_DEBUG=startup
+CVMFS_TEST_DEBUG=fail
 
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
@@ -104,9 +104,9 @@ create_empty_repo() {
 
   create_repo $repo $uid || return 101
 
-  sudo cvmfs_server transaction || return 102
+  sudo cvmfs_server transaction $repo || return 102
   rm -fR /cvmfs/$repo/new_repository
-  sudo cvmfs_server publish || return 103
+  sudo cvmfs_server publish $repo || return 103
 }
 
 
