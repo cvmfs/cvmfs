@@ -1,0 +1,100 @@
+
+cvmfs_test_name="Change Repository"
+
+produce_files_in()
+{
+	working_dir=$1
+
+	cd $working_dir
+
+	echo "meaningless file content" > file
+	echo "more clever file content" > clever
+
+	mkdir foo
+	mkdir bar
+
+	mkdir foo/bar
+	mkdir bar/foo
+
+	ln file hardlinkToFile
+	ln -s clever symlinkToClever
+
+	cd -
+}
+
+change_files_in()
+{
+  working_dir=$1
+
+  cd $working_dir
+
+  echo "additional meaningless content" >> file
+  
+  mkdir newdirectory
+  mkdir newdirectory/foo
+  mkdir newdirectory/bar
+
+  rm -fR bar
+  rm -f symlinkToClever
+
+  ln hardlinkToFile hardlinkToFile2
+  ln hardlinkToFile hardlinkToFile3
+
+  ln -s hardlinkToFile3 symlinkToHardlinkToFile3
+  
+  mv hardlinkToFile hardlinkToFile1
+
+  echo "deeply hidden content" > newdirectory/foo/bar
+  echo "another uselese blubb" > foo/bar/renemeusel
+
+  cd -
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  scratch_dir=`pwd`
+  mkdir reference_dir
+  reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return 1
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository" >> $logfile
+  cvmfs_server transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return 2
+
+  echo "putting some stuff in the new repository" >> $logfile
+  produce_files_in $repo_dir >> $logfile 2>&1 || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison" >> $logfile
+  produce_files_in $reference_dir >> $logfile 2>&1 || return 4
+
+  echo "creating CVMFS snapshot" >> $logfile
+  cvmfs_server publish $CVMFS_TEST_REPO >> $logfile 2>&1 || return 5
+
+  echo "compare the results of cvmfs to our reference copy" >> $logfile
+  compare_directories $repo_dir $reference_dir >> $logfile || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
+  cvmfs_server transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return 6
+
+  echo "change stuff in the repository" >> $logfile
+  change_files_in $repo_dir >> $logfile 2>&1 || return 7
+
+  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
+  change_files_in $reference_dir >> $logfile 2>&1 || return 8
+
+  echo "creating CVMFS snapshot" >> $logfile
+  cvmfs_server publish $CVMFS_TEST_REPO >> $logfile 2>&1 || return 9
+
+  echo "compare the changed directories" >> $logfile
+  compare_directories $repo_dir $reference_dir >> $logfile 2>&1 || return $?
+
+  return 0
+}
+

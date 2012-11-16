@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Populate repository test"
+cvmfs_test_name="Populate Repository"
 
 produce_files_in()
 {
@@ -30,6 +30,7 @@ cvmfs_run_test() {
   mkdir reference_dir
   reference_dir=$scratch_dir/reference_dir
 
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return 1
 
   echo "starting transaction to edit repository" >> $logfile
@@ -45,16 +46,7 @@ cvmfs_run_test() {
   cvmfs_server publish $CVMFS_TEST_REPO >> $logfile 2>&1 || return 5
 
   echo "compare the results of cvmfs to our reference copy" >> $logfile
-  cvmfs_listing=`create_listing $repo_dir`
-  reference_listing=`create_listing $reference_dir`
-
-  echo "check if the file contents are correct" >> $logfile
-  diff -ruN $repo_dir $reference_dir >> $logfile 2>&1 || return 6
-
-  echo "check if directory structure and file meta data fits" >> $logfile
-  echo -e "$cvmfs_listing" > cvmfs_listing
-  echo -e "$reference_listing" > reference_listing
-  diff -uN cvmfs_listing reference_listing >> $logfile 2>&1 || return 7
+  compare_directories $repo_dir $reference_dir >> $logfile || return $?
 
   return 0
 }
