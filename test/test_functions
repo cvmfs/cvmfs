@@ -11,7 +11,7 @@ cvmfs_clean() {
   sudo rm -f /etc/cvmfs/config.d/*
   
   timeout=5
-  while $(pgrep cvmfs2 > /dev/null); do
+  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
       return 101
     fi
