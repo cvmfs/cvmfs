@@ -95,6 +95,11 @@ cvmfs_run_test() {
   echo "compare the changed directories" >> $logfile
   compare_directories $repo_dir $reference_dir >> $logfile 2>&1 || return $?
 
+  # ============================================================================
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
   return 0
 }
 
