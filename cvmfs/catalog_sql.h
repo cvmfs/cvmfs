@@ -288,10 +288,16 @@ class SqlDirent : public Sql {
    *  @return an integer containing the bitmap of the flags field
    */
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
-  uint32_t HardlinksField2Linkcount(const uint64_t hardlinks) const;
-  uint32_t HardlinksField2HardlinkGroup(const uint64_t hardlinks) const;
-  uint64_t HardlinkGroupAndLinkcount2HardlinksField(const uint32_t hardlink_group,
-                                                    const uint32_t linkcount) const;
+
+  /**
+   * The hardlink information (hardlink group ID and linkcount) is saved in one
+   * uint_64t field in the CVMFS Catalogs. Therefore we need to do some minor
+   * bitshifting in these helper methods.
+   */
+  uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) const;
+  uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) const;
+  uint64_t MakeHardlinks(const uint32_t hardlink_group,
+                         const uint32_t linkcount) const;
 
   /**
    *  replaces place holder variables in a symbolic link by actual

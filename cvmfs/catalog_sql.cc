@@ -353,18 +353,18 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   return database_flags;
 }
 
-uint32_t SqlDirent::HardlinksField2Linkcount(const uint64_t hardlinks) const {
+uint32_t SqlDirent::Hardlinks2Linkcount(const uint64_t hardlinks) const {
   if (hardlinks == 0)
     return 1;
   return (hardlinks << 32) >> 32;
 }
 
-uint32_t SqlDirent::HardlinksField2HardlinkGroup(const uint64_t hardlinks) const {
+uint32_t SqlDirent::Hardlinks2HardlinkGroup(const uint64_t hardlinks) const {
   return hardlinks >> 32;
 }
 
-uint64_t SqlDirent::HardlinkGroupAndLinkcount2HardlinksField(const uint32_t hardlink_group,
-                                                             const uint32_t linkcount) const {
+uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
+                                  const uint32_t linkcount) const {
   return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
 }
 
@@ -431,8 +431,8 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                                       const DirectoryEntry &entry)
 {
   const uint64_t hardlinks =
-    HardlinkGroupAndLinkcount2HardlinksField(entry.hardlink_group_,
-                                             entry.linkcount_);
+    MakeHardlinks(entry.hardlink_group_,
+                  entry.linkcount_);
 
   return (
     BindSha1Blob(hash_idx, entry.checksum_) &&
@@ -496,8 +496,8 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
   // retrieve the hardlink information from the hardlinks database field
   const uint64_t hardlinks = RetrieveInt64(1);
-  result.linkcount_ = HardlinksField2Linkcount(hardlinks);
-  result.hardlink_group_ = HardlinksField2HardlinkGroup(hardlinks);
+  result.linkcount_ = Hardlinks2Linkcount(hardlinks);
+  result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
 
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
