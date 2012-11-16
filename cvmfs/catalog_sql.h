@@ -290,6 +290,16 @@ class SqlDirent : public Sql {
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
 
   /**
+   * The hardlink information (hardlink group ID and linkcount) is saved in one
+   * uint_64t field in the CVMFS Catalogs. Therefore we need to do some minor
+   * bitshifting in these helper methods.
+   */
+  uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) const;
+  uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) const;
+  uint64_t MakeHardlinks(const uint32_t hardlink_group,
+                         const uint32_t linkcount) const;
+
+  /**
    *  replaces place holder variables in a symbolic link by actual
    *  path elements
    *  @param raw_symlink the raw symlink path (may) containing place holders
