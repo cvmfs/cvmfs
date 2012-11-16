@@ -4,22 +4,29 @@ cvmfs_test_name="Tar Linux Kernel"
 cvmfs_run_test() {
   logfile=$1
 
-  setup_sft || return 1
+  cvmfs_mount sft.cern.ch || return 1
   
-  tmpdir=/tmp
-  if [ "x$CVMFS_TEMP_DIR" != "x" ]; then
-    tmpdir=$CVMFS_TEMP_DIR
-  fi 
+  local linux_source
+  linux_source=/cvmfs/sft.cern.ch/lcg/external/experimental/linux/linux-2.6.32.57  
 
-  rm -f $tmpdir/cvmfs-atlas-test.tar
-  tar cf $tmpdir/cvmfs-atlas-test.tar /cvmfs/sft.cern.ch/lcg/external/experimental/linux >> $logfile 2>&1 || return 2
-  rm -f $tmpdir/cvmfs-atlas-test.tar
-  tar cf $tmpdir/cvmfs-atlas-test.tar /cvmfs/sft.cern.ch/lcg/external/experimental/linux >> $logfile 2>&1 || return 3
-  rm -f $tmpdir/cvmfs-atlas-test.tar
+  echo "cold cache" >> $logfile
+  tar cf kernel.tar.gz $linux_source >> $logfile 2>&1 || return 2
+  local digest_cold
+  digest_cold=$(md5sum kernel.tar.gz | awk '{print $1}')
+  rm -f kernel.tar.gz
 
-  check_memory sft.cern.ch 50000 || return 4 
+  echo "warm cache" >> $logfile
+  tar cf kernel.tar.gz $linux_source >> $logfile 2>&1 || return 3 
+  local digest_warm
+  digest_warm=$(md5sum kernel.tar.gz | awk '{print $1}')
+  rm -f kernel.tar.gz
 
-  sudo rm -rf /var/cache/cvmfs2/sft.cern.ch/* >> $logfile 2>&1
+  if [ "x$digest_cold" != "x$digest_warm" ]; then
+    echo "Digest mismatch: $digest_old $digest_warm" >> $logfile
+    return 4
+  fi
+
+  check_memory sft.cern.ch 50000 || return 5 
 
   return 0
 }
