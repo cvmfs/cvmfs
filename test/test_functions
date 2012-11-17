@@ -44,7 +44,7 @@ cvmfs_umount() {
   repositories=$1
 
   for r in $(echo $repositories | tr , " "); do
-    umount /cvmfs/$r || return 100
+    sudo umount /cvmfs/$r || return 100
 
     timeout=5
     while cat /proc/mounts | grep -q /cvmfs/$r; do
