@@ -45,6 +45,7 @@ const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
   "fuse stub", "signature", "peers", "fs traversal", "nfs maps", "publish",
   "spooler" };
+int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
 LogLevels min_log_level = kLogNormal;
@@ -72,6 +73,18 @@ void SetLogSyslogLevel(const int level) {
       syslog_level = LOG_NOTICE;
       break;
   }
+}
+
+
+/**
+ * Sets the syslog facility to one of local0 .. local7.
+ * Falls back to LOG_USER if local_facility is not in [0..7] 
+ */
+void SetLogSyslogFacility(const int local_facility) {
+  if ((local_facility < 0) || (local_facility > 7))
+    syslog_facility = LOG_USER;
+  else
+    syslog_facility = LOG_LOCAL0 + local_facility;
 }
 
 
@@ -221,10 +234,10 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 
   if (mask & kLogSyslog) {
     if (syslog_prefix) {
-      syslog(LOG_MAKEPRI(LOG_USER, syslog_level), "(%s) %s",
+      syslog(LOG_MAKEPRI(syslog_facility, syslog_level), "(%s) %s",
              syslog_prefix, msg);
     } else {
-      syslog(LOG_MAKEPRI(LOG_USER, syslog_level), "%s", msg);
+      syslog(LOG_MAKEPRI(syslog_facility, syslog_level), "%s", msg);
     }
   }
 
