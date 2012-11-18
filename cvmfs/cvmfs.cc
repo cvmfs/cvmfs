@@ -1306,8 +1306,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     quota_limit = String2Int64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
-  if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
-    proxies = parameter;
   if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter))
     public_keys = parameter;
   if (options::GetValue("CVMFS_ROOT_HASH", &parameter))
