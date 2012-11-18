@@ -1,4 +1,5 @@
 2.1.5:
+  * Syslog facility adjustable to one of local0 .. local7
 
 2.1.4:
   * Check permissions by default

@@ -1283,6 +1283,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     SetLogSyslogLevel(String2Uint64(parameter));
   else
     SetLogSyslogLevel(3);
+  if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
+    SetLogSyslogFacility(String2Int64(parameter));
   if (options::GetValue("CVMFS_DEBUGLOG", &parameter))
     SetLogDebugFile(parameter);
   SetLogSyslogPrefix(loader_exports->repository_name);

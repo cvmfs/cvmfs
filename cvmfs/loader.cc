@@ -612,6 +612,8 @@ int main(int argc, char *argv[]) {
     SetLogSyslogLevel(String2Uint64(parameter));
   else
     SetLogSyslogLevel(3);
+  if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
+    SetLogSyslogFacility(String2Int64(parameter));
   SetLogSyslogPrefix(*repository_name_);
 
   // Permissions check
