@@ -588,7 +588,7 @@ rmfs() {
     sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
     mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
     mount | grep -q " ${spool_dir}/rdonly " && umount ${spool_dir}/rdonly
-    rmdir /cvmfs/$name
+    if [ -f /cvmfs/$name ]; then rmdir /cvmfs/$name; fi
     echo "done"
   fi
 
