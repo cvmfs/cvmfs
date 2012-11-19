@@ -1,11 +1,10 @@
 
 cvmfs_test_name="Change Repository"
 
-produce_files_in()
-{
+produce_files_in() {
 	working_dir=$1
 
-	cd $working_dir
+	pushd $working_dir
 
 	echo "meaningless file content" > file
 	echo "more clever file content" > clever
@@ -19,14 +18,13 @@ produce_files_in()
 	ln file hardlinkToFile
 	ln -s clever symlinkToClever
 
-	cd -
+	popd
 }
 
-change_files_in()
-{
+change_files_in() {
   working_dir=$1
 
-  cd $working_dir
+  pushd $working_dir
 
   echo "additional meaningless content" >> file
   
@@ -47,14 +45,14 @@ change_files_in()
   echo "deeply hidden content" > newdirectory/foo/bar
   echo "another uselese blubb" > foo/bar/renemeusel
 
-  cd -
+  popd
 }
 
 cvmfs_run_test() {
   logfile=$1
   repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  scratch_dir=`pwd`
+  scratch_dir=$(pwd)
   mkdir reference_dir
   reference_dir=$scratch_dir/reference_dir
 

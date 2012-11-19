@@ -678,7 +678,8 @@ Commands:
                Create a Stratum 1 replica of a repository
   publish <fully qualified name> [-d debug mode | -D blocking debug mode]:
                Make a new repository snapshot
-  rmfs:        Remove the repository
+  rmfs <fully qualified name> [-f force]:
+               Remove the repository
   resign:      Re-sign the 30 day whitelist
   list:        List available repositories
   info:        Print summary about the repository
@@ -778,8 +779,13 @@ case $1 in
   ;;
   rmfs)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
+    for last; do true; done
     reply=n
-    read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY INCLUDING SIGNING KEYS!  Are you sure (y/n)? " reply
+    if [ x"$last" == x"-f" ]; then
+      reply=y
+    else
+      read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY INCLUDING SIGNING KEYS!  Are you sure (y/n)? " reply
+    fi
     if [ "$reply" = "y" ]; then
       . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
       rmfs $CVMFS_REPOSITORY_NAME $CVMFS_SPOOL_DIR $CVMFS_UPSTREAM_STORAGE $CVMFS_REPOSITORY_TYPE

@@ -1,11 +1,10 @@
 
 cvmfs_test_name="Delete Nested Catalog (Merge into Parent)"
 
-produce_files_in()
-{
+produce_files_in() {
   working_dir=$1
 
-  cd $working_dir
+  pushd $working_dir
 
   mkdir dir1 # stays empty
   mkdir dir2
@@ -43,25 +42,24 @@ produce_files_in()
   # create nested catalog marker
   touch dir5/ndir5/.cvmfscatalog
 
-  cd -
+  popd
 }
 
-change_files_in()
-{
+change_files_in() {
   working_dir=$1
 
-  cd $working_dir
+  pushd $working_dir
 
   rm -f dir5/ndir5/.cvmfscatalog || return 201
 
-  cd -
+  popd
 }
 
 cvmfs_run_test() {
   logfile=$1
   repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  scratch_dir=`pwd`
+  scratch_dir=$(pwd)
   mkdir reference_dir
   reference_dir=$scratch_dir/reference_dir
 

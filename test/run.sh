@@ -1,11 +1,5 @@
 #!/bin/sh
 
-# By default, this script runs in testing mode
-# To allow for online debugging, export CVMFS_TEST_DEBUG like so:
-# 
-# `export CVMFS_TEST_DEBUG=fail`    - for crash debugging with gdb
-# `export CVMFS_TEST_DEBUG=startup` - for interactive debugging with gdb
-
 usage() {
   echo "$0 <logfile> [<test list>]"
 }

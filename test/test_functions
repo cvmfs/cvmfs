@@ -1,14 +1,25 @@
 
+# By default, this script runs in testing mode
+# Although it allows for a server debugging mode, which attaches gdb to
+# the `cvmfs_server publish` process and allows for both online and
+# failure debugging.
+#
+# To allow for online debugging, export CVMFS_TEST_SRVDEBUG like so:
+# 
+# `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
+# `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
+
+
 CVMFS_TEST_DEBUGLOG=
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
 
-CVMFS_TEST_REPO=test.cern.ch
-CVMFS_TEST_USER=sftnight
-CVMFS_TEST_GROUP=sftnight
+CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
+CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
+CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing 
 
-CVMFS_TEST_DEBUG=
+CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
@@ -116,9 +127,9 @@ create_repo() {
   repo=$1
   uid=$2
 
-  if [ `cvmfs_server list | grep $repo | wc -l` -ne 0 ]; then
+  if cvmfs_server list | grep -q $repo; then
     echo "Repository $repo is already present... removing it"
-    echo "y" | sudo cvmfs_server rmfs $repo || return 100
+    sudo cvmfs_server rmfs $repo -f || return 100
   fi
 
   echo "Creating new repository $repo..."
@@ -140,7 +151,7 @@ create_empty_repo() {
   create_repo $repo $uid || return 101
 
   sudo cvmfs_server transaction $repo || return 102
-  rm -fR /cvmfs/$repo/new_repository
+  rm -f /cvmfs/$repo/new_repository
   sudo cvmfs_server publish $repo || return 103
 }
 
@@ -158,16 +169,15 @@ create_empty_repo() {
 # @param uid                specify a UID for the file owner (optional)
 # @param gid                specify a GID for the file owner (optional)
 # @return                   a custom directory listing
-create_listing()
-{
+create_listing() {
   directory=$1
   uid=$2
   gid=$3
 
-  lst=`ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
+  lst=$(ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
   awk '
   {
-    # skipt the tatal file count, ls prints at the end of each directory listing
+    # skip the total file count, ls prints at the end of each directory listing
     if(substr($1, 0, 5) == "total") next;
 
     # length of base directory path
@@ -206,7 +216,7 @@ create_listing()
     if(first == "l") printf " " $7 " " $8;
     if(first != "d") printf " " $5;
     printf "\n"
-  }' uid=$uid gid=$gid base_dir=$directory`
+  }' uid=$uid gid=$gid base_dir=$directory)
 
   echo -e "$lst"
 }
@@ -218,13 +228,12 @@ create_listing()
 # @param dir1    the directory to probe
 # @param dir2    the ground truth directory
 # @return        != 0 to indicate inequality, 0 means success
-compare_directories()
-{
+compare_directories() {
   dir1=$1
   dir2=$2
 
-  listing1=`create_listing $dir1`
-  listing2=`create_listing $dir2`
+  listing1=$(create_listing $dir1)
+  listing2=$(create_listing $dir2)
 
   echo "check if directory structure and file meta data fits"
   echo -e "$listing1" > listingFile1
@@ -239,38 +248,39 @@ compare_directories()
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure
 # @param repo    the repository to be checked
-check_catalogs()
-{
+check_catalogs() {
   repo=$1
-  cvmfs_server check $repo
+  cvmfs_server check $repo || return 100
+  return 0
 }
 
 # wrapper function to start a new repository update transaction
 # @param repo    the repository you want to start the transaction for
-start_transaction()
-{
+start_transaction() {
   repo=$1
-  cvmfs_server transaction $repo
+  cvmfs_server transaction $repo || return 100
+  return 0
 }
 
 # wrapper function to publish an repository after its contents were updated.
 # @param repo    the repository name to start the transaction in
-publish_repo()
-{
+publish_repo() {
   repo=$1
 
   # enable the debug mode?
   # in debug mode we redirect output directly to the interactive shell,
   # overriding any redirections to logfiles or whatever... We want to hack!
-  case $CVMFS_TEST_DEBUG in
+  case $CVMFS_TEST_SRVDEBUG in
     fail)
-      cvmfs_server publish $repo -d > /dev/tty 2>&1
+      cvmfs_server publish $repo -d > /dev/tty 2>&1 || return 100
     ;;
     startup)
-      cvmfs_server publish $repo -D > /dev/tty 2>&1
+      cvmfs_server publish $repo -D > /dev/tty 2>&1 || return 100
     ;;
     *)
-      cvmfs_server publish $repo
+      cvmfs_server publish $repo || return 100
     ;;
   esac
+
+  return 0
 }

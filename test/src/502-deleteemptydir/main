@@ -1,11 +1,10 @@
 
 cvmfs_test_name="Delete Empty Directory"
 
-produce_files_in()
-{
+produce_files_in() {
 	working_dir=$1
 
-	cd $working_dir
+	pushd $working_dir
 
 	mkdir dir1 # stays empty
   mkdir dir2
@@ -28,26 +27,25 @@ produce_files_in()
 
   mkdir dir5/ndir5/nndir3
 
-	cd -
+	popd
 }
 
-change_files_in()
-{
+change_files_in() {
   working_dir=$1
 
-  cd $working_dir
+  pushd $working_dir
 
   rmdir dir1
   rm -fR dir6
 
-  cd -
+  popd
 }
 
 cvmfs_run_test() {
   logfile=$1
   repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  scratch_dir=`pwd`
+  scratch_dir=$(pwd)
   mkdir reference_dir
   reference_dir=$scratch_dir/reference_dir
 

@@ -1,11 +1,10 @@
 
 cvmfs_test_name="Delete and Recreate Directory"
 
-produce_files_in()
-{
+produce_files_in() {
   working_dir=$1
 
-  cd $working_dir
+  pushd $working_dir
 
   mkdir dir1 # stays empty
   mkdir dir2
@@ -40,14 +39,13 @@ produce_files_in()
   ln dir5/ndir5/nndir3/outlaw dir5/ndir5/nndir3/hardlinkToOutlaw2
   echo "NYPD! Stahp!" > dir5/ndir5/nndir3/NYPD
 
-  cd -
+  popd
 }
 
-change_files_in()
-{
+change_files_in() {
   working_dir=$1
 
-  cd $working_dir
+  pushd $working_dir
 
   rm -fR dir2 || return 201
   rm -fR dir5 || return 202
@@ -71,14 +69,14 @@ change_files_in()
   echo "Getting tired of all this meaningless text" > dir5/meaningless || return 214
   echo "The quick brown fox jumps over the lazy dog!" > dir5/meaningful || return 215
 
-  cd -
+  popd
 }
 
 cvmfs_run_test() {
   logfile=$1
   repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  scratch_dir=`pwd`
+  scratch_dir=$(pwd)
   mkdir reference_dir
   reference_dir=$scratch_dir/reference_dir
 

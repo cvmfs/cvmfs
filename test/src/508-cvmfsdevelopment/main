@@ -26,7 +26,7 @@ download_and_untar_cvmfs_versions() {
     echo $cvmfs_version
 
     wget --quiet $cvmfs_version || return 201
-    tarname=`basename $cvmfs_version`
+    tarname=$(basename $cvmfs_version)
     tar -xzf $tarname || return 202
   done
 }
@@ -96,8 +96,7 @@ check_catalog_presence() {
 # @param version        the version to be copied (index in array on top)
 # @param repo_dir       the repository directory to copy to
 # @param reference_dir  the reference directory to copy to
-copy_version()
-{
+copy_version() {
   version=$1
   repo_dir=$2
   reference_dir=$3
@@ -132,7 +131,7 @@ cvmfs_run_test() {
   logfile=$1
   repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  scratch_dir=`pwd`
+  scratch_dir=$(pwd)
   mkdir reference_dir
   reference_dir=$scratch_dir/reference_dir
 
