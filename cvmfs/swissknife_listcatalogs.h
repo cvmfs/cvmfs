@@ -11,6 +11,7 @@ namespace swissknife {
 
 class CommandListCatalogs : public Command {
  public:
+  CommandListCatalogs();
   ~CommandListCatalogs() { };
   std::string GetName() { return "lscat"; };
   std::string GetDescription() {
@@ -18,15 +19,13 @@ class CommandListCatalogs : public Command {
       "This command lists the nested catalog tree that builds up a "
       "cvmfs repository structure.";
   };
-  ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('t', "print tree structure of catalogs",
-                               true, true));
-    result.push_back(Parameter('h', "print hash for each catalog",
-                               true, true));
-    return result;
-  }
+  ParameterList GetParams();
+
   int Main(const ArgumentList &args);
+
+ private:
+  bool print_tree_;
+  bool print_hash_;
 };
 
 }
