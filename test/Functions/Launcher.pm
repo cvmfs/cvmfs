@@ -47,7 +47,12 @@ sub launch {
 	# Executing the script, if found
 	if(defined ($mainfile)){
 		my $error_found = 0;
-		($pid, $infh, $outfh, $errfh) = spawn("perl $mainfile --shell-path $shell_path $options");
+		if (defined($shell_path)) {
+			($pid, $infh, $outfh, $errfh) = spawn("perl $mainfile --shell-path $shell_path $options");
+		}
+		else {
+			($pid, $infh, $outfh, $errfh) = spawn("perl $mainfile $options");
+		}
 		while (defined(my $err = $errfh->getline)){
 			$error_found = 1;
 			send_msg($err);
