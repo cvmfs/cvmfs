@@ -4,18 +4,9 @@ cvmfs_test_name="Simulate CVMFS Development"
 # cvmfs source tarballs to be downloaded and used as test data
 cvmfs_versions=( \
   "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.1/cvmfs-2.1.1.tar.gz" \
-  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.2/cvmfs_2.1.2.tar.gz" \
-  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.3/cvmfs_2.1.3.tar.gz" \
-  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.4/cvmfs_2.1.4.tar.gz" \
-  )
-
-# directory names that come out of the tarballs above
-# (unfortunately not compatible to the tarball names :-( )
-cvmfs_versions_dir=( \
-  "cvmfs-2.1.1" \
-  "cvmfs-2.1.2" \
-  "cvmfs-2.1.3" \
-  "cvmfs-2.1.4" \
+  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.2/cvmfs-2.1.2.tar.gz" \
+  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.3/cvmfs-2.1.3.tar.gz" \
+  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.4/cvmfs-2.1.4.tar.gz" \
   )
 
 # downloads and extracts a number of CVMFS source packages
@@ -36,9 +27,12 @@ download_and_untar_cvmfs_versions() {
 # @param working_dir    the destination directory
 # @param version        the CVMFS version to be copied (index in array above)
 copy_cvmfs_version() {
-  working_dir=$1
-  version=$2
-  source_dir=${cvmfs_versions_dir[$version]}
+  local working_dir=$1
+  local version=$2
+  local source_dir
+  source_dir=$(basename ${cvmfs_versions[$version]} | sed 's/\.tar\.gz//')
+
+  echo $source_dir
 
   cp -uR $source_dir/* $working_dir
 }
@@ -47,8 +41,8 @@ copy_cvmfs_version() {
 # @param working_dir   the destination directory
 # @param version       the version of CVMFS to be copied (index in array on top)
 configure_nested_catalogs() {
-  working_dir=$1
-  version=$2
+  local working_dir=$1
+  local version=$2
 
   case $version in
     0)
@@ -82,7 +76,7 @@ configure_nested_catalogs() {
 # @param version    the repository version to be checked
 #                   (same as for configure_nested_catalogs())
 check_catalog_presence() {
-  version=$1
+  local version=$1
   # TODO: needs to be implemented in cvmfs_swissknife
 
   # case $version in
@@ -97,9 +91,9 @@ check_catalog_presence() {
 # @param repo_dir       the repository directory to copy to
 # @param reference_dir  the reference directory to copy to
 copy_version() {
-  version=$1
-  repo_dir=$2
-  reference_dir=$3
+  local version=$1
+  local repo_dir=$2
+  local reference_dir=$3
 
   echo "COPY VERSION === $version === ..."
 
@@ -129,11 +123,11 @@ copy_version() {
 
 cvmfs_run_test() {
   logfile=$1
-  repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  scratch_dir=$(pwd)
+  local scratch_dir=$(pwd)
   mkdir reference_dir
-  reference_dir=$scratch_dir/reference_dir
+  local reference_dir=$scratch_dir/reference_dir
 
   echo "downloading some previous versions of the CVMFS code as test data..." >> $logfile
   download_and_untar_cvmfs_versions >> $logfile 2>&1 || return $?

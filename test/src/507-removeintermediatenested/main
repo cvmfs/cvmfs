@@ -2,7 +2,7 @@
 cvmfs_test_name="Remove Intermediate Nested Catalog"
 
 produce_files_in() {
-  working_dir=$1
+  local working_dir=$1
 
   pushd $working_dir
 
@@ -66,7 +66,7 @@ produce_files_in() {
 }
 
 change_files_in() {
-  working_dir=$1
+  local working_dir=$1
 
   pushd $working_dir
 
@@ -77,11 +77,11 @@ change_files_in() {
 
 cvmfs_run_test() {
   logfile=$1
-  repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  scratch_dir=$(pwd)
+  local scratch_dir=$(pwd)
   mkdir reference_dir
-  reference_dir=$scratch_dir/reference_dir
+  local reference_dir=$scratch_dir/reference_dir
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?

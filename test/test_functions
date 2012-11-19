@@ -124,8 +124,8 @@ check_memory() {
 
 
 create_repo() {
-  repo=$1
-  uid=$2
+  local repo=$1
+  local uid=$2
 
   if cvmfs_server list | grep -q $repo; then
     echo "Repository $repo is already present... removing it"
@@ -138,8 +138,8 @@ create_repo() {
 
 
 create_empty_repo() {
-  repo=$1
-  uid=$2
+  local repo=$1
+  local uid=$2
 
   # check if someone tries to go upwards in the directory tree to safeguard
   # harmful things might happen with `rm -fR *` :o)
@@ -170,9 +170,10 @@ create_empty_repo() {
 # @param gid                specify a GID for the file owner (optional)
 # @return                   a custom directory listing
 create_listing() {
-  directory=$1
-  uid=$2
-  gid=$3
+  local directory=$1
+  local uid=$2
+  local gid=$3
+  local lst
 
   lst=$(ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
   awk '
@@ -229,8 +230,8 @@ create_listing() {
 # @param dir2    the ground truth directory
 # @return        != 0 to indicate inequality, 0 means success
 compare_directories() {
-  dir1=$1
-  dir2=$2
+  local dir1=$1
+  local dir2=$2
 
   listing1=$(create_listing $dir1)
   listing2=$(create_listing $dir2)
@@ -249,7 +250,8 @@ compare_directories() {
 # uses `cvmfs_server check` to check the integrity of the catalog structure
 # @param repo    the repository to be checked
 check_catalogs() {
-  repo=$1
+  local repo=$1
+
   cvmfs_server check $repo || return 100
   return 0
 }
@@ -257,7 +259,8 @@ check_catalogs() {
 # wrapper function to start a new repository update transaction
 # @param repo    the repository you want to start the transaction for
 start_transaction() {
-  repo=$1
+  local repo=$1
+
   cvmfs_server transaction $repo || return 100
   return 0
 }
@@ -265,7 +268,7 @@ start_transaction() {
 # wrapper function to publish an repository after its contents were updated.
 # @param repo    the repository name to start the transaction in
 publish_repo() {
-  repo=$1
+  local repo=$1
 
   # enable the debug mode?
   # in debug mode we redirect output directly to the interactive shell,

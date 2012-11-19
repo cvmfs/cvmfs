@@ -779,9 +779,8 @@ case $1 in
   ;;
   rmfs)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
-    for last; do true; done
     reply=n
-    if [ x"$last" == x"-f" ]; then
+    if [ x"$3" == x"-f" ]; then
       reply=y
     else
       read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY INCLUDING SIGNING KEYS!  Are you sure (y/n)? " reply
