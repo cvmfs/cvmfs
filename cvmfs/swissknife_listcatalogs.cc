@@ -7,6 +7,8 @@
 #include "cache.h"
 #include "catalog_mgr.h"
 
+#include "catalog_traversal.h"
+
 using namespace swissknife;
 
 CommandListCatalogs::CommandListCatalogs() :
@@ -31,7 +33,14 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   print_hash_ = (args.count('h') > 0);
 
   assert(args.count('r') > 0);
-  // const std::string &repository = *args.find('r')->second;
+  const std::string &repository = *args.find('r')->second;
+
+  CatalogTraversal<CommandListCatalogs> traversal(
+    this, 
+    &CommandListCatalogs::CatalogCallback,
+    repository);
+
+  traversal.Traverse();
 
   // const bool ignore_signature = true;
   // cache::CatalogManager* catalog_manager =
@@ -44,4 +53,11 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   // }
 
   return 0;
+}
+
+
+void CommandListCatalogs::CatalogCallback(const catalog::Catalog* catalog,
+                                          const unsigned          recursion_depth) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Depth: %d",
+    catalog->path().c_str(), recursion_depth);
 }

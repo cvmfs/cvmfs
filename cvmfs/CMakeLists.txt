@@ -92,6 +92,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sync_mediator.h sync_mediator.cc
 
   dirent.h shortstring.h
+  catalog_traversal.h
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc

@@ -7,6 +7,10 @@
 
 #include "swissknife.h"
 
+namespace catalog {
+  class Catalog;
+}
+
 namespace swissknife {
 
 class CommandListCatalogs : public Command {
@@ -22,6 +26,9 @@ class CommandListCatalogs : public Command {
   ParameterList GetParams();
 
   int Main(const ArgumentList &args);
+
+  void CatalogCallback(const catalog::Catalog* catalog,
+                       const unsigned          recursion_depth);
 
  private:
   bool print_tree_;
