@@ -16,9 +16,9 @@ use LWP::Simple;
 
 my $distributed = "$RealBin/Distributed";
 my $home = $ENV{"HOME"};
-my $cernvmurl = 'http://cernvm.cern.ch/releases/17/cernvm-basic-2.6.0-4-1-x86_64.vdi.gz';
-my $cernvmgz = 'cernvm-basic-2.6.0-4-1-x86_64.vdi.gz';
-my $cernvmvdi = 'cernvm-basic-2.6.0-4-1-x86_64.vdi';
+my $cernvmurl = 'http://cernvm.cern.ch/releases/17/cernvm-desktop-2.6.0-4-1-x86_64.vdi.gz';
+my $cernvmgz = 'cernvm-desktop-2.6.0-4-1-x86_64.vdi.gz';
+my $cernvmvdi = 'cernvm-desktop-2.6.0-4-1-x86_64.vdi';
 my $vmname = 'CVMFSTEST';
 my $vbm = '/usr/bin/VBoxManage';
 
@@ -109,11 +109,17 @@ sub in_context {
 	print "Done.\n";
 	
 	print 'Creating prolog.sh... ';
+	open (my $prologsh, '>', "$distributed/iso/prolog.sh");
+	print $prologsh "echo \"Starting prolog.sh..\"\n";
+	close($prologsh);
+	print "Done.\n";
+	
+	print 'Creating epilog.sh... ';
 	open (my $epilogsh, '<', "$distributed/epilog.sh");
 	open (my $newepilog, '>', "$distributed/iso/epilog.sh");
 	while (my $line = $epilogsh->getline) {
 		if($line =~ m/^SHELLPATH/ ) {
-			print $newepilog "SHELLPATH=\"$shell_address\"";
+			print $newepilog "SHELLPATH=\"$shell_address\"\n";
 		}
 		else {
 			print $newepilog $line;
@@ -122,6 +128,8 @@ sub in_context {
 	close($newepilog);
 	close($epilogsh);
 	print "Done.\n";
+	
+	system("chmod +x $distributed/prolog.sh $distributed/epilog.sh");
 	
 	print 'Generating context.iso... ';
 	system("mkisofs -o $distributed/context.iso $distributed/iso");

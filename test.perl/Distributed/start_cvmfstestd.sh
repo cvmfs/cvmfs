@@ -5,25 +5,26 @@
 # Everytime you use it to contextualize a CernVM, you should change the SHELLPATH variable
 # to match your address, cvmfs-test will do it for you.
 
-CVMFSTESTBIN="/usr/bin/git"
-GITBIN="/usr/bin/cvmfstest"
-SHELLPATH="192.168.1.50"
+GITBIN=`which git 2> /dev/null`
+CVMFSTESTBIN=`which cvmfs-test 2> /dev/null`
+SHELLPATH=`cat /root/current_shell_path.txt`
 LOGFILE="/root/initialization.log"
 
 echo "Running initialization script..." > $LOGFILE
 
 if [ ! "$CVMFSTESTBIN" == "" ] ; then
-	echo "cvmfs-test binary found. Starting it."
+	echo "cvmfs-test binary found. Starting it." >> $LOGFILE
 	# Starting the daemon
-	$CVMFSTESTBIN --start --shell-path $SHELLPATH:6651 --iface eth1
+	$CVMFSTESTBIN --start --shell-path $SHELLPATH --iface eth1
 else
-	echo "cvmfs-test binary not found. Starting installation process." >> $LOGIFILE
+	echo "cvmfs-test binary not found. Starting installation process." >> $LOGFILE
 	# Checking if git is already installed. It's not shipped with CernVM by default.
 	# If it's not yet installed, the script will install it as it needs it to retrieve
 	# the source code of cvmfs-test.
 	if [ "$GITBIN" == "" ] ; then
 		echo "Installing git..." >> $LOGFILE
 		conary update git
+		GITBIN=`which git 2> /dev/null`
 	fi
 	
 	# Changing current directory to root home
@@ -33,6 +34,7 @@ else
 	echo "Cloning cvmfs-test repository..." >> $LOGFILE
 	$GITBIN clone git://github.com/ruvolof/cvmfs-test cvmfs-test
 	./cvmfs-test/Install.pl
+	CVMFSTESTBIN=`which cvmfs-test 2> /dev/null`
 	
 	# Starting the daemon
 	echo "Starting the daemon." >> $LOGFILE
