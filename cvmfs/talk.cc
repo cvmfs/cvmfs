@@ -41,6 +41,8 @@
 #include "shortstring.h"
 #include "lru.h"
 #include "nfs_maps.h"
+#include "loader.h"
+#include "options.h"
 
 using namespace std;  // NOLINT
 
@@ -386,8 +388,26 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "pid") {
         const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
+      } else if (line == "parameters") {
+        Answer(con_fd, options::Dump());
+      } else if (line == "hotpatch history") {
+        string history_str =
+          StringifyTime(cvmfs::loader_exports_->boot_time, false) +
+          "    (start of CernVM-FS loader " +
+          cvmfs::loader_exports_->loader_version + ")\n";
+        for (loader::EventList::const_iterator i =
+             cvmfs::loader_exports_->history.begin(),
+             iEnd = cvmfs::loader_exports_->history.end(); i != iEnd; ++i)
+        {
+          history_str += StringifyTime((*i)->timestamp, false) +
+            "    (loaded CernVM-FS Fuse Module " +
+            (*i)->so_version + ")\n";
+        }
+        Answer(con_fd, history_str);
       } else if (line == "version") {
-        Answer(con_fd, string(VERSION) + "\n");
+        string version_str = string(VERSION) + " (CernVM-FS Fuse Module)\n" +
+          cvmfs::loader_exports_->loader_version + " (Loader)\n";
+        Answer(con_fd, version_str);
       } else if (line == "version patchlevel") {
         Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
       } else {

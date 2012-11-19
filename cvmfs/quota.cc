@@ -50,7 +50,7 @@
 using namespace std;  // NOLINT
 
 namespace quota {
-  
+
 static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
 /**
@@ -120,13 +120,13 @@ sqlite3_stmt *stmt_list_ = NULL;
 sqlite3_stmt *stmt_list_pinned_ = NULL;  /**< Loaded catalogs are pinned. */
 sqlite3_stmt *stmt_list_catalogs_ = NULL;
 
- 
+
 static void MakeReturnPipe(int pipe[2]) {
   if (!shared_) {
     MakePipe(pipe);
     return;
   }
-  
+
   // Create FIFO in cache directory, store path name (number) in pipe write end
   int i = 0;
   int retval;
@@ -136,35 +136,35 @@ static void MakeReturnPipe(int pipe[2]) {
     i++;
   } while ((retval == -1) && (errno == EEXIST));
   assert(retval == 0);
-  
+
   // Connect reader's end
-  pipe[0] = open((*cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str(), 
+  pipe[0] = open((*cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str(),
                  O_RDONLY | O_NONBLOCK);
   assert(pipe[0] >= 0);
   Nonblock2Block(pipe[0]);
 }
-  
-  
+
+
 // TODO: make sure that a broken return pipe does not kill the cache manager
 static int BindReturnPipe(int pipe_wronly) {
   if (!shared_)
     return pipe_wronly;
-  
+
   // Connect writer's end
-  int result = open((*cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(), 
+  int result = open((*cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(),
                     O_WRONLY | O_NONBLOCK);
   assert(result >= 0);
   Nonblock2Block(result);
   return result;
 }
-  
-  
+
+
 static void UnbindReturnPipe(int pipe_wronly) {
   if (shared_)
     close(pipe_wronly);
 }
-  
-  
+
+
 static void CloseReturnPipe(int pipe[2]) {
   if (shared_) {
     close(pipe[0]);
@@ -173,8 +173,8 @@ static void CloseReturnPipe(int pipe[2]) {
     ClosePipe(pipe);
   }
 }
-  
-  
+
+
 static bool DoCleanup(const uint64_t leave_size) {
   if ((limit_ == 0) || (gauge_ <= leave_size))
     return true;
@@ -368,7 +368,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     // Reservations are handled immediately and "out of band"
     if (command_type == kReserve) {
       bool success = true;
-      int return_pipe = 
+      int return_pipe =
         BindReturnPipe(command_buffer[num_commands].return_pipe);
       const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
                            sizeof(command_buffer[num_commands].digest));
@@ -422,7 +422,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
     if (immediate_command) {
       // Process cleanup, listings
-      int return_pipe = 
+      int return_pipe =
         BindReturnPipe(command_buffer[num_commands].return_pipe);
       int retval;
       sqlite3_stmt *this_stmt_list = NULL;
@@ -493,7 +493,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           break;
         case kLimits:
           WritePipe(return_pipe, &limit_, sizeof(limit_));
-          WritePipe(return_pipe, &cleanup_threshold_, 
+          WritePipe(return_pipe, &cleanup_threshold_,
                     sizeof(cleanup_threshold_));
           break;
         default:
@@ -664,18 +664,18 @@ bool RebuildDatabase() {
   if (dirp) closedir(dirp);
   return result;
 }
-  
-  
+
+
 static bool InitDatabase(const bool rebuild_database) {
   string sql;
   sqlite3_stmt *stmt;
-  
+
   fd_lock_cachedb_ = LockFile(*cache_dir_ + "/lock_cachedb");
   if (fd_lock_cachedb_ < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed to create cachedb lock");
     return false;
   }
-  
+
   bool retry = false;
 init_recover:
   const string db_file = (*cache_dir_) + "/cachedb";
@@ -710,7 +710,7 @@ init_recover:
              sql.c_str());
     goto init_database_fail;
   }
-  
+
   // If this an old cache catalog,
   // add and initialize new columns to cache_catalog
   sql = "ALTER TABLE cache_catalog ADD type INTEGER; "
@@ -726,7 +726,7 @@ init_recover:
       return false;
     }
   }
-  
+
   // Set pinned back
   sql = "UPDATE cache_catalog SET pinned=0;";
   err = sqlite3_exec(db_, sql.c_str(), NULL, NULL, NULL);
@@ -735,7 +735,7 @@ init_recover:
              sql.c_str());
     goto init_database_fail;
   }
-  
+
   // Set schema version
   sql = "INSERT OR REPLACE INTO properties (key, value) "
   "VALUES ('schema', '1.0')";
@@ -745,19 +745,19 @@ init_recover:
              sql.c_str());
     goto init_database_fail;
   }
-  
+
   // Easy way out, no quota restrictions
   if (limit_ == 0) {
     gauge_ = 0;
     return true;
   }
-  
+
   // If cache catalog is empty, recreate from file system
   sql = "SELECT count(*) FROM cache_catalog;";
   sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
   if (sqlite3_step(stmt) == SQLITE_ROW) {
     if ((sqlite3_column_int64(stmt, 0)) == 0 || rebuild_database) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
+      LogCvmfs(kLogCvmfs, kLogDebug,
                "CernVM-FS: building lru cache database...");
       if (!RebuildDatabase()) {
         LogCvmfs(kLogQuota, kLogDebug,
@@ -771,7 +771,7 @@ init_recover:
     goto init_database_fail;
   }
   sqlite3_finalize(stmt);
-  
+
   // How many bytes do we already have in cache?
   sql = "SELECT sum(size) FROM cache_catalog;";
   sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
@@ -783,7 +783,7 @@ init_recover:
     goto init_database_fail;
   }
   sqlite3_finalize(stmt);
-  
+
   // Highest seq-no?
   sql = "SELECT coalesce(max(acseq), 0) FROM cache_catalog;";
   sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
@@ -795,7 +795,7 @@ init_recover:
     goto init_database_fail;
   }
   sqlite3_finalize(stmt);
-  
+
   // Prepare touch, new, remove statements
   sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET acseq=:seq "
                      "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
@@ -822,13 +822,13 @@ init_recover:
                      ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) +
                       ";").c_str(), -1, &stmt_list_catalogs_, NULL);
   return true;
-  
+
  init_database_fail:
   UnlockFile(fd_lock_cachedb_);
   sqlite3_close(db_);
   return false;
 }
-  
+
 
 static void CloseDatabase() {
   if (stmt_list_catalogs_) sqlite3_finalize(stmt_list_catalogs_);
@@ -842,7 +842,7 @@ static void CloseDatabase() {
   if (stmt_new_) sqlite3_finalize(stmt_new_);
   if (db_) sqlite3_close(db_);
   UnlockFile(fd_lock_cachedb_);
-  
+
   stmt_list_catalogs_ = NULL;
   stmt_list_pinned_ = NULL;
   stmt_list_ = NULL;
@@ -851,7 +851,7 @@ static void CloseDatabase() {
   stmt_touch_ = NULL;
   stmt_new_ = NULL;
   db_ = NULL;
-  
+
   delete pinned_chunks_;
   pinned_chunks_ = NULL;
 }
@@ -860,13 +860,13 @@ static void CloseDatabase() {
 /**
  * Connects to a running peer server.  Creates a peer server, if necessary.
  */
-bool InitShared(const std::string &exe_path, const std::string &cache_dir, 
+bool InitShared(const std::string &exe_path, const std::string &cache_dir,
                 const uint64_t limit, const uint64_t cleanup_threshold)
 {
   shared_ = true;
   spawned_ = true;
   cache_dir_ = new string(cache_dir);
-  
+
   // Create lock file
   const int fd_lockfile = LockFile(*cache_dir_ + "/lock_cachemgr");
   if (fd_lockfile < 0) {
@@ -874,7 +874,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
              (*cache_dir_ + "/lock_cachemgr").c_str(), errno);
     return false;
   }
-  
+
   // Try to connect to pipe
   const string fifo_path = *cache_dir_ + "/cachemgr";
   LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
@@ -892,7 +892,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     LogCvmfs(kLogQuota, kLogDebug, "left-over FIFO found, unlinking");
     unlink(fifo_path.c_str());
   }
-  
+
   // Creating a new FIFO for the cache manager (to be bound later)
   int retval = mkfifo(fifo_path.c_str(), 0600);
   if (retval != 0) {
@@ -901,15 +901,15 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     UnlockFile(fd_lockfile);
     return false;
   }
-  
+
   // Create new cache manager
   int pipe_boot[2];
   int pipe_handshake[2];
   MakePipe(pipe_boot);
   MakePipe(pipe_handshake);
-  
+
   vector<string> command_line;
-  command_line.push_back(exe_path);  
+  command_line.push_back(exe_path);
   command_line.push_back("__cachemgr__");
   command_line.push_back(*cache_dir_);
   command_line.push_back(StringifyInt(pipe_boot[1]));
@@ -918,15 +918,15 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   command_line.push_back(StringifyInt(cleanup_threshold));
   command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(GetLogDebugFile());
-  
+
   vector<int> preserve_filedes;
   preserve_filedes.push_back(0);
   preserve_filedes.push_back(1);
   preserve_filedes.push_back(2);
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(pipe_handshake[0]);
-   
-  retval = ManagedExec(command_line, preserve_filedes);
+
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>());
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -934,7 +934,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
     return false;
   }
-   
+
   // Wait for cache manager to be ready
   close(pipe_boot[1]);
   close(pipe_handshake[0]);
@@ -947,17 +947,17 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     return false;
   }
   close(pipe_boot[0]);
-  
+
   // Connect write end
   pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (pipe_lru_[1] < 0) {
-    LogCvmfs(kLogQuota, kLogDebug, 
+    LogCvmfs(kLogQuota, kLogDebug,
              "failed to connect to newly created FIFO (%d)", errno);
     close(pipe_handshake[1]);
     UnlockFile(fd_lockfile);
     return false;
   }
-  
+
   // Finalize handshake
   buf = 'C';
   if (write(pipe_handshake[1], &buf, 1) != 1) {
@@ -967,35 +967,35 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     return false;
   }
   close(pipe_handshake[1]);
-  
+
   Nonblock2Block(pipe_lru_[1]);
   LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
-  
+
   UnlockFile(fd_lockfile);
-  
+
   GetLimits(&limit_, &cleanup_threshold_);
   LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
            limit_, cleanup_threshold_);
   return true;
 }
-  
-  
+
+
 /**
  * Entry point for the shared cache manager process
  */
 int MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
   int retval;
-  
+
   retval = monitor::Init(".", false);
   assert(retval);
   monitor::Spawn();
-  
+
   shared_ = true;
   spawned_ = true;
   pinned_ = 0;
   pinned_chunks_ = new map<hash::Any, uint64_t>();
-  
+
   // Process command line arguments
   cache_dir_ = new string(argv[2]);
   int pipe_boot = String2Int64(argv[3]);
@@ -1006,13 +1006,13 @@ int MainCacheManager(int argc, char **argv) {
   const string logfile = argv[8];
   if (logfile != "")
     SetLogDebugFile(logfile + ".cachemgr");
-  
+
   if (!foreground)
     Daemonize();
-  
+
   if (!InitDatabase(false))  // TODO: rebuild?
     return 1;
-  
+
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
@@ -1022,25 +1022,25 @@ int MainCacheManager(int argc, char **argv) {
   }
   Nonblock2Block(pipe_lru_[0]);
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager listening");
-  
+
   char buf = 'C';
   WritePipe(pipe_boot, &buf, 1);
   close(pipe_boot);
-  
+
   ReadPipe(pipe_handshake, &buf, 1);
   close(pipe_handshake);
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
-  
+
   MainCommandServer(NULL);
   unlink(fifo_path.c_str());
   CloseDatabase();
-  
+
   monitor::Fini();
-  
+
   return 0;
 }
-  
-  
+
+
 /**
  * Sets up parameters and SQL statements.
  * We don't check here whether cache is already too big.
@@ -1082,7 +1082,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
 /**
  * Spawns the LRU thread
  */
-void Spawn() { 
+void Spawn() {
   if (spawned_ || (limit_ == 0))
     return;
 
@@ -1101,7 +1101,7 @@ void Spawn() {
 void Fini() {
   delete cache_dir_;
   cache_dir_ = NULL;
-  
+
   if (shared_) {
     // Most of cleanup is done elsewhen by shared cache manager
     close(pipe_lru_[1]);
@@ -1388,12 +1388,12 @@ uint64_t GetSizePinned() {
   GetStatus(&gauge, &size_pinned);
   return size_pinned;
 }
-  
+
 
 static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold) {
   int pipe_limits[2];
   MakeReturnPipe(pipe_limits);
-  
+
   LruCommand cmd;
   cmd.command_type = kLimits;
   cmd.return_pipe = pipe_limits[1];

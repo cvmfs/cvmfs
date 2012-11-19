@@ -52,12 +52,12 @@ void WritableCatalog::InitPreparedStatements() {
 
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
-  sql_insert_ = new SqlDirentInsert(database());
-  sql_touch_ = new SqlDirentTouch(database());
-  sql_unlink_ = new SqlDirentUnlink(database());
-  sql_update_ = new SqlDirentUpdate(database());
-  sql_max_link_id_ = new SqlMaxHardlinkGroup(database());
-  sql_inc_linkcount_ = new SqlIncLinkcount(database());
+  sql_insert_        = new SqlDirentInsert     (database());
+  sql_unlink_        = new SqlDirentUnlink     (database());
+  sql_touch_         = new SqlDirentTouch      (database());
+  sql_update_        = new SqlDirentUpdate     (database());
+  sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
+  sql_inc_linkcount_ = new SqlIncLinkcount     (database());
 }
 
 
@@ -65,8 +65,8 @@ void WritableCatalog::FinalizePreparedStatements() {
   // no polymorphism: no up call (see Catalog.h -
   // near the definition of this method)
   delete sql_insert_;
-  delete sql_touch_;
   delete sql_unlink_;
+  delete sql_touch_;
   delete sql_update_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
@@ -119,28 +119,6 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
 
 
 /**
- * Set the mtime of a DirectoryEntry in the catalog to the current time
- * (utime or what the 'touch' command does)
- * @param entry the entry structure which will be touched
- * @param entry_path the full path of the entry to touch
- * @return true on successful touching, false otherwise
- */
-void WritableCatalog::TouchEntry(const DirectoryEntry &entry,
-                                 const std::string &entry_path) {
-  SetDirty();
-
-  // perform a touch operation for the given path
-  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(entry_path));
-  bool retval =
-    sql_touch_->BindPathHash(path_hash) &&
-    sql_touch_->BindTimestamp(entry.mtime()) &&
-    sql_touch_->Execute();
-  assert(retval);
-  sql_touch_->Reset();
-}
-
-
-/**
  * Removes the specified entry from the catalog.
  * Note: removing a directory which is non-empty results in dangling entries.
  *       (this should be treated in upper layers)
@@ -175,10 +153,23 @@ void WritableCatalog::IncLinkcount(const string &path_within_group,
 
   bool retval =
     sql_inc_linkcount_->BindPathHash(path_hash) &&
-    sql_inc_linkcount_->BindDelta(delta) &&
+    sql_inc_linkcount_->BindDelta(delta)        &&
     sql_inc_linkcount_->Execute();
   assert(retval);
   sql_inc_linkcount_->Reset();
+}
+
+
+void WritableCatalog::TouchEntry(const DirectoryEntryBase &entry,
+                                 const hash::Md5 &path_hash) {
+  SetDirty();
+
+  bool retval =
+    sql_touch_->BindPathHash(path_hash) &&
+    sql_touch_->BindDirentBase(entry)   &&
+    sql_touch_->Execute();
+  assert(retval);
+  sql_touch_->Reset();
 }
 
 
@@ -188,7 +179,7 @@ void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
 
   bool retval =
     sql_update_->BindPathHash(path_hash) &&
-    sql_update_->BindDirent(entry) &&
+    sql_update_->BindDirent(entry)       &&
     sql_update_->Execute();
   assert(retval);
   sql_update_->Reset();

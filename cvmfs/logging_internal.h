@@ -10,6 +10,10 @@
 #include <cstdarg>
 #include <string>
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 enum LogFacilities {
   kLogDebug = 1,
   kLogStdout = 2,
@@ -54,6 +58,7 @@ enum LogSource {
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 
 void SetLogSyslogLevel(const int level);
+void SetLogSyslogFacility(const int facility);
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogVerbosity(const LogLevels min_level);
 
@@ -67,5 +72,9 @@ std::string GetLogDebugFile();
 
 void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
                               const char *msg));
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_LOGGING_INTERNAL_H_

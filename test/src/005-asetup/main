@@ -1,0 +1,27 @@
+
+cvmfs_test_name="Setup ATLAS"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount atlas.cern.ch,atlas-nightlies.cern.ch,atlas-condb.cern.ch || return 1
+  
+  export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
+  export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase
+  echo "asetup cold cache" >> $logfile
+  . ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh >> $logfile 2>&1 || return 2
+  ${AtlasSetup}/python/asetup.py --debugprint 17.0.0 >> $logfile 2>&1 || return 3
+
+  echo "asetup warm cache" >> $logfile
+  start_time=`date -u +%s`
+  ${AtlasSetup}/python/asetup.py --debugprint 17.0.0 >> $logfile 2>&1 || return 4
+  end_time=`date -u +%s`
+  rm -f '<undefined>'
+  echo "$(($end_time-$start_time)) seconds required" >> $logfile
+
+  check_time $start_time $end_time 30 || return 5
+  check_memory atlas.cern.ch 25000 || return 6
+ 
+  return 0
+}
+

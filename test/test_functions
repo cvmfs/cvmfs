@@ -1,0 +1,107 @@
+
+CVMFS_TEST_DEBUGLOG=
+CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
+CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
+CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
+
+cvmfs_clean() {
+  sudo cvmfs_config umount > /dev/null || return 100
+  sudo rm -rf /var/lib/cvmfs/*
+  sudo rm -f /etc/cvmfs/default.local
+  sudo rm -f /etc/cvmfs/config.d/*
+  
+  timeout=5
+  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
+    if [ $timeout -eq 0 ]; then
+      return 101
+    fi
+    timeout=$(($timeout-1))
+    sleep 1
+  done
+
+  return 0
+}
+
+
+cvmfs_mount() {
+  repositories=$1
+
+  sudo sh -c "echo \"CVMFS_REPOSITORIES=$repositories\" > /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo \"CVMFS_HTTP_PROXY=${CVMFS_TEST_PROXY}\" >> /etc/cvmfs/default.local" || return 100
+  sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
+  sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
+  sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
+  if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
+    sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
+  fi
+  cvmfs_config probe > /dev/null 2>&1 || return 101
+  
+  return 0
+}
+
+
+cvmfs_umount() {
+  repositories=$1
+
+  for r in $(echo $repositories | tr , " "); do
+    sudo umount /cvmfs/$r || return 100
+
+    timeout=5
+    while cat /proc/mounts | grep -q /cvmfs/$r; do
+      if [ $timeout -eq 0 ]; then
+        return 101
+      fi
+      timeout=$(($timeout-1))
+      sleep 1
+    done
+  done
+
+  return 0
+}
+
+
+
+get_cvmfs_cachedir() {
+  repository=$1
+
+  local cache_dir
+  cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  if [ "x$cache_dir" = "x" ]; then
+    echo "Failed to figure out cache directory"
+    exit 1
+  fi
+  echo $cache_dir
+}
+
+
+check_time() {
+  start_time=$1
+  end_time=$2
+  limit=$3
+
+  diff_time=$(($end_time-$start_time))
+
+  if [ $diff_time -gt $limit ]; then
+    echo "Time limit exceeded" >&2
+    return 100
+  fi
+  
+  return 0
+}
+
+
+check_memory() {
+  instance=$1
+  limit=$2
+
+  pid=$(attr -qg pid /cvmfs/$instance) || return 100
+  rss=$(sudo cat /proc/$pid/status | grep VmRSS | awk '{print $2}') || return 101
+
+  if [ $rss -gt $limit ]; then
+    echo "Memory limit exceeded" >&2
+    return 102
+  fi
+
+  return 0
+}
+

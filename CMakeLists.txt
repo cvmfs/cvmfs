@@ -13,11 +13,11 @@ project (${PROJECT_NAME})
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.1.2
+## CVMFS_VERSION 2.1.4
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 1)
-set (CernVM-FS_VERSION_PATCH 2)
+set (CernVM-FS_VERSION_PATCH 4)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #
@@ -44,13 +44,13 @@ else ()
 	option (BUILD_LIBCVMFS "Build the CernVM-FS client library" ON)
 endif()
 option (BUILD_SERVER "Build writer's end programs" ON)
+option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
-set (INSTALL_TEST_SYSTEM "OFF" CACHE STRING "Install CernVM-FS test tools in the specified path")
 
 #
 # define where to find the external dependencies
@@ -157,16 +157,6 @@ install (
 		DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
 		PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
         )
-
-# Test system
-if (INSTALL_TEST_SYSTEM)
-  install (
-    CODE "execute_process (
-      COMMAND ${CMAKE_SOURCE_DIR}/test/Install.pl --prefix=${INSTALL_TEST_SYSTEM}
-      WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}/test
-    )"
-  )
-endif (INSTALL_TEST_SYSTEM)
 
 #
 # configure the packaging stuff

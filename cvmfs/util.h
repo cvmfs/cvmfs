@@ -7,6 +7,8 @@
 
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <time.h>
 #include <fcntl.h>
 
@@ -19,6 +21,10 @@
 #include "platform.h"
 #include "hash.h"
 #include "shortstring.h"
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
 
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
@@ -38,6 +44,10 @@ void ReadPipe(int fd, void *buf, size_t nbyte);
 void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void ClosePipe(int pipe_fd[2]);
 void Nonblock2Block(int filedes);
+void SendMsg2Socket(const int fd, const std::string &msg);
+
+bool SwitchCredentials(const uid_t uid, const gid_t gid,
+                       const bool temporarily);
 
 bool FileExists(const std::string &path);
 int64_t GetFileSize(const std::string &path);
@@ -67,10 +77,24 @@ std::string JoinStrings(const std::vector<std::string> &strings,
 
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
-std::string GetLine(const char *text, const int text_size);
+std::string GetLineMem(const char *text, const int text_size);
+bool GetLineFile(FILE *f, std::string *line);
+bool GetLineFd(const int fd, std::string *line);
+std::string Trim(const std::string &raw);
+std::string ToUpper(const std::string &mixed_case);
+std::string ReplaceAll(const std::string &haystack, const std::string &needle,
+                       const std::string &replace_by);
 
+void BlockSignal(int signum);
+void WaitForSignal(int signum);
 void Daemonize();
+bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ManagedExec(const std::vector<std::string> &command_line,
-                 const std::vector<int> &preserve_fildes);
+                 const std::vector<int> &preserve_fildes,
+                 const std::map<int, int> &map_fildes);
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_UTIL_H_

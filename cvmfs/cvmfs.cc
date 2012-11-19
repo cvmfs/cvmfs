@@ -82,6 +82,8 @@
 #include "shortstring.h"
 #include "smalloc.h"
 #include "globals.h"
+#include "options.h"
+#include "loader.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -93,6 +95,10 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
+const char *kDefaultCachedir = "/var/lib/cvmfs/default";
+const unsigned kDefaultTimeout = 2;
+const double kDefaultKCacheTimeout = 60.0;
+const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
@@ -121,6 +127,7 @@ struct DirectoryListing {
   DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
 };
 
+const loader::LoaderExports *loader_exports_ = NULL;
 bool foreground_ = false;
 bool nfs_maps_ = false;
 string *mountpoint_ = NULL;
@@ -130,14 +137,19 @@ string *repository_name_ = NULL;  /**< Expected repository name,
                                        e.g. atlas.cern.ch */
 pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
-uint64_t mem_cache_size_;
 unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 cache::CatalogManager *catalog_manager_;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
-double kcache_timeout_ = 60.0;  /**< TTL (s) of meta data in the kernel cache */
+double kcache_timeout_ = kDefaultKCacheTimeout;
+bool fixed_catalog_ = false;
+
+/**
+ * in maintenance mode, cache timeout is 0 and catalogs are not reloaded
+ */
+atomic_int32 maintenance_mode_;
 atomic_int32 catalogs_expired_;
 atomic_int32 drainout_mode_;
 atomic_int32 reload_critical_section_;
@@ -199,7 +211,8 @@ static unsigned GetEffectiveTTL() {
 
 
 static inline double GetKcacheTimeout() {
-  if (atomic_read32(&drainout_mode_)) return 0.0;
+  if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_))
+    return 0.0;
   return kcache_timeout_;
 }
 
@@ -320,6 +333,8 @@ static void RemountFinish() {
  * to be finished or starts a new remount if the TTL timer has been fired.
  */
 static void RemountCheck() {
+  if (atomic_read32(&maintenance_mode_) == 1)
+    return;
   RemountFinish();
 
   if (atomic_cas32(&catalogs_expired_, 1, 0)) {
@@ -597,7 +612,8 @@ static void AddToDirListing(const fuse_req_t req,
  * Open a directory for listing.
  */
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
-                          struct fuse_file_info *fi) {
+                          struct fuse_file_info *fi)
+{
   RemountCheck();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
@@ -682,7 +698,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
  * Release a directory.
  */
 static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
-                             struct fuse_file_info *fi) {
+                             struct fuse_file_info *fi)
+{
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode: %d",
            catalog_manager_->MangleInode(ino));
 
@@ -1167,22 +1184,6 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init");
 
-  pid_ = getpid();
-  monitor::Spawn();
-  download::Spawn();
-  quota::Spawn();
-  talk::Spawn();
-  if (nfs_maps_)
-    nfs_maps::Spawn();
-
-  if (*tracefile_ != "")
-    tracer::Init(8192, 7000, *tracefile_);
-  else
-    tracer::InitNull();
-
-  atomic_init32(&drainout_mode_);
-  atomic_init32(&reload_critical_section_);
-
   // NFS support
 #ifdef CVMFS_NFS_SUPPORT
   conn->want |= FUSE_CAP_EXPORT_SUPPORT;
@@ -1191,13 +1192,12 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
-  tracer::Fini();
 }
 
 /**
  * Puts the callback functions in one single structure
  */
-static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
+static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   memset(cvmfs_operations, 0, sizeof(*cvmfs_operations));
 
   // Init/Fini
@@ -1221,435 +1221,180 @@ static void set_cvmfs_ops(struct fuse_lowlevel_ops *cvmfs_operations) {
 }  // namespace cvmfs
 
 
-/**
- * One single structure to contain the file system options.
- * Strings(char *) must be deallocated by the user
- */
-struct CvmfsOptions {
-  unsigned timeout;
-  unsigned timeout_direct;
-  unsigned max_ttl;
-  char     *hostname;
-  char     *cachedir;
-  char     *proxies;
-  char     *tracefile;
-  char     *pubkey;
-  char     *logfile;
-  char     *blacklist;
-  char     *repo_name;
-  char     *interface;
-  char     *root_hash;
-  int      memcache;
-  int      ignore_signature;
-  int      rebuild_cachedb;
-  int      nofiles;
-  int      grab_mountpoint;
-  int      syslog_level;
-  int      kernel_cache;
-  int      auto_cache;
-  int      entry_timeout;
-  int      attr_timeout;
-  int      negative_timeout;
-  int      use_ino;
-  int      kcache_timeout;
-  int      diskless;
-  int      no_reload;
-  int      shared_cache;
-#ifdef CVMFS_NFS_SUPPORT
-  int      nfs_source;
-#endif
+bool g_options_ready = false;
+bool g_download_ready = false;
+bool g_cache_ready = false;
+bool g_nfs_maps_ready = false;
+bool g_peers_ready = false;
+bool g_monitor_ready = false;
+bool g_signature_ready = false;
+bool g_quota_ready = false;
+bool g_talk_ready = false;
+bool g_running_created = false;
 
-  int64_t  quota_limit;
-  int64_t  quota_threshold;
-};
+int g_fd_lockfile = -1;
+void *g_sqlite_scratch = NULL;
+void *g_sqlite_page_cache = NULL;
+string *g_boot_error = NULL;
 
-// Follow the fuse convention for option parsing
-enum {
-  KEY_HELP,
-  KEY_VERSION,
-  KEY_FOREGROUND,
-  KEY_SINGLETHREAD,
-  KEY_DEBUG,
-};
-#define CVMFS_OPT(t, p, v) { t, offsetof(struct CvmfsOptions, p), v }
-#define CVMFS_SWITCH(t, p) { t, offsetof(struct CvmfsOptions, p), 1 }
-static struct fuse_opt cvmfs_array_opts[] = {
-  CVMFS_OPT("timeout=%u",          timeout, 2),
-  CVMFS_OPT("timeout_direct=%u",   timeout_direct, 2),
-  CVMFS_OPT("max_ttl=%u",          max_ttl, 0),
-  CVMFS_OPT("memcache=%u",         memcache, 0),
-  CVMFS_OPT("cachedir=%s",         cachedir, 0),
-  CVMFS_OPT("proxies=%s",          proxies, 0),
-  CVMFS_OPT("tracefile=%s",        tracefile, 0),
-  CVMFS_SWITCH("ignore_signature", ignore_signature),
-  CVMFS_OPT("pubkey=%s",           pubkey, 0),
-  CVMFS_OPT("logfile=%s",          logfile, 0),
-  CVMFS_SWITCH("rebuild_cachedb",  rebuild_cachedb),
-  CVMFS_OPT("quota_limit=%ld",     quota_limit, 0),
-  CVMFS_OPT("quota_threshold=%ld", quota_threshold, 0),
-  CVMFS_OPT("nofiles=%d",          nofiles, 0),
-  CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
-  CVMFS_OPT("repo_name=%s",        repo_name, 0),
-  CVMFS_OPT("blacklist=%s",        blacklist, 0),
-  CVMFS_OPT("syslog_level=%d",     syslog_level, 3),
-  CVMFS_OPT("kcache_timeout=%d",   kcache_timeout, 60),
-  CVMFS_SWITCH("diskless",         diskless),
-  CVMFS_OPT("interface=%s",        interface, 0),
-  CVMFS_OPT("root_hash=%s",        root_hash, 0),
-  CVMFS_SWITCH("no_reload",        no_reload),
-  CVMFS_SWITCH("shared_cache",     shared_cache),
-#ifdef CVMFS_NFS_SUPPORT
-  CVMFS_SWITCH("nfs_source",       nfs_source),
-#endif
-
-  FUSE_OPT_KEY("-V",            KEY_VERSION),
-  FUSE_OPT_KEY("--version",     KEY_VERSION),
-  FUSE_OPT_KEY("-h",            KEY_HELP),
-  FUSE_OPT_KEY("--help",        KEY_HELP),
-  FUSE_OPT_KEY("-f",            KEY_FOREGROUND),
-  FUSE_OPT_KEY("-d",            KEY_DEBUG),
-  FUSE_OPT_KEY("debug",         KEY_DEBUG),
-  FUSE_OPT_KEY("-s",            KEY_SINGLETHREAD),
-  {0, 0, 0},
-};
+loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 
-CvmfsOptions g_cvmfs_opts;
-struct fuse_args g_fuse_args;
-bool g_foreground = false;
-bool g_single_threaded = false;
-
-/**
- * Display the usage message.
- * It will be done when we requested (the flag "-h" for example),
- * but also when an unidentified option is found.
- */
-static void usage(const char *progname) {
-  LogCvmfs(kLogCvmfs, kLogStdout,
-           "Copyright (c) 2009- CERN\n"
-           "All rights reserved\n\n"
-           "Please visit http://cernvm.cern.ch details.\n\n");
-
-  if (progname) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "usage: %s <mountpath> <url>[,<url>]* [options]\n\n", progname);
-  }
-
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "where options are:\n"
-    " -o opt,[opt...]  mount options\n\n"
-    "CernVM-FS options: \n"
-    " -o timeout=SECONDS         "
-      "Timeout for network operations (default is %d)\n"
-    " -o timeout_direct=SECONDS  "
-      "Timeout for network operations without proxy (default is %d)\n"
-    " -o max_ttl=MINUTES         "
-      "Maximum TTL for file catalogs (default: take from catalog)\n"
-    " -o kcache_timeout=SECONDS  "
-      "Timeout of the kernel meta-data cache (default %d, turn off with -1)\n"
-    " -o memcache=<MB>           "
-      "Memory in MB reserved for the meta-data memory cache (default: %u)\n"
-    " -o cachedir=DIR            Where to store disk cache\n"
-    " -o proxies=HTTP_PROXIES    "
-      "Set the HTTP proxy list, such as 'proxy1|proxy2;DIRECT'\n"
-    " -o tracefile=FILE          Trace FUSE opaerations into FILE\n"
-    " -o pubkey=PEMFILE          "
-      "Public RSA key that is used to verify the whitelist signature.\n"
-    " -o ignore_signature        "
-      "Except unsigned catalogs\n"
-    " -o rebuild_cachedb         "
-      "Force rebuilding the quota cache db from cache directory\n"
-    " -o quota_limit=MB          "
-      "Limit size of data chunks in cache. -1 Means unlimited.\n"
-    " -o quota_threshold=MB      Cleanup until size is <= threshold\n"
-    " -o nofiles=NUMBER          "
-      "Set the maximum number of open files for CernVM-FS process "
-      "(soft limit)\n"
-    " -o grab_mountpoint         "
-      "Give ownership of the mountpoint to the user before mounting "
-      "(automount hack)\n"
-    " -o logfile=FILE            "
-      "Logs all messages to FILE instead of stderr and daemonizes.\n"
-      "                            Makes only sense for the debug version\n"
-    " -o repo_name=<repository>  "
-      "Unique name of the mounted repository, e.g. atlas.cern.ch\n"
-    " -o blacklist=FILE          "
-      "Local blacklist for invalid certificates.  "
-      "Has precedence over the whitelist.\n"
-      "                            (Default is /etc/cvmfs/blacklist)\n"
-    " -o syslog_level=NUMBER     "
-      "Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
-    "                            Default is NOTICE.\n"
-    " -o no_reload               "
-      "Avoids to reload catalogs when the TTL expires.\n"
-    " -o shared_cache            "
-      "Cache directory is shared among multiple instances\n"
-#ifdef CVMFS_NFS_SUPPORT
-    " -o nfs_source              "
-      "The CernVM-FS mountpoint is exported by NFS\n"
-#endif
-    " Note: you cannot load files greater than quota_limit-quota_threshold\n"
-    "\nFuse options:\n"
-    " -o allow_other             "
-      "allow access to other users\n"
-    " -o allow_root              "
-      "allow access to root\n"
-    " -o nonempty                "
-      "allow mounts over non-empty file/dir\n"
-    " -o default_permissions     "
-      "enable permission checking by kernel\n",
-    2, 2, int(cvmfs::kcache_timeout_), cvmfs::kDefaultMemcache/(1024*1024));
-}
-
-
-/**
- * Since certain fileds in cvmfs_opts are filled automatically when parsing it,
- * we need a procedure to free the space.
- */
-static void FreeCvmfsOptions(CvmfsOptions *opts) {
-  if (opts->hostname)       free(opts->hostname);
-  if (opts->cachedir)       free(opts->cachedir);
-  if (opts->proxies)        free(opts->proxies);
-  if (opts->tracefile)      free(opts->tracefile);
-  if (opts->pubkey)         free(opts->pubkey);
-  if (opts->logfile)        free(opts->logfile);
-  if (opts->blacklist)      free(opts->blacklist);
-  if (opts->repo_name)      free(opts->repo_name);
-  if (opts->interface)      free(opts->interface);
-  if (opts->root_hash)      free(opts->root_hash);
-  delete cvmfs::cachedir_;
-  delete cvmfs::tracefile_;
-  delete cvmfs::repository_name_;
-  delete cvmfs::mountpoint_;
-  cvmfs::cachedir_ = NULL;
-  cvmfs::tracefile_ = NULL;
-  cvmfs::repository_name_ = NULL;
-  cvmfs::mountpoint_ = NULL;
-}
-
-
-/**
- * Checks whether the given option is one of our own options
- * (if it's not, it probably belongs to fuse).
- */
-static int IsCvmfsOption(const char *arg) {
-  if (arg[0] != '-') {
-    unsigned arglen = strlen(arg);
-    const char **o;
-    for (o = (const char**)cvmfs_array_opts; *o; o++) {
-      unsigned olen = strlen(*o);
-      if ((arglen > olen && arg[olen] == '=') &&
-          (strncasecmp(arg, *o, olen) == 0))
-        return 1;
-    }
-  }
-  return 0;
-}
-
-
-/**
- * The callback used when fuse is parsing all the options
- * We separate CVMFS options from FUSE options here.
- *
- * \return On success zero, else non-zero
- */
-static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
-                            int key, struct fuse_args *outargs) {
-  switch (key) {
-    case FUSE_OPT_KEY_OPT:
-      if (IsCvmfsOption(arg)) {
-        // If this is a "-o" option and is not one of ours, we assume that this
-        // must be used for mounting fuse.
-        // It can't be one of our option if it doesnt match the template.
-        return 0;
-      }
-      if (strstr(arg, "uid=")) {
-        g_uid = atoi(arg+4);
-        return 0;
-      }
-      if (strstr(arg, "gid=")) {
-        g_gid = atoi(arg+4);
-        return 0;
-      }
-      return 1;
-
-    case FUSE_OPT_KEY_NONOPT:
-      if (!g_cvmfs_opts.hostname &&
-          ((strstr(arg, "http://") == arg) ||
-           (strstr(arg, "file://") == arg))) {
-        // If we receive a parameter that contains "http://"
-        // we know for sure that it's our remote server
-        g_cvmfs_opts.hostname = strdup(arg);
-      } else {
-        // If we receive any other string, we take it as the mount point.
-        cvmfs::mountpoint_ = new string(arg);
-      }
-      return 0;
-
-    case KEY_HELP:
-      usage(outargs->argv[0]);
-      fuse_opt_add_arg(outargs, "-ho");
-      exit(0);
-
-    case KEY_VERSION:
-      LogCvmfs(kLogCvmfs, kLogStderr, "CernVM-FS version %s\n",
-               PACKAGE_VERSION);
-#if FUSE_VERSION >= 25
-      fuse_opt_add_arg(outargs, "--version");
-#endif
-      exit(0);
-
-    case KEY_FOREGROUND:
-      g_foreground = true;
-      cvmfs::foreground_ = true;
-      return 0;
-    case KEY_SINGLETHREAD:
-      g_single_threaded = true;
-      return 0;
-    case KEY_DEBUG:
-      fuse_opt_add_arg(outargs, "-d");
-      return 0;
-    default:
-      LogCvmfs(kLogCvmfs, kLogStderr, "internal option parsing error");
-      abort();
-  }
-}
-
-
-// Making OpenSSL (libcrypto) thread-safe
-pthread_mutex_t *gLibcryptoLocks;
-
-static void CallbackLibcryptoLock(int mode, int type,
-                                  const char *file, int line) {
-  (void)file;
-  (void)line;
-
+static int Init(const loader::LoaderExports *loader_exports) {
   int retval;
+  g_boot_error = new string("unknown error");
+  cvmfs::loader_exports_ = loader_exports;
 
-  if (mode & CRYPTO_LOCK) {
-    retval = pthread_mutex_lock(&(gLibcryptoLocks[type]));
+  uint64_t mem_cache_size = cvmfs::kDefaultMemcache;
+  unsigned timeout = cvmfs::kDefaultTimeout;
+  unsigned timeout_direct = cvmfs::kDefaultTimeout;
+  string tracefile = "";
+  string cachedir = string(cvmfs::kDefaultCachedir);
+  unsigned max_ttl = 0;
+  int kcache_timeout = 0;
+  bool diskless = false;
+  bool rebuild_cachedb = false;
+  bool nfs_source = false;
+  bool shared_cache = false;
+  int64_t quota_limit;
+  string hostname = "localhost";
+  string proxies = "";
+  string public_keys = "";
+  bool ignore_signature = false;
+  string root_hash = "";
+
+  cvmfs::boot_time_ = loader_exports->boot_time;
+
+  // Option parsing
+  options::Init();
+  if (loader_exports->config_files != "") {
+    vector<string> tokens = SplitString(loader_exports->config_files, ':');
+    for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
+      options::ParsePath(tokens[i]);
+    }
   } else {
-    retval = pthread_mutex_unlock(&(gLibcryptoLocks[type]));
+    options::ParseDefault(loader_exports->repository_name);
   }
-  assert(retval == 0);
-}
+  g_options_ready = true;
+  string parameter;
 
-static unsigned long CallbackLibcryptoThreadId() {
-  return platform_gettid();
-}
-
-static void SetupLibcryptoMt() {
-  gLibcryptoLocks = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
-                      CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
-  for (int i = 0; i < CRYPTO_num_locks(); ++i) {
-    int retval = pthread_mutex_init(&(gLibcryptoLocks[i]), NULL);
-    assert(retval == 0);
-  }
-
-  CRYPTO_set_id_callback(CallbackLibcryptoThreadId);
-  CRYPTO_set_locking_callback(CallbackLibcryptoLock);
-}
-
-static void CleanupLibcryptoMt(void) {
-  CRYPTO_set_locking_callback(NULL);
-  for (int i = 0; i < CRYPTO_num_locks(); ++i)
-    pthread_mutex_destroy(&(gLibcryptoLocks[i]));
-
-  OPENSSL_free(gLibcryptoLocks);
-}
-
-
-/**
- * Off we go
- */
-int main(int argc, char *argv[]) {
-  // Set a decent umask for new files (no write access to group/everyone).
-  // We want to allow group write access for the talk-socket.
-  umask(007);
-
-  // Jump into alternative process flavors
-  if (argc > 1) {
-    if (strcmp(argv[1], "__peersrv__") == 0) {
-      return peers::MainPeerServer(argc, argv);
-    }
-    if (strcmp(argv[1], "__cachemgr__") == 0) {
-      return quota::MainCacheManager(argc, argv);
-    }
-  }
-
-  int retval;
-  int result = -1;
-  struct fuse_chan *ch;
-  int fd_lockfile = -1;
-  void *sqlite_scratch = NULL;
-  void *sqlite_page_cache = NULL;
-  bool options_ready = false;
-  bool download_ready = false;
-  bool cache_ready = false;
-  bool nfs_maps_ready = false;
-  bool peers_ready = false;
-  bool monitor_ready = false;
-  bool signature_ready = false;
-  bool quota_ready = false;
-  bool talk_ready = false;
-  bool running_created = false;
-
-  cvmfs::boot_time_ = time(NULL);
-  SetupLibcryptoMt();
-
-  // Parse options
-  g_fuse_args.argc = argc;
-  g_fuse_args.argv = argv;
-  g_fuse_args.allocated = 0;
-  if ((fuse_opt_parse(&g_fuse_args, &g_cvmfs_opts, cvmfs_array_opts,
-                      ParseFuseOptions) != 0) ||
-      !g_cvmfs_opts.hostname) {
-    usage(argv[0]);
-    goto cvmfs_cleanup;
-    return 1;
-  }
-
-  // Default options
-  if (g_cvmfs_opts.memcache == 0)
-    g_cvmfs_opts.memcache = cvmfs::kDefaultMemcache;
+  // Logging
+  if (options::GetValue("CVMFS_SYSLOG_LEVEL", &parameter))
+    SetLogSyslogLevel(String2Uint64(parameter));
   else
-    g_cvmfs_opts.memcache *= 1024*1024;
-  if (g_cvmfs_opts.timeout == 0) g_cvmfs_opts.timeout = 2;
-  if (g_cvmfs_opts.timeout_direct == 0) g_cvmfs_opts.timeout_direct = 2;
-  if (g_cvmfs_opts.syslog_level == 0) g_cvmfs_opts.syslog_level = 3;
-  if (!g_cvmfs_opts.tracefile) g_cvmfs_opts.tracefile = strdup("");
-  if (!g_cvmfs_opts.repo_name) g_cvmfs_opts.repo_name = strdup("");
-  if (!g_cvmfs_opts.interface) g_cvmfs_opts.interface = strdup("");
-  if (!g_cvmfs_opts.cachedir)
-    g_cvmfs_opts.cachedir = strdup("/var/lib/cvmfs/default");
+    SetLogSyslogLevel(3);
+  if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
+    SetLogSyslogFacility(String2Int64(parameter));
+  if (options::GetValue("CVMFS_DEBUGLOG", &parameter))
+    SetLogDebugFile(parameter);
+  SetLogSyslogPrefix(loader_exports->repository_name);
 
-  // Fill cvmfs option variables from Fuse options
-  cvmfs::mem_cache_size_ = g_cvmfs_opts.memcache;
-  cvmfs::cachedir_ = new string(g_cvmfs_opts.cachedir);
-  cvmfs::tracefile_ = new string(g_cvmfs_opts.tracefile);
-  cvmfs::repository_name_ = new string(g_cvmfs_opts.repo_name);
-  if (!g_uid) g_uid = getuid();
-  if (!g_gid) g_gid = getgid();
-  if (g_cvmfs_opts.max_ttl) cvmfs::max_ttl_ = g_cvmfs_opts.max_ttl*60;
-  if (g_cvmfs_opts.kcache_timeout) {
-    cvmfs::kcache_timeout_ = (g_cvmfs_opts.kcache_timeout == -1) ?
-                             0.0 : double(g_cvmfs_opts.kcache_timeout);
+  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", options::Dump().c_str());
+
+  // Overwrite default options
+  if (options::GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
+    mem_cache_size = String2Uint64(parameter) * 1024*1024;
+  if (options::GetValue("CVMFS_TIMEOUT", &parameter))
+    timeout = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
+    timeout_direct = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_TRACEFILE", &parameter))
+    tracefile = parameter;
+  if (options::GetValue("CVMFS_MAX_TTL", &parameter))
+    max_ttl = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_KCACHE_TIMEOUT", &parameter))
+    kcache_timeout = String2Int64(parameter);
+  if (options::GetValue("CVMFS_QUOTA_LIMIT", &parameter))
+    quota_limit = String2Int64(parameter) * 1024*1024;
+  if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
+    proxies = parameter;
+  if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter))
+    public_keys = parameter;
+  if (options::GetValue("CVMFS_ROOT_HASH", &parameter))
+    root_hash = parameter;
+  if (options::GetValue("CVMFS_DISKLESS", &parameter) &&
+      options::IsOn(parameter))
+  {
+    diskless = true;
+  }
+  if (options::GetValue("CVMFS_NFS_SOURCE", &parameter) &&
+      options::IsOn(parameter))
+  {
+    nfs_source = true;
+  }
+  if (options::GetValue("CVMFS_IGNORE_SIGNATURE", &parameter) &&
+      options::IsOn(parameter))
+  {
+    ignore_signature = true;
+  }
+  if (options::GetValue("CVMFS_AUTO_UPDATE", &parameter) &&
+      !options::IsOn(parameter))
+  {
+    cvmfs::fixed_catalog_ = true;
+  }
+  if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
+    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
+    const string org = tokens[0];
+    hostname = ReplaceAll(parameter, "@org@", org);
+  }
+  if (options::GetValue("CVMFS_CACHE_BASE", &parameter)) {
+    cachedir = MakeCanonicalPath(parameter);
+    if (options::GetValue("CVMFS_SHARED_CACHE", &parameter) &&
+        options::IsOn(parameter))
+    {
+      shared_cache = true;
+      cachedir = cachedir + "/shared";
+    } else {
+      shared_cache = false;
+      cachedir = cachedir + "/" + loader_exports->repository_name;
+    }
+  }
+
+  // Fill cvmfs option variables from configuration
+  cvmfs::foreground_ = loader_exports->foreground;
+  cvmfs::cachedir_ = new string(cachedir);
+  cvmfs::tracefile_ = new string(tracefile);
+  cvmfs::repository_name_ = new string(loader_exports->repository_name);
+  cvmfs::mountpoint_ = new string(loader_exports->mount_point);
+  g_uid = geteuid();
+  g_gid = getegid();
+  cvmfs::max_ttl_ = max_ttl;
+  if (kcache_timeout) {
+    cvmfs::kcache_timeout_ =
+      (kcache_timeout == -1) ? 0.0 : double(kcache_timeout);
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            int(cvmfs::kcache_timeout_));
-  options_ready = true;
 
   // Tune SQlite3 memory
-  sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
-  sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, sqlite_scratch, 8192, 16);
+  g_sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
+  g_sqlite_page_cache = smalloc(1280*3275);  // 4MB
+  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, g_sqlite_scratch, 8192, 16);
   assert(retval == SQLITE_OK);
-  retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, sqlite_page_cache,
+  retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, g_sqlite_page_cache,
                           1280, 3275);
   assert(retval == SQLITE_OK);
   // 4 KB
   retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
   assert(retval == SQLITE_OK);
+
+  // Meta-data memory caches
+  const double memcache_unit_size =
+    7.0 * lru::Md5PathCache::GetEntrySize() +
+    lru::InodeCache::GetEntrySize() + lru::PathCache::GetEntrySize();
+  const unsigned memcache_num_units =
+    mem_cache_size / static_cast<unsigned>(memcache_unit_size);
+  // Number of cache entries must be a multiple of 64
+  const unsigned mask_64 = ~((1 << 6) - 1);
+  cvmfs::inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64);
+  cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
+  cvmfs::md5path_cache_ =
+    new lru::Md5PathCache((memcache_num_units*7) & mask_64);
+
+  // TODO: in loader
+  cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
+  cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
+  cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
 
   // Runtime counters
   atomic_init64(&cvmfs::num_fs_open_);
@@ -1663,309 +1408,250 @@ int main(int argc, char *argv[]) {
   cvmfs::previous_io_error_.timestamp = 0;
   cvmfs::previous_io_error_.delay = 0;
 
-  // Logging
-  SetLogSyslogLevel(g_cvmfs_opts.syslog_level);
-  SetLogSyslogPrefix(*cvmfs::repository_name_);
-  if (g_cvmfs_opts.logfile)
-    SetLogDebugFile(string(g_cvmfs_opts.logfile));
-
-  // Maximum number of open files
-  if (g_cvmfs_opts.nofiles) {
-    if (g_cvmfs_opts.nofiles < 0) {
-      PrintError("number of open files must be a positive number");
-      goto cvmfs_cleanup;
-    }
-    struct rlimit rpl;
-    memset(&rpl, 0, sizeof(rpl));
-    getrlimit(RLIMIT_NOFILE, &rpl);
-    if (rpl.rlim_max < (unsigned)g_cvmfs_opts.nofiles)
-      rpl.rlim_max = g_cvmfs_opts.nofiles;
-    rpl.rlim_cur = g_cvmfs_opts.nofiles;
-    if (setrlimit(RLIMIT_NOFILE, &rpl) != 0) {
-      PrintError("Failed to set maximum number of open files, "
-                 "insufficient permissions");
-      goto cvmfs_cleanup;
-    }
-  }
-
-  // Grab mountpoint
-  if (g_cvmfs_opts.grab_mountpoint) {
-    if ((chown(cvmfs::mountpoint_->c_str(), g_uid, g_gid) != 0) ||
-        (chmod(cvmfs::mountpoint_->c_str(), 0755) != 0)) {
-      PrintError("Failed to grab mountpoint (" + StringifyInt(errno) + ")");
-      goto cvmfs_cleanup;
-    }
-  }
-
-  // Drop credentials
-  if ((g_uid != 0) || (g_gid != 0)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
-             g_uid, g_gid);
-    if ((setgid(g_gid) != 0) || (setuid(g_uid) != 0)) {
-      PrintError("Failed to drop credentials");
-      goto cvmfs_cleanup;
-    }
-  }
-
   // Create cache directory, if necessary
   if (!MkdirDeep(*cvmfs::cachedir_, 0700)) {
-    PrintError("cannot create cache directory " + *cvmfs::cachedir_);
-    goto cvmfs_cleanup;
+    *g_boot_error = "cannot create cache directory " + *cvmfs::cachedir_;
+    return loader::kFailCacheDir;
   }
 
   // Spawn / connect to peer server
-  if (g_cvmfs_opts.diskless) {
-    if (!peers::Init(GetParentPath(*cvmfs::cachedir_), argv[0],
-                     g_cvmfs_opts.interface))
+  if (diskless) {
+    if (!peers::Init(GetParentPath(*cvmfs::cachedir_),
+                     loader_exports->program_name, ""))
     {
-      PrintError("failed to initialize peer socket");
-      goto cvmfs_cleanup;
+      *g_boot_error = "failed to initialize peer socket";
+      return loader::kFailPeers;
     }
   }
-  peers_ready = true;
+  g_peers_ready = true;
 
   // Try to jump to cache directory.  This tests, if it is accassible.
   // Also, it brings speed later on.
   if (chdir(cvmfs::cachedir_->c_str()) != 0) {
-    PrintError("cache directory " + *cvmfs::cachedir_ + " is unavailable");
-    goto cvmfs_cleanup;
+    *g_boot_error = "cache directory " + *cvmfs::cachedir_ + " is unavailable";
+    return loader::kFailCacheDir;
   }
 
   // Create lock file and running sentinel
-  fd_lockfile = LockFile("lock." + *cvmfs::repository_name_);
-  if (fd_lockfile < 0) {
-    PrintError("could not acquire lock (" + StringifyInt(errno) + ")");
-    goto cvmfs_cleanup;
+  g_fd_lockfile = LockFile("lock." + *cvmfs::repository_name_);
+  if (g_fd_lockfile < 0) {
+    *g_boot_error = "could not acquire lock (" + StringifyInt(errno) + ")";
+    return loader::kFailCacheDir;
   }
+  platform_stat64 info;
+  if (platform_stat(("running." + *cvmfs::repository_name_).c_str(),
+                    &info) == 0)
   {
-    platform_stat64 info;
-    if (platform_stat(("running." + *cvmfs::repository_name_).c_str(),
-                      &info) == 0)
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
-               "crashed previously, rebuilding cache database");
-      g_cvmfs_opts.rebuild_cachedb = 1;
-    }
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
+             "crashed previously, rebuilding cache database");
+    rebuild_cachedb = true;
   }
   retval = open(("running." + *cvmfs::repository_name_).c_str(),
                 O_RDONLY | O_CREAT, 0600);
   if (retval < 0) {
-    PrintError("could not open running sentinel (" + StringifyInt(errno) + ")");
-    goto cvmfs_cleanup;
+    *g_boot_error = "could not open running sentinel (" +
+                    StringifyInt(errno) + ")";
+    return loader::kFailCacheDir;
   }
   close(retval);
-  running_created = true;
+  g_running_created = true;
 
   // Creates a set of cache directories (256 directories named 00..ff)
   if (!cache::Init(".")) {
-    PrintError("Failed to setup cache in " + *cvmfs::cachedir_ +
-               ": " + strerror(errno));
-    goto cvmfs_cleanup;
+    *g_boot_error = "Failed to setup cache in " + *cvmfs::cachedir_ +
+                    ": " + strerror(errno);
+    return loader::kFailCacheDir;
   }
   CreateFile("./.cvmfscache", 0600);
-  cache_ready = true;
+  g_cache_ready = true;
 
   // Start NFS maps module, if necessary
 #ifdef CVMFS_NFS_SUPPORT
-  if (g_cvmfs_opts.nfs_source) {
+  if (nfs_source) {
     if (FileExists("./no_nfs_maps." + (*cvmfs::repository_name_))) {
-      PrintError("Cache was used without NFS maps before. "
-                 "It has to be wiped out.");
-      goto cvmfs_cleanup;
+      *g_boot_error = "Cache was used without NFS maps before. "
+                      "It has to be wiped out.";
+      return loader::kFailNfsMaps;
     }
 
-    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-             "CernVM-FS: loading NFS maps... ");
     cvmfs::nfs_maps_ = true;
     const string leveldb_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
     if (!MkdirDeep(leveldb_cache_dir, 0700)) {
-      PrintError("Failed to initialize NFS maps");
-      goto cvmfs_cleanup;
+      *g_boot_error = "Failed to initialize NFS maps";
+      return loader::kFailNfsMaps;
     }
     if (!nfs_maps::Init(leveldb_cache_dir,
                         catalog::AbstractCatalogManager::GetRootInode(),
-                        g_cvmfs_opts.rebuild_cachedb))
+                        rebuild_cachedb))
     {
-      PrintError("Failed to initialize NFS maps");
-      goto cvmfs_cleanup;
+      *g_boot_error = "Failed to initialize NFS maps";
+      return loader::kFailNfsMaps;
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, "done");
-    nfs_maps_ready = true;
+    g_nfs_maps_ready = true;
   } else {
     CreateFile("./no_nfs_maps." + (*cvmfs::repository_name_), 0600);
   }
 #endif
 
   // Init quota / managed cache
-  if (g_cvmfs_opts.quota_limit < 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size");
-    g_cvmfs_opts.quota_limit = -1;
-    g_cvmfs_opts.quota_threshold = 0;
-  } else {
-    g_cvmfs_opts.quota_limit *= 1024*1024;
-    g_cvmfs_opts.quota_threshold *= 1024*1024;
-  }
-  if (g_cvmfs_opts.shared_cache) {
-    if (!quota::InitShared(argv[0], ".", (uint64_t)g_cvmfs_opts.quota_limit,
-                           (uint64_t)g_cvmfs_opts.quota_threshold))
+  if (quota_limit < 0)
+    quota_limit = 0;
+  int64_t quota_threshold = quota_limit/2;
+  if (shared_cache) {
+    if (!quota::InitShared(loader_exports->program_name, ".",
+                           (uint64_t)quota_limit, (uint64_t)quota_threshold))
     {
-      PrintError("Failed to initialize shared lru cache");
-      goto cvmfs_cleanup;
+      *g_boot_error = "Failed to initialize shared lru cache";
+      return loader::kFailQuota;
     }
   } else {
-    if (!quota::Init(".", (uint64_t)g_cvmfs_opts.quota_limit,
-                     (uint64_t)g_cvmfs_opts.quota_threshold,
-                     g_cvmfs_opts.rebuild_cachedb))
+    if (!quota::Init(".", (uint64_t)quota_limit, (uint64_t)quota_threshold,
+                     rebuild_cachedb))
     {
-      PrintError("Failed to initialize lru cache");
-      goto cvmfs_cleanup;
+      *g_boot_error = "Failed to initialize lru cache";
+      return loader::kFailQuota;
     }
   }
-  quota_ready = true;
+  g_quota_ready = true;
 
   if (quota::GetSize() > quota::GetCapacity()) {
-    PrintWarning("your cache is already beyond quota size, cleaning up");
-    if (!quota::Cleanup(g_cvmfs_opts.quota_threshold)) {
-      PrintWarning("Failed to clean up");
-      goto cvmfs_cleanup;
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "cache is already beyond quota size, cleaning up");
+    if (!quota::Cleanup(quota_threshold)) {
+      *g_boot_error = "Failed to clean up cache";
+      return loader::kFailQuota;
     }
   }
-  if (g_cvmfs_opts.quota_limit) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
+  if (quota_limit) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
              "CernVM-FS: quota initialized, current size %luMB",
              quota::GetSize()/(1024*1024));
   }
 
   // Monitor, check for maximum number of open files
   if (!monitor::Init(".", true)) {
-    PrintError("failed to initialize watchdog.");
-    goto cvmfs_cleanup;
+    *g_boot_error = "failed to initialize watchdog.";
+    return loader::kFailMonitor;
   }
   cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
   atomic_init32(&cvmfs::open_files_);
   atomic_init32(&cvmfs::open_dirs_);
-  monitor_ready = true;
+  g_monitor_ready = true;
 
   // Control & command interface
   if (!talk::Init(".")) {
-    PrintError("failed to initialize talk socket (" + StringifyInt(errno) +
-               ")");
-    goto cvmfs_cleanup;
+    *g_boot_error = "failed to initialize talk socket (" +
+                    StringifyInt(errno) + ")";
+    return loader::kFailTalk;
   }
-  talk_ready = true;
+  g_talk_ready = true;
 
   // Network initialization
-  download::Init(16);
-  download::SetHostChain(string(g_cvmfs_opts.hostname));
-  download::SetProxyChain(g_cvmfs_opts.proxies ?
-                          string(g_cvmfs_opts.proxies) : "");
-  download::SetTimeout(g_cvmfs_opts.timeout, g_cvmfs_opts.timeout_direct);
-  download_ready = true;
+  download::Init(cvmfs::kDefaultNumConnections);
+  download::SetHostChain(hostname);
+  download::SetProxyChain(proxies);
+  download::SetTimeout(timeout, timeout_direct);
+  g_download_ready = true;
 
   signature::Init();
-  if (!signature::LoadPublicRsaKeys(g_cvmfs_opts.pubkey ?
-                                    g_cvmfs_opts.pubkey : ""))
-  {
-    PrintError("failed to load public key(s)");
-    goto cvmfs_cleanup;
+  if (!signature::LoadPublicRsaKeys(public_keys)) {
+    *g_boot_error = "failed to load public key(s)";
+    return loader::kFailSignature;
   } else {
-    if (!g_cvmfs_opts.pubkey)
-      PrintWarning("No public master key given. "
-                   "Cvmfs will fail on signed catalogs!");
-    else
-      LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: using public key(s) %s",
-               JoinStrings(
-                 SplitString(g_cvmfs_opts.pubkey, ':'), ", ").c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
+             public_keys.c_str());
   }
-  signature_ready = true;
-  if (g_cvmfs_opts.blacklist) {
-    if (!signature::LoadBlacklist(g_cvmfs_opts.blacklist)) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "failed to load blacklist");
-      goto cvmfs_cleanup;
+  g_signature_ready = true;
+  if (FileExists("/etc/cvmfs/blacklist")) {
+    if (!signature::LoadBlacklist("/etc/cvmfs/blacklist")) {
+      *g_boot_error = "failed to load blacklist";
+      return loader::kFailSignature;
     }
   }
 
   // Load initial file catalog
-  cvmfs::catalog_manager_ = new
-    cache::CatalogManager(*cvmfs::repository_name_,
-                          g_cvmfs_opts.ignore_signature);
-  if (g_cvmfs_opts.root_hash) {
-    retval = cvmfs::catalog_manager_->InitFixed(
-      hash::Any(hash::kSha1, hash::HexPtr(string(g_cvmfs_opts.root_hash))));
+  cvmfs::catalog_manager_ =
+      new cache::CatalogManager(*cvmfs::repository_name_, ignore_signature);
+  if (root_hash != "") {
+    cvmfs::fixed_catalog_ = true;
+    hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
+    retval = cvmfs::catalog_manager_->InitFixed(hash);
   } else {
     retval = cvmfs::catalog_manager_->Init();
   }
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize root file catalog");
-    goto cvmfs_cleanup;
+    *g_boot_error = "Failed to initialize root file catalog";
+    return loader::kFailCatalog;
   }
 
-  // Set fuse callbacks, remove url from arguments
-  LogCvmfs(kLogCvmfs, kLogSyslog,
-           "CernVM-FS: linking %s to repository %s",
-           cvmfs::mountpoint_->c_str(), cvmfs::repository_name_->c_str());
-  struct fuse_lowlevel_ops cvmfs_operations;
-  cvmfs::set_cvmfs_ops(&cvmfs_operations);
+  return loader::kFailOk;
+}
 
-  { // memcache
-    const double memcache_unit_size =
-      7.0 * lru::Md5PathCache::GetEntrySize() +
-      lru::InodeCache::GetEntrySize() + lru::PathCache::GetEntrySize();
-    const unsigned memcache_num_units =
-      cvmfs::mem_cache_size_ / static_cast<unsigned>(memcache_unit_size);
-    // Number of cache entries must be a multiple of 64
-    const unsigned mask_64 = ~((1 << 6) - 1);
-    cvmfs::inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64);
-    cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
-    cvmfs::md5path_cache_ =
-      new lru::Md5PathCache((memcache_num_units*7) & mask_64);
-  }
-  cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
-  cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
-  cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
 
-  if ((ch = fuse_mount(cvmfs::mountpoint_->c_str(), &g_fuse_args)) != NULL) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
-             cvmfs::mountpoint_->c_str());
-    if (!g_foreground)
-      Daemonize();
+/**
+ * Things that have to be executed after fork() / daemon()
+ */
+static void Spawn() {
+  int retval;
 
-    // Setup catalog reload alarm (_after_ fork())
-    atomic_init32(&cvmfs::catalogs_expired_);
-    if (!g_cvmfs_opts.root_hash && !g_cvmfs_opts.no_reload) {
-      struct sigaction sa;
-      memset(&sa, 0, sizeof(sa));
-      sa.sa_sigaction = cvmfs::AlarmReload;
-      sa.sa_flags = SA_SIGINFO;
-      sigfillset(&sa.sa_mask);
-      retval = sigaction(SIGALRM, &sa, NULL);
-      assert(retval == 0);
-      unsigned ttl = cvmfs::catalog_manager_->offline_mode() ?
+  // Setup catalog reload alarm (_after_ fork())
+  atomic_init32(&cvmfs::maintenance_mode_);
+  atomic_init32(&cvmfs::drainout_mode_);
+  atomic_init32(&cvmfs::reload_critical_section_);
+  atomic_init32(&cvmfs::catalogs_expired_);
+  if (!cvmfs::fixed_catalog_) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = cvmfs::AlarmReload;
+    sa.sa_flags = SA_SIGINFO;
+    sigfillset(&sa.sa_mask);
+    retval = sigaction(SIGALRM, &sa, NULL);
+    assert(retval == 0);
+    unsigned ttl = cvmfs::catalog_manager_->offline_mode() ?
       cvmfs::kShortTermTTL : cvmfs::GetEffectiveTTL();
-      alarm(ttl);
-      cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
-    } else {
-      cvmfs::catalogs_valid_until_ = cvmfs::kIndefiniteDeadline;
-    }
-
-    struct fuse_session *se;
-    se = fuse_lowlevel_new(&g_fuse_args, &cvmfs_operations,
-                           sizeof(cvmfs_operations), NULL);
-    if (se != NULL) {
-      if (fuse_set_signal_handlers(se) != -1) {
-        fuse_session_add_chan(se, ch);
-        if (g_single_threaded)
-          result = fuse_session_loop(se);
-        else
-          result = fuse_session_loop_mt(se);
-        fuse_remove_signal_handlers(se);
-        fuse_session_remove_chan(ch);
-      }
-      fuse_session_destroy(se);
-    }
-    fuse_unmount(cvmfs::mountpoint_->c_str(), ch);
+    alarm(ttl);
+    cvmfs::catalogs_valid_until_ = time(NULL) + ttl;
+  } else {
+    cvmfs::catalogs_valid_until_ = cvmfs::kIndefiniteDeadline;
   }
-  fuse_opt_free_args(&g_fuse_args);
+
+  cvmfs::pid_ = getpid();
+  monitor::Spawn();
+  download::Spawn();
+  quota::Spawn();
+  talk::Spawn();
+  if (cvmfs::nfs_maps_)
+    nfs_maps::Spawn();
+
+  if (*cvmfs::tracefile_ != "")
+    tracer::Init(8192, 7000, *cvmfs::tracefile_);
+  else
+    tracer::InitNull();
+}
+
+
+static string GetErrorMsg() {
+  if (g_boot_error)
+    return *g_boot_error;
+  return "";
+}
+
+
+static void Fini() {
+  signal(SIGALRM, SIG_DFL);
+  tracer::Fini();
+  if (g_signature_ready) signature::Fini();
+  if (g_download_ready) download::Fini();
+  if (g_talk_ready) talk::Fini();
+  if (g_monitor_ready) monitor::Fini();
+  if (g_quota_ready) quota::Fini();
+  if (g_nfs_maps_ready) nfs_maps::Fini();
+  if (g_cache_ready) cache::Fini();
+  if (g_running_created)
+    unlink(("running." + *cvmfs::repository_name_).c_str());
+  if (g_fd_lockfile >= 0) UnlockFile(g_fd_lockfile);
+  if (g_peers_ready) peers::Fini();
+  if (g_options_ready) options::Fini();
 
   delete cvmfs::catalog_manager_;
   delete cvmfs::directory_handles_;
@@ -1978,29 +1664,103 @@ int main(int argc, char *argv[]) {
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
 
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-           cvmfs::mountpoint_->c_str(), cvmfs::repository_name_->c_str());
+  if (g_sqlite_page_cache) free(g_sqlite_page_cache);
+  if (g_sqlite_scratch) free(g_sqlite_scratch);
+  g_sqlite_page_cache = NULL;
+  g_sqlite_scratch = NULL;
 
- cvmfs_cleanup:
-  if (signature_ready) signature::Fini();
-  if (download_ready) download::Fini();
-  if (talk_ready) talk::Fini();
-  if (monitor_ready) monitor::Fini();
-  if (quota_ready) quota::Fini();
-  if (nfs_maps_ready) nfs_maps::Fini();
-  if (cache_ready) cache::Fini();
-  if (running_created) unlink(("running." + *cvmfs::repository_name_).c_str());
-  if (fd_lockfile >= 0) UnlockFile(fd_lockfile);
-  if (peers_ready) peers::Fini();
-  if (options_ready) {
-    fuse_opt_free_args(&g_fuse_args);
-    FreeCvmfsOptions(&g_cvmfs_opts);
+  if (g_boot_error) free(g_boot_error);
+  g_boot_error = NULL;
+}
+
+
+static int AltProcessFlavor(int argc, char **argv) {
+  if (strcmp(argv[1], "__peersrv__") == 0) {
+    return peers::MainPeerServer(argc, argv);
   }
+  if (strcmp(argv[1], "__cachemgr__") == 0) {
+    return quota::MainCacheManager(argc, argv);
+  }
+  return 1;
+}
 
-  if (sqlite_page_cache) free(sqlite_page_cache);
-  if (sqlite_scratch) free(sqlite_scratch);
 
-  CleanupLibcryptoMt();
+static bool MaintenanceMode(const int fd_progress) {
+  SendMsg2Socket(fd_progress, "Entering maintenance mode\n");
+  signal(SIGALRM, SIG_DFL);
+  atomic_cas32(&cvmfs::maintenance_mode_, 0, 1);
+  string msg_progress = "Draining out kernel caches (" +
+                        StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  sleep((int)cvmfs::kcache_timeout_);
+  return true;
+}
 
-  return result;
+
+static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
+  string msg_progress = "Saving open directory handles (" +
+    StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  
+  cvmfs::DirectoryHandles *saved_handles =
+    new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
+  loader::SavedState *save_open_dirs = new loader::SavedState();
+  save_open_dirs->state_id = loader::kStateOpenDirs;
+  save_open_dirs->state = saved_handles;
+  saved_states->push_back(save_open_dirs);
+  
+  return true;
+}
+
+
+static bool RestoreState(const int fd_progress,
+                         const loader::StateList &saved_states)
+{
+  for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
+    if (saved_states[i]->state_id == loader::kStateOpenDirs) {
+      SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
+      delete cvmfs::directory_handles_;
+      cvmfs::DirectoryHandles *saved_handles =
+        (cvmfs::DirectoryHandles *)saved_states[i]->state;
+      cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
+
+      SendMsg2Socket(fd_progress,
+        StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
+    }
+  }
+  return true;
+}
+
+
+static void FreeSavedState(const int fd_progress,
+                           const loader::StateList &saved_states)
+{
+  for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
+    if (saved_states[i]->state_id == loader::kStateOpenDirs) {
+      SendMsg2Socket(fd_progress, "Releasing saved open directory handles\n");
+      delete (cvmfs::DirectoryHandles *)saved_states[i]->state;
+    }
+  }
+}
+
+
+static void __attribute__((constructor)) LibraryMain() {
+  g_cvmfs_exports = new loader::CvmfsExports();
+  g_cvmfs_exports->so_version = PACKAGE_VERSION;
+  g_cvmfs_exports->fnAltProcessFlavor = AltProcessFlavor;
+  g_cvmfs_exports->fnInit = Init;
+  g_cvmfs_exports->fnSpawn = Spawn;
+  g_cvmfs_exports->fnFini = Fini;
+  g_cvmfs_exports->fnGetErrorMsg = GetErrorMsg;
+  g_cvmfs_exports->fnMaintenanceMode = MaintenanceMode;
+  g_cvmfs_exports->fnSaveState = SaveState;
+  g_cvmfs_exports->fnRestoreState = RestoreState;
+  g_cvmfs_exports->fnFreeSavedState = FreeSavedState;
+  cvmfs::SetCvmfsOperations(&g_cvmfs_exports->cvmfs_operations);
+}
+
+
+static void __attribute__((destructor)) LibraryExit() {
+  delete g_cvmfs_exports;
+  g_cvmfs_exports = NULL;
 }

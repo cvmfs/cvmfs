@@ -50,6 +50,9 @@ sub usage {
   print "  timeout set                                                   \n";
   print "       <proxy> <direct>  sets the network timeouts in seconds   \n";
   print "  pid                    gets the pid                           \n";
+  print "  parameters             dumps the effective parameters         \n";
+  print "  hotpatch history       shows timestamps and version info of   \n";
+  print "                         loaded (hotpatched) Fuse modules       \n";
   print "  version                gets cvmfs version                     \n";
   print "  version patchlevel     gets cvmfs patchlevel                  \n";
   print "  open catalogs          shows information about currently      \n";
@@ -99,7 +102,7 @@ sub talk {
   }
 
   if (! -S "$pipe_path") {
-    print "Seems like CernVM-FS is not running in $cache_dir\n";
+    print "Seems like CernVM-FS is not running in $cache_dir (not found: $pipe_path)\n";
     return 1;
   }
   if (! -w "$pipe_path") {

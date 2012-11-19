@@ -7,11 +7,23 @@
 #ifndef CVMFS_PLATFORM_LINUX_H_
 #define CVMFS_PLATFORM_LINUX_H_
 
+#include <pthread.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <signal.h>
+
+#include <cassert>
+
+#include <string>
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 /**
  * Spinlocks are not necessarily part of pthread on all platforms.
  */
-#include <pthread.h>
-
 typedef pthread_spinlock_t platform_spinlock;
 
 inline int platform_spinlock_init(platform_spinlock *lock, int pshared) {
@@ -35,14 +47,20 @@ inline unsigned long platform_gettid() {
 }
 
 
+inline int platform_sigwait(const int signum) {
+  sigset_t sigset;
+  int retval = sigemptyset(&sigset);
+  assert(retval == 0);
+  retval = sigaddset(&sigset, signum);
+  assert(retval == 0);
+  retval = sigwaitinfo(&sigset, NULL);
+  return retval;
+}
+
+
 /**
  * File system functions, ensure 64bit versions.
  */
-#include <fcntl.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <cassert>
-
 typedef struct dirent64 platform_dirent64;
 
 inline platform_dirent64 *platform_readdir(DIR *dirp) {
@@ -70,5 +88,14 @@ inline void platform_disable_kcache(int filedes) {
 inline int platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
 }
+
+
+inline std::string platform_libname(const std::string &base_name) {
+  return "lib" + base_name + ".so";
+}
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_PLATFORM_LINUX_H_

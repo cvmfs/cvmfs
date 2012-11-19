@@ -10,6 +10,10 @@
 
 #include <stdint.h>
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 typedef int32_t atomic_int32;
 typedef int64_t atomic_int64;
 
@@ -72,5 +76,9 @@ static int32_t inline __attribute__((used)) atomic_cas32(atomic_int32 *a,
 {
   return __sync_bool_compare_and_swap(a, cmp, newval);
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_ATOMIC_H_

@@ -17,6 +17,9 @@
 #include "logging.h"
 #include "util.h"
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
 
 /**
  * @brief A simple recursion engine to abstract the recursion of directories.
@@ -198,5 +201,9 @@ class FileSystemTraversal {
     else return "";
   }
 };  // FileSystemTraversal
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_FS_TRAVERSAL_H_

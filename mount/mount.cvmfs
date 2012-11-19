@@ -1,6 +1,7 @@
 #!/bin/bash
 
 bin_path=/usr/bin
+lib_path=/usr/lib
 
 function usage()
 {
@@ -53,6 +54,15 @@ cvmfs_readconfig
 if [ $? -ne 0 ]; then
   echo "Failed to read CernVM-FS configuration"
   exit 1
+fi
+
+if [ "x$dryrun" != "xtrue" ]; then
+  if [ -f "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" ]; then
+    echo "Waiting for CernVM-FS reload..."
+    while [ -f "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" ]; do
+      sleep 1
+    done
+  fi
 fi
 
 device=`echo $1 | sed 's/\/cvmfs\///'` # sed is for Ubuntu 8.04 automounter
@@ -126,15 +136,11 @@ else
   mkdir -p $CVMFS_CACHE_DIR
   chown $CVMFS_USER $CVMFS_CACHE_DIR
 fi
+mkdir -p /var/run/cvmfs
+chown $CVMFS_USER /var/run/cvmfs
 
-QUOTA="quota_limit=$CVMFS_QUOTA_LIMIT"
-if [ $CVMFS_QUOTA_LIMIT -gt 0 ]
-then
-  QUOTA="$QUOTA,quota_threshold="$(($CVMFS_QUOTA_LIMIT/2))
-fi
-
-add_mount_option "fsname=cvmfs2,nodev,grab_mountpoint"
-add_mount_option "${CVMFS_ID},cachedir=$CVMFS_CACHE_DIR,$QUOTA,$CVMFS_OPTIONS,proxies='$CVMFS_HTTP_PROXY',repo_name=$name"
+add_mount_option "fsname=cvmfs2,allow_other,grab_mountpoint"
+add_mount_option "$CVMFS_ID"
 
 # set the number of open file handles per process
 # at some point that will be handled a LaunchdScript
@@ -143,38 +149,15 @@ if [ "$unamestr" = "Darwin" ]; then
   sudo -u cvmfs sudo sysctl -w kern.maxfilesperproc=$CVMFS_NFILES kern.maxfiles=$MAXFILES_OVERALL > /dev/null
 fi
 ulimit -n $CVMFS_NFILES
-add_mount_option "nofiles=$CVMFS_NFILES"
-
-if [ ! -z $CVMFS_TIMEOUT ]; then
-   add_mount_option "timeout=$CVMFS_TIMEOUT"
-fi
-if [ ! -z $CVMFS_TIMEOUT_DIRECT ]; then
-   add_mount_option "timeout_direct=$CVMFS_TIMEOUT_DIRECT"
-fi
 
 cvmfs_exe=$bin_path/cvmfs2
-if [ "x$CVMFS_DEBUGLOG" != "x" ]; then
-  cvmfs_exe=$bin_path/cvmfs2_debug
-  add_mount_option "logfile=$CVMFS_DEBUGLOG"
-fi
-[ x"$CVMFS_TRACEFILE" != x ] && add_mount_option "tracefile=$CVMFS_TRACEFILE"
-[ x"$CVMFS_SYSLOG_LEVEL" != x ] && add_mount_option "syslog_level=$CVMFS_SYSLOG_LEVEL"
-[ x"$CVMFS_IGNORE_SIGNATURE" = xyes ] && add_mount_option "ignore_signature"
-[ x"$CVMFS_PUBLIC_KEY" != x ] && add_mount_option "pubkey=$CVMFS_PUBLIC_KEY"
-[ x"$CVMFS_MAX_TTL" != x ] && add_mount_option "max_ttl=$CVMFS_MAX_TTL"
-[ x"$CVMFS_DISKLESS" = xyes ] && add_mount_option "diskless"
-[ x"$CVMFS_KCACHE_TIMEOUT" != x ] && add_mount_option "kcache_timeout=$CVMFS_KCACHE_TIMEOUT"
-[ x"$CVMFS_ROOT_HASH" != x ] && add_mount_option "root_hash=$CVMFS_ROOT_HASH"
-[ x"$CVMFS_CHECK_PERMISSIONS" = xyes ] && add_mount_option "default_permissions"
-[ x"$CVMFS_SHARED_CACHE" = xyes ] && add_mount_option "shared_cache"
-[ x"$CVMFS_NFS_SOURCE" = xyes ] && add_mount_option "nfs_source"
-[ x"$CVMFS_MEMCACHE_SIZE" != x ] && add_mount_option "memcache=$CVMFS_MEMCACHE_SIZE"
+export LD_LIBRARY_PATH=$lib_path:$LD_LIBRARY_PATH
 
 # Single threaded, hack around a fuse4x problem with unnamed semaphores
 if [[ "$unamestr" = 'Darwin' ]]; then
-  cmd="sudo -u cvmfs sudo $cvmfs_exe -s -o ${mount_options} $mountpoint '$repository'"
+  cmd="sudo -u cvmfs sudo $cvmfs_exe -s -o ${mount_options} $name $mountpoint"
 else
-  cmd="$cvmfs_exe -o ${mount_options} $mountpoint '$repository'"
+  cmd="$cvmfs_exe -o ${mount_options} $name $mountpoint"
 fi
 
 #check if group fuse exists

@@ -7,7 +7,7 @@
 set -e
 
 die() {
-  echo $1 >&2
+  echo -e $1 >&2
   exit 1
 }
 
@@ -17,6 +17,12 @@ abort_before_hook() { :; }
 abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
+
+if [ -x /sbin/fuser ]; then
+  fuser="/sbin/fuser"  # RHEL
+else
+  fuser="/bin/fuser"  # Ubuntu, SuSe
+fi
 
 
 create_master_key() {
@@ -70,7 +76,7 @@ create_whitelist() {
   echo "N$name" >> ${whitelist}.unsigned
   openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
 
-  local sha1; sha1=`openssl sha1 < ${whitelist}.unsigned | head -c40`
+  local sha1; sha1=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
   echo "--" >> ${whitelist}.unsigned
   echo $sha1 >> ${whitelist}.unsigned
   echo -n $sha1 > ${whitelist}.sha1
@@ -122,7 +128,7 @@ get_local_upstream() {
 
 reload_apache() {
    echo -n "Reloading Apache... "
-   /sbin/service httpd reload > /dev/null
+   ${SERVICE_BIN} ${APACHE} reload > /dev/null
    echo "done"
 }
 
@@ -146,7 +152,7 @@ abort() {
   local spool_dir=$3
 
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   reply=n
   read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION!  Are you sure (y/n)? " reply
@@ -172,9 +178,31 @@ publish() {
   local spool_dir=$3
   local stratum0=$4
   local upstream=$5
+  local debug=${6:-0}
+
+  local swissknife="cvmfs_swissknife"
+
+  # enable the debug mode?
+  if [ "$debug" -ne "0" ]
+  then
+    if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
+      case $debug in
+        1)
+          # in case something breaks we are provided with a GDB prompt.
+          swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+        ;;
+        2)
+          # attach gdb and provide a prompt WITHOUT actual running the program
+          swissknife="gdb --quiet --args cvmfs_swissknife_debug"
+        ;;
+      esac
+    else
+      echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+    fi
+  fi
 
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
@@ -185,7 +213,7 @@ publish() {
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-  $user_shell "cvmfs_swissknife sync -x -u /cvmfs/$name \
+  local sync_command="$swissknife sync -x -u /cvmfs/$name \
     -s ${spool_dir}/scratch \
     -c ${spool_dir}/rdonly \
     -t ${spool_dir}/tmp \
@@ -193,13 +221,16 @@ publish() {
     -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
-    $log_level" || die "Synchronization failed"
-  $user_shell "cvmfs_swissknife sign -c /etc/cvmfs/keys/${name}.crt \
+    $log_level"
+  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${spool_dir}/tmp/manifest \
     -t ${spool_dir}/tmp \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests" || die "Signing failed"
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests"
+
+  $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
+  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
@@ -270,7 +301,7 @@ get_cvmfs_owner() {
   local owner=$2
   local cvmfs_owner
 
-  if [ "x$owner" = "x" ]; then
+  if [ "x$owner" == "x" ]; then
     read -p "Owner of $name [$(whoami)]: " cvmfs_owner
     [ x"$cvmfs_owner" = x ] && cvmfs_owner=$(whoami)
   else
@@ -292,6 +323,7 @@ mkfs() {
   local scratch_dir="${spool_dir}/scratch"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
+  local cache_dir="${spool_dir}/cache"
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
   local repository_dir;
@@ -301,10 +333,10 @@ mkfs() {
 
   # Sanity checks
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
-  /sbin/modprobe aufs || die "aufs kernel module missing"
+  /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
-  [ -d /etc/httpd ] && /sbin/service httpd status >/dev/null || die "Apache must be installed and running"
+  [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
@@ -318,7 +350,7 @@ CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_UPSTREAM_STORAGE=$upstream
 EOF
-  cat > /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
+  cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 # For pushing files to the worker nodes
 Alias /fanout/cvmfs/$name /cvmfs/$name
@@ -342,7 +374,7 @@ Alias /fanout/$temp_dir $temp_dir
 </Directory>
 EOF
   if is_local_upstream $upstream; then
-    cat >> /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
+    cat >> /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
@@ -366,13 +398,18 @@ Alias /cvmfs/$name ${repository_dir}
 </Directory>
 EOF
   fi
-  [ -d /etc/cvmfs/config.d ] || mkdir -p /etc/cvmfs/config.d
-  cat > /etc/cvmfs/config.d/${name}.conf << EOF
+  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
 # Created by cvmfs_server.  Don't touch.
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_QUOTA_LIMIT=4000
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_STRICT_MOUNT=no
+CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_IGNORE_SIGNATURE=no
+CVMFS_AUTO_UPDATE=no
+CVMFS_NFS_SOURCE=no
 EOF
   cat >> /etc/sudoers << EOF
 $cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
@@ -390,7 +427,7 @@ EOF
   create_cert $name $cvmfs_user
 
   echo -n "Create CernVM-FS Storage... "
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir
+  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
   mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user /cvmfs/$name $spool_dir
   if is_local_upstream $upstream; then
@@ -417,7 +454,7 @@ EOF
 
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF
-$name $rdonly_dir cvmfs no_reload 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
@@ -433,8 +470,11 @@ EOF
 
   echo "\
 
-Install your software in /cvmfs/$name as user $cvmfs_user.
-Once you're happy, publish using 'cvmfs_server publish'
+Before you can install anything, call \`cvmfs_server transaction\`
+to enable write access on your repository. Then install your
+software in /cvmfs/$name as user $cvmfs_user.
+Once you're happy, publish using \`cvmfs_server publish\`
+
 For client configuration, have a look at 'cvmfs_server info'
 
 If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
@@ -461,7 +501,7 @@ add_replica() {
   # Sanity checks
   [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
   if is_local_upstream $upstream; then
-    [ -d /etc/httpd ] && /sbin/service httpd status >/dev/null || die "Apache must be installed and running"
+    [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
   fi
 
   echo -n "Creating configuration files... "
@@ -483,7 +523,7 @@ CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
   if is_local_upstream $upstream; then
-    cat > /etc/httpd/conf.d/cvmfs.${name}.conf << EOF
+    cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
@@ -543,7 +583,7 @@ rmfs() {
   [ x"$upstream" = x ] && die "Upstream storage undefined"
   [ x"$type" = x ] && die "Repository type undefined"
 
-  if [ "$type" = "stratum0" ]; then
+  if [ "$type" == "stratum0" ]; then
     echo -n "Unmounting CernVM-FS Area... "
     sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
     mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
@@ -566,14 +606,14 @@ rmfs() {
   fi
 
   echo -n "Removing keys and configuration... "
-  if [ "$type" = stratum0 ]; then
+  if [ "$type" == stratum0 ]; then
     rm -f /etc/cvmfs/keys/$name.masterkey \
         /etc/cvmfs/keys/$name.pub \
         /etc/cvmfs/keys/$name.key \
         /etc/cvmfs/keys/$name.crt
   fi
   if is_local_upstream $upstream; then
-    rm -f /etc/httpd/conf.d/cvmfs.${name}.conf
+    rm -f /etc/${APACHE}/conf.d/cvmfs.${name}.conf
     reload_apache > /dev/null
   fi
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
@@ -636,6 +676,8 @@ Commands:
   add-replica <fully qualified name> <stratum 0 url> <public key>
                [-o owner] [-u stratum1 upstram storage]
                Create a Stratum 1 replica of a repository
+  publish <fully qualified name> [-d debug mode | -D blocking debug mode]:
+               Make a new repository snapshot
   rmfs:        Remove the repository
   resign:      Re-sign the 30 day whitelist
   list:        List available repositories
@@ -643,7 +685,6 @@ Commands:
   check:       Checks if the repository is sane
   transaction: Start to edit a repository
   abort:       Abort transaction and return to the state before
-  publish:     Make a new repository snapshot
   snapshot:    Synchronize a Stratum 1 replica with the Stratum 0 source
 
 Note: If multiple repositories are maintained, the repository name must follow
@@ -653,6 +694,12 @@ the command."
 
 . /etc/cvmfs/config.sh
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
+
+# Setup environment
+APACHE="httpd"
+[ which apache2 >/dev/null 2>&1 ] && APACHE="apache2"
+SERVICE_BIN=$(which service)
+[ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
 
 select_fqrn() {
   local given_name="$1"
@@ -776,7 +823,20 @@ case $1 in
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
     [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
     . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE
+
+    for last; do true; done # Shell-KungFu: find last command-line parameter of cvmfs_server invocation
+    case $last in
+      -d)
+        DEBUG=1
+      ;;
+      -D)
+        DEBUG=2
+      ;;
+      *)
+        DEBUG=0
+    esac
+
+    publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE $DEBUG
   ;;
   snapshot)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"

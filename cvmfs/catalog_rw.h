@@ -8,7 +8,7 @@
  *
  * The main functionality is in:
  *  - AddEntry
- *  - TouchEntry
+ *  - UpdateEntry
  *  - RemoveEntry
  */
 
@@ -42,7 +42,10 @@ class WritableCatalog : public Catalog {
 
   void AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
                 const std::string &parent_path);
-  void TouchEntry(const DirectoryEntry &entry, const std::string &entry_path);
+  void TouchEntry(const DirectoryEntryBase &entry, const hash::Md5 &path_hash);
+  inline void TouchEntry(const DirectoryEntryBase &entry, const std::string &path) {
+    TouchEntry(entry, hash::Md5(hash::AsciiPtr(path)));
+  }
   void RemoveEntry(const std::string &entry_path);
   void IncLinkcount(const std::string &path_within_group, const int delta);
 
@@ -66,15 +69,14 @@ class WritableCatalog : public Catalog {
   Database::OpenMode DatabaseOpenMode() const {
     return Database::kOpenReadWrite;
   }
+  
+  void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
+  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path) {
+    UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
+  }
 
   inline void AddEntry(const DirectoryEntry &entry, const std::string &path) {
     AddEntry(entry, path, GetParentPath(path));
-  }
-
-  void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
-  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path)
-  {
-    UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
   }
 
   void InitPreparedStatements();
@@ -88,8 +90,8 @@ class WritableCatalog : public Catalog {
 
  private:
   SqlDirentInsert     *sql_insert_;
-  SqlDirentTouch      *sql_touch_;
   SqlDirentUnlink     *sql_unlink_;
+  SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;

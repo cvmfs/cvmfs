@@ -693,7 +693,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
 
   // Load and verify remote checksum
   manifest::Failures manifest_failure;
-  cache::ManifestEnsemble ensemble;
+  cache::ManifestEnsemble ensemble(this);
   manifest_failure = manifest::Fetch("", repo_name_, cache_last_modified,
                                      &cache_hash, &ensemble);
   if (manifest_failure != manifest::kFailOk) {
@@ -803,8 +803,12 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
 
 void ManifestEnsemble::FetchCertificate(const hash::Any &hash) {
   uint64_t size;
-  Open2Mem(hash, &cert_buf, &size);
+  bool retval = Open2Mem(hash, &cert_buf, &size);
   cert_size = size;
+  if (retval)
+    atomic_inc32(&catalog_mgr_->certificate_hits_);
+  else
+    atomic_inc32(&catalog_mgr_->certificate_misses_);
 }
 
 }  // namespace cache

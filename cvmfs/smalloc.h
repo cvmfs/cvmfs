@@ -10,6 +10,10 @@
 #include <stdlib.h>
 #include <cassert>
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 static inline void * __attribute__((used)) smalloc(size_t size) {
   void *mem = malloc(size);
   assert(mem && "Out Of Memory");
@@ -27,5 +31,9 @@ static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
   assert(mem && "Out Of Memory");
   return mem;
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_SMALLOC_H_

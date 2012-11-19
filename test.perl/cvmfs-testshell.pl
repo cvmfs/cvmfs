@@ -26,8 +26,7 @@ my $daemon_ip = "127.0.0.1";
 my $daemon_port = "6650";
 my $daemon_path = "$daemon_ip:$daemon_port";
 
-
-# Next variables is used to control when to skip a loop cicle
+# Next variables is used to control when to skip a loop cycle
 my $continue = undef;
 
 # Variables for socket managing

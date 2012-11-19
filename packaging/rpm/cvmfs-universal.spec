@@ -7,7 +7,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.2
+Version: 2.1.4
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -232,7 +232,8 @@ fi
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
-%{_bindir}/cvmfs2_debug
+%{_libdir}/libcvmfs_fuse.so
+%{_libdir}/libcvmfs_fuse_debug.so
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config

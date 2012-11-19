@@ -7,6 +7,23 @@
 #ifndef CVMFS_PLATFORM_OSX_H_
 #define CVMFS_PLATFORM_OSX_H_
 
+#include <libkern/OSAtomic.h>
+#include <mach/mach.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <alloca.h>
+#include <signal.h>
+
+#include <cstring>
+#include <cassert>
+
+#include <string>
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 /**
  * UNIX domain sockets:
  * MSG_NOSIGNAL prevents send() from sending SIGPIPE
@@ -24,9 +41,6 @@
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.
  */
-
-#include <libkern/OSAtomic.h>
-
 typedef OSSpinLock platform_spinlock;
 
 inline int platform_spinlock_init(platform_spinlock *lock, int pshared) {
@@ -44,21 +58,27 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
 /**
  * pthread_self() is not necessarily an unsigned long.
  */
-#include <mach/mach.h>
-
 inline unsigned long platform_gettid() {
   return mach_thread_self();
+}
+
+
+inline int platform_sigwait(const int signum) {
+  sigset_t sigset;
+  int retval = sigemptyset(&sigset);
+  assert(retval == 0);
+  retval = sigaddset(&sigset, signum);
+  assert(retval == 0);
+  int result;
+  retval = sigwait(&sigset, &result);
+  assert(retval == 0);
+  return result;
 }
 
 
 /**
  * File system functions, Mac OS X has 64bit functions by default.
  */
-#include <fcntl.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <cassert>
-
 typedef struct dirent platform_dirent64;
 
 inline platform_dirent64 *platform_readdir(DIR *dirp) { return readdir(dirp); }
@@ -90,9 +110,16 @@ inline int platform_readahead(int filedes) {
 /**
  * strdupa does not exist on OSX
  */
-#include <alloca.h>
-#include <cstring>
 #define strdupa(s) strcpy(reinterpret_cast<char *> \
   (alloca(strlen((s)) + 1)), (s))
+
+
+inline std::string platform_libname(const std::string &base_name) {
+  return "lib" + base_name + ".dylib";
+}
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_PLATFORM_OSX_H_
