@@ -4,7 +4,7 @@ cvmfs_test_name="Setup ATLAS"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount atlas.cern.ch,atlas-condb.cern.ch,atlas-nightlies.cern.ch || return 1
+  cvmfs_mount atlas.cern.ch,atlas-nightlies.cern.ch,atlas-condb.cern.ch || return 1
   
   export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo
   export ATLAS_LOCAL_ROOT_BASE=${ATL_LOCAL_ROOT}/ATLASLocalRootBase

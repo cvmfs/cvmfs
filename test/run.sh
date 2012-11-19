@@ -36,7 +36,7 @@ do
   workdir="${CVMFS_TEST_SCRATCH}/workdir/$t"
   rm -rf "$workdir" && mkdir -p "$workdir" || exit 3
   . $t/main || exit 4
-  echo "-- Testing $t" >> $logfile
+  echo "-- Testing $t (${cvmfs_test_name})" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
   
   exclude=0

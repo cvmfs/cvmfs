@@ -58,6 +58,7 @@ enum LogSource {
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 
 void SetLogSyslogLevel(const int level);
+void SetLogSyslogFacility(const int facility);
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogVerbosity(const LogLevels min_level);
 

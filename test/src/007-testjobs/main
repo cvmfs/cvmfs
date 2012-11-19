@@ -4,7 +4,7 @@ cvmfs_test_name="Experiment framwork test jobs"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount lhcb.cern.ch,atlas.cern.ch,atlas-condb.cern.ch,atlas-nightlies.cern.ch,cms.cern.ch || return 1
+  cvmfs_mount lhcb.cern.ch,atlas.cern.ch,atlas-condb.cern.ch,cms.cern.ch || return 1
 
   . /cvmfs/lhcb.cern.ch/etc/login.sh >> $logfile 2>&1 || return 2
   . SetupProject.sh Brunel >> $logfile 2>&1 || return 3

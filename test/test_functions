@@ -46,6 +46,40 @@ cvmfs_mount() {
 }
 
 
+cvmfs_umount() {
+  repositories=$1
+
+  for r in $(echo $repositories | tr , " "); do
+    sudo umount /cvmfs/$r || return 100
+
+    timeout=5
+    while cat /proc/mounts | grep -q /cvmfs/$r; do
+      if [ $timeout -eq 0 ]; then
+        return 101
+      fi
+      timeout=$(($timeout-1))
+      sleep 1
+    done
+  done
+
+  return 0
+}
+
+
+
+get_cvmfs_cachedir() {
+  repository=$1
+
+  local cache_dir
+  cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  if [ "x$cache_dir" = "x" ]; then
+    echo "Failed to figure out cache directory"
+    exit 1
+  fi
+  echo $cache_dir
+}
+
+
 check_time() {
   start_time=$1
   end_time=$2
