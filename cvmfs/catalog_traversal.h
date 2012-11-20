@@ -81,6 +81,8 @@ class CatalogTraversal
    *                           -> or an URL to a remote repository
    * @param repo_name          fully qualified repository name (used for remote
    *                           repository signature check) (optional)
+   * @param repo_keys          a comma separated list of public key file 
+   *                           locations to verify the repository manifest file
    */
 	CatalogTraversal(T*                 delegate,
                    Callback           catalog_callback,
@@ -119,8 +121,7 @@ class CatalogTraversal
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
     manifest::Manifest *manifest = LoadManifest();
-    if (!manifest)
-    {
+    if (!manifest) {
       LogCvmfs(kLogCatalogTraversal, kLogStderr, 
         "Failed to load manifest for repository %s", repo_name_.c_str());
       return false;
@@ -216,8 +217,7 @@ class CatalogTraversal
       // initialize signature module
       signature::Init();
       const bool success = signature::LoadPublicRsaKeys(repo_keys_);
-      if (!success)
-      {
+      if (!success) {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
           "cvmfs public key(s) could not be loaded.");
         signature::Fini();
