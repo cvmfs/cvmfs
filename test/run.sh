@@ -29,6 +29,7 @@ do
   cvmfs_clean || exit 2
   workdir="${CVMFS_TEST_SCRATCH}/workdir/$t"
   rm -rf "$workdir" && mkdir -p "$workdir" || exit 3
+  cvmfs_test_autofs_on_startup=true # might be overwritten by some tests
   . $t/main || exit 4
   echo "-- Testing $t (${cvmfs_test_name})" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
@@ -43,6 +44,12 @@ do
   fi
 
   if [ $exclude -eq 0 ]; then
+    if $cvmfs_test_autofs_on_startup; then
+      autofs_switch on >> $logfile 2>&1 || exit 5
+    else
+      autofs_switch off >> $logfile 2>&1 || exit 5
+    fi
+
     sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && exit $?"
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
