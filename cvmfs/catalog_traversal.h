@@ -283,8 +283,7 @@ class CatalogTraversal
    */
   bool Exists(const std::string &file) {
     if (is_remote_){
-      const std::string url = repository_ + "/" + file;
-      download::JobInfo head(&url, false);
+      download::JobInfo head(&file, false);
       return download::Fetch(&head) == download::kFailOk;
     }
     else
