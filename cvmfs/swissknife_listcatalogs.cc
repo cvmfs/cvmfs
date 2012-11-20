@@ -51,7 +51,7 @@ void CommandListCatalogs::CatalogCallback(const catalog::Catalog* catalog,
 
   if (print_tree_) {
     for (unsigned int i = 1; i < recursion_depth; ++i) {
-      tree_indent += "\u2502   ";
+      tree_indent += "\u2502  ";
     }
 
     if (recursion_depth > 0)
