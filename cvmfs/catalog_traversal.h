@@ -21,6 +21,10 @@ namespace swissknife {
  * Note: Since all CVMFS catalog files together can grow to several gigabytes in
  *       file size, each catalog is loaded, processed and removed immediately
  *       afterwards.
+ *
+ * CAUTION: currently the Catalog* pointer passed into the callback becomes in-
+ *          valid directly after the callback method returns. Therefore you
+ *          MUST NOT store it for later usage.
  */
 template<class T>
 class CatalogTraversal
@@ -175,6 +179,9 @@ class CatalogTraversal
     {
       catalog_stack_.push(CatalogJob(*i, job.recursion_depth + 1));
     }
+
+    // we are done with this catalog
+    delete catalog;
 
     // sucessfully traversed
     return true;
