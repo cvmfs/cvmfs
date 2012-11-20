@@ -1,0 +1,11 @@
+########################
+# A nop, tests the test system itself
+########################
+
+Short:  000-dummy	A first no-op test
+
+000-dummy:
+000-dummy:000-dummy
+000-dummy:	This test doesn't do anything except being invoked by
+000-dummy:	by the test system.
+000-dummy:

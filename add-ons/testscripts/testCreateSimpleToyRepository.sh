@@ -12,7 +12,7 @@ echo "recreate the repo first..."
 sh recreateRepo.sh
 
 echo "start transaction... "
-cvmfs_server transaction || die "fail"
+cvmfs_server transaction $REPO || die "fail"
 
 cd $UNION
 

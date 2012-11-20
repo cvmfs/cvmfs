@@ -127,7 +127,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   root_entry.uid_               = getuid();
   root_entry.gid_               = getgid();
   root_entry.checksum_          = hash::Any(hash::kSha1);
-  root_entry.set_hardlinks(0, 2);
+  root_entry.linkcount_         = 2;
   string root_path = "";
 
   // Create the database schema and the inital root entry
@@ -250,7 +250,8 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
     assert(false);
   }
 
-  parent_entry.set_hardlinks(0, parent_entry.linkcount()-1);
+  parent_entry.set_linkcount(parent_entry.linkcount() - 1);
+
   catalog->RemoveEntry(directory_path);
   catalog->UpdateEntry(parent_entry, parent_path);
   if (parent_entry.IsNestedCatalogRoot()) {
@@ -273,7 +274,7 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
  *                         directory to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
+void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
                                           const std::string &parent_directory)
 {
   const string parent_path = MakeRelativePath(parent_directory);
@@ -298,11 +299,11 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
     assert(false);
   }
 
-  DirectoryEntry FixedHardlinkCount = entry;
-  FixedHardlinkCount.set_hardlinks(0, 2);
-  catalog->AddEntry(FixedHardlinkCount, directory_path, parent_path);
+  DirectoryEntry fixed_hardlink_count(entry);
+  fixed_hardlink_count.set_linkcount(2);
+  catalog->AddEntry(fixed_hardlink_count, directory_path, parent_path);
 
-  parent_entry.set_hardlinks(0, parent_entry.linkcount()+1);
+  parent_entry.set_linkcount(parent_entry.linkcount() + 1);
   catalog->UpdateEntry(parent_entry, parent_path);
   if (parent_entry.IsNestedCatalogRoot()) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating transition point %s",
@@ -324,7 +325,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntry &entry,
  *                         file to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
+void WritableCatalogManager::AddFile(const DirectoryEntryBase &entry,
                                      const std::string &parent_directory) {
   const string parent_path = MakeRelativePath(parent_directory);
   string file_path = parent_path + "/";
@@ -339,7 +340,7 @@ void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
   }
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
-  catalog->AddEntry(entry, file_path, parent_path);
+  catalog->AddEntry(DirectoryEntry(entry), file_path, parent_path);
   SyncUnlock();
 }
 
@@ -351,8 +352,8 @@ void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
  *                         files to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
-                                          const std::string &parent_directory)
+void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
+                                              const std::string &parent_directory)
 {
   assert(entries.size() >= 1);
   if (entries.size() == 1)
@@ -382,13 +383,19 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryList &entries,
 	assert(new_group_id > 0);
 
 	// Add the file entries to the catalog
-	for (DirectoryEntryList::iterator i = entries.begin(), iEnd = entries.end();
+	for (DirectoryEntryBaseList::iterator i = entries.begin(), iEnd = entries.end();
        i != iEnd; ++i)
   {
 	  string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
-    i->set_hardlinks(new_group_id, entries.size());
-	  catalog->AddEntry(*i, file_path, parent_path);
+
+    // create a full fledged DirectoryEntry to add the hardlink group to it
+    // which is CVMFS specific meta data.
+    DirectoryEntry hardlink(*i);
+    hardlink.set_hardlink_group(new_group_id);
+    hardlink.set_linkcount(entries.size());
+
+	  catalog->AddEntry(hardlink, file_path, parent_path);
 	}
   SyncUnlock();
 }
@@ -413,43 +420,87 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
 
 /**
  * Update entry meta data (mode, owner, ...).
+ * CVMFS specific meta data are NOT changed by this method.
+ * @param entry      the directory entry to be touched
+ * @param path       the path of the directory entry to be touched
  */
-void WritableCatalogManager::TouchEntry(const DirectoryEntry entry,
-                                        const std::string &path)
-{
-  const string entry_path = MakeRelativePath(path);
+void WritableCatalogManager::TouchFile(const DirectoryEntryBase &entry,
+                                       const std::string &file_path) {
+  assert (!entry.IsDirectory());
+
+  const string entry_path = MakeRelativePath(file_path);
   const string parent_path = GetParentPath(entry_path);
 
   SyncLock();
+  // find the catalog to be updated
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
     LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
              entry_path.c_str());
     assert(false);
   }
+  
+  catalog->TouchEntry(entry, entry_path);
+  SyncUnlock();
+}
 
-  catalog->UpdateEntry(entry, entry_path);
 
-  if (entry.IsDirectory()) {
-    catalog::DirectoryEntry potential_transition_point;
-    PathString transition_path(entry_path.data(), entry_path.length());
-    bool retval = catalog->LookupPath(transition_path,
-                                      &potential_transition_point);
-    assert(retval);
-    if (potential_transition_point.IsNestedCatalogMountpoint()) {
-      LogCvmfs(kLogCatalog, kLogVerboseMsg,
-               "updating transition point at %s", entry_path.c_str());
-      hash::Any nested_hash;
-      retval = catalog->FindNested(transition_path, &nested_hash);
-      assert(retval);
-      Catalog *nested_catalog;
-      nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
-      assert(nested_catalog != NULL);
-      reinterpret_cast<WritableCatalog *>(nested_catalog)->
-        UpdateEntry(entry, entry_path);
-      assert(retval);
-    }
+/**
+ * Update entry meta data (mode, owner, ...).
+ * CVMFS specific meta data (i.e. nested catalog transition points) are NOT
+ * changed by this method, although transition points intrinsics are taken into
+ * account, to keep nested catalogs consistent.
+ * @param entry      the directory entry to be touched
+ * @param path       the path of the directory entry to be touched
+ */
+void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
+                                            const std::string &directory_path)
+{
+  assert(entry.IsDirectory());
+
+  const string entry_path = MakeRelativePath(directory_path);
+  const string parent_path = GetParentPath(entry_path);
+
+  SyncLock();
+  // find the catalog to be updated
+  WritableCatalog *catalog;
+  if (!FindCatalog(parent_path, &catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
+             entry_path.c_str());
+    assert(false);
   }
+  
+  catalog->TouchEntry(entry, entry_path);
+
+  // since we deal with a directory here, we might just touch a
+  // nested catalog transition point. If this is the case we would need to
+  // update two catalog entries:
+  //   * the nested catalog MOUNTPOINT in the parent catalog
+  //   * the nested catalog ROOT in the nested catalog
+
+  // first check if we really have a nested catalog transition point
+  catalog::DirectoryEntry potential_transition_point;
+  PathString transition_path(entry_path.data(), entry_path.length());
+  bool retval = catalog->LookupPath(transition_path,
+                                    &potential_transition_point);
+  assert(retval);
+  if (potential_transition_point.IsNestedCatalogMountpoint()) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg,
+             "updating transition point at %s", entry_path.c_str());
+
+    // find and mount nested catalog assciated to this transition point
+    hash::Any nested_hash;
+    retval = catalog->FindNested(transition_path, &nested_hash);
+    assert(retval);
+    Catalog *nested_catalog;
+    nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
+    assert(nested_catalog != NULL);
+
+    // update nested catalog root in the child catalog
+    reinterpret_cast<WritableCatalog *>(nested_catalog)->
+      TouchEntry(entry, entry_path);
+  }
+
   SyncUnlock();
 }
 

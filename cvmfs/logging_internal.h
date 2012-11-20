@@ -59,6 +59,7 @@ const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 const int kLogWarning    = kLogStdout | kLogShowSource | kLogNormal;
 
 void SetLogSyslogLevel(const int level);
+void SetLogSyslogFacility(const int facility);
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogVerbosity(const LogLevels min_level);
 

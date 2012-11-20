@@ -1283,6 +1283,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     SetLogSyslogLevel(String2Uint64(parameter));
   else
     SetLogSyslogLevel(3);
+  if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
+    SetLogSyslogFacility(String2Int64(parameter));
   if (options::GetValue("CVMFS_DEBUGLOG", &parameter))
     SetLogDebugFile(parameter);
   SetLogSyslogPrefix(loader_exports->repository_name);
@@ -1304,8 +1306,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     kcache_timeout = String2Int64(parameter);
   if (options::GetValue("CVMFS_QUOTA_LIMIT", &parameter))
     quota_limit = String2Int64(parameter) * 1024*1024;
-  if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
-    proxies = parameter;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
   if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter))

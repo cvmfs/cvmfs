@@ -290,6 +290,16 @@ class SqlDirent : public Sql {
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
 
   /**
+   * The hardlink information (hardlink group ID and linkcount) is saved in one
+   * uint_64t field in the CVMFS Catalogs. Therefore we need to do some minor
+   * bitshifting in these helper methods.
+   */
+  uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) const;
+  uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) const;
+  uint64_t MakeHardlinks(const uint32_t hardlink_group,
+                         const uint32_t linkcount) const;
+
+  /**
    *  replaces place holder variables in a symbolic link by actual
    *  path elements
    *  @param raw_symlink the raw symlink path (may) containing place holders
@@ -389,6 +399,24 @@ class SqlLookupInode : public SqlLookup {
  public:
   SqlLookupInode(const Database &database);
   bool BindRowId(const uint64_t inode);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Filesystem like _touch_ of a DirectoryEntry. Only file system specific meta
+ * data will be modified. All CVMFS-specific administrative data stays unchanged.
+ * NOTE: This is not a subclass of SqlDirent since it works on DirectoryEntryBase
+ *       objects, which are restricted to file system meta data.
+ */
+class SqlDirentTouch : public Sql {
+ public:
+  SqlDirentTouch(const Database &database);
+
+  bool BindDirentBase(const DirectoryEntryBase &entry);
+  bool BindPathHash(const hash::Md5 &hash);
 };
 
 

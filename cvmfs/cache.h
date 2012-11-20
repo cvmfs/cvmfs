@@ -52,6 +52,8 @@ int64_t GetNumDownloads();
  * them in the cache.
  */
 class CatalogManager : public catalog::AbstractCatalogManager {
+  friend class ManifestEnsemble;  // Maintains certificate hit/miss counters
+
  public:
   CatalogManager(const std::string &repo_name,
                  const bool ignore_signature);
@@ -107,7 +109,12 @@ class CatalogManager : public catalog::AbstractCatalogManager {
  * Tries to fetch the certificate from cache
  */
 struct ManifestEnsemble : public manifest::ManifestEnsemble {
+  explicit ManifestEnsemble(cache::CatalogManager *catalog_mgr) {
+    catalog_mgr_ = catalog_mgr;
+  }
   void FetchCertificate(const hash::Any &hash);
+ private:
+   cache::CatalogManager *catalog_mgr_;
 };
 
 }  // namespace cache
