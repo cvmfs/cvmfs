@@ -140,8 +140,7 @@ class CatalogTraversal
   }
 
 
-  bool ProcessCatalogJob(const CatalogJob &job)
-  {
+  bool ProcessCatalogJob(const CatalogJob &job) {
     // load a catalog
     const std::string tmp_file = LoadAndExtractCatalog(job.hash);
     if (tmp_file.empty()) {
@@ -289,7 +288,7 @@ class CatalogTraversal
    * @return       true if the file exists, false otherwise
    */
   bool Exists(const std::string &file) {
-    if (is_remote_){
+    if (is_remote_) {
       download::JobInfo head(&file, false);
       return download::Fetch(&head) == download::kFailOk;
     }
