@@ -102,7 +102,12 @@ print 'Installing cpanminus... ';
 system('curl --cacert cacert.pem -L http://cpanmin.us | perl - --self-upgrade');
 print "Done.\n";
 
-if (-f '/usr/bin/cpanm') {
+print 'Creating symlink to cpanminus in /usr/bin... ';
+system('ln -s /usr/local/bin/cpanm /usr/bin/cpanm');
+print "Done.\n";
+
+system("which cpanm > /dev/null 2>&1");
+if ( $? == 0 ) {
 	print 'Installing ZeroMQ perl modules... ';
 	system('sudo cpanm ZeroMQ');
 	print "Done.\n";
