@@ -129,11 +129,11 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
-  echo "downloading some previous versions of the CVMFS code as test data..." >> $logfile
-  download_and_untar_cvmfs_versions >> $logfile 2>&1 || return $?
-
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+  
+  echo "downloading some previous versions of the CVMFS code as test data..." >> $logfile
+  download_and_untar_cvmfs_versions >> $logfile 2>&1 || return $?
 
   echo "do the business" >> $logfile 2>&1
   for i in 0 1 2 3
