@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Delete Empty Directory"
+cvmfs_test_autofs_on_startup=false
 
 produce_files_in() {
 	local working_dir=$1

@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Simulate CVMFS Development"
+cvmfs_test_autofs_on_startup=false
 
 # cvmfs source tarballs to be downloaded and used as test data
 cvmfs_versions=( \

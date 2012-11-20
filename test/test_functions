@@ -21,6 +21,13 @@ CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for te
 
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 
+# find the service binary
+if [ -x /sbin/service ]; then
+  service_binary="/sbin/service"
+else
+  # Ubuntu
+  service_binary="/usr/sbin/service"
+fi
 
 # ensures that autofs is on or off
 # @param state   the desired state of autofs (on|off)
@@ -29,15 +36,6 @@ autofs_switch() {
   local state=$1
   local is_running
 
-  # find the service binary
-  local service
-  if [ -x /sbin/service ]; then
-    service="/sbin/service"
-  else
-    # Ubuntu
-    service="/usr/sbin/service"
-  fi
-
   # check if autofs is currently running
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
   is_running=$?
@@ -45,15 +43,15 @@ autofs_switch() {
   # switch it on or off, if necessary
   case $state in
     on)
-      if [ $is_running -eq 1 ]; then
+      if [ $is_running -ne 0 ]; then
         echo "starting autofs..."
-        $service autofs forcestart
+        $service_binary autofs start
       fi
       ;;
     off)
       if [ $is_running -eq 0 ]; then
         echo "stopping autofs..."
-        $service autofs stop
+        $service_binary autofs stop
       fi
       ;;
   esac
@@ -65,13 +63,11 @@ cvmfs_clean() {
   sudo rm -rf /var/lib/cvmfs/*
   sudo rm -f /etc/cvmfs/default.local
   sudo rm -f /etc/cvmfs/config.d/*
-
-  autofs_switch on || return 101
   
   timeout=5
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
-      return 102
+      return 101
     fi
     timeout=$(($timeout-1))
     sleep 1
