@@ -21,16 +21,57 @@ CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for te
 
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 
+
+# ensures that autofs is on or off
+# @param state   the desired state of autofs (on|off)
+# @return        0 on success, 1 on failure
+autofs_switch() {
+  local state=$1
+  local is_running
+
+  # find the service binary
+  local service
+  if [ -x /sbin/service ]; then
+    service="/sbin/service"
+  else
+    # Ubuntu
+    service="/usr/sbin/service"
+  fi
+
+  # check if autofs is currently running
+  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+  is_running=$?
+
+  # switch it on or off, if necessary
+  case $state in
+    on)
+      if [ $is_running -eq 1 ]; then
+        echo "starting autofs..."
+        $service autofs forcestart
+      fi
+      ;;
+    off)
+      if [ $is_running -eq 0 ]; then
+        echo "stopping autofs..."
+        $service autofs stop
+      fi
+      ;;
+  esac
+}
+
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo rm -rf /var/lib/cvmfs/*
   sudo rm -f /etc/cvmfs/default.local
   sudo rm -f /etc/cvmfs/config.d/*
+
+  autofs_switch on || return 101
   
   timeout=5
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
-      return 101
+      return 102
     fi
     timeout=$(($timeout-1))
     sleep 1
@@ -127,26 +168,22 @@ create_repo() {
   local repo=$1
   local uid=$2
 
+  echo "Shutting down autofs for the cvmfs mounts"
+  autofs_switch off || return 100
+
   if cvmfs_server list | grep -q $repo; then
     echo "Repository $repo is already present... removing it"
-    sudo cvmfs_server rmfs $repo -f || return 100
+    sudo cvmfs_server rmfs $repo -f || return 101
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs $repo -o $uid || return 101
+  sudo cvmfs_server mkfs $repo -o $uid || return 102
 }
 
 
 create_empty_repo() {
   local repo=$1
   local uid=$2
-
-  # check if someone tries to go upwards in the directory tree to safeguard
-  # harmful things might happen with `rm -fR *` :o)
-  if [ x"$repo" != x`echo $repo | sed -e 's/\/\.\.//' -e 's/\.\.\///' -e 's/\.\.//'` ];
-  then
-    return 100
-  fi
 
   create_repo $repo $uid || return 101
 
