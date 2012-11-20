@@ -38,7 +38,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
     &CommandListCatalogs::CatalogCallback,
     repository);
 
-  return traversal.Traverse();
+  return traversal.Traverse() ? 0 : 1;
 }
 
 
