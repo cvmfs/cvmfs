@@ -23,7 +23,9 @@
 #include "util.h"
 #include "logging.h"
 
-#include "upload_backend.h"
+#include "upload_local.h"
+#include "upload_riak.h"
+
 
 using namespace std;  // NOLINT
 
@@ -196,34 +198,39 @@ Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition) {
 
     AbstractSpoolerBackend *backend;
 
-    if (upstream_driver == "local")
-    {
+    if (upstream_driver == "local") {
       LogCvmfs(kLogSpooler, kLogVerboseMsg, "creating local spooler backend");
       LocalSpoolerBackend *local_backend = new LocalSpoolerBackend();
       local_backend->set_upstream_path(upstream_path);
       backend = local_backend;
     }
 
-    if (! backend->Connect(paths_out, digests_in))
-    {
+    if (upstream_driver == "riak") {
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "creating riak spooler backend");
+      RiakSpoolerBackend *riak_backend = new RiakSpoolerBackend();
+      backend = riak_backend;
+    }
+
+    if (! backend->Connect(paths_out, digests_in)) {
       PrintError("failed to connect to spooler backend");
       delete backend;
       exit(2);
-    } else
+    } else {
       LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected local spooler backend");
+    }
 
-
-    if (! backend->Initialize())
-    {
+    if (! backend->Initialize()) {
       PrintError("failed to initialize spooler backend");
       delete backend;
       exit(3);
-    } else
+    } else {
       LogCvmfs(kLogSpooler, kLogVerboseMsg, "initialized local spooler backend");
+    }
 
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "spooler backend is up and running...");
     retval = backend->Run();
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "spooler backend is up and running...");
     delete backend;
+
     exit(retval);
   }
 
