@@ -16,6 +16,7 @@
 #include "logging.h"
 #include "swissknife_zpipe.h"
 #include "swissknife_check.h"
+#include "swissknife_lsrepo.h"
 #include "swissknife_pull.h"
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
@@ -65,6 +66,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandSync());
   command_list.push_back(new swissknife::CommandSign());
   command_list.push_back(new swissknife::CommandCheck());
+  command_list.push_back(new swissknife::CommandListCatalogs());
   command_list.push_back(new swissknife::CommandPull());
   command_list.push_back(new swissknife::CommandZpipe());
 

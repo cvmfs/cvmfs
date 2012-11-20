@@ -205,8 +205,6 @@ class AbstractCatalogManager {
 
   InodeRange AcquireInodes(uint64_t size);
   void ReleaseInodes(const InodeRange chunk);
-
-  bool MountRecursively(Catalog *catalog);
 };  // class CatalogManager
 
 }  // namespace catalog
