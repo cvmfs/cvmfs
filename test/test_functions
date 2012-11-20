@@ -1,8 +1,62 @@
 
+# By default, this script runs in testing mode
+# Although it allows for a server debugging mode, which attaches gdb to
+# the `cvmfs_server publish` process and allows for both online and
+# failure debugging.
+#
+# To allow for online debugging, export CVMFS_TEST_SRVDEBUG like so:
+# 
+# `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
+# `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
+
+
 CVMFS_TEST_DEBUGLOG=
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
+
+CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
+CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
+CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing 
+
+CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
+
+# find the service binary
+if [ -x /sbin/service ]; then
+  service_binary="/sbin/service"
+else
+  # Ubuntu
+  service_binary="/usr/sbin/service"
+fi
+
+# ensures that autofs is on or off
+# @param state   the desired state of autofs (on|off)
+# @return        0 on success, 1 on failure
+autofs_switch() {
+  local state=$1
+  local is_running
+
+  # check if autofs is currently running
+  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+  is_running=$?
+
+  # switch it on or off, if necessary
+  case $state in
+    on)
+      if [ $is_running -ne 0 ]; then
+        echo "starting autofs..."
+        $service_binary autofs start
+      fi
+      ;;
+    off)
+      if [ $is_running -eq 0 ]; then
+        echo "stopping autofs..."
+        $service_binary autofs stop
+      fi
+      ;;
+  esac
+}
+
 
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
@@ -105,3 +159,164 @@ check_memory() {
   return 0
 }
 
+
+create_repo() {
+  local repo=$1
+  local uid=$2
+
+  echo "Shutting down autofs for the cvmfs mounts"
+  autofs_switch off || return 100
+
+  if cvmfs_server list | grep -q $repo; then
+    echo "Repository $repo is already present... removing it"
+    sudo cvmfs_server rmfs $repo -f || return 101
+  fi
+
+  echo "Creating new repository $repo..."
+  sudo cvmfs_server mkfs $repo -o $uid || return 102
+}
+
+
+create_empty_repo() {
+  local repo=$1
+  local uid=$2
+
+  create_repo $repo $uid || return 101
+
+  sudo cvmfs_server transaction $repo || return 102
+  rm -f /cvmfs/$repo/new_repository
+  sudo cvmfs_server publish $repo || return 103
+}
+
+
+# generate a custom style recursive listing with only the following infos:
+# - file name
+# - linkcount
+# - file mode
+# - file size
+# - parent directory
+# - symlink destination (when applicable)
+# - uid and gid can be specified
+#
+# @param directory          the directory to be listed
+# @param uid                specify a UID for the file owner (optional)
+# @param gid                specify a GID for the file owner (optional)
+# @return                   a custom directory listing
+create_listing() {
+  local directory=$1
+  local uid=$2
+  local gid=$3
+  local lst
+
+  lst=$(ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
+  awk '
+  {
+    # skip the total file count, ls prints at the end of each directory listing
+    if(substr($1, 0, 5) == "total") next;
+
+    # length of base directory path
+    base_dir_length = length(base_dir)
+
+    # truncate base path from the path printed before each new listing
+    if(substr($0, 0, base_dir_length) == base_dir) {
+      print substr($0, base_dir_length + 1, length($0)-1)
+      next;
+    }
+
+    # first character
+    first = substr($0, 0, 1);
+
+    # print file meta information
+    # $1    => file mode (rwx bits, ...)
+    # $2    => linkcount
+    # $3,$4 => owner, group (might also be provided from outside)
+    # $5    => file size (skipped for directories)
+    # $6    => file name
+    # $7,$8 => symlink destination (only for symlinks :o) )
+
+    if (first != "-" && first != "d" && first != "l")
+    {
+      printf "\n"
+      next;
+    }
+
+    # print out file information
+    printf $1                     " ";
+    printf $2                     " ";
+    printf (uid == "" ? $3 : uid) " ";
+    printf (gid == "" ? $4 : gid) " ";
+    printf $6;
+
+    if(first == "l") printf " " $7 " " $8;
+    if(first != "d") printf " " $5;
+    printf "\n"
+  }' uid=$uid gid=$gid base_dir=$directory)
+
+  echo -e "$lst"
+}
+
+# compares the file contents and file meta data of two directories
+# Note: function creates the files 'listingFile1' and 'listingFile2' in `pwd`
+#       `pwd` should NOT be part of the comparison!!
+#
+# @param dir1    the directory to probe
+# @param dir2    the ground truth directory
+# @return        != 0 to indicate inequality, 0 means success
+compare_directories() {
+  local dir1=$1
+  local dir2=$2
+
+  listing1=$(create_listing $dir1)
+  listing2=$(create_listing $dir2)
+
+  echo "check if directory structure and file meta data fits"
+  echo -e "$listing1" > listingFile1
+  echo -e "$listing2" > listingFile2
+  diff -uN listingFile1 listingFile2 2>&1 || return 101
+
+  echo "check if the file contents in both directories are the same"
+  diff -ruN $dir1 $dir2 2>&1 || return 102
+
+  return 0
+}
+
+# uses `cvmfs_server check` to check the integrity of the catalog structure
+# @param repo    the repository to be checked
+check_catalogs() {
+  local repo=$1
+
+  cvmfs_server check $repo || return 100
+  return 0
+}
+
+# wrapper function to start a new repository update transaction
+# @param repo    the repository you want to start the transaction for
+start_transaction() {
+  local repo=$1
+
+  cvmfs_server transaction $repo || return 100
+  return 0
+}
+
+# wrapper function to publish an repository after its contents were updated.
+# @param repo    the repository name to start the transaction in
+publish_repo() {
+  local repo=$1
+
+  # enable the debug mode?
+  # in debug mode we redirect output directly to the interactive shell,
+  # overriding any redirections to logfiles or whatever... We want to hack!
+  case $CVMFS_TEST_SRVDEBUG in
+    fail)
+      cvmfs_server publish $repo -d > /dev/tty 2>&1 || return 100
+    ;;
+    startup)
+      cvmfs_server publish $repo -D > /dev/tty 2>&1 || return 100
+    ;;
+    *)
+      cvmfs_server publish $repo || return 100
+    ;;
+  esac
+
+  return 0
+}

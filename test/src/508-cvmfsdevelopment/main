@@ -1,0 +1,146 @@
+
+cvmfs_test_name="Simulate CVMFS Development"
+cvmfs_test_autofs_on_startup=false
+
+# cvmfs source tarballs to be downloaded and used as test data
+cvmfs_versions=( \
+  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.1/cvmfs-2.1.1.tar.gz" \
+  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.2/cvmfs-2.1.2.tar.gz" \
+  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.3/cvmfs-2.1.3.tar.gz" \
+  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.4/cvmfs-2.1.4.tar.gz" \
+  )
+
+# downloads and extracts a number of CVMFS source packages
+# from the electric commander server (URLs above)
+download_and_untar_cvmfs_versions() {
+  for cvmfs_version in "${cvmfs_versions[@]}"
+  do
+    echo $cvmfs_version
+
+    wget --quiet $cvmfs_version || return 201
+    tarname=$(basename $cvmfs_version)
+    tar -xzf $tarname || return 202
+  done
+}
+
+# copies one version of the downloaded CVMFS source tree
+# to the given position while overwriting existing files.
+# @param working_dir    the destination directory
+# @param version        the CVMFS version to be copied (index in array above)
+copy_cvmfs_version() {
+  local working_dir=$1
+  local version=$2
+  local source_dir
+  source_dir=$(basename ${cvmfs_versions[$version]} | sed 's/\.tar\.gz//')
+
+  echo $source_dir
+
+  cp -uR $source_dir/* $working_dir
+}
+
+# set some nested catalogs in the CVMFS source tree
+# @param working_dir   the destination directory
+# @param version       the version of CVMFS to be copied (index in array on top)
+configure_nested_catalogs() {
+  local working_dir=$1
+  local version=$2
+
+  case $version in
+    0)
+      touch $working_dir/externals/.cvmfscatalog
+      touch $working_dir/cvmfs/.cvmfscatalog
+      touch $working_dir/test/.cvmfscatalog
+      ;;
+    1)
+      touch $working_dir/externals/zlib/.cvmfscatalog
+      touch $working_dir/externals/sqlite3/.cvmfscatalog
+      rm -f $working_dir/cvmfs/.cvmfscatalog
+      ;;
+    2)
+      touch $working_dir/test/HTTP/.cvmfscatalog
+      touch $working_dir/test/LWP/.cvmfscatalog
+      rm -f $working_dir/test/.cvmfscatalog
+      ;;
+    3)
+      rm -f $working_dir/externals/.cvmfscatalog
+      rm -f $working_dir/externals/zlib/.cvmfscatalog
+      rm -f $working_dir/externals/sqlite3/.cvmfscatalog
+      rm -f $working_dir/cvmfs/.cvmfscatalog
+      rm -f $working_dir/test/HTTP/.cvmfscatalog
+      rm -f $working_dir/test/LWP/.cvmfscatalog
+      ;;
+  esac
+}
+
+# checks if all nested catalogs that were requested by configure_nested_catalogs()
+# are actually present in the catalog tree.
+# @param version    the repository version to be checked
+#                   (same as for configure_nested_catalogs())
+check_catalog_presence() {
+  local version=$1
+  # TODO: needs to be implemented in cvmfs_swissknife
+
+  # case $version in
+  #   0)
+  #     ;;
+  #   1)
+  #     ...
+}
+
+# does a whole version update
+# @param version        the version to be copied (index in array on top)
+# @param repo_dir       the repository directory to copy to
+# @param reference_dir  the reference directory to copy to
+copy_version() {
+  local version=$1
+  local repo_dir=$2
+  local reference_dir=$3
+
+  echo "COPY VERSION === $version === ..."
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  copy_cvmfs_version $repo_dir $version || return 3
+  configure_nested_catalogs $repo_dir $version || return 4
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  copy_cvmfs_version $reference_dir $version || return 5
+  configure_nested_catalogs $reference_dir $version || return 6
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog integrity"
+  check_catalogs $CVMFS_TEST_REPO || return $?
+
+  echo "check if requested nested catalogs are present"
+  check_catalog_presence $version || return $?
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+  
+  echo "downloading some previous versions of the CVMFS code as test data..." >> $logfile
+  download_and_untar_cvmfs_versions >> $logfile 2>&1 || return $?
+
+  echo "do the business" >> $logfile 2>&1
+  for i in 0 1 2 3
+  do
+    copy_version $i $repo_dir $reference_dir >> $logfile 2>&1 || return $?
+  done
+
+  return 0
+}
