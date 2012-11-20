@@ -16,7 +16,7 @@
 #include "logging.h"
 #include "swissknife_zpipe.h"
 #include "swissknife_check.h"
-#include "swissknife_listcatalogs.h"
+#include "swissknife_lsrepo.h"
 #include "swissknife_pull.h"
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"

@@ -16,27 +16,27 @@ set (CVMFS_LOADER_SOURCES
 
 set (CVMFS_CLIENT_SOURCES
   smalloc.h
-	logging.cc logging.h logging_internal.h
-	tracer.h tracer.cc atomic.h
-	duplex_sqlite3.h duplex_curl.h
-	signature.h signature.cc
-	quota.h quota.cc
-	hash.h hash.cc
-	cache.h cache.cc
-	platform.h platform_osx.h platform_linux.h
-	monitor.h monitor.cc
-	util.cc util.h
-	duplex_zlib.h compression.h compression.cc
-	download.cc download.h
+  logging.cc logging.h logging_internal.h
+  tracer.h tracer.cc atomic.h
+  duplex_sqlite3.h duplex_curl.h
+  signature.h signature.cc
+  quota.h quota.cc
+  hash.h hash.cc
+  cache.h cache.cc
+  platform.h platform_osx.h platform_linux.h
+  monitor.h monitor.cc
+  util.cc util.h
+  duplex_zlib.h compression.h compression.cc
+  download.cc download.h
   manifest.h manifest.cc
   manifest_fetch.h manifest_fetch.cc
-	lru.h lru.cc
-	globals.h globals.cc
-	peers.h peers.cc
-	catalog_sql.h catalog_sql.cc
-	catalog.h catalog.cc
-	catalog_mgr.h catalog_mgr.cc
-	shortstring.h dirent.h
+  lru.h lru.cc
+  globals.h globals.cc
+  peers.h peers.cc
+  catalog_sql.h catalog_sql.cc
+  catalog.h catalog.cc
+  catalog_mgr.h catalog_mgr.cc
+  shortstring.h dirent.h
   fs_traversal.h
 )
 
@@ -62,13 +62,13 @@ set (LIBCVMFS_SOURCES
 )
 
 set (CVMFS_FSCK_SOURCES
-	platform.h platform_linux.h platform_osx.h
+  platform.h platform_linux.h platform_osx.h
   logging_internal.h logging.h logging.cc
   smalloc.h
   atomic.h
-	duplex_zlib.h compression.cc compression.h
-	hash.cc hash.h
-	util.cc util.h
+  duplex_zlib.h compression.cc compression.h
+  hash.cc hash.h
+  util.cc util.h
   cvmfs_fsck.cc)
 
 set (CVMFS_SWISSKNIFE_SOURCES
@@ -101,7 +101,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
-  swissknife_listcatalogs.h swissknife_listcatalogs.cc
+  swissknife_lsrepo.h swissknife_lsrepo.cc
   swissknife_pull.h swissknife_pull.cc
   swissknife_sign.h swissknife_sign.cc
   swissknife_sync.h swissknife_sync.cc

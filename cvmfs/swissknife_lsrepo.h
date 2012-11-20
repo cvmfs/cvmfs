@@ -19,9 +19,9 @@ class CommandListCatalogs : public Command {
  public:
   CommandListCatalogs();
   ~CommandListCatalogs() { };
-  std::string GetName() { return "lscat"; };
+  std::string GetName() { return "lsrepo"; };
   std::string GetDescription() {
-    return "CernVM File System Catalog Listing\n"
+    return "CernVM File System Repository Traversal\n"
       "This command lists the nested catalog tree that builds up a "
       "cvmfs repository structure.";
   };
@@ -31,7 +31,7 @@ class CommandListCatalogs : public Command {
 
   void CatalogCallback(const catalog::Catalog* catalog,
                        const hash::Any&        catalog_hash,
-                       const unsigned          recursion_depth);
+                       const unsigned          tree_level);
 
  private:
   bool print_tree_;

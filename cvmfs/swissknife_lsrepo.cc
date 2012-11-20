@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "swissknife_listcatalogs.h"
+#include "swissknife_lsrepo.h"
 
 #include "catalog_traversal.h"
 #include "logging.h"
@@ -16,11 +16,15 @@ CommandListCatalogs::CommandListCatalogs() :
 
 ParameterList CommandListCatalogs::GetParams() {
   ParameterList result;
-  result.push_back(Parameter('r', "repository name",
+  result.push_back(Parameter('r', "repository URL (absolute local path or remote URL)",
                              false, false));
+  result.push_back(Parameter('n', "fully qualified repository name",
+                             true, false));
+  result.push_back(Parameter('k', "repository master key(s)",
+                             true, false));
   result.push_back(Parameter('t', "print tree structure of catalogs",
                              true, true));
-  result.push_back(Parameter('h', "print hash for each catalog",
+  result.push_back(Parameter('d', "print digest for each catalog",
                              true, true));
   return result;
 }
@@ -28,15 +32,18 @@ ParameterList CommandListCatalogs::GetParams() {
 
 int CommandListCatalogs::Main(const ArgumentList &args) {
   print_tree_ = (args.count('t') > 0);
-  print_hash_ = (args.count('h') > 0);
+  print_hash_ = (args.count('d') > 0);
 
-  assert(args.count('r') > 0);
-  const std::string &repository = *args.find('r')->second;
+  const std::string &repo_url = *args.find('r')->second;
+  const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second : "";
+  const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
 
   CatalogTraversal<CommandListCatalogs> traversal(
     this, 
     &CommandListCatalogs::CatalogCallback,
-    repository);
+    repo_url,
+    repo_name,
+    repo_keys);
 
   return traversal.Traverse() ? 0 : 1;
 }
@@ -44,17 +51,17 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
 
 void CommandListCatalogs::CatalogCallback(const catalog::Catalog* catalog,
                                           const hash::Any&        catalog_hash,
-                                          const unsigned          recursion_depth) {
+                                          const unsigned          tree_level) {
   std::string tree_indent;
   std::string hash_string;
   std::string path;
 
   if (print_tree_) {
-    for (unsigned int i = 1; i < recursion_depth; ++i) {
+    for (unsigned int i = 1; i < tree_level; ++i) {
       tree_indent += "\u2502  ";
     }
 
-    if (recursion_depth > 0)
+    if (tree_level > 0)
       tree_indent += "\u251C\u2500 ";
   }
 

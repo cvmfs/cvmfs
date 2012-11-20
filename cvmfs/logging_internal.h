@@ -50,6 +50,7 @@ enum LogSource {
   kLogSignature,
   kLogPeers,
   kLogFsTraversal,
+  kLogCatalogTraversal,
   kLogNfsMaps,
   kLogPublish,
   kLogSpooler,
