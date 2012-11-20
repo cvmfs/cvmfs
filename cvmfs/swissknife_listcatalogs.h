@@ -7,6 +7,8 @@
 
 #include "swissknife.h"
 
+#include "hash.h"
+
 namespace catalog {
   class Catalog;
 }
@@ -28,6 +30,7 @@ class CommandListCatalogs : public Command {
   int Main(const ArgumentList &args);
 
   void CatalogCallback(const catalog::Catalog* catalog,
+                       const hash::Any&        catalog_hash,
                        const unsigned          recursion_depth);
 
  private:

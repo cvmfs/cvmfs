@@ -4,10 +4,8 @@
 
 #include "swissknife_listcatalogs.h"
 
-#include "cache.h"
-#include "catalog_mgr.h"
-
 #include "catalog_traversal.h"
+#include "logging.h"
 
 using namespace swissknife;
 
@@ -40,24 +38,34 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
     &CommandListCatalogs::CatalogCallback,
     repository);
 
-  traversal.Traverse();
-
-  // const bool ignore_signature = true;
-  // cache::CatalogManager* catalog_manager =
-  //     new cache::CatalogManager(repository, ignore_signature);
-
-  // if (!catalog_manager)
-  // {
-  //   LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize catalog manager");
-  //   return 1;
-  // }
-
-  return 0;
+  return traversal.Traverse();
 }
 
 
 void CommandListCatalogs::CatalogCallback(const catalog::Catalog* catalog,
+                                          const hash::Any&        catalog_hash,
                                           const unsigned          recursion_depth) {
-  LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Depth: %d",
-    catalog->path().c_str(), recursion_depth);
+  std::string tree_indent;
+  std::string hash_string;
+  std::string path;
+
+  if (print_tree_) {
+    for (unsigned int i = 1; i < recursion_depth; ++i) {
+      tree_indent += "\u2502   ";
+    }
+
+    if (recursion_depth > 0)
+      tree_indent += "\u251C\u2500 ";
+  }
+
+  if (print_hash_) {
+    hash_string = catalog_hash.ToString() + " ";
+  }
+
+  path = catalog->path().ToString();
+  if (path.empty())
+    path = "/";
+  
+  LogCvmfs(kLogCatalog, kLogStdout, "%s%s%s",
+    tree_indent.c_str(), hash_string.c_str(), path.c_str());
 }

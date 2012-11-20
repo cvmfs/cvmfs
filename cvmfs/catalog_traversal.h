@@ -29,11 +29,13 @@ class CatalogTraversal
   /**
    * Callback signature which has to be implemented by the delegate object
    * @param catalog             the catalog object which needs to be processed
+   * @param catalog_hash        the SHA1 content hash of the catalog
    * @param recursion_depth     the depth in the nested catalog tree 
    *                            (starting at zero)
    */
   typedef void (T::*Callback)(const catalog::Catalog* catalog,
-                              const unsigned recursion_depth);
+                              const hash::Any&        catalog_hash,
+                              const unsigned          recursion_depth);
 
 
  protected:
@@ -162,7 +164,7 @@ class CatalogTraversal
     }
 
     // provide the user with the catalog
-    (delegate_->*catalog_callback_)(catalog, job.recursion_depth);
+    (delegate_->*catalog_callback_)(catalog, job.hash, job.recursion_depth);
 
     // Inception! Go to the next recursion level
     catalog::Catalog::NestedCatalogList *nested_catalogs =
