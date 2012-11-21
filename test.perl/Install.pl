@@ -13,8 +13,8 @@ use FindBin qw($RealBin);
 $| = 1;
 
 my $prefix = '/opt';
-my $manpath = '/usr/local/man';
-my $bindir = '/usr/local/bin';
+my $manpath = '/usr/man';
+my $bindir = '/usr/bin';
 my $bin_name = 'cvmfs-test';
 my $cpanm_bin = '/usr/bin/cpanm';
 my $force = undef;
