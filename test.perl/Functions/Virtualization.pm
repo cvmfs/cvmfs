@@ -109,27 +109,21 @@ sub in_context {
 	print "Done.\n";
 	
 	print 'Creating prolog.sh... ';
-	open (my $prologsh, '>', "$distributed/iso/prolog.sh");
-	print $prologsh "echo \"Starting prolog.sh..\"\n";
+	open (my $prologsh, '<', "$distributed/prolog.sh");
+	open (my $newprolog, '>', "$distributed/iso/prolog.sh");
+	while (my $line = $prologsh->getline) {
+		if($line =~ m/^SHELLPATH/ ) {
+			print $newprolog "SHELLPATH=\"$shell_address\"\n";
+		}
+		else {
+			print $newprolog $line;
+		}
+	}
+	close($newprolog);
 	close($prologsh);
 	print "Done.\n";
 	
-	print 'Creating epilog.sh... ';
-	open (my $epilogsh, '<', "$distributed/epilog.sh");
-	open (my $newepilog, '>', "$distributed/iso/epilog.sh");
-	while (my $line = $epilogsh->getline) {
-		if($line =~ m/^SHELLPATH/ ) {
-			print $newepilog "SHELLPATH=\"$shell_address\"\n";
-		}
-		else {
-			print $newepilog $line;
-		}
-	}
-	close($newepilog);
-	close($epilogsh);
-	print "Done.\n";
-	
-	system("chmod +x $distributed/prolog.sh $distributed/epilog.sh");
+	system("chmod +x $distributed/prolog.sh");
 	
 	print 'Generating context.iso... ';
 	system("mkisofs -o $distributed/context.iso $distributed/iso");
