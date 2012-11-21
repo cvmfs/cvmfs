@@ -10,12 +10,14 @@ my $outputfile = '/var/log/cvmfs-test/do_all.out';
 my $errorfile = '/var/log/cvmfs-test/do_all.err';
 my $no_clean = undef;
 my %options;
+my $shell_path = '127.0.0.1:6651';
 
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "option=s" => \%options );
+					   "option=s" => \%options,
+					   "shell-path=s" => \$shell_path );
 					   
 # Test name used for socket identity
 my $testname = 'DO_ALL';
@@ -67,7 +69,7 @@ if (defined ($pid) and $pid == 0) {
 	my ($socket, $ctxt) = open_test_socket($testname);
 	
 	# Opening the socket to send the output to the shell
-	my ($shell_socket, $shell_ctxt) = open_shellout_socket();
+	my ($shell_socket, $shell_ctxt) = open_shellout_socket('tcp://', $shell_path);
 	
 	# Array to store every main.pl files
 	my @main_pl;

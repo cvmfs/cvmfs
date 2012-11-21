@@ -133,7 +133,9 @@ sub send_ip {
 	
 	my $daemon_ip = Functions::Testd::get_interface_address($interface);
 	
+	print 'Sending IP to the shell... ';
 	ZeroMQ::Raw::zmq_send($socket, "$daemon_ip:6650");
+	print "Done.\n";
 	
 	ZeroMQ::Raw::zmq_close($socket);
 	ZeroMQ::Raw::zmq_term($ctxt);

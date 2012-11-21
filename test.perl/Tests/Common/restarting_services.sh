@@ -3,7 +3,7 @@
 # which erases cvmfs cache.
 
 # cvmfs startup script
-CVMFS="/usr/bin/cvmfs_config"
+CVMFS="/etc/init.d/cvmfs"
 
 # autofs startup script
 AUTOFS="/etc/init.d/autofs"

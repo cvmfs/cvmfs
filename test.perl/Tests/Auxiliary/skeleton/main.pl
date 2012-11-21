@@ -62,12 +62,18 @@ my $errorfile = '/var/log/cvmfs-test/skeleton.err';
 
 my $no_clean = undef;
 
+# Next variable will be used to save the path where the script has to open the socket
+# to contact the shell. User hasn't to set any path, the daemon will automatically pass
+# to every test the shell path if this isn't local.
+my $shell_path = '127.0.0.1:6651';
+
 # After setting all variables, here we're parsing command line options that
 # were actually received by the script. Have a look to 'perldoc Getopt::Long'
 # for a reference on how tu use this module.
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
-					   "no-clean" => \$no_clean );
+					   "no-clean" => \$no_clean,
+					   "shell-path=s" => \$shell_path );
 ###########					   
 # FORKING #
 ###########
@@ -116,7 +122,7 @@ if (defined($pid) and $pid == 0) {
 	# socket as we don't need to get any data from the shell. We're not commenting it as
 	# we'll need to send output to the shell before the end of the script.
 
-	my ($shell_socket, $shell_ctxt) = open_shellout_socket();
+	my ($shell_socket, $shell_ctxt) = open_shellout_socket('tcp://', $shell_path);
 	
 	# It's a good idea to have your script to work in a clean environment. Every test,
 	# before starting, should send to the daemon a 'clean' command.

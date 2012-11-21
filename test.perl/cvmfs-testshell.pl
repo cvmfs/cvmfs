@@ -26,18 +26,25 @@ my $daemon_ip = "127.0.0.1";
 my $daemon_port = "6650";
 my $daemon_path = "$daemon_ip:$daemon_port";
 
-# Next variables is used to control when to skip a loop cycle
+
+# Next variables is used to control when to skip a loop cicle
 my $continue = undef;
 
 # Variables for socket managing
 my $socket = undef;
 my $ctxt = undef;
 
+# Variables for daemon, passed with --start option
+my $shell_path = undef;
+my $iface = undef;
+
 my $ret = GetOptions ( "c|command=s" => \$command,
 					   "wait-daemon" => \$wait_daemon,
 					   "setup" => \$setup,
 					   "start" => \$start,
-					   "h|help" => \$help_message );
+					   "h|help" => \$help_message,
+					   "shell-path=s" => \$shell_path,
+					   "iface=s" => \$iface );
 
 if (defined($help_message)) {
 	my $help = <<'END';
@@ -66,7 +73,7 @@ if (defined($wait_daemon)) {
 }
 
 if (defined($start)) {
-	($socket, $ctxt) = start_daemon($daemon_path);
+	($socket, $ctxt) = start_daemon($daemon_path, $shell_path, $iface);
 	exit_shell($socket, $ctxt, 2);
 }
 

@@ -12,10 +12,12 @@ use Functions::Help qw(help);
 use Proc::Daemon;
 use Fcntl ':mode';
 use Getopt::Long;
+use IO::Interface::Simple;
 use Functions::Setup qw(setup fixperm);
 use Functions::ShellSocket qw(connect_shell_socket send_shell_msg receive_shell_msg close_shell_socket term_shell_ctxt bind_shell_socket);
 use Term::ANSIColor;
 use Time::HiRes qw(sleep);
+use Functions::Virtualization qw(start_distributed);
 
 # Next lines are needed to export subroutines to the main package
 use base 'Exporter';
@@ -26,10 +28,13 @@ use vars qw/ @EXPORT_OK /;
 # if you have a better method, let me know.
 use FindBin qw($RealBin);
 
+# This variable will be set to 1 if the shell is speaking to a daemon on a remote machine
+my $remote = 0;
+
 # This function will check whether the daemon is running.
 sub check_daemon {
 	my $running = `ps -ef | grep cvmfs-testdwrapper | grep -v grep | grep -v defunct`;
-	return $running and $main::daemon_ip ne "127.0.0.1";
+	return ($running or $remote);
 }
 
 sub check_process {
@@ -54,7 +59,7 @@ sub check_command {
 	for ($command){
 		if ($_ eq 'exit' or $_ eq 'quit' or $_ eq 'q') { exit_shell($socket, $ctxt) }
 		elsif ($_ eq 'status') { print_status(); $executed = 1 }
-		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, $command); $executed = 1 }
+		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, undef, undef, $command); $executed = 1 }
 		elsif ($_ =~ m/^help\s*.*/ or $_ =~ m/^h\s.*/) { help($command), $executed = 1 }
 		elsif ($_ eq 'setup' ) { setup(); $executed = 1 }
 		elsif ($_ eq 'fixperm') { fixperm(); $executed = 1 }
@@ -85,8 +90,10 @@ sub wait_daemon {
 	# Opening the socket to wait for the daemon to send its ip
 	my ($shell_socket, $shell_ctxt) = bind_shell_socket();
 	
-	# Wait fo the daemon message
+	# Wait for the daemon message
+	print "Waiting for the daemon...\n";
 	my $answer = receive_shell_msg($shell_socket);
+	print "Received a connection from $answer.\n";
 	
 	# Splitting the message and assigning it to variables
 	my @ip_port = split /:/, $answer;
@@ -99,6 +106,11 @@ sub wait_daemon {
 	
 	# Opening the socket to communicate with the server
 	($socket, $ctxt) = connect_shell_socket($daemon_path);
+	
+	# Setting $remote = 1 if the connection was successfull
+	if ($socket) {
+		$remote = 1;
+	}
 	
 	# Returning new socket and context
 	return ($socket, $ctxt);
@@ -158,6 +170,12 @@ sub check_permission {
 
 # This function will print a loading animation while waiting for test output
 sub loading_animation {
+	# This function will immediatily return if the daemon is running remotely since I didn't
+	# find a way to check if the process is running remotely
+	if ($remote) {
+		return;
+	}
+	
 	my $process_name = shift;
 	$process_name = lc($process_name);
 	
@@ -232,7 +250,7 @@ sub get_daemon_output {
 			# Most of special signal will not be printed as output part.
 			my $processed = 0;
 			# This case if the daemon has stopped itself
-			if ($_ =~ m/DAEMON_STOPPED/) { $socket = close_shell_socket($socket); $ctxt = term_shell_ctxt($ctxt); $processed = 1 }
+			if ($_ =~ m/DAEMON_STOPPED/) { $socket = close_shell_socket($socket); $ctxt = term_shell_ctxt($ctxt); $remote = 0 if $remote; $processed = 1 }
 			elsif ($_ =~ m/PROCESSING/) {
 				my $process_name = (split /:/, $_)[-1];
 				chomp($process_name);
@@ -269,6 +287,8 @@ sub get_daemon_output {
 # This function will start the daemon if it's not already running
 sub start_daemon {
 	my $daemon_path = shift;
+	my $shell_path = shift;
+	my $iface = shift;
 	if (defined (@_) and scalar(@_) > 0) {
 		# Retrieving arguments
 		my $line = shift;
@@ -285,13 +305,41 @@ sub start_daemon {
 	# Setting default values for options
 	my $daemon_output = '/var/log/cvmfs-test/daemon.output';
 	my $daemon_error = '/var/log/cvmfs-test/daemon.error';
+	my $distributed = undef;
 	
+	# Options that works only with --distributed but are here to avoid warnings
+	my $force = undef;
+	my $shell_iface = undef;
+	
+	# I need this line as get options will destroy @ARGV
+	my @backup_argv = @ARGV;
+	
+	# Parsing options
+	my $ret = GetOptions (  "stdout=s" => \$daemon_output,
+						    "stderr=s" => \$daemon_error,
+						    "distributed" => \$distributed,
+						    "force" => \$force,
+						    "shell-iface=s" => \$shell_iface );
+						   
+	# If a distributed environment is requested, pass everything to start_distributed()
+	if (defined($distributed)){
+		my $error = Functions::Virtualization::start_distributed(@backup_argv);
+		if ($error) {
+			my ($socket, $ctxt) = wait_daemon();
+			return ($socket, $ctxt);
+		}
+		return;
+	}
+	
+	# If we are here, we don't have any other command line processing to do, so here we
+	# join @ARGV content to pass it as a string to the daemon.
+	my $daemon_options = "";
+	if (defined($shell_path) and defined($iface)) {
+		$daemon_options = '--shell-path ' . $shell_path . ' --iface ' . $iface;
+	}
+		
 	if (!check_daemon()){
-		if(check_permission()){				
-			# Parsing options
-			my $ret = GetOptions ( "stdout=s" => \$daemon_output,
-								   "stderr=s" => \$daemon_error );								  
-			
+		if(check_permission()){									  
 			my ($daempid, $daemin, $daemout, $daemerr);
 			print 'Starting daemon... ';
 			my $daemonpid = Proc::Daemon::Init( { 
@@ -299,7 +347,7 @@ sub start_daemon {
 													pid_file => '/tmp/daemon.pid',
 													child_STDOUT => $daemon_output,
 													child_STDERR => $daemon_error,
-													exec_command => "./cvmfs-testdwrapper ./cvmfs-testd.pl",
+													exec_command => "./cvmfs-testdwrapper ./cvmfs-testd.pl $daemon_options",
 												} );
 			# Sleep and wait for the daemon to start or fail
 			sleep 1;

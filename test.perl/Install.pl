@@ -95,6 +95,7 @@ else {
 	print "Something went wrong while trying to download $zmq_retrieve.\n";
 	print "Check your internet connection and retry.\n";
 	print color 'reset';
+	exit 0;
 }
 
 
@@ -111,6 +112,10 @@ if ( $? == 0 ) {
 	print 'Installing ZeroMQ perl modules... ';
 	system('sudo cpanm ZeroMQ');
 	print "Done.\n";
+	
+	print 'Installing IO::Interface perl module... ';
+	system('sudo cpanm IO::Interface');
+	print "Done.\n";
 
 	print 'Upgrading Socket.pm version... ';
 	system('sudo cpanm Socket');
@@ -121,6 +126,7 @@ else {
 	print "Something went wrong while trying to download cpanm.\n";
 	print "Check your internet connection and retry.\n";
 	print color 'reset';
+	exit 0;
 }
 
 
