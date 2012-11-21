@@ -85,10 +85,10 @@ class Spooler {
   static Spooler *Construct(const std::string &definition_string);
   ~Spooler();
 
-  bool Connect();
   void SetCallback(SpoolerCallback *value) { spooler_callback_ = value; }
   void UnsetCallback() { delete spooler_callback_; spooler_callback_ = NULL; }
   SpoolerCallback *spooler_callback() { return spooler_callback_; }
+
   void SpoolProcess(const std::string &local_path,
                     const std::string &remote_dir,
                     const std::string &file_postfix);
@@ -102,7 +102,9 @@ class Spooler {
   uint64_t num_errors() { return atomic_read64(&num_errors_); }
 
  protected:
-  Spooler(const SpoolerDefinition &definition);
+  Spooler();
+  bool Connect(const std::string &fifo_paths,
+               const std::string &fifo_digests);
 
  private:
   static void *MainReceive(void *caller);

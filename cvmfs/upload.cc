@@ -84,9 +84,9 @@ Spooler* Spooler::Construct(const std::string &definition_string) {
   SpawnSpoolerBackend(spooler_definition);
 
   // create a Spooler frontend and connect it to the backend
-  Spooler *spooler = new Spooler(spooler_definition);
-  bool retval = spooler->Connect();
-  if (!retval) {
+  Spooler *spooler = new Spooler();
+  if (! spooler->Connect(spooler_definition.paths_out_pipe,
+                                 spooler_definition.digests_in_pipe)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to connect to spooler");
     return NULL;
   }
@@ -101,8 +101,7 @@ void Spooler::SpawnSpoolerBackend(
 
   // spawn spooler backend process
   int pid = fork();
-  if (pid < 0)
-  {
+  if (pid < 0) {
     LogCvmfs(kLogSpooler, kLogStderr, "failed to spawn spooler backend");
     assert(pid >= 0); // nothing to do here anymore... good bye
   }
@@ -160,9 +159,7 @@ out:
 }
 
 
-Spooler::Spooler(const SpoolerDefinition &definition) :
-  fifo_paths_(definition.paths_out_pipe),
-  fifo_digests_(definition.digests_in_pipe),
+Spooler::Spooler() :
   spooler_callback_(NULL),
   connected_(false),
   move_mode_(false),
@@ -170,8 +167,6 @@ Spooler::Spooler(const SpoolerDefinition &definition) :
   fd_digests_(-1),
   fdigests_(NULL)
 {
-  assert (definition.IsValid());
-
   atomic_init64(&num_pending_);
   atomic_init64(&num_errors_);
 }
@@ -229,13 +224,14 @@ void *Spooler::MainReceive(void *caller) {
 }
 
 
-bool Spooler::Connect() {
-  fd_paths_ = open(fifo_paths_.c_str(), O_WRONLY);
+bool Spooler::Connect(const std::string &fifo_paths,
+                      const std::string &fifo_digests) {
+  fd_paths_ = open(fifo_paths.c_str(), O_WRONLY);
   if (fd_paths_ < 0)
     return false;
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected to paths pipe (write)");
 
-  fd_digests_ = open(fifo_digests_.c_str(), O_RDONLY);
+  fd_digests_ = open(fifo_digests.c_str(), O_RDONLY);
   if (fd_digests_ < 0) {
     close(fd_paths_);
     fd_paths_ = -1;
