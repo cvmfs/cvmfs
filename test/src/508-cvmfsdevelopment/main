@@ -72,29 +72,87 @@ configure_nested_catalogs() {
   esac
 }
 
+# checks if a nested catalog is part of the current catalog configuration
+# of the repository
+# @param catalog_path  the catalog root path to be checked
+# @param repo_name     the repository to be checked
+check_catalog_presence() {
+  local catalog_path=$1
+  local repo_name=$2
+
+  if cvmfs_swissknife lsrepo -r /srv/cvmfs/$repo_name | grep -x -q $catalog_path; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 # checks if all nested catalogs that were requested by configure_nested_catalogs()
 # are actually present in the catalog tree.
 # @param version    the repository version to be checked
 #                   (same as for configure_nested_catalogs())
-check_catalog_presence() {
+# @param repo_name  the name of the repository to be checked
+check_catalog_configuration() {
   local version=$1
-  # TODO: needs to be implemented in cvmfs_swissknife
+  local repo_name=$2
 
-  # case $version in
-  #   0)
-  #     ;;
-  #   1)
-  #     ...
+  case $version in
+    0)
+      if check_catalog_presence /                  $repo_name && \
+         check_catalog_presence /externals         $repo_name && \
+         check_catalog_presence /cvmfs             $repo_name && \
+         check_catalog_presence /test              $repo_name
+      then
+        return 0
+      else
+        return 1
+      fi
+      ;;
+    1)
+      if check_catalog_presence /                  $repo_name && \
+         check_catalog_presence /externals         $repo_name && \
+         check_catalog_presence /externals/zlib    $repo_name && \
+         check_catalog_presence /externals/sqlite3 $repo_name && \
+         check_catalog_presence /test              $repo_name
+      then
+        return 0
+      else
+        return 1
+      fi
+      ;;
+    2)
+      if check_catalog_presence /                  $repo_name && \
+         check_catalog_presence /externals/zlib    $repo_name && \
+         check_catalog_presence /externals/sqlite3 $repo_name && \
+         check_catalog_presence /test/HTTP         $repo_name && \
+         check_catalog_presence /test/LWP          $repo_name
+      then
+        return 0
+      else
+        return 1
+      fi
+      ;;
+    3)
+      if check_catalog_presence /                  $repo_name
+      then
+        return 0
+      else
+        return 1
+      fi
+      ;;
+  esac
 }
 
 # does a whole version update
 # @param version        the version to be copied (index in array on top)
 # @param repo_dir       the repository directory to copy to
+# @param repo_name      the repository name to copy to
 # @param reference_dir  the reference directory to copy to
 copy_version() {
   local version=$1
   local repo_dir=$2
-  local reference_dir=$3
+  local repo_name=$3
+  local reference_dir=$4
 
   echo "COPY VERSION === $version === ..."
 
@@ -119,7 +177,7 @@ copy_version() {
   check_catalogs $CVMFS_TEST_REPO || return $?
 
   echo "check if requested nested catalogs are present"
-  check_catalog_presence $version || return $?
+  check_catalog_configuration $version $repo_name || return $?
 }
 
 cvmfs_run_test() {
@@ -139,7 +197,7 @@ cvmfs_run_test() {
   echo "do the business" >> $logfile 2>&1
   for i in 0 1 2 3
   do
-    copy_version $i $repo_dir $reference_dir >> $logfile 2>&1 || return $?
+    copy_version $i $repo_dir $CVMFS_TEST_REPO $reference_dir >> $logfile 2>&1 || return $?
   done
 
   return 0
