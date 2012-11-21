@@ -22,7 +22,6 @@ my $force = undef;
 my $ret = GetOptions ("bindir=s" => \$bindir,
 					   "manpath=s" => \$manpath,
 					   "prefix=s" => \$prefix,
-					   "bin-name=s" => \$bin_name,
 					   "force" => \$force );
 
 
