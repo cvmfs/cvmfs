@@ -37,27 +37,27 @@ bool RiakSpoolerBackend::Initialize() {
 
 void RiakSpoolerBackend::Copy(const std::string &local_path,
                               const std::string &remote_path,
-                              const bool move,
-                              std::string &response) {
-  // TODO: do something useful here...
+                              const bool move) {
+  if (move) {
+    LogCvmfs(kLogSpooler, kLogStderr, "RiakSpoolerBackend does not support "
+                                      "move at the moment.");
+    SendResult(100, local_path);
+    return;
+  }
 
-  LogCvmfs(kLogSpooler, kLogDebug, "called COPY for local_path: %s",
-    local_path.c_str());
-
-  CreateResponseMessage(response, 100, local_path, "");
+  SendResult(100, local_path);
 }
 
 void RiakSpoolerBackend::Process(const std::string &local_path,
                                  const std::string &remote_dir,
                                  const std::string &file_suffix,
-                                 const bool move,
-                                 std::string &response) {
+                                 const bool move) {
   // TODO: do something useful here...
 
   LogCvmfs(kLogSpooler, kLogDebug, "called PROCESS for local_path: %s",
     local_path.c_str());
 
-  CreateResponseMessage(response, 103, local_path, "");
+  SendResult(103, local_path);
 }
 
 bool RiakSpoolerBackend::IsReady() const {

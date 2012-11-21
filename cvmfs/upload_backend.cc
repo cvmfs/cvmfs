@@ -70,7 +70,6 @@ int AbstractSpoolerBackend::Run() {
   std::string remote_path;
   std::string remote_dir;
   std::string file_suffix;
-  std::string return_line = "";
 
   // reading from input pipe until it is gone
   while ((retval = getc_unlocked(fpathes_)) != EOF && running) {
@@ -83,13 +82,12 @@ int AbstractSpoolerBackend::Run() {
     }
     unsigned char command = retval;
 
-    return_line.clear();
     switch (command) {
       case kCmdEndOfTransaction:
         LogCvmfs(kLogSpooler, kLogVerboseMsg,
                  "Spooler received 'end of transaction'");
 
-        EndOfTransaction(return_line);
+        EndOfTransaction();
         running = false;
         break;
 
@@ -100,7 +98,7 @@ int AbstractSpoolerBackend::Run() {
                  "Spooler received 'copy': source %s, dest %s move %d",
                  local_path.c_str(), remote_path.c_str(), move_file);
 
-        Copy(local_path, remote_path, move_file, return_line);
+        Copy(local_path, remote_path, move_file);
         break;
 
       case kCmdProcess:
@@ -112,49 +110,82 @@ int AbstractSpoolerBackend::Run() {
                  "postfix %s, move %d", local_path.c_str(),
                  remote_dir.c_str(), file_suffix.c_str(), move_file);
 
-        Process(local_path, remote_dir, file_suffix, move_file, return_line);
+        Process(local_path, remote_dir, file_suffix, move_file);
         break;
 
       default:
         LogCvmfs(kLogSpooler, kLogWarning, "Spooler received 'unknown command': %d",
                  command);
 
-        Unknown(return_line);
+        Unknown();
         break;
     }
-
-    LogCvmfs(kLogSpooler, kLogVerboseMsg,
-             "Spooler sends back result %s",
-             return_line.c_str());
-
-    WritePipe(fd_digests_, return_line.data(), return_line.length());
   }
 
   return 0;
 }
 
 
-void AbstractSpoolerBackend::CreateResponseMessage(
-                                    std::string &response,
+void AbstractSpoolerBackend::SendResult(
                                     const int error_code,
                                     const std::string &local_path,
-                                    const std::string &compressed_hash) const {
+                                    const hash::Any &compressed_hash) const {
+  // create response message
+  std::string response;
   response = StringifyInt(error_code);
   response.push_back('\0');
   response.append(local_path);
   response.push_back('\0');
-  response.append(compressed_hash);
+  response.append(compressed_hash.ToString());
   response.push_back('\n');
+
+  // send message to Spooler Frontend
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Spooler sends back result: %s",
+           response.c_str());
+
+  WritePipe(fd_digests_, response.data(), response.length());
 }
 
 
-void AbstractSpoolerBackend::EndOfTransaction(std::string &response) {
-  CreateResponseMessage(response, 0, "", "");
+void AbstractSpoolerBackend::EndOfTransaction() {
+  SendResult(0);
 }
 
 
-void AbstractSpoolerBackend::Unknown(std::string &response) {
-  CreateResponseMessage(response, 1, "", "");
+void AbstractSpoolerBackend::Unknown() {
+  SendResult(1);
+}
+
+
+bool AbstractSpoolerBackend::CompressToTempFile(
+                                    const std::string &source_file_path,
+                                    const std::string &destination_dir,
+                                    std::string       *tmp_file_path,
+                                    hash::Any         *content_hash) const {
+  // Create a temporary file at the given destination directory
+  FILE *fcas = CreateTempFile(destination_dir + "/cvmfs", 0777, "w", 
+                              tmp_file_path);
+  if (fcas == NULL) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file %s",
+             tmp_file_path->c_str());
+    return false;
+  }
+
+  // Compress the provided source file and write the result into the temporary.
+  // Additionally computes the content hash of the compressed data
+  int retval = zlib::CompressPath2File(source_file_path, fcas, content_hash);
+  if (! retval) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to compress file %s to temporary "
+                                      "file %s",
+             source_file_path.c_str(), tmp_file_path->c_str());
+
+    unlink(tmp_file_path->c_str());
+    return false;
+  }
+  fclose(fcas);
+
+  return true;
 }
 
 

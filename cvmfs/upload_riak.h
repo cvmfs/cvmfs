@@ -17,13 +17,11 @@ namespace upload {
    protected:
     void Copy(const std::string &local_path,
               const std::string &remote_path,
-              const bool move,
-              std::string &response);
+              const bool move);
     void Process(const std::string &local_path,
                  const std::string &remote_dir,
                  const std::string &file_suffix,
-                 const bool move,
-                 std::string &response);
+                 const bool move);
 
    private:
     const std::string config_file_path_;

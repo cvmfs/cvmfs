@@ -31,8 +31,7 @@ bool LocalSpoolerBackend::Initialize() {
 
 void LocalSpoolerBackend::Copy(const std::string &local_path,
                                const std::string &remote_path,
-                               const bool move,
-                               std::string &response) {
+                               const bool move) {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
   int retcode = 0;
@@ -45,17 +44,16 @@ void LocalSpoolerBackend::Copy(const std::string &local_path,
     retcode    = retval ? 0 : 100;
   }
 
-  CreateResponseMessage(response, retcode, local_path, "");
+  SendResult(retcode, local_path);
 }
 
 
 void LocalSpoolerBackend::Process(const std::string &local_path,
                                   const std::string &remote_dir,
                                   const std::string &file_suffix,
-                                  const bool move,
-                                  std::string &response) {
+                                  const bool move) {
   hash::Any compressed_hash(hash::kSha1);
-  std::string remote_path = upstream_path_ + "/" + remote_dir;
+  const std::string remote_path = upstream_path_ + "/" + remote_dir;
 
   std::string tmp_path;
   FILE *fcas = CreateTempFile(remote_path + "/cvmfs", 0777, "w",
@@ -85,7 +83,7 @@ void LocalSpoolerBackend::Process(const std::string &local_path,
       retcode = 105;
   }
 
-  CreateResponseMessage(response, retcode, local_path, compressed_hash.ToString());
+  SendResult(retcode, local_path, compressed_hash);
 }
 
 
