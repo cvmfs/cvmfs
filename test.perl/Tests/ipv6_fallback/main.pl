@@ -14,6 +14,7 @@ my $outputfile = '/var/log/cvmfs-test/ipv6_fallback.out';
 my $errorfile = '/var/log/cvmfs-test/ipv6_fallback.err';
 my $no_clean = undef;
 my $do_all = undef;
+my $shell_path = '127.0.0.1:6651';
 
 # Test name used for output and socket identity
 my $testname = 'IPV6_FALLBACK';
@@ -34,7 +35,8 @@ my @pids;
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "do-all" => \$do_all );
+					   "do-all" => \$do_all,
+					   "shell-path=s" => \$shell_path );
 
 
 # Forking the process so the daemon can come back in listening mode.
@@ -50,7 +52,7 @@ if (defined ($pid) and $pid == 0) {
 	my ($socket, $ctxt) = open_test_socket($testname);
 	
 	# Opening the socket to send the output to the shell
-	my ($shell_socket, $shell_ctxt) = open_shellout_socket();
+	my ($shell_socket, $shell_ctxt) = open_shellout_socket('tcp://', $shell_path);
 	
 	# Cleaning the environment if --no-clean is undef.
 	# See 'Tests/clean/main.pl' if you want to know what this command does.
