@@ -81,9 +81,19 @@ if (-f $zmq_source) {
 
 	chdir $zmq_source_dir;
 
-	system("./configure --prefix=/usr --libdir=/usr/lib" . $libsuffix);
-	system('make');
+	print "Compiling $zmq_source... ";
+	system('./configure --prefix=/usr --libdir=/usr/lib' . $libsuffix . " > configure.log 2>&1");
+	system("make > make.log 2>&1");
 	system('sudo make install');
+	
+	if (!-e '/usr/lib' . $libsuffix . '/libzmq.so') {
+		print color 'red';
+		print "Something went wrong while trying to compile ZeroMQ.\n";
+		print "Have a look at $zmq_source_dir/configure.log and $zmq_source_dir/make.log.\n";
+		print color 'reset';
+		exit 0;
+	}
+	print "Done.\n";
 
 	chdir '..';
 	
