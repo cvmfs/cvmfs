@@ -296,7 +296,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   stratum0_url = args.find('u')->second;
   temp_dir = args.find('x')->second;
-  spooler = upload::MakeSpoolerEnsemble(*args.find('r')->second);
+  spooler = upload::Spooler::Construct(*args.find('r')->second);
   assert(spooler);
   backend_stat = upload::GetBackendStat(*args.find('r')->second);
   assert(backend_stat);

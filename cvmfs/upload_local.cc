@@ -8,32 +8,18 @@
 
 using namespace upload;
 
-LocalSpoolerBackend::LocalSpoolerBackend() :
+LocalSpoolerBackend::LocalSpoolerBackend(const std::string &upstream_path) :
+  upstream_path_(upstream_path),
   initialized_(false)
 {}
 
-LocalSpoolerBackend::~LocalSpoolerBackend()
-{
 
-}
-
-void LocalSpoolerBackend::set_upstream_path(const std::string &upstream_path)
-{
-  if (IsReady())
-    LogCvmfs(kLogSpooler, kLogWarning, "Setting upstream path in a running "
-                                       "spooler backend might be harmful!");
-
-  upstream_path_ = upstream_path;
-}
-
-bool LocalSpoolerBackend::Initialize()
-{
+bool LocalSpoolerBackend::Initialize() {
   bool retval = AbstractSpoolerBackend::Initialize();
   if (!retval)
     return false;
 
-  if (upstream_path_.empty())
-  {
+  if (upstream_path_.empty()) {
     LogCvmfs(kLogSpooler, kLogWarning, "upstream path not configured");
     return false;
   }
@@ -42,11 +28,11 @@ bool LocalSpoolerBackend::Initialize()
   return true;
 }
 
+
 void LocalSpoolerBackend::Copy(const std::string &local_path,
                                const std::string &remote_path,
                                const bool move,
-                               std::string &response)
-{
+                               std::string &response) {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
   int retcode = 0;
@@ -62,12 +48,12 @@ void LocalSpoolerBackend::Copy(const std::string &local_path,
   CreateResponseMessage(response, retcode, local_path, "");
 }
 
+
 void LocalSpoolerBackend::Process(const std::string &local_path,
                                   const std::string &remote_dir,
                                   const std::string &file_suffix,
                                   const bool move,
-                                  std::string &response)
-{
+                                  std::string &response) {
   hash::Any compressed_hash(hash::kSha1);
   std::string remote_path = upstream_path_ + "/" + remote_dir;
 
@@ -102,8 +88,8 @@ void LocalSpoolerBackend::Process(const std::string &local_path,
   CreateResponseMessage(response, retcode, local_path, compressed_hash.ToString());
 }
 
-bool LocalSpoolerBackend::IsReady() const
-{
+
+bool LocalSpoolerBackend::IsReady() const {
   const bool ready = AbstractSpoolerBackend::IsReady();
   return ready && initialized_;
 }

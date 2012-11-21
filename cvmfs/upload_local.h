@@ -5,22 +5,12 @@
 
 namespace upload
 {
-  class LocalSpoolerBackend : public AbstractSpoolerBackend
-  {
+  class LocalSpoolerBackend : public AbstractSpoolerBackend {
    public:
-    LocalSpoolerBackend();
-    virtual ~LocalSpoolerBackend();
+    LocalSpoolerBackend(const std::string &upstream_path);
+
     bool Initialize();
-
     bool IsReady() const;
-
-    /**
-     *  This method configures the upstream path for the local repository
-     *  location. Call this once after you created this SpoolerBackend, then
-     *  call initialize and you should be ready to go.
-     *  @param upstream_path      the upstream path to be configured
-     */
-    void set_upstream_path(const std::string &upstream_path);
    
    protected:
     void Copy(const std::string &local_path,
@@ -34,7 +24,7 @@ namespace upload
                  std::string &response);
 
    private:
-    std::string upstream_path_;
+    const std::string upstream_path_;
     bool initialized_;
   };
 }

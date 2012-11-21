@@ -55,9 +55,36 @@ class SpoolerCallback {
  * The callback function is called from a parallel thread.
  */
 class Spooler {
+ protected:
+  struct SpoolerDefinition{
+    enum DriverType {
+      Riak,
+      Local,
+      Unknown
+    };
+
+    SpoolerDefinition(const std::string& definition_string);
+    bool IsValid() const { return valid_; }
+
+    DriverType  driver_type;
+    std::string upstream_path;    // < for the local spooler
+    std::string config_file_path; // < for the riak spooler
+    std::string paths_out_pipe;
+    std::string digests_in_pipe;
+
+    bool valid_;
+  };
+
  public:
-  Spooler(const std::string &fifo_paths, const std::string &fifo_digests);
+  /**
+   * Starts a spooler process and the creates the corresponding object
+   * from a definition string which depends on the type of spooler to create.
+   *  - Local Spooler: "local:/dir/to/repo,/path/pipe,/digest/pipe"
+   *  -  Riak Spooler: "riak:/path/to/config,/path/pipe/digest/pipe"
+   */
+  static Spooler *Construct(const std::string &definition_string);
   ~Spooler();
+
   bool Connect();
   void SetCallback(SpoolerCallback *value) { spooler_callback_ = value; }
   void UnsetCallback() { delete spooler_callback_; spooler_callback_ = NULL; }
@@ -74,8 +101,12 @@ class Spooler {
   void WaitFor();
   uint64_t num_errors() { return atomic_read64(&num_errors_); }
 
+ protected:
+  Spooler(const SpoolerDefinition &definition);
+
  private:
   static void *MainReceive(void *caller);
+  static void SpawnSpoolerBackend(const SpoolerDefinition &definition);
 
   atomic_int64 num_pending_;
   atomic_int64 num_errors_;
@@ -90,19 +121,6 @@ class Spooler {
   pthread_t thread_receive_;
 };
 
-
-int MainLocalSpooler(const std::string &fifo_paths,
-                     const std::string &fifo_digests,
-                     const std::string &upstream_basedir);
-
-int MainRiakSpooler(const std::string &fifo_paths,
-                    const std::string &fifo_digests);
-
-/**
- * Starts a spooler process and the creates the corresponding object
- * from a definition string like "local:/dir/to/repo,/path/pipe,/digest/pipe"
- */
-Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition);
 BackendStat *GetBackendStat(const std::string &spooler_definition);
 
 }  // namespace upload

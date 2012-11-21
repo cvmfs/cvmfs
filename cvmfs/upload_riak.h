@@ -4,14 +4,15 @@
 #include "upload_backend.h"
 
 namespace upload {
-  class RiakSpoolerBackend : public AbstractSpoolerBackend
-  {
+  class RiakSpoolerBackend : public AbstractSpoolerBackend {
    public:
-    RiakSpoolerBackend();
+    RiakSpoolerBackend(const std::string &config_file_path);
     virtual ~RiakSpoolerBackend();
     bool Initialize();
 
     bool IsReady() const;
+
+    bool addRiakNode(const std::string& url);
 
    protected:
     void Copy(const std::string &local_path,
@@ -25,6 +26,7 @@ namespace upload {
                  std::string &response);
 
    private:
+    const std::string config_file_path_;
     bool initialized_;
   };
 }

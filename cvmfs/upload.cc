@@ -35,16 +35,145 @@ bool LocalStat::Stat(const string &path) {
   return FileExists(base_path_ + "/" + path);
 }
 
-Spooler::Spooler(const string &fifo_paths, const string &fifo_digests) {
+
+Spooler::SpoolerDefinition::SpoolerDefinition(
+                                    const std::string& definition_string) :
+  valid_(false)
+{
+  // split the spooler definition into spooler driver and pipe definitions
+  vector<string> components = SplitString(definition_string, ',');
+  if (components.size() != 3) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler definition");
+    return;
+  }
+
+  // split the spooler driver definition into name and config part
+  vector<string> upstream = SplitString(components[0], ':');
+  if (upstream.size() != 2) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler driver");
+    return;
+  }
+
+  // recognize and configure the spooler driver
+  if (upstream[0] == "local") {
+    driver_type   = Local;
+    upstream_path = upstream[1];
+  } else if (upstream[0] == "riak") {
+    driver_type      = Riak;
+    config_file_path = upstream[1];
+  } else {
+    LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
+      upstream[0].c_str());
+    return;
+  }
+
+  // save named pipe paths and validate this SpoolerDefinition
+  paths_out_pipe  = components[1];
+  digests_in_pipe = components[2];
+  valid_ = true;
+}
+
+
+Spooler* Spooler::Construct(const std::string &definition_string) {
+  // read the spooler definition
+  SpoolerDefinition spooler_definition(definition_string);
+  if (!spooler_definition.IsValid())
+    return NULL;
+
+  // spawn a SpoolerBackend according to the provided defintion
+  SpawnSpoolerBackend(spooler_definition);
+
+  // create a Spooler frontend and connect it to the backend
+  Spooler *spooler = new Spooler(spooler_definition);
+  bool retval = spooler->Connect();
+  if (!retval) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to connect to spooler");
+    return NULL;
+  }
+
+  return spooler;
+}
+
+
+void Spooler::SpawnSpoolerBackend(
+                      const Spooler::SpoolerDefinition &definition) {
+  assert (definition.IsValid());
+
+  // spawn spooler backend process
+  int pid = fork();
+  if (pid < 0)
+  {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to spawn spooler backend");
+    assert(pid >= 0); // nothing to do here anymore... good bye
+  }
+
+  if (pid > 0)
+    return;
+
+  // ---------------------------------------------------------------------------
+  // From here on we are in the SpoolerBackend process
+
+  AbstractSpoolerBackend *backend = NULL;
+  int retval = 1;
+
+  // create a SpoolerBackend object of the requested type
+  switch (definition.driver_type) {
+    case SpoolerDefinition::Local:
+      backend = new LocalSpoolerBackend(definition.upstream_path);
+      break;
+
+    case SpoolerDefinition::Riak:
+      backend = new RiakSpoolerBackend(definition.config_file_path);
+      break;
+
+    default:
+      LogCvmfs(kLogSpooler, kLogStderr, "invalid spooler definition");
+      assert (false && definition.IsValid());
+  }
+  assert (backend != NULL);
+
+  // connect the named pipes in the SpoolerBackend
+  if (! backend->Connect(definition.paths_out_pipe,
+                         definition.digests_in_pipe)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to connect spooler backend");
+    retval = 2;
+    goto out;
+  }
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected spooler backend");
+
+  // do the final initialization of the SpoolerBackend
+  if (! backend->Initialize()) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize spooler backend");
+    retval = 3;
+    goto out;
+  }
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "initialized spooler backend");
+
+  // run the SpoolerBackend service
+  // returns on a termination signal though the named pipes
+  retval = backend->Run();
+
+  // all done, good bye...
+out:
+  delete backend;
+  exit(retval);
+}
+
+
+Spooler::Spooler(const SpoolerDefinition &definition) :
+  fifo_paths_(definition.paths_out_pipe),
+  fifo_digests_(definition.digests_in_pipe),
+  spooler_callback_(NULL),
+  connected_(false),
+  move_mode_(false),
+  fd_paths_(-1),
+  fd_digests_(-1),
+  fdigests_(NULL)
+{
+  assert (definition.IsValid());
+
   atomic_init64(&num_pending_);
   atomic_init64(&num_errors_);
-  fifo_paths_ = fifo_paths;
-  fifo_digests_ = fifo_digests;
-  spooler_callback_ = NULL;
-  connected_ = false;
-  move_mode_ = false;
-  fd_digests_ = fd_paths_ = -1;
-  fdigests_ = NULL;
 }
 
 
@@ -167,81 +296,6 @@ void Spooler::EndOfTransaction() {
 void Spooler::WaitFor() {
   while (!IsIdle())
     usleep(100000);  // 100 milliseconds
-}
-
-
-Spooler *MakeSpoolerEnsemble(const std::string &spooler_definition) {
-  string upstream_driver;
-  string upstream_path;
-  string paths_out;
-  string digests_in;
-
-  vector<string> components = SplitString(spooler_definition, ',');
-  if (components.size() != 3) {
-    PrintError("Invalid spooler definition");
-    return NULL;
-  }
-  vector<string> upstream = SplitString(components[0], ':');
-  if ((upstream.size() != 2) || (upstream[0] != "local")) {
-    PrintError("Invalid spooler driver");
-    return NULL;
-  }
-  upstream_driver = upstream[0];
-  upstream_path = upstream[1];
-  paths_out = components[1];
-  digests_in = components[2];
-
-  int pid = fork();
-  assert(pid >= 0);
-  if (pid == 0) {
-    int retval = 1;
-
-    AbstractSpoolerBackend *backend;
-
-    if (upstream_driver == "local") {
-      LogCvmfs(kLogSpooler, kLogVerboseMsg, "creating local spooler backend");
-      LocalSpoolerBackend *local_backend = new LocalSpoolerBackend();
-      local_backend->set_upstream_path(upstream_path);
-      backend = local_backend;
-    }
-
-    if (upstream_driver == "riak") {
-      LogCvmfs(kLogSpooler, kLogVerboseMsg, "creating riak spooler backend");
-      RiakSpoolerBackend *riak_backend = new RiakSpoolerBackend();
-      backend = riak_backend;
-    }
-
-    if (! backend->Connect(paths_out, digests_in)) {
-      PrintError("failed to connect to spooler backend");
-      delete backend;
-      exit(2);
-    } else {
-      LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected local spooler backend");
-    }
-
-    if (! backend->Initialize()) {
-      PrintError("failed to initialize spooler backend");
-      delete backend;
-      exit(3);
-    } else {
-      LogCvmfs(kLogSpooler, kLogVerboseMsg, "initialized local spooler backend");
-    }
-
-    retval = backend->Run();
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "spooler backend is up and running...");
-    delete backend;
-
-    exit(retval);
-  }
-
-  Spooler *spooler = new Spooler(paths_out, digests_in);
-  bool retval = spooler->Connect();
-  if (!retval) {
-    PrintError("Failed to connect to spooler");
-    return NULL;
-  }
-
-  return spooler;
 }
 
 

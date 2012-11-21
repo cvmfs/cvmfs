@@ -55,7 +55,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   // Connect to the spooler
-  spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  spooler = upload::Spooler::Construct(spooler_definition);
 
   signature::Init();
 

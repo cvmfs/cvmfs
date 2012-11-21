@@ -42,8 +42,6 @@ namespace upload
                          std::string &response) = 0;
     virtual void Unknown(std::string &response);
 
-    virtual bool Compress();
-
     void CreateResponseMessage(std::string &response,
                                const int error_code,
                                const std::string &local_path,

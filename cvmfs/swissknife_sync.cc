@@ -85,7 +85,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-  upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(spooler_definition);
   assert(spooler);
 
   manifest::Manifest *manifest =
@@ -111,7 +111,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   const string dest = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
-  upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(spooler_definition);
   assert(spooler);
   spooler->SpoolCopy(source, dest);
   spooler->EndOfTransaction();
@@ -154,7 +154,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 	if (!CheckParams(&params)) return 2;
 
   // Start spooler
-  params.spooler = upload::MakeSpoolerEnsemble(params.spooler_definition);
+  params.spooler = upload::Spooler::Construct(params.spooler_definition);
   download::Init(1);
 
   catalog::WritableCatalogManager
