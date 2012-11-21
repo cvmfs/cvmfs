@@ -14,13 +14,13 @@ fi
 
 if [ ! -f $IPTABLES_SAVE ] ; then
 	if [ -f "/usr/sbin/iptables-save" ] ; then
-		IPTABLES="/usr/sbin/iptables-save"
+		IPTABLES_SAVE="/usr/sbin/iptables-save"
 	fi
 fi
 
 if [ ! -f $IPTABLES_RESTORE ] ; then
 	if [ -f "/usr/sbin/iptables-restore" ] ; then
-		IPTABLES="/usr/sbin/iptables-restore"
+		IPTABLES_RESTORE="/usr/sbin/iptables-restore"
 	fi
 fi
 
