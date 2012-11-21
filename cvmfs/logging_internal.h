@@ -34,6 +34,11 @@ enum LogLevels {
   kLogNone = 2048,
 };
 
+/**
+ * CAUTION!
+ * Changes in this enum must be done in logging.cc as well!
+ * (see const char *module_names[] = {....})
+ */
 enum LogSource {
   kLogCache = 1,
   kLogCatalog,
