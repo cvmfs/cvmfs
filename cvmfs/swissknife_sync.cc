@@ -155,6 +155,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // Start spooler
   params.spooler = upload::Spooler::Construct(params.spooler_definition);
+  if (NULL == params.spooler)
+    return 3;
+
   download::Init(1);
 
   catalog::WritableCatalogManager
