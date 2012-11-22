@@ -218,7 +218,7 @@ publish() {
     -c ${spool_dir}/rdonly \
     -t ${spool_dir}/tmp \
     -b $base_hash \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
+    -r riak:foo,${spool_dir}/paths,${spool_dir}/digests \
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
     $log_level"

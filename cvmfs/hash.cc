@@ -30,6 +30,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kSha1:
       return sizeof(SHA_CTX);
     default:
+      LogCvmfs(kLogHash, kLogStderr, "tried to generate hash context for "
+                                     "unspecified hash. Aborting...");
       abort();  // Undefined hash
   }
 }

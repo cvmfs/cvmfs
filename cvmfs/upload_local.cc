@@ -24,6 +24,9 @@ bool LocalSpoolerBackend::Initialize() {
     return false;
   }
 
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "successfully initialized local "
+                                        "spooler backend");
+
   initialized_ = true;
   return true;
 }
