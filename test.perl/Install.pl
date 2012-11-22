@@ -13,15 +13,15 @@ use FindBin qw($RealBin);
 $| = 1;
 
 my $prefix = '/opt';
-my $manpath = '/usr/local/man';
-my $bindir = '/usr/local/bin';
+my $manpath = '/usr/man';
+my $bindir = '/usr/bin';
 my $bin_name = 'cvmfs-test';
+my $cpanm_bin = '/usr/bin/cpanm';
 my $force = undef;
 
 my $ret = GetOptions ("bindir=s" => \$bindir,
 					   "manpath=s" => \$manpath,
 					   "prefix=s" => \$prefix,
-					   "bin-name=s" => \$bin_name,
 					   "force" => \$force );
 
 
@@ -81,9 +81,19 @@ if (-f $zmq_source) {
 
 	chdir $zmq_source_dir;
 
-	system("./configure --prefix=/usr --libdir=/usr/lib" . $libsuffix);
-	system('make');
+	print "Compiling $zmq_source... ";
+	system('./configure --prefix=/usr --libdir=/usr/lib' . $libsuffix . " > configure.log 2>&1");
+	system("make > make.log 2>&1");
 	system('sudo make install');
+	
+	if (!-e '/usr/lib' . $libsuffix . '/libzmq.so') {
+		print color 'red';
+		print "Something went wrong while trying to compile ZeroMQ.\n";
+		print "Have a look at $zmq_source_dir/configure.log and $zmq_source_dir/make.log.\n";
+		print color 'reset';
+		exit 0;
+	}
+	print "Done.\n";
 
 	chdir '..';
 	
@@ -100,15 +110,13 @@ else {
 
 
 print 'Installing cpanminus... ';
-system('curl --cacert cacert.pem -L http://cpanmin.us | perl - --self-upgrade');
+system("curl --cacert cacert.pem -o $cpanm_bin -L http://cpanmin.us");
+system("chmod 555 $cpanm_bin");
 print "Done.\n";
 
-print 'Creating symlink to cpanminus in /usr/bin... ';
-system('ln -s /usr/local/bin/cpanm /usr/bin/cpanm');
-print "Done.\n";
-
-system("which cpanm > /dev/null 2>&1");
-if ( $? == 0 ) {
+my $cpanm_inpath = `which cpanm 2> /dev/null`;
+chomp($cpanm_inpath);
+if ( $cpanm_inpath ne "" ) {
 	print 'Installing ZeroMQ perl modules... ';
 	system('sudo cpanm ZeroMQ');
 	print "Done.\n";
@@ -123,12 +131,10 @@ if ( $? == 0 ) {
 }
 else {
 	print color 'red';
-	print "Something went wrong while trying to download cpanm.\n";
-	print "Check your internet connection and retry.\n";
+	print "Something went wrong while trying to run cpanm.\n";
 	print color 'reset';
 	exit 0;
 }
-
 
 unlink("$manpath/man1/$bin_name.1");
 copy("$RealBin/man/cvmfs-test.1", "$manpath/man1/$bin_name.1");
