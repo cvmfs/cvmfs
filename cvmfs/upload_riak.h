@@ -49,9 +49,10 @@ namespace upload {
                  const std::string &file_suffix,
                  const bool move);
 
-    std::string GenerateRiakKey(const std::string &remote_dir,
-                                const hash::Any   &compressed_hash,
+    std::string GenerateRiakKey(const hash::Any   &compressed_hash,
+                                const std::string &remote_dir,
                                 const std::string &file_suffix) const;
+    std::string GenerateRiakKey(const std::string &remote_path) const;
     void PushFileToRiakAsync(const std::string          &key,
                              const std::string          &file_path,
                              const PushFinishedCallback &callback);

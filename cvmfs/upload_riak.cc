@@ -1,5 +1,7 @@
 #include "upload_riak.h"
 
+#include <algorithm>
+
 #include "duplex_curl.h"
 #include "logging.h"
 
@@ -51,8 +53,10 @@ void RiakSpoolerBackend::Copy(const std::string &local_path,
     return;
   }
 
-  PushFileToRiakAsync(remote_path, local_path, PushFinishedCallback(this,
-                                                                    local_path));
+  PushFileToRiakAsync(GenerateRiakKey(remote_path),
+                      local_path,
+                      PushFinishedCallback(this,
+                                           local_path));
 }
 
 
@@ -83,8 +87,8 @@ void RiakSpoolerBackend::Process(const std::string &local_path,
   }
 
   // push to Riak
-  PushFileToRiakAsync(GenerateRiakKey(remote_dir, 
-                                      compressed_hash,
+  PushFileToRiakAsync(GenerateRiakKey(compressed_hash,
+                                      remote_dir,
                                       file_suffix),
                       tmp_file_path,
                       PushFinishedCallback(this,
@@ -94,10 +98,17 @@ void RiakSpoolerBackend::Process(const std::string &local_path,
 }
 
 
-std::string RiakSpoolerBackend::GenerateRiakKey(const std::string &remote_dir,
-                                                const hash::Any   &compressed_hash,
+std::string RiakSpoolerBackend::GenerateRiakKey(const hash::Any   &compressed_hash,
+                                                const std::string &remote_dir,
                                                 const std::string &file_suffix) const {
-  return remote_dir + compressed_hash.MakePath(1, 2) + file_suffix;
+  return remote_dir + compressed_hash.ToString() + file_suffix;
+}
+
+
+std::string RiakSpoolerBackend::GenerateRiakKey(const std::string &remote_path) const {
+  std::string result = remote_path;
+  std::remove(result.begin(), result.end(), '/');
+  return result;
 }
 
 
