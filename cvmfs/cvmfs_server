@@ -180,6 +180,12 @@ publish() {
   local upstream=$5
   local debug=${6:-0}
 
+  # HACK!
+  # if it is set to debug, we upload to Riak
+  if [ "$debug" -ne "0" ]; then
+    upstream="riak:foo"
+  fi
+
   local swissknife="cvmfs_swissknife"
 
   # enable the debug mode?

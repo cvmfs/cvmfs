@@ -1,5 +1,9 @@
 #include "upload_riak.h"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <algorithm>
 
 #include "duplex_curl.h"
@@ -14,6 +18,8 @@ RiakSpoolerBackend::RiakSpoolerBackend(const std::string &config_file_path) :
 
 
 RiakSpoolerBackend::~RiakSpoolerBackend() {
+  curl_easy_cleanup(curl_);
+  curl_slist_free_all(http_headers_);
   curl_global_cleanup();
 }
 
@@ -34,6 +40,24 @@ bool RiakSpoolerBackend::Initialize() {
     return false;
   }
 
+  // initialize cURL handle
+  curl_ = curl_easy_init();
+  if (! curl_) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize cURL handle.");
+    return false;
+  }
+
+  // configure cURL handle
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Configuring cURL handle for putting "
+                                        "files into a Riak instance");
+  if (curl_easy_setopt(curl_, CURLOPT_NOPROGRESS, 1L)    != CURLE_OK) return false;
+  if (curl_easy_setopt(curl_, CURLOPT_TCP_KEEPALIVE, 1L) != CURLE_OK) return false;
+  if (curl_easy_setopt(curl_, CURLOPT_UPLOAD, 1L)        != CURLE_OK) return false;
+
+  http_headers_ = curl_slist_append(http_headers_, "Content-Type: application/octet-stream");
+  if (curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, http_headers_) != CURLE_OK) return false;
+
+  // all done
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "successfully initialized Riak "
                                         "spooler backend");
 
@@ -117,9 +141,65 @@ void RiakSpoolerBackend::PushFileToRiakAsync(const std::string          &key,
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "pushing file %s to Riak using key %s",
            file_path.c_str(), key.c_str());
 
-  // TOOD: actually push here...
+  CURLcode res;
 
+  // find the size of the file to uploaded
+  struct stat file_info;
+  int hd = open(file_path.c_str(), O_RDONLY);
+  if (hd < 0) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to stat file %s",
+             file_path.c_str());
+    callback(1);
+    return;
+  }
+  fstat(hd, &file_info);
+  close(hd);
+
+  // open the file for reading
+  FILE *hd_src = fopen(file_path.c_str(), "rb");
+  if (hd_src == NULL) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to open file %s for reading.",
+             file_path.c_str());
+    callback(2);
+    return;
+  }
+
+  // set url for Riak put command
+  const std::string url = config_.CreateRequestUrl(key);
+  if (curl_easy_setopt(curl_, CURLOPT_URL, url.c_str()) != CURLE_OK) {
+    callback(3);
+    goto out;
+  }
+
+  // set file size of the file to be uploaded
+  if (curl_easy_setopt(curl_, CURLOPT_INFILESIZE_LARGE,
+                       (curl_off_t)file_info.st_size) != CURLE_OK) {
+    callback(4);
+    goto out;
+  }
+
+  // specify the file handle to be uploaded
+  if (curl_easy_setopt(curl_, CURLOPT_READDATA, hd_src) != CURLE_OK) {
+    callback(5);
+    goto out;
+  }
+
+  // do the actual business
+  res = curl_easy_perform(curl_);
+  if(res != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to upload file %s to Riak "
+                                      "because: '%s'",
+             file_path.c_str(), curl_easy_strerror(res));
+    callback(6);
+    goto out;
+  }
+
+  // all went well... tell the spooler frontend
   callback(0);
+
+out:
+  // close the uploaded file
+  fclose(hd_src);
 }
 
 
@@ -135,5 +215,14 @@ bool RiakSpoolerBackend::IsReady() const {
 RiakSpoolerBackend::RiakConfiguration::RiakConfiguration(
                                           const std::string& config_file_path) {
   // TODO: actually read the configuration from a file here
+
+  url    = "http://cernvmbl005";
+  port   = "8098";
   bucket = "riak";
+}
+
+
+std::string RiakSpoolerBackend::RiakConfiguration::CreateRequestUrl(
+                                          const std::string key) const {
+  return url + ":" + port + "/riak/" + bucket + "/" + key;
 }

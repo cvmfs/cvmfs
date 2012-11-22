@@ -5,12 +5,19 @@
 
 #include <vector>
 
+typedef void CURL;
+struct curl_slist;
+
 namespace upload {
   class RiakSpoolerBackend : public AbstractSpoolerBackend {
    protected:
     struct RiakConfiguration {
       RiakConfiguration(const std::string &config_file_path);
 
+      std::string CreateRequestUrl(const std::string key) const;
+
+      std::string url;
+      std::string port;
       std::string bucket;
     };
 
@@ -57,9 +64,17 @@ namespace upload {
                              const std::string          &file_path,
                              const PushFinishedCallback &callback);
 
+    // static size_t CurlReadCallback(void   *ptr,
+    //                                size_t  size,
+    //                                size_t  nmemb,
+    //                                void   *stream);
+
    private:
     RiakConfiguration config_;
     bool initialized_;
+
+    CURL *curl_;
+    struct curl_slist *http_headers_;
   };
 }
 
