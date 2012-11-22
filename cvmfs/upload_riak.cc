@@ -13,8 +13,7 @@ RiakSpoolerBackend::RiakSpoolerBackend(const std::string &config_file_path) :
 {}
 
 
-RiakSpoolerBackend::~RiakSpoolerBackend()
-{
+RiakSpoolerBackend::~RiakSpoolerBackend() {
   curl_global_cleanup();
 }
 

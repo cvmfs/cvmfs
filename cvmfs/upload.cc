@@ -86,7 +86,7 @@ Spooler* Spooler::Construct(const std::string &definition_string) {
   // create a Spooler frontend and connect it to the backend
   Spooler *spooler = new Spooler();
   if (! spooler->Connect(spooler_definition.paths_out_pipe,
-                                 spooler_definition.digests_in_pipe)) {
+                         spooler_definition.digests_in_pipe)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to connect to spooler");
     return NULL;
   }
@@ -251,8 +251,7 @@ bool Spooler::Connect(const std::string &fifo_paths,
 
 
 void Spooler::SpoolProcess(const string &local_path, const string &remote_dir,
-                           const string &file_postfix)
-{
+                           const string &file_postfix) {
   string line = "";
   unsigned char command = kCmdProcess;
   if (move_mode_) command |= kCmdMoveFlag;
