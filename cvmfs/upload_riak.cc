@@ -129,8 +129,12 @@ std::string RiakSpoolerBackend::GenerateRiakKey(const hash::Any   &compressed_ha
 
 
 std::string RiakSpoolerBackend::GenerateRiakKey(const std::string &remote_path) const {
-  std::string result = remote_path;
-  std::remove(result.begin(), result.end(), '/');
+  // removes slashes (/) from the remote_path
+  std::string result;
+  std::remove_copy(remote_path.begin(), 
+                   remote_path.end(), 
+                   std::back_inserter(result), 
+                   '/');
   return result;
 }
 
