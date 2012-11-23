@@ -173,7 +173,7 @@ create_repo() {
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs $repo -o $uid || return 102
+  sudo cvmfs_server mkfs $repo -w http://cernvmbl005/riak/cvmfs -u riak:http://cernvmbl005:8098/riak/cvmfs -o $uid || return 102
 }
 
 

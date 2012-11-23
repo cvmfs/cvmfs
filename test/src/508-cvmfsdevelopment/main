@@ -80,7 +80,7 @@ check_catalog_presence() {
   local catalog_path=$1
   local repo_name=$2
 
-  if cvmfs_swissknife lsrepo -r /srv/cvmfs/$repo_name | grep -x -q $catalog_path; then
+  if cvmfs_swissknife lsrepo -r http://cernvmbl005/riak/cvmfs -n test.cern.ch -k /etc/cvmfs/keys/test.cern.ch.pub | grep -x -q $catalog_path; then
     return 0
   else
     return 1
