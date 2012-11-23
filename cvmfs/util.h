@@ -71,7 +71,9 @@ void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
 
-std::vector<std::string> SplitString(const std::string &str, const char delim);
+std::vector<std::string> SplitString(const std::string &str,
+	                                 const char delim,
+                                     const unsigned max_chunks = 0);
 std::string JoinStrings(const std::vector<std::string> &strings,
                         const std::string &joint);
 

@@ -48,7 +48,7 @@ Spooler::SpoolerDefinition::SpoolerDefinition(
   }
 
   // split the spooler driver definition into name and config part
-  vector<string> upstream = SplitString(components[0], ':');
+  vector<string> upstream = SplitString(components[0], ':', 2);
   if (upstream.size() != 2) {
     LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler driver");
     return;

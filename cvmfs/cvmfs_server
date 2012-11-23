@@ -108,21 +108,34 @@ get_expiry() {
 }
 
 
-is_local_upstream() {
+check_upstream_type() {
   local upstream=$1
+  local needle_type=$2
 
-  if [ x$(echo "$upstream" | cut -d: -f1) = x"local" ]; then
+  if [ x$(echo "$upstream" | cut -d: -f1) = x"$needle_type" ]; then
     return 0
   else
     return 1
   fi
 }
 
+is_local_upstream() {
+  local upstream=$1
+  check_upstream_type $upstream "local"
+  return $?
+}
 
-get_local_upstream() {
+is_riak_upstream() {
+  local upstream=$1
+  check_upstream_type $upstream "riak"
+  return $?
+}
+
+
+get_upstream_path() {
   local upstream=$1
 
-  echo "$upstream" | cut -d: -f2
+  echo "$upstream" | cut -d: -f2-
 }
 
 
@@ -179,12 +192,6 @@ publish() {
   local stratum0=$4
   local upstream=$5
   local debug=${6:-0}
-
-  # HACK!
-  # if it is set to debug, we upload to Riak
-  if [ "$debug" -ne "0" ]; then
-    upstream="riak:foo"
-  fi
 
   local swissknife="cvmfs_swissknife"
 
@@ -333,8 +340,11 @@ mkfs() {
   local pipe_paths="${spool_dir}/paths"
   local pipe_digests="${spool_dir}/digests"
   local repository_dir;
+  local riak_urls;
   if is_local_upstream $upstream; then
-    repository_dir=$(get_local_upstream $upstream)
+    repository_dir=$(get_upstream_path $upstream)
+  elif is_riak_upstream $upstream; then
+    riak_urls=$(get_upstream_path $upstream)
   fi
 
   # Sanity checks
@@ -403,7 +413,13 @@ Alias /cvmfs/$name ${repository_dir}
     ExpiresByType application/x-cvmfs "access plus 1 minutes"
 </Directory>
 EOF
+  elif is_riak_upstream $upstream; then
+    cat > /etc/cvmfs/repositories.d/${name}/riak.conf << EOF
+# Created by cvmfs_server.
+CVMFS_RIAK_URLS=$riak_urls
+EOF
   fi
+
   cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 CVMFS_CACHE_BASE=$cache_dir
@@ -501,7 +517,7 @@ add_replica() {
   local temp_dir="${spool_dir}/tmp"
   local repository_dir;
   if is_local_upstream $upstream; then
-    repository_dir=$(get_local_upstream $upstream)
+    repository_dir=$(get_upstream_path $upstream)
   fi
 
   # Sanity checks
@@ -605,12 +621,14 @@ rmfs() {
   echo done
 
   if is_local_upstream $upstream; then
-    local repository_dir=$(get_local_upstream $upstream)
+    local repository_dir=$(get_upstream_path $upstream)
     if [ "x"$repository_dir != x ]; then
       echo -n "Removing repository storage... "
       rm -rf $repository_dir
       echo "done"
     fi
+  elif is_riak_upstream $upstream; then
+    echo "currently Riak Storage is not wiped! TBD."
   fi
 
   echo -n "Removing keys and configuration... "
@@ -653,7 +671,13 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 check() {
   local name=$1
   local upstream=$2
-  local repository_dir=$(get_local_upstream $upstream)
+
+  if is_riak_upstream $upstream; then
+    echo "checking of Riak storage is not supported. TBD"
+    return
+  fi
+
+  local repository_dir=$(get_upstream_path $upstream)
 
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
 
