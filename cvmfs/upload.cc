@@ -59,8 +59,8 @@ Spooler::SpoolerDefinition::SpoolerDefinition(
     driver_type   = Local;
     upstream_path = upstream[1];
   } else if (upstream[0] == "riak") {
-    driver_type      = Riak;
-    config_file_path = upstream[1];
+    driver_type   = Riak;
+    upstream_urls = upstream[1];
   } else {
     LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
       upstream[0].c_str());
@@ -122,7 +122,7 @@ void Spooler::SpawnSpoolerBackend(
       break;
 
     case SpoolerDefinition::Riak:
-      backend = new RiakSpoolerBackend(definition.config_file_path);
+      backend = new RiakSpoolerBackend(definition.upstream_urls);
       break;
 
     default:

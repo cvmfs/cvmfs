@@ -67,8 +67,8 @@ class Spooler {
     bool IsValid() const { return valid_; }
 
     DriverType  driver_type;
-    std::string upstream_path;    // < for the local spooler
-    std::string config_file_path; // < for the riak spooler
+    std::string upstream_path; // < for the local spooler
+    std::string upstream_urls; // < for the riak spooler
     std::string paths_out_pipe;
     std::string digests_in_pipe;
 

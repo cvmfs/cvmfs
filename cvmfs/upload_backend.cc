@@ -136,7 +136,7 @@ void AbstractSpoolerBackend::SendResult(
   response.push_back('\0');
   response.append(local_path);
   response.push_back('\0');
-  response.append(compressed_hash.ToString());
+  response.append((compressed_hash.IsNull()) ? "" : compressed_hash.ToString());
   response.push_back('\n');
 
   // send message to Spooler Frontend

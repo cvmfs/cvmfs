@@ -461,17 +461,25 @@ EOF
   local spooler_definition="${upstream},${pipe_paths},${pipe_digests}"
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $spooler_definition $temp_dir > /dev/null
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
+  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife_debug create \
     -t $temp_dir \
     -r $spooler_definition \
-    -o ${temp_dir}/new_manifest" > /dev/null
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+    -o ${temp_dir}/new_manifest"
+  if [ $? -ne 0 ]; then
+    echo "fail!"
+    return
+  fi
+  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife_debug sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${temp_dir}/new_manifest \
     -t $temp_dir \
-    -r $spooler_definition" > /dev/null
+    -r $spooler_definition"
+  if [ $? -ne 0 ]; then
+    echo "fail!"
+    return
+  fi
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "

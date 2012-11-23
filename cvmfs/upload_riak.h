@@ -12,13 +12,11 @@ namespace upload {
   class RiakSpoolerBackend : public AbstractSpoolerBackend {
    protected:
     struct RiakConfiguration {
-      RiakConfiguration(const std::string &config_file_path);
+      RiakConfiguration(const std::string &upstream_urls);
 
-      std::string CreateRequestUrl(const std::string key) const;
+      std::string CreateRequestUrl(const std::string &key) const;
 
       std::string url;
-      std::string port;
-      std::string bucket;
     };
 
     class PushFinishedCallback {
@@ -41,7 +39,7 @@ namespace upload {
     };
 
    public:
-    RiakSpoolerBackend(const std::string &config_file_path);
+    RiakSpoolerBackend(const std::string &upstream_urls);
     virtual ~RiakSpoolerBackend();
     bool Initialize();
 

@@ -11,8 +11,8 @@
 
 using namespace upload;
 
-RiakSpoolerBackend::RiakSpoolerBackend(const std::string &config_file_path) :
-  config_(config_file_path),
+RiakSpoolerBackend::RiakSpoolerBackend(const std::string &upstream_urls) :
+  config_(upstream_urls),
   initialized_(false)
 {}
 
@@ -217,16 +217,11 @@ bool RiakSpoolerBackend::IsReady() const {
 
 
 RiakSpoolerBackend::RiakConfiguration::RiakConfiguration(
-                                          const std::string& config_file_path) {
-  // TODO: actually read the configuration from a file here
-
-  url    = "http://cernvmbl005";
-  port   = "8098";
-  bucket = "riak";
-}
+                                          const std::string& upstream_urls) :
+  url(upstream_urls) {}
 
 
 std::string RiakSpoolerBackend::RiakConfiguration::CreateRequestUrl(
-                                          const std::string key) const {
-  return url + ":" + port + "/riak/" + bucket + "/" + key;
+                                          const std::string &key) const {
+  return url + "/" + key;
 }
