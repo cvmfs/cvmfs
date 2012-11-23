@@ -19,11 +19,18 @@ my $bin_name = 'cvmfs-test';
 my $cpanm_bin = '/usr/bin/cpanm';
 my $force = undef;
 
-my $ret = GetOptions ("bindir=s" => \$bindir,
-					   "manpath=s" => \$manpath,
-					   "prefix=s" => \$prefix,
-					   "force" => \$force );
+my $user_id = `id -u`;
+chomp($user_id);
 
+# This function check if the user is running Install.pl with root priviledges
+sub is_root {
+	if ($user_id == 0) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
 
 # This functions accept an absolute path and will recursive
 # remove all files and directories. Is the equivalent of
@@ -43,6 +50,43 @@ sub recursive_rm {
 	}
 }
 
+# This function will be called with --uninstall command line options
+sub uninstall {
+	if (is_root()) {
+		if (-f "$prefix/cvmfs-test/.installed") {
+			print "This process will not remove cpanm or any perl module installed during the installation.\n";
+			print "This is because it can\'t know if they were installed witch cvmfs-test or independently.\n";
+			
+			print "Removing $bindir/$bin_name... ";
+			unlink("$bindir/$bin_name");
+			print "Done.\n";
+			
+			print "Removing $manpath/man1/$bin_name.1... ";
+			unlink("$manpath/man1/$bin_name.1");
+			print "Done.\n";
+			
+			print 'Removing everything else... ';
+			recursive_rm("$prefix/cvmfs-test");
+			print "Done.\n";
+			
+			print "Uninstall complete.\n";
+		}
+		else {
+			print "cvmfs-test doesn't seem to be installed in $prefix. Unable to uninstall.\n";
+		}
+	}
+	else {
+		print "You need to be root to uninstall cvmfs-test.\n";
+	}
+	exit 0;
+}
+
+my $ret = GetOptions ("bindir=s" => \$bindir,
+					  "manpath=s" => \$manpath,
+					  "prefix=s" => \$prefix,
+					  "force" => \$force,
+					  "uninstall" => sub { uninstall() } );
+
 unless(defined($force)) {
 	if (-e "$prefix/cvmfs-test/.installed") {
 		print "\ncvmfs-test seems to be already installed.\n";
@@ -51,13 +95,9 @@ unless(defined($force)) {
 	}
 }
 
-my $user_id = `id -u`;
-chomp($user_id);
-
-if ($user_id ne '0') {
-	print 'To complete the installation process you need to be able to use sudo on your system. Are you? (N/y)';
-	my $sudoers = <STDIN>;
-	unless ($sudoers eq "y\n" or $sudoers eq "Y\n") { exit 0 }
+unless (is_root()) {
+	print "You need to be root to install cvmfs-test.\n";
+	exit 0;
 }
 
 my $zmq_retrieve = 'http://download.zeromq.org/zeromq-2.2.0.tar.gz';
