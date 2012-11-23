@@ -461,7 +461,7 @@ EOF
   local spooler_definition="${upstream},${pipe_paths},${pipe_digests}"
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $spooler_definition $temp_dir > /dev/null
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife_debug create \
+  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
     -t $temp_dir \
     -r $spooler_definition \
     -o ${temp_dir}/new_manifest"
@@ -469,7 +469,7 @@ EOF
     echo "fail!"
     return
   fi
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife_debug sign \
+  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
