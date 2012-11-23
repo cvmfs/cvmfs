@@ -180,7 +180,6 @@ unlink("$manpath/man1/$bin_name.1");
 copy("$RealBin/man/cvmfs-test.1", "$manpath/man1/$bin_name.1");
 
 dircopy($RealBin, "$prefix/cvmfs-test");
-system("sudo chown -R cvmfs-test:cvmfs-test $prefix/cvmfs-test");
 
 unlink("$bindir/$bin_name");
 symlink "$prefix/cvmfs-test/cvmfs-testshell.pl", "$bindir/$bin_name";
@@ -189,5 +188,7 @@ system("$bin_name --setup");
 
 open(my $create_sentinel, '>', "$prefix/cvmfs-test/.installed");
 close($create_sentinel);
+
+system("sudo chown -R cvmfs-test:cvmfs-test $prefix/cvmfs-test");
 
 exit 0;
