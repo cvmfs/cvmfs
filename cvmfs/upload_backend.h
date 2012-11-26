@@ -20,6 +20,26 @@ namespace upload
 
   class AbstractSpoolerBackend
   {
+   protected:
+    class PushFinishedCallback {
+     public:
+      PushFinishedCallback(const AbstractSpoolerBackend *delegate,
+                           const std::string            &local_path = "",
+                           const hash::Any              &content_hash = hash::Any()) :
+        delegate_(delegate),
+        local_path_(local_path),
+        content_hash_(content_hash) {}
+
+      inline void operator()(const int return_code) const {
+        delegate_->SendResult(return_code, local_path_, content_hash_);
+      }
+
+     private:
+      const AbstractSpoolerBackend *delegate_;
+      const std::string             local_path_;
+      const hash::Any               content_hash_;
+    };
+
    public:
     virtual ~AbstractSpoolerBackend();
     bool Connect(const std::string &fifo_paths,

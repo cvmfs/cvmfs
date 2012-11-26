@@ -19,25 +19,6 @@ namespace upload {
       std::string url;
     };
 
-    class PushFinishedCallback {
-     public:
-      PushFinishedCallback(const RiakSpoolerBackend *delegate,
-                           const std::string        &local_path = "",
-                           const hash::Any          &content_hash = hash::Any()) :
-        delegate_(delegate),
-        local_path_(local_path),
-        content_hash_(content_hash) {}
-
-      void operator()(const int return_code) const {
-        delegate_->SendResult(return_code, local_path_, content_hash_);
-      }
-
-     private:
-      const RiakSpoolerBackend *delegate_;
-      const std::string         local_path_;
-      const hash::Any           content_hash_;
-    };
-
    public:
     RiakSpoolerBackend(const std::string &upstream_urls);
     virtual ~RiakSpoolerBackend();
