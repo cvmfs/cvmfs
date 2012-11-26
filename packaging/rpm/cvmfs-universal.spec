@@ -81,6 +81,11 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
+%if 0%{?suse_version}
+Requires: insserv
+%else
+Requires: initscripts
+%endif
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -89,7 +94,6 @@ Requires: sudo
 Requires: psmisc
 Requires: curl
 Requires: attr
-Requires: initscripts
 Requires: openssl
 Requires: httpd
 Requires: cvmfs-keys >= 1.2
