@@ -130,7 +130,7 @@ void SpoolerBackend<PushWorkerT>::SendResult(
 
 template <class PushWorkerT>
 void SpoolerBackend<PushWorkerT>::Schedule(StorageJob *job) {
-
+  
 }
 
 

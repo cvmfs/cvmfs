@@ -82,7 +82,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   hash.h hash.cc
   compression.h compression.cc
   util.h util.cc
-  upload.h upload.cc
+  upload.h upload.cc upload_impl.h
   upload_backend.h upload_backend_impl.h
   upload_pushworker.h upload_pushworker.cc
   upload_local.h upload_local.cc
