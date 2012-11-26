@@ -14,9 +14,11 @@ AbstractPushWorker::~AbstractPushWorker() {
 
 bool AbstractPushWorker::Initialize() {
 
+	return false;
 }
 
 
 bool AbstractPushWorker::IsReady() const {
 
+	return false;
 }

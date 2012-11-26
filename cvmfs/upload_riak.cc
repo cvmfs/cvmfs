@@ -66,7 +66,7 @@ bool RiakPushWorker::Initialize() {
 }
 
 
-bool RiakPushWorker::ProcessJob(StoragePushJob *job) {
+bool RiakPushWorker::ProcessJob(StorageJob *job) {
 
   return false;
 }

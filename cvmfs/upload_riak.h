@@ -45,7 +45,7 @@ namespace upload {
     bool Initialize();
     bool IsReady() const;
 
-    bool ProcessJob(StoragePushJob *job);
+    bool ProcessJob(StorageJob *job);
 
    protected:
     void Copy(const std::string &local_path,

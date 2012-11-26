@@ -32,7 +32,7 @@ bool LocalPushWorker::Initialize() {
 }
 
 
-bool LocalPushWorker::ProcessJob(StoragePushJob *job) {
+bool LocalPushWorker::ProcessJob(StorageJob *job) {
 
   return false;
 }
