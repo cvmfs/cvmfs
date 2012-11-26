@@ -18,6 +18,55 @@ namespace upload
     kCmdMoveFlag          = 128,
   };
 
+
+  class StorageJob {
+   public:
+    StorageJob(const std::string            &local_path,
+               const bool                    move) :
+      local_path_(local_path),
+      move_(move) {}
+
+    inline virtual bool IsCompressionJob() const { return false; }
+    inline virtual bool IsCopyJob()        const { return false; }
+
+   private:
+    const std::string             local_path_;
+    const bool                    move_;
+  };
+
+  class StorageCompressionJob : public StorageJob {
+   public:
+    StorageCompressionJob(const std::string &local_path,
+                          const std::string &remote_dir,
+                          const std::string &file_suffix,
+                          const bool         move) :
+      StorageJob(local_path, move),
+      remote_dir_(remote_dir),
+      file_suffix_(file_suffix) {}
+
+    inline bool IsCompressionJob() const { return true; }
+
+    private:
+     const std::string remote_dir_;
+     const std::string file_suffix_;
+
+     hash::Any content_hash_;
+  };
+
+  class StorageCopyJob : public StorageJob {
+   public:
+    StorageCopyJob(const std::string &local_path,
+                   const std::string &remote_path,
+                   const bool         move) :
+      StorageJob(local_path, move),
+      remote_path_(remote_path) {}
+
+    inline bool IsCopyJob() const { return true; }
+
+   private:
+    const std::string remote_path_;
+  };
+
   template <class PushWorkerT>
   class SpoolerBackend {
    public:
@@ -33,14 +82,11 @@ namespace upload
 
    protected:
     void EndOfTransaction();
-    void Copy(const std::string &local_path,
-              const std::string &remote_path,
-              const bool move);
-    void Process(const std::string &local_path,
-                 const std::string &remote_dir,
-                 const std::string &file_suffix,
-                 const bool move);
-    void Unknown();
+    void Copy(const bool move);
+    void Process(const bool move);
+    void Unknown(const unsigned char command);
+
+    void Schedule(StorageJob *job);
 
     void SendResult(const int error_code,
                     const std::string &local_path = "",

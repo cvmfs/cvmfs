@@ -30,35 +30,26 @@ namespace upload {
     // From here on we are in the SpoolerBackend process
 
     // create a SpoolerBackend object of the requested type
-    SpoolerBackend<PushWorkerT> *backend = 
-      new SpoolerBackend<PushWorkerT>(definition.spooler_description);
-    assert (backend != NULL);
-    int retval = 1;
+    SpoolerBackend<PushWorkerT> backend(definition.spooler_description);
 
     // connect the named pipes in the SpoolerBackend
-    if (! backend->Connect(definition.paths_out_pipe,
-                           definition.digests_in_pipe)) {
+    if (! backend.Connect(definition.paths_out_pipe,
+                          definition.digests_in_pipe)) {
       LogCvmfs(kLogSpooler, kLogStderr, "failed to connect spooler backend");
-      retval = 2;
-      goto out;
+      exit(2);
     }
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected spooler backend");
 
     // do the final initialization of the SpoolerBackend
-    if (! backend->Initialize()) {
+    if (! backend.Initialize()) {
       LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize spooler backend");
-      retval = 3;
-      goto out;
+      exit(3);
     }
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "initialized spooler backend");
 
     // run the SpoolerBackend service
     // returns on a termination signal though the named pipes
-    retval = backend->Run();
-
-    // all done, good bye...
-  out:
-    delete backend;
+    const int retval = backend.Run();
     exit(retval);
   }
 

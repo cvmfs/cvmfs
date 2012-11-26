@@ -70,11 +70,6 @@ int SpoolerBackend<PushWorkerT>::Run() {
   int retval;
   bool running = true;
 
-  std::string local_path;
-  std::string remote_path;
-  std::string remote_dir;
-  std::string file_suffix;
-
   // reading from input pipe until it is gone
   while ((retval = getc_unlocked(fpathes_)) != EOF && running) {
 
@@ -88,40 +83,20 @@ int SpoolerBackend<PushWorkerT>::Run() {
 
     switch (command) {
       case kCmdEndOfTransaction:
-        LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Spooler received 'end of transaction'");
-
         EndOfTransaction();
         running = false;
         break;
 
       case kCmdCopy:
-        GetString(fpathes_, &local_path);
-        GetString(fpathes_, &remote_path);
-        LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Spooler received 'copy': source %s, dest %s move %d",
-                 local_path.c_str(), remote_path.c_str(), move_file);
-
-        Copy(local_path, remote_path, move_file);
+        Copy(move_file);
         break;
 
       case kCmdProcess:
-        GetString(fpathes_, &local_path);
-        GetString(fpathes_, &remote_dir);
-        GetString(fpathes_, &file_suffix);
-        LogCvmfs(kLogSpooler, kLogVerboseMsg,
-                 "Spooler received 'process': source %s, dest %s, "
-                 "postfix %s, move %d", local_path.c_str(),
-                 remote_dir.c_str(), file_suffix.c_str(), move_file);
-
-        Process(local_path, remote_dir, file_suffix, move_file);
+        Process(move_file);
         break;
 
       default:
-        LogCvmfs(kLogSpooler, kLogWarning, "Spooler received 'unknown command': %d",
-                 command);
-
-        Unknown();
+        Unknown(command);
         break;
     }
   }
@@ -154,30 +129,60 @@ void SpoolerBackend<PushWorkerT>::SendResult(
 
 
 template <class PushWorkerT>
+void SpoolerBackend<PushWorkerT>::Schedule(StorageJob *job) {
+
+}
+
+
+template <class PushWorkerT>
 void SpoolerBackend<PushWorkerT>::EndOfTransaction() {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Spooler received 'end of transaction'");
+
   SendResult(0);
 }
 
 
 template <class PushWorkerT>
-void SpoolerBackend<PushWorkerT>::Copy(const std::string &local_path,
-                          const std::string &remote_path,
-                          const bool move) {
+void SpoolerBackend<PushWorkerT>::Copy(const bool move) {
+  std::string local_path;
+  std::string remote_path;
 
+  GetString(fpathes_, &local_path);
+  GetString(fpathes_, &remote_path);
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Spooler received 'copy': source %s, dest %s move %d",
+           local_path.c_str(), remote_path.c_str(), move);
+
+  StorageJob *job = new StorageCopyJob(local_path, remote_path, move);
+  Schedule(job);
 }
 
 
 template <class PushWorkerT>
-void SpoolerBackend<PushWorkerT>::Process(const std::string &local_path,
-                             const std::string &remote_dir,
-                             const std::string &file_suffix,
-                             const bool move) {
+void SpoolerBackend<PushWorkerT>::Process(const bool move) {
+  std::string local_path;
+  std::string remote_dir;
+  std::string file_suffix;
 
+  GetString(fpathes_, &local_path);
+  GetString(fpathes_, &remote_dir);
+  GetString(fpathes_, &file_suffix);
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Spooler received 'process': source %s, dest %s, "
+           "postfix %s, move %d", local_path.c_str(),
+           remote_dir.c_str(), file_suffix.c_str(), move);
+
+  StorageJob *job = new StorageCompressionJob(local_path, remote_dir, file_suffix, move);
+  Schedule(job);
 }
 
 
 template <class PushWorkerT>
-void SpoolerBackend<PushWorkerT>::Unknown() {
+void SpoolerBackend<PushWorkerT>::Unknown(const unsigned char command) {
+  LogCvmfs(kLogSpooler, kLogWarning, "Spooler received 'unknown command': %d",
+           command);
+
   SendResult(1);
 }
 
