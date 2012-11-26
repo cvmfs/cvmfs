@@ -37,7 +37,7 @@ do
   exclude=0
   if [ "x$CVMFS_TEST_EXCLUDE" != "x" ]; then
     for testcase in $CVMFS_TEST_EXCLUDE; do
-      if echo $t | grep -q $testcase; then
+      if echo $(basename $t) | grep -q "^$testcase"; then
         exclude=1
       fi
     done
