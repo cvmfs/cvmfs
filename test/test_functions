@@ -47,13 +47,13 @@ autofs_switch() {
     on)
       if [ $is_running -ne 0 ]; then
         echo "starting autofs..."
-        $service_binary autofs start
+        sudo $service_binary autofs start
       fi
       ;;
     off)
       if [ $is_running -eq 0 ]; then
         echo "stopping autofs..."
-        $service_binary autofs stop
+        sudo $service_binary autofs stop
       fi
       ;;
   esac
