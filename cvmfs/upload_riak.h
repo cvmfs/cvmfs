@@ -1,7 +1,7 @@
 #ifndef CVMFS_UPLOAD_RIAK_H_
 #define CVMFS_UPLOAD_RIAK_H_
 
-#include "upload_backend.h"
+#include "upload_pushworker.h"
 
 #include <vector>
 
@@ -9,7 +9,26 @@ typedef void CURL;
 struct curl_slist;
 
 namespace upload {
-  class RiakSpoolerBackend : public AbstractSpoolerBackend {
+  class RiakPushWorker : public AbstractPushWorker {
+    class PushFinishedCallback {
+     public:
+      PushFinishedCallback(const RiakPushWorker *delegate,
+                           const std::string        &local_path = "",
+                           const hash::Any          &content_hash = hash::Any()) :
+        delegate_(delegate),
+        local_path_(local_path),
+        content_hash_(content_hash) {}
+
+      void operator()(const int return_code) const {
+        //delegate_->SendResult(return_code, local_path_, content_hash_);
+      }
+
+     private:
+      const RiakPushWorker *delegate_;
+      const std::string         local_path_;
+      const hash::Any           content_hash_;
+    };
+
    protected:
     struct RiakConfiguration {
       RiakConfiguration(const std::string &upstream_urls);
@@ -20,11 +39,13 @@ namespace upload {
     };
 
    public:
-    RiakSpoolerBackend(const std::string &upstream_urls);
-    virtual ~RiakSpoolerBackend();
-    bool Initialize();
+    RiakPushWorker(const std::string &upstream_urls);
+    virtual ~RiakPushWorker();
 
+    bool Initialize();
     bool IsReady() const;
+
+    bool ProcessJob(StoragePushJob *job);
 
    protected:
     void Copy(const std::string &local_path,

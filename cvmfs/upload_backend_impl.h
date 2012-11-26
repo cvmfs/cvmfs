@@ -1,5 +1,3 @@
-#include "upload_backend.h"
-
 #include <fcntl.h>
 #include <errno.h>
 
@@ -7,22 +5,26 @@
 #include "logging.h"
 #include "util.h"
 
-using namespace upload;
+namespace upload {
 
-AbstractSpoolerBackend::AbstractSpoolerBackend() :
+template <class PushWorkerT>
+SpoolerBackend<PushWorkerT>::SpoolerBackend(const std::string &spooler_description) :
+  spooler_description_(spooler_description),
   pipes_connected_(false),
   initialized_(false)
 {}
 
 
-AbstractSpoolerBackend::~AbstractSpoolerBackend() {
+template <class PushWorkerT>
+SpoolerBackend<PushWorkerT>::~SpoolerBackend() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler backend terminates");
   fclose(fpathes_);
   close(fd_digests_);
 }
 
 
-bool AbstractSpoolerBackend::Connect(const std::string &fifo_paths,
+template <class PushWorkerT>
+bool SpoolerBackend<PushWorkerT>::Connect(const std::string &fifo_paths,
                                      const std::string &fifo_digests) {
   // connect to incoming pathes pipe
   fpathes_ = fopen(fifo_paths.c_str(), "r");
@@ -51,7 +53,8 @@ bool AbstractSpoolerBackend::Connect(const std::string &fifo_paths,
 }
 
 
-bool AbstractSpoolerBackend::Initialize() {
+template <class PushWorkerT>
+bool SpoolerBackend<PushWorkerT>::Initialize() {
   if (!pipes_connected_) {
     LogCvmfs(kLogSpooler, kLogWarning, "IO pipes are not setup properly");
     return false;
@@ -62,7 +65,8 @@ bool AbstractSpoolerBackend::Initialize() {
 }
 
 
-int AbstractSpoolerBackend::Run() {
+template <class PushWorkerT>
+int SpoolerBackend<PushWorkerT>::Run() {
   int retval;
   bool running = true;
 
@@ -126,7 +130,8 @@ int AbstractSpoolerBackend::Run() {
 }
 
 
-void AbstractSpoolerBackend::SendResult(
+template <class PushWorkerT>
+void SpoolerBackend<PushWorkerT>::SendResult(
                                     const int error_code,
                                     const std::string &local_path,
                                     const hash::Any &compressed_hash) const {
@@ -148,55 +153,45 @@ void AbstractSpoolerBackend::SendResult(
 }
 
 
-void AbstractSpoolerBackend::EndOfTransaction() {
+template <class PushWorkerT>
+void SpoolerBackend<PushWorkerT>::EndOfTransaction() {
   SendResult(0);
 }
 
 
-void AbstractSpoolerBackend::Unknown() {
+template <class PushWorkerT>
+void SpoolerBackend<PushWorkerT>::Copy(const std::string &local_path,
+                          const std::string &remote_path,
+                          const bool move) {
+
+}
+
+
+template <class PushWorkerT>
+void SpoolerBackend<PushWorkerT>::Process(const std::string &local_path,
+                             const std::string &remote_dir,
+                             const std::string &file_suffix,
+                             const bool move) {
+
+}
+
+
+template <class PushWorkerT>
+void SpoolerBackend<PushWorkerT>::Unknown() {
   SendResult(1);
 }
 
 
-bool AbstractSpoolerBackend::CompressToTempFile(
-                                    const std::string &source_file_path,
-                                    const std::string &destination_dir,
-                                    std::string       *tmp_file_path,
-                                    hash::Any         *content_hash) const {
-  // Create a temporary file at the given destination directory
-  FILE *fcas = CreateTempFile(destination_dir + "/cvmfs", 0777, "w", 
-                              tmp_file_path);
-  if (fcas == NULL) {
-    LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file %s",
-             tmp_file_path->c_str());
-    return false;
-  }
-
-  // Compress the provided source file and write the result into the temporary.
-  // Additionally computes the content hash of the compressed data
-  int retval = zlib::CompressPath2File(source_file_path, fcas, content_hash);
-  if (! retval) {
-    LogCvmfs(kLogSpooler, kLogStderr, "failed to compress file %s to temporary "
-                                      "file %s",
-             source_file_path.c_str(), tmp_file_path->c_str());
-
-    unlink(tmp_file_path->c_str());
-    return false;
-  }
-  fclose(fcas);
-
-  return true;
-}
-
-
-bool AbstractSpoolerBackend::IsReady() const {
+template <class PushWorkerT>
+bool SpoolerBackend<PushWorkerT>::IsReady() const {
   return 
     pipes_connected_ &&
     initialized_;
 }
 
 
-bool AbstractSpoolerBackend::GetString(FILE *f, std::string *str) const {
+template <class PushWorkerT>
+bool SpoolerBackend<PushWorkerT>::GetString(FILE *f, std::string *str) const {
   str->clear();
   do {
     int retval = getc_unlocked(f);
@@ -208,3 +203,44 @@ bool AbstractSpoolerBackend::GetString(FILE *f, std::string *str) const {
     str->push_back(c);
   } while (true);
 }
+
+
+} // namespace upload
+
+// -----------------------------------------------------------------------------
+
+
+// bool SpoolerBackend<PushWorkerT>::StoragePushJob::Compress(CompressionContext *ctx) {
+//   // Create a temporary file at the given destination directory
+//   FILE *fcas = CreateTempFile(ctx->tmp_dir + "/cvmfs", 0777, "w",
+//                               &compressed_file_path_);
+//   if (fcas == NULL) {
+//     LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file %s",
+//              compressed_file_path_.c_str());
+//     return false;
+//   }
+
+//   // Compress the provided source file and write the result into the temporary.
+//   // Additionally computes the content hash of the compressed data
+//   int retval = zlib::CompressPath2File(local_path_, fcas, &content_hash_);
+//   if (! retval) {
+//     LogCvmfs(kLogSpooler, kLogStderr, "failed to compress file %s to temporary "
+//                                       "file %s",
+//              local_path_.c_str(), compressed_file_path_.c_str());
+
+//     unlink(compressed_file_path_.c_str());
+//     return false;
+//   }
+//   fclose(fcas);
+
+//   return true;
+// }
+
+
+// bool SpoolerBackend<PushWorkerT>::StoragePushJob::PushToStorage(StoragePushContext *ctx) {
+//   const std::string remote_path = remote_dir_                  +
+//                                   content_hash_.MakePath(1, 2) +
+//                                   file_suffix_;
+
+//   return delegate_->PushToStorage(ctx, compressed_file_path_, remote_path);
+// }

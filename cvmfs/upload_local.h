@@ -1,16 +1,18 @@
 #ifndef CVMFS_UPLOAD_LOCAL_H_
 #define CVMFS_UPLOAD_LOCAL_H_
 
-#include "upload_backend.h"
+#include "upload_pushworker.h"
 
 namespace upload
 {
-  class LocalSpoolerBackend : public AbstractSpoolerBackend {
+  class LocalPushWorker : public AbstractPushWorker {
    public:
-    LocalSpoolerBackend(const std::string &upstream_path);
+    LocalPushWorker(const std::string &spooler_description);
 
     bool Initialize();
     bool IsReady() const;
+
+    bool ProcessJob(StoragePushJob *job);
    
    protected:
     void Copy(const std::string &local_path,

@@ -6,6 +6,7 @@
 #define CVMFS_UPLOAD_H_
 
 #include <pthread.h>
+
 #include <stdint.h>
 #include <unistd.h>
 
@@ -13,6 +14,7 @@
 #include <string>
 
 #include "atomic.h"
+
 
 namespace upload {
 
@@ -56,7 +58,15 @@ class SpoolerCallback {
  */
 class Spooler {
  protected:
-  struct SpoolerDefinition{
+
+  /**
+   * SpoolerDefinition is given by a string of the form:
+   * <spooler type>:<spooler description>
+   *
+   * F.e: local:/srv/cvmfs/dev.cern.ch
+   *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
+   */
+  struct SpoolerDefinition {
     enum DriverType {
       Riak,
       Local,
@@ -67,8 +77,8 @@ class Spooler {
     bool IsValid() const { return valid_; }
 
     DriverType  driver_type;
-    std::string upstream_path; // < for the local spooler
-    std::string upstream_urls; // < for the riak spooler
+    std::string spooler_description;
+    std::string upstream_urls;
     std::string paths_out_pipe;
     std::string digests_in_pipe;
 
@@ -108,6 +118,8 @@ class Spooler {
 
  private:
   static void *MainReceive(void *caller);
+
+  template <class PushWorkerT>
   static void SpawnSpoolerBackend(const SpoolerDefinition &definition);
 
   atomic_int64 num_pending_;
@@ -126,5 +138,7 @@ class Spooler {
 BackendStat *GetBackendStat(const std::string &spooler_definition);
 
 }  // namespace upload
+
+#include "upload_impl.h"
 
 #endif  // CVMFS_UPLOAD_H_
