@@ -14,6 +14,8 @@ CVMFS_TEST_DEBUGLOG=
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
+CVMFS_TEST_SYSLOG_FACILITY=${CVMFS_TEST_SYSLOG_FACILITY:=5}
+CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
 
 CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
@@ -63,7 +65,8 @@ cvmfs_clean() {
   sudo rm -rf /var/lib/cvmfs/*
   sudo rm -f /etc/cvmfs/default.local
   sudo rm -f /etc/cvmfs/config.d/*
-  
+  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" 
+ 
   timeout=5
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
@@ -85,6 +88,7 @@ cvmfs_mount() {
   sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
+  sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
   if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
