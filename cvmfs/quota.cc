@@ -548,7 +548,7 @@ bool RebuildDatabase() {
   string path;
   set<string> catalogs;
 
-  LogCvmfs(kLogQuota, kLogDebug, "re-building cache-database");
+  LogCvmfs(kLogQuota, kLogSyslog | kLogDebug, "re-building cache-database");
 
   // Empty cache catalog and fscache
   sql = "DELETE FROM cache_catalog; DELETE FROM fscache;";
@@ -924,6 +924,9 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   command_line.push_back(StringifyInt(limit));
   command_line.push_back(StringifyInt(cleanup_threshold));
   command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(StringifyInt(GetLogSyslogLevel()));
+  command_line.push_back(StringifyInt(GetLogSyslogFacility()));
+  command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(GetLogDebugFile());
 
   vector<int> preserve_filedes;
@@ -1010,17 +1013,30 @@ int MainCacheManager(int argc, char **argv) {
   limit_ = String2Int64(argv[5]);
   cleanup_threshold_ = String2Int64(argv[6]);
   int foreground = String2Int64(argv[7]);
-  const string logfile = argv[8];
+  int syslog_level = String2Int64(argv[8]);
+  int syslog_facility = String2Int64(argv[9]);
+  const string logfile = argv[10];
+  SetLogSyslogLevel(syslog_level);
+  SetLogSyslogFacility(syslog_facility);
   if (logfile != "")
     SetLogDebugFile(logfile + ".cachemgr");
 
   if (!foreground)
     Daemonize();
 
-  if (!InitDatabase(false))  // TODO: rebuild?
+  // Initialize pipe, open non-blocking as cvmfs is not yet connected
+  const string crash_guard = *cache_dir_ + "/cachemgr.running";
+  const bool rebuild = FileExists(crash_guard);
+  retval = open(crash_guard.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (retval < 0) {
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "failed to create shared cache manager crash guard");
+    return 1;
+  }
+  close(retval);
+  if (!InitDatabase(rebuild))
     return 1;
 
-  // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
@@ -1041,6 +1057,7 @@ int MainCacheManager(int argc, char **argv) {
   MainCommandServer(NULL);
   unlink(fifo_path.c_str());
   CloseDatabase();
+  unlink(crash_guard.c_str());
 
   monitor::Fini();
 
