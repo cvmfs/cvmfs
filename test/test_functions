@@ -1,4 +1,3 @@
-
 # By default, this script runs in testing mode
 # Although it allows for a server debugging mode, which attaches gdb to
 # the `cvmfs_server publish` process and allows for both online and
@@ -47,16 +46,18 @@ autofs_switch() {
     on)
       if [ $is_running -ne 0 ]; then
         echo "starting autofs..."
-        sudo $service_binary autofs start
+        sudo $service_binary autofs start 2>&1 >/dev/null || return 100
       fi
       ;;
     off)
       if [ $is_running -eq 0 ]; then
         echo "stopping autofs..."
-        sudo $service_binary autofs stop
+        sudo $service_binary autofs stop 2>&1 >/dev/null || return 101
       fi
       ;;
   esac
+
+  return 0
 }
 
 

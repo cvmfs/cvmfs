@@ -1,4 +1,3 @@
-
 cvmfs_test_name="Populate Repository"
 cvmfs_test_autofs_on_startup=false
 
