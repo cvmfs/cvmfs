@@ -1,4 +1,5 @@
 2.1.5:
+  * Added "pid cachemgr" command to cvmfs_talk
   * Added CERN IT public keys
   * Syslog facility adjustable to one of local0 .. local7
 
