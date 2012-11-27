@@ -701,7 +701,12 @@ the command."
 # Setup environment
 APACHE="httpd"
 [ which apache2 >/dev/null 2>&1 ] && APACHE="apache2"
-SERVICE_BIN=$(which service)
+if [ -x /sbin/service ]; then
+  SERVICE_BIN="/sbin/service"
+else
+  # Ubuntu
+  SERVICE_BIN="/usr/sbin/service"
+fi
 [ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
 
 select_fqrn() {
