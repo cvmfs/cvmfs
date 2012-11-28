@@ -114,6 +114,11 @@ void ParsePath(const string &config_file) {
       parameter = parameter.substr(6);
       parameter = Trim(parameter);
     }
+    // Strip eval
+    if (parameter.find("eval") == 0) {
+      parameter = parameter.substr(4);
+      parameter = Trim(parameter);
+    }
     
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
