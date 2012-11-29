@@ -323,6 +323,19 @@ cvmfs_chksetup() {
           done
       fi
 
+      # Check readability of config files
+      for config_file in /etc/cvmfs/default.conf /etc/cvmfs/default.local \
+                         /etc/cvmfs/domain.d/*.conf /etc/cvmfs/domain.d/*.local \
+                         /etc/cvmfs/config.d/*.conf /etc/cvmfs/config.d/*.local
+      do
+        if [ -f $config_file ]; then
+          if ! sudo -u $CVMFS_USER test -r $config_file; then
+            echo "Error: $config_file is not readable by $CVMFS_USER"
+            num_errors=$(($num_errors+1))
+          fi
+        fi
+      done
+
       # Check that number of open files is reasonably high
       if [ $CVMFS_NFILES -lt 8192 ]; then
         echo "Warning: maximum number of open files is low ($CVMFS_NFILES) for $fqrn"
@@ -347,7 +360,6 @@ cvmfs_chksetup() {
           num_errors=$(($num_errors+1))
         fi
       fi
-
       if [ ! -z $CVMFS_SYSLOG_FACILITY ]; then
         if ! expr "$CVMFS_SYSLOG_FACILITY" : '[0,1,2,3,4,5,6,7]' > /dev/null; then
           echo -n "Error: invalud value for CVMFS_SYSLOG_FACILITY ($CVMFS_SYSLOG_FACILITY) for $fqrn. "
@@ -384,6 +396,16 @@ cvmfs_chksetup() {
           fi
         fi
       done
+
+      # Check that autofs is not active when NFS export is
+      if [ "$sys_arch" = "Linux" ]; then
+        if check_is_on CVMFS_NFS_SOURCE; then
+          if cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "; then
+            echo "Error: autofs and NFS export are mutually exclusive ($fqrn)"
+            num_errors=$(($num_errors+1))
+          fi
+        fi
+      fi
 
       # Check CVMFS_MOUNT_DIR
       if [ -z $CVMFS_MOUNT_DIR ] || [ ! -d $CVMFS_MOUNT_DIR ] || [ "$global_mount_dir" != "$CVMFS_MOUNT_DIR" ]; then
@@ -447,10 +469,9 @@ cvmfs_chksetup() {
 
   if [ $(($num_warnings+$num_errors)) -eq 0 ]; then
     echo "OK"
-    return 0
   fi
 
-  return 1
+  return $num_errors
 }
 
 
