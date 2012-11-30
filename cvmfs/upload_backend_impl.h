@@ -25,7 +25,7 @@ SpoolerBackend<PushWorkerT>::~SpoolerBackend() {
 
 template <class PushWorkerT>
 bool SpoolerBackend<PushWorkerT>::Connect(const std::string &fifo_paths,
-                                     const std::string &fifo_digests) {
+                                          const std::string &fifo_digests) {
   // connect to incoming pathes pipe
   fpathes_ = fopen(fifo_paths.c_str(), "r");
   if (!fpathes_) {
