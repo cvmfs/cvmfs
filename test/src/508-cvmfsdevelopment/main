@@ -3,17 +3,30 @@ cvmfs_test_name="Simulate CVMFS Development"
 cvmfs_test_autofs_on_startup=false
 
 # cvmfs source tarballs to be downloaded and used as test data
-cvmfs_versions=( \
-  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.1/cvmfs-2.1.1.tar.gz" \
-  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.2/cvmfs-2.1.2.tar.gz" \
-  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.3/cvmfs-2.1.3.tar.gz" \
-  "http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.4/cvmfs-2.1.4.tar.gz" \
-  )
+cvmfs_versions="http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.1/cvmfs-2.1.1.tar.gz
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.2/cvmfs-2.1.2.tar.gz
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.3/cvmfs-2.1.3.tar.gz
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.4/cvmfs-2.1.4.tar.gz"
+
+
+# retrieve the URL at a given index (dash workaround)
+get_url() {
+  local version=$1
+
+  i=0
+  for url in $cvmfs_versions; do
+    if [ $i = $version ]; then
+      echo "$url"
+      break
+    fi
+    i=$(( $i + 1 ))
+  done
+}
 
 # downloads and extracts a number of CVMFS source packages
 # from the electric commander server (URLs above)
 download_and_untar_cvmfs_versions() {
-  for cvmfs_version in "${cvmfs_versions[@]}"
+  for cvmfs_version in $cvmfs_versions
   do
     echo $cvmfs_version
 
@@ -31,9 +44,8 @@ copy_cvmfs_version() {
   local working_dir=$1
   local version=$2
   local source_dir
-  source_dir=$(basename ${cvmfs_versions[$version]} | sed 's/\.tar\.gz//')
-
-  echo $source_dir
+  local url=$(get_url $version)
+  source_dir=$(basename $url | sed 's/\.tar\.gz//')
 
   cp -uR $source_dir/* $working_dir
 }

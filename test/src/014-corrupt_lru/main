@@ -1,0 +1,34 @@
+
+cvmfs_test_name="Recover from corrupted LRU DB"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount lhcb.cern.ch || return 1
+
+  local cache_dir
+  local cache_list
+  
+  cache_dir=$(get_cvmfs_cachedir lhcb.cern.ch)
+  sudo [ -f ${cache_dir}/cachedb ] || return 2
+  ls /cvmfs/lhcb.cern.ch >> $logfile || return 3
+  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab >> $logfile || return 4
+  cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
+  if echo $cache_list | grep -q "automatic rebuild"; then
+    echo "$cache_list" >> $logfile
+    return 5
+  fi
+  
+  cvmfs_umount lhcb.cern.ch || 10
+  sudo sh -c "echo bla > ${cache_dir}/cachedb" || return 11
+  cvmfs_mount lhcb.cern.ch || return 12
+  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab >> $logfile || return 13
+  cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
+  if echo $cache_list | grep -v -q "automatic rebuild"; then
+    echo "$cache_list" >> $logfile
+    return 14
+  fi
+
+  return 0
+}
+

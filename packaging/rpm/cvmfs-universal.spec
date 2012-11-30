@@ -81,6 +81,11 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
+%if 0%{?suse_version}
+Requires: insserv
+%else
+Requires: initscripts
+%endif
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -89,7 +94,6 @@ Requires: sudo
 Requires: psmisc
 Requires: curl
 Requires: attr
-Requires: initscripts
 Requires: openssl
 Requires: httpd
 Requires: cvmfs-keys >= 1.2
@@ -111,7 +115,7 @@ export CFLAGS="-march=i686"
 export CXXFLAGS="-march=i686"
 %endif
 %if 0%{?suse_version}
-cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=no -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
 %cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes .
 %endif
@@ -164,9 +168,7 @@ make DESTDIR=$RPM_BUILD_ROOT install
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
-%if ! 0%{?suse_version}
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
-%endif
 
 # Keys are in cvmfs-keys
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -259,7 +261,6 @@ fi
 %{_includedir}/libcvmfs.h
 %doc COPYING AUTHORS README ChangeLog
 
-%if ! 0%{?suse_version}
 %files server
 %defattr(-,root,root)
 %{_bindir}/cvmfs_swissknife
@@ -267,7 +268,6 @@ fi
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 %doc COPYING AUTHORS README ChangeLog
-%endif
 
 %changelog
 * Tue Oct 02 2012 Jakob Blomer <jblomer@cern.ch>

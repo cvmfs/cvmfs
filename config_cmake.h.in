@@ -142,7 +142,7 @@
 #define PACKAGE_VERSION "${CernVM-FS_VERSION_STRING}"
 #define VERSION PACKAGE_VERSION
 
-#define CVMFS_PATCH_LEVEL "${CernVM-FS_VERSION_PATCH}"
+#define CVMFS_PATCH_LEVEL "0"
 
 
 /* Define to necessary symbol if this constant uses a non-standard name on

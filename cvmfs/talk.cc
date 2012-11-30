@@ -388,6 +388,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "pid") {
         const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
+      } else if (line == "pid cachemgr") {
+        const string pid_str = StringifyInt(quota::GetPid()) + "\n";
+        Answer(con_fd, pid_str);
       } else if (line == "parameters") {
         Answer(con_fd, options::Dump());
       } else if (line == "hotpatch history") {
