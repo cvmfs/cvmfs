@@ -10,6 +10,7 @@ struct curl_slist;
 
 namespace upload {
   class RiakPushWorker : public AbstractPushWorker {
+   protected:
     class PushFinishedCallback {
      public:
       PushFinishedCallback(const RiakPushWorker *delegate,
@@ -29,17 +30,25 @@ namespace upload {
       const hash::Any           content_hash_;
     };
 
-   protected:
-    struct RiakConfiguration {
-      RiakConfiguration(const std::string &upstream_urls);
-
-      std::string CreateRequestUrl(const std::string &key) const;
-
-      std::string url;
-    };
 
    public:
-    RiakPushWorker(const std::string &upstream_urls);
+    /**
+     * See AbstractPushWorker for description
+     */
+    struct Context : public AbstractPushWorker::Context {
+      Context(const std::vector<std::string> &upstream_urls) :
+        upstream_urls(upstream_urls) {}
+
+      std::vector<std::string> upstream_urls;
+    };
+
+    /**
+     * See AbstractPushWorker for description
+     */
+    static Context* GenerateContext(const std::string &upstream_urls);
+
+   public:
+    RiakPushWorker(Context* context);
     virtual ~RiakPushWorker();
 
     bool Initialize();
@@ -60,6 +69,8 @@ namespace upload {
                                 const std::string &remote_dir,
                                 const std::string &file_suffix) const;
     std::string GenerateRiakKey(const std::string &remote_path) const;
+    std::string CreateRequestUrl(const std::string &key) const;
+
     void PushFileToRiakAsync(const std::string          &key,
                              const std::string          &file_path,
                              const PushFinishedCallback &callback);
@@ -70,8 +81,9 @@ namespace upload {
     //                                void   *stream);
 
    private:
-    RiakConfiguration config_;
+    Context *context_;
     bool initialized_;
+    std::string upstream_url_;
 
     CURL *curl_;
     struct curl_slist *http_headers_;

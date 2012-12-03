@@ -60,8 +60,21 @@ bool SpoolerBackend<PushWorkerT>::Initialize() {
     return false;
   }
 
+  if (!SpawnPushWorkers()) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to spawn concurrent push workers");
+    return false;
+  }
+
   initialized_ = true;
   return true;
+}
+
+
+template <class PushWorkerT>
+bool SpoolerBackend<PushWorkerT>::SpawnPushWorkers() {
+  pushworker_context_ = PushWorkerT::GenerateContext(spooler_description_);
+
+  return false;
 }
 
 

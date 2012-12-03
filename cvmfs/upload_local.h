@@ -7,7 +7,24 @@ namespace upload
 {
   class LocalPushWorker : public AbstractPushWorker {
    public:
-    LocalPushWorker(const std::string &spooler_description);
+    /**
+     * See AbstractPushWorker for description
+     */
+    struct Context : public AbstractPushWorker::Context {
+      Context(const std::string &upstream_path) :
+        upstream_path(upstream_path) {}
+
+      const std::string upstream_path;
+    };
+
+    /**
+     * See AbstractPushWorker for description
+     */
+    static Context* GenerateContext(const std::string &upstream_path);
+
+
+   public:
+    LocalPushWorker(Context *context);
 
     bool Initialize();
     bool IsReady() const;
@@ -24,6 +41,8 @@ namespace upload
                  const bool move);
 
    private:
+    Context *context_;
+
     const std::string upstream_path_;
     bool initialized_;
   };

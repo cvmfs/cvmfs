@@ -8,8 +8,16 @@
 
 using namespace upload;
 
-LocalPushWorker::LocalPushWorker(const std::string &upstream_path) :
-  upstream_path_(upstream_path),
+LocalPushWorker::Context* LocalPushWorker::GenerateContext(
+                              const std::string &upstream_path) {
+  Context *ctx = new Context(upstream_path);
+  return ctx;
+}
+
+
+LocalPushWorker::LocalPushWorker(Context *context) :
+  AbstractPushWorker(context),
+  upstream_path_(context->upstream_path),
   initialized_(false)
 {}
 

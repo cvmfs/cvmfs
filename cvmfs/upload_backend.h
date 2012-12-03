@@ -86,6 +86,7 @@ namespace upload
     void Process(const bool move);
     void Unknown(const unsigned char command);
 
+    bool SpawnPushWorkers();
     void Schedule(StorageJob *job);
 
     void SendResult(const int error_code,
@@ -98,6 +99,8 @@ namespace upload
 
    private:
     const std::string spooler_description_;
+
+    typename PushWorkerT::Context* pushworker_context_;
 
     FILE *fpathes_;
     int fd_digests_;

@@ -11,9 +11,20 @@
 
 using namespace upload;
 
-RiakPushWorker::RiakPushWorker(const std::string &upstream_urls) :
-  config_(upstream_urls),
-  initialized_(false)
+RiakPushWorker::Context* RiakPushWorker::GenerateContext(
+                            const std::string &upstream_urls) {
+  // read configuration
+  // TODO...
+
+  std::vector<std::string> upstream_url_vector = SplitString(upstream_urls, ',');
+  return new Context(upstream_url_vector);
+}
+
+RiakPushWorker::RiakPushWorker(Context* context) :
+  AbstractPushWorker(context),
+  context_(context),
+  initialized_(false),
+  upstream_url_(context->upstream_urls.front()) // TODO: do something reasonable here
 {}
 
 
@@ -28,9 +39,6 @@ bool RiakPushWorker::Initialize() {
   bool retval = AbstractPushWorker::Initialize();
   if (!retval)
     return false;
-
-  // read configuration
-  // TODO...
 
   // initialize libcurl
   int cretval = curl_global_init(CURL_GLOBAL_ALL);
@@ -175,7 +183,7 @@ void RiakPushWorker::PushFileToRiakAsync(const std::string          &key,
   }
 
   // set url for Riak put command
-  const std::string url = config_.CreateRequestUrl(key);
+  const std::string url = CreateRequestUrl(key);
   if (curl_easy_setopt(curl_, CURLOPT_URL, url.c_str()) != CURLE_OK) {
     callback(3);
     goto out;
@@ -213,21 +221,13 @@ out:
 }
 
 
-bool RiakPushWorker::IsReady() const {
-  const bool ready = AbstractPushWorker::IsReady();
-  return ready && initialized_;
+
+std::string RiakPushWorker::CreateRequestUrl(const std::string &key) const {
+  return upstream_url_ + "/" + key;
 }
 
 
-// -----------------------------------------------------------------------------
-
-
-RiakPushWorker::RiakConfiguration::RiakConfiguration(
-                                          const std::string& upstream_urls) :
-  url(upstream_urls) {}
-
-
-std::string RiakPushWorker::RiakConfiguration::CreateRequestUrl(
-                                          const std::string &key) const {
-  return url + "/" + key;
+bool RiakPushWorker::IsReady() const {
+  const bool ready = AbstractPushWorker::IsReady();
+  return ready && initialized_;
 }
