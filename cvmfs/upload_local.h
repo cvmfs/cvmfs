@@ -40,13 +40,8 @@ namespace upload
     bool ProcessJob(StorageJob *job);
    
    protected:
-    void Copy(const std::string &local_path,
-              const std::string &remote_path,
-              const bool move);
-    void Process(const std::string &local_path,
-                 const std::string &remote_dir,
-                 const std::string &file_suffix,
-                 const bool move);
+    void Copy(StorageCopyJob *copy_job);
+    void CompressAndProcess(StorageCompressionJob *compression_job);
 
    private:
     Context *context_;

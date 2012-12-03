@@ -27,10 +27,18 @@ namespace upload
 
   class Job {
    public:
+    Job() : return_code_(-1) {}
+
     inline virtual bool IsStorageJob()       const { return false; }
     inline virtual bool IsCompressionJob()   const { return false; }
     inline virtual bool IsCopyJob()          const { return false; }
     inline virtual bool IsDeathSentenceJob() const { return false; }
+
+    inline bool IsSuccessful() const          { return return_code_ == 0; }
+    inline void Finished(int return_code = 0) { return_code_ = return_code; }
+
+   private:
+    int return_code_;
   };
 
   class DeathSentenceJob : public Job {
@@ -47,6 +55,9 @@ namespace upload
 
     inline bool IsStorageJob() const { return true; }
 
+    inline bool move()                     const { return move_; }
+    inline const std::string& local_path() const { return local_path_; }
+
    private:
     const std::string             local_path_;
     const bool                    move_;
@@ -60,9 +71,15 @@ namespace upload
                           const bool         move) :
       StorageJob(local_path, move),
       remote_dir_(remote_dir),
-      file_suffix_(file_suffix) {}
+      file_suffix_(file_suffix),
+      content_hash_(hash::kSha1) {}
 
     inline bool IsCompressionJob() const { return true; }
+
+    inline const std::string& remote_dir()   const { return remote_dir_; }
+    inline const std::string& file_suffix()  const { return file_suffix_; }
+    inline const hash::Any&   content_hash() const { return content_hash_; }
+    inline hash::Any&         content_hash()       { return content_hash_; }
 
     private:
      const std::string remote_dir_;
@@ -80,6 +97,8 @@ namespace upload
       remote_path_(remote_path) {}
 
     inline bool IsCopyJob() const { return true; }
+
+    inline const std::string& remote_path() const { return remote_path_; }
 
    private:
     const std::string remote_path_;
@@ -113,6 +132,7 @@ namespace upload
     void SendResult(const int error_code,
                     const std::string &local_path = "",
                     const hash::Any &compressed_hash = hash::Any()) const;
+    void SendResult(const StorageJob* storage_job) const;
 
     void Schedule(Job *job);
     Job* AcquireJob();

@@ -91,6 +91,10 @@ bool SpoolerBackend<PushWorkerT>::SpawnPushWorkers() {
   pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_description_);
   int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
 
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spawning %d concurrent spooler "
+                                        "worker threads",
+           workers_to_spawn);
+
   // initialize the PushWorker thread pool
   assert (pushworker_threads_.size() == 0);
   pushworker_threads_.resize(workers_to_spawn);
@@ -118,6 +122,7 @@ bool SpoolerBackend<PushWorkerT>::SpawnPushWorkers() {
 
 template <class PushWorkerT>
 void* SpoolerBackend<PushWorkerT>::RunPushWorker(void* context) {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Starting PushWorker thread...");
   // get the context object pointer out of the void* pointer
   typename PushWorkerT::Context *ctx =
     static_cast<typename PushWorkerT::Context*>(context);
@@ -125,24 +130,35 @@ void* SpoolerBackend<PushWorkerT>::RunPushWorker(void* context) {
   // boot up the push worker object and make sure it works
   PushWorkerT worker(ctx);
   worker.Initialize();
-  if (!worker.IsReady())
-    return NULL;
+  if (!worker.IsReady()) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Push Worker was not initialized "
+                                       "properly... will die now!");
+    return NULL; 
+  }
   SpoolerBackend<PushWorkerT> *master = ctx->master;
 
   // start the processing loop
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Running PushWorker...");
   while (true) {
+    // check if we should stop working and die silently
     Job *job = master->AcquireJob();
     if (job->IsDeathSentenceJob()) {
       delete job;
       break;
     }
 
+    // do the job we were asked for
     assert (job->IsStorageJob());
-    worker.ProcessJob(dynamic_cast<StorageJob*>(job));
+    StorageJob *storage_job = dynamic_cast<StorageJob*>(job);
+    worker.ProcessJob(storage_job);
+
+    // report to the supervisor and get ready for the next work piece
+    master->SendResult(storage_job);
     delete job;
   }
 
   // good bye thread...
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Terminating PushWorker thread...");
   return context;
 }
 
@@ -211,7 +227,29 @@ void SpoolerBackend<PushWorkerT>::SendResult(
 
 
 template <class PushWorkerT>
+void SpoolerBackend<PushWorkerT>::SendResult(
+                                     const StorageJob* storage_job) const {
+  if (!storage_job->IsSuccessful()) {
+    SendResult(1, storage_job->local_path());
+    return;
+  }
+
+  if (storage_job->IsCopyJob()) {
+    SendResult(0, storage_job->local_path());
+  }
+
+  if (storage_job->IsCompressionJob()) {
+    const StorageCompressionJob *compression_job = 
+                  dynamic_cast<const StorageCompressionJob*>(storage_job);
+    SendResult(0, compression_job->local_path(), compression_job->content_hash());
+  }
+}
+
+
+template <class PushWorkerT>
 void SpoolerBackend<PushWorkerT>::Schedule(Job *job) {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "scheduling new job into job queue");
+
   pthread_mutex_lock(&job_queue_mutex_);
 
   // wait until there is space in the job queue
@@ -231,6 +269,8 @@ void SpoolerBackend<PushWorkerT>::Schedule(Job *job) {
 
 template <class PushWorkerT>
 Job* SpoolerBackend<PushWorkerT>::AcquireJob() {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "acquiring a job from the job queue");
+
   pthread_mutex_lock(&job_queue_mutex_);
 
   // wait until there is something to do
