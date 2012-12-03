@@ -9,8 +9,9 @@
 using namespace upload;
 
 LocalPushWorker::Context* LocalPushWorker::GenerateContext(
-                              const std::string &upstream_path) {
-  Context *ctx = new Context(upstream_path);
+                              SpoolerBackend<LocalPushWorker> *master,
+                              const std::string               &upstream_path) {
+  Context *ctx = new Context(master, upstream_path);
   return ctx;
 }
 
@@ -20,7 +21,6 @@ int LocalPushWorker::GetNumberOfWorkers(const Context *context) {
 
 
 LocalPushWorker::LocalPushWorker(Context *context) :
-  AbstractPushWorker(context),
   upstream_path_(context->upstream_path),
   initialized_(false)
 {}

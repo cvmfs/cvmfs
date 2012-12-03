@@ -35,8 +35,10 @@ namespace upload {
     /**
      * See AbstractPushWorker for description
      */
-    struct Context : public AbstractPushWorker::Context {
-      Context(const std::vector<std::string> &upstream_urls) :
+    struct Context : public AbstractPushWorker::ContextBase<SpoolerBackend<RiakPushWorker> > {
+      Context(SpoolerBackend<RiakPushWorker> *master,
+              const std::vector<std::string> &upstream_urls) :
+        AbstractPushWorker::ContextBase<SpoolerBackend<RiakPushWorker> >(master),
         upstream_urls(upstream_urls) {}
 
       std::vector<std::string> upstream_urls;
@@ -45,7 +47,8 @@ namespace upload {
     /**
      * See AbstractPushWorker for description
      */
-    static Context* GenerateContext(const std::string &upstream_urls);
+    static Context* GenerateContext(SpoolerBackend<RiakPushWorker> *master,
+                                    const std::string              &upstream_urls);
     
     /**
      * See AbstractPushWorker for description

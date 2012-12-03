@@ -3,6 +3,8 @@
 
 #include <string>
 #include <cstdio>
+#include <pthread.h>
+#include <vector>
 
 #include "hash.h"
 
@@ -19,15 +21,30 @@ namespace upload
   };
 
 
-  class StorageJob {
+  // ---------------------------------------------------------------------------
+
+
+  class Job {
+   public:
+    inline virtual bool IsStorageJob()       const { return false; }
+    inline virtual bool IsCompressionJob()   const { return false; }
+    inline virtual bool IsCopyJob()          const { return false; }
+    inline virtual bool IsDeathSentenceJob() const { return false; }
+  };
+
+  class DeathSentenceJob : public Job {
+   public:
+    inline bool IsDeathSentenceJob() const { return true; }
+  };
+
+  class StorageJob : public Job {
    public:
     StorageJob(const std::string            &local_path,
                const bool                    move) :
       local_path_(local_path),
       move_(move) {}
 
-    inline virtual bool IsCompressionJob() const { return false; }
-    inline virtual bool IsCopyJob()        const { return false; }
+    inline bool IsStorageJob() const { return true; }
 
    private:
     const std::string             local_path_;
@@ -67,6 +84,10 @@ namespace upload
     const std::string remote_path_;
   };
 
+
+  // ---------------------------------------------------------------------------
+
+
   template <class PushWorkerT>
   class SpoolerBackend {
    public:
@@ -87,20 +108,26 @@ namespace upload
     void Unknown(const unsigned char command);
 
     bool SpawnPushWorkers();
-    void Schedule(StorageJob *job);
 
     void SendResult(const int error_code,
                     const std::string &local_path = "",
                     const hash::Any &compressed_hash = hash::Any()) const;
 
+    void Schedule(Job *job);
+    Job* AcquireJob();
+
    private:
     bool OpenPipes();
     bool GetString(FILE *f, std::string *str) const;
+
+    static void* RunPushWorker(void* context);
 
    private:
     const std::string spooler_description_;
 
     typename PushWorkerT::Context* pushworker_context_;
+    typedef std::vector<pthread_t> WorkerThreads;
+    WorkerThreads pushworker_threads_;
 
     FILE *fpathes_;
     int fd_digests_;

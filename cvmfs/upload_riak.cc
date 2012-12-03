@@ -12,12 +12,13 @@
 using namespace upload;
 
 RiakPushWorker::Context* RiakPushWorker::GenerateContext(
-                            const std::string &upstream_urls) {
+                            SpoolerBackend<RiakPushWorker> *master,
+                            const std::string              &upstream_urls) {
   // read configuration
   // TODO...
 
   std::vector<std::string> upstream_url_vector = SplitString(upstream_urls, ',');
-  return new Context(upstream_url_vector);
+  return new Context(master, upstream_url_vector);
 }
 
 int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
@@ -25,7 +26,6 @@ int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
 }
 
 RiakPushWorker::RiakPushWorker(Context* context) :
-  AbstractPushWorker(context),
   context_(context),
   initialized_(false),
   upstream_url_(context->upstream_urls.front()) // TODO: do something reasonable here

@@ -72,14 +72,63 @@ bool SpoolerBackend<PushWorkerT>::Initialize() {
 
 template <class PushWorkerT>
 bool SpoolerBackend<PushWorkerT>::SpawnPushWorkers() {
-  pushworker_context_  = PushWorkerT::GenerateContext(spooler_description_);
+  // find out about the environment of our PushWorker swarm
+  pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_description_);
   int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
 
-  for (int i = 0; i < workers_to_spawn; ++i) {
-    // spawn worker
+  // initialize the PushWorker thread pool
+  assert (pushworker_threads_.size() == 0);
+  pushworker_threads_.resize(workers_to_spawn);
+
+  // spawn the swarm and make them work
+  bool success = true;
+  WorkerThreads::iterator i          = pushworker_threads_.begin();
+  WorkerThreads::const_iterator iend = pushworker_threads_.end();
+  for (; i != iend; ++i) {
+    pthread_t* thread = &(*i);
+    const int retval = pthread_create(thread, 
+                                      NULL,
+                                      &SpoolerBackend::RunPushWorker,
+                                      pushworker_context_);
+    if (retval != 0) {
+      LogCvmfs(kLogSpooler, kLogWarning, "Failed to spawn a PushWorker.");
+      success = false;
+    }
   }
 
-  return false;
+  // all done...
+  return success;
+}
+
+
+template <class PushWorkerT>
+void* SpoolerBackend<PushWorkerT>::RunPushWorker(void* context) {
+  // get the context object pointer out of the void* pointer
+  typename PushWorkerT::Context *ctx =
+    static_cast<typename PushWorkerT::Context*>(context);
+
+  // boot up the push worker object and make sure it works
+  PushWorkerT worker(ctx);
+  worker.Initialize();
+  if (!worker.IsReady())
+    return NULL;
+  SpoolerBackend<PushWorkerT> *master = ctx->master;
+
+  // start the processing loop
+  while (true) {
+    Job *job = master->AcquireJob();
+    if (job->IsDeathSentenceJob()) {
+      delete job;
+      break;
+    }
+
+    assert (job->IsStorageJob());
+    worker.ProcessJob(dynamic_cast<StorageJob*>(job));
+    delete job;
+  }
+
+  // good bye thread...
+  return context;
 }
 
 
@@ -147,8 +196,14 @@ void SpoolerBackend<PushWorkerT>::SendResult(
 
 
 template <class PushWorkerT>
-void SpoolerBackend<PushWorkerT>::Schedule(StorageJob *job) {
+void SpoolerBackend<PushWorkerT>::Schedule(Job *job) {
   
+}
+
+template <class PushWorkerT>
+Job* SpoolerBackend<PushWorkerT>::AcquireJob() {
+
+  return NULL;
 }
 
 
