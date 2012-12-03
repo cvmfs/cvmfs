@@ -7,19 +7,27 @@
 
 namespace upload {
 
+
 template <class PushWorkerT>
 SpoolerBackend<PushWorkerT>::SpoolerBackend(const std::string &spooler_description) :
+  job_queue_max_length_(50), // TODO: make this configurable
   spooler_description_(spooler_description),
   pipes_connected_(false),
-  initialized_(false)
-{}
+  initialized_(false) {}
 
 
 template <class PushWorkerT>
 SpoolerBackend<PushWorkerT>::~SpoolerBackend() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler backend terminates");
+
+  // close pipe connection
   fclose(fpathes_);
   close(fd_digests_);
+
+  // free PushWorker synchronisation primitives
+  pthread_cond_destroy(&job_queue_cond_not_full_);
+  pthread_cond_destroy(&job_queue_cond_not_empty_);
+  pthread_mutex_destroy(&job_queue_mutex_);
 }
 
 
@@ -55,11 +63,18 @@ bool SpoolerBackend<PushWorkerT>::Connect(const std::string &fifo_paths,
 
 template <class PushWorkerT>
 bool SpoolerBackend<PushWorkerT>::Initialize() {
+  // check if pipes are connected properly
   if (!pipes_connected_) {
     LogCvmfs(kLogSpooler, kLogWarning, "IO pipes are not setup properly");
     return false;
   }
 
+  // initialize synchronisation for job queue (PushWorkers)
+  pthread_mutex_init(&job_queue_mutex_, NULL);
+  pthread_cond_init(&job_queue_cond_not_full_, NULL);
+  pthread_cond_init(&job_queue_cond_not_empty_, NULL);
+
+  // spawn the PushWorker objects in their own threads
   if (!SpawnPushWorkers()) {
     LogCvmfs(kLogSpooler, kLogWarning, "Failed to spawn concurrent push workers");
     return false;
@@ -197,13 +212,45 @@ void SpoolerBackend<PushWorkerT>::SendResult(
 
 template <class PushWorkerT>
 void SpoolerBackend<PushWorkerT>::Schedule(Job *job) {
-  
+  pthread_mutex_lock(&job_queue_mutex_);
+
+  // wait until there is space in the job queue
+  while (job_queue_.size() >= job_queue_max_length_) {
+    pthread_cond_wait(&job_queue_cond_not_full_, &job_queue_mutex_);
+  }
+
+  // put something into the job queue
+  job_queue_.push(job);
+
+  // wake all waiting threads
+  pthread_cond_broadcast(&job_queue_cond_not_empty_);
+
+  pthread_mutex_unlock(&job_queue_mutex_);
 }
+
 
 template <class PushWorkerT>
 Job* SpoolerBackend<PushWorkerT>::AcquireJob() {
+  pthread_mutex_lock(&job_queue_mutex_);
 
-  return NULL;
+  // wait until there is something to do
+  while (job_queue_.empty()) {
+    pthread_cond_wait(&job_queue_cond_not_empty_, &job_queue_mutex_);
+  }
+
+  // get the job and remove it from the queue
+  Job* job = job_queue_.front();
+  job_queue_.pop();
+
+  // signal the SpoolerBackend that there is at least one free space now
+  if (job_queue_.size() < job_queue_max_length_) {
+    pthread_cond_signal(&job_queue_cond_not_full_);
+  }
+
+  pthread_mutex_unlock(&job_queue_mutex_);
+
+  // return the acquired job
+  return job;
 }
 
 

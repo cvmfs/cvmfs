@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <pthread.h>
 #include <vector>
+#include <queue>
 
 #include "hash.h"
 
@@ -123,14 +124,24 @@ namespace upload
     static void* RunPushWorker(void* context);
 
    private:
-    const std::string spooler_description_;
-
+    // PushWorker environment
     typename PushWorkerT::Context* pushworker_context_;
     typedef std::vector<pthread_t> WorkerThreads;
     WorkerThreads pushworker_threads_;
 
+    // Job Queue
+    std::queue<Job*> job_queue_;
+    size_t           job_queue_max_length_;
+    pthread_mutex_t  job_queue_mutex_;
+    pthread_cond_t   job_queue_cond_not_empty_;
+    pthread_cond_t   job_queue_cond_not_full_;
+
+    // Connection to the user process
     FILE *fpathes_;
     int fd_digests_;
+
+    // Status information and flags
+    const std::string spooler_description_;
     bool pipes_connected_;
     bool initialized_;
   };
