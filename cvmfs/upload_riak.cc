@@ -20,6 +20,10 @@ RiakPushWorker::Context* RiakPushWorker::GenerateContext(
   return new Context(upstream_url_vector);
 }
 
+int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
+  return context->upstream_urls.size(); // TODO: do something reasonable here
+}
+
 RiakPushWorker::RiakPushWorker(Context* context) :
   AbstractPushWorker(context),
   context_(context),

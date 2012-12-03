@@ -72,7 +72,12 @@ bool SpoolerBackend<PushWorkerT>::Initialize() {
 
 template <class PushWorkerT>
 bool SpoolerBackend<PushWorkerT>::SpawnPushWorkers() {
-  pushworker_context_ = PushWorkerT::GenerateContext(spooler_description_);
+  pushworker_context_  = PushWorkerT::GenerateContext(spooler_description_);
+  int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
+
+  for (int i = 0; i < workers_to_spawn; ++i) {
+    // spawn worker
+  }
 
   return false;
 }

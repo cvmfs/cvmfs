@@ -7,6 +7,11 @@ AbstractPushWorker::Context* AbstractPushWorker::GenerateContext(
   return new Context();
 }
 
+int AbstractPushWorker::GetNumberOfWorkers(
+                          const AbstractPushWorker::Context *context) {
+  return 1; // default value, no concurrency
+}
+
 
 AbstractPushWorker::AbstractPushWorker(Context* context) {
 

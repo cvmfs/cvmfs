@@ -34,6 +34,16 @@ namespace upload
      */
     static Context* GenerateContext(const std::string &spooler_description);
 
+    /**
+     * Determines the number of workers to be spawned for the desired worker
+     * swarm.
+     * @param context   pointer to a generated Context object containing infor-
+     *                  mation about the worker swarm to be created
+     *                  See AbstractPushWorker::Context for more information
+     * @return          the number of PushWorkers to be spawned
+     */
+    static int GetNumberOfWorkers(const Context *context);
+
    public:
     AbstractPushWorker(Context* context);
     virtual ~AbstractPushWorker();

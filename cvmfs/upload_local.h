@@ -21,6 +21,11 @@ namespace upload
      * See AbstractPushWorker for description
      */
     static Context* GenerateContext(const std::string &upstream_path);
+    
+    /**
+     * See AbstractPushWorker for description
+     */
+    static int GetNumberOfWorkers(const Context *context);
 
 
    public:
