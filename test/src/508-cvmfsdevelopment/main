@@ -84,21 +84,6 @@ configure_nested_catalogs() {
   esac
 }
 
-# checks if a nested catalog is part of the current catalog configuration
-# of the repository
-# @param catalog_path  the catalog root path to be checked
-# @param repo_name     the repository to be checked
-check_catalog_presence() {
-  local catalog_path=$1
-  local repo_name=$2
-
-  if cvmfs_swissknife lsrepo -r /srv/cvmfs/$repo_name | grep -x -q $catalog_path; then
-    return 0
-  else
-    return 1
-  fi
-}
-
 # checks if all nested catalogs that were requested by configure_nested_catalogs()
 # are actually present in the catalog tree.
 # @param version    the repository version to be checked
@@ -110,6 +95,9 @@ check_catalog_configuration() {
 
   case $version in
     0)
+      if [ $(get_catalog_count $repo_name) -ne 4 ]; then
+        return 2
+      fi
       if check_catalog_presence /                  $repo_name && \
          check_catalog_presence /externals         $repo_name && \
          check_catalog_presence /cvmfs             $repo_name && \
@@ -121,6 +109,9 @@ check_catalog_configuration() {
       fi
       ;;
     1)
+      if [ $(get_catalog_count $repo_name) -ne 5 ]; then
+        return 2
+      fi
       if check_catalog_presence /                  $repo_name && \
          check_catalog_presence /externals         $repo_name && \
          check_catalog_presence /externals/zlib    $repo_name && \
@@ -133,7 +124,11 @@ check_catalog_configuration() {
       fi
       ;;
     2)
+      if [ $(get_catalog_count $repo_name) -ne 6 ]; then
+        return 2
+      fi
       if check_catalog_presence /                  $repo_name && \
+         check_catalog_presence /externals         $repo_name && \
          check_catalog_presence /externals/zlib    $repo_name && \
          check_catalog_presence /externals/sqlite3 $repo_name && \
          check_catalog_presence /test/HTTP         $repo_name && \
@@ -145,6 +140,9 @@ check_catalog_configuration() {
       fi
       ;;
     3)
+      if [ $(get_catalog_count $repo_name) -ne 1 ]; then
+        return 2
+      fi
       if check_catalog_presence /                  $repo_name
       then
         return 0
