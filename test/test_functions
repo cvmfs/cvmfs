@@ -63,9 +63,9 @@ autofs_switch() {
 
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
-  sudo rm -rf /var/lib/cvmfs/*
+  sudo sh -c "rm -rf /var/lib/cvmfs/*"
   sudo rm -f /etc/cvmfs/default.local
-  sudo rm -f /etc/cvmfs/config.d/*
+  sudo sh -c "rm -f /etc/cvmfs/config.d/*"
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" 
  
   timeout=5

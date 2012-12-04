@@ -58,7 +58,7 @@ do
     else
       echo "Failed!"
       echo "Test failed with RETVAL $RETVAL" >> $logfile
-      cp $CVMFS_TEST_SYSLOG_TARGET $workdir
+      sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
       num_failures=$(($num_failures+1))
     fi
   else
