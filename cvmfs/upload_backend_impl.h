@@ -318,6 +318,13 @@ void SpoolerBackend<PushWorkerT>::EndOfTransaction() {
     Schedule(new DeathSentenceJob);
   }
 
+  // wait for all running worker threads to terminate
+  WorkerThreads::iterator i = pushworker_threads_.begin();
+  WorkerThreads::const_iterator iend = pushworker_threads_.end();
+  for (; i != iend; ++i) {
+    pthread_join(*i, NULL);
+  }
+
   // we are finally done here
   SendResult(0);
 }
