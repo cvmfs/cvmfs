@@ -77,10 +77,10 @@ void PublishHardlinksCallback::Callback(const std::string &path, int retval,
     if (mediator_->hardlink_queue_[i].master.GetUnionPath() == path) {
       found = true;
       mediator_->hardlink_queue_[i].master.SetContentHash(hash);
-      SyncItemList::iterator j;
-      j = mediator_->hardlink_queue_[i].hardlinks.begin();
-      for (j = mediator_->hardlink_queue_[i].hardlinks.begin();
-           j != mediator_->hardlink_queue_[i].hardlinks.end(); ++j)
+      SyncItemList::iterator j,jend;
+      for (j = mediator_->hardlink_queue_[i].hardlinks.begin(),
+           jend = mediator_->hardlink_queue_[i].hardlinks.end();
+           j != jend; ++j)
       {
         j->second.SetContentHash(hash);
       }
