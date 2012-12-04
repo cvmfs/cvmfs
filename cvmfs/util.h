@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include <cstdio>
 
@@ -94,6 +95,62 @@ bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
                  const std::map<int, int> &map_fildes);
+
+/**
+ * RAII ftw!
+ * This is a very simple scooped lock implementation. Every object that has the
+ * methods Lock() and Unlock() should work with it.
+ * Creating a LockGuard object on the stack will lock the provided object. When
+ * the LockGuard runs out of scope it will automatically release the lock. This
+ * ensures a clean unlock in a lot of situations!
+ */
+template<typename T>
+class LockGuard {
+ public:
+  LockGuard(T &lock) :
+    ref_(lock)
+  {
+    ref_.Lock();
+  }
+
+  LockGuard(T *lock) :
+    ref_(*lock)
+  {
+    ref_.Lock();
+  }
+
+  ~LockGuard() {
+    ref_.Unlock();
+  }
+
+ private:
+  LockGuard(const LockGuard&); // don't copy that!
+
+  T &ref_;
+};
+
+/**
+ * Template specialization to enable the scooped lock described above to use
+ * plain POSIX mutexes
+ */
+template<>
+class LockGuard <pthread_mutex_t> {
+ public:
+  LockGuard(pthread_mutex_t &lock) :
+    ref_(lock)
+  {
+    pthread_mutex_lock(&ref_); 
+  }
+
+  ~LockGuard() {
+    pthread_mutex_unlock(&ref_);
+  }
+
+ private:
+  LockGuard(const LockGuard&); // don't copy that, either!
+
+  pthread_mutex_t &ref_;
+};
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }

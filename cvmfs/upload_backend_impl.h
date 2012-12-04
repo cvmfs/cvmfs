@@ -138,9 +138,9 @@ void* SpoolerBackend<PushWorkerT>::RunPushWorker(void* context) {
   SpoolerBackend<PushWorkerT> *master = ctx->master;
 
   // find out about the thread number
-  ctx->lock();
+  ctx->Lock();
   const int thread_number = ctx->base_thread_number++;
-  ctx->unlock();
+  ctx->Unlock();
 
   // start the processing loop
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Running PushWorker...");

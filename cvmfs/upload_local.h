@@ -10,12 +10,14 @@ namespace upload
     /**
      * See AbstractPushWorker for description
      */
-    struct Context : public AbstractPushWorker::ContextBase<SpoolerBackend<LocalPushWorker> > {
+    class Context : public AbstractPushWorker::ContextBase<SpoolerBackend<LocalPushWorker> > {
+     public:
       Context(SpoolerBackend<LocalPushWorker> *master,
               const std::string               &upstream_path) :
         AbstractPushWorker::ContextBase<SpoolerBackend<LocalPushWorker> >(master),
         upstream_path(upstream_path) {}
 
+     public:
       const std::string upstream_path;
     };
 
@@ -36,12 +38,10 @@ namespace upload
 
     bool Initialize();
     bool IsReady() const;
-
-    bool ProcessJob(StorageJob *job);
    
    protected:
-    void Copy(StorageCopyJob *copy_job);
-    void CompressAndProcess(StorageCompressionJob *compression_job);
+    void ProcessCopyJob(StorageCopyJob *copy_job);
+    void ProcessCompressionJob(StorageCompressionJob *compression_job);
 
    private:
     Context *context_;

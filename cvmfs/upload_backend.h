@@ -36,7 +36,10 @@ namespace upload
     inline virtual std::string name() const { return "Abstract Job"; }
 
     inline bool IsSuccessful() const          { return return_code_ == 0; }
+    inline void Failed(int return_code = 1)   { return_code_ = return_code; }
     inline void Finished(int return_code = 0) { return_code_ = return_code; }
+
+    inline int return_code() const { return return_code_; }
 
    private:
     int return_code_;

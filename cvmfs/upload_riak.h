@@ -10,38 +10,25 @@ struct curl_slist;
 
 namespace upload {
   class RiakPushWorker : public AbstractPushWorker {
-   protected:
-    class PushFinishedCallback {
-     public:
-      PushFinishedCallback(const RiakPushWorker *delegate,
-                           const std::string        &local_path = "",
-                           const hash::Any          &content_hash = hash::Any()) :
-        delegate_(delegate),
-        local_path_(local_path),
-        content_hash_(content_hash) {}
-
-      void operator()(const int return_code) const {
-        //delegate_->SendResult(return_code, local_path_, content_hash_);
-      }
-
-     private:
-      const RiakPushWorker *delegate_;
-      const std::string         local_path_;
-      const hash::Any           content_hash_;
-    };
-
-
    public:
     /**
      * See AbstractPushWorker for description
      */
-    struct Context : public AbstractPushWorker::ContextBase<SpoolerBackend<RiakPushWorker> > {
+    class Context : public AbstractPushWorker::ContextBase<SpoolerBackend<RiakPushWorker> > {
+     public:
       Context(SpoolerBackend<RiakPushWorker> *master,
               const std::vector<std::string> &upstream_urls) :
         AbstractPushWorker::ContextBase<SpoolerBackend<RiakPushWorker> >(master),
-        upstream_urls(upstream_urls) {}
+        upstream_urls(upstream_urls),
+        next_upstream_url_(0) {}
 
-      std::vector<std::string> upstream_urls;
+      const std::string& AcquireUpstreamUrl() const;
+
+     public:
+      const std::vector<std::string> upstream_urls;
+
+     private:
+      mutable int next_upstream_url_;
     };
 
     /**
@@ -62,31 +49,20 @@ namespace upload {
     bool Initialize();
     bool IsReady() const;
 
-    bool ProcessJob(StorageJob *job);
-
    protected:
-    void Copy(const std::string &local_path,
-              const std::string &remote_path,
-              const bool move);
-    void Process(const std::string &local_path,
-                 const std::string &remote_dir,
-                 const std::string &file_suffix,
-                 const bool move);
+    void ProcessCopyJob(StorageCopyJob *copy_job);
+    void ProcessCompressionJob(StorageCompressionJob *compression_job);
 
-    std::string GenerateRiakKey(const hash::Any   &compressed_hash,
-                                const std::string &remote_dir,
-                                const std::string &file_suffix) const;
+    bool CompressToTempFile(const std::string &source_file_path,
+                            const std::string &destination_dir,
+                            std::string       *tmp_file_path,
+                            hash::Any         *content_hash) const;
+
+    std::string GenerateRiakKey(const StorageCompressionJob *compression_job) const;
     std::string GenerateRiakKey(const std::string &remote_path) const;
     std::string CreateRequestUrl(const std::string &key) const;
 
-    void PushFileToRiakAsync(const std::string          &key,
-                             const std::string          &file_path,
-                             const PushFinishedCallback &callback);
-
-    // static size_t CurlReadCallback(void   *ptr,
-    //                                size_t  size,
-    //                                size_t  nmemb,
-    //                                void   *stream);
+    int PushFileToRiak(const std::string &key, const std::string &file_path);
 
    private:
     Context *context_;

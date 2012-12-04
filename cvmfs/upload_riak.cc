@@ -21,15 +21,28 @@ RiakPushWorker::Context* RiakPushWorker::GenerateContext(
   return new Context(master, upstream_url_vector);
 }
 
+
 int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
-  return context->upstream_urls.size(); // TODO: do something reasonable here
+  return context->upstream_urls.size();
 }
+
+
+const std::string& RiakPushWorker::Context::AcquireUpstreamUrl() const {
+  assert (upstream_urls.size() > 0);
+  // get an unique upstream URL and set the pointer to the next one...
+  const std::string& result = upstream_urls[next_upstream_url_];
+  next_upstream_url_ = (next_upstream_url_ + 1) % upstream_urls.size();
+  return result;
+}
+
 
 RiakPushWorker::RiakPushWorker(Context* context) :
   context_(context),
-  initialized_(false),
-  upstream_url_(context->upstream_urls.front()) // TODO: do something reasonable here
-{}
+  initialized_(false)
+{
+  LockGuard<Context> lock(context);
+  upstream_url_ = context->AcquireUpstreamUrl();
+}
 
 
 RiakPushWorker::~RiakPushWorker() {
@@ -78,71 +91,96 @@ bool RiakPushWorker::Initialize() {
 }
 
 
-bool RiakPushWorker::ProcessJob(StorageJob *job) {
-
-  return false;
-}
-
-
-void RiakPushWorker::Copy(const std::string &local_path,
-                              const std::string &remote_path,
-                              const bool move) {
-  if (move) {
+void RiakPushWorker::ProcessCopyJob(StorageCopyJob *copy_job) {
+  if (copy_job->move()) {
     LogCvmfs(kLogSpooler, kLogStderr, "RiakPushWorker does not support "
                                       "move at the moment.");
-    //SendResult(100, local_path);
+    copy_job->Failed();
     return;
   }
 
-  PushFileToRiakAsync(GenerateRiakKey(remote_path),
-                      local_path,
-                      PushFinishedCallback(this,
-                                           local_path));
+  const int retval = PushFileToRiak(GenerateRiakKey(copy_job->remote_path()),
+                                    copy_job->local_path());
+
+  copy_job->Finished(retval);
 }
 
 
-void RiakPushWorker::Process(const std::string &local_path,
-                                 const std::string &remote_dir,
-                                 const std::string &file_suffix,
-                                 const bool move) {
-  if (move) {
+void RiakPushWorker::ProcessCompressionJob(
+                                      StorageCompressionJob *compression_job) {
+  if (compression_job->move()) {
     LogCvmfs(kLogSpooler, kLogStderr, "RiakPushWorker does not support "
                                       "move at the moment.");
-    //SendResult(100, local_path);
+    compression_job->Failed();
     return;
   }
+
+  const std::string &local_path   = compression_job->local_path();
+        hash::Any   &content_hash = compression_job->content_hash();
 
   // compress the file to a temporary location
   static const std::string tmp_dir = "/tmp";
   std::string tmp_file_path;
   hash::Any compressed_hash(hash::kSha1);
-  // if (! CompressToTempFile(local_path,
-  //                          tmp_dir,
-  //                          &tmp_file_path,
-  //                          &compressed_hash) ) {
-  //   LogCvmfs(kLogSpooler, kLogStderr, "Failed to compress file before pushing "
-  //                                     "to Riak: %s",
-  //            local_path.c_str());
-  //   //SendResult(101, local_path);
-  //   return;
-  // }
+  if (! CompressToTempFile(local_path,
+                           tmp_dir,
+                           &tmp_file_path,
+                           &content_hash) ) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to compress file before pushing "
+                                      "to Riak: %s",
+             local_path.c_str());
+
+    compression_job->Failed(101);
+    return;
+  }
 
   // push to Riak
-  PushFileToRiakAsync(GenerateRiakKey(compressed_hash,
-                                      remote_dir,
-                                      file_suffix),
-                      tmp_file_path,
-                      PushFinishedCallback(this,
-                                           local_path,
-                                           compressed_hash)
-  );
+  const int retval = PushFileToRiak(GenerateRiakKey(compression_job),
+                                     tmp_file_path);
+
+  // clean up and go home
+  compression_job->Finished(retval);
+  unlink(tmp_file_path.c_str());
 }
 
 
-std::string RiakPushWorker::GenerateRiakKey(const hash::Any   &compressed_hash,
-                                                const std::string &remote_dir,
-                                                const std::string &file_suffix) const {
-  return remote_dir + compressed_hash.ToString() + file_suffix;
+bool RiakPushWorker::CompressToTempFile(const std::string &source_file_path,
+                                        const std::string &destination_dir,
+                                        std::string       *tmp_file_path,
+                                        hash::Any         *content_hash) const {
+  // Create a temporary file at the given destination directory
+  FILE *fcas = CreateTempFile(destination_dir + "/cvmfs", 0777, "w", 
+                              tmp_file_path);
+  if (fcas == NULL) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file %s",
+             tmp_file_path->c_str());
+    return false;
+  }
+
+  // Compress the provided source file and write the result into the temporary.
+  // Additionally computes the content hash of the compressed data
+  int retval = zlib::CompressPath2File(source_file_path, fcas, content_hash);
+  if (! retval) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to compress file %s to temporary "
+                                      "file %s",
+             source_file_path.c_str(), tmp_file_path->c_str());
+
+    unlink(tmp_file_path->c_str());
+    return false;
+  }
+  fclose(fcas);
+
+  return true;
+}
+
+
+std::string RiakPushWorker::GenerateRiakKey(
+                          const StorageCompressionJob *compression_job) const {
+  assert (!compression_job->content_hash().IsNull());
+
+  return compression_job->remote_dir()              + 
+         compression_job->content_hash().ToString() + 
+         compression_job->file_suffix();
 }
 
 
@@ -157,52 +195,55 @@ std::string RiakPushWorker::GenerateRiakKey(const std::string &remote_path) cons
 }
 
 
-void RiakPushWorker::PushFileToRiakAsync(const std::string          &key,
-                                             const std::string          &file_path,
-                                             const PushFinishedCallback &callback) {
+int RiakPushWorker::PushFileToRiak(const std::string &key,
+                                   const std::string &file_path) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "pushing file %s to Riak using key %s",
            file_path.c_str(), key.c_str());
 
-  CURLcode res;
+  const std::string url = CreateRequestUrl(key);
+  FILE *hd_src;
 
-  // find the size of the file to uploaded
+  CURLcode res;
+  int      retcode = -1;
+
+  // find the size of the file to be uploaded
   struct stat file_info;
   int hd = open(file_path.c_str(), O_RDONLY);
   if (hd < 0) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to stat file %s",
              file_path.c_str());
-    callback(1);
-    return;
+    retcode = 1;
+    close(hd);
+    goto out;
   }
   fstat(hd, &file_info);
   close(hd);
 
   // open the file for reading
-  FILE *hd_src = fopen(file_path.c_str(), "rb");
+  hd_src = fopen(file_path.c_str(), "rb");
   if (hd_src == NULL) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to open file %s for reading.",
              file_path.c_str());
-    callback(2);
-    return;
+    retcode = 2;
+    goto out;
   }
 
   // set url for Riak put command
-  const std::string url = CreateRequestUrl(key);
   if (curl_easy_setopt(curl_, CURLOPT_URL, url.c_str()) != CURLE_OK) {
-    callback(3);
+    retcode = 3;
     goto out;
   }
 
   // set file size of the file to be uploaded
   if (curl_easy_setopt(curl_, CURLOPT_INFILESIZE_LARGE,
                        (curl_off_t)file_info.st_size) != CURLE_OK) {
-    callback(4);
+    retcode = 4;
     goto out;
   }
 
   // specify the file handle to be uploaded
   if (curl_easy_setopt(curl_, CURLOPT_READDATA, hd_src) != CURLE_OK) {
-    callback(5);
+    retcode = 5;
     goto out;
   }
 
@@ -212,16 +253,17 @@ void RiakPushWorker::PushFileToRiakAsync(const std::string          &key,
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to upload file %s to Riak "
                                       "because: '%s'",
              file_path.c_str(), curl_easy_strerror(res));
-    callback(6);
+    retcode = 6;
     goto out;
   }
 
-  // all went well... tell the spooler frontend
-  callback(0);
+  // all went well...
+  retcode = 0;
 
 out:
   // close the uploaded file
   fclose(hd_src);
+  return retcode;
 }
 
 
