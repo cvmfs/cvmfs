@@ -6,6 +6,7 @@ if [ -f /bin/rpm ]; then
   sudo rpm -e cvmfs-replica || true
   sudo rpm -e cvmfs-selinux || true
   sudo rpm -e cvmfs || true
+  sudo rpm -e cvmfs-server || true
   sudo rpm -e cvmfs-keys || true
 fi
 sudo /usr/sbin/userdel cvmfs

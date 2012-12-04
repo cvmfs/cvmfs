@@ -42,16 +42,21 @@ case $sys_arch in
     exit 1 ;;
 esac
 
-var_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_DIR CVMFS_QUOTA_LIMIT \
+# TODO: NFS Export and autofs are mutually exclusive
+parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_DIR CVMFS_QUOTA_LIMIT \
           CVMFS_SERVER_URL CVMFS_DEBUGLOG CVMFS_HTTP_PROXY \
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_SYSLOG_FACILITY CVMFS_TRACEFILE \
-          CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT \
-          CVMFS_MAX_TTL CVMFS_SHARED_CACHE CVMFS_RELOAD_SOCKETS CVMFS_DEFAULT_DOMAIN \
-          CVMFS_NFS_SOURCE CVMFS_CHECK_PERMISSIONS CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT \
-          CVMFS_ROOT_HASH CVMFS_AUTO_UPDATE CVMFS_REPOSITORIES"
+          CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY \
+          CVMFS_MAX_TTL CVMFS_RELOAD_SOCKETS CVMFS_DEFAULT_DOMAIN \
+          CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORIES"
+switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
+          CVMFS_NFS_SOURCE CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE"
+required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
+               CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
+               CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
+var_list="$parm_list $switch_list"
 
-cvmfs_config_usage()
-{
+cvmfs_config_usage() {
  echo "Common configuration tasks for CernVM-FS"
  echo "Usage: $0 <command>"
  echo "Commands are"
@@ -67,8 +72,8 @@ cvmfs_config_usage()
  echo "  bugreport"
 }
 
-cvmfs_setup()
-{
+
+cvmfs_setup() {
   local nouser
   local nocfgmod
   local noservice
@@ -146,8 +151,7 @@ cvmfs_setup()
 }
 
 
-cvmfs_chksetup()
-{
+cvmfs_chksetup() {
   local num_warnings
   local num_errors
   num_warnings=0
@@ -178,9 +182,9 @@ cvmfs_chksetup()
 
   # Check mount helper
   local tools
-  if [ "$sys_arch" == 'Darwin' ]; then
+  if [ "$sys_arch" = "Darwin" ]; then
     tools="/sbin/mount_cvmfs"
-  elif [ "$sys_arch" == 'Linux' ]; then
+  elif [ "$sys_arch" = "Linux" ]; then
     tools="/sbin/mount.cvmfs"
   fi
 
@@ -194,12 +198,12 @@ cvmfs_chksetup()
   done
 
   # Fusermount (not necessary user under Mac OS X)
-  if [ "$sys_arch" == 'Linux' ]; then
+  if [ "$sys_arch" = "Linux" ]; then
     if [ ! -x /usr/bin/fusermount -a ! -x /bin/fusermount ]; then
       echo "Warning: failed to locate fusermount"
       num_errors=$(($num_errors+1))
     fi
-   fi
+  fi
 
   # Check that /etc/auto.cvmfs is referenced in /etc/auto.master
   # Check that /etc/auto.cvmfs is executable on Linux
@@ -291,7 +295,11 @@ cvmfs_chksetup()
     else
       # Check that cache directories are read-writable by CVMFS_USER
       local cache_dir
-      cache_dir="$CVMFS_CACHE_BASE/$fqrn"
+      if check_is_on CVMFS_SHARED_CACHE; then
+        cache_dir="$CVMFS_CACHE_BASE/shared"
+      else
+        cache_dir="$CVMFS_CACHE_BASE/$fqrn"
+      fi
       if [ -d $cache_dir ]; then
         if ! sudo -u $CVMFS_USER test -O $cache_dir; then
           echo "Error: $cache_dir is not owned by $CVMFS_USER"
@@ -314,6 +322,19 @@ cvmfs_chksetup()
               fi
           done
       fi
+
+      # Check readability of config files
+      for config_file in /etc/cvmfs/default.conf /etc/cvmfs/default.local \
+                         /etc/cvmfs/domain.d/*.conf /etc/cvmfs/domain.d/*.local \
+                         /etc/cvmfs/config.d/*.conf /etc/cvmfs/config.d/*.local
+      do
+        if [ -f $config_file ]; then
+          if ! sudo -u $CVMFS_USER test -r $config_file; then
+            echo "Error: $config_file is not readable by $CVMFS_USER"
+            num_errors=$(($num_errors+1))
+          fi
+        fi
+      done
 
       # Check that number of open files is reasonably high
       if [ $CVMFS_NFILES -lt 8192 ]; then
@@ -339,7 +360,6 @@ cvmfs_chksetup()
           num_errors=$(($num_errors+1))
         fi
       fi
-
       if [ ! -z $CVMFS_SYSLOG_FACILITY ]; then
         if ! expr "$CVMFS_SYSLOG_FACILITY" : '[0,1,2,3,4,5,6,7]' > /dev/null; then
           echo -n "Error: invalud value for CVMFS_SYSLOG_FACILITY ($CVMFS_SYSLOG_FACILITY) for $fqrn. "
@@ -360,14 +380,31 @@ cvmfs_chksetup()
       fi
 
       # Syntax check for switches
-      if [ ! -z $CVMFS_FORCE_SIGNING ] && [ "$CVMFS_FORCE_SIGNING" != "yes" ] && [ "$CVMFS_FORCE_SIGNING" != "no" ]; then
-        echo "Error: invalid value for CVMFS_FORCE_SIGNING (valid values: yes/no) for $fqrn"
-        num_errors=$(($num_errors+1))
-      fi
+      for parameter in $switch_list; do
+        eval value=\$$parameter
+        if [ "x$value" != "x" ]; then
+          local valid=0
+          for literal in "yes" "YES" "no" "NO" "on" "ON" "off" "OFF" "1" "0"
+          do
+            if [ "$value" = $literal ]; then
+              valid=1
+            fi
+          done
+          if [ $valid -eq 0 ]; then
+            echo "Error: invalid value for $parameter (valid values: yes/no) for $fqrn"
+            num_errors=$(($num_errors+1))
+          fi
+        fi
+      done
 
-      if [ ! -z $CVMFS_STRICT_MOUNT ] && [ "$CVMFS_STRICT_MOUNT" != "yes" ] && [ "$CVMFS_STRICT_MOUNT" != "no" ]; then
-        echo "Error: invalid value for CVMFS_STRICT_MOUNT (valid values: yes/no) for $fqrn"
-        num_errors=$(($num_errors+1))
+      # Check that autofs is not active when NFS export is
+      if [ "$sys_arch" = "Linux" ]; then
+        if check_is_on CVMFS_NFS_SOURCE; then
+          if cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "; then
+            echo "Error: autofs and NFS export are mutually exclusive ($fqrn)"
+            num_errors=$(($num_errors+1))
+          fi
+        fi
       fi
 
       # Check CVMFS_MOUNT_DIR
@@ -391,10 +428,8 @@ cvmfs_chksetup()
       fi
 
       # Check for required variables
-      for reqvar in CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR \
-                    CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
-                    CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT
-      do
+      for reqvar in $required_list
+      do 
         eval value=\$$reqvar
         if [ -z "$value" ]; then
           echo "Error: required parameter $reqvar undefined for $fqrn"
@@ -434,14 +469,13 @@ cvmfs_chksetup()
 
   if [ $(($num_warnings+$num_errors)) -eq 0 ]; then
     echo "OK"
-    return 0
   fi
 
-  return 1
+  return $num_errors
 }
 
-cvmfs_showconfig()
-{
+
+cvmfs_showconfig() {
   local fqrn
   local org
   local retval
@@ -492,8 +526,8 @@ cvmfs_showconfig()
   done
 }
 
-cvmfs_stat()
-{
+
+cvmfs_stat() {
   local fqrn
   local org
   local retval
@@ -595,8 +629,7 @@ cvmfs_stat()
 }
 
 
-cvmfs_status()
-{
+cvmfs_status() {
   local list
   list=""
 
@@ -617,8 +650,7 @@ cvmfs_status()
 }
 
 
-cvmfs_reload()
-{
+cvmfs_reload() {
   if ! cvmfs_readconfig; then
     echo "Failed to read CernVM-FS configuration"
     return 1
@@ -671,8 +703,7 @@ cvmfs_reload()
 }
 
 
-cvmfs_probe()
-{
+cvmfs_probe() {
   RETVAL=0
   local list
   list=""
@@ -736,8 +767,7 @@ cvmfs_umount() {
 }
 
 
-cvmfs_wipecache()
-{
+cvmfs_wipecache() {
   if ! cvmfs_readconfig; then
     echo "Failed to read CernVM-FS configuration"
     return 1
@@ -788,8 +818,7 @@ cvmfs_wipecache()
 }
 
 
-cvmfs_bugreport()
-{
+cvmfs_bugreport() {
   tmpdir=`mktemp -d -t cvmfs-bugreport.XXXXXX` || exit 1
   cd $tmpdir
   mkdir bugreport
@@ -823,7 +852,7 @@ cvmfs_bugreport()
                  'cvmfs_config chksetup' 'cvmfs_config stat -v' \
                  'cat /etc/fuse.conf'  'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
                  'cat /etc/auto.master' 'cat /etc/sysconfig/autofs' 'cat /etc/default/autofs' \
-                 'cat /etc/fstab' 'cat /etc/exports' )
+                 'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' )
       ;;
 
     Darwin )
@@ -866,8 +895,7 @@ list_mounts() {
 }
 
 
-add_cvmfs_group()
-{
+add_cvmfs_group() {
   case $sys_arch in
     Linux )
      if ! check_group "cvmfs"; then
@@ -899,8 +927,7 @@ add_cvmfs_group()
 }
 
 
-add_cvmfs_user()
-{
+add_cvmfs_user() {
   case $sys_arch in
     Linux )
       if ! check_cvmfs_user; then
@@ -946,8 +973,7 @@ add_cvmfs_user()
 }
 
 
-add_user_to_group_fuse()
-{
+add_user_to_group_fuse() {
   case $sys_arch in
     Linux )
       if ! id -Gn cvmfs | grep -q fuse; then
@@ -968,8 +994,7 @@ add_user_to_group_fuse()
 }
 
 
-check_auto_mounter()
-{
+check_auto_mounter() {
   case $sys_arch in
     Linux )
       $service autofs status > /dev/null 2>&1
@@ -986,8 +1011,7 @@ check_auto_mounter()
 }
 
 
-check_group()
-{
+check_group() {
   local group=$1
   case $sys_arch in
     Linux )
@@ -1005,8 +1029,7 @@ check_group()
 }
 
 
-check_cvmfs_user()
-{
+check_cvmfs_user() {
   case $sys_arch in
     Linux )
       /usr/bin/getent passwd cvmfs &> /dev/null
@@ -1023,8 +1046,7 @@ check_cvmfs_user()
 }
 
 
-check_dev_fuse()
-{
+check_dev_fuse() {
   local charDevice
   local return_code
 
@@ -1060,8 +1082,7 @@ check_dev_fuse()
 }
 
 
-check_user_in_group()
-{
+check_user_in_group() {
   local user=$1
   local group=$2
 
@@ -1081,8 +1102,7 @@ check_user_in_group()
 }
 
 
-configure_autofs()
-{
+configure_autofs() {
   case $sys_arch in
     Linux )
       sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master #Stil needed or needs to be adjusted?
@@ -1112,9 +1132,8 @@ configure_autofs()
 }
 
 
-configure_sudoers()
-{
-  if [ "$sys_arch" == 'Darwin' ]; then
+configure_sudoers() {
+  if [ "$sys_arch" = "Darwin" ]; then
     sudo sed -i .cvmfs_backup -e "/# added by CernVM-FS/d" /etc/sudoers
     sudo cat >> /etc/sudoers << EOF
 %everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/sudo # added by CernVM-FS
@@ -1128,8 +1147,8 @@ EOF
   fi
 }
 
-check_fuse_config()
-{
+
+check_fuse_config() {
   case $sys_arch in
     Linux )
       grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1
@@ -1149,8 +1168,8 @@ check_fuse_config()
   esac
 }
 
-configure_fuse()
-{
+
+configure_fuse() {
   case $sys_arch in
     Linux )
       if ! $(grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1); then
@@ -1170,8 +1189,8 @@ configure_fuse()
   esac
 }
 
-get_attr()
-{
+
+get_attr() {
   attr_name=$1
   path=$2
   if [ "x$path" = "x" ]; then
@@ -1190,6 +1209,20 @@ get_attr()
       exit 1 ;;
    esac
 }
+
+
+check_is_on() {
+  local parameter=$1
+  eval value=\$$parameter
+  if [ "x$value" = "x" ]; then
+    return 1
+  fi
+  if [ "$value" = "yes" -o "$value" = "YES" -o "$value" = "on" -o "$value" = "ON" -o "$value" = "1" ]; then
+    return 0
+  fi
+  return 1
+}
+
 
 case "$1" in
   setup)

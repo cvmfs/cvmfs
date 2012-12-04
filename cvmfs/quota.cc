@@ -74,6 +74,7 @@ enum CommandType {
   kListCatalogs,
   kStatus,
   kLimits,
+  kPid,
 };
 
 struct LruCommand {
@@ -411,7 +412,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     bool immediate_command = (command_type == kCleanup) ||
       (command_type == kList) || (command_type == kListPinned) ||
       (command_type == kListCatalogs) || (command_type == kRemove) ||
-      (command_type == kStatus) || (command_type == kLimits);
+      (command_type == kStatus) || (command_type == kLimits) ||
+      (command_type == kPid);
     if (!immediate_command) num_commands++;
 
     if ((num_commands == kCommandBufferSize) || immediate_command)
@@ -496,6 +498,11 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           WritePipe(return_pipe, &cleanup_threshold_,
                     sizeof(cleanup_threshold_));
           break;
+        case kPid: {
+          pid_t pid = getpid();
+          WritePipe(return_pipe, &pid, sizeof(pid));
+          break;
+        }
         default:
           abort();  // other types are handled by the bunch processor
       }
@@ -541,7 +548,7 @@ bool RebuildDatabase() {
   string path;
   set<string> catalogs;
 
-  LogCvmfs(kLogQuota, kLogDebug, "re-building cache-database");
+  LogCvmfs(kLogQuota, kLogSyslog | kLogDebug, "re-building cache-database");
 
   // Empty cache catalog and fscache
   sql = "DELETE FROM cache_catalog; DELETE FROM fscache;";
@@ -917,6 +924,9 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   command_line.push_back(StringifyInt(limit));
   command_line.push_back(StringifyInt(cleanup_threshold));
   command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(StringifyInt(GetLogSyslogLevel()));
+  command_line.push_back(StringifyInt(GetLogSyslogFacility()));
+  command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(GetLogDebugFile());
 
   vector<int> preserve_filedes;
@@ -1003,17 +1013,30 @@ int MainCacheManager(int argc, char **argv) {
   limit_ = String2Int64(argv[5]);
   cleanup_threshold_ = String2Int64(argv[6]);
   int foreground = String2Int64(argv[7]);
-  const string logfile = argv[8];
+  int syslog_level = String2Int64(argv[8]);
+  int syslog_facility = String2Int64(argv[9]);
+  const string logfile = argv[10];
+  SetLogSyslogLevel(syslog_level);
+  SetLogSyslogFacility(syslog_facility);
   if (logfile != "")
     SetLogDebugFile(logfile + ".cachemgr");
 
   if (!foreground)
     Daemonize();
 
-  if (!InitDatabase(false))  // TODO: rebuild?
+  // Initialize pipe, open non-blocking as cvmfs is not yet connected
+  const string crash_guard = *cache_dir_ + "/cachemgr.running";
+  const bool rebuild = FileExists(crash_guard);
+  retval = open(crash_guard.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (retval < 0) {
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "failed to create shared cache manager crash guard");
+    return 1;
+  }
+  close(retval);
+  if (!InitDatabase(rebuild))
     return 1;
 
-  // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
@@ -1034,6 +1057,7 @@ int MainCacheManager(int argc, char **argv) {
   MainCommandServer(NULL);
   unlink(fifo_path.c_str());
   CloseDatabase();
+  unlink(crash_guard.c_str());
 
   monitor::Fini();
 
@@ -1401,6 +1425,24 @@ static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold) {
   ReadHalfPipe(pipe_limits[0], limit, sizeof(*limit));
   ReadPipe(pipe_limits[0], cleanup_threshold, sizeof(*cleanup_threshold));
   CloseReturnPipe(pipe_limits);
+}
+
+pid_t GetPid() {
+  if (!shared_ || !spawned_) {
+    return cvmfs::pid_;
+  }
+  
+  pid_t result;
+  int pipe_pid[2];
+  MakeReturnPipe(pipe_pid);
+
+  LruCommand cmd;
+  cmd.command_type = kPid;
+  cmd.return_pipe = pipe_pid[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  ReadHalfPipe(pipe_pid[0], &result, sizeof(result));
+  CloseReturnPipe(pipe_pid);
+  return result;
 }
 
 

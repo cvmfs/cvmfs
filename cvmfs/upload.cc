@@ -57,15 +57,14 @@ Spooler::SpoolerDefinition::SpoolerDefinition(
   // recognize and configure the spooler driver
   if (upstream[0] == "local") {
     driver_type   = Local;
-    upstream_path = upstream[1];
   } else if (upstream[0] == "riak") {
     driver_type   = Riak;
-    upstream_urls = upstream[1];
   } else {
     LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
       upstream[0].c_str());
     return;
   }
+  spooler_description = upstream[1];
 
   // save named pipe paths and validate this SpoolerDefinition
   paths_out_pipe  = components[1];
@@ -81,7 +80,19 @@ Spooler* Spooler::Construct(const std::string &definition_string) {
     return NULL;
 
   // spawn a SpoolerBackend according to the provided defintion
-  SpawnSpoolerBackend(spooler_definition);
+  switch (spooler_definition.driver_type) {
+    case SpoolerDefinition::Local:
+      SpawnSpoolerBackend<LocalPushWorker>(spooler_definition);
+      break;
+
+    case SpoolerDefinition::Riak:
+      SpawnSpoolerBackend<RiakPushWorker>(spooler_definition);
+      break;
+
+    default:
+      LogCvmfs(kLogSpooler, kLogStderr, "invalid spooler definition");
+      assert (false && spooler_definition.IsValid());
+  }
 
   // create a Spooler frontend and connect it to the backend
   Spooler *spooler = new Spooler();
@@ -92,70 +103,6 @@ Spooler* Spooler::Construct(const std::string &definition_string) {
   }
 
   return spooler;
-}
-
-
-void Spooler::SpawnSpoolerBackend(
-                      const Spooler::SpoolerDefinition &definition) {
-  assert (definition.IsValid());
-
-  // spawn spooler backend process
-  int pid = fork();
-  if (pid < 0) {
-    LogCvmfs(kLogSpooler, kLogStderr, "failed to spawn spooler backend");
-    assert(pid >= 0); // nothing to do here anymore... good bye
-  }
-
-  if (pid > 0)
-    return;
-
-  // ---------------------------------------------------------------------------
-  // From here on we are in the SpoolerBackend process
-
-  AbstractSpoolerBackend *backend = NULL;
-  int retval = 1;
-
-  // create a SpoolerBackend object of the requested type
-  switch (definition.driver_type) {
-    case SpoolerDefinition::Local:
-      backend = new LocalSpoolerBackend(definition.upstream_path);
-      break;
-
-    case SpoolerDefinition::Riak:
-      backend = new RiakSpoolerBackend(definition.upstream_urls);
-      break;
-
-    default:
-      LogCvmfs(kLogSpooler, kLogStderr, "invalid spooler definition");
-      assert (false && definition.IsValid());
-  }
-  assert (backend != NULL);
-
-  // connect the named pipes in the SpoolerBackend
-  if (! backend->Connect(definition.paths_out_pipe,
-                         definition.digests_in_pipe)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "failed to connect spooler backend");
-    retval = 2;
-    goto out;
-  }
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected spooler backend");
-
-  // do the final initialization of the SpoolerBackend
-  if (! backend->Initialize()) {
-    LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize spooler backend");
-    retval = 3;
-    goto out;
-  }
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "initialized spooler backend");
-
-  // run the SpoolerBackend service
-  // returns on a termination signal though the named pipes
-  retval = backend->Run();
-
-  // all done, good bye...
-out:
-  delete backend;
-  exit(retval);
 }
 
 

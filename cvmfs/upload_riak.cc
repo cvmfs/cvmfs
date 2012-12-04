@@ -11,26 +11,38 @@
 
 using namespace upload;
 
-RiakSpoolerBackend::RiakSpoolerBackend(const std::string &upstream_urls) :
-  config_(upstream_urls),
-  initialized_(false)
+RiakPushWorker::Context* RiakPushWorker::GenerateContext(
+                            SpoolerBackend<RiakPushWorker> *master,
+                            const std::string              &upstream_urls) {
+  // read configuration
+  // TODO...
+
+  std::vector<std::string> upstream_url_vector = SplitString(upstream_urls, ',');
+  return new Context(master, upstream_url_vector);
+}
+
+int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
+  return context->upstream_urls.size(); // TODO: do something reasonable here
+}
+
+RiakPushWorker::RiakPushWorker(Context* context) :
+  context_(context),
+  initialized_(false),
+  upstream_url_(context->upstream_urls.front()) // TODO: do something reasonable here
 {}
 
 
-RiakSpoolerBackend::~RiakSpoolerBackend() {
+RiakPushWorker::~RiakPushWorker() {
   curl_easy_cleanup(curl_);
   curl_slist_free_all(http_headers_);
   curl_global_cleanup();
 }
 
 
-bool RiakSpoolerBackend::Initialize() {
-  bool retval = AbstractSpoolerBackend::Initialize();
+bool RiakPushWorker::Initialize() {
+  bool retval = AbstractPushWorker::Initialize();
   if (!retval)
     return false;
-
-  // read configuration
-  // TODO...
 
   // initialize libcurl
   int cretval = curl_global_init(CURL_GLOBAL_ALL);
@@ -66,13 +78,19 @@ bool RiakSpoolerBackend::Initialize() {
 }
 
 
-void RiakSpoolerBackend::Copy(const std::string &local_path,
+bool RiakPushWorker::ProcessJob(StorageJob *job) {
+
+  return false;
+}
+
+
+void RiakPushWorker::Copy(const std::string &local_path,
                               const std::string &remote_path,
                               const bool move) {
   if (move) {
-    LogCvmfs(kLogSpooler, kLogStderr, "RiakSpoolerBackend does not support "
+    LogCvmfs(kLogSpooler, kLogStderr, "RiakPushWorker does not support "
                                       "move at the moment.");
-    SendResult(100, local_path);
+    //SendResult(100, local_path);
     return;
   }
 
@@ -83,14 +101,14 @@ void RiakSpoolerBackend::Copy(const std::string &local_path,
 }
 
 
-void RiakSpoolerBackend::Process(const std::string &local_path,
+void RiakPushWorker::Process(const std::string &local_path,
                                  const std::string &remote_dir,
                                  const std::string &file_suffix,
                                  const bool move) {
   if (move) {
-    LogCvmfs(kLogSpooler, kLogStderr, "RiakSpoolerBackend does not support "
+    LogCvmfs(kLogSpooler, kLogStderr, "RiakPushWorker does not support "
                                       "move at the moment.");
-    SendResult(100, local_path);
+    //SendResult(100, local_path);
     return;
   }
 
@@ -98,16 +116,16 @@ void RiakSpoolerBackend::Process(const std::string &local_path,
   static const std::string tmp_dir = "/tmp";
   std::string tmp_file_path;
   hash::Any compressed_hash(hash::kSha1);
-  if (! CompressToTempFile(local_path,
-                           tmp_dir,
-                           &tmp_file_path,
-                           &compressed_hash) ) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to compress file before pushing "
-                                      "to Riak: %s",
-             local_path.c_str());
-    SendResult(101, local_path);
-    return;
-  }
+  // if (! CompressToTempFile(local_path,
+  //                          tmp_dir,
+  //                          &tmp_file_path,
+  //                          &compressed_hash) ) {
+  //   LogCvmfs(kLogSpooler, kLogStderr, "Failed to compress file before pushing "
+  //                                     "to Riak: %s",
+  //            local_path.c_str());
+  //   //SendResult(101, local_path);
+  //   return;
+  // }
 
   // push to Riak
   PushFileToRiakAsync(GenerateRiakKey(compressed_hash,
@@ -121,14 +139,14 @@ void RiakSpoolerBackend::Process(const std::string &local_path,
 }
 
 
-std::string RiakSpoolerBackend::GenerateRiakKey(const hash::Any   &compressed_hash,
+std::string RiakPushWorker::GenerateRiakKey(const hash::Any   &compressed_hash,
                                                 const std::string &remote_dir,
                                                 const std::string &file_suffix) const {
   return remote_dir + compressed_hash.ToString() + file_suffix;
 }
 
 
-std::string RiakSpoolerBackend::GenerateRiakKey(const std::string &remote_path) const {
+std::string RiakPushWorker::GenerateRiakKey(const std::string &remote_path) const {
   // removes slashes (/) from the remote_path
   std::string result;
   std::remove_copy(remote_path.begin(), 
@@ -139,7 +157,7 @@ std::string RiakSpoolerBackend::GenerateRiakKey(const std::string &remote_path) 
 }
 
 
-void RiakSpoolerBackend::PushFileToRiakAsync(const std::string          &key,
+void RiakPushWorker::PushFileToRiakAsync(const std::string          &key,
                                              const std::string          &file_path,
                                              const PushFinishedCallback &callback) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "pushing file %s to Riak using key %s",
@@ -169,7 +187,7 @@ void RiakSpoolerBackend::PushFileToRiakAsync(const std::string          &key,
   }
 
   // set url for Riak put command
-  const std::string url = config_.CreateRequestUrl(key);
+  const std::string url = CreateRequestUrl(key);
   if (curl_easy_setopt(curl_, CURLOPT_URL, url.c_str()) != CURLE_OK) {
     callback(3);
     goto out;
@@ -207,21 +225,13 @@ out:
 }
 
 
-bool RiakSpoolerBackend::IsReady() const {
-  const bool ready = AbstractSpoolerBackend::IsReady();
-  return ready && initialized_;
+
+std::string RiakPushWorker::CreateRequestUrl(const std::string &key) const {
+  return upstream_url_ + "/" + key;
 }
 
 
-// -----------------------------------------------------------------------------
-
-
-RiakSpoolerBackend::RiakConfiguration::RiakConfiguration(
-                                          const std::string& upstream_urls) :
-  url(upstream_urls) {}
-
-
-std::string RiakSpoolerBackend::RiakConfiguration::CreateRequestUrl(
-                                          const std::string &key) const {
-  return url + "/" + key;
+bool RiakPushWorker::IsReady() const {
+  const bool ready = AbstractPushWorker::IsReady();
+  return ready && initialized_;
 }

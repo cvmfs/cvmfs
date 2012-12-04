@@ -6,6 +6,8 @@
 #define CVMFS_QUOTA_H_
 
 #include <stdint.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <string>
 #include <vector>
@@ -43,6 +45,7 @@ uint64_t GetMaxFileSize();
 uint64_t GetCapacity();
 uint64_t GetSize();
 uint64_t GetSizePinned();
+pid_t GetPid();
 std::string GetMemoryUsage();
 
 }  // namespace quota

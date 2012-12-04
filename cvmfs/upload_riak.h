@@ -1,7 +1,7 @@
 #ifndef CVMFS_UPLOAD_RIAK_H_
 #define CVMFS_UPLOAD_RIAK_H_
 
-#include "upload_backend.h"
+#include "upload_pushworker.h"
 
 #include <vector>
 
@@ -9,19 +9,11 @@ typedef void CURL;
 struct curl_slist;
 
 namespace upload {
-  class RiakSpoolerBackend : public AbstractSpoolerBackend {
+  class RiakPushWorker : public AbstractPushWorker {
    protected:
-    struct RiakConfiguration {
-      RiakConfiguration(const std::string &upstream_urls);
-
-      std::string CreateRequestUrl(const std::string &key) const;
-
-      std::string url;
-    };
-
     class PushFinishedCallback {
      public:
-      PushFinishedCallback(const RiakSpoolerBackend *delegate,
+      PushFinishedCallback(const RiakPushWorker *delegate,
                            const std::string        &local_path = "",
                            const hash::Any          &content_hash = hash::Any()) :
         delegate_(delegate),
@@ -29,21 +21,48 @@ namespace upload {
         content_hash_(content_hash) {}
 
       void operator()(const int return_code) const {
-        delegate_->SendResult(return_code, local_path_, content_hash_);
+        //delegate_->SendResult(return_code, local_path_, content_hash_);
       }
 
      private:
-      const RiakSpoolerBackend *delegate_;
+      const RiakPushWorker *delegate_;
       const std::string         local_path_;
       const hash::Any           content_hash_;
     };
 
-   public:
-    RiakSpoolerBackend(const std::string &upstream_urls);
-    virtual ~RiakSpoolerBackend();
-    bool Initialize();
 
+   public:
+    /**
+     * See AbstractPushWorker for description
+     */
+    struct Context : public AbstractPushWorker::ContextBase<SpoolerBackend<RiakPushWorker> > {
+      Context(SpoolerBackend<RiakPushWorker> *master,
+              const std::vector<std::string> &upstream_urls) :
+        AbstractPushWorker::ContextBase<SpoolerBackend<RiakPushWorker> >(master),
+        upstream_urls(upstream_urls) {}
+
+      std::vector<std::string> upstream_urls;
+    };
+
+    /**
+     * See AbstractPushWorker for description
+     */
+    static Context* GenerateContext(SpoolerBackend<RiakPushWorker> *master,
+                                    const std::string              &upstream_urls);
+    
+    /**
+     * See AbstractPushWorker for description
+     */
+    static int GetNumberOfWorkers(const Context *context);
+
+   public:
+    RiakPushWorker(Context* context);
+    virtual ~RiakPushWorker();
+
+    bool Initialize();
     bool IsReady() const;
+
+    bool ProcessJob(StorageJob *job);
 
    protected:
     void Copy(const std::string &local_path,
@@ -58,6 +77,8 @@ namespace upload {
                                 const std::string &remote_dir,
                                 const std::string &file_suffix) const;
     std::string GenerateRiakKey(const std::string &remote_path) const;
+    std::string CreateRequestUrl(const std::string &key) const;
+
     void PushFileToRiakAsync(const std::string          &key,
                              const std::string          &file_path,
                              const PushFinishedCallback &callback);
@@ -68,8 +89,9 @@ namespace upload {
     //                                void   *stream);
 
    private:
-    RiakConfiguration config_;
+    Context *context_;
     bool initialized_;
+    std::string upstream_url_;
 
     CURL *curl_;
     struct curl_slist *http_headers_;

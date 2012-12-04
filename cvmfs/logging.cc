@@ -76,6 +76,18 @@ void SetLogSyslogLevel(const int level) {
 }
 
 
+int GetLogSyslogLevel() {
+  switch (syslog_level) {
+    case LOG_DEBUG:
+      return 1;
+    case LOG_INFO:
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+
 /**
  * Sets the syslog facility to one of local0 .. local7.
  * Falls back to LOG_USER if local_facility is not in [0..7] 
@@ -108,6 +120,30 @@ void SetLogSyslogFacility(const int local_facility) {
       break;
     default:
       syslog_facility = LOG_USER;
+  }
+}
+
+
+int GetLogSyslogFacility() {
+  switch (syslog_facility) {
+    case LOG_LOCAL0:
+      return 0;
+    case LOG_LOCAL1:
+      return 1;
+    case LOG_LOCAL2:
+      return 2;
+    case LOG_LOCAL3:
+      return 3;
+    case LOG_LOCAL4:
+      return 4;
+    case LOG_LOCAL5:
+      return 5;
+    case LOG_LOCAL6:
+      return 6;
+    case LOG_LOCAL7:
+      return 7;  
+   default:
+      return -1;
   }
 }
 
