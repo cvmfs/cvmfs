@@ -28,6 +28,20 @@ bool AbstractPushWorker::IsReady() const {
 }
 
 
+bool AbstractPushWorker::ProcessJob(StorageJob *job) {
+  if (job->IsCompressionJob()) {
+    StorageCompressionJob *compression_job =
+                                    dynamic_cast<StorageCompressionJob*>(job);
+    ProcessCompressionJob(compression_job);
+  } else if (job->IsCopyJob()) {
+    StorageCopyJob * copy_job = dynamic_cast<StorageCopyJob*>(job);
+    ProcessCopyJob(copy_job);
+  }
+
+  return job->IsSuccessful();
+}
+
+
 int AbstractPushWorker::GetNumberOfCpuCores() {
   const int numCPU = sysconf(_SC_NPROCESSORS_ONLN);
 

@@ -44,21 +44,7 @@ bool LocalPushWorker::Initialize() {
 }
 
 
-bool LocalPushWorker::ProcessJob(StorageJob *job) {
-  if (job->IsCompressionJob()) {
-    StorageCompressionJob *compression_job =
-                                    dynamic_cast<StorageCompressionJob*>(job);
-    CompressAndProcess(compression_job);
-  } else if (job->IsCopyJob()) {
-    StorageCopyJob * copy_job = dynamic_cast<StorageCopyJob*>(job);
-    Copy(copy_job);
-  }
-
-  return job->IsSuccessful();
-}
-
-
-void LocalPushWorker::CompressAndProcess(
+void LocalPushWorker::ProcessCompressionJob(
                         StorageCompressionJob *compression_job) {
         hash::Any   &compressed_hash = compression_job->content_hash();
   const std::string &local_path      = compression_job->local_path();
@@ -101,7 +87,7 @@ void LocalPushWorker::CompressAndProcess(
 }
 
 
-void LocalPushWorker::Copy(StorageCopyJob *copy_job) {
+void LocalPushWorker::ProcessCopyJob(StorageCopyJob *copy_job) {
   const std::string& local_path  = copy_job->local_path();
   const std::string& remote_path = copy_job->remote_path();
   const bool         move        = copy_job->move();

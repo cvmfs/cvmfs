@@ -19,7 +19,8 @@ namespace upload
      * and will never be instantiated alone.
      */
     template <class SpoolerBackendT>
-    struct ContextBase {
+    class ContextBase {
+     public:
       ContextBase(SpoolerBackendT *master) :
         master(master),
         base_thread_number(0)
@@ -31,12 +32,15 @@ namespace upload
         pthread_mutex_destroy(&mutex);
       }
 
-      inline void lock()   { pthread_mutex_lock  (&mutex); }
-      inline void unlock() { pthread_mutex_unlock(&mutex); }
+      inline void Lock()   { pthread_mutex_lock  (&mutex); }
+      inline void Unlock() { pthread_mutex_unlock(&mutex); }
 
+     public:
       SpoolerBackendT *master;
-      pthread_mutex_t mutex;
       int base_thread_number; ///< this is increased by 1 for new threads to have an ID
+
+     private:
+      pthread_mutex_t mutex;
     };
 
     /**
@@ -75,9 +79,12 @@ namespace upload
     virtual bool Initialize();
     virtual bool IsReady() const;
 
-    virtual bool ProcessJob(StorageJob *job) = 0;
+    bool ProcessJob(StorageJob *job);
 
    protected:
+    virtual void ProcessCopyJob(StorageCopyJob *job)               = 0;
+    virtual void ProcessCompressionJob(StorageCompressionJob *job) = 0;
+
     static int GetNumberOfCpuCores();
 
    private:
