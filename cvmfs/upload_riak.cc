@@ -38,7 +38,8 @@ const std::string& RiakPushWorker::Context::AcquireUpstreamUrl() const {
 
 RiakPushWorker::RiakPushWorker(Context* context) :
   context_(context),
-  initialized_(false)
+  initialized_(false),
+  http_headers_(NULL)
 {
   LockGuard<Context> lock(context);
   upstream_url_ = context->AcquireUpstreamUrl();
