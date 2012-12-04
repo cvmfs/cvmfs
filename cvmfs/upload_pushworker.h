@@ -76,6 +76,12 @@ namespace upload
     virtual bool IsReady() const;
 
     virtual bool ProcessJob(StorageJob *job) = 0;
+
+   protected:
+    static int GetNumberOfCpuCores();
+
+   private:
+    static const int default_number_of_processors;
   };
 }
 
