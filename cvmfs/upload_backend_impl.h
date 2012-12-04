@@ -137,6 +137,11 @@ void* SpoolerBackend<PushWorkerT>::RunPushWorker(void* context) {
   }
   SpoolerBackend<PushWorkerT> *master = ctx->master;
 
+  // find out about the thread number
+  ctx->lock();
+  const int thread_number = ctx->base_thread_number++;
+  ctx->unlock();
+
   // start the processing loop
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Running PushWorker...");
   while (true) {
@@ -154,6 +159,13 @@ void* SpoolerBackend<PushWorkerT>::RunPushWorker(void* context) {
 
     // report to the supervisor and get ready for the next work piece
     master->SendResult(storage_job);
+    if (!storage_job->IsSuccessful()) {
+      LogCvmfs(kLogSpooler, kLogWarning, "Job '%s' failed in Thread %d",
+               storage_job->name().c_str(), thread_number);
+    } else {
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "Job '%s' succeeded in Thread %d",
+               storage_job->name().c_str(), thread_number);
+    }
     delete job;
   }
 
@@ -248,7 +260,8 @@ void SpoolerBackend<PushWorkerT>::SendResult(
 
 template <class PushWorkerT>
 void SpoolerBackend<PushWorkerT>::Schedule(Job *job) {
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "scheduling new job into job queue");
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "scheduling new job into job queue: %s",
+           job->name().c_str());
 
   pthread_mutex_lock(&job_queue_mutex_);
 
@@ -269,8 +282,6 @@ void SpoolerBackend<PushWorkerT>::Schedule(Job *job) {
 
 template <class PushWorkerT>
 Job* SpoolerBackend<PushWorkerT>::AcquireJob() {
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "acquiring a job from the job queue");
-
   pthread_mutex_lock(&job_queue_mutex_);
 
   // wait until there is something to do
@@ -290,6 +301,8 @@ Job* SpoolerBackend<PushWorkerT>::AcquireJob() {
   pthread_mutex_unlock(&job_queue_mutex_);
 
   // return the acquired job
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "acquired a job from the job queue: %s",
+           job->name().c_str());
   return job;
 }
 
@@ -299,6 +312,13 @@ void SpoolerBackend<PushWorkerT>::EndOfTransaction() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg,
            "Spooler received 'end of transaction'");
 
+  // schedule a death sentence for every running worker thread
+  const int number_of_threads = pushworker_threads_.size();
+  for (int i = 0; i < number_of_threads; ++i) {
+    Schedule(new DeathSentenceJob);
+  }
+
+  // we are finally done here
   SendResult(0);
 }
 

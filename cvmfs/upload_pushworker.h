@@ -21,13 +21,22 @@ namespace upload
     template <class SpoolerBackendT>
     struct ContextBase {
       ContextBase(SpoolerBackendT *master) :
-        master(master)
+        master(master),
+        base_thread_number(0)
       {
         pthread_mutex_init(&mutex, NULL);
       }
 
+      ~ContextBase() {
+        pthread_mutex_destroy(&mutex);
+      }
+
+      inline void lock()   { pthread_mutex_lock  (&mutex); }
+      inline void unlock() { pthread_mutex_unlock(&mutex); }
+
       SpoolerBackendT *master;
       pthread_mutex_t mutex;
+      int base_thread_number; ///< this is increased by 1 for new threads to have an ID
     };
 
     /**

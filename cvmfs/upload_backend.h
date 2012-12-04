@@ -33,6 +33,7 @@ namespace upload
     inline virtual bool IsCompressionJob()   const { return false; }
     inline virtual bool IsCopyJob()          const { return false; }
     inline virtual bool IsDeathSentenceJob() const { return false; }
+    inline virtual std::string name() const { return "Abstract Job"; }
 
     inline bool IsSuccessful() const          { return return_code_ == 0; }
     inline void Finished(int return_code = 0) { return_code_ = return_code; }
@@ -44,6 +45,7 @@ namespace upload
   class DeathSentenceJob : public Job {
    public:
     inline bool IsDeathSentenceJob() const { return true; }
+    inline virtual std::string name() const { return "Death Sentence Job"; }
   };
 
   class StorageJob : public Job {
@@ -54,6 +56,7 @@ namespace upload
       move_(move) {}
 
     inline bool IsStorageJob() const { return true; }
+    inline virtual std::string name() const { return "Abstract Storage Job"; }
 
     inline bool move()                     const { return move_; }
     inline const std::string& local_path() const { return local_path_; }
@@ -75,6 +78,7 @@ namespace upload
       content_hash_(hash::kSha1) {}
 
     inline bool IsCompressionJob() const { return true; }
+    inline virtual std::string name() const { return "Compression Job"; }
 
     inline const std::string& remote_dir()   const { return remote_dir_; }
     inline const std::string& file_suffix()  const { return file_suffix_; }
@@ -97,6 +101,7 @@ namespace upload
       remote_path_(remote_path) {}
 
     inline bool IsCopyJob() const { return true; }
+    inline virtual std::string name() const { return "Copy Job"; }
 
     inline const std::string& remote_path() const { return remote_path_; }
 
