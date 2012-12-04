@@ -23,7 +23,7 @@ RiakPushWorker::Context* RiakPushWorker::GenerateContext(
 
 
 int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
-  return context->upstream_urls.size();
+  return context->upstream_urls.size() * GetNumberOfCpuCores();
 }
 
 
@@ -120,7 +120,7 @@ void RiakPushWorker::ProcessCompressionJob(
         hash::Any   &content_hash = compression_job->content_hash();
 
   // compress the file to a temporary location
-  static const std::string tmp_dir = "/tmp";
+  static const std::string tmp_dir = "/ramdisk";
   std::string tmp_file_path;
   hash::Any compressed_hash(hash::kSha1);
   if (! CompressToTempFile(local_path,
