@@ -51,7 +51,7 @@ void RiakPushWorker::DoGlobalCleanup() {
 RiakPushWorker::RiakPushWorker(Context* context) :
   context_(context),
   initialized_(false),
-  http_headers_(NULL)
+  http_headers_download_(NULL)
 {
   LockGuard<Context> lock(context);
   upstream_url_ = context->AcquireUpstreamUrl();
@@ -59,8 +59,9 @@ RiakPushWorker::RiakPushWorker(Context* context) :
 
 
 RiakPushWorker::~RiakPushWorker() {
-  curl_easy_cleanup(curl_);
-  curl_slist_free_all(http_headers_);
+  curl_easy_cleanup(curl_upload_);
+  curl_easy_cleanup(curl_download_);
+  curl_slist_free_all(http_headers_download_);
 }
 
 
@@ -69,28 +70,70 @@ bool RiakPushWorker::Initialize() {
   if (!retval)
     return false;
 
-  // initialize cURL handle
-  curl_ = curl_easy_init();
-  if (! curl_) {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Configuring cURL handles for putting "
+                                        "files into a Riak instance");
+
+  if (!InitUploadHandle() || !InitDownloadHandle()) {
     LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize cURL handle.");
     return false;
   }
-
-  // configure cURL handle
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Configuring cURL handle for putting "
-                                        "files into a Riak instance");
-  if (curl_easy_setopt(curl_, CURLOPT_NOPROGRESS, 1L)    != CURLE_OK) return false;
-  if (curl_easy_setopt(curl_, CURLOPT_TCP_KEEPALIVE, 1L) != CURLE_OK) return false;
-  if (curl_easy_setopt(curl_, CURLOPT_UPLOAD, 1L)        != CURLE_OK) return false;
-
-  http_headers_ = curl_slist_append(http_headers_, "Content-Type: application/octet-stream");
-  if (curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, http_headers_) != CURLE_OK) return false;
 
   // all done
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "successfully initialized Riak "
                                         "spooler backend");
 
   initialized_ = true;
+  return true;
+}
+
+
+bool RiakPushWorker::InitUploadHandle() {
+  // initialize cURL handle
+  curl_upload_ = curl_easy_init();
+  if (! curl_upload_) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize cURL handle.");
+    return false;
+  }
+
+  // configure cURL handle
+  if (curl_easy_setopt(curl_upload_, CURLOPT_NOPROGRESS, 1L)    != CURLE_OK)
+    return false;
+  if (curl_easy_setopt(curl_upload_, CURLOPT_TCP_KEEPALIVE, 1L) != CURLE_OK)
+    return false;
+  if (curl_easy_setopt(curl_upload_, CURLOPT_UPLOAD, 1L)        != CURLE_OK)
+    return false;
+
+  return true;
+}
+
+
+bool RiakPushWorker::InitDownloadHandle() {
+  // initialize cURL handle
+  curl_download_ = curl_easy_init();
+  if (! curl_download_) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize cURL handle.");
+    return false;
+  }
+
+  // configure cURL handle
+  if (curl_easy_setopt(curl_download_, CURLOPT_NOPROGRESS, 1L)    != CURLE_OK)
+    return false;
+  if (curl_easy_setopt(curl_download_, CURLOPT_TCP_KEEPALIVE, 1L) != CURLE_OK)
+    return false;
+  if (curl_easy_setopt(curl_download_, CURLOPT_HTTPGET, 1L)       != CURLE_OK)
+    return false;
+  if (curl_easy_setopt(curl_download_, CURLOPT_NOBODY, 1L)        != CURLE_OK)
+    return false;
+
+  // configure download headers
+  http_headers_download_ = curl_slist_append(http_headers_download_, "Accept: */*");
+  if (curl_easy_setopt(curl_download_, CURLOPT_HTTPHEADER, http_headers_download_) != CURLE_OK)
+    return false;
+
+  // configure header readout callback
+  if (curl_easy_setopt(curl_download_, CURLOPT_HEADERFUNCTION, &ReadHeaderCallback) != CURLE_OK)
+    return false;
+
   return true;
 }
 
@@ -183,6 +226,94 @@ bool RiakPushWorker::CompressToTempFile(const std::string &source_file_path,
 }
 
 
+/**
+ * This method looks for the X-Riak-Vclock header and copies its value into the 
+ * std::string provided through the void *userdata pointer.
+ * Handle this thing with absolute care!
+ */
+size_t RiakPushWorker::ReadHeaderCallback(void *ptr, 
+                                          size_t size,
+                                          size_t nmemb,
+                                          void *userdata) {
+  // vector clock header description
+  // Example:
+  // X-Riak-Vclock: a85hYGBgzGDKBVIceQ1fzgWYubNkMCUy5rEybNMzOcWXBQA=\r\n
+  // ~~~ name ~~~~  ~~~~~~~~~~~~~~~~~~~ clock ~~~~~~~~~~~~~~~~~~~~~~
+  //              ^~ padding             carriage return / line feed ~^
+  static const char*  vclock_header_name        = "X-Riak-Vclock";
+  static const size_t vclock_header_name_length = strlen(vclock_header_name);
+  static const size_t vclock_header_padding     = 2;
+  static const size_t vclock_header_newline     = 2;
+
+  // incoming data shaping
+  const char   *bytes          = (const char*)ptr;
+  const size_t  bytes_received = size*nmemb;
+  std::string  &result         = *(reinterpret_cast<std::string*>(userdata));
+
+  // check for the vector clock header
+  if (strncmp(bytes,
+              vclock_header_name,
+              std::min(bytes_received, vclock_header_name_length)) == 0)
+  {
+    // compute the length and position of the vector clock data
+    const char* start_of_clock_value = bytes                     +
+                                       vclock_header_name_length +
+                                       vclock_header_padding;
+    const size_t vector_clock_length = bytes_received            -
+                                       vclock_header_name_length -
+                                       vclock_header_padding     -
+                                       vclock_header_newline;
+
+    // copy the vector clock data into the result string
+    result = std::string(start_of_clock_value, vector_clock_length);
+  }
+
+  // cURL needs to receive the exact number of incoming bytes as return value
+  return bytes_received;
+}
+
+
+bool RiakPushWorker::GetVectorClock(const std::string &key,
+                                          std::string &vector_clock) {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "checking if key %s already exists",
+           key.c_str());
+
+  // generate the request URL
+  const std::string url = CreateRequestUrl(key);
+  if (curl_easy_setopt(curl_download_, CURLOPT_URL, url.c_str()) != CURLE_OK)
+    return false;
+
+  // set the vector_clock to be written in the ReadHeaderCallback()
+  if (curl_easy_setopt(curl_download_, CURLOPT_WRITEHEADER, (void*)&vector_clock) != CURLE_OK)
+    return false;
+
+  // do the actual business
+  CURLcode res = curl_easy_perform(curl_download_);
+  if (res != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to check existence of key %s in "
+                                      "Riak because: '%s'",
+             key.c_str(), curl_easy_strerror(res));
+    return false;
+  }
+
+  // check if all went fine
+  long response_code;
+  res = curl_easy_getinfo(curl_download_, CURLINFO_RESPONSE_CODE, &response_code);
+  if (res != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Unable to retrieve response code for "
+                                      "key %s in Riak node %s",
+             key.c_str(), url.c_str());
+    return false;
+  }
+
+  // check if object was found
+  if (response_code != 200 && response_code != 304)
+    return false;
+
+  // we found an object and therefore most likely vector_clock is set now
+  return true;
+}
+
 int RiakPushWorker::PushFileToRiak(const std::string &key,
                                    const std::string &file_path,
                                    const bool         is_critical) {
@@ -192,8 +323,14 @@ int RiakPushWorker::PushFileToRiak(const std::string &key,
   const std::string url = CreateRequestUrl(key, is_critical);
   FILE *hd_src;
 
+  long response_code;
+  double uploaded_bytes;
+
   CURLcode res;
+  struct curl_slist *headers = NULL;
   int      retcode = -1;
+
+  std::string vector_clock;
 
   // find the size of the file to be uploaded
   struct stat file_info;
@@ -217,32 +354,80 @@ int RiakPushWorker::PushFileToRiak(const std::string &key,
     goto out;
   }
 
+  // configure headers
+  headers = curl_slist_append(headers, "Content-Type: application/octet-stream");
+
+  // check if key already exists and find out about its current vector clock
+  if (GetVectorClock(key, vector_clock)) {
+    headers = curl_slist_append(headers, ("X-Riak-Vclock: " + vector_clock).c_str());
+  }
+
+  // set headers
+  if (curl_easy_setopt(curl_upload_, CURLOPT_HTTPHEADER, headers) != CURLE_OK)
+    return false;
+
   // set url for Riak put command
-  if (curl_easy_setopt(curl_, CURLOPT_URL, url.c_str()) != CURLE_OK) {
+  if (curl_easy_setopt(curl_upload_, CURLOPT_URL, url.c_str()) != CURLE_OK) {
     retcode = 3;
     goto out;
   }
 
   // set file size of the file to be uploaded
-  if (curl_easy_setopt(curl_, CURLOPT_INFILESIZE_LARGE,
+  if (curl_easy_setopt(curl_upload_, CURLOPT_INFILESIZE_LARGE,
                        (curl_off_t)file_info.st_size) != CURLE_OK) {
     retcode = 4;
     goto out;
   }
 
   // specify the file handle to be uploaded
-  if (curl_easy_setopt(curl_, CURLOPT_READDATA, hd_src) != CURLE_OK) {
+  if (curl_easy_setopt(curl_upload_, CURLOPT_READDATA, hd_src) != CURLE_OK) {
     retcode = 5;
     goto out;
   }
 
   // do the actual business
-  res = curl_easy_perform(curl_);
-  if(res != CURLE_OK) {
+  res = curl_easy_perform(curl_upload_);
+  if (res != CURLE_OK) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to upload %s to Riak node %s "
                                       "because: '%s'",
              file_path.c_str(), url.c_str(), curl_easy_strerror(res));
     retcode = 6;
+    goto out;
+  }
+
+  // check if all went fine
+  res = curl_easy_getinfo(curl_upload_, CURLINFO_RESPONSE_CODE, &response_code);
+  if (res != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Unable to retrieve response code");
+    retcode = 7;
+    goto out;
+  }
+
+  res = curl_easy_getinfo(curl_upload_, CURLINFO_SIZE_UPLOAD, &uploaded_bytes);
+  if (res != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Unable to retrieve number of uploaded "
+                                      "bytes");
+    retcode = 8;
+    goto out;
+  }
+
+  if (response_code != 204 && response_code != 200) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to upload %s to Riak node %s "
+                                      "response code from Riak was: %d",
+             file_path.c_str(), url.c_str(), response_code);
+    retcode = 9;
+    goto out;
+  }
+
+  if ((int)uploaded_bytes != file_info.st_size) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Did not upload the correct amount of "
+                                      "data to Riak: %d/%d bytes uploaded for "
+                                      "file %s to Riak node: %s",
+             (int)uploaded_bytes,
+             file_info.st_size,
+             file_path.c_str(),
+             url.c_str());
+    retcode = 10;
     goto out;
   }
 
@@ -252,6 +437,7 @@ int RiakPushWorker::PushFileToRiak(const std::string &key,
 out:
   // close the uploaded file
   fclose(hd_src);
+  curl_slist_free_all(headers);
   return retcode;
 }
 
@@ -279,7 +465,7 @@ std::string RiakPushWorker::GenerateRiakKey(const std::string &remote_path) cons
 
 std::string RiakPushWorker::CreateRequestUrl(const std::string &key,
                                              const bool is_critical) const {
-  return upstream_url_ + "/" + key + (is_critical ? "?w=all" : "?w=default");
+  return upstream_url_ + "/" + key + (is_critical ? "?w=all" : "");
 }
 
 

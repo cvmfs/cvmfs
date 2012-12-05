@@ -72,6 +72,11 @@ namespace upload {
                             std::string       *tmp_file_path,
                             hash::Any         *content_hash) const;
 
+    bool InitUploadHandle();
+    bool InitDownloadHandle();
+
+    bool GetVectorClock(const std::string &key, std::string &vector_clock);
+
     /**
      * Pushes a file into the Riak data store under a given key. Furthermore
      * uploads can be marked as 'critical' meaning that they are ensured to be
@@ -102,12 +107,19 @@ namespace upload {
                                  const bool         is_critical = false) const;
 
    private:
+    static size_t ReadHeaderCallback(void *ptr, 
+                                     size_t size,
+                                     size_t nmemb,
+                                     void *userdata);
+
+   private:
     Context *context_;
     bool initialized_;
     std::string upstream_url_;
 
-    CURL *curl_;
-    struct curl_slist *http_headers_;
+    CURL *curl_upload_;
+    CURL *curl_download_;
+    struct curl_slist *http_headers_download_;
   };
 }
 
