@@ -91,8 +91,7 @@ bool SpoolerBackend<PushWorkerT>::SpawnPushWorkers() {
   pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_description_);
   int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
 
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spawning %d concurrent spooler "
-                                        "worker threads",
+  LogCvmfs(kLogSpooler, kLogStdout, "Using %d concurrent publishing workers",
            workers_to_spawn);
 
   // initialize the PushWorker thread pool
