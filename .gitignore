@@ -1,5 +1,5 @@
-test/cvmfs-testdwrapper
-test/Tests/Common/zpipe.run
+test.perl/cvmfs-testdwrapper
+test.perl/Tests/Common/zpipe.run
 test/test.log
 *.DS_Store
 *._.DS_Store
