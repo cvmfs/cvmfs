@@ -20,7 +20,7 @@ RiakPushWorker::Context* RiakPushWorker::GenerateContext(
 
 
 int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
-  return context->upstream_urls.size() * GetNumberOfCpuCores();
+  return std::max((int)context->upstream_urls.size(), GetNumberOfCpuCores());
 }
 
 
