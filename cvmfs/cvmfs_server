@@ -245,12 +245,6 @@ publish() {
   $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
 
-  if is_riak_upstream $upstream; then
-    echo -n "Wait until the dust settles in Riak... "
-    sleep 5
-    echo "done"
-  fi
-
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
@@ -489,15 +483,9 @@ EOF
   fi
   echo "done"
 
-  if is_riak_upstream $upstream; then
-    echo -n "Wait until the dust settles in Riak... "
-    sleep 5
-    echo "done"
-  fi
-
   echo -n "Mounting CernVM-FS Storage... "
   cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse debug,allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null

@@ -103,8 +103,13 @@ void RiakPushWorker::ProcessCopyJob(StorageCopyJob *copy_job) {
     return;
   }
 
-  const int retval = PushFileToRiak(GenerateRiakKey(copy_job->remote_path()),
-                                    copy_job->local_path());
+  const std::string& remote_path = copy_job->remote_path();
+  const std::string& local_path  = copy_job->local_path();
+
+  // copy is always critical... set third parameter to 'true'
+  const int retval = PushFileToRiak(GenerateRiakKey(remote_path),
+                                    local_path,
+                                    true);
 
   copy_job->Finished(retval);
 }
@@ -140,7 +145,7 @@ void RiakPushWorker::ProcessCompressionJob(
 
   // push to Riak
   const int retval = PushFileToRiak(GenerateRiakKey(compression_job),
-                                     tmp_file_path);
+                                    tmp_file_path);
 
   // clean up and go home
   compression_job->Finished(retval);
@@ -178,33 +183,13 @@ bool RiakPushWorker::CompressToTempFile(const std::string &source_file_path,
 }
 
 
-std::string RiakPushWorker::GenerateRiakKey(
-                          const StorageCompressionJob *compression_job) const {
-  assert (!compression_job->content_hash().IsNull());
-
-  return compression_job->remote_dir()              + 
-         compression_job->content_hash().ToString() + 
-         compression_job->file_suffix();
-}
-
-
-std::string RiakPushWorker::GenerateRiakKey(const std::string &remote_path) const {
-  // removes slashes (/) from the remote_path
-  std::string result;
-  std::remove_copy(remote_path.begin(), 
-                   remote_path.end(), 
-                   std::back_inserter(result), 
-                   '/');
-  return result;
-}
-
-
 int RiakPushWorker::PushFileToRiak(const std::string &key,
-                                   const std::string &file_path) {
+                                   const std::string &file_path,
+                                   const bool         is_critical) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "pushing file %s to Riak using key %s",
            file_path.c_str(), key.c_str());
 
-  const std::string url = CreateRequestUrl(key);
+  const std::string url = CreateRequestUrl(key, is_critical);
   FILE *hd_src;
 
   CURLcode res;
@@ -271,9 +256,30 @@ out:
 }
 
 
+std::string RiakPushWorker::GenerateRiakKey(
+                          const StorageCompressionJob *compression_job) const {
+  assert (!compression_job->content_hash().IsNull());
 
-std::string RiakPushWorker::CreateRequestUrl(const std::string &key) const {
-  return upstream_url_ + "/" + key;
+  return compression_job->remote_dir()              + 
+         compression_job->content_hash().ToString() + 
+         compression_job->file_suffix();
+}
+
+
+std::string RiakPushWorker::GenerateRiakKey(const std::string &remote_path) const {
+  // removes slashes (/) from the remote_path
+  std::string result;
+  std::remove_copy(remote_path.begin(), 
+                   remote_path.end(), 
+                   std::back_inserter(result), 
+                   '/');
+  return result;
+}
+
+
+std::string RiakPushWorker::CreateRequestUrl(const std::string &key,
+                                             const bool is_critical) const {
+  return upstream_url_ + "/" + key + (is_critical ? "?w=all" : "?w=default");
 }
 
 
