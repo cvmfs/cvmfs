@@ -14,10 +14,7 @@ using namespace upload;
 RiakPushWorker::Context* RiakPushWorker::GenerateContext(
                             SpoolerBackend<RiakPushWorker> *master,
                             const std::string              &upstream_urls) {
-  // read configuration
-  // TODO...
-
-  std::vector<std::string> upstream_url_vector = SplitString(upstream_urls, ',');
+  std::vector<std::string> upstream_url_vector = SplitString(upstream_urls, '@');
   return new Context(master, upstream_url_vector);
 }
 
@@ -251,9 +248,9 @@ int RiakPushWorker::PushFileToRiak(const std::string &key,
   // do the actual business
   res = curl_easy_perform(curl_);
   if(res != CURLE_OK) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to upload file %s to Riak "
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to upload %s to Riak node %s "
                                       "because: '%s'",
-             file_path.c_str(), curl_easy_strerror(res));
+             file_path.c_str(), url.c_str(), curl_easy_strerror(res));
     retcode = 6;
     goto out;
   }
