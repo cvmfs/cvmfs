@@ -87,11 +87,19 @@ bool SpoolerBackend<PushWorkerT>::Initialize() {
 
 template <class PushWorkerT>
 bool SpoolerBackend<PushWorkerT>::SpawnPushWorkers() {
+  // do some global initialization work common for all PushWorkers
+  const bool retval = PushWorkerT::DoGlobalInitialization();
+  if (!retval) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to globally initialize "
+                                       "PushWorkers");
+    return false;
+  }
+
   // find out about the environment of our PushWorker swarm
   pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_description_);
   int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
 
-  LogCvmfs(kLogSpooler, kLogStdout, "Using %d concurrent publishing workers",
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Using %d concurrent publishing workers",
            workers_to_spawn);
 
   // initialize the PushWorker thread pool
@@ -323,6 +331,9 @@ void SpoolerBackend<PushWorkerT>::EndOfTransaction() {
   for (; i != iend; ++i) {
     pthread_join(*i, NULL);
   }
+
+  // clean up after PushWorker objects
+  PushWorkerT::DoGlobalCleanup();
 
   // we are finally done here
   SendResult(0);

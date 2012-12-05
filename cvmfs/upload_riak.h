@@ -42,6 +42,20 @@ namespace upload {
      */
     static int GetNumberOfWorkers(const Context *context);
 
+    /**
+     * See AbstractPushWorker for description
+     *
+     * This method essentially calls curl_global_init()
+     */
+    static bool DoGlobalInitialization();
+
+    /**
+     * See AbstractPushWorker for description
+     *
+     * This method essentially calls curl_global_cleanup()
+     */
+    static void DoGlobalCleanup();
+
    public:
     RiakPushWorker(Context* context);
     virtual ~RiakPushWorker();

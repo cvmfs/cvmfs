@@ -23,9 +23,16 @@ bool AbstractPushWorker::Initialize() {
 
 
 bool AbstractPushWorker::IsReady() const {
-
   return true;
 }
+
+
+bool AbstractPushWorker::DoGlobalInitialization() {
+  return true;
+}
+
+
+void AbstractPushWorker::DoGlobalCleanup() {}
 
 
 bool AbstractPushWorker::ProcessJob(StorageJob *job) {

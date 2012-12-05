@@ -33,6 +33,21 @@ const std::string& RiakPushWorker::Context::AcquireUpstreamUrl() const {
 }
 
 
+bool RiakPushWorker::DoGlobalInitialization() {
+  if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize cURL library");
+    return false;
+  }
+
+  return true;
+}
+
+
+void RiakPushWorker::DoGlobalCleanup() {
+  curl_global_cleanup();
+}
+
+
 RiakPushWorker::RiakPushWorker(Context* context) :
   context_(context),
   initialized_(false),
@@ -46,7 +61,6 @@ RiakPushWorker::RiakPushWorker(Context* context) :
 RiakPushWorker::~RiakPushWorker() {
   curl_easy_cleanup(curl_);
   curl_slist_free_all(http_headers_);
-  curl_global_cleanup();
 }
 
 
@@ -54,14 +68,6 @@ bool RiakPushWorker::Initialize() {
   bool retval = AbstractPushWorker::Initialize();
   if (!retval)
     return false;
-
-  // initialize libcurl
-  int cretval = curl_global_init(CURL_GLOBAL_ALL);
-  if (cretval != 0) {
-    LogCvmfs(kLogSpooler, kLogStderr, 
-      "failed to initialize curl in riak spooler. Errorcode: %d", cretval);
-    return false;
-  }
 
   // initialize cURL handle
   curl_ = curl_easy_init();

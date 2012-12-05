@@ -72,6 +72,23 @@ namespace upload
      */
     //static int GetNumberOfWorkers(const Context *context);
 
+    /**
+     * This method can do global initialization work before any PushWorker is
+     * instanciated. For example it can create some global state.
+     *
+     * The default implementation here is essentially a NOOP
+     *
+     * @return  true on success, false otherwise
+     */
+    static bool DoGlobalInitialization();
+
+    /**
+     * This method can do global cleanup work after all PushWorkers are destroyed
+     *
+     * The default implementation here is essentially a NOOP
+     */
+    static void DoGlobalCleanup();
+
    public:
     AbstractPushWorker();
     virtual ~AbstractPushWorker();
