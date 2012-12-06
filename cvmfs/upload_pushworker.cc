@@ -6,18 +6,8 @@ using namespace upload;
 
 const int AbstractPushWorker::default_number_of_processors = 1;
 
-AbstractPushWorker::AbstractPushWorker() {
-
-}
-
-
-AbstractPushWorker::~AbstractPushWorker() {
-
-}
-
 
 bool AbstractPushWorker::Initialize() {
-
   return true;
 }
 
@@ -37,11 +27,11 @@ void AbstractPushWorker::DoGlobalCleanup() {}
 
 bool AbstractPushWorker::ProcessJob(StorageJob *job) {
   if (job->IsCompressionJob()) {
-    StorageCompressionJob *compression_job =
-                                    dynamic_cast<StorageCompressionJob*>(job);
+    StorageCompressionJob 
+    *compression_job = dynamic_cast<StorageCompressionJob*>(job);
     ProcessCompressionJob(compression_job);
   } else if (job->IsCopyJob()) {
-    StorageCopyJob * copy_job = dynamic_cast<StorageCopyJob*>(job);
+    StorageCopyJob *copy_job = dynamic_cast<StorageCopyJob*>(job);
     ProcessCopyJob(copy_job);
   }
 

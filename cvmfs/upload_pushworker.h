@@ -8,39 +8,52 @@
 namespace upload
 {
   class AbstractPushWorker {
+   
+   protected:
+    class Context {
+     public:
+      virtual ~Context() {
+        pthread_mutex_destroy(&mutex_);
+      }
+
+      inline void Lock()   { pthread_mutex_lock  (&mutex_); }
+      inline void Unlock() { pthread_mutex_unlock(&mutex_); }
+
+     protected:
+      // This class is abstract and should never be instantiated alone.
+      Context() :
+        base_thread_number(0)
+      {
+        pthread_mutex_init(&mutex_, NULL);
+      }
+
+     public:
+      int base_thread_number; ///< this is increased by 1 for new threads
+                              ///< to have an ID
+
+     private:
+      pthread_mutex_t mutex_;
+    };
+
    public:
     /**
      * Every PushWorker implementation MUST have a context structure containing
      * shared data between the PushWorker instances. Please be careful with
      * thread synchronisation here, contexts are not locked automatically. Every
      * context object contains a mutex for this purpose, though.
+     * Consider using util.h LockGuard to lock Contexts.
      * 
      * This is just an abstract base class for all concrete PushWorker contexts
      * and will never be instantiated alone.
      */
     template <class SpoolerBackendT>
-    class ContextBase {
-     public:
+    class ContextBase : public Context {
+     protected:
       ContextBase(SpoolerBackendT *master) :
-        master(master),
-        base_thread_number(0)
-      {
-        pthread_mutex_init(&mutex, NULL);
-      }
-
-      ~ContextBase() {
-        pthread_mutex_destroy(&mutex);
-      }
-
-      inline void Lock()   { pthread_mutex_lock  (&mutex); }
-      inline void Unlock() { pthread_mutex_unlock(&mutex); }
+        master(master) {}
 
      public:
       SpoolerBackendT *master;
-      int base_thread_number; ///< this is increased by 1 for new threads to have an ID
-
-     private:
-      pthread_mutex_t mutex;
     };
 
     /**
@@ -49,28 +62,30 @@ namespace upload
      * after all PushWorkers are gone!
      *
      * This method MUST be implemented for each concrete implementation of Push-
-     * Worker objects.
+     * Worker objects. This method only shows the interface and will produce
+     * linker errors when used directly.
      *
      * @param spooler_description   the description string of the spooler backend
      *                              to be initialized
      * @return                      a context object to be passed into the
      *                              constructor of every new PushWorker
      */
-    //static Context* GenerateContext(const std::string &spooler_description);
+    static Context* GenerateContext(const std::string &spooler_description);
 
     /**
      * Determines the number of workers to be spawned for the desired worker
      * swarm.
      *
      * This method MUST be implemented for each concrete implementation of Push-
-     * Worker objects.
+     * Worker objects. This method only shows the interface and will produce
+     * linker errors when used directly.
      *
      * @param context   pointer to a generated Context object containing infor-
      *                  mation about the worker swarm to be created
      *                  See AbstractPushWorker::Context for more information
      * @return          the number of PushWorkers to be spawned
      */
-    //static int GetNumberOfWorkers(const Context *context);
+    static int GetNumberOfWorkers(const Context *context);
 
     /**
      * This method can do global initialization work before any PushWorker is
@@ -90,9 +105,6 @@ namespace upload
     static void DoGlobalCleanup();
 
    public:
-    AbstractPushWorker();
-    virtual ~AbstractPushWorker();
-
     virtual bool Initialize();
     virtual bool IsReady() const;
 
