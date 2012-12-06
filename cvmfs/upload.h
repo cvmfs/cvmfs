@@ -18,6 +18,7 @@
 
 namespace upload {
 
+class SpoolerBackend;
 
 class BackendStat {
  public:
@@ -93,7 +94,7 @@ class Spooler {
    *  -  Riak Spooler: "riak:http://riaknode1@...@http://riaknodeN,/path/pipe,/digest/pipe"
    */
   static Spooler *Construct(const std::string &definition_string);
-  ~Spooler();
+  virtual ~Spooler();
 
   void SetCallback(SpoolerCallback *value) { spooler_callback_ = value; }
   void UnsetCallback() { delete spooler_callback_; spooler_callback_ = NULL; }
@@ -101,7 +102,7 @@ class Spooler {
 
   void SpoolProcess(const std::string &local_path,
                     const std::string &remote_dir,
-                    const std::string &file_postfix);
+                    const std::string &file_suffix);
   void SpoolCopy(const std::string &local_path, const std::string &remote_path);
   void EndOfTransaction();
 
@@ -112,7 +113,7 @@ class Spooler {
   uint64_t num_errors() { return atomic_read64(&num_errors_); }
 
  protected:
-  Spooler();
+  Spooler(const SpoolerDefinition &spooler_definition);
   bool Connect(const std::string &fifo_paths,
                const std::string &fifo_digests);
 
@@ -120,19 +121,13 @@ class Spooler {
   static void *MainReceive(void *caller);
 
   template <class PushWorkerT>
-  static void SpawnSpoolerBackend(const SpoolerDefinition &definition);
+  void SpawnSpoolerBackend(const SpoolerDefinition &definition);
 
+  SpoolerBackend *backend_;
   atomic_int64 num_pending_;
   atomic_int64 num_errors_;
-  std::string fifo_paths_;
-  std::string fifo_digests_;
   SpoolerCallback *spooler_callback_;
-  bool connected_;
   bool move_mode_;
-  int fd_paths_;
-  int fd_digests_;
-  FILE *fdigests_;
-  pthread_t thread_receive_;
 };
 
 BackendStat *GetBackendStat(const std::string &spooler_definition);

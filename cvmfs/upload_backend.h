@@ -114,50 +114,45 @@ namespace upload
 
 
   // ---------------------------------------------------------------------------
+  
 
-
-  template <class PushWorkerT>
   class SpoolerBackend {
    public:
-    SpoolerBackend(const std::string &spooler_description,
-                   const int          max_pending_jobs = 1000);
+    static SpoolerBackend* Construct(const int          driver_type, // THIS IS SUBJECT TO CHANGE!
+                                     const std::string &spooler_description,
+                                     const int          max_pending_jobs = 1000);
+
     virtual ~SpoolerBackend();
 
-    bool Connect(const std::string &fifo_paths,
-                 const std::string &fifo_digests);
-    bool Initialize();
     int Run();
 
-    virtual bool IsReady() const;
+    void Copy(const std::string &local_path,
+              const std::string &remote_path,
+              const bool move);
+    void Process(const std::string &local_path,
+                 const std::string &remote_dir,
+                 const std::string &file_suffix,
+                 const bool move);
+
+    void EndOfTransaction();
+
+    virtual int GetNumberOfWorkers() const = 0;
+    void Wait();
 
    protected:
-    void EndOfTransaction();
-    void Copy(const bool move);
-    void Process(const bool move);
-    void Unknown(const unsigned char command);
+    SpoolerBackend(const std::string &spooler_description,
+                   const int          max_pending_jobs);
 
-    bool SpawnPushWorkers();
-
-    void SendResult(const int error_code,
-                    const std::string &local_path = "",
-                    const hash::Any &compressed_hash = hash::Any()) const;
-    void SendResult(const StorageJob* storage_job) const;
+    virtual bool Initialize();
 
     void Schedule(Job *job);
     Job* AcquireJob();
 
-   private:
-    bool OpenPipes();
-    bool GetString(FILE *f, std::string *str) const;
+    virtual bool SpawnPushWorkers() = 0;
 
-    static void* RunPushWorker(void* context);
+    inline const std::string& spooler_description() const { return spooler_description_; }
 
    private:
-    // PushWorker environment
-    typename PushWorkerT::Context* pushworker_context_;
-    typedef std::vector<pthread_t> WorkerThreads;
-    WorkerThreads pushworker_threads_;
-
     // Job Queue
     std::queue<Job*> job_queue_;
     size_t           job_queue_max_length_;
@@ -165,14 +160,38 @@ namespace upload
     pthread_cond_t   job_queue_cond_not_empty_;
     pthread_cond_t   job_queue_cond_not_full_;
 
-    // Connection to the user process
-    FILE *fpathes_;
-    int fd_digests_;
+    // Status Information
+    const std::string spooler_description_;
 
     // Status information and flags
-    const std::string spooler_description_;
-    bool pipes_connected_;
     bool initialized_;
+  };
+
+
+  // ---------------------------------------------------------------------------
+
+
+  template <class PushWorkerT>
+  class SpoolerBackendImpl : public SpoolerBackend {
+   public:
+    SpoolerBackendImpl(const std::string &spooler_description,
+                       const int          max_pending_jobs) :
+      SpoolerBackend(spooler_description, max_pending_jobs) {}
+
+    int GetNumberOfWorkers() const;
+
+   protected:
+    bool SpawnPushWorkers();
+
+   private:
+    static void* RunPushWorker(void* context);
+
+   private:
+    typename PushWorkerT::Context* pushworker_context_;
+
+    // PushWorker environment
+    typedef std::vector<pthread_t> WorkerThreads;
+    WorkerThreads pushworker_threads_;
   };
 
 }
