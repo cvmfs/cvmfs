@@ -204,6 +204,7 @@ do
     %{_datadir}/selinux/${selinuxvariant}/cvmfs.pp &> /dev/null || :
 done
 %endif
+/usr/bin/cvmfs_config reload
 
 %preun
 %if 0%{?selinux_cvmfs}

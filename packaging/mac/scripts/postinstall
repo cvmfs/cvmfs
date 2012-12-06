@@ -8,6 +8,7 @@ if [ -f $cvmfs_cfg ]; then
     echo "Configuring cvmfs failed." >> /tmp/cvmfs_postinstall
     exit 1
   fi
+  /usr/bin/cvmfs_config reload
 else
   echo "Could not find cvmfs_config script in $cvmfs_config!" >> /tmp/cvmfs_postinstall
   exit 2
