@@ -14,17 +14,22 @@ int main( int argc, char ** argv ) {
   char buf[CMDMAXLGTH];
   char *p = buf;
   int i = 1;
+  int setuid_success;
 
   pwd = getpwnam(user);
-  // success test needed here 
-  setuid(pwd->pw_uid);
-  // success test needed here 
 
-  memset (buf, 0, sizeof(buf));
-  while (argv[i]) {
-    p += sprintf(p, " %s", argv[i++]);
+  setuid_success = setuid(pwd->pw_uid);
+
+  if (setuid_success == 0) {
+	  memset (buf, 0, sizeof(buf));
+	  while (argv[i]) {
+		p += sprintf(p, " %s", argv[i++]);
+	  }
+	  system(buf);
   }
-  system(buf);
+  else {
+	  printf("Cannot setuid to cvmfs-test. Exiting.\n");
+  }
   return 0;
 }
 

@@ -315,7 +315,7 @@ get_cvmfs_owner() {
   local owner=$2
   local cvmfs_owner
 
-  if [ "x$owner" == "x" ]; then
+  if [ "x$owner" = "x" ]; then
     read -p "Owner of $name [$(whoami)]: " cvmfs_owner
     [ x"$cvmfs_owner" = x ] && cvmfs_owner=$(whoami)
   else
@@ -614,7 +614,7 @@ rmfs() {
   [ x"$upstream" = x ] && die "Upstream storage undefined"
   [ x"$type" = x ] && die "Repository type undefined"
 
-  if [ "$type" == "stratum0" ]; then
+  if [ "$type" = "stratum0" ]; then
     echo -n "Unmounting CernVM-FS Area... "
     sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
     mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
@@ -641,7 +641,7 @@ rmfs() {
   fi
 
   echo -n "Removing keys and configuration... "
-  if [ "$type" == stratum0 ]; then
+  if [ "$type" = stratum0 ]; then
     rm -f /etc/cvmfs/keys/$name.masterkey \
         /etc/cvmfs/keys/$name.pub \
         /etc/cvmfs/keys/$name.key \
@@ -739,7 +739,7 @@ the command."
 
 # Setup environment
 APACHE="httpd"
-[ which apache2 >/dev/null 2>&1 ] && APACHE="apache2"
+which apache2 >/dev/null 2>&1 && APACHE="apache2"
 if [ -x /sbin/service ]; then
   SERVICE_BIN="/sbin/service"
 else
@@ -826,7 +826,7 @@ case $1 in
   rmfs)
     [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
     reply=n
-    if [ x"$3" == x"-f" ]; then
+    if [ x"$3" = x"-f" ]; then
       reply=y
     else
       read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY INCLUDING SIGNING KEYS!  Are you sure (y/n)? " reply
