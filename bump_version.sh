@@ -15,7 +15,7 @@ sed -i -e "s/^set (CernVM-FS_VERSION_PATCH \(.*\)/set (CernVM-FS_VERSION_PATCH $
 grep VERSION CMakeLists.txt
 
 echo "Patching RPM"
-sed -i -e "s/^Version: \(.*\)/Version: 2.1.4/" packaging/rpm/cvmfs-universal.spec
+sed -i -e "s/^Version: \(.*\)/Version: $VERSION/" packaging/rpm/cvmfs-universal.spec
 grep Version packaging/rpm/cvmfs-universal.spec
 
 echo "Patching Mac Package"
