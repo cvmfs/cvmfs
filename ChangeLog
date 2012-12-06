@@ -1,3 +1,5 @@
+2.1.6:
+  
 2.1.5:
   * Added "pid cachemgr" command to cvmfs_talk
   * Added CERN IT public keys
