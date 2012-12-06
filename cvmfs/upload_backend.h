@@ -119,7 +119,8 @@ namespace upload
   template <class PushWorkerT>
   class SpoolerBackend {
    public:
-    SpoolerBackend(const std::string &spooler_description);
+    SpoolerBackend(const std::string &spooler_description,
+                   const int          max_pending_jobs = 1000);
     virtual ~SpoolerBackend();
 
     bool Connect(const std::string &fifo_paths,

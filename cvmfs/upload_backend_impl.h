@@ -9,8 +9,9 @@ namespace upload {
 
 
 template <class PushWorkerT>
-SpoolerBackend<PushWorkerT>::SpoolerBackend(const std::string &spooler_description) :
-  job_queue_max_length_(50), // TODO: make this configurable
+SpoolerBackend<PushWorkerT>::SpoolerBackend(const std::string &spooler_description,
+                                            const int          max_pending_jobs) :
+  job_queue_max_length_(max_pending_jobs),
   spooler_description_(spooler_description),
   pipes_connected_(false),
   initialized_(false) {}
@@ -408,41 +409,3 @@ bool SpoolerBackend<PushWorkerT>::GetString(FILE *f, std::string *str) const {
 
 
 } // namespace upload
-
-// -----------------------------------------------------------------------------
-
-
-// bool SpoolerBackend<PushWorkerT>::StoragePushJob::Compress(CompressionContext *ctx) {
-//   // Create a temporary file at the given destination directory
-//   FILE *fcas = CreateTempFile(ctx->tmp_dir + "/cvmfs", 0777, "w",
-//                               &compressed_file_path_);
-//   if (fcas == NULL) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file %s",
-//              compressed_file_path_.c_str());
-//     return false;
-//   }
-
-//   // Compress the provided source file and write the result into the temporary.
-//   // Additionally computes the content hash of the compressed data
-//   int retval = zlib::CompressPath2File(local_path_, fcas, &content_hash_);
-//   if (! retval) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "failed to compress file %s to temporary "
-//                                       "file %s",
-//              local_path_.c_str(), compressed_file_path_.c_str());
-
-//     unlink(compressed_file_path_.c_str());
-//     return false;
-//   }
-//   fclose(fcas);
-
-//   return true;
-// }
-
-
-// bool SpoolerBackend<PushWorkerT>::StoragePushJob::PushToStorage(StoragePushContext *ctx) {
-//   const std::string remote_path = remote_dir_                  +
-//                                   content_hash_.MakePath(1, 2) +
-//                                   file_suffix_;
-
-//   return delegate_->PushToStorage(ctx, compressed_file_path_, remote_path);
-// }
