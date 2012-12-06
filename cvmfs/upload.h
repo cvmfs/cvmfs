@@ -87,10 +87,10 @@ class Spooler {
 
  public:
   /**
-   * Starts a spooler process and the creates the corresponding object
+   * Starts a spooler process and creates the corresponding object
    * from a definition string which depends on the type of spooler to create.
    *  - Local Spooler: "local:/dir/to/repo,/path/pipe,/digest/pipe"
-   *  -  Riak Spooler: "riak:/path/to/config,/path/pipe/digest/pipe"
+   *  -  Riak Spooler: "riak:http://riaknode1@...@http://riaknodeN,/path/pipe,/digest/pipe"
    */
   static Spooler *Construct(const std::string &definition_string);
   ~Spooler();
