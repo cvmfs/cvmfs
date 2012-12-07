@@ -166,7 +166,7 @@ void Spooler::Schedule(Job *job) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "scheduling new job into job queue: %s",
            job->name().c_str());
 
-  pthread_mutex_lock(&job_queue_mutex_);
+  LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
 
   // wait until there is space in the job queue
   while (job_queue_.size() >= (size_t)spooler_definition_.max_pending_jobs) {
@@ -179,13 +179,11 @@ void Spooler::Schedule(Job *job) {
 
   // wake all waiting threads
   pthread_cond_broadcast(&job_queue_cond_not_empty_);
-
-  pthread_mutex_unlock(&job_queue_mutex_);
 }
 
 
 Job* Spooler::AcquireJob() {
-  pthread_mutex_lock(&job_queue_mutex_);
+  LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
 
   // wait until there is something to do
   while (job_queue_.empty()) {
@@ -201,8 +199,6 @@ Job* Spooler::AcquireJob() {
     pthread_cond_signal(&job_queue_cond_not_full_);
   }
 
-  pthread_mutex_unlock(&job_queue_mutex_);
-
   // return the acquired job
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "acquired a job from the job queue: %s",
            job->name().c_str());
@@ -211,7 +207,8 @@ Job* Spooler::AcquireJob() {
 
 
 void Spooler::WaitForUpload() const {
-  pthread_mutex_lock(&job_queue_mutex_);
+  LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
+
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Waiting for all jobs to be finished...");
 
   while (atomic_read32(&jobs_pending_) > 0) {
@@ -219,7 +216,6 @@ void Spooler::WaitForUpload() const {
   }
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Jobs are done... go on");
-  pthread_mutex_unlock(&job_queue_mutex_);
 }
 
 
