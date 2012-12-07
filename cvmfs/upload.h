@@ -166,11 +166,11 @@ namespace upload
     // Job Queue
     std::queue<Job*>         job_queue_;
     mutable pthread_mutex_t  job_queue_mutex_;
-    mutable pthread_cond_t   job_queue_cond_empty_;
     mutable pthread_cond_t   job_queue_cond_not_empty_;
     mutable pthread_cond_t   job_queue_cond_not_full_;
-    atomic_int32             jobs_pending_;
-    atomic_int32             jobs_failed_;
+    mutable pthread_cond_t   jobs_all_done_;
+    mutable atomic_int32     jobs_pending_;
+    mutable atomic_int32     jobs_failed_;
 
     // Status Information
     const SpoolerDefinition spooler_definition_;

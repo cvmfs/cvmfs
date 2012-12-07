@@ -85,7 +85,7 @@ create_whitelist() {
   chown $user $whitelist
 
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.sha1
-  gdb --arg cvmfs_swissknife_debug upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
+  cvmfs_swissknife_debug upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
   rm -f $whitelist
   echo "done"
 }

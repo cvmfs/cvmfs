@@ -94,7 +94,7 @@ bool Spooler::Initialize() {
   if (pthread_mutex_init(&job_queue_mutex_, NULL) != 0)         return false;
   if (pthread_cond_init(&job_queue_cond_not_full_, NULL) != 0)  return false;
   if (pthread_cond_init(&job_queue_cond_not_empty_, NULL) != 0) return false;
-  if (pthread_cond_init(&job_queue_cond_empty_, NULL) != 0)     return false;
+  if (pthread_cond_init(&jobs_all_done_, NULL) != 0)            return false;
 
   // spawn the PushWorker objects in their own threads
   if (!SpawnPushWorkers()) {
@@ -117,7 +117,7 @@ Spooler::~Spooler() {
   // free PushWorker synchronisation primitives
   pthread_cond_destroy(&job_queue_cond_not_full_);
   pthread_cond_destroy(&job_queue_cond_not_empty_);
-  pthread_cond_destroy(&job_queue_cond_empty_);
+  pthread_cond_destroy(&jobs_all_done_);
   pthread_mutex_destroy(&job_queue_mutex_);
 }
 
@@ -201,11 +201,6 @@ Job* Spooler::AcquireJob() {
     pthread_cond_signal(&job_queue_cond_not_full_);
   }
 
-  // signal the Spooler that the queue is empty
-  if (job_queue_.empty()) {
-    pthread_cond_signal(&job_queue_cond_empty_);
-  }
-
   pthread_mutex_unlock(&job_queue_mutex_);
 
   // return the acquired job
@@ -217,11 +212,13 @@ Job* Spooler::AcquireJob() {
 
 void Spooler::WaitForUpload() const {
   pthread_mutex_lock(&job_queue_mutex_);
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Waiting for all jobs to be finished...");
 
-  while (!job_queue_.empty()) {
-    pthread_cond_wait(&job_queue_cond_empty_, &job_queue_mutex_);
+  while (atomic_read32(&jobs_pending_) > 0) {
+    pthread_cond_wait(&jobs_all_done_, &job_queue_mutex_);
   }
 
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Jobs are done... go on");
   pthread_mutex_unlock(&job_queue_mutex_);
 }
 
@@ -243,6 +240,11 @@ void Spooler::JobFinishedCallback(Job* job) {
 
   delete job;
   atomic_dec32(&jobs_pending_);
+
+  // Signal the Spooler that all jobs are done...
+  if (atomic_read32(&jobs_pending_) == 0) {
+    pthread_cond_signal(&jobs_all_done_);
+  }
 }
 
 

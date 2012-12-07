@@ -82,7 +82,7 @@ void* SpoolerImpl<PushWorkerT>::RunPushWorker(void* context) {
     // check if we should stop working and die silently
     Job *job = master->AcquireJob();
     if (job->IsDeathSentenceJob()) {
-      delete job;
+      job->Finished();
       break;
     }
 
@@ -109,12 +109,17 @@ int SpoolerImpl<PushWorkerT>::GetNumberOfWorkers() const {
 
 template <class PushWorkerT>
 void SpoolerImpl<PushWorkerT>::WaitForTermination() const {
+  assert (TransactionEnded());
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Waiting for Jobs to finish and PushWorkers to terminate.");
   // wait for all running worker threads to terminate
   WorkerThreads::const_iterator i = pushworker_threads_.begin();
   WorkerThreads::const_iterator iend = pushworker_threads_.end();
   for (; i != iend; ++i) {
     pthread_join(*i, NULL);
   }
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler stopped working...");
 }
 
 
