@@ -44,16 +44,15 @@ struct ChunkJob {
 };
 
 
-class AbortSpoolerOnError : public upload::SpoolerCallback {
- public:
-  void Callback(const string &path, int retval, const string &digest) {
-    if (retval != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
-               retval, path.c_str(), digest.c_str());
-      abort();
-    }
+static void AbortSpoolerOnError(const string &path,
+                                const int     retval,
+                                const string &digest) {
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
+             retval, path.c_str(), digest.c_str());
+    abort();
   }
-};
+}
 
 
 string *stratum0_url = NULL;
@@ -121,7 +120,7 @@ static void *MainWorker(void *data) {
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
-      spooler->SpoolCopy(tmp_file, chunk_path);
+      spooler->Copy(tmp_file, chunk_path);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -253,9 +252,9 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
   delete catalog;
   unlink(file_catalog.c_str());
-  spooler->WaitFor();
-  spooler->SpoolCopy(file_catalog_vanilla,
-                     "data" + catalog_hash.MakePath(1, 2) + "C");
+  spooler->Wait();
+  spooler->Copy(file_catalog_vanilla,
+                "data" + catalog_hash.MakePath(1, 2) + "C");
   return true;
 
  pull_cleanup:
@@ -275,7 +274,7 @@ static void UploadBuffer(const unsigned char *buffer, const unsigned size,
   int retval = CopyMem2File(buffer, size, ftmp);
   assert(retval);
   fclose(ftmp);
-  spooler->SpoolCopy(tmp_file, dest_path);
+  spooler->Copy(tmp_file, dest_path);
 }
 
 
@@ -301,7 +300,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   backend_stat = upload::GetBackendStat(*args.find('r')->second);
   assert(backend_stat);
   spooler->set_move_mode(true);
-  spooler->SetCallback(new AbortSpoolerOnError());
+  spooler->SetCallback(new upload::SpoolerCallback(&AbortSpoolerOnError));
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
   if (args.find('n') != args.end())
@@ -390,7 +389,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Upload manifest ensemble
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
-    spooler->WaitFor();
+    spooler->Wait();
     const string certificate_path =
       "data" + ensemble.manifest->certificate().MakePath(1, 2) + "X";
     if (!backend_stat->Stat(certificate_path)) {
@@ -402,7 +401,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                  ".cvmfspublished");
   }
 
-  spooler->WaitFor();
+  spooler->Wait();
   LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %"PRId64" new chunks out of %"
            PRId64" processed chunks",
            atomic_read64(&overall_new), atomic_read64(&overall_chunks));

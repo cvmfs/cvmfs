@@ -10,11 +10,11 @@ namespace upload
     /**
      * See AbstractPushWorker for description
      */
-    class Context : public AbstractPushWorker::ContextBase<SpoolerBackendImpl<LocalPushWorker> > {
+    class Context : public AbstractPushWorker::ContextBase<SpoolerImpl<LocalPushWorker> > {
      public:
-      Context(SpoolerBackendImpl<LocalPushWorker> *master,
-              const std::string               &upstream_path) :
-        AbstractPushWorker::ContextBase<SpoolerBackendImpl<LocalPushWorker> >(master),
+      Context(SpoolerImpl<LocalPushWorker> *master,
+              const std::string            &upstream_path) :
+        AbstractPushWorker::ContextBase<SpoolerImpl<LocalPushWorker> >(master),
         upstream_path(upstream_path) {}
 
      public:
@@ -24,8 +24,8 @@ namespace upload
     /**
      * See AbstractPushWorker for description
      */
-    static Context* GenerateContext(SpoolerBackendImpl<LocalPushWorker> *master,
-                                    const std::string                   &upstream_path);
+    static Context* GenerateContext(SpoolerImpl<LocalPushWorker> *master,
+                                    const std::string            &upstream_path);
 
     /**
      * See AbstractPushWorker for description

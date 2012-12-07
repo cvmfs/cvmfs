@@ -72,22 +72,22 @@ typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
  * Callback object for newly added files.  The callback sets the hash.
  */
 class SyncMediator;
-class PublishFilesCallback : public upload::SpoolerCallback {
- public:
-  PublishFilesCallback(SyncMediator *mediator);
-  void Callback(const std::string &path, int retval,
-                const std::string &digest);
- private:
-  SyncMediator *mediator_;
-};
-class PublishHardlinksCallback : public upload::SpoolerCallback {
- public:
-  PublishHardlinksCallback(SyncMediator *mediator);
-  void Callback(const std::string &path, int retval,
-                const std::string &digest);
- private:
-  SyncMediator *mediator_;
-};
+// class PublishFilesCallback : public upload::SpoolerCallback {
+//  public:
+//   PublishFilesCallback(SyncMediator *mediator);
+//   void Callback(const std::string &path, int retval,
+//                 const std::string &digest);
+//  private:
+//   SyncMediator *mediator_;
+// };
+// class PublishHardlinksCallback : public upload::SpoolerCallback {
+//  public:
+//   PublishHardlinksCallback(SyncMediator *mediator);
+//   void Callback(const std::string &path, int retval,
+//                 const std::string &digest);
+//  private:
+//   SyncMediator *mediator_;
+// };
 
 
 /**
@@ -100,8 +100,8 @@ class PublishHardlinksCallback : public upload::SpoolerCallback {
  * and hashing.
  */
 class SyncMediator {
-  friend class PublishFilesCallback;
-  friend class PublishHardlinksCallback;
+  // friend class PublishFilesCallback;
+  // friend class PublishHardlinksCallback;
   friend class SyncUnion;
  public:
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
@@ -158,6 +158,14 @@ class SyncMediator {
                              const std::string &link_name);
   void RemoveDirectoryCallback(const std::string &parent_dir,
                                const std::string &dir_name);
+
+  // Called by Upload Spooler
+  void PublishFilesCallback(const std::string &path,
+                            const int          retval,
+                            const std::string &digest);
+  void PublishHardlinksCallback(const std::string &path,
+                                const int          retval,
+                                const std::string &digest);
 
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);

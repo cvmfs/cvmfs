@@ -5,10 +5,12 @@
 #include "logging.h"
 #include "util.h"
 
+#include "upload_jobs.h"
+
 namespace upload {
 
 template <class PushWorkerT>
-bool SpoolerBackendImpl<PushWorkerT>::SpawnPushWorkers() {
+bool SpoolerImpl<PushWorkerT>::SpawnPushWorkers() {
   // do some global initialization work common for all PushWorkers
   const bool retval = PushWorkerT::DoGlobalInitialization();
   if (!retval) {
@@ -36,7 +38,7 @@ bool SpoolerBackendImpl<PushWorkerT>::SpawnPushWorkers() {
     pthread_t* thread = &(*i);
     const int retval = pthread_create(thread, 
                                       NULL,
-                                      &SpoolerBackendImpl::RunPushWorker,
+                                      &SpoolerImpl::RunPushWorker,
                                       pushworker_context_);
     if (retval != 0) {
       LogCvmfs(kLogSpooler, kLogWarning, "Failed to spawn a PushWorker.");
@@ -50,7 +52,7 @@ bool SpoolerBackendImpl<PushWorkerT>::SpawnPushWorkers() {
 
 
 template <class PushWorkerT>
-void* SpoolerBackendImpl<PushWorkerT>::RunPushWorker(void* context) {
+void* SpoolerImpl<PushWorkerT>::RunPushWorker(void* context) {
   //
   // INITIALIZATION
   /////////////////
@@ -68,7 +70,7 @@ void* SpoolerBackendImpl<PushWorkerT>::RunPushWorker(void* context) {
                                        "properly... will die now!");
     return NULL; 
   }
-  SpoolerBackendImpl<PushWorkerT> *master = ctx->master;
+  SpoolerImpl<PushWorkerT> *master = ctx->master;
 
   // find out about the thread number
   ctx->Lock();
@@ -116,8 +118,20 @@ void* SpoolerBackendImpl<PushWorkerT>::RunPushWorker(void* context) {
 
 
 template <class PushWorkerT>
-int SpoolerBackendImpl<PushWorkerT>::GetNumberOfWorkers() const {
+int SpoolerImpl<PushWorkerT>::GetNumberOfWorkers() const {
   return pushworker_threads_.size();
+}
+
+template <class PushWorkerT>
+void SpoolerImpl<PushWorkerT>::Wait() const {
+  
+
+  // wait for all running worker threads to terminate
+  WorkerThreads::const_iterator i = pushworker_threads_.begin();
+  WorkerThreads::const_iterator iend = pushworker_threads_.end();
+  for (; i != iend; ++i) {
+    pthread_join(*i, NULL);
+  }
 }
 
 

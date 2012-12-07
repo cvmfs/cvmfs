@@ -155,10 +155,10 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest::Manifest *manifest = new manifest::Manifest(hash_catalog, "");
 
   // Upload catalog
-  spooler->SpoolCopy(file_path_compressed,
-                     "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler->Copy(file_path_compressed,
+                "data" + hash_catalog.MakePath(1, 2) + "C");
   spooler->EndOfTransaction();
-  spooler->WaitFor();
+  spooler->Wait();
   unlink(file_path_compressed.c_str());
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
@@ -647,7 +647,7 @@ manifest::Manifest *WritableCatalogManager::Commit() {
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
-      spooler_->WaitFor();
+      spooler_->Wait();
       if (spooler_->num_errors() > 0) {
         LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
         return NULL;
@@ -737,8 +737,8 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 	}
 
   // Upload catalog
-  spooler_->SpoolCopy(catalog->database_path() + ".compressed",
-                      "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler_->Copy(catalog->database_path() + ".compressed",
+                 "data" + hash_catalog.MakePath(1, 2) + "C");
 
 	// Update registered catalog SHA1 in nested catalog
 	if (!catalog->IsRoot()) {

@@ -12,8 +12,8 @@
 using namespace upload;
 
 RiakPushWorker::Context* RiakPushWorker::GenerateContext(
-                            SpoolerBackendImpl<RiakPushWorker> *master,
-                            const std::string                  &upstream_urls) {
+                            SpoolerImpl<RiakPushWorker> *master,
+                            const std::string           &upstream_urls) {
   std::vector<std::string> upstream_url_vector = SplitString(upstream_urls, '@');
   return new Context(master, upstream_url_vector);
 }

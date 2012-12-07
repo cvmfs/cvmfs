@@ -9,8 +9,8 @@
 using namespace upload;
 
 LocalPushWorker::Context* LocalPushWorker::GenerateContext(
-                              SpoolerBackendImpl<LocalPushWorker> *master,
-                              const std::string                   &upstream_path) {
+                              SpoolerImpl<LocalPushWorker> *master,
+                              const std::string            &upstream_path) {
   Context *ctx = new Context(master, upstream_path);
   return ctx;
 }

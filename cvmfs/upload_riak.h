@@ -14,11 +14,11 @@ namespace upload {
     /**
      * See AbstractPushWorker for description
      */
-    class Context : public AbstractPushWorker::ContextBase<SpoolerBackendImpl<RiakPushWorker> > {
+    class Context : public AbstractPushWorker::ContextBase<SpoolerImpl<RiakPushWorker> > {
      public:
-      Context(SpoolerBackendImpl<RiakPushWorker> *master,
+      Context(SpoolerImpl<RiakPushWorker> *master,
               const std::vector<std::string> &upstream_urls) :
-        AbstractPushWorker::ContextBase<SpoolerBackendImpl<RiakPushWorker> >(master),
+        AbstractPushWorker::ContextBase<SpoolerImpl<RiakPushWorker> >(master),
         upstream_urls(upstream_urls),
         next_upstream_url_(0) {}
 
@@ -34,8 +34,8 @@ namespace upload {
     /**
      * See AbstractPushWorker for description
      */
-    static Context* GenerateContext(SpoolerBackendImpl<RiakPushWorker> *master,
-                                    const std::string                  &upstream_urls);
+    static Context* GenerateContext(SpoolerImpl<RiakPushWorker> *master,
+                                    const std::string           &upstream_urls);
     
     /**
      * See AbstractPushWorker for description

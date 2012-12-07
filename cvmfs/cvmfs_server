@@ -496,7 +496,7 @@ EOF
   transaction $name $spool_dir > /dev/null
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
-  publish $name $cvmfs_user $spool_dir $stratum0 $upstream > /dev/null
+  publish $name $cvmfs_user $spool_dir $stratum0 $upstream 1
   cat $rdonly_dir/new_repository
 
   echo "\
