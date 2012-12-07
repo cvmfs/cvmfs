@@ -89,7 +89,7 @@ namespace upload
 
 
   class Spooler {
-   protected:
+   public:
     /**
      * SpoolerDefinition is given by a string of the form:
      * <spooler type>:<spooler description>
@@ -104,14 +104,16 @@ namespace upload
         Unknown
       };
 
-      SpoolerDefinition(const std::string& definition_string);
+      SpoolerDefinition(const std::string& definition_string,
+                        const int          max_pending_jobs);
       bool IsValid() const { return valid_; }
 
       DriverType  driver_type;
       std::string spooler_description;
-      std::string upstream_urls;
       std::string paths_out_pipe;
       std::string digests_in_pipe;
+
+      int         max_pending_jobs;
 
       bool valid_;
     };
@@ -128,7 +130,8 @@ namespace upload
                  const std::string &remote_dir,
                  const std::string &file_suffix);
     void EndOfTransaction();
-    virtual void Wait() const = 0;
+    void WaitForUpload() const;
+    virtual void WaitForTermination() const = 0;
 
     inline bool TransactionEnded() const { return transaction_ends_; }
     virtual int GetNumberOfWorkers() const = 0;
@@ -141,8 +144,7 @@ namespace upload
     inline void set_move_mode(const bool move) { move_ = move; }
 
    protected:
-    Spooler(const std::string &spooler_description,
-            const int          max_pending_jobs);
+    Spooler(const SpoolerDefinition &spooler_definition);
 
     virtual bool Initialize();
 
@@ -155,26 +157,26 @@ namespace upload
     void JobFinishedCallback(Job* job);
     void InvokeExternalCallback(Job* job);
 
-    inline const std::string& spooler_description() const { return spooler_description_; }
+    const SpoolerDefinition& spooler_definition() const { return spooler_definition_; }
 
    private:
     // Callback
     SpoolerCallbackBase *callback_;
 
     // Job Queue
-    std::queue<Job*> job_queue_;
-    size_t           job_queue_max_length_;
-    pthread_mutex_t  job_queue_mutex_;
-    pthread_cond_t   job_queue_cond_not_empty_;
-    pthread_cond_t   job_queue_cond_not_full_;
-    atomic_int32     jobs_pending_;
-    atomic_int32     jobs_failed_;
+    std::queue<Job*>         job_queue_;
+    mutable pthread_mutex_t  job_queue_mutex_;
+    mutable pthread_cond_t   job_queue_cond_empty_;
+    mutable pthread_cond_t   job_queue_cond_not_empty_;
+    mutable pthread_cond_t   job_queue_cond_not_full_;
+    atomic_int32             jobs_pending_;
+    atomic_int32             jobs_failed_;
 
     // Status Information
-    const std::string spooler_description_;
-    bool              transaction_ends_;
-    bool              initialized_;
-    bool              move_;
+    const SpoolerDefinition spooler_definition_;
+    bool                    transaction_ends_;
+    bool                    initialized_;
+    bool                    move_;
   };
 
 
@@ -184,12 +186,11 @@ namespace upload
   template <class PushWorkerT>
   class SpoolerImpl : public Spooler {
    public:
-    SpoolerImpl(const std::string &spooler_description,
-                const int          max_pending_jobs) :
-      Spooler(spooler_description, max_pending_jobs) {}
+    SpoolerImpl(const SpoolerDefinition &spooler_definition) :
+      Spooler(spooler_definition) {}
 
     int GetNumberOfWorkers() const;
-    void Wait() const;
+    void WaitForTermination() const;
 
    protected:
     bool SpawnPushWorkers();

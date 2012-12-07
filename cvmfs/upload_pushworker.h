@@ -59,12 +59,11 @@ namespace upload
      * Worker objects. This method only shows the interface and will produce
      * linker errors when used directly.
      *
-     * @param spooler_description   the description string of the spooler backend
-     *                              to be initialized
+     * @param spooler_definition    a struct defining the spooler to construct
      * @return                      a context object to be passed into the
      *                              constructor of every new PushWorker
      */
-    static Context* GenerateContext(const std::string &spooler_description);
+    static Context* GenerateContext(/* PushWorkerT *master, */ const Spooler::SpoolerDefinition& spooler_definition);
 
     /**
      * Determines the number of workers to be spawned for the desired worker
@@ -102,7 +101,7 @@ namespace upload
     virtual bool Initialize();
     virtual bool IsReady() const;
 
-    bool ProcessJob(StorageJob *job);
+    void ProcessJob(StorageJob *job);
 
    protected:
     virtual void ProcessCopyJob(StorageCopyJob *job)               = 0;

@@ -198,7 +198,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     spooler->Copy(manifest_path, ".cvmfspublished");
 
     spooler->EndOfTransaction();
-    spooler->Wait();
+    spooler->WaitForTermination();
     unlink(cert_path_tmp.c_str());
     unlink(manifest_path.c_str());
     if (spooler->num_errors()) {

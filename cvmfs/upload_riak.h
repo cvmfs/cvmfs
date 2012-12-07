@@ -34,8 +34,8 @@ namespace upload {
     /**
      * See AbstractPushWorker for description
      */
-    static Context* GenerateContext(SpoolerImpl<RiakPushWorker> *master,
-                                    const std::string           &upstream_urls);
+    static Context* GenerateContext(SpoolerImpl<RiakPushWorker>      *master,
+                                    const Spooler::SpoolerDefinition &spooler_definition);
     
     /**
      * See AbstractPushWorker for description

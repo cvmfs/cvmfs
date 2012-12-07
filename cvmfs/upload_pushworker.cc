@@ -25,7 +25,7 @@ bool AbstractPushWorker::DoGlobalInitialization() {
 void AbstractPushWorker::DoGlobalCleanup() {}
 
 
-bool AbstractPushWorker::ProcessJob(StorageJob *job) {
+void AbstractPushWorker::ProcessJob(StorageJob *job) {
   if (job->IsCompressionJob()) {
     StorageCompressionJob 
     *compression_job = dynamic_cast<StorageCompressionJob*>(job);
@@ -34,8 +34,6 @@ bool AbstractPushWorker::ProcessJob(StorageJob *job) {
     StorageCopyJob *copy_job = dynamic_cast<StorageCopyJob*>(job);
     ProcessCopyJob(copy_job);
   }
-
-  return job->IsSuccessful();
 }
 
 

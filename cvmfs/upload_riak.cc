@@ -12,9 +12,13 @@
 using namespace upload;
 
 RiakPushWorker::Context* RiakPushWorker::GenerateContext(
-                            SpoolerImpl<RiakPushWorker> *master,
-                            const std::string           &upstream_urls) {
-  std::vector<std::string> upstream_url_vector = SplitString(upstream_urls, '@');
+                            SpoolerImpl<RiakPushWorker>      *master,
+                            const Spooler::SpoolerDefinition &spooler_definition) {
+  assert (spooler_definition.IsValid() &&
+          spooler_definition.driver_type == Spooler::SpoolerDefinition::Riak);
+
+  std::vector<std::string> upstream_url_vector =
+    SplitString(spooler_definition.spooler_description, '@');
   return new Context(master, upstream_url_vector);
 }
 

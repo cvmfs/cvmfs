@@ -252,7 +252,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
   delete catalog;
   unlink(file_catalog.c_str());
-  spooler->Wait();
+  spooler->WaitForUpload();
   spooler->Copy(file_catalog_vanilla,
                 "data" + catalog_hash.MakePath(1, 2) + "C");
   return true;
@@ -389,7 +389,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Upload manifest ensemble
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
-    spooler->Wait();
+    spooler->WaitForUpload();
     const string certificate_path =
       "data" + ensemble.manifest->certificate().MakePath(1, 2) + "X";
     if (!backend_stat->Stat(certificate_path)) {
@@ -401,7 +401,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                  ".cvmfspublished");
   }
 
-  spooler->Wait();
+  spooler->WaitForUpload();
   LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %"PRId64" new chunks out of %"
            PRId64" processed chunks",
            atomic_read64(&overall_new), atomic_read64(&overall_chunks));

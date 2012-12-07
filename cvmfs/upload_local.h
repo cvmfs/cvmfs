@@ -24,8 +24,8 @@ namespace upload
     /**
      * See AbstractPushWorker for description
      */
-    static Context* GenerateContext(SpoolerImpl<LocalPushWorker> *master,
-                                    const std::string            &upstream_path);
+    static Context* GenerateContext(SpoolerImpl<LocalPushWorker>     *master,
+                                    const Spooler::SpoolerDefinition &spooler_definition);
 
     /**
      * See AbstractPushWorker for description

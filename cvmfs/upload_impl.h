@@ -20,7 +20,7 @@ bool SpoolerImpl<PushWorkerT>::SpawnPushWorkers() {
   }
 
   // find out about the environment of our PushWorker swarm
-  pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_description());
+  pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_definition());
   int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Using %d concurrent publishing workers",
@@ -108,9 +108,7 @@ int SpoolerImpl<PushWorkerT>::GetNumberOfWorkers() const {
 }
 
 template <class PushWorkerT>
-void SpoolerImpl<PushWorkerT>::Wait() const {
-  
-
+void SpoolerImpl<PushWorkerT>::WaitForTermination() const {
   // wait for all running worker threads to terminate
   WorkerThreads::const_iterator i = pushworker_threads_.begin();
   WorkerThreads::const_iterator iend = pushworker_threads_.end();

@@ -9,9 +9,12 @@
 using namespace upload;
 
 LocalPushWorker::Context* LocalPushWorker::GenerateContext(
-                              SpoolerImpl<LocalPushWorker> *master,
-                              const std::string            &upstream_path) {
-  Context *ctx = new Context(master, upstream_path);
+                              SpoolerImpl<LocalPushWorker>     *master,
+                              const Spooler::SpoolerDefinition &spooler_definition) {
+  assert (spooler_definition.IsValid() && 
+          spooler_definition.driver_type == Spooler::SpoolerDefinition::Local);
+
+  Context *ctx = new Context(master, spooler_definition.spooler_description);
   return ctx;
 }
 

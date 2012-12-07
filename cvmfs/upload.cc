@@ -8,7 +8,9 @@
 using namespace upload;
 
 Spooler::SpoolerDefinition::SpoolerDefinition(
-                                    const std::string& definition_string) :
+                                    const std::string& definition_string,
+                                    const int          max_pending_jobs) :
+  max_pending_jobs(max_pending_jobs),
   valid_(false)
 {
   // split the spooler definition into spooler driver and pipe definitions
@@ -27,14 +29,15 @@ Spooler::SpoolerDefinition::SpoolerDefinition(
 
   // recognize and configure the spooler driver
   if (upstream[0] == "local") {
-    driver_type   = Local;
+    driver_type = Local;
   } else if (upstream[0] == "riak") {
-    driver_type   = Riak;
+    driver_type = Riak;
   } else {
     LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
       upstream[0].c_str());
     return;
   }
+
   spooler_description = upstream[1];
 
   // save named pipe paths and validate this SpoolerDefinition
@@ -45,18 +48,16 @@ Spooler::SpoolerDefinition::SpoolerDefinition(
 
 Spooler* Spooler::Construct(const std::string &spooler_description,
                             const int          max_pending_jobs) {
-  SpoolerDefinition spooler_definition(spooler_description);
+  SpoolerDefinition spooler_definition(spooler_description, max_pending_jobs);
   Spooler *spooler = NULL;
 
-  // I know that this is crap! Refactoring in baby steps
-  // THIS IS A CRUTCH
   switch (spooler_definition.driver_type) {
     case SpoolerDefinition::Local:
-      spooler = new SpoolerImpl<LocalPushWorker>(spooler_description, max_pending_jobs);
+      spooler = new SpoolerImpl<LocalPushWorker>(spooler_definition);
       break;
 
     case SpoolerDefinition::Riak:
-      spooler = new SpoolerImpl<RiakPushWorker>(spooler_description, max_pending_jobs);
+      spooler = new SpoolerImpl<RiakPushWorker>(spooler_definition);
       break;
 
     default:
@@ -74,11 +75,9 @@ Spooler* Spooler::Construct(const std::string &spooler_description,
 }
 
 
-Spooler::Spooler(const std::string &spooler_description,
-                 const int          max_pending_jobs) :
+Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
   callback_(NULL),
-  job_queue_max_length_(max_pending_jobs),
-  spooler_description_(spooler_description),
+  spooler_definition_(spooler_definition),
   transaction_ends_(false),
   initialized_(false),
   move_(false)
@@ -95,6 +94,7 @@ bool Spooler::Initialize() {
   if (pthread_mutex_init(&job_queue_mutex_, NULL) != 0)         return false;
   if (pthread_cond_init(&job_queue_cond_not_full_, NULL) != 0)  return false;
   if (pthread_cond_init(&job_queue_cond_not_empty_, NULL) != 0) return false;
+  if (pthread_cond_init(&job_queue_cond_empty_, NULL) != 0)     return false;
 
   // spawn the PushWorker objects in their own threads
   if (!SpawnPushWorkers()) {
@@ -117,6 +117,7 @@ Spooler::~Spooler() {
   // free PushWorker synchronisation primitives
   pthread_cond_destroy(&job_queue_cond_not_full_);
   pthread_cond_destroy(&job_queue_cond_not_empty_);
+  pthread_cond_destroy(&job_queue_cond_empty_);
   pthread_mutex_destroy(&job_queue_mutex_);
 }
 
@@ -168,7 +169,7 @@ void Spooler::Schedule(Job *job) {
   pthread_mutex_lock(&job_queue_mutex_);
 
   // wait until there is space in the job queue
-  while (job_queue_.size() >= job_queue_max_length_) {
+  while (job_queue_.size() >= (size_t)spooler_definition_.max_pending_jobs) {
     pthread_cond_wait(&job_queue_cond_not_full_, &job_queue_mutex_);
   }
 
@@ -196,8 +197,13 @@ Job* Spooler::AcquireJob() {
   job_queue_.pop();
 
   // signal the Spooler that there is at least one free space now
-  if (job_queue_.size() < job_queue_max_length_) {
+  if (job_queue_.size() < (size_t)spooler_definition_.max_pending_jobs) {
     pthread_cond_signal(&job_queue_cond_not_full_);
+  }
+
+  // signal the Spooler that the queue is empty
+  if (job_queue_.empty()) {
+    pthread_cond_signal(&job_queue_cond_empty_);
   }
 
   pthread_mutex_unlock(&job_queue_mutex_);
@@ -209,16 +215,27 @@ Job* Spooler::AcquireJob() {
 }
 
 
+void Spooler::WaitForUpload() const {
+  pthread_mutex_lock(&job_queue_mutex_);
+
+  while (!job_queue_.empty()) {
+    pthread_cond_wait(&job_queue_cond_empty_, &job_queue_mutex_);
+  }
+
+  pthread_mutex_unlock(&job_queue_mutex_);
+}
+
+
 void Spooler::JobFinishedCallback(Job* job) {
   // BEWARE!
   // This callback might be called from a different thread!
 
-  if (!job->IsSuccessful()) {
-    atomic_inc32(&jobs_failed_);
-    LogCvmfs(kLogSpooler, kLogWarning, "Spooler Job '%s' failed.",
+  if (job->IsSuccessful()) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler Job '%s' succeeded.",
              job->name().c_str());
   } else {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler Job '%s' succeeded.",
+    atomic_inc32(&jobs_failed_);
+    LogCvmfs(kLogSpooler, kLogWarning, "Spooler Job '%s' failed.",
              job->name().c_str());
   }
 
