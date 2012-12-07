@@ -206,6 +206,6 @@ namespace upload
 
 }
 
-#include "upload_backend_impl.h"
+#include "upload_impl.h"
 
 #endif /* CVMFS_UPLOAD_BACKEND_H_ */
