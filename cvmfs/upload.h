@@ -121,7 +121,7 @@ namespace upload
 
    public:
     static Spooler* Construct(const std::string &definition_string,
-                              const int          max_pending_jobs = 1000);
+                              const int          max_pending_jobs = 100);
     virtual ~Spooler();
 
     void Copy(const std::string &local_path,
