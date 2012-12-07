@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #ifndef CVMFS_UPLOAD_BACKEND_H_
 #define CVMFS_UPLOAD_BACKEND_H_
 
