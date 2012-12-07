@@ -11,9 +11,25 @@
 
 namespace upload
 {
+  /**
+   * The AbstractPushWorker describes an interface for concrete PushWorkers.
+   * Each concrete PushWorker can generate a Context object before any of its
+   * objects is instantiated. Use this to facilitate a global state between Push-
+   * Worker objects where necessary.
+   * Before instantiation of any PushWorker object a concrete PushWorker has to
+   * decide how many PushWorker instances should be created. Each of these
+   * instances will then be run concurrently in different threads.
+   */
   class AbstractPushWorker {
    
    protected:
+    /**
+     * Base class for a PushWorker Context object. Before startup of any Push-
+     * Worker object this will be constructed using a static method each Push-
+     * Worker class should provide.
+     * The context contains a mutex object and can be used to produce a global
+     * state between instances of the same PushWorker class.
+     */
     class Context {
      public:
       virtual ~Context() {
@@ -39,7 +55,7 @@ namespace upload
      * shared data between the PushWorker instances. Please be careful with
      * thread synchronisation here, contexts are not locked automatically. Every
      * context object contains a mutex for this purpose, though.
-     * Consider using util.h LockGuard to lock Contexts.
+     * Consider using the LockGuard clas in util.h to lock Contexts.
      * 
      * This is just an abstract base class for all concrete PushWorker contexts
      * and will never be instantiated alone.
@@ -105,12 +121,25 @@ namespace upload
     virtual bool Initialize();
     virtual bool IsReady() const;
 
+    /**
+     * This method is called by the Spooler for each Job a concrete PushWorker
+     * instance should process. The threading and distribution of the Jobs is
+     * handled by the Spooler object as well.
+     * This method distributes the Job depending on its type to one of the abstract
+     * processing methods listed below. These should be implemented by concrete
+     * PushWorker classes.
+     *
+     * @param job   the job that should be processed by the PushWorker
+     */
     void ProcessJob(StorageJob *job);
 
    protected:
     virtual void ProcessCopyJob(StorageCopyJob *job)               = 0;
     virtual void ProcessCompressionJob(StorageCompressionJob *job) = 0;
 
+    /**
+     * @return  the number of CPU cores currently present in the system
+     */
     static int GetNumberOfCpuCores();
 
    private:

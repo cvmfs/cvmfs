@@ -13,6 +13,11 @@ namespace upload {
 
   class Spooler;
 
+  /**
+   * Provides an abstract interface for Spooler Job objects. Each job is
+   * scheduled into a job queue and then executed concurrently by one of the
+   * PushWorker threads
+   */
   class Job {
    public:
     Job(Spooler* delegate) : return_code_(-1), delegate_(delegate) {}
@@ -37,6 +42,9 @@ namespace upload {
     Spooler* delegate_;
   };
 
+  /**
+   * Tells the receiving PushWorker to terminate
+   */
   class DeathSentenceJob : public Job {
    public:
     DeathSentenceJob(Spooler *delegate) : Job(delegate) {}
@@ -45,6 +53,10 @@ namespace upload {
     inline virtual std::string name() const { return "Death Sentence Job"; }
   };
 
+  /**
+   * Abstract base job for storage jobs. Meaning jobs that actually process data
+   * and put it into a backend storage
+   */
   class StorageJob : public Job {
    public:
     StorageJob(const std::string            &local_path,

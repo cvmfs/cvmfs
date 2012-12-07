@@ -52,9 +52,12 @@ Spooler::SpoolerDefinition::SpoolerDefinition(
 
 Spooler* Spooler::Construct(const std::string &spooler_description,
                             const int          max_pending_jobs) {
+  // parse the spooler description string
   SpoolerDefinition spooler_definition(spooler_description, max_pending_jobs);
-  Spooler *spooler = NULL;
+  assert (spooler_definition.IsValid());
 
+  // create a concrete Spooler object dependent on the parsed definition
+  Spooler *spooler = NULL;
   switch (spooler_definition.driver_type) {
     case SpoolerDefinition::Local:
       spooler = new SpoolerImpl<LocalPushWorker>(spooler_definition);
@@ -70,11 +73,11 @@ Spooler* Spooler::Construct(const std::string &spooler_description,
 
   assert (spooler != NULL);
 
+  // initialize the spooler and return it to the user
   if (!spooler->Initialize()) {
     delete spooler;
     return NULL;
   }
-
   return spooler;
 }
 
@@ -88,6 +91,7 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
 {
   atomic_init32(&jobs_pending_);
   atomic_init32(&jobs_failed_);
+  atomic_init32(&death_sentences_executed_);
 }
 
 
@@ -113,10 +117,6 @@ bool Spooler::Initialize() {
 
 Spooler::~Spooler() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler backend terminates");
-
-  // clean the mess the PushWorkers produced
-  // TearDown();
-  // TODO! not possible here, since we have no polymorphy in destructor
 
   // free PushWorker synchronisation primitives
   pthread_cond_destroy(&job_queue_cond_not_full_);
@@ -170,6 +170,7 @@ void Spooler::Schedule(Job *job) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "scheduling new job into job queue: %s",
            job->name().c_str());
 
+  // lock the job queue
   LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
 
   // wait until there is space in the job queue
@@ -187,6 +188,7 @@ void Spooler::Schedule(Job *job) {
 
 
 Job* Spooler::AcquireJob() {
+  // lock the job queue
   LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
 
   // wait until there is something to do
@@ -211,10 +213,12 @@ Job* Spooler::AcquireJob() {
 
 
 void Spooler::WaitForUpload() const {
+  // lock the job queue
   LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Waiting for all jobs to be finished...");
 
+  // wait until all pending jobs are processed
   while (atomic_read32(&jobs_pending_) > 0) {
     pthread_cond_wait(&jobs_all_done_, &job_queue_mutex_);
   }
@@ -227,6 +231,7 @@ void Spooler::JobFinishedCallback(Job* job) {
   // BEWARE!
   // This callback might be called from a different thread!
 
+  // check if the finished job was successful
   if (job->IsSuccessful()) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler Job '%s' succeeded.",
              job->name().c_str());
@@ -236,10 +241,20 @@ void Spooler::JobFinishedCallback(Job* job) {
              job->name().c_str());
   }
 
+  // invoke the external callback for this job
   InvokeExternalCallback(job);
 
+  // remove the finished job from the pending 'list'
   delete job;
   atomic_dec32(&jobs_pending_);
+
+  // check if we have killed all PushWorker threads
+  if (job->IsDeathSentenceJob()) {
+    atomic_inc32(&death_sentences_executed_);
+    if (atomic_read32(&death_sentences_executed_) == GetNumberOfWorkers()) {
+      TearDown();
+    }
+  }
 
   // Signal the Spooler that all jobs are done...
   if (atomic_read32(&jobs_pending_) == 0) {
@@ -249,9 +264,11 @@ void Spooler::JobFinishedCallback(Job* job) {
 
 
 void Spooler::InvokeExternalCallback(Job* job) {
+  // check if there is actually a callback to be invoked
   if (NULL == callback_)
     return;
 
+  // call the callback for a finished compression job
   if (job->IsCompressionJob()) {
     StorageCompressionJob *compression_job =
       dynamic_cast<StorageCompressionJob*>(job);
@@ -260,6 +277,7 @@ void Spooler::InvokeExternalCallback(Job* job) {
                  compression_job->content_hash());
   } else
 
+  // call the callback for a finished copy job
   if (job->IsCopyJob()) {
     StorageCopyJob *copy_job =
       dynamic_cast<StorageCopyJob*>(job);

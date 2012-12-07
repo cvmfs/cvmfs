@@ -126,5 +126,10 @@ void SpoolerImpl<PushWorkerT>::WaitForTermination() const {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler stopped working...");
 }
 
+template <class PushWorkerT>
+void SpoolerImpl<PushWorkerT>::TearDown() {
+  PushWorkerT::DoGlobalCleanup();
+}
+
 
 } // namespace upload
