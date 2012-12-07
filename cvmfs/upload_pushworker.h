@@ -3,7 +3,7 @@
 
 #include <pthread.h>
 
-#include "upload_backend.h"
+#include "upload.h"
 
 namespace upload
 {
@@ -46,14 +46,14 @@ namespace upload
      * This is just an abstract base class for all concrete PushWorker contexts
      * and will never be instantiated alone.
      */
-    template <class SpoolerBackendT>
+    template <class SpoolerT>
     class ContextBase : public Context {
      protected:
-      ContextBase(SpoolerBackendT *master) :
+      ContextBase(SpoolerT *master) :
         master(master) {}
 
      public:
-      SpoolerBackendT *master;
+      SpoolerT *master;
     };
 
     /**

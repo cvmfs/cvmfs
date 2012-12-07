@@ -19,7 +19,7 @@
 #include "fs_traversal.h"
 #include "util.h"
 
-#include "upload_backend.h"
+#include "upload.h"
 
 using namespace std;  // NOLINT
 

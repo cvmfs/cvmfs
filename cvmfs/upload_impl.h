@@ -1,58 +1,138 @@
-/**
- * This file is part of the CernVM File System.
- */
+#include <fcntl.h>
+#include <errno.h>
 
-#ifndef CVMFS_UPLOAD_IMPL_H_
-#define CVMFS_UPLOAD_IMPL_H_
-
-#include <cassert>
-
+#include "compression.h"
 #include "logging.h"
-#include "upload_backend.h"
+#include "util.h"
+
+#include "upload_jobs.h"
 
 namespace upload {
 
-  // template <class PushWorkerT>
-  // void Spooler::SpawnSpoolerBackend(const SpoolerDefinition &definition) {
-  //   assert (definition.IsValid());
+template <class PushWorkerT>
+bool SpoolerImpl<PushWorkerT>::SpawnPushWorkers() {
+  // do some global initialization work common for all PushWorkers
+  const bool retval = PushWorkerT::DoGlobalInitialization();
+  if (!retval) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to globally initialize "
+                                       "PushWorkers");
+    return false;
+  }
 
-  //   // spawn spooler backend process
-  //   int pid = fork();
-  //   if (pid < 0) {
-  //     LogCvmfs(kLogSpooler, kLogStderr, "failed to spawn spooler backend");
-  //     assert(pid >= 0); // nothing to do here anymore... good bye
-  //   }
+  // find out about the environment of our PushWorker swarm
+  pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_description());
+  int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
 
-  //   if (pid > 0)
-  //     return;
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Using %d concurrent publishing workers",
+           workers_to_spawn);
 
-  //   // ---------------------------------------------------------------------------
-  //   // From here on we are in the SpoolerBackend process
+  // initialize the PushWorker thread pool
+  assert (pushworker_threads_.size() == 0);
+  pushworker_threads_.resize(workers_to_spawn);
 
-  //   // create a SpoolerBackend object of the requested type
-  //   SpoolerBackendImpl<PushWorkerT> backend(definition.spooler_description);
+  // spawn the swarm and make them work
+  bool success = true;
+  WorkerThreads::iterator i          = pushworker_threads_.begin();
+  WorkerThreads::const_iterator iend = pushworker_threads_.end();
+  for (; i != iend; ++i) {
+    pthread_t* thread = &(*i);
+    const int retval = pthread_create(thread, 
+                                      NULL,
+                                      &SpoolerImpl::RunPushWorker,
+                                      pushworker_context_);
+    if (retval != 0) {
+      LogCvmfs(kLogSpooler, kLogWarning, "Failed to spawn a PushWorker.");
+      success = false;
+    }
+  }
 
-  //   // connect the named pipes in the SpoolerBackend
-  //   if (! backend.Connect(definition.paths_out_pipe,
-  //                         definition.digests_in_pipe)) {
-  //     LogCvmfs(kLogSpooler, kLogStderr, "failed to connect spooler backend");
-  //     exit(2);
-  //   }
-  //   LogCvmfs(kLogSpooler, kLogVerboseMsg, "connected spooler backend");
-
-  //   // do the final initialization of the SpoolerBackend
-  //   if (! backend.Initialize()) {
-  //     LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize spooler backend");
-  //     exit(3);
-  //   }
-  //   LogCvmfs(kLogSpooler, kLogVerboseMsg, "initialized spooler backend");
-
-  //   // run the SpoolerBackend service
-  //   // returns on a termination signal though the named pipes
-  //   const int retval = backend.Run();
-  //   exit(retval);
-  // }
-
+  // all done...
+  return success;
 }
 
-#endif /* CVMFS_UPLOAD_IMPL_H_ */
+
+template <class PushWorkerT>
+void* SpoolerImpl<PushWorkerT>::RunPushWorker(void* context) {
+  //
+  // INITIALIZATION
+  /////////////////
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Starting PushWorker thread...");
+  // get the context object pointer out of the void* pointer
+  typename PushWorkerT::Context *ctx =
+    static_cast<typename PushWorkerT::Context*>(context);
+
+  // boot up the push worker object and make sure it works
+  PushWorkerT worker(ctx);
+  worker.Initialize();
+  if (!worker.IsReady()) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Push Worker was not initialized "
+                                       "properly... will die now!");
+    return NULL; 
+  }
+  SpoolerImpl<PushWorkerT> *master = ctx->master;
+
+  // find out about the thread number
+  ctx->Lock();
+  const int thread_number = ctx->base_thread_number++;
+  ctx->Unlock();
+
+  //
+  // PROCESSING LOOP
+  //////////////////
+
+  // start the processing loop
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Running PushWorker...");
+  while (true) {
+    // check if we should stop working and die silently
+    Job *job = master->AcquireJob();
+    if (job->IsDeathSentenceJob()) {
+      delete job;
+      break;
+    }
+
+    // do the job we were asked for
+    assert (job->IsStorageJob());
+    StorageJob *storage_job = dynamic_cast<StorageJob*>(job);
+    worker.ProcessJob(storage_job);
+
+    // report to the supervisor and get ready for the next work piece
+    if (!storage_job->IsSuccessful()) {
+      LogCvmfs(kLogSpooler, kLogWarning, "Job '%s' failed in Thread %d",
+               storage_job->name().c_str(), thread_number);
+    } else {
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "Job '%s' succeeded in Thread %d",
+               storage_job->name().c_str(), thread_number);
+    }
+    delete job;
+  }
+
+  //
+  // TEAR DOWN
+  ////////////
+
+  // good bye thread...
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Terminating PushWorker thread...");
+  return context;
+}
+
+
+template <class PushWorkerT>
+int SpoolerImpl<PushWorkerT>::GetNumberOfWorkers() const {
+  return pushworker_threads_.size();
+}
+
+template <class PushWorkerT>
+void SpoolerImpl<PushWorkerT>::Wait() const {
+  
+
+  // wait for all running worker threads to terminate
+  WorkerThreads::const_iterator i = pushworker_threads_.begin();
+  WorkerThreads::const_iterator iend = pushworker_threads_.end();
+  for (; i != iend; ++i) {
+    pthread_join(*i, NULL);
+  }
+}
+
+
+} // namespace upload

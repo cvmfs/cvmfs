@@ -1,51 +1,25 @@
-/**
- * This file is part of the CernVM File System.
- *
- * The Spooler class provides an interface to push files to a storage
- * component.  Copy/Move commands and paths are send via a pipe and the result
- * (e.g. the SHA-1 digest) is received from the spooler via another pipe.
- */
-
 #include "upload.h"
 
-#include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
-
-#include <cstdio>
-#include <cassert>
-#include <cstdlib>
-
 #include <vector>
-#include <string>
 
-#include "compression.h"
-#include "util.h"
-#include "logging.h"
+#include "upload_local.h"
+#include "upload_riak.h"
 
-
-using namespace std;  // NOLINT
-
-namespace upload {
-
-bool LocalStat::Stat(const string &path) {
-  return FileExists(base_path_ + "/" + path);
-}
-
+using namespace upload;
 
 Spooler::SpoolerDefinition::SpoolerDefinition(
                                     const std::string& definition_string) :
   valid_(false)
 {
   // split the spooler definition into spooler driver and pipe definitions
-  vector<string> components = SplitString(definition_string, ',');
+  std::vector<std::string> components = SplitString(definition_string, ',');
   if (components.size() != 3) {
     LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler definition");
     return;
   }
 
   // split the spooler driver definition into name and config part
-  vector<string> upstream = SplitString(components[0], ':', 2);
+  std::vector<std::string> upstream = SplitString(components[0], ':', 2);
   if (upstream.size() != 2) {
     LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler driver");
     return;
@@ -69,64 +43,214 @@ Spooler::SpoolerDefinition::SpoolerDefinition(
   valid_ = true;
 }
 
+Spooler* Spooler::Construct(const std::string &spooler_description,
+                            const int          max_pending_jobs) {
+  SpoolerDefinition spooler_definition(spooler_description);
+  Spooler *spooler = NULL;
 
-Spooler* Spooler::Construct(const std::string &definition_string) {
-  // read the spooler definition
-  SpoolerDefinition spooler_definition(definition_string);
-  if (!spooler_definition.IsValid())
+  // I know that this is crap! Refactoring in baby steps
+  // THIS IS A CRUTCH
+  switch (spooler_definition.driver_type) {
+    case SpoolerDefinition::Local:
+      spooler = new SpoolerImpl<LocalPushWorker>(spooler_description, max_pending_jobs);
+      break;
+
+    case SpoolerDefinition::Riak:
+      spooler = new SpoolerImpl<RiakPushWorker>(spooler_description, max_pending_jobs);
+      break;
+
+    default:
+      LogCvmfs(kLogSpooler, kLogStderr, "invalid spooler definition");
+  }
+
+  assert (spooler != NULL);
+
+  if (!spooler->Initialize()) {
+    delete spooler;
     return NULL;
+  }
 
-  // create a Spooler frontend
-  return new Spooler(spooler_definition);
+  return spooler;
 }
 
 
-Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
-  spooler_callback_(NULL),
-  move_mode_(false)
+Spooler::Spooler(const std::string &spooler_description,
+                 const int          max_pending_jobs) :
+  callback_(NULL),
+  job_queue_max_length_(max_pending_jobs),
+  spooler_description_(spooler_description),
+  transaction_ends_(false),
+  initialized_(false),
+  move_(false)
 {
-  // create a spooler backend object according to the spooler_definition
-  // THIS CODE IS SUBJECT TO CHANGE
-  int driver = (spooler_definition.driver_type == SpoolerDefinition::Riak) ? 1 : 0;
-  backend_ = SpoolerBackend::Construct(driver, spooler_definition.spooler_description);
-
-  atomic_init64(&num_pending_);
-  atomic_init64(&num_errors_);
+  atomic_init32(&jobs_pending_);
+  atomic_init32(&jobs_failed_);
 }
 
 
-Spooler::~Spooler() {}
+bool Spooler::Initialize() {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Initializing Spooler backend");
 
+  // initialize synchronisation for job queue (PushWorkers)
+  if (pthread_mutex_init(&job_queue_mutex_, NULL) != 0)         return false;
+  if (pthread_cond_init(&job_queue_cond_not_full_, NULL) != 0)  return false;
+  if (pthread_cond_init(&job_queue_cond_not_empty_, NULL) != 0) return false;
 
-void Spooler::SpoolProcess(const string &local_path, const string &remote_dir,
-                           const string &file_suffix) {
-  backend_->Process(local_path, remote_dir, file_suffix, move_mode_);
+  // spawn the PushWorker objects in their own threads
+  if (!SpawnPushWorkers()) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to spawn concurrent push workers");
+    return false;
+  }
+
+  initialized_ = true;
+  return true;
 }
 
 
-void Spooler::SpoolCopy(const string &local_path, const string &remote_path) {
-  backend_->Copy(local_path, remote_path, move_mode_);
+Spooler::~Spooler() {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler backend terminates");
+
+  // clean the mess the PushWorkers produced
+  // TearDown();
+  // TODO! not possible here, since we have no polymorphy in destructor
+
+  // free PushWorker synchronisation primitives
+  pthread_cond_destroy(&job_queue_cond_not_full_);
+  pthread_cond_destroy(&job_queue_cond_not_empty_);
+  pthread_mutex_destroy(&job_queue_mutex_);
+}
+
+
+void Spooler::Copy(const std::string &local_path,
+                   const std::string &remote_path) {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Spooler received 'copy': source %s, dest %s move %d",
+           local_path.c_str(), remote_path.c_str(), move_);
+
+  Schedule(new StorageCopyJob(local_path, remote_path, move_, this));
+}
+
+
+void Spooler::Process(const std::string &local_path,
+                      const std::string &remote_dir,
+                      const std::string &file_suffix) {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Spooler received 'process': source %s, dest %s, "
+           "postfix %s, move %d", local_path.c_str(),
+           remote_dir.c_str(), file_suffix.c_str(), move_);
+
+  Schedule(new StorageCompressionJob(local_path, remote_dir, file_suffix, move_, this));
 }
 
 
 void Spooler::EndOfTransaction() {
-  backend_->EndOfTransaction();
-}
+  assert(!transaction_ends_);
 
+  LogCvmfs(kLogSpooler, kLogVerboseMsg,
+           "Spooler received 'end of transaction'");
 
-void Spooler::WaitFor() {
-  backend_->Wait();
-}
-
-
-BackendStat *GetBackendStat(const string &spooler_definition) {
-  vector<string> components = SplitString(spooler_definition, ',');
-  vector<string> upstream = SplitString(components[0], ':');
-  if ((upstream.size() != 2) || (upstream[0] != "local")) {
-    PrintError("Invalid upstream");
-    return NULL;
+  // Schedule a death sentence for every running worker thread.
+  // Since we have a FIFO queue the death sentences will be at the end of the
+  // line waiting for the threads to kill them.
+  const int number_of_threads = GetNumberOfWorkers();
+  for (int i = 0; i < number_of_threads; ++i) {
+    Schedule(new DeathSentenceJob(this));
   }
-  return new LocalStat(upstream[1]);
+
+  transaction_ends_ = true;
 }
 
-}  // namespace upload
+
+void Spooler::Schedule(Job *job) {
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "scheduling new job into job queue: %s",
+           job->name().c_str());
+
+  pthread_mutex_lock(&job_queue_mutex_);
+
+  // wait until there is space in the job queue
+  while (job_queue_.size() >= job_queue_max_length_) {
+    pthread_cond_wait(&job_queue_cond_not_full_, &job_queue_mutex_);
+  }
+
+  // put something into the job queue
+  job_queue_.push(job);
+  atomic_inc32(&jobs_pending_);
+
+  // wake all waiting threads
+  pthread_cond_broadcast(&job_queue_cond_not_empty_);
+
+  pthread_mutex_unlock(&job_queue_mutex_);
+}
+
+
+Job* Spooler::AcquireJob() {
+  pthread_mutex_lock(&job_queue_mutex_);
+
+  // wait until there is something to do
+  while (job_queue_.empty()) {
+    pthread_cond_wait(&job_queue_cond_not_empty_, &job_queue_mutex_);
+  }
+
+  // get the job and remove it from the queue
+  Job* job = job_queue_.front();
+  job_queue_.pop();
+
+  // signal the Spooler that there is at least one free space now
+  if (job_queue_.size() < job_queue_max_length_) {
+    pthread_cond_signal(&job_queue_cond_not_full_);
+  }
+
+  pthread_mutex_unlock(&job_queue_mutex_);
+
+  // return the acquired job
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "acquired a job from the job queue: %s",
+           job->name().c_str());
+  return job;
+}
+
+
+void Spooler::JobFinishedCallback(Job* job) {
+  // BEWARE!
+  // This callback might be called from a different thread!
+  // if (job->IsCompressionStorageJob()) {
+
+  // }
+
+  if (!job->IsSuccessful())
+    atomic_inc32(&jobs_failed_);
+
+  atomic_dec32(&jobs_pending_);
+}
+
+
+void Spooler::SetCallback(SpoolerCallbackBase *callback_object) {
+  assert (callback_ == NULL);
+  callback_ = callback_object;
+}
+
+
+void Spooler::UnsetCallback() {
+  delete callback_;
+  callback_ = NULL;
+}
+
+
+// -----------------------------------------------------------------------------
+
+bool LocalStat::Stat(const std::string &path) {
+  return FileExists(base_path_ + "/" + path);
+}
+
+namespace upload {
+
+  BackendStat *GetBackendStat(const std::string &spooler_definition) {
+    std::vector<std::string> components = SplitString(spooler_definition, ',');
+    std::vector<std::string> upstream = SplitString(components[0], ':');
+    if ((upstream.size() != 2) || (upstream[0] != "local")) {
+      PrintError("Invalid upstream");
+      return NULL;
+    }
+    return new LocalStat(upstream[1]);
+  }
+  
+}
