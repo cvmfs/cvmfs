@@ -44,12 +44,12 @@ struct ChunkJob {
 };
 
 
-static void AbortSpoolerOnError(const string &path,
-                                const int     retval,
-                                const string &digest) {
+static void AbortSpoolerOnError(const string      &path,
+                                const int          retval,
+                                const hash::Any   &digest) {
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
-             retval, path.c_str(), digest.c_str());
+             retval, path.c_str(), digest.ToString().c_str());
     abort();
   }
 }

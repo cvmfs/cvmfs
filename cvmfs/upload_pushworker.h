@@ -21,15 +21,9 @@ namespace upload
 
      protected:
       // This class is abstract and should never be instantiated alone.
-      Context() :
-        base_thread_number(0)
-      {
+      Context() {
         pthread_mutex_init(&mutex_, NULL);
       }
-
-     public:
-      int base_thread_number; ///< this is increased by 1 for new threads
-                              ///< to have an ID
 
      private:
       pthread_mutex_t mutex_;

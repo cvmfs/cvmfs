@@ -40,21 +40,21 @@ namespace upload
    public:
     virtual void operator()(const std::string &path,
                                     const int  retval,
-                            const std::string &digest) = 0;
+                            const hash::Any   &digest = hash::Any(hash::kSha1)) = 0;
   };
 
   class SpoolerCallback : public SpoolerCallbackBase {
    public:
     typedef void (*Callback)(const std::string &path,
                              const int retval,
-                             const std::string &digest);
+                             const hash::Any   &digest);
 
     SpoolerCallback(Callback function) :
       function_(function) {}
 
     void operator()(const std::string &path,
                             const int  retval,
-                    const std::string &digest) {
+                    const hash::Any   &digest = hash::Any(hash::kSha1)) {
       function_(path, retval, digest);
     }
 
@@ -67,7 +67,7 @@ namespace upload
    public:
     typedef void (DelegateT::*Callback)(const std::string &path,
                                         const int          retval,
-                                        const std::string &digest);
+                                        const hash::Any   &digest);
 
     BoundSpoolerCallback(DelegateT* delegate, Callback method) :
       delegate_(delegate),
@@ -75,7 +75,7 @@ namespace upload
    
     void operator()(const std::string &path,
                     const int          retval,
-                    const std::string &digest) {
+                    const hash::Any   &digest = hash::Any(hash::kSha1)) {
       (delegate_->*method_)(path, retval, digest);
     }
 
@@ -153,6 +153,7 @@ namespace upload
 
     friend class Job;
     void JobFinishedCallback(Job* job);
+    void InvokeExternalCallback(Job* job);
 
     inline const std::string& spooler_description() const { return spooler_description_; }
 

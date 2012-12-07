@@ -212,14 +212,41 @@ Job* Spooler::AcquireJob() {
 void Spooler::JobFinishedCallback(Job* job) {
   // BEWARE!
   // This callback might be called from a different thread!
-  // if (job->IsCompressionStorageJob()) {
 
-  // }
-
-  if (!job->IsSuccessful())
+  if (!job->IsSuccessful()) {
     atomic_inc32(&jobs_failed_);
+    LogCvmfs(kLogSpooler, kLogWarning, "Spooler Job '%s' failed.",
+             job->name().c_str());
+  } else {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "Spooler Job '%s' succeeded.",
+             job->name().c_str());
+  }
 
+  InvokeExternalCallback(job);
+
+  delete job;
   atomic_dec32(&jobs_pending_);
+}
+
+
+void Spooler::InvokeExternalCallback(Job* job) {
+  if (NULL == callback_)
+    return;
+
+  if (job->IsCompressionJob()) {
+    StorageCompressionJob *compression_job =
+      dynamic_cast<StorageCompressionJob*>(job);
+    (*callback_)(compression_job->local_path(),
+                 compression_job->return_code(),
+                 compression_job->content_hash());
+  } else
+
+  if (job->IsCopyJob()) {
+    StorageCopyJob *copy_job =
+      dynamic_cast<StorageCopyJob*>(job);
+    (*callback_)(copy_job->local_path(),
+                 copy_job->return_code());
+  }
 }
 
 

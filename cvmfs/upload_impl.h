@@ -72,11 +72,6 @@ void* SpoolerImpl<PushWorkerT>::RunPushWorker(void* context) {
   }
   SpoolerImpl<PushWorkerT> *master = ctx->master;
 
-  // find out about the thread number
-  ctx->Lock();
-  const int thread_number = ctx->base_thread_number++;
-  ctx->Unlock();
-
   //
   // PROCESSING LOOP
   //////////////////
@@ -95,16 +90,6 @@ void* SpoolerImpl<PushWorkerT>::RunPushWorker(void* context) {
     assert (job->IsStorageJob());
     StorageJob *storage_job = dynamic_cast<StorageJob*>(job);
     worker.ProcessJob(storage_job);
-
-    // report to the supervisor and get ready for the next work piece
-    if (!storage_job->IsSuccessful()) {
-      LogCvmfs(kLogSpooler, kLogWarning, "Job '%s' failed in Thread %d",
-               storage_job->name().c_str(), thread_number);
-    } else {
-      LogCvmfs(kLogSpooler, kLogVerboseMsg, "Job '%s' succeeded in Thread %d",
-               storage_job->name().c_str(), thread_number);
-    }
-    delete job;
   }
 
   //

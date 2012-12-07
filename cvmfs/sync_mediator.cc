@@ -461,14 +461,14 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 
 void SyncMediator::PublishFilesCallback(const std::string &path,
                                         const int retval,
-                                        const std::string &digest) {
+                                        const hash::Any   &digest) {
   assert (false);
 }
 
 
 void SyncMediator::PublishHardlinksCallback(const std::string &path,
                                             const int          retval,
-                                            const std::string &digest) {
+                                            const hash::Any   &digest) {
   assert (false);
 }
 
