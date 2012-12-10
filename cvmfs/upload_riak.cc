@@ -34,7 +34,7 @@ RiakPushWorker::Context* RiakPushWorker::GenerateContext(
 
 
 int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
-  return std::min((int)context->upstream_urls.size(), GetNumberOfCpuCores()) * 5;
+  return std::min((int)context->upstream_urls.size(), GetNumberOfCpuCores()) * 3;
 }
 
 
@@ -88,6 +88,8 @@ RiakPushWorker::~RiakPushWorker() {
   curl_easy_cleanup(curl_upload_);
   curl_easy_cleanup(curl_download_);
   curl_slist_free_all(http_headers_download_);
+
+  free(compression_buffer_);
 
   if (upload_jobs_count_ == 0) {
     LogCvmfs(kLogSpooler, kLogStdout, "Did not compress/upload anything.");

@@ -23,7 +23,7 @@ LocalPushWorker::Context* LocalPushWorker::GenerateContext(
 }
 
 int LocalPushWorker::GetNumberOfWorkers(const Context *context) {
-  return GetNumberOfCpuCores();
+  return GetNumberOfCpuCores() * 3;
 }
 
 
