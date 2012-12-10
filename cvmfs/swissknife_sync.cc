@@ -178,6 +178,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 4;
   }
 
+  // finalize the spooler
+  params.spooler->EndOfTransaction();
+  params.spooler->WaitForTermination();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
