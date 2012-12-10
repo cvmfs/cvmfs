@@ -21,15 +21,18 @@ namespace upload {
     class Context : public AbstractPushWorker::ContextBase<SpoolerImpl<RiakPushWorker> > {
      public:
       Context(SpoolerImpl<RiakPushWorker> *master,
-              const std::vector<std::string> &upstream_urls) :
+              const std::vector<std::string> &upstream_urls,
+              const size_t compression_buffer_size) :
         AbstractPushWorker::ContextBase<SpoolerImpl<RiakPushWorker> >(master),
         upstream_urls(upstream_urls),
+        compression_buffer_size(compression_buffer_size),
         next_upstream_url_(0) {}
 
       const std::string& AcquireUpstreamUrl() const;
 
      public:
       const std::vector<std::string> upstream_urls;
+      const size_t                   compression_buffer_size;
 
      private:
       mutable int next_upstream_url_;
@@ -93,6 +96,10 @@ namespace upload {
     int PushFileToRiak(const std::string &key,
                        const std::string &file_path,
                        const bool         is_critical = false);
+    int PushMemoryToRiak(const std::string   &key,
+                         const unsigned char *mem,
+                         const size_t         size,
+                         const bool           is_critical = false);
 
     std::string GenerateRiakKey(const StorageCompressionJob *compression_job) const;
     std::string GenerateRiakKey(const std::string &remote_path) const;
@@ -110,11 +117,24 @@ namespace upload {
     std::string CreateRequestUrl(const std::string &key,
                                  const bool         is_critical = false) const;
 
+    typedef size_t (*UploadCallback)(void*, size_t, size_t, void*);
+    bool ConfigureUpload(const std::string   &key,
+                         const std::string   &url,
+                         struct curl_slist   *headers,
+                         const size_t         data_size, 
+                         const UploadCallback callback,
+                         const void*          userdata);
+    bool CheckUploadSuccess(const int file_size);
+
    private:
     static size_t ReadHeaderCallback(void *ptr, 
                                      size_t size,
                                      size_t nmemb,
                                      void *userdata);
+    static size_t WriteMemoryCallback(void *ptr,
+                                      size_t size,
+                                      size_t nmemb,
+                                      void *userdata);
     bool CollectUploadStatistics();
     bool CollectVclockFetchStatistics();
 
@@ -129,10 +149,13 @@ namespace upload {
     CURL *curl_download_;
     struct curl_slist *http_headers_download_;
 
+    // in-memory compression buffer
+    unsigned char *compression_buffer_;
+    const size_t   compression_buffer_size_;
+
     // instrumentation
     StopWatch compression_stopwatch_;
     StopWatch upload_stopwatch_;
-
     double compression_time_aggregated_;
     double upload_time_aggregated_;
     double curl_upload_time_aggregated_;
@@ -140,7 +163,6 @@ namespace upload {
     double curl_connection_time_aggregated_;
     int    curl_connections_;
     double curl_upload_speed_aggregated_;
-
     int upload_jobs_count_;
   };
 }
