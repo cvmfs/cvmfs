@@ -50,6 +50,10 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest);
 bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash);
 bool CompressPath2File(const std::string &src, FILE *fdest,
                        hash::Any *compressed_hash);
+bool CompressPath2Mem(const std::string &src, unsigned char *mem, const size_t mem_size,
+                      size_t *bytes_used, hash::Any *compressed_hash);
+bool CompressFile2Mem(FILE *fsrc, unsigned char *mem, const size_t mem_size,
+                      size_t *bytes_used, hash::Any *compressed_hash);
 bool DecompressFile2File(FILE *fsrc, FILE *fdest);
 
 // User of these functions has to free out_buf, if successful

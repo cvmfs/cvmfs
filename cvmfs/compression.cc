@@ -10,6 +10,7 @@
 
 #include "cvmfs_config.h"
 #include "compression.h"
+#include "platform.h"
 
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -17,6 +18,7 @@
 
 #include <cstring>
 #include <cassert>
+#include <algorithm>
 
 #include "logging.h"
 #include "hash.h"
@@ -383,6 +385,85 @@ bool CompressPath2File(const string &src, FILE *fdest,
   bool retval = CompressFile2File(fsrc, fdest, compressed_hash);
   fclose(fsrc);
   return retval;
+}
+
+
+bool CompressPath2Mem(const std::string &src, unsigned char *mem, const size_t mem_size,
+                      size_t *bytes_used, hash::Any *compressed_hash) {
+  FILE *fsrc = fopen(src.c_str(), "r");
+  if (!fsrc)
+    return false;
+
+  const bool retval = CompressFile2Mem(fsrc, mem, mem_size, bytes_used, compressed_hash);
+  fclose(fsrc);
+  return retval;
+}
+
+
+bool CompressFile2Mem(FILE *fsrc, unsigned char *mem, const size_t mem_size,
+                      size_t *bytes_used, hash::Any *compressed_hash) {
+  int z_ret, flush;
+  bool result = false;
+  unsigned have;
+  z_stream strm;
+  unsigned char in[kZChunk];
+  size_t used = 0;
+  *bytes_used = used;
+  hash::ContextPtr hash_context(compressed_hash->algorithm);
+
+  CompressInit(&strm);
+  hash_context.buffer = alloca(hash_context.size);
+  hash::Init(hash_context);
+
+  // get file size and check if it fits in the provided buffer
+  platform_stat64 info;
+  int fd = fileno(fsrc);
+  if (platform_fstat(fd, &info) != 0)
+    return false;
+  size_t bound = deflateBound(&strm, info.st_size);
+  if (bound > mem_size) {
+    *bytes_used = mem_size + 1;
+    return false;
+  }
+
+  // Compress until end of file
+  do {
+    strm.avail_in = fread(in, 1, kZChunk, fsrc);
+    if (ferror(fsrc)) goto compress_file2mem_hashed_final;
+
+    flush = feof(fsrc) ? Z_FINISH : Z_NO_FLUSH;
+    strm.next_in = in;
+
+    // Run deflate() on input until output buffer not full, finish
+    // compression if all of source has been read in
+    do {
+      strm.avail_out = std::min((size_t)kZChunk, mem_size - used);
+      strm.next_out = mem + used;
+      z_ret = deflate(&strm, flush);  // no bad return value
+      if (z_ret == Z_STREAM_ERROR)
+        goto compress_file2mem_hashed_final;  // state not clobbered
+      have = kZChunk - strm.avail_out;
+      hash::Update(mem + used, have, hash_context);
+      used += have;
+    } while (strm.avail_out == 0);
+
+    // Done when last data in file processed
+  } while (flush != Z_FINISH);
+
+  // Stream will be complete
+  if (z_ret != Z_STREAM_END) goto compress_file2mem_hashed_final;
+
+  hash::Final(hash_context, compressed_hash);
+  result = true;
+
+  // Clean up and return
+ compress_file2mem_hashed_final:
+  CompressFini(&strm);
+  *bytes_used = used;
+  LogCvmfs(kLogCompress, kLogDebug, "file compression finished with result %d",
+           result);
+  return result;
+
 }
 
 
