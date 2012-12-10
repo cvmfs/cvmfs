@@ -118,7 +118,7 @@ namespace upload
     static void DoGlobalCleanup();
 
    public:
-    AbstractPushWorker() : processed_jobs_count_(0) { LogCvmfs(kLogSpooler, kLogStdout, "created..."); }
+    AbstractPushWorker() : processed_jobs_count_(0) {}
     virtual ~AbstractPushWorker();
 
     virtual bool Initialize();
