@@ -115,6 +115,8 @@ namespace upload {
                                      size_t size,
                                      size_t nmemb,
                                      void *userdata);
+    bool CollectUploadStatistics();
+    bool CollectVclockFetchStatistics();
 
    private:
     // state information
@@ -133,6 +135,11 @@ namespace upload {
 
     double compression_time_aggregated_;
     double upload_time_aggregated_;
+    double curl_upload_time_aggregated_;
+    double curl_get_vclock_time_aggregated_;
+    double curl_connection_time_aggregated_;
+    int    curl_connections_;
+    double curl_upload_speed_aggregated_;
 
     int upload_jobs_count_;
   };

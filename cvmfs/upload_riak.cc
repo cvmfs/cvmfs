@@ -61,7 +61,15 @@ void RiakPushWorker::DoGlobalCleanup() {
 RiakPushWorker::RiakPushWorker(Context* context) :
   context_(context),
   initialized_(false),
-  http_headers_download_(NULL)
+  http_headers_download_(NULL),
+  compression_time_aggregated_(0),
+  upload_time_aggregated_(0),
+  curl_upload_time_aggregated_(0),
+  curl_get_vclock_time_aggregated_(0),
+  curl_connection_time_aggregated_(0),
+  curl_connections_(0),
+  curl_upload_speed_aggregated_(0),
+  upload_jobs_count_(0)
 {
   LockGuard<Context> lock(context);
   upstream_url_ = context->AcquireUpstreamUrl();
@@ -78,10 +86,23 @@ RiakPushWorker::~RiakPushWorker() {
     return;
   }
 
-  LogCvmfs(kLogSpooler, kLogStdout, "Statistics:\nAvg Compression time: %f\n"
-                                    "Avg Uploading time: %f",
-           (compression_time_aggregated_ / (double)upload_jobs_count_),
-           (upload_time_aggregated_      / (double)upload_jobs_count_));
+  const double uploaded_jobs = (double)upload_jobs_count_;
+  LogCvmfs(kLogSpooler, kLogStdout, "Statistics:\n"
+                                    "Avg Compression time:          %f s\n"
+                                    "Avg Uploading time:            %f s\n"
+                                    "Avg CURL upload time:          %f s\n"
+                                    "Avg CURL Vclock retrieve time: %f s\n"
+                                    "Avg CURL connection time:      %f s\n"
+                                    "CURL connections:              %d\n"
+                                    "Avg Data Upload speed:         %f kB/s",
+
+           (compression_time_aggregated_     / uploaded_jobs),
+           (upload_time_aggregated_          / uploaded_jobs),
+           (curl_upload_time_aggregated_     / uploaded_jobs),
+           (curl_get_vclock_time_aggregated_ / uploaded_jobs),
+           (curl_connection_time_aggregated_ / uploaded_jobs*2),
+            curl_connections_,
+           (curl_upload_speed_aggregated_    / uploaded_jobs / 1024.0));
 }
 
 
@@ -345,6 +366,11 @@ bool RiakPushWorker::GetVectorClock(const std::string &key,
   if (response_code != 200 && response_code != 304)
     return false;
 
+  if (!CollectVclockFetchStatistics()) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to collect vclock fetch statistics");
+    return false;
+  }
+
   // we found an object and therefore most likely vector_clock is set now
   return true;
 }
@@ -466,6 +492,12 @@ int RiakPushWorker::PushFileToRiak(const std::string &key,
     goto out;
   }
 
+  if (!CollectUploadStatistics()) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to grab statistics data.");
+    retcode = 11;
+    goto out;
+  }
+
   // all went well...
   retcode = 0;
 
@@ -474,6 +506,51 @@ out:
   fclose(hd_src);
   curl_slist_free_all(headers);
   return retcode;
+}
+
+
+bool RiakPushWorker::CollectUploadStatistics() {
+  CURLcode res;
+
+  double upload_time;
+  double connection_time;
+  long   connections;
+  double upload_speed;
+
+  res = curl_easy_getinfo(curl_upload_, CURLINFO_TOTAL_TIME, &upload_time);
+  if (res != CURLE_OK) return false;
+  curl_upload_time_aggregated_ += upload_time;
+
+  res = curl_easy_getinfo(curl_upload_, CURLINFO_CONNECT_TIME, &connection_time);
+  if (res != CURLE_OK) return false;
+  curl_connection_time_aggregated_ += connection_time;
+
+  res = curl_easy_getinfo(curl_upload_, CURLINFO_NUM_CONNECTS, &connections);
+  if (res != CURLE_OK) return false;
+  curl_connections_ += connections;
+
+  res = curl_easy_getinfo(curl_upload_, CURLINFO_SPEED_UPLOAD, &upload_speed);
+  if (res != CURLE_OK) return false;
+  curl_upload_speed_aggregated_ += upload_speed;
+
+  return true;
+}
+
+
+bool RiakPushWorker::CollectVclockFetchStatistics() {
+  CURLcode res;
+  double request_time;
+  double connection_time;
+
+  res = curl_easy_getinfo(curl_download_, CURLINFO_TOTAL_TIME, &request_time);
+  if (res != CURLE_OK) return false;
+  curl_get_vclock_time_aggregated_ += request_time;
+
+  res = curl_easy_getinfo(curl_download_, CURLINFO_CONNECT_TIME, &connection_time);
+  if (res != CURLE_OK) return false;
+  curl_connection_time_aggregated_ += connection_time;
+
+  return true;
 }
 
 
