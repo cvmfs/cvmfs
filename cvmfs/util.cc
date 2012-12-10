@@ -904,6 +904,37 @@ bool ManagedExec(const vector<string> &command_line,
   return true;
 }
 
+// -----------------------------------------------------------------------------
+
+void StopWatch::Start() {
+  assert (!running_);
+
+  gettimeofday(&start_, NULL);
+  running_ = true;
+}
+
+
+void StopWatch::Stop() {
+  assert (running_);
+
+  gettimeofday(&end_, NULL);
+  running_ = false;
+}
+
+
+void StopWatch::Reset() {
+  start_ = timeval();
+  end_   = timeval();
+  running_ = false;
+}
+
+
+double StopWatch::GetTime() const {
+  assert (!running_);
+
+  return DiffTimeSeconds(start_, end_);
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }
 #endif

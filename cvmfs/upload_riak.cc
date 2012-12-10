@@ -13,6 +13,8 @@
 #include "duplex_curl.h"
 #include "logging.h"
 
+#include "util.h"
+
 using namespace upload;
 
 RiakPushWorker::Context* RiakPushWorker::GenerateContext(
@@ -70,6 +72,16 @@ RiakPushWorker::~RiakPushWorker() {
   curl_easy_cleanup(curl_upload_);
   curl_easy_cleanup(curl_download_);
   curl_slist_free_all(http_headers_download_);
+
+  if (upload_jobs_count_ == 0) {
+    LogCvmfs(kLogSpooler, kLogStdout, "Did not compress/upload anything.");
+    return;
+  }
+
+  LogCvmfs(kLogSpooler, kLogStdout, "Statistics:\nAvg Compression time: %f\n"
+                                    "Avg Uploading time: %f",
+           (compression_time_aggregated_ / (double)upload_jobs_count_),
+           (upload_time_aggregated_      / (double)upload_jobs_count_));
 }
 
 
@@ -175,6 +187,9 @@ void RiakPushWorker::ProcessCompressionJob(
     return;
   }
 
+  compression_stopwatch_.Reset();
+  upload_stopwatch_.Reset();
+
   const std::string &local_path   = compression_job->local_path();
         hash::Any   &content_hash = compression_job->content_hash();
 
@@ -182,6 +197,9 @@ void RiakPushWorker::ProcessCompressionJob(
   static const std::string tmp_dir = "/ramdisk";
   std::string tmp_file_path;
   hash::Any compressed_hash(hash::kSha1);
+
+  compression_stopwatch_.Start();
+
   if (! CompressToTempFile(local_path,
                            tmp_dir,
                            &tmp_file_path,
@@ -194,9 +212,18 @@ void RiakPushWorker::ProcessCompressionJob(
     return;
   }
 
+  compression_stopwatch_.Stop();
+
   // push to Riak
+  upload_stopwatch_.Start();
   const int retval = PushFileToRiak(GenerateRiakKey(compression_job),
                                     tmp_file_path);
+  upload_stopwatch_.Stop();
+
+  // retrieve the stopwatch values
+  upload_time_aggregated_ += upload_stopwatch_.GetTime();
+  compression_time_aggregated_ += compression_stopwatch_.GetTime();
+  upload_jobs_count_++;
 
   // clean up and go home
   compression_job->Finished(retval);

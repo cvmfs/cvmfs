@@ -117,13 +117,24 @@ namespace upload {
                                      void *userdata);
 
    private:
+    // state information
     Context *context_;
     bool initialized_;
     std::string upstream_url_;
 
+    // CURL state
     CURL *curl_upload_;
     CURL *curl_download_;
     struct curl_slist *http_headers_download_;
+
+    // instrumentation
+    StopWatch compression_stopwatch_;
+    StopWatch upload_stopwatch_;
+
+    double compression_time_aggregated_;
+    double upload_time_aggregated_;
+
+    int upload_jobs_count_;
   };
 }
 

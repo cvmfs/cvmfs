@@ -152,6 +152,33 @@ class LockGuard <pthread_mutex_t> {
   pthread_mutex_t &ref_;
 };
 
+/**
+ * Very simple StopWatch implementation.
+ * Currently the implementation does not allow a restart of a stopped
+ * watch. You should always reset the clock before you reuse it.
+ *
+ * Stopwatch watch();
+ * watch.Start();
+ * // do nasty thing
+ * watch.Stop();
+ * printf("%f", watch.GetTime());
+ */
+
+class StopWatch {
+ public:
+  StopWatch() : running_(false) {}
+
+  void Start();
+  void Stop();
+  void Reset();
+
+  double GetTime() const;
+
+ private:
+  bool running_;
+  timeval start_, end_;
+};
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }
 #endif

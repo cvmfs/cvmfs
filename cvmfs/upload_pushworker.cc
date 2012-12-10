@@ -11,6 +11,11 @@ using namespace upload;
 const int AbstractPushWorker::default_number_of_processors = 1;
 
 
+AbstractPushWorker::~AbstractPushWorker() {
+  LogCvmfs(kLogSpooler, kLogStdout, "Processed jobs: %d", processed_jobs_count_);
+}
+
+
 bool AbstractPushWorker::Initialize() {
   return true;
 }
@@ -30,6 +35,8 @@ void AbstractPushWorker::DoGlobalCleanup() {}
 
 
 void AbstractPushWorker::ProcessJob(StorageJob *job) {
+  processed_jobs_count_++;
+
   if (job->IsCompressionJob()) {
     StorageCompressionJob 
     *compression_job = dynamic_cast<StorageCompressionJob*>(job);

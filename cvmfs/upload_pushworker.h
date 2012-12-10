@@ -118,6 +118,9 @@ namespace upload
     static void DoGlobalCleanup();
 
    public:
+    AbstractPushWorker() : processed_jobs_count_(0) { LogCvmfs(kLogSpooler, kLogStdout, "created..."); }
+    virtual ~AbstractPushWorker();
+
     virtual bool Initialize();
     virtual bool IsReady() const;
 
@@ -144,6 +147,8 @@ namespace upload
 
    private:
     static const int default_number_of_processors;
+
+    int processed_jobs_count_;
   };
 }
 
