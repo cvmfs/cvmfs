@@ -200,8 +200,10 @@ Job* Spooler::AcquireJob() {
   Job* job = job_queue_.front();
   job_queue_.pop();
 
-  // signal the Spooler that there is at least one free space now
-  if (job_queue_.size() < (size_t)spooler_definition_.max_pending_jobs) {
+  // signal the Spooler that there is a fair amount of free space now
+  static const size_t desired_free_slots =
+    (size_t)spooler_definition_.max_pending_jobs / 2 + 1;
+  if (job_queue_.size() < desired_free_slots) {
     pthread_cond_signal(&job_queue_cond_not_full_);
   }
 
@@ -244,10 +246,6 @@ void Spooler::JobFinishedCallback(Job* job) {
   // invoke the external callback for this job
   InvokeExternalCallback(job);
 
-  // remove the finished job from the pending 'list'
-  delete job;
-  atomic_dec32(&jobs_pending_);
-
   // check if we have killed all PushWorker threads
   if (job->IsDeathSentenceJob()) {
     atomic_inc32(&death_sentences_executed_);
@@ -255,6 +253,10 @@ void Spooler::JobFinishedCallback(Job* job) {
       TearDown();
     }
   }
+
+  // remove the finished job from the pending 'list'
+  delete job;
+  atomic_dec32(&jobs_pending_);
 
   // Signal the Spooler that all jobs are done...
   if (atomic_read32(&jobs_pending_) == 0) {
