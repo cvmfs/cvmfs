@@ -174,7 +174,7 @@ namespace upload
      *                            thing went wrong
      */
     static Spooler* Construct(const std::string &definition_string,
-                              const int          max_pending_jobs = 100);
+                              const int          max_pending_jobs = 500);
     virtual ~Spooler();
 
     /**
