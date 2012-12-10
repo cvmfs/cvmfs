@@ -7,7 +7,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.4
+Version: 2.1.5
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -162,6 +162,7 @@ if [ $? -ne 0 ]; then
 fi
 
 %install
+export DONT_STRIP=1
 rm -rf $RPM_BUILD_ROOT
 
 make DESTDIR=$RPM_BUILD_ROOT install
@@ -204,6 +205,8 @@ do
     %{_datadir}/selinux/${selinuxvariant}/cvmfs.pp &> /dev/null || :
 done
 %endif
+/sbin/ldconfig
+/usr/bin/cvmfs_config reload
 
 %preun
 %if 0%{?selinux_cvmfs}

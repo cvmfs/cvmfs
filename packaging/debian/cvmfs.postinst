@@ -24,8 +24,8 @@ case "$1" in
         echo "creating cvmfs user/group..."
         mkdir -p /cvmfs
         getent group cvmfs >/dev/null || getent passwd cvmfs > /dev/null || \
-	      adduser --system --group --no-create-home --home /cvmfs cvmfs
-
+        adduser --system --group --no-create-home --home /cvmfs cvmfs
+        /usr/bin/cvmfs_config reload
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

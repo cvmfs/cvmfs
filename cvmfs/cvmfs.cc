@@ -1367,6 +1367,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
            int(cvmfs::kcache_timeout_));
 
   // Tune SQlite3 memory
+  sqlite3_shutdown();  // Make sure SQlite starts clean after initialization
   g_sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   g_sqlite_page_cache = smalloc(1280*3275);  // 4MB
   retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, g_sqlite_scratch, 8192, 16);
@@ -1701,14 +1702,14 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress = "Saving open directory handles (" +
     StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  
+
   cvmfs::DirectoryHandles *saved_handles =
     new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
   loader::SavedState *save_open_dirs = new loader::SavedState();
   save_open_dirs->state_id = loader::kStateOpenDirs;
   save_open_dirs->state = saved_handles;
   saved_states->push_back(save_open_dirs);
-  
+
   return true;
 }
 
