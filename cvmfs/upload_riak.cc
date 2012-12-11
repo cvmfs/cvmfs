@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <algorithm>
 
@@ -208,6 +209,7 @@ void RiakPushWorker::ProcessCopyJob(StorageCopyJob *copy_job) {
   copy_job->Finished(retval);
 }
 
+#define RANDOM_TEST
 
 void RiakPushWorker::ProcessCompressionJob(
                                       StorageCompressionJob *compression_job) {
@@ -227,11 +229,18 @@ void RiakPushWorker::ProcessCompressionJob(
   // compress the file to a temporary location
   static const std::string tmp_dir = "/ramdisk";
   std::string tmp_file_path;
-  hash::Any compressed_hash(hash::kSha1);
+  content_hash = hash::Any(hash::kSha1);
 
   compression_stopwatch_.Start();
 
+  struct stat st;
+  stat(local_path.c_str(), &st);
+
   size_t bytes_used;
+#ifdef RANDOM_TEST
+  bytes_used   = std::min((size_t)st.st_size, compression_buffer_size_);
+  content_hash = hash::Any::randomHash(hash::kSha1);
+#else
   if (! zlib::CompressPath2Mem(local_path,
                                compression_buffer_,
                                compression_buffer_size_,
@@ -252,11 +261,13 @@ void RiakPushWorker::ProcessCompressionJob(
       return;
     }
   }
+#endif
 
   compression_stopwatch_.Stop();
 
   // push to Riak
   upload_stopwatch_.Start();
+
   const std::string key = GenerateRiakKey(compression_job);
   const int retval = (tmp_file_path.empty()) ?
                         PushMemoryToRiak(key, compression_buffer_, bytes_used)
@@ -683,6 +694,16 @@ std::string RiakPushWorker::GenerateRiakKey(const std::string &remote_path) cons
                    remote_path.end(), 
                    std::back_inserter(result), 
                    '/');
+  return result;
+}
+
+
+std::string RiakPushWorker::GenerateRandomKey() const {
+  static const size_t random_key_length = 10;
+  std::string result(random_key_length, ' ');
+  for (size_t i = 0; i < random_key_length; ++i) {
+    result[i] = static_cast<char>(rand() % 26 + static_cast<int>('a'));
+  }
   return result;
 }
 

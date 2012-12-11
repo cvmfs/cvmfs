@@ -104,6 +104,8 @@ namespace upload {
     std::string GenerateRiakKey(const StorageCompressionJob *compression_job) const;
     std::string GenerateRiakKey(const std::string &remote_path) const;
 
+    std::string GenerateRandomKey() const;
+
     /**
      * Generates a request URL out of the known Riak base URL and the given key.
      * Additionally it can set the W-value to 'all' if a consistent write must
