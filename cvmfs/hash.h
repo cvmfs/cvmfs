@@ -207,6 +207,8 @@ struct Sha1 : public Digest<20, kSha1> { };
  * setting the algorithm field accordingly.
  */
 struct Any : public Digest<20, kAny> {
+  static Any randomHash(const Algorithms a);
+
   Any() : Digest<20, kAny>() { }
   explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
   Any(const Algorithms a,
