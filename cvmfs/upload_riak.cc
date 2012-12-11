@@ -209,7 +209,7 @@ void RiakPushWorker::ProcessCopyJob(StorageCopyJob *copy_job) {
   copy_job->Finished(retval);
 }
 
-#define RANDOM_TEST
+//#define RANDOM_TEST
 
 void RiakPushWorker::ProcessCompressionJob(
                                       StorageCompressionJob *compression_job) {
@@ -227,7 +227,7 @@ void RiakPushWorker::ProcessCompressionJob(
         hash::Any   &content_hash = compression_job->content_hash();
 
   // compress the file to a temporary location
-  static const std::string tmp_dir = "/ramdisk";
+  static const std::string tmp_dir = "/ramdisk/tmp";
   std::string tmp_file_path;
   content_hash = hash::Any(hash::kSha1);
 

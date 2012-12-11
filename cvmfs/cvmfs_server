@@ -177,8 +177,8 @@ abort() {
   abort_before_hook $name
   sudo umount /cvmfs/$name
   rm -rf ${spool_dir}/tmp/*
-  sudo rm -rf ${spool_dir}/scratch
-  $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
+  sudo rm -rf /ramdisk/${name}/scratch
+  $user_shell "mkdir /ramdisk/${name}/scratch"
   sudo mount /cvmfs/$name
   rm -f ${spool_dir}/in_transaction
   abort_after_hook $name
@@ -227,7 +227,7 @@ publish() {
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
   local sync_command="$swissknife sync -x -u /cvmfs/$name \
-    -s ${spool_dir}/scratch \
+    -s /ramdisk/${name}/scratch \
     -c ${spool_dir}/rdonly \
     -t ${spool_dir}/tmp \
     -b $base_hash \
@@ -248,9 +248,9 @@ publish() {
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
-  sudo rm -rf ${spool_dir}/scratch
+  sudo rm -rf /ramdisk/${name}/scratch
   rm -rf ${spool_dir}/tmp/*
-  $user_shell "mkdir ${spool_dir}/scratch"
+  $user_shell "mkdir /ramdisk/${name}/scratch"
   sudo mount ${spool_dir}/rdonly > /dev/null
   sudo mount /cvmfs/$name
   rm -f ${spool_dir}/in_transaction
@@ -334,7 +334,7 @@ mkfs() {
 
   local cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
-  local scratch_dir="${spool_dir}/scratch"
+  local scratch_dir="/ramdisk/${name}/scratch"
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
@@ -452,7 +452,7 @@ EOF
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
   mkfifo -m 0660 $pipe_paths $pipe_digests
-  chown -R $cvmfs_user /cvmfs/$name $spool_dir
+  chown -R $cvmfs_user /cvmfs/$name $spool_dir /ramdisk/${name}
   if is_local_upstream $upstream; then
     create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
   fi
