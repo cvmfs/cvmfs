@@ -1,4 +1,4 @@
-cvmfs_test_name="Creating Symlink in File"
+cvmfs_test_name="Creating Symlinks in Directory"
 cvmfs_test_autofs_on_startup=false
 
 produce_files_in() {
@@ -7,9 +7,12 @@ produce_files_in() {
 	pushd $working_dir
 
   mkdir dir4
+  echo "meaningless content" > dir4/meaningless_file
+  ln -s meaningless_file dir4/symlink_to_meaningless_file
 
-	echo "meaningless file content" > dir4/file
-	ln -s file /dir4/symlinkToFile
+  mkdir dir5
+  echo "meaningless content" > dir5/meaninglessFile
+  ln -s meaninglessFile dir5/symlinkToMeaninglessFile
 
 	popd
 }
