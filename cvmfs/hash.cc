@@ -22,6 +22,20 @@ namespace hash {
 
 
 /**
+ * Generates a purely random hash
+ * Only used for testing purposes
+ */
+Any Any::RandomHash(const Algorithms a) {
+  Any result(a);
+  unsigned bytes = result.GetDigestSize();
+  for (unsigned i = 0; i < bytes; ++i) {
+    result.digest[i] = rand() % 256;
+  }
+  return result;
+}
+
+
+/**
  * Allows the caller to create the context on the stack.
  */
 unsigned GetContextSize(const Algorithms algorithm) {
