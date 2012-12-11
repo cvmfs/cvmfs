@@ -267,12 +267,15 @@ void RiakPushWorker::ProcessCompressionJob(
 
   // push to Riak
   upload_stopwatch_.Start();
-
   const std::string key = GenerateRiakKey(compression_job);
+#ifdef RANDOM_TEST
+  const int retval = PushFileToRiak(key, tmp_file_path);
+#else
   const int retval = (tmp_file_path.empty()) ?
                         PushMemoryToRiak(key, compression_buffer_, bytes_used)
                                              :
                         PushFileToRiak(key, tmp_file_path);
+#endif
   upload_stopwatch_.Stop();
 
   // retrieve the stopwatch values
