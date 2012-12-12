@@ -87,6 +87,11 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_pushworker.h upload_pushworker.cc
   upload_local.h upload_local.cc
   upload_riak.h upload_riak.cc
+  # riak uses JSON for configuration, therefore we need
+  # a simple JSON parser:
+  vjson/block_allocator.h vjson/block_allocator.cpp
+  vjson/json.h vjson/json.cpp
+
   duplex_curl.h download.h download.cc
   signature.cc signature.h
 
