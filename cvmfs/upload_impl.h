@@ -15,16 +15,18 @@ namespace upload {
 
 template <class PushWorkerT>
 bool SpoolerImpl<PushWorkerT>::SpawnPushWorkers() {
+  // find out about the environment of our PushWorker swarm
+  pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_definition());
+
   // do some global initialization work common for all PushWorkers
-  const bool retval = PushWorkerT::DoGlobalInitialization();
+  const bool retval = PushWorkerT::DoGlobalInitialization(pushworker_context_);
   if (!retval) {
     LogCvmfs(kLogSpooler, kLogWarning, "Failed to globally initialize "
                                        "PushWorkers");
     return false;
   }
 
-  // find out about the environment of our PushWorker swarm
-  pushworker_context_  = PushWorkerT::GenerateContext(this, spooler_definition());
+  // find out how many PushWorkers should be spawned in concurrent threads
   int workers_to_spawn = PushWorkerT::GetNumberOfWorkers(pushworker_context_);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Using %d concurrent publishing workers",

@@ -106,9 +106,10 @@ namespace upload
      *
      * The default implementation here is essentially a NOOP
      *
-     * @return  true on success, false otherwise
+     * @param context    pointer to a generated Context object 
+     * @return           true on success, false otherwise
      */
-    static bool DoGlobalInitialization();
+    static bool DoGlobalInitialization(const Context *context);
 
     /**
      * This method can do global cleanup work after all PushWorkers are destroyed

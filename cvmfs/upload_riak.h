@@ -12,6 +12,9 @@
 typedef void CURL;
 struct curl_slist;
 
+struct json_value;
+typedef struct json_value JSON;
+
 namespace upload {
   class RiakPushWorker : public AbstractPushWorker {
    public:
@@ -52,9 +55,10 @@ namespace upload {
     /**
      * See AbstractPushWorker for description
      *
-     * This method essentially calls curl_global_init()
+     * This method essentially calls curl_global_init() and checks the Riak
+     * configuration
      */
-    static bool DoGlobalInitialization();
+    static bool DoGlobalInitialization(const Context *context);
 
     /**
      * See AbstractPushWorker for description
@@ -128,17 +132,49 @@ namespace upload {
                          const void*          userdata);
     bool CheckUploadSuccess(const int file_size);
 
+   protected:
+    /**
+     * Encapsulates an extendable memory buffer.
+     * consecutive calls to Copy() will copy the given memory into the buffer
+     * without overwriting the previously copied data. This is very handy for
+     * cURL-style data handling callbacks.
+     */
+    struct DataBuffer {
+      DataBuffer() : data(NULL), size_(0), offset_(0) {}
+      ~DataBuffer() { free(data); data = NULL; size_ = 0; offset_ = 0; }
+
+      bool           Reserve(const size_t bytes);
+      unsigned char* Position() const;
+      void           Copy(const unsigned char* ptr, const size_t bytes);
+
+      unsigned char* data;
+      size_t         size_;
+      unsigned int   offset_;
+    };
+
    private:
-    static size_t ReadHeaderCallback(void *ptr, 
-                                     size_t size,
-                                     size_t nmemb,
-                                     void *userdata);
+    static bool  CheckRiakConfiguration(const Context *context);
+    static bool  DownloadRiakConfiguration(const std::string &url,
+                                           DataBuffer& buffer);
+    static JSON* ParseJsonConfiguration(DataBuffer& buffer);
+    static bool  CheckJsonConfiguration(const JSON *json_root);
+
+    bool CollectUploadStatistics();
+    bool CollectVclockFetchStatistics();
+
+    // cURL callback methods
+    static size_t ObtainVclockCallback(void *ptr, 
+                                       size_t size,
+                                       size_t nmemb,
+                                       void *userdata);
     static size_t WriteMemoryCallback(void *ptr,
                                       size_t size,
                                       size_t nmemb,
                                       void *userdata);
-    bool CollectUploadStatistics();
-    bool CollectVclockFetchStatistics();
+    static size_t ReceiveDataCallback(void *ptr,
+                                      size_t size,
+                                      size_t nmemb,
+                                      void *userdata);
 
    private:
     // state information

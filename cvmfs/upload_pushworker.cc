@@ -26,7 +26,7 @@ bool AbstractPushWorker::IsReady() const {
 }
 
 
-bool AbstractPushWorker::DoGlobalInitialization() {
+bool AbstractPushWorker::DoGlobalInitialization(const Context* context) {
   return true;
 }
 
