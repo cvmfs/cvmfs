@@ -727,7 +727,8 @@ std::string RiakPushWorker::GenerateRandomKey() const {
 
 std::string RiakPushWorker::CreateRequestUrl(const std::string &key,
                                              const bool is_critical) const {
-  return upstream_url_ + "/" + key + (is_critical ? "?w=all" : "");
+  const std::string additional = is_critical ? "&w=all&dw=all" : "";
+  return upstream_url_ + "/" + key + "?returnbody=false" + additional;
 }
 
 
