@@ -44,9 +44,10 @@ my $ret = GetOptions ( "c|command=s" => \$command,
 					   "start" => \$start,
 					   "h|help" => \$help_message,
 					   "shell-path=s" => \$shell_path,
-					   "iface=s" => \$iface );
+					   "iface=s" => \$iface,
+					   "connect-to=s" => \$daemon_path );
 
-if (defined($help_message)) {
+if (defined($help_message) or !$ret) {
 	my $help = <<'END';
 Usage: cvmfs-test [--i] [--setup] [--wait-daemon] [--c command]
 	
