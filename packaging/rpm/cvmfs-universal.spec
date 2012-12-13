@@ -5,6 +5,8 @@
 %define selinux_variants mls strict targeted
 %endif
 
+%define __strip /bin/true
+
 Summary: CernVM File System
 Name: cvmfs
 Version: 2.1.5
