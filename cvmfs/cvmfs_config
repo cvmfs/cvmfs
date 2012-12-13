@@ -429,7 +429,7 @@ cvmfs_chksetup() {
 
       # Check for required variables
       for reqvar in $required_list
-      do 
+      do
         eval value=\$$reqvar
         if [ -z "$value" ]; then
           echo "Error: required parameter $reqvar undefined for $fqrn"
@@ -667,6 +667,16 @@ cvmfs_reload() {
   fi
 
   # Organized reload of all repositories
+  if [ ! -d "$CVMFS_RELOAD_SOCKETS" ]; then
+    local mount_list
+    mount_list=`list_mounts | awk '{print $3}'`
+    if [ x"$mount_list" != "x" ]; then
+      echo "$CVMFS_RELOAD_SOCKETS is not a directory.  No hotpatch performed."
+      echo "Warning: nevertheless, there are mounted cvmfs repositories."
+      return 1
+    fi
+    return 0
+  fi
   touch "$CVMFS_RELOAD_SOCKETS/cvmfs.pause"
   trap "rm -f $CVMFS_RELOAD_SOCKETS/cvmfs.pause" EXIT
 
