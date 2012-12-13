@@ -6,6 +6,9 @@
 %endif
 
 %define __strip /bin/true
+if 0%{?el6} || 0%{?el5}
+%define __os_install_post %{nil}
+%endif
 
 Summary: CernVM File System
 Name: cvmfs

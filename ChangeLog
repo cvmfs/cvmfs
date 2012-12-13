@@ -1,4 +1,5 @@
 2.1.6:
+  * Packaging: don't strip binaries
   * cvmfs_reload returns with error if socket directory
     does not exist
   

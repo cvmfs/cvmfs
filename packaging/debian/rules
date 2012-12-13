@@ -65,7 +65,7 @@ binary-arch: build install
 #        dh_undocumented
 	dh_installchangelogs ChangeLog
 	dh_link
-	dh_strip
+#	dh_strip
 	dh_compress
 	dh_fixperms
 #        dh_makeshlibs
