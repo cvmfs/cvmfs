@@ -36,7 +36,7 @@ RiakPushWorker::Context* RiakPushWorker::GenerateContext(
 
 
 int RiakPushWorker::GetNumberOfWorkers(const Context *context) {
-  return std::min((int)context->upstream_urls.size(), GetNumberOfCpuCores()) * 3;
+  return std::max((int)context->upstream_urls.size(), GetNumberOfCpuCores() * 2);
 }
 
 
@@ -225,6 +225,12 @@ void RiakPushWorker::ProcessCopyJob(StorageCopyJob *copy_job) {
 
 //#define RANDOM_TEST
 
+//#define NOOP
+//#define READ_ONLY
+//#define COMPRESSION_TO_MEM
+//#define COMPRESSION_TO_DISK
+//#define UPLOAD_RANDOM_DATA
+
 void RiakPushWorker::ProcessCompressionJob(
                                       StorageCompressionJob *compression_job) {
   if (compression_job->move()) {
@@ -244,17 +250,77 @@ void RiakPushWorker::ProcessCompressionJob(
   static const std::string tmp_dir = "/ramdisk/tmp";
   std::string tmp_file_path;
   content_hash = hash::Any(hash::kSha1);
-
-  compression_stopwatch_.Start();
+  size_t bytes_used;
 
   struct stat st;
   stat(local_path.c_str(), &st);
 
-  size_t bytes_used;
-#ifdef RANDOM_TEST
-  bytes_used   = std::min((size_t)st.st_size, compression_buffer_size_);
+#ifdef NOOP
   content_hash = hash::Any::randomHash(hash::kSha1);
-#else
+  compression_job->Finished();
+
+  return;
+#endif
+
+#ifdef READ_ONLY
+  FILE *fr = fopen(local_path.c_str(), "r");
+  const size_t array_size = 1024;
+  unsigned char *buffer[array_size];
+
+  while (!feof(fr)) {
+    fread((void*)buffer, array_size, 1, fr);
+  }
+
+  fclose(fr);
+
+  content_hash = hash::Any::randomHash(hash::kSha1);
+  compression_job->Finished();
+
+  return;
+#endif
+
+#ifdef COMPRESSION_TO_MEM
+  if (! zlib::CompressPath2Mem(local_path,
+                               compression_buffer_,
+                               compression_buffer_size_,
+                              &bytes_used,
+                              &content_hash)) {
+    abort();
+  }
+
+  content_hash = hash::Any::randomHash(hash::kSha1);
+  compression_job->Finished();
+
+  return;
+#endif
+
+#ifdef COMPRESSION_TO_DISK
+  if (! CompressToTempFile(local_path,
+                           tmp_dir,
+                          &tmp_file_path,
+                          &content_hash) ) {
+    abort();
+  }
+
+  unlink(tmp_file_path.c_str());
+
+  content_hash = hash::Any::randomHash(hash::kSha1);
+  compression_job->Finished();
+
+  return;
+#endif
+
+#ifdef UPLOAD_RANDOM_DATA
+  content_hash = hash::Any::randomHash(hash::kSha1);
+  bytes_used = std::min((size_t)st.st_size, compression_buffer_size_);
+  PushMemoryToRiak(GenerateRiakKey(compression_job), compression_buffer_, bytes_used);
+
+  compression_job->Finished();
+  return;
+#endif
+
+  compression_stopwatch_.Start();
+
   if (! zlib::CompressPath2Mem(local_path,
                                compression_buffer_,
                                compression_buffer_size_,
@@ -275,21 +341,16 @@ void RiakPushWorker::ProcessCompressionJob(
       return;
     }
   }
-#endif
 
   compression_stopwatch_.Stop();
 
   // push to Riak
   upload_stopwatch_.Start();
   const std::string key = GenerateRiakKey(compression_job);
-#ifdef RANDOM_TEST
-  const int retval = PushFileToRiak(key, tmp_file_path);
-#else
   const int retval = (tmp_file_path.empty()) ?
                         PushMemoryToRiak(key, compression_buffer_, bytes_used)
                                              :
                         PushFileToRiak(key, tmp_file_path);
-#endif
   upload_stopwatch_.Stop();
 
   // retrieve the stopwatch values
