@@ -152,6 +152,8 @@ class LockGuard <pthread_mutex_t> {
   pthread_mutex_t &ref_;
 };
 
+typedef LockGuard<pthread_mutex_t> PosixLockGuard;
+
 /**
  * Very simple StopWatch implementation.
  * Currently the implementation does not allow a restart of a stopped

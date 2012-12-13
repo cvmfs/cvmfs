@@ -426,7 +426,7 @@ void SyncMediator::PublishFilesCallback(const std::string &path,
 
   SyncItemList::iterator itr;
   {
-    LockGuard<pthread_mutex_t> guard(lock_file_queue_);
+    PosixLockGuard guard(lock_file_queue_);
 
     itr = file_queue_.find(path);
     assert(itr != file_queue_.end());

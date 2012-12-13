@@ -171,7 +171,7 @@ void Spooler::Schedule(Job *job) {
            job->name().c_str());
 
   // lock the job queue
-  LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
+  PosixLockGuard guard(job_queue_mutex_);
 
   // wait until there is space in the job queue
   while (job_queue_.size() >= (size_t)spooler_definition_.max_pending_jobs) {
@@ -189,7 +189,7 @@ void Spooler::Schedule(Job *job) {
 
 Job* Spooler::AcquireJob() {
   // lock the job queue
-  LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
+  PosixLockGuard guard(job_queue_mutex_);
 
   // wait until there is something to do
   while (job_queue_.empty()) {
@@ -216,7 +216,7 @@ Job* Spooler::AcquireJob() {
 
 void Spooler::WaitForUpload() const {
   // lock the job queue
-  LockGuard<pthread_mutex_t> guard(job_queue_mutex_);
+  PosixLockGuard guard(job_queue_mutex_);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Waiting for all jobs to be finished...");
 
