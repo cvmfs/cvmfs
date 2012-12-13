@@ -1665,6 +1665,7 @@ static void Fini() {
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
 
+  sqlite3_shutdown();
   if (g_sqlite_page_cache) free(g_sqlite_page_cache);
   if (g_sqlite_scratch) free(g_sqlite_scratch);
   g_sqlite_page_cache = NULL;
