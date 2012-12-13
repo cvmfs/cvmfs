@@ -672,7 +672,7 @@ cvmfs_reload() {
     mount_list=`list_mounts | awk '{print $3}'`
     if [ x"$mount_list" != "x" ]; then
       echo "$CVMFS_RELOAD_SOCKETS is not a directory.  No hotpatch performed."
-      echo "Warning: nevertheless, there are mounted cvmfs repositories."
+      echo "Nevertheless, there are mounted cvmfs repositories."
       return 1
     fi
     return 0

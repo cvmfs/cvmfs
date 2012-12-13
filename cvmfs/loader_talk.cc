@@ -36,7 +36,7 @@ bool Init(const string &socket_path) {
     return false;
 
   unlink((socket_path + ".paused").c_str());
-  
+
   return true;
 }
 
@@ -74,7 +74,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       }
     }
   }
-  
+
   return NULL;
 }
 
@@ -92,7 +92,7 @@ void Fini() {
   shutdown(socket_fd_, SHUT_RDWR);
   close(socket_fd_);
   if (spawned_) pthread_join(thread_talk_, NULL);
-  
+
   free(socket_path_);
   socket_path_ = NULL;
   spawned_ = false;
@@ -122,8 +122,10 @@ int MainReload(const std::string &socket_path, const bool stop_and_go) {
       break;
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%c", buf);
   }
-  if (retval != 1)
+  if (retval != 1) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Reload CRASHED! CernVM-FS unusuable.");
     return 101;
+  }
 
   int result = 102;
   read(socket_fd, &result, sizeof(result));
@@ -133,6 +135,6 @@ int MainReload(const std::string &socket_path, const bool stop_and_go) {
 
   return result;
 }
-  
+
 }  // namespace loader_talk
 }  // namespace loader
