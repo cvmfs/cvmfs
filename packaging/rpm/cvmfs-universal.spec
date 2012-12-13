@@ -7,7 +7,7 @@
 
 %define __strip /bin/true
 %define debug_package %{nil}
-if 0%{?el6} || 0%{?el5}
+%if 0%{?el6} || 0%{?el5}
 %define __os_install_post %{nil}
 %endif
 
