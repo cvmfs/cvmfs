@@ -59,6 +59,7 @@ enum LogSource {
   kLogNfsMaps,
   kLogPublish,
   kLogSpooler,
+  kLogConcurrency
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
