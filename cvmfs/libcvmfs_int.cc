@@ -231,14 +231,6 @@ static bool GetDirentForPath(const PathString &path,
   return false;
 }
 
-/**
- * Removes a file from local cache
- */
-int ClearFile(const string &path) {
-	// not implemented, but required for linking
-  return 0;
-}
-
 }  // namespace cvmfs
 
 

@@ -907,55 +907,6 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 }
 
 
-/**
- * Emulates the getattr walk done by Fuse.
- */
-static int walk_path(const string &path) {
-  //      struct stat info;
-  // if ((path == "") || (path == "/"))
-  //    return cvmfs_getattr("/", &info);
-
-  int attr_result = walk_path(GetParentPath(path));
-  // if (attr_result == 0)
-  //    return cvmfs_getattr(path.c_str(), &info);
-
-  return attr_result;
-}
-
-
-/**
- * Removes a file from local cache
- * TODO
- */
-int ClearFile(const string &path) {
-  /*  int attr_result = walk_path(path);
-   if (attr_result != 0)
-   return attr_result;
-
-   const hash::t_md5 md5(catalog::mangled_path(path));
-   int result;
-
-   catalog::lock();
-
-   catalog::t_dirent d;
-   if (catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-   if ((!(d.flags & catalog::FILE)) || (d.flags & catalog::FILE_LINK)) {
-   result = -EINVAL;
-   } else {
-   quota::remove(d.checksum);
-   result = 0;
-   }
-   } else {
-   result = -ENOENT;
-   }
-
-   catalog::unlock();
-
-   return result;*/
-  return 0;
-}
-
-
 static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %d", ino);

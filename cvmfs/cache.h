@@ -108,7 +108,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
 /**
  * Tries to fetch the certificate from cache
  */
-struct ManifestEnsemble : public manifest::ManifestEnsemble {
+class ManifestEnsemble : public manifest::ManifestEnsemble {
+ public:
   explicit ManifestEnsemble(cache::CatalogManager *catalog_mgr) {
     catalog_mgr_ = catalog_mgr;
   }
