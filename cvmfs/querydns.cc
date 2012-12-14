@@ -67,8 +67,8 @@ static void callback_cname(void *arg, int status,int timeouts,
    cname = host->h_name;
 }
 
-bool QueryDns(string hostname, int type, const string *dns_server,
-              const uint16_t port, string *result)
+bool QueryDns(std::string hostname, int type, const std::string *dns_server,
+              const uint16_t port, std::string *result)
 {
   int status;
   int optmask = 0;
