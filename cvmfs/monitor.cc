@@ -49,6 +49,7 @@ const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
 const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 
 string *cache_dir_ = NULL;
+string *process_name_ = NULL;
 bool spawned_ = false;
 unsigned max_open_files_;
 int pipe_wd_[2];
@@ -129,7 +130,8 @@ static void SendTrace(int signal,
 static void LogEmergency(string msg) {
   char ctime_buffer[32];
 
-  FILE *fp = fopen((*cache_dir_ + "/stacktrace").c_str(), "a");
+  FILE *fp = fopen((*cache_dir_ + "/stacktrace." + *process_name_).c_str(),
+                   "a");
   if (fp) {
     time_t now = time(NULL);
     msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
@@ -220,8 +222,11 @@ static void Watchdog() {
 }
 
 
-bool Init(const string cache_dir, const bool check_max_open_files) {
+bool Init(const string &cache_dir, const std::string &process_name,
+          const bool check_max_open_files)
+{
   monitor::cache_dir_ = new string(cache_dir);
+  monitor::process_name_ = new string(process_name);
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
 
   /* check number of open files */
@@ -280,8 +285,10 @@ void Fini() {
     free(sighandler_stack_.ss_sp);
     sighandler_stack_.ss_size = 0;
   }
-  
+
+  delete process_name_;
   delete cache_dir_;
+  process_name_ = NULL;
   cache_dir_ = NULL;
   if (spawned_) {
     char quit = 'Q';
@@ -327,7 +334,7 @@ void Spawn() {
   sighandler_stack_.ss_flags = 0;
   if (sigaltstack(&sighandler_stack_, NULL) != 0)
     abort();
-  
+
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_sigaction = SendTrace;

@@ -1530,7 +1530,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Monitor, check for maximum number of open files
-  if (!monitor::Init(".", true)) {
+  if (!monitor::Init(".", *cvmfs::repository_name_, true)) {
     *g_boot_error = "failed to initialize watchdog.";
     return loader::kFailMonitor;
   }
