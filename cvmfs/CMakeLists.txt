@@ -49,6 +49,7 @@ set (CVMFS2_DEBUG_SOURCES
   nfs_maps.h nfs_maps.cc
   loader.h
   cvmfs.h cvmfs.cc
+  querydns.h querydns.cc
 )
 
 set (CVMFS2_SOURCES
