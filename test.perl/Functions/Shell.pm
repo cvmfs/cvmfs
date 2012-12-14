@@ -30,7 +30,7 @@ use vars qw/ @EXPORT_OK /;
 use FindBin qw($RealBin);
 
 # This variable will be set to 1 if the shell is speaking to a daemon on a remote machine
-my $remote = 1;
+my $remote = 0;
 
 # This function will check whether the daemon is running.
 sub check_daemon {
@@ -118,7 +118,7 @@ sub check_command {
 	# Switching the value of $command
 	for ($command){
 		if ($_ eq 'exit' or $_ eq 'quit' or $_ eq 'q') { exit_shell($socket, $ctxt) }
-		elsif ($_ eq 'status') { print_status(); $executed = 1 }
+		elsif ($_ eq 'status' or $_ eq 'ping') { print_status(); $executed = 1 }
 		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, undef, undef, $command); $executed = 1 }
 		elsif ($_ =~ m/^help\s*.*/ or $_ =~ m/^h\s.*/) { help($command), $executed = 1 }
 		elsif ($_ eq 'setup' ) { setup(); $executed = 1 }
