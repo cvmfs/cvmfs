@@ -23,6 +23,7 @@ void ClearConfig();
 bool GetValue(const std::string &key, std::string *value);
 bool GetSource(const std::string &key, std::string *value);
 bool IsOn(const std::string &param_value);
+bool QueryDns(std::string, int, const std::string*, const uint16_t, std::string*);
 std::vector<std::string> GetAllKeys();
 std::string Dump();
 
