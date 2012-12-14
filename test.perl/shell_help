@@ -9,10 +9,11 @@ Short:Shell commands:
 Short:  help (h)	Print this help and exit.
 Short:  exit (q)	Exit from the shell.
 Short:  fixperm	Fix permission for files and directories.
+Short:  ping		Check whether the daemon is running.
 Short:  restart	Restart the daemon.
 Short:  setup		Setup the environment for the daemon.
 Short:  start		Start the daemon.
-Short:  status	Check whether the daemon is running.
+Short:  status	Same as ping.
 Short:  wait-daemon	Wait for a daemon signal before opening socket.
 Short:
 
