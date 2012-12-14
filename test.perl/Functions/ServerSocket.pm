@@ -52,7 +52,7 @@ sub receive_msg {
 	}
 
 	my @check = split /[[:blank:]]/, $line;
-	if (scalar(@check) == 1 and $check[0] eq uc($check[0])){
+	if (scalar(@check) == 1 and $check[0] eq uc($check[0]) and $check[0] !~ m/\bPING\b/){
 		$sender = $line;
 		return "Receiving connection from $sender.\n";
 	}
@@ -72,7 +72,7 @@ sub select_recipient {
 
 # Send a message
 sub send_msg {
-	# Retrieve message
+	# Retrieve message and flags
 	my $msg = shift;
 
 	# If $sender is not undef, sending the first part of output with socket identity
@@ -80,7 +80,13 @@ sub send_msg {
 		select_recipient();
 	}
 	
-	ZeroMQ::Raw::zmq_send($socket, $msg, ZMQ_SNDMORE);
+	if ($msg ne 'PONG') {
+		ZeroMQ::Raw::zmq_send($socket, $msg, ZMQ_SNDMORE);
+	}
+	else {
+		ZeroMQ::Raw::zmq_send($socket, $msg)
+	}
+	
 	chomp($msg);
 	print "MSG: \"$msg\" sent.\n";
 }

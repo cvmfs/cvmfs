@@ -18,6 +18,7 @@ use vars qw/ @EXPORT_OK /;
 sub connect_shell_socket {
 	my $socket_path = shift;
 	my $socket_protocol = shift;
+	my $identity = shift;
 
 	# Modify this variables to change the default path to the socket
 	unless (defined($socket_path)) {
@@ -27,9 +28,14 @@ sub connect_shell_socket {
 		$socket_protocol = 'tcp://';
 	}
 	
+	unless (defined($identity)) {
+		$identity = 'SHELL';
+	}
+	
 	my $ctxt = ZeroMQ::Raw::zmq_init(5) || die "Couldn't initialise ZeroMQ context.\n";
 	my $socket = ZeroMQ::Raw::zmq_socket($ctxt, ZMQ_DEALER) || die "Couldn't create socket.\n";
-	my $setopt = ZeroMQ::Raw::zmq_setsockopt($socket, ZMQ_IDENTITY, 'SHELL');
+	my $setid = ZeroMQ::Raw::zmq_setsockopt($socket, ZMQ_IDENTITY, $identity);
+	my $setling = ZeroMQ::Raw::zmq_setsockopt($socket, ZMQ_LINGER, 0);
 
 	my $rc = ZeroMQ::Raw::zmq_connect( $socket, "${socket_protocol}${socket_path}" );
 	
@@ -39,9 +45,22 @@ sub connect_shell_socket {
 # Receiving a message
 sub receive_shell_msg {
 	my $socket = shift;
+	my $noblock = shift;
 	
-	my $msg = ZeroMQ::Raw::zmq_recv($socket);
-	my $line = ZeroMQ::Raw::zmq_msg_data($msg) || die "Couldn't retrieve pointer to data: $!\n";
+	my $msg = undef;
+	
+	unless (defined($noblock)) {
+		$msg = ZeroMQ::Raw::zmq_recv($socket);
+	}
+	else {
+		$msg = ZeroMQ::Raw::zmq_recv($socket, ZMQ_NOBLOCK);
+	}
+	
+	my $line = undef;
+	
+	if ($msg) {
+		$line = ZeroMQ::Raw::zmq_msg_data($msg) || die "Couldn't retrieve pointer to data: $!\n";
+	}
 	
 	return $line;
 }
