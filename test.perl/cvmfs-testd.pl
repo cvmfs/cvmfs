@@ -8,7 +8,7 @@ use IO::Handle;
 use Functions::Help qw(help);
 use Functions::Launcher qw(launch kill_process jobs killall);
 use Functions::Testd qw(stop_daemon);
-use Functions::ServerSocket qw(start_socket receive_msg end_msg send_ip);
+use Functions::ServerSocket qw(start_socket receive_msg end_msg send_ip send_msg);
 use Getopt::Long;
 
 my $shell_path = undef;
@@ -34,6 +34,11 @@ while(1) {
 	if ($line =~ m/Receiving connection from/) {
 	    print $line;
 	    next;
+	}
+	elsif ($line =~ m/PING/) {
+		print "Received a ping request...\n";
+		send_msg("PONG");
+		next;
 	}
 	
 	# Deleting return at the end of the line

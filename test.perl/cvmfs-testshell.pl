@@ -24,7 +24,9 @@ my $interactive = 1;
 # Variables to store daemon ip and port on distributed test
 my $daemon_ip = "127.0.0.1";
 my $daemon_port = "6650";
-my $daemon_path = "$daemon_ip:$daemon_port";
+
+# This variable is declared as our since other packages will accesses and modifies it
+our $daemon_path = "$daemon_ip:$daemon_port";
 
 
 # Next variables is used to control when to skip a loop cicle

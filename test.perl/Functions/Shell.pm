@@ -8,6 +8,7 @@ package Functions::Shell;
 use strict;
 use warnings;
 use threads;
+use threads::shared;
 use Functions::Help qw(help);
 use Proc::Daemon;
 use Fcntl ':mode';
@@ -29,12 +30,71 @@ use vars qw/ @EXPORT_OK /;
 use FindBin qw($RealBin);
 
 # This variable will be set to 1 if the shell is speaking to a daemon on a remote machine
-my $remote = 0;
+my $remote = 1;
 
 # This function will check whether the daemon is running.
 sub check_daemon {
+	# Retrieving daemon path from main package
+	my $daemon_path = $main::daemon_path;
+	
+	# Checking with ps if the daemon is running locally
 	my $running = `ps -ef | grep cvmfs-testdwrapper | grep -v grep | grep -v defunct`;
-	return ($running or $remote);
+	
+	# If the daemon is local, ps is enough, otherwise the shell will try to ping the daemon
+	unless ($remote) {
+		return ($running);
+	}
+	else {
+		return ping_daemon($daemon_path);
+	}
+}
+
+# This function will be used to ping a remote daemon and check if it's awake
+sub ping_daemon {
+	my $daemon_path = shift;
+	my $seconds = shift;
+	
+	# Assigning $seconds a default value of 5
+	if (!defined($seconds)) {
+		$seconds = 5;
+	}
+	
+	# This variable will be used to register if a pong is received and will be shared with
+	# the inner thread
+	my $pong = 0;
+	share($pong);
+	
+	# This variable will be incremented by the while in the inner sub and will be shared
+	# with the inner thread
+	my $count = 0;
+	share($count);
+	
+	# This sub will be ran in a thread and will ping the daemon hoping for a response
+	my $actual_pinging = sub {
+		my ($ping_socket, $ping_ctxt) = connect_shell_socket($daemon_path, undef, 'SHELL_PING');
+		while (($count < $seconds) and !$pong) {
+			send_shell_msg($ping_socket, "PING");
+			my $msg = receive_shell_msg($ping_socket, "ZMQ_NOBLOCK");
+			if (defined($msg)) {
+				$pong = 1;
+			}
+			$count++;
+			sleep 0.5;
+		}
+		close_shell_socket($ping_socket);
+		term_shell_ctxt($ping_ctxt);
+	};
+	
+	# Starting the pinging thread
+	my $pinging_threads = threads->create($actual_pinging);
+	$pinging_threads->detach();
+	
+	# Waiting for pong to be received
+	until ($pong or $count >= 5) {
+		sleep 0.5;
+	}
+	
+	return $pong;
 }
 
 sub check_process {
@@ -69,7 +129,7 @@ sub check_command {
 	
 	# If the daemon is not running and no command was executed, print on screen a message
 	# saying that the command was not found
-	if(!check_daemon and !$executed){
+	if(!check_daemon() and !$executed){
 		print "Command not found. Type 'help' for a list of available commands.\n";
 	}
 	
@@ -118,11 +178,21 @@ sub wait_daemon {
 
 # This function will print the current status of the daemon
 sub print_status {
-	if(check_daemon){
-		print "Daemon is running.\n";
+	if(check_daemon()){
+		unless ($remote) {
+			print "Daemon is running.\n";
+		}
+		else {
+			print "Daemon is running on $main::daemon_path.\n";
+		}
 	}
 	else {
-		print "The daemon is not running. Type 'start' to run it.\n";
+		unless ($remote) {
+			print "The daemon is not running. Type 'start' to run it.\n";
+		}
+		else {
+			print "No daemon could be reached at $main::daemon_path. Type 'start' to run it locally.\n";
+		}
 	}
 }
 
