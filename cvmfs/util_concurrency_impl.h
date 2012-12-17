@@ -2,44 +2,137 @@
  * This file is part of the CernVM File System.
  */
 
-#include "util.h"
-
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+
+//
+// +----------------------------------------------------------------------------
+// |  Observable
+//
+
+
+template <typename ParamT>
+Observable<ParamT>::Observable() {
+  const int ret = pthread_rwlock_init(&listeners_rw_lock_, NULL);
+  assert (ret == 0);
+}
+
+
+template <typename ParamT>
+Observable<ParamT>::~Observable() {
+  UnregisterListeners();
+  pthread_rwlock_destroy(&listeners_rw_lock_);
+}
+
+
+template <typename ParamT>
+template <class DelegateT>
+typename Observable<ParamT>::callback_t Observable<ParamT>::RegisterListener(
+    typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
+    DelegateT *delegate) {
+  CallbackBase<ParamT> *callback =
+    new BoundCallback<ParamT, DelegateT>(method, delegate);
+  RegisterListener(callback);
+  return callback;
+}
+
+
+template <typename ParamT>
+typename Observable<ParamT>::callback_t Observable<ParamT>::RegisterListener(
+    typename Callback<ParamT>::CallbackFunction fn) {
+  CallbackBase<ParamT> *callback =
+    new Callback<ParamT>(fn);
+  RegisterListener(callback);
+  return callback;
+}
+
+
+template <typename ParamT>
+void Observable<ParamT>::RegisterListener(
+    Observable<ParamT>::callback_t callback_object) {
+  WriteLockGuard guard(listeners_rw_lock_);
+  listeners_.insert(callback_object);
+}
+
+
+template <typename ParamT>
+void Observable<ParamT>::UnregisterListener(
+    Observable<ParamT>::callback_t callback_object) {
+  WriteLockGuard guard(listeners_rw_lock_);
+
+  listeners_.erase(callback_object);
+  delete callback_object;
+}
+
+
+template <typename ParamT>
+void Observable<ParamT>::UnregisterListeners() {
+  WriteLockGuard guard(listeners_rw_lock_);
+
+  typename Callbacks::const_iterator i    = listeners_.begin();
+  typename Callbacks::const_iterator iend = listeners_.end();
+  for (; i != iend; ++i) {
+    delete *i;
+  }
+  listeners_.clear();
+}
+
+
+template <typename ParamT>
+void Observable<ParamT>::NotifyListeners(const ParamT &parameter) {
+  ReadLockGuard guard(listeners_rw_lock_);
+
+  typename Callbacks::const_iterator i    = listeners_.begin();
+  typename Callbacks::const_iterator iend = listeners_.end();
+  for (; i != iend; ++i) {
+    (**i)(parameter);
+  }
+}
+
+
+//
+// +----------------------------------------------------------------------------
+// |  ConcurrentWorkers
+//
+
+
 template <class WorkerT>
-ConcurrentWorkers<WorkerT>::ConcurrentWorkers(const size_t      number_of_workers,
-                                              const size_t      maximal_queue_length,
-                                              worker_context_t *worker_context) :
+ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
+          const size_t                                  number_of_workers,
+          const size_t                                  maximal_queue_length,
+          ConcurrentWorkers<WorkerT>::worker_context_t *worker_context) :
   number_of_workers_(number_of_workers),
   maximal_queue_length_(maximal_queue_length),
   desired_free_slots_(maximal_queue_length / 2 + 1),
   worker_context_(worker_context),
+  thread_context_(this, worker_context_),
   initialized_(false),
   running_(false)
 {
   assert (maximal_queue_length_ > 0);
   assert (desired_free_slots_   > 0);
   assert (number_of_workers     > 0);
+
+  atomic_init32(&jobs_pending_);
+  atomic_init32(&jobs_failed_);
+  atomic_init64(&jobs_processed_);
 }
 
 
 template <class WorkerT>
 ConcurrentWorkers<WorkerT>::~ConcurrentWorkers() {
-  if (running_) {
+  if (IsRunning()) {
     Terminate();
   }
-
-  // remove listener callbacks
-  UnregisterListeners();
 
   // destroy some synchronisation data structures
   pthread_cond_destroy(&job_queue_cond_not_full_);
   pthread_cond_destroy(&job_queue_cond_not_empty_);
   pthread_cond_destroy(&jobs_all_done_);
+  pthread_mutex_destroy(&running_mutex_);
   pthread_mutex_destroy(&job_queue_mutex_);
-  pthread_mutex_destroy(&listeners_mutex_);
 }
 
 
@@ -51,14 +144,13 @@ bool ConcurrentWorkers<WorkerT>::Initialize() {
            number_of_workers_, maximal_queue_length_);
 
   // initialize synchronisation for job queue (Workers)
-  if (pthread_mutex_init(&listeners_mutex_, NULL)         != 0) return false;
   if (pthread_mutex_init(&job_queue_mutex_, NULL)         != 0) return false;
+  if (pthread_mutex_init(&running_mutex_, NULL)           != 0) return false;
   if (pthread_cond_init(&job_queue_cond_not_full_, NULL)  != 0) return false;
   if (pthread_cond_init(&job_queue_cond_not_empty_, NULL) != 0) return false;
   if (pthread_cond_init(&jobs_all_done_, NULL)            != 0) return false;
 
   // spawn the Worker objects in their own threads
-  running_ = true;
   if (!SpawnWorkers()) {
     LogCvmfs(kLogConcurrency, kLogWarning, "Failed to spawn workers");
     return false;
@@ -74,6 +166,8 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
   assert (worker_threads_.size() == 0);
   worker_threads_.resize(number_of_workers_);
 
+  StartRunning();
+
   // spawn the swarm and make them work
   bool success = true;
   WorkerThreads::iterator i          = worker_threads_.begin();
@@ -83,7 +177,7 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
     const int retval = pthread_create(thread,
                                       NULL,
                                       &ConcurrentWorkers<WorkerT>::RunWorker,
-                                      pushworker_context_);
+                               (void*)&thread_context_);
     if (retval != 0) {
       LogCvmfs(kLogConcurrency, kLogWarning, "Failed to spawn a Worker");
       success = false;
@@ -101,17 +195,17 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   // INITIALIZATION
   /////////////////
 
-  RunBinding *binding = static_cast<RunBinding*>(run_binding);
-  ConcurrentWorkers<WorkerT> *delegate       = binding->delegate;
-  worker_context_t           *worker_context = binding->worker_context;
-  delete binding;
+  const RunBinding binding = *(static_cast<RunBinding*>(run_binding));
+  ConcurrentWorkers<WorkerT> *master         = binding.delegate;
+  const worker_context_t     *worker_context = binding.worker_context;
 
   // boot up the push worker object and make sure it works
-  WorkerT worker(worker_context, delegate);
+  WorkerT worker(worker_context);
+  worker.RegisterMaster(master);
   if (! worker.Initialize()) {
     LogCvmfs(kLogConcurrency, kLogWarning, "Worker was not initialized "
                                            "properly... it will die now!");
-    return NULL; 
+    return NULL;
   }
 
   //
@@ -120,14 +214,21 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
 
   // start the processing loop
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Starting Worker...");
-  while (master->is_running()) {
-    expected_data_t& job = delegate->AcquireJob();
-    worker(job);
+  while (master->IsRunning()) {
+    Job job = master->Acquire();
+    if (!job.is_death_sentence) {
+      worker(job.data);
+    } else {
+      break;
+    }
   }
 
   //
   // TEAR DOWN
   ////////////
+
+  // give the worker the chance to tidy up
+  worker.TearDown();
 
   // good bye thread...
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Terminating Worker...");
@@ -136,14 +237,14 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
 
 
 template <class WorkerT>
-void ConcurrentWorkers<WorkerT>::Schedule(const expected_data_t &data) {
+void ConcurrentWorkers<WorkerT>::Schedule(Job job) {
   // Note: This method can be called from arbitrary threads. Thus we do not
   //       necessarily have just one producer in the system.
 
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "scheduling new job");
+  assert (IsRunning() || job.is_death_sentence);
 
   // lock the job queue
-  PosixLockGuard guard(job_queue_mutex_);
+  MutexLockGuard guard(job_queue_mutex_);
 
   // wait until there is space in the job queue
   while (job_queue_.size() >= maximal_queue_length_) {
@@ -151,8 +252,10 @@ void ConcurrentWorkers<WorkerT>::Schedule(const expected_data_t &data) {
   }
 
   // put something into the job queue
-  job_queue_.push(data);
-  atomic_inc32(&jobs_pending_);
+  job_queue_.push(job);
+  if (!job.is_death_sentence) {
+    atomic_inc32(&jobs_pending_);
+  }
 
   // wake all waiting threads
   pthread_cond_broadcast(&job_queue_cond_not_empty_);
@@ -160,25 +263,29 @@ void ConcurrentWorkers<WorkerT>::Schedule(const expected_data_t &data) {
 
 
 template <class WorkerT>
-expected_data_t ConcurrentWorkers<WorkerT>::Acquire() {
+void ConcurrentWorkers<WorkerT>::ScheduleDeathSentences() {
+  const unsigned int number_of_workers = GetNumberOfWorkers();
+  for (unsigned int i = 0; i < number_of_workers; ++i) {
+    Schedule(Job());
+  }
+}
+
+template <class WorkerT>
+typename ConcurrentWorkers<WorkerT>::Job ConcurrentWorkers<WorkerT>::Acquire() {
   // Note: This method is exclusively called inside the worker threads!
   //       Any other usage might produce undefined behavior.
 
   // lock the job queue
-  PosixLockGuard guard(job_queue_mutex_);
+  MutexLockGuard guard(job_queue_mutex_);
 
   // wait until there is something to do
   while (job_queue_.empty()) {
     pthread_cond_wait(&job_queue_cond_not_empty_, &job_queue_mutex_);
-    if (!running_) {
-      // we were asked to commit suicide...
-      pthread_exit(NULL);
-    }
   }
 
   // get the job and remove it from the queue
-  const expected_data_t& job = job_queue_.front(); // TODO: need to copy here
-                               job_queue_.pop();   //       C++11 move semantics? don't really know...
+  Job job = job_queue_.front();
+  job_queue_.pop();
 
   // signal the Scheduler that there is a fair amount of free space now
   if (job_queue_.size() < desired_free_slots_) {
@@ -186,25 +293,24 @@ expected_data_t ConcurrentWorkers<WorkerT>::Acquire() {
   }
 
   // return the acquired job
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "acquired a job");
   return job;
 }
 
 
 template <class WorkerT>
 void ConcurrentWorkers<WorkerT>::Terminate() {
-  // Note: this method causes threads to die immediately after they finished
-  //       their last acquired job or when they are in idle state.
+  // Note: this method causes workers to die immediately after they finished
+  //       their last acquired job. To make sure that each worker will check
+  //       the running state, we schedule empty jobs or Death Sentences.
 
-  // lock the job queue
-  PosixLockGuard guard(job_queue_mutex_);
+  assert (IsRunning());
 
-  // unset the running flag (causing threads to die on the next check point)
-  running_ = false;
+  // unset the running flag (causing threads to die on the next checkpoint)
+  StopRunning();
 
-  // send broadcast to wake up possible idle threads
-  // they will first check the running_ flag and die immediately
-  pthread_cond_broadcast(&job_queue_cond_not_empty_);
+  // schedule empty jobs to make sure that each worker will actually reach the
+  // next checkpoint in their processing loop and terminate as expected
+  ScheduleDeathSentences();
 
   // wait for the worker threads to return
   WorkerThreads::const_iterator i    = worker_threads_.begin();
@@ -230,16 +336,19 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   }
 
   // thanks, and good bye...
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "All workers stopped. Terminating...");
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "All workers stopped. They processed "
+                                            "%d jobs. Terminating...",
+           atomic_read64(&jobs_processed_));
 }
 
 
 template <class WorkerT>
 void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
   // lock the job queue
-  PosixLockGuard guard(job_queue_mutex_);
+  MutexLockGuard guard(job_queue_mutex_);
 
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Waiting for all jobs to be finished...");
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Waiting for %d jobs to be finished",
+           atomic_read32(&jobs_pending_));
 
   // wait until all pending jobs are processed
   while (atomic_read32(&jobs_pending_) > 0) {
@@ -251,68 +360,41 @@ void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
 
 
 template <class WorkerT>
-void ConcurrentWorkers<WorkerT>::WaitForTermination() const {
+void ConcurrentWorkers<WorkerT>::WaitForTermination() {
+  if (!IsRunning())
+    return;
+
   WaitForEmptyQueue();
   Terminate();
 }
 
 
 template <class WorkerT>
-void ConcurrentWorkers<WorkerT>::RegisterListener(callback_t *callback_object) {
-  PosixLockGuard guard(listeners_mutex_);
-  listeners_.insert(callback_object);
-}
-
-
-template <class WorkerT>
-void ConcurrentWorkers<WorkerT>::UnregisterListener(callback_t *callback_object) {
-  PosixLockGuard guard(listeners_mutex_);
-  listeners_.erase(callback_object);
-}
-
-
-template <class WorkerT>
-void ConcurrentWorkers<WorkerT>::UnregisterListeners() {
-  PosixLockGuard guard(listeners_mutex_);
-  Callbacks::const_iterator i    = listeners_.begin();
-  Callbacks::const_iterator iend = listeners_.end();
-  for (; i != iend; ++i) {
-    delete *i;
-  }
-  listeners_.clear();
-}
-
-
-template <class WorkerT>
-void ConcurrentWorkers<WorkerT>::JobDone(const returned_data_t& data,
-                                         const bool             success) {
+void ConcurrentWorkers<WorkerT>::JobDone(
+              const ConcurrentWorkers<WorkerT>::returned_data_t& data,
+              const bool                                         success) {
   // BEWARE!
   // This is a callback method that might be called from a different thread!
 
   // check if the finished job was successful
-  if (success) {
-    LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Job succeeded";
-  } else {
+  if (!success) {
     atomic_inc32(&jobs_failed_);
     LogCvmfs(kLogConcurrency, kLogWarning, "Job failed");
   }
 
-  // call all callback objects and inform our groupies...
-  {
-    PosixLockGuard guard(listeners_mutex_);
-    Callbacks::const_iterator i    = listeners_.begin();
-    Callbacks::const_iterator iend = listeners_.end();
-    for (; i != iend; ++i) {
-      (**i)(data);
-    }
-  }
-
+  // notify all observers about the finished job
+  this->NotifyListeners(data);
+  
   // remove the finished job from the pending 'list'
-  atomic_dec32(&jobs_pending_);
+  {
+    MutexLockGuard guard(job_queue_mutex_);
+    atomic_dec32(&jobs_pending_);
+    atomic_inc64(&jobs_processed_);
 
-  // Signal the Spooler that all jobs are done...
-  if (atomic_read32(&jobs_pending_) == 0) {
-    pthread_cond_signal(&jobs_all_done_);
+    // Signal the Spooler that all jobs are done...
+    if (atomic_read32(&jobs_pending_) == 0) {
+      pthread_cond_broadcast(&jobs_all_done_);
+    }
   }
 }
 
