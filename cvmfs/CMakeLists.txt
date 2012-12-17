@@ -209,6 +209,16 @@ endif (NOT MACOSX)
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
+set (GTEST_ROOT "NOTFOUND" CACHE PATH "Where is the GTest package?")
+
+find_package (GTest QUIET)
+
+if (NOT GTEST_FOUND)
+    message (FATAL_ERROR "GTest was not found, you might want to set GTEST_ROOT!")
+endif (NOT GTEST_FOUND)
+
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
+
 
 #
 # set some include and linking stuff
@@ -227,6 +237,34 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
   include (${MURMUR_LOCATION}/CVMFS-CMakeLists.txt)
 	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MURMUR_LOCATION}/src)
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
+
+
+
+# ------------------------------------------------------------------------------
+
+set (CVMFS_SOURCES_TO_TEST
+    atomic.h
+
+    platform.h platform_osx.h platform_linux.h
+    hash.h hash.cc
+    smalloc.h
+    logging.h logging_internal.h logging.cc 
+    fs_traversal.h
+
+    util.h util.cc
+    util_concurrency.h util_concurrency_impl.h util_concurrency.cc
+
+    test_concurrency.cc
+)
+
+add_executable (test_concurrency ${CVMFS_SOURCES_TO_TEST})
+target_link_libraries(test_concurrency ${GTEST_BOTH_LIBRARIES} ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+
+set_target_properties (test_concurrency PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
+
+# ------------------------------------------------------------------------------
+
+
 
 if (BUILD_CVMFS)
 
