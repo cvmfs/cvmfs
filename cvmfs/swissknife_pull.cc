@@ -44,31 +44,31 @@ struct ChunkJob {
 };
 
 
-static void AbortSpoolerOnError(const string      &path,
-                                const int          retval,
-                                const hash::Any   &digest) {
-  if (retval != 0) {
+static void AbortSpoolerOnError(const upload::SpoolerResult &result) {
+  if (result.return_code != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
-             retval, path.c_str(), digest.ToString().c_str());
+             result.return_code,
+             result.local_path.c_str(),
+             result.content_hash.ToString().c_str());
     abort();
   }
 }
 
 
-string *stratum0_url = NULL;
-string *temp_dir = NULL;
-unsigned num_parallel = 1;
-bool pull_history = false;
-upload::Spooler *spooler = NULL;
-int pipe_chunks[2];
+string                  *stratum0_url = NULL;
+string                  *temp_dir = NULL;
+unsigned                 num_parallel = 1;
+bool                     pull_history = false;
+upload::AbstractSpooler *spooler = NULL;
+int                      pipe_chunks[2];
 // required for concurrent reading
-pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 upload::BackendStat *backend_stat = NULL;
-unsigned retries = 3;
-atomic_int64 overall_retries;
-atomic_int64 overall_chunks;
-atomic_int64 overall_new;
-atomic_int64 chunk_queue;
+unsigned             retries = 3;
+atomic_int64         overall_retries;
+atomic_int64         overall_chunks;
+atomic_int64         overall_new;
+atomic_int64         chunk_queue;
 
 }
 
@@ -295,12 +295,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   stratum0_url = args.find('u')->second;
   temp_dir = args.find('x')->second;
-  spooler = upload::Spooler::Construct(*args.find('r')->second);
+  spooler = upload::AbstractSpooler::Construct(*args.find('r')->second);
   assert(spooler);
   backend_stat = upload::GetBackendStat(*args.find('r')->second);
   assert(backend_stat);
   spooler->set_move_mode(true);
-  spooler->SetCallback(new upload::SpoolerCallback(&AbortSpoolerOnError));
+  spooler->RegisterListener(&AbortSpoolerOnError);
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
   if (args.find('n') != args.end())

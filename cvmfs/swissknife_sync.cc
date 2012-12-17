@@ -85,7 +85,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-  upload::Spooler *spooler = upload::Spooler::Construct(spooler_definition);
+  upload::AbstractSpooler *spooler =
+    upload::AbstractSpooler::Construct(spooler_definition);
   assert(spooler);
 
   manifest::Manifest *manifest =
@@ -111,7 +112,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   const string dest = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
-  upload::Spooler *spooler = upload::Spooler::Construct(spooler_definition);
+  upload::AbstractSpooler *spooler =
+    upload::AbstractSpooler::Construct(spooler_definition);
   assert(spooler);
   spooler->Copy(source, dest);
   spooler->EndOfTransaction();
@@ -154,7 +156,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 	if (!CheckParams(&params)) return 2;
 
   // Start spooler
-  params.spooler = upload::Spooler::Construct(params.spooler_definition);
+  params.spooler = upload::AbstractSpooler::Construct(params.spooler_definition);
   if (NULL == params.spooler)
     return 3;
 
@@ -179,6 +181,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   // finalize the spooler
+  LogCvmfs(kLogCvmfs, kLogStdout, "Spooler will die...");
   params.spooler->EndOfTransaction();
   params.spooler->WaitForTermination();
   delete params.spooler;

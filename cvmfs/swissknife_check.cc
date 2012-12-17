@@ -243,11 +243,11 @@ static bool Find(const catalog::Catalog *catalog,
       computed_counters->d_self_dir++;
       num_subdirs++;
       // Directory size
-      if (entries[i].size() < 4096) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "invalid file size for %s",
-                 full_path.c_str());
-        retval = false;
-      }
+      // if (entries[i].size() < 4096) {
+      //   LogCvmfs(kLogCvmfs, kLogStderr, "invalid file size for %s",
+      //            full_path.c_str());
+      //   retval = false;
+      // }
       // No directory hardlinks
       if (entries[i].hardlink_group() != 0) {
         LogCvmfs(kLogCvmfs, kLogStderr, "directory hardlink found at %s",

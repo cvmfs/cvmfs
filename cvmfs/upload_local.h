@@ -5,53 +5,88 @@
 #ifndef CVMFS_UPLOAD_LOCAL_H_
 #define CVMFS_UPLOAD_LOCAL_H_
 
-#include "upload_pushworker.h"
+#include "upload.h"
+
+#include "util_concurrency.h"
 
 namespace upload
 {
-  class LocalPushWorker : public AbstractPushWorker {
-   public:
-    /**
-     * See AbstractPushWorker for description
-     */
-    class Context : public AbstractPushWorker::ContextBase<SpoolerImpl<LocalPushWorker> > {
+  class LocalSpooler : public AbstractSpooler {
+   protected:
+    class LocalCompressionWorker : public ConcurrentWorker<LocalCompressionWorker> {
      public:
-      Context(SpoolerImpl<LocalPushWorker> *master,
-              const std::string            &upstream_path) :
-        AbstractPushWorker::ContextBase<SpoolerImpl<LocalPushWorker> >(master),
-        upstream_path(upstream_path) {}
+      struct expected_data {
+        expected_data(const std::string &local_path,
+                      const std::string &remote_dir,
+                      const std::string &file_suffix,
+                      const bool         move) :
+          local_path(local_path),
+          remote_dir(remote_dir),
+          file_suffix(file_suffix),
+          move(move) {}
+
+        expected_data() : local_path(), remote_dir(), file_suffix(), move(false) {}
+
+        const std::string local_path;
+        const std::string remote_dir;
+        const std::string file_suffix;
+        const bool        move;
+      };
+
+      struct returned_data {
+        returned_data(const int          return_code,
+                      const std::string &local_path = "",
+                      const hash::Any   &content_hash = hash::Any()) :
+          return_code(return_code),
+          local_path(local_path),
+          content_hash(content_hash) {}
+
+        const int         return_code;
+        const std::string local_path;
+        const hash::Any   content_hash;
+      };
+
+      struct worker_context {
+        worker_context(const std::string &upstream_path) :
+          upstream_path(upstream_path) {}
+
+        const std::string upstream_path;
+      };
 
      public:
-      const std::string upstream_path;
+      LocalCompressionWorker(const worker_context *context);
+      void operator()(const expected_data &data);
+
+     private:
+      const std::string upstream_path_;
     };
 
-    /**
-     * See AbstractPushWorker for description
-     */
-    static Context* GenerateContext(SpoolerImpl<LocalPushWorker>     *master,
-                                    const Spooler::SpoolerDefinition &spooler_definition);
-
-    /**
-     * See AbstractPushWorker for description
-     */
-    static int GetNumberOfWorkers(const Context *context);
-
-
    public:
-    LocalPushWorker(Context *context);
+    LocalSpooler(const SpoolerDefinition &spooler_definition);
 
-    bool Initialize();
-    bool IsReady() const;
-   
+    void Copy(const std::string &local_path,
+              const std::string &remote_path);
+    void Process(const std::string &local_path,
+                 const std::string &remote_dir,
+                 const std::string &file_suffix);
+
+    void EndOfTransaction();
+    void WaitForUpload() const;
+    void WaitForTermination() const;
+
+    int num_errors();
+
    protected:
-    void ProcessCopyJob(StorageCopyJob *copy_job);
-    void ProcessCompressionJob(StorageCompressionJob *compression_job);
+    bool Initialize();
+    void TearDown();
+
+    void CompressionCallback(const LocalCompressionWorker::returned_data &data);
 
    private:
-    Context *context_;
-
     const std::string upstream_path_;
-    bool initialized_;
+
+    ConcurrentWorkers<LocalCompressionWorker> *concurrent_compression_;
+    LocalCompressionWorker::worker_context    *worker_context_;
   };
 }
 

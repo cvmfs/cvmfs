@@ -1,63 +1,63 @@
-/**
- * This file is part of the CernVM File System.
- */
+// /**
+//  * This file is part of the CernVM File System.
+//  */
 
-#include "upload_pushworker.h"
+// #include "upload_pushworker.h"
 
-#include <unistd.h>
+// #include <unistd.h>
 
-using namespace upload;
+// using namespace upload;
 
-const int AbstractPushWorker::default_number_of_processors = 1;
-
-
-AbstractPushWorker::~AbstractPushWorker() {
-  LogCvmfs(kLogSpooler, kLogStdout, "Processed jobs: %d", processed_jobs_count_);
-}
+// const int AbstractPushWorker::default_number_of_processors = 1;
 
 
-bool AbstractPushWorker::Initialize() {
-  return true;
-}
+// AbstractPushWorker::~AbstractPushWorker() {
+//   LogCvmfs(kLogSpooler, kLogStdout, "Processed jobs: %d", processed_jobs_count_);
+// }
 
 
-bool AbstractPushWorker::IsReady() const {
-  return true;
-}
+// bool AbstractPushWorker::Initialize() {
+//   return true;
+// }
 
 
-bool AbstractPushWorker::DoGlobalInitialization(const Context* context) {
-  return true;
-}
+// bool AbstractPushWorker::IsReady() const {
+//   return true;
+// }
 
 
-void AbstractPushWorker::DoGlobalCleanup() {}
+// bool AbstractPushWorker::DoGlobalInitialization(const Context* context) {
+//   return true;
+// }
 
 
-void AbstractPushWorker::ProcessJob(StorageJob *job) {
-  processed_jobs_count_++;
-
-  if (job->IsCompressionJob()) {
-    StorageCompressionJob 
-    *compression_job = dynamic_cast<StorageCompressionJob*>(job);
-    ProcessCompressionJob(compression_job);
-  } else if (job->IsCopyJob()) {
-    StorageCopyJob *copy_job = dynamic_cast<StorageCopyJob*>(job);
-    ProcessCopyJob(copy_job);
-  }
-}
+// void AbstractPushWorker::DoGlobalCleanup() {}
 
 
-int AbstractPushWorker::GetNumberOfCpuCores() {
-  const int numCPU = sysconf(_SC_NPROCESSORS_ONLN);
+// void AbstractPushWorker::ProcessJob(StorageJob *job) {
+//   processed_jobs_count_++;
 
-  if (numCPU <= 0) {
-    LogCvmfs(kLogSpooler, kLogWarning, "Unable to determine the available "
-                                       "number of processors in the system... "
-                                       "falling back to default '%d'",
-             AbstractPushWorker::default_number_of_processors);
-    return AbstractPushWorker::default_number_of_processors;
-  }
+//   if (job->IsCompressionJob()) {
+//     StorageCompressionJob 
+//     *compression_job = dynamic_cast<StorageCompressionJob*>(job);
+//     ProcessCompressionJob(compression_job);
+//   } else if (job->IsCopyJob()) {
+//     StorageCopyJob *copy_job = dynamic_cast<StorageCopyJob*>(job);
+//     ProcessCopyJob(copy_job);
+//   }
+// }
 
-  return numCPU;
-}
+
+// int AbstractPushWorker::GetNumberOfCpuCores() {
+//   const int numCPU = sysconf(_SC_NPROCESSORS_ONLN);
+
+//   if (numCPU <= 0) {
+//     LogCvmfs(kLogSpooler, kLogWarning, "Unable to determine the available "
+//                                        "number of processors in the system... "
+//                                        "falling back to default '%d'",
+//              AbstractPushWorker::default_number_of_processors);
+//     return AbstractPushWorker::default_number_of_processors;
+//   }
+
+//   return numCPU;
+// }

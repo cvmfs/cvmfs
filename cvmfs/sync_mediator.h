@@ -137,12 +137,8 @@ class SyncMediator {
                                const std::string &dir_name);
 
   // Called by Upload Spooler
-  void PublishFilesCallback(const std::string &path,
-                            const int          retval,
-                            const hash::Any   &digest);
-  void PublishHardlinksCallback(const std::string &path,
-                                const int          retval,
-                                const hash::Any   &digest);
+  void PublishFilesCallback(const upload::SpoolerResult &result);
+  void PublishHardlinksCallback(const upload::SpoolerResult &result);
 
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
