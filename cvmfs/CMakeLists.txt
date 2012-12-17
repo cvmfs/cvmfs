@@ -83,9 +83,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   compression.h compression.cc
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
-  upload_jobs.h upload_jobs.cc
-  upload.h upload_impl.h upload.cc
-  upload_pushworker.h upload_pushworker.cc
+  upload.h upload.cc
   upload_local.h upload_local.cc
   upload_riak.h upload_riak.cc
   # riak uses JSON for configuration, therefore we need
