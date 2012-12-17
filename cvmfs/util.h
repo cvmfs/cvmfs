@@ -96,6 +96,25 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
                  const std::map<int, int> &map_fildes);
 
+template <class T>
+class UniquePtr {
+ public:
+  inline UniquePtr() : ref_(NULL) {}
+  inline UniquePtr(T *ref) : ref_(ref) {}
+  inline ~UniquePtr()                 { delete ref_; }
+
+  inline operator bool() const        { return (ref_ != NULL); }
+  inline operator T*() const          { return ref_; }
+  inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
+  inline T* operator->() const        { return ref_; }
+
+ private:
+  UniquePtr(const UniquePtr &ptr)     { assert (false); } // don't copy!
+
+ private:
+  T *ref_;
+};
+
 /**
  * Very simple StopWatch implementation.
  * Currently the implementation does not allow a restart of a stopped
