@@ -20,6 +20,24 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+class Lockable {
+ public:
+  inline Lockable()          { pthread_mutex_init(&mutex_, NULL); }
+  inline virtual ~Lockable() { pthread_mutex_destroy(&mutex_);    }
+
+  void Lock() const          { pthread_mutex_lock(&mutex_);       }
+  void Unlock() const        { pthread_mutex_unlock(&mutex_);     }
+
+ private:
+  mutable pthread_mutex_t mutex_;
+};
+
+
+//
+// -----------------------------------------------------------------------------
+//
+
+
 /**
  * RAII ftw!
  * This is a very simple scooped lock implementation. Every object that has the
@@ -28,16 +46,16 @@ namespace CVMFS_NAMESPACE_GUARD {
  * the LockGuard runs out of scope it will automatically release the lock. This
  * ensures a clean unlock in a lot of situations!
  */
-template<typename T>
+template<typename LockableT>
 class LockGuard {
  public:
-  LockGuard(T &lock) :
+  LockGuard(const LockableT &lock) :
     ref_(lock)
   {
     ref_.Lock();
   }
 
-  LockGuard(T *lock) :
+  LockGuard(const LockableT *lock) :
     ref_(*lock)
   {
     ref_.Lock();
@@ -50,7 +68,7 @@ class LockGuard {
  private:
   LockGuard(const LockGuard&); // don't copy that!
 
-  T &ref_;
+  const LockableT &ref_;
 };
 
 /**
@@ -217,6 +235,7 @@ class Observable {
 //
 // -----------------------------------------------------------------------------
 //
+
 
 static const unsigned int kFallbackNumberOfCpus = 1;
 unsigned int GetNumberOfCpuCores();
