@@ -63,9 +63,9 @@ AbstractSpooler* AbstractSpooler::Construct(
       spooler = new LocalSpooler(spooler_definition);
       break;
 
-    // case SpoolerDefinition::Riak:
-    //   spooler = new RiakSpooler(spooler_definition);
-    //   break;
+    case SpoolerDefinition::Riak:
+      spooler = new RiakSpooler(spooler_definition);
+      break;
 
     default:
       LogCvmfs(kLogSpooler, kLogStderr, "invalid spooler definition");
@@ -84,15 +84,12 @@ AbstractSpooler* AbstractSpooler::Construct(
 
 
 AbstractSpooler::AbstractSpooler(const SpoolerDefinition &spooler_definition) :
-  callback_(NULL),
   spooler_definition_(spooler_definition),
   move_(false)
 {}
 
 
-AbstractSpooler::~AbstractSpooler() {
-  delete callback_;
-}
+AbstractSpooler::~AbstractSpooler() {}
 
 
 // -----------------------------------------------------------------------------

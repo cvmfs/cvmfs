@@ -24,7 +24,7 @@ LocalSpooler::LocalSpooler(const SpoolerDefinition &spooler_definition) :
 }
 
   
-int LocalSpooler::num_errors() {
+unsigned int LocalSpooler::num_errors() {
   return 0; // TODO: ...
 }
 
@@ -54,8 +54,6 @@ bool LocalSpooler::Initialize() {
 
 void LocalSpooler::TearDown() {
   concurrent_compression_->WaitForTermination();
-  delete concurrent_compression_;
-  delete worker_context_;
 }
 
 
@@ -72,10 +70,7 @@ void LocalSpooler::Process(const std::string &local_path,
 
 void LocalSpooler::CompressionCallback(
                           const LocalCompressionWorker::returned_data &data) {
-  const SpoolerResult result(data.return_code,
-                             data.local_path,
-                             data.content_hash);
-  NotifyListeners(result);
+  NotifyListeners(data);
 }
 
 

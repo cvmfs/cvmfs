@@ -41,7 +41,7 @@ namespace upload
 
 
   struct SpoolerResult {
-    SpoolerResult(const int         return_code,
+    SpoolerResult(const int         return_code = -1,
                   const std::string &local_path = "",
                   const hash::Any   &digest     = hash::Any()) :
       return_code(return_code),
@@ -89,6 +89,27 @@ namespace upload
       std::string digests_in_pipe;
 
       bool valid_;
+    };
+
+
+    struct compression_parameters {
+      compression_parameters(const std::string &local_path,
+                             const std::string &remote_dir,
+                             const std::string &file_suffix,
+                             const bool         move) :
+        local_path(local_path),
+        remote_dir(remote_dir),
+        file_suffix(file_suffix),
+        move(move) {}
+
+      // default constructor to create an 'empty' struct
+      compression_parameters() :
+        local_path(), remote_dir(), file_suffix(), move(false) {}
+
+      const std::string local_path;
+      const std::string remote_dir;
+      const std::string file_suffix;
+      const bool        move;
     };
 
 
@@ -155,7 +176,7 @@ namespace upload
      */
     virtual void WaitForTermination() const = 0;
 
-    virtual int num_errors() = 0;
+    virtual unsigned int num_errors() = 0;
 
     inline void set_move_mode(const bool move) { move_ = move; }
 
@@ -169,16 +190,11 @@ namespace upload
     inline bool move() const { return move_; }
 
    private:
-    // Callback
-    CallbackBase<callback_param> *callback_;
-
     // Status Information
     const SpoolerDefinition spooler_definition_;
     bool                    move_;
   };
 
 }
-
-#include "upload_impl.h"
 
 #endif /* CVMFS_UPLOAD_H_ */

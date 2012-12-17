@@ -1,30 +1,28 @@
-// /**
-//  * This file is part of the CernVM File System.
-//  */
+/**
+ * This file is part of the CernVM File System.
+ */
 
-// #include "upload_riak.h"
+#include "upload_riak.h"
 
-// #include <fcntl.h>
-// #include <sys/stat.h>
-// #include <unistd.h>
-// #include <stdlib.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdlib.h>
 
-// #include <algorithm>
+#include <algorithm>
 
-// #include "duplex_curl.h"
-// #include "logging.h"
+#include "duplex_curl.h"
+#include "logging.h"
 
-// #include "util.h"
-// #include "util_concurrency.h"
-// #include "vjson/json.h"
+#include "util.h"
+#include "util_concurrency.h"
+#include "vjson/json.h"
 
-// using namespace upload;
+using namespace upload;
 
 // RiakPushWorker::Context* RiakPushWorker::GenerateContext(
 //                             SpoolerImpl<RiakPushWorker>      *master,
 //                             const Spooler::SpoolerDefinition &spooler_definition) {
-//   assert (spooler_definition.IsValid() &&
-//           spooler_definition.driver_type == Spooler::SpoolerDefinition::Riak);
 
 //   std::vector<std::string> upstream_url_vector =
 //     SplitString(spooler_definition.spooler_description, '@');
@@ -41,13 +39,14 @@
 // }
 
 
-// const std::string& RiakPushWorker::Context::AcquireUpstreamUrl() const {
-//   assert (upstream_urls.size() > 0);
-//   // get an unique upstream URL and set the pointer to the next one...
-//   const std::string& result = upstream_urls[next_upstream_url_];
-//   next_upstream_url_ = (next_upstream_url_ + 1) % upstream_urls.size();
-//   return result;
-// }
+const std::string& RiakSpooler::UploadWorker::worker_context::AcquireUpstreamUrl() const {
+  assert (upstream_urls.size() > 0);
+  // get an unique upstream URL and set the pointer to the next one...
+  LockGuard<worker_context> guard(this);
+  const std::string& result = upstream_urls[next_upstream_url_];
+  next_upstream_url_ = (next_upstream_url_ + 1) % upstream_urls.size();
+  return result;
+}
 
 
 // bool RiakPushWorker::DoGlobalInitialization(const Context *context) {
@@ -78,80 +77,141 @@
 // }
 
 
-// RiakPushWorker::RiakPushWorker(Context* context) :
-//   context_(context),
-//   initialized_(false),
-//   http_headers_download_(NULL),
-//   compression_buffer_(NULL),
-//   compression_buffer_size_(context->compression_buffer_size),
-//   compression_time_aggregated_(0),
-//   upload_time_aggregated_(0),
-//   curl_upload_time_aggregated_(0),
-//   curl_get_vclock_time_aggregated_(0),
-//   curl_connection_time_aggregated_(0),
-//   curl_connections_(0),
-//   curl_upload_speed_aggregated_(0),
-//   upload_jobs_count_(0)
-// {
-//   LockGuard<Context> lock(context);
-//   upstream_url_ = context->AcquireUpstreamUrl();
-//   compression_buffer_ = (unsigned char*)malloc(compression_buffer_size_);
-//   assert (compression_buffer_ != NULL);
-// }
+RiakSpooler::RiakSpooler(const SpoolerDefinition &spooler_definition) :
+  AbstractSpooler(spooler_definition),
+//  http_headers_download_(NULL),
+
+  concurrent_compression_(NULL),
+  concurrent_upload_(NULL),
+  compression_context_(NULL),
+  upload_context_(NULL),
+
+  compression_time_aggregated_(0),
+  upload_time_aggregated_(0),
+  curl_upload_time_aggregated_(0),
+  curl_get_vclock_time_aggregated_(0),
+  curl_connection_time_aggregated_(0),
+  curl_connections_(0),
+  curl_upload_speed_aggregated_(0),
+  upload_jobs_count_(0)
+{
+  assert (spooler_definition.IsValid() &&
+          spooler_definition.driver_type == SpoolerDefinition::Riak);
+}
 
 
-// RiakPushWorker::~RiakPushWorker() {
-//   curl_easy_cleanup(curl_upload_);
-//   curl_easy_cleanup(curl_download_);
-//   curl_slist_free_all(http_headers_download_);
 
-//   free(compression_buffer_);
+bool RiakSpooler::Initialize() {
+  // get the individual upstream URLs out of the spooler description string
+  std::vector<std::string> upstream_url_vector =
+    SplitString(spooler_definition().spooler_description, '@');
+  if (upstream_url_vector.empty()) {
+    LogCvmfs(kLogSpooler, kLogWarning, "No Riak upstream URL given");
+    return false;
+  }
 
-//   if (upload_jobs_count_ == 0) {
-//     LogCvmfs(kLogSpooler, kLogStdout, "Did not compress/upload anything.");
-//     return;
-//   }
+  // initialize the cURL environment
+  if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize cURL library");
+    return false;
+  }
 
-//   const double uploaded_jobs = (double)upload_jobs_count_;
-//   LogCvmfs(kLogSpooler, kLogStdout, "Statistics:\n"
-//                                     "Avg Compression time:          %f s\n"
-//                                     "Avg Uploading time:            %f s\n"
-//                                     "Avg CURL upload time:          %f s\n"
-//                                     "Avg CURL Vclock retrieve time: %f s\n"
-//                                     "Avg CURL connection time:      %f s\n"
-//                                     "CURL connections:              %d\n"
-//                                     "Avg Data Upload speed:         %f kB/s",
+  // check if the Riak cluster is correctly configured
+  if (! CheckRiakConfiguration(upstream_url_vector.front())) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Riak cluster is misconfigured");
+    return false;
+  }
 
-//            (compression_time_aggregated_     / uploaded_jobs),
-//            (upload_time_aggregated_          / uploaded_jobs),
-//            (curl_upload_time_aggregated_     / uploaded_jobs),
-//            (curl_get_vclock_time_aggregated_ / uploaded_jobs),
-//            (curl_connection_time_aggregated_ / uploaded_jobs*2),
-//             curl_connections_,
-//            (curl_upload_speed_aggregated_    / uploaded_jobs / 1024.0));
-// }
+  // generate the concurrent worker contexts
+  compression_context_ = new CompressionWorker::worker_context();
+  upload_context_      = new UploadWorker::worker_context(upstream_url_vector);
+
+  assert (compression_context_ && upload_context_);
+
+  // create the concurrent workers environments
+  const unsigned int number_of_cpus = GetNumberOfCpuCores();
+  concurrent_compression_ =
+    new ConcurrentWorkers<CompressionWorker>(number_of_cpus,
+                                             number_of_cpus * 10, // TODO: magic number (?)
+                                             compression_context_);
+  concurrent_upload_      =
+    new ConcurrentWorkers<UploadWorker>(number_of_cpus * 5,
+                                        number_of_cpus * 50, // TODO: magic number (?)
+                                        upload_context_);
+
+  assert(concurrent_compression_ && concurrent_upload_);
+
+  // initialize the concurrent workers
+  if (! concurrent_compression_->Initialize() ||
+      ! concurrent_upload_->Initialize()) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize concurrent "
+                                       "workers for RiakSpooler.");
+    return false;
+  }
+
+  // register callbacks to the concurrent workers
+  concurrent_compression_->RegisterListener(
+                              &RiakSpooler::CompressionWorkerCallback,
+                              this);
+  concurrent_upload_->RegisterListener(
+                              &RiakSpooler::UploadWorkerCallback,
+                              this);
+
+  // all set... ready to go
+  return true;
+}
 
 
-// bool RiakPushWorker::Initialize() {
-//   bool retval = AbstractPushWorker::Initialize();
-//   if (!retval)
-//     return false;
+void RiakSpooler::TearDown() {
+  curl_global_cleanup();
+}
 
-//   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Configuring cURL handles for putting "
-//                                         "files into a Riak instance");
 
-//   if (!InitUploadHandle() || !InitDownloadHandle()) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize cURL handle.");
-//     return false;
-//   }
+RiakSpooler::~RiakSpooler() {
+  // curl_easy_cleanup(curl_upload_);
+  // curl_easy_cleanup(curl_download_);
+  // curl_slist_free_all(http_headers_download_);
 
-//   // all done
-//   LogCvmfs(kLogSpooler, kLogVerboseMsg, "successfully initialized Riak "
-//                                         "spooler backend");
+  const double uploaded_jobs = (double)upload_jobs_count_;
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Statistics:\n"
+                                        "Avg Compression time:          %f s\n"
+                                        "Avg Uploading time:            %f s\n"
+                                        "Avg CURL upload time:          %f s\n"
+                                        "Avg CURL Vclock retrieve time: %f s\n"
+                                        "Avg CURL connection time:      %f s\n"
+                                        "CURL connections:              %d\n"
+                                        "Avg Data Upload speed:         %f kB/s",
 
-//   initialized_ = true;
-//   return true;
-// }
+           (compression_time_aggregated_     / uploaded_jobs),
+           (upload_time_aggregated_          / uploaded_jobs),
+           (curl_upload_time_aggregated_     / uploaded_jobs),
+           (curl_get_vclock_time_aggregated_ / uploaded_jobs),
+           (curl_connection_time_aggregated_ / uploaded_jobs*2),
+            curl_connections_,
+           (curl_upload_speed_aggregated_    / uploaded_jobs / 1024.0));
+}
+
+
+//bool RiakSpooler::Initialize() {
+  // bool retval = AbstractPushWorker::Initialize();
+  // if (!retval)
+  //   return false;
+
+  // LogCvmfs(kLogSpooler, kLogVerboseMsg, "Configuring cURL handles for putting "
+  //                                       "files into a Riak instance");
+
+  // if (!InitUploadHandle() || !InitDownloadHandle()) {
+  //   LogCvmfs(kLogSpooler, kLogStderr, "failed to initialize cURL handle.");
+  //   return false;
+  // }
+
+  // // all done
+  // LogCvmfs(kLogSpooler, kLogVerboseMsg, "successfully initialized Riak "
+  //                                       "spooler backend");
+
+  // initialized_ = true;
+  // return true;
+//}
 
 
 // bool RiakPushWorker::InitUploadHandle() {
@@ -205,32 +265,60 @@
 // }
 
 
-// void RiakPushWorker::ProcessCopyJob(StorageCopyJob *copy_job) {
-//   if (copy_job->move()) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "RiakPushWorker does not support "
-//                                       "move at the moment.");
-//     copy_job->Failed();
-//     return;
-//   }
+std::string RiakSpooler::compression_results::GetRiakKey() const {
+  if (remote_path.empty()) {
+    return "data"                  + // TODO: replace magic string
+           content_hash.ToString() + 
+           file_suffix;
+  } else {
+    std::string result;
+    std::remove_copy(remote_path.begin(), 
+                     remote_path.end(), 
+                     std::back_inserter(result), 
+                     '/');
+    return result;
+  }
+}
 
-//   const std::string& remote_path = copy_job->remote_path();
-//   const std::string& local_path  = copy_job->local_path();
+void RiakSpooler::Copy(const std::string &local_path,
+                       const std::string &remote_path) {
+  if (move()) {
+    LogCvmfs(kLogSpooler, kLogStderr, "RiakPushWorker does not support "
+                                      "move at the moment.");
+    const SpoolerResult failed(1, local_path);
+    NotifyListeners(failed);
+    return;
+  }
 
-//   // copy is always critical... set third parameter to 'true'
-//   const int retval = PushFileToRiak(GenerateRiakKey(remote_path),
-//                                     local_path,
-//                                     true);
+  compression_results input(local_path, remote_path);
+  concurrent_upload_->Schedule(input);
 
-//   copy_job->Finished(retval);
-// }
+  // // copy is always critical... set third parameter to 'true'
+  // const int retval = PushFileToRiak(GenerateRiakKey(remote_path),
+  //                                   local_path,
+  //                                   true);
 
-// //#define RANDOM_TEST
+  // copy_job->Finished(retval);
+}
 
-// //#define NOOP
-// //#define READ_ONLY
-// //#define COMPRESSION_TO_MEM
-// //#define COMPRESSION_TO_DISK
-// //#define UPLOAD_RANDOM_DATA
+
+void RiakSpooler::Process(const std::string &local_path,
+                          const std::string &remote_dir,
+                          const std::string &file_suffix) {
+  compression_parameters params(local_path,
+                                remote_dir,
+                                file_suffix,
+                                move());
+  concurrent_compression_->Schedule(params);
+}
+
+//#define RANDOM_TEST
+
+//#define NOOP
+//#define READ_ONLY
+//#define COMPRESSION_TO_MEM
+//#define COMPRESSION_TO_DISK
+//#define UPLOAD_RANDOM_DATA
 
 // void RiakPushWorker::ProcessCompressionJob(
 //                                       StorageCompressionJob *compression_job) {
@@ -395,11 +483,11 @@
 // }
 
 
-// /**
-//  * This method looks for the X-Riak-Vclock header and copies its value into the 
-//  * std::string provided through the void *userdata pointer.
-//  * Handle this thing with absolute care!
-//  */
+/**
+ * This method looks for the X-Riak-Vclock header and copies its value into the 
+ * std::string provided through the void *userdata pointer.
+ * Handle this thing with absolute care!
+ */
 // size_t RiakPushWorker::ObtainVclockCallback(void *ptr, 
 //                                             size_t size,
 //                                             size_t nmemb,
@@ -794,248 +882,239 @@
 // }
 
 
-// bool RiakPushWorker::CheckRiakConfiguration(const Context *context) {
-//   // get the URL for the configuration download
-//   assert (!context->upstream_urls.empty());
-//   const std::string url = context->upstream_urls.front();
+bool RiakSpooler::CheckRiakConfiguration(const std::string &url) {
+  // download the configuration
+  DataBuffer buffer;
+  if (! DownloadRiakConfiguration(url, buffer)) return false;
 
-//   // download the configuration
-//   DataBuffer buffer;
-//   if (!DownloadRiakConfiguration(url, buffer)) return false;
+  // parse JSON configuration
+  JSON *root = ParseJsonConfiguration(buffer);
 
-//   // parse JSON configuration
-//   JSON *root = ParseJsonConfiguration(buffer);
-
-//   // check the configuration
-//   return CheckJsonConfiguration(root);
-// }
+  // check the configuration
+  return CheckJsonConfiguration(root);
+}
 
 
-// bool RiakPushWorker::DownloadRiakConfiguration(const std::string &url,
-//                                                DataBuffer& buffer) {
-//   // initialize cURL handle
-//   CURL *curl_handle = curl_easy_init();
-//   if (! curl_handle) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Failed to initialize cURL handle to "
-//                                       "check the riak configuration.");
-//     return false;
-//   }
+bool RiakSpooler::DownloadRiakConfiguration(const std::string &url,
+                                            DataBuffer& buffer) {
+  // initialize cURL handle
+  CURL *curl_handle = curl_easy_init();
+  if (! curl_handle) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to initialize cURL handle to "
+                                      "check the riak configuration.");
+    return false;
+  }
 
-//   // set request headers
-//   struct curl_slist *headers = NULL;
-//   headers = curl_slist_append(headers, "Accept: */*");
+  // set request headers
+  struct curl_slist *headers = NULL;
+  headers = curl_slist_append(headers, "Accept: */*");
 
-//   // configure cURL handle
-//   if (curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L)                      != CURLE_OK ||
-//       curl_easy_setopt(curl_handle, CURLOPT_TCP_KEEPALIVE, 0L)                   != CURLE_OK ||
-//       curl_easy_setopt(curl_handle, CURLOPT_HTTPGET, 1L)                         != CURLE_OK ||
-//       curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, headers)                 != CURLE_OK ||
-//       curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &buffer)                  != CURLE_OK ||
-//       curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, &ReceiveDataCallback) != CURLE_OK ||
-//       curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str())          != CURLE_OK)
-//   {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Failed to configure cURL handle to "
-//                                       "check the riak configuration.");
-//     return false;
-//   }
+  // configure cURL handle
+  if (curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L)                      != CURLE_OK ||
+      curl_easy_setopt(curl_handle, CURLOPT_TCP_KEEPALIVE, 0L)                   != CURLE_OK ||
+      curl_easy_setopt(curl_handle, CURLOPT_HTTPGET, 1L)                         != CURLE_OK ||
+      curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, headers)                 != CURLE_OK ||
+      curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &buffer)                  != CURLE_OK ||
+      curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, &ReceiveDataCallback) != CURLE_OK ||
+      curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str())          != CURLE_OK)
+  {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to configure cURL handle to "
+                                      "check the riak configuration.");
+    return false;
+  }
 
-//   // do the action!
-//   if (curl_easy_perform(curl_handle) != CURLE_OK) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Failed to download bucket configuration "
-//                                       "for Riak URL: %s",
-//              url.c_str());
-//     return false;
-//   }
+  // do the action!
+  if (curl_easy_perform(curl_handle) != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to download bucket configuration "
+                                      "for Riak URL: %s",
+             url.c_str());
+    return false;
+  }
 
-//   // check the response code
-//   long response_code;
-//   if (curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &response_code) != CURLE_OK) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Failed to retrieve response code from "
-//                                       "request");
-//     return false;
-//   }
+  // check the response code
+  long response_code;
+  if (curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &response_code) != CURLE_OK) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to retrieve response code from "
+                                      "request");
+    return false;
+  }
 
-//   // check if response code is valid
-//   if (response_code != 200) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Failed to check configuration of Riak "
-//                                       "HTTP Response code was: %d",
-//              response_code);
-//     return false; 
-//   }
+  // check if response code is valid
+  if (response_code != 200) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to check configuration of Riak "
+                                      "HTTP Response code was: %d",
+             response_code);
+    return false; 
+  }
 
-//   // all done...
-//   curl_easy_cleanup(curl_handle);
+  // all done...
+  curl_easy_cleanup(curl_handle);
 
-//   return true;
-// }
-
-
-// JSON* RiakPushWorker::ParseJsonConfiguration(DataBuffer& buffer) {
-//   // parse the JSON string with the vjson library
-//   char *error_pos  = 0;
-//   char *error_desc = 0;
-//   int error_line   = 0;
-//   block_allocator allocator(1 << 10);
-//   JSON *root = json_parse((char*)buffer.data,
-//                                 &error_pos,
-//                                 &error_desc,
-//                                 &error_line,
-//                                 &allocator);
-
-//   // check if the json string was parsed successfully
-//   if (!root) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse Riak configuration json "
-//                                       "string.\n"
-//                                       "Error at line %d: %s\n"
-//                                       "%s\n"
-//                                       "JSON String was:\n"
-//                                       "%s",
-//              error_line, error_desc, error_pos, buffer.data);
-//   }
-
-//   return root;
-// }
-
-// struct CheckResponse { // C++11: replace this scoped boxing by a typed enum!
-//   enum T {
-//     Correct,
-//     NotCorrect,
-//     NotMyResponsibility
-//   };
-// };
-
-// /**
-//  * checks a single property JSON object for a certain value
-//  * Note: you need to specialize this template for each data type you like to
-//  *       check! Please give a consistent error message, if you notice that some-
-//  *       thing is fishy with the configuration.
-//  *
-//  * @param object         the property JSON object to be checked
-//  * @param prop_name      the property name to look for
-//  * @param expectation    the expected value for the checked property
-//  * @return               Correct                if the right property was found
-//  *                                              to be correct
-//  *                       NotCorrect             if the right property was found
-//  *                                              but it is misconfigured
-//  *                       NotMyResponsibility    if we did not hit the right
-//  *                                              property
-//  */
-// template <typename T>
-// CheckResponse::T Check(const JSON *object,
-//                        const std::string &prop_name,
-//                        const T &expectation) {
-//   const bool not_implemented = false;
-//   assert (not_implemented);
-// }
-
-// template <>
-// CheckResponse::T Check<bool>(const JSON *object,
-//                              const std::string &prop_name,
-//                              const bool &expectation) {
-//   // check if we got the right object here
-//   if (object->type != JSON_BOOL    ||
-//       prop_name    != object->name)
-//     return CheckResponse::NotMyResponsibility;
-
-//   // check if the expected value is set
-//   if (object->int_value != expectation) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Expected Riak config '%s' to be %s but "
-//                                       "turned out to be %s.",
-//              prop_name.c_str(), (expectation ? "true" : "false"),
-//                                 (object->int_value ? "true" : "false"));
-//     return CheckResponse::NotCorrect;
-//   }
-
-//   // all good
-//   return CheckResponse::Correct;
-// }
-
-// template <typename T>
-// bool ConfigAssertion(const JSON *object,
-//                      const std::string &prop_name,
-//                      const T &expectation) {
-//   // go through the configuration and check for the right value
-//   for (JSON *it = object->first_child; it != NULL; it = it->next_sibling) {
-//     CheckResponse::T result = Check<T>(it, prop_name, expectation);
-//     if (result == CheckResponse::Correct)    return true;
-//     if (result == CheckResponse::NotCorrect) return false;
-//   }
-
-//   // element was not found in the configuration... this is fishy!
-//   LogCvmfs(kLogSpooler, kLogStderr, "No entry for '%s' found in the given Riak "
-//                                     "configuration JSON object.",
-//            prop_name.c_str());
-//   return false;
-// }
+  return true;
+}
 
 
-// bool RiakPushWorker::CheckJsonConfiguration(const JSON *json_root) {
-//   // check general structure of JSON configuration
-//   if (json_root                    == NULL               ||
-//       json_root->type              != JSON_OBJECT        ||
-//       json_root->first_child       == NULL               ||
-//       json_root->first_child->type != JSON_OBJECT        ||
-//       strcmp(json_root->first_child->name, "props") != 0) {
-//     LogCvmfs(kLogSpooler, kLogStderr, "Cannot read JSON configuration returned "
-//                                       "by Riak.");
-//     return false;
-//   }
+JSON* RiakSpooler::ParseJsonConfiguration(DataBuffer& buffer) {
+  // parse the JSON string with the vjson library
+  char *error_pos  = 0;
+  char *error_desc = 0;
+  int error_line   = 0;
+  block_allocator allocator(1 << 10);
+  JSON *root = json_parse((char*)buffer.data,
+                                &error_pos,
+                                &error_desc,
+                                &error_line,
+                                &allocator);
 
-//   // check individual Riak configurations
-//   JSON *props = json_root->first_child;
-//   return ConfigAssertion<bool>(props, "allow_mult",      false) &&
-//          ConfigAssertion<bool>(props, "last_write_wins", true);
-// }
+  // check if the json string was parsed successfully
+  if (!root) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse Riak configuration json "
+                                      "string.\n"
+                                      "Error at line %d: %s\n"
+                                      "%s\n"
+                                      "JSON String was:\n"
+                                      "%s",
+             error_line, error_desc, error_pos, buffer.data);
+  }
+
+  return root;
+}
+
+struct CheckResponse { // C++11: replace this scoped boxing by a typed enum!
+  enum T {
+    Correct,
+    NotCorrect,
+    NotMyResponsibility
+  };
+};
+
+/**
+ * checks a single property JSON object for a certain value. Additionally it is
+ * checked if the property is present, reporting an error if not.
+ *
+ * Note: you need to specialize this template for each data type you like to
+ *       check! Please give a consistent error message, if you notice that some-
+ *       thing is fishy with the configuration.
+ *
+ * @param object         the property JSON object to be checked
+ * @param prop_name      the property name to look for
+ * @param expectation    the expected value for the checked property
+ * @return               Correct                if the right property was found
+ *                                              to be correct
+ *                       NotCorrect             if the right property was found
+ *                                              but it is misconfigured
+ *                       NotMyResponsibility    if we did not hit the right
+ *                                              property
+ */
+template <typename T>
+CheckResponse::T Check(const JSON *object,
+                       const std::string &prop_name,
+                       const T &expectation) {
+  const bool not_implemented = false;
+  assert (not_implemented);
+}
+
+template <>
+CheckResponse::T Check<bool>(const JSON *object,
+                             const std::string &prop_name,
+                             const bool &expectation) {
+  // check if we got the right object here
+  if (object->type != JSON_BOOL    ||
+      prop_name    != object->name)
+    return CheckResponse::NotMyResponsibility;
+
+  // check if the expected value is set
+  if (object->int_value != expectation) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Expected Riak config '%s' to be %s but "
+                                      "turned out to be %s.",
+             prop_name.c_str(), (expectation ? "true" : "false"),
+                                (object->int_value ? "true" : "false"));
+    return CheckResponse::NotCorrect;
+  }
+
+  // all good
+  return CheckResponse::Correct;
+}
+
+template <typename T>
+bool ConfigAssertion(const JSON *object,
+                     const std::string &prop_name,
+                     const T &expectation) {
+  // go through the configuration and check for the right value
+  for (JSON *it = object->first_child; it != NULL; it = it->next_sibling) {
+    CheckResponse::T result = Check<T>(it, prop_name, expectation);
+    if (result == CheckResponse::Correct)    return true;
+    if (result == CheckResponse::NotCorrect) return false;
+  }
+
+  // element was not found in the configuration... this is fishy!
+  LogCvmfs(kLogSpooler, kLogStderr, "No entry for '%s' found in the given Riak "
+                                    "configuration JSON object.",
+           prop_name.c_str());
+  return false;
+}
 
 
-// size_t RiakPushWorker::ReceiveDataCallback(void *ptr,
-//                                            size_t size,
-//                                            size_t nmemb,
-//                                            void *userdata) {
-//   const size_t bytes = size * nmemb;
-//   DataBuffer& buffer = *(static_cast<DataBuffer*>(userdata));
+bool RiakSpooler::CheckJsonConfiguration(const JSON *json_root) {
+  // check general structure of JSON configuration
+  if (json_root                    == NULL               ||
+      json_root->type              != JSON_OBJECT        ||
+      json_root->first_child       == NULL               ||
+      json_root->first_child->type != JSON_OBJECT        ||
+      strcmp(json_root->first_child->name, "props") != 0) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Cannot read JSON configuration returned "
+                                      "by Riak.");
+    return false;
+  }
 
-//   if (!buffer.Reserve(bytes)) {
-//     return 0;
-//   }
-
-//   buffer.Copy((unsigned char*)ptr, bytes);
-
-//   return bytes;
-// }
-
-
-// bool RiakPushWorker::RiakPushWorker::IsReady() const {
-//   const bool ready = AbstractPushWorker::IsReady();
-//   return ready && initialized_;
-// }
+  // check individual Riak configurations
+  JSON *props = json_root->first_child;
+  return ConfigAssertion<bool>(props, "allow_mult",      false) &&
+         ConfigAssertion<bool>(props, "last_write_wins", true);
+}
 
 
-// // -----------------------------------------------------------------------------
+size_t RiakSpooler::ReceiveDataCallback(void *ptr,
+                                        size_t size,
+                                        size_t nmemb,
+                                        void *userdata) {
+  const size_t bytes = size * nmemb;
+  DataBuffer& buffer = *(static_cast<DataBuffer*>(userdata));
+
+  if (!buffer.Reserve(bytes)) {
+    return 0;
+  }
+
+  buffer.Copy((unsigned char*)ptr, bytes);
+  return bytes;
+}
 
 
-// bool RiakPushWorker::DataBuffer::Reserve(const size_t bytes) {
-//   unsigned char *new_buffer = (unsigned char*)realloc((void*)data,
-//                                                              size_ + bytes);
-//   if (new_buffer == NULL)
-//     return false;
-
-//   data   = new_buffer;
-//   size_ += bytes;
-//   return true;
-// }
+// -----------------------------------------------------------------------------
 
 
-// unsigned char* RiakPushWorker::DataBuffer::Position() const {
-//   return data + offset_;
-// }
+bool RiakSpooler::DataBuffer::Reserve(const size_t bytes) {
+  unsigned char *new_buffer = (unsigned char*)realloc((void*)data,
+                                                             size_ + bytes);
+  if (new_buffer == NULL)
+    return false;
+
+  data   = new_buffer;
+  size_ += bytes;
+  return true;
+}
 
 
-// void RiakPushWorker::DataBuffer::Copy(const unsigned char* ptr,
-//                                       const size_t bytes) {
-//   const size_t free_space = size_ - offset_;
-//   assert (free_space >= bytes);
+unsigned char* RiakSpooler::DataBuffer::Position() const {
+  return data + offset_;
+}
 
-//   memcpy(Position(), ptr, bytes);
-//   offset_ += bytes;
-// }
+
+void RiakSpooler::DataBuffer::Copy(const unsigned char* ptr,
+                                      const size_t bytes) {
+  const size_t free_space = size_ - offset_;
+  assert (free_space >= bytes);
+
+  memcpy(Position(), ptr, bytes);
+  offset_ += bytes;
+}

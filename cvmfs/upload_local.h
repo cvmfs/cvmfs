@@ -15,36 +15,8 @@ namespace upload
    protected:
     class LocalCompressionWorker : public ConcurrentWorker<LocalCompressionWorker> {
      public:
-      struct expected_data {
-        expected_data(const std::string &local_path,
-                      const std::string &remote_dir,
-                      const std::string &file_suffix,
-                      const bool         move) :
-          local_path(local_path),
-          remote_dir(remote_dir),
-          file_suffix(file_suffix),
-          move(move) {}
-
-        expected_data() : local_path(), remote_dir(), file_suffix(), move(false) {}
-
-        const std::string local_path;
-        const std::string remote_dir;
-        const std::string file_suffix;
-        const bool        move;
-      };
-
-      struct returned_data {
-        returned_data(const int          return_code,
-                      const std::string &local_path = "",
-                      const hash::Any   &content_hash = hash::Any()) :
-          return_code(return_code),
-          local_path(local_path),
-          content_hash(content_hash) {}
-
-        const int         return_code;
-        const std::string local_path;
-        const hash::Any   content_hash;
-      };
+      typedef compression_parameters expected_data;
+      typedef SpoolerResult          returned_data;
 
       struct worker_context {
         worker_context(const std::string &upstream_path) :
@@ -74,7 +46,7 @@ namespace upload
     void WaitForUpload() const;
     void WaitForTermination() const;
 
-    int num_errors();
+    unsigned int num_errors();
 
    protected:
     bool Initialize();
@@ -85,8 +57,8 @@ namespace upload
    private:
     const std::string upstream_path_;
 
-    ConcurrentWorkers<LocalCompressionWorker> *concurrent_compression_;
-    LocalCompressionWorker::worker_context    *worker_context_;
+    UniquePtr<ConcurrentWorkers<LocalCompressionWorker> > concurrent_compression_;
+    UniquePtr<LocalCompressionWorker::worker_context>     worker_context_;
   };
 }
 
