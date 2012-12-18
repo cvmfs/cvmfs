@@ -299,6 +299,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
   void Schedule(Job job);
   void ScheduleDeathSentences();
+  void TruncateJobQueue(const bool forget_pending = false);
 
   Job Acquire();
   void JobDone(const returned_data_t& data, const bool success = true);

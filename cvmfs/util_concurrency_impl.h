@@ -111,9 +111,9 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
   initialized_(false),
   running_(false)
 {
-  assert (maximal_queue_length_ > 0);
-  assert (desired_free_slots_   > 0);
-  assert (number_of_workers     > 0);
+  assert (maximal_queue_length_ >= number_of_workers_);
+  assert (desired_free_slots_   >  0);
+  assert (number_of_workers     >  0);
 
   atomic_init32(&jobs_pending_);
   atomic_init32(&jobs_failed_);
@@ -241,7 +241,11 @@ void ConcurrentWorkers<WorkerT>::Schedule(Job job) {
   // Note: This method can be called from arbitrary threads. Thus we do not
   //       necessarily have just one producer in the system.
 
-  assert (IsRunning() || job.is_death_sentence);
+  if (!IsRunning() && !job.is_death_sentence) {
+    LogCvmfs(kLogConcurrency, kLogWarning, "Tried to schedule a job but "
+                                           "concurrency was not running...");
+    return;
+  }
 
   // lock the job queue
   MutexLockGuard guard(job_queue_mutex_);
@@ -264,6 +268,10 @@ void ConcurrentWorkers<WorkerT>::Schedule(Job job) {
 
 template <class WorkerT>
 void ConcurrentWorkers<WorkerT>::ScheduleDeathSentences() {
+  // make sure that the queue is empty before we schedule a death sentence
+  TruncateJobQueue();
+
+  // schedule a death sentence for each running thread
   const unsigned int number_of_workers = GetNumberOfWorkers();
   for (unsigned int i = 0; i < number_of_workers; ++i) {
     Schedule(Job());
@@ -289,11 +297,33 @@ typename ConcurrentWorkers<WorkerT>::Job ConcurrentWorkers<WorkerT>::Acquire() {
 
   // signal the Scheduler that there is a fair amount of free space now
   if (job_queue_.size() < desired_free_slots_) {
-    pthread_cond_signal(&job_queue_cond_not_full_);
+    pthread_cond_broadcast(&job_queue_cond_not_full_);
   }
 
   // return the acquired job
   return job;
+}
+
+
+template <class WorkerT>
+void ConcurrentWorkers<WorkerT>::TruncateJobQueue(const bool forget_pending) {
+  // Note: This method will throw away all jobs currently waiting in the job
+  //       queue. These jobs will not be processed!
+
+  // lock the job queue
+  MutexLockGuard guard(job_queue_mutex_);
+
+  // clear the job queue
+  while (!job_queue_.empty()) job_queue_.pop();
+
+  // if desired, we remove the jobs from the pending 'list'
+  if (forget_pending) {
+    const int pending = atomic_read32(&jobs_pending_);
+    atomic_xadd32(&jobs_pending_, -pending);
+  }
+
+  // signal the scheduler that the queue is now empty
+  pthread_cond_broadcast(&job_queue_cond_not_full_);
 }
 
 
