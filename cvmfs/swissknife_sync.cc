@@ -118,7 +118,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   spooler->Copy(source, dest);
   spooler->EndOfTransaction();
   spooler->WaitForTermination();
-  if (spooler->num_errors() > 0) {
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
     return 1;
   }

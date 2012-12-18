@@ -46,7 +46,7 @@ namespace upload
     void WaitForUpload() const;
     void WaitForTermination() const;
 
-    unsigned int num_errors();
+    unsigned int GetNumberOfErrors() const;
 
    protected:
     bool Initialize();
@@ -55,8 +55,11 @@ namespace upload
     void CompressionCallback(const LocalCompressionWorker::returned_data &data);
 
    private:
-    const std::string upstream_path_;
+    // state information
+    const std::string    upstream_path_;
+    mutable atomic_int32 copy_errors_;
 
+    // concurrency subsystem
     UniquePtr<ConcurrentWorkers<LocalCompressionWorker> > concurrent_compression_;
     UniquePtr<LocalCompressionWorker::worker_context>     worker_context_;
   };

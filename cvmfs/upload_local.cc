@@ -21,11 +21,13 @@ LocalSpooler::LocalSpooler(const SpoolerDefinition &spooler_definition) :
 {
   assert (spooler_definition.IsValid() &&
           spooler_definition.driver_type == SpoolerDefinition::Local);
+
+  atomic_init32(&copy_errors_);
 }
 
   
-unsigned int LocalSpooler::num_errors() {
-  return 0; // TODO: ...
+unsigned int LocalSpooler::GetNumberOfErrors() const {
+  return concurrent_compression_->GetNumberOfFailedJobs() + atomic_read32(&copy_errors_);
 }
 
 
@@ -85,6 +87,10 @@ void LocalSpooler::Copy(const std::string &local_path,
   } else {
     int retval = CopyPath2Path(local_path, destination_path);
     retcode    = retval ? 0 : 100;
+  }
+
+  if (retcode != 0) {
+    atomic_inc32(&copy_errors_);
   }
 
   const SpoolerResult result(retcode, local_path);

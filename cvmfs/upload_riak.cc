@@ -186,8 +186,9 @@ void RiakSpooler::WaitForTermination() const {
 }
 
 
-unsigned int RiakSpooler::num_errors() {
-  return 0; // TODO: implement
+unsigned int RiakSpooler::GetNumberOfErrors() const {
+  return concurrent_compression_->GetNumberOfFailedJobs() +
+         concurrent_upload_->GetNumberOfFailedJobs();
 }
 
 

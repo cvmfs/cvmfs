@@ -193,7 +193,7 @@ manifest::Manifest *SyncMediator::Commit() {
   params_->spooler->UnregisterListeners();
 
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
-  if (params_->spooler->num_errors() > 0) {
+  if (params_->spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogPublish, kLogStderr, "failed to commit files");
     return NULL;
   }

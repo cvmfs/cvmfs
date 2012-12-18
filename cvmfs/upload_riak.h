@@ -230,7 +230,7 @@ namespace upload {
     void WaitForUpload() const;
     void WaitForTermination() const;
 
-    unsigned int num_errors();
+    unsigned int GetNumberOfErrors() const;
 
    protected:
     bool Initialize();

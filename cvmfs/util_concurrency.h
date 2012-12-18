@@ -288,6 +288,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   void WaitForTermination();
 
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
+  inline unsigned int GetNumberOfFailedJobs() const { return atomic_read32(&jobs_failed_); }
 
   // these methods are called by the worker objects and NOBODY else!
   inline void JobSuccessful(const returned_data_t& data) { JobDone(data, true); }

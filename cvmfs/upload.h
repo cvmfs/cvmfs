@@ -175,7 +175,7 @@ namespace upload
      */
     virtual void WaitForTermination() const = 0;
 
-    virtual unsigned int num_errors() = 0;
+    virtual unsigned int GetNumberOfErrors() const = 0;
 
     inline void set_move_mode(const bool move) { move_ = move; }
 
