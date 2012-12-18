@@ -340,6 +340,13 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
 template <class DerivedWorkerT>
 class ConcurrentWorker {
+ public:
+  virtual bool Initialize() { return true; } // no up call! just a dummy
+  virtual void TearDown() {}                 // no up call!
+
+  //void operator()(const expected_data &data); // do the actual job of the
+                                                // worker
+
  protected:
   ConcurrentWorker() : master_(NULL) {}
   inline ConcurrentWorkers<DerivedWorkerT>* master() const { return master_; }
@@ -353,8 +360,6 @@ class ConcurrentWorker {
   void RegisterMaster(ConcurrentWorkers<DerivedWorkerT> *master) {
     master_ = master;
   }
-  virtual bool Initialize() { return true; }
-  virtual void TearDown() {}
 
  private:
   ConcurrentWorkers<DerivedWorkerT> *master_;
