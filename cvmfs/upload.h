@@ -85,8 +85,7 @@ namespace upload
 
       DriverType  driver_type;
       std::string spooler_description;
-      std::string paths_out_pipe;
-      std::string digests_in_pipe;
+      std::string temp_directory;
 
       bool valid_;
     };

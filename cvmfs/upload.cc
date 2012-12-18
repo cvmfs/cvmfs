@@ -42,11 +42,10 @@ AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
     return;
   }
 
+  // save data
   spooler_description = upstream[1];
+  temp_directory = "/ramdisk/tmp"; // TODO: make this configurable
 
-  // save named pipe paths and validate this SpoolerDefinition
-  paths_out_pipe  = components[1];
-  digests_in_pipe = components[2];
   valid_ = true;
 }
 
