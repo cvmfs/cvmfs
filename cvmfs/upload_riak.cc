@@ -110,6 +110,9 @@ bool RiakSpooler::Initialize() {
 
 void RiakSpooler::TearDown() {
   curl_global_cleanup();
+
+  concurrent_compression_->WaitForTermination();
+  concurrent_upload_->WaitForTermination();
 }
 
 
@@ -272,6 +275,8 @@ bool RiakSpooler::CompressionWorker::CompressToTempFile(
 
 RiakSpooler::UploadWorker::UploadWorker(
                      const RiakSpooler::UploadWorker::worker_context *context) :
+  upstream_url_(context->AcquireUpstreamUrl()),
+  http_headers_download_(NULL),
   upload_time_aggregated_(0),
   curl_upload_time_aggregated_(0),
   curl_get_vclock_time_aggregated_(0),
