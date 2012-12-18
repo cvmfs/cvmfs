@@ -78,11 +78,11 @@ bool RiakSpooler::Initialize() {
   const unsigned int number_of_cpus = GetNumberOfCpuCores();
   concurrent_compression_ =
     new ConcurrentWorkers<CompressionWorker>(number_of_cpus,
-                                             number_of_cpus * 10, // TODO: magic number (?)
+                                             number_of_cpus * 500, // TODO: magic number (?)
                                              compression_context_);
   concurrent_upload_      =
     new ConcurrentWorkers<UploadWorker>(number_of_cpus * 5,
-                                        number_of_cpus * 50, // TODO: magic number (?)
+                                        number_of_cpus * 500, // TODO: magic number (?)
                                         upload_context_);
 
   assert(concurrent_compression_ && concurrent_upload_);
@@ -494,7 +494,8 @@ void RiakSpooler::UploadWorker::operator()(const expected_data &input) {
   upload_stopwatch_.Reset();
   upload_stopwatch_.Start();
   const std::string key = input.GetRiakKey();
-  const int retval = PushFileToRiak(key,
+  int retval = 0;
+    retval = PushFileToRiak(key,
                                     input.upload_source_path,
                                     (input.type == expected_data::kPlainUpload));
   upload_stopwatch_.Stop();
