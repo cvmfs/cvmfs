@@ -94,7 +94,7 @@ void LocalSpooler::Copy(const std::string &local_path,
 
 void LocalSpooler::EndOfTransaction() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "End of Transaction");
-  concurrent_compression_->WaitForTermination();
+  WaitForTermination();
 }
 
 
