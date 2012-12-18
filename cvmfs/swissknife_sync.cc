@@ -181,7 +181,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   // finalize the spooler
-  LogCvmfs(kLogCvmfs, kLogStdout, "Spooler will die...");
   params.spooler->EndOfTransaction();
   params.spooler->WaitForTermination();
   delete params.spooler;

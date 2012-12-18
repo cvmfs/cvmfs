@@ -207,17 +207,6 @@ endif (NOT MACOSX)
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
-set (GTEST_ROOT "NOTFOUND" CACHE PATH "Where is the GTest package?")
-
-find_package (GTest QUIET)
-
-if (NOT GTEST_FOUND)
-    message (FATAL_ERROR "GTest was not found, you might want to set GTEST_ROOT!")
-endif (NOT GTEST_FOUND)
-
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
-
-
 #
 # set some include and linking stuff
 #
