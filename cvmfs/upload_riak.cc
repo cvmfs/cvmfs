@@ -109,10 +109,10 @@ bool RiakSpooler::Initialize() {
 
 
 void RiakSpooler::TearDown() {
-  curl_global_cleanup();
-
   concurrent_compression_->WaitForTermination();
   concurrent_upload_->WaitForTermination();
+
+  curl_global_cleanup();
 }
 
 
@@ -154,7 +154,9 @@ void RiakSpooler::Process(const std::string &local_path,
 
 void RiakSpooler::CompressionWorkerCallback(
                     const RiakSpooler::CompressionWorker::returned_data &data) {
-  concurrent_upload_->Schedule(data);
+  if (data.type != CompressionWorker::returned_data::kEmpty) {
+    concurrent_upload_->Schedule(data);
+  }
 }
 
 
@@ -479,8 +481,8 @@ void RiakSpooler::UploadWorker::operator()(const expected_data &input) {
   assert (input.type != expected_data::kEmpty);
 
   if (input.move) {
-    LogCvmfs(kLogSpooler, kLogStderr, "RiakPushWorker does not support "
-                                      "move at the moment.");
+    LogCvmfs(kLogSpooler, kLogStderr, "RiakSpooler does not support move at "
+                                      "the moment.");
     master()->JobFailed(SpoolerResult(1,
                                       input.local_path,
                                       input.content_hash));
