@@ -25,7 +25,6 @@ extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;
 
-int ClearFile(const std::string &path);
 catalog::LoadError RemountStart();
 unsigned GetRevision();
 std::string GetOpenCatalogs();

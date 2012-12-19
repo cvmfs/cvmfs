@@ -1,4 +1,8 @@
 2.1.6:
+  * Separate stacktrace logs by process
+  * Packaging: don't strip binaries
+  * cvmfs_reload returns with error if socket directory
+    does not exist
   
 2.1.5:
   * Added "pid cachemgr" command to cvmfs_talk

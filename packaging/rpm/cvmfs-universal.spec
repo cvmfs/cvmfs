@@ -5,9 +5,15 @@
 %define selinux_variants mls strict targeted
 %endif
 
+%define __strip /bin/true
+%define debug_package %{nil}
+%if 0%{?el6} || 0%{?el5}
+%define __os_install_post %{nil}
+%endif
+
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.5
+Version: 2.1.6
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}

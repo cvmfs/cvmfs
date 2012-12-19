@@ -28,7 +28,6 @@ sub usage {
   print "  cache list pinned      gets pinned file catalogs in cache     \n";
   print "  cache list catalogs    gets all file catalogs in cache        \n";
   print "  cleanup <MB>           cleans file cache until size <= <MB>   \n";
-  print "  clear file <path>      removes <path> from local cache        \n";
   print "  mountpoint             returns the mount point                \n";
   print "  remount                look for new catalogs                  \n";
   print "  revision               gets the repository revision           \n";

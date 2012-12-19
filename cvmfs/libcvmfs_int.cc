@@ -231,14 +231,6 @@ static bool GetDirentForPath(const PathString &path,
   return false;
 }
 
-/**
- * Removes a file from local cache
- */
-int ClearFile(const string &path) {
-	// not implemented, but required for linking
-  return 0;
-}
-
 }  // namespace cvmfs
 
 
@@ -494,7 +486,7 @@ int cvmfs_int_init(
 
   // Monitor, check for maximum number of open files
   if (cvmfs_opts_enable_monitor) {
-    if (!monitor::Init(relative_cachedir, true)) {
+    if (!monitor::Init(relative_cachedir, *cvmfs::repository_name_, true)) {
       PrintError("failed to initialize watchdog.");
       goto cvmfs_cleanup;
     }

@@ -9,7 +9,8 @@
 
 namespace monitor {
 
-bool Init(const std::string cache_dir, const bool check_max_open_files);
+bool Init(const std::string &cache_dir, const std::string &process_name,
+          const bool check_max_open_files);
 void Fini();
 void Spawn();
 

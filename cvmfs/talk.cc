@@ -151,33 +151,6 @@ static void *MainTalk(void *data __attribute__((unused))) {
             }
           }
         }
-      } else if (line.substr(0, 10) == "clear file") {
-        if (quota::GetCapacity() == 0) {
-          Answer(con_fd, "Cache is unmanaged\n");
-        } else {
-          if (line.length() < 12) {
-            Answer(con_fd, "Usage: clear file <path>\n");
-          } else {
-            const string path = line.substr(11);
-            int retval = cvmfs::ClearFile(path);
-            switch (retval) {
-              case 0:
-                Answer(con_fd, "OK\n");
-                break;
-              case -ENOENT:
-                Answer(con_fd, "No such file\n");
-                break;
-              case -EINVAL:
-                Answer(con_fd, "Not a regular file\n");
-                break;
-              default:
-                const string error_str = "Unknown error (" +
-                                         StringifyInt(retval) + ")\n";
-                Answer(con_fd, error_str);
-                break;
-            }
-          }
-        }
       } else if (line == "mountpoint") {
         Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {
@@ -414,7 +387,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "version patchlevel") {
         Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
       } else {
-        Answer(con_fd, "What?\n");
+        Answer(con_fd, "unknown command\n");
       }
     }
   }

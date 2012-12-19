@@ -141,6 +141,7 @@ chown $CVMFS_USER /var/run/cvmfs
 
 add_mount_option "fsname=cvmfs2,allow_other,grab_mountpoint"
 add_mount_option "$CVMFS_ID"
+[ "x$CVMFS_DEBUGLOG" != x ] && add_mount_option "debug"
 
 # set the number of open file handles per process
 # at some point that will be handled a LaunchdScript

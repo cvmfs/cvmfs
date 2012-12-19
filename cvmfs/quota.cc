@@ -997,7 +997,7 @@ int MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
   int retval;
 
-  retval = monitor::Init(".", false);
+  retval = monitor::Init(".", "cachemgr", false);
   assert(retval);
   monitor::Spawn();
 
@@ -1431,7 +1431,7 @@ pid_t GetPid() {
   if (!shared_ || !spawned_) {
     return cvmfs::pid_;
   }
-  
+
   pid_t result;
   int pipe_pid[2];
   MakeReturnPipe(pipe_pid);
