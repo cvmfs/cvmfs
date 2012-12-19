@@ -525,7 +525,7 @@ void RiakSpooler::UploadWorker::operator()(const expected_data &input) {
 std::string RiakSpooler::UploadWorker::CreateRequestUrl(
                                               const std::string &key,
                                               const bool is_critical) const {
-  const std::string additional = is_critical ? "&w=all&dw=all" : "";
+  const std::string additional = is_critical ? "&w=all&dw=all" : "&w=1";
   return upstream_url_ + "/" + key + "?returnbody=false" + additional;
 }
 
@@ -944,7 +944,7 @@ bool RiakSpooler::CheckJsonConfiguration(const JSON *json_root) {
   JSON *props = json_root->first_child;
   return ConfigAssertion(props, "allow_mult",      false) &&
          ConfigAssertion(props, "last_write_wins", true)  &&
-         ConfigAssertion(props, "n_val",           1);
+         ConfigAssertion(props, "n_val",           3);
 }
 
 
