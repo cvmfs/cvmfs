@@ -58,7 +58,6 @@ option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
-option (BUILD_UNITTESTS "Build CVMFS's unit tests" OFF)
 
 #
 # define where to find the external dependencies
@@ -161,13 +160,6 @@ add_subdirectory (cvmfs)
 if (INSTALL_MOUNT_SCRIPTS)
 	add_subdirectory (mount)
 endif (INSTALL_MOUNT_SCRIPTS)
-
-#
-# Unit Tests
-#
-if (BUILD_UNITTESTS)
-	add_subdirectory (test/unittests)
-endif (BUILD_UNITTESTS)
 
 #
 # Documentation
