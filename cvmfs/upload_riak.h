@@ -159,12 +159,14 @@ namespace upload {
       upload_parameters(const int           return_code,
                         const std::string  &local_path,
                         const std::string  &compressed_path,
+                        const std::string  &remote_dir,
                         const hash::Any    &content_hash,
                         const std::string  &file_suffix,
                         const bool          move) :
         SpoolerResult(return_code, local_path, content_hash),
         type(kCompressedUpload),
         upload_source_path(compressed_path),
+        remote_dir(remote_dir),
         file_suffix(file_suffix),
         move(move) {}
 
@@ -190,8 +192,9 @@ namespace upload {
 
       const JobType     type;               //!< type specifier for this upload_parameters
       const std::string upload_source_path; //!< path to the source file to be uploaded
-      const std::string remote_path;        //!< path where the final file should be found (only filled for type==kPlainUpload)
-      const std::string file_suffix;        //!< suffix to append to the Riak key (only filled for type==kCompressedUpload)
+      const std::string remote_path;        //!< path where the final file should be found (only filled for type == kPlainUpload)
+      const std::string remote_dir;         //!< path where to put the compressed file     (only filled for type == kCompressedUpload)
+      const std::string file_suffix;        //!< suffix to append to the Riak key          (only filled for type == kCompressedUpload)
       const bool        move;               //!< should the file just be moved?
     };
 

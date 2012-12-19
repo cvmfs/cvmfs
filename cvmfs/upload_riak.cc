@@ -251,6 +251,7 @@ void RiakSpooler::CompressionWorker::operator()(const expected_data &input) {
     master()->JobSuccessful(returned_data(0,
                                           input.local_path,
                                           tmp_file_path,
+                                          input.remote_dir,
                                           content_hash,
                                           input.file_suffix,
                                           input.move));
@@ -725,7 +726,7 @@ bool RiakSpooler::UploadWorker::CollectUploadStatistics() {
 std::string RiakSpooler::upload_parameters::GetRiakKey() const {
   if (type == upload_parameters::kCompressedUpload) {
     // generate Riak key from the content hash
-    return "data"                  + // TODO: replace magic string
+    return remote_dir              +
            content_hash.ToString() + 
            file_suffix;
 
