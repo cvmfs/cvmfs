@@ -620,8 +620,8 @@ bool RiakSpooler::UploadWorker::ConfigureUpload(const std::string   &key,
   std::string vector_clock;
 
   // check if key already exists and find out about its current vector clock
-  if (GetVectorClock(key, vector_clock))
-    headers = curl_slist_append(headers, ("X-Riak-Vclock: " + vector_clock).c_str());
+  // if (GetVectorClock(key, vector_clock))
+  //   headers = curl_slist_append(headers, ("X-Riak-Vclock: " + vector_clock).c_str());
 
   // set headers
   if (curl_easy_setopt(curl_upload_, CURLOPT_HTTPHEADER, headers) != CURLE_OK)
@@ -871,8 +871,8 @@ CheckResponse::T Check<bool>(const JSON *object,
                              const std::string &prop_name,
                              const bool &expectation) {
   // check if we got the right object here
-  if (object->type != JSON_BOOL    ||
-      prop_name    != object->name)
+  if (object->type != JSON_BOOL ||
+      object->name != prop_name)
     return CheckResponse::NotMyResponsibility;
 
   // check if the expected value is set
@@ -881,6 +881,27 @@ CheckResponse::T Check<bool>(const JSON *object,
                                       "turned out to be %s.",
              prop_name.c_str(), (expectation ? "true" : "false"),
                                 (object->int_value ? "true" : "false"));
+    return CheckResponse::NotCorrect;
+  }
+
+  // all good
+  return CheckResponse::Correct;
+}
+
+template <>
+CheckResponse::T Check<int>(const JSON *object,
+                            const std::string &prop_name,
+                            const int &expectation) {
+  // check if we got the right object here
+  if (object->type != JSON_INT    ||
+      object->name != prop_name)
+    return CheckResponse::NotMyResponsibility;
+
+  // check if the expected value is set
+  if (object->int_value != expectation) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Expected Riak config '%s' to be %d but "
+                                      "turned out to be %d.",
+             prop_name.c_str(), expectation, object->int_value);
     return CheckResponse::NotCorrect;
   }
 
@@ -922,7 +943,8 @@ bool RiakSpooler::CheckJsonConfiguration(const JSON *json_root) {
   // check individual Riak configurations
   JSON *props = json_root->first_child;
   return ConfigAssertion(props, "allow_mult",      false) &&
-         ConfigAssertion(props, "last_write_wins", true);
+         ConfigAssertion(props, "last_write_wins", true)  &&
+         ConfigAssertion(props, "n_val",           1);
 }
 
 
