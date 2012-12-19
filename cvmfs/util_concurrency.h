@@ -20,13 +20,21 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+/**
+ * Implements a simple interface to lock objects of derived classes. Classes that
+ * inherit from Lockable are also usable with the LockGuard template for scoped
+ * locking semantics.
+ */
 class Lockable {
  public:
-  inline Lockable()          { pthread_mutex_init(&mutex_, NULL); }
   inline virtual ~Lockable() { pthread_mutex_destroy(&mutex_);    }
 
   void Lock() const          { pthread_mutex_lock(&mutex_);       }
   void Unlock() const        { pthread_mutex_unlock(&mutex_);     }
+
+ protected:
+  Lockable() { pthread_mutex_init(&mutex_, NULL); }; // don't instantiate this
+                                                     // class directly
 
  private:
   mutable pthread_mutex_t mutex_;
@@ -39,9 +47,10 @@ class Lockable {
 
 
 /**
- * RAII ftw!
- * This is a very simple scooped lock implementation. Every object that has the
- * methods Lock() and Unlock() should work with it.
+ * This is a simple scoped lock implementation. Every object that provides the
+ * methods Lock() and Unlock() should work with it. Classes that should be used
+ * with this template should therefore simply inherit from Lockable.
+ *
  * Creating a LockGuard object on the stack will lock the provided object. When
  * the LockGuard runs out of scope it will automatically release the lock. This
  * ensures a clean unlock in a lot of situations!
@@ -49,42 +58,48 @@ class Lockable {
 template<typename LockableT>
 class LockGuard {
  public:
-  LockGuard(const LockableT &lock) :
+  inline LockGuard(const LockableT &lock) :
     ref_(lock)
   {
     ref_.Lock();
   }
 
-  LockGuard(const LockableT *lock) :
+  inline LockGuard(const LockableT *lock) :
     ref_(*lock)
   {
     ref_.Lock();
   }
 
-  ~LockGuard() {
+  inline ~LockGuard() {
     ref_.Unlock();
   }
 
  private:
-  LockGuard(const LockGuard&); // don't copy that!
+  LockGuard(const LockGuard& other) { assert (false); } // don't copy that!
 
   const LockableT &ref_;
 };
 
 /**
- * Template specialization to enable the scooped lock described above to use
+ * Template specialization to enable the scoped lock described above to use
  * plain POSIX mutexes
  */
 template<>
 class LockGuard <pthread_mutex_t> {
  public:
-  LockGuard(pthread_mutex_t &lock) :
+  inline LockGuard(pthread_mutex_t &lock) :
     ref_(lock)
   {
     pthread_mutex_lock(&ref_); 
   }
 
-  ~LockGuard() {
+  inline LockGuard(pthread_mutex_t *lock) :
+    ref_(*lock)
+  {
+    pthread_mutex_lock(lock);
+  }
+
+  inline ~LockGuard() {
     pthread_mutex_unlock(&ref_);
   }
 
@@ -93,7 +108,8 @@ class LockGuard <pthread_mutex_t> {
 typedef LockGuard<pthread_mutex_t> MutexLockGuard;
 
 /**
- * TODO: Find a better way than copy/paste for this 'multipe template specialzation'.
+ * TODO: Find a better way than copy/paste for this 
+ *       'multipe template specialization'.
  *       
  * This lock guards will acquire a write lock or a read lock!
  *                                (WriteLockGuard)(ReadLockGuard)
@@ -127,9 +143,15 @@ class ReadLockGuard {
   pthread_rwlock_t &ref_;
 };
 
+
 //
 // -----------------------------------------------------------------------------
 //
+
+
+template <typename ParamT>
+class Observable;
+
 
 /**
  * Encapsulates a callback function that handles asynchronous responses.
@@ -143,7 +165,10 @@ template <typename ParamT>
 class CallbackBase {
  public:
   virtual void operator()(const ParamT &value) = 0;
-  virtual ~CallbackBase() {}
+
+ protected:
+  friend class Observable<ParamT>;
+  virtual ~CallbackBase() {} // don't delete externally
 };
 
 /**
@@ -151,8 +176,8 @@ class CallbackBase {
  * functions with the following signature:
  * void <name>(ParamT <parameter>);
  *
- * TODO: One might use varidic templates once C++11 will be supported in order
- *       to allow for more than one parameter.
+ * TODO: One might use varidic templates once C++11 will be supported, in order
+ *       to allow for more than one parameter to be passed to the callback.
  *
  * @param ParamT    the type of the parameter to be passed to the callback
  */
@@ -160,11 +185,13 @@ template <typename ParamT>
 class Callback : public CallbackBase<ParamT> {
  public:
   typedef void (*CallbackFunction)(const ParamT &value);
-
-  Callback(CallbackFunction function) : function_(function) {}
   void operator()(const ParamT &value) { function_(value); }
 
  protected:
+  friend class Observable<ParamT>;
+  Callback(CallbackFunction function) : function_(function) {}
+
+ private:
   Callback(const Callback& callback) { assert (false); } // don't copy!
 
  private:
@@ -177,15 +204,22 @@ class Callback : public CallbackBase<ParamT> {
  * The member must have the following interface:
  * void <DelegateT>::<member name>(ParamT <parameter>);
  *
+ * Note: it is the responsibility of the user to ensure that the bound object
+ *       for `delegate` remains alive in the whole time this callback might be
+ *       invoked.
+ *
+ * @param ParamT      the type of the parameter to be passed to the callback
  * @param DelegateT   the <class name> of the object the member <member name>
  *                    should be invoked in
- * @param ParamT      the type of the parameter to be passed to the callback
  */
 template <typename ParamT, class DelegateT>
 class BoundCallback : public CallbackBase<ParamT> {
  public:
   typedef void (DelegateT::*CallbackMethod)(const ParamT &value);
+  void operator()(const ParamT &value) { (delegate_->*method_)(value); }
 
+ protected:
+  friend class Observable<ParamT>;
   BoundCallback(CallbackMethod method, DelegateT *delegate) :
     delegate_(delegate),
     method_(method) {}
@@ -193,9 +227,7 @@ class BoundCallback : public CallbackBase<ParamT> {
     delegate_(&delegate),
     method_(method) {}
 
-  void operator()(const ParamT &value) { (delegate_->*method_)(value); }
-
- protected:
+ private:
   BoundCallback(const BoundCallback& callback) { assert (false); } // don't copy!
 
  private:
@@ -203,6 +235,24 @@ class BoundCallback : public CallbackBase<ParamT> {
   CallbackMethod method_;
 };
 
+/**
+ * This is a base class for classes that need to expose a callback interface for
+ * asynchronous callback methods. One can register an arbitrary number of
+ * observers on an Observable that get notified when the method NotifyListeners()
+ * is invoked.
+ *
+ * Note: the registration and invocation of callbacks in Observable is thread-
+ *       safe, but be aware that the callbacks of observing classes might run in
+ *       arbitrary threads. When using these classes, you should take extra care
+ *       for thread-safety.
+ *
+ * Note: The RegisterListener() methods return a pointer to a CallbackBase.
+ *       You MUST NOT free these objects, they are managed by the Observable
+ *       class. Use them only as handles to unregister specific callbacks.
+ *
+ * @param ParamT   the type of the parameter that is passed to every callback
+ *                 invocation.
+ */
 template <typename ParamT>
 class Observable {
  public:
@@ -212,97 +262,273 @@ class Observable {
   typedef std::set<callback_t> Callbacks;
 
  public:
-  Observable();
   virtual ~Observable();
 
+  /**
+   * Registers a method of a specific object as a listener to the Observable
+   * object. The method is invoked on the given delegate when the callback is
+   * fired by the observed object using NotifyListeners().
+   *
+   * @param DelegateT  the type of the delegate object
+   * @param method     a pointer to the method to be invoked by the callback
+   * @param delegate   a pointer to the object to invoke the callback on
+   * @return  a handle to the registered callback
+   */
   template <class DelegateT>
   callback_t RegisterListener(typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
                               DelegateT *delegate);
+
+  /**
+   * Registers a static class member or a C-like function as a callback to the
+   * Observable object. The function is invoked when the callback is fired by
+   * the observed object using NotifyListeners().
+   *
+   * @param fn  a pointer to the function to be called by the callback
+   * @return  a handle to the registered callback
+   */
   callback_t RegisterListener(typename Callback<ParamT>::CallbackFunction fn);
 
+  /**
+   * Removes the given callback from the listeners group of this Observable.
+   *
+   * @param callback_object  a callback handle that was returned by
+   *                         RegisterListener() before.
+   */
   void UnregisterListener(callback_t callback_object);
+
+  /**
+   * Removes all listeners from the Observable
+   */
   void UnregisterListeners();
 
  protected:
+  Observable(); // don't instantiate this as a stand alone object
+
   void RegisterListener(callback_t callback_object);
+
+  /**
+   * Notifies all registered listeners and passes them the provided argument
+   * This method should be called by a derived class to send out asynchronous
+   * messages to registered observers.
+   *
+   * @param parameter  the data to be passed to the observers
+   */
   void NotifyListeners(const ParamT &parameter);
 
  private:
-  Callbacks                    listeners_;
+  Callbacks                    listeners_;         //!< the set of registered callback objects
   mutable pthread_rwlock_t     listeners_rw_lock_;
 };
+
 
 //
 // -----------------------------------------------------------------------------
 //
 
 
-static const unsigned int kFallbackNumberOfCpus = 1;
+/**
+ * Returns the number of CPU cores present in the system or a fallback number
+ * if it failed to determine the number of CPU cores.
+ *
+ * @return  the number of active CPU cores in the system
+ */
 unsigned int GetNumberOfCpuCores();
+static const unsigned int kFallbackNumberOfCpus = 1;
 
+
+/**
+ * This template implements a generic producer/consumer approach to concurrent
+ * worker tasks. It spawns a given number of Workers derived from the base class
+ * ConcurrentWorker and uses them to distribute the work load onto concurrent
+ * threads.
+ * One can have multiple producers, that use Schedule() to post new work into
+ * a central job queue, which in turn is processed concurrently by the Worker
+ * objects in multiple threads. Furthermore the template provides an interface
+ * to control the worker swarm, i.e. to wait for their completion or cancel them
+ * before all jobs are processed.
+ *
+ * Note: A worker is a class inheriting from ConcurrentWorker that needs to meet
+ *       a couple of requirements. See the documentation of ConcurrentWorker for
+ *       additional details.
+ *
+ * @param WorkerT   the class to be used as a worker for a concurrent worker
+ *                  swarm
+ */
 template <class WorkerT>
 class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  public:
-  typedef typename WorkerT::expected_data  expected_data_t;
-  typedef typename WorkerT::returned_data  returned_data_t;
-  typedef typename WorkerT::worker_context worker_context_t;
+  // these data types must be defined by the worker class
+  typedef typename WorkerT::expected_data  expected_data_t;  //!< input data type
+  typedef typename WorkerT::returned_data  returned_data_t;  //!< output data type
+  typedef typename WorkerT::worker_context worker_context_t; //!< common context type
 
  protected:
   typedef std::vector<pthread_t>           WorkerThreads;
 
+  /**
+   * This is a simple wrapper structure to piggy-back control information on
+   * scheduled jobs. Job structures are scheduled into a central FIFO queue and 
+   * are then processed concurrently by the workers.
+   */
   struct Job {
+    /**
+     * Creates a usual Job structure by copying the provided input data.
+     *
+     * @param data  the data to be processed by one of the workers
+     */
     explicit Job(const expected_data_t &data) :
       data(data),
       is_death_sentence(false) {}
+
+    /**
+     * Creates an empty Job structure that works as a 'death sentence' to the
+     * worker that will acquire it. When acquired, the worker will immediately
+     * terminate.
+     */
     Job() :
       data(),
       is_death_sentence(true) {}
 
-    const expected_data_t data;
-    const bool is_death_sentence;
+    const expected_data_t data;              //!< data to be processed
+    const bool            is_death_sentence; //!< death sentence flag
   };
   typedef std::queue<Job> JobQueue;
 
+  /**
+   * Provides a wrapper for initialization data passed to newly spawned worker
+   * threads for initialization.
+   * It contains a pointer to the spawning ConcurrentWorkers master object as
+   * well as a pointer to a context object defined by the concrete worker to be
+   * spawned.
+   */
   struct RunBinding {
     RunBinding(ConcurrentWorkers<WorkerT> *delegate,
                const worker_context_t     *worker_context) :
       delegate(delegate),
       worker_context(worker_context) {}
 
-    ConcurrentWorkers<WorkerT> *delegate;
-    const worker_context_t     *worker_context;
+    ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the ConcurrentWorkers master
+    const worker_context_t     *worker_context; //!< WorkerT defined context objects for worker initialization
   };
 
  public:
+  /**
+   * Creates a ConcurrentWorkers master object that encapsulates the actual
+   * workers.
+   *
+   * @param number_of_workers     the number of concurrent workers to be spawned
+   * @param maximal_queue_length  the maximal length of the job queue (>= number_of_workers)
+   * @param worker_context        a pointer to the WorkerT defined context object
+   */
   ConcurrentWorkers(const size_t      number_of_workers,
                     const size_t      maximal_queue_length,
                     worker_context_t *worker_context = NULL);
   virtual ~ConcurrentWorkers();
 
+  /**
+   * Initializes the ConcurrentWorkers swarm, spawnes a thread for each new 
+   * worker object and puts everything into working state.
+   *
+   * @return  true if all went fine
+   */
   bool Initialize();
 
+  /**
+   * Schedules a new job for processing into the internal job queue. This method
+   * will block in case the job queue is already full and wait for an empty slot.
+   *
+   * @param data  the data to be processed
+   */
   inline void Schedule(const expected_data_t &data) { Schedule(Job(data)); }
+
+  /**
+   * Shuts down the ConcurrentWorkers object as well as the encapsulated workers
+   * as soon as possible. Workers will finish their current job and will termi-
+   * nate afterwards. If no jobs are scheduled they will simply stop waiting for
+   * new ones and terminate afterwards.
+   * This method MUST not be called more than once per ConcurrentWorkers.
+   */
   void Terminate();
 
+  /**
+   * Waits until the job queue is fully processed
+   *
+   * Note: this might lead to undefined behaviour or infinite waiting if other
+   *       producers still schedule jobs into the job queue.
+   */
   void WaitForEmptyQueue() const;
+
+  /**
+   * Waits until the ConcurrentWorkers swarm fully processed the current job
+   * queue and shuts down afterwards.
+   *
+   * Note: just as for WaitForEmptyQueue() this assumes that no other producers
+   *       schedule jobs in the mean time.
+   */
   void WaitForTermination();
 
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
   inline unsigned int GetNumberOfFailedJobs() const { return atomic_read32(&jobs_failed_); }
 
-  // these methods are called by the worker objects and NOBODY else!
+  /**
+   * Defines a job as successfully finished.
+   * DO NOT CALL THIS OUTSIDE OF A WORKER OBJECT!
+   *
+   * @param data  the data to be returned back to the user
+   */
   inline void JobSuccessful(const returned_data_t& data) { JobDone(data, true); }
+
+  /**
+   * Defines a job as failed.
+   * DO NOT CALL THIS OUTSIDE OF A WORKER OBJECT!
+   *
+   * Note: Even for failed jobs the user will get a callback with a data object.
+   *       You might want to make sure, that this data contains a status flag as
+   *       well, telling the user what went wrong.
+   *
+   * @param data  the data to be returned back to the user
+   */
   inline void JobFailed(const returned_data_t& data) { JobDone(data, false); }
 
  protected:
   bool SpawnWorkers();
+
+  /**
+   * POSIX conform function for thread entry point. Is invoked for every new
+   * worker thread and contains the initialization, processing loop and tear
+   * down of the unique worker objects
+   *
+   * @param run_binding  void pointer to a RunBinding structure (C interface)
+   * @return  NULL in any case
+   */
   static void* RunWorker(void *run_binding);
 
   void Schedule(Job job);
   void ScheduleDeathSentences();
+
+  /**
+   * Empties the job queue
+   *
+   * @param forget_pending  controls if cancelled jobs should be seen as finished
+   */
   void TruncateJobQueue(const bool forget_pending = false);
 
+  /**
+   * Retrieves a job from the job queue. If the job queue is empty it will block
+   * until there is a new job available for processing.
+   * THIS METHOD MUST ONLY BE CALLED INSIDE THE WORKER OBJECTS
+   *
+   * @return  a job to be processed by a worker
+   */
   Job Acquire();
+
+  /**
+   * Controls the asynchronous finishing of a job.
+   * DO NOT CALL THIS, use JobSuccessful() or JobFailed() wrappers instead.
+   *
+   * @param data     the data to be returned to the user
+   * @param success  flag if job was successful
+   */
   void JobDone(const returned_data_t& data, const bool success = true);
 
   inline void StartRunning()    { MutexLockGuard guard(running_mutex_); running_ = true; }
@@ -314,11 +540,11 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
  private:
   // general configuration
-  const size_t                 number_of_workers_;
+  const size_t                 number_of_workers_;    //!< number of concurrent worker threads
   const size_t                 maximal_queue_length_;
-  const size_t                 desired_free_slots_;
-  const worker_context_t      *worker_context_;
-  const RunBinding             thread_context_;
+  const size_t                 desired_free_slots_;   //!< number of free spots before a blocked Schedule() is resumed
+  const worker_context_t      *worker_context_;       //!< the WorkerT defined context object
+  const RunBinding             thread_context_;       //!< the thread context passed to newly spawned threads
 
   // status information
   bool                         initialized_;
@@ -326,7 +552,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   mutable pthread_mutex_t      running_mutex_;
 
   // worker threads
-  WorkerThreads                worker_threads_;
+  WorkerThreads                worker_threads_;       //!< list of worker threads
 
   // job queue
   JobQueue                     job_queue_;
@@ -340,17 +566,85 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 };
 
 
+/**
+ * Base class for worker classes that should be used in a ConcurrentWorkers
+ * swarm. These classes need to fulfill a number of requirements in order to
+ * satisfy the needs of the ConcurrentWorkers template.
+ *
+ * Requirements:
+ *  -> needs to define the following types:
+ *       - expected_data   - input data structure of the worker
+ *       - returned_data   - output data structure of the worker
+ *       - worker_context  - context structure for initialization information
+ *
+ *  -> implement a constructor that takes a pointer to its worker_context
+ *     as its only parameter:
+ *        AwesomeWorker(const AwesomeWorker::worker_context*)
+ *     Note: do not rely on the context object to be available after the
+ *           consturctor has returned!
+ *
+ *  -> needs to define the calling-operator expecting one parameter of type:
+ *     const expected_data& and returning void
+ *     This will be invoked for every new job the worker should process
+ *
+ *  -> inside the implementation of the described calling-operator it needs to
+ *     invoke either:
+ *        master()->JobSuccessful(const returned_data&)
+ *     or:
+ *        master()->JobFailed(const returned_data&)
+ *     as its LAST operation before returning.
+ *     This will keep track of finished jobs and inform the user of Concurrent-
+ *     Workers about finished jobs.
+ *
+ *  -> [optional] overwrite Initialize() and/or TearDown() to do environmental
+ *     setup work, before or respectively after jobs will be processed
+ *
+ * General Reminder:
+ *   You will be running in a multi-threaded environment here! Buckle up and
+ *   make suitable preparations to shield yourself from serious head-ache.
+ *
+ * @param DerivedWorkerT  the class name of the inheriting class
+ *        (f.e.   class AwesomeWorker : public ConcurrentWorker<AwesomeWorker>)
+ */
 template <class DerivedWorkerT>
 class ConcurrentWorker {
  public:
-  virtual bool Initialize() { return true; } // no up call! just a dummy
-  virtual void TearDown() {}                 // no up call!
+  /**
+   * Does general initialization before any jobs will get scheduled. You do not
+   * need to up-call this initialize method, since it is seen as a dummy here.
+   *
+   * @returns  true one successful initialization
+   */
+  virtual bool Initialize() { return true; }
 
+  /**
+   * Does general clean-up after the last job was processed in the worker object
+   * and it is about to vanish. You do not need to up-call this method.
+   */
+  virtual void TearDown() {}
+
+  /**
+   * The actual job-processing entry point. See the description of the inheriting
+   * class requirements to learn about the semantics of this methods.
+   * DO NOT FORGET TO CALL master()->JobSuccessful() OR master()->JobFinished()
+   * at the end of thismethod!!
+   *
+   * Note: There is no way to generally define this operator, it is therefore 
+   *       commented out and placed here just as a reminder.
+   *
+   * @param data  the data to be processed.
+   */
   //void operator()(const expected_data &data); // do the actual job of the
                                                 // worker
 
  protected:
   ConcurrentWorker() : master_(NULL) {}
+
+  /**
+   * Gets a pointer to the ConcurrentWorkers object that this worker resides in
+   *
+   * @returns  a pointer to the ConcurrentWorkers object
+   */
   inline ConcurrentWorkers<DerivedWorkerT>* master() const { return master_; }
 
  private:
