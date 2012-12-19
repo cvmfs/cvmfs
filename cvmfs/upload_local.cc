@@ -32,13 +32,14 @@ unsigned int LocalSpooler::GetNumberOfErrors() const {
 
 
 bool LocalSpooler::Initialize() {
+  // create a ConcurrentWorkers structure to do compression concurrently
   const unsigned int number_of_cpus = GetNumberOfCpuCores();
 
+  // Note: these are UniquePtrs and will be freed automatically
   worker_context_ = new LocalCompressionWorker::worker_context(upstream_path_);
-
   concurrent_compression_ =
     new ConcurrentWorkers<LocalCompressionWorker>(number_of_cpus,
-                                                  number_of_cpus * 10, // TODO: magic number (?)
+                                                  number_of_cpus * 100, // TODO: magic number (?)
                                                   worker_context_);
 
   assert (worker_context_ && concurrent_compression_);
@@ -47,9 +48,11 @@ bool LocalSpooler::Initialize() {
     return false;
   }
 
+  // register the local CompressionCallback as listener to the compression worker
   concurrent_compression_->RegisterListener(&LocalSpooler::CompressionCallback,
                                              this);
 
+  // all done
   return true;
 }
 
@@ -62,6 +65,7 @@ void LocalSpooler::TearDown() {
 void LocalSpooler::Process(const std::string &local_path,
                            const std::string &remote_dir,
                            const std::string &file_suffix) {
+  // schedule a compression job for the concurrent compression workers
   LocalCompressionWorker::expected_data input(local_path,
                                               remote_dir,
                                               file_suffix,
@@ -72,6 +76,7 @@ void LocalSpooler::Process(const std::string &local_path,
 
 void LocalSpooler::CompressionCallback(
                           const LocalCompressionWorker::returned_data &data) {
+  // just forward this callback to the listeners of LocalSpooler
   NotifyListeners(data);
 }
 
@@ -100,7 +105,7 @@ void LocalSpooler::Copy(const std::string &local_path,
 
 void LocalSpooler::EndOfTransaction() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "End of Transaction");
-  WaitForTermination();
+  WaitForUpload();
 }
 
 
@@ -115,6 +120,9 @@ void LocalSpooler::WaitForTermination() const {
   concurrent_compression_->WaitForTermination();
 }
 
+//
+// -----------------------------------------------------------------------------
+//
 
 LocalSpooler::LocalCompressionWorker::LocalCompressionWorker(
                                               const worker_context *context) :
@@ -125,6 +133,7 @@ void LocalSpooler::LocalCompressionWorker::operator()(
             const LocalSpooler::LocalCompressionWorker::expected_data &data) {
   hash::Any compressed_hash(hash::kSha1);
 
+  // get data references to the provided job structure for convenience
   const std::string &local_path  = data.local_path;
   const std::string &remote_dir  = data.remote_dir;
   const std::string &file_suffix = data.file_suffix;
@@ -161,6 +170,8 @@ void LocalSpooler::LocalCompressionWorker::operator()(
       retcode = 105;
   }
 
+  // inform the scheduler of the compression results, which in turn will invoke
+  // listener's callbacks
   returned_data return_values(retcode,
                               local_path,
                               compressed_hash);

@@ -117,6 +117,10 @@ void RiakSpooler::TearDown() {
 
 
 RiakSpooler::~RiakSpooler() {
+  //
+  // Legacy code: readout of the performance counters...
+  //              this might be used as a simple template later on
+
   // const double uploaded_jobs = (double)upload_jobs_count_;
   // LogCvmfs(kLogSpooler, kLogVerboseMsg, "Statistics:\n"
   //                                       "Avg Compression time:          %f s\n"
@@ -139,6 +143,8 @@ RiakSpooler::~RiakSpooler() {
 
 void RiakSpooler::Copy(const std::string &local_path,
                        const std::string &remote_path) {
+  // schedule a plain upload job into the UploadWorker. In this case no com=
+  // pression is performed
   upload_parameters input(local_path, remote_path, move());
   concurrent_upload_->Schedule(input);
 }
@@ -147,6 +153,11 @@ void RiakSpooler::Copy(const std::string &local_path,
 void RiakSpooler::Process(const std::string &local_path,
                           const std::string &remote_dir,
                           const std::string &file_suffix) {
+  // schedule a compression job into the CompressionWorker
+  // Note: on successful completion this will schedule an additional job
+  //       into the UploadWorker in order to push the compression (and
+  //       hashing) results into the Riak storage
+  //       See: CompressionWorkerCallback()
   compression_parameters params(local_path, remote_dir, file_suffix, move());
   concurrent_compression_->Schedule(params);
 }
@@ -154,21 +165,30 @@ void RiakSpooler::Process(const std::string &local_path,
 
 void RiakSpooler::CompressionWorkerCallback(
                     const RiakSpooler::CompressionWorker::returned_data &data) {
+  // checks if the compression job was successful and schedules an upload job
+  // into the UploadWorker.
+  // Note: If the compression job failed it will be directly presented to the
+  //       user without attemting an upload
   if (data.type != CompressionWorker::returned_data::kEmpty) {
     concurrent_upload_->Schedule(data);
+  } else {
+    NotifyListeners(data);
   }
 }
 
 
 void RiakSpooler::UploadWorkerCallback(
                     const RiakSpooler::UploadWorker::returned_data &data) {
+  // notify the user on the outcome of the upload job
+  // Note: This could implicitly also be the result of compression job.
+  //       The user is NOT notified about successful compression job directly. 
   NotifyListeners(data);
 }
 
 
 void RiakSpooler::EndOfTransaction() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "End of Transaction");
-  WaitForTermination();
+  WaitForUpload();
 }
 
 
@@ -265,6 +285,7 @@ bool RiakSpooler::CompressionWorker::CompressToTempFile(
   }
   fclose(fcas);
 
+  // all done...
   return true;
 }
 
@@ -280,6 +301,7 @@ RiakSpooler::UploadWorker::UploadWorker(
                      const RiakSpooler::UploadWorker::worker_context *context) :
   upstream_url_(context->AcquireUpstreamUrl()),
   http_headers_download_(NULL),
+
   upload_time_aggregated_(0),
   curl_upload_time_aggregated_(0),
   curl_get_vclock_time_aggregated_(0),
@@ -366,12 +388,6 @@ bool RiakSpooler::UploadWorker::InitDownloadHandle() {
 }
 
 
-/**
- * cURL Callback to receive result header information:
- * This method looks for the X-Riak-Vclock header and copies its value into the 
- * std::string provided through the void *userdata pointer.
- * Handle this thing with absolute care!
- */
 size_t RiakSpooler::UploadWorker::ObtainVclockCallback(void *ptr, 
                                                        size_t size,
                                                        size_t nmemb,
@@ -494,18 +510,18 @@ void RiakSpooler::UploadWorker::operator()(const expected_data &input) {
   upload_stopwatch_.Reset();
   upload_stopwatch_.Start();
   const std::string key = input.GetRiakKey();
-  int retval = 0;
-    retval = PushFileToRiak(key,
+  const int retval = PushFileToRiak(key,
                                     input.upload_source_path,
                                     (input.type == expected_data::kPlainUpload));
   upload_stopwatch_.Stop();
   upload_time_aggregated_ += upload_stopwatch_.GetTime();
 
-  // clean up and go home
+  // clean up
   if (input.type == expected_data::kCompressedUpload) {
     unlink(input.upload_source_path.c_str());
   }
 
+  // return results to the controller
   SpoolerResult return_value(retval,
                              input.local_path,
                              input.content_hash);
@@ -525,7 +541,10 @@ void RiakSpooler::UploadWorker::operator()(const expected_data &input) {
 std::string RiakSpooler::UploadWorker::CreateRequestUrl(
                                               const std::string &key,
                                               const bool is_critical) const {
+  // configure the upload URL for performance of consistency
   const std::string additional = is_critical ? "&w=all&dw=all" : "&w=1";
+
+  // build up the upstream URL
   return upstream_url_ + "/" + key + "?returnbody=false" + additional;
 }
 
@@ -536,6 +555,7 @@ int RiakSpooler::UploadWorker::PushFileToRiak(const std::string &key,
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "pushing file %s to Riak using key %s",
            file_path.c_str(), key.c_str());
 
+  // get context information
   const std::string url = CreateRequestUrl(key, is_critical);
   FILE *hd_src;
 
@@ -605,7 +625,7 @@ int RiakSpooler::UploadWorker::PushFileToRiak(const std::string &key,
   retcode = 0;
 
 out:
-  // close the uploaded file
+  // clean up
   fclose(hd_src);
   curl_slist_free_all(headers);
   return retcode;
@@ -652,18 +672,19 @@ bool RiakSpooler::UploadWorker::CheckUploadSuccess(const int file_size) {
   long response_code;
   double uploaded_bytes;
 
+  // get HTTP response code
   if (curl_easy_getinfo(curl_upload_, CURLINFO_RESPONSE_CODE, &response_code) != CURLE_OK)
     return false;
-
-  if (curl_easy_getinfo(curl_upload_, CURLINFO_SIZE_UPLOAD, &uploaded_bytes) != CURLE_OK)
-    return false;
-
   if (response_code != 204 && response_code != 200)
     return false;
 
+  // check number of uploaded bytes
+  if (curl_easy_getinfo(curl_upload_, CURLINFO_SIZE_UPLOAD, &uploaded_bytes) != CURLE_OK)
+    return false;
   if ((int)uploaded_bytes != file_size)
     return false;
 
+  // all fine... 
   return true;
 }
 
@@ -702,17 +723,25 @@ bool RiakSpooler::UploadWorker::CollectUploadStatistics() {
 
 
 std::string RiakSpooler::upload_parameters::GetRiakKey() const {
-  if (remote_path.empty()) {
+  if (type == upload_parameters::kCompressedUpload) {
+    // generate Riak key from the content hash
     return "data"                  + // TODO: replace magic string
            content_hash.ToString() + 
            file_suffix;
-  } else {
+
+  } else if (type == upload_parameters::kPlainUpload) {
+    // remove slashes from the remote_path (Riak cannot handle them in keys)
     std::string result;
     std::remove_copy(remote_path.begin(), 
                      remote_path.end(), 
                      std::back_inserter(result), 
                      '/');
     return result;
+
+  } else {
+    // something went terribly wrong here!
+    const bool malformed_upload_parameters = false;
+    assert (malformed_upload_parameters);
   }
 }
 
@@ -730,6 +759,7 @@ bool RiakSpooler::CheckRiakConfiguration(const std::string &url) {
 }
 
 
+/// Data callback for Configuration Retrieval
 size_t ReceiveDataCallback(void *ptr,
                            size_t size,
                            size_t nmemb,
@@ -799,9 +829,8 @@ bool RiakSpooler::DownloadRiakConfiguration(const std::string &url,
     return false; 
   }
 
-  // all done...
+  // cleanup and return
   curl_easy_cleanup(curl_handle);
-
   return true;
 }
 
@@ -827,16 +856,18 @@ JSON* RiakSpooler::ParseJsonConfiguration(DataBuffer& buffer) {
                                       "JSON String was:\n"
                                       "%s",
              error_line, error_desc, error_pos, buffer.data);
+    return NULL;
   }
 
+  // all fine
   return root;
 }
 
-struct CheckResponse { // C++11: replace this scoped boxing by a typed enum!
+struct CheckResponse { // TODO: C++11: replace this scoped boxing by a typed enum!
   enum T {
-    Correct,
-    NotCorrect,
-    NotMyResponsibility
+    Correct,            //!< Parameter was identified and correct
+    NotCorrect,         //!< Parameter was identified but incorrect
+    NotMyResponsibility //!< Parameter was not identified... go on
   };
 };
 
@@ -909,6 +940,15 @@ CheckResponse::T Check<int>(const JSON *object,
   return CheckResponse::Correct;
 }
 
+/**
+ * goes through all parameters in the JSON configuration and determines if the
+ * given parameter is correctly configured.
+ *
+ * @param object     the JSON configuration object to be checked
+ * @param prop_name  the property name to be identified and checked
+ * @param expection  the asserted setting of the property
+ * @return  true if the property was found AND it was correctly configured
+ */
 template <typename T>
 bool ConfigAssertion(const JSON *object,
                      const std::string &prop_name,

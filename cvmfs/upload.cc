@@ -70,14 +70,20 @@ AbstractSpooler* AbstractSpooler::Construct(
       LogCvmfs(kLogSpooler, kLogStderr, "invalid spooler definition");
   }
 
-  assert (spooler != NULL);
+  // check if we managed to produce a sound spooler
+  if (!spooler) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to create spooler object");
+    return NULL;
+  }
 
   // initialize the spooler and return it to the user
   if (!spooler->Initialize()) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to intialize spooler object");
     delete spooler;
     return NULL;
   }
 
+  // all done... deliver what the user was asking for
   return spooler;
 }
 
