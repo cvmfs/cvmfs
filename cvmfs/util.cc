@@ -555,20 +555,35 @@ bool HasPrefix(const string &str, const string &prefix,
 }
 
 
-vector<string> SplitString(const string &str, const char delim) {
+vector<string> SplitString(const string &str,
+                           const char delim,
+                           const unsigned max_chunks) {
   vector<string> result;
 
+  // edge case... one chunk is always the whole string
+  if (1 == max_chunks) {
+    result.push_back(str);
+    return result;
+  }
+
+  // split the string
   const unsigned size = str.size();
   unsigned marker = 0;
+  unsigned chunks = 1;
   unsigned i;
   for (i = 0; i < size; ++i) {
     if (str[i] == delim) {
       result.push_back(str.substr(marker, i-marker));
       marker = i+1;
+
+      // we got what we want... good bye
+      if (++chunks == max_chunks)
+        break;
     }
   }
-  result.push_back(str.substr(marker, i-marker));
 
+  // push the remainings of the string and return
+  result.push_back(str.substr(marker));
   return result;
 }
 
@@ -887,6 +902,37 @@ bool ManagedExec(const vector<string> &command_line,
   close(pipe_fork[0]);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
   return true;
+}
+
+// -----------------------------------------------------------------------------
+
+void StopWatch::Start() {
+  assert (!running_);
+
+  gettimeofday(&start_, NULL);
+  running_ = true;
+}
+
+
+void StopWatch::Stop() {
+  assert (running_);
+
+  gettimeofday(&end_, NULL);
+  running_ = false;
+}
+
+
+void StopWatch::Reset() {
+  start_ = timeval();
+  end_   = timeval();
+  running_ = false;
+}
+
+
+double StopWatch::GetTime() const {
+  assert (!running_);
+
+  return DiffTimeSeconds(start_, end_);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

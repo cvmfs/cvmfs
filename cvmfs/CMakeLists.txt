@@ -82,6 +82,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   hash.h hash.cc
   compression.h compression.cc
   util.h util.cc
+  util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   upload.h upload.cc
   duplex_curl.h download.h download.cc
   signature.cc signature.h
@@ -199,7 +200,6 @@ endif (NOT MACOSX)
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
-
 #
 # set some include and linking stuff
 #
@@ -217,6 +217,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
   include (${MURMUR_LOCATION}/CVMFS-CMakeLists.txt)
 	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MURMUR_LOCATION}/src)
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
+
 
 if (BUILD_CVMFS)
 
