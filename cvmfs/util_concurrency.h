@@ -49,98 +49,96 @@ class Lockable : DontCopy {
 
 /**
  * This is a simple scoped lock implementation. Every object that provides the
- * methods Lock() and Unlock() should work with it. Classes that should be used
+ * methods Lock() and Unlock() should work with it. Classes that will be used
  * with this template should therefore simply inherit from Lockable.
  *
  * Creating a LockGuard object on the stack will lock the provided object. When
  * the LockGuard runs out of scope it will automatically release the lock. This
  * ensures a clean unlock in a lot of situations!
+ *
+ * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
  */
-template<typename LockableT>
+template <typename LockableT>
 class LockGuard : DontCopy {
  public:
   inline LockGuard(const LockableT &lock) :
-    ref_(lock)
-  {
-    ref_.Lock();
-  }
-
+    ref_(lock) { ref_.Lock(); }
   inline LockGuard(const LockableT *lock) :
-    ref_(*lock)
-  {
-    ref_.Lock();
-  }
-
-  inline ~LockGuard() {
-    ref_.Unlock();
-  }
+    ref_(*lock) { ref_.Lock(); }
+  inline ~LockGuard() { ref_.Unlock(); }
 
  private:
   const LockableT &ref_;
 };
 
 /**
- * Template specialization to enable the scoped lock described above to use
- * plain POSIX mutexes
+ * Used to allow for static polymorphism in the LockGuardAdapter to statically
+ * decide which lock functions to use, if we have more than one possiblity.
+ * (I.e. Read/Write locks)
+ *
+ * TODO: eventually replace this by C++11 typed enum
  */
-template<>
-class LockGuard <pthread_mutex_t> : DontCopy {
- public:
-  inline LockGuard(pthread_mutex_t &lock) :
-    ref_(lock)
-  {
-    pthread_mutex_lock(&ref_); 
-  }
-
-  inline LockGuard(pthread_mutex_t *lock) :
-    ref_(*lock)
-  {
-    pthread_mutex_lock(lock);
-  }
-
-  inline ~LockGuard() {
-    pthread_mutex_unlock(&ref_);
-  }
-
-  pthread_mutex_t &ref_;
+struct _LGA_Polymorphism {
+  enum T {
+    None,
+    ReadLock,
+    WriteLock
+  };
 };
-typedef LockGuard<pthread_mutex_t> MutexLockGuard;
 
 /**
- * TODO: Find a better way than copy/paste for this 
- *       'multipe template specialization'.
- *       
- * This lock guards will acquire a write lock or a read lock!
- *                                (WriteLockGuard)(ReadLockGuard)
+ * Wraps lockable objects that do not conform to the Lock()/Unlock() interface
+ * but use something different. For example pthread_mutex_t can be used with our
+ * LockGuard template by the help of this little adapter template
+ *
+ * Additionally this adapter allows for static (say: compile time) polymorphism
+ * to allow the use locks with multiple lock functions (i.e. pthread_rwlock_t)
+ *
+ * In order to implement new locking capabilities simply specialize the template
+ * for your lock type and provide the needed adapter.
  */
-class WriteLockGuard : DontCopy {
+template <typename T,
+          _LGA_Polymorphism::T polymorph = _LGA_Polymorphism::None>
+class LockGuardAdapter : DontCopy {
  public:
-  WriteLockGuard(pthread_rwlock_t &lock) :
-    ref_(lock)
-  {
-    pthread_rwlock_wrlock(&ref_);
-  }
+  inline LockGuardAdapter(T &lock) : ref_(&lock) {};
+  inline LockGuardAdapter(T *lock) : ref_(lock)  {};
+  inline void Lock() const;
+  inline void Unlock() const;
 
-  ~WriteLockGuard() {
-    pthread_rwlock_unlock(&ref_);
-  }
-
-  pthread_rwlock_t &ref_;
+ private:
+  mutable T *ref_;
 };
-class ReadLockGuard : DontCopy {
- public:
-  ReadLockGuard(pthread_rwlock_t &lock) :
-    ref_(lock)
-  {
-    pthread_rwlock_rdlock(&ref_);
-  }
 
-  ~ReadLockGuard() {
-    pthread_rwlock_unlock(&ref_);
-  }
+template <> /// Locks a pthread_mutex_t
+inline void LockGuardAdapter<pthread_mutex_t>::Lock() const {
+  pthread_mutex_lock(ref_);
+}
+template <> /// Unlocks a pthread_mutex_t
+inline void LockGuardAdapter<pthread_mutex_t>::Unlock() const {
+  pthread_mutex_unlock(ref_);
+}
+template <> /// Read-Locks a pthread_rwlock_t
+inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::ReadLock>::Lock() const {
+  pthread_rwlock_rdlock(ref_);
+}
+template <> /// Read-Unlocks a pthread_rwlock_t
+inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::ReadLock>::Unlock() const {
+  pthread_rwlock_unlock(ref_);
+}
+template <> /// Write-Locks a pthread_rwlock_t
+inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::WriteLock>::Lock() const {
+  pthread_rwlock_wrlock(ref_);
+}
+template <> /// Read-Unlocks a pthread_rwlock_t
+inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::WriteLock>::Unlock() const {
+  pthread_rwlock_unlock(ref_);
+}
 
-  pthread_rwlock_t &ref_;
-};
+// convenience typedefs to use special locks with the LockGuard template
+typedef LockGuard<LockGuardAdapter<pthread_mutex_t> > MutexLockGuard;
+typedef LockGuard<LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::ReadLock> > ReadLockGuard;
+typedef LockGuard<LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::WriteLock> > WriteLockGuard;
 
 
 //
