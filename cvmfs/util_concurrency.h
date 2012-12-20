@@ -24,8 +24,10 @@ namespace CVMFS_NAMESPACE_GUARD {
  * Implements a simple interface to lock objects of derived classes. Classes that
  * inherit from Lockable are also usable with the LockGuard template for scoped
  * locking semantics.
+ *
+ * Note: a Lockable object should not be copied!
  */
-class Lockable {
+class Lockable : DontCopy {
  public:
   inline virtual ~Lockable() { pthread_mutex_destroy(&mutex_);    }
 
@@ -33,8 +35,7 @@ class Lockable {
   void Unlock() const        { pthread_mutex_unlock(&mutex_);     }
 
  protected:
-  Lockable() { pthread_mutex_init(&mutex_, NULL); }; // don't instantiate this
-                                                     // class directly
+  Lockable() { pthread_mutex_init(&mutex_, NULL); };
 
  private:
   mutable pthread_mutex_t mutex_;
@@ -56,7 +57,7 @@ class Lockable {
  * ensures a clean unlock in a lot of situations!
  */
 template<typename LockableT>
-class LockGuard {
+class LockGuard : DontCopy {
  public:
   inline LockGuard(const LockableT &lock) :
     ref_(lock)
@@ -75,8 +76,6 @@ class LockGuard {
   }
 
  private:
-  LockGuard(const LockGuard& other) { assert (false); } // don't copy that!
-
   const LockableT &ref_;
 };
 
@@ -85,7 +84,7 @@ class LockGuard {
  * plain POSIX mutexes
  */
 template<>
-class LockGuard <pthread_mutex_t> {
+class LockGuard <pthread_mutex_t> : DontCopy {
  public:
   inline LockGuard(pthread_mutex_t &lock) :
     ref_(lock)
@@ -114,7 +113,7 @@ typedef LockGuard<pthread_mutex_t> MutexLockGuard;
  * This lock guards will acquire a write lock or a read lock!
  *                                (WriteLockGuard)(ReadLockGuard)
  */
-class WriteLockGuard {
+class WriteLockGuard : DontCopy {
  public:
   WriteLockGuard(pthread_rwlock_t &lock) :
     ref_(lock)
@@ -128,7 +127,7 @@ class WriteLockGuard {
 
   pthread_rwlock_t &ref_;
 };
-class ReadLockGuard {
+class ReadLockGuard : DontCopy {
  public:
   ReadLockGuard(pthread_rwlock_t &lock) :
     ref_(lock)
@@ -162,7 +161,7 @@ class Observable;
  *  --> 2. for member functions of arbitrary objects
  */
 template <typename ParamT>
-class CallbackBase {
+class CallbackBase : DontCopy {
  public:
   virtual void operator()(const ParamT &value) = 0;
 
@@ -190,9 +189,6 @@ class Callback : public CallbackBase<ParamT> {
  protected:
   friend class Observable<ParamT>;
   Callback(CallbackFunction function) : function_(function) {}
-
- private:
-  Callback(const Callback& callback) { assert (false); } // don't copy!
 
  private:
   CallbackFunction function_;
@@ -228,9 +224,6 @@ class BoundCallback : public CallbackBase<ParamT> {
     method_(method) {}
 
  private:
-  BoundCallback(const BoundCallback& callback) { assert (false); } // don't copy!
-
- private:
   DelegateT*     delegate_;
   CallbackMethod method_;
 };
@@ -254,7 +247,7 @@ class BoundCallback : public CallbackBase<ParamT> {
  *                 invocation.
  */
 template <typename ParamT>
-class Observable {
+class Observable : DontCopy {
  public:
   typedef CallbackBase<ParamT> *callback_t;
 
@@ -536,9 +529,6 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   inline bool IsRunning() const { MutexLockGuard guard(running_mutex_); return running_; }
 
  private:
-  ConcurrentWorkers(const ConcurrentWorkers& other) { assert(false); } // do not copy!
-
- private:
   // general configuration
   const size_t                 number_of_workers_;    //!< number of concurrent worker threads
   const size_t                 maximal_queue_length_;
@@ -607,7 +597,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  *        (f.e.   class AwesomeWorker : public ConcurrentWorker<AwesomeWorker>)
  */
 template <class DerivedWorkerT>
-class ConcurrentWorker {
+class ConcurrentWorker : DontCopy {
  public:
   /**
    * Does general initialization before any jobs will get scheduled. You do not
@@ -648,10 +638,6 @@ class ConcurrentWorker {
   inline ConcurrentWorkers<DerivedWorkerT>* master() const { return master_; }
 
  private:
-  ConcurrentWorker(const ConcurrentWorker<DerivedWorkerT> &other) {
-    assert (false); // do not copy!
-  }
-
   friend class ConcurrentWorkers<DerivedWorkerT>;
   void RegisterMaster(ConcurrentWorkers<DerivedWorkerT> *master) {
     master_ = master;

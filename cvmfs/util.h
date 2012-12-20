@@ -96,8 +96,25 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
                  const std::map<int, int> &map_fildes);
 
+
+/**
+ * Generic base class to mark an inheriting class as 'non-copyable'
+ */
+class DontCopy {
+ protected:
+  // prevent DontCopy from being instantiated on its own
+  DontCopy() {}
+
+ private:
+  // produce a linker error by not implementing copy constructor and
+  // assignment operator. We don't want to copy that object!
+  DontCopy(const DontCopy &other);
+  DontCopy& operator=(const DontCopy &rhs);
+};
+
+
 template <class T>
-class UniquePtr {
+class UniquePtr : DontCopy {
  public:
   inline UniquePtr() : ref_(NULL) {}
   inline UniquePtr(T *ref) : ref_(ref) {}
@@ -107,9 +124,6 @@ class UniquePtr {
   inline operator T*() const          { return ref_; }
   inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
   inline T* operator->() const        { return ref_; }
-
- private:
-  UniquePtr(const UniquePtr &ptr)     { assert (false); } // don't copy!
 
  private:
   T *ref_;
@@ -126,7 +140,7 @@ class UniquePtr {
  * watch.Stop();
  * printf("%f", watch.GetTime());
  */
-class StopWatch {
+class StopWatch : DontCopy {
  public:
   StopWatch() : running_(false) {}
 
