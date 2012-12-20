@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <time.h>
 #include <fcntl.h>
-#include <pthread.h>
 
 #include <cstdio>
 
