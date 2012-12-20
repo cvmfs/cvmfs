@@ -593,6 +593,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  *   You will be running in a multi-threaded environment here! Buckle up and
  *   make suitable preparations to shield yourself from serious head-ache.
  *
+ * Note: This implements a Curiously Recurring Template Pattern
+ *       (http://en.wikipedia.org/wiki/Curiously_recurring_template_pattern)
+ *
  * @param DerivedWorkerT  the class name of the inheriting class
  *        (f.e.   class AwesomeWorker : public ConcurrentWorker<AwesomeWorker>)
  */
