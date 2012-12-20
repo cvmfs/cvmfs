@@ -84,6 +84,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   upload.h upload.cc
+  upload_local.h upload_local.cc
   duplex_curl.h download.h download.cc
   signature.cc signature.h
 
