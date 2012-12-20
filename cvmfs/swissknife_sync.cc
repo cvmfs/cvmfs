@@ -85,7 +85,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-  upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  upload::AbstractSpooler *spooler =
+    upload::AbstractSpooler::Construct(spooler_definition);
   assert(spooler);
 
   manifest::Manifest *manifest =
@@ -111,12 +112,13 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   const string dest = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
-  upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  upload::AbstractSpooler *spooler =
+    upload::AbstractSpooler::Construct(spooler_definition);
   assert(spooler);
-  spooler->SpoolCopy(source, dest);
+  spooler->Copy(source, dest);
   spooler->EndOfTransaction();
-  spooler->WaitFor();
-  if (spooler->num_errors() > 0) {
+  spooler->WaitForTermination();
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
     return 1;
   }
@@ -154,7 +156,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 	if (!CheckParams(&params)) return 2;
 
   // Start spooler
-  params.spooler = upload::MakeSpoolerEnsemble(params.spooler_definition);
+  params.spooler = upload::AbstractSpooler::Construct(params.spooler_definition);
+  if (NULL == params.spooler)
+    return 3;
+
   download::Init(1);
 
   catalog::WritableCatalogManager
@@ -175,6 +180,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 4;
   }
 
+  // finalize the spooler
+  params.spooler->EndOfTransaction();
+  params.spooler->WaitForTermination();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

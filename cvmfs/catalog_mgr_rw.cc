@@ -28,10 +28,10 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
-                                               const std::string &stratum0,
-                                               const string &dir_temp,
-                                               upload::Spooler *spooler)
+WritableCatalogManager::WritableCatalogManager(const hash::Any         &base_hash,
+                                               const std::string       &stratum0,
+                                               const string            &dir_temp,
+                                               upload::AbstractSpooler *spooler)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -110,8 +110,8 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  * @return true on success, false otherwise
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
-  const string &dir_temp,
-  upload::Spooler *spooler)
+  const string            &dir_temp,
+  upload::AbstractSpooler *spooler)
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
@@ -155,12 +155,12 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest::Manifest *manifest = new manifest::Manifest(hash_catalog, "");
 
   // Upload catalog
-  spooler->SpoolCopy(file_path_compressed,
-                     "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler->Copy(file_path_compressed,
+                "data" + hash_catalog.MakePath(1, 2) + "C");
   spooler->EndOfTransaction();
-  spooler->WaitFor();
+  spooler->WaitForTermination();
   unlink(file_path_compressed.c_str());
-  if (spooler->num_errors() > 0) {
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
              file_path_compressed.c_str());
     return NULL;
@@ -647,8 +647,8 @@ manifest::Manifest *WritableCatalogManager::Commit() {
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
-      spooler_->WaitFor();
-      if (spooler_->num_errors() > 0) {
+      spooler_->WaitForUpload();
+      if (spooler_->GetNumberOfErrors() > 0) {
         LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
         return NULL;
       }
@@ -737,8 +737,8 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 	}
 
   // Upload catalog
-  spooler_->SpoolCopy(catalog->database_path() + ".compressed",
-                      "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler_->Copy(catalog->database_path() + ".compressed",
+                 "data" + hash_catalog.MakePath(1, 2) + "C");
 
 	// Update registered catalog SHA1 in nested catalog
 	if (!catalog->IsRoot()) {
