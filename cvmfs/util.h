@@ -71,7 +71,9 @@ void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
 
-std::vector<std::string> SplitString(const std::string &str, const char delim);
+std::vector<std::string> SplitString(const std::string &str,
+	                                 const char delim,
+                                     const unsigned max_chunks = 0);
 std::string JoinStrings(const std::vector<std::string> &strings,
                         const std::string &joint);
 
@@ -92,6 +94,65 @@ bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
                  const std::map<int, int> &map_fildes);
+
+
+/**
+ * Generic base class to mark an inheriting class as 'non-copyable'
+ */
+class DontCopy {
+ protected:
+  // prevent DontCopy from being instantiated on its own
+  DontCopy() {}
+
+ private:
+  // produce a linker error by not implementing copy constructor and
+  // assignment operator. We don't want to copy that object!
+  DontCopy(const DontCopy &other);
+  DontCopy& operator=(const DontCopy &rhs);
+};
+
+
+template <class T>
+class UniquePtr : DontCopy {
+ public:
+  inline UniquePtr() : ref_(NULL) {}
+  inline UniquePtr(T *ref) : ref_(ref) {}
+  inline ~UniquePtr()                 { delete ref_; }
+
+  inline operator bool() const        { return (ref_ != NULL); }
+  inline operator T*() const          { return ref_; }
+  inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
+  inline T* operator->() const        { return ref_; }
+
+ private:
+  T *ref_;
+};
+
+/**
+ * Very simple StopWatch implementation.
+ * Currently the implementation does not allow a restart of a stopped
+ * watch. You should always reset the clock before you reuse it.
+ *
+ * Stopwatch watch();
+ * watch.Start();
+ * // do nasty thing
+ * watch.Stop();
+ * printf("%f", watch.GetTime());
+ */
+class StopWatch : DontCopy {
+ public:
+  StopWatch() : running_(false) {}
+
+  void Start();
+  void Stop();
+  void Reset();
+
+  double GetTime() const;
+
+ private:
+  bool running_;
+  timeval start_, end_;
+};
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }
