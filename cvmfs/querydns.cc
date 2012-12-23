@@ -6,6 +6,7 @@
  */
 
 #include "querydns.h"
+#include "logging.h"
 
 using namespace std; // NOLINT
 
@@ -42,7 +43,7 @@ static void callback_txt(void *arg, int status,int timeouts,
    status = ares_parse_txt_reply(abuf, alen, &get_txt_result);
    if (status != ARES_SUCCESS)
    {
-     cout << ares_strerror(status)<<endl;
+     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
      result_txt = NULL;
      return;
    }
@@ -59,7 +60,7 @@ static void callback_cname(void *arg, int status,int timeouts,
    status = ares_parse_a_reply(abuf, alen, &host,NULL,NULL);
    if (status != ARES_SUCCESS)
    { 
-     cout << ares_strerror(status)<<endl;
+     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
      cname = "";
      return;
    }
@@ -82,7 +83,7 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
   status = ares_library_init(ARES_LIB_INIT_ALL);
   if (status != ARES_SUCCESS)
   {
-     cout << ares_strerror(status);
+     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
      return false;
   }
 
@@ -93,7 +94,7 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
   status = ares_init_options(&channel, &options, optmask); 
   if (status != ARES_SUCCESS)
   {
-     cout << ares_strerror(status);
+     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
      return false;
   }
 
@@ -110,7 +111,7 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
   status = ares_set_servers(channel, set_nameserver);
   if (status != ARES_SUCCESS)
   {
-     cout << ares_strerror(status);
+     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
      return false;
   }
 
@@ -128,7 +129,7 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
      return false;
 
   // Change the result type and then return it.
-  string_buff = string_buff.assign((const char*)result_txt);
+  string_buff.assign((const char*)result_txt);
   *result = string_buff;
 
   delete set_nameserver;
@@ -137,14 +138,3 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
 
   return true;
 }
-
-/*
-int main(int argc,char* argv[])
-{
-  string my_string;
-  QueryDns("httpproxy.geo.cdn.cernvm.org", AF_INET,"137.138.234.60", 53, &my_string);
-  cout <<"Txt Result :"<< my_string << endl;
-
-  return 0;
-}
-*/
