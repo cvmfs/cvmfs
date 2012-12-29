@@ -42,6 +42,7 @@ Requires: autofs
 Requires: fuse
 Requires: curl
 Requires: attr
+Requires: zlib
 # Account for different package names
 %if 0%{?suse_version}
 Requires: libfuse2

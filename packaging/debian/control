@@ -8,7 +8,7 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs
 Architecture: i386 amd64
-Depends: bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils
+Depends: bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g
 Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
  See http://cernvm.cern.ch
