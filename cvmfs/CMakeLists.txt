@@ -4,7 +4,8 @@
 #
 
 set (CVMFS_LOADER_SOURCES
-  smalloc.h atomic.h shortstring.h platform.h fs_traversal.h
+  smalloc.h atomic.h shortstring.h fs_traversal.h
+  platform.h platform_linux.h platform_osx.h
   logging_internal.h logging.h logging.cc
   hash.h hash.cc
   util.h util.cc
