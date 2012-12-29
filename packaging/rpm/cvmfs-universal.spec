@@ -244,7 +244,9 @@ fi
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
 %{_libdir}/libcvmfs_fuse.so
+%{_libdir}/libcvmfs_fuse.so.%{version}
 %{_libdir}/libcvmfs_fuse_debug.so
+%{_libdir}/libcvmfs_fuse_debug.so.%{version}
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
