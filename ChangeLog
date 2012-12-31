@@ -1,5 +1,5 @@
 2.1.6:
-  * Use system libz by default
+  * Default symbol visibility hidden 
   * Separate stacktrace logs by process
   * Packaging: don't strip binaries
   * cvmfs_reload returns with error if socket directory

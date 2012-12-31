@@ -1188,6 +1188,7 @@ void *g_sqlite_scratch = NULL;
 void *g_sqlite_page_cache = NULL;
 string *g_boot_error = NULL;
 
+__attribute__ ((visibility ("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 

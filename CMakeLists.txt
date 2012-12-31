@@ -47,7 +47,7 @@ option (BUILD_SERVER "Build writer's end programs" ON)
 option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
-option (ZLIB_BUILTIN "Don't use system zlib" OFF)
+option (ZLIB_BUILTIN "Don't use system zlib" ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
@@ -88,8 +88,8 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
