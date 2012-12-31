@@ -19,6 +19,7 @@ my $wait_daemon = undef;
 my $setup = undef;
 my $start = undef;
 my $help_message = undef;
+my $connect_to = undef;
 my $interactive = 1;
 
 # Variables to store daemon ip and port on distributed test
@@ -47,7 +48,7 @@ my $ret = GetOptions ( "c|command=s" => \$command,
 					   "h|help" => \$help_message,
 					   "shell-path=s" => \$shell_path,
 					   "iface=s" => \$iface,
-					   "connect-to=s" => \$daemon_path );
+					   "connect-to=s" => \$connect_to );
 
 if (defined($help_message) or !$ret) {
 	my $help = <<'END';
@@ -72,7 +73,13 @@ if (defined($setup)) {
 }
 
 if (defined($wait_daemon)) {
+	$connect_to = undef;
 	($continue, $socket, $ctxt) = check_command(undef, undef, undef, 'wait-daemon');
+}
+
+if (defined($connect_to)) {
+	$daemon_path = $connect_to;
+	($continue, $socket, $ctxt) = check_command(undef, undef, $daemon_path, 'connect-to');
 }
 
 if (defined($start)) {
