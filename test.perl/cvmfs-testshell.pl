@@ -104,7 +104,7 @@ if ($interactive) {
 
 	# If the daemon is not running, the shell will ask the user if it has to start it
 	if (!check_daemon()) {
-		print 'The daemon is not running. Would you like to run it now? [Y/n]';
+		print 'The daemon is not running. Would you like to run it now? It will run locally. [Y/n]';
 		my $answer = <STDIN>;
 		if($answer eq "\n" or $answer eq "Y\n" or $answer eq "y\n"){
 			($socket, $ctxt) = start_daemon($daemon_path);
