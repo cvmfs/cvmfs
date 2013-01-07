@@ -194,6 +194,42 @@ create_empty_repo() {
 }
 
 
+# creates a cvmfs repository and fills it with some dummy data
+#
+# @param repo_name   the name of the repository to create
+# @param uid         the user id of the new repository's owner
+create_filled_repo() {
+  local repo=$1
+  local uid=$2
+
+  create_empty_repo $repo $uid || return 101
+
+  sudo cvmfs_server transaction $repo || return 102
+
+  pushd /cvmfs/$repo
+
+  echo "meaningless file content" > file
+  echo "more clever file content" > clever
+  ln file hardlinkToFile
+  ln -s clever symlinkToClever
+
+  mkdir -p foo/bar/baz
+  mkdir -p bar/foo/baz
+  touch foo/.cvmfscatalog
+
+  # Put some meaningful stuff into files
+  echo "Vom Eise befreit sind Strom und Bäche"         > foo/bar/verse1
+  echo "Durch des Frühlings holden, belebenden Blick," > foo/bar/verse2
+  echo "Im Tale grünet Hoffnungsglück;"                > foo/bar/verse3
+  echo "Der alte Winter, in seiner Schwäche,"          > foo/bar/verse4
+  echo "Zog sich in rauhe Berge zurück."               > foo/bar/verse5
+
+  popd
+
+  sudo cvmfs_server publish $repo || return 103
+}
+
+
 # generate a custom style recursive listing with only the following infos:
 # - file name
 # - linkcount
