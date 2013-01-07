@@ -19,6 +19,9 @@ if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
 
+TEST_ROOT=$(readlink -f $(dirname $0))
+export TEST_ROOT
+
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
 
