@@ -738,7 +738,7 @@ Failures Fetch(JobInfo *info) {
 
 
 /**
- * Called when new curl sockets arrive or existing curl sockets departure.
+ * Called when new curl sockets arrive or existing curl sockets depart.
  */
 static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                               void *userp, void *socketp)
