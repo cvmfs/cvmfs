@@ -460,6 +460,15 @@ start_perl_service() {
 }
 
 
+# kills all perl services that might still run in the background
+kill_all_perl_services() {
+  services=$(ps aux | grep "[0-9] perl Services/.*/main.pl" | awk '{print $2}')
+  if [ x"$services" != x ]; then
+    kill $services
+  fi
+}
+
+
 # checks if a nested catalog is part of the current catalog configuration
 # of the repository
 # @param catalog_path  the catalog root path to be checked

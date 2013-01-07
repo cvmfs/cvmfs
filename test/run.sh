@@ -64,6 +64,7 @@ do
       sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
       num_failures=$(($num_failures+1))
     fi
+    kill_all_perl_services >> $logfile 2>&1
   else
     rm -rf "$workdir"
     echo "Skipped"
