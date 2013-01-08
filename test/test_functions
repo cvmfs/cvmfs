@@ -530,3 +530,14 @@ publish_repo() {
 
   return 0
 }
+
+# runs the given command and measures the time it took to execute 
+stop_watch() {
+  begin=$(date +%s)
+  cmd="$@"
+  sh -c "$cmd"
+  res=$?
+  end=$(date +%s)
+  echo $((end - begin))
+  return $res
+}
