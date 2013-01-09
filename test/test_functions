@@ -403,13 +403,13 @@ prepare_config_for_local_named() {
   local tmp_dir=$1
 
   echo -n "Creating backup of resolv.conf... "
-  sudo cp /etc/resolv.conf $tmp_dir/resolv.conf || return 101
+  cp /etc/resolv.conf $tmp_dir/resolv.conf || return 101
   echo "Done."
 
   # Overwriting /etc/resolv.conf with an empty file to avoid that the system
   # complains about dns answer arriving from other than the expected host.
   echo -n "Overwriting resolv.conf... "
-  sudo echo "" > /etc/resolv.conf || return 102
+  cat /dev/null > /etc/resolv.conf || return 102
   echo "Done."
 
   # Saving iptables rules
