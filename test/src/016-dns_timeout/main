@@ -55,7 +55,7 @@ cvmfs_run_test() {
   fi
 
   # check if repo was mounted successfully (which is bad in this case)
-  if [ "$cvmfs_retcode" -eq 0 ]; then
+  if [ "$cvmfs_retcode" -ne 16 ]; then
     retcode=104
   fi
 
