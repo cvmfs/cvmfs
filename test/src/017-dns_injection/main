@@ -27,16 +27,18 @@ cvmfs_run_test() {
   mkdir $webroot
   publish=$webroot/.cvmfspublished
   whitelist=$webroot/.cvmfswhitelist
-  echo "<html>"                                                         >  $publish
-  echo "  <head>"                                                       >> $publish
-  echo "    <title>CVMFS Hotel Wifi</title>"                            >> $publish
-  echo "  </head>"                                                      >> $publish
-  echo "  <body>"                                                       >> $publish
-  echo "    <form name=\"credentials\" method=\"POST\">"                >> $publish
-  echo "      Credit Card: <input type=\"text\" name=\"creditcard\" />" >> $publish
-  echo "    </form>"                                                    >> $publish
-  echo "  </body>"                                                      >> $publish
-  echo "</html>"                                                        >> $publish
+  cat > $publish << EOF
+<html>
+  <head>
+    <title>CVMFS Hotel Wifi</title>
+  </head>
+  <body>
+    <form name="credentials" method="POST">
+      Credit Card: <input type="text" name="creditcard" />
+    </form>
+  </body>
+</html>
+EOF
   cp $publish $whitelist
 
 
