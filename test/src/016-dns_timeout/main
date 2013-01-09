@@ -67,9 +67,9 @@ cvmfs_run_test() {
   fi
 
   echo "killing perl services" >> $logfile
-  kill $named_pid >> $logfile 2>&1
-  kill $proxy_pid >> $logfile 2>&1
-  kill $httpd_pid >> $logfile 2>&1
+  kill_perl_service $named_pid >> $logfile 2>&1
+  kill_perl_service $proxy_pid >> $logfile 2>&1
+  kill_perl_service $httpd_pid >> $logfile 2>&1
 
 
   echo "restore system configuration for normal DNS usage" >> $logfile
