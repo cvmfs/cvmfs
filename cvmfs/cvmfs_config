@@ -536,33 +536,46 @@ cvmfs_stat() {
     verbose=1
     shift
   fi
+  local mounted_repos
   org=$1
 
-  cvmfs_readconfig
+  mounted_repos=`list_mounts | awk '{print $3}'`
+
   if [ -z "$org" ]; then
-    list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
-    for entry in $list
+    for mountpoint in $mounted_repos
     do
+      cd $mountpoint || exit 32
+      local this_fqrn
+      get_attr fqrn; this_fqrn=$attr_value
       echo
-      echo "Running $0 stat $entry:"
+      echo "Running $0 stat $this_fqrn:"
       if [ $verbose -eq 1 ]; then
-        cvmfs_stat -v $entry
+        cvmfs_stat -v $this_fqrn
       else
-        cvmfs_stat $entry
+        cvmfs_stat $this_fqrn
       fi
     done
     return 0
   fi
 
+  cvmfs_readconfig
   fqrn=`cvmfs_mkfqrn $org`
   org=`cvmfs_getorg $fqrn`
-  cvmfs_readconfig $fqrn
-  retval=$?
-  if [ $retval -ne 0 ]; then
-    return $retval
+  local active=0
+  for mountpoint in $mounted_repos
+  do
+    cd $mountpoint || exit 32
+    local this_fqrn
+    get_attr fqrn; this_fqrn=$attr_value
+    if [ "$this_fqrn" = "$fqrn" ]; then
+      active=1
+      break
+    fi
+  done
+  if [ $active -eq 0 ]; then
+    echo "$fqrn not mounted"
+    return 1
   fi
-
-  cd /cvmfs/$fqrn 2>/dev/null || exit 32
 
   get_attr version; version=$attr_value
   get_attr pid; pid=$attr_value

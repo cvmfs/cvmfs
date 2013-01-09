@@ -305,6 +305,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
 
     case FUSE_OPT_KEY_NONOPT:
       // first: repository name, second: mount point
+      assert(arg != NULL);
       if (!repository_name_) {
         repository_name_ = new string(arg);
       } else {
@@ -406,7 +407,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
     if (!library_handle_)
       return NULL;
   }
-    
+
   CvmfsExports **exports_ptr =
     reinterpret_cast<CvmfsExports **>(dlsym(library_handle_, "g_cvmfs_exports"));
   if (!exports_ptr)
@@ -436,7 +437,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
                                        &loader_exports_->saved_states);
   if (!retval)
     return kFailSaveState;
-  
+
   SendMsg2Socket(fd_progress, "Waiting for active file system calls\n");
   while (atomic_read64(&num_operations_)) {
     sched_yield();
@@ -478,7 +479,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
 
   SendMsg2Socket(fd_progress, "Activating Fuse module\n");
   cvmfs_exports_->fnSpawn();
-  
+
   atomic_cas32(&blocking_, 1, 0);
   return kFailOk;
 }
@@ -539,7 +540,7 @@ int main(int argc, char *argv[]) {
   BlockSignal(SIGUSR1);
 
   int retval;
-  
+
   // Jump into alternative process flavors (e.g. shared cache manager)
   // We are here due to a fork+execve (ManagedExec in util.cc)
   if ((argc > 1) && (strstr(argv[1], "__") == argv[1])) {
@@ -551,7 +552,7 @@ int main(int argc, char *argv[]) {
         stop_and_go = true;
       return loader_talk::MainReload(argv[2], stop_and_go);
     }
-    
+
     debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
     cvmfs_exports_ = LoadLibrary(debug_mode_, NULL);
     if (!cvmfs_exports_)
@@ -604,7 +605,7 @@ int main(int argc, char *argv[]) {
              options::Dump().c_str());
     return 0;
   }
-  
+
   string parameter;
 
   // Logging

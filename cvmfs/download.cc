@@ -348,10 +348,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     if (info->compressed) {
       //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
       //         num_bytes, info->url->c_str());
-      bool retval = zlib::DecompressZStream2File(&info->zstream,
-                                                 info->destination_file,
-                                                 ptr, num_bytes);
-      if (!retval) {
+      zlib::StreamStates retval =
+        zlib::DecompressZStream2File(&info->zstream,
+                                     info->destination_file,
+                                     ptr, num_bytes);
+      if (retval == zlib::kStreamError) {
         LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
                  info->url->c_str());
         info->error_code = kFailBadData;
@@ -738,7 +739,7 @@ Failures Fetch(JobInfo *info) {
 
 
 /**
- * Called when new curl sockets arrive or existing curl sockets departure.
+ * Called when new curl sockets arrive or existing curl sockets depart.
  */
 static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                               void *userp, void *socketp)

@@ -163,6 +163,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
              file_path_compressed.c_str());
+    delete manifest;
     return NULL;
   }
 
@@ -439,7 +440,7 @@ void WritableCatalogManager::TouchFile(const DirectoryEntryBase &entry,
              entry_path.c_str());
     assert(false);
   }
-  
+
   catalog->TouchEntry(entry, entry_path);
   SyncUnlock();
 }
@@ -469,7 +470,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
              entry_path.c_str());
     assert(false);
   }
-  
+
   catalog->TouchEntry(entry, entry_path);
 
   // since we deal with a directory here, we might just touch a

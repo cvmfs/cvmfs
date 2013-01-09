@@ -93,6 +93,21 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
                  const std::map<int, int> &map_fildes);
 
+/**
+ * Generic base class to mark an inheriting class as 'non-copyable'
+ */
+class SingleCopy {
+ protected:
+  // Prevent DontCopy from being instantiated on its own
+  SingleCopy() {}
+
+ private:
+  // Provoke a linker error by not implementing copy constructor and
+  // assignment operator.
+  SingleCopy(const SingleCopy &other);
+  SingleCopy& operator=(const SingleCopy &rhs);
+};
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }
 #endif
