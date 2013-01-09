@@ -13,10 +13,10 @@ cvmfs_run_test() {
   create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
 
   echo "unmounting $CVMFS_TEST_REPO" >> $logfile
-  umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
+  sudo umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
 
   echo "stopping apache" >> $logfile
-  apachectl -k stop >> $logfile 2>&1 || return 2
+  sudo apachectl -k stop >> $logfile 2>&1 || return 2
 
 
   echo "configure the system for local DNS usage on port 5300" >> $logfile
@@ -48,7 +48,7 @@ cvmfs_run_test() {
 
 
   echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
-  seconds=$(stop_watch "cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1") || cvmfs_retcode=$?
+  seconds=$(stop_watch "sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1") || cvmfs_retcode=$?
   # check if timeout took approx. the expected number of seconds
   if [ "$seconds" -le 18 ] || [ "$seconds" -ge 22 ]; then
     retcode=103
@@ -66,7 +66,7 @@ cvmfs_run_test() {
   fi
 
   echo "unmounting our homebrew repository (which was basically never mounted)" >> $logfile
-  umount /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
+  sudo umount /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
   # check if we unmounted successfully (which would be strange here)
   if [ $? -eq 0 ]; then
     retcode=102
@@ -82,7 +82,7 @@ cvmfs_run_test() {
   restore_normal_dns_configuration $scratch_dir >> $logfile 2>&1 || retcode=$?
 
   echo "restart apache" >> $logfile
-  httpd >> $logfile 2>&1 || return 3
+  sudo httpd >> $logfile 2>&1 || return 3
   
   return $retcode
 }
