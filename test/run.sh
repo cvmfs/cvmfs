@@ -19,6 +19,9 @@ if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
 
+TEST_ROOT=$(readlink -f $(dirname $0))
+export TEST_ROOT
+
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
 
@@ -61,6 +64,7 @@ do
       sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
       num_failures=$(($num_failures+1))
     fi
+    kill_all_perl_services >> $logfile 2>&1
   else
     rm -rf "$workdir"
     echo "Skipped"
