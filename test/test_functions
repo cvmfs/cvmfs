@@ -22,6 +22,10 @@ CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for te
 
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 
+die() {
+  echo -e $1 >&2
+  exit 1
+}
 
 # iptables handling
 IPTABLES_STARTUP="/etc/init.d/iptables"
@@ -32,18 +36,24 @@ IPTABLES_RESTORE="/sbin/iptables-restore"
 if [ ! -f $IPTABLES ] ; then
   if [ -f "/usr/sbin/iptables" ] ; then
     IPTABLES="/usr/sbin/iptables"
+  else
+    die "iptables binary not found"
   fi
 fi
 
 if [ ! -f $IPTABLES_SAVE ] ; then
   if [ -f "/usr/sbin/iptables-save" ] ; then
     IPTABLES_SAVE="/usr/sbin/iptables-save"
+  else
+    die "iptables-save binary not found"
   fi
 fi
 
 if [ ! -f $IPTABLES_RESTORE ] ; then
   if [ -f "/usr/sbin/iptables-restore" ] ; then
     IPTABLES_RESTORE="/usr/sbin/iptables-restore"
+  else
+    die "iptables-restore binary not found"
   fi
 fi
 
