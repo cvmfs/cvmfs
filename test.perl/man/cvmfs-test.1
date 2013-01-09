@@ -5,7 +5,7 @@
 .SH NAME
 cvmfs-test \- Test cvmfs features.
 .SH SYNOPSIS
-.B cvmfs-test [--i] [--setup] [--start] [--wait-daemon] [--c | --command
+.B cvmfs-test [--i] [--setup] [--start] [--wait-daemon] [connect-to IP:PORT] [--c | --command
 .I command
 .B ]
 .br
@@ -39,6 +39,9 @@ When invoked with this option, the shell will wait for the daemon
 to send its own ip address before trying to connect the
 socket. It's used when the daemon isn't on the same
 machine as the shell.
+.IP --connect-to IP:PORT
+Connect the shell to a remote daemon. A cvmfs-test daemon usually
+will run on port 6650.
 .IP "--c command | --command command"
 Execute 
 .B command
