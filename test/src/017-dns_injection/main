@@ -64,7 +64,12 @@ cvmfs_run_test() {
   echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
   cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1 || cvmfs_retcode=$?
   # repository should not be mounted successfully
+  if [ "$cvmfs_retcode" -eq 0 ]; then
+    echo "------> NOTE: cvmfs was unexpectedly mounted successfully! It should have failed." >> $logfile
+    retcode=104
+  fi
   if [ "$cvmfs_retcode" -ne 16 ]; then
+    echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
     retcode=104
   fi
 
