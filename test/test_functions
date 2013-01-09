@@ -457,7 +457,7 @@ restore_normal_dns_configuration() {
 start_perl_service() {
   service_name=$1
   shift
-  if [ ! -f $TEST_ROOT/perl/Services/$service_name/main.pl ]; then
+  if [ ! -f $TEST_ROOT/mock_services/Services/$service_name/main.pl ]; then
     echo "No such perl service '$service_name'"
     return 1
   fi
