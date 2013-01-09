@@ -466,7 +466,7 @@ start_perl_service() {
 
   # start the service
   pushd $TEST_ROOT/mock_services > /dev/null
-  output=$(perl Services/$service_name/main.pl $@)
+  output=$(sudo perl Services/$service_name/main.pl $@)
   popd > /dev/null
   pid=$(echo "$output" | grep SAVE_PID | cut -d : -f 2)
 
