@@ -55,7 +55,13 @@ cvmfs_run_test() {
   fi
 
   # check if repo was mounted successfully (which is bad in this case)
+  # or if it failed to mount but the abort code was unexpected
+  if [ "$cvmfs_retcode" -eq 0 ]; then
+    echo "------> NOTE: cvmfs was unexpectedly mounted successfully! It should have failed." >> $logfile
+    retcode=104
+  fi
   if [ "$cvmfs_retcode" -ne 16 ]; then
+    echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
     retcode=104
   fi
 
@@ -67,9 +73,9 @@ cvmfs_run_test() {
   fi
 
   echo "killing perl services" >> $logfile
-  kill $named_pid >> $logfile 2>&1
-  kill $proxy_pid >> $logfile 2>&1
-  kill $httpd_pid >> $logfile 2>&1
+  kill_perl_service $named_pid >> $logfile 2>&1
+  kill_perl_service $proxy_pid >> $logfile 2>&1
+  kill_perl_service $httpd_pid >> $logfile 2>&1
 
 
   echo "restore system configuration for normal DNS usage" >> $logfile
