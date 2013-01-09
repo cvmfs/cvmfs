@@ -19,6 +19,9 @@ if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
 
+TEST_ROOT=$(readlink -f $(dirname $0))
+export TEST_ROOT
+
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
 
@@ -50,7 +53,7 @@ do
       autofs_switch off >> $logfile 2>&1 || exit 5
     fi
 
-    sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && exit $?"
+    sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && retval=$? && kill_all_perl_services && exit $retval"
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
       rm -rf "$workdir"

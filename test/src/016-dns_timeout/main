@@ -1,0 +1,88 @@
+
+cvmfs_test_name="DNS timeout"
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local repo_pub="/srv/cvmfs/$CVMFS_TEST_REPO"
+  local retcode=0 # after changing global configuration stuff we DONT WANT
+                  # to return from somewhere... save the retcode in the error
+                  # case and reset the configuration at the end of the script
+
+  echo "create a dummy repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
+  create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+
+  echo "unmounting $CVMFS_TEST_REPO" >> $logfile
+  umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
+
+  echo "stopping apache" >> $logfile
+  apachectl -k stop >> $logfile 2>&1 || return 2
+
+
+  echo "configure the system for local DNS usage on port 5300" >> $logfile
+  prepare_config_for_local_named $scratch_dir >> $logfile 2>&1 || retcode=$?
+
+
+  echo "starting local webserver" >> $logfile
+  httpd_pid=$(start_perl_service httpd --root $repo_pub --index-of --all --port 8080)
+
+  echo "starting local web proxy" >> $logfile
+  proxy_pid=$(start_perl_service webproxy --port 3128 --backend http://127.0.0.1:8080)
+
+  echo "starting local DNS daemon" >> $logfile
+  named_pid=$(start_perl_service named --port 5300 --add $CVMFS_TEST_REPO=127.0.0.1 --timeout)
+
+
+  echo "configure cvmfs for the test case" >> $logfile
+  global_test_config_file=$scratch_dir/global.conf
+  repo_test_config_file=$scratch_dir/repo.conf
+
+  echo "CVMFS_REPOSITORIES=$CVMFS_TEST_REPO"                    >  $global_test_config_file
+  echo "CVMFS_TIMEOUT=10"                                       >> $global_test_config_file
+  echo "CVMFS_TIMEOUT_DIRECT=5"                                 >> $global_test_config_file
+  echo "CVMFS_QUOTA_LIMIT=8000"                                 >> $global_test_config_file
+  echo "CVMFS_DEBUGLOG=/tmp/cvmfsdebug.log"                     >> $global_test_config_file
+  echo "CVMFS_SERVER_URL=http://$CVMFS_TEST_REPO:8080"          >  $repo_test_config_file
+  echo "CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub"  >> $repo_test_config_file
+  echo "CVMFS_HTTP_PROXY=\"http://$CVMFS_TEST_REPO:3128\""      >> $repo_test_config_file
+
+
+  echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
+  seconds=$(stop_watch "cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1") || cvmfs_retcode=$?
+  # check if timeout took approx. the expected number of seconds
+  if [ "$seconds" -le 18 ] || [ "$seconds" -ge 22 ]; then
+    retcode=103
+  fi
+
+  # check if repo was mounted successfully (which is bad in this case)
+  # or if it failed to mount but the abort code was unexpected
+  if [ "$cvmfs_retcode" -eq 0 ]; then
+    echo "------> NOTE: cvmfs was unexpectedly mounted successfully! It should have failed." >> $logfile
+    retcode=104
+  fi
+  if [ "$cvmfs_retcode" -ne 16 ]; then
+    echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
+    retcode=104
+  fi
+
+  echo "unmounting our homebrew repository (which was basically never mounted)" >> $logfile
+  umount /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
+  # check if we unmounted successfully (which would be strange here)
+  if [ $? -eq 0 ]; then
+    retcode=102
+  fi
+
+  echo "killing perl services" >> $logfile
+  kill_perl_service $named_pid >> $logfile 2>&1
+  kill_perl_service $proxy_pid >> $logfile 2>&1
+  kill_perl_service $httpd_pid >> $logfile 2>&1
+
+
+  echo "restore system configuration for normal DNS usage" >> $logfile
+  restore_normal_dns_configuration $scratch_dir >> $logfile 2>&1 || retcode=$?
+
+  echo "restart apache" >> $logfile
+  httpd >> $logfile 2>&1 || return 3
+  
+  return $retcode
+}
