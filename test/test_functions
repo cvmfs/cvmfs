@@ -372,21 +372,21 @@ iptables_rules() {
   case "$cmd" in
     "backup")
       if [ -f $IPTABLES_STARTUP ] ; then
-        $IPTABLES_STARTUP save
+        sudo $IPTABLES_STARTUP save
       else
-        $IPTABLES_SAVE > saved_iptables_rules
+        sudo $IPTABLES_SAVE > saved_iptables_rules
       fi
       ;;
     "restore")
       if [ -f $IPTABLES_STARTUP ] ; then
-        $IPTABLES_STARTUP restart
+        sudo $IPTABLES_STARTUP restart
       else
-        $IPTABLES_RESTORE < saved_iptables_rules
+        sudo $IPTABLES_RESTORE < saved_iptables_rules
       fi
       ;;
     "forward")
-      $IPTABLES -t nat -A OUTPUT -p tcp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
-      $IPTABLES -t nat -A OUTPUT -p udp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
+      sudo $IPTABLES -t nat -A OUTPUT -p tcp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
+      sudo $IPTABLES -t nat -A OUTPUT -p udp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
       ;;
     *)
       echo "No action set for this argument."
@@ -409,7 +409,8 @@ prepare_config_for_local_named() {
   # Overwriting /etc/resolv.conf with an empty file to avoid that the system
   # complains about dns answer arriving from other than the expected host.
   echo -n "Overwriting resolv.conf... "
-  cat /dev/null > /etc/resolv.conf || return 102
+  sudo rm /etc/resolv.conf || return 102
+  sudo touch /etc/resolv.conf || return 102
   echo "Done."
 
   # Saving iptables rules
@@ -466,7 +467,7 @@ start_perl_service() {
 
   # start the service
   pushd $TEST_ROOT/mock_services > /dev/null
-  output=$(perl Services/$service_name/main.pl $@)
+  output=$(sudo perl Services/$service_name/main.pl $@)
   popd > /dev/null
   pid=$(echo "$output" | grep SAVE_PID | cut -d : -f 2)
 
