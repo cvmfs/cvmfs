@@ -125,6 +125,7 @@ sub check_command {
 		elsif ($_ eq 'fixperm') { fixperm(); $executed = 1 }
 		elsif ($_ =~ m/^restart\s*.*/ ) { ($socket, $ctxt) = restart_daemon($socket, $ctxt, $daemon_path, $command); $executed = 1 }
 		elsif ($_ =~ m/^wait-daemon\s*.*/ ) { ($socket, $ctxt) = wait_daemon($socket, $ctxt); $executed = 1 }
+		elsif ($_ =~ m/^connect-to\s*.*/ ) { ($socket, $ctxt) = connect_to($daemon_path, $socket, $ctxt); $executed = 1 }
 	}
 	
 	# If the daemon is not running and no command was executed, print on screen a message
@@ -137,6 +138,7 @@ sub check_command {
 	return ($executed, $socket, $ctxt);
 }
 
+# This function is used to passive wait a daemon to connect to the shell
 sub wait_daemon {
 	my $socket = shift;
 	my $ctxt = shift;
@@ -174,6 +176,35 @@ sub wait_daemon {
 	
 	# Returning new socket and context
 	return ($socket, $ctxt);
+}
+
+# This function is used to actively connect to a remote daemon
+sub connect_to {
+	my $daemon_path = shift;
+	my $socket = shift;
+	my $ctxt = shift;
+	
+	if ($daemon_path !~ m/127\.0\.0\.1/ and $daemon_path !~ m/localhost/) {
+		$remote = 1;
+	}
+	else {
+		$remote = 0;
+		print "To start a server locally use 'start' instead.\n";
+		return ($socket, $ctxt);
+	}
+	
+	if (check_daemon($daemon_path)) {
+		print "Daemon found on $daemon_path.\n";
+		print 'Opening shell_socket... ';
+		my ($newsocket, $newctxt) = connect_shell_socket($daemon_path);
+		print "Done.\n";
+		return ($newsocket, $newctxt);
+	}
+	else {
+		$remote = 0;
+		print "Daemon could not be reached on $daemon_path.\n";
+		return ($socket, $ctxt);
+	}
 }
 
 # This function will print the current status of the daemon

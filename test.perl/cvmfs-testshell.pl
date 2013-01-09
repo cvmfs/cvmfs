@@ -19,6 +19,7 @@ my $wait_daemon = undef;
 my $setup = undef;
 my $start = undef;
 my $help_message = undef;
+my $connect_to = undef;
 my $interactive = 1;
 
 # Variables to store daemon ip and port on distributed test
@@ -47,7 +48,7 @@ my $ret = GetOptions ( "c|command=s" => \$command,
 					   "h|help" => \$help_message,
 					   "shell-path=s" => \$shell_path,
 					   "iface=s" => \$iface,
-					   "connect-to=s" => \$daemon_path );
+					   "connect-to=s" => \$connect_to );
 
 if (defined($help_message) or !$ret) {
 	my $help = <<'END';
@@ -72,7 +73,13 @@ if (defined($setup)) {
 }
 
 if (defined($wait_daemon)) {
+	$connect_to = undef;
 	($continue, $socket, $ctxt) = check_command(undef, undef, undef, 'wait-daemon');
+}
+
+if (defined($connect_to)) {
+	$daemon_path = $connect_to;
+	($continue, $socket, $ctxt) = check_command(undef, undef, $daemon_path, 'connect-to');
 }
 
 if (defined($start)) {
@@ -104,7 +111,7 @@ if ($interactive) {
 
 	# If the daemon is not running, the shell will ask the user if it has to start it
 	if (!check_daemon()) {
-		print 'The daemon is not running. Would you like to run it now? [Y/n]';
+		print 'The daemon is not running. Would you like to run it now? It will run locally. [Y/n]';
 		my $answer = <STDIN>;
 		if($answer eq "\n" or $answer eq "Y\n" or $answer eq "y\n"){
 			($socket, $ctxt) = start_daemon($daemon_path);
