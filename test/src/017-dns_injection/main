@@ -1,0 +1,87 @@
+
+cvmfs_test_name="DNS injection"
+# Some providers of public WiFi services use DNS injection to present
+# a landing page to users that just recently connected. Usually with
+# means to provide customer credentials or payment information.
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local repo_pub="/srv/cvmfs/$CVMFS_TEST_REPO"
+  local retcode=0 # after changing global configuration stuff we DONT WANT
+                  # to return from somewhere... save the retcode in the error
+                  # case and reset the configuration at the end of the script
+
+  echo "create a dummy repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
+  create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+
+  echo "unmounting $CVMFS_TEST_REPO" >> $logfile
+  umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
+
+  echo "stopping apache" >> $logfile
+  apachectl -k stop >> $logfile 2>&1 || return 2
+
+
+  echo "creating fake landing pages for .cvmfspublished and .cvmfswhitelist" >> $logfile
+  webroot=$scratch_dir/www
+  mkdir $webroot
+  publish=$webroot/.cvmfspublished
+  whitelist=$webroot/.cvmfswhitelist
+  echo "<html>"                                                         >  $publish
+  echo "  <head>"                                                       >> $publish
+  echo "    <title>CVMFS Hotel Wifi</title>"                            >> $publish
+  echo "  </head>"                                                      >> $publish
+  echo "  <body>"                                                       >> $publish
+  echo "    <form name=\"credentials\" method=\"POST\">"                >> $publish
+  echo "      Credit Card: <input type=\"text\" name=\"creditcard\" />" >> $publish
+  echo "    </form>"                                                    >> $publish
+  echo "  </body>"                                                      >> $publish
+  echo "</html>"                                                        >> $publish
+  cp $publish $whitelist
+
+
+  echo "starting local webserver" >> $logfile
+  httpd_pid=$(start_perl_service httpd --root $webroot --index-of --all --port 8080)
+
+  echo "starting local web proxy" >> $logfile
+  proxy_pid=$(start_perl_service webproxy --port 3128 --backend http://127.0.0.1:8080)
+
+
+  echo "configure cvmfs for the test case" >> $logfile
+  global_test_config_file=$scratch_dir/global.conf
+  repo_test_config_file=$scratch_dir/repo.conf
+
+  echo "CVMFS_REPOSITORIES=$CVMFS_TEST_REPO"                    >  $global_test_config_file
+  echo "CVMFS_TIMEOUT=10"                                       >> $global_test_config_file
+  echo "CVMFS_TIMEOUT_DIRECT=5"                                 >> $global_test_config_file
+  echo "CVMFS_QUOTA_LIMIT=8000"                                 >> $global_test_config_file
+  echo "CVMFS_DEBUGLOG=/tmp/cvmfsdebug.log"                     >> $global_test_config_file
+  echo "CVMFS_SERVER_URL=http://127.0.0.1:8080"                 >  $repo_test_config_file
+  echo "CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub"  >> $repo_test_config_file
+  echo "CVMFS_HTTP_PROXY=\"http://127.0.0.1:3128\""             >> $repo_test_config_file
+
+
+  echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
+  cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1 || cvmfs_retcode=$?
+  # repository should not be mounted successfully
+  if [ "$cvmfs_retcode" -ne 16 ]; then
+    retcode=104
+  fi
+
+
+  echo "unmounting our homebrew repository (which was basically never mounted)" >> $logfile
+  umount /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
+  # check if we unmounted successfully (which would be strange here)
+  if [ $? -eq 0 ]; then
+    retcode=102
+  fi
+
+  echo "killing perl services" >> $logfile
+  kill $proxy_pid >> $logfile 2>&1
+  kill $httpd_pid >> $logfile 2>&1
+
+  echo "restart apache" >> $logfile
+  httpd >> $logfile 2>&1 || return 3
+  
+  return $retcode
+}
