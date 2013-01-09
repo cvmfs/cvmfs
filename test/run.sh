@@ -53,7 +53,7 @@ do
       autofs_switch off >> $logfile 2>&1 || exit 5
     fi
 
-    sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && exit $?"
+    sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && retval=$? && kill_all_perl_services && exit $retval"
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
       rm -rf "$workdir"
@@ -64,7 +64,6 @@ do
       sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
       num_failures=$(($num_failures+1))
     fi
-    kill_all_perl_services >> $logfile 2>&1
   else
     rm -rf "$workdir"
     echo "Skipped"
