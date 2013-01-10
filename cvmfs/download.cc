@@ -89,10 +89,20 @@ unsigned opt_proxy_groups_current_;
 unsigned opt_proxy_groups_current_burned_;
 unsigned opt_num_proxies_;
 
+/**
+ * More than one proxy group can be considered as group of primary proxies
+ * followed by backup proxy groups, e.g. at another site.
+ * If opt_proxy_groups_reset_after_ is > 0, cvmfs will reset its proxy group
+ * to the first one after opt_proxy_groups_reset_after_ seconds are elapsed.
+ */
+time_t opt_timestamp_backup_proxies_ = 0;
+unsigned opt_proxy_groups_reset_after_ = 0;
+
 // Writes and reads should be atomic because reading happens in a different
 // thread than writing.
 double stat_transferred_bytes_;
 double stat_transfer_time_;
+uint64_t stat_num_requests_;
 
 
 /**
@@ -194,6 +204,18 @@ static void SwitchProxy(JobInfo *info) {
     if (opt_proxy_groups_->size() > 1) {
       opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
                                   opt_proxy_groups_->size();
+      // Remeber the timestamp of switching to backup proxies
+      if (opt_proxy_groups_reset_after_ > 0) {
+        if (opt_proxy_groups_current_ > 0) {
+          opt_timestamp_backup_proxies_ = time(NULL);
+          LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+                   "switched to (another) backup proxy group");
+        } else {
+          opt_timestamp_backup_proxies_ = 0;
+          LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+                   "switched back to primary proxy group");
+        }
+      }
     }
   }
 
@@ -263,6 +285,7 @@ void SwitchProxyGroup() {
   opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
                               opt_proxy_groups_->size();
   opt_proxy_groups_current_burned_ = 0;
+  opt_timestamp_backup_proxies_ = time(NULL);
 
   pthread_mutex_unlock(&lock_options_);
 }
@@ -458,6 +481,18 @@ static void SetUrlOptions(JobInfo *info) {
   string url_prefix;
 
   pthread_mutex_lock(&lock_options_);
+  // Check if proxy group needs to be reset from backup to primary
+  if (opt_timestamp_backup_proxies_ > 0) {
+    const time_t now = time(NULL);
+    if (now > opt_timestamp_backup_proxies_ + opt_proxy_groups_reset_after_) {
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+               "reset proxy groups");
+      opt_proxy_groups_current_ = 0;
+      opt_proxy_groups_current_burned_ = 0;
+      opt_timestamp_backup_proxies_ = 0;
+    }
+  }
+
   if (!opt_proxy_groups_ ||
       ((*opt_proxy_groups_)[opt_proxy_groups_current_][0] == "DIRECT"))
   {
@@ -713,6 +748,7 @@ Failures Fetch(JobInfo *info) {
     int retval;
     do {
       retval = curl_easy_perform(handle);
+      stat_num_requests_++;
       double elapsed;
       if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &elapsed) == CURLE_OK)
         stat_transfer_time_ += elapsed;
@@ -889,6 +925,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
     int msgs_in_queue;
     while ((curl_msg = curl_multi_info_read(curl_multi_, &msgs_in_queue))) {
       if (curl_msg->msg == CURLMSG_DONE) {
+        stat_num_requests_++;
         JobInfo *info;
         CURL *easy_handle = curl_msg->easy_handle;
         int curl_error = curl_msg->data.result;
@@ -942,6 +979,7 @@ void Init(const unsigned max_pool_handles) {
 
   stat_transferred_bytes_ = 0.0;
   stat_transfer_time_ = 0.0;
+  stat_num_requests_ = 0;
 
   // Prepare HTTP headers
   string custom_header;
@@ -1086,6 +1124,11 @@ uint64_t GetTransferTime() {
 }
 
 
+uint64_t GetNumRequests() {
+  return stat_num_requests_;
+}
+
+
 /**
  * Parses a list of ';'-separated hosts for the host chain.  The empty string
  * removes the host list.
@@ -1135,6 +1178,7 @@ void GetHostInfo(std::vector<std::string> *host_chain,
 void SetProxyChain(const std::string &proxy_list) {
   pthread_mutex_lock(&lock_options_);
 
+  opt_timestamp_backup_proxies_ = 0;
   delete opt_proxy_groups_;
   if (proxy_list == "") {
     opt_proxy_groups_ = NULL;
@@ -1249,6 +1293,21 @@ void ProbeHosts() {
   opt_host_chain_ = new vector<string>(host_chain);
   opt_host_chain_rtt_ = new vector<int>(host_rtt);
   opt_host_chain_current_ = 0;
+  pthread_mutex_unlock(&lock_options_);
+}
+
+
+void SetProxyGroupResetDelay(const unsigned seconds) {
+  pthread_mutex_lock(&lock_options_);
+  opt_proxy_groups_reset_after_ = seconds;
+  pthread_mutex_unlock(&lock_options_);
+}
+
+
+void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover) {
+  pthread_mutex_lock(&lock_options_);
+  *reset_delay = opt_proxy_groups_reset_after_;
+  *timestamp_failover = opt_timestamp_backup_proxies_;
   pthread_mutex_unlock(&lock_options_);
 }
 
