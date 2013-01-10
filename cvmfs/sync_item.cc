@@ -112,7 +112,7 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
 		const ssize_t length = readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
-    assert(length > 0);
+    assert(length >= 0);
     dirent.symlink_.Assign(slnk, length);
   }
 
