@@ -67,15 +67,17 @@ CVMFS_HTTP_PROXY=http://127.0.0.1:3128
 EOF
 
   echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
-  sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1 || cvmfs_retcode=$?
+  sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
+  cvmfs_retcode=$?
   # repository should not be mounted successfully
   if [ "$cvmfs_retcode" -eq 0 ]; then
     echo "------> NOTE: cvmfs was unexpectedly mounted successfully! It should have failed." >> $logfile
     retcode=104
-  fi
-  if [ "$cvmfs_retcode" -ne 16 ]; then
-    echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
-    retcode=104
+  else
+    if [ "$cvmfs_retcode" -ne 16 ]; then
+      echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
+      retcode=104
+    fi
   fi
 
 
@@ -83,6 +85,7 @@ EOF
   sudo umount /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
   # check if we unmounted successfully (which would be strange here)
   if [ $? -eq 0 ]; then
+    echo "------> NOTE: unmounted cvmfs repository successfully... should have failed!" >> $logfile
     retcode=102
   fi
 

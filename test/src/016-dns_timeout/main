@@ -52,27 +52,30 @@ EOF
 
 
   echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
-  seconds=$(stop_watch "sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1") || cvmfs_retcode=$?
-  # check if timeout took approx. the expected number of seconds
-  if [ "$seconds" -le 18 ] || [ "$seconds" -ge 22 ]; then
-    retcode=103
-  fi
-
-  # check if repo was mounted successfully (which is bad in this case)
-  # or if it failed to mount but the abort code was unexpected
+  seconds=$(stop_watch "sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1")
+  cvmfs_retcode=$?
+  # repository should not be mounted successfully
   if [ "$cvmfs_retcode" -eq 0 ]; then
     echo "------> NOTE: cvmfs was unexpectedly mounted successfully! It should have failed." >> $logfile
     retcode=104
-  fi
-  if [ "$cvmfs_retcode" -ne 16 ]; then
-    echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
-    retcode=104
+  else
+    if [ "$cvmfs_retcode" -ne 16 ]; then
+      echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
+      retcode=104
+    fi
+
+    # check if timeout took approx. the expected number of seconds
+    if [ "$seconds" -le 18 ] || [ "$seconds" -ge 22 ]; then
+      echo "------> NOTE: cvmfs failed but the timeout was unsual: took $seconds seconds to fail..." >> $logfile
+      retcode=103
+    fi
   fi
 
   echo "unmounting our homebrew repository (which was basically never mounted)" >> $logfile
   sudo umount /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
   # check if we unmounted successfully (which would be strange here)
   if [ $? -eq 0 ]; then
+    echo "------> NOTE: unmounted cvmfs repository successfully... should have failed!" >> $logfile
     retcode=102
   fi
 
