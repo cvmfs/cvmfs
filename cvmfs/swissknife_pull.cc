@@ -163,7 +163,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
                                           &file_catalog_vanilla);
   if (!fcatalog_vanilla) {
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
-    fclose(fcatalog);
+    fclose(fcatalog_vanilla);
     unlink(file_catalog.c_str());
     return false;
   }

@@ -106,12 +106,13 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   dirent.size_           = this->GetUnionStat().st_size;
   dirent.mtime_          = this->GetUnionStat().st_mtime;
   dirent.checksum_       = this->GetContentHash();
-  
+
   dirent.name_.Assign(filename_.data(), filename_.length());
 
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
-		ssize_t length = readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
+		const ssize_t length = readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
+    assert(length >= 0);
     dirent.symlink_.Assign(slnk, length);
   }
 
