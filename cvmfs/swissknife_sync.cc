@@ -88,6 +88,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
   assert(spooler);
 
+  // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(dir_temp, spooler);
   if (!manifest) {
@@ -98,6 +99,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest->Export(manifest_path)) {
     PrintError("Failed to create new repository");
+    delete manifest;
     return 5;
   }
   delete manifest;
@@ -165,6 +167,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                               params.dir_scratch);
 
   sync.Traverse();
+  // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest = mediator.Commit();
 
   download::Fini();
@@ -179,6 +182,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Failed to create new repository");
+    delete manifest;
     return 5;
   }
   delete manifest;
