@@ -5,7 +5,7 @@ cvmfs_test_autofs_on_startup=false
 produce_files_in() {
   local working_dir=$1
 
-  pushd $working_dir
+  pushdir $working_dir
 
   mkdir dir1 # stays empty
   mkdir dir2
@@ -40,20 +40,20 @@ produce_files_in() {
   ln dir5/ndir5/nndir3/outlaw dir5/ndir5/nndir3/hardlinkToOutlaw2
   echo "NYPD! Stahp!" > dir5/ndir5/nndir3/NYPD
 
-  popd
+  popdir
 }
 
 change_files_in()
 {
   local working_dir=$1
 
-  pushd $working_dir
+  pushdir $working_dir
 
   rmdir dir1 || return 201
   rm -fR dir4 || return 202
   rm -fR dir5 || return 203
 
-  popd
+  popdir
 }
 
 cvmfs_run_test() {
