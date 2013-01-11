@@ -35,7 +35,7 @@ static void run_ares_mainloop(ares_channel channel)
   }
 }
 
-static void callback_txt(void *arg, int status,int timeouts,
+static void callback_txt(void *arg, int status, int timeouts,
                          unsigned char *abuf, int alen)
 {
    struct ares_txt_reply *get_txt_result=NULL;
@@ -43,7 +43,7 @@ static void callback_txt(void *arg, int status,int timeouts,
    status = ares_parse_txt_reply(abuf, alen, &get_txt_result);
    if (status != ARES_SUCCESS)
    {
-     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
+     LogCvmfs(kLogDns, kLogStderr, "%s", ares_strerror(status));
      result_txt = NULL;
      return;
    }
@@ -52,15 +52,15 @@ static void callback_txt(void *arg, int status,int timeouts,
 }
 
 
-static void callback_cname(void *arg, int status,int timeouts,
+static void callback_cname(void *arg, int status, int timeouts,
                            unsigned char *abuf, int alen)
 {
    struct hostent *host=NULL;
    
-   status = ares_parse_a_reply(abuf, alen, &host,NULL,NULL);
+   status = ares_parse_a_reply(abuf, alen, &host, NULL, NULL);
    if (status != ARES_SUCCESS)
    { 
-     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
+     LogCvmfs(kLogDns, kLogStderr, "%s", ares_strerror(status));
      cname = "";
      return;
    }
@@ -68,8 +68,11 @@ static void callback_cname(void *arg, int status,int timeouts,
    cname = host->h_name;
 }
 
-bool QueryDns(std::string hostname, int type, const std::string *dns_server,
-              const uint16_t port, std::string *result)
+bool QueryDns(const std::string &hostname, 
+              int type, 
+              const std::string &dns_server,
+              const uint16_t port, 
+              std::string *result)
 {
   int status;
   int optmask = 0;
@@ -83,7 +86,7 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
   status = ares_library_init(ARES_LIB_INIT_ALL);
   if (status != ARES_SUCCESS)
   {
-     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
+     cout << ares_strerror(status);
      return false;
   }
 
@@ -94,15 +97,15 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
   status = ares_init_options(&channel, &options, optmask); 
   if (status != ARES_SUCCESS)
   {
-     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
+     LogCvmfs(kLogDns, kLogStderr, "%s", ares_strerror(status));
      return false;
   }
 
   // Set up the name server we'd like to query.
   if ( type == AF_INET)
-     inet_pton(type, (*dns_server).c_str(), &set_nameserver->addr.addr4);
+     inet_pton(type, dns_server.c_str(), &set_nameserver->addr.addr4);
   else if ( type == AF_INET6)
-     inet_pton(type, (*dns_server).c_str(), &set_nameserver->addr.addr6);
+     inet_pton(type, dns_server.c_str(), &set_nameserver->addr.addr6);
   else
      return false;
 
@@ -111,18 +114,18 @@ bool QueryDns(std::string hostname, int type, const std::string *dns_server,
   status = ares_set_servers(channel, set_nameserver);
   if (status != ARES_SUCCESS)
   {
-     LogCvmfs(kLogQueryDNS,kLogStderr,ares_strerror(status));
+     LogCvmfs(kLogDns, kLogStderr, "%s", ares_strerror(status));
      return false;
   }
 
   // Query the CNAME for the given hostname.
-  ares_query(channel, hostname.c_str(),C_IN, T_CNAME, callback_cname, NULL);
+  ares_query(channel, hostname.c_str(), C_IN, T_CNAME, callback_cname, NULL);
   run_ares_mainloop(channel);
    
   // After get the cname, query the txt result.
   if (cname != "")
   {
-     ares_query(channel, cname.c_str(),C_IN, T_TXT, callback_txt, NULL);
+     ares_query(channel, cname.c_str(), C_IN, T_TXT, callback_txt, NULL);
      run_ares_mainloop(channel);
   }
   else
