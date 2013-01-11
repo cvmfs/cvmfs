@@ -325,6 +325,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
           StringifyInt(download::GetTransferTime()) + " s\n";
         result += "  Number of requests: " +
           StringifyInt(download::GetNumRequests()) + "\n";
+        result += "  Number of retries: " +
+          StringifyInt(download::GetNumRetries()) + "\n";
         unsigned proxy_reset_delay;
         time_t proxy_timestamp_failover;
         download::GetProxyBackupInfo(&proxy_reset_delay,

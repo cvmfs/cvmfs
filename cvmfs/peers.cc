@@ -404,7 +404,7 @@ static void *MainWatchdog(void *data __attribute__((unused))) {
 
   MessagePing ping(address_self_->port);
   while (1) {
-    sleep(kPingInterval);
+    SafeSleepMs(kPingInterval*1000);
     pthread_mutex_lock(&lock_watchees_);
     if (watchee1_.ip4_address != 0) {
       LogCvmfs(kLogPeers, kLogDebug, "lost peer %s",

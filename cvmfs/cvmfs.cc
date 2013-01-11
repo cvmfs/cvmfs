@@ -850,7 +850,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   // TODO: move to download
   time_t now = time(NULL);
   if (now - previous_io_error_.timestamp < kForgetDos) {
-    usleep(previous_io_error_.delay*1000);
+    SafeSleepMs(previous_io_error_.delay);
     if (previous_io_error_.delay < kMaxIoDelay)
       previous_io_error_.delay *= 2;
   } else {
@@ -1650,7 +1650,7 @@ static bool MaintenanceMode(const int fd_progress) {
   string msg_progress = "Draining out kernel caches (" +
                         StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  sleep((int)cvmfs::kcache_timeout_);
+  SafeSleepMs((int)cvmfs::kcache_timeout_*1000);
   return true;
 }
 

@@ -36,6 +36,8 @@ enum Failures {
   kFailOk = 0,
   kFailLocalIO,
   kFailBadUrl,
+  kFailProxyResolve,
+  kFailHostResolve,
   kFailProxyConnection,
   kFailHostConnection,
   kFailBadData,
@@ -97,6 +99,8 @@ struct JobInfo {
   Failures error_code;
   unsigned char num_failed_proxies;
   unsigned char num_failed_hosts;
+  unsigned char num_retries;
+  unsigned backoff_ms;
 };
 
 
@@ -112,6 +116,7 @@ void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
 uint64_t GetTransferredBytes();
 uint64_t GetTransferTime();
 uint64_t GetNumRequests();
+uint64_t GetNumRetries();
 void SetHostChain(const std::string &host_list);
 void GetHostInfo(std::vector<std::string> *host_chain,
                  std::vector<int> *rtt, unsigned *current_host);

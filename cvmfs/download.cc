@@ -89,6 +89,11 @@ unsigned opt_proxy_groups_current_;
 unsigned opt_proxy_groups_current_burned_;
 unsigned opt_num_proxies_;
 
+unsigned opt_max_retries_ = 0;
+unsigned opt_backoff_init_ms_ = 0;
+unsigned opt_backoff_max_ms_ = 0;
+
+
 /**
  * More than one proxy group can be considered as group of primary proxies
  * followed by backup proxy groups, e.g. at another site.
@@ -103,6 +108,7 @@ unsigned opt_proxy_groups_reset_after_ = 0;
 double stat_transferred_bytes_;
 double stat_transfer_time_;
 uint64_t stat_num_requests_;
+uint64_t stat_num_retries_;
 
 
 /**
@@ -445,6 +451,8 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
   info->nocache = false;
   info->num_failed_proxies = 0;
   info->num_failed_hosts = 0;
+  info->num_retries = 0;
+  info->backoff_ms = 0;
   if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
   }
@@ -534,6 +542,38 @@ static void UpdateStatistics(CURL *handle) {
 
 
 /**
+ * Backoff for retry to introduce a jitter into a cluster of requesting
+ * cvmfs nodes.
+ * Retry only when HTTP caching is on.
+ *
+ * \return true if backoff has been performed, false otherwise
+ */
+static bool Backoff(JobInfo *info) {
+  pthread_mutex_lock(&lock_options_);
+  unsigned max_retries = opt_max_retries_;
+  unsigned backoff_init_ms = opt_backoff_init_ms_;
+  unsigned backoff_max_ms = opt_backoff_max_ms_;
+  pthread_mutex_unlock(&lock_options_);
+
+  if (!info->nocache && (info->num_retries < max_retries)) {
+    info->num_retries++;
+    stat_num_retries_++;
+    if (info->backoff_ms == 0) {
+      info->backoff_ms = random() % backoff_init_ms + 1;  // Must be != 0
+    } else {
+      info->backoff_ms *= 2;
+    }
+    if (info->backoff_ms > backoff_max_ms)
+      info->backoff_ms = backoff_max_ms;
+
+    SafeSleepMs(info->backoff_ms);
+    return true;
+  }
+  return false;
+}
+
+
+/**
  * Checks the result of a curl download and implements the failure logic, such
  * as changing the proxy server.  Takes care of cleanup.
  *
@@ -588,10 +628,10 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->error_code = kFailBadUrl;
       break;
     case CURLE_COULDNT_RESOLVE_PROXY:
-      info->error_code = kFailProxyConnection;
+      info->error_code = kFailProxyResolve;
       break;
     case CURLE_COULDNT_RESOLVE_HOST:
-      info->error_code = kFailHostConnection;
+      info->error_code = kFailHostResolve;
       break;
     case CURLE_COULDNT_CONNECT:
     case CURLE_OPERATION_TIMEDOUT:
@@ -617,13 +657,15 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     pthread_mutex_lock(&lock_options_);
     if ((info->error_code) == kFailBadData && !info->nocache)
       try_again = true;
-    if ((info->error_code == kFailHostConnection) &&
+    if (( (info->error_code == kFailHostResolve) ||
+          (info->error_code == kFailHostConnection) ) &&
         info->probe_hosts &&
         opt_host_chain_ && (info->num_failed_hosts < opt_host_chain_->size()))
     {
       try_again = true;
     }
-    if ((info->error_code == kFailProxyConnection) &&
+    if (( (info->error_code == kFailProxyResolve) ||
+          (info->error_code == kFailProxyConnection) ) &&
         (info->num_failed_proxies < opt_num_proxies_))
     {
       try_again = true;
@@ -656,17 +698,40 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       zlib::DecompressInit(&info->zstream);
 
     // Failure handling
-    if (info->error_code == kFailBadData) {
-      curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER,
-                       http_headers_nocache_);
-      info->nocache = true;
-    } else if (info->error_code == kFailHostConnection) {
-      SwitchHost(info);
-      info->num_failed_hosts++;
-      SetUrlOptions(info);
-    } else if (info->error_code == kFailProxyConnection) {
+    bool switch_proxy = false;
+    bool switch_host = false;
+    switch (info->error_code) {
+      case kFailBadData:
+        curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER,
+                         http_headers_nocache_);
+        info->nocache = true;
+        break;
+      case kFailProxyResolve:
+        switch_proxy = true;
+        break;
+      case kFailHostResolve:
+        switch_host = true;
+        break;
+      case kFailProxyConnection:
+        if (!Backoff(info))
+          switch_proxy = true;
+        break;
+      case kFailHostConnection:
+        if (!Backoff(info))
+          switch_host = true;
+        break;
+      default:
+        // No other errors expected when retrying
+        abort();
+    }
+    if (switch_proxy) {
       SwitchProxy(info);
       info->num_failed_proxies++;
+      SetUrlOptions(info);
+    }
+    if (switch_host) {
+      SwitchHost(info);
+      info->num_failed_hosts++;
       SetUrlOptions(info);
     }
 
@@ -980,6 +1045,7 @@ void Init(const unsigned max_pool_handles) {
   stat_transferred_bytes_ = 0.0;
   stat_transfer_time_ = 0.0;
   stat_num_requests_ = 0;
+  stat_num_retries_ = 0;
 
   // Prepare HTTP headers
   string custom_header;
@@ -1126,6 +1192,11 @@ uint64_t GetTransferTime() {
 
 uint64_t GetNumRequests() {
   return stat_num_requests_;
+}
+
+
+uint64_t GetNumRetries() {
+  return stat_num_retries_;
 }
 
 

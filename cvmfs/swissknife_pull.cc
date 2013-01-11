@@ -106,9 +106,9 @@ static void *MainWorker(void *data) {
         retval = download::Fetch(&download_chunk);
         if (retval != download::kFailOk) {
           if (attempts < retries) {
-            // Backoff
+            // Backoff (TODO: use download backoff logic)
             atomic_inc64(&overall_retries);
-            usleep((100 + random()%100) * 1000);
+            SafeSleepMs((100 + random()%100));
             rewind(fchunk);
             int retval = ftruncate(fileno(fchunk), 0);
             assert(retval == 0);
@@ -218,7 +218,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   }
   catalog->AllChunksEnd();
   while (atomic_read64(&chunk_queue) != 0) {
-    usleep(100000);
+    SafeSleepMs(100);
   }
   LogCvmfs(kLogCvmfs, kLogStdout, " fetched %"PRId64" new chunks out of "
            "%"PRId64" processed chunks",
