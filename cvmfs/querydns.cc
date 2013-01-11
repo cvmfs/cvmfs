@@ -86,7 +86,7 @@ bool QueryDns(const std::string &hostname,
   status = ares_library_init(ARES_LIB_INIT_ALL);
   if (status != ARES_SUCCESS)
   {
-     cout << ares_strerror(status);
+     LogCvmfs(kLogDns, kLogStderr, "%s", ares_strerror(status));
      return false;
   }
 
