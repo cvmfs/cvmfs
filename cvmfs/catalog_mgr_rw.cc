@@ -72,6 +72,12 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
   const string url = stratum0_ + "/data" + effective_hash.MakePath(1, 2) + "C";
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
                                   catalog_path);
+  if (!fcatalog) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to create temp file when loading %s", url.c_str());
+    assert(false);
+  }
+
   download::JobInfo download_catalog(&url, true, false, fcatalog,
                                      &effective_hash);
 
@@ -163,6 +169,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   if (spooler->num_errors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
              file_path_compressed.c_str());
+    delete manifest;
     return NULL;
   }
 
@@ -439,7 +446,7 @@ void WritableCatalogManager::TouchFile(const DirectoryEntryBase &entry,
              entry_path.c_str());
     assert(false);
   }
-  
+
   catalog->TouchEntry(entry, entry_path);
   SyncUnlock();
 }
@@ -469,7 +476,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
              entry_path.c_str());
     assert(false);
   }
-  
+
   catalog->TouchEntry(entry, entry_path);
 
   // since we deal with a directory here, we might just touch a
@@ -722,7 +729,9 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
     catalog->SetPreviousRevision(base_hash_);
   } else {
     hash::Any hash_previous;
-    catalog->parent()->FindNested(catalog->path(), &hash_previous);
+    const bool retval =
+      catalog->parent()->FindNested(catalog->path(), &hash_previous);
+    assert (retval);
     catalog->SetPreviousRevision(hash_previous);
   }
 

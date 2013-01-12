@@ -213,7 +213,7 @@ class Sql {
   }
 
  protected:
-  Sql() { }
+  Sql() : statement_(NULL), last_error_code_(0) { }
   bool Init(const sqlite3 *database, const std::string &statement);
 
   /**

@@ -111,6 +111,7 @@ void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
 void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
 uint64_t GetTransferredBytes();
 uint64_t GetTransferTime();
+uint64_t GetNumRequests();
 void SetHostChain(const std::string &host_list);
 void GetHostInfo(std::vector<std::string> *host_chain,
                  std::vector<int> *rtt, unsigned *current_host);
@@ -121,6 +122,8 @@ void GetProxyInfo(std::vector< std::vector<std::string> > *proxy_chain,
                   unsigned *current_group);
 void RebalanceProxies();
 void SwitchProxyGroup();
+void SetProxyGroupResetDelay(const unsigned seconds);
+void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover);
 void RestartNetwork();
 
 }  // namespace download

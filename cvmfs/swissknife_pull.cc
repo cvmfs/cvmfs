@@ -154,13 +154,19 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   string file_catalog_vanilla;
   FILE *fcatalog = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                   &file_catalog);
-  FILE *fcatalog_vanilla = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
-                                          &file_catalog_vanilla);
-  if (!fcatalog || !fcatalog_vanilla) {
+  if (!fcatalog) {
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
     return false;
   }
   fclose(fcatalog);
+  FILE *fcatalog_vanilla = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
+                                          &file_catalog_vanilla);
+  if (!fcatalog_vanilla) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
+    fclose(fcatalog_vanilla);
+    unlink(file_catalog.c_str());
+    return false;
+  }
   const string url_catalog = *stratum0_url + "/data" +
                              catalog_hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url_catalog, false, false,

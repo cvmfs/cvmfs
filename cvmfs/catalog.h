@@ -19,6 +19,7 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "duplex_sqlite3.h"
+#include "util.h"
 
 namespace catalog {
 
@@ -98,7 +99,7 @@ struct Counters {
  *
  * Read-only catalog. A sub-class provides read-write access.
  */
-class Catalog {
+  class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
   friend class SqlLookup;  // for mangled inode
  public:

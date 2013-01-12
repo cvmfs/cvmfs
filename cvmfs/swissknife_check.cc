@@ -167,7 +167,8 @@ static bool Exists(const string &file) {
  * Recursive catalog walk-through
  */
 static bool Find(const catalog::Catalog *catalog,
-                 PathString path, catalog::DeltaCounters *computed_counters)
+                 const PathString &path,
+                 catalog::DeltaCounters *computed_counters)
 {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
@@ -538,6 +539,7 @@ int swissknife::CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (!Exists(certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());
+    delete manifest;
     return 1;
   }
 
@@ -545,5 +547,6 @@ int swissknife::CommandCheck::Main(const swissknife::ArgumentList &args) {
   bool retval = InspectTree("", manifest->catalog_hash(), NULL,
                             &computed_counters);
 
+  delete manifest;
   return retval ? 0 : 1;
 }

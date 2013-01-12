@@ -130,7 +130,7 @@ int MakeSocket(const string &path, const int mode) {
   // fchmod on a socket is not allowed under Mac OS X
   // using default 0770 here
   if (fchmod(socket_fd, mode) != 0)
-    return false;
+    goto make_socket_failure;
 #endif
 
   if (bind(socket_fd, (struct sockaddr *)&sock_addr,
@@ -141,14 +141,18 @@ int MakeSocket(const string &path, const int mode) {
       if (bind(socket_fd, (struct sockaddr *)&sock_addr,
                sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
       {
-        return -1;
+        goto make_socket_failure;
       }
     } else {
-      return -1;
+      goto make_socket_failure;
     }
   }
 
   return socket_fd;
+
+ make_socket_failure:
+  close(socket_fd);
+  return -1;
 }
 
 
@@ -362,12 +366,16 @@ int LockFile(const std::string &path) {
 
 
   if (flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) {
-    if (errno != EWOULDBLOCK)
+    if (errno != EWOULDBLOCK) {
+      close(fd_lockfile);
       return -1;
+    }
     LogCvmfs(kLogCvmfs, kLogSyslog, "another process holds %s, waiting.",
              path.c_str());
-    if (flock(fd_lockfile, LOCK_EX) != 0)
+    if (flock(fd_lockfile, LOCK_EX) != 0) {
+      close(fd_lockfile);
       return -1;
+    }
     LogCvmfs(kLogCvmfs, kLogSyslog, "lock %s acquired", path.c_str());
   }
 
