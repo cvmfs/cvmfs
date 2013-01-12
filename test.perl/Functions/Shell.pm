@@ -233,6 +233,11 @@ sub check_permission {
 	# Checking if the user exists in the system
 	$user = `cat /etc/passwd | grep cvmfs-test`;
 	
+	# Printing if user cvmfs-test doesn't exist
+	unless ($user) {
+		print "ERROR: cvmfs-test user doesn't exist.\n";
+	}
+	
 	# Checking if the user own the daemon file
 	if (-e "$RealBin/cvmfs-testdwrapper"){
 		my $uid = (stat("$RealBin/cvmfs-testdwrapper"))[4];
@@ -240,6 +245,11 @@ sub check_permission {
 	}
 	else {
 		$owner = 0;
+	}
+	
+	# Printing if owner is not root
+	unless ($owner eq 'root') {
+		print "ERROR: Wrapper owner isn't root. It's $owner.\n";
 	}
 	
 	# Checking if the file has the setuid bit
@@ -251,6 +261,11 @@ sub check_permission {
 		$suid = 0;
 	}
 	
+	# Printing if suid byte isn't set
+	unless ($suid) {
+		print "ERROR: Wrapper hasn't suid byte set.\n";
+	}
+	
 	# Checking if the log directory exists and the owner is cvmfs-test
 	if ( -e '/var/log/cvmfs-test' ) {
 		my $log_uid = (stat('/var/log/cvmfs-test'))[4];
@@ -258,6 +273,11 @@ sub check_permission {
 	}
 	else {
 		$log_owner = 0;
+	}
+	
+	# Printing if log folder doesn't belong to cvmfs-test user
+	unless ($log_owner eq 'cvmfs-test') {
+		print "ERROR: Log folder doesn't belong to cvmfs-test user. It belongs to $log_owner.\n";
 	}
 	
 	# Return true only if all conditions are true
