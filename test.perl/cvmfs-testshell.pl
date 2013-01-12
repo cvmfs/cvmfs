@@ -48,18 +48,21 @@ my $ret = GetOptions ( "c|command=s" => \$command,
 					   "h|help" => \$help_message,
 					   "shell-path=s" => \$shell_path,
 					   "iface=s" => \$iface,
-					   "connect-to=s" => \$connect_to );
+					   "connect-to=s" => \$connect_to,
+					   "i|interactive" => sub { return } );
 
 if (defined($help_message) or !$ret) {
 	my $help = <<'END';
-Usage: cvmfs-test [--i] [--setup] [--wait-daemon] [--c command]
-	
--h|--help	Print this help and exit.
---i		Start the interactive shell. Default.
---setup		Setup the environment.
---start		Start the daemon.
---wait-daemon	Wait for the daemon to send its ip.
---c command	Executes command and exit.
+Usage: cvmfs-test <options>
+
+Available options:
+
+	-h|--help	Print this help and exit.
+	-i|--interactiveStart the interactive shell. Default.
+	--setup		Setup the environment.
+	--start		Start the daemon.
+	--wait-daemon	Wait for the daemon to send its ip.
+	--c command	Executes command and exit.
 
 END
 	print $help;
