@@ -390,7 +390,7 @@ sub start_daemon {
 	my $daemon_path = shift;
 	my $shell_path = shift;
 	my $iface = shift;
-	if (defined (@_) and scalar(@_) > 0) {
+	if (@_ and scalar(@_) > 0) {
 		# Retrieving arguments
 		my $line = shift;
 		
