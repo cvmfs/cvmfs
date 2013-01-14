@@ -319,20 +319,13 @@ static void *MainTalk(void *data __attribute__((unused))) {
         }
 
         result += "\nNetwork Statistics:\n";
-        result += "  Transferred Bytes: " +
-          StringifyInt(download::GetTransferredBytes()) + "\n";
-        result += "  Transfer duration: " +
-          StringifyInt(download::GetTransferTime()) + " s\n";
-        result += "  Number of requests: " +
-          StringifyInt(download::GetNumRequests()) + "\n";
-        result += "  Number of retries: " +
-          StringifyInt(download::GetNumRetries()) + "\n";
+        result += download::GetStatistics().Print();
         unsigned proxy_reset_delay;
         time_t proxy_timestamp_failover;
         download::GetProxyBackupInfo(&proxy_reset_delay,
                                      &proxy_timestamp_failover);
-        result += "  Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
-          ("Backup since " + StringifyTime(proxy_timestamp_failover, false)) :
+        result += "Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
+          ("Backup since " + StringifyTime(proxy_timestamp_failover, true)) :
           "Primary");
         result += "\n\n";
 

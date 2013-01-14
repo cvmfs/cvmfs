@@ -1071,11 +1071,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download::GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = download::GetTransferredBytes();
+    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = download::GetTransferredBytes();
-    int64_t time = download::GetTransferTime();
+    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
+    int64_t time = uint64_t(download::GetStatistics().transfer_time);
     if (time == 0)
       attribute_value = "n/a";
     else

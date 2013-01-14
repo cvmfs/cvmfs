@@ -44,6 +44,28 @@ enum Failures {
   kFailOther,
 };
 
+
+struct Statistics {
+  double transferred_bytes;
+  double transfer_time;
+  uint64_t num_requests;
+  uint64_t num_retries;
+  uint64_t num_proxy_failover;
+  uint64_t num_host_failover;
+
+  Statistics() {
+    transferred_bytes = 0.0;
+    transfer_time = 0.0;
+    num_requests = 0;
+    num_retries = 0;
+    num_proxy_failover = 0;
+    num_host_failover = 0;
+  }
+
+  std::string Print() const;
+};
+
+
 /**
  * Contains all the information to specify a download job.
  */
@@ -113,10 +135,7 @@ Failures Head(const std::string *url);
 void SetDnsServer(const std::string &address);
 void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
 void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
-uint64_t GetTransferredBytes();
-uint64_t GetTransferTime();
-uint64_t GetNumRequests();
-uint64_t GetNumRetries();
+const Statistics &GetStatistics();
 void SetHostChain(const std::string &host_list);
 void GetHostInfo(std::vector<std::string> *host_chain,
                  std::vector<int> *rtt, unsigned *current_host);
