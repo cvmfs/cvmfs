@@ -66,7 +66,6 @@ int pipe_chunks[2];
 pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 upload::BackendStat *backend_stat = NULL;
 unsigned retries = 3;
-atomic_int64 overall_retries;
 atomic_int64 overall_chunks;
 atomic_int64 overall_new;
 atomic_int64 chunk_queue;
@@ -105,18 +104,9 @@ static void *MainWorker(void *data) {
       do {
         retval = download::Fetch(&download_chunk);
         if (retval != download::kFailOk) {
-          if (attempts < retries) {
-            // Backoff (TODO: use download backoff logic)
-            atomic_inc64(&overall_retries);
-            SafeSleepMs((100 + random()%100));
-            rewind(fchunk);
-            int retval = ftruncate(fileno(fchunk), 0);
-            assert(retval == 0);
-          } else {
-            LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
-                     url_chunk.c_str(), retval);
-            abort();
-          }
+          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
+                   url_chunk.c_str(), retval);
+          abort();
         }
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
@@ -316,7 +306,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     timeout = String2Uint64(*args.find('t')->second);
   if (args.find('a') != args.end())
     retries = String2Uint64(*args.find('a')->second);
-  atomic_init64(&overall_retries);
   if (args.find('p') != args.end())
     pull_history = true;
   pthread_t *workers =
@@ -335,6 +324,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&chunk_queue);
   download::Init(num_parallel+1);
   download::SetTimeout(timeout, timeout);
+  download::SetRetryParameters(retries, timeout, 3*timeout);
   download::Spawn();
   signature::Init();
   if (!signature::LoadPublicRsaKeys(master_keys)) {
@@ -388,9 +378,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (!retval)
     goto fini;
 
-  if (atomic_read64(&overall_retries) > 0) {
+  if (download::GetStatistics().num_retries > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Overall number of retries: %"PRId64,
-             atomic_read64(&overall_retries));
+             download::GetStatistics().num_retries);
   }
 
   // Upload manifest ensemble

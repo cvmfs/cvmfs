@@ -1201,6 +1201,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
   unsigned proxy_reset_after = 0;
+  unsigned max_retries = 1;
+  unsigned backoff_init = 2000;
+  unsigned backoff_max = 10000;
   string tracefile = "";
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
@@ -1253,6 +1256,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
     timeout_direct = String2Uint64(parameter);
   if (options::GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
     proxy_reset_after = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_MAX_RETRIES", &parameter))
+    max_retries = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_BACKOFF_INIT", &parameter))
+    backoff_init = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
+    backoff_max = String2Uint64(parameter);
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
   if (options::GetValue("CVMFS_MAX_TTL", &parameter))
@@ -1508,6 +1517,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   download::SetProxyChain(proxies);
   download::SetTimeout(timeout, timeout_direct);
   download::SetProxyGroupResetDelay(proxy_reset_after);
+  download::SetRetryParameters(max_retries, backoff_init, backoff_max);
   g_download_ready = true;
 
   signature::Init();

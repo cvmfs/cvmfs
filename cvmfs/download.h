@@ -148,6 +148,9 @@ void RebalanceProxies();
 void SwitchProxyGroup();
 void SetProxyGroupResetDelay(const unsigned seconds);
 void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover);
+void SetRetryParameters(const unsigned max_retries,
+                        const unsigned backoff_init_ms,
+                        const unsigned backoff_max_ms);
 void RestartNetwork();
 
 }  // namespace download

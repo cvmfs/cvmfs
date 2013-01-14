@@ -1396,6 +1396,18 @@ void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover) {
 }
 
 
+void SetRetryParameters(const unsigned max_retries,
+                        const unsigned backoff_init_ms,
+                        const unsigned backoff_max_ms)
+{
+  pthread_mutex_lock(&lock_options_);
+  opt_max_retries_ = max_retries;
+  opt_backoff_init_ms_ = backoff_init_ms;
+  opt_backoff_max_ms_ = backoff_max_ms;
+  pthread_mutex_unlock(&lock_options_);
+}
+
+
 void RestartNetwork() {
   // TODO: transfer special job
 }
