@@ -1,5 +1,5 @@
 
-cvmfs_test_name="DNS timeout"
+cvmfs_test_name="DNS Timeout"
 
 cvmfs_run_test() {
   logfile=$1
@@ -16,7 +16,7 @@ cvmfs_run_test() {
   sudo umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
 
   echo "stopping apache" >> $logfile
-  sudo apachectl -k stop >> $logfile 2>&1 || return 2
+  apache_switch off >> $logfile 2>&1 || return 2
 
 
   echo "configure the system for local DNS usage on port 5300" >> $logfile
@@ -49,7 +49,6 @@ CVMFS_SERVER_URL=http://$CVMFS_TEST_REPO:8080
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
 CVMFS_HTTP_PROXY=http://$CVMFS_TEST_REPO:3128
 EOF
-
 
   echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
   seconds=$(stop_watch "sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1")
@@ -89,7 +88,7 @@ EOF
   restore_normal_dns_configuration $scratch_dir >> $logfile 2>&1 || retcode=$?
 
   echo "restart apache" >> $logfile
-  sudo httpd >> $logfile 2>&1 || return 3
+  apache_switch on >> $logfile 2>&1 || return 3
   
   return $retcode
 }

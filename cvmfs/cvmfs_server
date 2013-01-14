@@ -133,6 +133,28 @@ reload_apache() {
 }
 
 
+# lowers restrictions of hardlink creation if needed
+# allows AUFS to properly whiteout files without root privileges
+lower_hardlink_restrictions() {
+  if [ -f /proc/sys/kernel/yama/protected_nonaccess_hardlinks ] && \
+     [ $(cat /proc/sys/kernel/yama/protected_nonaccess_hardlinks) -ne 0 ]; then
+    # disable hardlink restrictions at runtime
+    sysctl -w kernel.yama.protected_nonaccess_hardlinks=0 > /dev/null 2>&1 || return 1
+
+    # change sysctl.conf to make the change persist reboots
+    cat >> /etc/sysctl.conf << EOF
+
+# added by CVMFS to allow proper whiteout of files in AUFS
+# when creating or altering repositories on this machine.
+kernel.yama.protected_nonaccess_hardlinks=0
+EOF
+    echo "Note: permanently disabled kernel option: kernel.yama.protected_nonaccess_hardlinks"
+  fi
+
+  return 0
+}
+
+
 transaction() {
   local name=$1
   local spool_dir=$2
@@ -337,6 +359,7 @@ mkfs() {
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
   [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
+  lower_hardlink_restrictions
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
