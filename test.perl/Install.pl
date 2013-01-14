@@ -191,4 +191,17 @@ close($create_sentinel);
 
 system("sudo chown -R cvmfs-test:cvmfs-test $prefix/cvmfs-test");
 
+# Chowning again the wrapper to root
+my $chowned = chown 0, 0, "$prefix/cvmfs-test/cvmfs-testdwrapper";
+unless ($chowned == 1) {
+	print "Error while changing cvmfs-testdwrapper owner and group to root.\n";
+	print "It must belong to root in order for the shell to works. Do it manually.\n";
+}
+
+# Adding againg setuid bit to the wrapper
+my $chmoded = chmod 04555, "$prefix/cvmfs-test/cvmfs-testdwrapper";
+unless ($chmoded == 1) {
+	print "Error while setting setuid bit to cvmfs-testdwrapper. Add it manually.\n";
+}
+
 exit 0;
