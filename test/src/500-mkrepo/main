@@ -4,7 +4,7 @@ cvmfs_test_autofs_on_startup=false
 produce_files_in() {
 	local working_dir=$1
 
-	pushd $working_dir
+	pushdir $working_dir
 
 	echo "meaningless file content" > file
 	echo "more clever file content" > clever
@@ -18,7 +18,7 @@ produce_files_in() {
 	ln file hardlinkToFile
 	ln -s clever symlinkToClever
 
-	popd
+	popdir
 }
 
 cvmfs_run_test() {

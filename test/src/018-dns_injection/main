@@ -1,5 +1,5 @@
 
-cvmfs_test_name="DNS injection"
+cvmfs_test_name="DNS Injection"
 # Some providers of public WiFi services use DNS injection to present
 # a landing page to users that just recently connected. Usually with
 # means to provide customer credentials or payment information.
@@ -19,7 +19,7 @@ cvmfs_run_test() {
   sudo umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
 
   echo "stopping apache" >> $logfile
-  sudo apachectl -k stop >> $logfile 2>&1 || return 2
+  apache_switch off >> $logfile 2>&1 || return 2
 
 
   echo "creating fake landing pages for .cvmfspublished and .cvmfswhitelist" >> $logfile
@@ -94,7 +94,7 @@ EOF
   kill_perl_service $httpd_pid >> $logfile 2>&1
 
   echo "restart apache" >> $logfile
-  sudo httpd >> $logfile 2>&1 || return 3
+  apache_switch on >> $logfile 2>&1 || return 3
   
   return $retcode
 }

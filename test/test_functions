@@ -66,34 +66,84 @@ else
   service_binary="/usr/sbin/service"
 fi
 
-# ensures that autofs is on or off
-# @param state   the desired state of autofs (on|off)
-# @return        0 on success, 1 on failure
-autofs_switch() {
-  local state=$1
-  local is_running
+# find the name of the httpd service
+apache="httpd"
+which apache2 >/dev/null 2>&1 && apache="apache2"
 
-  # check if autofs is currently running
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
-  is_running=$?
+# ensures that a generic service is running
+# @param service  the name of the service
+# @param state    the desired state of the service (on|off)
+# @return         0 on success
+service_switch() {
+  local service_name=$1
+  local state=$2
 
   # switch it on or off, if necessary
   case $state in
     on)
-      if [ $is_running -ne 0 ]; then
-        echo "starting autofs..."
-        sudo $service_binary autofs start 2>&1 >/dev/null || return 100
-      fi
+      echo "starting $service_name..."
+      sudo $service_binary $service_name start || return 100
       ;;
     off)
-      if [ $is_running -eq 0 ]; then
-        echo "stopping autofs..."
-        sudo $service_binary autofs stop 2>&1 >/dev/null || return 101
-      fi
+      echo "stopping $service_name..."
+      sudo $service_binary $service_name stop || return 101
       ;;
+    *)
+      echo "unrecognized state switching for $service_name"
+      return 102
   esac
 
   return 0
+}
+
+
+# checks if a service needs to be switched on or off
+# @param desired_state  the state the service should be switched to
+# @param state          the state the service is currently in
+# @return  0 if a switch is needed
+service_should_switch() {
+  local desired_state=$1
+  local state=$2
+  if [ $state -eq 0 ]; then # is running and...
+    if [ "$desired_state" = "off" ]; then # should be switched off
+      return 0
+    fi
+  else                 # is NOT running and...
+    if [ "$desired_state" = "on" ]; then # should be switched on
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+# ensures that autofs is on or off
+# @param state   the desired state of autofs (on|off)
+# @return        0 on success
+autofs_switch() {
+  sudo $service_binary autofs status | grep -q "running"
+  service_should_switch $1 $?
+  if [ $? -eq 0 ]; then
+    service_switch autofs $1
+    return $?
+  else
+    return 0
+  fi
+}
+
+
+# switches apache on or off
+# @param state   the desired state of autofs (on|off)
+# @return        0 on success
+apache_switch() {
+  sudo $service_binary $apache status > /dev/null 2>&1
+  service_should_switch $1 $?
+  if [ $? -eq 0 ]; then
+    service_switch $apache $1
+    return $?
+  else
+    return 0 # already in correct state
+  fi
 }
 
 
@@ -242,7 +292,7 @@ create_filled_repo() {
 
   sudo cvmfs_server transaction $repo || return 102
 
-  pushd /cvmfs/$repo
+  pushdir /cvmfs/$repo
 
   echo "meaningless file content" > file
   echo "more clever file content" > clever
@@ -260,7 +310,7 @@ create_filled_repo() {
   echo "Der alte Winter, in seiner Schwäche,"          > foo/bar/verse4
   echo "Zog sich in rauhe Berge zurück."               > foo/bar/verse5
 
-  popd
+  popdir
 
   sudo cvmfs_server publish $repo || return 103
 }
@@ -466,9 +516,9 @@ start_perl_service() {
   fi
 
   # start the service
-  pushd $TEST_ROOT/mock_services > /dev/null
+  pushdir $TEST_ROOT/mock_services > /dev/null
   output=$(sudo perl Services/$service_name/main.pl $@)
-  popd > /dev/null
+  popdir > /dev/null
   pid=$(echo "$output" | grep SAVE_PID | cut -d : -f 2)
 
   # log its process ID
@@ -586,4 +636,36 @@ stop_watch() {
   end=$(date +%s)
   echo $((end - begin))
   return $res
+}
+
+
+# wrapper around pushd (that is not available in dash)
+# if pushd is not available, a normal `cd` is used
+# Note: We do not reimplement the whole functionality of pushd, with our work-
+#       around it is only possible to have ONE directory-level stored
+pushdir() {
+  type pushd > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    pushd $1
+    return $?
+  else
+    cd $1
+    return $?
+  fi
+}
+
+
+# wrapper around popd (that is not available in dash)
+# if popd is not available, a normal `cd -` is used to go back to the last dir
+# Note: We do not reimplement the whole functionality of popd, with our work-
+#       around it is only possible to have ONE directory-level stored
+popdir() {
+  type popd > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    popd $1
+    return $?
+  else
+    cd -
+    return $?
+  fi
 }
