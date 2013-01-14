@@ -1259,9 +1259,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (options::GetValue("CVMFS_MAX_RETRIES", &parameter))
     max_retries = String2Uint64(parameter);
   if (options::GetValue("CVMFS_BACKOFF_INIT", &parameter))
-    backoff_init = String2Uint64(parameter);
+    backoff_init = String2Uint64(parameter)*1000;
   if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
-    backoff_max = String2Uint64(parameter);
+    backoff_max = String2Uint64(parameter)*1000;
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
   if (options::GetValue("CVMFS_MAX_TTL", &parameter))
