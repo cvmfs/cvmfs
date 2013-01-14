@@ -16,7 +16,7 @@ cvmfs_run_test() {
   sudo umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
 
   echo "stopping apache" >> $logfile
-  sudo apachectl -k stop >> $logfile 2>&1 || return 2
+  apache_switch off >> $logfile 2>&1 || return 2
 
 
   echo "configure the system for local DNS usage on port 5300" >> $logfile
@@ -76,7 +76,7 @@ EOF
   restore_normal_dns_configuration $scratch_dir >> $logfile 2>&1 || retcode=$?
 
   echo "restart apache" >> $logfile
-  sudo httpd >> $logfile 2>&1 || return 3
+  apache_switch on >> $logfile 2>&1 || return 3
   
   return $retcode
 }
