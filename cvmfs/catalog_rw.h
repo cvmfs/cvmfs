@@ -69,7 +69,7 @@ class WritableCatalog : public Catalog {
   Database::OpenMode DatabaseOpenMode() const {
     return Database::kOpenReadWrite;
   }
-  
+
   void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
   inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path) {
     UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
@@ -98,7 +98,6 @@ class WritableCatalog : public Catalog {
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 
-  const WritableCatalogManager *catalog_mgr_;
   DeltaCounters delta_counters_;
 
   inline void SetDirty() {
