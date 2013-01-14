@@ -4,7 +4,7 @@ cvmfs_test_autofs_on_startup=false
 produce_files_in() {
 	local working_dir=$1
 
-	pushd $working_dir
+	pushdir $working_dir
 
   mkdir dir4
   echo "meaningless content" > dir4/meaningless_file
@@ -14,7 +14,7 @@ produce_files_in() {
   echo "meaningless content" > dir5/meaninglessFile
   ln -s meaninglessFile dir5/symlinkToMeaninglessFile
 
-	popd
+	popdir
 }
 
 cvmfs_run_test() {

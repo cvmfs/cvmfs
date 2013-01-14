@@ -5,7 +5,7 @@ cvmfs_test_autofs_on_startup=false
 produce_files_in() {
 	local working_dir=$1
 
-	pushd $working_dir
+	pushdir $working_dir
 
 	mkdir dir1 # stays empty
   mkdir dir2
@@ -28,18 +28,18 @@ produce_files_in() {
 
   mkdir dir5/ndir5/nndir3
 
-	popd
+	popdir
 }
 
 change_files_in() {
   local working_dir=$1
 
-  pushd $working_dir
+  pushdir $working_dir
 
   rmdir dir1
   rm -fR dir6
 
-  popd
+  popdir
 }
 
 cvmfs_run_test() {
