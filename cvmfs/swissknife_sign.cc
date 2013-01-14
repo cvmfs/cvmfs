@@ -184,6 +184,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     FILE *fmanifest = fopen(manifest_path.c_str(), "w");
     if (!fmanifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      delete manifest;
       goto sign_fail;
     }
     if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
