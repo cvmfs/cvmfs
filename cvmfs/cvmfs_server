@@ -127,7 +127,7 @@ get_local_upstream() {
 
 
 has_selinux() {
-  return [ -f /selinux/enforce ]
+  [ -f /selinux/enforce ]
 }
 
 
@@ -346,7 +346,7 @@ create_repository_skeleton() {
     i=$(($i+1))
   done
   chown -R $user $directory
-  if [ has_selinux ]; then # on ubuntu selinux is not installed...
+  if has_selinux; then
     chcon -Rv --type=httpd_sys_content_t $directory
   fi
   echo "done"
@@ -513,7 +513,7 @@ EOF
 
   echo -n "Mounting CernVM-FS Storage... "
   local selinux_context=""
-  if [ has_selinux ]; then
+  if has_selinux; then
     selinux_context="context=\"system_u:object_r:default_t:s0\""
   fi
   cat >> /etc/fstab << EOF
