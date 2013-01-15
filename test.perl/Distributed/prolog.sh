@@ -10,12 +10,12 @@ RCLOCAL_DOWNLOAD=`grep "$DOWNLOADING_SCRIPT" /etc/rc.local 2>/dev/null`
 RCLOCAL=`grep "$CONTEXTSH" /etc/rc.local 2>/dev/null`
 
 start() {
-	if [ "$RCLOCAL_DOWNLOAD" == "" ] ; then
+	if [ "x$RCLOCAL_DOWNLOAD" == "x" ] ; then
 		echo "wget -O $CONTEXTSH https://raw.github.com/ruvolof/cvmfs-test/master/Distributed/start_cvmfstestd.sh" >> /etc/rc.local
 		echo "chmod +x $CONTEXTSH" >> /etc/rc.local
 	fi
 
-	if [ "$RCLOCAL" == "" ] ; then
+	if [ "x$RCLOCAL" == "x" ] ; then
 		echo $CONTEXTSH >> /etc/rc.local
 	fi
 
