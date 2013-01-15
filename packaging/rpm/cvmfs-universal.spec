@@ -30,6 +30,9 @@ BuildRequires: fuse-devel
 BuildRequires: pkgconfig
 BuildRequires: openssl-devel
 %{?el5:BuildRequires: buildsys-macros}
+
+Conflicts: cvmfs < 2.1
+
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -282,6 +285,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Jan 15 2013 Jakob Blomer <jblomer@cern.ch>
+- Package conflicts with the cvmfs 2.0 branch
 * Tue Oct 02 2012 Jakob Blomer <jblomer@cern.ch>
 - Added sub packages for server and library
 * Wed Sep 12 2012 Jakob Blomer <jblomer@cern.ch>
