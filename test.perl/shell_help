@@ -84,3 +84,21 @@ wait-daemon:	is received. So, this command can be used to switch
 wait-daemon:	between different daemon instances running on different
 wait-daemon:	machines.
 wait-daemon:
+
+status:
+status:status
+status:	Shows daemon status and active daemons list.
+status:	Usage: status <options>
+status:
+status:	Available options:
+status:	  --show-active	Shows a list of currently active daemons.
+status:
+
+ping:
+ping:ping
+ping:	Shows daemon status and active daemons list.
+ping:	Usage: ping <options>
+ping:
+ping:	Available options:
+ping:	  --show-active	Shows a list of currently active daemons.
+ping:

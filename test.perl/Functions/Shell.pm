@@ -132,7 +132,7 @@ sub check_command {
 	# Switching the value of $command
 	for ($command){
 		if ($_ eq 'exit' or $_ eq 'quit' or $_ eq 'q') { exit_shell($socket, $ctxt) }
-		elsif ($_ =~ m/status/ or $_ =~ m/ping/) { print_status($command); $executed = 1 }
+		elsif ($_ =~ m/^status/ or $_ =~ m/^ping/) { print_status($command); $executed = 1 }
 		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, undef, undef, $command); $executed = 1 }
 		elsif ($_ =~ m/^help\s*.*/ or $_ =~ m/^h\s.*/) { help($command), $executed = 1 }
 		elsif ($_ eq 'setup' ) { setup(); $executed = 1 }
