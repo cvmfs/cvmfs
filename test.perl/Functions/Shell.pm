@@ -442,7 +442,7 @@ sub get_daemon_output {
 			# Most of special signal will not be printed as output part.
 			my $processed = 0;
 			# This case if the daemon has stopped itself
-			if ($_ =~ m/DAEMON_STOPPED/) { $socket = close_shell_socket($socket); $ctxt = term_shell_ctxt($ctxt); $remote = 0 if $remote; $processed = 1 }
+			if ($_ =~ m/DAEMON_STOPPED/) { ($socket, $ctxt) = daemon_stopped($socket, $ctxt); $processed = 1 }
 			elsif ($_ =~ m/PROCESSING/) {
 				my $process_name = (split /:/, $_)[-1];
 				chomp($process_name);
@@ -474,6 +474,29 @@ sub get_daemon_output {
 		}
 		print $reply if $reply ne "END\n" and $reply ne "NO_PRINT";
 	}
+	return ($socket, $ctxt);
+}
+
+# This function is called every time the shell receives a DAEMON_STOPPED message.
+sub daemon_stopped {
+	my $socket = shift;
+	my $ctxt = shift;
+	
+	# Closing socket and ctxt
+	$socket = close_shell_socket($socket);
+	$ctxt = term_shell_ctxt($ctxt);
+	
+	# Checking if a local server is running and trying to reconnect to it.
+	if ($remote and check_daemon('127.0.0.1:6650')) {
+		print 'A local running daemon was found. Reconnecting... ';
+		($socket, $ctxt) = connect_shell_socket();
+		print "Done.\n";
+	}
+	
+	# Resetting $remote
+	$remote = 0 if $remote;
+	
+	return ($socket, $ctxt);
 }
 
 # This function will start the daemon if it's not already running
@@ -577,21 +600,26 @@ sub start_daemon {
 
 # This function will stop and restart the daemon
 sub restart_daemon {
-	my $socket = shift;
-	my $ctxt = shift;
-	my $daemon_path = shift;
-	# Retrieving options to pass to start_daemon
-	my $line = shift;
-	
-	if (check_daemon()) {
-		send_shell_msg($socket, 'stop');
-		get_daemon_output($socket, $ctxt);
-		sleep 1;
-		($socket, $ctxt) = start_daemon($daemon_path, $line);
-		return ($socket, $ctxt);
+	unless ($remote) {
+		my $socket = shift;
+		my $ctxt = shift;
+		my $daemon_path = shift;
+		# Retrieving options to pass to start_daemon
+		my $line = shift;
+		
+		if (check_daemon()) {
+			send_shell_msg($socket, 'stop');
+			get_daemon_output($socket, $ctxt);
+			sleep 1;
+			($socket, $ctxt) = start_daemon($daemon_path, $line);
+			return ($socket, $ctxt);
+		}
+		else {
+			print "Daemon is not running. Type 'start' to run it.\n"
+		}
 	}
 	else {
-		print "Daemon is not running. Type 'start' to run it.\n"
+		print "You cannot stop and restart a remote server.\n";
 	}
 }
 

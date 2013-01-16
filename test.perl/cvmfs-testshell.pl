@@ -156,7 +156,7 @@ if ($interactive) {
 			send_shell_msg($socket, $line);
 			
 			# Get answer from the daemon
-			get_daemon_output($socket, $ctxt);
+			($socket, $ctxt) = get_daemon_output($socket, $ctxt);
 		}
 		
 		# This is the second shell, use when the daemon is closed
