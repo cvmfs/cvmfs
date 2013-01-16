@@ -341,7 +341,9 @@ create_repository_skeleton() {
     i=$(($i+1))
   done
   chown -R $user $directory
-  chcon -Rv --type=httpd_sys_content_t $directory
+  if [ -f /selinux/enforce ]; then # on ubuntu selinux is not installed...
+    chcon -Rv --type=httpd_sys_content_t $directory
+  fi
   echo "done"
 }
 
