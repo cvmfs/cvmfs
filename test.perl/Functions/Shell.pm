@@ -35,7 +35,17 @@ my $remote = 0;
 # This function will check whether the daemon is running.
 sub check_daemon {
 	# Retrieving daemon path from main package
-	my $daemon_path = $main::daemon_path;
+	my $daemon_path = shift;
+	
+	# Setting daemon_path default to $main::daemon_path
+	unless ($daemon_path) {
+		if ($remote) {
+			$daemon_path = $main::connect_to;
+		}
+		else {
+			$daemon_path = $main::daemon_path;
+		}
+	}
 	
 	# Checking with ps if the daemon is running locally
 	my $running = `ps -ef | grep cvmfs-testdwrapper | grep -v grep | grep -v defunct`;
@@ -125,7 +135,7 @@ sub check_command {
 		elsif ($_ eq 'fixperm') { fixperm(); $executed = 1 }
 		elsif ($_ =~ m/^restart\s*.*/ ) { ($socket, $ctxt) = restart_daemon($socket, $ctxt, $daemon_path, $command); $executed = 1 }
 		elsif ($_ =~ m/^wait-daemon\s*.*/ ) { ($socket, $ctxt) = wait_daemon($socket, $ctxt); $executed = 1 }
-		elsif ($_ =~ m/^connect-to\s*.*/ ) { ($socket, $ctxt) = connect_to($daemon_path, $socket, $ctxt); $executed = 1 }
+		elsif ($_ =~ m/^connect-to\s*.*/ ) { ($socket, $ctxt) = connect_to($daemon_path, $command, $socket, $ctxt); $executed = 1 }
 	}
 	
 	# If the daemon is not running and no command was executed, print on screen a message
@@ -181,21 +191,50 @@ sub wait_daemon {
 # This function is used to actively connect to a remote daemon
 sub connect_to {
 	my $daemon_path = shift;
+	my $command = shift;
 	my $socket = shift;
 	my $ctxt = shift;
+	
+	# Checking in $command if the user supplied an alternative IP to daemon_path
+	my ($ip) = $command =~ m/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
+	my ($port) = $command =~ m/:(\d{3,4})/;
+	
+	# Setting port to default
+	unless ($port) {
+		$port = 6650;
+	}
+	
+	# Resetting $daemon_path if user has supplied alternative ip and port.
+	if ($ip) {
+		$daemon_path = "$ip:$port";
+		
+		# Setting $main::connect_to for other function to access this value
+		$main::connect_to = $daemon_path;
+	}
 	
 	if ($daemon_path !~ m/127\.0\.0\.1/ and $daemon_path !~ m/localhost/) {
 		$remote = 1;
 	}
 	else {
 		$remote = 0;
-		print "To start a server locally use 'start' instead.\n";
-		return ($socket, $ctxt);
 	}
 	
 	if (check_daemon($daemon_path)) {
 		print "Daemon found on $daemon_path.\n";
-		print 'Opening shell_socket... ';
+		
+		# Closing old socket
+		print 'Closing old socket... ';
+		$socket = close_shell_socket();
+		$ctxt = term_shell_ctxt();
+		if ($socket or $ctxt) {
+			print "ERROR.\n";
+		}
+		else {
+			print "Done.\n";
+		}
+		
+		# Opening new socket
+		print 'Opening new socket... ';
 		my ($newsocket, $newctxt) = connect_shell_socket($daemon_path);
 		print "Done.\n";
 		return ($newsocket, $newctxt);
@@ -203,6 +242,7 @@ sub connect_to {
 	else {
 		$remote = 0;
 		print "Daemon could not be reached on $daemon_path.\n";
+		print "To start a server locally use 'start'.\n" if $daemon_path =~ m/127\.0\.0\.1/ or $daemon_path =~ m/localhost/;
 		return ($socket, $ctxt);
 	}
 }

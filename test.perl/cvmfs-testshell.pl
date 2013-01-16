@@ -19,15 +19,15 @@ my $wait_daemon = undef;
 my $setup = undef;
 my $start = undef;
 my $help_message = undef;
-my $connect_to = undef;
 my $interactive = 1;
 
 # Variables to store daemon ip and port on distributed test
 my $daemon_ip = "127.0.0.1";
 my $daemon_port = "6650";
 
-# This variable is declared as our since other packages will accesses and modifies it
+# These variables are declared as our since other packages will accesses and modifies them
 our $daemon_path = "$daemon_ip:$daemon_port";
+our $connect_to = undef;
 
 
 # Next variables is used to control when to skip a loop cicle
@@ -81,8 +81,7 @@ if (defined($wait_daemon)) {
 }
 
 if (defined($connect_to)) {
-	$daemon_path = $connect_to;
-	($continue, $socket, $ctxt) = check_command(undef, undef, $daemon_path, 'connect-to');
+	($continue, $socket, $ctxt) = check_command(undef, undef, $daemon_path, "connect-to $connect_to");
 }
 
 if (defined($start)) {
