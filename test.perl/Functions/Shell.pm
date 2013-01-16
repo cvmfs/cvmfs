@@ -251,10 +251,10 @@ sub connect_to {
 sub print_status {
 	if(check_daemon()){
 		unless ($remote) {
-			print "Daemon is running.\n";
+			print "Daemon is running on $main::daemon_path.\n";
 		}
 		else {
-			print "Daemon is running on $main::daemon_path.\n";
+			print "Daemon is running on $main::connect_to.\n";
 		}
 	}
 	else {
