@@ -1,8 +1,5 @@
 
-cvmfs_test_name="DNS injection"
-# Some providers of public WiFi services use DNS injection to present
-# a landing page to users that just recently connected. Usually with
-# means to provide customer credentials or payment information.
+cvmfs_test_name="Server Timeout"
 
 cvmfs_run_test() {
   logfile=$1
@@ -19,31 +16,11 @@ cvmfs_run_test() {
   sudo umount $(mount | grep ".*/$CVMFS_TEST_REPO" | awk '{print $3}' | tac)
 
   echo "stopping apache" >> $logfile
-  sudo apachectl -k stop >> $logfile 2>&1 || return 2
-
-
-  echo "creating fake landing pages for .cvmfspublished and .cvmfswhitelist" >> $logfile
-  webroot=$scratch_dir/www
-  mkdir $webroot
-  publish=$webroot/.cvmfspublished
-  whitelist=$webroot/.cvmfswhitelist
-  cat > $publish << EOF
-<html>
-  <head>
-    <title>CVMFS Hotel Wifi</title>
-  </head>
-  <body>
-    <form name="credentials" method="POST">
-      Credit Card: <input type="text" name="creditcard" />
-    </form>
-  </body>
-</html>
-EOF
-  cp $publish $whitelist
+  apache_switch off >> $logfile 2>&1 || return 2
 
 
   echo "starting local webserver" >> $logfile
-  httpd_pid=$(start_perl_service httpd --root $webroot --index-of --all --port 8080)
+  httpd_pid=$(start_perl_service httpd --root $repo_pub --index-of --all --port 8080 --timeout)
 
   echo "starting local web proxy" >> $logfile
   proxy_pid=$(start_perl_service webproxy --port 3128 --backend http://127.0.0.1:8080)
@@ -67,7 +44,7 @@ CVMFS_HTTP_PROXY=http://127.0.0.1:3128
 EOF
 
   echo "mount $CVMFS_TEST_REPO using the test infrastructure" >> $logfile
-  sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1
+  seconds=$(stop_watch "sudo cvmfs2 -d -o config=$global_test_config_file:$repo_test_config_file $CVMFS_TEST_REPO /cvmfs/$CVMFS_TEST_REPO >> $logfile 2>&1")
   cvmfs_retcode=$?
   # repository should not be mounted successfully
   if [ "$cvmfs_retcode" -eq 0 ]; then
@@ -77,6 +54,12 @@ EOF
     if [ "$cvmfs_retcode" -ne 16 ]; then
       echo "------> NOTE: cvmfs failed to mount but the abort code was not 16 as expected!" >> $logfile
       retcode=104
+    fi
+
+    # check if timeout took approx. the expected number of seconds
+    if [ "$seconds" -le 18 ] || [ "$seconds" -ge 22 ]; then
+      echo "------> NOTE: cvmfs failed but the timeout was unsual: took $seconds seconds to fail..." >> $logfile
+      retcode=103
     fi
   fi
 
@@ -94,7 +77,7 @@ EOF
   kill_perl_service $httpd_pid >> $logfile 2>&1
 
   echo "restart apache" >> $logfile
-  sudo httpd >> $logfile 2>&1 || return 3
+  apache_switch on >> $logfile 2>&1 || return 3
   
   return $retcode
 }

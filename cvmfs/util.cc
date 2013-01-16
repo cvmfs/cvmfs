@@ -15,6 +15,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/select.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -895,6 +896,18 @@ bool ManagedExec(const vector<string> &command_line,
   close(pipe_fork[0]);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
   return true;
+}
+
+
+/**
+ * Sleeps using select.  This is without signals and doesn't interfere with
+ * other uses of the ALRM signal.
+ */
+void SafeSleepMs(const unsigned ms) {
+  struct timeval wait_for;
+  wait_for.tv_sec = ms / 1000;
+  wait_for.tv_usec = (ms % 1000) * 1000;
+  select(0, NULL, NULL, NULL, &wait_for);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

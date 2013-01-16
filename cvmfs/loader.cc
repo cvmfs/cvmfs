@@ -132,8 +132,7 @@ static void Usage(const std::string &exename) {
 
 static inline void FileSystemFence() {
   while (atomic_read32(&blocking_)) {
-    // Don't sleep, interferes with alarm()
-    sched_yield();
+    SafeSleepMs(100);
   }
 }
 

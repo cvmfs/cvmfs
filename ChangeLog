@@ -1,4 +1,7 @@
 2.1.6:
+  * Added retry with exponential backoff to download
+    worker, adjustable with CVMFS_MAX_RETRY,
+    CVMFS_BACKOFF_INIT, CVMFS_BACKOFF_MAX
   * Added automatic proxy group reset after
     CVMFS_PROXY_RESET_AFTER seconds
   * Added network statistics to 'cvmfs_talk internal affairs'

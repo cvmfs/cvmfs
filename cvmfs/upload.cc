@@ -318,7 +318,7 @@ void Spooler::EndOfTransaction() {
 
 void Spooler::WaitFor() {
   while (!IsIdle())
-    usleep(100000);  // 100 milliseconds
+    SafeSleepMs(100);
 }
 
 
