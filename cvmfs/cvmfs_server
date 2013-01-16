@@ -341,6 +341,7 @@ create_repository_skeleton() {
     i=$(($i+1))
   done
   chown -R $user $directory
+  chcon -Rv --type=httpd_sys_content_t $directory
   echo "done"
 }
 
