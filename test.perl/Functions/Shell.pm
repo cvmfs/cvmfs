@@ -32,6 +32,10 @@ use FindBin qw($RealBin);
 # This variable will be set to 1 if the shell is speaking to a daemon on a remote machine
 my $remote = 0;
 
+# This is, indeed, a very important variable since here we'll store all path to active daemons.
+# User will be able to retrieve all active daemons list with 'status show-active'.
+my %active;
+
 # This function will check whether the daemon is running.
 sub check_daemon {
 	# Retrieving daemon path from main package
@@ -51,7 +55,7 @@ sub check_daemon {
 	my $running = `ps -ef | grep cvmfs-testdwrapper | grep -v grep | grep -v defunct`;
 	
 	# If the daemon is local, ps is enough, otherwise the shell will try to ping the daemon
-	unless ($remote) {
+	if ($daemon_path =~ m/127\.0\.0\.1/) {
 		return ($running);
 	}
 	else {
@@ -128,7 +132,7 @@ sub check_command {
 	# Switching the value of $command
 	for ($command){
 		if ($_ eq 'exit' or $_ eq 'quit' or $_ eq 'q') { exit_shell($socket, $ctxt) }
-		elsif ($_ eq 'status' or $_ eq 'ping') { print_status(); $executed = 1 }
+		elsif ($_ =~ m/status/ or $_ =~ m/ping/) { print_status($command); $executed = 1 }
 		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, undef, undef, $command); $executed = 1 }
 		elsif ($_ =~ m/^help\s*.*/ or $_ =~ m/^h\s.*/) { help($command), $executed = 1 }
 		elsif ($_ eq 'setup' ) { setup(); $executed = 1 }
@@ -237,6 +241,12 @@ sub connect_to {
 		print 'Opening new socket... ';
 		my ($newsocket, $newctxt) = connect_shell_socket($daemon_path);
 		print "Done.\n";
+		
+		# Adding newly connected daemon to %active if it's not there already
+		unless (exists $active{$daemon_path}) {
+			$active{$daemon_path} = 1;
+		}
+		
 		return ($newsocket, $newctxt);
 	}
 	else {
@@ -249,6 +259,27 @@ sub connect_to {
 
 # This function will print the current status of the daemon
 sub print_status {
+	my $command = shift;
+	
+	# Checking weather the user requeste the list of active daemons
+	if ($command =~ m/--show-active/) {
+		if (%active) {
+			foreach (keys %active) {
+				if (check_daemon($_)) {
+					print "$_ is active.\n";
+				}
+				else {
+					print "$_ was active, but it's no longer. Removed from list.\n";
+					delete $active{$_};
+				}
+			}
+		}
+		else {
+			print "There are no active daemons.\n";
+		}
+		return;
+	}
+	
 	if(check_daemon()){
 		unless ($remote) {
 			print "Daemon is running on $main::daemon_path.\n";
@@ -516,6 +547,9 @@ sub start_daemon {
 			# Checking if the daemon were started
 			if (check_daemon()) {
 				print "Done.\n";
+				
+				# Adding local daemon to active hash
+				$active{$daemon_path} = 1 unless exists $active{$daemon_path};
 			}
 			else {
 				print "Failed.\nHave a look to $daemon_error.\n";
