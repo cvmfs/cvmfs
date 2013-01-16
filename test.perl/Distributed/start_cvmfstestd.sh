@@ -12,7 +12,7 @@ LOGFILE="/root/initialization.log"
 
 echo "Running initialization script..." > $LOGFILE
 
-if [ ! "$CVMFSTESTBIN" == "" ] ; then
+if [ ! "x$CVMFSTESTBIN" == "x" ] ; then
 	echo "cvmfs-test binary found. Starting it." >> $LOGFILE
 	# Starting the daemon
 	$CVMFSTESTBIN --start --shell-path $SHELLPATH --iface eth1
@@ -21,7 +21,7 @@ else
 	# Checking if git is already installed. It's not shipped with CernVM by default.
 	# If it's not yet installed, the script will install it as it needs it to retrieve
 	# the source code of cvmfs-test.
-	if [ "$GITBIN" == "" ] ; then
+	if [ "x$GITBIN" == "x" ] ; then
 		echo "Installing git..." >> $LOGFILE
 		conary update git
 		GITBIN=`which git 2> /dev/null`
