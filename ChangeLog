@@ -1,4 +1,5 @@
 2.1.6:
+  * Fixed 'cvmfs_config chksetup' for root not in sudoers
   * Added retry with exponential backoff to download
     worker, adjustable with CVMFS_MAX_RETRY,
     CVMFS_BACKOFF_INIT, CVMFS_BACKOFF_MAX

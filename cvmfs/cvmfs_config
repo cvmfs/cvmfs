@@ -302,15 +302,15 @@ cvmfs_chksetup() {
         cache_dir="$CVMFS_CACHE_BASE/$fqrn"
       fi
       if [ -d $cache_dir ]; then
-        if ! sudo -u $CVMFS_USER test -O $cache_dir; then
+        if ! runas $CVMFS_USER "test -O $cache_dir"; then
           echo "Error: $cache_dir is not owned by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
-        if ! sudo -u $CVMFS_USER test -r $cache_dir; then
+        if ! runas $CVMFS_USER "test -r $cache_dir"; then
           echo "Error: $cache_dir is not readable by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
-        if ! sudo -u $CVMFS_USER test -w $cache_dir; then
+        if ! runas $CVMFS_USER "test -w $cache_dir"; then
           echo "Error: $cache_dir is not writable by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
@@ -330,7 +330,7 @@ cvmfs_chksetup() {
                          /etc/cvmfs/config.d/*.conf /etc/cvmfs/config.d/*.local
       do
         if [ -f $config_file ]; then
-          if ! sudo -u $CVMFS_USER test -r $config_file; then
+          if ! runas $CVMFS_USER "test -r $config_file"; then
             echo "Error: $config_file is not readable by $CVMFS_USER"
             num_errors=$(($num_errors+1))
           fi
@@ -1092,11 +1092,11 @@ check_dev_fuse() {
     echo "Error: character device $charDevice does not exist"
     return_code=$(($return_code+1))
   else
-    if ! sudo -u $CVMFS_USER test -r $charDevice; then
+    if ! runas $CVMFS_USER "test -r $charDevice"; then
       echo "Error: $charDevice is not readable by user $CVMFS_USER"
       return_code=$(($return_code+1))
     fi
-    if ! sudo -u $CVMFS_USER test -w $charDevice; then
+    if ! runas $CVMFS_USER "test -w $charDevice"; then
       echo "Error: $charDevice is not writable by user $CVMFS_USER"
       return_code=$(($return_code+1))
     fi
@@ -1247,6 +1247,18 @@ check_is_on() {
   return 1
 }
 
+runas() {
+  local user=$1
+  local cmd=$2
+
+  case $sys_arch in
+    Linux )
+      su -s /bin/sh $user -c "$cmd" ;;
+
+    Darwin )
+      sudo -u $user $cmd ;;
+  esac
+}
 
 case "$1" in
   setup)
