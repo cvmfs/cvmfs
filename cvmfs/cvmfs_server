@@ -126,6 +126,11 @@ get_local_upstream() {
 }
 
 
+has_selinux() {
+  [ -f /selinux/enforce ]
+}
+
+
 reload_apache() {
    echo -n "Reloading Apache... "
    ${SERVICE_BIN} ${APACHE} reload > /dev/null
@@ -341,6 +346,9 @@ create_repository_skeleton() {
     i=$(($i+1))
   done
   chown -R $user $directory
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t $directory
+  fi
   echo "done"
 }
 
@@ -504,9 +512,13 @@ EOF
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
+  local selinux_context=""
+  if has_selinux; then
+    selinux_context="context=\"system_u:object_r:default_t:s0\""
+  fi
   cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for $name
-aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
