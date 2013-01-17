@@ -195,8 +195,6 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
         next_chunk.type = 'L';
         break;
       case catalog::kChunkPiece:
-        next_chunk.type = 'C';
-        break;
       default:
         next_chunk.type = '\0';
     }
