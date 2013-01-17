@@ -1,4 +1,4 @@
-cvmfs_test_name="Create Stratum1 snapshot"
+cvmfs_test_name="Create Stratum1 snapshot with nested Catalogs and Chunked Files"
 cvmfs_test_autofs_on_startup=false
 
 inflate_file() {
@@ -98,8 +98,8 @@ EOF
 
 desaster_cleanup() {
   local mountpoint=$1
-  sudo umount $mountpoint
-  kill_all_perl_services
+  sudo umount $mountpoint > /dev/null 2>&1
+  kill_all_perl_services > /dev/null 2>&1
 }
 
 cvmfs_run_test() {

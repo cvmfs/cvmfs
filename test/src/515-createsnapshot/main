@@ -69,8 +69,8 @@ EOF
 
 desaster_cleanup() {
   local mountpoint=$1
-  sudo umount $mountpoint
-  kill_all_perl_services
+  sudo umount $mountpoint > /dev/null 2>&1
+  kill_all_perl_services > /dev/null 2>&1
 }
 
 cvmfs_run_test() {
