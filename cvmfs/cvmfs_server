@@ -11,6 +11,15 @@ die() {
   exit 1
 }
 
+
+################################################################################
+#                                                                              #
+#                              Environment Setup                               #
+#                                                                              #
+################################################################################
+
+
+# setup server hooks
 transaction_before_hook() { :; }
 transaction_after_hook() { :; }
 abort_before_hook() { :; }
@@ -18,11 +27,180 @@ abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
 
+. /etc/cvmfs/config.sh
+[ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
+
+# Find out about Apache's name
+APACHE="httpd"
+which apache2 >/dev/null 2>&1 && APACHE="apache2"
+
+# Find the service binary
+if [ -x /sbin/service ]; then
+  SERVICE_BIN="/sbin/service"
+else
+  SERVICE_BIN="/usr/sbin/service" # Ubuntu
+fi
+[ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
+
+# Find the fuser binary
 if [ -x /sbin/fuser ]; then
-  fuser="/sbin/fuser"  # RHEL
+  fuser="/sbin/fuser" # RHEL
 else
   fuser="/bin/fuser"  # Ubuntu, SuSe
 fi
+
+
+################################################################################
+#                                                                              #
+#                              Utility Functions                               #
+#                                                                              #
+################################################################################
+
+
+# checks if the given command name is a supported command of cvmfs_server
+#
+# @param subcommand   the subcommand to be called
+# @return   0 if the command was recognized
+is_subcommand() {
+  subcommand=$1
+  supported_commands="mkfs add-replica publish rmfs resign list info check transaction abort snapshot skeleton"
+  for possible_command in $supported_commands; do
+    if [ x"$possible_command" = x"$subcommand" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+
+# prints some help information optionally followed by an error message
+# afterwards it aborts the script
+#
+# @param errormsg   an optional error message that is printed after the
+#                   actual usage text
+usage() {
+  errormsg=$1
+
+  echo "\
+CernVM-FS Server Tool
+
+Usage: cvmfs_server COMMAND [options] <parameters>
+
+Supported Commands:
+  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
+                <fully qualified repository name>
+                Creates a new repository with a given name
+  add-replica   [-u stratum1 upstream storage] [-o owner]
+                <fully qualified name> <stratum 0 url> <public key>
+                Creates a Stratum 1 replica of a repository
+  publish       [-d debug mode | -D blocking debug mode]
+                <fully qualified name>
+                Make a new repository snapshot
+  rmfs          [-f don't ask again] 
+                <fully qualified name>
+                Remove the repository
+  abort         [-f don't ask again]
+                <fully qualified name>
+                Abort transaction and return to the state before
+  resign        <fully qualified name>
+                Re-sign the 30 day whitelist
+  info          <fully qualified name>
+                Print summary about the repository
+  check         <fully qualified name>
+                Checks if the repository is sane
+  transaction   <fully qualified name>
+                Start to edit a repository
+  snapshot      <fully qualified name>
+                Synchronize a Stratum 1 replica with the Stratum 0 source
+  list:         List available repositories"
+
+
+  if [ x"$errormsg" != x ]; then
+    echo "\
+
+________________________________________________________________________
+
+NOTE: $errormsg
+"
+    exit 3
+  else
+    exit 2
+  fi
+}
+
+
+# checks if the given repository name already exists
+#
+# @param given_name   the name of the repository to be checked
+# @return             0 if the repository was found
+check_repository_existence() {
+  local given_name="$1"
+  local fqrn
+
+  # empty name is not allowed (and thus does not exist)
+  if [ x"$given_name" = x ]; then
+    return 1
+  fi
+
+  # Check if exists
+  fqrn=$(cvmfs_mkfqrn $given_name)
+  [ -d /etc/cvmfs/repositories.d/$fqrn ]
+}
+
+
+# checks if the running user is root
+#
+# @return   0 if the current user is root
+is_root() {
+  [ $(id -u) -eq 0 ]
+}
+
+
+# checks if a given repository is a stratum 0 repository
+#
+# @param name   the repository name to be checked
+# @return       0 if it is a stratum 0 repository
+is_stratum0() {
+  local name=$1
+  ! [ -f /etc/cvmfs/repositories.d/$name/replica.conf ]
+}
+
+
+# checks if a given repository is a stratum 1 repository
+#
+# @param name   the repository name to be checked
+# @return       0 if it is a stratum 1 repository
+is_stratum1() {
+  local name=$1
+  ! is_stratum0 $name
+}
+
+
+# checks if a user exists in the system
+#
+# @param user   the name of the user to be checked
+# @return       0 if user was found
+check_user() {
+  local user=$1
+  id $user > /dev/null 2>&1
+}
+
+
+is_local_upstream() {
+  local upstream=$1
+
+  if [ x$(echo "$upstream" | cut -d: -f1) = x"local" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+
+has_selinux() {
+  [ -f /selinux/enforce ]
+}
 
 
 create_master_key() {
@@ -108,26 +286,10 @@ get_expiry() {
 }
 
 
-is_local_upstream() {
-  local upstream=$1
-
-  if [ x$(echo "$upstream" | cut -d: -f1) = x"local" ]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-
 get_local_upstream() {
   local upstream=$1
 
   echo "$upstream" | cut -d: -f2
-}
-
-
-has_selinux() {
-  [ -f /selinux/enforce ]
 }
 
 
@@ -187,152 +349,6 @@ ensure_enabled_apache_modules() {
 }
 
 
-transaction() {
-  local name=$1
-  local spool_dir=$2
-
-  [ -f ${spool_dir}/in_transaction ] && die "Already in a transaction"
-
-  transaction_before_hook $name
-  sudo mount -o remount,rw /cvmfs/$name
-  touch ${spool_dir}/in_transaction
-  transaction_after_hook $name
-}
-
-
-abort() {
-  local name=$1
-  local user=$2
-  local spool_dir=$3
-
-  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
-
-  reply=n
-  read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION!  Are you sure (y/n)? " reply
-  [ x"$reply" != xy ] && return
-
-  local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
-
-  abort_before_hook $name
-  sudo umount /cvmfs/$name
-  rm -rf ${spool_dir}/tmp/*
-  sudo rm -rf ${spool_dir}/scratch
-  $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
-  sudo mount /cvmfs/$name
-  rm -f ${spool_dir}/in_transaction
-  abort_after_hook $name
-}
-
-
-publish() {
-  local name=$1
-  local user=$2
-  local spool_dir=$3
-  local stratum0=$4
-  local upstream=$5
-  local debug=${6:-0}
-
-  local swissknife="cvmfs_swissknife"
-
-  # enable the debug mode?
-  if [ "$debug" -ne "0" ]
-  then
-    if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
-      case $debug in
-        1)
-          # in case something breaks we are provided with a GDB prompt.
-          swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
-        ;;
-        2)
-          # attach gdb and provide a prompt WITHOUT actual running the program
-          swissknife="gdb --quiet --args cvmfs_swissknife_debug"
-        ;;
-      esac
-    else
-      echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
-    fi
-  fi
-
-  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
-
-  local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
-
-  publish_before_hook $name
-  sudo /bin/mount -o remount,ro /cvmfs/$name
-  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
-  local log_level=
-  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
-
-  local sync_command="$swissknife sync -x -u /cvmfs/$name \
-    -s ${spool_dir}/scratch \
-    -c ${spool_dir}/rdonly \
-    -t ${spool_dir}/tmp \
-    -b $base_hash \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
-    -w $stratum0 \
-    -o ${spool_dir}/tmp/manifest \
-    $log_level"
-  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
-    -k /etc/cvmfs/keys/${name}.key \
-    -n $name \
-    -m ${spool_dir}/tmp/manifest \
-    -t ${spool_dir}/tmp \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests"
-
-  $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
-  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
-  echo "Remounting newly created repository revision"
-  sudo umount /cvmfs/$name
-  sudo umount ${spool_dir}/rdonly
-  sudo rm -rf ${spool_dir}/scratch
-  rm -rf ${spool_dir}/tmp/*
-  $user_shell "mkdir ${spool_dir}/scratch"
-  sudo mount ${spool_dir}/rdonly > /dev/null
-  sudo mount /cvmfs/$name
-  rm -f ${spool_dir}/in_transaction
-  publish_after_hook $name
-}
-
-
-snapshot() {
-  local name=$1
-  local user=$2
-  local spool_dir=$3
-  local stratum0=$4
-  local upstream=$5
-  local num_workers=$6
-  local public_key=$7
-  local timeout=$8
-  local retries=$9
-
-  local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
-
-  local log_level=
-  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
-  local with_history=
-  if [ -f /etc/cvmfs/repositories.d/{$name}/last_snapshot ]; then
-    with_history="-p"
-  else
-    echo "Initial snapshot"
-  fi
-
-  $user_shell "cvmfs_swissknife pull -m $name \
-    -u $stratum0 \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
-    -x ${spool_dir}/tmp \
-    -k $public_key \
-    -n $num_workers \
-    -t $timeout \
-    -a $retries $with_history $log_level"
-  date > /etc/cvmfs/repositories.d/${name}/last_snapshot
-}
-
-
 create_repository_skeleton() {
   local directory=$1
   local user=$2
@@ -364,17 +380,59 @@ get_cvmfs_owner() {
   else
     cvmfs_owner=$owner
   fi
-  id $cvmfs_owner > /dev/null 2>&1 || die "No user $cvmfs_owner"
+  check_user $cvmfs_user || return 1
   echo $cvmfs_owner
 }
 
 
-mkfs() {
-  local name=$1
-  local stratum0=$2
-  local upstream=$3
-  local owner=$4
+################################################################################
+#                                                                              #
+#                                Sub Commands                                  #
+#                                                                              #
+################################################################################
 
+
+mkfs() {
+  local name
+  local stratum0
+  local upstream
+  local owner
+
+  # parameter handling
+  OPTIND=1
+  while getopts "w:u:o:" option; do
+    case $option in
+      w)
+        stratum0=$OPTARG
+      ;;
+      u)
+        upstream=$OPTARG
+      ;;
+      o)
+        owner=$OPTARG
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command mkfs: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  if [ $# -eq 0 ]; then
+    usage "Command mkfs: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command mkfs: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # default values
+  [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
+  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
+
+  # other configurations
   local cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local scratch_dir="${spool_dir}/scratch"
@@ -389,7 +447,9 @@ mkfs() {
   fi
 
   # Sanity checks
-  [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
+  check_repository_existence $name && die "The repository $name already exists"
+  is_root || die "Only root can create a new repository"
+  check_user $cvmfs_user || die "No user $cvmfs_user"
   /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
@@ -525,10 +585,10 @@ EOF
   echo "done"
 
   echo -n "Initial commit... "
-  transaction $name $spool_dir > /dev/null
+  transaction $name > /dev/null
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
-  publish $name $cvmfs_user $spool_dir $stratum0 $upstream > /dev/null
+  publish $name > /dev/null
   cat $rdonly_dir/new_repository
 
   echo "\
@@ -544,13 +604,50 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
-add_replica() {
-  local name=$1
-  local stratum0=$2
-  local public_key=$3
-  local upstream=$4
-  local owner=$5
+################################################################################
 
+
+add_replica() {
+  local name
+  local stratum0
+  local public_key
+  local upstream
+  local owner
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "o:u:" option
+  do
+    case $option in
+      u)
+        upstream=$OPTARG
+      ;;
+      o)
+        owner=$OPTARG
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command add-replica: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+   # get repository name, stratum0 url and path of public key
+  shift $(($OPTIND-1))
+  if [ $# -lt 3 ]; then
+    usage "Command add-replica: Too few arguments"
+  fi
+  if [ $# -gt 3 ]; then
+    usage "Command add-replica: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+  stratum0=$2
+  public_key=$3
+
+  # default values
+  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
+
+  # additional configuration
   local cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
   local pipe_paths="${spool_dir}/paths"
@@ -562,10 +659,11 @@ add_replica() {
   fi
 
   # Sanity checks
-  [ $(id -u) -ne 0 ] && die "Only root can create a new repository"
+  is_root || die "Only root can create a new repository"
   if is_local_upstream $upstream; then
     [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
   fi
+  check_repository_existence $name && die "Repository $name already exists."
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
@@ -635,15 +733,63 @@ You might have to add the key in /etc/cvmfs/repositories.d/${name}/replica.conf"
 }
 
 
-rmfs() {
-  local name=$1
-  local spool_dir=$2
-  local upstream=$3
-  local type=$4
+################################################################################
 
+
+rmfs() {
+  local name
+  local spool_dir
+  local upstream
+  local type
+  local force=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "f" option
+  do
+    case $option in
+      f)
+        force=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command rmfs: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  if [ $# -eq 0 ]; then
+    usage "Command rmfs: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command rmfs: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # sanity checks
+  is_root || die "Only root can remove a repository"
+  check_repository_existence $name || die "The repository $name does not exist"
+
+  # better ask the user again!
+  if [ $force -ne 1 ]; then
+    local reply
+    read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY $name INCLUDING SIGNING KEYS!  Are you sure (y/N)? " reply
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      return 1
+    fi
+  fi
+
+  # get information about repository
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  spool_dir=$CVMFS_SPOOL_DIR
+  upstream=$CVMFS_UPSTREAM_STORAGE
+  type=$CVMFS_REPOSITORY_TYPE
+
+  # do it!
   ensure_enabled_apache_modules
 
-  [ $(id -u) -ne 0 ] && die "Only root can remove a repository"
   [ x"$spool_dir" = x ] && die "Spool directory undefined"
   [ x"$upstream" = x ] && die "Upstream storage undefined"
   [ x"$type" = x ] && die "Repository type undefined"
@@ -691,10 +837,63 @@ rmfs() {
 }
 
 
-info() {
-  local name=$1
-  local stratum0=$2
+################################################################################
 
+
+resign() {
+  local name
+
+  # get repository name
+  if [ $# -eq 0 ]; then
+    usage "Command resign: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command resign: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_root || die "Only root can resign repositories"
+  is_stratum0 $name || die "This is not a stratum 0 repository ($name)"
+  
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+
+  # do it!
+  create_whitelist $name $CVMFS_USER \
+      ${CVMFS_UPSTREAM_STORAGE},${CVMFS_SPOOL_DIR}/paths,${CVMFS_SPOOL_DIR}/digests \
+      ${CVMFS_SPOOL_DIR}/tmp
+}
+
+
+################################################################################
+
+
+info() {
+  local name
+  local stratum0
+
+  # get repository name
+  if [ $# -eq 0 ]; then
+    usage "Command info: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command info: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  echo $name
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+  
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  stratum0=$CVMFS_STRATUM0
+
+  # do it!
   echo "Repository name: $name"
   get_expiry $name $stratum0
   echo
@@ -709,11 +908,32 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 }
 
 
-check() {
-  local name=$1
-  local upstream=$2
-  local repository_dir=$(get_local_upstream $upstream)
+################################################################################
 
+
+check() {
+  local name
+  local upstream
+  local repository_dir
+
+  # get repository name
+  if [ $# -eq 0 ]; then
+    usage "Command check: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command check: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  upstream=$CVMFS_UPSTREAM_STORAGE
+  repository_dir=$(get_local_upstream $upstream)
+
+  # do it!
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
 
   echo "Verifying $name"
@@ -721,7 +941,10 @@ check() {
 }
 
 
-list_repositories() {
+################################################################################
+
+
+list() {
   for repository in /etc/cvmfs/repositories.d/*; do
     if [ "x$repository" = "x/etc/cvmfs/repositories.d/*" ]; then
       return 0
@@ -733,209 +956,341 @@ list_repositories() {
 }
 
 
-usage() {
-   echo "\
-CernVM-FS Server Tool
-Commands:
-  mkfs <fully qualified name> [-w stratum0 url] [-u upstream storage]
-                              [-o owner]:
-               Create a new repository with a given name
-  add-replica <fully qualified name> <stratum 0 url> <public key>
-               [-o owner] [-u stratum1 upstram storage]
-               Create a Stratum 1 replica of a repository
-  publish <fully qualified name> [-d debug mode | -D blocking debug mode]:
-               Make a new repository snapshot
-  rmfs <fully qualified name> [-f force]:
-               Remove the repository
-  resign:      Re-sign the 30 day whitelist
-  list:        List available repositories
-  info:        Print summary about the repository
-  check:       Checks if the repository is sane
-  transaction: Start to edit a repository
-  abort:       Abort transaction and return to the state before
-  snapshot:    Synchronize a Stratum 1 replica with the Stratum 0 source
-
-Note: If multiple repositories are maintained, the repository name must follow
-the command."
-}
+################################################################################
 
 
-. /etc/cvmfs/config.sh
-[ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
+transaction() {
+  local name
+  local spool_dir
 
-# Setup environment
-APACHE="httpd"
-which apache2 >/dev/null 2>&1 && APACHE="apache2"
-if [ -x /sbin/service ]; then
-  SERVICE_BIN="/sbin/service"
-else
-  # Ubuntu
-  SERVICE_BIN="/usr/sbin/service"
-fi
-[ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
-
-select_fqrn() {
-  local given_name="$1"
-  if [ x"$given_name" != x ]; then
-    # Check if exists
-    given_name=$(cvmfs_mkfqrn $given_name)
-    [ -d /etc/cvmfs/repositories.d/$given_name ] && echo $given_name
-  else
-    # Check if only one repository active
-    [ $(list_repositories | wc -l) -eq 1 ] && list_repositories | cut -d" " -f1
+  # get repository name
+  if [ $# -eq 0 ]; then
+    usage "Command transaction: Please provide a repository name"
   fi
-  return 0
+  if [ $# -gt 1 ]; then
+    usage "Command transaction: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+  
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  spool_dir=$CVMFS_SPOOL_DIR
+
+  # more sanity checks
+  [ -f ${spool_dir}/in_transaction ] && die "Repository $name in already in a transaction"
+
+  # do it!
+  transaction_before_hook $name
+  sudo mount -o remount,rw /cvmfs/$name
+  touch ${spool_dir}/in_transaction
+  transaction_after_hook $name
 }
-CVMFS_REPOSITORY_NAME=$(select_fqrn $2)
 
 
-case $1 in
-  mkfs)
-    [ x"$CVMFS_REPOSITORY_NAME" != x ] && die "There is already an active repository $CVMFS_REPOSITORY_NAME"
-    CVMFS_REPOSITORY_NAME=$(cvmfs_mkfqrn $2)
-    if [ x"$CVMFS_REPOSITORY_NAME" = x ]; then
-      usage
-      exit 2
-    fi
-    # Stratum 0, upstream storage
-    STRATUM0="http://localhost/cvmfs/$CVMFS_REPOSITORY_NAME"
-    UPSTREAM="local:/srv/cvmfs/$CVMFS_REPOSITORY_NAME"
-    shift 2
-    while getopts "w:u:o:" OPTION
-    do
-      case $OPTION in
-        w)
-          STRATUM0=$OPTARG
-        ;;
-        u)
-          UPSTREAM=$OPTARG
-        ;;
-        o)
-          OWNER=$OPTARG
-        ;;
-        ?)
-          echo "Invalid option"
-          exit 1
-        ;;
-      esac
-    done
-    mkfs $CVMFS_REPOSITORY_NAME $STRATUM0 $UPSTREAM $OWNER
-    ;;
-  add-replica)
-    [ x"$CVMFS_REPOSITORY_NAME" != x ] && die "There is already an active repository $CVMFS_REPOSITORY_NAME"
-    CVMFS_REPOSITORY_NAME=$(cvmfs_mkfqrn $2)
-    CVMFS_STRATUM0=$3
-    CVMFS_PUBLIC_KEY=$4
-    if [ x"$CVMFS_REPOSITORY_NAME" = x -o x"$CVMFS_STRATUM0" = x -o x"$CVMFS_PUBLIC_KEY" = x ]; then
-      usage
-      exit 2
-    fi
-    UPSTREAM="local:/srv/cvmfs/$CVMFS_REPOSITORY_NAME"
-    shift 4
-    while getopts "o:u:" OPTION
-    do
-      case $OPTION in
-        u)
-          UPSTREAM=$OPTARG
-        ;;
-        o)
-          OWNER=$OPTARG
-        ;;
-        ?)
-          echo "Invalid option"
-          exit 1
-        ;;
-      esac
-    done
-    add_replica $CVMFS_REPOSITORY_NAME $CVMFS_STRATUM0 $CVMFS_PUBLIC_KEY $UPSTREAM $OWNER
-  ;;
-  rmfs)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
-    reply=n
-    if [ x"$3" = x"-f" ]; then
-      reply=y
-    else
-      read -p "You are about to WIPE OUT THE CERNVM-FS REPOSITORY INCLUDING SIGNING KEYS!  Are you sure (y/n)? " reply
-    fi
-    if [ "$reply" = "y" ]; then
-      . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-      rmfs $CVMFS_REPOSITORY_NAME $CVMFS_SPOOL_DIR $CVMFS_UPSTREAM_STORAGE $CVMFS_REPOSITORY_TYPE
-    fi
-  ;;
-  resign)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository?"
-    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    create_whitelist $CVMFS_REPOSITORY_NAME $CVMFS_USER \
-      ${CVMFS_UPSTREAM_STORAGE},${CVMFS_SPOOL_DIR}/paths,${CVMFS_SPOOL_DIR}/digests \
-      ${CVMFS_SPOOL_DIR}/tmp
-  ;;
-  list)
-    list_repositories
-  ;;
-  info)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
-    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    info $CVMFS_REPOSITORY_NAME $CVMFS_STRATUM0
-  ;;
-  check)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    check $CVMFS_REPOSITORY_NAME $CVMFS_UPSTREAM_STORAGE
-  ;;
-  transaction)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
-    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    transaction $CVMFS_REPOSITORY_NAME $CVMFS_SPOOL_DIR
-  ;;
-  abort)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
-    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    abort $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR
-  ;;
-  publish)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
-    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] && die "This is not a stratum 0 repository"
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
+################################################################################
 
-    for last; do true; done # Shell-KungFu: find last command-line parameter of cvmfs_server invocation
-    case $last in
-      -d)
-        DEBUG=1
+
+abort() {
+  local name
+  local user
+  local spool_dir
+  local force=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "f" option
+  do
+    case $option in
+      f)
+        force=1
       ;;
-      -D)
-        DEBUG=2
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command abort: Unrecognized option: $1"
       ;;
-      *)
-        DEBUG=0
     esac
+  done
 
-    publish $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 $CVMFS_UPSTREAM_STORAGE $DEBUG
-  ;;
-  snapshot)
-    [ x"$CVMFS_REPOSITORY_NAME" = x ] && die "Which repository"
-    [ -f /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf ] || die "This is not a stratum 1 repository"
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/server.conf
-    . /etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/replica.conf
-    snapshot $CVMFS_REPOSITORY_NAME $CVMFS_USER $CVMFS_SPOOL_DIR $CVMFS_STRATUM0 \
-      $CVMFS_UPSTREAM_STORAGE $CVMFS_NUM_WORKERS $CVMFS_PUBLIC_KEY \
-      $CVMFS_HTTP_TIMEOUT $CVMFS_HTTP_RETRIES
-  ;;
-  skeleton)
-    SKELETON_DIR=$2
-    [ x"$SKELETON_DIR" = x ] && die "skeleton directory missing"
-    read -p "Owner of $SKELETON_DIR [$(whoami)]: " SKELETON_USER
-    [ x"$SKELETON_USER" = x ] && SKELETON_USER=$(whoami)
-    id $SKELETON_USER > /dev/null 2>&1 || die "No user $SKELETON_USER"
-    create_repository_skeleton $SKELETON_DIR $SKELETON_USER
-  ;;
-  snapshot)
-    echo "TBD"
-  ;;
-  *)
-    usage
-  ;;
-esac
+  # get repository name
+  shift $(($OPTIND-1))
+  if [ $# -eq 0 ]; then
+    usage "Command abort: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command abort: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  user=$CVMFS_USER
+  spool_dir=$CVMFS_SPOOL_DIR
+
+  # more sanity checks
+  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+
+  # better ask the user once again!
+  if [ $force -ne 1 ]; then
+    local reply
+    read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION for $name!  Are you sure (y/N)? " reply
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      return 1
+    fi
+  fi
+
+  # do it!
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+
+  abort_before_hook $name
+  sudo umount /cvmfs/$name
+  rm -rf ${spool_dir}/tmp/*
+  sudo rm -rf ${spool_dir}/scratch
+  $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
+  sudo mount /cvmfs/$name
+  rm -f ${spool_dir}/in_transaction
+  abort_after_hook $name
+}
+
+
+################################################################################
+
+
+publish() {
+  local name
+  local user
+  local spool_dir
+  local stratum0
+  local upstream
+  local debug=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "dD" option
+  do
+    case $option in
+      d)
+        debug=1
+      ;;
+      D)
+        debug=2
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command publish: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  echo $@
+  shift $(($OPTIND-1))
+  if [ $# -eq 0 ]; then
+    usage "Command publish: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command publish: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  user=$CVMFS_USER
+  spool_dir=$CVMFS_SPOOL_DIR
+  stratum0=$CVMFS_STRATUM0
+  upstream=$CVMFS_UPSTREAM_STORAGE
+
+  # more sanity checks
+  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+
+  # do it!
+  local swissknife="cvmfs_swissknife"
+
+  # enable the debug mode?
+  if [ $debug -ne 0 ]
+  then
+    if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
+      case $debug in
+        1)
+          # in case something breaks we are provided with a GDB prompt.
+          swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+        ;;
+        2)
+          # attach gdb and provide a prompt WITHOUT actual running the program
+          swissknife="gdb --quiet --args cvmfs_swissknife_debug"
+        ;;
+      esac
+    else
+      echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+    fi
+  fi
+
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+
+  publish_before_hook $name
+  sudo /bin/mount -o remount,ro /cvmfs/$name
+  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+  local log_level=
+  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+
+  local sync_command="$swissknife sync -x -u /cvmfs/$name \
+    -s ${spool_dir}/scratch \
+    -c ${spool_dir}/rdonly \
+    -t ${spool_dir}/tmp \
+    -b $base_hash \
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
+    -w $stratum0 \
+    -o ${spool_dir}/tmp/manifest \
+    $log_level"
+  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    -m ${spool_dir}/tmp/manifest \
+    -t ${spool_dir}/tmp \
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests"
+
+  $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
+  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+  echo "Remounting newly created repository revision"
+  sudo umount /cvmfs/$name
+  sudo umount ${spool_dir}/rdonly
+  sudo rm -rf ${spool_dir}/scratch
+  rm -rf ${spool_dir}/tmp/*
+  $user_shell "mkdir ${spool_dir}/scratch"
+  sudo mount ${spool_dir}/rdonly > /dev/null
+  sudo mount /cvmfs/$name
+  rm -f ${spool_dir}/in_transaction
+  publish_after_hook $name
+}
+
+
+################################################################################
+
+
+snapshot() {
+  local name
+  local user
+  local spool_dir
+  local stratum0
+  local upstream
+  local num_workers
+  local public_key
+  local timeout
+  local retries
+
+  # get repository name
+  if [ $# -eq 0 ]; then
+    usage "Command snapshot: Please provide a repository name"
+  fi
+  if [ $# -gt 1 ]; then
+    usage "Command snapshot: Too many arguments"
+  fi
+  name=$(cvmfs_mkfqrn $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum1 $name || die "This is not a stratum 1 repository"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  . /etc/cvmfs/repositories.d/$name/replica.conf
+  user=$CVMFS_USER
+  spool_dir=$CVMFS_SPOOL_DIR
+  stratum0=$CVMFS_STRATUM0
+  upstream=$CVMFS_UPSTREAM_STORAGE
+  num_workers=$CVMFS_NUM_WORKERS
+  public_key=$CVMFS_PUBLIC_KEY
+  timeout=$CVMFS_HTTP_TIMEOUT
+  retries=$CVMFS_HTTP_RETRIES
+
+  # do it!
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+
+  local log_level=
+  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+  local with_history=
+  if [ -f /etc/cvmfs/repositories.d/{$name}/last_snapshot ]; then
+    with_history="-p"
+  else
+    echo "Initial snapshot"
+  fi
+
+  $user_shell "cvmfs_swissknife pull -m $name \
+    -u $stratum0 \
+    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
+    -x ${spool_dir}/tmp \
+    -k $public_key \
+    -n $num_workers \
+    -t $timeout \
+    -a $retries $with_history $log_level"
+  date > /etc/cvmfs/repositories.d/${name}/last_snapshot
+}
+
+
+################################################################################
+
+
+skeleton() {
+  local skeleton_dir
+  local skeleton_user
+
+  # get skeleton destination directory
+  if [ $# -eq 0 ]; then
+    die "Command skeleton: Please provide a skeleton destination directory"
+  fi
+  if [ $# -gt 1 ]; then
+    die "Command skeleton: Too many arguments"
+  fi
+  skeleton_dir=$1
+
+  # ask for the skeleton dir owern
+  read -p "Owner of $skeleton_dir [$(whoami)]: " skeleton_user
+
+  # default values
+  [ x"$skeleton_user" = x ] && skeleton_user=$(whoami)
+
+  # sanity checks
+  check_user $skeleton_user || die "No user $skeleton_user"
+  
+  # do it!
+  create_repository_skeleton $skeleton_dir $skeleton_user
+}
+
+
+################################################################################
+#                                                                              #
+#                                Entry Point                                   #
+#                                                                              #
+################################################################################
+
+
+# check if there is at least a selected sub-command
+if [ $# -lt 1 ]; then
+  usage
+fi
+
+# check if the given sub-command is known and, if so, call it
+subcommand=$1
+shift
+if is_subcommand $subcommand; then
+  # replace a dash (-) by an underscore (_) and call the requested sub-command
+  eval "$(echo $subcommand | sed 's/-/_/g') $@"
+else
+  usage "Unrecognized command: $subcommand"
+fi
