@@ -103,6 +103,12 @@ bool Init(const string &cache_path) {
   if (!MakeCacheDirectories(cache_path, 0700))
     return false;
 
+  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
+    LogCvmfs(kLogCache, kLogStderr | kLogSyslog,
+             "Not mounting on cvmfs 2.0.X cache");
+    return false;
+  }
+
   int retval = pthread_key_create(&thread_local_storage_, CleanupTLS);
   assert(retval == 0);
 

@@ -709,9 +709,13 @@ cvmfs_reload() {
     all_guard_files="$all_guard_files ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused"
   done
   for guard_file in $all_guard_files; do
-    while [ ! -f $guard_file ]; do
+    while [ ! -f ${guard_file}* ]; do
       sleep 1
     done
+    if [ -f ${guard_file}.crashed ]; then
+      echo "RELOADING FAILED (${guard_file}.crashed)" 1>&2
+      rm -f ${guard_file}.crashed
+    fi
   done
 
   if [ $clean_cache -eq 1 ]; then
@@ -1247,6 +1251,7 @@ check_is_on() {
   return 1
 }
 
+
 runas() {
   local user=$1
   local cmd=$2
@@ -1259,6 +1264,7 @@ runas() {
       sudo -u $user $cmd ;;
   esac
 }
+
 
 case "$1" in
   setup)
