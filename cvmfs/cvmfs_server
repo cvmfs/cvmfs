@@ -76,7 +76,6 @@ is_subcommand() {
 
 # prints some help information optionally followed by an error message
 # afterwards it aborts the script
-# Note: this prints directly to /dev/tty, you cannot catch the output!
 #
 # @param errormsg   an optional error message that is printed after the
 #                   actual usage text
@@ -115,7 +114,7 @@ Supported Commands:
   snapshot      <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
   list:         List available repositories
-" > /dev/tty
+"
 
 
   if [ x"$errormsg" != x ]; then
@@ -123,7 +122,7 @@ Supported Commands:
 ________________________________________________________________________
 
 NOTE: $errormsg
-" > /dev/tty
+"
     exit 3
   else
     exit 2
@@ -233,35 +232,43 @@ get_repository_name() {
 }
 
 
+# checks the parameter count for a situation where we might be able to guess
+# the repository name based on the repositories present in the system
+# Note: if the parameter count does not fit or if guessing is impossible,
+#       this will print the usage string with an error message and exit
+#
+# @param provided_parameter_count  number of parameters provided by the user
+check_parameter_count_with_guessing() {
+  local provided_parameter_count=$1
+
+  if [ $provided_parameter_count -lt 1 ]; then
+    # check if we have not _exactly_ one repository present
+    if [ $(ls /etc/cvmfs/repositories.d/ | wc -l) -ne 1 ]; then
+      usage "Please provide a repository name"
+    fi
+  fi
+
+  if [ $provided_parameter_count -gt 1 ]; then
+    usage "Too many arguments provided"
+  fi
+}
+
+
 # mangles the repository name into a fully qualified repository name
 # if there was no repository name given and there is only one repository present
 # in the system, it automatically returns the name of this one.
-# Note: this function also checks if there are too many arguments given
-#       Therefore pass in all available command line arguments with $@
-#       In case of error it prints the usage string and kills the script.
 #
 # @param expected_parameter_count  the number of expected parameters
 # @param variadic                  all provided command line parameters ($@)
 # @return                          echoes a suitable repository name
-check_parameters_and_get_or_guess_repository_name() {
-  local expected_parameter_count=$1
-  shift
+get_or_guess_repository_name() {
+  local repository_name=$1
 
-  if [ $# -lt $expected_parameter_count ]; then
-    # check if we only have one repository present
-    if [ $(ls /etc/cvmfs/repositories.d/ | wc -l) -ne 1 ]; then
-      usage "Please provide a repository name"
-    fi
-
+  if [ x"$repository_name" == x ]; then
     echo $(get_repository_name $(ls /etc/cvmfs/repositories.d))
-    return 0
+  else
+    echo $(get_repository_name $repository_name)
   fi
-
-  if [ $# -gt $expected_parameter_count ]; then
-    usage "Too many arguments provided"
-  fi
-
-  echo $(get_repository_name $1)
 }
 
 
@@ -815,7 +822,8 @@ rmfs() {
 
   # get repository name
   shift $(($OPTIND-1))
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   is_root || die "Only root can remove a repository"
@@ -893,7 +901,8 @@ resign() {
   local name
 
   # get repository name
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -918,7 +927,8 @@ info() {
   local stratum0
 
   # get repository name
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   echo $name
 
@@ -954,7 +964,8 @@ check() {
   local repository_dir
 
   # get repository name
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -995,7 +1006,8 @@ transaction() {
   local spool_dir
 
   # get repository name
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -1042,7 +1054,8 @@ abort() {
 
   # get repository name
   shift $(($OPTIND-1))
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -1112,7 +1125,8 @@ publish() {
 
   # get repository name
   shift $(($OPTIND-1))
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -1206,7 +1220,8 @@ snapshot() {
   local retries
 
   # get repository name
-  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
