@@ -265,9 +265,8 @@ check_parameter_count_with_guessing() {
 # if there was no repository name given and there is only one repository present
 # in the system, it automatically returns the name of this one.
 #
-# @param expected_parameter_count  the number of expected parameters
-# @param variadic                  all provided command line parameters ($@)
-# @return                          echoes a suitable repository name
+# @param repository_name  the name of the repository to work on (might be empty)
+# @return                 echoes a suitable repository name
 get_or_guess_repository_name() {
   local repository_name=$1
 
