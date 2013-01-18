@@ -5,6 +5,10 @@
 # on a Stratum 0/1 server
 
 set -e # ESSENTIAL! Don't remove this!
+       # Stops the server script in case anything unexpected occures, so that
+       # malfunctions cause as less as possible damage.
+       # For example a crashing `cvmfs_server publish` is prevented from wiping
+       # the scratch area, giving us a chance to fix and retry the process.
 
 die() {
   echo -e $1 >&2
@@ -19,7 +23,7 @@ die() {
 ################################################################################
 
 
-# setup server hooks
+# setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
 transaction_after_hook() { :; }
 abort_before_hook() { :; }
@@ -92,7 +96,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner]
-                <fully qualified name> <stratum 0 url> <public key>
+                <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   publish       [-d debug mode | -D blocking debug mode]
                 <fully qualified name>
@@ -236,6 +240,9 @@ get_repository_name() {
 # the repository name based on the repositories present in the system
 # Note: if the parameter count does not fit or if guessing is impossible,
 #       this will print the usage string with an error message and exit
+# Note: this method is commonly used right before invoking
+#       `get_or_guess_repository_name` to check its preconditions and report
+#       error before actually doing something wrong
 #
 # @param provided_parameter_count  number of parameters provided by the user
 check_parameter_count_with_guessing() {
@@ -258,13 +265,12 @@ check_parameter_count_with_guessing() {
 # if there was no repository name given and there is only one repository present
 # in the system, it automatically returns the name of this one.
 #
-# @param expected_parameter_count  the number of expected parameters
-# @param variadic                  all provided command line parameters ($@)
-# @return                          echoes a suitable repository name
+# @param repository_name  the name of the repository to work on (might be empty)
+# @return                 echoes a suitable repository name
 get_or_guess_repository_name() {
   local repository_name=$1
 
-  if [ x"$repository_name" == x ]; then
+  if [ "x$repository_name" = "x" ]; then
     echo $(get_repository_name $(ls /etc/cvmfs/repositories.d))
   else
     echo $(get_repository_name $repository_name)
@@ -698,13 +704,14 @@ add_replica() {
     esac
   done
 
-   # get repository name, stratum0 url and path of public key
+   # get stratum0 url and path of public key
   shift $(($OPTIND-1))
-  check_parameter_count 3 $#
+  check_parameter_count 2 $#
 
-  name=$(get_repository_name $1)
-  stratum0=$2
-  public_key=$3
+  stratum0=$1
+  public_key=$2
+
+  name=$(cvmfs_swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
 
   # default values
   [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
@@ -722,10 +729,17 @@ add_replica() {
 
   # Sanity checks
   is_root || die "Only root can create a new repository"
+  check_user $cvmfs_user || die "No user $cvmfs_user"
   if is_local_upstream $upstream; then
     [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
   fi
-  check_repository_existence $name && die "Repository $name already exists."
+  if check_repository_existence $name; then
+    if is_stratum0 $name; then
+      die "Repository $name already exists as a Stratum0 repository. You cannot create a Stratum1 replica for $name on this machine."
+    else
+      die "There is already a Stratum1 repository $name"
+    fi
+  fi
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
