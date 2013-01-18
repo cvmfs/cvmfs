@@ -270,7 +270,7 @@ check_parameter_count_with_guessing() {
 get_or_guess_repository_name() {
   local repository_name=$1
 
-  if [ x"$repository_name" == x ]; then
+  if [ "x$repository_name" = "x" ]; then
     echo $(get_repository_name $(ls /etc/cvmfs/repositories.d))
   else
     echo $(get_repository_name $repository_name)
@@ -729,6 +729,7 @@ add_replica() {
 
   # Sanity checks
   is_root || die "Only root can create a new repository"
+  check_user $cvmfs_user || die "No user $cvmfs_user"
   if is_local_upstream $upstream; then
     [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
   fi

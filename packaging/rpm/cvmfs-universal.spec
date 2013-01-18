@@ -31,8 +31,6 @@ BuildRequires: pkgconfig
 BuildRequires: openssl-devel
 %{?el5:BuildRequires: buildsys-macros}
 
-Conflicts: cvmfs < 2.1
-
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -217,6 +215,7 @@ done
 %endif
 /sbin/ldconfig
 /usr/bin/cvmfs_config reload
+:
 
 %preun
 %if 0%{?selinux_cvmfs}

@@ -302,15 +302,15 @@ cvmfs_chksetup() {
         cache_dir="$CVMFS_CACHE_BASE/$fqrn"
       fi
       if [ -d $cache_dir ]; then
-        if ! sudo -u $CVMFS_USER test -O $cache_dir; then
+        if ! runas $CVMFS_USER "test -O $cache_dir"; then
           echo "Error: $cache_dir is not owned by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
-        if ! sudo -u $CVMFS_USER test -r $cache_dir; then
+        if ! runas $CVMFS_USER "test -r $cache_dir"; then
           echo "Error: $cache_dir is not readable by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
-        if ! sudo -u $CVMFS_USER test -w $cache_dir; then
+        if ! runas $CVMFS_USER "test -w $cache_dir"; then
           echo "Error: $cache_dir is not writable by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
@@ -330,7 +330,7 @@ cvmfs_chksetup() {
                          /etc/cvmfs/config.d/*.conf /etc/cvmfs/config.d/*.local
       do
         if [ -f $config_file ]; then
-          if ! sudo -u $CVMFS_USER test -r $config_file; then
+          if ! runas $CVMFS_USER "test -r $config_file"; then
             echo "Error: $config_file is not readable by $CVMFS_USER"
             num_errors=$(($num_errors+1))
           fi
@@ -705,21 +705,26 @@ cvmfs_reload() {
     get_attr pid ${m}; pid=$attr_value
     echo "Pausing ${fqrn} on ${m}"
     cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go &
-    all_pids="$all_pids $pid"
+    echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
     all_guard_files="$all_guard_files ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused"
   done
   for guard_file in $all_guard_files; do
-    while [ ! -f $guard_file ]; do
+    while [ ! -f ${guard_file}* ]; do
       sleep 1
     done
+    if [ -f ${guard_file}.crashed ]; then
+      echo "RELOADING FAILED (${guard_file}.crashed)" 1>&2
+      rm -f "$(dirname $guard_file)/pid.$(basename $guard_file)" ${guard_file}.crashed
+    fi
   done
 
   if [ $clean_cache -eq 1 ]; then
     cvmfs_wipecache
   fi
 
-  for pid in $all_pids; do
-    kill -SIGUSR1 $pid
+  for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
+    kill -SIGUSR1 $(cat $pidfile)
+    rm -f $pidfile
   done
   wait
 
@@ -1092,11 +1097,11 @@ check_dev_fuse() {
     echo "Error: character device $charDevice does not exist"
     return_code=$(($return_code+1))
   else
-    if ! sudo -u $CVMFS_USER test -r $charDevice; then
+    if ! runas $CVMFS_USER "test -r $charDevice"; then
       echo "Error: $charDevice is not readable by user $CVMFS_USER"
       return_code=$(($return_code+1))
     fi
-    if ! sudo -u $CVMFS_USER test -w $charDevice; then
+    if ! runas $CVMFS_USER "test -w $charDevice"; then
       echo "Error: $charDevice is not writable by user $CVMFS_USER"
       return_code=$(($return_code+1))
     fi
@@ -1245,6 +1250,20 @@ check_is_on() {
     return 0
   fi
   return 1
+}
+
+
+runas() {
+  local user=$1
+  local cmd=$2
+
+  case $sys_arch in
+    Linux )
+      su -s /bin/sh $user -c "$cmd" ;;
+
+    Darwin )
+      sudo -u $user $cmd ;;
+  esac
 }
 
 

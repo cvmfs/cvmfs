@@ -549,7 +549,11 @@ int main(int argc, char *argv[]) {
       bool stop_and_go = false;
       if ((argc > 3) && (string(argv[3]) == "stop_and_go"))
         stop_and_go = true;
-      return loader_talk::MainReload(argv[2], stop_and_go);
+      retval = loader_talk::MainReload(argv[2], stop_and_go);
+      if ((retval != 0) && (stop_and_go)) {
+        CreateFile(string(argv[2]) + ".paused.crashed", 0600);
+      }
+      return retval;
     }
 
     debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
