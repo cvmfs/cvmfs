@@ -691,8 +691,14 @@ cvmfs_reload() {
     fi
     return 0
   fi
+  if [ -f "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" ]; then
+    echo "Another reload process has not finished yet"
+    return 1
+  fi
+  # Race condition here, TODO
   touch "$CVMFS_RELOAD_SOCKETS/cvmfs.pause"
   trap "rm -f $CVMFS_RELOAD_SOCKETS/cvmfs.pause" EXIT
+  rm -f "${CVMFS_RELOAD_SOCKETS}/pid.*" "${CVMFS_RELOAD_SOCKETS}/guard_files*"
 
   RETVAL=0
   local mount_list
@@ -706,9 +712,11 @@ cvmfs_reload() {
     echo "Pausing ${fqrn} on ${m}"
     cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go &
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
-    all_guard_files="$all_guard_files ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused"
+    echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
   done
-  for guard_file in $all_guard_files; do
+  sort -u "${CVMFS_RELOAD_SOCKETS}/guard_files" > "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp"
+  mv "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp" "${CVMFS_RELOAD_SOCKETS}/guard_files"
+  for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
     while [ ! -f ${guard_file}* ]; do
       sleep 1
     done
@@ -717,6 +725,7 @@ cvmfs_reload() {
       rm -f "$(dirname $guard_file)/pid.$(basename $guard_file)" ${guard_file}.crashed
     fi
   done
+  rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
 
   if [ $clean_cache -eq 1 ]; then
     cvmfs_wipecache
