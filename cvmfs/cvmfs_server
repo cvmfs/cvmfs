@@ -4,7 +4,7 @@
 # This script takes care of creating, removing, and maintaining repositories
 # on a Stratum 0/1 server
 
-set -e
+set -e # ESSENTIAL! Don't remove this!
 
 die() {
   echo -e $1 >&2
@@ -76,6 +76,7 @@ is_subcommand() {
 
 # prints some help information optionally followed by an error message
 # afterwards it aborts the script
+# Note: this prints directly to /dev/tty, you cannot catch the output!
 #
 # @param errormsg   an optional error message that is printed after the
 #                   actual usage text
@@ -113,16 +114,16 @@ Supported Commands:
                 Start to edit a repository
   snapshot      <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
-  list:         List available repositories"
+  list:         List available repositories
+" > /dev/tty
 
 
   if [ x"$errormsg" != x ]; then
     echo "\
-
 ________________________________________________________________________
 
 NOTE: $errormsg
-"
+" > /dev/tty
     exit 3
   else
     exit 2
@@ -200,6 +201,67 @@ is_local_upstream() {
 
 has_selinux() {
   [ -f /selinux/enforce ]
+}
+
+
+# checks if the right number of arguments was provided
+# if the wrong number was provided it will kill the script after printing the
+# usage text and an error message
+#
+# @param expected_parameter_count   number of expected parameters
+# @param provided_parameter_count   number of provided parameters
+check_parameter_count() {
+  local expected_parameter_count=$1
+  local provided_parameter_count=$2
+
+  if [ $provided_parameter_count -lt $expected_parameter_count ]; then
+    usage "Too few arguments provided"
+  fi
+  if [ $provided_parameter_count -gt $expected_parameter_count ]; then
+    usage "Too many arguments provided"
+  fi
+}
+
+
+# mangles the repository name into a fully qualified repository name
+#
+# @param repository_name       the repository name given by the user
+# @return                      echoes the correct repository name to use
+get_repository_name() {
+  local repository_name=$1
+  echo $(cvmfs_mkfqrn $repository_name)
+}
+
+
+# mangles the repository name into a fully qualified repository name
+# if there was no repository name given and there is only one repository present
+# in the system, it automatically returns the name of this one.
+# Note: this function also checks if there are too many arguments given
+#       Therefore pass in all available command line arguments with $@
+#       In case of error it prints the usage string and kills the script.
+#
+# @param expected_parameter_count  the number of expected parameters
+# @param variadic                  all provided command line parameters ($@)
+# @return                          echoes a suitable repository name
+check_parameters_and_get_or_guess_repository_name() {
+  local expected_parameter_count=$1
+  shift
+
+  if [ $# -lt $expected_parameter_count ]; then
+    # check if we only have one repository present
+    if [ $(ls /etc/cvmfs/repositories.d/ | wc -l) -ne 1 ]; then
+      usage "Please provide a repository name"
+    fi
+
+    echo $(get_repository_name $(ls /etc/cvmfs/repositories.d))
+    return 0
+  fi
+
+  if [ $# -gt $expected_parameter_count ]; then
+    usage "Too many arguments provided"
+  fi
+
+  echo $(get_repository_name $1)
 }
 
 
@@ -420,17 +482,16 @@ mkfs() {
 
   # get repository name
   shift $(($OPTIND-1))
-  if [ $# -eq 0 ]; then
-    usage "Command mkfs: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command mkfs: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  check_parameter_count 1 $#
+  name=$(get_repository_name $1)
 
   # default values
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
+
+  # sanity checks
+  check_repository_existence $name && die "The repository $name already exists"
+  is_root || die "Only root can create a new repository"
 
   # other configurations
   local cvmfs_user=`get_cvmfs_owner $name $owner`
@@ -446,9 +507,7 @@ mkfs() {
     repository_dir=$(get_local_upstream $upstream)
   fi
 
-  # Sanity checks
-  check_repository_existence $name && die "The repository $name already exists"
-  is_root || die "Only root can create a new repository"
+  # more sanity checks
   check_user $cvmfs_user || die "No user $cvmfs_user"
   /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
@@ -634,13 +693,9 @@ add_replica() {
 
    # get repository name, stratum0 url and path of public key
   shift $(($OPTIND-1))
-  if [ $# -lt 3 ]; then
-    usage "Command add-replica: Too few arguments"
-  fi
-  if [ $# -gt 3 ]; then
-    usage "Command add-replica: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  check_parameter_count 3 $#
+
+  name=$(get_repository_name $1)
   stratum0=$2
   public_key=$3
 
@@ -760,13 +815,7 @@ rmfs() {
 
   # get repository name
   shift $(($OPTIND-1))
-  if [ $# -eq 0 ]; then
-    usage "Command rmfs: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command rmfs: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   # sanity checks
   is_root || die "Only root can remove a repository"
@@ -844,13 +893,7 @@ resign() {
   local name
 
   # get repository name
-  if [ $# -eq 0 ]; then
-    usage "Command resign: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command resign: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -875,13 +918,7 @@ info() {
   local stratum0
 
   # get repository name
-  if [ $# -eq 0 ]; then
-    usage "Command info: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command info: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   echo $name
 
@@ -917,13 +954,7 @@ check() {
   local repository_dir
 
   # get repository name
-  if [ $# -eq 0 ]; then
-    usage "Command check: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command check: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -964,13 +995,7 @@ transaction() {
   local spool_dir
 
   # get repository name
-  if [ $# -eq 0 ]; then
-    usage "Command transaction: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command transaction: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -1017,13 +1042,7 @@ abort() {
 
   # get repository name
   shift $(($OPTIND-1))
-  if [ $# -eq 0 ]; then
-    usage "Command abort: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command abort: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -1092,15 +1111,8 @@ publish() {
   done
 
   # get repository name
-  echo $@
   shift $(($OPTIND-1))
-  if [ $# -eq 0 ]; then
-    usage "Command publish: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command publish: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
@@ -1194,13 +1206,7 @@ snapshot() {
   local retries
 
   # get repository name
-  if [ $# -eq 0 ]; then
-    usage "Command snapshot: Please provide a repository name"
-  fi
-  if [ $# -gt 1 ]; then
-    usage "Command snapshot: Too many arguments"
-  fi
-  name=$(cvmfs_mkfqrn $1)
+  name=$(check_parameters_and_get_or_guess_repository_name 1 $@)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
