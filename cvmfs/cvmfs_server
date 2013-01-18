@@ -92,7 +92,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner]
-                <fully qualified name> <stratum 0 url> <public key>
+                <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   publish       [-d debug mode | -D blocking debug mode]
                 <fully qualified name>
@@ -698,13 +698,14 @@ add_replica() {
     esac
   done
 
-   # get repository name, stratum0 url and path of public key
+   # get stratum0 url and path of public key
   shift $(($OPTIND-1))
-  check_parameter_count 3 $#
+  check_parameter_count 2 $#
 
-  name=$(get_repository_name $1)
-  stratum0=$2
-  public_key=$3
+  stratum0=$1
+  public_key=$2
+
+  name=$(cvmfs_swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
 
   # default values
   [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
@@ -725,7 +726,13 @@ add_replica() {
   if is_local_upstream $upstream; then
     [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
   fi
-  check_repository_existence $name && die "Repository $name already exists."
+  if check_repository_existence $name; then
+    if is_stratum0 $name; then
+      die "Repository $name already exists as a Stratum0 repository. You cannot create a Stratum1 replica for $name on this machine."
+    else
+      die "There is already a Stratum1 repository $name"
+    fi
+  fi
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
