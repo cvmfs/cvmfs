@@ -741,8 +741,8 @@ Commands:
                               [-o owner]:
                Create a new repository with a given name
   add-replica <fully qualified name> <stratum 0 url> <public key>
-               [-o owner] [-u stratum1 upstram storage]
-               Create a Stratum 1 replica of a repository
+               [-o owner] [-u stratum1 upstream storage]
+               Create a Stratum 1 replica of an existing Stratum 0 repository
   publish <fully qualified name> [-d debug mode | -D blocking debug mode]:
                Make a new repository snapshot
   rmfs <fully qualified name> [-f force]:
