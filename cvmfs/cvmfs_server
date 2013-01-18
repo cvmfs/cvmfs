@@ -94,7 +94,7 @@ Supported Commands:
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner]
                 <fully qualified name> <stratum 0 url> <public key>
-                Creates a Stratum 1 replica of a repository
+                Creates a Stratum 1 replica of a Stratum 0 repository
   publish       [-d debug mode | -D blocking debug mode]
                 <fully qualified name>
                 Make a new repository snapshot
