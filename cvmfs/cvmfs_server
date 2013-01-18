@@ -5,6 +5,10 @@
 # on a Stratum 0/1 server
 
 set -e # ESSENTIAL! Don't remove this!
+       # Stops the server script in case anything unexpected occures, so that
+       # malfunctions cause as less as possible damage.
+       # For example a crashing `cvmfs_server publish` is prevented from wiping
+       # the scratch area, giving us a chance to fix and retry the process.
 
 die() {
   echo -e $1 >&2
