@@ -504,6 +504,7 @@ int swissknife::CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load Manifest
+  // TODO: Do this using Manifest::Fetch() in the future
   manifest::Manifest *manifest = NULL;
   if (remote_repository == NULL) {
     if (chdir(repository.c_str()) != 0) {

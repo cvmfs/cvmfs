@@ -55,6 +55,10 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 
   // Load manifest file
   // Repository can be HTTP address or on local file system
+  // TODO: do this using Manifest::Fetch
+  //       currently this is not possible, since Manifest::Fetch asks for the
+  //       repository name... Which we want to figure out with the tool at hand.
+  //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
   manifest::Manifest *manifest = NULL;
   if (IsRemote(repository)) {
     download::Init(1);
