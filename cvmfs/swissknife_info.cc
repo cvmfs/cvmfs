@@ -10,21 +10,12 @@
 #include "cvmfs_config.h"
 #include "swissknife_info.h"
 
-#include <unistd.h>
-#include <inttypes.h>
-
 #include <string>
-#include <queue>
-#include <vector>
-#include <map>
 
 #include "logging.h"
 #include "manifest.h"
 #include "util.h"
 #include "hash.h"
-#include "catalog.h"
-#include "compression.h"
-#include "shortstring.h"
 #include "download.h"
 
 using namespace std;  // NOLINT
