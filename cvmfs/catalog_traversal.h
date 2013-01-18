@@ -30,6 +30,9 @@ namespace swissknife {
  * CAUTION: currently the Catalog* pointer passed into the callback becomes in-
  *          valid directly after the callback method returns. Therefore you
  *          MUST NOT store it for later use.
+ *
+ * TODO: Use the Observable template buried in Pull Request 46 instead of imple-
+ *       menting your own callback infrastructure here.
  */
 template<class T>
 class CatalogTraversal
@@ -39,7 +42,7 @@ class CatalogTraversal
    * Callback signature which has to be implemented by the delegate object
    * @param catalog             the catalog object which needs to be processed
    * @param catalog_hash        the SHA-1 content hash of the catalog
-   * @param tree_level          the depth in the nested catalog tree 
+   * @param tree_level          the depth in the nested catalog tree
    *                            (starting at zero)
    */
   typedef void (T::*Callback)(const catalog::Catalog* catalog,
@@ -72,7 +75,7 @@ class CatalogTraversal
 
   /**
    * Constructs a new catalog traversal engine.
-   * @param delegate           the object to be notified when a catalog needs 
+   * @param delegate           the object to be notified when a catalog needs
    *                           to be processed
    * @param catalog_callback   a function pointer to the callback to be called
    *                           on the delegate object
@@ -81,7 +84,7 @@ class CatalogTraversal
    *                           -> or an URL to a remote repository
    * @param repo_name          fully qualified repository name (used for remote
    *                           repository signature check) (optional)
-   * @param repo_keys          a comma separated list of public key file 
+   * @param repo_keys          a comma separated list of public key file
    *                           locations to verify the repository manifest file
    */
 	CatalogTraversal(T*                 delegate,
@@ -122,7 +125,7 @@ class CatalogTraversal
     // root catalog of the repository to be traversed
     manifest::Manifest *manifest = LoadManifest();
     if (!manifest) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, 
+      LogCvmfs(kLogCatalogTraversal, kLogStderr,
         "Failed to load manifest for repository %s", repo_name_.c_str());
       return false;
     }
@@ -188,8 +191,8 @@ class CatalogTraversal
     catalog::Catalog::NestedCatalogList *nested_catalogs =
       catalog->ListNestedCatalogs();
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs->begin(), iEnd = nested_catalogs->end(); 
-         i != iEnd; ++i) 
+         nested_catalogs->begin(), iEnd = nested_catalogs->end();
+         i != iEnd; ++i)
     {
       catalog_stack_.push(CatalogJob(*i, job.tree_level + 1));
     }
@@ -298,7 +301,7 @@ class CatalogTraversal
                          std::string *catalog_file) {
     catalog_file->clear();
 
-    const std::string source = 
+    const std::string source =
       repo_url_ + "/data" + catalog_hash.MakePath(1,2) + "C";
     const std::string dest = "/tmp/" + catalog_hash.ToString();
 

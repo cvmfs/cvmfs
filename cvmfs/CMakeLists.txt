@@ -106,6 +106,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_pull.h swissknife_pull.cc
   swissknife_sign.h swissknife_sign.cc
   swissknife_sync.h swissknife_sync.cc
+  swissknife_info.h swissknife_info.cc
   swissknife.h swissknife.cc)
 
 
