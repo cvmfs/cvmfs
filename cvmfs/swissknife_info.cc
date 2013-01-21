@@ -40,6 +40,20 @@ static bool Exists(const string &repository, const string &file) {
   }
 }
 
+swissknife::ParameterList swissknife::CommandInfo::GetParams() {
+  swissknife::ParameterList result;
+  result.push_back(Parameter('r', "repository directory / url",
+                             false, false));
+  result.push_back(Parameter('l', "log level (0-4, default: 2)", true, false));
+  result.push_back(Parameter('c', "show root catalog hash", true, true));
+  result.push_back(Parameter('n', "show fully qualified repository name", true, true));
+  result.push_back(Parameter('t', "show time stamp", true, true));
+  result.push_back(Parameter('m', "check if repository is marked as replication master copy", true, true));
+  result.push_back(Parameter('h', "print results in human readable form", true, true));
+  // to be extended...
+  return result;
+}
+
 
 int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (args.find('l') != args.end()) {
@@ -120,6 +134,12 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%d",
              (human_readable) ? "Time Stamp:                      " : "",
              manifest->publish_timestamp());
+  }
+
+  if (args.count('m') > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "Replication Master Copy:         " : "",
+             (Exists(repository, ".cvmfs_master_replica")) ? "true" : "false");
   }
 
   delete manifest;

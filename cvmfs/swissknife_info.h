@@ -18,18 +18,7 @@ class CommandInfo : public Command {
       "This command reads the content of a .cvmfspublished file and exposes it "
       "to the user.";
   };
-  ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('r', "repository directory / url",
-                               false, false));
-    result.push_back(Parameter('l', "log level (0-4, default: 2)", true, false));
-    result.push_back(Parameter('c', "show root catalog hash", true, true));
-    result.push_back(Parameter('n', "show fully qualified repository name", true, true));
-    result.push_back(Parameter('t', "show time stamp", true, true));
-    result.push_back(Parameter('h', "print results in human readable form", true, true));
-    // to be extended...
-    return result;
-  }
+  ParameterList GetParams();
   int Main(const ArgumentList &args);
 };
 
