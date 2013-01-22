@@ -53,6 +53,15 @@ option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
+# set name of fuse library (-losxfuse for osxfuse)
+#
+if (MACOSX)
+	set(LIBFUSE osxfuse)
+else (MACOSX)
+	set(LIBFUSE fuse)
+endif(MACOSX)
+
+#
 # define where to find the external dependencies
 #
 # for the external libraries there should be a CVMFS-CMakeLists.txt file provided
