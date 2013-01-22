@@ -156,6 +156,51 @@ class StopWatch : SingleCopy {
   timeval start_, end_;
 };
 
+/**
+ * Template for a calling a method of an object after leaving a specific scope.
+ * This is a generic RAII tool to safely free certain resources
+ *
+ * Example:
+ *  int main() {
+ *    File f("myfile");
+ *    BoundScopedCallback<File> m(&Close, f);
+ *    if (! MightFail()) {
+ *      return 1; // f gets closed here...
+ *    }
+ *
+ *    // f gets closed here...
+ *  }
+ *
+ */
+template <class DelegateT>
+class BoundScopedCallback : SingleCopy {
+ protected:
+  typedef void (DelegateT::*CallbackMethod)();
+ public:
+  BoundScopedCallback(CallbackMethod method, DelegateT *delegate) :
+    delegate_(delegate), method_(method) {}
+  BoundScopedCallback(CallbackMethod method, DelegateT &delegate) :
+    delegate_(&delegate), method_(method) {}
+  ~BoundScopedCallback() { (delegate_->*method_)(); }
+ private:
+  DelegateT      *delegate_;
+  CallbackMethod  method_;
+};
+
+/**
+ * Template for a calling a function after leaving a specific scope.
+ * This is a generic RAII tool to safely free certain resources
+ */
+class ScopedCallback : SingleCopy {
+ protected:
+  typedef void (*CallbackFunction)();
+ public:
+  ScopedCallback(CallbackFunction function) : function_(function) {}
+  ~ScopedCallback() { (function_)(); }
+ private:
+  CallbackFunction  function_;
+};
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }
