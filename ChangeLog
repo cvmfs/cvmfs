@@ -1,4 +1,16 @@
 2.1.6:
+  * Fixed hanging reload when reload socket can not be
+    opened
+  * Prohibit the use of 2.0.X cache directories
+  * Fixed 'cvmfs_config chksetup' for root not in sudoers
+  * Added retry with exponential backoff to download
+    worker, adjustable with CVMFS_MAX_RETRY,
+    CVMFS_BACKOFF_INIT, CVMFS_BACKOFF_MAX
+  * Added automatic proxy group reset after
+    CVMFS_PROXY_RESET_AFTER seconds
+  * Added network statistics to 'cvmfs_talk internal affairs'
+  * Fixed 'cvmfs_config stat' for non-standard mount points
+  * Default symbol visibility hidden 
   * Separate stacktrace logs by process
   * Packaging: don't strip binaries
   * cvmfs_reload returns with error if socket directory

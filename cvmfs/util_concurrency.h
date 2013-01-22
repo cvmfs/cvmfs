@@ -27,7 +27,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  *
  * Note: a Lockable object should not be copied!
  */
-class Lockable : DontCopy {
+class Lockable : SingleCopy {
  public:
   inline virtual ~Lockable() { pthread_mutex_destroy(&mutex_);    }
 
@@ -59,7 +59,7 @@ class Lockable : DontCopy {
  * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
  */
 template <typename LockableT>
-class LockGuard : DontCopy {
+class LockGuard : SingleCopy {
  public:
   inline LockGuard(const LockableT &lock) :
     ref_(lock) { ref_.Lock(); }
@@ -99,7 +99,7 @@ struct _LGA_Polymorphism {
  */
 template <typename T,
           _LGA_Polymorphism::T polymorph = _LGA_Polymorphism::None>
-class LockGuardAdapter : DontCopy {
+class LockGuardAdapter : SingleCopy {
  public:
   inline LockGuardAdapter(T &lock) : ref_(&lock) {};
   inline LockGuardAdapter(T *lock) : ref_(lock)  {};
@@ -159,7 +159,7 @@ class Observable;
  *  --> 2. for member functions of arbitrary objects
  */
 template <typename ParamT>
-class CallbackBase : DontCopy {
+class CallbackBase : SingleCopy {
  public:
   virtual void operator()(const ParamT &value) = 0;
 
@@ -245,7 +245,7 @@ class BoundCallback : public CallbackBase<ParamT> {
  *                 invocation.
  */
 template <typename ParamT>
-class Observable : DontCopy {
+class Observable : SingleCopy {
  public:
   typedef CallbackBase<ParamT> *callback_t;
 
@@ -358,7 +358,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
   /**
    * This is a simple wrapper structure to piggy-back control information on
-   * scheduled jobs. Job structures are scheduled into a central FIFO queue and 
+   * scheduled jobs. Job structures are scheduled into a central FIFO queue and
    * are then processed concurrently by the workers.
    */
   struct Job {
@@ -417,7 +417,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   virtual ~ConcurrentWorkers();
 
   /**
-   * Initializes the ConcurrentWorkers swarm, spawnes a thread for each new 
+   * Initializes the ConcurrentWorkers swarm, spawnes a thread for each new
    * worker object and puts everything into working state.
    *
    * @return  true if all went fine
@@ -598,7 +598,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  *        (f.e.   class AwesomeWorker : public ConcurrentWorker<AwesomeWorker>)
  */
 template <class DerivedWorkerT>
-class ConcurrentWorker : DontCopy {
+class ConcurrentWorker : SingleCopy {
  public:
   /**
    * Does general initialization before any jobs will get scheduled. You do not
@@ -620,7 +620,7 @@ class ConcurrentWorker : DontCopy {
    * DO NOT FORGET TO CALL master()->JobSuccessful() OR master()->JobFinished()
    * at the end of thismethod!!
    *
-   * Note: There is no way to generally define this operator, it is therefore 
+   * Note: There is no way to generally define this operator, it is therefore
    *       commented out and placed here just as a reminder.
    *
    * @param data  the data to be processed.

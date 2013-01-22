@@ -14,6 +14,8 @@
 #include <list>
 #include <string>
 
+#include <cstring>
+
 #include "platform.h"
 #include "util.h"
 #include "hash.h"
@@ -122,7 +124,7 @@ class DirectoryEntryBase {
   }
 
  protected:
-  
+
   inode_t inode_;        // inodes are generated on the fly by the cvmfs client.
   inode_t parent_inode_; // since they are file system stuff, we have them here
                          // Though, they are NOT written to any catalog.
@@ -160,7 +162,7 @@ class DirectoryEntry : public DirectoryEntryBase {
   /**
    * This is _kind of_ a copy constructor allowing us to create
    * DirectoryEntries directly from DirectoryEntryBase objects. Though we
-   * make this explicit, to disallow black magic from happening. It uses the 
+   * make this explicit, to disallow black magic from happening. It uses the
    * copy constructor of DirectoryEntryBase and initializes the additional
    * fields of DirectoryEntry.
    */
@@ -172,8 +174,8 @@ class DirectoryEntry : public DirectoryEntryBase {
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false) {}
 
-  inline DirectoryEntry() : 
-    catalog_(NULL), 
+  inline DirectoryEntry() :
+    catalog_(NULL),
     cached_mtime_(0),
     hardlink_group_(0),
     is_nested_catalog_root_(false),
@@ -228,7 +230,7 @@ struct StatEntry {
   NameString name;
   struct stat info;
 
-  StatEntry() { }
+  StatEntry() { memset(&info, 0, sizeof(info)); }
   StatEntry(const NameString &n, const struct stat &i) : name(n), info(i) { }
 };
 

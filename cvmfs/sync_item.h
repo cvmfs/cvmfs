@@ -62,7 +62,7 @@ class SyncItem {
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
   inline std::string GetRelativePath() const {
-    return (relative_parent_path_.empty()) ? 
+    return (relative_parent_path_.empty()) ?
       filename_                            :
       relative_parent_path_ + (filename_.empty() ? "" : ("/" + filename_));
   }

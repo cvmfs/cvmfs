@@ -32,16 +32,30 @@ use FindBin qw($RealBin);
 # This variable will be set to 1 if the shell is speaking to a daemon on a remote machine
 my $remote = 0;
 
+# This is, indeed, a very important variable since here we'll store all path to active daemons.
+# User will be able to retrieve all active daemons list with 'status show-active'.
+my %active;
+
 # This function will check whether the daemon is running.
 sub check_daemon {
 	# Retrieving daemon path from main package
-	my $daemon_path = $main::daemon_path;
+	my $daemon_path = shift;
+	
+	# Setting daemon_path default to $main::daemon_path
+	unless ($daemon_path) {
+		if ($remote) {
+			$daemon_path = $main::connect_to;
+		}
+		else {
+			$daemon_path = $main::daemon_path;
+		}
+	}
 	
 	# Checking with ps if the daemon is running locally
 	my $running = `ps -ef | grep cvmfs-testdwrapper | grep -v grep | grep -v defunct`;
 	
 	# If the daemon is local, ps is enough, otherwise the shell will try to ping the daemon
-	unless ($remote) {
+	if ($daemon_path =~ m/127\.0\.0\.1/) {
 		return ($running);
 	}
 	else {
@@ -118,13 +132,14 @@ sub check_command {
 	# Switching the value of $command
 	for ($command){
 		if ($_ eq 'exit' or $_ eq 'quit' or $_ eq 'q') { exit_shell($socket, $ctxt) }
-		elsif ($_ eq 'status' or $_ eq 'ping') { print_status(); $executed = 1 }
+		elsif ($_ =~ m/^status/ or $_ =~ m/^ping/) { print_status($command); $executed = 1 }
 		elsif ($_ =~ m/^start\s*.*/ ) { ($socket, $ctxt) = start_daemon($daemon_path, undef, undef, $command); $executed = 1 }
 		elsif ($_ =~ m/^help\s*.*/ or $_ =~ m/^h\s.*/) { help($command), $executed = 1 }
 		elsif ($_ eq 'setup' ) { setup(); $executed = 1 }
 		elsif ($_ eq 'fixperm') { fixperm(); $executed = 1 }
 		elsif ($_ =~ m/^restart\s*.*/ ) { ($socket, $ctxt) = restart_daemon($socket, $ctxt, $daemon_path, $command); $executed = 1 }
 		elsif ($_ =~ m/^wait-daemon\s*.*/ ) { ($socket, $ctxt) = wait_daemon($socket, $ctxt); $executed = 1 }
+		elsif ($_ =~ m/^connect-to\s*.*/ ) { ($socket, $ctxt) = connect_to($daemon_path, $command, $socket, $ctxt); $executed = 1 }
 	}
 	
 	# If the daemon is not running and no command was executed, print on screen a message
@@ -137,6 +152,7 @@ sub check_command {
 	return ($executed, $socket, $ctxt);
 }
 
+# This function is used to passive wait a daemon to connect to the shell
 sub wait_daemon {
 	my $socket = shift;
 	my $ctxt = shift;
@@ -176,14 +192,100 @@ sub wait_daemon {
 	return ($socket, $ctxt);
 }
 
-# This function will print the current status of the daemon
-sub print_status {
-	if(check_daemon()){
-		unless ($remote) {
-			print "Daemon is running.\n";
+# This function is used to actively connect to a remote daemon
+sub connect_to {
+	my $daemon_path = shift;
+	my $command = shift;
+	my $socket = shift;
+	my $ctxt = shift;
+	
+	# Checking in $command if the user supplied an alternative IP to daemon_path
+	my ($ip) = $command =~ m/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
+	my ($port) = $command =~ m/:(\d{3,4})/;
+	
+	# Setting port to default
+	unless ($port) {
+		$port = 6650;
+	}
+	
+	# Resetting $daemon_path if user has supplied alternative ip and port.
+	if ($ip) {
+		$daemon_path = "$ip:$port";
+		
+		# Setting $main::connect_to for other function to access this value
+		$main::connect_to = $daemon_path;
+	}
+	
+	if ($daemon_path !~ m/127\.0\.0\.1/ and $daemon_path !~ m/localhost/) {
+		$remote = 1;
+	}
+	else {
+		$remote = 0;
+	}
+	
+	if (check_daemon($daemon_path)) {
+		print "Daemon found on $daemon_path.\n";
+		
+		# Closing old socket
+		print 'Closing old socket... ';
+		$socket = close_shell_socket();
+		$ctxt = term_shell_ctxt();
+		if ($socket or $ctxt) {
+			print "ERROR.\n";
 		}
 		else {
+			print "Done.\n";
+		}
+		
+		# Opening new socket
+		print 'Opening new socket... ';
+		my ($newsocket, $newctxt) = connect_shell_socket($daemon_path);
+		print "Done.\n";
+		
+		# Adding newly connected daemon to %active if it's not there already
+		unless (exists $active{$daemon_path}) {
+			$active{$daemon_path} = 1;
+		}
+		
+		return ($newsocket, $newctxt);
+	}
+	else {
+		$remote = 0;
+		print "Daemon could not be reached on $daemon_path.\n";
+		print "To start a server locally use 'start'.\n" if $daemon_path =~ m/127\.0\.0\.1/ or $daemon_path =~ m/localhost/;
+		return ($socket, $ctxt);
+	}
+}
+
+# This function will print the current status of the daemon
+sub print_status {
+	my $command = shift;
+	
+	# Checking weather the user requeste the list of active daemons
+	if ($command =~ m/--show-active/) {
+		if (%active) {
+			foreach (keys %active) {
+				if (check_daemon($_)) {
+					print "$_ is active.\n";
+				}
+				else {
+					print "$_ was active, but it's no longer. Removed from list.\n";
+					delete $active{$_};
+				}
+			}
+		}
+		else {
+			print "There are no active daemons.\n";
+		}
+		return;
+	}
+	
+	if(check_daemon()){
+		unless ($remote) {
 			print "Daemon is running on $main::daemon_path.\n";
+		}
+		else {
+			print "Daemon is running on $main::connect_to.\n";
 		}
 	}
 	else {
@@ -202,6 +304,11 @@ sub check_permission {
 	# Checking if the user exists in the system
 	$user = `cat /etc/passwd | grep cvmfs-test`;
 	
+	# Printing if user cvmfs-test doesn't exist
+	unless ($user) {
+		print "ERROR: cvmfs-test user doesn't exist.\n";
+	}
+	
 	# Checking if the user own the daemon file
 	if (-e "$RealBin/cvmfs-testdwrapper"){
 		my $uid = (stat("$RealBin/cvmfs-testdwrapper"))[4];
@@ -209,6 +316,11 @@ sub check_permission {
 	}
 	else {
 		$owner = 0;
+	}
+	
+	# Printing if owner is not root
+	unless ($owner eq 'root') {
+		print "ERROR: Wrapper owner isn't root. It's $owner.\n";
 	}
 	
 	# Checking if the file has the setuid bit
@@ -220,6 +332,11 @@ sub check_permission {
 		$suid = 0;
 	}
 	
+	# Printing if suid byte isn't set
+	unless ($suid) {
+		print "ERROR: Wrapper hasn't suid byte set.\n";
+	}
+	
 	# Checking if the log directory exists and the owner is cvmfs-test
 	if ( -e '/var/log/cvmfs-test' ) {
 		my $log_uid = (stat('/var/log/cvmfs-test'))[4];
@@ -227,6 +344,11 @@ sub check_permission {
 	}
 	else {
 		$log_owner = 0;
+	}
+	
+	# Printing if log folder doesn't belong to cvmfs-test user
+	unless ($log_owner eq 'cvmfs-test') {
+		print "ERROR: Log folder doesn't belong to cvmfs-test user. It belongs to $log_owner.\n";
 	}
 	
 	# Return true only if all conditions are true
@@ -320,7 +442,7 @@ sub get_daemon_output {
 			# Most of special signal will not be printed as output part.
 			my $processed = 0;
 			# This case if the daemon has stopped itself
-			if ($_ =~ m/DAEMON_STOPPED/) { $socket = close_shell_socket($socket); $ctxt = term_shell_ctxt($ctxt); $remote = 0 if $remote; $processed = 1 }
+			if ($_ =~ m/DAEMON_STOPPED/) { ($socket, $ctxt) = daemon_stopped($socket, $ctxt); $processed = 1 }
 			elsif ($_ =~ m/PROCESSING/) {
 				my $process_name = (split /:/, $_)[-1];
 				chomp($process_name);
@@ -352,6 +474,29 @@ sub get_daemon_output {
 		}
 		print $reply if $reply ne "END\n" and $reply ne "NO_PRINT";
 	}
+	return ($socket, $ctxt);
+}
+
+# This function is called every time the shell receives a DAEMON_STOPPED message.
+sub daemon_stopped {
+	my $socket = shift;
+	my $ctxt = shift;
+	
+	# Closing socket and ctxt
+	$socket = close_shell_socket($socket);
+	$ctxt = term_shell_ctxt($ctxt);
+	
+	# Checking if a local server is running and trying to reconnect to it.
+	if ($remote and check_daemon('127.0.0.1:6650')) {
+		print 'A local running daemon was found. Reconnecting... ';
+		($socket, $ctxt) = connect_shell_socket();
+		print "Done.\n";
+	}
+	
+	# Resetting $remote
+	$remote = 0 if $remote;
+	
+	return ($socket, $ctxt);
 }
 
 # This function will start the daemon if it's not already running
@@ -359,7 +504,7 @@ sub start_daemon {
 	my $daemon_path = shift;
 	my $shell_path = shift;
 	my $iface = shift;
-	if (defined (@_) and scalar(@_) > 0) {
+	if (@_ and scalar(@_) > 0) {
 		# Retrieving arguments
 		my $line = shift;
 		
@@ -425,6 +570,9 @@ sub start_daemon {
 			# Checking if the daemon were started
 			if (check_daemon()) {
 				print "Done.\n";
+				
+				# Adding local daemon to active hash
+				$active{$daemon_path} = 1 unless exists $active{$daemon_path};
 			}
 			else {
 				print "Failed.\nHave a look to $daemon_error.\n";
@@ -452,21 +600,26 @@ sub start_daemon {
 
 # This function will stop and restart the daemon
 sub restart_daemon {
-	my $socket = shift;
-	my $ctxt = shift;
-	my $daemon_path = shift;
-	# Retrieving options to pass to start_daemon
-	my $line = shift;
-	
-	if (check_daemon()) {
-		send_shell_msg($socket, 'stop');
-		get_daemon_output($socket, $ctxt);
-		sleep 1;
-		($socket, $ctxt) = start_daemon($daemon_path, $line);
-		return ($socket, $ctxt);
+	unless ($remote) {
+		my $socket = shift;
+		my $ctxt = shift;
+		my $daemon_path = shift;
+		# Retrieving options to pass to start_daemon
+		my $line = shift;
+		
+		if (check_daemon()) {
+			send_shell_msg($socket, 'stop');
+			get_daemon_output($socket, $ctxt);
+			sleep 1;
+			($socket, $ctxt) = start_daemon($daemon_path, $line);
+			return ($socket, $ctxt);
+		}
+		else {
+			print "Daemon is not running. Type 'start' to run it.\n"
+		}
 	}
 	else {
-		print "Daemon is not running. Type 'start' to run it.\n"
+		print "You cannot stop and restart a remote server.\n";
 	}
 }
 

@@ -103,6 +103,12 @@ bool Init(const string &cache_path) {
   if (!MakeCacheDirectories(cache_path, 0700))
     return false;
 
+  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
+    LogCvmfs(kLogCache, kLogStderr | kLogSyslog,
+             "Not mounting on cvmfs 2.0.X cache");
+    return false;
+  }
+
   int retval = pthread_key_create(&thread_local_storage_, CleanupTLS);
   assert(retval == 0);
 
@@ -381,8 +387,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
 
     iDownloadQueue->second->push_back(tls->pipe_wait[1]);
     pthread_mutex_unlock(&lock_queues_download_);
-    retval = read(tls->pipe_wait[0], &fd_return, sizeof(int));
-    assert(retval = sizeof(int));
+    ReadPipe(tls->pipe_wait[0], &fd_return, sizeof(int));
 
     LogCvmfs(kLogCache, kLogDebug, "received from another thread fd %d for %s",
              fd_return, cvmfs_path.c_str());
@@ -491,8 +496,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
   pthread_mutex_lock(&lock_queues_download_);
   for (unsigned i = 0, s = tls->other_pipes_waiting.size(); i < s; ++i) {
     int fd_dup = dup(result);
-    int retval = write(tls->other_pipes_waiting[i], &fd_dup, sizeof(int));
-    assert(retval == sizeof(int));
+    WritePipe(tls->other_pipes_waiting[i], &fd_dup, sizeof(int));
   }
   tls->other_pipes_waiting.clear();
   queues_download_->erase(d.checksum());

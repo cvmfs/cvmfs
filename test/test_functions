@@ -22,6 +22,42 @@ CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for te
 
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 
+die() {
+  echo -e $1 >&2
+  exit 1
+}
+
+# iptables handling
+IPTABLES_STARTUP="/etc/init.d/iptables"
+IPTABLES="/sbin/iptables"
+IPTABLES_SAVE="/sbin/iptables-save"
+IPTABLES_RESTORE="/sbin/iptables-restore"
+
+if [ ! -f $IPTABLES ] ; then
+  if [ -f "/usr/sbin/iptables" ] ; then
+    IPTABLES="/usr/sbin/iptables"
+  else
+    die "iptables binary not found"
+  fi
+fi
+
+if [ ! -f $IPTABLES_SAVE ] ; then
+  if [ -f "/usr/sbin/iptables-save" ] ; then
+    IPTABLES_SAVE="/usr/sbin/iptables-save"
+  else
+    die "iptables-save binary not found"
+  fi
+fi
+
+if [ ! -f $IPTABLES_RESTORE ] ; then
+  if [ -f "/usr/sbin/iptables-restore" ] ; then
+    IPTABLES_RESTORE="/usr/sbin/iptables-restore"
+  else
+    die "iptables-restore binary not found"
+  fi
+fi
+
+
 # find the service binary
 if [ -x /sbin/service ]; then
   service_binary="/sbin/service"
@@ -30,34 +66,84 @@ else
   service_binary="/usr/sbin/service"
 fi
 
-# ensures that autofs is on or off
-# @param state   the desired state of autofs (on|off)
-# @return        0 on success, 1 on failure
-autofs_switch() {
-  local state=$1
-  local is_running
+# find the name of the httpd service
+apache="httpd"
+which apache2 >/dev/null 2>&1 && apache="apache2"
 
-  # check if autofs is currently running
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
-  is_running=$?
+# ensures that a generic service is running
+# @param service  the name of the service
+# @param state    the desired state of the service (on|off)
+# @return         0 on success
+service_switch() {
+  local service_name=$1
+  local state=$2
 
   # switch it on or off, if necessary
   case $state in
     on)
-      if [ $is_running -ne 0 ]; then
-        echo "starting autofs..."
-        sudo $service_binary autofs start 2>&1 >/dev/null || return 100
-      fi
+      echo "starting $service_name..."
+      sudo $service_binary $service_name start || return 100
       ;;
     off)
-      if [ $is_running -eq 0 ]; then
-        echo "stopping autofs..."
-        sudo $service_binary autofs stop 2>&1 >/dev/null || return 101
-      fi
+      echo "stopping $service_name..."
+      sudo $service_binary $service_name stop || return 101
       ;;
+    *)
+      echo "unrecognized state switching for $service_name"
+      return 102
   esac
 
   return 0
+}
+
+
+# checks if a service needs to be switched on or off
+# @param desired_state  the state the service should be switched to
+# @param state          the state the service is currently in
+# @return  0 if a switch is needed
+service_should_switch() {
+  local desired_state=$1
+  local state=$2
+  if [ $state -eq 0 ]; then # is running and...
+    if [ "$desired_state" = "off" ]; then # should be switched off
+      return 0
+    fi
+  else                 # is NOT running and...
+    if [ "$desired_state" = "on" ]; then # should be switched on
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+# ensures that autofs is on or off
+# @param state   the desired state of autofs (on|off)
+# @return        0 on success
+autofs_switch() {
+  sudo $service_binary autofs status | grep -q "running"
+  service_should_switch $1 $?
+  if [ $? -eq 0 ]; then
+    service_switch autofs $1
+    return $?
+  else
+    return 0
+  fi
+}
+
+
+# switches apache on or off
+# @param state   the desired state of autofs (on|off)
+# @return        0 on success
+apache_switch() {
+  sudo $service_binary $apache status > /dev/null 2>&1
+  service_should_switch $1 $?
+  if [ $? -eq 0 ]; then
+    service_switch $apache $1
+    return $?
+  else
+    return 0 # already in correct state
+  fi
 }
 
 
@@ -174,11 +260,11 @@ create_repo() {
 
   if cvmfs_server list | grep -q $repo; then
     echo "Repository $repo is already present... removing it"
-    sudo cvmfs_server rmfs $repo -f || return 101
+    sudo cvmfs_server rmfs -f $repo || return 101
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs $repo -o $uid || return 102
+  sudo cvmfs_server mkfs -o $uid $repo || return 102
 }
 
 
@@ -190,6 +276,42 @@ create_empty_repo() {
 
   sudo cvmfs_server transaction $repo || return 102
   rm -f /cvmfs/$repo/new_repository
+  sudo cvmfs_server publish $repo || return 103
+}
+
+
+# creates a cvmfs repository and fills it with some dummy data
+#
+# @param repo_name   the name of the repository to create
+# @param uid         the user id of the new repository's owner
+create_filled_repo() {
+  local repo=$1
+  local uid=$2
+
+  create_empty_repo $repo $uid || return 101
+
+  sudo cvmfs_server transaction $repo || return 102
+
+  pushdir /cvmfs/$repo
+
+  echo "meaningless file content" > file
+  echo "more clever file content" > clever
+  ln file hardlinkToFile
+  ln -s clever symlinkToClever
+
+  mkdir -p foo/bar/baz
+  mkdir -p bar/foo/baz
+  touch foo/.cvmfscatalog
+
+  # Put some meaningful stuff into files
+  echo "Vom Eise befreit sind Strom und Bäche"         > foo/bar/verse1
+  echo "Durch des Frühlings holden, belebenden Blick," > foo/bar/verse2
+  echo "Im Tale grünet Hoffnungsglück;"                > foo/bar/verse3
+  echo "Der alte Winter, in seiner Schwäche,"          > foo/bar/verse4
+  echo "Zog sich in rauhe Berge zurück."               > foo/bar/verse5
+
+  popdir
+
   sudo cvmfs_server publish $repo || return 103
 }
 
@@ -286,6 +408,163 @@ compare_directories() {
 }
 
 
+# handles some iptables related stuff
+#
+# @param command   what should be done?
+#                   - backup
+#                   - restore
+#                   - forward
+# @param ____      what to forward
+# @param ____      which port to forward to
+iptables_rules() {
+  local cmd=$1
+
+  case "$cmd" in
+    "backup")
+      if [ -f $IPTABLES_STARTUP ] ; then
+        sudo $IPTABLES_STARTUP save
+      else
+        sudo $IPTABLES_SAVE > saved_iptables_rules
+      fi
+      ;;
+    "restore")
+      if [ -f $IPTABLES_STARTUP ] ; then
+        sudo $IPTABLES_STARTUP restart
+      else
+        sudo $IPTABLES_RESTORE < saved_iptables_rules
+      fi
+      ;;
+    "forward")
+      sudo $IPTABLES -t nat -A OUTPUT -p tcp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
+      sudo $IPTABLES -t nat -A OUTPUT -p udp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
+      ;;
+    *)
+      echo "No action set for this argument."
+  esac
+}
+
+
+# configures the system to use a local named on port 5300
+# Note: This does NOT start the actual named service, but only prepares the
+#       environment for it!
+#
+# @param tmp_dir   directory to backup configuration files to
+prepare_config_for_local_named() {
+  local tmp_dir=$1
+
+  echo -n "Creating backup of resolv.conf... "
+  cp /etc/resolv.conf $tmp_dir/resolv.conf || return 101
+  echo "Done."
+
+  # Overwriting /etc/resolv.conf with an empty file to avoid that the system
+  # complains about dns answer arriving from other than the expected host.
+  echo -n "Overwriting resolv.conf... "
+  sudo rm /etc/resolv.conf || return 102
+  sudo touch /etc/resolv.conf || return 102
+  echo "Done."
+
+  # Saving iptables rules
+  echo -n "Creating iptables rules backup... "
+  iptables_rules backup || return 103
+  echo "Done."
+
+  # Adding iptables rules to redirect any dns request to non-standard port 5300
+  echo -n "Adding iptables rules... "
+  iptables_rules forward domain 5300 || return 104
+  echo "Done."
+
+  return 0
+}
+
+
+# restores the configuration to use global DNS services instead of local ones
+# again. Needs the backups generated by `prepare_for_local_named`
+#
+# @param tmp_dir   location of the backup configuration files
+restore_normal_dns_configuration() {
+  local tmp_dir=$1
+
+  # Restoring resolv.conf
+  echo -n "Restoring resolv.conf backup... "
+  sudo cp $tmp_dir/resolv.conf /etc/resolv.conf || return 101
+  echo "Done."
+  
+  # Restarting iptables, it will load previously saved rules
+  echo -n "Restoring iptables rules... "
+  iptables_rules restore || return 102
+  echo "Done."
+
+  return 0
+}
+
+
+# starts a perl helper service
+#
+# @param service_name   the identifier of the service to be started:
+#                       i.e.  named, httpd, webproxy
+# @param __             all addtional parameters will be passed to the starting
+#                       perl service
+# @return               the process ID of the started service
+start_perl_service() {
+  service_name=$1
+  shift
+
+  # check if the service exists
+  if [ ! -f $TEST_ROOT/mock_services/Services/$service_name/main.pl ]; then
+    echo "No such perl service '$service_name'"
+    return 1
+  fi
+
+  # start the service
+  pushdir $TEST_ROOT/mock_services > /dev/null
+  output=$(sudo perl Services/$service_name/main.pl $@)
+  popdir > /dev/null
+  pid=$(echo "$output" | grep SAVE_PID | cut -d : -f 2)
+
+  # log its process ID
+  mkdir -p service_pids
+  touch service_pids/$pid
+
+  echo $pid
+  return 0
+}
+
+
+# kills a single perl process
+#
+# @param pid   the process ID of the perl service to be killed
+kill_perl_service() {
+  pid=$1
+
+  # check if the process ID was logged before
+  if [ ! -f service_pids/$pid ]; then
+    echo "No such perl service with process ID: $pid"
+    return 1
+  fi
+
+  # kill the service
+  sudo kill $pid
+  rm -f service_pids/$pid
+
+  return 0
+}
+
+
+# kills all perl services that might still run in the background
+kill_all_perl_services() {
+  # check if there are any services to kill
+  if [ ! -d service_pids ]; then
+    return 0
+  fi
+
+  # kill them all!!
+  services=$(ls service_pids)
+  for service in $services; do
+    kill_perl_service $service
+  done
+}
+
+
 # checks if a nested catalog is part of the current catalog configuration
 # of the repository
 # @param catalog_path  the catalog root path to be checked
@@ -335,10 +614,10 @@ publish_repo() {
   # overriding any redirections to logfiles or whatever... We want to hack!
   case $CVMFS_TEST_SRVDEBUG in
     fail)
-      cvmfs_server publish $repo -d > /dev/tty 2>&1 || return 100
+      cvmfs_server publish -d $repo > /dev/tty 2>&1 || return 100
     ;;
     startup)
-      cvmfs_server publish $repo -D > /dev/tty 2>&1 || return 100
+      cvmfs_server publish -D $repo > /dev/tty 2>&1 || return 100
     ;;
     *)
       cvmfs_server publish $repo || return 100
@@ -346,4 +625,47 @@ publish_repo() {
   esac
 
   return 0
+}
+
+# runs the given command and measures the time it took to execute 
+stop_watch() {
+  begin=$(date +%s)
+  cmd="$@"
+  sh -c "$cmd"
+  res=$?
+  end=$(date +%s)
+  echo $((end - begin))
+  return $res
+}
+
+
+# wrapper around pushd (that is not available in dash)
+# if pushd is not available, a normal `cd` is used
+# Note: We do not reimplement the whole functionality of pushd, with our work-
+#       around it is only possible to have ONE directory-level stored
+pushdir() {
+  type pushd > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    pushd $1
+    return $?
+  else
+    cd $1
+    return $?
+  fi
+}
+
+
+# wrapper around popd (that is not available in dash)
+# if popd is not available, a normal `cd -` is used to go back to the last dir
+# Note: We do not reimplement the whole functionality of popd, with our work-
+#       around it is only possible to have ONE directory-level stored
+popdir() {
+  type popd > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    popd $1
+    return $?
+  else
+    cd -
+    return $?
+  fi
 }

@@ -20,6 +20,8 @@ grep Version packaging/rpm/cvmfs-universal.spec
 
 echo "Patching Mac Package"
 sed -i -e "s/\(\s*\)<f n=\"cvmfs-[0-9\.]*\(.*\)/\1<f n=\"cvmfs-$VERSION\2/" packaging/mac/cvmfs.pmdoc.template/01cvmfs-contents.xml
-grep cvmfs- packaging/mac/cvmfs.pmdoc.template/01cvmfs-contents.xml
+sed -i -e "s/\(\s*\)<f n=\"libcvmfs_fuse\.[0-9\.]\+\(.*\)/\1<f n=\"libcvmfs_fuse.$VERSION.\2/" packaging/mac/cvmfs.pmdoc.template/01cvmfs-contents.xml
+sed -i -e "s/\(\s*\)<f n=\"libcvmfs_fuse_debug\.[0-9\.]\+\(.*\)/\1<f n=\"libcvmfs_fuse_debug.$VERSION.\2/" packaging/mac/cvmfs.pmdoc.template/01cvmfs-contents.xml
+grep $VERSION packaging/mac/cvmfs.pmdoc.template/01cvmfs-contents.xml
 
 

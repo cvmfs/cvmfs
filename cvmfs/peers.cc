@@ -111,17 +111,17 @@ bool Init(const string &cachedir, const string &exe_path,
   command_line.push_back(StringifyInt(socket_pair[1]));
   command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(GetLogDebugFile());
-  
+
   vector<int> preserve_filedes;
   preserve_filedes.push_back(0);
   preserve_filedes.push_back(1);
   preserve_filedes.push_back(2);
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(socket_pair[1]);
-  
+
   retval = ManagedExec(command_line, preserve_filedes, map<int, int>());
   close(socket_pair[1]);
-  
+
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -404,7 +404,7 @@ static void *MainWatchdog(void *data __attribute__((unused))) {
 
   MessagePing ping(address_self_->port);
   while (1) {
-    sleep(kPingInterval);
+    SafeSleepMs(kPingInterval*1000);
     pthread_mutex_lock(&lock_watchees_);
     if (watchee1_.ip4_address != 0) {
       LogCvmfs(kLogPeers, kLogDebug, "lost peer %s",
@@ -491,14 +491,17 @@ int MainPeerServer(int argc, char **argv) {
   if (listen(socket_fd, 128) != 0) {
     LogCvmfs(kLogPeers, kLogDebug, "failed to listen at peer socket (%d)",
              errno);
+    close(socket_fd);
     return 1;
   }
   LogCvmfs(kLogPeers, kLogDebug, "listening on %s",
            (*cachedir_ + "/peers").c_str());
 
   // Network initialization
-  if (!InitGossip())
+  if (!InitGossip()) {
+    close(socket_fd);
     return 1;
+  }
   retval = pthread_create(&thread_receive_unicast_, NULL, MainUnicast, NULL);
   retval |= pthread_create(&thread_receive_multicast_, NULL, MainMulticast,
                            NULL);
@@ -526,6 +529,7 @@ int MainPeerServer(int argc, char **argv) {
   int connection_fd = -1;
   while (true) {
     connection_fd = accept(socket_fd, (struct sockaddr *)&remote, &socket_size);
+    assert(connection_fd >= 0);
     int active_connections = atomic_xadd32(&num_connections_, 1);
     if (active_connections == 0) {
       close(connection_fd);

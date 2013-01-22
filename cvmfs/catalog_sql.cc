@@ -202,6 +202,7 @@ bool Database::Create(const string &filename,
   sql_schema = new Sql(database, "INSERT INTO properties "
                                  "(key, value) VALUES ('schema', :schema);");
   retval = sql_schema->BindDouble(1, kLatestSchema) && sql_schema->Execute();
+  delete sql_schema;
   if (!retval)
     goto create_schema_fail;
 

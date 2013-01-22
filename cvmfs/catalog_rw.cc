@@ -18,7 +18,13 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
-  Catalog(PathString(path.data(), path.length()), parent)
+  Catalog(PathString(path.data(), path.length()), parent),
+  sql_insert_(NULL),
+  sql_unlink_(NULL),
+  sql_touch_(NULL),
+  sql_update_(NULL),
+  sql_max_link_id_(NULL),
+  sql_inc_linkcount_(NULL)
 {
   read_only_ = false;
   dirty_ = false;

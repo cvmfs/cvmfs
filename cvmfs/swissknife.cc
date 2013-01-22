@@ -20,6 +20,7 @@
 #include "swissknife_pull.h"
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
+#include "swissknife_info.h"
 
 using namespace std;  // NOLINT
 
@@ -69,6 +70,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandListCatalogs());
   command_list.push_back(new swissknife::CommandPull());
   command_list.push_back(new swissknife::CommandZpipe());
+  command_list.push_back(new swissknife::CommandInfo());
 
   if (argc < 2) {
     swissknife::Usage();

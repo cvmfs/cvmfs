@@ -30,6 +30,7 @@ BuildRequires: fuse-devel
 BuildRequires: pkgconfig
 BuildRequires: openssl-devel
 %{?el5:BuildRequires: buildsys-macros}
+
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -42,6 +43,7 @@ Requires: autofs
 Requires: fuse
 Requires: curl
 Requires: attr
+Requires: zlib
 # Account for different package names
 %if 0%{?suse_version}
 Requires: libfuse2
@@ -213,6 +215,7 @@ done
 %endif
 /sbin/ldconfig
 /usr/bin/cvmfs_config reload
+:
 
 %preun
 %if 0%{?selinux_cvmfs}
@@ -244,7 +247,9 @@ fi
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
 %{_libdir}/libcvmfs_fuse.so
+%{_libdir}/libcvmfs_fuse.so.%{version}
 %{_libdir}/libcvmfs_fuse_debug.so
+%{_libdir}/libcvmfs_fuse_debug.so.%{version}
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
@@ -279,6 +284,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Jan 15 2013 Jakob Blomer <jblomer@cern.ch>
+- Package conflicts with the cvmfs 2.0 branch
 * Tue Oct 02 2012 Jakob Blomer <jblomer@cern.ch>
 - Added sub packages for server and library
 * Wed Sep 12 2012 Jakob Blomer <jblomer@cern.ch>

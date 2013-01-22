@@ -25,8 +25,9 @@ my $interactive = 1;
 my $daemon_ip = "127.0.0.1";
 my $daemon_port = "6650";
 
-# This variable is declared as our since other packages will accesses and modifies it
+# These variables are declared as our since other packages will accesses and modifies them
 our $daemon_path = "$daemon_ip:$daemon_port";
+our $connect_to = undef;
 
 
 # Next variables is used to control when to skip a loop cicle
@@ -47,18 +48,21 @@ my $ret = GetOptions ( "c|command=s" => \$command,
 					   "h|help" => \$help_message,
 					   "shell-path=s" => \$shell_path,
 					   "iface=s" => \$iface,
-					   "connect-to=s" => \$daemon_path );
+					   "connect-to=s" => \$connect_to,
+					   "i|interactive" => sub { return } );
 
 if (defined($help_message) or !$ret) {
 	my $help = <<'END';
-Usage: cvmfs-test [--i] [--setup] [--wait-daemon] [--c command]
-	
--h|--help	Print this help and exit.
---i		Start the interactive shell. Default.
---setup		Setup the environment.
---start		Start the daemon.
---wait-daemon	Wait for the daemon to send its ip.
---c command	Executes command and exit.
+Usage: cvmfs-test <options>
+
+Available options:
+
+	-h|--help	Print this help and exit.
+	-i|--interactiveStart the interactive shell. Default.
+	--setup		Setup the environment.
+	--start		Start the daemon.
+	--wait-daemon	Wait for the daemon to send its ip.
+	--c command	Executes command and exit.
 
 END
 	print $help;
@@ -72,7 +76,12 @@ if (defined($setup)) {
 }
 
 if (defined($wait_daemon)) {
+	$connect_to = undef;
 	($continue, $socket, $ctxt) = check_command(undef, undef, undef, 'wait-daemon');
+}
+
+if (defined($connect_to)) {
+	($continue, $socket, $ctxt) = check_command(undef, undef, $daemon_path, "connect-to $connect_to");
 }
 
 if (defined($start)) {
@@ -104,7 +113,7 @@ if ($interactive) {
 
 	# If the daemon is not running, the shell will ask the user if it has to start it
 	if (!check_daemon()) {
-		print 'The daemon is not running. Would you like to run it now? [Y/n]';
+		print 'The daemon is not running. Would you like to run it now? It will run locally. [Y/n]';
 		my $answer = <STDIN>;
 		if($answer eq "\n" or $answer eq "Y\n" or $answer eq "y\n"){
 			($socket, $ctxt) = start_daemon($daemon_path);
@@ -147,7 +156,7 @@ if ($interactive) {
 			send_shell_msg($socket, $line);
 			
 			# Get answer from the daemon
-			get_daemon_output($socket, $ctxt);
+			($socket, $ctxt) = get_daemon_output($socket, $ctxt);
 		}
 		
 		# This is the second shell, use when the daemon is closed

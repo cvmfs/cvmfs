@@ -318,6 +318,17 @@ static void *MainTalk(void *data __attribute__((unused))) {
           result += nfs_maps::GetStatistics();
         }
 
+        result += "\nNetwork Statistics:\n";
+        result += download::GetStatistics().Print();
+        unsigned proxy_reset_delay;
+        time_t proxy_timestamp_failover;
+        download::GetProxyBackupInfo(&proxy_reset_delay,
+                                     &proxy_timestamp_failover);
+        result += "Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
+          ("Backup since " + StringifyTime(proxy_timestamp_failover, true)) :
+          "Primary");
+        result += "\n\n";
+
         result += "SQlite Statistics:\n";
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
         result += "  Number of allocations " + StringifyInt(current) + "\n";

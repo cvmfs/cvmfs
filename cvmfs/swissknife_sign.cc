@@ -124,6 +124,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
     // Load Manifest
+    // TODO: consider using the unique pointer to come in Github Pull Request 46
     manifest::Manifest *manifest = manifest::Manifest::LoadFile(manifest_path);
     if (!manifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
@@ -137,6 +138,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
                                &compr_buf, &compr_size))
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to compress certificate");
+      delete manifest;
       goto sign_fail;
     }
     hash::Any certificate_hash(hash::kSha1);
@@ -144,6 +146,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     const string cert_path_tmp = temp_dir + "/cvmfspublisher.tmp";
     if (!CopyMem2Path((unsigned char *)compr_buf, compr_size, cert_path_tmp)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to save certificate");
+      delete manifest;
       goto sign_fail;
     }
     free(compr_buf);
@@ -173,6 +176,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
       unlink(cert_path_tmp.c_str());
+      delete manifest;
       goto sign_fail;
     }
 
@@ -180,6 +184,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     FILE *fmanifest = fopen(manifest_path.c_str(), "w");
     if (!fmanifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      delete manifest;
       goto sign_fail;
     }
     if ((fwrite(signed_manifest.data(), 1, signed_manifest.length(), fmanifest)
@@ -189,6 +194,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
       fclose(fmanifest);
       unlink(cert_path_tmp.c_str());
+      delete manifest;
       goto sign_fail;
     }
     free(sig);
@@ -203,8 +209,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     unlink(manifest_path.c_str());
     if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest");
+      delete manifest;
       goto sign_fail;
     }
+
+    delete manifest;
   }
 
   delete spooler;

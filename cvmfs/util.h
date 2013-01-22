@@ -96,25 +96,26 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
                  const std::map<int, int> &map_fildes);
 
+void SafeSleepMs(const unsigned ms);
 
 /**
  * Generic base class to mark an inheriting class as 'non-copyable'
  */
-class DontCopy {
+class SingleCopy {
  protected:
-  // prevent DontCopy from being instantiated on its own
-  DontCopy() {}
+  // Prevent SingleCopy from being instantiated on its own
+  SingleCopy() {}
 
  private:
-  // produce a linker error by not implementing copy constructor and
-  // assignment operator. We don't want to copy that object!
-  DontCopy(const DontCopy &other);
-  DontCopy& operator=(const DontCopy &rhs);
+  // Provoke a linker error by not implementing copy constructor and
+  // assignment operator.
+  SingleCopy(const SingleCopy &other);
+  SingleCopy& operator=(const SingleCopy &rhs);
 };
 
 
 template <class T>
-class UniquePtr : DontCopy {
+class UniquePtr : SingleCopy {
  public:
   inline UniquePtr() : ref_(NULL) {}
   inline UniquePtr(T *ref) : ref_(ref) {}
@@ -140,7 +141,7 @@ class UniquePtr : DontCopy {
  * watch.Stop();
  * printf("%f", watch.GetTime());
  */
-class StopWatch : DontCopy {
+class StopWatch : SingleCopy {
  public:
   StopWatch() : running_(false) {}
 
@@ -154,6 +155,7 @@ class StopWatch : DontCopy {
   bool running_;
   timeval start_, end_;
 };
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }

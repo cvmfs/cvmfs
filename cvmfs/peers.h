@@ -44,8 +44,8 @@ struct Address {
   };
   uint16_t port;
 
-  Address() : version(kIPv4) { }
-  explicit Address(const IPVersion v) : version(v) { }
+  Address() : version(kIPv4), port(0) { }
+  explicit Address(const IPVersion v) : version(v), port(0) { }
   Address(const uint32_t a, const uint16_t p) :
     version(kIPv4), ip4_address(a), port(p) { }
 

@@ -36,11 +36,35 @@ enum Failures {
   kFailOk = 0,
   kFailLocalIO,
   kFailBadUrl,
+  kFailProxyResolve,
+  kFailHostResolve,
   kFailProxyConnection,
   kFailHostConnection,
   kFailBadData,
   kFailOther,
 };
+
+
+struct Statistics {
+  double transferred_bytes;
+  double transfer_time;
+  uint64_t num_requests;
+  uint64_t num_retries;
+  uint64_t num_proxy_failover;
+  uint64_t num_host_failover;
+
+  Statistics() {
+    transferred_bytes = 0.0;
+    transfer_time = 0.0;
+    num_requests = 0;
+    num_retries = 0;
+    num_proxy_failover = 0;
+    num_host_failover = 0;
+  }
+
+  std::string Print() const;
+};
+
 
 /**
  * Contains all the information to specify a download job.
@@ -97,6 +121,8 @@ struct JobInfo {
   Failures error_code;
   unsigned char num_failed_proxies;
   unsigned char num_failed_hosts;
+  unsigned char num_retries;
+  unsigned backoff_ms;
 };
 
 
@@ -109,8 +135,7 @@ Failures Head(const std::string *url);
 void SetDnsServer(const std::string &address);
 void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
 void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
-uint64_t GetTransferredBytes();
-uint64_t GetTransferTime();
+const Statistics &GetStatistics();
 void SetHostChain(const std::string &host_list);
 void GetHostInfo(std::vector<std::string> *host_chain,
                  std::vector<int> *rtt, unsigned *current_host);
@@ -121,6 +146,11 @@ void GetProxyInfo(std::vector< std::vector<std::string> > *proxy_chain,
                   unsigned *current_group);
 void RebalanceProxies();
 void SwitchProxyGroup();
+void SetProxyGroupResetDelay(const unsigned seconds);
+void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover);
+void SetRetryParameters(const unsigned max_retries,
+                        const unsigned backoff_init_ms,
+                        const unsigned backoff_max_ms);
 void RestartNetwork();
 
 }  // namespace download

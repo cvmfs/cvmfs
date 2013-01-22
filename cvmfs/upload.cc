@@ -114,5 +114,5 @@ namespace upload {
     }
     return new LocalStat(upstream[1]);
   }
-  
+
 }

@@ -850,7 +850,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   // TODO: move to download
   time_t now = time(NULL);
   if (now - previous_io_error_.timestamp < kForgetDos) {
-    usleep(previous_io_error_.delay*1000);
+    SafeSleepMs(previous_io_error_.delay);
     if (previous_io_error_.delay < kMaxIoDelay)
       previous_io_error_.delay *= 2;
   } else {
@@ -1071,11 +1071,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download::GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = download::GetTransferredBytes();
+    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = download::GetTransferredBytes();
-    int64_t time = download::GetTransferTime();
+    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
+    int64_t time = uint64_t(download::GetStatistics().transfer_time);
     if (time == 0)
       attribute_value = "n/a";
     else
@@ -1188,6 +1188,7 @@ void *g_sqlite_scratch = NULL;
 void *g_sqlite_page_cache = NULL;
 string *g_boot_error = NULL;
 
+__attribute__ ((visibility ("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 
@@ -1199,6 +1200,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   uint64_t mem_cache_size = cvmfs::kDefaultMemcache;
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
+  unsigned proxy_reset_after = 0;
+  unsigned max_retries = 1;
+  unsigned backoff_init = 2000;
+  unsigned backoff_max = 10000;
   string tracefile = "";
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
@@ -1249,6 +1254,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
     timeout = String2Uint64(parameter);
   if (options::GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
     timeout_direct = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
+    proxy_reset_after = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_MAX_RETRIES", &parameter))
+    max_retries = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_BACKOFF_INIT", &parameter))
+    backoff_init = String2Uint64(parameter)*1000;
+  if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
+    backoff_max = String2Uint64(parameter)*1000;
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
   if (options::GetValue("CVMFS_MAX_TTL", &parameter))
@@ -1503,6 +1516,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   download::SetHostChain(hostname);
   download::SetProxyChain(proxies);
   download::SetTimeout(timeout, timeout_direct);
+  download::SetProxyGroupResetDelay(proxy_reset_after);
+  download::SetRetryParameters(max_retries, backoff_init, backoff_max);
   g_download_ready = true;
 
   signature::Init();
@@ -1645,7 +1660,7 @@ static bool MaintenanceMode(const int fd_progress) {
   string msg_progress = "Draining out kernel caches (" +
                         StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  sleep((int)cvmfs::kcache_timeout_);
+  SafeSleepMs((int)cvmfs::kcache_timeout_*1000);
   return true;
 }
 
