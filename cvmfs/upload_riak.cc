@@ -150,15 +150,16 @@ void RiakSpooler::Copy(const std::string &local_path,
 }
 
 
-void RiakSpooler::Process(const std::string &local_path,
-                          const std::string &remote_dir,
-                          const std::string &file_suffix) {
+void RiakSpooler::ProcessChunk(const std::string   &local_path,
+                               const std::string   &remote_dir,
+                               const unsigned long  offset,
+                               const unsigned long  length) {
   // schedule a compression job into the CompressionWorker
   // Note: on successful completion this will schedule an additional job
   //       into the UploadWorker in order to push the compression (and
   //       hashing) results into the Riak storage
   //       See: CompressionWorkerCallback()
-  compression_parameters params(local_path, remote_dir, file_suffix, move());
+  compression_parameters params(local_path, remote_dir, "", move());
   concurrent_compression_->Schedule(params);
 }
 
@@ -172,7 +173,7 @@ void RiakSpooler::CompressionWorkerCallback(
   if (data.type != CompressionWorker::returned_data::kEmpty) {
     concurrent_upload_->Schedule(data);
   } else {
-    NotifyListeners(data);
+    JobDone(data);
   }
 }
 
@@ -180,9 +181,9 @@ void RiakSpooler::CompressionWorkerCallback(
 void RiakSpooler::UploadWorkerCallback(
                     const RiakSpooler::UploadWorker::returned_data &data) {
   // notify the user on the outcome of the upload job
-  // Note: This could implicitly also be the result of compression job.
-  //       The user is NOT notified about successful compression job directly. 
-  NotifyListeners(data);
+  // Note: This could implicitly also be the result of a compression job.
+  //       The user is NOT notified about successful compression job directly.
+  JobDone(data);
 }
 
 
@@ -265,7 +266,7 @@ bool RiakSpooler::CompressionWorker::CompressToTempFile(
                                         std::string       *tmp_file_path,
                                         hash::Any         *content_hash) const {
   // Create a temporary file at the given destination directory
-  FILE *fcas = CreateTempFile(destination_dir + "/cvmfs", 0777, "w", 
+  FILE *fcas = CreateTempFile(destination_dir + "/cvmfs", 0777, "w",
                               tmp_file_path);
   if (fcas == NULL) {
     LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file %s",
@@ -389,7 +390,7 @@ bool RiakSpooler::UploadWorker::InitDownloadHandle() {
 }
 
 
-size_t RiakSpooler::UploadWorker::ObtainVclockCallback(void *ptr, 
+size_t RiakSpooler::UploadWorker::ObtainVclockCallback(void *ptr,
                                                        size_t size,
                                                        size_t nmemb,
                                                        void *userdata) {
@@ -635,7 +636,7 @@ out:
 bool RiakSpooler::UploadWorker::ConfigureUpload(const std::string   &key,
                                                 const std::string   &url,
                                                 struct curl_slist   *headers,
-                                                const size_t         data_size, 
+                                                const size_t         data_size,
                                                 const UploadCallback callback,
                                                 const void*          userdata) {
   std::string vector_clock;
@@ -685,7 +686,7 @@ bool RiakSpooler::UploadWorker::CheckUploadSuccess(const int file_size) {
   if ((int)uploaded_bytes != file_size)
     return false;
 
-  // all fine... 
+  // all fine...
   return true;
 }
 
@@ -727,15 +728,15 @@ std::string RiakSpooler::upload_parameters::GetRiakKey() const {
   if (type == upload_parameters::kCompressedUpload) {
     // generate Riak key from the content hash
     return remote_dir              +
-           content_hash.ToString() + 
+           content_hash.ToString() +
            file_suffix;
 
   } else if (type == upload_parameters::kPlainUpload) {
     // remove slashes from the remote_path (Riak cannot handle them in keys)
     std::string result;
-    std::remove_copy(remote_path.begin(), 
-                     remote_path.end(), 
-                     std::back_inserter(result), 
+    std::remove_copy(remote_path.begin(),
+                     remote_path.end(),
+                     std::back_inserter(result),
                      '/');
     return result;
 
@@ -827,7 +828,7 @@ bool RiakSpooler::DownloadRiakConfiguration(const std::string &url,
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to check configuration of Riak "
                                       "HTTP Response code was: %d",
              response_code);
-    return false; 
+    return false;
   }
 
   // cleanup and return

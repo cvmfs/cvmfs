@@ -270,7 +270,7 @@ namespace upload {
 
       /**
        * Concurrent UploadWorkers need to communicate through this context
-       * object, therefore it implements the Lockable interface to be used as a 
+       * object, therefore it implements the Lockable interface to be used as a
        * mutex object in conjuction with the LockGuard template.
        */
       struct worker_context : public Lockable {
@@ -364,7 +364,7 @@ namespace upload {
       bool ConfigureUpload(const std::string   &key,
                            const std::string   &url,
                            struct curl_slist   *headers,
-                           const size_t         data_size, 
+                           const size_t         data_size,
                            const UploadCallback callback,
                            const void*          userdata);
       bool CheckUploadSuccess(const int file_size);
@@ -376,7 +376,7 @@ namespace upload {
        * cURL callback to extract the vector clock header from a received list
        * of headers.
        */
-      static size_t ObtainVclockCallback(void *ptr, 
+      static size_t ObtainVclockCallback(void *ptr,
                                          size_t size,
                                          size_t nmemb,
                                          void *userdata);
@@ -417,16 +417,17 @@ namespace upload {
     /**
      * Schedules an asynchronous compression and hashing job, which in turn will
      * schedule an asynchronous upload job when successfully finished. The final
-     * result is, that the given fill will be stored under its content hash into
+     * result is, that the given file will be stored under its content hash into
      * the Riak backend storage.
      *
      * @param local_path   path to the file to be processed
      * @param remote_dir   remote directory where the file should end up in
      * @param file_suffix  suffix to be attached to the final Riak key
      */
-    void Process(const std::string &local_path,
-                 const std::string &remote_dir,
-                 const std::string &file_suffix);
+    virtual void ProcessChunk(const std::string   &local_path,
+                              const std::string   &remote_dir,
+                              const unsigned long  offset,
+                              const unsigned long  length);
 
     void EndOfTransaction();
     void WaitForUpload() const;

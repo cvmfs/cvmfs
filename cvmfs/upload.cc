@@ -97,6 +97,17 @@ AbstractSpooler::AbstractSpooler(const SpoolerDefinition &spooler_definition) :
 AbstractSpooler::~AbstractSpooler() {}
 
 
+void AbstractSpooler::Process(const std::string &local_path,
+                              const std::string &remote_dir,
+                              const bool         allow_chunking) {
+  ProcessChunk(local_path, remote_dir, 0, 0);
+}
+
+void AbstractSpooler::JobDone(const SpoolerResult &data) {
+  NotifyListeners(data);
+}
+
+
 // -----------------------------------------------------------------------------
 
 bool LocalStat::Stat(const std::string &path) {

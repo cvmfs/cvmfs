@@ -182,9 +182,9 @@ namespace upload
      * @param file_suffix   a suffix that will be appended to the end of the
      *                      final remote path used in the backend storage
      */
-    virtual void Process(const std::string &local_path,
-                         const std::string &remote_dir,
-                         const std::string &file_suffix) = 0;
+    void Process(const std::string &local_path,
+                 const std::string &remote_dir,
+                 const bool         allow_chunking = true);
 
     /**
      * This method should always be called after all desired spooler operations
@@ -232,6 +232,19 @@ namespace upload
      *                             some intrinsics of the concrete Spoolers.
      */
     AbstractSpooler(const SpoolerDefinition &spooler_definition);
+
+    /**
+     *
+     */
+    virtual void ProcessChunk(const std::string   &local_path,
+                              const std::string   &remote_dir,
+                              const unsigned long  offset,
+                              const unsigned long  length) = 0;
+
+    /**
+     *
+     */
+    void JobDone(const SpoolerResult &result);
 
     /**
      * This method is called once before any other operations are performed on

@@ -56,14 +56,15 @@ namespace upload
               const std::string &remote_path);
 
     /**
-     * Process() schedules a job in the LocalCompressionWorker to allow for
+     * ProcessChunk() schedules a job in the LocalCompressionWorker to allow for
      * concurrent and asynchronous compression.
      * This method calls NotifyListeners and invokes a callback for all registered
      * listeners (see the Observable template for details).
      */
-    void Process(const std::string &local_path,
-                 const std::string &remote_dir,
-                 const std::string &file_suffix);
+    virtual void ProcessChunk(const std::string   &local_path,
+                              const std::string   &remote_dir,
+                              const unsigned long  offset,
+                              const unsigned long  length);
 
     void EndOfTransaction();
     void WaitForUpload() const;

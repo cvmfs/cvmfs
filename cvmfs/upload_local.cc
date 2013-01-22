@@ -25,7 +25,7 @@ LocalSpooler::LocalSpooler(const SpoolerDefinition &spooler_definition) :
   atomic_init32(&copy_errors_);
 }
 
-  
+
 unsigned int LocalSpooler::GetNumberOfErrors() const {
   return concurrent_compression_->GetNumberOfFailedJobs() + atomic_read32(&copy_errors_);
 }
@@ -62,13 +62,14 @@ void LocalSpooler::TearDown() {
 }
 
 
-void LocalSpooler::Process(const std::string &local_path,
-                           const std::string &remote_dir,
-                           const std::string &file_suffix) {
+void LocalSpooler::ProcessChunk(const std::string   &local_path,
+                                const std::string   &remote_dir,
+                                const unsigned long  offset,
+                                const unsigned long  length) {
   // schedule a compression job for the concurrent compression workers
   LocalCompressionWorker::expected_data input(local_path,
                                               remote_dir,
-                                              file_suffix,
+                                              "", // TODO: remove this!
                                               move());
   concurrent_compression_->Schedule(input);
 }
@@ -77,7 +78,7 @@ void LocalSpooler::Process(const std::string &local_path,
 void LocalSpooler::CompressionCallback(
                           const LocalCompressionWorker::returned_data &data) {
   // just forward this callback to the listeners of LocalSpooler
-  NotifyListeners(data);
+  JobDone(data);
 }
 
 
@@ -99,7 +100,7 @@ void LocalSpooler::Copy(const std::string &local_path,
   }
 
   const SpoolerResult result(retcode, local_path);
-  NotifyListeners(result);
+  JobDone(result);
 }
 
 

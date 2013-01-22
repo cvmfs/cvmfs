@@ -176,7 +176,7 @@ manifest::Manifest *SyncMediator::Commit() {
     {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "Spooling hardlink group %s",
                i->master.GetUnionPath().c_str());
-      params_->spooler->Process(i->master.GetUnionPath(), "data", "");
+      params_->spooler->Process(i->master.GetUnionPath(), "data");
     }
 
     params_->spooler->WaitForUpload();
@@ -497,7 +497,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
     file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->Process(entry.GetUnionPath(), "data", "");
+    params_->spooler->Process(entry.GetUnionPath(), "data");
   }
 }
 
@@ -537,7 +537,7 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
 
 /**
  * this method deletes a single directory entry! Make sure to empty it
- * before you call this method or simply use 
+ * before you call this method or simply use
  * SyncMediator::RemoveDirectoryRecursively instead.
  */
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
