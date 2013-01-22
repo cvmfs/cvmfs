@@ -158,7 +158,7 @@ namespace upload
      * Schedules a copy job that transfers a file found at local_path to the
      * location pointed to by remote_path. Copy Jobs do not hash or compress the
      * given file. They simply upload it.
-     * When the processing has finish a callback will be invoked asynchronously.
+     * When the copying has finished a callback will be invoked asynchronously.
      *
      * @param local_path    path to the file which needs to be copied into the
      *                      backend storage
