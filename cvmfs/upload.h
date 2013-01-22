@@ -76,6 +76,80 @@ namespace upload
    *       NotifyListeners() when a spooler job has finished.
    */
   class AbstractSpooler : public Observable<SpoolerResult> {
+   protected:
+    struct FileChunk {
+      FileChunk() :
+        temporary_path(""),
+        content_hash(hash::Any()) {}
+      FileChunk(const std::string &path, const hash::Any &hash) :
+        temporary_path(path),
+        content_hash(hash) {}
+
+      std::string temporary_path;
+      hash::Any   content_hash;
+    };
+    typedef std::vector<FileChunk> FileChunks;
+
+    /**
+     * This structure encapsulates the required data for a spooler compression
+     * operation and is used internally as input for the concurrent processing
+     * workers.
+     */
+    struct processing_parameters {
+      processing_parameters(const std::string &local_path,
+                            const bool         allow_chunking) :
+        local_path(local_path),
+        allow_chunking(allow_chunking) {}
+
+      // default constructor to create an 'empty' struct
+      // (needed by the ConcurrentWorkers implementation)
+      processing_parameters() :
+        local_path(), allow_chunking(false) {}
+
+      const std::string local_path;
+      const bool        allow_chunking;
+    };
+
+    struct processing_results {
+      int        return_code;
+      FileChunk  bulk_file;
+      FileChunks file_chunks;
+    };
+
+    /**
+     * Implements a concurrent compression worker based on the Concurrent-
+     * Workers template. File compression is done in parallel when possible.
+     */
+    class ProcessingWorker : public ConcurrentWorker<ProcessingWorker> {
+     public:
+      typedef processing_parameters expected_data;
+      typedef processing_results    returned_data;
+
+      struct worker_context {
+        worker_context(const std::string &destination_path) :
+          destination_path(destination_path) {}
+        const std::string destination_path; //!< base path to store processing
+                                            //!< results in a temporary files
+      };
+
+     public:
+      ProcessingWorker(const worker_context *context);
+      void operator()(const expected_data &data);
+
+     protected:
+      bool MapFile(const std::string &file_path);
+      void UnmapFile();
+
+      bool GenerateFileChunks(returned_data &data);
+      bool GenerateBulkFile(returned_data &data);
+
+     private:
+      const std::string destination_path_;
+
+      void    *mapped_file_;
+      size_t   mapped_size_;
+    };
+
    public:
     /**
      * SpoolerDefinition is given by a string of the form:
@@ -109,36 +183,6 @@ namespace upload
 
       bool valid_;
     };
-
-
-    /**
-     * This structure encapsulates the required data for a spooler compression
-     * operation and is used internally by concrete spoolers as input to their
-     * concurrent compression workers.
-     * An external user of AbstractSpooler and its derived classes should NOT
-     * use this structure.
-     */
-    struct compression_parameters {
-      compression_parameters(const std::string &local_path,
-                             const std::string &remote_dir,
-                             const std::string &file_suffix,
-                             const bool         move) :
-        local_path(local_path),
-        remote_dir(remote_dir),
-        file_suffix(file_suffix),
-        move(move) {}
-
-      // default constructor to create an 'empty' struct
-      // (needed by the ConcurrentWorkers implementation)
-      compression_parameters() :
-        local_path(), remote_dir(), file_suffix(), move(false) {}
-
-      const std::string local_path;
-      const std::string remote_dir;
-      const std::string file_suffix;
-      const bool        move;
-    };
-
 
    public:
     /**
@@ -191,31 +235,39 @@ namespace upload
      * are scheduled. It will wait until all operations are finished an allows
      * the concrete spooler implementations to do potential commiting steps or
      * clean-up work.
+     *
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
-    virtual void EndOfTransaction() = 0;
+    virtual void EndOfTransaction();
 
     /**
      * Blocks until all jobs currently under processing are finished.
      * Note: We assume that no one schedules new jobs after this method was
      *       called. Otherwise it might never return, since the job queue does
      *       not get empty.
+     *
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
-    virtual void WaitForUpload() const = 0;
+    virtual void WaitForUpload() const;
 
     /**
      * Blocks until all jobs are processed and all PushWorkers terminated
      * successfully.
      * Call this after you have called EndOfTransaction() to wait until the
      * Spooler terminated.
+     *
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
-    virtual void WaitForTermination() const = 0;
+    virtual void WaitForTermination() const;
 
     /**
      * Checks how many of the already processed jobs are failed.
      *
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD AND ADD YOUR OWN ERROR COUNT!
+     *
      * @return   the number of failed jobs at the time this method is invoked
      */
-    virtual unsigned int GetNumberOfErrors() const = 0;
+    virtual unsigned int GetNumberOfErrors() const;
 
     inline void set_move_mode(const bool move) { move_ = move; }
 
@@ -236,30 +288,26 @@ namespace upload
     /**
      *
      */
-    virtual void ProcessChunk(const std::string   &local_path,
-                              const std::string   &remote_dir,
-                              const unsigned long  offset,
-                              const unsigned long  length) = 0;
-
-    /**
-     *
-     */
     void JobDone(const SpoolerResult &result);
 
     /**
      * This method is called once before any other operations are performed on
      * a concrete Spooler. Implement this in your concrete Spooler class to do
      * global initialization work.
+     *
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
-    virtual bool Initialize() = 0;
+    virtual bool Initialize();
 
     /**
      * This method is called right before the Spooler object will terminate.
      * Implement this to do global clean up work. You should not finish jobs
      * in this method, since it is meant to be called after the Spooler has
      * stopped its actual work or was terminated prematurely.
+     *
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
-    virtual void TearDown() = 0;
+    virtual void TearDown();
 
     /*
      * @return   the spooler definition that was initially given to any Spooler
@@ -270,8 +318,10 @@ namespace upload
 
    private:
     // Status Information
-    const SpoolerDefinition spooler_definition_;
-    bool                    move_;
+    const SpoolerDefinition                         spooler_definition_;
+    UniquePtr<ConcurrentWorkers<ProcessingWorker> > concurrent_processing_;
+    UniquePtr<ProcessingWorker::worker_context >    concurrent_processing_context_;
+    bool                                            move_;
   };
 
 }

@@ -19,31 +19,6 @@ namespace upload
    * the AbstractSpooler base class.
    */
   class LocalSpooler : public AbstractSpooler {
-   protected:
-    /**
-     * Implements a concurrent compression worker based on the Concurrent-
-     * Workers template. File compression is done in parallel when possible.
-     */
-    class LocalCompressionWorker : public ConcurrentWorker<LocalCompressionWorker> {
-     public:
-      typedef compression_parameters expected_data;
-      typedef SpoolerResult          returned_data;
-
-      struct worker_context {
-        worker_context(const std::string &upstream_path) :
-          upstream_path(upstream_path) {}
-
-        const std::string upstream_path; //!< base path to store compression results
-      };
-
-     public:
-      LocalCompressionWorker(const worker_context *context);
-      void operator()(const expected_data &data);
-
-     private:
-      const std::string upstream_path_;
-    };
-
    public:
     /**
      * Copy() is not done concurrently in the current implementation of the
@@ -56,21 +31,6 @@ namespace upload
               const std::string &remote_path);
 
     /**
-     * ProcessChunk() schedules a job in the LocalCompressionWorker to allow for
-     * concurrent and asynchronous compression.
-     * This method calls NotifyListeners and invokes a callback for all registered
-     * listeners (see the Observable template for details).
-     */
-    virtual void ProcessChunk(const std::string   &local_path,
-                              const std::string   &remote_dir,
-                              const unsigned long  offset,
-                              const unsigned long  length);
-
-    void EndOfTransaction();
-    void WaitForUpload() const;
-    void WaitForTermination() const;
-
-    /**
      * Determines the number of failed jobs in the LocalCompressionWorker as
      * well as in the Copy() command.
      */
@@ -80,22 +40,10 @@ namespace upload
     friend class AbstractSpooler;
     LocalSpooler(const SpoolerDefinition &spooler_definition);
 
-    bool Initialize();
-    void TearDown();
-
-    /**
-     * This method is called when a compression job finishes execution.
-     */
-    void CompressionCallback(const LocalCompressionWorker::returned_data &data);
-
    private:
     // state information
     const std::string    upstream_path_;
     mutable atomic_int32 copy_errors_;   //!< counts the number of occured errors in Copy()
-
-    // concurrency subsystem
-    UniquePtr<ConcurrentWorkers<LocalCompressionWorker> > concurrent_compression_;
-    UniquePtr<LocalCompressionWorker::worker_context>     worker_context_;
   };
 }
 
