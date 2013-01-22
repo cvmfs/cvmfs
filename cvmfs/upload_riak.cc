@@ -100,7 +100,7 @@ bool RiakSpooler::Initialize() {
                               &RiakSpooler::CompressionWorkerCallback,
                               this);
   concurrent_upload_->RegisterListener(
-                              &RiakSpooler::UploadWorkerCallback,
+                              &RiakSpooler::JobDone,
                               this);
 
   // all set... ready to go
@@ -175,15 +175,6 @@ void RiakSpooler::CompressionWorkerCallback(
   } else {
     JobDone(data);
   }
-}
-
-
-void RiakSpooler::UploadWorkerCallback(
-                    const RiakSpooler::UploadWorker::returned_data &data) {
-  // notify the user on the outcome of the upload job
-  // Note: This could implicitly also be the result of a compression job.
-  //       The user is NOT notified about successful compression job directly.
-  JobDone(data);
 }
 
 

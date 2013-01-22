@@ -49,7 +49,7 @@ bool LocalSpooler::Initialize() {
   }
 
   // register the local CompressionCallback as listener to the compression worker
-  concurrent_compression_->RegisterListener(&LocalSpooler::CompressionCallback,
+  concurrent_compression_->RegisterListener(&LocalSpooler::JobDone,
                                              this);
 
   // all done
@@ -72,13 +72,6 @@ void LocalSpooler::ProcessChunk(const std::string   &local_path,
                                               "", // TODO: remove this!
                                               move());
   concurrent_compression_->Schedule(input);
-}
-
-
-void LocalSpooler::CompressionCallback(
-                          const LocalCompressionWorker::returned_data &data) {
-  // just forward this callback to the listeners of LocalSpooler
-  JobDone(data);
 }
 
 
