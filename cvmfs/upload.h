@@ -39,6 +39,17 @@ namespace upload
 
   // ---------------------------------------------------------------------------
 
+  struct FileChunk {
+    FileChunk() :
+      content_hash(hash::Any(hash::kSha1)),
+      offset(0),
+      size(0) {}
+
+    hash::Any content_hash;
+    size_t    offset;
+    size_t    size;
+  };
+  typedef std::vector<FileChunk> FileChunks;
 
   /**
    * This data structure will be passed to every callback spoolers will invoke.
@@ -49,16 +60,21 @@ namespace upload
    *       likely undefined, Null or rubbish.
    */
   struct SpoolerResult {
-    SpoolerResult(const int         return_code = -1,
-                  const std::string &local_path = "",
-                  const hash::Any   &digest     = hash::Any()) :
+    SpoolerResult(const int           return_code = -1,
+                  const std::string  &local_path  = "",
+                  const hash::Any    &digest      = hash::Any(),
+                  const FileChunks   &file_chunks = FileChunks()) :
       return_code(return_code),
       local_path(local_path),
-      content_hash(digest) {}
+      content_hash(digest),
+      file_chunks(file_chunks) {}
+
+    inline bool IsChunked() const { return !file_chunks.empty(); }
 
     const int         return_code;  //!< the return value of the spooler operation
     const std::string local_path;   //!< the local_path previously given as input
-    const hash::Any   content_hash; //!< the content_hash derived during processing
+    const hash::Any   content_hash; //!< the content_hash of the bulk file derived during processing
+    const FileChunks  file_chunks;  //!< the file chunks generated during processing
   };
 
   /**
@@ -77,18 +93,13 @@ namespace upload
    */
   class AbstractSpooler : public Observable<SpoolerResult> {
    protected:
-    struct FileChunk {
-      FileChunk() :
-        temporary_path(""),
-        content_hash(hash::Any()) {}
-      FileChunk(const std::string &path, const hash::Any &hash) :
-        temporary_path(path),
-        content_hash(hash) {}
+    static const std::string kChunkSuffix;
 
+   protected:
+    struct TemporaryFileChunk : public FileChunk {
       std::string temporary_path;
-      hash::Any   content_hash;
     };
-    typedef std::vector<FileChunk> FileChunks;
+    typedef std::vector<TemporaryFileChunk> TemporaryFileChunks;
 
     /**
      * This structure encapsulates the required data for a spooler compression
@@ -111,9 +122,16 @@ namespace upload
     };
 
     struct processing_results {
-      int        return_code;
-      FileChunk  bulk_file;
-      FileChunks file_chunks;
+      processing_results(const std::string &local_path) :
+        return_code(-1),
+        local_path(local_path) {}
+
+      int                  return_code;
+      TemporaryFileChunk   bulk_file;
+      TemporaryFileChunks  file_chunks;
+      const std::string    local_path;
+
+      inline bool IsChunked() const { return file_chunks.size() > 1; }
     };
 
     /**
@@ -126,10 +144,10 @@ namespace upload
       typedef processing_results    returned_data;
 
       struct worker_context {
-        worker_context(const std::string &destination_path) :
-          destination_path(destination_path) {}
-        const std::string destination_path; //!< base path to store processing
-                                            //!< results in a temporary files
+        worker_context(const std::string &temporary_path) :
+          temporary_path(temporary_path) {}
+        const std::string temporary_path; //!< base path to store processing
+                                          //!< results in temporary files
       };
 
      public:
@@ -137,17 +155,16 @@ namespace upload
       void operator()(const expected_data &data);
 
      protected:
-      bool MapFile(const std::string &file_path);
-      void UnmapFile();
+      bool GenerateFileChunks(const MemoryMappedFile &mmf,
+                                    returned_data    &data) const;
+      bool GenerateBulkFile(const MemoryMappedFile   &mmf,
+                                  returned_data      &data) const;
 
-      bool GenerateFileChunks(returned_data &data);
-      bool GenerateBulkFile(returned_data &data);
+      bool ProcessFileChunk(const MemoryMappedFile   &mmf,
+                                  TemporaryFileChunk &chunk) const;
 
      private:
-      const std::string destination_path_;
-
-      void    *mapped_file_;
-      size_t   mapped_size_;
+      const std::string temporary_path_;
     };
 
    public:
@@ -209,8 +226,8 @@ namespace upload
      * @param remote_path   the destination of the file to be copied in the
      *                      backend storage
      */
-    virtual void Copy(const std::string &local_path,
-                      const std::string &remote_path) = 0;
+    virtual void Upload(const std::string &local_path,
+                        const std::string &remote_path) = 0;
 
     /**
      * Schedules a process job that compresses and hashes the provided file in
@@ -288,6 +305,11 @@ namespace upload
     /**
      *
      */
+    virtual void Upload(const ProcessingWorker::returned_data &data) = 0;
+
+    /**
+     *
+     */
     void JobDone(const SpoolerResult &result);
 
     /**
@@ -308,6 +330,8 @@ namespace upload
      * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
     virtual void TearDown();
+
+    void ProcessingCallback(const ProcessingWorker::returned_data &data);
 
     /*
      * @return   the spooler definition that was initially given to any Spooler

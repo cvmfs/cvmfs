@@ -4,17 +4,18 @@
 
 #include "upload.h"
 
- #include <sys/mman.h>
- #include <fcntl.h>
-
 #include <vector>
 
 #include "upload_local.h"
 //#include "upload_riak.h"
 
 #include "util_concurrency.h"
+#include "file_chunk_generator.h"
+#include "compression.h"
 
 using namespace upload;
+
+const std::string AbstractSpooler::kChunkSuffix = "P";
 
 AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
                                        const std::string& definition_string) :
@@ -101,6 +102,25 @@ AbstractSpooler::~AbstractSpooler() {}
 
 
 bool AbstractSpooler::Initialize() {
+  concurrent_processing_context_ =
+    new AbstractSpooler::ProcessingWorker::worker_context(
+                                      spooler_definition_.spooler_description);
+
+  const unsigned int number_of_cpus = GetNumberOfCpuCores();
+  concurrent_processing_ =
+     new ConcurrentWorkers<AbstractSpooler::ProcessingWorker>(number_of_cpus,
+                                                              number_of_cpus * 500, // TODO: magic number (?)
+                                                              concurrent_processing_context_);
+  concurrent_processing_->RegisterListener(&AbstractSpooler::ProcessingCallback, this);
+
+  assert(concurrent_processing_);
+
+  // initialize the concurrent workers
+  if (! concurrent_processing_->Initialize()) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize concurrent "
+                                       "processing in AbstractSpooler.");
+    return false;
+  }
 
   return true;
 }
@@ -111,9 +131,7 @@ void AbstractSpooler::TearDown() {
 
 
 AbstractSpooler::ProcessingWorker::ProcessingWorker(const worker_context *context) :
-  destination_path_(context->destination_path),
-  mapped_file_(NULL),
-  mapped_size_(0) {}
+  temporary_path_(context->temporary_path) {}
 
 
 void AbstractSpooler::ProcessingWorker::operator()(const expected_data &data) {
@@ -121,20 +139,17 @@ void AbstractSpooler::ProcessingWorker::operator()(const expected_data &data) {
   const std::string &local_path     = data.local_path;
   const bool         allow_chunking = data.allow_chunking;
 
-  returned_data result;
+  returned_data result(local_path);
 
   // map the file to process into memory
-  if (! MapFile(local_path)) {
+  MemoryMappedFile mmf(local_path);
+  if (!mmf.Map()) {
     result.return_code = 1;
-    return;
+    goto fail;
   }
 
-  // RAII... do the unmap in ANY case...
-  BoundScopedCallback<AbstractSpooler::ProcessingWorker>
-    unmap_file_(&AbstractSpooler::ProcessingWorker::UnmapFile, this);
-
   // chunk the file if needed
-  if (allow_chunking && ! GenerateFileChunks(result)) {
+  if (allow_chunking && ! GenerateFileChunks(mmf, result)) {
     result.return_code = 2;
     goto fail;
   }
@@ -144,8 +159,8 @@ void AbstractSpooler::ProcessingWorker::operator()(const expected_data &data) {
     // ... and simply use that as bulk file as well
     result.bulk_file = result.file_chunks.front();
 
-    // or generate an additional bulk version of the file
-  } else if (! GenerateBulkFile(result)) {
+    // otherwise generate an additional bulk version of the file
+  } else if (! GenerateBulkFile(mmf, result)) {
     result.return_code = 3;
     goto fail;
   }
@@ -160,125 +175,119 @@ fail:
 }
 
 
-bool AbstractSpooler::ProcessingWorker::GenerateFileChunks(returned_data &data) {
+bool AbstractSpooler::ProcessingWorker::GenerateFileChunks(
+                                            const MemoryMappedFile &mmf,
+                                            returned_data          &data) const {
+  assert (mmf.IsMapped());
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "generating file chunks for %s",
+             mmf.file_path().c_str());
+
+  ChunkGenerator chunk_generator(mmf);
+
+  while (chunk_generator.HasMoreData()) {
+    // find the next file chunk boundary
+    Chunk chunk_boundary = chunk_generator.Next();
+    TemporaryFileChunk file_chunk;
+    file_chunk.offset = chunk_boundary.offset();
+    file_chunk.size   = chunk_boundary.size();
+
+    // do what you need to do with the data
+    if (!ProcessFileChunk(mmf, file_chunk)) {
+      return false;
+    }
+
+    // all done... save the chunk information
+    data.file_chunks.push_back(file_chunk);
+  }
+
   return true;
 }
 
 
-bool AbstractSpooler::ProcessingWorker::GenerateBulkFile(returned_data &data) {
-  return true;
+bool AbstractSpooler::ProcessingWorker::GenerateBulkFile(
+                                            const MemoryMappedFile &mmf,
+                                            returned_data          &data) const {
+  assert (mmf.IsMapped());
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "generating bulk file for %s",
+             mmf.file_path().c_str());
+
+  // create a chunk that contains the whole file
+  data.bulk_file.offset = 0;
+  data.bulk_file.size   = mmf.size();
+
+  // process the whole file in bulk
+  return ProcessFileChunk(mmf, data.bulk_file);
 }
 
 
-
-  // std::string tmp_path;
-  // FILE *fcas = CreateTempFile(remote_path + "/cvmfs", 0777, "w",
-  //                             &tmp_path);
-
-  // int retcode = 0;
-  // if (fcas == NULL) {
-  //   retcode = 103;
-  // } else {
-  //   int retval = zlib::CompressPath2File(local_path,
-  //                                        fcas,
-  //                                       &compressed_hash);
-  //   retcode = retval ? 0 : 103;
-  //   fclose(fcas);
-  //   if (retval) {
-  //     const std::string cas_path = remote_path + compressed_hash.MakePath(1, 2)
-  //                             + file_suffix;
-  //     retval = rename(tmp_path.c_str(), cas_path.c_str());
-  //     if (retval != 0) {
-  //       unlink(tmp_path.c_str());
-  //       retcode = 104;
-  //     }
-  //   }
-  // }
-  // if (move) {
-  //   if (unlink(local_path.c_str()) != 0)
-  //     retcode = 105;
-  // }
-
-  // // inform the scheduler of the compression results, which in turn will invoke
-  // // listener's callbacks
-  // returned_data return_values(retcode,
-  //                             local_path,
-  //                             compressed_hash);
-
-  // if (retcode == 0) {
-  //   master()->JobSuccessful(return_values);
-  // } else {
-  //   master()->JobFailed(return_values);
-  // }
-
-
-
-bool AbstractSpooler::ProcessingWorker::MapFile(const std::string &file_path) {
-  assert (mapped_size_ == 0 && mapped_file_ == NULL);
-
-  // open the file
-  int fd;
-  if ((fd = open(file_path.c_str(), O_RDONLY, 0)) == -1) {
-    LogCvmfs(kLogSpooler, kLogStderr, "failed to open %s", file_path.c_str());
+bool AbstractSpooler::ProcessingWorker::ProcessFileChunk(
+                                            const MemoryMappedFile &mmf,
+                                            TemporaryFileChunk &chunk) const {
+  // create a temporary to store the compression result of this chunk
+  FILE *fcas = CreateTempFile(temporary_path_ + "/chunk", 0777, "w",
+                              &chunk.temporary_path);
+  if (fcas == NULL) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file for "
+                                      "chunk: %d %d of file %s",
+             chunk.offset,
+             chunk.size,
+             mmf.file_path().c_str());
     return false;
   }
 
-  // get file size
-  platform_stat64 filesize;
-  if (platform_fstat(fd, &filesize) != 0) {
-    LogCvmfs(kLogSpooler, kLogStderr, "failed to fstat %s", file_path.c_str());
+  // compress the chunk and compute the content hash simultaneously
+  if (! zlib::CompressMem2File(mmf.buffer() + chunk.offset,
+                              chunk.size,
+                              fcas,
+                              &chunk.content_hash)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "failed to compress chunk: %d %d of "
+                                      "file %s",
+             chunk.offset,
+             chunk.size,
+             mmf.file_path().c_str());
     return false;
   }
 
-  // map the given file into memory
-  void *mapping = mmap(NULL, filesize.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (mapping == MAP_FAILED) {
-    return false;
-  }
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "compressed chunk: %d %d | hash: %s",
+           chunk.offset,
+           chunk.size,
+           chunk.content_hash.ToString().c_str());
 
-  // save results
-  mapped_file_ = mapping;
-  mapped_size_ = filesize.st_size;
   return true;
-}
-
-
-void AbstractSpooler::ProcessingWorker::UnmapFile() {
-  assert (mapped_size_ > 0 && mapped_file_ != NULL);
-
-  // unmap the previously mapped file
-  if (munmap(mapped_file_, mapped_size_) != 0) {
-    return;
-  }
-
-  // reset data
-  mapped_file_ = NULL;
-  mapped_size_ = 0;
 }
 
 
 void AbstractSpooler::Process(const std::string &local_path,
                               const std::string &remote_dir,
                               const bool         allow_chunking) {
+  processing_parameters params(local_path,
+                               allow_chunking);
+  concurrent_processing_->Schedule(params);
+}
+
+void AbstractSpooler::ProcessingCallback(const ProcessingWorker::returned_data &data) {
+  Upload(data);
 }
 
 void AbstractSpooler::EndOfTransaction() {
-
+  WaitForUpload();
 }
 
 
 void AbstractSpooler::WaitForUpload() const {
-
+  concurrent_processing_->WaitForEmptyQueue();
 }
 
 
 void AbstractSpooler::WaitForTermination() const {
-
+  concurrent_processing_->WaitForTermination();
 }
 
 
 unsigned int AbstractSpooler::GetNumberOfErrors() const {
-
+  return concurrent_processing_->GetNumberOfFailedJobs();
 }
 
 void AbstractSpooler::JobDone(const SpoolerResult &data) {

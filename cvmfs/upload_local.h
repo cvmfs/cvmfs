@@ -21,18 +21,19 @@ namespace upload
   class LocalSpooler : public AbstractSpooler {
    public:
     /**
-     * Copy() is not done concurrently in the current implementation of the
+     * Upload() is not done concurrently in the current implementation of the
      * LocalSpooler, since it is a simple move or copy of a file without CPU
      * intensive operation
      * This method calls NotifyListeners and invokes a callback for all registered
      * listeners (see the Observable template for details).
      */
-    void Copy(const std::string &local_path,
-              const std::string &remote_path);
+    void Upload(const std::string &local_path,
+                const std::string &remote_path);
+    void Upload(const ProcessingWorker::returned_data &data);
 
     /**
      * Determines the number of failed jobs in the LocalCompressionWorker as
-     * well as in the Copy() command.
+     * well as in the Upload() command.
      */
     unsigned int GetNumberOfErrors() const;
 
@@ -40,10 +41,13 @@ namespace upload
     friend class AbstractSpooler;
     LocalSpooler(const SpoolerDefinition &spooler_definition);
 
+    int Move(const std::string &local_path,
+             const std::string &remote_path) const;
+
    private:
     // state information
     const std::string    upstream_path_;
-    mutable atomic_int32 copy_errors_;   //!< counts the number of occured errors in Copy()
+    mutable atomic_int32 copy_errors_;   //!< counts the number of occured errors in Upload()
   };
 }
 
