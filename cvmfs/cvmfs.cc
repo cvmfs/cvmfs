@@ -1300,6 +1300,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
     const string org = tokens[0];
     hostname = ReplaceAll(parameter, "@org@", org);
+    hostname = ReplaceAll(parameter, "@fqrn@", loader_exports->repository_name);
   }
   if (options::GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
