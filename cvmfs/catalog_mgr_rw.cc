@@ -161,8 +161,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest::Manifest *manifest = new manifest::Manifest(hash_catalog, "");
 
   // Upload catalog
-  spooler->Copy(file_path_compressed,
-                "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler->Upload(file_path_compressed,
+                  "data" + hash_catalog.MakePath(1, 2) + "C");
   spooler->EndOfTransaction();
   spooler->WaitForTermination();
   unlink(file_path_compressed.c_str());
@@ -746,8 +746,8 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 	}
 
   // Upload catalog
-  spooler_->Copy(catalog->database_path() + ".compressed",
-                 "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler_->Upload(catalog->database_path() + ".compressed",
+                   "data" + hash_catalog.MakePath(1, 2) + "C");
 
 	// Update registered catalog SHA1 in nested catalog
 	if (!catalog->IsRoot()) {

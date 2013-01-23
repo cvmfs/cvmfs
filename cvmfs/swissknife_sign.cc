@@ -153,7 +153,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
     const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2)
                                   + "X";
-    spooler->Copy(cert_path_tmp, cert_hash_path);
+    spooler->Upload(cert_path_tmp, cert_hash_path);
 
     // Update manifest
     manifest->set_certificate(certificate_hash);
@@ -201,7 +201,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     fclose(fmanifest);
 
     // Upload manifest
-    spooler->Copy(manifest_path, ".cvmfspublished");
+    spooler->Upload(manifest_path, ".cvmfspublished");
 
     spooler->EndOfTransaction();
     spooler->WaitForTermination();

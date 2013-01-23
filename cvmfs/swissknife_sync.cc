@@ -117,7 +117,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   upload::AbstractSpooler *spooler =
     upload::AbstractSpooler::Construct(spooler_definition);
   assert(spooler);
-  spooler->Copy(source, dest);
+  spooler->Upload(source, dest);
   spooler->EndOfTransaction();
   spooler->WaitForTermination();
   if (spooler->GetNumberOfErrors() > 0) {

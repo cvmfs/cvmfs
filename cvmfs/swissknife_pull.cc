@@ -110,7 +110,7 @@ static void *MainWorker(void *data) {
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
-      spooler->Copy(tmp_file, chunk_path);
+      spooler->Upload(tmp_file, chunk_path);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -249,8 +249,8 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   delete catalog;
   unlink(file_catalog.c_str());
   spooler->WaitForUpload();
-  spooler->Copy(file_catalog_vanilla,
-                "data" + catalog_hash.MakePath(1, 2) + "C");
+  spooler->Upload(file_catalog_vanilla,
+                  "data" + catalog_hash.MakePath(1, 2) + "C");
   return true;
 
  pull_cleanup:
@@ -270,7 +270,7 @@ static void UploadBuffer(const unsigned char *buffer, const unsigned size,
   int retval = CopyMem2File(buffer, size, ftmp);
   assert(retval);
   fclose(ftmp);
-  spooler->Copy(tmp_file, dest_path);
+  spooler->Upload(tmp_file, dest_path);
 }
 
 
