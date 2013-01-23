@@ -17,22 +17,15 @@ AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
                                        const std::string& definition_string) :
   valid_(false)
 {
-  // split the spooler definition into spooler driver and pipe definitions
-  std::vector<std::string> components = SplitString(definition_string, ',');
-  if (components.size() != 3) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler definition");
-    return;
-  }
-
   // split the spooler driver definition into name and config part
-  std::vector<std::string> upstream = SplitString(components[0], ':', 2);
-  if (upstream.size() != 2) {
+  std::vector<std::string> upstream = SplitString(definition_string, ':', 3);
+  if (upstream.size() != 3) {
     LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler driver");
     return;
   }
 
   // recognize and configure the spooler driver
-  if (upstream[0] == "local") {
+  if (upstream[0]        == "local") {
     driver_type = Local;
   } else if (upstream[0] == "riak") {
     driver_type = Riak;
@@ -43,9 +36,8 @@ AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
   }
 
   // save data
-  spooler_description = upstream[1];
-  temp_directory = "/ramdisk/tmp"; // TODO: make this configurable
-
+  temporary_path        = upstream[1];
+  spooler_configuration = upstream[2];
   valid_ = true;
 }
 
@@ -100,7 +92,7 @@ AbstractSpooler::~AbstractSpooler() {}
 bool AbstractSpooler::Initialize() {
   // configure the file processor context
   concurrent_processing_context_ =
-    new FileProcessor::worker_context(spooler_definition_.spooler_description);
+    new FileProcessor::worker_context(spooler_definition_.temporary_path);
 
   // create and configure a file processor worker environment
   const unsigned int number_of_cpus = GetNumberOfCpuCores();
@@ -123,7 +115,9 @@ bool AbstractSpooler::Initialize() {
 }
 
 
-void AbstractSpooler::TearDown() {}
+void AbstractSpooler::TearDown() {
+  concurrent_processing_->WaitForTermination();
+}
 
 
 void AbstractSpooler::Process(const std::string &local_path,
@@ -165,6 +159,7 @@ void AbstractSpooler::JobDone(const SpoolerResult &data) {
 
 
 // -----------------------------------------------------------------------------
+
 
 bool LocalStat::Stat(const std::string &path) {
   return FileExists(base_path_ + "/" + path);

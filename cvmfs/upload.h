@@ -115,9 +115,10 @@ namespace upload
       SpoolerDefinition(const std::string& definition_string);
       bool IsValid() const { return valid_; }
 
-      DriverType  driver_type;         //!< the type of the spooler driver
-      std::string spooler_description; //!< a driver specific spooler description (interpreted by the concrete spooler object)
-      std::string temp_directory;      //!< the temp directory to use as scratch space
+      DriverType  driver_type;           //!< the type of the spooler driver
+      std::string temporary_path;        //!< scratch space for the FileProcessor
+      std::string spooler_configuration; //!< a driver specific spooler configuration string
+                                         //!< (interpreted by the concrete spooler object)
 
       bool valid_;
     };

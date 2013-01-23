@@ -15,7 +15,7 @@ using namespace upload;
 
 LocalSpooler::LocalSpooler(const SpoolerDefinition &spooler_definition) :
   AbstractSpooler(spooler_definition),
-  upstream_path_(spooler_definition.spooler_description)
+  upstream_path_(spooler_definition.spooler_configuration)
 {
   assert (spooler_definition.IsValid() &&
           spooler_definition.driver_type == SpoolerDefinition::Local);

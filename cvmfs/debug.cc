@@ -11,13 +11,12 @@ static void SpoolCallback(const SpoolerResult &result) {
 
 int main() {
 
-  AbstractSpooler* spooler = AbstractSpooler::Construct("local:/home/rene/Documents/Schweinestall/cvmfs/build/tmp,foo,bar");
+  AbstractSpooler* spooler = AbstractSpooler::Construct("local:/home/rene/Documents/Schweinestall/cvmfs/build/tmp/data/txn:/home/rene/Documents/Schweinestall/cvmfs/build/tmp/");
   assert (spooler);
 
   spooler->RegisterListener(&SpoolCallback);
 
-  spooler->Process("/home/rene/Documents/Schweinestall/cvmfs/build/cvmfs/debug_spool",
-                   "/home/rene/Documents/Schweinestall/cvmfs/build/tmp");
+  spooler->Process("/home/rene/Documents/Schweinestall/cvmfs/build/cvmfs/debug_spool");
 
   spooler->WaitForTermination();
 

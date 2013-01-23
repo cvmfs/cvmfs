@@ -8,6 +8,7 @@
 #include "upload.h"
 
 #include "util_concurrency.h"
+#include "atomic.h"
 
 namespace upload
 {

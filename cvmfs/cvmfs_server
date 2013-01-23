@@ -388,7 +388,7 @@ is_riak_upstream() {
 get_upstream_path() {
   local upstream=$1
 
-  echo "$upstream" | cut -d: -f2-
+  echo "$upstream" | cut -d: -f3-
 }
 
 
@@ -460,6 +460,7 @@ create_repository_skeleton() {
     mkdir ${directory}/data/$(printf "%02x" $i)
     i=$(($i+1))
   done
+  mkdir ${directory}/data/txn
   chown -R $user $directory
   if has_selinux; then
     chcon -Rv --type=httpd_sys_content_t $directory
@@ -524,7 +525,7 @@ mkfs() {
 
   # default values
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
-  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
+  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name/data/txn:/srv/cvmfs/$name"
 
   # sanity checks
   check_repository_existence $name && die "The repository $name already exists"
@@ -537,8 +538,6 @@ mkfs() {
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
-  local pipe_paths="${spool_dir}/paths"
-  local pipe_digests="${spool_dir}/digests"
   local repository_dir;
   local riak_urls;
   if is_local_upstream $upstream; then
@@ -652,7 +651,6 @@ EOF
 
   echo -n "Create CernVM-FS Storage... "
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
-  mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user /cvmfs/$name $spool_dir
   if is_local_upstream $upstream; then
     create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
@@ -660,7 +658,7 @@ EOF
   reload_apache > /dev/null
   echo "done"
 
-  local spooler_definition="${upstream},${pipe_paths},${pipe_digests}"
+  local spooler_definition="${upstream}"
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $spooler_definition $temp_dir > /dev/null
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
@@ -767,13 +765,11 @@ add_replica() {
   fi
 
   # default values
-  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
+  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name/data/txn:/srv/cvmfs/$name"
 
   # additional configuration
   local cvmfs_user=`get_cvmfs_owner $name $owner`
   local spool_dir="/var/spool/cvmfs/${name}"
-  local pipe_paths="${spool_dir}/paths"
-  local pipe_digests="${spool_dir}/digests"
   local temp_dir="${spool_dir}/tmp"
   local repository_dir;
   if is_local_upstream $upstream; then
@@ -836,13 +832,10 @@ EOF
   mkdir -p $spool_dir
   if [ x"$repository_dir" != x ]; then
     create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
-    mkdir $repository_dir/data/txn
-    chown $cvmfs_user $repository_dir/data/txn
     ln -s $repository_dir/data/txn $temp_dir
   else
     mkdir -p $temp_dir
   fi
-  mkfifo -m 0660 $pipe_paths $pipe_digests
   chown -R $cvmfs_user $spool_dir
   reload_apache > /dev/null
   echo "done"
