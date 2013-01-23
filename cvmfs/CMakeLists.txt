@@ -84,6 +84,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   compression.h compression.cc
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
+  file_chunk_generator.h file_chunk_generator.cc
   upload.h upload.cc
   upload_local.h upload_local.cc
   upload_riak.h upload_riak.cc
@@ -226,6 +227,23 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
   include (${MURMUR_LOCATION}/CVMFS-CMakeLists.txt)
 	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MURMUR_LOCATION}/src)
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
+
+add_executable (debug_spool debug.cc
+							platform.h platform_linux.h platform_osx.h
+							duplex_zlib.h duplex_sqlite3.h
+							logging.cc logging.h logging_internal.h
+							globals.cc globals.h
+							hash.h hash.cc
+							compression.h compression.cc
+							util.h util.cc
+							util_concurrency.h util_concurrency_impl.h util_concurrency.cc
+  							file_chunk_generator.h file_chunk_generator.cc
+							upload.h upload.cc
+							upload_local.h upload_local.cc
+							signature.cc signature.h)
+
+target_link_libraries (debug_spool	${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+set_target_properties (debug_spool PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS} -g -DDEBUGMSG" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
 
 if (BUILD_CVMFS)
