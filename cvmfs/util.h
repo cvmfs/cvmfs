@@ -202,6 +202,34 @@ class ScopedCallback : SingleCopy {
 };
 
 
+/**
+ * Wraps the functionality of mmap().
+ *
+ * Note: You need to call Map() to actually map the provided file path to memory
+ */
+class MemoryMappedFile : SingleCopy {
+ public:
+  MemoryMappedFile(const std::string &file_path);
+  ~MemoryMappedFile();
+
+  bool Map();
+  void Unmap();
+
+  inline unsigned char*      buffer()    const { return mapped_file_; }
+  inline size_t              size()      const { return mapped_size_; }
+  inline const std::string&  file_path() const { return file_path_; }
+
+  inline bool IsMapped() const {
+    return mapped_file_ != NULL && mapped_size_ != 0;
+  }
+
+ private:
+  const std::string  file_path_;
+  unsigned char     *mapped_file_;
+  size_t             mapped_size_;
+};
+
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }
 #endif

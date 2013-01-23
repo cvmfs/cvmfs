@@ -18,6 +18,7 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <inttypes.h>
 #include <dirent.h>
@@ -955,6 +956,62 @@ void SafeSleepMs(const unsigned ms) {
   wait_for.tv_usec = (ms % 1000) * 1000;
   select(0, NULL, NULL, NULL, &wait_for);
 }
+
+
+MemoryMappedFile::MemoryMappedFile(const std::string &file_path) :
+  file_path_(file_path), mapped_file_(NULL), mapped_size_(0) {}
+
+MemoryMappedFile::~MemoryMappedFile() {
+  if (IsMapped()) {
+    Unmap();
+  }
+}
+
+bool MemoryMappedFile::Map() {
+  assert (mapped_size_ == 0 && mapped_file_ == NULL);
+
+  // open the file
+  int fd;
+  if ((fd = open(file_path_.c_str(), O_RDONLY, 0)) == -1) {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to open %s", file_path_.c_str());
+    return false;
+  }
+
+  // get file size
+  platform_stat64 filesize;
+  if (platform_fstat(fd, &filesize) != 0) {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to fstat %s", file_path_.c_str());
+    return false;
+  }
+
+  // map the given file into memory
+  void *mapping = mmap(NULL, filesize.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (mapping == MAP_FAILED) {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to mmap %s", file_path_.c_str());
+    return false;
+  }
+
+  // save results
+  mapped_file_ = static_cast<unsigned char*>(mapping);
+  mapped_size_ = filesize.st_size;
+  LogCvmfs(kLogUtility, kLogVerboseMsg, "mmap'ed %s", file_path_.c_str());
+  return true;
+}
+
+void MemoryMappedFile::Unmap() {
+  assert (mapped_size_ > 0 && mapped_file_ != NULL);
+
+  // unmap the previously mapped file
+  if (munmap(static_cast<void*>(mapped_file_), mapped_size_) != 0) {
+    return;
+  }
+
+  // reset data
+  mapped_file_ = NULL;
+  mapped_size_ = 0;
+  LogCvmfs(kLogUtility, kLogVerboseMsg, "munmap'ed %s", file_path_.c_str());
+}
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }
