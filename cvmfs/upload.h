@@ -2,6 +2,12 @@
  * This file is part of the CernVM File System.
  */
 
+/**
+ * Backend Storage Spooler
+ *
+ * TODO: Write up the general workflow of file processing and upload...
+ */
+
 #ifndef CVMFS_UPLOAD_H_
 #define CVMFS_UPLOAD_H_
 
@@ -10,9 +16,7 @@
 #include <vector>
 
 #include "hash.h"
-#include "atomic.h"
-
-#include "util_concurrency.h"
+#include "upload_file_processor.h"
 
 namespace upload
 {
@@ -39,17 +43,6 @@ namespace upload
 
   // ---------------------------------------------------------------------------
 
-  struct FileChunk {
-    FileChunk() :
-      content_hash(hash::Any(hash::kSha1)),
-      offset(0),
-      size(0) {}
-
-    hash::Any content_hash;
-    size_t    offset;
-    size_t    size;
-  };
-  typedef std::vector<FileChunk> FileChunks;
 
   /**
    * This data structure will be passed to every callback spoolers will invoke.
@@ -94,78 +87,6 @@ namespace upload
   class AbstractSpooler : public Observable<SpoolerResult> {
    protected:
     static const std::string kChunkSuffix;
-
-   protected:
-    struct TemporaryFileChunk : public FileChunk {
-      std::string temporary_path;
-    };
-    typedef std::vector<TemporaryFileChunk> TemporaryFileChunks;
-
-    /**
-     * This structure encapsulates the required data for a spooler compression
-     * operation and is used internally as input for the concurrent processing
-     * workers.
-     */
-    struct processing_parameters {
-      processing_parameters(const std::string &local_path,
-                            const bool         allow_chunking) :
-        local_path(local_path),
-        allow_chunking(allow_chunking) {}
-
-      // default constructor to create an 'empty' struct
-      // (needed by the ConcurrentWorkers implementation)
-      processing_parameters() :
-        local_path(), allow_chunking(false) {}
-
-      const std::string local_path;
-      const bool        allow_chunking;
-    };
-
-    struct processing_results {
-      processing_results(const std::string &local_path) :
-        return_code(-1),
-        local_path(local_path) {}
-
-      int                  return_code;
-      TemporaryFileChunk   bulk_file;
-      TemporaryFileChunks  file_chunks;
-      const std::string    local_path;
-
-      inline bool IsChunked() const { return file_chunks.size() > 1; }
-    };
-
-    /**
-     * Implements a concurrent compression worker based on the Concurrent-
-     * Workers template. File compression is done in parallel when possible.
-     */
-    class ProcessingWorker : public ConcurrentWorker<ProcessingWorker> {
-     public:
-      typedef processing_parameters expected_data;
-      typedef processing_results    returned_data;
-
-      struct worker_context {
-        worker_context(const std::string &temporary_path) :
-          temporary_path(temporary_path) {}
-        const std::string temporary_path; //!< base path to store processing
-                                          //!< results in temporary files
-      };
-
-     public:
-      ProcessingWorker(const worker_context *context);
-      void operator()(const expected_data &data);
-
-     protected:
-      bool GenerateFileChunks(const MemoryMappedFile &mmf,
-                                    returned_data    &data) const;
-      bool GenerateBulkFile(const MemoryMappedFile   &mmf,
-                                  returned_data      &data) const;
-
-      bool ProcessFileChunk(const MemoryMappedFile   &mmf,
-                                  TemporaryFileChunk &chunk) const;
-
-     private:
-      const std::string temporary_path_;
-    };
 
    public:
     /**
@@ -238,13 +159,10 @@ namespace upload
      *
      * @param local_path    the location of the file to be processed and uploaded
      *                      into the backend storage
-     * @param remote_dir    the base directory that should be used in the back-
-     *                      end storage <remote_dir>/<content hash><file suffix>
      * @param file_suffix   a suffix that will be appended to the end of the
      *                      final remote path used in the backend storage
      */
     void Process(const std::string &local_path,
-                 const std::string &remote_dir,
                  const bool         allow_chunking = true);
 
     /**
@@ -286,31 +204,16 @@ namespace upload
      */
     virtual unsigned int GetNumberOfErrors() const;
 
-    inline void set_move_mode(const bool move) { move_ = move; }
 
    protected:
     /**
-     * No concrete spooler should have a public constructor. Instead one should
-     * extend the static Construct() method of AbstractSpooler to transparently
-     * create a new Spooler based on the given spooler definition string.
+     * Uploads the results of a FileProcessor job. This could be only one file
+     * or a list of file chunks + one bulk version of the file.
      *
-     * Note: Concrete spoolers should overwrite this constructor and process the
-     *       given spooler_definition in it.
-     *
-     * @param spooler_definition   the SpoolerDefinition structure that defines
-     *                             some intrinsics of the concrete Spoolers.
+     * @param data  the results data structure obtained from the FileProcessor
+     *              callback method
      */
-    AbstractSpooler(const SpoolerDefinition &spooler_definition);
-
-    /**
-     *
-     */
-    virtual void Upload(const ProcessingWorker::returned_data &data) = 0;
-
-    /**
-     *
-     */
-    void JobDone(const SpoolerResult &result);
+    virtual void Upload(const FileProcessor::Results &data) = 0;
 
     /**
      * This method is called once before any other operations are performed on
@@ -331,21 +234,60 @@ namespace upload
      */
     virtual void TearDown();
 
-    void ProcessingCallback(const ProcessingWorker::returned_data &data);
+
+   protected:
+    /**
+     * No concrete spooler should have a public constructor. Instead one should
+     * extend the static Construct() method of AbstractSpooler to transparently
+     * create a new Spooler based on the given spooler definition string.
+     *
+     * Note: Concrete spoolers should overwrite this constructor and process the
+     *       given spooler_definition in it.
+     *
+     * @param spooler_definition   the SpoolerDefinition structure that defines
+     *                             some intrinsics of the concrete Spoolers.
+     */
+    AbstractSpooler(const SpoolerDefinition &spooler_definition);
+
+    /**
+     * Concrete implementations of the AbstractSpooler must call this method
+     * when they finish an upload job. A single upload job might contain more
+     * than one file to be uploaded (see Upload(FileProcessor::Results) ).
+     *
+     * Note: If the concrete spooler implements uploading as an asynchronous
+     *       task, this method MUST be called when all files for one upload
+     *       job are processed.
+     *
+     * The concrete implementations of AbstractSpooler are responsible to fill
+     * the SpoolerResult structure properly and pass it to this method.
+     *
+     * JobDone() will inform Listeners of the Spooler object about the finished
+     * job.
+     */
+    void JobDone(const SpoolerResult &result);
+
+    /**
+     * Used internally: Is called when FileProcessor finishes a job.
+     * Will automatically take care of, that processed files get uploaded using
+     * Upload(FileProcessor::Results)
+     */
+    void ProcessingCallback(const FileProcessor::Results &data);
 
     /*
      * @return   the spooler definition that was initially given to any Spooler
      *           constructor.
      */
-    inline const SpoolerDefinition& spooler_definition() const { return spooler_definition_; }
-    inline bool move() const { return move_; }
+    inline const SpoolerDefinition& spooler_definition() const {
+      return spooler_definition_;
+    }
 
    private:
     // Status Information
-    const SpoolerDefinition                         spooler_definition_;
-    UniquePtr<ConcurrentWorkers<ProcessingWorker> > concurrent_processing_;
-    UniquePtr<ProcessingWorker::worker_context >    concurrent_processing_context_;
-    bool                                            move_;
+    const SpoolerDefinition                      spooler_definition_;
+
+    // File processor
+    UniquePtr<ConcurrentWorkers<FileProcessor> > concurrent_processing_;
+    UniquePtr<FileProcessor::worker_context >    concurrent_processing_context_;
   };
 
 }

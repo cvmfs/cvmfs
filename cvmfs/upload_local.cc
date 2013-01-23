@@ -29,7 +29,7 @@ unsigned int LocalSpooler::GetNumberOfErrors() const {
 }
 
 
-void LocalSpooler::Upload(const AbstractSpooler::ProcessingWorker::returned_data &data) {
+void LocalSpooler::Upload(const FileProcessor::Results &data) {
   int retcode = 0;
   int move_retcode = 0;
 

@@ -84,7 +84,8 @@ set (CVMFS_SWISSKNIFE_SOURCES
   compression.h compression.cc
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
-  file_chunk_generator.h file_chunk_generator.cc
+  upload_file_chunker.h upload_file_chunker.cc
+  upload_file_processor.h upload_file_processor.cc
   upload.h upload.cc
   upload_local.h upload_local.cc
   upload_riak.h upload_riak.cc
@@ -237,7 +238,8 @@ add_executable (debug_spool debug.cc
 							compression.h compression.cc
 							util.h util.cc
 							util_concurrency.h util_concurrency_impl.h util_concurrency.cc
-  							file_chunk_generator.h file_chunk_generator.cc
+  							upload_file_chunker.h upload_file_chunker.cc
+  							upload_file_processor.h upload_file_processor.cc
 							upload.h upload.cc
 							upload_local.h upload_local.cc
 							signature.cc signature.h)

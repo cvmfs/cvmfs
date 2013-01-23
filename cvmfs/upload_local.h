@@ -29,7 +29,7 @@ namespace upload
      */
     void Upload(const std::string &local_path,
                 const std::string &remote_path);
-    void Upload(const ProcessingWorker::returned_data &data);
+    void Upload(const FileProcessor::Results &data);
 
     /**
      * Determines the number of failed jobs in the LocalCompressionWorker as

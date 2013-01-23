@@ -295,7 +295,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   assert(spooler);
   backend_stat = upload::GetBackendStat(*args.find('r')->second);
   assert(backend_stat);
-  spooler->set_move_mode(true);
   spooler->RegisterListener(&AbortSpoolerOnError);
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;

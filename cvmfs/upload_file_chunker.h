@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_FILE_CHUNK_GENERATOR_H_
-#define CVMFS_FILE_CHUNK_GENERATOR_H_
+#ifndef CVMFS_UPLOAD_FILE_CHUNKER_H_
+#define CVMFS_UPLOAD_FILE_CHUNKER_H_
 
 #include <utility>
 
@@ -41,4 +41,4 @@ class ChunkGenerator : SingleCopy {
 
 }
 
-#endif /* CVMFS_FILE_CHUNK_GENERATOR_H_ */
+#endif /* CVMFS_UPLOAD_FILE_CHUNKER_H_ */
