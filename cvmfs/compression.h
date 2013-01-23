@@ -56,6 +56,9 @@ bool CompressFile2Mem(FILE *fsrc, unsigned char *mem, const size_t mem_size,
                       size_t *bytes_used, hash::Any *compressed_hash);
 bool DecompressFile2File(FILE *fsrc, FILE *fdest);
 
+bool CompressMem2File(const unsigned char *buf, const size_t size,
+                      FILE *fdest, hash::Any *compressed_hash);
+
 // User of these functions has to free out_buf, if successful
 bool CompressMem2Mem(const void *buf, const int64_t size,
                      void **out_buf, int64_t *out_size);
