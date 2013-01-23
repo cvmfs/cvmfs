@@ -42,6 +42,8 @@ namespace upload
     friend class AbstractSpooler;
     LocalSpooler(const SpoolerDefinition &spooler_definition);
 
+    int Copy(const std::string &local_path,
+             const std::string &remote_path) const;
     int Move(const std::string &local_path,
              const std::string &remote_path) const;
 

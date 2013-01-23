@@ -122,6 +122,9 @@ bool FileProcessor::ProcessFileChunk(const MemoryMappedFile &mmf,
     return false;
   }
 
+  // close temporary file
+  fclose(fcas);
+
   // all done... thanks
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "compressed chunk: %d %d | hash: %s",
            chunk.offset,

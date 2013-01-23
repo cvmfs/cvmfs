@@ -969,7 +969,7 @@ resign() {
 
   # do it!
   create_whitelist $name $CVMFS_USER \
-      ${CVMFS_UPSTREAM_STORAGE},${CVMFS_SPOOL_DIR}/paths,${CVMFS_SPOOL_DIR}/digests \
+      ${CVMFS_UPSTREAM_STORAGE} \
       ${CVMFS_SPOOL_DIR}/tmp
 }
 
@@ -1238,7 +1238,7 @@ publish() {
     -c ${spool_dir}/rdonly \
     -t ${spool_dir}/tmp \
     -b $base_hash \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
+    -r ${upstream} \
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
     $log_level"
@@ -1247,7 +1247,7 @@ publish() {
     -n $name \
     -m ${spool_dir}/tmp/manifest \
     -t ${spool_dir}/tmp \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests"
+    -r ${upstream}"
 
   $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
@@ -1313,7 +1313,7 @@ snapshot() {
 
   $user_shell "cvmfs_swissknife pull -m $name \
     -u $stratum0 \
-    -r ${upstream},${spool_dir}/paths,${spool_dir}/digests \
+    -r ${upstream} \
     -x ${spool_dir}/tmp \
     -k $public_key \
     -n $num_workers \

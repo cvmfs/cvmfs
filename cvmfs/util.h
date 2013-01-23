@@ -203,7 +203,7 @@ class ScopedCallback : SingleCopy {
 
 
 /**
- * Wraps the functionality of mmap().
+ * Wraps the functionality of mmap() to create a read-only memory mapped file.
  *
  * Note: You need to call Map() to actually map the provided file path to memory
  */
@@ -219,14 +219,13 @@ class MemoryMappedFile : SingleCopy {
   inline size_t              size()      const { return mapped_size_; }
   inline const std::string&  file_path() const { return file_path_; }
 
-  inline bool IsMapped() const {
-    return mapped_file_ != NULL && mapped_size_ != 0;
-  }
+  inline bool IsMapped() const { return mapped_; }
 
  private:
   const std::string  file_path_;
   unsigned char     *mapped_file_;
   size_t             mapped_size_;
+  bool               mapped_;
 };
 
 

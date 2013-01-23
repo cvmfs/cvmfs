@@ -64,16 +64,35 @@ void LocalSpooler::Upload(const FileProcessor::Results &data) {
 
 void LocalSpooler::Upload(const std::string &local_path,
                           const std::string &remote_path) {
-  const int retcode = Move(local_path, remote_path);
+  const int retcode = Copy(local_path, remote_path);
 
   const SpoolerResult result(retcode, local_path);
   JobDone(result);
+}
+
+int LocalSpooler::Copy(const std::string &local_path,
+                       const std::string &remote_path) const {
+  const std::string destination_path = upstream_path_ + "/" + remote_path;
+
+  int retval  = CopyPath2Path(local_path, destination_path);
+  int retcode = retval ? 0 : 100;
+
+  if (retcode != 0) {
+    atomic_inc32(&copy_errors_);
+  }
+
+  return retcode;
 }
 
 int LocalSpooler::Move(const std::string &local_path,
                        const std::string &remote_path) const {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
-  int retval = rename(local_path.c_str(), destination_path.c_str());
-  return (retval == 0) ? 0 : errno;
+  int retval  = rename(local_path.c_str(), destination_path.c_str());
+  int retcode = (retval == 0) ? 0 : errno;
+  if (retcode != 0) {
+    atomic_inc32(&copy_errors_);
+  }
+
+  return retcode;
 }

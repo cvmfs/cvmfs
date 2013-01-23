@@ -31,6 +31,6 @@ size_t ChunkGenerator::FindNextCutMark() const {
 }
 
 bool ChunkGenerator::HasMoreData() const {
-  return offset_ < mmf_.size() - 1;
+  return offset_ < mmf_.size();
 }
 
