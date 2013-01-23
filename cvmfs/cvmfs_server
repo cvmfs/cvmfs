@@ -685,6 +685,7 @@ add_replica() {
   local public_key
   local upstream
   local owner
+  local is_master_replica
 
   # optional parameter handling
   OPTIND=1
@@ -713,6 +714,17 @@ add_replica() {
 
   name=$(cvmfs_swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
 
+  # sanity checks
+  is_master_replica=$(cvmfs_swissknife info -r $stratum0 -m 2>/dev/null)
+  [ "x$is_master_replica" != "xtrue" ] && die "The repository URL $stratum0 does not point to a replicable master copy of $name"
+  if check_repository_existence $name; then
+    if is_stratum0 $name; then
+      die "Repository $name already exists as a Stratum0 repository.\nYou cannot create a Stratum1 replica for $name on this machine."
+    else
+      die "There is already a Stratum1 repository $name"
+    fi
+  fi
+
   # default values
   [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name"
 
@@ -727,18 +739,11 @@ add_replica() {
     repository_dir=$(get_local_upstream $upstream)
   fi
 
-  # Sanity checks
+  # additional sanity checks
   is_root || die "Only root can create a new repository"
   check_user $cvmfs_user || die "No user $cvmfs_user"
   if is_local_upstream $upstream; then
     [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
-  fi
-  if check_repository_existence $name; then
-    if is_stratum0 $name; then
-      die "Repository $name already exists as a Stratum0 repository. You cannot create a Stratum1 replica for $name on this machine."
-    else
-      die "There is already a Stratum1 repository $name"
-    fi
   fi
 
   echo -n "Creating configuration files... "
