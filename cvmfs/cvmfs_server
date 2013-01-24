@@ -523,7 +523,7 @@ mkfs() {
   # more sanity checks
   check_user $cvmfs_user || die "No user $cvmfs_user"
   /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
-  [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
+  command -v cvmfs2 > /dev/null || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
   [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
   lower_hardlink_restrictions
