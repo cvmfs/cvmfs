@@ -68,7 +68,7 @@ Available options:
 
 END
 	print $help;
-	exit_shell($socket, $ctxt);
+	exit 0;
 }
 
 if (defined($setup)) {
