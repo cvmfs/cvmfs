@@ -72,15 +72,19 @@ org=`cvmfs_getorg $fqrn`
 # check the operating system
 unamestr=`uname`
 
+#fuse device
+if [ "$unamestr" = 'Darwin' ]; then
+  #load osxfuse kernel extension
+  /Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs
+  fusedev="/dev/osxfuse0"
+else
+  fusedev="/dev/fuse"
+fi
+
 # Check for fuse
-if [ ! -c /dev/fuse ]; then
-  if [ "$unamestr" = 'Darwin' ]; then
-    /Library/Extensions/fuse4x.kext/Support/load_fuse4x   # has the sticky bit
-    sudo -u cvmfs sudo sysctl -w vfs.generic.fuse4x.tunables.allow_other=1 > /dev/null
-  else
-    echo "Fuse not loaded"
-    exit 1
-  fi
+if [ ! -c $fusedev ]; then
+  echo "Fuse not loaded"
+  exit 1
 fi
 
 mountpoint=$2
@@ -131,13 +135,17 @@ else
 fi
 
 if [ "$unamestr" = 'Darwin' ]; then
-  sudo -u cvmfs mkdir -p $CVMFS_CACHE_DIR
+  sudo -u $CVMFS_USER mkdir -p $CVMFS_CACHE_DIR
+  # create /var/run/cvmfs needed for reload functionality
+  sudo mkdir -p /var/run/cvmfs
+  sudo chown $CVMFS_USER /var/run/cvmfs
 else
   mkdir -p $CVMFS_CACHE_DIR
   chown $CVMFS_USER $CVMFS_CACHE_DIR
+  # create /var/run/cvmfs needed for reload functionality
+  mkdir -p /var/run/cvmfs
+  chown $CVMFS_USER /var/run/cvmfs
 fi
-mkdir -p /var/run/cvmfs
-chown $CVMFS_USER /var/run/cvmfs
 
 add_mount_option "fsname=cvmfs2,allow_other,grab_mountpoint"
 add_mount_option "$CVMFS_ID"
@@ -154,9 +162,8 @@ ulimit -n $CVMFS_NFILES
 cvmfs_exe=$bin_path/cvmfs2
 export LD_LIBRARY_PATH=$lib_path:$LD_LIBRARY_PATH
 
-# Single threaded, hack around a fuse4x problem with unnamed semaphores
 if [[ "$unamestr" = 'Darwin' ]]; then
-  cmd="sudo -u cvmfs sudo $cvmfs_exe -s -o ${mount_options} $name $mountpoint"
+  cmd="sudo -u cvmfs sudo $cvmfs_exe -o ${mount_options} $name $mountpoint"
 else
   cmd="$cvmfs_exe -o ${mount_options} $name $mountpoint"
 fi
@@ -194,4 +201,3 @@ else
 fi
 
 exit $retval
-
