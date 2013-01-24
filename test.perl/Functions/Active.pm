@@ -7,7 +7,7 @@ use warnings;
 use threads;
 use threads::shared;
 use Time::HiRes qw (sleep);
-use Functions::Shell qw(get_remote);
+use Functions::Shell;
 use Functions::ShellSocket qw(connect_shell_socket send_shell_msg receive_shell_msg term_shell_ctxt close_shell_socket);
 
 # Next lines are needed to export subroutines to the main package
@@ -74,10 +74,17 @@ sub check_daemon {
 	
 	# If the daemon is local, ps is enough, otherwise the shell will try to ping the daemon
 	if ($daemon_path =~ m/127\.0\.0\.1/) {
+		# Adding daemon to the active list id $running is true
+		add_active($daemon_path) if $running;
+		# Returning $running
 		return ($running);
 	}
 	else {
-		return ping_daemon($daemon_path);
+		my $pinged = ping_daemon($daemon_path);
+		# Addind daemon to the active list if ping was successful
+		add_active($daemon_path) if $pinged;
+		# Returning $pinged
+		return $pinged;
 	}
 }
 

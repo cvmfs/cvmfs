@@ -18,7 +18,7 @@ use Functions::ShellSocket qw(connect_shell_socket send_shell_msg receive_shell_
 use Term::ANSIColor;
 use Time::HiRes qw(sleep);
 use Functions::Virtualization qw(start_distributed);
-use Functions::Active qw (add_active show_active check_daemon);
+use Functions::Active qw (show_active check_daemon);
 
 # Next lines are needed to export subroutines to the main package
 use base 'Exporter';
@@ -179,9 +179,6 @@ sub connect_to {
 		print 'Opening new socket... ';
 		my ($newsocket, $newctxt) = connect_shell_socket($daemon_path);
 		print "Done.\n";
-		
-		# Adding newly connected daemon to %active if it's not there already
-		add_active($daemon_path);
 		
 		return ($newsocket, $newctxt);
 	}
@@ -493,9 +490,6 @@ sub start_daemon {
 			# Checking if the daemon were started
 			if (check_daemon()) {
 				print "Done.\n";
-				
-				# Adding local daemon to active hash
-				add_active($daemon_path);
 			}
 			else {
 				print "Failed.\nHave a look to $daemon_error.\n";
