@@ -10,7 +10,8 @@ use lib "$RealBin";
 use strict;
 use warnings;
 use Proc::Spawn;
-use Functions::Shell qw(check_daemon check_command start_daemon get_daemon_output exit_shell);
+use Functions::Shell qw(check_command start_daemon get_daemon_output exit_shell);
+use Functions::Active qw(check_daemon);
 use Functions::ShellSocket qw(connect_shell_socket receive_shell_msg send_shell_msg close_shell_socket term_shell_ctxt bind_shell_socket);
 use Getopt::Long;
 

@@ -7,7 +7,7 @@ package Functions::Help;
 use strict;
 use warnings;
 use File::Find;
-use Functions::Shell qw(check_daemon);
+use Functions::Active qw(check_daemon);
 
 # The next line is here to help me find the directory of the script
 # if you have a better method, let me know.

@@ -8,7 +8,6 @@ package Functions::Shell;
 use strict;
 use warnings;
 use threads;
-use threads::shared;
 use Functions::Help qw(help);
 use Proc::Daemon;
 use Fcntl ':mode';
@@ -19,11 +18,12 @@ use Functions::ShellSocket qw(connect_shell_socket send_shell_msg receive_shell_
 use Term::ANSIColor;
 use Time::HiRes qw(sleep);
 use Functions::Virtualization qw(start_distributed);
+use Functions::Active qw (add_active show_active check_daemon);
 
 # Next lines are needed to export subroutines to the main package
 use base 'Exporter';
 use vars qw/ @EXPORT_OK /;
-@EXPORT_OK = qw(check_daemon check_command start_daemon get_daemon_output exit_shell);
+@EXPORT_OK = qw(check_command start_daemon get_daemon_output exit_shell get_remote);
 
 # The next line is here to help me find the directory of the script
 # if you have a better method, let me know.
@@ -32,85 +32,23 @@ use FindBin qw($RealBin);
 # This variable will be set to 1 if the shell is speaking to a daemon on a remote machine
 my $remote = 0;
 
-# This is, indeed, a very important variable since here we'll store all path to active daemons.
-# User will be able to retrieve all active daemons list with 'status show-active'.
-my %active;
+# Getter and setter for $remote
+sub get_remote {
+	return $remote;
+}
 
-# This function will check whether the daemon is running.
-sub check_daemon {
-	# Retrieving daemon path from main package
-	my $daemon_path = shift;
+sub set_remote {
+	my $val_to_set = shift;
 	
-	# Setting daemon_path default to $main::daemon_path
-	unless ($daemon_path) {
-		if ($remote) {
-			$daemon_path = $main::connect_to;
-		}
-		else {
-			$daemon_path = $main::daemon_path;
-		}
-	}
-	
-	# Checking with ps if the daemon is running locally
-	my $running = `ps -ef | grep cvmfs-testdwrapper | grep -v grep | grep -v defunct`;
-	
-	# If the daemon is local, ps is enough, otherwise the shell will try to ping the daemon
-	if ($daemon_path =~ m/127\.0\.0\.1/) {
-		return ($running);
+	if ($val_to_set == 1 or $val_to_set == 0) {
+		$remote = $val_to_set;
 	}
 	else {
-		return ping_daemon($daemon_path);
+		print "ERROR: Uknown \$remote value: $remote.\n";
 	}
 }
 
-# This function will be used to ping a remote daemon and check if it's awake
-sub ping_daemon {
-	my $daemon_path = shift;
-	my $seconds = shift;
-	
-	# Assigning $seconds a default value of 5
-	if (!defined($seconds)) {
-		$seconds = 5;
-	}
-	
-	# This variable will be used to register if a pong is received and will be shared with
-	# the inner thread
-	my $pong = 0;
-	share($pong);
-	
-	# This variable will be incremented by the while in the inner sub and will be shared
-	# with the inner thread
-	my $count = 0;
-	share($count);
-	
-	# This sub will be ran in a thread and will ping the daemon hoping for a response
-	my $actual_pinging = sub {
-		my ($ping_socket, $ping_ctxt) = connect_shell_socket($daemon_path, undef, 'SHELL_PING');
-		while (($count < $seconds) and !$pong) {
-			send_shell_msg($ping_socket, "PING");
-			my $msg = receive_shell_msg($ping_socket, "ZMQ_NOBLOCK");
-			if (defined($msg)) {
-				$pong = 1;
-			}
-			$count++;
-			sleep 0.5;
-		}
-		close_shell_socket($ping_socket);
-		term_shell_ctxt($ping_ctxt);
-	};
-	
-	# Starting the pinging thread
-	my $pinging_threads = threads->create($actual_pinging);
-	$pinging_threads->detach();
-	
-	# Waiting for pong to be received
-	until ($pong or $count >= 5) {
-		sleep 0.5;
-	}
-	
-	return $pong;
-}
-
+# This function is called to check if a process is running
 sub check_process {
 	my $process_name = shift;
 	my $running = `ps -fu cvmfs-test | grep -i $process_name | grep -v grep`;
@@ -185,7 +123,7 @@ sub wait_daemon {
 	
 	# Setting $remote = 1 if the connection was successfull
 	if ($socket) {
-		$remote = 1;
+		set_remote(1);
 	}
 	
 	# Returning new socket and context
@@ -217,10 +155,10 @@ sub connect_to {
 	}
 	
 	if ($daemon_path !~ m/127\.0\.0\.1/ and $daemon_path !~ m/localhost/) {
-		$remote = 1;
+		set_remote(1);
 	}
 	else {
-		$remote = 0;
+		set_remote(0);
 	}
 	
 	if (check_daemon($daemon_path)) {
@@ -243,14 +181,12 @@ sub connect_to {
 		print "Done.\n";
 		
 		# Adding newly connected daemon to %active if it's not there already
-		unless (exists $active{$daemon_path}) {
-			$active{$daemon_path} = 1;
-		}
+		add_active($daemon_path);
 		
 		return ($newsocket, $newctxt);
 	}
 	else {
-		$remote = 0;
+		set_remote(0);
 		print "Daemon could not be reached on $daemon_path.\n";
 		print "To start a server locally use 'start'.\n" if $daemon_path =~ m/127\.0\.0\.1/ or $daemon_path =~ m/localhost/;
 		return ($socket, $ctxt);
@@ -263,25 +199,12 @@ sub print_status {
 	
 	# Checking weather the user requeste the list of active daemons
 	if ($command =~ m/--show-active/) {
-		if (%active) {
-			foreach (keys %active) {
-				if (check_daemon($_)) {
-					print "$_ is active.\n";
-				}
-				else {
-					print "$_ was active, but it's no longer. Removed from list.\n";
-					delete $active{$_};
-				}
-			}
-		}
-		else {
-			print "There are no active daemons.\n";
-		}
+		show_active();
 		return;
 	}
 	
 	if(check_daemon()){
-		unless ($remote) {
+		unless (get_remote()) {
 			print "Daemon is running on $main::daemon_path.\n";
 		}
 		else {
@@ -289,7 +212,7 @@ sub print_status {
 		}
 	}
 	else {
-		unless ($remote) {
+		unless (get_remote()) {
 			print "The daemon is not running. Type 'start' to run it.\n";
 		}
 		else {
@@ -364,7 +287,7 @@ sub check_permission {
 sub loading_animation {
 	# This function will immediatily return if the daemon is running remotely since I didn't
 	# find a way to check if the process is running remotely
-	if ($remote) {
+	if (get_remote()) {
 		return;
 	}
 	
@@ -487,14 +410,14 @@ sub daemon_stopped {
 	$ctxt = term_shell_ctxt($ctxt);
 	
 	# Checking if a local server is running and trying to reconnect to it.
-	if ($remote and check_daemon('127.0.0.1:6650')) {
+	if (get_remote() and check_daemon('127.0.0.1:6650')) {
 		print 'A local running daemon was found. Reconnecting... ';
 		($socket, $ctxt) = connect_shell_socket();
 		print "Done.\n";
 	}
 	
 	# Resetting $remote
-	$remote = 0 if $remote;
+	set_remote(0) if get_remote();
 	
 	return ($socket, $ctxt);
 }
@@ -572,7 +495,7 @@ sub start_daemon {
 				print "Done.\n";
 				
 				# Adding local daemon to active hash
-				$active{$daemon_path} = 1 unless exists $active{$daemon_path};
+				add_active($daemon_path);
 			}
 			else {
 				print "Failed.\nHave a look to $daemon_error.\n";
@@ -600,7 +523,7 @@ sub start_daemon {
 
 # This function will stop and restart the daemon
 sub restart_daemon {
-	unless ($remote) {
+	unless (get_remote()) {
 		my $socket = shift;
 		my $ctxt = shift;
 		my $daemon_path = shift;
