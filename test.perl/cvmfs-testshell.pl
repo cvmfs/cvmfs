@@ -11,7 +11,7 @@ use strict;
 use warnings;
 use Proc::Spawn;
 use Functions::Shell qw(check_command start_daemon get_daemon_output exit_shell);
-use Functions::Active qw(check_daemon);
+use Functions::Active qw(check_daemon add_active);
 use Functions::ShellSocket qw(connect_shell_socket receive_shell_msg send_shell_msg close_shell_socket term_shell_ctxt bind_shell_socket);
 use Getopt::Long;
 
@@ -63,6 +63,7 @@ Available options:
 	--setup		Setup the environment.
 	--start		Start the daemon.
 	--wait-daemon	Wait for the daemon to send its ip.
+	--connect-to IP	Try to connect to a deamon on IP.
 	--c command	Executes command and exit.
 
 END
