@@ -1111,8 +1111,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 
   const char base_list[] = "user.pid\0user.version\0user.revision\0"
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
-    "user.host\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
-    "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0";
+    "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
+    "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
+    "user.ndiropen\0";
   string attribute_list(base_list, sizeof(base_list));
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
@@ -1299,8 +1300,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
     const string org = tokens[0];
-    hostname = ReplaceAll(parameter, "@org@", org);
-    hostname = ReplaceAll(parameter, "@fqrn@", loader_exports->repository_name);
+    hostname = parameter;
+    hostname = ReplaceAll(hostname, "@org@", org);
+    hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
   }
   if (options::GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
