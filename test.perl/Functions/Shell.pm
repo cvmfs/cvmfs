@@ -23,7 +23,7 @@ use Functions::Active qw (show_active check_daemon);
 # Next lines are needed to export subroutines to the main package
 use base 'Exporter';
 use vars qw/ @EXPORT_OK /;
-@EXPORT_OK = qw(check_command start_daemon get_daemon_output exit_shell get_remote);
+@EXPORT_OK = qw(check_command start_daemon get_daemon_output exit_shell set_remote);
 
 # The next line is here to help me find the directory of the script
 # if you have a better method, let me know.

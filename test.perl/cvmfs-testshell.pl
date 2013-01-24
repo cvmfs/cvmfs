@@ -10,7 +10,7 @@ use lib "$RealBin";
 use strict;
 use warnings;
 use Proc::Spawn;
-use Functions::Shell qw(check_command start_daemon get_daemon_output exit_shell);
+use Functions::Shell qw(set_remote check_command start_daemon get_daemon_output exit_shell);
 use Functions::Active qw(check_daemon add_active);
 use Functions::ShellSocket qw(connect_shell_socket receive_shell_msg send_shell_msg close_shell_socket term_shell_ctxt bind_shell_socket);
 use Getopt::Long;
@@ -144,8 +144,15 @@ if ($interactive) {
 			# Checking again if the daemon is running, maybe something killed it.
 			unless (check_daemon()) {
 				print "Daemon isn't running anymore. Check logs.\n";
+				
+				# Closing socket and ctxt
 				$socket = close_shell_socket($socket);
 				$ctxt = term_shell_ctxt($ctxt);
+				
+				# Resetting remote status for a fester shell response
+				set_remote(0);
+				
+				# Skipping to next while cycle, it will evaluate false, so you'll switch to the second while.
 				next;
 			}
 			
