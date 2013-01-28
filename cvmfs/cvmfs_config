@@ -714,27 +714,31 @@ cvmfs_reload() {
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
     echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
   done
-  sort -u "${CVMFS_RELOAD_SOCKETS}/guard_files" > "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp"
-  mv "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp" "${CVMFS_RELOAD_SOCKETS}/guard_files"
-  for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
-    while [ ! -f ${guard_file}* ]; do
-      sleep 1
+  if [ -f "${CVMFS_RELOAD_SOCKETS}/guard_files" ]; then
+    sort -u "${CVMFS_RELOAD_SOCKETS}/guard_files" > "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp"
+    mv "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp" "${CVMFS_RELOAD_SOCKETS}/guard_files"
+    for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
+      while [ ! -f ${guard_file}* ]; do
+        sleep 1
+      done
+      if [ -f ${guard_file}.crashed ]; then
+        echo "RELOADING FAILED (${guard_file}.crashed)" 1>&2
+        rm -f "$(dirname $guard_file)/pid.$(basename $guard_file)" ${guard_file}.crashed
+      fi
     done
-    if [ -f ${guard_file}.crashed ]; then
-      echo "RELOADING FAILED (${guard_file}.crashed)" 1>&2
-      rm -f "$(dirname $guard_file)/pid.$(basename $guard_file)" ${guard_file}.crashed
-    fi
-  done
-  rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
+    rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
+  fi
 
   if [ $clean_cache -eq 1 ]; then
     cvmfs_wipecache
   fi
 
-  for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
-    kill -SIGUSR1 $(cat $pidfile)
-    rm -f $pidfile
-  done
+  if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
+    for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
+      kill -SIGUSR1 $(cat $pidfile)
+      rm -f $pidfile
+    done
+  fi
   wait
 
   return $RETVAL
