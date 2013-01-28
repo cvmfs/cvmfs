@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <cstdlib>
 #include <cassert>
@@ -32,8 +33,10 @@ bool Init(const string &socket_path) {
   socket_fd_ = MakeSocket(*socket_path_, 0600);
   if (socket_fd_ == -1)
     return false;
-  if (listen(socket_fd_, 1) == -1)
+  if (listen(socket_fd_, 1) == -1) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "listening on socket failed (%d)", errno);
     return false;
+  }
 
   unlink((socket_path + ".paused.crashed").c_str());
   unlink((socket_path + ".paused").c_str());

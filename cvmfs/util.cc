@@ -142,9 +142,11 @@ int MakeSocket(const string &path, const int mode) {
       if (bind(socket_fd, (struct sockaddr *)&sock_addr,
                sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
       {
+        LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
         goto make_socket_failure;
       }
     } else {
+      LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
       goto make_socket_failure;
     }
   }
