@@ -1,5 +1,5 @@
 2.1.7:
-
+  * Fixed cvmfs_config reload on clean nodes
 
 2.1.6:
   * Fixed hanging reload when reload socket can not be
