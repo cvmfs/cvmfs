@@ -319,6 +319,7 @@ static bool Find(const catalog::Catalog *catalog,
         next_offset = c->offset + c->size;
         aggregated_file_size += c->size;
 
+        // are all data chunks in the data store?
         const string chunk_path = "data" + c->content_hash.MakePath(1, 2) + "P";
         if (!Exists(chunk_path)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %sP (%s -> "
