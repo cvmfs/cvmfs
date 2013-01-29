@@ -569,6 +569,9 @@ void WritableCatalog::CopyToParent() {
   retval = Sql(database(), "INSERT INTO other.catalog "
                            "SELECT * FROM main.catalog;").Execute();
   assert(retval);
+  retval = Sql(database(), "INSERT INTO other.chunks "
+                           "SELECT * FROM main.chunks;").Execute();
+  assert(retval);
   retval = Sql(database(), "DETACH other;").Execute();
   assert(retval);
   parent->SetDirty();
