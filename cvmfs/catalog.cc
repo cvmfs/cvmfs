@@ -148,12 +148,13 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_ = new SqlListing(database());
-  sql_lookup_md5path_ = new SqlLookupPathHash(database());
-  sql_lookup_inode_ = new SqlLookupInode(database());
-  sql_lookup_nested_ = new SqlNestedCatalogLookup(database());
-  sql_list_nested_ = new SqlNestedCatalogListing(database());
-  sql_all_chunks_ = new SqlAllChunks(database());
+  sql_listing_         = new SqlListing(database());
+  sql_lookup_md5path_  = new SqlLookupPathHash(database());
+  sql_lookup_inode_    = new SqlLookupInode(database());
+  sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
+  sql_list_nested_     = new SqlNestedCatalogListing(database());
+  sql_all_chunks_      = new SqlAllChunks(database());
+  sql_get_file_chunks_ = new SqlGetFileChunks(database());
 }
 
 
@@ -164,6 +165,7 @@ void Catalog::FinalizePreparedStatements() {
   delete sql_lookup_inode_;
   delete sql_lookup_nested_;
   delete sql_list_nested_;
+  delete sql_get_file_chunks_;
 }
 
 
@@ -342,6 +344,22 @@ bool Catalog::AllChunksNext(hash::Any *hash, ChunkTypes *type) {
 
 bool Catalog::AllChunksEnd() {
   return sql_all_chunks_->Close();
+}
+
+
+bool Catalog::GetMd5FileChunks(const hash::Md5  &md5path,
+                               FileChunks       *chunks) const {
+  assert(IsInitialized() && chunks->empty());
+
+  pthread_mutex_lock(lock_);
+  sql_get_file_chunks_->BindPathHash(md5path);
+  while (sql_get_file_chunks_->FetchRow()) {
+    chunks->push_back(sql_get_file_chunks_->GetFileChunk());
+  }
+  sql_get_file_chunks_->Reset();
+  pthread_mutex_unlock(lock_);
+
+  return true;
 }
 
 
