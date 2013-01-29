@@ -291,6 +291,57 @@ static bool Find(const catalog::Catalog *catalog,
                full_path.c_str());
       retval = false;
     }
+
+    // checking file chunk integrity
+    if (entries[i].IsChunkedFile()) {
+      FileChunks chunks;
+      catalog->GetFileChunks(full_path, &chunks);
+
+      // do we find file chunks for the chunked file in this catalog?
+      if (chunks.size() == 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "no file chunks found for big file %s",
+                 full_path.c_str());
+        retval = false;
+      }
+
+      size_t aggregated_file_size = 0;
+      size_t next_offset          = 0;
+
+      FileChunks::const_iterator c    = chunks.begin();
+      FileChunks::const_iterator cend = chunks.end();
+      for (; c != cend; ++c) {
+        // check if the chunk boundaries fit together...
+        if (next_offset != c->offset) {
+          LogCvmfs(kLogCvmfs, kLogStderr, "misaligned chunk offsets for %s",
+                   full_path.c_str());
+          retval = false;
+        }
+        next_offset = c->offset + c->size;
+        aggregated_file_size += c->size;
+
+        const string chunk_path = "data" + c->content_hash.MakePath(1, 2) + "P";
+        if (!Exists(chunk_path)) {
+          LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %sP (%s -> "
+                                          "offset: %d | size: %d) missing",
+                   c->content_hash.ToString().c_str(),
+                   full_path.c_str(),
+                   c->offset,
+                   c->size);
+          retval = false;
+        }
+      }
+
+      // is the aggregated chunk size equal to the actual file size?
+      if (aggregated_file_size != entries[i].size()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "chunks of file %s produce a size "
+                                        "mismatch. Calculated %d bytes | %d "
+                                        "bytes expected",
+                 full_path.c_str(),
+                 aggregated_file_size,
+                 entries[i].size());
+        retval = false;
+      }
+    }
   }
 
   // Check directory linkcount
