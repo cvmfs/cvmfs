@@ -5,7 +5,6 @@
 using namespace upload;
 
 static void SpoolCallback(const SpoolerResult &result) {
-
   std::cout << result.return_code << std::endl;
 }
 
@@ -16,7 +15,7 @@ int main() {
 
   spooler->RegisterListener(&SpoolCallback);
 
-  spooler->Process("/home/rene/Documents/Schweinestall/cvmfs/build/cvmfs/debug_spool");
+  spooler->Process("/home/rene/Documents/Schweinestall/cvmfs/build/cvmfs/bigfile");
 
   spooler->WaitForTermination();
 
