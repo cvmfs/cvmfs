@@ -748,6 +748,31 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
+SqlInsertFileChunk::SqlInsertFileChunk(const Database &database) {
+  const string statememt =
+    "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
+    //                       1          2        3      4     5
+    "VALUES (:md5_1, :md5_2, :offset, :size, :hash)";
+  Init(database.sqlite_db(), statememt);
+}
+
+
+bool SqlInsertFileChunk::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+bool SqlInsertFileChunk::BindFileChunk(const FileChunk &chunk) {
+  return
+    BindInt64(3,    chunk.offset)       &&
+    BindInt64(4,    chunk.size)         &&
+    BindSha1Blob(5, chunk.content_hash);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }

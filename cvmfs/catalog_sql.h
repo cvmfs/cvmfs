@@ -492,6 +492,17 @@ class SqlIncLinkcount : public Sql {
 //------------------------------------------------------------------------------
 
 
+class SqlInsertFileChunk : public Sql {
+ public:
+  SqlInsertFileChunk(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  bool BindFileChunk(const FileChunk &chunk);
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlMaxHardlinkGroup : public Sql {
  public:
   SqlMaxHardlinkGroup(const Database &database);
