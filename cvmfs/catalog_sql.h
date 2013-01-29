@@ -503,6 +503,16 @@ class SqlInsertFileChunk : public Sql {
 //------------------------------------------------------------------------------
 
 
+class SqlRemoveFileChunks : public Sql {
+ public:
+  SqlRemoveFileChunks(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlMaxHardlinkGroup : public Sql {
  public:
   SqlMaxHardlinkGroup(const Database &database);

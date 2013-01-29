@@ -777,9 +777,26 @@ bool SqlInsertFileChunk::BindFileChunk(const FileChunk &chunk) {
 //------------------------------------------------------------------------------
 
 
+SqlRemoveFileChunks::SqlRemoveFileChunks(const Database &database) {
+  const string statement =
+    "DELETE FROM chunks "
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2)";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlRemoveFileChunks::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
+
 
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
   return RetrieveInt64(0) >> 32;

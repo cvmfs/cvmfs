@@ -24,6 +24,7 @@ WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   sql_touch_(NULL),
   sql_update_(NULL),
   sql_insert_file_chunk_(NULL),
+  sql_remove_file_chunks_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
   dirty_(false)
@@ -59,13 +60,14 @@ void WritableCatalog::InitPreparedStatements() {
 
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
-  sql_insert_            = new SqlDirentInsert     (database());
-  sql_unlink_            = new SqlDirentUnlink     (database());
-  sql_touch_             = new SqlDirentTouch      (database());
-  sql_update_            = new SqlDirentUpdate     (database());
-  sql_insert_file_chunk_ = new SqlInsertFileChunk  (database());
-  sql_max_link_id_       = new SqlMaxHardlinkGroup (database());
-  sql_inc_linkcount_     = new SqlIncLinkcount     (database());
+  sql_insert_             = new SqlDirentInsert     (database());
+  sql_unlink_             = new SqlDirentUnlink     (database());
+  sql_touch_              = new SqlDirentTouch      (database());
+  sql_update_             = new SqlDirentUpdate     (database());
+  sql_insert_file_chunk_  = new SqlInsertFileChunk  (database());
+  sql_remove_file_chunks_ = new SqlRemoveFileChunks (database());
+  sql_max_link_id_        = new SqlMaxHardlinkGroup (database());
+  sql_inc_linkcount_      = new SqlIncLinkcount     (database());
 }
 
 
@@ -142,6 +144,16 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
 
   SetDirty();
 
+  // if the entry used to be a chunked file... remove the chunks
+  if (entry.IsChunkedFile()) {
+    retval =
+      sql_remove_file_chunks_->BindPathHash(path_hash) &&
+      sql_remove_file_chunks_->Execute();
+    assert(retval);
+    sql_remove_file_chunks_->Reset();
+  }
+
+  // remove the entry itself
   retval =
     sql_unlink_->BindPathHash(path_hash) &&
     sql_unlink_->Execute();

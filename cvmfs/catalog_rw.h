@@ -95,6 +95,7 @@ class WritableCatalog : public Catalog {
   SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
   SqlInsertFileChunk  *sql_insert_file_chunk_;
+  SqlRemoveFileChunks *sql_remove_file_chunks_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
 
