@@ -1,4 +1,4 @@
-cvmfs_test_name="Creating File Chunks"
+cvmfs_test_name="Remove Chunked File"
 cvmfs_test_autofs_on_startup=false
 
 produce_files_in() {
