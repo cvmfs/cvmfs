@@ -513,6 +513,17 @@ class SqlRemoveFileChunks : public Sql {
 //------------------------------------------------------------------------------
 
 
+class SqlGetFileChunks : public Sql {
+ public:
+  SqlGetFileChunks(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  FileChunk GetFileChunk() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlMaxHardlinkGroup : public Sql {
  public:
   SqlMaxHardlinkGroup(const Database &database);

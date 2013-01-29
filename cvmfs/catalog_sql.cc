@@ -756,7 +756,7 @@ SqlInsertFileChunk::SqlInsertFileChunk(const Database &database) {
   const string statememt =
     "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
     //                       1          2        3      4     5
-    "VALUES (:md5_1, :md5_2, :offset, :size, :hash)";
+    "VALUES (:md5_1, :md5_2, :offset, :size, :hash);";
   Init(database.sqlite_db(), statememt);
 }
 
@@ -780,13 +780,38 @@ bool SqlInsertFileChunk::BindFileChunk(const FileChunk &chunk) {
 SqlRemoveFileChunks::SqlRemoveFileChunks(const Database &database) {
   const string statement =
     "DELETE FROM chunks "
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2)";
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statement);
 }
 
 
 bool SqlRemoveFileChunks::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(1, 2, hash);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlGetFileChunks::SqlGetFileChunks(const Database &database) {
+  const string statement =
+    "SELECT offset, size, hash FROM chunks "
+    //         0      1     2
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+    //                    1                          2
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlGetFileChunks::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+FileChunk SqlGetFileChunks::GetFileChunk() const {
+  return FileChunk(RetrieveSha1Blob(2),
+                   RetrieveInt64(0),
+                   RetrieveInt64(1));
 }
 
 
