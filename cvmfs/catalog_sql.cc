@@ -797,8 +797,9 @@ SqlGetFileChunks::SqlGetFileChunks(const Database &database) {
   const string statement =
     "SELECT offset, size, hash FROM chunks "
     //         0      1     2
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2) "
     //                    1                          2
+    "ORDER BY offset ASC;";
   Init(database.sqlite_db(), statement);
 }
 
