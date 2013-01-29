@@ -278,7 +278,7 @@ class SqlDirent : public Sql {
   const static int kFlagFile                = 4;
   const static int kFlagLink                = 8;
   const static int kFlagFileStat            = 16;  // currently unused
-  const static int kFlagFileChunk           = 64;  // currently unused
+  const static int kFlagFileChunk           = 64;
 
  protected:
   /**

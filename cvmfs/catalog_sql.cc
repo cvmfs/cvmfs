@@ -351,6 +351,9 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   else
     database_flags |= kFlagFile;
 
+  if (entry.IsChunkedFile())
+    database_flags |= kFlagFileChunk;
+
   return database_flags;
 }
 
@@ -487,6 +490,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
+  result.is_chunked_file_ = (database_flags & kFlagFileChunk);
   const char *name = reinterpret_cast<const char *>(RetrieveText(6));
   const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
