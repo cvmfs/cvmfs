@@ -27,7 +27,7 @@ Chunk ChunkGenerator::Next() {
 size_t ChunkGenerator::FindNextCutMark() const {
   assert (HasMoreData());
 
-  return offset_ + std::min(100ul * 1024ul, mmf_.size() - offset_);
+  return offset_ + std::min(8ul * 1024ul * 1024ul, mmf_.size() - offset_);
 }
 
 bool ChunkGenerator::HasMoreData() const {
