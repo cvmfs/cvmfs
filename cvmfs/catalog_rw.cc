@@ -78,6 +78,8 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_unlink_;
   delete sql_touch_;
   delete sql_update_;
+  delete sql_insert_file_chunk_;
+  delete sql_remove_file_chunks_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
 }
@@ -318,7 +320,7 @@ void WritableCatalog::MoveToNestedRecursively(
        WritableCatalog *new_nested_catalog,
        vector<string> *grand_child_mountpoints)
 {
-  // After creating a new nested catalog we have move all elements
+  // After creating a new nested catalog we have to move all elements
   // now contained by the new one.  List and move them recursively.
   DirectoryEntryList listing;
   bool retval = ListingPath(PathString(directory.data(), directory.length()),
@@ -326,12 +328,10 @@ void WritableCatalog::MoveToNestedRecursively(
   assert(retval);
 
   // Go through the listing
-  string full_path;
   for (DirectoryEntryList::const_iterator i = listing.begin(),
        iEnd = listing.end(); i != iEnd; ++i)
   {
-    full_path = directory + "/";
-    full_path.append(i->name().GetChars(), i->name().GetLength());
+    const string full_path = i->GetFullPath(directory);
 
     // The entries are first inserted into the new catalog
     new_nested_catalog->AddEntry(*i, full_path);
@@ -343,6 +343,8 @@ void WritableCatalog::MoveToNestedRecursively(
       // Recurse deeper into the directory tree
       MoveToNestedRecursively(full_path, new_nested_catalog,
                               grand_child_mountpoints);
+    } else if (i->IsChunkedFile()) {
+      MoveFileChunksToNested(full_path, new_nested_catalog);
     }
 
     // Remove the entry from the current catalog
@@ -368,6 +370,21 @@ void WritableCatalog::MoveCatalogsToNested(
 
     new_nested_catalog->InsertNestedCatalog(*i, attached_reference,
                                             hash_nested);
+  }
+}
+
+
+void WritableCatalog::MoveFileChunksToNested(
+        const std::string   &full_path,
+        WritableCatalog     *new_nested_catalog) {
+  FileChunks chunks;
+  GetFileChunks(PathString(full_path), &chunks);
+  assert (chunks.size() > 0);
+
+  FileChunks::const_iterator i    = chunks.begin();
+  FileChunks::const_iterator iend = chunks.end();
+  for (; i != iend; ++i) {
+    new_nested_catalog->AddFileChunk(full_path, *i);
   }
 }
 
