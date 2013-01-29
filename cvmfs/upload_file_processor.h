@@ -10,22 +10,6 @@
 namespace upload {
 
 /**
- * Describes a FileChunk as generated from the FileProcessor in collaboration
- * with the ChunkGenerator.
- */
-struct FileChunk {
-  FileChunk() :
-    content_hash(hash::Any(hash::kSha1)),
-    offset(0),
-    size(0) {}
-
-  hash::Any content_hash; //!< content hash of the compressed file chunk
-  size_t    offset;       //!< byte offset in the uncompressed input file
-  size_t    size;         //!< uncompressed size of the data chunk
-};
-typedef std::vector<FileChunk> FileChunks;
-
-/**
  * Adds a temporary file path to the FileChunk structure
  * This is needed internally before the file is actually stored under it's
  * content hash
