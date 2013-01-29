@@ -61,7 +61,12 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
   // DirectoryEntry handling
   void AddFile(const DirectoryEntryBase &entry,
-               const std::string &parent_directory);
+               const std::string &parent_directory) {
+    AddFile(DirectoryEntry(entry), parent_directory);
+  }
+  void AddChunkedFile(const DirectoryEntryBase &entry,
+                      const std::string &parent_directory,
+                      const FileChunks &file_chunks);
   void TouchFile(const DirectoryEntryBase &entry,
                  const std::string &file_path);
   void RemoveFile(const std::string &file_path);
@@ -94,6 +99,9 @@ class WritableCatalogManager : public AbstractCatalogManager {
   LoadError LoadCatalog(const PathString &mountpoint, const hash::Any &hash,
                         std::string *catalog_path);
   Catalog* CreateCatalog(const PathString &mountpoint, Catalog *parent_catalog);
+
+  inline void AddFile(const DirectoryEntry  &entry,
+                      const std::string     &parent_directory);
 
  private:
   bool FindCatalog(const std::string &path, WritableCatalog **result);

@@ -23,11 +23,12 @@ WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   sql_unlink_(NULL),
   sql_touch_(NULL),
   sql_update_(NULL),
+  sql_insert_file_chunk_(NULL),
   sql_max_link_id_(NULL),
-  sql_inc_linkcount_(NULL)
+  sql_inc_linkcount_(NULL),
+  dirty_(false)
 {
-  read_only_ = false;
-  dirty_ = false;
+  read_only_ =false;
 }
 
 
@@ -58,12 +59,13 @@ void WritableCatalog::InitPreparedStatements() {
 
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
-  sql_insert_        = new SqlDirentInsert     (database());
-  sql_unlink_        = new SqlDirentUnlink     (database());
-  sql_touch_         = new SqlDirentTouch      (database());
-  sql_update_        = new SqlDirentUpdate     (database());
-  sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
-  sql_inc_linkcount_ = new SqlIncLinkcount     (database());
+  sql_insert_            = new SqlDirentInsert     (database());
+  sql_unlink_            = new SqlDirentUnlink     (database());
+  sql_touch_             = new SqlDirentTouch      (database());
+  sql_update_            = new SqlDirentUpdate     (database());
+  sql_insert_file_chunk_ = new SqlInsertFileChunk  (database());
+  sql_max_link_id_       = new SqlMaxHardlinkGroup (database());
+  sql_inc_linkcount_     = new SqlIncLinkcount     (database());
 }
 
 
@@ -189,6 +191,26 @@ void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
     sql_update_->Execute();
   assert(retval);
   sql_update_->Reset();
+}
+
+void WritableCatalog::AddFileChunk(const std::string &entry_path,
+                                   const FileChunk &chunk) {
+  SetDirty();
+
+  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
+
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding chunk for %s from offset %d "
+                                        "and chunk size: %d bytes",
+           entry_path.c_str(),
+           chunk.offset,
+           chunk.offset + chunk.size);
+
+  bool retval =
+    sql_insert_file_chunk_->BindPathHash(path_hash) &&
+    sql_insert_file_chunk_->BindFileChunk(chunk) &&
+    sql_insert_file_chunk_->Execute();
+  assert(retval);
+  sql_insert_file_chunk_->Reset();
 }
 
 

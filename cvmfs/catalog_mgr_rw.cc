@@ -324,7 +324,6 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   SyncUnlock();
 }
 
-
 /**
  * Add a new file to the catalogs.
  * @param entry a DirectoryEntry structure describing the new file
@@ -332,11 +331,10 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
  *                         file to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddFile(const DirectoryEntryBase &entry,
-                                     const std::string &parent_directory) {
+void WritableCatalogManager::AddFile(const DirectoryEntry  &entry,
+                                     const std::string     &parent_directory) {
   const string parent_path = MakeRelativePath(parent_directory);
-  string file_path = parent_path + "/";
-  file_path.append(entry.name().GetChars(), entry.name().GetLength());
+  const string file_path   = entry.GetFullPath(parent_path);
 
   SyncLock();
   WritableCatalog *catalog;
@@ -347,7 +345,37 @@ void WritableCatalogManager::AddFile(const DirectoryEntryBase &entry,
   }
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
-  catalog->AddEntry(DirectoryEntry(entry), file_path, parent_path);
+  catalog->AddEntry(entry, file_path, parent_path);
+  SyncUnlock();
+}
+
+
+void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase  &entry,
+                                            const std::string         &parent_directory,
+                                            const FileChunks          &file_chunks) {
+  assert (file_chunks.size() > 0);
+
+  DirectoryEntry full_entry(entry);
+  full_entry.set_is_chunked_file(true);
+
+  AddFile(full_entry, parent_directory);
+
+  const string parent_path = MakeRelativePath(parent_directory);
+  const string file_path   = entry.GetFullPath(parent_path);
+
+  SyncLock();
+  WritableCatalog *catalog;
+  if (!FindCatalog(parent_path, &catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
+             file_path.c_str());
+    assert(false);
+  }
+
+  FileChunks::const_iterator i    = file_chunks.begin();
+  FileChunks::const_iterator iend = file_chunks.end();
+  for (; i != iend; ++i) {
+    catalog->AddFileChunk(file_path, *i);
+  }
   SyncUnlock();
 }
 

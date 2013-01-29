@@ -48,6 +48,7 @@ class WritableCatalog : public Catalog {
   }
   void RemoveEntry(const std::string &entry_path);
   void IncLinkcount(const std::string &path_within_group, const int delta);
+  void AddFileChunk(const std::string &entry_path, const FileChunk &chunk);
 
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
@@ -93,6 +94,7 @@ class WritableCatalog : public Catalog {
   SqlDirentUnlink     *sql_unlink_;
   SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
+  SqlInsertFileChunk  *sql_insert_file_chunk_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
 
