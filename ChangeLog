@@ -1,4 +1,5 @@
 2.1.7:
+  * Renamed cvmfs-lib RPM to cvmfs-devel 
   * Fixed cvmfs_config reload on clean nodes
 
 2.1.6:

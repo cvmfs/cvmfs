@@ -79,11 +79,11 @@ HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch
 Copyright (c) CERN
 
-%package lib
+%package devel
 Summary: CernVM-FS static client library
 Group: Applications/System
 Requires: openssl
-%description lib
+%description devel
 CernVM-FS static client library for pure user-space use
 
 %package server
@@ -269,7 +269,7 @@ fi
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %doc COPYING AUTHORS README ChangeLog
 
-%files lib
+%files devel 
 %defattr(-,root,root)
 %{_libdir}/libcvmfs.a
 %{_includedir}/libcvmfs.h
@@ -284,6 +284,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Jan 29 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
+- Renamed cvmfs-lib package to cvmfs-devel package
 * Tue Jan 15 2013 Jakob Blomer <jblomer@cern.ch>
 - Package conflicts with the cvmfs 2.0 branch
 * Tue Oct 02 2012 Jakob Blomer <jblomer@cern.ch>
