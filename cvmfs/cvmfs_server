@@ -203,7 +203,7 @@ is_local_upstream() {
 
 
 has_selinux() {
-  [ -f /selinux/enforce ]
+  [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
 }
 
 
