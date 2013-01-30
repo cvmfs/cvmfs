@@ -600,6 +600,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 template <class DerivedWorkerT>
 class ConcurrentWorker : SingleCopy {
  public:
+  virtual ~ConcurrentWorker() {}
+
   /**
    * Does general initialization before any jobs will get scheduled. You do not
    * need to up-call this initialize method, since it is seen as a dummy here.

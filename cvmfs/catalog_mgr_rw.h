@@ -100,8 +100,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
                         std::string *catalog_path);
   Catalog* CreateCatalog(const PathString &mountpoint, Catalog *parent_catalog);
 
-  inline void AddFile(const DirectoryEntry  &entry,
-                      const std::string     &parent_directory);
+  void AddFile(const DirectoryEntry  &entry,
+               const std::string     &parent_directory);
 
  private:
   bool FindCatalog(const std::string &path, WritableCatalog **result);
