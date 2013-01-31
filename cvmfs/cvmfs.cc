@@ -61,6 +61,8 @@
 #include <algorithm>
 #include <functional>
 
+#include "cvmfs.h"
+
 #include "platform.h"
 #include "logging.h"
 #include "tracer.h"
@@ -73,6 +75,7 @@
 #include "signature.h"
 #include "quota.h"
 #include "util.h"
+#include "util_concurrency.h"
 #include "atomic.h"
 #include "lru.h"
 #include "peers.h"
@@ -126,6 +129,40 @@ struct DirectoryListing {
 
   DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
 };
+
+/**
+ * For opening and reading chunked files
+ */
+class LiveFileChunk : public FileChunk {
+ public:
+  explicit LiveFileChunk(const FileChunk &chunk) :
+    FileChunk(chunk),
+    open_(false),
+    file_descriptor_(0) {}
+
+  bool Fetch();
+  bool Close();
+  inline int file_descriptor() const { return file_descriptor_; }
+
+  inline bool IsOpen() const { return open_; }
+
+  /**
+   * exclusively used to find file chunks using std::lower_bound
+   */
+  inline bool operator<(const off_t offset) const {
+    return this->offset + this->size <= offset;
+  }
+
+ private:
+  bool open_;
+  int  file_descriptor_;
+};
+typedef std::vector<LiveFileChunk> LiveFileChunks;
+typedef std::map<fuse_ino_t, LiveFileChunks> LiveFileChunksMap;
+
+LiveFileChunksMap live_file_chunks_;
+pthread_mutex_t live_file_chunks_mutex_ = PTHREAD_MUTEX_INITIALIZER;
+
 
 const loader::LoaderExports *loader_exports_ = NULL;
 bool foreground_ = false;
@@ -184,6 +221,8 @@ atomic_int32 open_dirs_; /**< number of currently open directories */
 unsigned max_open_files_; /**< maximum allowed number of open files */
 const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
+
+
 
 
 unsigned GetMaxTTL() {
@@ -325,6 +364,32 @@ static void RemountFinish() {
   }
 
   atomic_cas32(&reload_critical_section_, 1, 0);
+}
+
+
+/**
+ * Fetches a single chunk of a chunked file
+ */
+bool LiveFileChunk::Fetch() {
+  file_descriptor_ = cache::Fetch(*this, "file chunk");
+  if (file_descriptor_ >= 0) {
+    open_ = true;
+  }
+  return IsOpen();
+}
+
+
+/**
+ * Closes the file handle to this chunk
+ */
+bool LiveFileChunk::Close() {
+  if (!IsOpen()) {
+    return true;
+  }
+
+  const int closed = close(file_descriptor_);
+  open_ = false;
+  return closed == 0;
 }
 
 
@@ -807,8 +872,46 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
+  if (dirent.IsChunkedFile()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "chunked file %s opened (download delayed "
+                                   "to read() call",
+             path.c_str());
+
+    // Retrieve File chunks from the catalog
+    FileChunks chunks;
+    if (! dirent.catalog()->GetFileChunks(path, &chunks) || chunks.empty()) {
+      LogCvmfs(kLogCvmfs, kLogSyslog, "file %s is marked as 'chunked', but no "
+                                      "chunks found in the catalog %s.",
+               path.c_str(),
+               dirent.catalog()->path().c_str());
+      fuse_reply_err(req, EIO);
+      return;
+    }
+
+    // Add process data to the retrieved chunks
+    LiveFileChunks live_chunks;
+    FileChunks::const_iterator i    = chunks.begin();
+    FileChunks::const_iterator iend = chunks.end();
+    for (; i != iend; ++i) {
+      live_chunks.push_back(LiveFileChunk(*i));
+    }
+
+    // Save the newly opened file chunks into the respective list
+    {
+      MutexLockGuard guard(live_file_chunks_mutex_);
+      if (live_file_chunks_.count(ino) == 0) {
+        live_file_chunks_[ino] = live_chunks;
+      }
+    }
+
+    // DONE! Actual file chunks will be loaded on demand...
+    atomic_inc64(&num_fs_open_);
+    fi->fh = -2;
+    fuse_reply_open(req, fi);
+    return;
+  }
+
   fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
-  atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
@@ -828,6 +931,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         inode_cache_->Insert(ino, dirent);
       }
       fi->fh = fd;
+      atomic_inc64(&num_fs_open_);
       fuse_reply_open(req, fi);
       return;
     } else {
@@ -877,15 +981,95 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
   // Get data chunk (<=4k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
-  const int64_t fd = fi->fh;
-  int result = pread(fd, data, size, off);
+
+  int bytes_read = 0;
+
+  // Do we fiddle with a chunked file?
+  if (fi->fh == -2) {
+    MutexLockGuard guard(live_file_chunks_mutex_);
+
+    // find the file chunk descriptions for the requested inode
+    LiveFileChunksMap::iterator chunks_itr = live_file_chunks_.find(ino);
+    if (chunks_itr == live_file_chunks_.end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find file chunk "
+                                                  "data for ino: %d",
+               ino);
+      fuse_reply_err(req, EIO);
+      return;
+    }
+    LiveFileChunks &chunks = chunks_itr->second;
+
+    // find the chunk that holds the beginning of the requested data
+    LiveFileChunks::iterator chunk_itr = chunks.begin();
+    chunk_itr = std::lower_bound(chunk_itr,
+                                 chunks.end(),
+                                 off);
+    if (chunk_itr == chunks.end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find specific "
+                                                  "file chunk for "
+                                                  "ino: %d starting at offset: "
+                                                  "%d",
+               ino, off);
+      fuse_reply_err(req, EIO);
+      return;
+    }
+
+    // fetch all needed chunks and read the requested data
+    off_t offset_in_chunk = off - chunk_itr->offset;
+    do {
+      assert (chunk_itr != chunks.end());
+      LiveFileChunk &chunk = *chunk_itr;
+
+      // download and open chunk on demand
+      if (!chunk.IsOpen()) {
+        if (!chunk.Fetch()) {
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to load chunk for "
+                                                      "inode: %d, CAS key: %s, "
+                                                      "error code: %d",
+             ino, chunk.content_hash.ToString().c_str(), errno);
+
+          if (errno == EMFILE) {
+            fuse_reply_err(req, EMFILE);
+            return;
+          }
+
+          fuse_reply_err(req, EIO);
+          return;
+        }
+      }
+
+      // read data from the chunk
+      assert (chunk.IsOpen());
+      size_t bytes_to_read   = size - bytes_read;
+      size_t size_in_chunk   = std::min(bytes_to_read, chunk.size - offset_in_chunk);
+      int    read_bytes      = pread(chunk.file_descriptor(),
+                                     data + bytes_read,
+                                     size_in_chunk,
+                                     offset_in_chunk);
+      if (read_bytes < 0) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, bytes_read);
+        fuse_reply_err(req, errno);
+        return;
+      }
+      bytes_read += read_bytes;
+
+      // advance to the next chunk to keep on reading data
+      chunk.Close();
+      chunk_itr++;
+      offset_in_chunk = 0;
+    } while (bytes_read < size && chunk_itr != chunks.end());
+
+  } else {
+    const int64_t fd = fi->fh;
+    bytes_read = pread(fd, data, size, off);
+  }
 
   // Push it to user
-  if (result >= 0) {
-    fuse_reply_buf(req, data, result);
-    LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", result);
+  if (bytes_read >= 0) {
+    fuse_reply_buf(req, data, bytes_read);
+    LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", bytes_read);
   } else {
-    LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, result);
+    LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, bytes_read);
     fuse_reply_err(req, errno);
   }
 }
@@ -901,7 +1085,20 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
            catalog_manager_->MangleInode(ino));
 
   const int64_t fd = fi->fh;
-  if (close(fd) == 0) atomic_dec32(&open_files_);
+
+  // do we work with a chunked file here?
+  if (fd == -2) {
+    MutexLockGuard guard(live_file_chunks_mutex_);
+    if (live_file_chunks_.erase(ino) > 0) {
+      atomic_dec32(&open_files_);
+    }
+
+  } else {
+
+    if (close(fd) == 0) {
+      atomic_dec32(&open_files_);
+    }
+  }
 
   fuse_reply_err(req, 0);
 }
