@@ -158,11 +158,6 @@ class LiveFileChunk : public FileChunk {
   int  file_descriptor_;
 };
 typedef std::vector<LiveFileChunk> LiveFileChunks;
-typedef std::map<fuse_ino_t, LiveFileChunks> LiveFileChunksMap;
-
-LiveFileChunksMap live_file_chunks_;
-pthread_mutex_t live_file_chunks_mutex_ = PTHREAD_MUTEX_INITIALIZER;
-
 
 const loader::LoaderExports *loader_exports_ = NULL;
 bool foreground_ = false;
@@ -193,8 +188,9 @@ atomic_int32 reload_critical_section_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
-struct hash_dirhandle {
-  size_t operator() (const uint64_t handle) const {
+template <typename hashed_type>
+struct hash_handle {
+  size_t operator() (const hashed_type handle) const {
 #ifdef __x86_64__
     return MurmurHash64A(&handle, sizeof(handle), 0x9ce603115bba659bLLU);
 #else
@@ -202,11 +198,17 @@ struct hash_dirhandle {
 #endif
   }
 };
-typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_dirhandle>
+typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_handle<uint64_t> >
   DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
+
+typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks, hash_handle<uint64_t> >
+  LiveFileChunksMap;
+
+LiveFileChunksMap *live_file_chunks_ = NULL;
+pthread_mutex_t live_file_chunks_mutex_ = PTHREAD_MUTEX_INITIALIZER;
 
 atomic_int64 num_fs_open_;
 atomic_int64 num_fs_dir_open_;
@@ -899,8 +901,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     // Save the newly opened file chunks into the respective list
     {
       MutexLockGuard guard(live_file_chunks_mutex_);
-      if (live_file_chunks_.count(ino) == 0) {
-        live_file_chunks_[ino] = live_chunks;
+      if (live_file_chunks_->count(ino) == 0) {
+        (*live_file_chunks_)[ino] = live_chunks;
       }
     }
 
@@ -989,8 +991,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     MutexLockGuard guard(live_file_chunks_mutex_);
 
     // find the file chunk descriptions for the requested inode
-    LiveFileChunksMap::iterator chunks_itr = live_file_chunks_.find(ino);
-    if (chunks_itr == live_file_chunks_.end()) {
+    LiveFileChunksMap::iterator chunks_itr = live_file_chunks_->find(ino);
+    if (chunks_itr == live_file_chunks_->end()) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find file chunk "
                                                   "data for ino: %d",
                ino);
@@ -1089,7 +1091,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   // do we work with a chunked file here?
   if (fd == -2) {
     MutexLockGuard guard(live_file_chunks_mutex_);
-    if (live_file_chunks_.erase(ino) > 0) {
+    if (live_file_chunks_->erase(ino) > 0) {
       atomic_dec32(&open_files_);
     }
 
@@ -1560,6 +1562,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
+  cvmfs::live_file_chunks_  = new cvmfs::LiveFileChunksMap();
+  cvmfs::live_file_chunks_->set_empty_key((fuse_ino_t)(-1));
+  cvmfs::live_file_chunks_->set_deleted_key((fuse_ino_t)(-2));
 
   // Runtime counters
   atomic_init64(&cvmfs::num_fs_open_);
@@ -1822,11 +1827,13 @@ static void Fini() {
 
   delete cvmfs::catalog_manager_;
   delete cvmfs::directory_handles_;
+  delete cvmfs::live_file_chunks_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
   cvmfs::catalog_manager_ = NULL;
   cvmfs::directory_handles_ = NULL;
+  cvmfs::live_file_chunks_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
