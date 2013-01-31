@@ -1232,6 +1232,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   } else {
     options::ParseDefault(loader_exports->repository_name);
   }
+  options::ResolveParameters();
   g_options_ready = true;
   string parameter;
 

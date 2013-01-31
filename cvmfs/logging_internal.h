@@ -59,6 +59,7 @@ enum LogSource {
   kLogNfsMaps,
   kLogPublish,
   kLogSpooler,
+  kLogDns
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;

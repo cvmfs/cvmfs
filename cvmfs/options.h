@@ -23,6 +23,7 @@ void ClearConfig();
 bool GetValue(const std::string &key, std::string *value);
 bool GetSource(const std::string &key, std::string *value);
 bool IsOn(const std::string &param_value);
+bool ResolveParameters();
 std::vector<std::string> GetAllKeys();
 std::string Dump();
 
