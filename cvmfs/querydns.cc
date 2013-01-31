@@ -5,14 +5,18 @@
  *
  */
 
+#include "cvmfs_config.h"
 #include "querydns.h"
-#include "logging.h"
 
 using namespace std; // NOLINT
 
 // Global variables for getting the results of cname and txt.
 static string cname;
 unsigned char *result_txt;
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
 
 static void run_ares_mainloop(ares_channel channel)
 { 
@@ -35,7 +39,7 @@ static void run_ares_mainloop(ares_channel channel)
   }
 }
 
-static void callback_txt(void *arg, int status, int timeouts,
+static void callback_txt(void *arg, int status,int timeouts,
                          unsigned char *abuf, int alen)
 {
    struct ares_txt_reply *get_txt_result=NULL;
@@ -52,12 +56,12 @@ static void callback_txt(void *arg, int status, int timeouts,
 }
 
 
-static void callback_cname(void *arg, int status, int timeouts,
+static void callback_cname(void *arg, int status,int timeouts,
                            unsigned char *abuf, int alen)
 {
    struct hostent *host=NULL;
    
-   status = ares_parse_a_reply(abuf, alen, &host, NULL, NULL);
+   status = ares_parse_a_reply(abuf, alen, &host,NULL,NULL);
    if (status != ARES_SUCCESS)
    { 
      LogCvmfs(kLogDns, kLogStderr, "%s", ares_strerror(status));
@@ -86,7 +90,7 @@ bool QueryDns(const std::string &hostname,
   status = ares_library_init(ARES_LIB_INIT_ALL);
   if (status != ARES_SUCCESS)
   {
-     LogCvmfs(kLogDns, kLogStderr, "%s", ares_strerror(status));
+     cout << ares_strerror(status);
      return false;
   }
 
@@ -125,7 +129,7 @@ bool QueryDns(const std::string &hostname,
   // After get the cname, query the txt result.
   if (cname != "")
   {
-     ares_query(channel, cname.c_str(), C_IN, T_TXT, callback_txt, NULL);
+     ares_query(channel, cname.c_str(),C_IN, T_TXT, callback_txt, NULL);
      run_ares_mainloop(channel);
   }
   else
@@ -141,3 +145,8 @@ bool QueryDns(const std::string &hostname,
 
   return true;
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
+
