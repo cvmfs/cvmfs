@@ -50,6 +50,7 @@ using namespace std;  // NOLINT
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+const std::string FileChunk::kChecksumSuffix = "P";
 
 /**
  * Removes a trailing "/" from a path.

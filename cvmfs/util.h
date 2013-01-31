@@ -241,14 +241,16 @@ struct FileChunk {
     offset(0),
     size(0) {}
   FileChunk(const hash::Any &hash,
-            const size_t     offset,
+            const off_t      offset,
             const size_t     size) :
     content_hash(hash),
     offset(offset),
     size(size) {}
 
+  static const std::string kChecksumSuffix;
+
   hash::Any content_hash; //!< content hash of the compressed file chunk
-  size_t    offset;       //!< byte offset in the uncompressed input file
+  off_t     offset;       //!< byte offset in the uncompressed input file
   size_t    size;         //!< uncompressed size of the data chunk
 };
 typedef std::vector<FileChunk> FileChunks;

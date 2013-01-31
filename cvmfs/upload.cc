@@ -11,8 +11,6 @@
 
 using namespace upload;
 
-const std::string AbstractSpooler::kChunkSuffix = "P";
-
 AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
                                        const std::string& definition_string) :
   valid_(false)

@@ -85,9 +85,6 @@ namespace upload
    *       NotifyListeners() when a spooler job has finished.
    */
   class AbstractSpooler : public Observable<SpoolerResult> {
-   protected:
-    static const std::string kChunkSuffix;
-
    public:
     /**
      * SpoolerDefinition is given by a string of the form:

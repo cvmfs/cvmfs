@@ -40,7 +40,7 @@ void LocalSpooler::Upload(const FileProcessor::Results &data) {
     TemporaryFileChunks::const_iterator iend = data.file_chunks.end();
     for (; i != iend; ++i) {
       move_retcode = Move(i->temporary_path,
-                          "data" + i->content_hash.MakePath(1,2) + kChunkSuffix);
+                          "data" + i->content_hash.MakePath(1,2) + FileChunk::kChecksumSuffix);
       if (move_retcode != 0) {
         retcode = move_retcode;
         break;
