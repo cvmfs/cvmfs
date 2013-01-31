@@ -8,6 +8,7 @@
 
 #include "cvmfs_config.h"
 #include "options.h"
+#include "querydns.h"
 
 #include <unistd.h>
 
@@ -145,15 +146,15 @@ bool ResolveParameters()
   const uint16_t port = 53;
   const string ns_server="137.138.234.60";
 
-  for (map<string, ConfigValue>::iterator iter = conf_->begin(),
-       iEnd = conf_->end(); iter != iEnd; ++iter)
-  {   
+  for (map<string, ConfigValue>::iterator iter = config_->begin(),
+       iEnd = config_->end(); iter != iEnd; ++iter)
+  {
     const string conf_val = iter->second.value;
 
     if( conf_val.find_first_of(flag) == 0 )
     {
        res_host.assign(conf_val, 1, conf_val.length()-1);
-       retval = QueryDns(res_host, type, &ns_server, port, &res_result);
+       retval = QueryDns(res_host, type, ns_server, port, &res_result);
        if (retval == 1)
           iter->second.value = res_result;
        else
