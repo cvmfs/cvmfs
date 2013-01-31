@@ -1,6 +1,6 @@
 Name:           cvmfs-release       
 Version:        2
-Release:        3
+Release:        3%{?dist}
 Summary:        Packages for the CernVM File System
 
 Group:          Applications/System
