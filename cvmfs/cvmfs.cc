@@ -850,7 +850,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   // TODO: move to download
   time_t now = time(NULL);
   if (now - previous_io_error_.timestamp < kForgetDos) {
-    usleep(previous_io_error_.delay*1000);
+    SafeSleepMs(previous_io_error_.delay);
     if (previous_io_error_.delay < kMaxIoDelay)
       previous_io_error_.delay *= 2;
   } else {
@@ -904,55 +904,6 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   if (close(fd) == 0) atomic_dec32(&open_files_);
 
   fuse_reply_err(req, 0);
-}
-
-
-/**
- * Emulates the getattr walk done by Fuse.
- */
-static int walk_path(const string &path) {
-  //      struct stat info;
-  // if ((path == "") || (path == "/"))
-  //    return cvmfs_getattr("/", &info);
-
-  int attr_result = walk_path(GetParentPath(path));
-  // if (attr_result == 0)
-  //    return cvmfs_getattr(path.c_str(), &info);
-
-  return attr_result;
-}
-
-
-/**
- * Removes a file from local cache
- * TODO
- */
-int ClearFile(const string &path) {
-  /*  int attr_result = walk_path(path);
-   if (attr_result != 0)
-   return attr_result;
-
-   const hash::t_md5 md5(catalog::mangled_path(path));
-   int result;
-
-   catalog::lock();
-
-   catalog::t_dirent d;
-   if (catalog::lookup_informed_unprotected(md5, find_catalog_id(path), d)) {
-   if ((!(d.flags & catalog::FILE)) || (d.flags & catalog::FILE_LINK)) {
-   result = -EINVAL;
-   } else {
-   quota::remove(d.checksum);
-   result = 0;
-   }
-   } else {
-   result = -ENOENT;
-   }
-
-   catalog::unlock();
-
-   return result;*/
-  return 0;
 }
 
 
@@ -1120,11 +1071,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download::GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = download::GetTransferredBytes();
+    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = download::GetTransferredBytes();
-    int64_t time = download::GetTransferTime();
+    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
+    int64_t time = uint64_t(download::GetStatistics().transfer_time);
     if (time == 0)
       attribute_value = "n/a";
     else
@@ -1160,8 +1111,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 
   const char base_list[] = "user.pid\0user.version\0user.revision\0"
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
-    "user.host\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
-    "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0";
+    "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
+    "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
+    "user.ndiropen\0";
   string attribute_list(base_list, sizeof(base_list));
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
@@ -1237,6 +1189,7 @@ void *g_sqlite_scratch = NULL;
 void *g_sqlite_page_cache = NULL;
 string *g_boot_error = NULL;
 
+__attribute__ ((visibility ("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 
@@ -1248,6 +1201,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   uint64_t mem_cache_size = cvmfs::kDefaultMemcache;
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
+  unsigned proxy_reset_after = 0;
+  unsigned max_retries = 1;
+  unsigned backoff_init = 2000;
+  unsigned backoff_max = 10000;
   string tracefile = "";
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
@@ -1275,6 +1232,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   } else {
     options::ParseDefault(loader_exports->repository_name);
   }
+  options::ResolveParameters();
   g_options_ready = true;
   string parameter;
 
@@ -1298,6 +1256,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
     timeout = String2Uint64(parameter);
   if (options::GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
     timeout_direct = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
+    proxy_reset_after = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_MAX_RETRIES", &parameter))
+    max_retries = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_BACKOFF_INIT", &parameter))
+    backoff_init = String2Uint64(parameter)*1000;
+  if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
+    backoff_max = String2Uint64(parameter)*1000;
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
   if (options::GetValue("CVMFS_MAX_TTL", &parameter))
@@ -1335,7 +1301,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
     const string org = tokens[0];
-    hostname = ReplaceAll(parameter, "@org@", org);
+    hostname = parameter;
+    hostname = ReplaceAll(hostname, "@org@", org);
+    hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
   }
   if (options::GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
@@ -1552,6 +1520,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   download::SetHostChain(hostname);
   download::SetProxyChain(proxies);
   download::SetTimeout(timeout, timeout_direct);
+  download::SetProxyGroupResetDelay(proxy_reset_after);
+  download::SetRetryParameters(max_retries, backoff_init, backoff_max);
   g_download_ready = true;
 
   signature::Init();
@@ -1694,7 +1664,7 @@ static bool MaintenanceMode(const int fd_progress) {
   string msg_progress = "Draining out kernel caches (" +
                         StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  sleep((int)cvmfs::kcache_timeout_);
+  SafeSleepMs((int)cvmfs::kcache_timeout_*1000);
   return true;
 }
 
