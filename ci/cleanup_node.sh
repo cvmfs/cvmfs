@@ -8,6 +8,7 @@ if [ -f /bin/rpm ]; then
   sudo rpm -e cvmfs || true
   sudo rpm -e cvmfs-server || true
   sudo rpm -e cvmfs-keys || true
+  sudo rpm -e cvmfs-devel || true
 fi
 sudo /usr/sbin/userdel cvmfs
 sudo rm -rf /etc/cvmfs /var/cache/cvmfs2 /var/lib/cvmfs
