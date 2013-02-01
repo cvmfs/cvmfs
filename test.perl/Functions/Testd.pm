@@ -15,7 +15,7 @@ use Functions::Tools qw(get_interface_address);
 # Next lines are needed to export subroutine to the main package
 use base 'Exporter';
 use vars qw/ @EXPORT_OK /;
-@EXPORT_OK = qw(stop_daemon get_interface_address supports_ipv6);
+@EXPORT_OK = qw(stop_daemon get_interface_address supports_ipv6 print_all_listening_address);
 
 # This function will close the socket, the context and unlink the file.
 sub remove_socket {	
@@ -103,6 +103,15 @@ sub supports_ipv6 {
 	}
 	else {
 		return 1;
+	}
+}
+
+# This function will be called to print all address on which the daemon is listening
+sub print_all_listening_address {
+	my %list = get_interface_address('any');
+	
+	foreach (sort keys %list) {
+		print "Listening on interface $_ at $list{$_}.\n" if $_;
 	}
 }
 

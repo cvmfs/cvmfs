@@ -15,8 +15,21 @@ use vars qw/ @EXPORT_OK /;
 # This function will accept a network interface and will retrieve the network ip for that interface
 sub get_interface_address {
 	my $iface = shift;
-	my $if = IO::Interface::Simple->new($iface);
-	if ($if) {
+	
+	# Variable to store interface object
+	my $if = undef;
+	
+	if ($iface eq 'any') {
+		my %iface_address = undef;
+		my @if_list = IO::Interface::Simple->interfaces;
+		foreach (@if_list) {
+			$if = IO::Interface::Simple->new("$_"); 
+			$iface_address{$if} = $if->address;
+		}
+		return %iface_address;
+	}
+	elsif ($if) {
+		$if = IO::Interface::Simple->new($iface);
 		return $if->address;
 	}
 	else {
