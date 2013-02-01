@@ -4,6 +4,36 @@
 
 using namespace upload;
 
+size_t  // TODO: make this configurable
+ChunkGenerator::average_chunk_size_ = 8 * 1024 * 1024;
+
+ChunkGenerator::RegisteredChunkGenerators
+ChunkGenerator::registered_chunk_generators_;
+
+ChunkGenerator* ChunkGenerator::Construct(const MemoryMappedFile &mmf) {
+  if (registered_chunk_generators_.empty()) {
+    RegisterChunkGenerators();
+  }
+
+  RegisteredChunkGenerators::const_iterator i    = registered_chunk_generators_.begin();
+  RegisteredChunkGenerators::const_iterator iend = registered_chunk_generators_.end();
+  for (; i != iend; ++i) {
+    if ((*i)->WillHandleFile(mmf)) {
+      return (*i)->Construct(mmf);
+    }
+  }
+
+  return NULL;
+}
+
+
+void ChunkGenerator::RegisterChunkGenerators() {
+  assert (registered_chunk_generators_.empty());
+
+  RegisterChunkGenerator<NaiveChunkGenerator>();
+}
+
+
 ChunkGenerator::ChunkGenerator(const MemoryMappedFile &mmf) :
   mmf_(mmf),
   offset_(0)
@@ -11,7 +41,6 @@ ChunkGenerator::ChunkGenerator(const MemoryMappedFile &mmf) :
   assert (mmf.IsMapped());
 }
 
-ChunkGenerator::~ChunkGenerator() {}
 
 Chunk ChunkGenerator::Next() {
   assert (HasMoreData());
@@ -24,13 +53,18 @@ Chunk ChunkGenerator::Next() {
 }
 
 
-off_t ChunkGenerator::FindNextCutMark() const {
-  assert (HasMoreData());
-
-  return offset_ + std::min(8ul * 1024ul * 1024ul, mmf_.size() - offset_);
-}
-
 bool ChunkGenerator::HasMoreData() const {
   return offset_ < mmf_.size();
 }
 
+
+bool NaiveChunkGenerator::WillHandleFile(const MemoryMappedFile &mmf) {
+  // this will always kick in as a last resort!
+  return true;
+}
+
+
+off_t NaiveChunkGenerator::FindNextCutMark() const {
+  assert (HasMoreData());
+  return offset() + std::min(average_chunk_size_, mmf().size() - offset());
+}

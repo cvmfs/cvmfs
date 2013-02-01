@@ -57,11 +57,12 @@ bool FileProcessor::GenerateFileChunks(const MemoryMappedFile  &mmf,
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "generating file chunks for %s",
              mmf.file_path().c_str());
 
-  ChunkGenerator chunk_generator(mmf);
+  UniquePtr<ChunkGenerator> chunk_generator(ChunkGenerator::Construct(mmf));
+  assert (chunk_generator);
 
-  while (chunk_generator.HasMoreData()) {
+  while (chunk_generator->HasMoreData()) {
     // find the next file chunk boundary
-    Chunk chunk_boundary = chunk_generator.Next();
+    Chunk chunk_boundary = chunk_generator->Next();
     TemporaryFileChunk file_chunk(chunk_boundary.offset(),
                                   chunk_boundary.size());
 
