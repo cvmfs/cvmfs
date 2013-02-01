@@ -15,8 +15,8 @@ ChunkGenerator::~ChunkGenerator() {}
 
 Chunk ChunkGenerator::Next() {
   assert (HasMoreData());
-  const size_t next_cut_mark = FindNextCutMark();
-  const size_t chunk_offset = offset_;
+  const off_t  next_cut_mark = FindNextCutMark();
+  const off_t  chunk_offset = offset_;
   const size_t chunk_size   = next_cut_mark - chunk_offset;
 
   offset_ = next_cut_mark;
@@ -24,7 +24,7 @@ Chunk ChunkGenerator::Next() {
 }
 
 
-size_t ChunkGenerator::FindNextCutMark() const {
+off_t ChunkGenerator::FindNextCutMark() const {
   assert (HasMoreData());
 
   return offset_ + std::min(8ul * 1024ul * 1024ul, mmf_.size() - offset_);

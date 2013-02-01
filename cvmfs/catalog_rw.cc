@@ -216,8 +216,8 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding chunk for %s from offset %d "
                                         "and chunk size: %d bytes",
            entry_path.c_str(),
-           chunk.offset,
-           chunk.offset + chunk.size);
+           chunk.offset(),
+           chunk.offset() + chunk.size());
 
   bool retval =
     sql_insert_file_chunk_->BindPathHash(path_hash) &&

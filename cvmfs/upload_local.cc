@@ -39,8 +39,8 @@ void LocalSpooler::Upload(const FileProcessor::Results &data) {
     TemporaryFileChunks::const_iterator i    = data.file_chunks.begin();
     TemporaryFileChunks::const_iterator iend = data.file_chunks.end();
     for (; i != iend; ++i) {
-      move_retcode = Move(i->temporary_path,
-                          "data" + i->content_hash.MakePath(1,2) + FileChunk::kChecksumSuffix);
+      move_retcode = Move(i->temporary_path(),
+                          "data" + i->content_hash().MakePath(1,2) + FileChunk::kChecksumSuffix);
       if (move_retcode != 0) {
         retcode = move_retcode;
         break;
@@ -51,13 +51,13 @@ void LocalSpooler::Upload(const FileProcessor::Results &data) {
   }
 
   if (retcode == 0) {
-    retcode = Move(data.bulk_file.temporary_path,
-                   "data" + data.bulk_file.content_hash.MakePath(1,2));
+    retcode = Move(data.bulk_file.temporary_path(),
+                   "data" + data.bulk_file.content_hash().MakePath(1,2));
   }
 
   const SpoolerResult result(retcode,
                              data.local_path,
-                             data.bulk_file.content_hash,
+                             data.bulk_file.content_hash(),
                              uploaded_chunks);
   JobDone(result);
 }

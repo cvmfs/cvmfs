@@ -359,7 +359,10 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
  *         On failure a negative error code.
  */
 int Fetch(const FileChunk &chunk, const string &cvmfs_path) {
-  return Fetch(chunk.content_hash, FileChunk::kChecksumSuffix, chunk.size, cvmfs_path);
+  return Fetch(chunk.content_hash(),
+               FileChunk::kChecksumSuffix,
+               chunk.size(),
+               cvmfs_path);
 }
 
 

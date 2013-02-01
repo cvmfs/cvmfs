@@ -768,9 +768,9 @@ bool SqlInsertFileChunk::BindPathHash(const hash::Md5 &hash) {
 
 bool SqlInsertFileChunk::BindFileChunk(const FileChunk &chunk) {
   return
-    BindInt64(3,    chunk.offset)       &&
-    BindInt64(4,    chunk.size)         &&
-    BindSha1Blob(5, chunk.content_hash);
+    BindInt64(3,    chunk.offset())       &&
+    BindInt64(4,    chunk.size())         &&
+    BindSha1Blob(5, chunk.content_hash());
 }
 
 

@@ -11,12 +11,12 @@
 
 namespace upload {
 
-class Chunk : private std::pair<size_t, size_t> {
+class Chunk : private std::pair<off_t, size_t> {
  public:
-  Chunk(const size_t offset, const size_t size) :
-    std::pair<size_t, size_t>(offset, size) {}
+  Chunk(const off_t offset, const size_t size) :
+    std::pair<off_t, size_t>(offset, size) {}
 
-  inline size_t offset() const { return this->first; }
+  inline off_t offset() const { return this->first; }
   inline size_t size() const   { return this->second; }
 };
 
@@ -31,12 +31,12 @@ class ChunkGenerator : SingleCopy {
   bool HasMoreData() const;
 
  protected:
-  size_t FindNextCutMark() const;
+  off_t FindNextCutMark() const;
 
  private:
   const MemoryMappedFile &mmf_;
 
-  size_t offset_;
+  off_t offset_;
 };
 
 }

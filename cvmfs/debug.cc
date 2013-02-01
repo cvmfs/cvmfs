@@ -16,7 +16,7 @@ class LiveFileChunk : public FileChunk {
   inline bool IsOpen() const { return open_; }
 
   inline bool operator<(const off_t offset) const {
-    return this->offset + this->size <= offset;
+    return this->offset() + this->size() <= offset;
   }
 
  private:
@@ -34,7 +34,7 @@ void find_chunk(const LiveFileChunks &chunks, const off_t offset) {
     return;
   }
 
-  std::cout << "needle: " << offset << " found: (" << chunk_itr->offset << " | " << chunk_itr->size << ")" << std::endl;
+  std::cout << "needle: " << offset << " found: (" << chunk_itr->offset() << " | " << chunk_itr->size() << ")" << std::endl;
 }
 
 int main() {

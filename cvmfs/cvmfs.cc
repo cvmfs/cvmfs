@@ -150,7 +150,7 @@ class LiveFileChunk : public FileChunk {
    * exclusively used to find file chunks using std::lower_bound
    */
   inline bool operator<(const off_t offset) const {
-    return this->offset + this->size <= offset;
+    return this->offset() + this->size() <= offset;
   }
 
  private:
@@ -1017,7 +1017,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     }
 
     // fetch all needed chunks and read the requested data
-    off_t offset_in_chunk = off - chunk_itr->offset;
+    off_t offset_in_chunk = off - chunk_itr->offset();
     do {
       assert (chunk_itr != chunks.end());
       LiveFileChunk &chunk = *chunk_itr;
@@ -1028,7 +1028,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
           LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to load chunk for "
                                                       "inode: %d, CAS key: %s, "
                                                       "error code: %d",
-             ino, chunk.content_hash.ToString().c_str(), errno);
+             ino, chunk.content_hash().ToString().c_str(), errno);
 
           if (errno == EMFILE) {
             fuse_reply_err(req, EMFILE);
@@ -1043,7 +1043,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       // read data from the chunk
       assert (chunk.IsOpen());
       size_t bytes_to_read   = size - bytes_read;
-      size_t size_in_chunk   = std::min(bytes_to_read, chunk.size - offset_in_chunk);
+      size_t size_in_chunk   = std::min(bytes_to_read, chunk.size() - offset_in_chunk);
       int    read_bytes      = pread(chunk.file_descriptor(),
                                      data + bytes_read,
                                      size_in_chunk,

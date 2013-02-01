@@ -311,23 +311,23 @@ static bool Find(const catalog::Catalog *catalog,
       FileChunks::const_iterator cend = chunks.end();
       for (; c != cend; ++c) {
         // check if the chunk boundaries fit together...
-        if (next_offset != c->offset) {
+        if (next_offset != c->offset()) {
           LogCvmfs(kLogCvmfs, kLogStderr, "misaligned chunk offsets for %s",
                    full_path.c_str());
           retval = false;
         }
-        next_offset = c->offset + c->size;
-        aggregated_file_size += c->size;
+        next_offset = c->offset() + c->size();
+        aggregated_file_size += c->size();
 
         // are all data chunks in the data store?
-        const string chunk_path = "data" + c->content_hash.MakePath(1, 2) + FileChunk::kChecksumSuffix;
+        const string chunk_path = "data" + c->content_hash().MakePath(1, 2) + FileChunk::kChecksumSuffix;
         if (!Exists(chunk_path)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %sP (%s -> "
                                           "offset: %d | size: %d) missing",
-                   c->content_hash.ToString().c_str(),
+                   c->content_hash().ToString().c_str(),
                    full_path.c_str(),
-                   c->offset,
-                   c->size);
+                   c->offset(),
+                   c->size());
           retval = false;
         }
       }

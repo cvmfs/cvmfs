@@ -62,9 +62,8 @@ bool FileProcessor::GenerateFileChunks(const MemoryMappedFile  &mmf,
   while (chunk_generator.HasMoreData()) {
     // find the next file chunk boundary
     Chunk chunk_boundary = chunk_generator.Next();
-    TemporaryFileChunk file_chunk;
-    file_chunk.offset = chunk_boundary.offset();
-    file_chunk.size   = chunk_boundary.size();
+    TemporaryFileChunk file_chunk(chunk_boundary.offset(),
+                                  chunk_boundary.size());
 
     // do what you need to do with the data
     if (!ProcessFileChunk(mmf, file_chunk)) {
@@ -87,8 +86,7 @@ bool FileProcessor::GenerateBulkFile(const MemoryMappedFile &mmf,
              mmf.file_path().c_str());
 
   // create a chunk that contains the whole file
-  data.bulk_file.offset = 0;
-  data.bulk_file.size   = mmf.size();
+  data.bulk_file = TemporaryFileChunk(0, mmf.size());
 
   // process the whole file in bulk
   return ProcessFileChunk(mmf, data.bulk_file);
@@ -98,37 +96,41 @@ bool FileProcessor::GenerateBulkFile(const MemoryMappedFile &mmf,
 bool FileProcessor::ProcessFileChunk(const MemoryMappedFile &mmf,
                                      TemporaryFileChunk     &chunk) const {
   // create a temporary to store the compression result of this chunk
+  std::string temporary_path;
   FILE *fcas = CreateTempFile(temporary_path_ + "/chunk", 0666, "w",
-                              &chunk.temporary_path);
+                              &temporary_path);
+  chunk.set_temporary_path(temporary_path);
   if (fcas == NULL) {
     LogCvmfs(kLogSpooler, kLogStderr, "failed to create temporary file for "
                                       "chunk: %d %d of file %s",
-             chunk.offset,
-             chunk.size,
+             chunk.offset(),
+             chunk.size(),
              mmf.file_path().c_str());
     return false;
   }
 
   // compress the chunk and compute the content hash simultaneously
-  if (! zlib::CompressMem2File(mmf.buffer() + chunk.offset,
-                              chunk.size,
-                              fcas,
-                              &chunk.content_hash)) {
+  hash::Any content_hash(hash::kSha1);
+  if (! zlib::CompressMem2File(mmf.buffer() + chunk.offset(),
+                               chunk.size(),
+                               fcas,
+                               &content_hash)) {
     LogCvmfs(kLogSpooler, kLogStderr, "failed to compress chunk: %d %d of "
                                       "file %s",
-             chunk.offset,
-             chunk.size,
+             chunk.offset(),
+             chunk.size(),
              mmf.file_path().c_str());
     return false;
   }
+  chunk.set_content_hash(content_hash);
 
   // close temporary file
   fclose(fcas);
 
   // all done... thanks
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "compressed chunk: %d %d | hash: %s",
-           chunk.offset,
-           chunk.size,
-           chunk.content_hash.ToString().c_str());
+           chunk.offset(),
+           chunk.size(),
+           chunk.content_hash().ToString().c_str());
   return true;
 }
