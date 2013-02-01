@@ -10,7 +10,7 @@ use FindBin qw($RealBin);
 use Tests::Common qw(recursive_rm);
 use Getopt::Long;
 use Sys::Detect::Virtualization;
-use IO::Interface::Simple;
+use Functions::Tools qw(get_interface_address);
 use File::Copy;
 use LWP::Simple;
 
@@ -38,13 +38,6 @@ sub detect_virtualization {
     else {
 		return 0;
 	}
-}
-
-# This function will accept a network interface and will retrieve the network ip for that interface
-sub get_interface_address {
-	my $iface = shift;
-	my $if = IO::Interface::Simple->new($iface);
-	return $if->address;
 }
 
 # Next funxtion checks if $vbm is installed

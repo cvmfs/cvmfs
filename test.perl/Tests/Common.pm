@@ -333,7 +333,7 @@ sub open_shellout_socket {
 	}
 	
 	# Opening the socket to communicate with the server and setting is identity.
-	print 'Opening the socket to communicate with the shell... ';
+	print "Opening the socket to communicate with the shell on $socket_path... ";
 	my $ctxt = ZeroMQ::Context->new();
 	my $socket = $ctxt->socket(ZMQ_PUSH);
 	$socket->connect( "${socket_protocol}${socket_path}" );
