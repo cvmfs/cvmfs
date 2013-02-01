@@ -28,7 +28,7 @@ sub get_interface_address {
 		}
 		return %iface_address;
 	}
-	elsif ($if) {
+	elsif ($iface) {
 		$if = IO::Interface::Simple->new($iface);
 		return $if->address;
 	}

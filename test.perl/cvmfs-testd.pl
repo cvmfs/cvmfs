@@ -11,7 +11,10 @@ use Functions::Testd qw(stop_daemon print_all_listening_address);
 use Functions::ServerSocket qw(start_socket receive_msg end_msg send_ip send_msg);
 use Getopt::Long;
 
-my $shell_path = undef;
+# This variable is declared as variable as daemon will modify it whenever a new shell
+# connects to it.
+our $shell_path = undef;
+
 my $iface = 'eth0';
 
 my $ret = GetOptions ("shell-path=s" => \$shell_path,
