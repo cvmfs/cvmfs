@@ -10,7 +10,7 @@ use warnings;
 use Functions::ServerSocket qw(send_msg close_socket term_ctxt end_msg);
 use Scalar::Util qw(looks_like_number);
 use Socket;
-use IO::Interface::Simple;
+use Functions::Tools qw(get_interface_address);
 
 # Next lines are needed to export subroutine to the main package
 use base 'Exporter';
@@ -85,13 +85,6 @@ sub stop_daemon {
 	print "Daemon stopped.\n";
 	STDOUT->flush();
 	exit 0;
-}
-
-# This function will accept a network interface and will retrieve the network ip for that interface
-sub get_interface_address {
-	my $iface = shift;
-	my $if = IO::Interface::Simple->new($iface);
-	return $if->address;
 }
 
 # This functions checks if the system that is running the daemon supports ipv6
