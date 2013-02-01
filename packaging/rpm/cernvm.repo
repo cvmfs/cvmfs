@@ -1,0 +1,15 @@
+[cernvm]
+name=CernVM packages
+baseurl=http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs/EL/$releasever/$basearch/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+gpgcheck=1
+enabled=1
+protect=1
+
+[cernvm-testing]
+name=CernVM testing packages
+baseurl=http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-testing/EL/$releasever/$basearch/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+gpgcheck=1
+enabled=0
+protect=1
