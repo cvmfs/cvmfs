@@ -54,6 +54,16 @@ sub receive_msg {
 	my @check = split /[[:blank:]]/, $line;
 	if (scalar(@check) == 1 and $check[0] eq uc($check[0]) and $check[0] !~ m/\bPING\b/){
 		$sender = $line;
+				
+		# Trying to retrieve shell ip address to set shell_path and pass it to tests
+		my @path = split /_/, $sender;
+		if (defined($path[1])) {
+			if ($path[1] != m/:\d\d\d\d/ ) {
+				$path[1] .= ":6651";
+			}
+			$main::shell_path = $path[1];
+		}
+		
 		return "Receiving connection from $sender.\n";
 	}
 	else {

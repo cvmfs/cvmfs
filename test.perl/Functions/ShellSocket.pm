@@ -8,6 +8,7 @@ package Functions::ShellSocket;
 use strict;
 use warnings;
 use ZeroMQ q/:all/;
+use Functions::Tools qw(get_interface_address);
 
 # Next lines are needed to export subroutines to the main package
 use base 'Exporter';
@@ -19,6 +20,7 @@ sub connect_shell_socket {
 	my $socket_path = shift;
 	my $socket_protocol = shift;
 	my $identity = shift;
+	my $interface = shift;
 
 	# Modify this variables to change the default path to the socket
 	unless (defined($socket_path)) {
@@ -29,7 +31,32 @@ sub connect_shell_socket {
 	}
 	
 	unless (defined($identity)) {
-		$identity = 'SHELL';
+		my $address = "";
+		my $addr = undef;
+		
+		unless ($identity) {
+			$addr = get_interface_address('eth0');
+			if ($addr) {
+				$address = $addr;
+			}
+			else {
+				$addr = get_interface_address('wlan0');
+				if ($addr) {
+					$address = $addr;
+				}
+			}
+		}
+		else {
+			$addr = get_interface_address($interface);
+		}
+		
+		unless ($addr) {
+			print "Unable to find a valid IP address neither for eth0 or wlan0.\n";
+			print "You won't be able to retrieve test output from remote daemon.\n";
+		}
+				
+		# Setting identity to SHELL+IP
+		$identity = "SHELL_$address";
 	}
 	
 	my $ctxt = ZeroMQ::Raw::zmq_init(5) || die "Couldn't initialise ZeroMQ context.\n";
