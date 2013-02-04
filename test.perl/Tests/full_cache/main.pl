@@ -52,7 +52,7 @@ if (defined($setup)) {
 # setup.
 unless (-e "Tests/Common/zpipe.run") {
 	print "zpipe has to be compiled in order to run this test.\n";
-	print "Run 'repo_signature --setup' to compile it.\n";
+	print "Run 'full_cache --setup' to compile it.\n";
 	if (defined($do_all)) {
 		print "RUN_SETUP\n";
 	}
