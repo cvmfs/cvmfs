@@ -9,11 +9,11 @@ use lib "$RealBin";
 
 use strict;
 use warnings;
-use Proc::Spawn;
 use Functions::Shell qw(set_remote check_command start_daemon get_daemon_output exit_shell);
 use Functions::Active qw(check_daemon add_active);
 use Functions::ShellSocket qw(connect_shell_socket receive_shell_msg send_shell_msg close_shell_socket term_shell_ctxt bind_shell_socket);
 use Getopt::Long;
+use Term::ReadLine;
 
 my $command = undef;
 my $wait_daemon = undef;
@@ -106,6 +106,15 @@ if (defined($command)) {
 	exit_shell($socket, $ctxt, 1);
 }
 
+# Term::ReadLine instance for both shells: connected and disconnected
+my $rlactive = Term::ReadLine->new('ShellConnected');
+$rlactive->Attribs->ornaments(0);
+my $rlactive_prompt = '-> ';
+
+my $rldisco = Term::ReadLine->new('ShellDisconnected');
+$rldisco->Attribs->ornaments(0);
+my $rldisco_prompt = '(Daemon not running) -> ';
+
 if ($interactive) {
 	# A simple welcome.
 	print '#'x80 . "\n";
@@ -136,10 +145,7 @@ if ($interactive) {
 	while(1){
 		# This is the first shell, the one used to communicate with the daemon
 		while(check_daemon()){
-			print '-> ';
-			# Reading an input line.
-			my $line = STDIN->getline;
-			chomp($line);
+			my $line = $rlactive->readline($rlactive_prompt);
 			
 			# Checking again if the daemon is running, maybe something killed it.
 			unless (check_daemon()) {
@@ -170,10 +176,7 @@ if ($interactive) {
 		
 		# This is the second shell, use when the daemon is closed
 		while(!check_daemon()){
-			print '(Daemon not running) -> ';
-			# Reading an input line.
-			my $line = STDIN->getline;
-			chomp($line);
+			my $line = $rldisco->readline($rldisco_prompt);
 			
 			# Launching the command
 			($continue, $socket, $ctxt) = check_command($socket, $ctxt, $daemon_path, $line);

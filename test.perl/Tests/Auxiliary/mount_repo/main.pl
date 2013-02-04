@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use ZeroMQ qw/:all/;
-use Tests::Common qw (get_daemon_output killing_services check_repo setup_environment restart_cvmfs_services check_mount_timeout set_stdout_stderr open_test_socket close_test_socket);
+use Tests::Common qw (get_daemon_output killing_services check_repo setup_environment restart_cvmfs_services check_mount_timeout set_stdout_stderr open_test_socket close_test_socket open_shellout_socket);
 use Getopt::Long;
 use FindBin qw($RealBin);
 

@@ -47,7 +47,7 @@ sub launch {
 	# Executing the script, if found
 	if(defined ($mainfile)){
 		my $error_found = 0;
-		if (defined($shell_path)) {
+		if (defined($shell_path) and $mainfile !~ m/Services/) {
 			($pid, $infh, $outfh, $errfh) = spawn("perl $mainfile --shell-path $shell_path $options");
 		}
 		else {

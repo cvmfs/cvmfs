@@ -37,13 +37,18 @@ my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "no-clean" => \$no_clean,
 					   "setup" => \$setup,
 					   "do-all" => \$do_all,
-					   "shell-path=s" \$shell_path );
+					   "shell-path=s" => \$shell_path );
 
 
 # If setup option was invoked, compile zpipe and exit.
 if (defined($setup)) {
 	print 'Compiling zpipe... ';
-	system("gcc -o Tests/Common/zpipe.run Tests/Common/zpipe.c -lz");
+	if (-w "Tests/Common") {
+		system("gcc -o Tests/Common/zpipe.run Tests/Common/zpipe.c -lz");
+	}
+	else {
+		system("sudo gcc -o Tests/Common/zpipe.run Tests/Common/zpipe.c -lz");
+	}
 	print "Done.\n";
 	print "Setup complete. You're now able to run the test.\n";
 }
@@ -52,7 +57,7 @@ if (defined($setup)) {
 # setup.
 unless (-e "Tests/Common/zpipe.run") {
 	print "zpipe has to be compiled in order to run this test.\n";
-	print "Run 'repo_signature --setup' to compile it.\n";
+	print "Run 'full_cache --setup' to compile it.\n";
 	if (defined($do_all)) {
 		print "RUN_SETUP\n";
 	}
