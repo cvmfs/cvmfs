@@ -37,7 +37,7 @@ my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "no-clean" => \$no_clean,
 					   "setup" => \$setup,
 					   "do-all" => \$do_all,
-					   "shell-path=s" \$shell_path );
+					   "shell-path=s" => \$shell_path );
 
 
 # If setup option was invoked, compile zpipe and exit.
