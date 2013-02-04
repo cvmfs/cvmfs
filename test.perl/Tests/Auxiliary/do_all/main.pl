@@ -20,7 +20,7 @@ my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "shell-path=s" => \$shell_path );
 					   
 # Test name used for socket identity
-my $testname = 'DOALL';
+my $testname = 'DO_ALL';
 
 sub check_process {
 	my $process_name = shift;

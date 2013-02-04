@@ -56,7 +56,7 @@ sub connect_shell_socket {
 		}
 				
 		# Setting identity to SHELL+IP
-		$identity = "SHELL_$address";
+		$identity = "SHELL:$address";
 	}
 	
 	my $ctxt = ZeroMQ::Raw::zmq_init(5) || die "Couldn't initialise ZeroMQ context.\n";

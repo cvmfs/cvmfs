@@ -43,7 +43,12 @@ my $ret = GetOptions ( "stdout=s" => \$outputfile,
 # If setup option was invoked, compile zpipe and exit.
 if (defined($setup)) {
 	print 'Compiling zpipe... ';
-	system("gcc -o Tests/Common/zpipe.run Tests/Common/zpipe.c -lz");
+	if (-w "Tests/Common") {
+		system("gcc -o Tests/Common/zpipe.run Tests/Common/zpipe.c -lz");
+	}
+	else {
+		system("sudo gcc -o Tests/Common/zpipe.run Tests/Common/zpipe.c -lz");
+	}
 	print "Done.\n";
 	print "Setup complete. You're now able to run the test.\n";
 }
