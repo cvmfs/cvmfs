@@ -69,7 +69,9 @@ class ChunkGenerator : SingleCopy {
   static void RegisterChunkGenerators();
 
  protected:
-  static size_t                     average_chunk_size_;
+  static const size_t               minimal_chunk_size_;
+  static const size_t               maximal_chunk_size_;
+  static const size_t               average_chunk_size_;
 
  private:
   typedef std::vector<ChunkGeneratorFactory*> RegisteredChunkGenerators;
