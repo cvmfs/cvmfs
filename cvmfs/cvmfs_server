@@ -117,7 +117,7 @@ Supported Commands:
                 Start to edit a repository
   snapshot      <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
-  list:         List available repositories
+  list          List available repositories
 "
 
 
@@ -1049,6 +1049,10 @@ list() {
   for repository in /etc/cvmfs/repositories.d/*; do
     if [ "x$repository" = "x/etc/cvmfs/repositories.d/*" ]; then
       return 0
+    fi
+    if [ -f $repository ]; then
+      echo "Warning: unexpected file '$repository' in directory /etc/cvmfs/repositories.d/"
+      continue
     fi
     . ${repository}/server.conf
     local name=$(basename $repository)
