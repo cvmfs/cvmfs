@@ -7,6 +7,9 @@ using namespace upload;
 // this defines the center of the interval where the xor32 rolling checksum is
 // queried. You should never change this number, since it affects the definition
 // of cut marks.
+// Note: We consider checksums respectively their underlying byte-patterns
+//       'stronger', if their difference to the magic_number is smaller.
+//       See Xor32ChunkGenerator::InitThresholds()
 const uint32_t Xor32ChunkGenerator::magic_number_   =
   std::numeric_limits<uint32_t>::max() / 2;
 const uint32_t Xor32ChunkGenerator::base_threshold_ =
