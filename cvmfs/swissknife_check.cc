@@ -305,7 +305,7 @@ static bool Find(const catalog::Catalog *catalog,
       }
 
       size_t aggregated_file_size = 0;
-      size_t next_offset          = 0;
+      off_t  next_offset          = 0;
 
       FileChunks::const_iterator c    = chunks.begin();
       FileChunks::const_iterator cend = chunks.end();

@@ -78,9 +78,9 @@ off_t Xor32ChunkGenerator::FindNextCutMark() const {
   Thresholds::const_iterator i    = thresholds_.begin();
   Thresholds::const_iterator iend = thresholds_.end();
   for (; i != iend; ++i) {
-    const size_t   limit     = std::min(
-                                     start_offset + i->first,
-                                     max_data_size);
+    const off_t    limit     = (off_t)std::min(
+                                        start_offset + i->first,
+                                        max_data_size);
     const uint32_t threshold = i->second;
 
     for (; off < limit; ++off) {
@@ -88,7 +88,7 @@ off_t Xor32ChunkGenerator::FindNextCutMark() const {
       xor_output = (xor_output << 1) ^ data[off];
 
       // check if we found a cut mark
-      if (abs(xor_output - magic_number_) < threshold) {
+      if (abs(xor_output - magic_number_) < (int32_t)threshold) {
         return off;
       }
     }

@@ -65,7 +65,7 @@ Chunk ChunkGenerator::Next() {
 
 
 bool ChunkGenerator::HasMoreData() const {
-  return offset_ < mmf_.size();
+  return (size_t)offset_ < mmf_.size();
 }
 
 
