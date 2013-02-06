@@ -13,7 +13,11 @@ my $testname = 'CLEAN';
 # Variables to store commandline options switch
 my $deep = undef;
 
-my $ret = GetOptions ( "deep" => \$deep );
+# Getopt variable to avoid warning, this script doesn't really need them
+my $shell_path = undef;
+
+my $ret = GetOptions ( "deep" => \$deep,
+					   "shell-path=s" => \$shell_path );
 
 # Print statement are self explanatory.
 

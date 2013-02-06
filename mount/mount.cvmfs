@@ -190,7 +190,11 @@ else
   else
     /bin/sh -c "$cmd"
   fi
-  retval=$?
+  if [ $? -eq 0 ]; then
+    retval=0
+  else
+    retval=32  # mount failure
+  fi
 fi
 
 exit $retval

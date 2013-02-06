@@ -56,9 +56,9 @@ sub receive_msg {
 		$sender = $line;
 				
 		# Trying to retrieve shell ip address to set shell_path and pass it to tests
-		my @path = split /_/, $sender;
+		my @path = split /:/, $sender, 2;
 		if (defined($path[1])) {
-			if ($path[1] != m/:\d\d\d\d/ ) {
+			if ($path[1] !~ m/:\d\d\d\d/ ) {
 				$path[1] .= ":6651";
 			}
 			$main::shell_path = $path[1];

@@ -164,6 +164,10 @@ if ( $cpanm_inpath ne "" ) {
 	print 'Installing IO::Interface perl module... ';
 	system('sudo cpanm IO::Interface');
 	print "Done.\n";
+	
+	print 'Installing Term::ReadLine::Gnu perl module... ';
+	system('sudo cpanm Term::ReadLine::Gnu');
+	print "Done.\n";
 
 	print 'Upgrading Socket.pm version... ';
 	system('sudo cpanm Socket');

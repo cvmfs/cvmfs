@@ -155,7 +155,7 @@ if (defined ($pid) and $pid == 0) {
 	$socket->send("httpd --root $repo_pub --index-of --all --port 8080");
 	@pids = get_daemon_output($socket, @pids);
 	sleep 5;
-	$socket->send("named --port 5300 --add-ipv6 $repo_name=::10 --add $repo_name=127.0.0.1");
+	$socket->send("named --port 5300 --add-ipv6 $repo_name=::1 --add $repo_name=127.0.0.1");
 	@pids = get_daemon_output($socket, @pids);
 	sleep 5;
 	print "Done.\n";
