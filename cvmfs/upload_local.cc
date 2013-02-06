@@ -24,6 +24,11 @@ LocalSpooler::LocalSpooler(const SpoolerDefinition &spooler_definition) :
 }
 
 
+bool LocalSpooler::WillHandle(const SpoolerDefinition &spooler_definition) {
+  return spooler_definition.driver_type == SpoolerDefinition::Local;
+}
+
+
 unsigned int LocalSpooler::GetNumberOfErrors() const {
   return AbstractSpooler::GetNumberOfErrors() + atomic_read32(&copy_errors_);
 }

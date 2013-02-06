@@ -21,6 +21,9 @@ namespace upload
    */
   class LocalSpooler : public AbstractSpooler {
    public:
+    LocalSpooler(const SpoolerDefinition &spooler_definition);
+    static bool WillHandle(const SpoolerDefinition &spooler_definition);
+
     /**
      * Upload() is not done concurrently in the current implementation of the
      * LocalSpooler, since it is a simple move or copy of a file without CPU
@@ -39,9 +42,6 @@ namespace upload
     unsigned int GetNumberOfErrors() const;
 
    protected:
-    friend class AbstractSpooler;
-    LocalSpooler(const SpoolerDefinition &spooler_definition);
-
     int Copy(const std::string &local_path,
              const std::string &remote_path) const;
     int Move(const std::string &local_path,

@@ -70,6 +70,49 @@ namespace upload
     const FileChunks  file_chunks;  //!< the file chunks generated during processing
   };
 
+
+  /**
+   * SpoolerDefinition is given by a string of the form:
+   * <spooler type>:<spooler description>
+   *
+   * F.e: local:/srv/cvmfs/dev.cern.ch
+   *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
+   */
+  struct SpoolerDefinition {
+    enum DriverType {
+      Riak,
+      Local,
+      Unknown
+    };
+
+    /**
+     * Reads a given definition_string as described above and interprets
+     * it. If the provided string turns out to be malformed the created
+     * SpoolerDefinition object will not be valid. A user should check this
+     * after creation using IsValid().
+     *
+     * @param definition_string   the spooler definition string to be inter-
+     *                            preted by the constructor
+     */
+    SpoolerDefinition(const std::string& definition_string,
+                      const bool          use_file_chunking   = false,
+                      const size_t        min_file_chunk_size = 0,
+                      const size_t        avg_file_chunk_size = 0,
+                      const size_t        max_file_chunk_size = 0);
+    bool IsValid() const { return valid_; }
+
+    DriverType  driver_type;           //!< the type of the spooler driver
+    std::string temporary_path;        //!< scratch space for the FileProcessor
+    std::string spooler_configuration; //!< a driver specific spooler configuration string
+                                       //!< (interpreted by the concrete spooler object)
+    bool        use_file_chunking;
+    size_t      min_file_chunk_size;
+    size_t      avg_file_chunk_size;
+    size_t      max_file_chunk_size;
+
+    bool valid_;
+  };
+
   /**
    * The Spooler takes care of the upload procedure of files into a backend
    * storage. It can be extended to multiple supported backend storage types,
@@ -84,63 +127,24 @@ namespace upload
    *       Concrete implementations of this class should take care of calling
    *       NotifyListeners() when a spooler job has finished.
    */
-  class AbstractSpooler : public Observable<SpoolerResult> {
+  class AbstractSpooler : public Observable<SpoolerResult>,
+                          public PolymorphicConstruction<AbstractSpooler,
+                                                         SpoolerDefinition> {
    public:
-    /**
-     * SpoolerDefinition is given by a string of the form:
-     * <spooler type>:<spooler description>
-     *
-     * F.e: local:/srv/cvmfs/dev.cern.ch
-     *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
-     */
-    struct SpoolerDefinition {
-      enum DriverType {
-        Riak,
-        Local,
-        Unknown
-      };
-
-      /**
-       * Reads a given definition_string as described above and interprets
-       * it. If the provided string turns out to be malformed the created
-       * SpoolerDefinition object will not be valid. A user should check this
-       * after creation using IsValid().
-       *
-       * @param definition_string   the spooler definition string to be inter-
-       *                            preted by the constructor
-       */
-      SpoolerDefinition(const std::string& definition_string,
-                        const bool          use_file_chunking   = false,
-                        const size_t        min_file_chunk_size = 0,
-                        const size_t        avg_file_chunk_size = 0,
-                        const size_t        max_file_chunk_size = 0);
-      bool IsValid() const { return valid_; }
-
-      DriverType  driver_type;           //!< the type of the spooler driver
-      std::string temporary_path;        //!< scratch space for the FileProcessor
-      std::string spooler_configuration; //!< a driver specific spooler configuration string
-                                         //!< (interpreted by the concrete spooler object)
-      bool        use_file_chunking;
-      size_t      min_file_chunk_size;
-      size_t      avg_file_chunk_size;
-      size_t      max_file_chunk_size;
-
-      bool valid_;
-    };
 
    public:
-    /**
-     * Instantiates a concrete spooler class according to the given spooler
-     * definition string. This static method should be used as a replacement
-     * for a usual constructor from the outside.
-     *
-     * @param definition_string   a spooler definition string describing the
-     *                            spooler object to be generated
-     * @return   a concrete instance of a Spooler backend that allows for
-     *           file upload into different backend storages.
-     */
-    static AbstractSpooler* Construct(const SpoolerDefinition &spooler_definition);
+    static void RegisterPlugins();
+
     virtual ~AbstractSpooler();
+
+    /**
+     * This method is called once before any other operations are performed on
+     * a concrete Spooler. Implement this in your concrete Spooler class to do
+     * global initialization work.
+     *
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
+     */
+    bool Initialize();
 
     /**
      * Schedules a copy job that transfers a file found at local_path to the
@@ -220,15 +224,6 @@ namespace upload
      *              callback method
      */
     virtual void Upload(const FileProcessor::Results &data) = 0;
-
-    /**
-     * This method is called once before any other operations are performed on
-     * a concrete Spooler. Implement this in your concrete Spooler class to do
-     * global initialization work.
-     *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
-     */
-    virtual bool Initialize();
 
     /**
      * This method is called right before the Spooler object will terminate.

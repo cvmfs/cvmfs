@@ -13,12 +13,12 @@
 
 using namespace upload;
 
-AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
-                                       const std::string& definition_string,
-                                       const bool         use_file_chunking,
-                                       const size_t       min_file_chunk_size,
-                                       const size_t       avg_file_chunk_size,
-                                       const size_t       max_file_chunk_size) :
+SpoolerDefinition::SpoolerDefinition(
+                      const std::string& definition_string,
+                      const bool         use_file_chunking,
+                      const size_t       min_file_chunk_size,
+                      const size_t       avg_file_chunk_size,
+                      const size_t       max_file_chunk_size) :
   use_file_chunking(use_file_chunking),
   min_file_chunk_size(min_file_chunk_size),
   avg_file_chunk_size(avg_file_chunk_size),
@@ -57,40 +57,9 @@ AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
 }
 
 
-AbstractSpooler* AbstractSpooler::Construct(
-                                const SpoolerDefinition &spooler_definition) {
-  assert (spooler_definition.IsValid());
-
-  // create a concrete Spooler object dependent on the parsed definition
-  AbstractSpooler *spooler = NULL;
-  switch (spooler_definition.driver_type) {
-    case SpoolerDefinition::Local:
-      spooler = new LocalSpooler(spooler_definition);
-      break;
-
-    // case SpoolerDefinition::Riak:
-    //   spooler = new RiakSpooler(spooler_definition);
-    //   break;
-
-    default:
-      LogCvmfs(kLogSpooler, kLogStderr, "invalid spooler definition");
-  }
-
-  // check if we managed to produce a sound spooler
-  if (!spooler) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to create spooler object");
-    return NULL;
-  }
-
-  // initialize the spooler and return it to the user
-  if (!spooler->Initialize()) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to intialize spooler object");
-    delete spooler;
-    return NULL;
-  }
-
-  // all done... deliver what the user was asking for
-  return spooler;
+void AbstractSpooler::RegisterPlugins() {
+  RegisterPlugin<LocalSpooler>();
+  //RegisterPlugin<RiakSpooler>();
 }
 
 
