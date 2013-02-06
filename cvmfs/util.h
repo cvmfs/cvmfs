@@ -313,9 +313,13 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  *                                   AbstractNumberCruncher::Construct(param);
  *   polymorphicCruncher->Crunch();
  *
- * polymorphicCruncher now points to an instance of ConcreteGpuNumberCruncher
+ * `polymorphicCruncher` now points to an instance of ConcreteGpuNumberCruncher
  * and can be used as any other polymorphic class with the interface defined in
- * AbstractNumberCruncher
+ * AbstractNumberCruncher.
+ *
+ * Note: PolymorphicCreation goes through the list of registered plugins in the
+ *       order they have been registered and instantiates the first class that
+ *       claims responsibility for the given parameter.
  *
  * @param AbstractProductT  the common base class of all classes that should be
  *                          polymorphically created. In most cases this will be
