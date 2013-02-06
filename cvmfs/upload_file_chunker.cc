@@ -13,26 +13,6 @@ ChunkGenerator::average_chunk_size_ =  8 * 1024 * 1024;
 size_t
 ChunkGenerator::maximal_chunk_size_ = 16 * 1024 * 1024;
 
-ChunkGenerator::RegisteredChunkGenerators
-ChunkGenerator::registered_chunk_generators_;
-
-ChunkGenerator* ChunkGenerator::Construct(const MemoryMappedFile &mmf) {
-  if (registered_chunk_generators_.empty()) {
-    RegisterChunkGenerators();
-  }
-
-  RegisteredChunkGenerators::const_iterator i    = registered_chunk_generators_.begin();
-  RegisteredChunkGenerators::const_iterator iend = registered_chunk_generators_.end();
-  for (; i != iend; ++i) {
-    if ((*i)->WillHandleFile(mmf)) {
-      return (*i)->Construct(mmf);
-    }
-  }
-
-  return NULL;
-}
-
-
 void ChunkGenerator::SetFileChunkRestrictions(const size_t minimal_chunk_size,
                                               const size_t average_chunk_size,
                                               const size_t maximal_chunk_size) {
@@ -45,11 +25,9 @@ void ChunkGenerator::SetFileChunkRestrictions(const size_t minimal_chunk_size,
 }
 
 
-void ChunkGenerator::RegisterChunkGenerators() {
-  assert (registered_chunk_generators_.empty());
-
-  RegisterChunkGenerator<Xor32ChunkGenerator>();
-  RegisterChunkGenerator<NaiveChunkGenerator>();
+void ChunkGenerator::RegisterPlugins() {
+  RegisterPlugin<Xor32ChunkGenerator>();
+  RegisterPlugin<NaiveChunkGenerator>();
 }
 
 
@@ -81,7 +59,7 @@ bool ChunkGenerator::HasMoreData() const {
 }
 
 
-bool NaiveChunkGenerator::WillHandleFile(const MemoryMappedFile &mmf) {
+bool NaiveChunkGenerator::WillHandle(const MemoryMappedFile &mmf) {
   // this will always kick in as a last resort!
   return true;
 }

@@ -25,7 +25,7 @@ namespace upload {
 class Xor32ChunkGenerator : public ChunkGenerator {
  public:
   Xor32ChunkGenerator(const MemoryMappedFile &mmf);
-  static bool  WillHandleFile(const MemoryMappedFile &mmf);
+  static bool  WillHandle(const MemoryMappedFile &mmf);
 
  protected:
   off_t        FindNextCutMark() const;

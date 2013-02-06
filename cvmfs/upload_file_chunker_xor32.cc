@@ -46,7 +46,7 @@ void Xor32ChunkGenerator::InitThresholds() {
 }
 
 
-bool Xor32ChunkGenerator::WillHandleFile(const MemoryMappedFile &mmf) {
+bool Xor32ChunkGenerator::WillHandle(const MemoryMappedFile &mmf) {
   // TODO: only handle binary files with this chunk generator
   //       even better: files with high informational entropy
   return true;

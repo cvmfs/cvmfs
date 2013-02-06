@@ -228,6 +228,156 @@ class MemoryMappedFile : SingleCopy {
   bool               mapped_;
 };
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+/**
+ * Used internally by the PolymorphicConstruction template
+ * Provides an abstract interface for Factory objects that allow the poly-
+ * morphic creation of arbitrary objects at runtime.
+ *
+ * @param AbstractProductT  the abstract base class of all classes that could be
+ *                          polymorphically constructed by this factory
+ * @param ParameterT        the type of the parameter that is used to figure out
+ *                          which class should be instanciated at runtime
+ */
+template <class AbstractProductT, typename ParameterT>
+class AbstractFactory {
+ public:
+  AbstractFactory() {}
+
+  virtual bool WillHandle(const ParameterT &param) const = 0;
+  virtual AbstractProductT* Construct(const ParameterT &param) const = 0;
+};
+
+
+/**
+ * Concrete (but templated) implementation of the AbstractFactory template to
+ * wrap the creation of a specific class instance. Namely ConcreteProductT.
+ * See the description of PolymorphicCreation for more details
+ *
+ * @param ConcreteProductT  the class that will be instanciated by this factory
+ *                          class (must be derived from AbstractProductT)
+ * @param AbstractProductT  the base class of all used ConcreteProductT classes
+ * @param ParameterT        the type of the parameter that is used to poly-
+ *                          morphically create a specific ConcreteProductT
+ */
+template <class ConcreteProductT, class AbstractProductT, typename ParameterT>
+class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT> {
+ public:
+  inline bool WillHandle(const ParameterT &param) const {
+    return ConcreteProductT::WillHandle(param);
+  }
+  inline AbstractProductT* Construct(const ParameterT &param) const {
+    AbstractProductT* product = new ConcreteProductT(param);
+    return product;
+  }
+};
+
+
+/**
+ * Template to simplify the polymorphic creation of a number of concrete classes
+ * that share the common base class AbstractProductT. Use this to create flexible
+ * class hierarchies.
+ *
+ * The template assumes a number of things from the user classes:
+ *  1. AbstractProductT must implement `static void RegisterPlugins()` which
+ *     will register all available derived classes by calling
+ *     `RegisterPlugin<DerivedClass>()` for each implemented sub-class.
+ *  2. Each derived class of AbstractProductT must implement
+ *     `static bool WillHandle(const ParameterT &param)` that figures out if the
+ *     concrete class can cope with the given parameter
+ *  3. Each derived class must have at least the following constructor:
+ *     `DerivedClass(const ParameterT &param)` which is used to instantiate the
+ *     concrete class in case it returned true in WillHandle()
+ *
+ * A possible class hierarchy could look like this:
+ *
+ *    PolymorphicConstruction<AbstractNumberCruncher, Parameter>
+ *     |
+ *     +--> AbstractNumberCruncher
+ *           |
+ *           +--> ConcreteMulticoreNumberCruncher
+ *           |
+ *           +--> ConcreteGpuNumberCruncher
+ *           |
+ *           +--> ConcreteClusterNumberCruncher
+ *
+ * In this example AbstractNumberCruncher::RegisterPlugins() will register all
+ * three concrete number cruncher classes. Using the whole thing would look like
+ * so:
+ *
+ *   Parameter param = Parameter(typicalGpuProblem);
+ *   AbstractNumberCruncher *polymorphicCruncher =
+ *                                   AbstractNumberCruncher::Construct(param);
+ *   polymorphicCruncher->Crunch();
+ *
+ * polymorphicCruncher now points to an instance of ConcreteGpuNumberCruncher
+ * and can be used as any other polymorphic class with the interface defined in
+ * AbstractNumberCruncher
+ *
+ * @param AbstractProductT  the common base class of all classes that should be
+ *                          polymorphically created. In most cases this will be
+ *                          the class that directly inherits from Polymorphic-
+ *                          Construction.
+ * @param ParameterT        the type of the parameter that is used to poly-
+ *                          morphically instantiate one of the subclasses of
+ *                          AbstractProductT
+ */
+template <class AbstractProductT, typename ParameterT>
+class PolymorphicConstruction {
+ private:
+  typedef AbstractFactory<AbstractProductT, ParameterT> Factory;
+  typedef std::vector<Factory*> RegisteredPlugins;
+
+ public:
+  static AbstractProductT* Construct(const ParameterT &param) {
+    // lazy registration of plugins
+    if (registered_plugins_.empty()) {
+      AbstractProductT::RegisterPlugins();
+    }
+    assert (!registered_plugins_.empty());
+
+    // selection of the correct plugin at runtime
+    // (polymorphic construction)
+    typename RegisteredPlugins::const_iterator i    = registered_plugins_.begin();
+    typename RegisteredPlugins::const_iterator iend = registered_plugins_.end();
+    for (; i != iend; ++i) {
+      if ((*i)->WillHandle(param)) {
+        return (*i)->Construct(param);
+      }
+    }
+
+    // no plugin found to handle the given parameter...
+    return NULL;
+  }
+
+ protected:
+  template <class ConcreteProductT>
+  static void RegisterPlugin() {
+    registered_plugins_.push_back(
+      new AbstractFactoryImpl<ConcreteProductT,
+                              AbstractProductT,
+                              ParameterT>()
+    );
+  }
+
+ private:
+  static RegisteredPlugins registered_plugins_;
+};
+
+// init the static member registered_plugins_ inside the PolymorphicConstruction
+// template... whoa, what ugly code :o)
+template <class AbstractProductT, typename ParameterT>
+typename PolymorphicConstruction<AbstractProductT, ParameterT>::RegisteredPlugins
+PolymorphicConstruction<AbstractProductT, ParameterT>::registered_plugins_;
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
 
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration
