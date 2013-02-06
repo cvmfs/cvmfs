@@ -21,6 +21,10 @@
 #include "duplex_sqlite3.h"
 #include "util.h"
 
+namespace swissknife {
+  class CommandCheck;
+}
+
 namespace catalog {
 
 class AbstractCatalogManager;
@@ -89,7 +93,6 @@ struct Counters {
   uint64_t subtree_dir;
   uint64_t subtree_nested;
 };
-
 
 /**
  * This class wraps a catalog database and provides methods
@@ -194,6 +197,7 @@ struct Counters {
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
 
+  friend class swissknife::CommandCheck;
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 

@@ -20,13 +20,13 @@
 #include "logging.h"
 #include "manifest.h"
 #include "util.h"
-#include "hash.h"
-#include "catalog.h"
+#include "catalog_sql.h"
 #include "compression.h"
 #include "shortstring.h"
 #include "download.h"
 
 using namespace std;  // NOLINT
+using namespace swissknife;
 
 namespace {
 bool check_chunks;
@@ -34,9 +34,9 @@ std::string *remote_repository;
 }
 
 
-static bool CompareEntries(const catalog::DirectoryEntry &a,
-                           const catalog::DirectoryEntry &b,
-                           const bool compare_names)
+bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
+                                  const catalog::DirectoryEntry &b,
+                                  const bool compare_names)
 {
   bool retval = true;
   if (compare_names) {
@@ -86,8 +86,8 @@ static bool CompareEntries(const catalog::DirectoryEntry &a,
 }
 
 
-static bool CompareCounters(const catalog::Counters &a,
-                            const catalog::Counters &b)
+bool CommandCheck::CompareCounters(const catalog::Counters &a,
+                                   const catalog::Counters &b)
 {
   bool retval = true;
   if (a.self_regular != b.self_regular) {
@@ -152,7 +152,7 @@ static bool CompareCounters(const catalog::Counters &a,
 /**
  * Checks for existance of a file either locally or via HTTP head
  */
-static bool Exists(const string &file) {
+bool CommandCheck::Exists(const string &file) {
   if (remote_repository == NULL)
     return FileExists(file);
   else {
@@ -166,10 +166,9 @@ static bool Exists(const string &file) {
 /**
  * Recursive catalog walk-through
  */
-static bool Find(const catalog::Catalog *catalog,
-                 const PathString &path,
-                 catalog::DeltaCounters *computed_counters)
-{
+bool CommandCheck::Find(const catalog::Catalog *catalog,
+                        const PathString &path,
+                        catalog::DeltaCounters *computed_counters) {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
 
@@ -342,6 +341,16 @@ static bool Find(const catalog::Catalog *catalog,
                  entries[i].size());
         retval = false;
       }
+
+      // check if there are any dangling chunks in the catalog
+      // (chunks are dangling, if they do not have a file referring to them)
+      // this should actually never happen because of database schema constraints
+      // but I've seen horses vomitting in front of the pharmacy :o)
+      const std::string sql =
+        "SELECT count(*) FROM chunks WHERE NOT EXISTS "
+        "(SELECT * FROM catalog WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileChunk) + " != 0 AND "
+        "chunks.md5path_1 == catalog.md5path_1 AND chunks.md5path_2 == catalog.md5path_2);";
+      catalog::Sql stmt(catalog->database(), sql);
     }
   }
 
@@ -369,9 +378,8 @@ static bool Find(const catalog::Catalog *catalog,
 }
 
 
-static std::string DownloadCatalog(const string &path,
-                                   const hash::Any catalog_hash)
-{
+std::string CommandCheck::DownloadCatalog(const string &path,
+                                          const hash::Any catalog_hash) {
   const string source = "data" + catalog_hash.MakePath(1,2) + "C";
   const string dest = "/tmp/" + catalog_hash.ToString();
   const string url = *remote_repository + "/" + source;
@@ -387,9 +395,8 @@ static std::string DownloadCatalog(const string &path,
 }
 
 
-static std::string DecompressCatalog(const string &path,
-                                     const hash::Any catalog_hash)
-{
+std::string CommandCheck::DecompressCatalog(const string &path,
+                                            const hash::Any catalog_hash) {
   const string source = "data" + catalog_hash.MakePath(1,2) + "C";
   const string dest = "/tmp/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
@@ -402,10 +409,10 @@ static std::string DecompressCatalog(const string &path,
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
-static bool InspectTree(const string &path, const hash::Any &catalog_hash,
-                        const catalog::DirectoryEntry *transition_point,
-                        catalog::DeltaCounters *computed_counters)
-{
+bool CommandCheck::InspectTree(const string &path,
+                               const hash::Any &catalog_hash,
+                               const catalog::DirectoryEntry *transition_point,
+                               catalog::DeltaCounters *computed_counters) {
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
@@ -532,7 +539,7 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
 }
 
 
-int swissknife::CommandCheck::Main(const swissknife::ArgumentList &args) {
+int CommandCheck::Main(const swissknife::ArgumentList &args) {
   check_chunks = false;
   if (args.find('c') != args.end())
     check_chunks = true;
