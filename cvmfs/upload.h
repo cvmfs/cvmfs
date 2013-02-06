@@ -109,13 +109,21 @@ namespace upload
        * @param definition_string   the spooler definition string to be inter-
        *                            preted by the constructor
        */
-      SpoolerDefinition(const std::string& definition_string);
+      SpoolerDefinition(const std::string& definition_string,
+                        const bool          use_file_chunking   = false,
+                        const size_t        min_file_chunk_size = 0,
+                        const size_t        avg_file_chunk_size = 0,
+                        const size_t        max_file_chunk_size = 0);
       bool IsValid() const { return valid_; }
 
       DriverType  driver_type;           //!< the type of the spooler driver
       std::string temporary_path;        //!< scratch space for the FileProcessor
       std::string spooler_configuration; //!< a driver specific spooler configuration string
                                          //!< (interpreted by the concrete spooler object)
+      bool        use_file_chunking;
+      size_t      min_file_chunk_size;
+      size_t      avg_file_chunk_size;
+      size_t      max_file_chunk_size;
 
       bool valid_;
     };
@@ -131,7 +139,7 @@ namespace upload
      * @return   a concrete instance of a Spooler backend that allows for
      *           file upload into different backend storages.
      */
-    static AbstractSpooler* Construct(const std::string &definition_string);
+    static AbstractSpooler* Construct(const SpoolerDefinition &spooler_definition);
     virtual ~AbstractSpooler();
 
     /**

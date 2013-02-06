@@ -6,11 +6,11 @@
 
 using namespace upload;
 
-const size_t  // TODO: make this configurable
-ChunkGenerator::average_chunk_size_ =  8 * 1024 * 1024;
-const size_t
+size_t
 ChunkGenerator::minimal_chunk_size_ =  4 * 1024 * 1024;
-const size_t
+size_t
+ChunkGenerator::average_chunk_size_ =  8 * 1024 * 1024;
+size_t
 ChunkGenerator::maximal_chunk_size_ = 16 * 1024 * 1024;
 
 ChunkGenerator::RegisteredChunkGenerators
@@ -30,6 +30,18 @@ ChunkGenerator* ChunkGenerator::Construct(const MemoryMappedFile &mmf) {
   }
 
   return NULL;
+}
+
+
+void ChunkGenerator::SetFileChunkRestrictions(const size_t minimal_chunk_size,
+                                              const size_t average_chunk_size,
+                                              const size_t maximal_chunk_size) {
+  assert (minimal_chunk_size < average_chunk_size &&
+          average_chunk_size < maximal_chunk_size);
+
+  ChunkGenerator::minimal_chunk_size_ = minimal_chunk_size;
+  ChunkGenerator::average_chunk_size_ = average_chunk_size;
+  ChunkGenerator::maximal_chunk_size_ = maximal_chunk_size;
 }
 
 

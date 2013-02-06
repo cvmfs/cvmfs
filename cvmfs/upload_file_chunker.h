@@ -60,6 +60,11 @@ class ChunkGenerator : SingleCopy {
 
   virtual off_t FindNextCutMark() const = 0;
 
+  friend class AbstractSpooler;
+  static void SetFileChunkRestrictions(const size_t minimal_chunk_size,
+                                       const size_t average_chunk_size,
+                                       const size_t maximal_chunk_size);
+
  private:
   template <class ChunkGeneratorT>
   static void RegisterChunkGenerator() {
@@ -69,9 +74,9 @@ class ChunkGenerator : SingleCopy {
   static void RegisterChunkGenerators();
 
  protected:
-  static const size_t               minimal_chunk_size_;
-  static const size_t               maximal_chunk_size_;
-  static const size_t               average_chunk_size_;
+  static size_t minimal_chunk_size_;
+  static size_t average_chunk_size_;
+  static size_t maximal_chunk_size_;
 
  private:
   typedef std::vector<ChunkGeneratorFactory*> RegisteredChunkGenerators;

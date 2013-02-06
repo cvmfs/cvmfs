@@ -6,7 +6,8 @@
 using namespace upload;
 
 FileProcessor::FileProcessor(const worker_context *context) :
-  temporary_path_(context->temporary_path) {}
+  temporary_path_(context->temporary_path),
+  use_file_chunking_(context->use_file_chunking) {}
 
 
 void FileProcessor::operator()(const FileProcessor::Parameters &data) {
@@ -23,8 +24,9 @@ void FileProcessor::operator()(const FileProcessor::Parameters &data) {
     goto fail;
   }
 
-  // chunk the file if needed
-  if (allow_chunking && ! GenerateFileChunks(mmf, result)) {
+  // chunk the file if requested and if enabled
+  if (allow_chunking && use_file_chunking_ &&
+      ! GenerateFileChunks(mmf, result)) {
     result.return_code = 2;
     goto fail;
   }

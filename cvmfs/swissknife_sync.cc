@@ -208,7 +208,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 	if (!CheckParams(params)) return 2;
 
   // Start spooler
-  params.spooler = upload::AbstractSpooler::Construct(params.spooler_definition);
+  const upload::AbstractSpooler::SpoolerDefinition spooler_definition(
+    params.spooler_definition,
+    params.use_file_chunking,
+    params.min_file_chunk_size,
+    params.avg_file_chunk_size,
+    params.max_file_chunk_size);
+  params.spooler = upload::AbstractSpooler::Construct(spooler_definition);
   if (NULL == params.spooler)
     return 3;
 

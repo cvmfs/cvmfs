@@ -9,12 +9,29 @@
 #include "upload_local.h"
 //#include "upload_riak.h"
 
+#include "upload_file_chunker.h"
+
 using namespace upload;
 
 AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
-                                       const std::string& definition_string) :
+                                       const std::string& definition_string,
+                                       const bool         use_file_chunking,
+                                       const size_t       min_file_chunk_size,
+                                       const size_t       avg_file_chunk_size,
+                                       const size_t       max_file_chunk_size) :
+  use_file_chunking(use_file_chunking),
+  min_file_chunk_size(min_file_chunk_size),
+  avg_file_chunk_size(avg_file_chunk_size),
+  max_file_chunk_size(max_file_chunk_size),
   valid_(false)
 {
+  // check if given file chunking values are sane
+  if (use_file_chunking && (min_file_chunk_size >= avg_file_chunk_size ||
+                            avg_file_chunk_size >= max_file_chunk_size)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "file chunk size values are not sane");
+    return;
+  }
+
   // split the spooler driver definition into name and config part
   std::vector<std::string> upstream = SplitString(definition_string, ':', 3);
   if (upstream.size() != 3) {
@@ -41,9 +58,7 @@ AbstractSpooler::SpoolerDefinition::SpoolerDefinition(
 
 
 AbstractSpooler* AbstractSpooler::Construct(
-                                      const std::string &spooler_description) {
-  // parse the spooler description string
-  SpoolerDefinition spooler_definition(spooler_description);
+                                const SpoolerDefinition &spooler_definition) {
   assert (spooler_definition.IsValid());
 
   // create a concrete Spooler object dependent on the parsed definition
@@ -90,7 +105,8 @@ AbstractSpooler::~AbstractSpooler() {}
 bool AbstractSpooler::Initialize() {
   // configure the file processor context
   concurrent_processing_context_ =
-    new FileProcessor::worker_context(spooler_definition_.temporary_path);
+    new FileProcessor::worker_context(spooler_definition_.temporary_path,
+                                      spooler_definition_.use_file_chunking);
 
   // create and configure a file processor worker environment
   const unsigned int number_of_cpus = GetNumberOfCpuCores();
@@ -106,6 +122,14 @@ bool AbstractSpooler::Initialize() {
     LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize concurrent "
                                        "processing in AbstractSpooler.");
     return false;
+  }
+
+  // configure the file chunking size restrictions
+  if (spooler_definition_.use_file_chunking) {
+    ChunkGenerator::SetFileChunkRestrictions(
+          spooler_definition_.min_file_chunk_size,
+          spooler_definition_.avg_file_chunk_size,
+          spooler_definition_.max_file_chunk_size);
   }
 
   // all done...

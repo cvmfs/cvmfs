@@ -45,10 +45,13 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
    * ConcurrentWorkers implementation
    */
   struct worker_context {
-    worker_context(const std::string &temporary_path) :
-      temporary_path(temporary_path) {}
+    worker_context(const std::string &temporary_path,
+                   const bool         use_file_chunking) :
+      temporary_path(temporary_path),
+      use_file_chunking(use_file_chunking) {}
     const std::string temporary_path; //!< base path to store processing
                                       //!< results in temporary files
+    const bool        use_file_chunking;
   };
 
 
@@ -111,6 +114,7 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
 
  private:
   const std::string temporary_path_;
+  const bool        use_file_chunking_;
 };
 
 }
