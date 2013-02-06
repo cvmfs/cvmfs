@@ -58,6 +58,10 @@ bool ChunkGenerator::HasMoreData() const {
   return (size_t)offset_ < mmf_.size();
 }
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
 
 bool NaiveChunkGenerator::WillHandle(const MemoryMappedFile &mmf) {
   // this will always kick in as a last resort!

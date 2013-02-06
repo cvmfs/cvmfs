@@ -13,6 +13,9 @@
 
 namespace upload {
 
+/**
+ * Defines a simple file chunk by providing an offset and the chunk size
+ */
 class Chunk : private std::pair<off_t, size_t> {
  public:
   Chunk(const off_t offset, const size_t size) :
@@ -22,6 +25,33 @@ class Chunk : private std::pair<off_t, size_t> {
   inline size_t size() const   { return this->second; }
 };
 
+/**
+ * Abstract base class of a chunk generator. Uses the PolymorphicConstruction
+ * template to allow for easy addition of new concrete ChunkGenerators.
+ *
+ * Derived classes mainly need to override the `FindNextCutMark()` method that
+ * returns the offset in the file where a new chunk should start. This method
+ * gets called from the `Next()` which provides the next Chunk to be processed.
+ *
+ * Also it provides the global configuration for the roughly desired chunk sizes
+ * which should be obeyed by each concrete implementation of ChunkGenerator. It
+ * lies in the responsiblity of the concrete implementations to actually make
+ * sure that the chunks stay inside this limitiations!
+ *
+ * The idea to have more than one concrete implementation of ChunkGenerator is
+ * to cut different file types differently. For example one could cut text files
+ * at line breaks, while binary files could be cut at 0x0 bytes.
+ *
+ * Example Usage:
+ *
+ *   ChunkGenerator *generator = ChunkGenerator::Construct(mmf);
+ *   while(generator->HasMoreData()) {
+ *     Chunk chunk = generator->Next();
+ *     process(chunk);
+ *   }
+ *   delete generator;
+ *
+ */
 class ChunkGenerator : public PolymorphicConstruction<ChunkGenerator,
                                                       MemoryMappedFile>,
                        private SingleCopy {
@@ -29,7 +59,17 @@ class ChunkGenerator : public PolymorphicConstruction<ChunkGenerator,
   ChunkGenerator(const MemoryMappedFile &mmf);
   virtual ~ChunkGenerator() {};
 
+  /**
+   * Find the next Chunk of the file to be processed.
+   * @return  the next Chunk to be processed
+   */
   Chunk Next();
+
+  /**
+   * Checks whether the whole file was processed. If true, you must not call
+   * `Next()` on this ChunkGenerator anymore!
+   * @return  true if there is at least one more chunk to come
+   */
   bool HasMoreData() const;
 
   static void RegisterPlugins();
@@ -38,9 +78,21 @@ class ChunkGenerator : public PolymorphicConstruction<ChunkGenerator,
   inline const MemoryMappedFile& mmf()    const { return mmf_; }
   inline off_t                   offset() const { return offset_; }
 
+  /**
+   * Abstract method that needs to be overridden by derived ChunkGenerators.
+   * In derived classes this should figure out at which position the file should
+   * be cut successively.
+   *
+   * @return  the offset in the file where the next chunk should be chopped off
+   */
   virtual off_t FindNextCutMark() const = 0;
 
   friend class AbstractSpooler;
+  /**
+   * Configures the chunk size restrictions each ChunkGenerator should obey.
+   * This method is called by AbstractSpooler once, before any files get pro-
+   * cessed.
+   */
   static void SetFileChunkRestrictions(const size_t minimal_chunk_size,
                                        const size_t average_chunk_size,
                                        const size_t maximal_chunk_size);
@@ -56,6 +108,14 @@ class ChunkGenerator : public PolymorphicConstruction<ChunkGenerator,
   off_t                             offset_;
 };
 
+
+/**
+ * This provides the most simple implementation of a ChunkGenerator. It cuts
+ * files blindly at a fixed chunk size.
+ *
+ * This should be seen as a last resort and will automatically be used, if no
+ * other ChunkGenerator decides to take responsibility for a given file type.
+ */
 class NaiveChunkGenerator : public ChunkGenerator {
  public:
   NaiveChunkGenerator(const MemoryMappedFile &mmf) : ChunkGenerator(mmf) {};
