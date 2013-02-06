@@ -566,6 +566,10 @@ CVMFS_UNION_DIR=/cvmfs/$name
 CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_UPSTREAM_STORAGE=$upstream
+CVMFS_USE_FILE_CHUNKING=true
+CVMFS_MIN_CHUNK_SIZE=4194304
+CVMFS_AVG_CHUNK_SIZE=8388608
+CVMFS_MAX_CHUNK_SIZE=16777216
 EOF
   cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
@@ -1246,6 +1250,12 @@ publish() {
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
     $log_level"
+  if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
+    sync_command="$sync_command -p \
+     -l $CVMFS_MIN_CHUNK_SIZE \
+     -a $CVMFS_AVG_CHUNK_SIZE \
+     -h $CVMFS_MAX_CHUNK_SIZE"
+  fi
   local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \

@@ -27,6 +27,7 @@
 #include <cstdio>
 
 #include <string>
+#include <vector>
 
 #include "platform.h"
 #include "sync_union.h"
@@ -40,34 +41,40 @@
 using namespace std;  // NOLINT
 
 
-bool CheckParams(SyncParameters *p) {
-  if (!DirectoryExists(p->dir_scratch)) {
+bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
+  if (!DirectoryExists(p.dir_scratch)) {
     PrintError("overlay (copy on write) directory does not exist");
     return false;
   }
-  if (!DirectoryExists(p->dir_union)) {
+  if (!DirectoryExists(p.dir_union)) {
     PrintError("union volume does not exist");
     return false;
   }
-  if (!DirectoryExists(p->dir_rdonly)) {
+  if (!DirectoryExists(p.dir_rdonly)) {
     PrintError("cvmfs read/only repository does not exist");
     return false;
   }
-  if (p->stratum0 == "") {
+  if (p.stratum0 == "") {
     PrintError("Stratum0 url missing");
     return false;
   }
 
-  if (p->manifest_path == "") {
+  if (p.manifest_path == "") {
     PrintError("manifest output required");
     return false;
   }
-  if (!DirectoryExists(p->dir_temp)) {
+  if (!DirectoryExists(p.dir_temp)) {
     PrintError("data store directory does not exist");
     return false;
   }
 
-	return true;
+  if (p.min_file_chunk_size >= p.avg_file_chunk_size ||
+      p.avg_file_chunk_size >= p.max_file_chunk_size) {
+    PrintError("file chunk size values are not sane");
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -129,6 +136,41 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
 }
 
 
+struct chunk_arg {
+  chunk_arg(char param, size_t *save_to) : param(param), save_to(save_to) {}
+  char    param;
+  size_t *save_to;
+};
+
+bool swissknife::CommandSync::ReadFileChunkingArgs(
+                                          const swissknife::ArgumentList &args,
+                                          SyncParameters &params) {
+  typedef std::vector<chunk_arg> ChunkArgs;
+
+  // define where to store the value of which file chunk argument
+  ChunkArgs chunk_args;
+  chunk_args.push_back(chunk_arg('a', &params.avg_file_chunk_size));
+  chunk_args.push_back(chunk_arg('l', &params.min_file_chunk_size));
+  chunk_args.push_back(chunk_arg('h', &params.max_file_chunk_size));
+
+  // read the arguments
+  ChunkArgs::const_iterator i    = chunk_args.begin();
+  ChunkArgs::const_iterator iend = chunk_args.end();
+  for (; i != iend; ++i) {
+    swissknife::ArgumentList::const_iterator arg = args.find(i->param);
+
+    if (arg != args.end()) {
+      size_t arg_value = static_cast<size_t>(String2Uint64(*arg->second));
+      if (arg_value > 0) *i->save_to = arg_value;
+      else return false;
+    }
+  }
+
+  // check if argument values are sane
+  return true;
+}
+
+
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 	SyncParameters params;
 
@@ -155,7 +197,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-	if (!CheckParams(&params)) return 2;
+  if (args.find('p') != args.end()) {
+    params.use_file_chunking = true;
+    if (!ReadFileChunkingArgs(args, params)) {
+      PrintError("Failed to read file chunk size values");
+      return 2;
+    }
+  }
+
+	if (!CheckParams(params)) return 2;
 
   // Start spooler
   params.spooler = upload::AbstractSpooler::Construct(params.spooler_definition);
