@@ -291,6 +291,10 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  *  3. Each derived class must have at least the following constructor:
  *     `DerivedClass(const ParameterT &param)` which is used to instantiate the
  *     concrete class in case it returned true in WillHandle()
+ *  4. (OPTIONAL) Both AbstractProductT and ConcreteProductTs can override the
+ *     virtual method `bool Initialize()` which will be called directly after
+ *     creation of a ConcreteProductT. If it returns false, the constructed in-
+ *     stance is deleted and the list of plugins is traversed further.
  *
  * A possible class hierarchy could look like this:
  *
@@ -343,13 +347,19 @@ class PolymorphicConstruction {
     }
     assert (!registered_plugins_.empty());
 
-    // selection of the correct plugin at runtime
+    // select and initialize the correct plugin at runtime
     // (polymorphic construction)
     typename RegisteredPlugins::const_iterator i    = registered_plugins_.begin();
     typename RegisteredPlugins::const_iterator iend = registered_plugins_.end();
     for (; i != iend; ++i) {
       if ((*i)->WillHandle(param)) {
-        return (*i)->Construct(param);
+        // create and initialize the class that claimed responsibility
+        AbstractProductT *product = (*i)->Construct(param);
+        if (! product->Initialize()) {
+          delete product;
+          continue;
+        }
+        return product;
       }
     }
 
@@ -366,6 +376,8 @@ class PolymorphicConstruction {
                               ParameterT>()
     );
   }
+
+  virtual bool Initialize() { return true; };
 
  private:
   static RegisteredPlugins registered_plugins_;
