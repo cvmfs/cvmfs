@@ -71,7 +71,7 @@ off_t Xor32ChunkGenerator::FindNextCutMark() const {
   // last 32 bytes of the data contained in the minimal chunk size
   off += minimal_chunk_size_ - 32;
   for (int i = 0; i < 32; ++i, ++off) {
-    xor_output = (xor_output << 1) ^ data[off];
+    xor_output = xor32(xor_output, data[off]);
   }
 
   // the rest of the data needs to be processed byte by byte to find locations
@@ -88,7 +88,7 @@ off_t Xor32ChunkGenerator::FindNextCutMark() const {
 
     for (; off < limit; ++off) {
       // calculate the xor32 rolling checksum
-      xor_output = (xor_output << 1) ^ data[off];
+      xor_output = xor32(xor_output, data[off]);
 
       // check if we found a cut mark
       if (abs(xor_output - magic_number_) < (int32_t)threshold) {

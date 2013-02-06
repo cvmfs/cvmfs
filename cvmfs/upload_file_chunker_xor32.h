@@ -36,6 +36,10 @@ class Xor32ChunkGenerator : public ChunkGenerator {
  private:
   void InitThresholds();
 
+  inline uint32_t xor32(const uint32_t checksum, const char byte) const {
+    return (checksum << 1) ^ byte;
+  }
+
  private:
   Thresholds            thresholds_;
   static const uint32_t magic_number_;
