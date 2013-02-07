@@ -137,3 +137,14 @@ bool FileProcessor::ProcessFileChunk(const MemoryMappedFile &mmf,
            chunk.content_hash().ToString().c_str());
   return true;
 }
+
+
+FileChunks FileProcessor::Results::GetFinalizedFileChunks() const {
+  FileChunks final_chunks;
+  TemporaryFileChunks::const_iterator i    = file_chunks.begin();
+  TemporaryFileChunks::const_iterator iend = file_chunks.end();
+  for (; i != iend; ++i) {
+    final_chunks.push_back(static_cast<FileChunk>(*i));
+  }
+  return final_chunks;
+}
