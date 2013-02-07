@@ -24,6 +24,8 @@ namespace upload
     LocalSpooler(const SpoolerDefinition &spooler_definition);
     static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
+    inline std::string name() const { return "Local"; }
+
     /**
      * Upload() is not done concurrently in the current implementation of the
      * LocalSpooler, since it is a simple move or copy of a file without CPU

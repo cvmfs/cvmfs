@@ -272,6 +272,7 @@ namespace upload {
     virtual ~RiakSpooler();
 
     static bool WillHandle(const SpoolerDefinition &spooler_definition);
+    inline std::string name() const { return "Riak HTTP"; }
 
     /**
      * Schedules an asynchronous upload to a Riak storage.

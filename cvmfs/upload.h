@@ -138,6 +138,12 @@ namespace upload
     virtual ~AbstractSpooler();
 
     /**
+     * Prints the name of the concrete spooler.
+     * Intended for debugging purposes only!
+     */
+    virtual std::string name() const = 0;
+
+    /**
      * This method is called once before any other operations are performed on
      * a concrete Spooler. Implement this in your concrete Spooler class to do
      * global initialization work.
