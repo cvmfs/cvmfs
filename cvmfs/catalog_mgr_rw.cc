@@ -163,7 +163,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   // Upload catalog
   spooler->Upload(file_path_compressed,
                   "data" + hash_catalog.MakePath(1, 2) + "C");
-  spooler->EndOfTransaction();
+  spooler->WaitForUpload();
   spooler->WaitForTermination();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {

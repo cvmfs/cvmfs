@@ -90,7 +90,8 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
     TemporaryFileChunks  file_chunks; //!< list of the generated file chunks
     const std::string    local_path;  //!< path to the local file that was processed (same as given in Parameters)
 
-    inline bool IsChunked() const { return file_chunks.size() > 1; }
+    inline bool IsChunked() const { return !file_chunks.empty(); }
+    FileChunks GetFinalizedFileChunks() const;
   };
 
   // these typedefs are needed for the ConcurrentWorkers template

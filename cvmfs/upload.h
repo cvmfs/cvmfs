@@ -3,9 +3,80 @@
  */
 
 /**
- * Backend Storage Spooler
+ *    Backend Storage Spooler
+ *    ~~~~~~~~~~~~~~~~~~~~~~~
  *
- * TODO: Write up the general workflow of file processing and upload...
+ * This is the entry point to the general file processing facility of the CVMFS
+ * backend. It works with a two-stage approach:
+ *
+ *   1. Process file content
+ *      -> create smaller file chunks for big input files
+ *      -> compress the file content (optionally chunked)
+ *      -> generate a content hash of the compression result
+ *
+ *   2. Upload files
+ *      -> pluggable to support different upload pathes (local, Riak, ...)
+ *
+ * There are a number of different entities involved in this process. Namely:
+ *   -> AbstractSpooler     - general steering tasks ( + common interface )
+ *   -> FileProcessor       - chunking, compression and hashing of files
+ *   -> concrete Spoolers   - upload functionality for various backend storages
+ *
+ * Stage 1 aka. the processing of files is handled by the FileProcessor, since
+ * it is independent from the actual uploading this functionality is outsourced.
+ * The FileProcessor will take care of the above mentioned steps in a concurrent
+ * fashion. This process is invoked by calling AbstractSpooler::Process().
+ * As a result AbstractSpooler obtains a FileProcessor::Results structure that
+ * describes the processed file (chunks, checksum, compressed data location) and
+ * hands it over to one of the concrete Spooler classes for upload.
+ *
+ * Stage 2 aka. the upload is handled by one of the concrete Spooler classes.
+ * Usually the input to the upload routine is a FileProcessor::Results structure
+ * which might contain several files to be uploaded (think: file chunks).
+ * Depending on the implementation of the concrete Spooler we might therefore
+ * produce more than one upload job for a single AbstractSpooler::Process() call.
+ *
+ * For some specific files we need to be able to circumvent the FileProcessor to
+ * directly push them into the backend storage (i.e. .cvmfspublished), therefore
+ * AbstractSpooler::Upload() is overloaded with a public method, that provides
+ * this circumvention to the user. By 'user' we of course mean the classes that
+ * use this Spooler facility to upload their files to the backend storage.
+ *
+ * In any case, calling AbstractSpooler::Process() or AbstractSpooler::Upload()
+ * will invoke a callback once the whole job has been finished. Callbacks are
+ * provided by the Observable template. Please see the implementation of this
+ * template for more details on usage and implementation.
+ * The data structure provided by this callback is called SpoolerResult and con-
+ * tains information about the processed file (status, content hash, chunks, ..)
+ * Note: Even if a concrete Spooler internally spawns more than one upload job
+ *       to send out chunked files, the user will only see a single invocation
+ *       containing information about the uploaded file including it's generated
+ *       chunks.
+ *
+ * Workflow:
+ *
+ *   User
+ *   \O/                Callback (SpoolerResult)
+ *    |   <----------------------+
+ *   / \                         |
+ *    |                          |
+ *    |                          |          File
+ *    |  File       ################### ---------------------> #################
+ *    +-----------> # AbstractSpooler #                        # FileProcessor #
+ *    |             ################### <--------------------- #################
+ *    |                      |    ^     FileProcessor::Results
+ *    |            Hand Over |    |
+ *    |                     `|´   |
+ *    |  direct    #####################
+ *    +----------> # Concrete Spooler  #
+ *       upload    #####################
+ *                           |    ^
+ *                    Upload |    | Callback (SpoolerResult)
+ *                          `|´   |
+ *                 #####################
+ *                 #  Backend Storage  #
+ *                 #####################
+ *
  */
 
 #ifndef CVMFS_UPLOAD_H_
@@ -64,10 +135,10 @@ namespace upload
 
     inline bool IsChunked() const { return !file_chunks.empty(); }
 
-    const int         return_code;  //!< the return value of the spooler operation
-    const std::string local_path;   //!< the local_path previously given as input
-    const hash::Any   content_hash; //!< the content_hash of the bulk file derived during processing
-    const FileChunks  file_chunks;  //!< the file chunks generated during processing
+    int         return_code;  //!< the return value of the spooler operation
+    std::string local_path;   //!< the local_path previously given as input
+    hash::Any   content_hash; //!< the content_hash of the bulk file derived during processing
+    FileChunks  file_chunks;  //!< the file chunks generated during processing
   };
 
 
@@ -124,8 +195,11 @@ namespace upload
    *
    * Note: A spooler is derived from the Observable template, meaning that it
    *       allows for Listeners to be registered onto it.
-   *       Concrete implementations of this class should take care of calling
-   *       NotifyListeners() when a spooler job has finished.
+   *
+   * Note: Concrete implementations of AbstractSpooler are responsible to pro-
+   *       duce a SpoolerResult once they finish a job and pass it upwards by
+   *       invoking JobDone(). AbstractSpooler will then take care of notifying
+   *       all registered listeners.
    */
   class AbstractSpooler : public Observable<SpoolerResult>,
                           public PolymorphicConstruction<AbstractSpooler,
@@ -136,6 +210,12 @@ namespace upload
     static void RegisterPlugins();
 
     virtual ~AbstractSpooler();
+
+    /**
+     * Prints the name of the concrete spooler.
+     * Intended for debugging purposes only!
+     */
+    virtual std::string name() const = 0;
 
     /**
      * This method is called once before any other operations are performed on
@@ -167,46 +247,43 @@ namespace upload
      * file_suffix.
      * When the processing has finish a callback will be invoked asynchronously.
      *
-     * @param local_path    the location of the file to be processed and uploaded
-     *                      into the backend storage
-     * @param file_suffix   a suffix that will be appended to the end of the
-     *                      final remote path used in the backend storage
+     * Note: This method might decide to chunk the file into a number of smaller
+     *       parts and upload them separately. Still, you will receive a single
+     *       callback for the whole job, that contains information about the
+     *       generated chunks.
+     *
+     * @param local_path      the location of the file to be processed and up-
+     *                        loaded into the backend storage
+     * @param allow_chunking  (optional) controls if this file should be cut in
+     *                        chunks or uploaded at once
      */
     void Process(const std::string &local_path,
                  const bool         allow_chunking = true);
 
     /**
-     * This method should always be called after all desired spooler operations
-     * are scheduled. It will wait until all operations are finished an allows
-     * the concrete spooler implementations to do potential commiting steps or
-     * clean-up work.
+     * Blocks until all jobs currently under processing are finished. After it
+     * returned, more jobs can be scheduled if needed.
+     * Note: We assume that no one schedules new jobs while this method is in
+     *       waiting state. Otherwise it might never return, since the job queue
+     *       does not get empty.
      *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
-     */
-    virtual void EndOfTransaction();
-
-    /**
-     * Blocks until all jobs currently under processing are finished.
-     * Note: We assume that no one schedules new jobs after this method was
-     *       called. Otherwise it might never return, since the job queue does
-     *       not get empty.
-     *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD WHEN OVERRIDING!
      */
     virtual void WaitForUpload() const;
 
     /**
-     * Blocks until all jobs are processed and all PushWorkers terminated
-     * successfully.
-     * Call this after you have called EndOfTransaction() to wait until the
-     * Spooler terminated.
+     * Blocks until all jobs are processed and all worker threads terminated
+     * successfully. Afterwards the spooler will be out of service.
+     * Call this after you have called WaitForUpload() to wait until the
+     * Spooler terminates.
+     * Note: after calling this method NO JOBS should be scheduled anymore.
      *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD WHEN OVERRIDING!
      */
     virtual void WaitForTermination() const;
 
     /**
-     * Checks how many of the already processed jobs are failed.
+     * Checks how many of the already processed jobs have failed.
      *
      * Note: DO NOT FORGET TO UP-CALL THIS METHOD AND ADD YOUR OWN ERROR COUNT!
      *
@@ -238,12 +315,10 @@ namespace upload
 
    protected:
     /**
-     * No concrete spooler should have a public constructor. Instead one should
-     * extend the static Construct() method of AbstractSpooler to transparently
-     * create a new Spooler based on the given spooler definition string.
-     *
-     * Note: Concrete spoolers should overwrite this constructor and process the
-     *       given spooler_definition in it.
+     * AbstractSpooler uses the PolymorphicConstruction template to generate
+     * concrete spoolers. Therefore each concrete spooler must have a constructor
+     * that overrides and up-calls this one.
+     * Furthermore they may use the information in SpoolerDefinition
      *
      * @param spooler_definition   the SpoolerDefinition structure that defines
      *                             some intrinsics of the concrete Spoolers.
@@ -256,7 +331,7 @@ namespace upload
      * than one file to be uploaded (see Upload(FileProcessor::Results) ).
      *
      * Note: If the concrete spooler implements uploading as an asynchronous
-     *       task, this method MUST be called when all files for one upload
+     *       task, this method MUST be called when all items for one upload
      *       job are processed.
      *
      * The concrete implementations of AbstractSpooler are responsible to fill
@@ -269,8 +344,8 @@ namespace upload
 
     /**
      * Used internally: Is called when FileProcessor finishes a job.
-     * Will automatically take care of, that processed files get uploaded using
-     * Upload(FileProcessor::Results)
+     * Automatically takes care of processed files and prepares them for upload
+     * by calling AbstractSpooler::Upload(FileProcessor::Results)
      */
     void ProcessingCallback(const FileProcessor::Results &data);
 

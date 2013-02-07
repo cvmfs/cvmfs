@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "upload_local.h"
-//#include "upload_riak.h"
+#include "upload_riak.h"
 
 #include "upload_file_chunker.h"
 
@@ -59,7 +59,7 @@ SpoolerDefinition::SpoolerDefinition(
 
 void AbstractSpooler::RegisterPlugins() {
   RegisterPlugin<LocalSpooler>();
-  //RegisterPlugin<RiakSpooler>();
+  RegisterPlugin<RiakSpooler>();
 }
 
 
@@ -121,11 +121,6 @@ void AbstractSpooler::Process(const std::string &local_path,
 
 void AbstractSpooler::ProcessingCallback(const FileProcessor::Results &data) {
   Upload(data);
-}
-
-
-void AbstractSpooler::EndOfTransaction() {
-  WaitForUpload();
 }
 
 

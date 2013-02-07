@@ -33,8 +33,9 @@ void FileProcessor::operator()(const FileProcessor::Parameters &data) {
 
   // check if we only produced one chunk...
   if (result.file_chunks.size() == 1) {
-    // ... and simply use that as bulk file as well
+    // ... and simply use that as bulk file and discard the chunk
     result.bulk_file = result.file_chunks.front();
+    result.file_chunks.clear();
 
     // otherwise generate an additional bulk version of the file
   } else if (! GenerateBulkFile(mmf, result)) {
@@ -136,4 +137,15 @@ bool FileProcessor::ProcessFileChunk(const MemoryMappedFile &mmf,
            chunk.size(),
            chunk.content_hash().ToString().c_str());
   return true;
+}
+
+
+FileChunks FileProcessor::Results::GetFinalizedFileChunks() const {
+  FileChunks final_chunks;
+  TemporaryFileChunks::const_iterator i    = file_chunks.begin();
+  TemporaryFileChunks::const_iterator iend = file_chunks.end();
+  for (; i != iend; ++i) {
+    final_chunks.push_back(static_cast<FileChunk>(*i));
+  }
+  return final_chunks;
 }

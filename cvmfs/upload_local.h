@@ -14,8 +14,7 @@ namespace upload
 {
   /**
    * The LocalSpooler implements the AbstractSpooler interface to push files
-   * into a local CVMFS repository backend. Compression is done concurrently
-   * using the ConcurrentWorkers.
+   * into a local CVMFS repository backend.
    * For a detailed description of the classes interface please have a look into
    * the AbstractSpooler base class.
    */
@@ -23,6 +22,8 @@ namespace upload
    public:
     LocalSpooler(const SpoolerDefinition &spooler_definition);
     static bool WillHandle(const SpoolerDefinition &spooler_definition);
+
+    inline std::string name() const { return "Local"; }
 
     /**
      * Upload() is not done concurrently in the current implementation of the
@@ -33,7 +34,6 @@ namespace upload
      */
     void Upload(const std::string &local_path,
                 const std::string &remote_path);
-    void Upload(const FileProcessor::Results &data);
 
     /**
      * Determines the number of failed jobs in the LocalCompressionWorker as
@@ -42,6 +42,8 @@ namespace upload
     unsigned int GetNumberOfErrors() const;
 
    protected:
+    void Upload(const FileProcessor::Results &data);
+
     int Copy(const std::string &local_path,
              const std::string &remote_path) const;
     int Move(const std::string &local_path,
