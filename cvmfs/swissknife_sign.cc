@@ -203,7 +203,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     // Upload manifest
     spooler->Upload(manifest_path, ".cvmfspublished");
 
-    spooler->EndOfTransaction();
+    spooler->WaitForUpload();
     spooler->WaitForTermination();
     unlink(cert_path_tmp.c_str());
     unlink(manifest_path.c_str());

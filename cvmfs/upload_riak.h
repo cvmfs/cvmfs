@@ -282,7 +282,6 @@ namespace upload {
      */
     void Upload(const std::string &local_path,
                 const std::string &remote_path);
-    void Upload(const FileProcessor::Results &data);
 
     void WaitForUpload() const;
     void WaitForTermination() const;
@@ -290,6 +289,8 @@ namespace upload {
     unsigned int GetNumberOfErrors() const;
 
    protected:
+    void Upload(const FileProcessor::Results &data);
+
     bool Initialize();
     void TearDown();
 

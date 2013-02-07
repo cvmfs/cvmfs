@@ -30,11 +30,7 @@ int main() {
   UniquePtr<AbstractSpooler> spooler(AbstractSpooler::Construct(sd));
   spooler->RegisterListener(&SplCallback);
 
-  spooler->Process("/mnt/atlas-condb/cond12_data.000002.lar.COND._0003.pool.root");
-  spooler->Process("/mnt/atlas-condb/cond12_data.000002.lar.COND._0002.pool.root");
-  spooler->Process("/mnt/atlas-condb/cond12_data.000002.lar.COND._0001.pool.root");
-  spooler->Process("/mnt/atlas-condb/cond12_data.000002.lar.COND._0004.pool.root");
-  spooler->Process("/mnt/atlas-condb/cond12_data.000002.lar.COND._0005.pool.root");
+  spooler->Upload("Makefile", "data/MyMakefile");
 
   spooler->WaitForTermination();
 

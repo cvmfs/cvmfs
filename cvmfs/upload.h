@@ -124,8 +124,11 @@ namespace upload
    *
    * Note: A spooler is derived from the Observable template, meaning that it
    *       allows for Listeners to be registered onto it.
-   *       Concrete implementations of this class should take care of calling
-   *       NotifyListeners() when a spooler job has finished.
+   *
+   * Note: Concrete implementations of AbstractSpooler are responsible to pro-
+   *       duce a SpoolerResult once they finish a job and pass it upwards by
+   *       invoking JobDone(). AbstractSpooler will then take care of notifying
+   *       all registered listeners.
    */
   class AbstractSpooler : public Observable<SpoolerResult>,
                           public PolymorphicConstruction<AbstractSpooler,
@@ -173,44 +176,43 @@ namespace upload
      * file_suffix.
      * When the processing has finish a callback will be invoked asynchronously.
      *
-     * @param local_path    the location of the file to be processed and uploaded
-     *                      into the backend storage
-     * @param file_suffix   a suffix that will be appended to the end of the
-     *                      final remote path used in the backend storage
+     * Note: This method might decide to chunk the file into a number of smaller
+     *       parts and upload them separately. Still, you will receive a single
+     *       callback for the whole job, that contains information about the
+     *       generated chunks.
+     *
+     * @param local_path      the location of the file to be processed and up-
+     *                        loaded into the backend storage
+     * @param allow_chunking  (optional) controls if this file should be cut in
+     *                        chunks or uploaded at once
      */
     void Process(const std::string &local_path,
                  const bool         allow_chunking = true);
 
     /**
-     * This method should always be called after all desired spooler operations
-     * are scheduled. It will wait until all operations are finished and allows
-     * the concrete spooler implementations to do potential commiting steps or
-     * clean-up work.
-     */
-    void EndOfTransaction();
-
-    /**
-     * Blocks until all jobs currently under processing are finished.
-     * Note: We assume that no one schedules new jobs after this method was
-     *       called. Otherwise it might never return, since the job queue does
-     *       not get empty.
+     * Blocks until all jobs currently under processing are finished. After it
+     * returned, more jobs can be scheduled if needed.
+     * Note: We assume that no one schedules new jobs while this method is in
+     *       waiting state. Otherwise it might never return, since the job queue
+     *       does not get empty.
      *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD WHEN OVERRIDING!
      */
     virtual void WaitForUpload() const;
 
     /**
-     * Blocks until all jobs are processed and all PushWorkers terminated
-     * successfully.
-     * Call this after you have called EndOfTransaction() to wait until the
-     * Spooler terminated.
+     * Blocks until all jobs are processed and all worker threads terminated
+     * successfully. Afterwards the spooler will be out of service.
+     * Call this after you have called WaitForUpload() to wait until the
+     * Spooler terminates.
+     * Note: after calling this method NO JOBS should be scheduled anymore.
      *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
+     * Note: DO NOT FORGET TO UP-CALL THIS METHOD WHEN OVERRIDING!
      */
     virtual void WaitForTermination() const;
 
     /**
-     * Checks how many of the already processed jobs are failed.
+     * Checks how many of the already processed jobs have failed.
      *
      * Note: DO NOT FORGET TO UP-CALL THIS METHOD AND ADD YOUR OWN ERROR COUNT!
      *
@@ -242,12 +244,10 @@ namespace upload
 
    protected:
     /**
-     * No concrete spooler should have a public constructor. Instead one should
-     * extend the static Construct() method of AbstractSpooler to transparently
-     * create a new Spooler based on the given spooler definition string.
-     *
-     * Note: Concrete spoolers should overwrite this constructor and process the
-     *       given spooler_definition in it.
+     * AbstractSpooler uses the PolymorphicConstruction template to generate
+     * concrete spoolers. Therefore each concrete spooler must have a constructor
+     * that overrides and up-calls this one.
+     * Furthermore they may use the information in SpoolerDefinition
      *
      * @param spooler_definition   the SpoolerDefinition structure that defines
      *                             some intrinsics of the concrete Spoolers.
@@ -260,7 +260,7 @@ namespace upload
      * than one file to be uploaded (see Upload(FileProcessor::Results) ).
      *
      * Note: If the concrete spooler implements uploading as an asynchronous
-     *       task, this method MUST be called when all files for one upload
+     *       task, this method MUST be called when all items for one upload
      *       job are processed.
      *
      * The concrete implementations of AbstractSpooler are responsible to fill
@@ -273,8 +273,8 @@ namespace upload
 
     /**
      * Used internally: Is called when FileProcessor finishes a job.
-     * Will automatically take care of, that processed files get uploaded using
-     * Upload(FileProcessor::Results)
+     * Automatically takes care of processed files and prepares them for upload
+     * by calling AbstractSpooler::Upload(FileProcessor::Results)
      */
     void ProcessingCallback(const FileProcessor::Results &data);
 

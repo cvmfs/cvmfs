@@ -124,11 +124,6 @@ void AbstractSpooler::ProcessingCallback(const FileProcessor::Results &data) {
 }
 
 
-void AbstractSpooler::EndOfTransaction() {
-  WaitForUpload();
-}
-
-
 void AbstractSpooler::WaitForUpload() const {
   concurrent_processing_->WaitForEmptyQueue();
 }
