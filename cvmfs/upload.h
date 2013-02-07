@@ -64,10 +64,10 @@ namespace upload
 
     inline bool IsChunked() const { return !file_chunks.empty(); }
 
-    const int         return_code;  //!< the return value of the spooler operation
-    const std::string local_path;   //!< the local_path previously given as input
-    const hash::Any   content_hash; //!< the content_hash of the bulk file derived during processing
-    const FileChunks  file_chunks;  //!< the file chunks generated during processing
+    int         return_code;  //!< the return value of the spooler operation
+    std::string local_path;   //!< the local_path previously given as input
+    hash::Any   content_hash; //!< the content_hash of the bulk file derived during processing
+    FileChunks  file_chunks;  //!< the file chunks generated during processing
   };
 
 
