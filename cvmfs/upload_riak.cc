@@ -209,6 +209,8 @@ void RiakSpooler::UploadWorkerCallback(const UploadWorker::Results &result) {
 
 
 void RiakSpooler::PendingSpoolerResult::Finalize() {
+  assert (AllUploadsFinished());
+
   // if all went fine, just set the return_code of this SpoolerResult to 0
   if (IsSuccessful()) {
     return_code = 0;
@@ -950,7 +952,11 @@ bool RiakSpooler::CheckJsonConfiguration(const JSON *json_root) {
 }
 
 
-// -----------------------------------------------------------------------------
+//
+// +----------------------------------------------------------------------------
+// | PendingSpoolerResults
+// |    - wrapper of std::map<std::string, PendingSpoolerResults>
+//
 
 
 void RiakSpooler::PendingSpoolerResults::Insert(const std::string &local_path) {
@@ -978,7 +984,10 @@ void RiakSpooler::PendingSpoolerResults::Erase(const std::string &local_path) {
 }
 
 
-// -----------------------------------------------------------------------------
+//
+// +----------------------------------------------------------------------------
+// | DataBuffer
+//
 
 
 bool RiakSpooler::DataBuffer::Reserve(const size_t bytes) {

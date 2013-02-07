@@ -21,11 +21,7 @@ namespace upload {
   /**
    * The RiakSpooler implements an upstream backend adapter for a Riak key/value
    * storage (see http://basho.com/products/riak-overview/ for details).
-   * It implements both the Process() and the Copy() functionality concurrently
-   * using the ConcurrentWorkers template. Process() will first compress and hash
-   * the given file and afterwards schedule an upload job based on the results
-   * while Copy() will directly schedule an upload job. See upload_parameters for
-   * more details.
+   * It implements Upload() concurrently using the ConcurrentWorkers template.
    *
    * For a detailed interface description of this class please have a look at the
    * AbstractSpooler class which it is derived from.
@@ -61,7 +57,7 @@ namespace upload {
 
 
     /**
-     * Implementatino of ConcurrentWorker that pushes files into a Riak storage
+     * Implementation of ConcurrentWorker that pushes files into a Riak storage.
      * Currently this worker is based on cURL and uses the HTTP interface of
      * Riak. Possibly this will be extended by a Protocol Buffer implementation.
      */
@@ -350,6 +346,10 @@ namespace upload {
     /**
      * Attaches additional information to the SpoolerResult structure that is
      * needed to keep track of currently ongoing upload jobs.
+     *
+     * This is created BEFORE the actual upload jobs for this SpoolerResult are
+     * scheduled. Upload results will drop in asynchronously in will be added in
+     * RiakSpooler::UploadWorkerCallback.
      */
     struct PendingSpoolerResult : public SpoolerResult {
       enum ItemUploadState {
@@ -373,6 +373,11 @@ namespace upload {
         uploads_finished(0),
         errors(0) {}
 
+      /**
+       * Checks if this PendingSpoolerResult is ready to be delivered
+       *
+       * @return  true if all items of this SpoolerResults reported back
+       */
       inline bool AllUploadsFinished() const {
         return uploads_finished == chunk_upload_states.size() + 1;
       }
@@ -381,21 +386,67 @@ namespace upload {
         return AllUploadsFinished() && errors == 0;
       }
 
+      /**
+       * Analyzes the result of the PendingSpoolerResult and brings it into its
+       * final state. Afterwards it can be safely returned through
+       * AbstractSpooler::JobDone()
+       *
+       * Note: this method assumes that all items related to this SpoolerResult
+       *       already reported back (see AllUploadsFinished())
+       */
       void Finalize();
 
-      ItemUploadState   bulk_upload_state;
-      ItemUploadStates  chunk_upload_states;
+      ItemUploadState   bulk_upload_state;   //!< state flag for the bulk file upload
+      ItemUploadStates  chunk_upload_states; //!< state flags for all generated file chunks
 
-      unsigned int      uploads_finished;
-      unsigned int      errors;
+      unsigned int      uploads_finished;    //!< counter of how many callbacks this PendingSpoolerResult already received
+      unsigned int      errors;              //!< counter how many of the associated upload jobs failed
     };
 
+    /**
+     * Wraps the mapping from local_path to PendingSpoolerResults to keep track
+     * of the progressing update procedure.
+     *
+     * Note: This will be used in RiakSpooler::UploadWorkerCallback meaning that
+     *       it might suffer from threading issues. PendingSpoolerResults is not
+     *       thread safe by itself but implements Lockable.
+     *       You should always use LockGuard<PendingSpoolerResults> to sync your
+     *       accesses into this map.
+     */
     class PendingSpoolerResults : public std::map<std::string, PendingSpoolerResult>,
                                   public Lockable {
      public:
+      /**
+       * Inserts a simple upload job (user called AbstractSpooler::Upload() )
+       *
+       * @param local_path  the local path of the file that is being uploaded
+       */
       void Insert(const std::string &local_path);
+
+      /**
+       * Inserts a (possibly) complex upload job that might contain multiple
+       * chunks (invoked indirectly through AbstractSpooler::Process() )
+       *
+       * @param data  the results structure produced by the FileProcessor
+       */
       void Insert(const FileProcessor::Results &data);
+
+      /**
+       * Retrieves the PendingSpoolerResult reference mapped to local_path
+       * Note: this will CRASH if local_path is NOT found in the map.
+       *
+       * @param local_path  the local path to be retrieved from the map
+       */
       PendingSpoolerResult& Get(const std::string &local_path) const;
+
+      /**
+       * Erases the PendingSpoolerResult mapped to local_path from the map
+       * Note: This will CRASH if local_path is NOT found in the map.
+       *       Additionally you might still hold a reference obtained by Get(),
+       *       that might get invalidated by invoking Erase(), keep in that mind
+       *
+       * @param local_path  the local path to be erased from the map
+       */
       void Erase(const std::string &local_path);
     };
 
@@ -404,7 +455,7 @@ namespace upload {
     UniquePtr<ConcurrentWorkers<UploadWorker> >  concurrent_upload_;
     UniquePtr<UploadWorker::worker_context>      upload_context_;
 
-    PendingSpoolerResults                        pending_results_;
+    PendingSpoolerResults                        pending_results_; //!< list of currently pending upload jobs
   };
 }
 
