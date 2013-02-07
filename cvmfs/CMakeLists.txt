@@ -246,9 +246,16 @@ add_executable (debug_spool debug.cc
                 upload_file_processor.h upload_file_processor.cc
                 upload.h upload.cc
                 upload_local.h upload_local.cc
-                signature.cc signature.h)
+                upload_riak.h upload_riak.cc
+                signature.cc signature.h
+                duplex_curl.h
 
-target_link_libraries (debug_spool  ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+                # riak uses JSON for configuration, therefore we need
+                # a simple JSON parser:
+                vjson/block_allocator.h vjson/block_allocator.cpp
+                vjson/json.h vjson/json.cpp)
+
+target_link_libraries (debug_spool  ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} pthread dl)
 set_target_properties (debug_spool PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS} -g -DDEBUGMSG" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
 

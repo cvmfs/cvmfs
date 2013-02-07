@@ -177,13 +177,11 @@ namespace upload
 
     /**
      * This method should always be called after all desired spooler operations
-     * are scheduled. It will wait until all operations are finished an allows
+     * are scheduled. It will wait until all operations are finished and allows
      * the concrete spooler implementations to do potential commiting steps or
      * clean-up work.
-     *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
-    virtual void EndOfTransaction();
+    void EndOfTransaction();
 
     /**
      * Blocks until all jobs currently under processing are finished.
