@@ -494,6 +494,12 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   static void* RunWorker(void *run_binding);
 
+  /**
+   * Tells the master that a worker thread did start. This does not mean, that
+   * it was initialized successfully.
+   */
+  void ReportStartedWorker() const;
+
   void Schedule(Job job);
   void ScheduleDeathSentences();
 
@@ -522,9 +528,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   void JobDone(const returned_data_t& data, const bool success = true);
 
-  inline void StartRunning()    { MutexLockGuard guard(running_mutex_); running_ = true; }
-  inline void StopRunning()     { MutexLockGuard guard(running_mutex_); running_ = false; }
-  inline bool IsRunning() const { MutexLockGuard guard(running_mutex_); return running_; }
+  inline void StartRunning()    { MutexLockGuard guard(status_mutex_); running_ = true; }
+  inline void StopRunning()     { MutexLockGuard guard(status_mutex_); running_ = false; }
+  inline bool IsRunning() const { MutexLockGuard guard(status_mutex_); return running_; }
 
  private:
   // general configuration
@@ -537,7 +543,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   // status information
   bool                         initialized_;
   bool                         running_;
-  mutable pthread_mutex_t      running_mutex_;
+  mutable unsigned int         workers_started_;
+  mutable pthread_mutex_t      status_mutex_;
+  mutable pthread_cond_t       worker_started_;
 
   // worker threads
   WorkerThreads                worker_threads_;       //!< list of worker threads

@@ -116,7 +116,8 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
   worker_context_(worker_context),
   thread_context_(this, worker_context_),
   initialized_(false),
-  running_(false)
+  running_(false),
+  workers_started_(0)
 {
   assert (maximal_queue_length_ >= number_of_workers_);
   assert (desired_free_slots_   >  0);
@@ -138,7 +139,8 @@ ConcurrentWorkers<WorkerT>::~ConcurrentWorkers() {
   pthread_cond_destroy(&job_queue_cond_not_full_);
   pthread_cond_destroy(&job_queue_cond_not_empty_);
   pthread_cond_destroy(&jobs_all_done_);
-  pthread_mutex_destroy(&running_mutex_);
+  pthread_cond_destroy(&worker_started_);
+  pthread_mutex_destroy(&status_mutex_);
   pthread_mutex_destroy(&job_queue_mutex_);
 }
 
@@ -152,10 +154,13 @@ bool ConcurrentWorkers<WorkerT>::Initialize() {
 
   // initialize synchronisation for job queue (Workers)
   if (pthread_mutex_init(&job_queue_mutex_, NULL)         != 0 ||
-      pthread_mutex_init(&running_mutex_, NULL)           != 0 ||
+      pthread_mutex_init(&status_mutex_, NULL)            != 0 ||
       pthread_cond_init(&job_queue_cond_not_full_, NULL)  != 0 ||
       pthread_cond_init(&job_queue_cond_not_empty_, NULL) != 0 ||
-      pthread_cond_init(&jobs_all_done_, NULL)            != 0) return false;
+      pthread_cond_init(&jobs_all_done_, NULL)            != 0 ||
+      pthread_cond_init(&worker_started_, NULL)) {
+    return false;
+  }
 
   // spawn the Worker objects in their own threads
   if (!SpawnWorkers()) {
@@ -193,6 +198,15 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
     }
   }
 
+  // wait for all workers to report in...
+  {
+    MutexLockGuard guard(status_mutex_);
+
+    while (workers_started_ < number_of_workers_) {
+      pthread_cond_wait(&worker_started_, &status_mutex_);
+    }
+  }
+
   // all done...
   return success;
 }
@@ -214,7 +228,12 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   // boot up the worker object and make sure it works
   WorkerT worker(worker_context);
   worker.RegisterMaster(master);
-  if (! worker.Initialize()) {
+  const bool init_success = worker.Initialize();
+
+  // tell the master that this worker was started
+  master->ReportStartedWorker();
+
+  if (!init_success) {
     LogCvmfs(kLogConcurrency, kLogWarning, "Worker was not initialized "
                                            "properly... it will die now!");
     return NULL;
@@ -248,6 +267,14 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   // good bye thread...
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Terminating Worker...");
   return NULL;
+}
+
+
+template <class WorkerT>
+void ConcurrentWorkers<WorkerT>::ReportStartedWorker() const {
+  MutexLockGuard lock(status_mutex_);
+  ++workers_started_;
+  pthread_cond_signal(&worker_started_);
 }
 
 
@@ -439,7 +466,7 @@ void ConcurrentWorkers<WorkerT>::JobDone(
 
   // notify all observers about the finished job
   this->NotifyListeners(data);
-  
+
   // remove the job from the pending 'list' and add it to the ready 'list'
   atomic_dec32(&jobs_pending_);
   atomic_inc64(&jobs_processed_);
