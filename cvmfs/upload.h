@@ -3,9 +3,80 @@
  */
 
 /**
- * Backend Storage Spooler
+ *    Backend Storage Spooler
+ *    ~~~~~~~~~~~~~~~~~~~~~~~
  *
- * TODO: Write up the general workflow of file processing and upload...
+ * This is the entry point to the general file processing facility of the CVMFS
+ * backend. It works with a two-stage approach:
+ *
+ *   1. Process file content
+ *      -> create smaller file chunks for big input files
+ *      -> compress the file content (optionally chunked)
+ *      -> generate a content hash of the compression result
+ *
+ *   2. Upload files
+ *      -> pluggable to support different upload pathes (local, Riak, ...)
+ *
+ * There are a number of different entities involved in this process. Namely:
+ *   -> AbstractSpooler     - general steering tasks ( + common interface )
+ *   -> FileProcessor       - chunking, compression and hashing of files
+ *   -> concrete Spoolers   - upload functionality for various backend storages
+ *
+ * Stage 1 aka. the processing of files is handled by the FileProcessor, since
+ * it is independent from the actual uploading this functionality is outsourced.
+ * The FileProcessor will take care of the above mentioned steps in a concurrent
+ * fashion. This process is invoked by calling AbstractSpooler::Process().
+ * As a result AbstractSpooler obtains a FileProcessor::Results structure that
+ * describes the processed file (chunks, checksum, compressed data location) and
+ * hands it over to one of the concrete Spooler classes for upload.
+ *
+ * Stage 2 aka. the upload is handled by one of the concrete Spooler classes.
+ * Usually the input to the upload routine is a FileProcessor::Results structure
+ * which might contain several files to be uploaded (think: file chunks).
+ * Depending on the implementation of the concrete Spooler we might therefore
+ * produce more than one upload job for a single AbstractSpooler::Process() call.
+ *
+ * For some specific files we need to be able to circumvent the FileProcessor to
+ * directly push them into the backend storage (i.e. .cvmfspublished), therefore
+ * AbstractSpooler::Upload() is overloaded with a public method, that provides
+ * this circumvention to the user. By 'user' we of course mean the classes that
+ * use this Spooler facility to upload their files to the backend storage.
+ *
+ * In any case, calling AbstractSpooler::Process() or AbstractSpooler::Upload()
+ * will invoke a callback once the whole job has been finished. Callbacks are
+ * provided by the Observable template. Please see the implementation of this
+ * template for more details on usage and implementation.
+ * The data structure provided by this callback is called SpoolerResult and con-
+ * tains information about the processed file (status, content hash, chunks, ..)
+ * Note: Even if a concrete Spooler internally spawns more than one upload job
+ *       to send out chunked files, the user will only see a single invocation
+ *       containing information about the uploaded file including it's generated
+ *       chunks.
+ *
+ * Workflow:
+ *
+ *   User
+ *   \O/                Callback (SpoolerResult)
+ *    |   <----------------------+
+ *   / \                         |
+ *    |                          |
+ *    |                          |          File
+ *    |  File       ################### ---------------------> #################
+ *    +-----------> # AbstractSpooler #                        # FileProcessor #
+ *    |             ################### <--------------------- #################
+ *    |                      |    ^     FileProcessor::Results
+ *    |            Hand Over |    |
+ *    |                     `|´   |
+ *    |  direct    #####################
+ *    +----------> # Concrete Spooler  #
+ *       upload    #####################
+ *                           |    ^
+ *                    Upload |    | Callback (SpoolerResult)
+ *                          `|´   |
+ *                 #####################
+ *                 #  Backend Storage  #
+ *                 #####################
+ *
  */
 
 #ifndef CVMFS_UPLOAD_H_
