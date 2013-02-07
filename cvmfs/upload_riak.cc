@@ -135,14 +135,24 @@ RiakSpooler::~RiakSpooler() {
 
 void RiakSpooler::Upload(const std::string &local_path,
                          const std::string &remote_path) {
-  // schedule a plain upload job into the UploadWorker. In this case no com=
-  // pression is performed
+  // upload the given local file to the Riak storage stored under a key that
+  // is derived from remote_path (not as usually from the file's content hash)
+  {
+    LockGuard<PendingSpoolerResults> lock(pending_results_);
+    pending_results_.Insert(local_path);
+  }
   UploadWorker::Parameters input(local_path, MakeRiakKey(remote_path));
   concurrent_upload_->Schedule(input);
 }
 
 
 void RiakSpooler::Upload(const FileProcessor::Results &data) {
+  // insert the job into the pending spooler results
+  {
+    LockGuard<PendingSpoolerResults> lock(pending_results_);
+    pending_results_.Insert(data);
+  }
+
   // schedule file chunks for upload if necessary
   if (data.IsChunked()) {
     int chunk_id = 0;
@@ -162,13 +172,69 @@ void RiakSpooler::Upload(const FileProcessor::Results &data) {
   // schedule the upload of the bulk file
   UploadWorker::Parameters input(data.local_path,
                                  data.bulk_file.temporary_path(),
-                                 MakeRiakKey(data.bulk_file.temporary_path()));
+                                 MakeRiakKey(data.bulk_file.content_hash()));
   concurrent_upload_->Schedule(input);
 }
 
 
-void RiakSpooler::UploadWorkerCallback(const UploadWorker::Results &data) {
-  // TODO: do something here
+void RiakSpooler::UploadWorkerCallback(const UploadWorker::Results &result) {
+  LockGuard<PendingSpoolerResults> lock(pending_results_);
+
+  // retrieve the pending SpoolerResult from the list of results
+  PendingSpoolerResult &pending_result = pending_results_.Get(result.local_path);
+
+  // obtain a reference to the item state to be changed
+  PendingSpoolerResult::ItemUploadState &item_state = (result.IsBulkFile()) ?
+    pending_result.bulk_upload_state                                        :
+    pending_result.chunk_upload_states[result.file_chunk_id];
+
+  // check and update the item state
+  assert (item_state == PendingSpoolerResult::kItemUploadPending);
+  pending_result.uploads_finished++;
+  if (result.IsSuccessful()) {
+    item_state = PendingSpoolerResult::kItemUploadSuccessful;
+  } else {
+    item_state = PendingSpoolerResult::kItemUploadFailed;
+    pending_result.errors++;
+  }
+
+  // check if everything is done and react on that...
+  if (pending_result.AllUploadsFinished()) {
+    pending_result.Finalize();
+    SpoolerResult final_result = static_cast<SpoolerResult>(pending_result);
+    pending_results_.Erase(result.local_path);
+    JobDone(final_result);
+  }
+}
+
+
+void RiakSpooler::PendingSpoolerResult::Finalize() {
+  // if all went fine, just set the return_code of this SpoolerResult to 0
+  if (IsSuccessful()) {
+    return_code = 0;
+    return;
+  }
+
+  // otherwise print some post mortem analysis
+  LogCvmfs(kLogSpooler, kLogWarning, "Upload of file '%s' produced %d errors",
+           local_path.c_str(), errors);
+
+  // check if the bulk file was uploaded successfully
+  if (bulk_upload_state == kItemUploadFailed) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to upload bulk version of '%s'",
+             local_path.c_str());
+  }
+
+  // check if the chunks were uploaded successfully
+  unsigned int chunk_id = 0;
+  ItemUploadStates::const_iterator i    = chunk_upload_states.begin();
+  ItemUploadStates::const_iterator iend = chunk_upload_states.end();
+  for (; i != iend; ++i, ++chunk_id) {
+    if (*i == kItemUploadFailed) {
+      LogCvmfs(kLogSpooler, kLogWarning, "Failed to upload chunk %d of '%s'",
+               chunk_id, local_path.c_str());
+    }
+  }
 }
 
 
@@ -881,6 +947,34 @@ bool RiakSpooler::CheckJsonConfiguration(const JSON *json_root) {
   return ConfigAssertion(props, "allow_mult",      false) &&
          ConfigAssertion(props, "last_write_wins", true)  &&
          ConfigAssertion(props, "n_val",           3);
+}
+
+
+// -----------------------------------------------------------------------------
+
+
+void RiakSpooler::PendingSpoolerResults::Insert(const std::string &local_path) {
+  (*this)[local_path] = RiakSpooler::PendingSpoolerResult(local_path);
+}
+
+void RiakSpooler::PendingSpoolerResults::Insert(
+                                          const FileProcessor::Results &data) {
+  (*this)[data.local_path] = RiakSpooler::PendingSpoolerResult(
+                                                         data.local_path,
+                                                         data.bulk_file.content_hash(),
+                                                         data.GetFinalizedFileChunks());
+}
+
+RiakSpooler::PendingSpoolerResult& RiakSpooler::PendingSpoolerResults::Get(
+                                         const std::string &local_path) const {
+  const_iterator found = this->find(local_path);
+  assert (found != this->end());
+  return const_cast<RiakSpooler::PendingSpoolerResult&>(found->second);
+}
+
+void RiakSpooler::PendingSpoolerResults::Erase(const std::string &local_path) {
+  int deleted_items = this->erase(local_path);
+  assert (deleted_items > 0);
 }
 
 

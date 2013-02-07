@@ -68,21 +68,21 @@ namespace upload {
     class UploadWorker : public ConcurrentWorker<UploadWorker> {
      public:
       struct Parameters {
-        static const int kInvalidFileChunkId = -1;
+        static const int kBulkFileChunk = -1;
 
         Parameters(const std::string &local_path,
                    const std::string &riak_key) :
           local_path(local_path),
           temporary_path(local_path),
           riak_key(riak_key),
-          file_chunk_id(kInvalidFileChunkId),
+          file_chunk_id(kBulkFileChunk),
           delete_after_upload(false),
           is_critical(true) {}
 
         Parameters(const std::string  &local_path,
                    const std::string  &temporary_path,
                    const std::string  &riak_key,
-                   const int           file_chunk_id = kInvalidFileChunkId) :
+                   const int           file_chunk_id = kBulkFileChunk) :
           local_path(local_path),
           temporary_path(temporary_path),
           riak_key(riak_key),
@@ -96,12 +96,12 @@ namespace upload {
          * See the documentation of the ConcurrentWorkers template for details.
          */
         Parameters() :
-          file_chunk_id(kInvalidFileChunkId),
+          file_chunk_id(kBulkFileChunk),
           delete_after_upload(false),
           is_critical(false) {}
 
         inline bool IsFileChunk() const {
-          return file_chunk_id != kInvalidFileChunkId;
+          return file_chunk_id != kBulkFileChunk;
         }
 
         const std::string  local_path;          //!< local path of file to be uploaded (for identification only)
@@ -119,6 +119,9 @@ namespace upload {
           local_path(local_path),
           return_code(return_code),
           file_chunk_id(file_chunk_id) {}
+
+        bool IsBulkFile() const { return file_chunk_id == Parameters::kBulkFileChunk; }
+        bool IsSuccessful() const { return return_code == 0; }
 
         const std::string local_path;    //!< local path of the uploaded file (might also be just a chunk of it)
         const int         return_code;   //!< 0 if job was successful
@@ -298,7 +301,7 @@ namespace upload {
      * Callback method for the concurrent UploadWorker
      * Will inform the user about the outcome of a scheduled job.
      */
-    void UploadWorkerCallback(const UploadWorker::returned_data &data);
+    void UploadWorkerCallback(const UploadWorker::Results &result);
 
     std::string MakeRiakKey(const std::string &path) const;
     std::string MakeRiakKey(const hash::Any   &hash,
@@ -343,10 +346,65 @@ namespace upload {
      */
     static bool CheckJsonConfiguration(const JSON *json_root);
 
+   protected:
+    /**
+     * Attaches additional information to the SpoolerResult structure that is
+     * needed to keep track of currently ongoing upload jobs.
+     */
+    struct PendingSpoolerResult : public SpoolerResult {
+      enum ItemUploadState {
+        kItemUploadPending,
+        kItemUploadSuccessful,
+        kItemUploadFailed
+      };
+      typedef std::vector<ItemUploadState> ItemUploadStates;
+
+      // TODO: with C++11 this might not be needed
+      //       one could use std::map::emplace in PendingSpoolerResults::Insert
+      PendingSpoolerResult() :
+        SpoolerResult(-1, "", hash::Any(), FileChunks()) {}
+
+      PendingSpoolerResult(const std::string &local_path,
+                           const hash::Any   &content_hash = hash::Any(),
+                           const FileChunks  &file_chunks = FileChunks()) :
+        SpoolerResult(-1, local_path, content_hash, file_chunks),
+        bulk_upload_state(kItemUploadPending),
+        chunk_upload_states(file_chunks.size(), kItemUploadPending),
+        uploads_finished(0),
+        errors(0) {}
+
+      inline bool AllUploadsFinished() const {
+        return uploads_finished == chunk_upload_states.size() + 1;
+      }
+
+      inline bool IsSuccessful() const {
+        return AllUploadsFinished() && errors == 0;
+      }
+
+      void Finalize();
+
+      ItemUploadState   bulk_upload_state;
+      ItemUploadStates  chunk_upload_states;
+
+      unsigned int      uploads_finished;
+      unsigned int      errors;
+    };
+
+    class PendingSpoolerResults : public std::map<std::string, PendingSpoolerResult>,
+                                  public Lockable {
+     public:
+      void Insert(const std::string &local_path);
+      void Insert(const FileProcessor::Results &data);
+      PendingSpoolerResult& Get(const std::string &local_path) const;
+      void Erase(const std::string &local_path);
+    };
+
    private:
     // concurrency objects
-    UniquePtr<ConcurrentWorkers<UploadWorker> >      concurrent_upload_;
-    UniquePtr<UploadWorker::worker_context>          upload_context_;
+    UniquePtr<ConcurrentWorkers<UploadWorker> >  concurrent_upload_;
+    UniquePtr<UploadWorker::worker_context>      upload_context_;
+
+    PendingSpoolerResults                        pending_results_;
   };
 }
 
