@@ -351,6 +351,13 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         "(SELECT * FROM catalog WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileChunk) + " != 0 AND "
         "chunks.md5path_1 == catalog.md5path_1 AND chunks.md5path_2 == catalog.md5path_2);";
       catalog::Sql stmt(catalog->database(), sql);
+      stmt.Execute();
+      int64_t number_of_dangling_chunks = stmt.RetrieveInt64(0);
+      if (number_of_dangling_chunks > 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "found %d dangling chunks.",
+                 number_of_dangling_chunks);
+        return false;
+      }
     }
   }
 
