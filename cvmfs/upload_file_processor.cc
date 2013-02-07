@@ -33,8 +33,9 @@ void FileProcessor::operator()(const FileProcessor::Parameters &data) {
 
   // check if we only produced one chunk...
   if (result.file_chunks.size() == 1) {
-    // ... and simply use that as bulk file as well
+    // ... and simply use that as bulk file and discard the chunk
     result.bulk_file = result.file_chunks.front();
+    result.file_chunks.clear();
 
     // otherwise generate an additional bulk version of the file
   } else if (! GenerateBulkFile(mmf, result)) {
