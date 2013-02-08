@@ -222,6 +222,10 @@ namespace upload
      * a concrete Spooler. Implement this in your concrete Spooler class to do
      * global initialization work.
      *
+     * TODO: In C++11 you might want to make this protected. Currently we cannot
+     *       do this, since it is called by PolymorphicCreation which cannot
+     *       befriend it's template parameters.
+     *
      * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
     bool Initialize();
