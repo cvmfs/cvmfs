@@ -33,7 +33,7 @@ SpoolerDefinition::SpoolerDefinition(
   }
 
   // split the spooler driver definition into name and config part
-  std::vector<std::string> upstream = SplitString(definition_string, ':', 3);
+  std::vector<std::string> upstream = SplitString(definition_string, ',');
   if (upstream.size() != 3) {
     LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler driver");
     return;

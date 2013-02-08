@@ -191,17 +191,6 @@ check_user() {
 }
 
 
-is_local_upstream() {
-  local upstream=$1
-
-  if [ x$(echo "$upstream" | cut -d: -f1) = x"local" ]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-
 has_selinux() {
   [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
 }
@@ -365,7 +354,7 @@ check_upstream_type() {
   local upstream=$1
   local needle_type=$2
 
-  if [ x$(echo "$upstream" | cut -d: -f1) = x"$needle_type" ]; then
+  if [ x$(echo "$upstream" | cut -d, -f1) = x"$needle_type" ]; then
     return 0
   else
     return 1
@@ -384,11 +373,17 @@ is_riak_upstream() {
   return $?
 }
 
-
 get_upstream_path() {
   local upstream=$1
 
-  echo "$upstream" | cut -d: -f3-
+  echo "$upstream" | cut -d, -f3-
+}
+
+make_upstream() {
+  local type_name=$1
+  local tmp_dir=$2
+  local config_string=$3
+  echo "$type_name,$tmp_dir,$config_string"
 }
 
 
@@ -525,7 +520,7 @@ mkfs() {
 
   # default values
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
-  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name/data/txn:/srv/cvmfs/$name"
+  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
 
   # sanity checks
   check_repository_existence $name && die "The repository $name already exists"
