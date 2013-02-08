@@ -1,6 +1,6 @@
-// /**
-//  * This file is part of the CernVM File System.
-//  */
+/**
+ * This file is part of the CernVM File System.
+ */
 
 #include "upload_riak.h"
 
@@ -16,7 +16,7 @@
 
 #include "util.h"
 #include "util_concurrency.h"
-#include "vjson/json.h"
+#include "json_document.h"
 
 using namespace upload;
 
@@ -716,10 +716,11 @@ bool RiakSpooler::CheckRiakConfiguration(const std::string &url) {
   if (! DownloadRiakConfiguration(url, buffer)) return false;
 
   // parse JSON configuration
-  JSON *root = ParseJsonConfiguration(buffer);
+  JsonDocument json;
+  if (! json.Parse((char*)buffer.data)) return false;
 
   // check the configuration
-  return CheckJsonConfiguration(root);
+  return CheckJsonConfiguration(json);
 }
 
 
@@ -798,34 +799,6 @@ bool RiakSpooler::DownloadRiakConfiguration(const std::string &url,
   return true;
 }
 
-
-JSON* RiakSpooler::ParseJsonConfiguration(DataBuffer& buffer) {
-  // parse the JSON string with the vjson library
-  char *error_pos  = 0;
-  char *error_desc = 0;
-  int error_line   = 0;
-  block_allocator allocator(1 << 10);
-  JSON *root = json_parse((char*)buffer.data,
-                                &error_pos,
-                                &error_desc,
-                                &error_line,
-                                &allocator);
-
-  // check if the json string was parsed successfully
-  if (!root) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse Riak configuration json "
-                                      "string.\n"
-                                      "Error at line %d: %s\n"
-                                      "%s\n"
-                                      "JSON String was:\n"
-                                      "%s",
-             error_line, error_desc, error_pos, buffer.data);
-    return NULL;
-  }
-
-  // all fine
-  return root;
-}
 
 struct CheckResponse { // TODO: C++11: replace this scoped boxing by a typed enum!
   enum T {
@@ -932,8 +905,9 @@ bool ConfigAssertion(const JSON *object,
 }
 
 
-bool RiakSpooler::CheckJsonConfiguration(const JSON *json_root) {
+bool RiakSpooler::CheckJsonConfiguration(const JsonDocument &json_document) {
   // check general structure of JSON configuration
+  const JSON *json_root = json_document.root();
   if (json_root                    == NULL               ||
       json_root->type              != JSON_OBJECT        ||
       json_root->first_child       == NULL               ||

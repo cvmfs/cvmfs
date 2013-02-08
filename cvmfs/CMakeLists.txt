@@ -96,6 +96,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   # a simple JSON parser:
   vjson/block_allocator.h vjson/block_allocator.cpp
   vjson/json.h vjson/json.cpp
+  json_document.h json_document.cc
 
   duplex_curl.h download.h download.cc
   signature.cc signature.h
@@ -253,7 +254,8 @@ add_executable (debug_spool debug.cc
                 # riak uses JSON for configuration, therefore we need
                 # a simple JSON parser:
                 vjson/block_allocator.h vjson/block_allocator.cpp
-                vjson/json.h vjson/json.cpp)
+                vjson/json.h vjson/json.cpp
+                json_document.h json_document.cc)
 
 target_link_libraries (debug_spool  ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} pthread dl)
 set_target_properties (debug_spool PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS} -g -DDEBUGMSG" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")

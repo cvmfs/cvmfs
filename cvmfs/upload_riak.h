@@ -16,6 +16,7 @@ struct curl_slist;
 
 struct json_value;
 typedef struct json_value JSON;
+class JsonDocument;
 
 namespace upload {
   /**
@@ -325,23 +326,13 @@ namespace upload {
                                            DataBuffer& buffer);
 
     /**
-     * Parses the obtained configuration information as a JSON string and pro-
-     * vides a simple JSON structure for further investigation. We use the slim
-     * JSON library vjson for parsing (see: http://code.google.com/p/vjson/)
-     *
-     * @param buffer  the DataBuffer object containing the JSON string
-     * @return  a pointer to a vjson JSON structure
-     */
-    static JSON* ParseJsonConfiguration(DataBuffer& buffer);
-
-    /**
      * Checks the JSON configuration obtained from Riak and makes sure that it
      * is configured as we expect it to be.
      *
      * @param json_root  the JSON structure obtained from ParseJsonConfiguration
      * @return  true if the configuration matches or requirements
      */
-    static bool CheckJsonConfiguration(const JSON *json_root);
+    static bool CheckJsonConfiguration(const JsonDocument &json_root);
 
    protected:
     /**
