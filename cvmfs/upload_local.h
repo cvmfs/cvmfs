@@ -5,7 +5,7 @@
 #ifndef CVMFS_UPLOAD_LOCAL_H_
 #define CVMFS_UPLOAD_LOCAL_H_
 
-#include "upload.h"
+#include "upload_facility.h"
 
 #include "util_concurrency.h"
 #include "atomic.h"
@@ -18,9 +18,9 @@ namespace upload
    * For a detailed description of the classes interface please have a look into
    * the AbstractSpooler base class.
    */
-  class LocalSpooler : public AbstractSpooler {
+  class LocalUploader : public AbstractUploader {
    public:
-    LocalSpooler(const SpoolerDefinition &spooler_definition);
+    LocalUploader(const SpoolerDefinition &spooler_definition);
     static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
     inline std::string name() const { return "Local"; }
@@ -32,8 +32,14 @@ namespace upload
      * This method calls NotifyListeners and invokes a callback for all registered
      * listeners (see the Observable template for details).
      */
-    void Upload(const std::string &local_path,
-                const std::string &remote_path);
+    void Upload(const std::string  &local_path,
+                const std::string  &remote_path,
+                const callback_t   *callback = NULL);
+
+    void Upload(const std::string  &local_path,
+                const hash::Any    &content_hash,
+                const std::string  &hash_suffix,
+                const callback_t   *callback = NULL);
 
     /**
      * Determines the number of failed jobs in the LocalCompressionWorker as
@@ -42,8 +48,6 @@ namespace upload
     unsigned int GetNumberOfErrors() const;
 
    protected:
-    void Upload(const FileProcessor::Results &data);
-
     int Copy(const std::string &local_path,
              const std::string &remote_path) const;
     int Move(const std::string &local_path,

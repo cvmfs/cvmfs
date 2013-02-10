@@ -13,8 +13,8 @@
 using namespace upload;
 
 
-LocalSpooler::LocalSpooler(const SpoolerDefinition &spooler_definition) :
-  AbstractSpooler(spooler_definition),
+LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition) :
+  AbstractUploader(spooler_definition),
   upstream_path_(spooler_definition.spooler_configuration)
 {
   assert (spooler_definition.IsValid() &&
@@ -24,55 +24,34 @@ LocalSpooler::LocalSpooler(const SpoolerDefinition &spooler_definition) :
 }
 
 
-bool LocalSpooler::WillHandle(const SpoolerDefinition &spooler_definition) {
+bool LocalUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
   return spooler_definition.driver_type == SpoolerDefinition::Local;
 }
 
 
-unsigned int LocalSpooler::GetNumberOfErrors() const {
-  return AbstractSpooler::GetNumberOfErrors() + atomic_read32(&copy_errors_);
+unsigned int LocalUploader::GetNumberOfErrors() const {
+  return atomic_read32(&copy_errors_);
 }
 
 
-void LocalSpooler::Upload(const FileProcessor::Results &data) {
-  int retcode = 0;
-  int move_retcode = 0;
-
-  if (data.IsChunked()) {
-    TemporaryFileChunks::const_iterator i    = data.file_chunks.begin();
-    TemporaryFileChunks::const_iterator iend = data.file_chunks.end();
-    for (; i != iend; ++i) {
-      move_retcode = Move(i->temporary_path(),
-                          "data" + i->content_hash().MakePath(1,2) + FileChunk::kChecksumSuffix);
-      if (move_retcode != 0) {
-        retcode = move_retcode;
-        break;
-      }
-    }
-  }
-
-  if (retcode == 0) {
-    retcode = Move(data.bulk_file.temporary_path(),
-                   "data" + data.bulk_file.content_hash().MakePath(1,2));
-  }
-
-  const SpoolerResult result(retcode,
-                             data.local_path,
-                             data.bulk_file.content_hash(),
-                             data.GetFinalizedFileChunks());
-  JobDone(result);
-}
-
-void LocalSpooler::Upload(const std::string &local_path,
-                          const std::string &remote_path) {
+void LocalUploader::Upload(const std::string &local_path,
+                           const std::string &remote_path,
+                           const callback_t   *callback) {
   const int retcode = Copy(local_path, remote_path);
-
-  const SpoolerResult result(retcode, local_path);
-  JobDone(result);
+  Respond(callback, retcode, local_path);
 }
 
-int LocalSpooler::Copy(const std::string &local_path,
-                       const std::string &remote_path) const {
+void LocalUploader::Upload(const std::string  &local_path,
+                           const hash::Any    &content_hash,
+                           const std::string  &hash_suffix,
+                           const callback_t   *callback) {
+  const int retcode = Move(local_path,
+                           "data" + content_hash.MakePath(1,2) + hash_suffix);
+  Respond(callback, retcode, local_path);
+}
+
+int LocalUploader::Copy(const std::string &local_path,
+                        const std::string &remote_path) const {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
   int retval  = CopyPath2Path(local_path, destination_path);
@@ -85,8 +64,8 @@ int LocalSpooler::Copy(const std::string &local_path,
   return retcode;
 }
 
-int LocalSpooler::Move(const std::string &local_path,
-                       const std::string &remote_path) const {
+int LocalUploader::Move(const std::string &local_path,
+                        const std::string &remote_path) const {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
   int retval  = rename(local_path.c_str(), destination_path.c_str());
