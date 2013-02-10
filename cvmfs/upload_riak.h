@@ -7,7 +7,7 @@
 
 #include <vector>
 
-#include "upload.h"
+#include "upload_facility.h"
 
 #include "util_concurrency.h"
 
@@ -20,14 +20,14 @@ class JsonDocument;
 
 namespace upload {
   /**
-   * The RiakSpooler implements an upstream backend adapter for a Riak key/value
+   * The RiakUploader implements an upstream backend adapter for a Riak key/value
    * storage (see http://basho.com/products/riak-overview/ for details).
    * It implements Upload() concurrently using the ConcurrentWorkers template.
    *
    * For a detailed interface description of this class please have a look at the
    * AbstractSpooler class which it is derived from.
    */
-  class RiakSpooler : public AbstractSpooler {
+  class RiakUploader : public AbstractUploader {
    public:
     /**
      * Encapsulates an extendable memory buffer.
@@ -67,25 +67,16 @@ namespace upload {
       struct Parameters {
         static const int kBulkFileChunk = -1;
 
-        Parameters(const std::string &local_path,
-                   const std::string &riak_key) :
-          local_path(local_path),
-          temporary_path(local_path),
-          riak_key(riak_key),
-          file_chunk_id(kBulkFileChunk),
-          delete_after_upload(false),
-          is_critical(true) {}
-
         Parameters(const std::string  &local_path,
-                   const std::string  &temporary_path,
                    const std::string  &riak_key,
-                   const int           file_chunk_id = kBulkFileChunk) :
+                   const bool          delete_after_upload,
+                   const bool          is_critical,
+                   const callback_ptr  callback = NULL) :
           local_path(local_path),
-          temporary_path(temporary_path),
           riak_key(riak_key),
-          file_chunk_id(file_chunk_id),
-          delete_after_upload(true),
-          is_critical(false) {}
+          delete_after_upload(delete_after_upload),
+          is_critical(is_critical),
+          callback(callback) {}
 
         /**
          * This constructor produces an empty upload_parameters structure which
@@ -93,36 +84,30 @@ namespace upload {
          * See the documentation of the ConcurrentWorkers template for details.
          */
         Parameters() :
-          file_chunk_id(kBulkFileChunk),
           delete_after_upload(false),
-          is_critical(false) {}
-
-        inline bool IsFileChunk() const {
-          return file_chunk_id != kBulkFileChunk;
-        }
+          is_critical(false),
+          callback(NULL) {}
 
         const std::string  local_path;          //!< local path of file to be uploaded (for identification only)
-        const std::string  temporary_path;      //!< location of the file to be uploaded into Riak
         const std::string  riak_key;            //!< Riak conform key the file should be stored under
-        const int          file_chunk_id;       //!< used internally to relate to file chunk upload jobs
         const bool         delete_after_upload; //!< might unlink a file after upload (temporary files)
         const bool         is_critical;         //!< should the upload be performed with special care?
+        callback_ptr       callback;
       };
 
       struct Results {
-        Results(const std::string &local_path,
-                const int          return_code,
-                const int          file_chunk_id) :
+        Results(const std::string  &local_path,
+                const int           return_code,
+                const callback_ptr  callback) :
           local_path(local_path),
           return_code(return_code),
-          file_chunk_id(file_chunk_id) {}
+          callback(callback) {}
 
-        bool IsBulkFile() const { return file_chunk_id == Parameters::kBulkFileChunk; }
         bool IsSuccessful() const { return return_code == 0; }
 
         const std::string local_path;    //!< local path of the uploaded file (might also be just a chunk of it)
         const int         return_code;   //!< 0 if job was successful
-        const int         file_chunk_id; //!< used internally to relate to file chunk upload jobs
+        callback_ptr      callback;
       };
 
      public:
@@ -268,8 +253,8 @@ namespace upload {
 
 
    public:
-    RiakSpooler(const SpoolerDefinition &spooler_definition);
-    virtual ~RiakSpooler();
+    RiakUploader(const SpoolerDefinition &spooler_definition);
+    virtual ~RiakUploader();
 
     static bool WillHandle(const SpoolerDefinition &spooler_definition);
     inline std::string name() const { return "Riak HTTP"; }
@@ -280,18 +265,21 @@ namespace upload {
      * @param local_path   path to the file to be directly uploaded into Riak
      * @param remote_path  used to determine the Riak key to make the file avail-
      *                     able under a certain remote_path in Riak
+     * @param callback     the callback to be notified when the upload finished
      */
-    void Upload(const std::string &local_path,
-                const std::string &remote_path);
+    virtual void Upload(const std::string  &local_path,
+                        const std::string  &remote_path,
+                        const callback_t   *callback = NULL);
+    virtual void Upload(const std::string  &local_path,
+                        const hash::Any    &content_hash,
+                        const std::string  &hash_suffix,
+                        const callback_t   *callback = NULL);
 
     void WaitForUpload() const;
-    void WaitForTermination() const;
 
     unsigned int GetNumberOfErrors() const;
 
    protected:
-    void Upload(const FileProcessor::Results &data);
-
     bool Initialize();
     void TearDown();
 
@@ -334,120 +322,10 @@ namespace upload {
      */
     static bool CheckJsonConfiguration(const JsonDocument &json_root);
 
-   protected:
-    /**
-     * Attaches additional information to the SpoolerResult structure that is
-     * needed to keep track of currently ongoing upload jobs.
-     *
-     * This is created BEFORE the actual upload jobs for this SpoolerResult are
-     * scheduled. Upload results will drop in asynchronously in will be added in
-     * RiakSpooler::UploadWorkerCallback.
-     */
-    struct PendingSpoolerResult : public SpoolerResult {
-      enum ItemUploadState {
-        kItemUploadPending,
-        kItemUploadSuccessful,
-        kItemUploadFailed
-      };
-      typedef std::vector<ItemUploadState> ItemUploadStates;
-
-      // TODO: with C++11 this might not be needed
-      //       one could use std::map::emplace in PendingSpoolerResults::Insert
-      PendingSpoolerResult() :
-        SpoolerResult(-1, "", hash::Any(), FileChunks()) {}
-
-      PendingSpoolerResult(const std::string &local_path,
-                           const hash::Any   &content_hash = hash::Any(),
-                           const FileChunks  &file_chunks = FileChunks()) :
-        SpoolerResult(-1, local_path, content_hash, file_chunks),
-        bulk_upload_state(kItemUploadPending),
-        chunk_upload_states(file_chunks.size(), kItemUploadPending),
-        uploads_finished(0),
-        errors(0) {}
-
-      /**
-       * Checks if this PendingSpoolerResult is ready to be delivered
-       *
-       * @return  true if all items of this SpoolerResults reported back
-       */
-      inline bool AllUploadsFinished() const {
-        return uploads_finished == chunk_upload_states.size() + 1;
-      }
-
-      inline bool IsSuccessful() const {
-        return AllUploadsFinished() && errors == 0;
-      }
-
-      /**
-       * Analyzes the result of the PendingSpoolerResult and brings it into its
-       * final state. Afterwards it can be safely returned through
-       * AbstractSpooler::JobDone()
-       *
-       * Note: this method assumes that all items related to this SpoolerResult
-       *       already reported back (see AllUploadsFinished())
-       */
-      void Finalize();
-
-      ItemUploadState   bulk_upload_state;   //!< state flag for the bulk file upload
-      ItemUploadStates  chunk_upload_states; //!< state flags for all generated file chunks
-
-      unsigned int      uploads_finished;    //!< counter of how many callbacks this PendingSpoolerResult already received
-      unsigned int      errors;              //!< counter how many of the associated upload jobs failed
-    };
-
-    /**
-     * Wraps the mapping from local_path to PendingSpoolerResults to keep track
-     * of the progressing update procedure.
-     *
-     * Note: This will be used in RiakSpooler::UploadWorkerCallback meaning that
-     *       it might suffer from threading issues. PendingSpoolerResults is not
-     *       thread safe by itself but implements Lockable.
-     *       You should always use LockGuard<PendingSpoolerResults> to sync your
-     *       accesses into this map.
-     */
-    class PendingSpoolerResults : public std::map<std::string, PendingSpoolerResult>,
-                                  public Lockable {
-     public:
-      /**
-       * Inserts a simple upload job (user called AbstractSpooler::Upload() )
-       *
-       * @param local_path  the local path of the file that is being uploaded
-       */
-      void Insert(const std::string &local_path);
-
-      /**
-       * Inserts a (possibly) complex upload job that might contain multiple
-       * chunks (invoked indirectly through AbstractSpooler::Process() )
-       *
-       * @param data  the results structure produced by the FileProcessor
-       */
-      void Insert(const FileProcessor::Results &data);
-
-      /**
-       * Retrieves the PendingSpoolerResult reference mapped to local_path
-       * Note: this will CRASH if local_path is NOT found in the map.
-       *
-       * @param local_path  the local path to be retrieved from the map
-       */
-      PendingSpoolerResult& Get(const std::string &local_path) const;
-
-      /**
-       * Erases the PendingSpoolerResult mapped to local_path from the map
-       * Note: This will CRASH if local_path is NOT found in the map.
-       *       Additionally you might still hold a reference obtained by Get(),
-       *       that might get invalidated by invoking Erase(), keep in that mind
-       *
-       * @param local_path  the local path to be erased from the map
-       */
-      void Erase(const std::string &local_path);
-    };
-
    private:
     // concurrency objects
     UniquePtr<ConcurrentWorkers<UploadWorker> >  concurrent_upload_;
     UniquePtr<UploadWorker::worker_context>      upload_context_;
-
-    PendingSpoolerResults                        pending_results_; //!< list of currently pending upload jobs
   };
 }
 

@@ -21,7 +21,7 @@
 using namespace upload;
 
 
-const std::string& RiakSpooler::UploadWorker::worker_context::AcquireUpstreamUrl() const {
+const std::string& RiakUploader::UploadWorker::worker_context::AcquireUpstreamUrl() const {
   assert (upstream_urls.size() > 0);
   // get an unique upstream URL and set the pointer to the next one...
   LockGuard<worker_context> guard(this);
@@ -31,8 +31,8 @@ const std::string& RiakSpooler::UploadWorker::worker_context::AcquireUpstreamUrl
 }
 
 
-RiakSpooler::RiakSpooler(const SpoolerDefinition &spooler_definition) :
-  AbstractSpooler(spooler_definition),
+RiakUploader::RiakUploader(const SpoolerDefinition &spooler_definition) :
+  AbstractUploader(spooler_definition),
 
   concurrent_upload_(NULL),
   upload_context_(NULL)
@@ -42,14 +42,14 @@ RiakSpooler::RiakSpooler(const SpoolerDefinition &spooler_definition) :
 }
 
 
-bool RiakSpooler::WillHandle(const SpoolerDefinition &spooler_definition) {
+bool RiakUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
   return spooler_definition.driver_type == SpoolerDefinition::Riak;
 }
 
 
-bool RiakSpooler::Initialize() {
+bool RiakUploader::Initialize() {
   // upcall for initialization of common stuff
-  if (!AbstractSpooler::Initialize()) {
+  if (!AbstractUploader::Initialize()) {
     return false;
   }
 
@@ -82,33 +82,33 @@ bool RiakSpooler::Initialize() {
   concurrent_upload_      =
     new ConcurrentWorkers<UploadWorker>(number_of_cpus * 5,   // TODO: magic number (?)
                                         number_of_cpus * 500, // TODO: magic number (?)
-                                        upload_context_);
+                                        upload_context_.weak_ref());
   assert(concurrent_upload_);
 
   // initialize the concurrent workers
   if (! concurrent_upload_->Initialize()) {
     LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize concurrent "
-                                       "workers for RiakSpooler.");
+                                       "workers for RiakUploader.");
     return false;
   }
 
   // register callbacks to the concurrent workers
-  concurrent_upload_->RegisterListener(&RiakSpooler::UploadWorkerCallback, this);
+  concurrent_upload_->RegisterListener(&RiakUploader::UploadWorkerCallback, this);
 
   // all set... ready to go
   return true;
 }
 
 
-void RiakSpooler::TearDown() {
-  AbstractSpooler::TearDown();
+void RiakUploader::TearDown() {
+  AbstractUploader::TearDown();
   concurrent_upload_->WaitForTermination();
 
   curl_global_cleanup();
 }
 
 
-RiakSpooler::~RiakSpooler() {
+RiakUploader::~RiakUploader() {
   //
   // Legacy code: readout of the performance counters...
   //              this might be used as a simple template later on
@@ -133,132 +133,51 @@ RiakSpooler::~RiakSpooler() {
 }
 
 
-void RiakSpooler::Upload(const std::string &local_path,
-                         const std::string &remote_path) {
-  // upload the given local file to the Riak storage stored under a key that
-  // is derived from remote_path (not as usually from the file's content hash)
-  {
-    LockGuard<PendingSpoolerResults> lock(pending_results_);
-    pending_results_.Insert(local_path);
-  }
-  UploadWorker::Parameters input(local_path, MakeRiakKey(remote_path));
+
+void RiakUploader::Upload(const std::string  &local_path,
+                    const std::string  &remote_path,
+                    const callback_t   *callback) {
+  const bool delete_after_upload = false;
+  const bool is_critical         = true;
+  UploadWorker::Parameters input(local_path,
+                                 MakeRiakKey(remote_path),
+                                 delete_after_upload,
+                                 is_critical);
   concurrent_upload_->Schedule(input);
 }
 
 
-void RiakSpooler::Upload(const FileProcessor::Results &data) {
-  // insert the job into the pending spooler results
-  {
-    LockGuard<PendingSpoolerResults> lock(pending_results_);
-    pending_results_.Insert(data);
-  }
-
-  // schedule file chunks for upload if necessary
-  if (data.IsChunked()) {
-    int chunk_id = 0;
-    TemporaryFileChunks::const_iterator i    = data.file_chunks.begin();
-    TemporaryFileChunks::const_iterator iend = data.file_chunks.end();
-    for (; i != iend; ++i, ++chunk_id) {
-      UploadWorker::Parameters input(data.local_path,
-                                     i->temporary_path(),
-                                     MakeRiakKey(i->content_hash(),
-                                                 FileChunk::kChecksumSuffix),
-                                     chunk_id); // <-- used to identify individ-
-                                                //     ual chunks in callback
-      concurrent_upload_->Schedule(input);
-    }
-  }
-
-  // schedule the upload of the bulk file
-  UploadWorker::Parameters input(data.local_path,
-                                 data.bulk_file.temporary_path(),
-                                 MakeRiakKey(data.bulk_file.content_hash()));
+void RiakUploader::Upload(const std::string  &local_path,
+                          const hash::Any    &content_hash,
+                          const std::string  &hash_suffix,
+                          const callback_t   *callback) {
+  const bool delete_after_upload = true;
+  const bool is_critical         = false;
+  UploadWorker::Parameters input(local_path,
+                                 MakeRiakKey(content_hash, hash_suffix),
+                                 delete_after_upload,
+                                 is_critical);
   concurrent_upload_->Schedule(input);
 }
 
 
-void RiakSpooler::UploadWorkerCallback(const UploadWorker::Results &result) {
-  LockGuard<PendingSpoolerResults> lock(pending_results_);
-
-  // retrieve the pending SpoolerResult from the list of results
-  PendingSpoolerResult &pending_result = pending_results_.Get(result.local_path);
-
-  // obtain a reference to the item state to be changed
-  PendingSpoolerResult::ItemUploadState &item_state = (result.IsBulkFile()) ?
-    pending_result.bulk_upload_state                                        :
-    pending_result.chunk_upload_states[result.file_chunk_id];
-
-  // check and update the item state
-  assert (item_state == PendingSpoolerResult::kItemUploadPending);
-  pending_result.uploads_finished++;
-  if (result.IsSuccessful()) {
-    item_state = PendingSpoolerResult::kItemUploadSuccessful;
-  } else {
-    item_state = PendingSpoolerResult::kItemUploadFailed;
-    pending_result.errors++;
-  }
-
-  // check if everything is done and react on that...
-  if (pending_result.AllUploadsFinished()) {
-    pending_result.Finalize();
-    SpoolerResult final_result = static_cast<SpoolerResult>(pending_result);
-    pending_results_.Erase(result.local_path);
-    JobDone(final_result);
-  }
+void RiakUploader::UploadWorkerCallback(const UploadWorker::Results &result) {
+  Respond(result.callback, result.return_code, result.local_path);
 }
 
 
-void RiakSpooler::PendingSpoolerResult::Finalize() {
-  assert (AllUploadsFinished());
-
-  // if all went fine, just set the return_code of this SpoolerResult to 0
-  if (IsSuccessful()) {
-    return_code = 0;
-    return;
-  }
-
-  // otherwise print some post mortem analysis
-  LogCvmfs(kLogSpooler, kLogWarning, "Upload of file '%s' produced %d errors",
-           local_path.c_str(), errors);
-
-  // check if the bulk file was uploaded successfully
-  if (bulk_upload_state == kItemUploadFailed) {
-    LogCvmfs(kLogSpooler, kLogWarning, "Failed to upload bulk version of '%s'",
-             local_path.c_str());
-  }
-
-  // check if the chunks were uploaded successfully
-  unsigned int chunk_id = 0;
-  ItemUploadStates::const_iterator i    = chunk_upload_states.begin();
-  ItemUploadStates::const_iterator iend = chunk_upload_states.end();
-  for (; i != iend; ++i, ++chunk_id) {
-    if (*i == kItemUploadFailed) {
-      LogCvmfs(kLogSpooler, kLogWarning, "Failed to upload chunk %d of '%s'",
-               chunk_id, local_path.c_str());
-    }
-  }
-}
-
-
-void RiakSpooler::WaitForUpload() const {
-  AbstractSpooler::WaitForUpload();
+void RiakUploader::WaitForUpload() const {
+  AbstractUploader::WaitForUpload();
   concurrent_upload_->WaitForEmptyQueue();
 }
 
 
-void RiakSpooler::WaitForTermination() const {
-  AbstractSpooler::WaitForTermination();
-  concurrent_upload_->WaitForTermination();
+unsigned int RiakUploader::GetNumberOfErrors() const {
+  return concurrent_upload_->GetNumberOfFailedJobs();
 }
 
 
-unsigned int RiakSpooler::GetNumberOfErrors() const {
-  return AbstractSpooler::GetNumberOfErrors()         +
-         concurrent_upload_->GetNumberOfFailedJobs();
-}
-
-
-std::string RiakSpooler::MakeRiakKey(const std::string &path) const {
+std::string RiakUploader::MakeRiakKey(const std::string &path) const {
   // remove slashes from the remote_path (Riak cannot handle them in keys)
   std::string result;
   std::remove_copy(path.begin(),
@@ -269,7 +188,7 @@ std::string RiakSpooler::MakeRiakKey(const std::string &path) const {
 }
 
 
-std::string RiakSpooler::MakeRiakKey(const hash::Any &content_hash,
+std::string RiakUploader::MakeRiakKey(const hash::Any &content_hash,
                                      const std::string &suffix) const {
   return "data"                  +
          content_hash.ToString() +
@@ -283,8 +202,8 @@ std::string RiakSpooler::MakeRiakKey(const hash::Any &content_hash,
 //
 
 
-RiakSpooler::UploadWorker::UploadWorker(
-                     const RiakSpooler::UploadWorker::worker_context *context) :
+RiakUploader::UploadWorker::UploadWorker(
+                     const RiakUploader::UploadWorker::worker_context *context) :
   upstream_url_(context->AcquireUpstreamUrl()),
   http_headers_download_(NULL),
 
@@ -297,7 +216,7 @@ RiakSpooler::UploadWorker::UploadWorker(
 {}
 
 
-bool RiakSpooler::UploadWorker::Initialize() {
+bool RiakUploader::UploadWorker::Initialize() {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Configuring cURL handles for putting "
                                         "files into a Riak instance");
 
@@ -314,14 +233,14 @@ bool RiakSpooler::UploadWorker::Initialize() {
 }
 
 
-void RiakSpooler::UploadWorker::TearDown() {
+void RiakUploader::UploadWorker::TearDown() {
   curl_easy_cleanup(curl_upload_);
   curl_easy_cleanup(curl_download_);
   curl_slist_free_all(http_headers_download_);
 }
 
 
-bool RiakSpooler::UploadWorker::InitUploadHandle() {
+bool RiakUploader::UploadWorker::InitUploadHandle() {
   // initialize cURL handle
   curl_upload_ = curl_easy_init();
   if (! curl_upload_) {
@@ -342,7 +261,7 @@ bool RiakSpooler::UploadWorker::InitUploadHandle() {
 }
 
 
-bool RiakSpooler::UploadWorker::InitDownloadHandle() {
+bool RiakUploader::UploadWorker::InitDownloadHandle() {
   // initialize cURL handle
   curl_download_ = curl_easy_init();
   if (! curl_download_) {
@@ -374,7 +293,7 @@ bool RiakSpooler::UploadWorker::InitDownloadHandle() {
 }
 
 
-size_t RiakSpooler::UploadWorker::ObtainVclockCallback(void *ptr,
+size_t RiakUploader::UploadWorker::ObtainVclockCallback(void *ptr,
                                                        size_t size,
                                                        size_t nmemb,
                                                        void *userdata) {
@@ -416,7 +335,7 @@ size_t RiakSpooler::UploadWorker::ObtainVclockCallback(void *ptr,
 }
 
 
-bool RiakSpooler::UploadWorker::GetVectorClock(const std::string &key,
+bool RiakUploader::UploadWorker::GetVectorClock(const std::string &key,
                                                std::string &vector_clock) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "checking if key %s already exists",
            key.c_str());
@@ -463,7 +382,7 @@ bool RiakSpooler::UploadWorker::GetVectorClock(const std::string &key,
 }
 
 
-bool RiakSpooler::UploadWorker::CollectVclockFetchStatistics() {
+bool RiakUploader::UploadWorker::CollectVclockFetchStatistics() {
   CURLcode res;
   double request_time;
   double connection_time;
@@ -480,45 +399,34 @@ bool RiakSpooler::UploadWorker::CollectVclockFetchStatistics() {
 }
 
 
-void RiakSpooler::UploadWorker::operator()(
-                           const RiakSpooler::UploadWorker::Parameters &input) {
+void RiakUploader::UploadWorker::operator()(
+                           const RiakUploader::UploadWorker::Parameters &input) {
   // push to Riak
   upload_stopwatch_.Reset();
   upload_stopwatch_.Start();
   const int retval = PushFileToRiak(input.riak_key,
-                                    input.temporary_path,
+                                    input.local_path,
                                     input.is_critical);
   upload_stopwatch_.Stop();
   upload_time_aggregated_ += upload_stopwatch_.GetTime();
 
   // clean up
   if (input.delete_after_upload) {
-    unlink(input.temporary_path.c_str());
+    unlink(input.local_path.c_str());
   }
 
   // generate reponse
   UploadWorker::Results return_value(input.local_path,
                                      retval,
-                                     input.file_chunk_id);
+                                     input.callback);
 
   // return results to the controller
   if (retval != 0) {
-    if (input.IsFileChunk()) {
-      LogCvmfs(kLogSpooler, kLogWarning, "Failed to upload file chunk ID: %d "
-                                         "of file '%s' to Riak node '%s' using "
-                                         "key '%s'",
-               input.file_chunk_id,
-               input.local_path.c_str(),
-               upstream_url_.c_str(),
-               input.riak_key.c_str());
-    } else {
-      LogCvmfs(kLogSpooler, kLogWarning, "Failed to upload file '%s' to Riak "
-                                         "node '%s' using key '%s'",
-               input.local_path.c_str(),
-               upstream_url_.c_str(),
-               input.riak_key.c_str());
-    }
-
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to upload file '%s' to Riak "
+                                       "node '%s' using key '%s'",
+             input.local_path.c_str(),
+             upstream_url_.c_str(),
+             input.riak_key.c_str());
     master()->JobFailed(return_value);
   } else {
     master()->JobSuccessful(return_value);
@@ -526,7 +434,7 @@ void RiakSpooler::UploadWorker::operator()(
 }
 
 
-std::string RiakSpooler::UploadWorker::CreateRequestUrl(
+std::string RiakUploader::UploadWorker::CreateRequestUrl(
                                               const std::string &key,
                                               const bool is_critical) const {
   // configure the upload URL for performance of consistency
@@ -537,7 +445,7 @@ std::string RiakSpooler::UploadWorker::CreateRequestUrl(
 }
 
 
-int RiakSpooler::UploadWorker::PushFileToRiak(const std::string &key,
+int RiakUploader::UploadWorker::PushFileToRiak(const std::string &key,
                                               const std::string &file_path,
                                               const bool         is_critical) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "pushing file %s to Riak using key %s",
@@ -619,7 +527,7 @@ out:
   return retcode;
 }
 
-bool RiakSpooler::UploadWorker::ConfigureUpload(const std::string   &key,
+bool RiakUploader::UploadWorker::ConfigureUpload(const std::string   &key,
                                                 const std::string   &url,
                                                 struct curl_slist   *headers,
                                                 const size_t         data_size,
@@ -656,7 +564,7 @@ bool RiakSpooler::UploadWorker::ConfigureUpload(const std::string   &key,
 }
 
 
-bool RiakSpooler::UploadWorker::CheckUploadSuccess(const int file_size) {
+bool RiakUploader::UploadWorker::CheckUploadSuccess(const int file_size) {
   long response_code;
   double uploaded_bytes;
 
@@ -677,7 +585,7 @@ bool RiakSpooler::UploadWorker::CheckUploadSuccess(const int file_size) {
 }
 
 
-bool RiakSpooler::UploadWorker::CollectUploadStatistics() {
+bool RiakUploader::UploadWorker::CollectUploadStatistics() {
   CURLcode res;
 
   double upload_time;
@@ -710,7 +618,7 @@ bool RiakSpooler::UploadWorker::CollectUploadStatistics() {
 //
 
 
-bool RiakSpooler::CheckRiakConfiguration(const std::string &url) {
+bool RiakUploader::CheckRiakConfiguration(const std::string &url) {
   // download the configuration
   DataBuffer buffer;
   if (! DownloadRiakConfiguration(url, buffer)) return false;
@@ -730,8 +638,8 @@ size_t ReceiveDataCallback(void *ptr,
                            size_t nmemb,
                            void *userdata) {
   const size_t bytes = size * nmemb;
-  RiakSpooler::DataBuffer& buffer =
-                            *(static_cast<RiakSpooler::DataBuffer*>(userdata));
+  RiakUploader::DataBuffer& buffer =
+                            *(static_cast<RiakUploader::DataBuffer*>(userdata));
 
   if (!buffer.Reserve(bytes)) {
     return 0;
@@ -742,7 +650,7 @@ size_t ReceiveDataCallback(void *ptr,
 }
 
 
-bool RiakSpooler::DownloadRiakConfiguration(const std::string &url,
+bool RiakUploader::DownloadRiakConfiguration(const std::string &url,
                                             DataBuffer& buffer) {
   // initialize cURL handle
   CURL *curl_handle = curl_easy_init();
@@ -905,7 +813,7 @@ bool ConfigAssertion(const JSON *object,
 }
 
 
-bool RiakSpooler::CheckJsonConfiguration(const JsonDocument &json_document) {
+bool RiakUploader::CheckJsonConfiguration(const JsonDocument &json_document) {
   // check general structure of JSON configuration
   const JSON *json_root = json_document.root();
   if (json_root                    == NULL               ||
@@ -928,43 +836,11 @@ bool RiakSpooler::CheckJsonConfiguration(const JsonDocument &json_document) {
 
 //
 // +----------------------------------------------------------------------------
-// | PendingSpoolerResults
-// |    - wrapper of std::map<std::string, PendingSpoolerResults>
-//
-
-
-void RiakSpooler::PendingSpoolerResults::Insert(const std::string &local_path) {
-  (*this)[local_path] = RiakSpooler::PendingSpoolerResult(local_path);
-}
-
-void RiakSpooler::PendingSpoolerResults::Insert(
-                                          const FileProcessor::Results &data) {
-  (*this)[data.local_path] = RiakSpooler::PendingSpoolerResult(
-                                                         data.local_path,
-                                                         data.bulk_file.content_hash(),
-                                                         data.GetFinalizedFileChunks());
-}
-
-RiakSpooler::PendingSpoolerResult& RiakSpooler::PendingSpoolerResults::Get(
-                                         const std::string &local_path) const {
-  const_iterator found = this->find(local_path);
-  assert (found != this->end());
-  return const_cast<RiakSpooler::PendingSpoolerResult&>(found->second);
-}
-
-void RiakSpooler::PendingSpoolerResults::Erase(const std::string &local_path) {
-  int deleted_items = this->erase(local_path);
-  assert (deleted_items > 0);
-}
-
-
-//
-// +----------------------------------------------------------------------------
 // | DataBuffer
 //
 
 
-bool RiakSpooler::DataBuffer::Reserve(const size_t bytes) {
+bool RiakUploader::DataBuffer::Reserve(const size_t bytes) {
   unsigned char *new_buffer = (unsigned char*)realloc((void*)data,
                                                              size_ + bytes);
   if (new_buffer == NULL)
@@ -976,12 +852,12 @@ bool RiakSpooler::DataBuffer::Reserve(const size_t bytes) {
 }
 
 
-unsigned char* RiakSpooler::DataBuffer::Position() const {
+unsigned char* RiakUploader::DataBuffer::Position() const {
   return data + offset_;
 }
 
 
-void RiakSpooler::DataBuffer::Copy(const unsigned char* ptr,
+void RiakUploader::DataBuffer::Copy(const unsigned char* ptr,
                                       const size_t bytes) {
   const size_t free_space = size_ - offset_;
   assert (free_space >= bytes);

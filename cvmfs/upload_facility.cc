@@ -5,13 +5,13 @@
 #include "upload_facility.h"
 
 #include "upload_local.h"
-//#include "upload_riak.h"
+#include "upload_riak.h"
 
 using namespace upload;
 
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
-  //RegisterPlugin<RiakUploader>();
+  RegisterPlugin<RiakUploader>();
 }
 
 

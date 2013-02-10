@@ -25,6 +25,9 @@ struct UploaderResults {
 class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                                                         SpoolerDefinition>,
                          public Callbackable<UploaderResults> {
+ protected:
+  typedef Callbackable<UploaderResults>::callback_t* callback_ptr;
+
  public:
   virtual bool Initialize();
   virtual void TearDown();
