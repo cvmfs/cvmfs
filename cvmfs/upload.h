@@ -87,12 +87,14 @@
 #include <vector>
 
 #include "hash.h"
+
+#include "upload_spooler_definition.h"
+
 #include "upload_file_processor.h"
+#include "upload_facility.h"
 
 namespace upload
 {
-  class Job;
-
   class BackendStat {
    public:
     BackendStat(const std::string &base_path) { base_path_ = base_path; }
@@ -143,48 +145,6 @@ namespace upload
 
 
   /**
-   * SpoolerDefinition is given by a string of the form:
-   * <spooler type>:<spooler description>
-   *
-   * F.e: local:/srv/cvmfs/dev.cern.ch
-   *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
-   */
-  struct SpoolerDefinition {
-    enum DriverType {
-      Riak,
-      Local,
-      Unknown
-    };
-
-    /**
-     * Reads a given definition_string as described above and interprets
-     * it. If the provided string turns out to be malformed the created
-     * SpoolerDefinition object will not be valid. A user should check this
-     * after creation using IsValid().
-     *
-     * @param definition_string   the spooler definition string to be inter-
-     *                            preted by the constructor
-     */
-    SpoolerDefinition(const std::string& definition_string,
-                      const bool          use_file_chunking   = false,
-                      const size_t        min_file_chunk_size = 0,
-                      const size_t        avg_file_chunk_size = 0,
-                      const size_t        max_file_chunk_size = 0);
-    bool IsValid() const { return valid_; }
-
-    DriverType  driver_type;           //!< the type of the spooler driver
-    std::string temporary_path;        //!< scratch space for the FileProcessor
-    std::string spooler_configuration; //!< a driver specific spooler configuration string
-                                       //!< (interpreted by the concrete spooler object)
-    bool        use_file_chunking;
-    size_t      min_file_chunk_size;
-    size_t      avg_file_chunk_size;
-    size_t      max_file_chunk_size;
-
-    bool valid_;
-  };
-
-  /**
    * The Spooler takes care of the upload procedure of files into a backend
    * storage. It can be extended to multiple supported backend storage types,
    * like f.e. the local file system or a key value storage.
@@ -201,34 +161,18 @@ namespace upload
    *       invoking JobDone(). AbstractSpooler will then take care of notifying
    *       all registered listeners.
    */
-  class AbstractSpooler : public Observable<SpoolerResult>,
-                          public PolymorphicConstruction<AbstractSpooler,
-                                                         SpoolerDefinition> {
+  class Spooler : public Observable<SpoolerResult> {
    public:
 
    public:
-    static void RegisterPlugins();
-
-    virtual ~AbstractSpooler();
+    static Spooler* Construct(const SpoolerDefinition &spooler_definition);
+    virtual ~Spooler();
 
     /**
-     * Prints the name of the concrete spooler.
+     * Prints the name of the targeted backend storage.
      * Intended for debugging purposes only!
      */
-    virtual std::string name() const = 0;
-
-    /**
-     * This method is called once before any other operations are performed on
-     * a concrete Spooler. Implement this in your concrete Spooler class to do
-     * global initialization work.
-     *
-     * TODO: In C++11 you might want to make this protected. Currently we cannot
-     *       do this, since it is called by PolymorphicCreation which cannot
-     *       befriend it's template parameters.
-     *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
-     */
-    bool Initialize();
+    std::string backend_name() const;
 
     /**
      * Schedules a copy job that transfers a file found at local_path to the
@@ -241,8 +185,8 @@ namespace upload
      * @param remote_path   the destination of the file to be copied in the
      *                      backend storage
      */
-    virtual void Upload(const std::string &local_path,
-                        const std::string &remote_path) = 0;
+    void Upload(const std::string &local_path,
+                const std::string &remote_path);
 
     /**
      * Schedules a process job that compresses and hashes the provided file in
@@ -270,10 +214,8 @@ namespace upload
      * Note: We assume that no one schedules new jobs while this method is in
      *       waiting state. Otherwise it might never return, since the job queue
      *       does not get empty.
-     *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD WHEN OVERRIDING!
      */
-    virtual void WaitForUpload() const;
+    void WaitForUpload() const;
 
     /**
      * Blocks until all jobs are processed and all worker threads terminated
@@ -281,53 +223,39 @@ namespace upload
      * Call this after you have called WaitForUpload() to wait until the
      * Spooler terminates.
      * Note: after calling this method NO JOBS should be scheduled anymore.
-     *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD WHEN OVERRIDING!
      */
-    virtual void WaitForTermination() const;
+    void WaitForTermination() const;
 
     /**
      * Checks how many of the already processed jobs have failed.
      *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD AND ADD YOUR OWN ERROR COUNT!
-     *
      * @return   the number of failed jobs at the time this method is invoked
      */
-    virtual unsigned int GetNumberOfErrors() const;
+    unsigned int GetNumberOfErrors() const;
 
 
    protected:
     /**
-     * Uploads the results of a FileProcessor job. This could be only one file
-     * or a list of file chunks + one bulk version of the file.
-     *
-     * @param data  the results data structure obtained from the FileProcessor
-     *              callback method
+     * This method is called once before any other operations are performed on
+     * a Spooler. Implements global initialization work.
      */
-    virtual void Upload(const FileProcessor::Results &data) = 0;
+    bool Initialize();
 
     /**
      * This method is called right before the Spooler object will terminate.
      * Implement this to do global clean up work. You should not finish jobs
      * in this method, since it is meant to be called after the Spooler has
      * stopped its actual work or was terminated prematurely.
-     *
-     * Note: DO NOT FORGET TO UP-CALL THIS METHOD!
      */
-    virtual void TearDown();
+    void TearDown();
 
 
    protected:
     /**
-     * AbstractSpooler uses the PolymorphicConstruction template to generate
-     * concrete spoolers. Therefore each concrete spooler must have a constructor
-     * that overrides and up-calls this one.
-     * Furthermore they may use the information in SpoolerDefinition
-     *
      * @param spooler_definition   the SpoolerDefinition structure that defines
      *                             some intrinsics of the concrete Spoolers.
      */
-    AbstractSpooler(const SpoolerDefinition &spooler_definition);
+    Spooler(const SpoolerDefinition &spooler_definition);
 
     /**
      * Concrete implementations of the AbstractSpooler must call this method
@@ -353,6 +281,8 @@ namespace upload
      */
     void ProcessingCallback(const FileProcessor::Results &data);
 
+    void UploadingCallback(const UploaderResults &data);
+
     /*
      * @return   the spooler definition that was initially given to any Spooler
      *           constructor.
@@ -368,6 +298,9 @@ namespace upload
     // File processor
     UniquePtr<ConcurrentWorkers<FileProcessor> > concurrent_processing_;
     UniquePtr<FileProcessor::worker_context >    concurrent_processing_context_;
+
+    // Uploader facility
+    UniquePtr<AbstractUploader>                  uploader_;
   };
 
 }

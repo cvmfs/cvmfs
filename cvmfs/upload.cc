@@ -3,93 +3,61 @@
  */
 
 #include "upload.h"
+#include "upload_file_chunker.h"
+
+#include "util_concurrency.h"
 
 #include <vector>
 
-#include "upload_local.h"
-#include "upload_riak.h"
-
-#include "upload_file_chunker.h"
-
 using namespace upload;
 
-SpoolerDefinition::SpoolerDefinition(
-                      const std::string& definition_string,
-                      const bool         use_file_chunking,
-                      const size_t       min_file_chunk_size,
-                      const size_t       avg_file_chunk_size,
-                      const size_t       max_file_chunk_size) :
-  use_file_chunking(use_file_chunking),
-  min_file_chunk_size(min_file_chunk_size),
-  avg_file_chunk_size(avg_file_chunk_size),
-  max_file_chunk_size(max_file_chunk_size),
-  valid_(false)
-{
-  // check if given file chunking values are sane
-  if (use_file_chunking && (min_file_chunk_size >= avg_file_chunk_size ||
-                            avg_file_chunk_size >= max_file_chunk_size)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "file chunk size values are not sane");
-    return;
-  }
 
-  // split the spooler driver definition into name and config part
-  std::vector<std::string> upstream = SplitString(definition_string, ',');
-  if (upstream.size() != 3) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Invalid spooler driver");
-    return;
+Spooler* Spooler::Construct(const SpoolerDefinition &spooler_definition) {
+  Spooler *result = new Spooler(spooler_definition);
+  if (!result->Initialize()) {
+    delete result;
+    result = NULL;
   }
-
-  // recognize and configure the spooler driver
-  if (upstream[0]        == "local") {
-    driver_type = Local;
-  } else if (upstream[0] == "riak") {
-    driver_type = Riak;
-  } else {
-    LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
-      upstream[0].c_str());
-    return;
-  }
-
-  // save data
-  temporary_path        = upstream[1];
-  spooler_configuration = upstream[2];
-  valid_ = true;
+  return result;
 }
 
 
-void AbstractSpooler::RegisterPlugins() {
-  RegisterPlugin<LocalSpooler>();
-  RegisterPlugin<RiakSpooler>();
-}
-
-
-AbstractSpooler::AbstractSpooler(const SpoolerDefinition &spooler_definition) :
+Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
   spooler_definition_(spooler_definition)
 {}
 
 
-AbstractSpooler::~AbstractSpooler() {}
+Spooler::~Spooler() {}
 
 
-bool AbstractSpooler::Initialize() {
+bool Spooler::Initialize() {
+  // configure the uploader environment
+  uploader_ = AbstractUploader::Construct(spooler_definition_);
+  if (uploader_ == NULL) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize backend upload "
+                                       "facility in Spooler.");
+    return false;
+  }
+
   // configure the file processor context
   concurrent_processing_context_ =
     new FileProcessor::worker_context(spooler_definition_.temporary_path,
-                                      spooler_definition_.use_file_chunking);
+                                      spooler_definition_.use_file_chunking,
+                                      uploader_.weak_ref());
 
   // create and configure a file processor worker environment
   const unsigned int number_of_cpus = GetNumberOfCpuCores();
   concurrent_processing_ =
      new ConcurrentWorkers<FileProcessor>(number_of_cpus,
                                           number_of_cpus * 500, // TODO: magic number (?)
-                                          concurrent_processing_context_);
+                                          concurrent_processing_context_.weak_ref());
   assert(concurrent_processing_);
-  concurrent_processing_->RegisterListener(&AbstractSpooler::ProcessingCallback, this);
+  concurrent_processing_->RegisterListener(&Spooler::ProcessingCallback, this);
 
   // initialize the file processor environment
   if (! concurrent_processing_->Initialize()) {
     LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize concurrent "
-                                       "processing in AbstractSpooler.");
+                                       "processing in Spooler.");
     return false;
   }
 
@@ -106,41 +74,56 @@ bool AbstractSpooler::Initialize() {
 }
 
 
-void AbstractSpooler::TearDown() {
+void Spooler::TearDown() {
   concurrent_processing_->WaitForTermination();
+  uploader_->WaitForUpload();
 }
 
 
-void AbstractSpooler::Process(const std::string &local_path,
-                              const bool         allow_chunking) {
+void Spooler::Process(const std::string &local_path,
+                      const bool         allow_chunking) {
   // fill the file processor parameter structure and schedule the job
   const FileProcessor::Parameters params(local_path, allow_chunking);
   concurrent_processing_->Schedule(params);
 }
 
 
-void AbstractSpooler::ProcessingCallback(const FileProcessor::Results &data) {
-  Upload(data);
+void Spooler::Upload(const std::string &local_path,
+                     const std::string &remote_path) {
+  uploader_->Upload(local_path,
+                    remote_path,
+                    AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
 }
 
 
-void AbstractSpooler::WaitForUpload() const {
+void Spooler::ProcessingCallback(const FileProcessor::Results &data) {
+  NotifyListeners(SpoolerResult(data.return_code,
+                                data.local_path,
+                                data.bulk_file.content_hash(),
+                                data.file_chunks));
+}
+
+void Spooler::UploadingCallback(const UploaderResults &data) {
+  NotifyListeners(SpoolerResult(data.return_code,
+                                data.local_path));
+}
+
+
+void Spooler::WaitForUpload() const {
   concurrent_processing_->WaitForEmptyQueue();
+  uploader_->WaitForUpload();
 }
 
 
-void AbstractSpooler::WaitForTermination() const {
+void Spooler::WaitForTermination() const {
   concurrent_processing_->WaitForTermination();
+  uploader_->WaitForUpload();
 }
 
 
-unsigned int AbstractSpooler::GetNumberOfErrors() const {
-  return concurrent_processing_->GetNumberOfFailedJobs();
-}
-
-
-void AbstractSpooler::JobDone(const SpoolerResult &data) {
-  NotifyListeners(data);
+unsigned int Spooler::GetNumberOfErrors() const {
+  return concurrent_processing_->GetNumberOfFailedJobs() +
+         uploader_->GetNumberOfErrors();
 }
 
 
