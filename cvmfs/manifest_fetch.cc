@@ -83,7 +83,8 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
                     whitelist_size-payload_bytes);
   if ((expected_repository != "") && ("N" + expected_repository != line)) {
     LogCvmfs(kLogSignature, kLogDebug,
-             "repository name does not match (found %s, expected %s)",
+             "repository name on the whitelist does not match "
+             "(found %s, expected %s)",
              line.c_str(), expected_repository.c_str());
     return false;
   }
@@ -145,8 +146,11 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                                          &certificate_hash);
 
   retval = download::Fetch(&download_manifest);
-  if (retval != download::kFailOk)
+  if (retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "failed to download repository manifest (%d)", retval);
     return kFailLoad;
+  }
 
   // Load Manifest
   ensemble->raw_manifest_buf =
@@ -160,6 +164,10 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
 
   // Basic manifest sanity check
   if (ensemble->manifest->repository_name() != repository_name) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "repository name does not match (found %s, expected %s)",
+             ensemble->manifest->repository_name().c_str(),
+             repository_name.c_str());
     result = kFailNameMismatch;
     goto cleanup;
   }

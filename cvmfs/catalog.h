@@ -92,6 +92,37 @@ struct Counters {
 
 
 /**
+ * Allows to define a class that stores additional information in the upper
+ * bits of an inode.  Cvmfs will abort if the inode is too large to fit into
+ * the protected lower bits.
+ * Currently, annotation is used to mangle the catalog revision number into
+ * the inode.  The implementation is in the catalog manager.  Mangling of the
+ * revision number is necessary in order to avoid the following situation:
+ *   1) Process A opens file /foo and starts to read it.
+ *   2) The catalog is reloaded, all caches are flushed.  In the new catalog,
+ *      file /foo has another content.
+ *   3) Process B opens file /foo (same inode, different content) and reads
+ *      the new content completely, thereby fills the kernel caches.
+ *   4) Process A reads the rest of /foo, which is now served in the new version
+ *      from the kernel caches.
+ */
+class InodeAnnotation {
+ public:
+  virtual ~InodeAnnotation() { };
+  virtual inode_t Annotate(const inode_t raw_inode) = 0;
+  virtual void SetRevision(const uint64_t new_revision) = 0;
+  inode_t Strip(const inode_t annotated_inode) {
+    // Clear upper bits
+    return ((uint64_t(1) << num_protected_bits_) - 1) & annotated_inode;
+  }
+  unsigned num_protected_bits() { return num_protected_bits_; }
+
+ protected:
+  unsigned num_protected_bits_;
+};
+
+
+/**
  * This class wraps a catalog database and provides methods
  * to query for directory entries.
  * It has a pointer to its parent catalog and its children, thereby creating
@@ -99,7 +130,7 @@ struct Counters {
  *
  * Read-only catalog. A sub-class provides read-write access.
  */
-  class Catalog : public SingleCopy {
+class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
   friend class SqlLookup;  // for mangled inode
  public:
@@ -168,6 +199,8 @@ struct Counters {
   NestedCatalogList *ListNestedCatalogs() const;
   bool FindNested(const PathString &mountpoint, hash::Any *hash) const;
 
+  void SetInodeAnnotation(InodeAnnotation *new_annotation);
+
  protected:
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
   HardlinkGroupMap hardlink_groups_;
@@ -196,9 +229,7 @@ struct Counters {
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
-  inline uint64_t GetRowIdFromInode(const inode_t inode) const {
-    return inode - inode_range_.offset;
-  }
+  uint64_t GetRowIdFromInode(const inode_t inode) const;
   inode_t GetMangledInode(const uint64_t row_id,
                           const uint64_t hardlink_group);
 
@@ -217,6 +248,7 @@ struct Counters {
 
   InodeRange inode_range_;
   uint64_t max_row_id_;
+  InodeAnnotation *inode_annotation;
 
   SqlListing *sql_listing_;
   SqlLookupPathHash *sql_lookup_md5path_;

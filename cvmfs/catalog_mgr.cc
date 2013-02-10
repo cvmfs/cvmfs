@@ -2,8 +2,11 @@
  * This file is part of the CernVM File System
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "catalog_mgr.h"
 
+#include <inttypes.h>
 #include <cassert>
 
 #include "logging.h"
@@ -14,8 +17,32 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+InodeRevisionAnnotation::InodeRevisionAnnotation(const unsigned inode_width) {
+  revision_annotation_ = 0;
+  inode_width_ = inode_width;
+  switch (inode_width_) {
+    case 32:
+      num_protected_bits_ = 24;
+      break;
+    case 64:
+      num_protected_bits_ = 32;
+      break;
+    default:
+      abort();
+  }
+}
+
+
+void InodeRevisionAnnotation::SetRevision(const uint64_t new_revision) {
+  const unsigned revision_width = inode_width_ - num_protected_bits_;
+  const uint64_t revision_cut = new_revision % (uint64_t(1) << revision_width);
+  revision_annotation_ = revision_cut << num_protected_bits_;
+}
+
+
 AbstractCatalogManager::AbstractCatalogManager() {
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
+  inode_annotation_ = NULL;
   rwlock_ =
     reinterpret_cast<pthread_rwlock_t *>(smalloc(sizeof(pthread_rwlock_t)));
   int retval = pthread_rwlock_init(rwlock_, NULL);
@@ -33,6 +60,13 @@ AbstractCatalogManager::~AbstractCatalogManager() {
 }
 
 
+void AbstractCatalogManager::SetInodeAnnotation(InodeAnnotation *new_annotation)
+{
+  assert(catalogs_.empty() || (new_annotation == inode_annotation_));
+  inode_annotation_ = new_annotation;
+}
+
+
 /**
  * Initializes the CatalogManager and loads and attaches the root entry.
  * @return true on successful init, otherwise false
@@ -45,6 +79,10 @@ bool AbstractCatalogManager::Init() {
 
   if (!attached) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to initialize root catalog");
+  }
+
+  if (attached && inode_annotation_) {
+    inode_annotation_->SetRevision(GetRootCatalog()->GetRevision());
   }
 
   return attached;
@@ -74,6 +112,10 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
     assert(new_root);
     bool retval = AttachCatalog(catalog_path, new_root);
     assert(retval);
+
+    if (inode_annotation_) {
+      inode_annotation_->SetRevision(new_root->GetRevision());
+    }
   }
   Unlock();
 
@@ -98,16 +140,19 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
 
   // Get corresponding catalog
   Catalog *catalog = NULL;
+  const inode_t raw_inode =
+    inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
   for (CatalogList::const_iterator i = catalogs_.begin(),
        iEnd = catalogs_.end(); i != iEnd; ++i)
   {
-    if ((*i)->inode_range().ContainsInode(inode)) {
+    if ((*i)->inode_range().ContainsInode(raw_inode)) {
       catalog = *i;
       break;
     }
   }
   if (catalog == NULL) {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %d", inode);
+    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %"PRIu64" "
+             "(raw inode: %"PRIu64")", inode, raw_inode);
     goto lookup_inode_fini;
   }
 
@@ -138,7 +183,7 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
     // If there is no parent entry, it might be data corruption
     if (!found_parent) {
       LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
-               "cannot find parent entry for inode %d --> data corrupt?",
+               "cannot find parent entry for inode %"PRIu64" --> data corrupt?",
                inode);
       found = false;
     } else {
@@ -551,6 +596,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   uint64_t inode_chunk_size = new_catalog->max_row_id();
   InodeRange range = AcquireInodes(inode_chunk_size);
   new_catalog->set_inode_range(range);
+  new_catalog->SetInodeAnnotation(inode_annotation_);
 
   // Add catalog to the manager
   if (!new_catalog->IsInitialized()) {

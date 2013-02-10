@@ -1,5 +1,8 @@
 2.1.7:
-  * Fixed mount helper return values
+  * Fix: stale page caches across file catalog reloads
+  * Fix: hardlink count for entries of 2.0 file catalogs
+  * Fix: don't retry downloads on HTTP errors 
+  * Fix: comply with system mount return values in the helper
   * Renamed cvmfs-lib RPM to cvmfs-devel 
   * Fixed cvmfs_config reload on clean nodes
 

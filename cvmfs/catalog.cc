@@ -118,6 +118,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   path_ = path;
   parent_ = parent;
   max_row_id_ = 0;
+  inode_annotation = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
@@ -140,6 +141,7 @@ Catalog::~Catalog() {
   delete database_;
   delete nested_catalog_cache_;
 }
+
 
 /**
  * InitPreparedStatement uses polymorphism in case of a r/w catalog.
@@ -477,8 +479,31 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
     }
   }
 
+  if (inode_annotation) {
+    // Abort if inode is too large and overlaps with annotation
+    if (inode >= (uint64_t(1) << inode_annotation->num_protected_bits())) {
+      LogCvmfs(kLogCatalog, kLogSyslog, "inode violation");
+      abort();
+    }
+
+    inode = inode_annotation->Annotate(inode);
+  }
+
   return inode;
 }
+
+
+/**
+ * Revert the inode mangling.  Required to lookup using inodes.
+ */
+uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
+  inode_t row_id = inode;
+  if (inode_annotation)
+    row_id = inode_annotation->Strip(row_id);
+
+  return row_id - inode_range_.offset;
+}
+
 
 /**
  * Get a list of all registered nested catalogs in this catalog.
@@ -529,6 +554,20 @@ bool Catalog::FindNested(const PathString &mountpoint, hash::Any *hash) const {
   pthread_mutex_unlock(lock_);
 
   return found;
+}
+
+
+/**
+ * Sets a new object to do inode annotations (or set to NULL)
+ * The annotation object is not owned by the catalog.
+ */
+void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
+  pthread_mutex_lock(lock_);
+  // Since annotated inodes could come back to the catalog in order to
+  // get stripped, exchanging the annotation is not allowed
+  assert((inode_annotation == NULL) || (inode_annotation == new_annotation));
+  inode_annotation = new_annotation;
+  pthread_mutex_unlock(lock_);
 }
 
 
