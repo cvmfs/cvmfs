@@ -18,37 +18,38 @@
  *      -> pluggable to support different upload pathes (local, Riak, ...)
  *
  * There are a number of different entities involved in this process. Namely:
- *   -> AbstractSpooler     - general steering tasks ( + common interface )
- *   -> FileProcessor       - chunking, compression and hashing of files
- *   -> concrete Spoolers   - upload functionality for various backend storages
+ *   -> Spooler            - general steering tasks ( + common interface )
+ *   -> FileProcessor      - chunking, compression and hashing of files
+ *   -> AbstractUploader   - abstract base class for uploading facilities
+ *   -> concrete Uploaders - upload functionality for various backend storages
  *
  * Stage 1 aka. the processing of files is handled by the FileProcessor, since
  * it is independent from the actual uploading this functionality is outsourced.
  * The FileProcessor will take care of the above mentioned steps in a concurrent
- * fashion. This process is invoked by calling AbstractSpooler::Process().
- * As a result AbstractSpooler obtains a FileProcessor::Results structure that
- * describes the processed file (chunks, checksum, compressed data location) and
- * hands it over to one of the concrete Spooler classes for upload.
+ * fashion. This process is invoked by calling Spooler::Process().
+ * While processing, the FileProcessor immediately schedules Upload jobs as well
+ * in order to push data to the backend storage as early as possible.
  *
- * Stage 2 aka. the upload is handled by one of the concrete Spooler classes.
- * Usually the input to the upload routine is a FileProcessor::Results structure
- * which might contain several files to be uploaded (think: file chunks).
- * Depending on the implementation of the concrete Spooler we might therefore
- * produce more than one upload job for a single AbstractSpooler::Process() call.
+ * Stage 2 aka. the upload is handled by one of the concrete Uploader classes.
+ * Uploaders have a thin interface described in the AbstractUploader class.
+ * The file processor uses a concrete Uploader to push files into the backend
+ * storage as part of it's processing.
+ * Furthermore the user can directly upload files using the Spooler::Upload()
+ * method as described in the next paragraph.
  *
  * For some specific files we need to be able to circumvent the FileProcessor to
- * directly push them into the backend storage (i.e. .cvmfspublished), therefore
- * AbstractSpooler::Upload() is overloaded with a public method, that provides
- * this circumvention to the user. By 'user' we of course mean the classes that
- * use this Spooler facility to upload their files to the backend storage.
+ * directly push them into the backend storage (i.e. .cvmfspublished). For this
+ * Spooler::Upload() is used. It directly schedules an upload job in the used
+ * concrete Uploader facility. These files will not get compressed or check-
+ * summed by any means.
  *
- * In any case, calling AbstractSpooler::Process() or AbstractSpooler::Upload()
- * will invoke a callback once the whole job has been finished. Callbacks are
- * provided by the Observable template. Please see the implementation of this
- * template for more details on usage and implementation.
+ * In any case, calling Spooler::Process() or Spooler::Upload() will invoke a
+ * callback once the whole job has been finished. Callbacks are provided by the
+ * Observable template. Please see the implementation of this template for more
+ * details on usage and implementation.
  * The data structure provided by this callback is called SpoolerResult and con-
  * tains information about the processed file (status, content hash, chunks, ..)
- * Note: Even if a concrete Spooler internally spawns more than one upload job
+ * Note: Even if a concrete Uploader internally spawns more than one upload job
  *       to send out chunked files, the user will only see a single invocation
  *       containing information about the uploaded file including it's generated
  *       chunks.
@@ -62,20 +63,21 @@
  *    |                          |
  *    |                          |          File
  *    |  File       ################### ---------------------> #################
- *    +-----------> # AbstractSpooler #                        # FileProcessor #
+ *    +-----------> #     Spooler     #                        # FileProcessor #
  *    |             ################### <--------------------- #################
- *    |                      |    ^     FileProcessor::Results
- *    |            Hand Over |    |
- *    |                     `|´   |
- *    |  direct    #####################
- *    +----------> # Concrete Spooler  #
- *       upload    #####################
- *                           |    ^
- *                    Upload |    | Callback (SpoolerResult)
- *                          `|´   |
- *                 #####################
- *                 #  Backend Storage  #
- *                 #####################
+ *    |                          ^      FileProcessor::Results    |   ^
+ *    |                          |                                |   |
+ *    |                 Callback |                                |   |
+ *    |                          |              Schedule Upload   |   |
+ *    |  direct    ##################### <------------------------+   |
+ *    +----------> #  Upload facility  #                              |
+ *       upload    ##################### -----------------------------+
+ *                           |             Callback (UploaderResults)
+ *                    Upload |
+ *                          `|´
+ *                 *********************
+ *                 *  Backend Storage  *
+ *                 *********************
  *
  */
 

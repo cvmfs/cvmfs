@@ -47,7 +47,15 @@ class TemporaryFileChunk : public FileChunk {
 };
 typedef std::vector<TemporaryFileChunk> TemporaryFileChunks;
 
-
+/**
+ * PendingFiles are created for each processing job. It encapsulates the syn-
+ * chronisation of FileProcessor and AbstractUploader.
+ * When a FileChunk was successfully created, it is scheduled for upload in the
+ * AbstractUploader, which in turn notifies the responsible PendingFile object
+ * once the chunk was uploaded. When a PendingFile object determines itself to
+ * be completely finished, it notifies the FileProcessor which then hands out
+ * the final results (FileProcessor::Results).
+ */
 class PendingFile : public Callbackable<std::string>,
                     public Lockable {
  public:
@@ -64,10 +72,34 @@ class PendingFile : public Callbackable<std::string>,
 
   void AddChunk(const TemporaryFileChunk  &file_chunk);
   void AddBulk (const TemporaryFileChunk  &file_chunk);
+
+  /**
+   * If the FileProcessor created only one single FileChunk, it will call this
+   * method to set this one chunk as the bulk version of the file
+   * (performance optimization)
+   */
   void PromoteSingleChunkToBulk();
 
+  /**
+   * Callback method that gets called for each uploaded file chunk of a Pending-
+   * File object.
+   *
+   * @param data   the results of the finished uploading job
+   */
   void UploadCallback(const UploaderResults &data);
+
+  /**
+   * Checks if the file was completely processed and uploaded and notifies the
+   * Spooler in positive case.
+   */
   void CheckForCompletionAndNotify();
+
+  /**
+   * Once a file is processed completely processed by the FileProcessor, it
+   * notifies the PendingFile by calling this method.
+   * Note: It might be, that the PendingFile still needs to wait for upload jobs
+   *       to be finished!
+   */
   void FinalizeProcessing();
 
   FileChunks GetFinalizedFileChunks() const;
