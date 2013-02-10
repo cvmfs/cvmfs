@@ -29,23 +29,23 @@ Observable<ParamT>::~Observable() {
 
 template <typename ParamT>
 template <class DelegateT>
-typename Observable<ParamT>::callback_t Observable<ParamT>::RegisterListener(
+typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
     typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
     DelegateT *delegate) {
   // create a new BoundCallback, register it and return the handle
   CallbackBase<ParamT> *callback =
-    new BoundCallback<ParamT, DelegateT>(method, delegate);
+    Observable<ParamT>::MakeCallback(method, delegate);
   RegisterListener(callback);
   return callback;
 }
 
 
 template <typename ParamT>
-typename Observable<ParamT>::callback_t Observable<ParamT>::RegisterListener(
+typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
     typename Callback<ParamT>::CallbackFunction fn) {
   // create a new Callback, register it and return the handle
   CallbackBase<ParamT> *callback =
-    new Callback<ParamT>(fn);
+    Observable<ParamT>::MakeCallback(fn);
   RegisterListener(callback);
   return callback;
 }
@@ -53,7 +53,7 @@ typename Observable<ParamT>::callback_t Observable<ParamT>::RegisterListener(
 
 template <typename ParamT>
 void Observable<ParamT>::RegisterListener(
-    Observable<ParamT>::callback_t callback_object) {
+    Observable<ParamT>::callback_ptr callback_object) {
   // register a generic CallbackBase callback
   WriteLockGuard guard(listeners_rw_lock_);
   listeners_.insert(callback_object);
@@ -62,12 +62,12 @@ void Observable<ParamT>::RegisterListener(
 
 template <typename ParamT>
 void Observable<ParamT>::UnregisterListener(
-    Observable<ParamT>::callback_t callback_object) {
+    typename Observable<ParamT>::callback_ptr callback_object) {
   // remove a callback handle from the callbacks list
   // if it is not registered --> crash
   WriteLockGuard guard(listeners_rw_lock_);
   const size_t was_removed = listeners_.erase(callback_object);
-  assert (was_removed);
+  assert (was_removed > 0);
   delete callback_object;
 }
 

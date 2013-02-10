@@ -159,13 +159,10 @@ class Observable;
  *  --> 2. for member functions of arbitrary objects
  */
 template <typename ParamT>
-class CallbackBase : SingleCopy {
+class CallbackBase {
  public:
-  virtual void operator()(const ParamT &value) = 0;
-
- protected:
-  friend class Observable<ParamT>;
-  virtual ~CallbackBase() {} // don't delete externally
+  virtual ~CallbackBase() {}
+  virtual void operator()(const ParamT &value) const = 0;
 };
 
 /**
@@ -182,11 +179,9 @@ template <typename ParamT>
 class Callback : public CallbackBase<ParamT> {
  public:
   typedef void (*CallbackFunction)(const ParamT &value);
-  void operator()(const ParamT &value) { function_(value); }
 
- protected:
-  friend class Observable<ParamT>;
   Callback(CallbackFunction function) : function_(function) {}
+  void operator()(const ParamT &value) const { function_(value); }
 
  private:
   CallbackFunction function_;
@@ -210,10 +205,7 @@ template <typename ParamT, class DelegateT>
 class BoundCallback : public CallbackBase<ParamT> {
  public:
   typedef void (DelegateT::*CallbackMethod)(const ParamT &value);
-  void operator()(const ParamT &value) { (delegate_->*method_)(value); }
 
- protected:
-  friend class Observable<ParamT>;
   BoundCallback(CallbackMethod method, DelegateT *delegate) :
     delegate_(delegate),
     method_(method) {}
@@ -221,10 +213,33 @@ class BoundCallback : public CallbackBase<ParamT> {
     delegate_(&delegate),
     method_(method) {}
 
+  void operator()(const ParamT &value) const { (delegate_->*method_)(value); }
+
  private:
   DelegateT*     delegate_;
   CallbackMethod method_;
 };
+
+
+template <class ParamT>
+class Callbackable {
+ public:
+  typedef CallbackBase<ParamT> callback_t;
+
+ public:
+  // replace this stuff by C++11 lambdas!
+  template <class DelegateT>
+  static callback_t* MakeCallback(
+        typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
+        DelegateT *delegate) {
+    return new BoundCallback<ParamT, DelegateT>(method, delegate);
+  }
+  static callback_t* MakeCallback(
+        typename Callback<ParamT>::CallbackFunction function) {
+    return new Callback<ParamT>(function);
+  }
+};
+
 
 /**
  * This is a base class for classes that need to expose a callback interface for
@@ -245,12 +260,11 @@ class BoundCallback : public CallbackBase<ParamT> {
  *                 invocation.
  */
 template <typename ParamT>
-class Observable : SingleCopy {
- public:
-  typedef CallbackBase<ParamT> *callback_t;
-
+class Observable : public Callbackable<ParamT>,
+                   SingleCopy {
  protected:
-  typedef std::set<callback_t> Callbacks;
+  typedef typename Callbackable<ParamT>::callback_t*  callback_ptr;
+  typedef std::set<callback_ptr>                      Callbacks;
 
  public:
   virtual ~Observable();
@@ -266,8 +280,9 @@ class Observable : SingleCopy {
    * @return  a handle to the registered callback
    */
   template <class DelegateT>
-  callback_t RegisterListener(typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
-                              DelegateT *delegate);
+  callback_ptr RegisterListener(
+          typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
+          DelegateT *delegate);
 
   /**
    * Registers a static class member or a C-like function as a callback to the
@@ -277,7 +292,7 @@ class Observable : SingleCopy {
    * @param fn  a pointer to the function to be called by the callback
    * @return  a handle to the registered callback
    */
-  callback_t RegisterListener(typename Callback<ParamT>::CallbackFunction fn);
+  callback_ptr RegisterListener(typename Callback<ParamT>::CallbackFunction fn);
 
   /**
    * Removes the given callback from the listeners group of this Observable.
@@ -285,7 +300,7 @@ class Observable : SingleCopy {
    * @param callback_object  a callback handle that was returned by
    *                         RegisterListener() before.
    */
-  void UnregisterListener(callback_t callback_object);
+  void UnregisterListener(callback_ptr callback_object);
 
   /**
    * Removes all listeners from the Observable
@@ -295,7 +310,7 @@ class Observable : SingleCopy {
  protected:
   Observable(); // don't instantiate this as a stand alone object
 
-  void RegisterListener(callback_t callback_object);
+  void RegisterListener(callback_ptr callback_object);
 
   /**
    * Notifies all registered listeners and passes them the provided argument
