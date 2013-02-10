@@ -403,6 +403,9 @@ hash::Any Catalog::GetPreviousRevision() const {
  * Receive catalog statistics
  */
 bool Catalog::GetCounters(Counters *counters) const {
+  if (!database_)
+    return false;
+
   SqlGetCounter sql_counter(database());
   bool retval;
 
