@@ -20,22 +20,22 @@ struct SyncParameters {
     avg_file_chunk_size(8*1024*1024),
     max_file_chunk_size(16*1024*1024) {}
 
-  upload::AbstractSpooler *spooler;
-  std::string              dir_union;
-  std::string              dir_scratch;
-  std::string              dir_rdonly;
-  std::string              dir_temp;
-  std::string              base_hash;
-  std::string              stratum0;
-  std::string              manifest_path;
-  std::string              spooler_definition;
-  bool                     print_changeset;
-  bool                     dry_run;
-  bool                     mucatalogs;
-  bool                     use_file_chunking;
-  size_t                   min_file_chunk_size;
-  size_t                   avg_file_chunk_size;
-  size_t                   max_file_chunk_size;
+  upload::Spooler *spooler;
+  std::string      dir_union;
+  std::string      dir_scratch;
+  std::string      dir_rdonly;
+  std::string      dir_temp;
+  std::string      base_hash;
+  std::string      stratum0;
+  std::string      manifest_path;
+  std::string      spooler_definition;
+  bool             print_changeset;
+  bool             dry_run;
+  bool             mucatalogs;
+  bool             use_file_chunking;
+  size_t           min_file_chunk_size;
+  size_t           avg_file_chunk_size;
+  size_t           max_file_chunk_size;
 };
 
 

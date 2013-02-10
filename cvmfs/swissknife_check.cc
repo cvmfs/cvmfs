@@ -319,7 +319,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         aggregated_file_size += c->size();
 
         // are all data chunks in the data store?
-        const string chunk_path = "data" + c->content_hash().MakePath(1, 2) + FileChunk::kChecksumSuffix;
+        const string chunk_path = "data" + c->content_hash().MakePath(1, 2);
         if (!Exists(chunk_path)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %sP (%s -> "
                                           "offset: %d | size: %d) missing",

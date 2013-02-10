@@ -87,7 +87,7 @@ class ChunkGenerator : public PolymorphicConstruction<ChunkGenerator,
    */
   virtual off_t FindNextCutMark() const = 0;
 
-  friend class AbstractSpooler;
+  friend class Spooler;
   /**
    * Configures the chunk size restrictions each ChunkGenerator should obey.
    * This method is called by AbstractSpooler once, before any files get pro-

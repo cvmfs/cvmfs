@@ -47,7 +47,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('n') != args.end()) repo_name = *args.find('n')->second;
   string pwd = "";
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
-  upload::AbstractSpooler *spooler = NULL;
+  upload::Spooler *spooler = NULL;
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
@@ -55,7 +55,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   // Connect to the spooler
-  spooler = upload::AbstractSpooler::Construct(spooler_definition);
+  spooler = upload::Spooler::Construct(spooler_definition);
 
   signature::Init();
 

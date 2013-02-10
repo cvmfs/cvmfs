@@ -39,7 +39,7 @@
 #include "catalog_mgr.h"
 
 namespace upload {
-class AbstractSpooler;
+class Spooler;
 }
 namespace manifest {
 class Manifest;
@@ -49,13 +49,13 @@ namespace catalog {
 
 class WritableCatalogManager : public AbstractCatalogManager {
  public:
-  WritableCatalogManager(const hash::Any         &base_hash,
-                         const std::string       &stratum0,
-                         const std::string       &dir_temp,
-                         upload::AbstractSpooler *spooler);
+  WritableCatalogManager(const hash::Any   &base_hash,
+                         const std::string &stratum0,
+                         const std::string &dir_temp,
+                         upload::Spooler   *spooler);
   ~WritableCatalogManager();
-  static manifest::Manifest *CreateRepository(const std::string       &dir_temp,
-                                              upload::AbstractSpooler *spooler);
+  static manifest::Manifest *CreateRepository(const std::string &dir_temp,
+                                              upload::Spooler   *spooler);
 
   bool Init();
 
@@ -138,11 +138,11 @@ class WritableCatalogManager : public AbstractCatalogManager {
   // defined in catalog_mgr_rw.cc
   const static std::string kCatalogFilename;
 
-  pthread_mutex_t         *sync_lock_;  // private lock of WritableCatalogManager
-  hash::Any                base_hash_;
-  std::string              stratum0_;
-  std::string              dir_temp_;
-  upload::AbstractSpooler *spooler_;
+  pthread_mutex_t  *sync_lock_;  // private lock of WritableCatalogManager
+  hash::Any         base_hash_;
+  std::string       stratum0_;
+  std::string       dir_temp_;
+  upload::Spooler  *spooler_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

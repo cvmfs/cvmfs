@@ -458,7 +458,7 @@ create_repository_skeleton() {
   mkdir ${directory}/data/txn
   chown -R $user $directory
   if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $directory
+    chcon -Rv --type=httpd_sys_content_t $directory > /dev/null
   fi
   echo "done"
 }

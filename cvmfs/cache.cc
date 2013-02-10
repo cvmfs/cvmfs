@@ -360,7 +360,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
  */
 int Fetch(const FileChunk &chunk, const string &cvmfs_path) {
   return Fetch(chunk.content_hash(),
-               FileChunk::kChecksumSuffix,
+               "",
                chunk.size(),
                cvmfs_path);
 }

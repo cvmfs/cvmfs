@@ -55,12 +55,12 @@ static void AbortSpoolerOnError(const upload::SpoolerResult &result) {
 }
 
 
-string                  *stratum0_url = NULL;
-string                  *temp_dir = NULL;
-unsigned                 num_parallel = 1;
-bool                     pull_history = false;
-upload::AbstractSpooler *spooler = NULL;
-int                      pipe_chunks[2];
+string              *stratum0_url = NULL;
+string              *temp_dir = NULL;
+unsigned             num_parallel = 1;
+bool                 pull_history = false;
+upload::Spooler     *spooler = NULL;
+int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 upload::BackendStat *backend_stat = NULL;
@@ -291,7 +291,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   stratum0_url = args.find('u')->second;
   temp_dir = args.find('x')->second;
-  spooler = upload::AbstractSpooler::Construct(*args.find('r')->second);
+  spooler = upload::Spooler::Construct(*args.find('r')->second);
   assert(spooler);
   backend_stat = upload::GetBackendStat(*args.find('r')->second);
   assert(backend_stat);

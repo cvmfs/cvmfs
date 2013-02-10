@@ -28,10 +28,10 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-WritableCatalogManager::WritableCatalogManager(const hash::Any         &base_hash,
-                                               const std::string       &stratum0,
-                                               const string            &dir_temp,
-                                               upload::AbstractSpooler *spooler)
+WritableCatalogManager::WritableCatalogManager(const hash::Any   &base_hash,
+                                               const std::string &stratum0,
+                                               const string      &dir_temp,
+                                               upload::Spooler   *spooler)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -116,8 +116,8 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  * @return true on success, false otherwise
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
-  const string            &dir_temp,
-  upload::AbstractSpooler *spooler)
+  const string     &dir_temp,
+  upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";

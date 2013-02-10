@@ -92,8 +92,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-  upload::AbstractSpooler *spooler =
-    upload::AbstractSpooler::Construct(spooler_definition);
+  upload::Spooler *spooler =
+    upload::Spooler::Construct(spooler_definition);
   assert(spooler);
 
   // TODO: consider using the unique pointer to come in Github Pull Request 46
@@ -121,8 +121,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   const string dest = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
-  upload::AbstractSpooler *spooler =
-    upload::AbstractSpooler::Construct(spooler_definition);
+  upload::Spooler *spooler =
+    upload::Spooler::Construct(spooler_definition);
   assert(spooler);
   spooler->Upload(source, dest);
   spooler->WaitForUpload();
@@ -214,7 +214,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.min_file_chunk_size,
     params.avg_file_chunk_size,
     params.max_file_chunk_size);
-  params.spooler = upload::AbstractSpooler::Construct(spooler_definition);
+  params.spooler = upload::Spooler::Construct(spooler_definition);
   if (NULL == params.spooler)
     return 3;
 

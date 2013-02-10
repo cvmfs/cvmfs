@@ -7,7 +7,7 @@
 using namespace upload;
 
 void SplCallback(const upload::SpoolerResult &result) {
-  std::cout << "spooler sent callback" << std::endl;
+  std::cout << "spooler sent callback for: " << result.local_path << std::endl;
 
   if (result.IsChunked()) {
     std::cout << "CHUNKS:" << std::endl;
@@ -24,13 +24,16 @@ void SplCallback(const upload::SpoolerResult &result) {
 
 int main() {
 
-  std::string sds = "riak:/home/rene/Documents/Schweinestall/cvmfs/build/ramdisk:http://cernvmbl005:8098/riak/cvmfs@http://cernvmbl006:8098/riak/cvmfs@http://cernvmbl007:8098/riak/cvmfs@http://cernvmbl008:8098/riak/cvmfs@http://cernvmbl009:8098/riak/cvmfs";
+  //std::string sds = "riak,/home/rene/Documents/Schweinestall/cvmfs/build/ramdisk,http://cernvmbl005:8098/riak/cvmfs@http://cernvmbl006:8098/riak/cvmfs@http://cernvmbl007:8098/riak/cvmfs@http://cernvmbl008:8098/riak/cvmfs@http://cernvmbl009:8098/riak/cvmfs";
+  std::string sds = "local,/home/rene/Documents/Schweinestall/cvmfs/build/srv/data/txn,/home/rene/Documents/Schweinestall/cvmfs/build/srv";
   SpoolerDefinition sd(sds, true, 4000000, 8000000, 16000000);
 
-  UniquePtr<AbstractSpooler> spooler(AbstractSpooler::Construct(sd));
+  UniquePtr<Spooler> spooler(Spooler::Construct(sd));
   spooler->RegisterListener(&SplCallback);
 
-  spooler->Upload("Makefile", "data/MyMakefile");
+  spooler->Process("Makefile");
+
+  //spooler->Upload("Makefile", "data/MyMakefile");
 
   spooler->WaitForTermination();
 
