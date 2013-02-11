@@ -135,14 +135,15 @@ RiakUploader::~RiakUploader() {
 
 
 void RiakUploader::Upload(const std::string  &local_path,
-                    const std::string  &remote_path,
-                    const callback_t   *callback) {
+                          const std::string  &remote_path,
+                          const callback_t   *callback) {
   const bool delete_after_upload = false;
   const bool is_critical         = true;
   UploadWorker::Parameters input(local_path,
                                  MakeRiakKey(remote_path),
                                  delete_after_upload,
-                                 is_critical);
+                                 is_critical,
+                                 callback);
   concurrent_upload_->Schedule(input);
 }
 
@@ -156,7 +157,8 @@ void RiakUploader::Upload(const std::string  &local_path,
   UploadWorker::Parameters input(local_path,
                                  MakeRiakKey(content_hash, hash_suffix),
                                  delete_after_upload,
-                                 is_critical);
+                                 is_critical,
+                                 callback);
   concurrent_upload_->Schedule(input);
 }
 

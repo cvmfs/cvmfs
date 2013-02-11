@@ -65,13 +65,11 @@ namespace upload {
     class UploadWorker : public ConcurrentWorker<UploadWorker> {
      public:
       struct Parameters {
-        static const int kBulkFileChunk = -1;
-
         Parameters(const std::string  &local_path,
                    const std::string  &riak_key,
                    const bool          delete_after_upload,
                    const bool          is_critical,
-                   const callback_ptr  callback = NULL) :
+                   const callback_t  *callback) :
           local_path(local_path),
           riak_key(riak_key),
           delete_after_upload(delete_after_upload),
@@ -88,26 +86,26 @@ namespace upload {
           is_critical(false),
           callback(NULL) {}
 
-        const std::string  local_path;          //!< local path of file to be uploaded (for identification only)
-        const std::string  riak_key;            //!< Riak conform key the file should be stored under
-        const bool         delete_after_upload; //!< might unlink a file after upload (temporary files)
-        const bool         is_critical;         //!< should the upload be performed with special care?
-        callback_ptr       callback;
+        const std::string   local_path;          //!< local path of file to be uploaded (for identification only)
+        const std::string   riak_key;            //!< Riak conform key the file should be stored under
+        const bool          delete_after_upload; //!< might unlink a file after upload (temporary files)
+        const bool          is_critical;         //!< should the upload be performed with special care?
+        const callback_t   *callback;
       };
 
       struct Results {
         Results(const std::string  &local_path,
                 const int           return_code,
-                const callback_ptr  callback) :
+                const callback_t   *callback) :
           local_path(local_path),
           return_code(return_code),
           callback(callback) {}
 
         bool IsSuccessful() const { return return_code == 0; }
 
-        const std::string local_path;    //!< local path of the uploaded file (might also be just a chunk of it)
-        const int         return_code;   //!< 0 if job was successful
-        callback_ptr      callback;
+        const std::string   local_path;    //!< local path of the uploaded file (might also be just a chunk of it)
+        const int           return_code;   //!< 0 if job was successful
+        const callback_t   *callback;
       };
 
      public:
