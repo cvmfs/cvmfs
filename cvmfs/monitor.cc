@@ -58,32 +58,6 @@ stack_t sighandler_stack_;
 
 
 /**
- * Get the instruction pointer in a platform independant fashion.
- */
-static void* GetInstructionPointer(ucontext_t *uc) {
-  void *result;
-
-#ifdef __APPLE__
-#ifdef __x86_64__
-  result = reinterpret_cast<void *>(uc->uc_mcontext->__ss.__rip);
-#else
-  result = reinterpret_cast<void *>(uc-uc_mcontext->__ss.__eip);
-#endif
-
-#else  // Linux
-
-#ifdef __x86_64__
-  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_RIP]);
-#else
-  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_EIP]);
-#endif
-#endif
-
-  return result;
-}
-
-
-/**
  * Signal handler for bad things.  Send debug information to watchdog.
  */
 static void SendTrace(int signal,
@@ -96,28 +70,37 @@ static void SendTrace(int signal,
     while (true) {}
   }
 
-  void *adr_buf[kMaxBacktrace];
   char cflow = 'S';
   if (write(pipe_wd_[1], &cflow, 1) != 1)
     _exit(1);
 
+  // write the occured signal
   if (write(pipe_wd_[1], &signal, sizeof(signal)) != sizeof(signal))
     _exit(1);
+
+  // write the last error number
   if (write(pipe_wd_[1], &send_errno, sizeof(send_errno)) != sizeof(send_errno))
     _exit(1);
 
-  int stack_size = backtrace(adr_buf, kMaxBacktrace);
-  // Fix around sigaction
-  if (stack_size > 1) {
-    ucontext_t *uc = reinterpret_cast<ucontext_t *>(context);
-    adr_buf[1] = GetInstructionPointer(uc);
-  }
-  if (write(pipe_wd_[1], &stack_size, sizeof(stack_size)) != sizeof(stack_size))
+  // write the PID
+  pid_t pid = getpid();
+  if (write(pipe_wd_[1], &pid, sizeof(pid_t)) != sizeof(pid_t))
     _exit(1);
-  backtrace_symbols_fd(adr_buf, stack_size, pipe_wd_[1]);
+
+  // write the exe path
+  const char   *exe_path        = GetExePath();
+  const size_t  exe_path_length = strlen(exe_path) + 1; // null termination
+  if (write(pipe_wd_[1], &exe_path_length, sizeof(size_t)) != sizeof(size_t))
+    _exit(1);
+  if (write(pipe_wd_[1], exe_path, exe_path_length) != (int)exe_path_length)
+    _exit(1);
 
   cflow = 'Q';
   (void)write(pipe_wd_[1], &cflow, 1);
+
+  // do not die before the stack trace was generated
+  // kill -9 <pid> will finish this
+  while(true) {}
 
   _exit(1);
 }
@@ -146,17 +129,60 @@ static void LogEmergency(string msg) {
 
 
 /**
- * Read a line from the pipe.
- * Quite inefficient but good enough for the purpose.
+ * Uses an external shell and gdb to create a full stack trace of the dying
+ * cvmfs client. The same shell is used to force-quit the client afterwards.
  */
-static string ReadLineFromPipe() {
-  string result = "";
-  char next;
-  while (read(pipe_wd_[0], &next, 1) == 1) {
-    result += next;
-    if (next == '\n') break;
+static string GenerateStackTraceAndKill(const string &exe_path, const pid_t pid) {
+  int retval;
+
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  retval = Shell(&fd_stdin, &fd_stdout, &fd_stderr);
+  assert(retval);
+
+  // Let the shell execute the stacktrace extraction script
+  const string bt_cmd = "/etc/cvmfs/gdb-stacktrace.sh " + exe_path + " " +
+                     StringifyInt(pid) + "\n";
+  WritePipe(fd_stdin, bt_cmd.data(), bt_cmd.length());
+
+  // give the dying cvmfs client the finishing stroke
+  const string kill_cmd = "kill -9 " + StringifyInt(pid) + "\n";
+  WritePipe(fd_stdin, kill_cmd.data(), kill_cmd.length());
+
+  // close the standard in to close the shell
+  close(fd_stdin);
+
+  // read the stack trace from the stdout of our shell
+  const int bytes_at_a_time = 2;
+  char *read_buffer = NULL;
+  int buffer_size = 0;
+  int buffer_offset = 0;
+  int chars_io;
+  while (1) {
+    if (buffer_offset + bytes_at_a_time > buffer_size) {
+      buffer_size = bytes_at_a_time + buffer_size * 2;
+      read_buffer = (char*)realloc(read_buffer, buffer_size);
+      assert (read_buffer);
+    }
+
+    chars_io = read(fd_stdout,
+                    read_buffer + buffer_offset,
+                    bytes_at_a_time);
+    if (chars_io <= 0) break;
+    buffer_offset += chars_io;
   }
-  return result;
+
+  if (chars_io < 0) {
+    return "failed to read stack traces";
+  }
+
+  // close the pipes to the shell
+  close(fd_stderr);
+  close(fd_stdout);
+
+  // good bye...
+  return read_buffer;
 }
 
 
@@ -164,7 +190,6 @@ static string ReadLineFromPipe() {
  * Generates useful information from the backtrace log in the pipe.
  */
 static string ReportStacktrace() {
-  int stack_size;
   string debug = "--\n";
 
   int recv_signal;
@@ -181,19 +206,30 @@ static string ReportStacktrace() {
   {
     return "failure while reading errno";
   }
-  debug += ", errno: " + StringifyInt(errno) + "\n";
+  debug += ", errno: " + StringifyInt(errno);
 
-  debug += "version: " + string(VERSION) + "\n";
+  debug += ", version: " + string(VERSION);
 
-  if (read(pipe_wd_[0], &stack_size, sizeof(stack_size)) <
-      int(sizeof(stack_size)))
-  {
-    return "failure while reading stacktrace";
+  pid_t pid;
+  if (read(pipe_wd_[0], &pid, sizeof(pid_t)) < int(sizeof(pid_t))) {
+    return "failure while reading PID";
+  }
+  debug += ", PID: " + StringifyInt(pid) + "\n";
+
+  size_t exe_path_length;
+  if (read(pipe_wd_[0], &exe_path_length, sizeof(size_t)) < int(sizeof(size_t))) {
+    return "failure while reading length of exe path";
   }
 
-  for (int i = 0; i < stack_size; ++i) {
-    debug += ReadLineFromPipe();
+  char exe_path[kMaxPathLength];
+  if (read(pipe_wd_[0], exe_path, exe_path_length) < int(exe_path_length)) {
+    return "failure while reading executable path";
   }
+  std::string s_exe_path(exe_path);
+  debug += "Executable path: " + s_exe_path + "\n";
+
+  debug += GenerateStackTraceAndKill(s_exe_path, pid);
+
   return debug;
 }
 

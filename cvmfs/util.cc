@@ -27,6 +27,10 @@
 #include <pthread.h>
 #include <signal.h>
 
+#ifdef __APPLE__
+  #include <mach-o/dyld.h>
+#endif
+
 #include <cctype>
 #include <cstdlib>
 #include <cstdio>
@@ -752,6 +756,24 @@ void Daemonize() {
     waitpid(pid, &statloc, 0);
     _exit(0);
   }
+}
+
+const char *GetExePath()
+{
+#ifdef __APPLE__
+  const char* path = _dyld_get_image_name(0);
+  assert (strlen(path) < kMaxPathLength);
+  return path;
+#else
+  static char buf[kMaxPathLength] = {0};
+  if (strlen(buf) == 0) {
+    int ret = readlink("/proc/self/exe", buf, kMaxPathLength);
+    if (ret > 0 && ret < (int)kMaxPathLength) {
+       buf[ret] = 0;
+    }
+  }
+  return buf;
+#endif
 }
 
 

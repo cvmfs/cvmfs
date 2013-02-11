@@ -26,6 +26,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+const size_t kMaxPathLength = 256;
+
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
@@ -88,6 +90,7 @@ std::string ReplaceAll(const std::string &haystack, const std::string &needle,
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
 void Daemonize();
+const char* GetExePath();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
