@@ -210,7 +210,7 @@ typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks, hash_handle<fuse_ino_
   LiveFileChunksMap;
 
 LiveFileChunksMap *live_file_chunks_ = NULL;
-pthread_mutex_t live_file_chunks_mutex_ = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t live_file_chunks_mutex_ = PTHREAD_RWLOCK_INITIALIZER;
 
 atomic_int64 num_fs_open_;
 atomic_int64 num_fs_dir_open_;
@@ -902,7 +902,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
     // Save the newly opened file chunks into the respective list
     {
-      MutexLockGuard guard(live_file_chunks_mutex_);
+      WriteLockGuard guard(live_file_chunks_mutex_);
       if (live_file_chunks_->count(ino) == 0) {
         (*live_file_chunks_)[ino] = live_chunks;
       }
@@ -990,7 +990,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
   // Do we fiddle with a chunked file?
   if (fi->fh == kChunkedFileHandle) {
-    MutexLockGuard guard(live_file_chunks_mutex_);
+    ReadLockGuard guard(live_file_chunks_mutex_);
 
     // find the file chunk descriptions for the requested inode
     LiveFileChunksMap::iterator chunks_itr = live_file_chunks_->find(ino);
@@ -1085,7 +1085,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 
   // do we work with a chunked file here?
   if (fd == -2) {
-    MutexLockGuard guard(live_file_chunks_mutex_);
+    WriteLockGuard guard(live_file_chunks_mutex_);
     if (live_file_chunks_->erase(ino) > 0) {
       atomic_dec32(&open_files_);
     }
