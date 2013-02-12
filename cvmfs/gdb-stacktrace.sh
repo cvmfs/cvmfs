@@ -4,8 +4,8 @@
 # It is used by monitor.cc on Linux and MacOS X.
 
 # Note: this script was taken from the ROOT svn repository
-#       and slightly adapted to print a stacktrace to syslog instead
-#       of a temporary file.
+#       and slightly adapted to print a stacktrace to stdout instead
+#       of an output file.
 
 tempname=`basename $0 .sh`
 
@@ -48,24 +48,7 @@ else
       exit 1
    fi
 
-   # GDB doesn't allow "thread apply all bt" when the process isn't
-   # threaded; need to peek at the process to determine if that or the
-   # simpler "bt" should be used.
-   # The leading spaces are needed for have_eval_command's replacement.
-
-   backtrace="bt"
-   if test -d /proc/$2/task ; then
-      # Newer kernel; has a task/ directory.
-      if test `ls /proc/$2/task | wc -l` -gt 1 2>/dev/null ; then
-         backtrace="thread apply all bt"
-      fi
-   elif test -f /proc/$2/maps ; then
-      # Older kernel; go by it loading libpthread.
-      if grep -e libpthread /proc/$2/maps > /dev/null 2>&1 ; then
-         backtrace="thread apply all bt"
-      fi
-   fi
-
+   backtrace="thread apply all bt"
    GDB=${GDB:-gdb}
 
    # Run GDB, strip out unwanted noise.
