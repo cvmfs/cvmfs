@@ -1,4 +1,8 @@
 2.1.7:
+  * Packaging: Do not try to reload when upgrading from
+    the 2.0 branch
+  * Fix: Save fuse module state only after drainout of
+         file system calls
   * Fix: stale page caches across file catalog reloads
   * Fix: hardlink count for entries of 2.0 file catalogs
   * Fix: don't retry downloads on HTTP errors 

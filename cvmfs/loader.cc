@@ -432,15 +432,15 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   SendMsg2Socket(fd_progress, "Blocking new file system calls\n");
   atomic_cas32(&blocking_, 0, 1);
 
-  retval = cvmfs_exports_->fnSaveState(fd_progress,
-                                       &loader_exports_->saved_states);
-  if (!retval)
-    return kFailSaveState;
-
   SendMsg2Socket(fd_progress, "Waiting for active file system calls\n");
   while (atomic_read64(&num_operations_)) {
     sched_yield();
   }
+
+  retval = cvmfs_exports_->fnSaveState(fd_progress,
+                                       &loader_exports_->saved_states);
+  if (!retval)
+    return kFailSaveState;
 
   SendMsg2Socket(fd_progress, "Unloading Fuse module\n");
   cvmfs_exports_->fnFini();

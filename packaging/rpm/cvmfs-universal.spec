@@ -214,7 +214,9 @@ do
 done
 %endif
 /sbin/ldconfig
-/usr/bin/cvmfs_config reload
+if [ -d /var/run/cvmfs ]; then
+  /usr/bin/cvmfs_config reload
+fi
 :
 
 %preun
@@ -284,6 +286,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Feb 12 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
+- Avoid reloading when the reload sockets are missing (upgrade from 2.0)
 * Tue Jan 29 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
 - Renamed cvmfs-lib package to cvmfs-devel package
 * Tue Jan 15 2013 Jakob Blomer <jblomer@cern.ch>
