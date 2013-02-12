@@ -121,7 +121,6 @@ inline std::string platform_libname(const std::string &base_name) {
 
 inline const char* platform_getexepath() {
   const char* path = _dyld_get_image_name(0);
-  assert (strlen(path) < kMaxPathLength);
   return path;
 }
 
