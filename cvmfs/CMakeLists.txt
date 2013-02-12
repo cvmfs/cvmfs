@@ -1,4 +1,4 @@
-#
+
 # Define the sources needed to compile the different
 # executables in this directory
 #
@@ -141,9 +141,9 @@ set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 #
 
 if (MACOSX)
-  find_package (Fuse4x REQUIRED)
-	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
-	set (FUSE_LIBRARIES ${FUSE4X_LIBRARIES}) # just abstract the difference here... they are compatible
+  find_package (OSXFuse REQUIRED)
+	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OSXFUSE_INCLUDE_DIR})
+	set (FUSE_LIBRARIES ${OSXFUSE_LIBRARIES}) # just abstract the difference here... they are compatible
 else (MACOSX)
   find_package (FUSE REQUIRED)
 	set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
@@ -227,11 +227,6 @@ if (BUILD_CVMFS)
 	add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
   add_executable (cvmfs_fsck		${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
 
-	if (LIBFUSE_BUILTIN)
-		add_dependencies (cvmfs_fuse_debug libfuse) # here it does not matter if libfuse or libfuse4x
-		add_dependencies (cvmfs_fuse libfuse)       # at this point only the appropriate one is defined
-	endif (LIBFUSE_BUILTIN)
-
 	if (LIBCURL_BUILTIN)
 		add_dependencies (cvmfs_fuse_debug libcares libcurl)
 		add_dependencies (cvmfs_fuse libcares libcurl)
@@ -272,7 +267,7 @@ if (BUILD_CVMFS)
   set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
 
 	# link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
-	target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} fuse ${RT_LIBRARY} pthread dl)
+	target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} ${LIBFUSE} ${RT_LIBRARY} pthread dl)
   target_link_libraries (cvmfs_fuse_debug		${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
 	target_link_libraries (cvmfs_fuse			${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${MURMUR_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
 	target_link_libraries (cvmfs_fsck		${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)

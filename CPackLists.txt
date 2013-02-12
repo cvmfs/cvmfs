@@ -45,7 +45,7 @@ set (CPACK_RESOURCE_FILE_LICENSE ${CMAKE_SOURCE_DIR}/InstallerResources/License.
 set (CPACK_RESOURCE_FILE_README ${CMAKE_SOURCE_DIR}/InstallerResources/Readme.txt)
 set (CPACK_RESOURCE_FILE_WELCOME ${CMAKE_SOURCE_DIR}/InstallerResources/Welcome.txt)
 
-set (CPACK_OSX_PACKAGE_VERSION 10.5) # fuse4x needs at least Leopard
+set (CPACK_OSX_PACKAGE_VERSION 10.5) # osxfuse needs at least Leopard
 set (CPACK_PREFLIGHT_SCRIPT ${CMAKE_SOURCE_DIR}/InstallerResources/pkg/preinstall.sh)
 
 set (CPACK_DEBIAN_PACKAGE_DEPENDS "autofs,chkconfig")

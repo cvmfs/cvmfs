@@ -34,7 +34,7 @@ case $sys_arch in
 
   Darwin )
     fuser="/usr/bin/fuser"
-    fuse_fs_type="fuse4x"
+    fuse_fs_type="osxfusefs"
     ;;
 
   * )
@@ -264,16 +264,8 @@ cvmfs_chksetup() {
   # Check fuse configuration
   if [ "$CVMFS_USER" != "root" ]; then
     if ! check_fuse_config; then
-      case $sys_arch in
-        Linux )
-          echo "Error: user_allow_other not set in /etc/fuse.conf" ;;
-        Darwin )
-          echo "Error: vfs.generic.fuse4x.tunables.allow_other not set using sysctl" ;;
-        * )
-          echo "Architecture $sys_arch is not supported"
-          exit 1 ;;
-       esac
-       num_errors=$(($num_errors+1))
+      echo "Error: user_allow_other not set in /etc/fuse.conf"
+      num_errors=$(($num_errors+1))
     fi
   fi
 
@@ -903,7 +895,7 @@ cvmfs_bugreport() {
                   "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                   'cvmfs_config probe' 'cvmfs_config status' 'cvmfs_config internal affairs' \
                   'mount' 'df -h' 'ps -ef' 'cvmfs_config showconfig' 'cvmfs_config chksetup' \
-                  'cvmfs_config stat -v' 'sysctl vfs.generic.fuse4x' \
+                  'cvmfs_config stat -v' 'cat /etc/fuse.conf' \
                   'cat /etc/auto_master' 'sysctl vfs.autofs' 'cat /etc/exports' )
       ;;
 
@@ -1097,7 +1089,9 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      charDevice=/dev/fuse4x0 ;;
+      #load osxfuse kernel extension
+      /Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs
+      charDevice=/dev/osxfuse0 ;;
 
     * )
      echo "Architecture $sys_arch is not supported"
@@ -1147,7 +1141,7 @@ check_user_in_group() {
 configure_autofs() {
   case $sys_arch in
     Linux )
-      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master #Stil needed or needs to be adjusted?
+      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master #Still needed or needs to be adjusted?
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
       if ! grep -q "^$cvmfs_map" /etc/auto.master; then
         echo "$cvmfs_map" >> /etc/auto.master
@@ -1183,52 +1177,24 @@ cvmfs ALL= NOPASSWD: /usr/bin/cvmfs2 # added by CernVM-FS
 cvmfs ALL= NOPASSWD: /usr/bin/cvmfs2_debug # added by CernVM-FS
 %everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/cvmfs_talk -i * mountpoint # added by CernVM-FS
 %everyone ALL=(cvmfs:cvmfs) NOPASSWD: /bin/mkdir # added by CernVM-FS
-cvmfs ALL= NOPASSWD: /usr/sbin/sysctl -w vfs.generic.fuse4x.tunables.allow_other=1 # added by CernVM-FS
 cvmfs ALL= NOPASSWD: /usr/sbin/sysctl -w kern.maxfilesperproc=* kern.maxfiles=* # added by CernVM-FS
+%everyone ALL= NOPASSWD: /bin/mkdir -p /var/run/cvmfs # added by CernVM-FS
+%everyone ALL= NOPASSWD: /usr/sbin/chown $CVMFS_USER /var/run/cvmfs # added by CernVM-FS
 EOF
   fi
 }
 
 
 check_fuse_config() {
-  case $sys_arch in
-    Linux )
-      grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1
-      return $? ;;
-
-    Darwin )
-      # load fuse4x module
-      /Library/Extensions/fuse4x.kext/Support/load_fuse4x
-      if [ $(sysctl vfs.generic.fuse4x.tunables.allow_other | awk {'print $NF'}) -eq 1 ]; then
-        return 0
-      else
-	return 1
-      fi ;;
-   * )
-     echo "Architecture $sys_arch is not supported"
-     exit 1 ;;
-  esac
+  grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1
+  return $?
 }
 
 
 configure_fuse() {
-  case $sys_arch in
-    Linux )
-      if ! $(grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1); then
-        echo "user_allow_other # added by CernVM-FS" >> /etc/fuse.conf
-      fi ;;
-
-    Darwin )
-      #Load fuse4x module
-      /Library/Extensions/fuse4x.kext/Support/load_fuse4x
-      if [ $(sysctl vfs.generic.fuse4x.tunables.allow_other | awk {'print $NF'}) -eq 0 ] ; then
-        sysctl -w vfs.generic.fuse4x.tunables.allow_other=1
-      fi ;;
-
-    * )
-      echo "Architecture $sys_arch is not supported"
-      exit 1 ;;
-  esac
+  if ! $(grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1); then
+    echo "user_allow_other # added by CernVM-FS" >> /etc/fuse.conf
+  fi
 }
 
 
