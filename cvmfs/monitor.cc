@@ -298,26 +298,35 @@ static bool CreateStacktraceScript(const std::string &cache_dir,
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   //
 
-  FILE *fp = fopen(helper_script_path_->c_str(), "a");
+  FILE *fp = fopen(helper_script_path_->c_str(), "w");
 
   if (!fp ||
-      fwrite(script.c_str(), 1, script.length(), fp) != script.length()) {
-    LogCvmfs(kLogMonitor, kLogStderr, "Failed to create gdb helper script");
-    return false;
+      fwrite(script.data(), 1, script.length(), fp) != script.length() ||
+      (chmod(helper_script_path_->c_str(), S_IRUSR | S_IWUSR | S_IXUSR) != 0))
+  {
+    LogCvmfs(kLogMonitor, kLogStderr, "Failed to create gdb helper script (%d)",
+             errno);
+    goto create_stacktrace_fail;
   }
-  chmod(helper_script_path_->c_str(), S_IRUSR | S_IXUSR);
   fclose(fp);
 
-  fp = fopen(helper_script_gdb_cmd_path_->c_str(), "a");
+  fp = fopen(helper_script_gdb_cmd_path_->c_str(), "w");
   if (!fp ||
-      fwrite(gdb.c_str(), 1, gdb.length(), fp) != gdb.length()) {
-    LogCvmfs(kLogMonitor, kLogStderr, "Failed to create gdb helper helper script");
-    return false;
+      fwrite(gdb.data(), 1, gdb.length(), fp) != gdb.length() ||
+      (chmod(helper_script_gdb_cmd_path_->c_str(), S_IRUSR | S_IWUSR) != 0))
+  {
+    LogCvmfs(kLogMonitor, kLogStderr,
+             "Failed to create gdb helper helper script (%d)");
+    goto create_stacktrace_fail;
   }
-  chmod(helper_script_gdb_cmd_path_->c_str(), S_IRUSR);
   fclose(fp);
 
   return true;
+
+ create_stacktrace_fail:
+  if (fp)
+    fclose(fp);
+  return false;
 }
 
 
@@ -328,13 +337,25 @@ bool Init(const string &cache_dir, const std::string &process_name,
   monitor::process_name_ = new string(process_name);
   monitor::exe_path_ = new string(platform_getexepath());
   monitor::helper_script_path_ =
-                new string(cache_dir + "/gdb-helper." + process_name + ".sh");
+    new string(cache_dir + "/gdb-helper." + process_name + ".sh");
   monitor::helper_script_gdb_cmd_path_ =
-                new string(cache_dir + "/gdb-helper-gdb-cmd." + process_name);
+    new string(cache_dir + "/gdb-helper-gdb-cmd." + process_name);
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
 
   // create stacktrace retrieve script in cache directory
-  CreateStacktraceScript(cache_dir, process_name);
+  if (!CreateStacktraceScript(cache_dir, process_name)) {
+    delete monitor::cache_dir_;
+    delete monitor::exe_path_;
+    delete monitor::process_name_;
+    delete monitor::helper_script_path_;
+    delete monitor::helper_script_gdb_cmd_path_;
+    monitor::cache_dir_ = NULL;
+    monitor::process_name_ = NULL;
+    monitor::exe_path_ = NULL;
+    monitor::helper_script_path_ = NULL;
+    monitor::helper_script_gdb_cmd_path_ = NULL;
+    return false;
+  }
 
   /* check number of open files */
   if (check_max_open_files) {
@@ -393,8 +414,6 @@ void Fini() {
     sighandler_stack_.ss_size = 0;
   }
 
-  process_name_ = NULL;
-  cache_dir_ = NULL;
   if (spawned_) {
     char quit = 'Q';
     (void)write(pipe_wd_[1], &quit, 1);
@@ -407,6 +426,11 @@ void Fini() {
   delete exe_path_;
   delete helper_script_path_;
   delete helper_script_gdb_cmd_path_;
+  process_name_ = NULL;
+  cache_dir_ = NULL;
+  exe_path_ = NULL;
+  helper_script_path_ = NULL;
+  helper_script_gdb_cmd_path_ = NULL;
   platform_spinlock_destroy(&lock_handler_);
 }
 
