@@ -147,12 +147,6 @@ static string GenerateStackTraceAndKill(const string &exe_path, const pid_t pid)
                      StringifyInt(pid) + "\n";
   WritePipe(fd_stdin, bt_cmd.data(), bt_cmd.length());
 
-  // give the dying cvmfs client the finishing stroke
-  string result = "";
-  if (kill(pid, SIGKILL) != 0) {
-    result += "Failed to kill cvmfs client!\n\n";
-  }
-
   // close the standard in to close the shell
   close(fd_stdin);
 
@@ -180,12 +174,18 @@ static string GenerateStackTraceAndKill(const string &exe_path, const pid_t pid)
   close(fd_stderr);
   close(fd_stdout);
 
+  // give the dying cvmfs client the finishing stroke
+  string result = "";
+  if (kill(pid, SIGKILL) != 0) {
+    result += "Failed to kill cvmfs client!\n\n";
+  }
+
   // good bye...
   if (chars_io < 0) {
     result += "failed to read stack traces";
     return result;
   } else {
-    return result + read_buffer;
+    return result + std::string(read_buffer);
   }
 }
 
