@@ -27,8 +27,8 @@
  * it is independent from the actual uploading this functionality is outsourced.
  * The FileProcessor will take care of the above mentioned steps in a concurrent
  * fashion. This process is invoked by calling Spooler::Process().
- * While processing, the FileProcessor immediately schedules Upload jobs as well
- * in order to push data to the backend storage as early as possible.
+ * While processing, the FileProcessor immediately schedules Upload jobs in
+ * order to push data to the backend storage as early as possible.
  *
  * Stage 2 aka. the upload is handled by one of the concrete Uploader classes.
  * Uploaders have a thin interface described in the AbstractUploader class.
@@ -61,17 +61,17 @@
  *    |   <----------------------+
  *   / \                         |
  *    |                          |
- *    |                          |          File
- *    |  File       ################### ---------------------> #################
- *    +-----------> #     Spooler     #                        # FileProcessor #
- *    |             ################### <--------------------- #################
- *    |                          ^      FileProcessor::Results    |   ^
- *    |                          |                                |   |
- *    |                 Callback |                                |   |
- *    |                          |              Schedule Upload   |   |
- *    |  direct    ##################### <------------------------+   |
- *    +----------> #  Upload facility  #                              |
- *       upload    ##################### -----------------------------+
+ *    | Process()                |          File
+ *    +-----------> ################### ---------------------> #################
+ *    | Upload()    #     Spooler     #                        # FileProcessor #
+ *    +-----------> ################### <--------------------- #################
+ *                   |               ^    FileProcessor::Results   |    ^
+ *                   |               |                             |    |
+ *     direct Upload |      Callback |                             |    |
+ *                  `|´              |            Schedule Upload  |    |
+ *                 ##################### <-------------------------+    |
+ *                 #  Upload facility  #                                |
+ *                 ##################### -------------------------------+
  *                           |             Callback (UploaderResults)
  *                    Upload |
  *                          `|´
