@@ -10,7 +10,7 @@
 namespace upload {
 
 class AbstractUploader;
-class UploaderResults;
+struct UploaderResults;
 
 /**
  * Adds a temporary file path to the FileChunk structure

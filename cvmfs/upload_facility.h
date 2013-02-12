@@ -41,6 +41,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   typedef Callbackable<UploaderResults>::callback_t* callback_ptr;
 
  public:
+  virtual ~AbstractUploader() {};
+
   virtual bool Initialize();
   virtual void TearDown();
 

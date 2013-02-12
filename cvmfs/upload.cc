@@ -33,7 +33,7 @@ Spooler::~Spooler() {}
 bool Spooler::Initialize() {
   // configure the uploader environment
   uploader_ = AbstractUploader::Construct(spooler_definition_);
-  if (uploader_ == NULL) {
+  if (!uploader_) {
     LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize backend upload "
                                        "facility in Spooler.");
     return false;

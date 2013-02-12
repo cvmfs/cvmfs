@@ -1067,13 +1067,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   }
 
   // Push it to user
-  if (overall_bytes_read >= 0) {
-    fuse_reply_buf(req, data, overall_bytes_read);
-    LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", overall_bytes_read);
-  } else {
-    LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, overall_bytes_read);
-    fuse_reply_err(req, errno);
-  }
+  fuse_reply_buf(req, data, overall_bytes_read);
+  LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", overall_bytes_read);
 }
 
 
