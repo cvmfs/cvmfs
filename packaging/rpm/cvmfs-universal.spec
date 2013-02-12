@@ -44,6 +44,7 @@ Requires: fuse
 Requires: curl
 Requires: attr
 Requires: zlib
+Requires: gdb
 # Account for different package names
 %if 0%{?suse_version}
 Requires: libfuse2
