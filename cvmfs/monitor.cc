@@ -50,6 +50,7 @@ const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 
 string *cache_dir_ = NULL;
 string *process_name_ = NULL;
+string *exe_path_ = NULL;
 bool spawned_ = false;
 unsigned max_open_files_;
 int pipe_wd_[2];
@@ -86,14 +87,6 @@ static void SendTrace(int signal,
   // write the PID
   pid_t pid = getpid();
   if (write(pipe_wd_[1], &pid, sizeof(pid_t)) != sizeof(pid_t))
-    _exit(1);
-
-  // write the exe path
-  const char   *exe_path        = platform_getexepath();
-  const size_t  exe_path_length = strlen(exe_path) + 1; // null termination
-  if (write(pipe_wd_[1], &exe_path_length, sizeof(size_t)) != sizeof(size_t))
-    _exit(1);
-  if (write(pipe_wd_[1], exe_path, exe_path_length) != (int)exe_path_length)
     _exit(1);
 
   cflow = 'Q';
@@ -208,19 +201,9 @@ static string ReportStacktrace() {
   }
   debug += ", PID: " + StringifyInt(pid) + "\n";
 
-  size_t exe_path_length;
-  if (read(pipe_wd_[0], &exe_path_length, sizeof(size_t)) < int(sizeof(size_t))) {
-    return "failure while reading length of exe path";
-  }
+  debug += "Executable path: " + *exe_path_ + "\n";
 
-  char exe_path[kMaxPathLength];
-  if (read(pipe_wd_[0], exe_path, exe_path_length) < int(exe_path_length)) {
-    return "failure while reading executable path";
-  }
-  std::string s_exe_path(exe_path);
-  debug += "Executable path: " + s_exe_path + "\n";
-
-  debug += GenerateStackTraceAndKill(s_exe_path, pid);
+  debug += GenerateStackTraceAndKill(*exe_path_, pid);
 
   return debug;
 }
@@ -255,6 +238,7 @@ bool Init(const string &cache_dir, const std::string &process_name,
 {
   monitor::cache_dir_ = new string(cache_dir);
   monitor::process_name_ = new string(process_name);
+  monitor::exe_path_ = new string(platform_getexepath());
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
 
   /* check number of open files */
@@ -316,6 +300,7 @@ void Fini() {
 
   delete process_name_;
   delete cache_dir_;
+  delete exe_path_;
   process_name_ = NULL;
   cache_dir_ = NULL;
   if (spawned_) {
