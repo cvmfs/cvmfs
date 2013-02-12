@@ -1487,7 +1487,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   if (quota::GetSize() > quota::GetCapacity()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "cache is already beyond quota size, cleaning up");
+             "cache is already beyond quota size "
+             "(size: %"PRId64", capacity: %"PRId64"), cleaning up",
+             quota::GetSize(), quota::GetCapacity());
     if (!quota::Cleanup(quota_threshold)) {
       *g_boot_error = "Failed to clean up cache";
       return loader::kFailQuota;

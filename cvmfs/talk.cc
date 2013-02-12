@@ -411,6 +411,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         Answer(con_fd, version_str);
       } else if (line == "version patchlevel") {
         Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
+      } else if (line == "tear down to read-only") {
+        cache::TearDown2ReadOnly();
+        Answer(con_fd, "In read-only mode\n");
       } else {
         Answer(con_fd, "unknown command\n");
       }

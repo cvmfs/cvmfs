@@ -1,4 +1,5 @@
 2.1.7:
+  * Improved error reporting on mount failures
   * Packaging: Do not try to reload when upgrading from
     the 2.0 branch
   * Fix: Save fuse module state only after drainout of

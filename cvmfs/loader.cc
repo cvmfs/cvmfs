@@ -462,6 +462,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   if (retval != kFailOk) {
     string msg_progress = cvmfs_exports_->fnGetErrorMsg() + " (" +
                           StringifyInt(retval) + ")\n";
+    LogCvmfs(kLogCvmfs, kLogSyslog, "%s", msg_progress.c_str());
     SendMsg2Socket(fd_progress, msg_progress);
     return (Failures)retval;
   }
@@ -698,7 +699,7 @@ int main(int argc, char *argv[]) {
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
   if (retval != kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "%s (%d)",
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslog, "%s (%d)",
              cvmfs_exports_->fnGetErrorMsg().c_str(), retval);
     return retval;
   }
