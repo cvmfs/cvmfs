@@ -151,23 +151,18 @@ static string GenerateStackTraceAndKill(const string &exe_path, const pid_t pid)
   close(fd_stdin);
 
   // read the stack trace from the stdout of our shell
-  const int bytes_at_a_time = 2;
-  char *read_buffer = NULL;
-  int buffer_size = 0;
-  int buffer_offset = 0;
+  string result = "";
+  char mini_buffer;
   int chars_io;
   while (1) {
-    if (buffer_offset + bytes_at_a_time > buffer_size) {
-      buffer_size = bytes_at_a_time + buffer_size * 2;
-      read_buffer = (char*)realloc(read_buffer, buffer_size);
-      assert (read_buffer);
-    }
-
-    chars_io = read(fd_stdout,
-                    read_buffer + buffer_offset,
-                    bytes_at_a_time);
+    chars_io = read(fd_stdout, &mini_buffer, 1);
     if (chars_io <= 0) break;
-    buffer_offset += chars_io;
+    result += mini_buffer;
+  }
+
+  // check if the stacktrace readout went fine
+  if (chars_io < 0) {
+    result += "failed to read stack traces";
   }
 
   // close the pipes to the shell
@@ -175,18 +170,11 @@ static string GenerateStackTraceAndKill(const string &exe_path, const pid_t pid)
   close(fd_stdout);
 
   // give the dying cvmfs client the finishing stroke
-  string result = "";
   if (kill(pid, SIGKILL) != 0) {
     result += "Failed to kill cvmfs client!\n\n";
   }
 
-  // good bye...
-  if (chars_io < 0) {
-    result += "failed to read stack traces";
-    return result;
-  } else {
-    return result + std::string(read_buffer);
-  }
+  return result;
 }
 
 
