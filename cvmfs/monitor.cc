@@ -13,7 +13,6 @@
 
 #include <signal.h>
 #include <sys/resource.h>
-#include <execinfo.h>
 #ifdef __APPLE__
   #include <sys/ucontext.h>
 #else
@@ -128,7 +127,9 @@ static void LogEmergency(string msg) {
  * Uses an external shell and gdb to create a full stack trace of the dying
  * cvmfs client. The same shell is used to force-quit the client afterwards.
  */
-static string GenerateStackTraceAndKill(const string &exe_path, const pid_t pid) {
+static string GenerateStackTraceAndKill(const string &exe_path,
+                                        const pid_t pid)
+{
   int retval;
 
   int fd_stdin;
@@ -389,11 +390,6 @@ bool Init(const string &cache_dir, const std::string &process_name,
   } else {
     max_open_files_ = 0;
   }
-
-  // Dummy call to backtrace to load library
-  void *unused = NULL;
-  backtrace(&unused, 1);
-  if (!unused) return false;
 
   return true;
 }

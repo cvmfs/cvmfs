@@ -1,4 +1,6 @@
 2.1.7:
+  * Fix: create stack traces by gdb, thereby handle hidden 
+    symbols
   * Packaging: Do not try to reload when upgrading from
     the 2.0 branch
   * Fix: Save fuse module state only after drainout of
