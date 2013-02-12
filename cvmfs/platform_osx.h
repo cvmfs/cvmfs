@@ -122,7 +122,7 @@ inline std::string platform_libname(const std::string &base_name) {
 inline const char* platform_getexepath() {
   static char* path;
   if (strlen(path) == 0) {
-    const char* path = _dyld_get_image_name(0);
+    path = _dyld_get_image_name(0);
   }
   return path;
 }
