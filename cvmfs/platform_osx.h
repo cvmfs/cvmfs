@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include <alloca.h>
 #include <signal.h>
+#include <mach-o/dyld.h>
 
 #include <cstring>
 #include <cassert>
@@ -116,6 +117,11 @@ inline int platform_readahead(int filedes) {
 
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".dylib";
+}
+
+inline const char* platform_getexepath() {
+  static const char* path = _dyld_get_image_name(0);
+  return path;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
