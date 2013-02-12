@@ -51,6 +51,7 @@ const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 string *cache_dir_ = NULL;
 string *process_name_ = NULL;
 string *exe_path_ = NULL;
+string *helper_script_path_ = NULL;
 bool spawned_ = false;
 unsigned max_open_files_;
 int pipe_wd_[2];
@@ -136,7 +137,7 @@ static string GenerateStackTraceAndKill(const string &exe_path, const pid_t pid)
   assert(retval);
 
   // Let the shell execute the stacktrace extraction script
-  const string bt_cmd = "/etc/cvmfs/gdb-stacktrace.sh " + exe_path + " " +
+  const string bt_cmd = *helper_script_path_ + " " + exe_path + " " +
                      StringifyInt(pid) + "\n";
   WritePipe(fd_stdin, bt_cmd.data(), bt_cmd.length());
 
@@ -233,13 +234,107 @@ static void Watchdog() {
 }
 
 
+static void CreateStacktraceScript(const std::string &cache_dir,
+                                   const std::string &process_name) {
+  FILE *fp = fopen(helper_script_path_->c_str(), "a");
+
+  string script =
+"#!/bin/sh\n"
+"\n"
+"# This script is almost identical to /usr/bin/gstack.\n"
+"# It is used by monitor.cc on Linux and MacOS X.\n"
+"\n"
+"# Note: this script was taken from the ROOT svn repository\n"
+"#       and slightly adapted to print a stacktrace to stdout instead\n"
+"#       of an output file.\n"
+"\n"
+"tempname=`basename $0 .sh`\n"
+"\n"
+"if test $# -lt 2; then\n"
+"   echo \"Usage: ${tempname} <executable> <process-id>\" 1>&2\n"
+"   exit 1\n"
+"fi\n"
+"\n"
+"if [ `uname -s` = \"Darwin\" ]; then\n"
+"\n"
+"   if test ! -x $1; then\n"
+"      echo \"${tempname}: process $1 not found.\" 1>&2\n"
+"      exit 1\n"
+"   fi\n"
+"\n"
+"   TMPFILE=`mktemp -q /tmp/${tempname}.XXXXXX`\n"
+"   if test $? -ne 0; then\n"
+"      echo \"${tempname}: can't create temp file, exiting...\" 1>&2\n"
+"      exit 1\n"
+"   fi\n"
+"\n"
+"   backtrace=\"thread apply all bt\"\n"
+"   echo $backtrace > $TMPFILE\n"
+"\n"
+"   GDB=${GDB:-gdb}\n"
+"\n"
+"   # Run GDB, strip out unwanted noise.\n"
+"   $GDB -q -batch -n -x $TMPFILE $1 $2 2>&1  < /dev/null |\n"
+"   /usr/bin/sed -n \\\n"
+"    -e 's/^(gdb) //' \\\n"
+"    -e '/^#/p' \\\n"
+"    -e 's/\\(^Thread.*\\)/@\1/p' | tr \"@\" \"\\n\" > /dev/stdout\n"
+"\n"
+"   rm -f $TMPFILE\n"
+"\n"
+"else\n"
+"\n"
+"   if test ! -r /proc/$2; then\n"
+"      echo \"${tempname}: process $2 not found.\" 1>&2\n"
+"      exit 1\n"
+"   fi\n"
+"\n"
+"   backtrace=\"thread apply all bt\"\n"
+"   GDB=${GDB:-gdb}\n"
+"\n"
+"   # Run GDB, strip out unwanted noise.\n"
+"   have_eval_command=`gdb --help 2>&1 |grep eval-command`\n"
+"   if ! test \"x$have_eval_command\" = \"x\"; then\n"
+"      $GDB --batch --eval-command=\"$backtrace\" /proc/$2/exe $2 2>&1 < /dev/null |\n"
+"      /bin/sed -n \\\n"
+"         -e 's/^(gdb) //' \\\n"
+"         -e '/^#/p' \\\n"
+"         -e '/^   /p' \\\n"
+"         -e 's/\\(^Thread.*\\)/@\1/p' | tr '@' '\\n' > /dev/stdout\n"
+"   else\n"
+"      $GDB -q -n /proc/$2/exe $2 <<EOF 2>&1 |\n"
+"   $backtrace\n"
+"EOF\n"
+"      /bin/sed -n \\\n"
+"         -e 's/^(gdb) //' \\\n"
+"         -e '/^#/p' \\\n"
+"         -e '/^   /p' \\\n"
+"         -e 's/\\(^Thread.*\\)/@\1/p' | tr '@' '\\n' > /dev/stdout\n"
+"   fi\n"
+"fi\n"
+"";
+
+  if (fp) {
+    if (fwrite(script.c_str(), 1, script.length(), fp) != script.length()) {
+      LogCvmfs(kLogMonitor, kLogStderr, "Failed to create gdb helper script");
+    }
+    chmod(helper_script_path_->c_str(), S_IRUSR | S_IXUSR);
+    fclose(fp);
+  }
+}
+
+
 bool Init(const string &cache_dir, const std::string &process_name,
           const bool check_max_open_files)
 {
   monitor::cache_dir_ = new string(cache_dir);
   monitor::process_name_ = new string(process_name);
   monitor::exe_path_ = new string(platform_getexepath());
+  monitor::helper_script_path_ = new string(cache_dir + "/gdb-helper." + process_name + ".sh");
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
+
+  // create stacktrace retrieve script in cache directory
+  CreateStacktraceScript(cache_dir, process_name);
 
   /* check number of open files */
   if (check_max_open_files) {
@@ -298,16 +393,18 @@ void Fini() {
     sighandler_stack_.ss_size = 0;
   }
 
-  delete process_name_;
-  delete cache_dir_;
-  delete exe_path_;
   process_name_ = NULL;
   cache_dir_ = NULL;
   if (spawned_) {
     char quit = 'Q';
     (void)write(pipe_wd_[1], &quit, 1);
     close(pipe_wd_[1]);
+    unlink(helper_script_path_->c_str());
   }
+  delete process_name_;
+  delete cache_dir_;
+  delete exe_path_;
+  delete helper_script_path_;
   platform_spinlock_destroy(&lock_handler_);
 }
 
