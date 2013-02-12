@@ -58,7 +58,8 @@ stack_t sighandler_stack_;
 
 
 /**
- * Signal handler for bad things.  Send debug information to watchdog.
+ * Signal handler for signals that indicate a cvmfs crash.
+ * Sends debug information to watchdog.
  */
 static void SendTrace(int signal,
                       siginfo_t *siginfo __attribute__((unused)),
