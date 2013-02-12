@@ -986,11 +986,11 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   // Get data chunk (<=4k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
 
-  unsigned int overall_bytes_read = 0;
+  unsigned int overall_bytes_fetched = 0;
 
   // Do we fiddle with a chunked file?
   if (fi->fh == kChunkedFileHandle) {
-    ReadLockGuard guard(live_file_chunks_mutex_);
+    WriteLockGuard guard(live_file_chunks_mutex_);
 
     // find the file chunk descriptions for the requested inode
     LiveFileChunksMap::iterator chunks_itr = live_file_chunks_->find(ino);
@@ -1042,33 +1042,35 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
       // read data from the chunk
       assert (chunk.IsOpen());
-      size_t bytes_to_read   = size - overall_bytes_read;
-      size_t size_in_chunk   = std::min(bytes_to_read, chunk.size() - offset_in_chunk);
-      int    bytes_read      = pread(chunk.file_descriptor(),
-                                     data + bytes_read,
-                                     size_in_chunk,
-                                     offset_in_chunk);
-      if (bytes_read < 0) {
-        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, bytes_read);
+      const size_t bytes_to_read            = size - overall_bytes_fetched;
+      const size_t remaining_bytes_in_chunk = chunk.size() - offset_in_chunk;
+      size_t bytes_to_read_in_chunk = std::min(bytes_to_read, remaining_bytes_in_chunk);
+      const size_t bytes_fetched = pread(chunk.file_descriptor(),
+                                         data + overall_bytes_fetched,
+                                         bytes_to_read_in_chunk,
+                                         offset_in_chunk);
+
+      if (bytes_fetched == -1) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, bytes_fetched);
         fuse_reply_err(req, errno);
         return;
       }
-      overall_bytes_read += bytes_read;
+      overall_bytes_fetched += bytes_fetched;
 
       // advance to the next chunk to keep on reading data
       chunk.Close();
-      chunk_itr++;
+      ++chunk_itr;
       offset_in_chunk = 0;
-    } while (overall_bytes_read < size && chunk_itr != chunks.end());
+    } while (overall_bytes_fetched < size && chunk_itr != chunks.end());
 
   } else {
     const int64_t fd = fi->fh;
-    overall_bytes_read = pread(fd, data, size, off);
+    overall_bytes_fetched = pread(fd, data, size, off);
   }
 
   // Push it to user
-  fuse_reply_buf(req, data, overall_bytes_read);
-  LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", overall_bytes_read);
+  fuse_reply_buf(req, data, overall_bytes_fetched);
+  LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", overall_bytes_fetched);
 }
 
 
