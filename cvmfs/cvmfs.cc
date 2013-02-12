@@ -1681,10 +1681,15 @@ static bool MaintenanceMode(const int fd_progress) {
 
 
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
+  unsigned num_open_dirs = cvmfs::directory_handles_->size();
+  if (num_open_dirs == 0)
+    return true;
+
   string msg_progress = "Saving open directory handles (" +
-    StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
+    StringifyInt(num_open_dirs) + " handles)\n";
   SendMsg2Socket(fd_progress, msg_progress);
 
+  // TODO: should rather be saved just in a malloc'd memory block
   cvmfs::DirectoryHandles *saved_handles =
     new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
   loader::SavedState *save_open_dirs = new loader::SavedState();
