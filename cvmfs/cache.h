@@ -27,6 +27,11 @@ struct Any;
 
 namespace cache {
 
+enum CacheModes {
+  kCacheReadWrite = 0,
+  kCacheReadOnly,
+};
+
 bool Init(const std::string &cache_path);
 void Fini();
 
@@ -45,6 +50,9 @@ bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
 bool Contains(const hash::Any &id);
 int Fetch(const catalog::DirectoryEntry &d, const std::string &cvmfs_path);
 int64_t GetNumDownloads();
+
+CacheModes GetCacheMode();
+void TearDown2ReadOnly();
 
 
 /**

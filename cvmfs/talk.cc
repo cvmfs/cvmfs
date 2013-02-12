@@ -43,6 +43,7 @@
 #include "nfs_maps.h"
 #include "loader.h"
 #include "options.h"
+#include "cache.h"
 
 using namespace std;  // NOLINT
 
@@ -312,6 +313,19 @@ static void *MainTalk(void *data __attribute__((unused))) {
         result += "Symlink Strings:\n  instances: " +
           StringifyInt(LinkString::num_instances()) + "  overflows: " +
           StringifyInt(LinkString::num_overflows()) + "\n";
+
+        result += "\nCache Mode: ";
+        switch (cache::GetCacheMode()) {
+          case cache::kCacheReadWrite:
+            result += "read-write";
+            break;
+          case cache::kCacheReadOnly:
+            result += "read-only";
+            break;
+          default:
+            result += "unknown";
+        }
+        result += "\n";
 
         if (cvmfs::nfs_maps_) {
           result += "\nLEVELDB Statistics:\n";
