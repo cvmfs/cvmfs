@@ -889,12 +889,12 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (pipe_lru_[1] >= 0) {
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
+    initialized_ = true;
     Nonblock2Block(pipe_lru_[1]);
     UnlockFile(fd_lockfile);
     GetLimits(&limit_, &cleanup_threshold_);
     LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
              limit_, cleanup_threshold_);
-    initialized_ = true;
     return true;
   }
   if (errno == ENXIO) {
@@ -985,10 +985,10 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
 
   UnlockFile(fd_lockfile);
 
+  initialized_ = true;
   GetLimits(&limit_, &cleanup_threshold_);
   LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
            limit_, cleanup_threshold_);
-  initialized_ = true;
   return true;
 }
 
@@ -1405,7 +1405,7 @@ static void GetStatus(uint64_t *gauge, uint64_t *pinned) {
     *gauge = 0;
     *pinned = 0;
     return;
-  };
+  }
   int pipe_status[2];
   MakeReturnPipe(pipe_status);
 

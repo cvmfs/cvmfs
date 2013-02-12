@@ -438,6 +438,8 @@ void Spawn() {
 
   pid_t pid;
   int statloc;
+  int max_fd = sysconf(_SC_OPEN_MAX);
+  assert(max_fd >= 0);
   switch (pid = fork()) {
     case -1: abort();
     case 0:
@@ -447,6 +449,11 @@ void Spawn() {
         case 0: {
           close(pipe_wd_[1]);
           Daemonize();
+          // Close all unused file descriptors
+          for (int fd = 0; fd < max_fd; fd++) {
+            if (fd != pipe_wd_[0])
+              close(fd);
+          }
           Watchdog();
           exit(0);
         }

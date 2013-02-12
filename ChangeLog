@@ -1,4 +1,5 @@
 2.1.7:
+  * Experimental support for cache read-only mode
   * Improved error reporting on mount failures
   * Fix: create stack traces by gdb, thereby handle hidden 
     symbols
