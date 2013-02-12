@@ -88,7 +88,7 @@ static void SendTrace(int signal,
     _exit(1);
 
   // write the exe path
-  const char   *exe_path        = GetExePath();
+  const char   *exe_path        = platform_getexepath();
   const size_t  exe_path_length = strlen(exe_path) + 1; // null termination
   if (write(pipe_wd_[1], &exe_path_length, sizeof(size_t)) != sizeof(size_t))
     _exit(1);

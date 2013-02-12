@@ -90,7 +90,6 @@ std::string ReplaceAll(const std::string &haystack, const std::string &needle,
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
 void Daemonize();
-const char* GetExePath();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
