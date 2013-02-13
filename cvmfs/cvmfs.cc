@@ -887,7 +887,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
     // Retrieve File chunks from the catalog
     FileChunks chunks;
-    if (! dirent.catalog()->GetFileChunks(path, &chunks) || chunks.empty()) {
+    if (! dirent.catalog()->ListFileChunks(path, &chunks) || chunks.empty()) {
       LogCvmfs(kLogCvmfs, kLogSyslog, "file %s is marked as 'chunked', but no "
                                       "chunks found in the catalog %s.",
                path.c_str(),

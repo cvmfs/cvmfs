@@ -493,9 +493,9 @@ class SqlIncLinkcount : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlInsertFileChunk : public Sql {
+class SqlChunkInsert : public Sql {
  public:
-  SqlInsertFileChunk(const Database &database);
+  SqlChunkInsert(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   bool BindFileChunk(const FileChunk &chunk);
 };
@@ -504,9 +504,9 @@ class SqlInsertFileChunk : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlRemoveFileChunks : public Sql {
+class SqlChunksRemove : public Sql {
  public:
-  SqlRemoveFileChunks(const Database &database);
+  SqlChunksRemove(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
 };
 
@@ -514,9 +514,9 @@ class SqlRemoveFileChunks : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlGetFileChunks : public Sql {
+class SqlChunksListing : public Sql {
  public:
-  SqlGetFileChunks(const Database &database);
+  SqlChunksListing(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   FileChunk GetFileChunk() const;
 };

@@ -131,6 +131,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   sql_lookup_nested_ = NULL;
   sql_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
+  sql_chunks_listing_ = NULL;
 }
 
 
@@ -156,7 +157,7 @@ void Catalog::InitPreparedStatements() {
   sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
   sql_list_nested_     = new SqlNestedCatalogListing(database());
   sql_all_chunks_      = new SqlAllChunks(database());
-  sql_get_file_chunks_ = new SqlGetFileChunks(database());
+  sql_chunks_listing_  = new SqlChunksListing(database());
 }
 
 
@@ -167,7 +168,7 @@ void Catalog::FinalizePreparedStatements() {
   delete sql_lookup_inode_;
   delete sql_lookup_nested_;
   delete sql_list_nested_;
-  delete sql_get_file_chunks_;
+  delete sql_chunks_listing_;
 }
 
 
@@ -349,16 +350,16 @@ bool Catalog::AllChunksEnd() {
 }
 
 
-bool Catalog::GetMd5FileChunks(const hash::Md5  &md5path,
-                               FileChunks       *chunks) const {
+bool Catalog::ListMd5FileChunks(const hash::Md5  &md5path,
+                                FileChunks       *chunks) const {
   assert(IsInitialized() && chunks->empty());
 
   pthread_mutex_lock(lock_);
-  sql_get_file_chunks_->BindPathHash(md5path);
-  while (sql_get_file_chunks_->FetchRow()) {
-    chunks->push_back(sql_get_file_chunks_->GetFileChunk());
+  sql_chunks_listing_->BindPathHash(md5path);
+  while (sql_chunks_listing_->FetchRow()) {
+    chunks->push_back(sql_chunks_listing_->GetFileChunk());
   }
-  sql_get_file_chunks_->Reset();
+  sql_chunks_listing_->Reset();
   pthread_mutex_unlock(lock_);
 
   return true;

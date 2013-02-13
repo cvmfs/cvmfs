@@ -173,11 +173,11 @@ class Catalog : public SingleCopy {
   bool AllChunksNext(hash::Any *hash, ChunkTypes *type);
   bool AllChunksEnd();
 
-  inline bool GetFileChunks(const PathString &path, FileChunks *chunks) const {
-    return GetMd5FileChunks(hash::Md5(path.GetChars(), path.GetLength()),
-                            chunks);
+  inline bool ListFileChunks(const PathString &path, FileChunks *chunks) const {
+    return ListMd5FileChunks(hash::Md5(path.GetChars(), path.GetLength()),
+                             chunks);
   }
-  bool GetMd5FileChunks(const hash::Md5 &md5path, FileChunks *chunks) const;
+  bool ListMd5FileChunks(const hash::Md5 &md5path, FileChunks *chunks) const;
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
@@ -267,7 +267,7 @@ class Catalog : public SingleCopy {
   SqlNestedCatalogLookup   *sql_lookup_nested_;
   SqlNestedCatalogListing  *sql_list_nested_;
   SqlAllChunks             *sql_all_chunks_;
-  SqlGetFileChunks         *sql_get_file_chunks_;
+  SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
 
 Catalog *AttachFreely(const std::string &root_path, const std::string &file);

@@ -295,7 +295,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     // checking file chunk integrity
     if (entries[i].IsChunkedFile()) {
       FileChunks chunks;
-      catalog->GetFileChunks(full_path, &chunks);
+      catalog->ListFileChunks(full_path, &chunks);
 
       // do we find file chunks for the chunked file in this catalog?
       if (chunks.size() == 0) {

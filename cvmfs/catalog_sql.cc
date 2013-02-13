@@ -753,7 +753,7 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
-SqlInsertFileChunk::SqlInsertFileChunk(const Database &database) {
+SqlChunkInsert::SqlChunkInsert(const Database &database) {
   const string statememt =
     "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
     //                       1          2        3      4     5
@@ -762,12 +762,12 @@ SqlInsertFileChunk::SqlInsertFileChunk(const Database &database) {
 }
 
 
-bool SqlInsertFileChunk::BindPathHash(const hash::Md5 &hash) {
+bool SqlChunkInsert::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
 
-bool SqlInsertFileChunk::BindFileChunk(const FileChunk &chunk) {
+bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
   return
     BindInt64(3,    chunk.offset())       &&
     BindInt64(4,    chunk.size())         &&
@@ -778,7 +778,7 @@ bool SqlInsertFileChunk::BindFileChunk(const FileChunk &chunk) {
 //------------------------------------------------------------------------------
 
 
-SqlRemoveFileChunks::SqlRemoveFileChunks(const Database &database) {
+SqlChunksRemove::SqlChunksRemove(const Database &database) {
   const string statement =
     "DELETE FROM chunks "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
@@ -786,7 +786,7 @@ SqlRemoveFileChunks::SqlRemoveFileChunks(const Database &database) {
 }
 
 
-bool SqlRemoveFileChunks::BindPathHash(const hash::Md5 &hash) {
+bool SqlChunksRemove::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -794,7 +794,7 @@ bool SqlRemoveFileChunks::BindPathHash(const hash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlGetFileChunks::SqlGetFileChunks(const Database &database) {
+SqlChunksListing::SqlChunksListing(const Database &database) {
   const string statement =
     "SELECT offset, size, hash FROM chunks "
     //         0      1     2
@@ -805,12 +805,12 @@ SqlGetFileChunks::SqlGetFileChunks(const Database &database) {
 }
 
 
-bool SqlGetFileChunks::BindPathHash(const hash::Md5 &hash) {
+bool SqlChunksListing::BindPathHash(const hash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
 
-FileChunk SqlGetFileChunks::GetFileChunk() const {
+FileChunk SqlChunksListing::GetFileChunk() const {
   return FileChunk(RetrieveSha1Blob(2),
                    RetrieveInt64(0),
                    RetrieveInt64(1));

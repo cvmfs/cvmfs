@@ -23,8 +23,8 @@ WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   sql_unlink_(NULL),
   sql_touch_(NULL),
   sql_update_(NULL),
-  sql_insert_file_chunk_(NULL),
-  sql_remove_file_chunks_(NULL),
+  sql_chunk_insert_(NULL),
+  sql_chunks_remove_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
   dirty_(false)
@@ -60,14 +60,14 @@ void WritableCatalog::InitPreparedStatements() {
 
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
-  sql_insert_             = new SqlDirentInsert     (database());
-  sql_unlink_             = new SqlDirentUnlink     (database());
-  sql_touch_              = new SqlDirentTouch      (database());
-  sql_update_             = new SqlDirentUpdate     (database());
-  sql_insert_file_chunk_  = new SqlInsertFileChunk  (database());
-  sql_remove_file_chunks_ = new SqlRemoveFileChunks (database());
-  sql_max_link_id_        = new SqlMaxHardlinkGroup (database());
-  sql_inc_linkcount_      = new SqlIncLinkcount     (database());
+  sql_insert_        = new SqlDirentInsert     (database());
+  sql_unlink_        = new SqlDirentUnlink     (database());
+  sql_touch_         = new SqlDirentTouch      (database());
+  sql_update_        = new SqlDirentUpdate     (database());
+  sql_chunk_insert_  = new SqlChunkInsert      (database());
+  sql_chunks_remove_ = new SqlChunksRemove     (database());
+  sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
+  sql_inc_linkcount_ = new SqlIncLinkcount     (database());
 }
 
 
@@ -78,8 +78,8 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_unlink_;
   delete sql_touch_;
   delete sql_update_;
-  delete sql_insert_file_chunk_;
-  delete sql_remove_file_chunks_;
+  delete sql_chunk_insert_;
+  delete sql_chunks_remove_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
 }
@@ -149,10 +149,10 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
   // if the entry used to be a chunked file... remove the chunks
   if (entry.IsChunkedFile()) {
     retval =
-      sql_remove_file_chunks_->BindPathHash(path_hash) &&
-      sql_remove_file_chunks_->Execute();
+      sql_chunks_remove_->BindPathHash(path_hash) &&
+      sql_chunks_remove_->Execute();
     assert(retval);
-    sql_remove_file_chunks_->Reset();
+    sql_chunks_remove_->Reset();
   }
 
   // remove the entry itself
@@ -220,11 +220,11 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
            chunk.offset() + chunk.size());
 
   bool retval =
-    sql_insert_file_chunk_->BindPathHash(path_hash) &&
-    sql_insert_file_chunk_->BindFileChunk(chunk) &&
-    sql_insert_file_chunk_->Execute();
+    sql_chunk_insert_->BindPathHash(path_hash) &&
+    sql_chunk_insert_->BindFileChunk(chunk) &&
+    sql_chunk_insert_->Execute();
   assert(retval);
-  sql_insert_file_chunk_->Reset();
+  sql_chunk_insert_->Reset();
 }
 
 
@@ -375,10 +375,11 @@ void WritableCatalog::MoveCatalogsToNested(
 
 
 void WritableCatalog::MoveFileChunksToNested(
-        const std::string   &full_path,
-        WritableCatalog     *new_nested_catalog) {
+  const std::string  &full_path,
+  WritableCatalog    *new_nested_catalog)
+{
   FileChunks chunks;
-  GetFileChunks(PathString(full_path), &chunks);
+  ListFileChunks(PathString(full_path), &chunks);
   assert (chunks.size() > 0);
 
   FileChunks::const_iterator i    = chunks.begin();
