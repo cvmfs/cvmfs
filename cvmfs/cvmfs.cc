@@ -1053,7 +1053,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                                          bytes_to_read_in_chunk,
                                          offset_in_chunk);
 
-      if (bytes_fetched == -1) {
+      if (bytes_fetched == (size_t)-1) {
         LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, bytes_fetched);
         fuse_reply_err(req, errno);
         return;
