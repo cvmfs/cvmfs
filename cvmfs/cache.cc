@@ -386,7 +386,7 @@ static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
+int FetchDirent(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
   return Fetch(d.checksum(), "", d.size(), cvmfs_path);
 }
 
@@ -400,11 +400,8 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int Fetch(const FileChunk &chunk, const string &cvmfs_path) {
-  return Fetch(chunk.content_hash(),
-               "",
-               chunk.size(),
-               cvmfs_path);
+int FetchChunk(const FileChunk &chunk, const string &cvmfs_path) {
+  return Fetch(chunk.content_hash(), "", chunk.size(), cvmfs_path);
 }
 
 
@@ -426,8 +423,9 @@ int Fetch(const FileChunk &chunk, const string &cvmfs_path) {
  */
 int Fetch(const hash::Any &checksum,
           const string    &hash_suffix,
-          const size_t     size,
-          const string    &cvmfs_path) {
+          const uint64_t   size,
+          const string    &cvmfs_path)
+{
   CallGuard call_guard;
   int fd_return;  // Read-only file descriptor that is returned
   int retval;

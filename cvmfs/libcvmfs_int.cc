@@ -617,7 +617,7 @@ int cvmfs_open(const char *c_path)
     return -ENOENT;
   }
 
-  fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
+  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {

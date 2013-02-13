@@ -378,7 +378,7 @@ static void RemountFinish() {
  * Fetches a single chunk of a chunked file
  */
 bool LiveFileChunk::Fetch() {
-  file_descriptor_ = cache::Fetch(*this, "file chunk");
+  file_descriptor_ = cache::FetchChunk(*this, "file chunk TODO: of what");
   if (file_descriptor_ >= 0) {
     open_ = true;
   }
@@ -918,7 +918,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
+  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
@@ -958,7 +958,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   // Prevent Squid DoS
-  // TODO: move to download
   time_t now = time(NULL);
   if (now - previous_io_error_.timestamp < kForgetDos) {
     SafeSleepMs(previous_io_error_.delay);
@@ -1001,7 +1000,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find file chunk "
                                                   "data for ino: %d",
                ino);
-      fuse_reply_err(req, EIO);
+      fuse_reply_err(req, EINVAL);
       return;
     }
     LiveFileChunks &chunks = chunks_itr->second;

@@ -36,8 +36,9 @@ bool Init(const std::string &cache_path);
 void Fini();
 
 int Open(const hash::Any &id);
-int Fetch(const catalog::DirectoryEntry &d, const std::string &cvmfs_path);
-int Fetch(const FileChunk &chunk, const std::string &cvmfs_path);
+int FetchDirent(const catalog::DirectoryEntry &d,
+                const std::string &cvmfs_path);
+int FetchChunk(const FileChunk &chunk, const std::string &cvmfs_path);
 int Fetch(const hash::Any   &checksum,
           const std::string &hash_suffix,
           const size_t       size,
