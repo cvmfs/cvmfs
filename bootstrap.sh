@@ -53,6 +53,12 @@ mkdir -p "$outOfSource/murmur/src"
 cp src/* "$outOfSource/murmur/src"
 cd ../..
 
+# vjson
+cd externals/vjson
+mkdir -p "$outOfSource/vjson/src"
+cp src/* "$outOfSource/vjson/src"
+cd ../..
+
 # google sparse hash
 cd externals/sparsehash
 tar xfz sparsehash-${SPARSEHASH_VERSION}.tar.gz 
