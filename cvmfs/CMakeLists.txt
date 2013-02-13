@@ -335,6 +335,7 @@ if (BUILD_LIBCVMFS)
 
   # dummy target to cause merged libcvmfs to be produced
   add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
+  add_dependencies (libcvmfs cvmfs_only)
 
 endif (BUILD_LIBCVMFS)
 
