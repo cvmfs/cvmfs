@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include <cassert>
 
