@@ -18,6 +18,7 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <inttypes.h>
 #include <dirent.h>
@@ -48,7 +49,6 @@ using namespace std;  // NOLINT
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
-
 
 /**
  * Removes a trailing "/" from a path.
@@ -402,8 +402,9 @@ FILE *CreateTempFile(const string &path_prefix, const int mode,
   *final_path = path_prefix + ".XXXXXX";
   char *tmp_file = strdupa(final_path->c_str());
   int tmp_fd = mkstemp(tmp_file);
-  if (tmp_fd < 0)
+  if (tmp_fd < 0) {
     return NULL;
+  }
   if (fchmod(tmp_fd, mode) != 0) {
     close(tmp_fd);
     return NULL;
@@ -566,20 +567,35 @@ bool HasPrefix(const string &str, const string &prefix,
 }
 
 
-vector<string> SplitString(const string &str, const char delim) {
+vector<string> SplitString(const string &str,
+                           const char delim,
+                           const unsigned max_chunks) {
   vector<string> result;
 
+  // edge case... one chunk is always the whole string
+  if (1 == max_chunks) {
+    result.push_back(str);
+    return result;
+  }
+
+  // split the string
   const unsigned size = str.size();
   unsigned marker = 0;
+  unsigned chunks = 1;
   unsigned i;
   for (i = 0; i < size; ++i) {
     if (str[i] == delim) {
       result.push_back(str.substr(marker, i-marker));
       marker = i+1;
+
+      // we got what we want... good bye
+      if (++chunks == max_chunks)
+        break;
     }
   }
-  result.push_back(str.substr(marker, i-marker));
 
+  // push the remainings of the string and return
+  result.push_back(str.substr(marker));
   return result;
 }
 
@@ -900,6 +916,37 @@ bool ManagedExec(const vector<string> &command_line,
   return true;
 }
 
+// -----------------------------------------------------------------------------
+
+void StopWatch::Start() {
+  assert (!running_);
+
+  gettimeofday(&start_, NULL);
+  running_ = true;
+}
+
+
+void StopWatch::Stop() {
+  assert (running_);
+
+  gettimeofday(&end_, NULL);
+  running_ = false;
+}
+
+
+void StopWatch::Reset() {
+  start_ = timeval();
+  end_   = timeval();
+  running_ = false;
+}
+
+
+double StopWatch::GetTime() const {
+  assert (!running_);
+
+  return DiffTimeSeconds(start_, end_);
+}
+
 
 /**
  * Sleeps using select.  This is without signals and doesn't interfere with
@@ -911,6 +958,73 @@ void SafeSleepMs(const unsigned ms) {
   wait_for.tv_usec = (ms % 1000) * 1000;
   select(0, NULL, NULL, NULL, &wait_for);
 }
+
+
+MemoryMappedFile::MemoryMappedFile(const std::string &file_path) :
+  file_path_(file_path), mapped_file_(NULL), mapped_size_(0), mapped_(false) {}
+
+MemoryMappedFile::~MemoryMappedFile() {
+  if (IsMapped()) {
+    Unmap();
+  }
+}
+
+bool MemoryMappedFile::Map() {
+  assert (!mapped_);
+
+  // open the file
+  int fd;
+  if ((fd = open(file_path_.c_str(), O_RDONLY, 0)) == -1) {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to open %s (%d)", file_path_.c_str(), errno);
+    return false;
+  }
+
+  // get file size
+  platform_stat64 filesize;
+  if (platform_fstat(fd, &filesize) != 0) {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to fstat %s (%d)", file_path_.c_str(), errno);
+    return false;
+  }
+
+  // check if the file is empty and 'pretend' that the file is mapped
+  // --> buffer will then look like a buffer without any size...
+  void *mapping = NULL;
+  if (filesize.st_size > 0) {
+    // map the given file into memory
+    mapping = mmap(NULL, filesize.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (mapping == MAP_FAILED) {
+      LogCvmfs(kLogUtility, kLogStderr, "failed to mmap %s (file size: %d) "
+                                        "(errno: %d)",
+                file_path_.c_str(),
+                filesize.st_size,
+                errno);
+      return false;
+    }
+  }
+
+  // save results
+  mapped_file_ = static_cast<unsigned char*>(mapping);
+  mapped_size_ = filesize.st_size;
+  mapped_      = true;
+  LogCvmfs(kLogUtility, kLogVerboseMsg, "mmap'ed %s", file_path_.c_str());
+  return true;
+}
+
+void MemoryMappedFile::Unmap() {
+  assert (mapped_);
+
+  // unmap the previously mapped file
+  if (mapped_file_ != NULL && munmap(static_cast<void*>(mapped_file_), mapped_size_) != 0) {
+    return;
+  }
+
+  // reset data
+  mapped_file_ = NULL;
+  mapped_size_ = 0;
+  mapped_      = false;
+  LogCvmfs(kLogUtility, kLogVerboseMsg, "munmap'ed %s", file_path_.c_str());
+}
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }

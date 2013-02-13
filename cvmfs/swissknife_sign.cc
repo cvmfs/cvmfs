@@ -55,7 +55,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   // Connect to the spooler
-  spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  spooler = upload::Spooler::Construct(spooler_definition);
 
   signature::Init();
 
@@ -153,7 +153,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
     const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2)
                                   + "X";
-    spooler->SpoolCopy(cert_path_tmp, cert_hash_path);
+    spooler->Upload(cert_path_tmp, cert_hash_path);
 
     // Update manifest
     manifest->set_certificate(certificate_hash);
@@ -201,13 +201,13 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     fclose(fmanifest);
 
     // Upload manifest
-    spooler->SpoolCopy(manifest_path, ".cvmfspublished");
+    spooler->Upload(manifest_path, ".cvmfspublished");
 
-    spooler->EndOfTransaction();
-    spooler->WaitFor();
+    spooler->WaitForUpload();
+    spooler->WaitForTermination();
     unlink(cert_path_tmp.c_str());
     unlink(manifest_path.c_str());
-    if (spooler->num_errors()) {
+    if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest");
       delete manifest;
       goto sign_fail;

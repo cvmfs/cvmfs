@@ -21,6 +21,20 @@ namespace CVMFS_NAMESPACE_GUARD {
 namespace hash {
 
 /**
+ * Generates a purely random hash
+ * Mostly used for testing purposes
+ */
+Any Any::randomHash(const Algorithms a) {
+  Any result(a);
+  unsigned bytes = result.GetDigestSize();
+  for (unsigned i = 0; i < bytes; ++i) {
+    result.digest[i] = rand() % 256;
+  }
+  return result;
+}
+
+
+/**
  * Allows the caller to create the context on the stack.
  */
 unsigned GetContextSize(const Algorithms algorithm) {
@@ -30,6 +44,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kSha1:
       return sizeof(SHA_CTX);
     default:
+      LogCvmfs(kLogHash, kLogStderr, "tried to generate hash context for "
+                                     "unspecified hash. Aborting...");
       abort();  // Undefined hash
   }
 }

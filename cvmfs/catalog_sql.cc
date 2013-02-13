@@ -351,6 +351,9 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   else
     database_flags |= kFlagFile;
 
+  if (entry.IsChunkedFile())
+    database_flags |= kFlagFileChunk;
+
   return database_flags;
 }
 
@@ -487,6 +490,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
+  result.is_chunked_file_ = (database_flags & kFlagFileChunk);
   const char *name = reinterpret_cast<const char *>(RetrieveText(6));
   const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
@@ -749,9 +753,77 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
+SqlInsertFileChunk::SqlInsertFileChunk(const Database &database) {
+  const string statememt =
+    "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
+    //                       1          2        3      4     5
+    "VALUES (:md5_1, :md5_2, :offset, :size, :hash);";
+  Init(database.sqlite_db(), statememt);
+}
+
+
+bool SqlInsertFileChunk::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+bool SqlInsertFileChunk::BindFileChunk(const FileChunk &chunk) {
+  return
+    BindInt64(3,    chunk.offset())       &&
+    BindInt64(4,    chunk.size())         &&
+    BindSha1Blob(5, chunk.content_hash());
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlRemoveFileChunks::SqlRemoveFileChunks(const Database &database) {
+  const string statement =
+    "DELETE FROM chunks "
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlRemoveFileChunks::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlGetFileChunks::SqlGetFileChunks(const Database &database) {
+  const string statement =
+    "SELECT offset, size, hash FROM chunks "
+    //         0      1     2
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2) "
+    //                    1                          2
+    "ORDER BY offset ASC;";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlGetFileChunks::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+FileChunk SqlGetFileChunks::GetFileChunk() const {
+  return FileChunk(RetrieveSha1Blob(2),
+                   RetrieveInt64(0),
+                   RetrieveInt64(1));
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
+
 
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
   return RetrieveInt64(0) >> 32;

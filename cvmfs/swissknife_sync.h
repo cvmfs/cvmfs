@@ -10,25 +10,32 @@
 #include "upload.h"
 
 struct SyncParameters {
-  SyncParameters() {
-    print_changeset = false;
-    dry_run = false;
-    mucatalogs = false;
-    spooler = NULL;
-  }
+  SyncParameters() :
+    spooler(NULL),
+    print_changeset(false),
+    dry_run(false),
+    mucatalogs(false),
+    use_file_chunking(false),
+    min_file_chunk_size(4*1024*1024),
+    avg_file_chunk_size(8*1024*1024),
+    max_file_chunk_size(16*1024*1024) {}
 
   upload::Spooler *spooler;
-	std::string dir_union;
-  std::string dir_scratch;
-	std::string dir_rdonly;
-  std::string dir_temp;
-  std::string base_hash;
-  std::string stratum0;
-  std::string manifest_path;
-  std::string spooler_definition;
-	bool print_changeset;
-	bool dry_run;
-	bool mucatalogs;
+  std::string      dir_union;
+  std::string      dir_scratch;
+  std::string      dir_rdonly;
+  std::string      dir_temp;
+  std::string      base_hash;
+  std::string      stratum0;
+  std::string      manifest_path;
+  std::string      spooler_definition;
+  bool             print_changeset;
+  bool             dry_run;
+  bool             mucatalogs;
+  bool             use_file_chunking;
+  size_t           min_file_chunk_size;
+  size_t           avg_file_chunk_size;
+  size_t           max_file_chunk_size;
 };
 
 
@@ -99,9 +106,22 @@ class CommandSync : public Command {
     result.push_back(Parameter('m', "create micro catalogs", true, true));
     result.push_back(Parameter('z', "log level (0-4, default: 2)",
                                true, false));
+
+    result.push_back(Parameter('p', "enable file chunking", true, true));
+    result.push_back(Parameter('a', "desired average chunk size in bytes", true,
+                               false));
+    result.push_back(Parameter('l', "minimal file chunk size in bytes", true,
+                               false));
+    result.push_back(Parameter('h', "maximal file chunk size in bytes", true,
+                               false));
     return result;
   }
   int Main(const ArgumentList &args);
+
+ protected:
+  bool ReadFileChunkingArgs(const swissknife::ArgumentList &args,
+                            SyncParameters &params);
+  bool CheckParams(const SyncParameters &p);
 };
 
 }  // namespace swissknife

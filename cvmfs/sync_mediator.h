@@ -69,28 +69,6 @@ typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
 
 
 /**
- * Callback object for newly added files.  The callback sets the hash.
- */
-class SyncMediator;
-class PublishFilesCallback : public upload::SpoolerCallback {
- public:
-  PublishFilesCallback(SyncMediator *mediator);
-  void Callback(const std::string &path, int retval,
-                const std::string &digest);
- private:
-  SyncMediator *mediator_;
-};
-class PublishHardlinksCallback : public upload::SpoolerCallback {
- public:
-  PublishHardlinksCallback(SyncMediator *mediator);
-  void Callback(const std::string &path, int retval,
-                const std::string &digest);
- private:
-  SyncMediator *mediator_;
-};
-
-
-/**
  * The SyncMediator refines the input received from a concrete UnionSync object.
  * For example, it resolves the insertion and deletion of complete directories
  * by recursing them.  It works as a mediator between the union file system and
@@ -100,12 +78,11 @@ class PublishHardlinksCallback : public upload::SpoolerCallback {
  * and hashing.
  */
 class SyncMediator {
-  friend class PublishFilesCallback;
-  friend class PublishHardlinksCallback;
   friend class SyncUnion;
  public:
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                const SyncParameters *params);
+  virtual ~SyncMediator();
 
   void Add(SyncItem &entry);
   void Touch(SyncItem &entry);
@@ -159,6 +136,10 @@ class SyncMediator {
   void RemoveDirectoryCallback(const std::string &parent_dir,
                                const std::string &dir_name);
 
+  // Called by Upload Spooler
+  void PublishFilesCallback(const upload::SpoolerResult &result);
+  void PublishHardlinksCallback(const upload::SpoolerResult &result);
+
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
@@ -191,6 +172,7 @@ class SyncMediator {
 	 */
   pthread_mutex_t lock_file_queue_;
 	SyncItemList file_queue_;
+
 	HardlinkGroupList hardlink_queue_;
 
 	const SyncParameters *params_;

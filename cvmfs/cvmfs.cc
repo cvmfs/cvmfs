@@ -63,6 +63,8 @@
 #include <algorithm>
 #include <functional>
 
+#include "cvmfs.h"
+
 #include "platform.h"
 #include "logging.h"
 #include "tracer.h"
@@ -75,6 +77,7 @@
 #include "signature.h"
 #include "quota.h"
 #include "util.h"
+#include "util_concurrency.h"
 #include "atomic.h"
 #include "lru.h"
 #include "peers.h"
@@ -110,6 +113,8 @@ const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
                                      backoff */
 const int kMaxIoDelay = 2000; /**< Maximum 2 seconds */
 const int kForgetDos = 10000; /**< Clear DoS memory after 10 seconds */
+
+const uint64_t kChunkedFileHandle = static_cast<uint64_t>(-2);
 /**
  * Prevent DoS attacks on the Squid server
  */
@@ -128,6 +133,35 @@ struct DirectoryListing {
 
   DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
 };
+
+/**
+ * For opening and reading chunked files
+ */
+class LiveFileChunk : public FileChunk {
+ public:
+  explicit LiveFileChunk(const FileChunk &chunk) :
+    FileChunk(chunk),
+    open_(false),
+    file_descriptor_(0) {}
+
+  bool Fetch();
+  bool Close();
+  inline int file_descriptor() const { return file_descriptor_; }
+
+  inline bool IsOpen() const { return open_; }
+
+  /**
+   * exclusively used to find file chunks using std::lower_bound
+   */
+  inline bool operator<(const off_t offset) const {
+    return (off_t)(this->offset() + this->size()) <= offset;
+  }
+
+ private:
+  bool open_;
+  int  file_descriptor_;
+};
+typedef std::vector<LiveFileChunk> LiveFileChunks;
 
 const loader::LoaderExports *loader_exports_ = NULL;
 bool foreground_ = false;
@@ -159,8 +193,9 @@ atomic_int32 reload_critical_section_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
-struct hash_dirhandle {
-  size_t operator() (const uint64_t handle) const {
+template <typename hashed_type>
+struct hash_handle {
+  size_t operator() (const hashed_type handle) const {
 #ifdef __x86_64__
     return MurmurHash64A(&handle, sizeof(handle), 0x9ce603115bba659bLLU);
 #else
@@ -168,11 +203,17 @@ struct hash_dirhandle {
 #endif
   }
 };
-typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_dirhandle>
+typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_handle<uint64_t> >
   DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
+
+typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks, hash_handle<fuse_ino_t> >
+  LiveFileChunksMap;
+
+LiveFileChunksMap *live_file_chunks_ = NULL;
+pthread_rwlock_t live_file_chunks_mutex_ = PTHREAD_RWLOCK_INITIALIZER;
 
 atomic_int64 num_fs_open_;
 atomic_int64 num_fs_dir_open_;
@@ -187,6 +228,8 @@ atomic_int32 open_dirs_; /**< number of currently open directories */
 unsigned max_open_files_; /**< maximum allowed number of open files */
 const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
+
+
 
 
 unsigned GetMaxTTL() {
@@ -328,6 +371,32 @@ static void RemountFinish() {
   }
 
   atomic_cas32(&reload_critical_section_, 1, 0);
+}
+
+
+/**
+ * Fetches a single chunk of a chunked file
+ */
+bool LiveFileChunk::Fetch() {
+  file_descriptor_ = cache::Fetch(*this, "file chunk");
+  if (file_descriptor_ >= 0) {
+    open_ = true;
+  }
+  return IsOpen();
+}
+
+
+/**
+ * Closes the file handle to this chunk
+ */
+bool LiveFileChunk::Close() {
+  if (!IsOpen()) {
+    return true;
+  }
+
+  const int closed = close(file_descriptor_);
+  open_ = false;
+  return closed == 0;
 }
 
 
@@ -810,8 +879,46 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
+  if (dirent.IsChunkedFile()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "chunked file %s opened (download delayed "
+                                   "to read() call",
+             path.c_str());
+
+    // Retrieve File chunks from the catalog
+    FileChunks chunks;
+    if (! dirent.catalog()->GetFileChunks(path, &chunks) || chunks.empty()) {
+      LogCvmfs(kLogCvmfs, kLogSyslog, "file %s is marked as 'chunked', but no "
+                                      "chunks found in the catalog %s.",
+               path.c_str(),
+               dirent.catalog()->path().c_str());
+      fuse_reply_err(req, EIO);
+      return;
+    }
+
+    // Add process data to the retrieved chunks
+    LiveFileChunks live_chunks;
+    FileChunks::const_iterator i    = chunks.begin();
+    FileChunks::const_iterator iend = chunks.end();
+    for (; i != iend; ++i) {
+      live_chunks.push_back(LiveFileChunk(*i));
+    }
+
+    // Save the newly opened file chunks into the respective list
+    {
+      WriteLockGuard guard(live_file_chunks_mutex_);
+      if (live_file_chunks_->count(ino) == 0) {
+        (*live_file_chunks_)[ino] = live_chunks;
+      }
+    }
+
+    // DONE! Actual file chunks will be loaded on demand...
+    atomic_inc64(&num_fs_open_);
+    fi->fh = kChunkedFileHandle;
+    fuse_reply_open(req, fi);
+    return;
+  }
+
   fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
-  atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
@@ -831,6 +938,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         inode_cache_->Insert(ino, dirent);
       }
       fi->fh = fd;
+      atomic_inc64(&num_fs_open_);
       fuse_reply_open(req, fi);
       return;
     } else {
@@ -880,17 +988,92 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
   // Get data chunk (<=4k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
-  const int64_t fd = fi->fh;
-  int result = pread(fd, data, size, off);
+
+  unsigned int overall_bytes_fetched = 0;
+
+  // Do we fiddle with a chunked file?
+  if (fi->fh == kChunkedFileHandle) {
+    WriteLockGuard guard(live_file_chunks_mutex_);
+
+    // find the file chunk descriptions for the requested inode
+    LiveFileChunksMap::iterator chunks_itr = live_file_chunks_->find(ino);
+    if (chunks_itr == live_file_chunks_->end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find file chunk "
+                                                  "data for ino: %d",
+               ino);
+      fuse_reply_err(req, EIO);
+      return;
+    }
+    LiveFileChunks &chunks = chunks_itr->second;
+
+    // find the chunk that holds the beginning of the requested data
+    LiveFileChunks::iterator chunk_itr = chunks.begin();
+    chunk_itr = std::lower_bound(chunk_itr,
+                                 chunks.end(),
+                                 off);
+    if (chunk_itr == chunks.end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find specific "
+                                                  "file chunk for "
+                                                  "ino: %d starting at offset: "
+                                                  "%d",
+               ino, off);
+      fuse_reply_err(req, EIO);
+      return;
+    }
+
+    // fetch all needed chunks and read the requested data
+    off_t offset_in_chunk = off - chunk_itr->offset();
+    do {
+      assert (chunk_itr != chunks.end());
+      LiveFileChunk &chunk = *chunk_itr;
+
+      // download and open chunk on demand
+      if (!chunk.IsOpen() && !chunk.Fetch()) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to load chunk for "
+                                                    "inode: %d, CAS key: %s, "
+                                                    "error code: %d",
+           ino, chunk.content_hash().ToString().c_str(), errno);
+
+        if (errno == EMFILE) {
+          fuse_reply_err(req, EMFILE);
+          return;
+        }
+
+        fuse_reply_err(req, EIO);
+        return;
+      }
+
+      // read data from the chunk
+      assert (chunk.IsOpen());
+      const size_t bytes_to_read            = size - overall_bytes_fetched;
+      const size_t remaining_bytes_in_chunk = chunk.size() - offset_in_chunk;
+      size_t bytes_to_read_in_chunk = std::min(bytes_to_read, remaining_bytes_in_chunk);
+      const size_t bytes_fetched = pread(chunk.file_descriptor(),
+                                         data + overall_bytes_fetched,
+                                         bytes_to_read_in_chunk,
+                                         offset_in_chunk);
+
+      if (bytes_fetched == -1) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, bytes_fetched);
+        fuse_reply_err(req, errno);
+        return;
+      }
+      overall_bytes_fetched += bytes_fetched;
+
+      // advance to the next chunk to keep on reading data
+      chunk.Close();
+      ++chunk_itr;
+      offset_in_chunk = 0;
+    } while (overall_bytes_fetched < size && chunk_itr != chunks.end());
+
+  } else {
+    const int64_t fd = fi->fh;
+    overall_bytes_fetched = pread(fd, data, size, off);
+  }
 
   // Push it to user
-  if (result >= 0) {
-    fuse_reply_buf(req, data, result);
-    LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", result);
-  } else {
-    LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, result);
-    fuse_reply_err(req, errno);
-  }
+  fuse_reply_buf(req, data, overall_bytes_fetched);
+  LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", overall_bytes_fetched);
 }
 
 
@@ -904,7 +1087,20 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
            catalog_manager_->MangleInode(ino));
 
   const int64_t fd = fi->fh;
-  if (close(fd) == 0) atomic_dec32(&open_files_);
+
+  // do we work with a chunked file here?
+  if (fd == -2) {
+    WriteLockGuard guard(live_file_chunks_mutex_);
+    if (live_file_chunks_->erase(ino) > 0) {
+      atomic_dec32(&open_files_);
+    }
+
+  } else {
+
+    if (close(fd) == 0) {
+      atomic_dec32(&open_files_);
+    }
+  }
 
   fuse_reply_err(req, 0);
 }
@@ -1366,6 +1562,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
+  cvmfs::live_file_chunks_  = new cvmfs::LiveFileChunksMap();
+  cvmfs::live_file_chunks_->set_empty_key((fuse_ino_t)(-1));
+  cvmfs::live_file_chunks_->set_deleted_key((fuse_ino_t)(-2));
 
   // Runtime counters
   atomic_init64(&cvmfs::num_fs_open_);
@@ -1638,12 +1837,14 @@ static void Fini() {
   delete cvmfs::catalog_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
+  delete cvmfs::live_file_chunks_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
   cvmfs::catalog_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
+  cvmfs::live_file_chunks_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
