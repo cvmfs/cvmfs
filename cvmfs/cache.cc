@@ -433,9 +433,9 @@ int Fetch(const hash::Any &checksum,
   int retval;
 
   // Try to open from local cache
-  if ((fd_return = cache::Open(d.checksum())) >= 0) {
+  if ((fd_return = cache::Open(checksum)) >= 0) {
     if (cache_mode_ == kCacheReadWrite)
-      quota::Touch(d.checksum());
+      quota::Touch(checksum);
     return fd_return;
   }
 
