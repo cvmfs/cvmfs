@@ -74,6 +74,7 @@ set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libcurl/src")
 set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")
 set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/sparsehash/src")
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/leveldb/src")
+set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/vjson/src")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})

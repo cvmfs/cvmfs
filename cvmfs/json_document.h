@@ -5,7 +5,7 @@
 #ifndef CVMFS_VJSON_JSON_DOCUMENT_H_
 #define CVMFS_VJSON_JSON_DOCUMENT_H_
 
-#include "vjson/json.h"
+#include "json.h"
 #include "util.h"
 
 typedef struct json_value JSON;
