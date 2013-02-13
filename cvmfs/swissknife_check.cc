@@ -19,6 +19,7 @@
 
 #include "logging.h"
 #include "manifest.h"
+#include "file_chunk.h"
 #include "util.h"
 #include "catalog_sql.h"
 #include "compression.h"

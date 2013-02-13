@@ -37,7 +37,7 @@ set (CVMFS_CLIENT_SOURCES
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
-  shortstring.h dirent.h
+  shortstring.h dirent.h file_chunk.h
   fs_traversal.h
 )
 
@@ -84,7 +84,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   compression.h compression.cc
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
-  
+
   upload_file_chunker.h upload_file_chunker.cc
   upload_file_chunker_xor32.h upload_file_chunker_xor32.cc
   upload_file_processor.h upload_file_processor.cc
@@ -108,7 +108,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sync_union.h sync_union.cc
   sync_mediator.h sync_mediator.cc
 
-  dirent.h shortstring.h
+  dirent.h file_chunk.h shortstring.h
   catalog_traversal.h
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc

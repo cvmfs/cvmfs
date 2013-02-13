@@ -89,6 +89,7 @@
 #include <vector>
 
 #include "hash.h"
+#include "file_chunk.h"
 
 #include "upload_spooler_definition.h"
 

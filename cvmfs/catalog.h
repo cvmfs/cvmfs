@@ -16,6 +16,7 @@
 
 #include "catalog_sql.h"
 #include "dirent.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "shortstring.h"
 #include "duplex_sqlite3.h"

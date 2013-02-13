@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "catalog_mgr.h"
+#include "file_chunk.h"
 #include "shortstring.h"
 #include "atomic.h"
 #include "manifest_fetch.h"

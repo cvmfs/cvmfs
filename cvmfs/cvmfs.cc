@@ -82,6 +82,7 @@
 #include "lru.h"
 #include "peers.h"
 #include "dirent.h"
+#include "file_chunk.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
 #include "shortstring.h"

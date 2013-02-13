@@ -6,6 +6,7 @@
 #define CVMFS_UPLOAD_FILE_PROCESSOR_H_
 
 #include "util_concurrency.h"
+#include "file_chunk.h"
 
 namespace upload {
 
