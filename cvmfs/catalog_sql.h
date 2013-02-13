@@ -278,7 +278,7 @@ class SqlDirent : public Sql {
   const static int kFlagFile                = 4;
   const static int kFlagLink                = 8;
   const static int kFlagFileStat            = 16;  // currently unused
-  const static int kFlagFileChunk           = 64;  // currently unused
+  const static int kFlagFileChunk           = 64;
 
  protected:
   /**
@@ -486,6 +486,38 @@ class SqlIncLinkcount : public Sql {
   SqlIncLinkcount(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   bool BindDelta(const int delta);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlInsertFileChunk : public Sql {
+ public:
+  SqlInsertFileChunk(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  bool BindFileChunk(const FileChunk &chunk);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlRemoveFileChunks : public Sql {
+ public:
+  SqlRemoveFileChunks(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlGetFileChunks : public Sql {
+ public:
+  SqlGetFileChunks(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  FileChunk GetFileChunk() const;
 };
 
 

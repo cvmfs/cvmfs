@@ -1,0 +1,7 @@
+vjson is a very simplistic JSON parser.
+It is licensed under MIT License and written by Ivan Vashchaev
+
+This is no real external dependency but is used by just copying the
+files from vjson hg repository into this directory.
+
+See: http://code.google.com/p/vjson/

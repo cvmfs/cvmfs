@@ -37,6 +37,11 @@ void Fini();
 
 int Open(const hash::Any &id);
 int Fetch(const catalog::DirectoryEntry &d, const std::string &cvmfs_path);
+int Fetch(const FileChunk &chunk, const std::string &cvmfs_path);
+int Fetch(const hash::Any   &checksum,
+          const std::string &hash_suffix,
+          const size_t       size,
+          const std::string &cvmfs_path);
 int64_t GetNumDownloads();
 
 CacheModes GetCacheMode();

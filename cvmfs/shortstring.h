@@ -30,15 +30,17 @@ class ShortString {
   ShortString() : long_string_(NULL), length_(0) {
     atomic_inc64(&num_instances_);
   }
-  ShortString(const ShortString &other) {
+  ShortString(const ShortString &other) : long_string_(NULL) {
     atomic_inc64(&num_instances_);
-    long_string_ = NULL;
     Assign(other);
   }
-  ShortString(const char *chars, const unsigned length) {
+  ShortString(const char *chars, const unsigned length) : long_string_(NULL) {
     atomic_inc64(&num_instances_);
-    long_string_ = NULL;
     Assign(chars, length);
+  }
+  explicit ShortString(const std::string &std_string) : long_string_(NULL) {
+    atomic_inc64(&num_instances_);
+    Assign(std_string.c_str(), std_string.length());
   }
 
   ShortString & operator= (const ShortString & other) {

@@ -15,6 +15,8 @@
 #include "lru.h"
 #include "loader.h"
 
+#include "util.h"
+
 namespace cvmfs {
 
 extern const loader::LoaderExports *loader_exports_;

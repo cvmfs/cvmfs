@@ -18,78 +18,13 @@
 #include "hash.h"
 #include "fs_traversal.h"
 #include "util.h"
+#include "util_concurrency.h"
+
+#include "upload.h"
 
 using namespace std;  // NOLINT
 
 namespace publish {
-
-
-PublishFilesCallback::PublishFilesCallback(SyncMediator *mediator) {
-  assert(mediator);
-  mediator_ = mediator;
-}
-
-
-void PublishFilesCallback::Callback(const std::string &path, int retval,
-                                    const std::string &digest)
-{
-  LogCvmfs(kLogPublish, kLogVerboseMsg,
-           "Spooler callback for %s, digest %s, retval %d",
-           path.c_str(), digest.c_str(), retval);
-  if (retval != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             path.c_str(), retval);
-    abort();
-  }
-  hash::Any hash(hash::kSha1, hash::HexPtr(digest));
-
-  pthread_mutex_lock(&mediator_->lock_file_queue_);
-  SyncItemList::iterator itr = mediator_->file_queue_.find(path);
-  assert(itr != mediator_->file_queue_.end());
-  itr->second.SetContentHash(hash);
-  pthread_mutex_unlock(&mediator_->lock_file_queue_);
-  mediator_->catalog_manager_->AddFile(itr->second.CreateBasicCatalogDirent(),
-                                       itr->second.relative_parent_path());
-}
-
-
-PublishHardlinksCallback::PublishHardlinksCallback(SyncMediator *mediator) {
-  assert(mediator);
-  mediator_ = mediator;
-}
-
-
-void PublishHardlinksCallback::Callback(const std::string &path, int retval,
-                                        const std::string &digest)
-{
-  LogCvmfs(kLogPublish, kLogVerboseMsg,
-           "Spooler callback for hardlink %s, digest %s, retval %d",
-           path.c_str(), digest.c_str(), retval);
-  if (retval != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             path.c_str(), retval);
-    abort();
-  }
-  hash::Any hash(hash::kSha1, hash::HexPtr(digest));
-
-  bool found = false;
-  for (unsigned i = 0; i < mediator_->hardlink_queue_.size(); ++i) {
-    if (mediator_->hardlink_queue_[i].master.GetUnionPath() == path) {
-      found = true;
-      mediator_->hardlink_queue_[i].master.SetContentHash(hash);
-      SyncItemList::iterator j;
-      j = mediator_->hardlink_queue_[i].hardlinks.begin();
-      for (j = mediator_->hardlink_queue_[i].hardlinks.begin();
-           j != mediator_->hardlink_queue_[i].hardlinks.end(); ++j)
-      {
-        j->second.SetContentHash(hash);
-      }
-      break;
-    }
-  }
-  assert(found);
-}
-
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
@@ -99,8 +34,14 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
-  params->spooler->SetCallback(new PublishFilesCallback(this));
+  params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
+
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+}
+
+
+SyncMediator::~SyncMediator() {
+  pthread_mutex_destroy(&lock_file_queue_);
 }
 
 
@@ -207,21 +148,38 @@ void SyncMediator::LeaveDirectory(SyncItem &entry)
 manifest::Manifest *SyncMediator::Commit() {
   LogCvmfs(kLogPublish, kLogStdout,
            "Waiting for upload of files before committing...");
-  params_->spooler->WaitFor();
+  params_->spooler->WaitForUpload();
 
   if (!hardlink_queue_.empty()) {
     LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
-    params_->spooler->UnsetCallback();
-    params_->spooler->SetCallback(new PublishHardlinksCallback(this));
+    params_->spooler->UnregisterListeners();
+    params_->spooler->RegisterListener(&SyncMediator::PublishHardlinksCallback, this);
+
+    // TODO: Revise that for Thread Safety!
+    //       This loop will spool hardlinks into the spooler, which will then
+    //       process them.
+    //       On completion of every hardlink the spooler will asynchronously
+    //       emit callbacks (SyncMediator::PublishHardlinksCallback) which
+    //       might happen while this for-loop goes through the hardlink_queue_
+    //
+    //       For the moment this seems not to be a problem, but it's an accident
+    //       just waiting to happen.
+    //
+    //       Note: Just wrapping this loop in a mutex might produce a dead lock
+    //             since the spooler does not fill it's processing queue to an
+    //             unlimited size. Meaning that it might be flooded with hard-
+    //             links and waiting for the queue to be processed while proces-
+    //             sing is stalled because the callback is waiting for this
+    //             mutex.
     for (HardlinkGroupList::const_iterator i = hardlink_queue_.begin(),
          iEnd = hardlink_queue_.end(); i != iEnd; ++i)
     {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "Spooling hardlink group %s",
                i->master.GetUnionPath().c_str());
-      params_->spooler->SpoolProcess(i->master.GetUnionPath(), "data", "");
+      params_->spooler->Process(i->master.GetUnionPath(), "data");
     }
 
-    params_->spooler->WaitFor();
+    params_->spooler->WaitForUpload();
 
     for (HardlinkGroupList::const_iterator i = hardlink_queue_.begin(),
          iEnd = hardlink_queue_.end(); i != iEnd; ++i)
@@ -232,10 +190,10 @@ manifest::Manifest *SyncMediator::Commit() {
     }
   }
 
-  params_->spooler->UnsetCallback();
+  params_->spooler->UnregisterListeners();
 
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
-  if (params_->spooler->num_errors() > 0) {
+  if (params_->spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogPublish, kLogStderr, "failed to commit files");
     return NULL;
   }
@@ -446,6 +404,74 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 }
 
 
+void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for %s, digest %s, produced %d chunks, retval %d",
+           result.local_path.c_str(),
+           result.content_hash.ToString().c_str(),
+           result.file_chunks.size(),
+           result.return_code);
+  if (result.return_code != 0) {
+    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
+             result.local_path.c_str(), result.return_code);
+    abort();
+  }
+
+  SyncItemList::iterator itr;
+  {
+    MutexLockGuard guard(lock_file_queue_);
+    itr = file_queue_.find(result.local_path);
+  }
+
+  assert(itr != file_queue_.end());
+
+  SyncItem &item = itr->second;
+  item.SetContentHash(result.content_hash);
+
+  if (result.IsChunked()) {
+    catalog_manager_->AddChunkedFile(item.CreateBasicCatalogDirent(),
+                                     item.relative_parent_path(),
+                                     result.file_chunks);
+  } else {
+    catalog_manager_->AddFile(item.CreateBasicCatalogDirent(),
+                              item.relative_parent_path());
+  }
+}
+
+
+void SyncMediator::PublishHardlinksCallback(const upload::SpoolerResult &result) {
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for hardlink %s, digest %s, retval %d",
+           result.local_path.c_str(),
+           result.content_hash.ToString().c_str(),
+           result.return_code);
+  if (result.return_code != 0) {
+    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
+             result.local_path.c_str(), result.return_code);
+    abort();
+  }
+
+  bool found = false;
+  for (unsigned i = 0; i < hardlink_queue_.size(); ++i) {
+    if (hardlink_queue_[i].master.GetUnionPath() == result.local_path) {
+      found = true;
+      hardlink_queue_[i].master.SetContentHash(result.content_hash);
+      SyncItemList::iterator j,jend;
+      for (j = hardlink_queue_[i].hardlinks.begin(),
+           jend = hardlink_queue_[i].hardlinks.end();
+           j != jend; ++j)
+      {
+        j->second.SetContentHash(result.content_hash);
+      }
+
+      break;
+    }
+  }
+
+  assert(found);
+}
+
+
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
   if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[add] Nested catalog at %s",
@@ -480,7 +506,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
     file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->SpoolProcess(entry.GetUnionPath(), "data", "");
+    params_->spooler->Process(entry.GetUnionPath(), "data");
   }
 }
 
@@ -520,7 +546,7 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
 
 /**
  * this method deletes a single directory entry! Make sure to empty it
- * before you call this method or simply use 
+ * before you call this method or simply use
  * SyncMediator::RemoveDirectoryRecursively instead.
  */
 void SyncMediator::RemoveDirectory(SyncItem &entry) {

@@ -28,10 +28,10 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-WritableCatalogManager::WritableCatalogManager(const hash::Any &base_hash,
+WritableCatalogManager::WritableCatalogManager(const hash::Any   &base_hash,
                                                const std::string &stratum0,
-                                               const string &dir_temp,
-                                               upload::Spooler *spooler)
+                                               const string      &dir_temp,
+                                               upload::Spooler   *spooler)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -116,8 +116,8 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  * @return true on success, false otherwise
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
-  const string &dir_temp,
-  upload::Spooler *spooler)
+  const string     &dir_temp,
+  upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
@@ -161,12 +161,12 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest::Manifest *manifest = new manifest::Manifest(hash_catalog, "");
 
   // Upload catalog
-  spooler->SpoolCopy(file_path_compressed,
-                     "data" + hash_catalog.MakePath(1, 2) + "C");
-  spooler->EndOfTransaction();
-  spooler->WaitFor();
+  spooler->Upload(file_path_compressed,
+                  "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler->WaitForUpload();
+  spooler->WaitForTermination();
   unlink(file_path_compressed.c_str());
-  if (spooler->num_errors() > 0) {
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
              file_path_compressed.c_str());
     delete manifest;
@@ -324,7 +324,6 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   SyncUnlock();
 }
 
-
 /**
  * Add a new file to the catalogs.
  * @param entry a DirectoryEntry structure describing the new file
@@ -332,11 +331,10 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
  *                         file to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddFile(const DirectoryEntryBase &entry,
-                                     const std::string &parent_directory) {
+void WritableCatalogManager::AddFile(const DirectoryEntry  &entry,
+                                     const std::string     &parent_directory) {
   const string parent_path = MakeRelativePath(parent_directory);
-  string file_path = parent_path + "/";
-  file_path.append(entry.name().GetChars(), entry.name().GetLength());
+  const string file_path   = entry.GetFullPath(parent_path);
 
   SyncLock();
   WritableCatalog *catalog;
@@ -347,7 +345,37 @@ void WritableCatalogManager::AddFile(const DirectoryEntryBase &entry,
   }
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
-  catalog->AddEntry(DirectoryEntry(entry), file_path, parent_path);
+  catalog->AddEntry(entry, file_path, parent_path);
+  SyncUnlock();
+}
+
+
+void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase  &entry,
+                                            const std::string         &parent_directory,
+                                            const FileChunks          &file_chunks) {
+  assert (file_chunks.size() > 0);
+
+  DirectoryEntry full_entry(entry);
+  full_entry.set_is_chunked_file(true);
+
+  AddFile(full_entry, parent_directory);
+
+  const string parent_path = MakeRelativePath(parent_directory);
+  const string file_path   = entry.GetFullPath(parent_path);
+
+  SyncLock();
+  WritableCatalog *catalog;
+  if (!FindCatalog(parent_path, &catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
+             file_path.c_str());
+    assert(false);
+  }
+
+  FileChunks::const_iterator i    = file_chunks.begin();
+  FileChunks::const_iterator iend = file_chunks.end();
+  for (; i != iend; ++i) {
+    catalog->AddFileChunk(file_path, *i);
+  }
   SyncUnlock();
 }
 
@@ -654,8 +682,8 @@ manifest::Manifest *WritableCatalogManager::Commit() {
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
-      spooler_->WaitFor();
-      if (spooler_->num_errors() > 0) {
+      spooler_->WaitForUpload();
+      if (spooler_->GetNumberOfErrors() > 0) {
         LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
         return NULL;
       }
@@ -746,8 +774,8 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 	}
 
   // Upload catalog
-  spooler_->SpoolCopy(catalog->database_path() + ".compressed",
-                      "data" + hash_catalog.MakePath(1, 2) + "C");
+  spooler_->Upload(catalog->database_path() + ".compressed",
+                   "data" + hash_catalog.MakePath(1, 2) + "C");
 
 	// Update registered catalog SHA1 in nested catalog
 	if (!catalog->IsRoot()) {
