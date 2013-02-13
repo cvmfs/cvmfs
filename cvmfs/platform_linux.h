@@ -12,9 +12,11 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <limits.h>
 
 #include <cassert>
 
+#include <cstring>
 #include <string>
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -92,6 +94,18 @@ inline int platform_readahead(int filedes) {
 
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".so";
+}
+
+
+inline const char* platform_getexepath() {
+  static char buf[PATH_MAX] = {0};
+  if (strlen(buf) == 0) {
+    int ret = readlink("/proc/self/exe", buf, PATH_MAX);
+    if (ret > 0 && ret < (int)PATH_MAX) {
+       buf[ret] = 0;
+    }
+  }
+  return buf;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

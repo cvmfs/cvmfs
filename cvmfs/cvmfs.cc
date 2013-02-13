@@ -19,6 +19,7 @@
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define FUSE_USE_VERSION 26
+#define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
 
@@ -41,6 +42,7 @@
 #include <sys/resource.h>
 #include <pthread.h>
 #include <sys/xattr.h>
+#include <inttypes.h>
 
 #include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
@@ -173,7 +175,8 @@ pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
 unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
-cache::CatalogManager *catalog_manager_;
+catalog::InodeRevisionAnnotation *inode_annotation_ = NULL;
+cache::CatalogManager *catalog_manager_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
@@ -614,7 +617,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   RemountCheck();
 
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %"PRIu64, ino);
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
@@ -928,8 +931,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
       if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
-                 "file might be new or changed, invalidating cache (%d %d)",
-                 dirent.mtime(), dirent.cached_mtime());
+                 "file might be new or changed, invalidating cache (%d %d %d)",
+                 dirent.mtime(), dirent.cached_mtime(), ino);
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
         inode_cache_->Insert(ino, dirent);
@@ -1648,7 +1651,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailNfsMaps;
     }
     if (!nfs_maps::Init(leveldb_cache_dir,
-                        catalog::AbstractCatalogManager::GetRootInode(),
+                        catalog::AbstractCatalogManager::kInodeOffset+1,
                         rebuild_cachedb))
     {
       *g_boot_error = "Failed to initialize NFS maps";
@@ -1683,7 +1686,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   if (quota::GetSize() > quota::GetCapacity()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "cache is already beyond quota size, cleaning up");
+             "cache is already beyond quota size "
+             "(size: %"PRId64", capacity: %"PRId64"), cleaning up",
+             quota::GetSize(), quota::GetCapacity());
     if (!quota::Cleanup(quota_threshold)) {
       *g_boot_error = "Failed to clean up cache";
       return loader::kFailQuota;
@@ -1739,8 +1744,15 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Load initial file catalog
+  LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
+           sizeof(fuse_ino_t) * 8);
+  cvmfs::inode_annotation_ =
+    new catalog::InodeRevisionAnnotation(sizeof(fuse_ino_t)*8);
   cvmfs::catalog_manager_ =
       new cache::CatalogManager(*cvmfs::repository_name_, ignore_signature);
+  if (!nfs_source) {
+    cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
+  }
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
@@ -1823,12 +1835,14 @@ static void Fini() {
   if (g_options_ready) options::Fini();
 
   delete cvmfs::catalog_manager_;
+  delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::live_file_chunks_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
   cvmfs::catalog_manager_ = NULL;
+  cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::live_file_chunks_ = NULL;
   cvmfs::path_cache_ = NULL;
@@ -1870,10 +1884,15 @@ static bool MaintenanceMode(const int fd_progress) {
 
 
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
+  unsigned num_open_dirs = cvmfs::directory_handles_->size();
+  if (num_open_dirs == 0)
+    return true;
+
   string msg_progress = "Saving open directory handles (" +
-    StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
+    StringifyInt(num_open_dirs) + " handles)\n";
   SendMsg2Socket(fd_progress, msg_progress);
 
+  // TODO: should rather be saved just in a malloc'd memory block
   cvmfs::DirectoryHandles *saved_handles =
     new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
   loader::SavedState *save_open_dirs = new loader::SavedState();

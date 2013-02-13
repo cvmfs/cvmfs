@@ -68,10 +68,10 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
   }
   retval = platform_readahead(fd_readahead);
   if (retval != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to read-ahead %s (%d)",
+    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog, "failed to read-ahead %s (%d)",
              filename_.c_str(), errno);
-    close(fd_readahead);
-    goto database_failure;
+    //close(fd_readahead);
+    //goto database_failure;
   }
   close(fd_readahead);
 
@@ -498,15 +498,16 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
 
   // retrieve the hardlink information from the hardlinks database field
-  const uint64_t hardlinks = RetrieveInt64(1);
-  result.linkcount_ = Hardlinks2Linkcount(hardlinks);
-  result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
-
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
+    result.linkcount_ = 1;
+    result.hardlink_group_ = 0;
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
     result.uid_ = g_uid;
     result.gid_ = g_gid;
   } else {
+    const uint64_t hardlinks = RetrieveInt64(1);
+    result.linkcount_ = Hardlinks2Linkcount(hardlinks);
+    result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
                                                          result.hardlink_group_);
     result.uid_ = RetrieveInt64(13);

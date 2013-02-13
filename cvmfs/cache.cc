@@ -64,6 +64,40 @@ using namespace std;  // NOLINT
 namespace cache {
 
 /**
+ * A CallQuard object can be placed at the beginning of a function.  It counts
+ * the number of so-annotated functions that are in flight.  The Drainout() call
+ * will wait until all functions that have been called so far are finished.
+ *
+ * The class is used in order to wait for remaining calls when switching into
+ * the read-only cache mode.
+ */
+class CallGuard {
+ public:
+  CallGuard() {
+    int32_t global_drainout = atomic_read32(&global_drainout_);
+    drainout_ = (global_drainout != 0);
+    if (!drainout_)
+      atomic_inc32(&num_inflight_calls_);
+  }
+  ~CallGuard() {
+    if (!drainout_)
+      atomic_dec32(&num_inflight_calls_);
+  }
+  static void Drainout() {
+    atomic_cas32(&global_drainout_, 0, 1);
+    while (atomic_read32(&num_inflight_calls_) != 0)
+      SafeSleepMs(50);
+  }
+ private:
+  bool drainout_;
+  static atomic_int32 global_drainout_;
+  static atomic_int32 num_inflight_calls_;
+};
+atomic_int32 CallGuard::num_inflight_calls_ = 0;
+atomic_int32 CallGuard::global_drainout_ = 0;
+
+
+/**
  * Everything that should be reused per thread
  */
 struct ThreadLocalStorage {
@@ -82,6 +116,8 @@ pthread_mutex_t lock_queues_download_ = PTHREAD_MUTEX_INITIALIZER;
 pthread_key_t thread_local_storage_;
 atomic_int64 num_download_;
 
+CacheModes cache_mode_;
+
 
 static void CleanupTLS(void *data) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(data);
@@ -96,6 +132,7 @@ static void CleanupTLS(void *data) {
  * \return True on success, false otherwise
  */
 bool Init(const string &cache_path) {
+  cache_mode_ = kCacheReadWrite;
   cache_path_ = new string(cache_path);
   queues_download_ = new ThreadQueues();
   atomic_init64(&num_download_);
@@ -124,6 +161,18 @@ void Fini() {
   delete queues_download_;
   cache_path_ = NULL;
   queues_download_ = NULL;
+}
+
+
+CacheModes GetCacheMode() {
+  return cache_mode_;
+}
+
+void TearDown2ReadOnly() {
+  cache_mode_ = kCacheReadOnly;
+  CallGuard::Drainout();
+  quota::Fini();
+  LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
 }
 
 
@@ -181,7 +230,9 @@ int Open(const hash::Any &id) {
  * @param[out] size Size of the file
  * \return True if successful, false otherwise.
  */
-bool Open2Mem(const hash::Any &id, unsigned char **buffer, uint64_t *size) {
+static bool Open2Mem(const hash::Any &id,
+                     unsigned char **buffer, uint64_t *size)
+{
   *size = 0;
   *buffer = NULL;
 
@@ -221,9 +272,12 @@ bool Open2Mem(const hash::Any &id, unsigned char **buffer, uint64_t *size) {
  * @param[out] temp_path Absolute path of the temporoary file in local cache
  * \return File descriptor of temporary file, error code of mkstemp() else
  */
-int StartTransaction(const hash::Any &id,
-                     string *final_path, string *temp_path)
+static int StartTransaction(const hash::Any &id,
+                            string *final_path, string *temp_path)
 {
+  if (cache_mode_ == kCacheReadOnly)
+    return -EROFS;
+
   int result;
   *final_path = GetPathInCache(id);
   *temp_path = GetTempName();
@@ -251,8 +305,9 @@ int StartTransaction(const hash::Any &id,
  * @param[in] temp_path Absolute path of the temporoary file in local cache
  * \return Zero on success, error code of unlink() else.
  */
-int AbortTransaction(const string &temp_path) {
+static int AbortTransaction(const string &temp_path) {
   LogCvmfs(kLogCache, kLogDebug, "abort %s", temp_path.c_str());
+
   int result = unlink(temp_path.c_str());
   if (result == -1)
     return -errno;
@@ -274,11 +329,11 @@ int AbortTransaction(const string &temp_path) {
  * @param[in] size Decompressed size of the file
  * \return Zero on success, non-zero else.
  */
-int CommitTransaction(const string &final_path,
-                      const string &temp_path,
-                      const string &cvmfs_path,
-                      const hash::Any &hash,
-                      const uint64_t size)
+static int CommitTransaction(const string &final_path,
+                             const string &temp_path,
+                             const string &cvmfs_path,
+                             const hash::Any &hash,
+                             const uint64_t size)
 {
   int result;
   LogCvmfs(kLogCache, kLogDebug, "commit %s %s",
@@ -301,8 +356,8 @@ int CommitTransaction(const string &final_path,
  * Commits the memory blob buffer to the given chunk id and name on cvmfs.
  * No checking! The hash and the memory blob need to match.
  */
-bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
-                   const uint64_t size, const std::string &cvmfs_path)
+static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
+                          const uint64_t size, const std::string &cvmfs_path)
 {
   string temp_path;
   string final_path;
@@ -319,19 +374,6 @@ bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
   }
 
   return CommitTransaction(final_path, temp_path, cvmfs_path, id, size) == 0;
-}
-
-
-/**
- * Checks for a file in local cache.  Because we support parallel operations,
- * this is just a hint.  Open gives a definitive answer.
- *
- * @param[in] id content hash of the catalog entry.
- * \return True, if file is in local cache, false otherwise.
- */
-bool Contains(const hash::Any &id) {
-  platform_stat64 info;
-  return platform_stat(GetPathInCache(id).c_str(), &info) == 0;
 }
 
 
@@ -386,19 +428,24 @@ int Fetch(const hash::Any &checksum,
           const string    &hash_suffix,
           const size_t     size,
           const string    &cvmfs_path) {
+  CallGuard call_guard;
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
+
+  // Try to open from local cache
+  if ((fd_return = cache::Open(d.checksum())) >= 0) {
+    if (cache_mode_ == kCacheReadWrite)
+      quota::Touch(d.checksum());
+    return fd_return;
+  }
+
+  if (cache_mode_ == kCacheReadOnly)
+    return -EROFS;
 
   if (size > quota::GetMaxFileSize()) {
     LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64")",
              size);
     return -ENOSPC;
-  }
-
-  // Try to open from local cache
-  if ((fd_return = cache::Open(checksum)) >= 0) {
-    quota::Touch(checksum);
-    return fd_return;
   }
 
   // Initialize TLS
@@ -605,6 +652,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
                                                   const string &cvmfs_path,
                                                   std::string *catalog_path)
 {
+  CallGuard call_guard;
   int64_t size;
   int retval;
   bool pin_retval;
@@ -617,22 +665,27 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
     LogCvmfs(kLogCache, kLogDebug, "found catalog %s in cache",
              hash.ToString().c_str());
 
-    size = GetFileSize(catalog_path->c_str());
-    assert(size > 0);
-    pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path);
-    if (!pin_retval) {
-      quota::Remove(hash);
-      unlink(catalog_path->c_str());
-      LogCvmfs(kLogCache, kLogDebug,
-               "failed to pin cached copy of catalog %s",
-               hash.ToString().c_str());
-      return catalog::kLoadNoSpace;
+    if (cache_mode_ == kCacheReadWrite) {
+      size = GetFileSize(catalog_path->c_str());
+      assert(size > 0);
+      pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path);
+      if (!pin_retval) {
+        quota::Remove(hash);
+        unlink(catalog_path->c_str());
+        LogCvmfs(kLogCache, kLogDebug,
+                 "failed to pin cached copy of catalog %s",
+                 hash.ToString().c_str());
+        return catalog::kLoadNoSpace;
+      }
     }
     // Pinned, can be safely renamed
     retval = rename(catalog_path->c_str(), cache_path.c_str());
     *catalog_path = cache_path;
     return catalog::kLoadNew;
   }
+
+  if (cache_mode_ == kCacheReadOnly)
+    return catalog::kLoadFail;
 
   // Download
   string temp_path;
@@ -685,6 +738,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
                                                const hash::Any &hash,
                                                std::string *catalog_path)
 {
+  CallGuard call_guard;
   string cvmfs_path = "file catalog at " + repo_name_ + ":" +
     (mountpoint.IsEmpty() ?
       "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
@@ -743,15 +797,17 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
     if (!cache_hash.IsNull()) {
       // TODO remove code duplication
       if (catalog_path) {
-        *catalog_path = "." + cache_hash.MakePath(1, 2);
-        int64_t size = GetFileSize(*catalog_path);
-        assert(size >= 0);
-        retval = quota::Pin(cache_hash, uint64_t(size),
-                            cvmfs_path);
-        if (!retval) {
-          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-                   "failed to pin cached root catalog");
-          return catalog::kLoadFail;
+        if (cache_mode_ == kCacheReadWrite) {
+          *catalog_path = "." + cache_hash.MakePath(1, 2);
+          int64_t size = GetFileSize(*catalog_path);
+          assert(size >= 0);
+          retval = quota::Pin(cache_hash, uint64_t(size),
+                              cvmfs_path);
+          if (!retval) {
+            LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+                     "failed to pin cached root catalog");
+            return catalog::kLoadFail;
+          }
         }
         loaded_catalogs_[mountpoint] = cache_hash;
         offline_mode_ = true;
@@ -771,14 +827,16 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
     if (catalog_path) {
       *catalog_path = "." + cache_hash.MakePath(1, 2);
       // quota::Pin is only effective on first load, afterwards it is a NOP
-      int64_t size = GetFileSize(*catalog_path);
-      assert(size >= 0);
-      retval = quota::Pin(cache_hash, uint64_t(size),
-                          cvmfs_path);
-      if (!retval) {
-        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-                 "failed to pin cached root catalog");
-        return catalog::kLoadFail;
+      if (cache_mode_ == kCacheReadWrite) {
+        int64_t size = GetFileSize(*catalog_path);
+        assert(size >= 0);
+        retval = quota::Pin(cache_hash, uint64_t(size),
+                            cvmfs_path);
+        if (!retval) {
+          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+                   "failed to pin cached root catalog");
+          return catalog::kLoadFail;
+        }
       }
       loaded_catalogs_[mountpoint] = cache_hash;
       return catalog::kLoadUp2Date;
@@ -789,6 +847,9 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   }
   if (!catalog_path)
     return catalog::kLoadNew;
+
+  if (cache_mode_ == kCacheReadOnly)
+    return catalog::kLoadFail;
 
   // Load new catalog
   catalog::LoadError load_retval =
@@ -834,7 +895,9 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
     mounted_catalogs_.find(catalog->path());
   assert(iter != mounted_catalogs_.end());
 
-  quota::Unpin(iter->second);
+  if (cache_mode_ == kCacheReadWrite)
+    quota::Unpin(iter->second);
+
   mounted_catalogs_.erase(iter);
   catalog::Counters counters;
   catalog->GetCounters(&counters);

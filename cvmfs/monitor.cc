@@ -13,7 +13,6 @@
 
 #include <signal.h>
 #include <sys/resource.h>
-#include <execinfo.h>
 #ifdef __APPLE__
   #include <sys/ucontext.h>
 #else
@@ -50,6 +49,9 @@ const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 
 string *cache_dir_ = NULL;
 string *process_name_ = NULL;
+string *exe_path_ = NULL;
+string *helper_script_path_ = NULL;
+string *helper_script_gdb_cmd_path_;
 bool spawned_ = false;
 unsigned max_open_files_;
 int pipe_wd_[2];
@@ -58,33 +60,8 @@ stack_t sighandler_stack_;
 
 
 /**
- * Get the instruction pointer in a platform independant fashion.
- */
-static void* GetInstructionPointer(ucontext_t *uc) {
-  void *result;
-
-#ifdef __APPLE__
-#ifdef __x86_64__
-  result = reinterpret_cast<void *>(uc->uc_mcontext->__ss.__rip);
-#else
-  result = reinterpret_cast<void *>(uc-uc_mcontext->__ss.__eip);
-#endif
-
-#else  // Linux
-
-#ifdef __x86_64__
-  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_RIP]);
-#else
-  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_EIP]);
-#endif
-#endif
-
-  return result;
-}
-
-
-/**
- * Signal handler for bad things.  Send debug information to watchdog.
+ * Signal handler for signals that indicate a cvmfs crash.
+ * Sends debug information to watchdog.
  */
 static void SendTrace(int signal,
                       siginfo_t *siginfo __attribute__((unused)),
@@ -96,28 +73,29 @@ static void SendTrace(int signal,
     while (true) {}
   }
 
-  void *adr_buf[kMaxBacktrace];
   char cflow = 'S';
   if (write(pipe_wd_[1], &cflow, 1) != 1)
     _exit(1);
 
+  // write the occured signal
   if (write(pipe_wd_[1], &signal, sizeof(signal)) != sizeof(signal))
     _exit(1);
+
+  // write the last error number
   if (write(pipe_wd_[1], &send_errno, sizeof(send_errno)) != sizeof(send_errno))
     _exit(1);
 
-  int stack_size = backtrace(adr_buf, kMaxBacktrace);
-  // Fix around sigaction
-  if (stack_size > 1) {
-    ucontext_t *uc = reinterpret_cast<ucontext_t *>(context);
-    adr_buf[1] = GetInstructionPointer(uc);
-  }
-  if (write(pipe_wd_[1], &stack_size, sizeof(stack_size)) != sizeof(stack_size))
+  // write the PID
+  pid_t pid = getpid();
+  if (write(pipe_wd_[1], &pid, sizeof(pid_t)) != sizeof(pid_t))
     _exit(1);
-  backtrace_symbols_fd(adr_buf, stack_size, pipe_wd_[1]);
 
   cflow = 'Q';
   (void)write(pipe_wd_[1], &cflow, 1);
+
+  // do not die before the stack trace was generated
+  // kill -9 <pid> will finish this
+  while(true) {}
 
   _exit(1);
 }
@@ -146,16 +124,53 @@ static void LogEmergency(string msg) {
 
 
 /**
- * Read a line from the pipe.
- * Quite inefficient but good enough for the purpose.
+ * Uses an external shell and gdb to create a full stack trace of the dying
+ * cvmfs client. The same shell is used to force-quit the client afterwards.
  */
-static string ReadLineFromPipe() {
+static string GenerateStackTraceAndKill(const string &exe_path,
+                                        const pid_t pid)
+{
+  int retval;
+
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  retval = Shell(&fd_stdin, &fd_stdout, &fd_stderr);
+  assert(retval);
+
+  // Let the shell execute the stacktrace extraction script
+  const string bt_cmd = *helper_script_path_ + " " + exe_path + " " +
+                        StringifyInt(pid) + " " +
+                        *helper_script_gdb_cmd_path_ + "\n";
+  WritePipe(fd_stdin, bt_cmd.data(), bt_cmd.length());
+
+  // close the standard in to close the shell
+  close(fd_stdin);
+
+  // read the stack trace from the stdout of our shell
   string result = "";
-  char next;
-  while (read(pipe_wd_[0], &next, 1) == 1) {
-    result += next;
-    if (next == '\n') break;
+  char mini_buffer;
+  int chars_io;
+  while (1) {
+    chars_io = read(fd_stdout, &mini_buffer, 1);
+    if (chars_io <= 0) break;
+    result += mini_buffer;
   }
+
+  // check if the stacktrace readout went fine
+  if (chars_io < 0) {
+    result += "failed to read stack traces";
+  }
+
+  // close the pipes to the shell
+  close(fd_stderr);
+  close(fd_stdout);
+
+  // give the dying cvmfs client the finishing stroke
+  if (kill(pid, SIGKILL) != 0) {
+    result += "Failed to kill cvmfs client!\n\n";
+  }
+
   return result;
 }
 
@@ -164,7 +179,6 @@ static string ReadLineFromPipe() {
  * Generates useful information from the backtrace log in the pipe.
  */
 static string ReportStacktrace() {
-  int stack_size;
   string debug = "--\n";
 
   int recv_signal;
@@ -181,19 +195,20 @@ static string ReportStacktrace() {
   {
     return "failure while reading errno";
   }
-  debug += ", errno: " + StringifyInt(errno) + "\n";
+  debug += ", errno: " + StringifyInt(errno);
 
-  debug += "version: " + string(VERSION) + "\n";
+  debug += ", version: " + string(VERSION);
 
-  if (read(pipe_wd_[0], &stack_size, sizeof(stack_size)) <
-      int(sizeof(stack_size)))
-  {
-    return "failure while reading stacktrace";
+  pid_t pid;
+  if (read(pipe_wd_[0], &pid, sizeof(pid_t)) < int(sizeof(pid_t))) {
+    return "failure while reading PID";
   }
+  debug += ", PID: " + StringifyInt(pid) + "\n";
 
-  for (int i = 0; i < stack_size; ++i) {
-    debug += ReadLineFromPipe();
-  }
+  debug += "Executable path: " + *exe_path_ + "\n";
+
+  debug += GenerateStackTraceAndKill(*exe_path_, pid);
+
   return debug;
 }
 
@@ -222,12 +237,126 @@ static void Watchdog() {
 }
 
 
+static bool CreateStacktraceScript(const std::string &cache_dir,
+                                   const std::string &process_name) {
+  const string script =
+"#!/bin/sh\n"
+"\n"
+"# This script is almost identical to /usr/bin/gstack.\n"
+"# It is used by monitor.cc on Linux and MacOS X.\n"
+"\n"
+"# Note: this script was taken from the ROOT svn repository\n"
+"#       and slightly adapted to print a stacktrace to stdout instead\n"
+"#       of an output file.\n"
+"\n"
+"tempname=`basename $0 .sh`\n"
+"\n"
+"if test $# -lt 3; then\n"
+"   echo \"Usage: ${tempname} <executable> <process-id> <gdb cmd file>\" 1>&2\n"
+"   exit 1\n"
+"fi\n"
+"\n"
+"if [ `uname -s` = \"Darwin\" ]; then\n"
+"\n"
+"   if test ! -x $1; then\n"
+"      echo \"${tempname}: process $1 not found.\" 1>&2\n"
+"      exit 1\n"
+"   fi\n"
+"\n"
+"   GDB=${GDB:-gdb}\n"
+"\n"
+"   # Run GDB, strip out unwanted noise.\n"
+"   $GDB -q -batch -x $3 -n $1 $2 2>&1  < /dev/null |\n"
+"   /usr/bin/sed -n \\\n"
+"    -e 's/^(gdb) //' \\\n"
+"    -e '/^#/p' \\\n"
+"    -e 's/\\(^Thread.*\\)/@\1/p' | tr \"@\" \"\\n\" > /dev/stdout\n"
+"\n"
+"   rm -f $TMPFILE\n"
+"\n"
+"else\n"
+"\n"
+"   if test ! -r /proc/$2; then\n"
+"      echo \"${tempname}: process $2 not found.\" 1>&2\n"
+"      exit 1\n"
+"   fi\n"
+"\n"
+"   GDB=${GDB:-gdb}\n"
+"\n"
+"   # Run GDB, strip out unwanted noise.\n"
+"   $GDB -q -batch -x $3 -n /proc/$2/exe $2 |\n"
+"   /bin/sed -n \\\n"
+"      -e 's/^(gdb) //' \\\n"
+"      -e '/^#/p' \\\n"
+"      -e '/^   /p' \\\n"
+"      -e 's/\\(^Thread.*\\)/@\1/p' | tr '@' '\\n' > /dev/stdout\n"
+"fi\n"
+"";
+
+  const string gdb = "thread apply all bt\n";
+
+  //
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  //
+
+  FILE *fp = fopen(helper_script_path_->c_str(), "w");
+
+  if (!fp ||
+      fwrite(script.data(), 1, script.length(), fp) != script.length() ||
+      (chmod(helper_script_path_->c_str(), S_IRUSR | S_IWUSR | S_IXUSR) != 0))
+  {
+    LogCvmfs(kLogMonitor, kLogStderr, "Failed to create gdb helper script (%d)",
+             errno);
+    goto create_stacktrace_fail;
+  }
+  fclose(fp);
+
+  fp = fopen(helper_script_gdb_cmd_path_->c_str(), "w");
+  if (!fp ||
+      fwrite(gdb.data(), 1, gdb.length(), fp) != gdb.length() ||
+      (chmod(helper_script_gdb_cmd_path_->c_str(), S_IRUSR | S_IWUSR) != 0))
+  {
+    LogCvmfs(kLogMonitor, kLogStderr,
+             "Failed to create gdb helper helper script (%d)");
+    goto create_stacktrace_fail;
+  }
+  fclose(fp);
+
+  return true;
+
+ create_stacktrace_fail:
+  if (fp)
+    fclose(fp);
+  return false;
+}
+
+
 bool Init(const string &cache_dir, const std::string &process_name,
           const bool check_max_open_files)
 {
   monitor::cache_dir_ = new string(cache_dir);
   monitor::process_name_ = new string(process_name);
+  monitor::exe_path_ = new string(platform_getexepath());
+  monitor::helper_script_path_ =
+    new string(cache_dir + "/gdb-helper." + process_name + ".sh");
+  monitor::helper_script_gdb_cmd_path_ =
+    new string(cache_dir + "/gdb-helper-gdb-cmd." + process_name);
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
+
+  // create stacktrace retrieve script in cache directory
+  if (!CreateStacktraceScript(cache_dir, process_name)) {
+    delete monitor::cache_dir_;
+    delete monitor::exe_path_;
+    delete monitor::process_name_;
+    delete monitor::helper_script_path_;
+    delete monitor::helper_script_gdb_cmd_path_;
+    monitor::cache_dir_ = NULL;
+    monitor::process_name_ = NULL;
+    monitor::exe_path_ = NULL;
+    monitor::helper_script_path_ = NULL;
+    monitor::helper_script_gdb_cmd_path_ = NULL;
+    return false;
+  }
 
   /* check number of open files */
   if (check_max_open_files) {
@@ -262,11 +391,6 @@ bool Init(const string &cache_dir, const std::string &process_name,
     max_open_files_ = 0;
   }
 
-  // Dummy call to backtrace to load library
-  void *unused = NULL;
-  backtrace(&unused, 1);
-  if (!unused) return false;
-
   return true;
 }
 
@@ -286,15 +410,23 @@ void Fini() {
     sighandler_stack_.ss_size = 0;
   }
 
-  delete process_name_;
-  delete cache_dir_;
-  process_name_ = NULL;
-  cache_dir_ = NULL;
   if (spawned_) {
     char quit = 'Q';
     (void)write(pipe_wd_[1], &quit, 1);
     close(pipe_wd_[1]);
+    unlink(helper_script_path_->c_str());
+    unlink(helper_script_gdb_cmd_path_->c_str());
   }
+  delete process_name_;
+  delete cache_dir_;
+  delete exe_path_;
+  delete helper_script_path_;
+  delete helper_script_gdb_cmd_path_;
+  process_name_ = NULL;
+  cache_dir_ = NULL;
+  exe_path_ = NULL;
+  helper_script_path_ = NULL;
+  helper_script_gdb_cmd_path_ = NULL;
   platform_spinlock_destroy(&lock_handler_);
 }
 
@@ -306,6 +438,8 @@ void Spawn() {
 
   pid_t pid;
   int statloc;
+  int max_fd = sysconf(_SC_OPEN_MAX);
+  assert(max_fd >= 0);
   switch (pid = fork()) {
     case -1: abort();
     case 0:
@@ -315,6 +449,11 @@ void Spawn() {
         case 0: {
           close(pipe_wd_[1]);
           Daemonize();
+          // Close all unused file descriptors
+          for (int fd = 0; fd < max_fd; fd++) {
+            if (fd != pipe_wd_[0])
+              close(fd);
+          }
           Watchdog();
           exit(0);
         }

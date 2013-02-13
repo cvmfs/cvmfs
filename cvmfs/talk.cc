@@ -43,6 +43,7 @@
 #include "nfs_maps.h"
 #include "loader.h"
 #include "options.h"
+#include "cache.h"
 
 using namespace std;  // NOLINT
 
@@ -313,6 +314,19 @@ static void *MainTalk(void *data __attribute__((unused))) {
           StringifyInt(LinkString::num_instances()) + "  overflows: " +
           StringifyInt(LinkString::num_overflows()) + "\n";
 
+        result += "\nCache Mode: ";
+        switch (cache::GetCacheMode()) {
+          case cache::kCacheReadWrite:
+            result += "read-write";
+            break;
+          case cache::kCacheReadOnly:
+            result += "read-only";
+            break;
+          default:
+            result += "unknown";
+        }
+        result += "\n";
+
         if (cvmfs::nfs_maps_) {
           result += "\nLEVELDB Statistics:\n";
           result += nfs_maps::GetStatistics();
@@ -397,6 +411,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         Answer(con_fd, version_str);
       } else if (line == "version patchlevel") {
         Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
+      } else if (line == "tear down to read-only") {
+        cache::TearDown2ReadOnly();
+        Answer(con_fd, "In read-only mode\n");
       } else {
         Answer(con_fd, "unknown command\n");
       }

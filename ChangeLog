@@ -1,5 +1,16 @@
 2.1.7:
-  * Fixed mount helper return values
+  * Experimental support for cache read-only mode
+  * Improved error reporting on mount failures
+  * Fix: create stack traces by gdb, thereby handle hidden 
+    symbols
+  * Packaging: Do not try to reload when upgrading from
+    the 2.0 branch
+  * Fix: Save fuse module state only after drainout of
+         file system calls
+  * Fix: stale page caches across file catalog reloads
+  * Fix: hardlink count for entries of 2.0 file catalogs
+  * Fix: don't retry downloads on HTTP errors 
+  * Fix: comply with system mount return values in the helper
   * Renamed cvmfs-lib RPM to cvmfs-devel 
   * Fixed cvmfs_config reload on clean nodes
 

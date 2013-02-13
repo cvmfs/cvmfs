@@ -72,6 +72,22 @@ struct Statistics {
   }
 };
 
+
+class InodeRevisionAnnotation : public InodeAnnotation {
+ public:
+  InodeRevisionAnnotation(const unsigned inode_width);
+  ~InodeRevisionAnnotation() { };
+  inode_t Annotate(const inode_t raw_inode) {
+    return raw_inode | revision_annotation_;
+  }
+  void SetRevision(const uint64_t new_revision);
+
+ private:
+  unsigned inode_width_;
+  uint64_t revision_annotation_;
+};
+
+
 /**
  * This class provides the read-only interface to a tree of catalogs
  * representing a (subtree of a) repository.
@@ -88,9 +104,11 @@ struct Statistics {
  */
 class AbstractCatalogManager {
  public:
+  const static inode_t kInodeOffset = 255;
   AbstractCatalogManager();
   virtual ~AbstractCatalogManager();
 
+  void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadError Remount(const bool dry_run);
   void DetachAll() { DetachSubtree(GetRootCatalog()); }
@@ -125,7 +143,10 @@ class AbstractCatalogManager {
    * ('root' means the root of the whole file system)
    * @return the root inode number
    */
-  static inline inode_t GetRootInode() { return kInodeOffset + 1; }
+  inline inode_t GetRootInode() const {
+    return inode_annotation_ ?
+      inode_annotation_->Annotate(kInodeOffset + 1) : kInodeOffset + 1;
+  }
   /**
    * Inodes are ambiquitous under some circumstances, to prevent problems
    * they must be passed through this method first
@@ -188,7 +209,6 @@ class AbstractCatalogManager {
   virtual void EnforceSqliteMemLimit();
 
  private:
-  const static inode_t kInodeOffset = 255;
   /**
    * This list is only needed to find a catalog given an inode.
    * This might possibly be done by walking the catalog tree, similar to
@@ -196,6 +216,7 @@ class AbstractCatalogManager {
    */
   CatalogList catalogs_;
   uint64_t inode_gauge_;  /**< highest issued inode */
+  InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;

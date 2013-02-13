@@ -40,6 +40,8 @@ enum Failures {
   kFailHostResolve,
   kFailProxyConnection,
   kFailHostConnection,
+  kFailProxyHttp,
+  kFailHostHttp,
   kFailBadData,
   kFailOther,
 };

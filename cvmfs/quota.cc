@@ -97,6 +97,7 @@ pthread_t thread_lru_;
 int pipe_lru_[2];
 bool shared_;
 bool spawned_;
+bool initialized_ = false;
 map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
 int fd_lock_cachedb_;
 
@@ -888,6 +889,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (pipe_lru_[1] >= 0) {
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
+    initialized_ = true;
     Nonblock2Block(pipe_lru_[1]);
     UnlockFile(fd_lockfile);
     GetLimits(&limit_, &cleanup_threshold_);
@@ -983,6 +985,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
 
   UnlockFile(fd_lockfile);
 
+  initialized_ = true;
   GetLimits(&limit_, &cleanup_threshold_);
   LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
            limit_, cleanup_threshold_);
@@ -1098,6 +1101,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
     return false;
 
   MakePipe(pipe_lru_);
+  initialized_ = true;
 
   return true;
 }
@@ -1123,6 +1127,8 @@ void Spawn() {
  * Cleanup, closes SQLite connections.
  */
 void Fini() {
+  if (!initialized_) return;
+
   delete cache_dir_;
   cache_dir_ = NULL;
 
@@ -1152,6 +1158,7 @@ void Fini() {
  * \return True on success, false otherwise
  */
 bool Cleanup(const uint64_t leave_size) {
+  if (!initialized_) return false;
   bool result;
 
   if (!spawned_) {
@@ -1202,6 +1209,7 @@ static void DoInsert(const hash::Any &hash, const uint64_t size,
 void Insert(const hash::Any &any_hash, const uint64_t size,
             const string &cvmfs_path)
 {
+  assert(initialized_);
   if (limit_ == 0) return;
   DoInsert(any_hash, size, cvmfs_path, false);
 }
@@ -1216,6 +1224,7 @@ void Insert(const hash::Any &any_hash, const uint64_t size,
 bool Pin(const hash::Any &hash, const uint64_t size,
          const string &cvmfs_path)
 {
+  assert(initialized_);
   if (limit_ == 0) return true;
 
   const string hash_str = hash.ToString();
@@ -1292,6 +1301,7 @@ void Unpin(const hash::Any &hash) {
  * Updates the sequence number of the file specified by the hash.
  */
 void Touch(const hash::Any &hash) {
+  assert(initialized_);
   if (limit_ == 0) return;
 
   LruCommand cmd;
@@ -1305,6 +1315,7 @@ void Touch(const hash::Any &hash) {
  * Removes a chunk from cache, if it exists.
  */
 void Remove(const hash::Any &hash) {
+  assert(initialized_);
   string hash_str = hash.ToString();
 
   if (limit_ != 0) {
@@ -1320,6 +1331,11 @@ void Remove(const hash::Any &hash) {
 
 static vector<string> DoList(const CommandType list_command) {
   vector<string> result;
+  if (!initialized_) {
+    result.push_back("--CACHE UNMANAGED--");
+    return result;
+  }
+
   int pipe_list[2];
   MakeReturnPipe(pipe_list);
   char path_buffer[kMaxCvmfsPath];
@@ -1372,17 +1388,24 @@ vector<string> ListCatalogs() {
  * files smaller than limit-cleanup_threshold.
  */
 uint64_t GetMaxFileSize() {
+  if (!initialized_) return 0;
   if (limit_ == 0) return INT64_MAX;
   return limit_ - cleanup_threshold_;
 }
 
 
 uint64_t GetCapacity() {
+  if (!initialized_) return 0;
   return limit_;
 }
 
 
 static void GetStatus(uint64_t *gauge, uint64_t *pinned) {
+  if (!initialized_) {
+    *gauge = 0;
+    *pinned = 0;
+    return;
+  }
   int pipe_status[2];
   MakeReturnPipe(pipe_status);
 
@@ -1415,6 +1438,11 @@ uint64_t GetSizePinned() {
 
 
 static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold) {
+  if (!initialized_) {
+    *limit = 0;
+    *cleanup_threshold = 0;
+    return;
+  }
   int pipe_limits[2];
   MakeReturnPipe(pipe_limits);
 
@@ -1428,7 +1456,7 @@ static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold) {
 }
 
 pid_t GetPid() {
-  if (!shared_ || !spawned_) {
+  if (!initialized_ || !shared_ || !spawned_) {
     return cvmfs::pid_;
   }
 

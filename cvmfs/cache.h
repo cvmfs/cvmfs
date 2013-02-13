@@ -27,22 +27,15 @@ struct Any;
 
 namespace cache {
 
+enum CacheModes {
+  kCacheReadWrite = 0,
+  kCacheReadOnly,
+};
+
 bool Init(const std::string &cache_path);
 void Fini();
 
 int Open(const hash::Any &id);
-bool Open2Mem(const hash::Any &id, unsigned char **buffer, uint64_t *size);
-int StartTransaction(const hash::Any &id,
-                     std::string *final_path, std::string *temp_path);
-int AbortTransaction(const std::string &temp_path);
-int CommitTransaction(const std::string &final_path,
-                      const std::string &temp_path,
-                      const std::string &cvmfs_path,
-                      const hash::Any &hash,
-                      const uint64_t size);
-bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
-                   const uint64_t size, const std::string &cvmfs_path);
-bool Contains(const hash::Any &id);
 int Fetch(const catalog::DirectoryEntry &d, const std::string &cvmfs_path);
 int Fetch(const FileChunk &chunk, const std::string &cvmfs_path);
 int Fetch(const hash::Any   &checksum,
@@ -50,6 +43,9 @@ int Fetch(const hash::Any   &checksum,
           const size_t       size,
           const std::string &cvmfs_path);
 int64_t GetNumDownloads();
+
+CacheModes GetCacheMode();
+void TearDown2ReadOnly();
 
 
 /**

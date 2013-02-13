@@ -336,8 +336,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
                header_line.c_str());
-      info->error_code = (info->proxy == "") ? kFailHostConnection :
-                                               kFailProxyConnection;
+      info->error_code = (info->proxy == "") ? kFailHostHttp :
+                                               kFailProxyHttp;
       // code dependent error heuristics?
       return 0;
     }
@@ -683,7 +683,8 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       try_again = true;
     if ( same_url_retry || (
          ( (info->error_code == kFailHostResolve) ||
-           (info->error_code == kFailHostConnection) ) &&
+           (info->error_code == kFailHostConnection) ||
+           (info->error_code == kFailHostHttp)) &&
          info->probe_hosts &&
          opt_host_chain_ && (info->num_failed_hosts < opt_host_chain_->size()))
        )
@@ -692,7 +693,8 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if ( same_url_retry || (
          ( (info->error_code == kFailProxyResolve) ||
-           (info->error_code == kFailProxyConnection) ) &&
+           (info->error_code == kFailProxyConnection) ||
+           (info->error_code == kFailProxyHttp)) &&
          (info->num_failed_proxies < opt_num_proxies_))
        )
     {
@@ -737,9 +739,11 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->nocache = true;
         break;
       case kFailProxyResolve:
+      case kFailProxyHttp:
         switch_proxy = true;
         break;
       case kFailHostResolve:
+      case kFailHostHttp:
         switch_host = true;
         break;
       case kFailProxyConnection:
