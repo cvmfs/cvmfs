@@ -205,6 +205,7 @@ template <class AbstractProductT, typename ParameterT>
 class AbstractFactory {
  public:
   AbstractFactory() {}
+  virtual ~AbstractFactory() {}
 
   virtual bool WillHandle(const ParameterT &param) const = 0;
   virtual AbstractProductT* Construct(const ParameterT &param) const = 0;
@@ -299,6 +300,8 @@ class PolymorphicConstruction {
   typedef std::vector<Factory*> RegisteredPlugins;
 
  public:
+  virtual ~PolymorphicConstruction() {};
+
   static AbstractProductT* Construct(const ParameterT &param) {
     // lazy registration of plugins
     if (registered_plugins_.empty()) {
