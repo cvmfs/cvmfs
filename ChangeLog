@@ -4,6 +4,7 @@
   * Experimental support for cache read-only mode
   * Multi-threaded, extensible storage backend
   * Improved error reporting on mount failures
+  * Fix: store compressed certificate in replication
   * Fix: Build system for parallel builds 
   * Fix: create stack traces by gdb, thereby handle hidden 
     symbols

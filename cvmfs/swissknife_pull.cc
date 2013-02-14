@@ -261,12 +261,18 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
 
 static void UploadBuffer(const unsigned char *buffer, const unsigned size,
-                         const std::string dest_path)
+                         const std::string dest_path, const bool compress)
 {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
-  int retval = CopyMem2File(buffer, size, ftmp);
+  int retval;
+  if (compress) {
+    hash::Any dummy(hash::kSha1);
+    retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
+  } else {
+    retval = CopyMem2File(buffer, size, ftmp);
+  }
   assert(retval);
   fclose(ftmp);
   spooler->Upload(tmp_file, dest_path);
@@ -385,12 +391,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string certificate_path =
       "data" + ensemble.manifest->certificate().MakePath(1, 2) + "X";
     if (!spooler->Peek(certificate_path)) {
-      UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path);
+      UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path,
+                   true);
     }
     UploadBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                 ".cvmfswhitelist");
+                 ".cvmfswhitelist", false);
     UploadBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                 ".cvmfspublished");
+                 ".cvmfspublished", false);
   }
 
   spooler->WaitForUpload();
