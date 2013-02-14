@@ -342,23 +342,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  entries[i].size());
         retval = false;
       }
-
-      // check if there are any dangling chunks in the catalog
-      // (chunks are dangling, if they do not have a file referring to them)
-      // this should actually never happen because of database schema constraints
-      // but I've seen horses vomitting in front of the pharmacy :o)
-      const std::string sql =
-        "SELECT count(*) FROM chunks WHERE NOT EXISTS "
-        "(SELECT * FROM catalog WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileChunk) + " != 0 AND "
-        "chunks.md5path_1 == catalog.md5path_1 AND chunks.md5path_2 == catalog.md5path_2);";
-      catalog::Sql stmt(catalog->database(), sql);
-      stmt.Execute();
-      int64_t number_of_dangling_chunks = stmt.RetrieveInt64(0);
-      if (number_of_dangling_chunks > 0) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "found %d dangling chunks.",
-                 number_of_dangling_chunks);
-        return false;
-      }
     }
   }
 
@@ -367,6 +350,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     LogCvmfs(kLogCvmfs, kLogStderr, "wrong linkcount for %s; "
              "expected %lu, got %lu",
              path.c_str(), num_subdirs + 2, this_directory.linkcount());
+    retval = false;
   }
 
   // Check hardlink linkcounts
