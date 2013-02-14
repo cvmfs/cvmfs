@@ -23,6 +23,7 @@
 #include "swissknife_info.h"
 
 using namespace std;  // NOLINT
+using namespace swissknife;
 
 vector<swissknife::Command *> command_list;
 
@@ -71,15 +72,20 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandPull());
   command_list.push_back(new swissknife::CommandZpipe());
   command_list.push_back(new swissknife::CommandInfo());
+  command_list.push_back(new swissknife::CommandVersion());
 
   if (argc < 2) {
     swissknife::Usage();
     return 1;
   }
-  if ((string(argv[1]) == "--help") || (string(argv[1]) == "--version")) {
+  if ((string(argv[1]) == "--help")) {
     swissknife::Usage();
 		return 0;
 	}
+  if ((string(argv[1]) == "--version")) {
+    swissknife::CommandVersion().Main(swissknife::ArgumentList());
+    return 0;
+  }
 
   for (unsigned i = 0; i < command_list.size(); ++i) {
     if (command_list[i]->GetName() == string(argv[1])) {
