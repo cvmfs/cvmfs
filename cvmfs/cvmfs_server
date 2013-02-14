@@ -754,7 +754,7 @@ add_replica() {
 
   # sanity checks
   is_master_replica=$(cvmfs_swissknife info -r $stratum0 -m 2>/dev/null)
-  #[ "x$is_master_replica" != "xtrue" ] && die "The repository URL $stratum0 does not point to a replicable master copy of $name"
+  [ "x$is_master_replica" != "xtrue" ] && die "The repository URL $stratum0 does not point to a replicable master copy of $name"
   if check_repository_existence $name; then
     if is_stratum0 $name; then
       die "Repository $name already exists as a Stratum0 repository.\nYou cannot create a Stratum1 replica for $name on this machine."

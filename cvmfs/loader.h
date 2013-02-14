@@ -39,6 +39,8 @@ enum Failures {
   kFailMaintenanceMode,
   kFailSaveState,
   kFailRestoreState,
+  kFailOtherMount,
+  kFailDoubleMount,
 };
 
 
@@ -56,7 +58,7 @@ struct SavedState {
     state_id = kStateUnknown;
     state = NULL;
   }
-  
+
   uint32_t version;
   uint32_t size;
   StateId state_id;

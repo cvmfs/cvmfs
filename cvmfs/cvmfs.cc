@@ -1586,10 +1586,34 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Create lock file and running sentinel
-  g_fd_lockfile = LockFile("lock." + *cvmfs::repository_name_);
-  if (g_fd_lockfile < 0) {
+  g_fd_lockfile = TryLockFile("lock." + *cvmfs::repository_name_);
+  if (g_fd_lockfile == -1) {
     *g_boot_error = "could not acquire lock (" + StringifyInt(errno) + ")";
     return loader::kFailCacheDir;
+  } else if (g_fd_lockfile == -2) {
+    // Prevent double mount
+    string fqrn;
+    retval = platform_getxattr(*cvmfs::mountpoint_, "user.fqrn", &fqrn);
+    if (!retval) {
+      g_fd_lockfile = LockFile("lock." + *cvmfs::repository_name_);
+      if (g_fd_lockfile < 0) {
+        *g_boot_error = "could not acquire lock (" + StringifyInt(errno) + ")";
+        return loader::kFailCacheDir;
+      }
+    } else {
+      if (fqrn == *cvmfs::repository_name_) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                 "repository already mounted on %s",
+                 cvmfs::mountpoint_->c_str());
+        return loader::kFailDoubleMount;
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                 "CernVM-FS repository %s already mounted on %s",
+                 fqrn.c_str(), cvmfs::mountpoint_->c_str());
+        return loader::kFailOtherMount;
+
+      }
+    }
   }
   platform_stat64 info;
   if (platform_stat(("running." + *cvmfs::repository_name_).c_str(),

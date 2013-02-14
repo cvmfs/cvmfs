@@ -699,6 +699,13 @@ int main(int argc, char *argv[]) {
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
   if (retval != kFailOk) {
+    if (retval == kFailDoubleMount) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "\nCernVM-FS: repository %s already mounted on %s",
+               loader_exports_->repository_name.c_str(),
+               loader_exports_->mount_point.c_str());
+      return 0;
+    }
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslog, "%s (%d)",
              cvmfs_exports_->fnGetErrorMsg().c_str(), retval);
     return retval;

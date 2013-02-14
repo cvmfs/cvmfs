@@ -357,6 +357,29 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
   return true;
 }
 
+
+/**
+ * Tries to locks file path, return an error if file is already locked.
+ * Creates path if required.
+ *
+ * \return file descriptor, -1 on error, -2 if it would block
+ */
+int TryLockFile(const std::string &path) {
+  const int fd_lockfile = open(path.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (fd_lockfile < 0)
+    return -1;
+
+  if (flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) {
+    close(fd_lockfile);
+    if (errno != EWOULDBLOCK)
+      return -1;
+    return -2;
+  }
+
+  return fd_lockfile;
+}
+
+
 /**
  * Locks file path, blocks if file is already locked.  Creates path if required.
  *
