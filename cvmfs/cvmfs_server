@@ -210,6 +210,9 @@ check_repository_compatibility() {
     return 0 # trivial case... no update of CernVM-FS taken place
   fi
 
+  # all non-matching version numbers are treated as "incompatible" at the moment
+  # this might change from version to version and has to be considered here!
+
   if [ $# -gt 0 ]; then
     return 1
   fi

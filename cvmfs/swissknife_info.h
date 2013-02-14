@@ -25,9 +25,9 @@ class CommandInfo : public Command {
 class CommandVersion : public Command {
  public:
   ~CommandVersion() {};
-  std::string GetName()        { return "version";                      }
-  std::string GetDescription() { return "Prints the version CernVM-FS"; }
-  ParameterList GetParams()    { return ParameterList(); }
+  std::string GetName()        { return "version";                         }
+  std::string GetDescription() { return "Prints the version of CernVM-FS"; }
+  ParameterList GetParams()    { return ParameterList();                   }
   int Main(const ArgumentList &args);
 };
 
