@@ -22,9 +22,6 @@
 #include "duplex_sqlite3.h"
 #include "util.h"
 
-namespace swissknife {
-  class CommandCheck;
-}
 
 namespace catalog {
 
@@ -174,10 +171,10 @@ class Catalog : public SingleCopy {
   bool AllChunksEnd();
 
   inline bool ListFileChunks(const PathString &path, FileChunks *chunks) const {
-    return ListMd5FileChunks(hash::Md5(path.GetChars(), path.GetLength()),
+    return ListMd5PathChunks(hash::Md5(path.GetChars(), path.GetLength()),
                              chunks);
   }
-  bool ListMd5FileChunks(const hash::Md5 &md5path, FileChunks *chunks) const;
+  bool ListMd5PathChunks(const hash::Md5 &md5path, FileChunks *chunks) const;
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;

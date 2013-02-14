@@ -490,7 +490,6 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
-  result.is_chunked_file_ = (database_flags & kFlagFileChunk);
   const char *name = reinterpret_cast<const char *>(RetrieveText(6));
   const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
@@ -504,6 +503,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
     result.uid_ = g_uid;
     result.gid_ = g_gid;
+    result.is_chunked_file_ = false;
   } else {
     const uint64_t hardlinks = RetrieveInt64(1);
     result.linkcount_ = Hardlinks2Linkcount(hardlinks);
@@ -512,6 +512,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
                                                          result.hardlink_group_);
     result.uid_ = RetrieveInt64(13);
     result.gid_ = RetrieveInt64(14);
+    result.is_chunked_file_ = (database_flags & kFlagFileChunk);
   }
   result.mode_ = RetrieveInt(3);
   result.size_ = RetrieveInt64(2);

@@ -162,13 +162,13 @@ void Catalog::InitPreparedStatements() {
 
 
 void Catalog::FinalizePreparedStatements() {
+  delete sql_chunks_listing_;
   delete sql_all_chunks_;
   delete sql_listing_;
   delete sql_lookup_md5path_;
   delete sql_lookup_inode_;
   delete sql_lookup_nested_;
   delete sql_list_nested_;
-  delete sql_chunks_listing_;
 }
 
 
@@ -350,8 +350,9 @@ bool Catalog::AllChunksEnd() {
 }
 
 
-bool Catalog::ListMd5FileChunks(const hash::Md5  &md5path,
-                                FileChunks       *chunks) const {
+bool Catalog::ListMd5PathChunks(const hash::Md5  &md5path,
+                                FileChunks       *chunks) const
+{
   assert(IsInitialized() && chunks->empty());
 
   pthread_mutex_lock(lock_);
