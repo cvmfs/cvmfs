@@ -143,10 +143,19 @@ class LiveFileChunk : public FileChunk {
   explicit LiveFileChunk(const FileChunk &chunk) :
     FileChunk(chunk),
     open_(false),
-    file_descriptor_(0) {}
+    file_descriptor_(0) { }
 
-  bool Fetch();
-  bool Close();
+  bool Fetch() {
+    file_descriptor_ = cache::FetchChunk(*this, "file chunk TODO: of what");
+    if (file_descriptor_ >= 0)
+      open_ = true;
+    return IsOpen();
+  }
+  bool Close() {
+    if (!IsOpen()) return true;
+    open_ = close(file_descriptor_) != 0;
+    return !open_;
+  }
   inline int file_descriptor() const { return file_descriptor_; }
 
   inline bool IsOpen() const { return open_; }
@@ -204,15 +213,16 @@ struct hash_handle {
 #endif
   }
 };
-typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_handle<uint64_t> >
-  DirectoryHandles;
+typedef google::dense_hash_map<uint64_t, DirectoryListing,
+                               hash_handle<uint64_t> >
+        DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
-typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks, hash_handle<fuse_ino_t> >
-  LiveFileChunksMap;
-
+typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks,
+                               hash_handle<fuse_ino_t> >
+        LiveFileChunksMap;
 LiveFileChunksMap *live_file_chunks_ = NULL;
 pthread_rwlock_t live_file_chunks_mutex_ = PTHREAD_RWLOCK_INITIALIZER;
 
@@ -372,32 +382,6 @@ static void RemountFinish() {
   }
 
   atomic_cas32(&reload_critical_section_, 1, 0);
-}
-
-
-/**
- * Fetches a single chunk of a chunked file
- */
-bool LiveFileChunk::Fetch() {
-  file_descriptor_ = cache::FetchChunk(*this, "file chunk TODO: of what");
-  if (file_descriptor_ >= 0) {
-    open_ = true;
-  }
-  return IsOpen();
-}
-
-
-/**
- * Closes the file handle to this chunk
- */
-bool LiveFileChunk::Close() {
-  if (!IsOpen()) {
-    return true;
-  }
-
-  const int closed = close(file_descriptor_);
-  open_ = false;
-  return closed == 0;
 }
 
 
@@ -849,6 +833,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
+  atomic_inc64(&num_fs_open_);
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -912,8 +897,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       }
     }
 
-    // DONE! Actual file chunks will be loaded on demand...
-    atomic_inc64(&num_fs_open_);
+    // Actual file chunks will be loaded on demand...
     fi->fh = kChunkedFileHandle;
     fuse_reply_open(req, fi);
     return;
@@ -939,7 +923,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         inode_cache_->Insert(ino, dirent);
       }
       fi->fh = fd;
-      atomic_inc64(&num_fs_open_);
       fuse_reply_open(req, fi);
       return;
     } else {

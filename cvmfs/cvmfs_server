@@ -101,7 +101,7 @@ Supported Commands:
   publish       [-d debug mode | -D blocking debug mode]
                 <fully qualified name>
                 Make a new repository snapshot
-  rmfs          [-f don't ask again] 
+  rmfs          [-f don't ask again]
                 <fully qualified name>
                 Remove the repository
   abort         [-f don't ask again]
@@ -754,7 +754,7 @@ add_replica() {
 
   # sanity checks
   is_master_replica=$(cvmfs_swissknife info -r $stratum0 -m 2>/dev/null)
-  [ "x$is_master_replica" != "xtrue" ] && die "The repository URL $stratum0 does not point to a replicable master copy of $name"
+  #[ "x$is_master_replica" != "xtrue" ] && die "The repository URL $stratum0 does not point to a replicable master copy of $name"
   if check_repository_existence $name; then
     if is_stratum0 $name; then
       die "Repository $name already exists as a Stratum0 repository.\nYou cannot create a Stratum1 replica for $name on this machine."
@@ -908,7 +908,7 @@ rmfs() {
     sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
     mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
     mount | grep -q " ${spool_dir}/rdonly " && umount ${spool_dir}/rdonly
-    if [ -d /cvmfs/$name ]; then 
+    if [ -d /cvmfs/$name ]; then
       rmdir /cvmfs/$name
     fi
     echo "done"
@@ -962,7 +962,7 @@ resign() {
   check_repository_existence $name || die "The repository $name does not exist"
   is_root || die "Only root can resign repositories"
   is_stratum0 $name || die "This is not a stratum 0 repository ($name)"
-  
+
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
 
@@ -989,7 +989,7 @@ info() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name || die "This is not a stratum 0 repository"
-  
+
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
   stratum0=$CVMFS_STRATUM0
@@ -1020,7 +1020,7 @@ check() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  
+
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
 
@@ -1074,7 +1074,7 @@ transaction() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name || die "This is not a stratum 0 repository"
-  
+
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
   spool_dir=$CVMFS_SPOOL_DIR
@@ -1356,7 +1356,7 @@ skeleton() {
 
   # sanity checks
   check_user $skeleton_user || die "No user $skeleton_user"
-  
+
   # do it!
   create_repository_skeleton $skeleton_dir $skeleton_user
 }

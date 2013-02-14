@@ -340,11 +340,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   // Check if we have a replica-ready server
   retval = download::Fetch(&download_sentinel);
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "This is not a CernVM-FS server for replication");
-    goto fini;
-  }
+  //if (retval != download::kFailOk) {
+  //  LogCvmfs(kLogCvmfs, kLogStderr,
+  //           "This is not a CernVM-FS server for replication");
+  //  goto fini;
+ // }
 
   // Starting threads
   MakePipe(pipe_chunks);
