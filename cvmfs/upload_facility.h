@@ -73,6 +73,14 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                       const std::string  &hash_suffix,
                       const callback_t   *callback = NULL) = 0;
 
+  /**
+   * Checks if a file is already present in the backend storage
+   *
+   * @param path  the path of the file to be checked
+   * @return      true if the file was found in the backend storage
+   */
+  virtual bool Peek(const std::string &path) const = 0;
+
   virtual void WaitForUpload() const;
   virtual unsigned int GetNumberOfErrors() const = 0;
 

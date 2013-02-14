@@ -63,7 +63,6 @@ upload::Spooler     *spooler = NULL;
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-upload::BackendStat *backend_stat = NULL;
 unsigned             retries = 3;
 atomic_int64         overall_chunks;
 atomic_int64         overall_new;
@@ -89,7 +88,7 @@ static void *MainWorker(void *data) {
     if (next_chunk.type != 0)
       chunk_path.push_back(next_chunk.type);
 
-    if (!backend_stat->Stat(chunk_path)) {
+    if (!spooler->Peek(chunk_path)) {
       string tmp_file;
       FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                     &tmp_file);
@@ -127,7 +126,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   int retval;
 
   // Check if the catalog already exists
-  if (backend_stat->Stat("data" + catalog_hash.MakePath(1, 2) + "C")) {
+  if (spooler->Peek("data" + catalog_hash.MakePath(1, 2) + "C")) {
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
     return true;
   }
@@ -293,8 +292,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   temp_dir = args.find('x')->second;
   spooler = upload::Spooler::Construct(*args.find('r')->second);
   assert(spooler);
-  backend_stat = upload::GetBackendStat(*args.find('r')->second);
-  assert(backend_stat);
   spooler->RegisterListener(&AbortSpoolerOnError);
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
@@ -387,7 +384,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     spooler->WaitForUpload();
     const string certificate_path =
       "data" + ensemble.manifest->certificate().MakePath(1, 2) + "X";
-    if (!backend_stat->Stat(certificate_path)) {
+    if (!spooler->Peek(certificate_path)) {
       UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path);
     }
     UploadBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
@@ -406,7 +403,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   free(workers);
   signature::Fini();
   download::Fini();
-  delete backend_stat;
   delete spooler;
   return result;
 }

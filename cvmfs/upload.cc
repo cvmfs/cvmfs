@@ -96,6 +96,10 @@ void Spooler::Upload(const std::string &local_path,
 }
 
 
+bool Spooler::Peek(const std::string &path) const {
+  return uploader_->Peek(path);
+}
+
 void Spooler::ProcessingCallback(const FileProcessor::Results &data) {
   NotifyListeners(SpoolerResult(data.return_code,
                                 data.local_path,
@@ -124,27 +128,4 @@ void Spooler::WaitForTermination() const {
 unsigned int Spooler::GetNumberOfErrors() const {
   return concurrent_processing_->GetNumberOfFailedJobs() +
          uploader_->GetNumberOfErrors();
-}
-
-
-// -----------------------------------------------------------------------------
-
-
-bool LocalStat::Stat(const std::string &path) {
-  return FileExists(base_path_ + "/" + path);
-}
-
-
-namespace upload {
-
-  BackendStat *GetBackendStat(const std::string &spooler_definition) {
-    std::vector<std::string> components = SplitString(spooler_definition, ',');
-    std::vector<std::string> upstream = SplitString(components[0], ':');
-    if ((upstream.size() != 2) || (upstream[0] != "local")) {
-      PrintError("Invalid upstream");
-      return NULL;
-    }
-    return new LocalStat(upstream[1]);
-  }
-
 }

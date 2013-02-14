@@ -41,6 +41,8 @@ namespace upload
                 const std::string  &hash_suffix,
                 const callback_t   *callback = NULL);
 
+    bool Peek(const std::string& path) const;
+
     /**
      * Determines the number of failed jobs in the LocalCompressionWorker as
      * well as in the Upload() command.

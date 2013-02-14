@@ -98,28 +98,6 @@
 
 namespace upload
 {
-  class BackendStat {
-   public:
-    BackendStat(const std::string &base_path) { base_path_ = base_path; }
-    virtual ~BackendStat() { }
-    virtual bool Stat(const std::string &path) = 0;
-   protected:
-    std::string base_path_;
-  };
-
-
-  class LocalStat : public BackendStat {
-   public:
-    LocalStat(const std::string &base_path) : BackendStat(base_path) { }
-    bool Stat(const std::string &path);
-  };
-
-  BackendStat *GetBackendStat(const std::string &spooler_definition);
-
-
-  // ---------------------------------------------------------------------------
-
-
   /**
    * This data structure will be passed to every callback spoolers will invoke.
    * It encapsulates the results of a spooler command along with the given
@@ -210,6 +188,14 @@ namespace upload
      */
     void Process(const std::string &local_path,
                  const bool         allow_chunking = true);
+
+    /**
+     * Checks if a file is already present in the backend storage
+     *
+     * @param path  the path of the file to be peeked
+     * @return      true if the file was found in the backend storage
+     */
+    bool Peek(const std::string &path) const;
 
     /**
      * Blocks until all jobs currently under processing are finished. After it
