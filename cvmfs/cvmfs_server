@@ -764,7 +764,7 @@ add_replica() {
   fi
 
   # default values
-  [ x"$upstream" = x ] && upstream="local:/srv/cvmfs/$name/data/txn:/srv/cvmfs/$name"
+  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
 
   # additional configuration
   local cvmfs_user=`get_cvmfs_owner $name $owner`
