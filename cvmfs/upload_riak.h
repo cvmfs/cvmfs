@@ -265,13 +265,15 @@ namespace upload {
      *                     able under a certain remote_path in Riak
      * @param callback     the callback to be notified when the upload finished
      */
-    virtual void Upload(const std::string  &local_path,
-                        const std::string  &remote_path,
-                        const callback_t   *callback = NULL);
-    virtual void Upload(const std::string  &local_path,
-                        const hash::Any    &content_hash,
-                        const std::string  &hash_suffix,
-                        const callback_t   *callback = NULL);
+    void Upload(const std::string  &local_path,
+                const std::string  &remote_path,
+                const callback_t   *callback = NULL);
+    void Upload(const std::string  &local_path,
+                const hash::Any    &content_hash,
+                const std::string  &hash_suffix,
+                const callback_t   *callback = NULL);
+
+    bool Peek(const std::string& path) const;
 
     void WaitForUpload() const;
 

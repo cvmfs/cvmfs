@@ -41,6 +41,7 @@ void LocalUploader::Upload(const std::string &local_path,
   Respond(callback, retcode, local_path);
 }
 
+
 void LocalUploader::Upload(const std::string  &local_path,
                            const hash::Any    &content_hash,
                            const std::string  &hash_suffix,
@@ -49,6 +50,12 @@ void LocalUploader::Upload(const std::string  &local_path,
                            "data" + content_hash.MakePath(1,2) + hash_suffix);
   Respond(callback, retcode, local_path);
 }
+
+
+bool LocalUploader::Peek(const std::string& path) const {
+  return FileExists(upstream_path_ + "/" + path);
+}
+
 
 int LocalUploader::Copy(const std::string &local_path,
                         const std::string &remote_path) const {
@@ -63,6 +70,7 @@ int LocalUploader::Copy(const std::string &local_path,
 
   return retcode;
 }
+
 
 int LocalUploader::Move(const std::string &local_path,
                         const std::string &remote_path) const {

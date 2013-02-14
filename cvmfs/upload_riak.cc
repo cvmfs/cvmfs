@@ -163,6 +163,11 @@ void RiakUploader::Upload(const std::string  &local_path,
 }
 
 
+bool RiakUploader::Peek(const std::string &path) const {
+  return false; // TODO: fill this with a lookup
+}
+
+
 void RiakUploader::UploadWorkerCallback(const UploadWorker::Results &result) {
   Respond(result.callback, result.return_code, result.local_path);
 }
