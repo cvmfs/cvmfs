@@ -53,6 +53,12 @@ else
   fuser="/bin/fuser"  # Ubuntu, SuSe
 fi
 
+# standard values
+CVMFS_DEFAULT_USE_FILE_CHUNKING=true
+CVMFS_DEFAULT_MIN_CHUNK_SIZE=4194304
+CVMFS_DEFAULT_AVG_CHUNK_SIZE=8388608
+CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
+
 
 ################################################################################
 #                                                                              #
@@ -67,7 +73,7 @@ fi
 # @return   0 if the command was recognized
 is_subcommand() {
   subcommand=$1
-  supported_commands="mkfs add-replica publish rmfs resign list info check transaction abort snapshot skeleton"
+  supported_commands="mkfs add-replica publish rmfs resign list info check transaction abort snapshot skeleton migrate"
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
@@ -78,6 +84,37 @@ is_subcommand() {
 }
 
 
+# returns the version string of the current cvmfs installation
+cvmfs_version_string() {
+  local version_string
+  if ! cvmfs_swissknife version > /dev/null 2>&1; then
+    # Fallback: for CernVM-FS versions before 2.1.7
+    # this is just a security measure... it should never happen, since this
+    # function was introduced with CernVM-FS 2.1.7
+    version_string=$(cvmfs_swissknife --version | sed -n '2{p;q}' | awk '{print $2}')
+  else
+    version_string=$(cvmfs_swissknife --version)
+  fi
+  echo $version_string
+}
+version_major() { echo $1 | cut --delimiter=. --fields=1; }
+version_minor() { echo $1 | cut --delimiter=. --fields=2; }
+version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+version_greater_or_equal() {
+  local needle=$1
+  local current=$(cvmfs_version_string)
+  [ $(version_major $current) -ge $(version_major $needle) ] && \
+  [ $(version_minor $current) -ge $(version_minor $needle) ] && \
+  [ $(version_patch $current) -ge $(version_patch $needle) ]
+}
+version_equal() {
+  local needle=$1
+  local current=$(cvmfs_version_string)
+  [ $(version_major $current) -eq $(version_major $needle) ] && \
+  [ $(version_minor $current) -eq $(version_minor $needle) ] && \
+  [ $(version_patch $current) -eq $(version_patch $needle) ]
+}
+
 # prints some help information optionally followed by an error message
 # afterwards it aborts the script
 #
@@ -87,7 +124,7 @@ usage() {
   errormsg=$1
 
   echo "\
-CernVM-FS Server Tool
+CernVM-FS Server Tool $(cvmfs_version_string)
 
 Usage: cvmfs_server COMMAND [options] <parameters>
 
@@ -117,6 +154,8 @@ Supported Commands:
                 Start to edit a repository
   snapshot      <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
+  migrate       <fully qualified name>
+                Migrates a repository to the current version of CernVM-FS
   list          List available repositories
 "
 
@@ -131,6 +170,60 @@ NOTE: $errormsg
   else
     exit 2
   fi
+}
+
+# retrieves (or guesses) the version of CernVM-FS that was used to create the
+# repository whose server.conf is currently sourced
+# Note: this assumes that server.conf is already sourced!
+repository_creator_version() {
+  local version=$CVMFS_CREATOR_VERSION
+  if [ x"$version" = x ]; then
+    version="2.1.6" # 2.1.6 was the last version, that did not store the creator
+                    # version... therefore this has to be handled as "<= 2.1.6"
+                    # Note: see also `mangle_version_string()`
+  fi
+  echo $version
+}
+
+# whenever you print the version string you should use this function since
+# a repository created before CernVM-FS 2.1.7 cannot be fingerprinted
+# correctly...
+# @param version_string  the plain version string
+mangle_version_string() {
+  local version_string=$1
+  if [ x"$version_string" = x"2.1.6" ]; then
+    echo "2.1.6 or lower"
+  else
+    echo $version_string
+  fi
+}
+
+# checks if the sourced server.conf is compatible with the running version of
+# this script.
+# Note: this assumes that server.conf was already sourced!
+# @param nokill  (optional) if not set -> `exit 1` on incompatibility
+check_repository_compatibility() {
+  local creator=$(repository_creator_version)
+  local current=$(cvmfs_version_string)
+  local nokill=$1
+  if [ "$creator" = "$current" ]; then
+    return 0 # trivial case... no update of CernVM-FS taken place
+  fi
+
+  # all non-matching version numbers are treated as "incompatible" at the moment
+  # this might change from version to version and has to be considered here!
+
+  if [ $# -gt 0 ]; then
+    return 1
+  fi
+
+  echo "\
+This Repository was created with CernVM-FS $(mangle_version_string $creator).
+You are currently running CernVM-FS $(mangle_version_string $current), which is 
+incompatible to $(mangle_version_string $creator).
+
+Please run \`cvmfs_server migrate\` to update your repository before proceeding."
+  exit 1
 }
 
 
@@ -554,6 +647,7 @@ mkfs() {
   mkdir -p /etc/cvmfs/repositories.d/${name}
   cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # Created by cvmfs_server.
+CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
 CVMFS_REPOSITORY_NAME=$name
 CVMFS_REPOSITORY_TYPE=stratum0
 CVMFS_USER=$cvmfs_user
@@ -561,10 +655,10 @@ CVMFS_UNION_DIR=/cvmfs/$name
 CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_UPSTREAM_STORAGE=$upstream
-CVMFS_USE_FILE_CHUNKING=true
-CVMFS_MIN_CHUNK_SIZE=4194304
-CVMFS_AVG_CHUNK_SIZE=8388608
-CVMFS_MAX_CHUNK_SIZE=16777216
+CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
+CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
+CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
+CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 EOF
   cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
@@ -786,6 +880,7 @@ add_replica() {
   mkdir -p /etc/cvmfs/repositories.d/${name}
   cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # Created by cvmfs_server.
+CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
 CVMFS_REPOSITORY_NAME=$name
 CVMFS_REPOSITORY_TYPE=stratum1
 CVMFS_USER=$cvmfs_user
@@ -896,6 +991,9 @@ rmfs() {
   upstream=$CVMFS_UPSTREAM_STORAGE
   type=$CVMFS_REPOSITORY_TYPE
 
+  # check if repository is compatible to the installed CernVM-FS version
+  check_repository_compatibility
+
   # do it!
   ensure_enabled_apache_modules
 
@@ -966,6 +1064,9 @@ resign() {
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
 
+  # check if repository is compatible to the installed CernVM-FS version
+  check_repository_compatibility
+
   # do it!
   create_whitelist $name $CVMFS_USER \
       ${CVMFS_UPSTREAM_STORAGE} \
@@ -996,6 +1097,7 @@ info() {
 
   # do it!
   echo "Repository name: $name"
+  echo "Created by CernVM-FS $(mangle_version_string $(repository_creator_version))"
   get_expiry $name $stratum0
   echo
 
@@ -1023,6 +1125,9 @@ check() {
   
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
+
+  # check if repository is compatible to the installed CernVM-FS version
+  check_repository_compatibility
 
   # more sanity checks
   if is_riak_upstream $upstream; then
@@ -1055,7 +1160,16 @@ list() {
     fi
     . ${repository}/server.conf
     local name=$(basename $repository)
-    echo "$name ($CVMFS_REPOSITORY_TYPE)"
+    local version_info=""
+    local creator_version=$(repository_creator_version)
+    if ! version_equal $creator_version; then
+      version_info="(created by CernVM-FS $(mangle_version_string $creator_version))"
+    else
+      version_info=""
+    fi
+
+    echo "$name ($CVMFS_REPOSITORY_TYPE) $version_info"
+    CVMFS_CREATOR_VERSION=""
   done
 }
 
@@ -1080,6 +1194,7 @@ transaction() {
   spool_dir=$CVMFS_SPOOL_DIR
 
   # more sanity checks
+  check_repository_compatibility
   [ -f ${spool_dir}/in_transaction ] && die "Repository $name in already in a transaction"
 
   # do it!
@@ -1129,6 +1244,7 @@ abort() {
   spool_dir=$CVMFS_SPOOL_DIR
 
   # more sanity checks
+  check_repository_compatibility
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
@@ -1202,6 +1318,7 @@ publish() {
   upstream=$CVMFS_UPSTREAM_STORAGE
 
   # more sanity checks
+  check_repository_compatibility
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
@@ -1307,6 +1424,9 @@ snapshot() {
   timeout=$CVMFS_HTTP_TIMEOUT
   retries=$CVMFS_HTTP_RETRIES
 
+  # more sanity checks
+  check_repository_compatibility
+
   # do it!
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
@@ -1329,6 +1449,105 @@ snapshot() {
     -t $timeout \
     -a $retries $with_history $log_level"
   date > /etc/cvmfs/repositories.d/${name}/last_snapshot
+}
+
+
+################################################################################
+
+
+migrate_2_1_6() {
+  local name=$name
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+
+  echo "Migrating repository '$name' from CernVM-FS $(mangle_version_string '2.1.6') to $(mangle_version_string '2.1.7')"
+
+  echo "--> generating new upstream descriptor"
+  # before 2.1.6 there were only local backends... no need to differentiate here
+  local storage_path=$(echo $CVMFS_UPSTREAM_STORAGE | cut --delimiter=: --fields=2)
+  local new_upstream="local,${storage_path}/data/txn,${storage_path}"
+  
+  echo "--> removing spooler pipes"
+  local pipe_pathes="${CVMFS_SPOOL_DIR}/paths"
+  local pipe_digests="${CVMFS_SPOOL_DIR}/digests"
+  rm -f $pipe_pathes > /dev/null 2>&1 || echo "Warning: not able to delete $pipe_pathes"
+  rm -f $pipe_digests > /dev/null 2>&1 || echo "Warning: not able to delete $pipe_digests"
+
+  if is_stratum0 $name; then
+    echo "--> create temp directory in upstream storage"
+    local tmp_dir=${storage_path}/data/txn
+    mkdir $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to create $tmp_dir"
+    chown -R $CVMFS_USER $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chown $tmp_dir to $CVMFS_USER"
+    if has_selinux; then
+      chcon -Rv --type=httpd_sys_content_t $tmp_dir > /dev/null 2>&1 || echo "Warning: not able to chcon $tmp_dir to httpd_sys_content_t"
+    fi
+
+    echo "--> updating server.conf"
+    mv /etc/cvmfs/repositories.d/${name}/server.conf /etc/cvmfs/repositories.d/${name}/server.conf.old
+    cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+# created by cvmfs_server.
+# migrated from version $(mangle_version_string "2.1.6").
+CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
+CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
+CVMFS_USER=$CVMFS_USER
+CVMFS_UNION_DIR=$CVMFS_UNION_DIR
+CVMFS_SPOOL_DIR=$CVMFS_SPOOL_DIR
+CVMFS_STRATUM0=$CVMFS_STRATUM0
+CVMFS_UPSTREAM_STORAGE=$new_upstream
+CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
+CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
+CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
+CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+EOF
+  fi
+
+  if is_stratum1 $name; then
+    echo "--> updating server.conf"
+    mv /etc/cvmfs/repositories.d/${name}/server.conf /etc/cvmfs/repositories.d/${name}/server.conf.old
+    cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+# Created by cvmfs_server.
+# migrated from version $(mangle_version_string "2.1.6").
+CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
+CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
+CVMFS_USER=$CVMFS_USER
+CVMFS_SPOOL_DIR=$CVMFS_SPOOL_DIR
+CVMFS_STRATUM0=$CVMFS_STRATUM0
+CVMFS_UPSTREAM_STORAGE=$new_upstream
+EOF
+  fi
+
+  # reload repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+}
+
+
+migrate() {
+  local name
+
+  # get repository name
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_root || die "Only root can migrate repositories"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+
+  # more sanity checks
+  if check_repository_compatibility "nokill"; then
+    echo "Repository '$name' is already up-to-date."
+    exit 0
+  fi
+
+  # do the migrations...
+  if [ $(repository_creator_version) = "2.1.6" ]; then
+    migrate_2_1_6 $name
+  fi
 }
 
 
