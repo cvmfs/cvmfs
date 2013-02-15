@@ -34,9 +34,17 @@ publish_after_hook() { :; }
 . /etc/cvmfs/config.sh
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
 
-# Find out about Apache's name
-APACHE="httpd"
-which apache2 >/dev/null 2>&1 && APACHE="apache2"
+# Find out about Apache's name and configuration Directory depending on the Distribution
+if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+elif which apache2 >/dev/null 2>&1; then # Debian based
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+else 
+  APACHE_SERVICE="httpd" # EL based
+  APACHE_CONF=${APACHE_SERVICE}
+fi
 
 # Find the service binary
 if [ -x /sbin/service ]; then
@@ -482,7 +490,7 @@ make_upstream() {
 
 reload_apache() {
    echo -n "Reloading Apache... "
-   ${SERVICE_BIN} ${APACHE} reload > /dev/null
+   ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
    echo "done"
 }
 
@@ -529,7 +537,7 @@ ensure_enabled_apache_modules() {
 
   # restart apache if needed
   if [ $restart -ne 0 ]; then
-    ${SERVICE_BIN} ${APACHE} restart > /dev/null 2>&1 | { echo "Warning: Failed to restart apache after enabling necessary modules"; retcode=2; }
+    ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null 2>&1 | { echo "Warning: Failed to restart apache after enabling necessary modules"; retcode=2; }
   fi
 
   return $retcode
@@ -639,7 +647,7 @@ mkfs() {
   /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
-  [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
+  [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
 
@@ -660,7 +668,7 @@ CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
 CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 EOF
-  cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
+  cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 # For pushing files to the worker nodes
 Alias /fanout/cvmfs/$name /cvmfs/$name
@@ -684,7 +692,7 @@ Alias /fanout/$temp_dir $temp_dir
 </Directory>
 EOF
   if is_local_upstream $upstream; then
-    cat >> /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
+    cat >> /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
@@ -873,7 +881,7 @@ add_replica() {
   is_root || die "Only root can create a new repository"
   check_user $cvmfs_user || die "No user $cvmfs_user"
   if is_local_upstream $upstream; then
-    [ -d /etc/${APACHE} ] && ${SERVICE_BIN} ${APACHE} status >/dev/null || die "Apache must be installed and running"
+    [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
   fi
 
   echo -n "Creating configuration files... "
@@ -896,7 +904,7 @@ CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
   if is_local_upstream $upstream; then
-    cat > /etc/${APACHE}/conf.d/cvmfs.${name}.conf << EOF
+    cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
@@ -1035,7 +1043,7 @@ rmfs() {
         /etc/cvmfs/keys/$name.crt
   fi
   if is_local_upstream $upstream; then
-    rm -f /etc/${APACHE}/conf.d/cvmfs.${name}.conf
+    rm -f /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf
     reload_apache > /dev/null
   fi
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
