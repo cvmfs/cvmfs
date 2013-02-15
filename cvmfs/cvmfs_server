@@ -768,7 +768,7 @@ EOF
     -n $name \
     -m ${temp_dir}/new_manifest \
     -t $temp_dir \
-    -r $spooler_definition"
+    -r $spooler_definition" > /dev/null
   if [ $? -ne 0 ]; then
     echo "fail!"
     return

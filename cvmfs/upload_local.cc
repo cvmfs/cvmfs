@@ -15,7 +15,8 @@ using namespace upload;
 
 LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition) :
   AbstractUploader(spooler_definition),
-  upstream_path_(spooler_definition.spooler_configuration)
+  upstream_path_(spooler_definition.spooler_configuration),
+  temporary_path_(spooler_definition.temporary_path)
 {
   assert (spooler_definition.IsValid() &&
           spooler_definition.driver_type == SpoolerDefinition::Local);
@@ -37,7 +38,27 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 void LocalUploader::Upload(const std::string &local_path,
                            const std::string &remote_path,
                            const callback_t   *callback) {
-  const int retcode = Copy(local_path, remote_path);
+  // create destination in backend storage temporary directory
+  std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
+  if (tmp_path.empty()) {
+    atomic_inc32(&copy_errors_);
+    Respond(callback, 1, local_path);
+    return;
+  }
+
+  // copy file into controlled temporary directory location
+  int retval  = CopyPath2Path(local_path, tmp_path);
+  int retcode = retval ? 0 : 100;
+  if (retcode != 0) {
+    atomic_inc32(&copy_errors_);
+    Respond(callback, retcode, local_path);
+  }
+
+  // move the file in place
+  retcode = Move(tmp_path, remote_path);
+  if (retcode != 0) {
+    atomic_inc32(&copy_errors_);
+  }
   Respond(callback, retcode, local_path);
 }
 
@@ -48,6 +69,9 @@ void LocalUploader::Upload(const std::string  &local_path,
                            const callback_t   *callback) {
   const int retcode = Move(local_path,
                            "data" + content_hash.MakePath(1,2) + hash_suffix);
+  if (retcode != 0) {
+    atomic_inc32(&copy_errors_);
+  }
   Respond(callback, retcode, local_path);
 }
 
@@ -57,30 +81,20 @@ bool LocalUploader::Peek(const std::string& path) const {
 }
 
 
-int LocalUploader::Copy(const std::string &local_path,
-                        const std::string &remote_path) const {
-  const std::string destination_path = upstream_path_ + "/" + remote_path;
-
-  int retval  = CopyPath2Path(local_path, destination_path);
-  int retcode = retval ? 0 : 100;
-
-  if (retcode != 0) {
-    atomic_inc32(&copy_errors_);
-  }
-
-  return retcode;
-}
-
-
 int LocalUploader::Move(const std::string &local_path,
                         const std::string &remote_path) const {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
-  int retval  = rename(local_path.c_str(), destination_path.c_str());
-  int retcode = (retval == 0) ? 0 : errno;
+  // make sure the file has the right permissions
+  int retval  = chmod(local_path.c_str(), 0666);
+  int retcode = (retval == 0) ? 0 : 101;
   if (retcode != 0) {
-    atomic_inc32(&copy_errors_);
+    return retcode;
   }
+
+  // move the file in place
+  retval  = rename(local_path.c_str(), destination_path.c_str());
+  retcode = (retval == 0) ? 0 : errno;
 
   return retcode;
 }
