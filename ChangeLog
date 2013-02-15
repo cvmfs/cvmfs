@@ -1,4 +1,7 @@
 2.1.7:
+  * Added support for CVMFS_KEYS_DIR, which has precedence over
+    CVMFS_PUBLIC_KEY 
+  * Changed default install prefix to /usr
   * Experimental support for Riak storage backend
   * Experimental support for file chunking
   * Experimental support for cache read-only mode

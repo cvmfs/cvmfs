@@ -506,6 +506,29 @@ bool RemoveTree(const string &path) {
 }
 
 
+/**
+ * Returns ls $dir/GLOB$suffix
+ */
+vector<string> FindFiles(const string &dir, const string &suffix) {
+  vector<string> result;
+  DIR *dirp = opendir(dir.c_str());
+  if (!dirp)
+    return result;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const string name(dirent->d_name);
+    if ((name.length() >= suffix.length()) &&
+        (name.substr(name.length()-suffix.length()) == suffix))
+    {
+      result.push_back(dir + "/" + name);
+    }
+  }
+  closedir(dirp);
+  return result;
+}
+
+
 string StringifyInt(const int64_t value) {
   char buffer[48];
   snprintf(buffer, sizeof(buffer), "%"PRId64, value);

@@ -833,7 +833,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
-  atomic_inc64(&num_fs_open_);
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -864,6 +863,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, EEXIST);
     return;
   }
+
+  atomic_inc64(&num_fs_open_);  // Count actual open / fetch operations
 
   if (dirent.IsChunkedFile()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "chunked file %s opened (download delayed "
@@ -1455,8 +1456,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
     quota_limit = String2Int64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
-  if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter))
+  if (options::GetValue("CVMFS_KEYS_DIR", &parameter)) {
+    // Collect .pub files from CVMFS_KEYS_DIR
+    public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
+  } else if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
     public_keys = parameter;
+  }
   if (options::GetValue("CVMFS_ROOT_HASH", &parameter))
     root_hash = parameter;
   if (options::GetValue("CVMFS_DISKLESS", &parameter) &&

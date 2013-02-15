@@ -64,6 +64,8 @@ int TryLockFile(const std::string &path);
 int LockFile(const std::string &path);
 void UnlockFile(const int filedes);
 bool RemoveTree(const std::string &path);
+std::vector<std::string> FindFiles(const std::string &dir,
+                                   const std::string &suffix);
 
 std::string StringifyInt(const int64_t value);
 std::string StringifyTime(const time_t seconds, const bool utc);
