@@ -50,14 +50,13 @@ namespace upload
     unsigned int GetNumberOfErrors() const;
 
    protected:
-    int Copy(const std::string &local_path,
-             const std::string &remote_path) const;
     int Move(const std::string &local_path,
              const std::string &remote_path) const;
 
    private:
     // state information
     const std::string    upstream_path_;
+    const std::string    temporary_path_;
     mutable atomic_int32 copy_errors_;   //!< counts the number of occured errors in Upload()
   };
 }
