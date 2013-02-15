@@ -826,7 +826,8 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
  *
- * \return Read-only file descriptor in fi->fh
+ * \return Read-only file descriptor in fi->fh or kChunkedFileHandle for
+ * chunked files
  */
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi)
@@ -867,13 +868,14 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   atomic_inc64(&num_fs_open_);  // Count actual open / fetch operations
 
   if (dirent.IsChunkedFile()) {
+    // TODO: file descriptor pool and accounting
     LogCvmfs(kLogCvmfs, kLogDebug, "chunked file %s opened (download delayed "
                                    "to read() call",
              path.c_str());
 
     // Retrieve File chunks from the catalog
     FileChunks chunks;
-    if (! dirent.catalog()->ListFileChunks(path, &chunks) || chunks.empty()) {
+    if (!dirent.catalog()->ListFileChunks(path, &chunks) || chunks.empty()) {
       LogCvmfs(kLogCvmfs, kLogSyslog, "file %s is marked as 'chunked', but no "
                                       "chunks found in the catalog %s.",
                path.c_str(),
@@ -975,8 +977,10 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
   unsigned int overall_bytes_fetched = 0;
 
-  // Do we fiddle with a chunked file?
+  // Do we have a a chunked file?
   if (fi->fh == kChunkedFileHandle) {
+    // TODO: file descriptor pool and accounting
+    // TODO: read-ahead thread for chunks
     WriteLockGuard guard(live_file_chunks_mutex_);
 
     // find the file chunk descriptions for the requested inode
@@ -990,6 +994,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     }
     LiveFileChunks &chunks = chunks_itr->second;
 
+    // TODO: unlock here?
     // find the chunk that holds the beginning of the requested data
     LiveFileChunks::iterator chunk_itr = chunks.begin();
     chunk_itr = std::lower_bound(chunk_itr,
@@ -1031,14 +1036,16 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       assert (chunk.IsOpen());
       const size_t bytes_to_read            = size - overall_bytes_fetched;
       const size_t remaining_bytes_in_chunk = chunk.size() - offset_in_chunk;
-      size_t bytes_to_read_in_chunk = std::min(bytes_to_read, remaining_bytes_in_chunk);
+      size_t bytes_to_read_in_chunk =
+        std::min(bytes_to_read, remaining_bytes_in_chunk);
       const size_t bytes_fetched = pread(chunk.file_descriptor(),
                                          data + overall_bytes_fetched,
                                          bytes_to_read_in_chunk,
                                          offset_in_chunk);
 
       if (bytes_fetched == (size_t)-1) {
-        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, bytes_fetched);
+        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d",
+                 errno, bytes_fetched);
         fuse_reply_err(req, errno);
         return;
       }
@@ -1057,7 +1064,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
   // Push it to user
   fuse_reply_buf(req, data, overall_bytes_fetched);
-  LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", overall_bytes_fetched);
+  LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user",
+           overall_bytes_fetched);
 }
 
 
@@ -1072,20 +1080,17 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 
   const int64_t fd = fi->fh;
 
-  // do we work with a chunked file here?
-  if (fd == -2) {
+  // do we haveh a chunked file?
+  if (static_cast<uint64_t>(fd) == kChunkedFileHandle) {
     WriteLockGuard guard(live_file_chunks_mutex_);
     if (live_file_chunks_->erase(ino) > 0) {
       atomic_dec32(&open_files_);
     }
-
   } else {
-
     if (close(fd) == 0) {
       atomic_dec32(&open_files_);
     }
   }
-
   fuse_reply_err(req, 0);
 }
 
@@ -1461,6 +1466,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
   } else if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
     public_keys = parameter;
+  } else {
+    public_keys = JoinStrings(FindFiles("/etc/cvmfs/keys", ".pub"), ":");
   }
   if (options::GetValue("CVMFS_ROOT_HASH", &parameter))
     root_hash = parameter;

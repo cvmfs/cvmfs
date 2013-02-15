@@ -40,7 +40,7 @@ class ShortString {
   }
   explicit ShortString(const std::string &std_string) : long_string_(NULL) {
     atomic_inc64(&num_instances_);
-    Assign(std_string.c_str(), std_string.length());
+    Assign(std_string.data(), std_string.length());
   }
 
   ShortString & operator= (const ShortString & other) {

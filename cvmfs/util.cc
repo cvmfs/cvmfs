@@ -1021,14 +1021,16 @@ bool MemoryMappedFile::Map() {
   // open the file
   int fd;
   if ((fd = open(file_path_.c_str(), O_RDONLY, 0)) == -1) {
-    LogCvmfs(kLogUtility, kLogStderr, "failed to open %s (%d)", file_path_.c_str(), errno);
+    LogCvmfs(kLogUtility, kLogStderr, "failed to open %s (%d)",
+             file_path_.c_str(), errno);
     return false;
   }
 
   // get file size
   platform_stat64 filesize;
   if (platform_fstat(fd, &filesize) != 0) {
-    LogCvmfs(kLogUtility, kLogStderr, "failed to fstat %s (%d)", file_path_.c_str(), errno);
+    LogCvmfs(kLogUtility, kLogStderr, "failed to fstat %s (%d)",
+             file_path_.c_str(), errno);
     return false;
   }
 
@@ -1060,7 +1062,9 @@ void MemoryMappedFile::Unmap() {
   assert (mapped_);
 
   // unmap the previously mapped file
-  if (mapped_file_ != NULL && munmap(static_cast<void*>(mapped_file_), mapped_size_) != 0) {
+  if ((mapped_file_ != NULL) &&
+      (munmap(static_cast<void*>(mapped_file_), mapped_size_) != 0))
+  {
     return;
   }
 

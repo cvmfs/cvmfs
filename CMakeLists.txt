@@ -151,9 +151,7 @@ check_include_file (execinfo.h HAVE_EXECINFO_H)
 check_include_file (poll.h HAVE_POLL_H)
 if (NOT MACOSX)
 	check_include_file (sys/statfs.h HAVE_SYS_STATFS_H)
-	check_include_file (ucontext.h HAVE_UCONTEXT_H)
-else ()
-	check_include_file (sys/ucontext.h HAVE_UCONTEXT_H)
+  check_include_file (attr/xattr.h HAVE_ATTR_XATTR_H)
 endif ()
 
 #

@@ -890,17 +890,17 @@ cvmfs_bugreport() {
                  "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                  'cvmfs_config probe' 'mount' 'df -h' 'ps -ef' \
                  'cvmfs_config status' 'cvmfs_config showconfig' \
-                 'cvmfs_config chksetup' 'cvmfs_config stat -v' 'cvmfs_config internal affairs' \
+                 'cvmfs_config chksetup' 'cvmfs_config stat -v' 'cvmfs_talk internal affairs' \
                  'cat /etc/fuse.conf'  'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
                  'cat /etc/auto.master' 'cat /etc/sysconfig/autofs' 'cat /etc/default/autofs' \
-                 'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' )
+                 'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' 'cat /proc/cpuinfo' )
       ;;
 
     Darwin )
       commands=( 'uname -a' 'sw_vers' 'hostname -f' 'ifconfig -a' 'cvmfs2 --version' \
                  'grep cvmfs2 /var/log/system.log' 'grep cvmfs2 /var/log/kernel.log' \
                   "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
-                  'cvmfs_config probe' 'cvmfs_config status' 'cvmfs_config internal affairs' \
+                  'cvmfs_config probe' 'cvmfs_config status' 'cvmfs_talk internal affairs' \
                   'mount' 'df -h' 'ps -ef' 'cvmfs_config showconfig' 'cvmfs_config chksetup' \
                   'cvmfs_config stat -v' 'sysctl vfs.generic.fuse4x' \
                   'cat /etc/auto_master' 'sysctl vfs.autofs' 'cat /etc/exports' )

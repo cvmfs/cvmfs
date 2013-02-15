@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+// TODO: Move to Riak specific source files
+
 #include "json_document.h"
 
 JsonDocument::JsonDocument() :
