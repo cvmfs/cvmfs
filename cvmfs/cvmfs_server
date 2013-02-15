@@ -585,10 +585,11 @@ mkfs() {
   local stratum0
   local upstream
   local owner
+  local replicable=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:" option; do
+  while getopts "w:u:o:m" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -598,6 +599,9 @@ mkfs() {
       ;;
       o)
         owner=$OPTARG
+      ;;
+      m)
+        replicable=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -787,6 +791,19 @@ EOF
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
   echo "done"
+
+  if [ $replicable -eq 1 ]; then
+    echo -n "Allowing Replication of this Repository..."
+    local master_replica="${temp_dir}/.cvmfs_master_replica"
+    touch $master_replica
+    cvmfs_swissknife upload -i $master_replica -o $(basename $master_replica) -r $spooler_definition > /dev/null
+    if [ $? -ne 0 ]; then
+      echo "fail!"
+    else
+      echo "done"
+    fi
+    rm -f $master_replica
+  fi
 
   echo -n "Initial commit... "
   transaction $name > /dev/null
