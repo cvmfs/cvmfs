@@ -145,3 +145,14 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   delete manifest;
   return 0;
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+int swissknife::CommandVersion::Main(const ArgumentList &args) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s", PACKAGE_VERSION);
+  return 0;
+}
