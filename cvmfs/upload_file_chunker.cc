@@ -71,5 +71,6 @@ bool NaiveChunkGenerator::WillHandle(const MemoryMappedFile &mmf) {
 
 off_t NaiveChunkGenerator::FindNextCutMark() const {
   assert (HasMoreData());
-  return offset() + std::min(average_chunk_size_, mmf().size() - offset());
+  return offset() + std::min(average_chunk_size_,
+                             static_cast<size_t>(mmf().size() - offset()));
 }
