@@ -505,7 +505,10 @@ static void SetUrlOptions(JobInfo *info) {
   // Check if proxy group needs to be reset from backup to primary
   if (opt_timestamp_backup_proxies_ > 0) {
     const time_t now = time(NULL);
-    if (now > opt_timestamp_backup_proxies_ + opt_proxy_groups_reset_after_) {
+    if (static_cast<int64_t>(now) >
+        static_cast<int64_t>(opt_timestamp_backup_proxies_ +
+                             opt_proxy_groups_reset_after_))
+    {
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
                "reset proxy groups");
       opt_proxy_groups_current_ = 0;
@@ -627,7 +630,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // Decompress memory in a single run
       if ((info->destination == kDestinationMem) && info->compressed) {
         void *buf;
-        int64_t size;
+        uint64_t size;
         bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
                                               info->destination_mem.size,
                                               &buf, &size);

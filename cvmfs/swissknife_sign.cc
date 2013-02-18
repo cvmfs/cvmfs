@@ -133,7 +133,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
     // Safe certificate
     void *compr_buf;
-    int64_t compr_size;
+    uint64_t compr_size;
     if (!zlib::CompressMem2Mem(cert_buf, cert_buf_size,
                                &compr_buf, &compr_size))
     {

@@ -27,11 +27,15 @@ my $repo_name = '127.0.0.1';
 # for the other two tests.
 my ($mount_successful) = (0);
 
+# Variable use for debug purpose;
+my $break_point = undef;
+
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "shell-path=s" => \$shell_path );
+					   "shell-path=s" => \$shell_path,
+					   "breakpoint|bp=i" => \$break_point );
 
 # Forking the process so the daemon can come back in listening mode.
 my $pid = fork();
@@ -77,6 +81,16 @@ if (defined ($pid) and $pid == 0) {
 	get_daemon_output($socket);
 	sleep 5;
 	print "Done.\n";
+	
+	# Exiting if break_point is set to 1
+	if ($break_point == 1) {
+			close_test_socket($socket, $ctxt);
+			
+			$shell_socket->send("Exiting at breakpoint 1. Good debug.\n");
+			$shell_socket->send("END\n");
+			close_test_socket($shell_socket, $shell_ctxt);
+			exit 1;
+	}
 	
 	# For this first test, we should be able to mount the repo. So, if possibile, setting its variable
 	# to 1.
