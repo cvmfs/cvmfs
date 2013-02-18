@@ -2,11 +2,11 @@
   * Added support for CVMFS_KEYS_DIR, which has precedence over
     CVMFS_PUBLIC_KEY 
   * Changed default install prefix to /usr
-  * Experimental support for Riak storage backend
   * Experimental support for file chunking
   * Experimental support for cache read-only mode
   * Multi-threaded, extensible storage backend
   * Improved error reporting on mount failures
+  * Fix: file permissions for local storage backend
   * Fix: prevent double mount block with private mount points
   * Fix: store compressed certificate in replication
   * Fix: Build system for parallel builds 

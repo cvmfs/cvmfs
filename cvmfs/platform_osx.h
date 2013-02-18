@@ -23,6 +23,8 @@
 
 #include <string>
 
+#include "smalloc.h"
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
@@ -104,7 +106,7 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
                               std::string *value)
 {
   int size = 0;
-  void *buffer = NULL
+  void *buffer = NULL;
   int retval;
   retval = getxattr(path.c_str(), name.c_str(), buffer, size, 0, 0);
   if (retval >= 1) {
