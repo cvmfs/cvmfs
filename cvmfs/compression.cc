@@ -529,7 +529,7 @@ bool CompressMem2File(const unsigned char *buf, const size_t size,
  * User of this function has to free out_buf.
  */
 bool CompressMem2Mem(const void *buf, const int64_t size,
-                    void **out_buf, int64_t *out_size)
+                    void **out_buf, uint64_t *out_size)
 {
   unsigned char out[kZChunk];
   int z_ret;
@@ -587,7 +587,7 @@ bool CompressMem2Mem(const void *buf, const int64_t size,
  * User of this function has to free out_buf.
  */
 bool DecompressMem2Mem(const void *buf, const int64_t size,
-                       void **out_buf, int64_t *out_size)
+                       void **out_buf, uint64_t *out_size)
 {
   unsigned char out[kZChunk];
   int z_ret;
