@@ -413,8 +413,9 @@ static int Fetch(const hash::Any &checksum,
     return -EROFS;
 
   if (size > quota::GetMaxFileSize()) {
-    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64")",
-             size);
+    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
+                                   "requested but only %"PRIu64" bytes free)",
+             size, quota::GetMaxFileSize());
     return -ENOSPC;
   }
 

@@ -89,7 +89,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
     if ((con_fd = accept(socket_fd_, (struct sockaddr *)&remote, &socket_size))
          < 0)
     {
-      LogCvmfs(kLogTalk, kLogDebug, "terminating talk thead (fd %d, errno %d)",
+      LogCvmfs(kLogTalk, kLogDebug, "terminating talk thread (fd %d, errno %d)",
                con_fd, errno);
       break;
     }

@@ -264,7 +264,7 @@ create_repo() {
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs -o $uid $repo || return 102
+  sudo cvmfs_server mkfs -o $uid -m $repo || return 102
 }
 
 

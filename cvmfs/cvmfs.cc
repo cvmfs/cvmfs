@@ -871,7 +871,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   if (dirent.IsChunkedFile()) {
     // TODO: file descriptor pool and accounting
     LogCvmfs(kLogCvmfs, kLogDebug, "chunked file %s opened (download delayed "
-                                   "to read() call",
+                                   "to read() call)",
              path.c_str());
 
     // Retrieve File chunks from the catalog

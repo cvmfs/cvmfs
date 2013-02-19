@@ -81,7 +81,7 @@ CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 # @return   0 if the command was recognized
 is_subcommand() {
   subcommand=$1
-  supported_commands="mkfs add-replica publish rmfs resign list info check transaction abort snapshot skeleton migrate"
+  supported_commands="mkfs add-replica publish rmfs alterfs resign list info check transaction abort snapshot skeleton migrate"
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
@@ -279,6 +279,25 @@ is_stratum0() {
 is_stratum1() {
   local name=$1
   ! is_stratum0 $name
+}
+
+# checks if a given repository is replicable
+#
+# @param name   the repository name to be checked
+# @return       0 if it is a stratum0 repository and replicable
+is_master_replica() {
+  local name=$1
+  local is_master_replica
+
+  if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
+    is_master_replica=$(cvmfs_swissknife info -r $name -m 2>/dev/null)
+  else
+    is_stratum0 $name || return 1
+    . /etc/cvmfs/repositories.d/${name}/server.conf
+    is_master_replica=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -m 2>/dev/null)
+  fi
+  
+  [ "x$is_master_replica" = "xtrue" ]
 }
 
 
@@ -588,15 +607,84 @@ get_cvmfs_owner() {
 ################################################################################
 
 
+alterfs() {
+  local master_replica=-1
+  local name
+
+  # parameter handling
+  OPTIND=1
+  while getopts "m:" option; do
+    case $option in
+      m)
+        if [ x$OPTARG = "xon" ]; then
+          master_replica=1
+        elif [ x$OPTARG = "xoff" ]; then
+          master_replica=0
+        else
+          usage "Command alterfs: parameter -m expects 'on' or 'off'"
+        fi
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command alterfs: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  [ $master_replica -ne -1 ] || usage "Command alterfs: What should I change?"
+  is_root || die "Only root can alter a repository"
+  
+  # gather repository information
+  . /etc/cvmfs/repositories.d/${name}/server.conf
+  local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
+
+  # do what you've been asked for
+  local success=1
+  if is_master_replica $name && [ $master_replica -eq 0 ]; then
+    echo -n "Disallowing Replication of this Repository... "
+    cvmfs_swissknife remove -o ".cvmfs_master_replica" -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
+    if [ $success -ne 1 ]; then
+      echo "fail!"
+      return 1
+    else
+      echo "done"
+    fi
+  elif ! is_master_replica $name && [ $master_replica -eq 1 ]; then
+    echo -n "Allowing Replication of this Repository... "
+    local master_replica="${temp_dir}/.cvmfs_master_replica"
+    touch $master_replica
+    cvmfs_swissknife upload -i $master_replica -o $(basename $master_replica) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
+    if [ $success -ne 1 ]; then
+      echo "fail!"
+      return 1
+    else
+      echo "done"
+    fi
+    rm -f $master_replica
+  fi
+}
+
+
+################################################################################
+
+
 mkfs() {
   local name
   local stratum0
   local upstream
   local owner
+  local replicable=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:" option; do
+  while getopts "w:u:o:m" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -606,6 +694,9 @@ mkfs() {
       ;;
       o)
         owner=$OPTARG
+      ;;
+      m)
+        replicable=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -796,6 +887,10 @@ EOF
   mount /cvmfs/$name
   echo "done"
 
+  if [ $replicable -eq 1 ]; then
+    alterfs -m on $name
+  fi
+
   echo -n "Initial commit... "
   transaction $name > /dev/null
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
@@ -825,7 +920,6 @@ add_replica() {
   local public_key
   local upstream
   local owner
-  local is_master_replica
 
   # optional parameter handling
   OPTIND=1
@@ -855,8 +949,7 @@ add_replica() {
   name=$(cvmfs_swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
 
   # sanity checks
-  is_master_replica=$(cvmfs_swissknife info -r $stratum0 -m 2>/dev/null)
-  [ "x$is_master_replica" != "xtrue" ] && die "The repository URL $stratum0 does not point to a replicable master copy of $name"
+  is_master_replica $stratum0 || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
   if check_repository_existence $name; then
     if is_stratum0 $name; then
       die "Repository $name already exists as a Stratum0 repository.\nYou cannot create a Stratum1 replica for $name on this machine."
@@ -1093,8 +1186,6 @@ info() {
   check_parameter_count_with_guessing $#
   name=$(get_or_guess_repository_name $1)
 
-  echo $name
-
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name || die "This is not a stratum 0 repository"
@@ -1106,6 +1197,9 @@ info() {
   # do it!
   echo "Repository name: $name"
   echo "Created by CernVM-FS $(mangle_version_string $(repository_creator_version))"
+  local replication_allowed="yes"
+  is_master_replica $name || replication_allowed="no"
+  echo "Stratum1 Replication Allowed: $replication_allowed"
   get_expiry $name $stratum0
   echo
 
