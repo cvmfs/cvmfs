@@ -185,6 +185,7 @@ class MemoryMappedFile : SingleCopy {
 
  private:
   const std::string  file_path_;
+  int                file_descriptor_;
   unsigned char     *mapped_file_;
   size_t             mapped_size_;
   bool               mapped_;
