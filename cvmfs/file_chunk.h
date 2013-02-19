@@ -11,6 +11,7 @@
 
 #include "hash.h"
 #include <vector>
+#include <string>
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -19,10 +20,11 @@ namespace CVMFS_NAMESPACE_GUARD {
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration
  * with the ChunkGenerator.
- *
- * TODO: think about a general location for globally used data structures
  */
 class FileChunk {
+ public:
+  static const std::string kCasSuffix;
+
  public:
   FileChunk() : content_hash_(hash::Any(hash::kSha1)), offset_(0), size_(0) { }
   FileChunk(const hash::Any &hash,
