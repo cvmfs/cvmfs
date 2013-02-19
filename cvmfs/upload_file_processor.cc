@@ -17,131 +17,107 @@ FileProcessor::FileProcessor(const worker_context *context) :
   uploader_(context->uploader) {}
 
 
-void FileProcessor::operator()(const FileProcessor::Parameters &data) {
-  // get data references to the provided job structure for convenience
-  const std::string &local_path     = data.local_path;
-  const bool         allow_chunking = data.allow_chunking;
+void FileProcessor::operator()(const FileProcessor::Parameters &parameters) {
+  // asynchrously remove already finished processing jobs
+  RemoveCompletedPendingFiles();
 
-  RemoveCompletedFiles();
-
-  // map the file to process into memory
-  MemoryMappedFile mmf(local_path);
+  // map the file to be processed into memory
+  MemoryMappedFile mmf(parameters.local_path);
   if (!mmf.Map()) {
-    master()->JobFailed(Results(local_path, 1));
+    master()->JobFailed(Results(parameters.local_path, 1));
     return;
   }
 
-  // schedule a pending job
-  PendingFile *file = new PendingFile(local_path, this);
-  {
-    LockGuard<PendingFilesMap> lock(pending_files_);
-    pending_files_[local_path] = file;
-  }
-
-  // chunk the file if requested and if enabled
-  int generated_chunks = 0;
-  if (allow_chunking && use_file_chunking_) {
-    generated_chunks = GenerateFileChunks(mmf, file);
-    if (generated_chunks == -1) {
-      master()->JobFailed(Results(local_path, 2));
-      return;
-    }
-  }
-
-  // check if we only produced one chunk...
-  if (generated_chunks == 1) {
-    // ... then simply use that as bulk file and discard the chunk
-    LockGuard<PendingFile> lock(file);
-    file->PromoteSingleChunkToBulk();
-
-    // otherwise generate an additional bulk version of the file
-  } else if (! GenerateBulkFile(mmf, file)) {
-    master()->JobFailed(Results(local_path, 3));
+  // process the file (chunking, compression, checksumming, uploading)...
+  PendingFile* file = CreatePendingFile(parameters.local_path);
+  if (! ProcessFile(parameters, mmf, file)) {
+    master()->JobFailed(Results(parameters.local_path, 2));
     return;
   }
 
   // all done... inform the pending file (mitigate race condition)
-  {
-    LockGuard<PendingFile> lock(file);
-    file->FinalizeProcessing();
-  }
+  FinalizeProcessing(file);
 
   // success will be reported once all uploads are finsihed
   return;
 }
 
 
-int FileProcessor::GenerateFileChunks(const MemoryMappedFile  &mmf,
-                                            PendingFile       *file) const {
+bool FileProcessor::ProcessFile(const Parameters       &parameters,
+                                const MemoryMappedFile &mmf,
+                                      PendingFile      *file) const {
   assert (mmf.IsMapped());
 
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "generating file chunks for %s",
+  // do file chunking if it is enabled
+  if (use_file_chunking_ && parameters.allow_chunking) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "generating file chunks for %s",
+               mmf.file_path().c_str());
+
+    UniquePtr<ChunkGenerator> chunk_generator(ChunkGenerator::Construct(mmf));
+    assert (chunk_generator);
+
+    int generated_chunks = 0;
+    while (chunk_generator->HasMoreData()) {
+      // find the next file chunk boundary
+      Chunk chunk_boundary = chunk_generator->Next();
+      TemporaryFileChunk file_chunk(chunk_boundary.offset(),
+                                    chunk_boundary.size());
+
+      // do what you need to do with the data
+      if (! ProcessFileChunk(mmf, file_chunk)) {
+        return false;
+      }
+
+      ++generated_chunks;
+      if (generated_chunks == 1 && ! chunk_generator->HasMoreData()) {
+        // this will be the only generated chunk (i.e. the file is small)
+        // we directly use it as bulk version (optimization)
+        LockGuard<PendingFile> lock(file);
+        file->AddBulk(file_chunk);
+      } else {
+        // we are dealing with a chunked file (i.e. the file is big)
+        // upload the piece we just generated...
+        {
+          LockGuard<PendingFile> lock(file);
+          file->AddChunk(file_chunk);
+        }
+        UploadChunk(file_chunk, file, FileChunk::kCasSuffix);
+      }
+    }
+  }
+
+  // if still necessary we generate a bulk version of the file (legacy)
+  if (! file->HasBulkChunk()) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "generating bulk file for %s",
              mmf.file_path().c_str());
 
-  UniquePtr<ChunkGenerator> chunk_generator(ChunkGenerator::Construct(mmf));
-  assert (chunk_generator);
-
-  int generated_chunks = 0;
-  while (chunk_generator->HasMoreData()) {
-    // find the next file chunk boundary
-    Chunk chunk_boundary = chunk_generator->Next();
-    TemporaryFileChunk file_chunk(chunk_boundary.offset(),
-                                  chunk_boundary.size());
-
-    // do what you need to do with the data
-    if (! ProcessFileChunk(mmf, file_chunk)) {
-      return -1;
+    // create a chunk that contains the whole file
+    TemporaryFileChunk bulk_file(0, mmf.size());
+    if (! ProcessFileChunk(mmf, bulk_file)) {
+      return false;
     }
 
-    // add the chunk to the pending file in progress
+    // add the bulk chunk to the pending file
     {
       LockGuard<PendingFile> lock(file);
-      file->AddChunk(file_chunk);
+      file->AddBulk(bulk_file);
     }
-
-    // hand the chunk over to the upload facility for upload
-    UploadChunk(file_chunk, file);
-    ++generated_chunks;
   }
 
-  return generated_chunks;
-}
-
-
-bool FileProcessor::GenerateBulkFile(const MemoryMappedFile &mmf,
-                                           PendingFile      *file) const {
-  assert (mmf.IsMapped());
-
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "generating bulk file for %s",
-             mmf.file_path().c_str());
-
-  // create a chunk that contains the whole file
-   TemporaryFileChunk bulk_file(0, mmf.size());
-
-  // process the whole file in bulk
-  if (!ProcessFileChunk(mmf, bulk_file)) {
-    return false;
-  }
-
-  // add the chunk to the pending file in progress
-  {
-    LockGuard<PendingFile> lock(file);
-    file->AddBulk(bulk_file);
-  }
-
-  // hand the chunk over to the upload facility for upload
-  UploadChunk(bulk_file, file);
+  // in any case we need to upload the bulk version of the file
+  UploadChunk(file->bulk_chunk(), file);
   return true;
 }
 
 
 void FileProcessor::UploadChunk(const TemporaryFileChunk &file_chunk,
-                                      PendingFile        *file) const {
+                                      PendingFile        *file,
+                                const std::string        &cas_suffix) const {
   // schedule the chunk for upload
   // the pending file itself will get the callback when a chunk is uploaded
   uploader_->Upload(file_chunk.temporary_path(),
                     file_chunk.content_hash(),
-                    "",
+                    cas_suffix,
                     AbstractUploader::MakeCallback(&PendingFile::UploadCallback,
                                                    file));
 }
@@ -216,7 +192,22 @@ void FileProcessor::ProcessingCompleted(PendingFile *pending_file) {
   master()->JobSuccessful(final_result);
 }
 
-void FileProcessor::RemoveCompletedFiles() {
+PendingFile* FileProcessor::CreatePendingFile(const std::string &local_path) {
+  PendingFile *file = new PendingFile(local_path, this);
+  {
+    LockGuard<PendingFilesMap> lock(pending_files_);
+    pending_files_[local_path] = file;
+  }
+
+  return file;
+}
+
+void FileProcessor::FinalizeProcessing(PendingFile *pending_file) {
+  LockGuard<PendingFile> lock(pending_file);
+  pending_file->FinalizeProcessing();
+}
+
+void FileProcessor::RemoveCompletedPendingFiles() {
   LockGuard<PendingFilesList> lock(completed_files_);
   if (completed_files_.empty()) {
     return;
@@ -232,7 +223,7 @@ void FileProcessor::RemoveCompletedFiles() {
 
 
 void FileProcessor::TearDown() {
-  RemoveCompletedFiles();
+  RemoveCompletedPendingFiles();
 }
 
 
@@ -248,11 +239,14 @@ void PendingFile::AddChunk(const TemporaryFileChunk  &file_chunk) {
 
 
 void PendingFile::AddBulk(const TemporaryFileChunk  &file_chunk) {
-  bulk_chunk_ = file_chunk;
+  assert (! has_bulk_chunk_);
+  bulk_chunk_     = file_chunk;
+  has_bulk_chunk_ = true;
 }
 
 
 void PendingFile::FinalizeProcessing() {
+  assert (has_bulk_chunk_);
   processing_complete_ = true;
   CheckForCompletionAndNotify();
 }
@@ -307,12 +301,6 @@ FileChunks PendingFile::GetFinalizedFileChunks() const {
 
 
 FileChunk PendingFile::GetFinalizedBulkFile() const {
+  assert (has_bulk_chunk_);
   return static_cast<FileChunk>(bulk_chunk_);
-}
-
-
-void PendingFile::PromoteSingleChunkToBulk() {
-  assert (file_chunks_.size() == 1);
-  bulk_chunk_     = file_chunks_.begin()->second;
-  file_chunks_.clear();
 }
