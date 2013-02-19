@@ -32,8 +32,7 @@ void FileProcessor::operator()(const FileProcessor::Parameters &data) {
   }
 
   // schedule a pending job
-  PendingFile *file = new PendingFile(local_path,
-          PendingFile::MakeCallback(&FileProcessor::ProcessingCompleted, this));
+  PendingFile *file = new PendingFile(local_path, this);
   {
     LockGuard<PendingFilesMap> lock(pending_files_);
     pending_files_[local_path] = file;
@@ -193,27 +192,25 @@ bool FileProcessor::ProcessFileChunk(const MemoryMappedFile       &mmf,
 }
 
 
-void FileProcessor::ProcessingCompleted(const std::string &local_path) {
-  PendingFile* file = NULL;
+void FileProcessor::ProcessingCompleted(PendingFile *pending_file) {
+  const std::string &local_path = pending_file->local_path();
   {
     LockGuard<PendingFilesMap> lock(pending_files_);
-    PendingFilesMap::iterator file_itr = pending_files_.find(local_path);
-    assert (file_itr != pending_files_.end());
-    file = file_itr->second;
-    pending_files_.erase(local_path);
+    const int removed_items = pending_files_.erase(local_path);
+    assert (removed_items == 1);
   }
 
-  if (!file->IsCompletedSuccessfully()) {
+  if (!pending_file->IsCompletedSuccessfully()) {
     master()->JobFailed(Results(local_path, 4));
     return;
   }
 
   Results final_result(local_path, 0);
-  final_result.file_chunks = file->GetFinalizedFileChunks();
-  final_result.bulk_file   = file->GetFinalizedBulkFile();
+  final_result.file_chunks = pending_file->GetFinalizedFileChunks();
+  final_result.bulk_file   = pending_file->GetFinalizedBulkFile();
   {
     LockGuard<PendingFilesList> lock(completed_files_);
-    completed_files_.push_back(file);
+    completed_files_.push_back(pending_file);
   }
 
   master()->JobSuccessful(final_result);
@@ -242,11 +239,6 @@ void FileProcessor::TearDown() {
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
-
-
-PendingFile::~PendingFile() {
-  delete finished_callback_;
-}
 
 
 void PendingFile::AddChunk(const TemporaryFileChunk  &file_chunk) {
@@ -298,7 +290,7 @@ void PendingFile::CheckForCompletionAndNotify() {
       processing_complete_ &&
       chunks_uploaded_ == file_chunks_.size() + 1) {
     uploading_complete_ = true;
-    (*finished_callback_)(local_path_);
+    delegate_->ProcessingCompleted(this);
   }
 }
 
