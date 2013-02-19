@@ -57,6 +57,7 @@ string *socket_path_ = NULL;  /**< $cache_dir/cvmfs_io */
 int socket_fd_;
 pthread_t thread_talk_;
 bool spawned_;
+bool initialized_ = false;
 
 
 static void Answer(const int con_fd, const string &msg) {
@@ -414,6 +415,10 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "tear down to read-only") {
         cache::TearDown2ReadOnly();
         Answer(con_fd, "In read-only mode\n");
+
+        // Self-shutdown
+        spawned_ = false;  // Avoid block on pthread_join
+        Fini();
       } else {
         Answer(con_fd, "unknown command\n");
       }
@@ -428,6 +433,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
  * Init the socket.
  */
 bool Init(const string &cachedir) {
+  if (initialized_) return true;
   spawned_ = false;
   cachedir_ = new string(cachedir);
   socket_path_ = new string(cachedir + "/cvmfs_io." + *cvmfs::repository_name_);
@@ -442,6 +448,7 @@ bool Init(const string &cachedir) {
   LogCvmfs(kLogTalk, kLogDebug, "socket created at %s (fd %d)",
            socket_path_->c_str(), socket_fd_);
 
+  initialized_ = true;
   return true;
 }
 
@@ -461,6 +468,7 @@ void Spawn() {
  * Terminates command-listener thread.  Removes socket.
  */
 void Fini() {
+  if (!initialized_) return;
   int result;
   result = unlink(socket_path_->c_str());
   if (result != 0) {
@@ -477,6 +485,7 @@ void Fini() {
   close(socket_fd_);
   if (spawned_) pthread_join(thread_talk_, NULL);
   LogCvmfs(kLogTalk, kLogDebug, "talk thread stopped");
+  initialized_ = false;
 }
 
 }  // namespace talk

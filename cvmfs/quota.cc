@@ -1135,6 +1135,7 @@ void Fini() {
   if (shared_) {
     // Most of cleanup is done elsewhen by shared cache manager
     close(pipe_lru_[1]);
+    initialized_ = false;
     return;
   }
 
@@ -1148,6 +1149,7 @@ void Fini() {
   }
 
   CloseDatabase();
+  initialized_ = false;
 }
 
 
