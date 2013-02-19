@@ -1007,7 +1007,11 @@ void SafeSleepMs(const unsigned ms) {
 
 
 MemoryMappedFile::MemoryMappedFile(const std::string &file_path) :
-  file_path_(file_path), mapped_file_(NULL), mapped_size_(0), mapped_(false) {}
+  file_path_(file_path),
+  file_descriptor_(-1),
+  mapped_file_(NULL),
+  mapped_size_(0),
+  mapped_(false) {}
 
 MemoryMappedFile::~MemoryMappedFile() {
   if (IsMapped()) {
@@ -1031,6 +1035,7 @@ bool MemoryMappedFile::Map() {
   if (platform_fstat(fd, &filesize) != 0) {
     LogCvmfs(kLogUtility, kLogStderr, "failed to fstat %s (%d)",
              file_path_.c_str(), errno);
+    close(fd);
     return false;
   }
 
@@ -1046,14 +1051,16 @@ bool MemoryMappedFile::Map() {
                 file_path_.c_str(),
                 filesize.st_size,
                 errno);
+      close(fd);
       return false;
     }
   }
 
   // save results
-  mapped_file_ = static_cast<unsigned char*>(mapping);
-  mapped_size_ = filesize.st_size;
-  mapped_      = true;
+  mapped_file_     = static_cast<unsigned char*>(mapping);
+  file_descriptor_ = fd;
+  mapped_size_     = filesize.st_size;
+  mapped_          = true;
   LogCvmfs(kLogUtility, kLogVerboseMsg, "mmap'ed %s", file_path_.c_str());
   return true;
 }
@@ -1061,17 +1068,24 @@ bool MemoryMappedFile::Map() {
 void MemoryMappedFile::Unmap() {
   assert (mapped_);
 
-  // unmap the previously mapped file
-  if ((mapped_file_ != NULL) &&
-      (munmap(static_cast<void*>(mapped_file_), mapped_size_) != 0))
-  {
+  if (mapped_file_ == NULL) {
     return;
   }
 
-  // reset data
-  mapped_file_ = NULL;
-  mapped_size_ = 0;
-  mapped_      = false;
+  // unmap the previously mapped file
+  if ((munmap(static_cast<void*>(mapped_file_), mapped_size_) != 0) ||
+      (close(file_descriptor_) != 0))
+  {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to unmap %s", file_path_.c_str());
+    const bool munmap_failed = false;
+    assert (munmap_failed);
+  }
+
+  // reset (resettable) data
+  mapped_file_     = NULL;
+  file_descriptor_ = -1;
+  mapped_size_     = 0;
+  mapped_          = false;
   LogCvmfs(kLogUtility, kLogVerboseMsg, "munmap'ed %s", file_path_.c_str());
 }
 

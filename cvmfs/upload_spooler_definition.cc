@@ -17,6 +17,7 @@ SpoolerDefinition::SpoolerDefinition(
                       const size_t       min_file_chunk_size,
                       const size_t       avg_file_chunk_size,
                       const size_t       max_file_chunk_size) :
+  driver_type(Unknown),
   use_file_chunking(use_file_chunking),
   min_file_chunk_size(min_file_chunk_size),
   avg_file_chunk_size(avg_file_chunk_size),

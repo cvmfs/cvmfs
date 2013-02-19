@@ -35,7 +35,10 @@ class Lockable : SingleCopy {
   void Unlock() const        { pthread_mutex_unlock(&mutex_);     }
 
  protected:
-  Lockable() { pthread_mutex_init(&mutex_, NULL); };
+  Lockable() {
+    const int retval = pthread_mutex_init(&mutex_, NULL);
+    assert (retval == 0);
+  };
 
  private:
   mutable pthread_mutex_t mutex_;
