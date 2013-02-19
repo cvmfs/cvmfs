@@ -74,6 +74,18 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                       const callback_t   *callback = NULL) = 0;
 
   /**
+   * Removes a file from the backend storage. This is done synchronously in any
+   * case.
+   *
+   * Note: This method is currently used very sparsely! If this changes in the
+   *       future, one might think about doing deletion asynchronously!
+   *
+   * @param file_to_delete  path to the file to be removed
+   * @return                true if the file was successfully removed
+   */
+  virtual bool Remove(const std::string &file_to_delete) = 0;
+
+  /**
    * Checks if a file is already present in the backend storage
    *
    * @param path  the path of the file to be checked

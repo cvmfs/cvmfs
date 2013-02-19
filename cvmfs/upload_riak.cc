@@ -163,6 +163,11 @@ void RiakUploader::Upload(const std::string  &local_path,
 }
 
 
+bool RiakUploader::Remove(const std::string& file_to_delete) {
+  return false; // TODO: implement this!
+}
+
+
 bool RiakUploader::Peek(const std::string &path) const {
   return false; // TODO: fill this with a lookup
 }

@@ -41,6 +41,8 @@ namespace upload
                 const std::string  &hash_suffix,
                 const callback_t   *callback = NULL);
 
+    bool Remove(const std::string &file_to_delete);
+
     bool Peek(const std::string& path) const;
 
     /**

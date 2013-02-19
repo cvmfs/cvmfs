@@ -136,6 +136,25 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
 }
 
 
+int swissknife::CommandRemove::Main(const ArgumentList &args) {
+  const string file_to_delete     = *args.find('o')->second;
+  const string spooler_definition = *args.find('r')->second;
+
+  upload::Spooler *spooler =
+    upload::Spooler::Construct(spooler_definition);
+  assert(spooler);
+  const bool success = spooler->Remove(file_to_delete);
+  spooler->WaitForTermination();
+  if (spooler->GetNumberOfErrors() > 0 || ! success) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
+             file_to_delete.c_str());
+    return 1;
+  }
+
+  return 0;
+}
+
+
 struct chunk_arg {
   chunk_arg(char param, size_t *save_to) : param(param), save_to(save_to) {}
   char    param;

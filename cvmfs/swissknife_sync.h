@@ -81,6 +81,23 @@ class CommandUpload : public Command {
 };
 
 
+class CommandRemove : public Command {
+ public:
+  ~CommandRemove() { };
+  std::string GetName() { return "remove"; };
+  std::string GetDescription() {
+    return "Removes a file in the repository storage.";
+  };
+  ParameterList GetParams() {
+    ParameterList result;
+    result.push_back(Parameter('o', "path to file", false, false));
+    result.push_back(Parameter('r', "spooler definition", false, false));
+    return result;
+  }
+  int Main(const ArgumentList &args);
+};
+
+
 class CommandSync : public Command {
  public:
   ~CommandSync() { };
