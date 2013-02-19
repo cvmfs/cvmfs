@@ -50,6 +50,8 @@ class TemporaryFileChunk : public FileChunk {
 };
 typedef std::vector<TemporaryFileChunk> TemporaryFileChunks;
 
+class FileProcessor;
+
 /**
  * PendingFiles are created for each processing job. It encapsulates the syn-
  * chronisation of FileProcessor and AbstractUploader.
@@ -59,19 +61,18 @@ typedef std::vector<TemporaryFileChunk> TemporaryFileChunks;
  * be completely finished, it notifies the FileProcessor which then hands out
  * the final results (FileProcessor::Results).
  */
-class PendingFile : public Callbackable<std::string>,
-                    public Lockable {
+class PendingFile : public Lockable {
  public:
   typedef std::map<std::string, TemporaryFileChunk> TemporaryFileChunkMap;
 
  public:
-  PendingFile(const std::string &local_path,
-              const callback_t  *callback) :
+  PendingFile(const std::string   &local_path,
+                    FileProcessor *delegate) :
     local_path_(local_path),
-    finished_callback_(callback),
+    delegate_(delegate),
     chunks_uploaded_(0), errors_(0),
     processing_complete_(false), uploading_complete_(false) {}
-  virtual ~PendingFile();
+  virtual ~PendingFile() {}
 
   void AddChunk(const TemporaryFileChunk  &file_chunk);
   void AddBulk (const TemporaryFileChunk  &file_chunk);
@@ -111,9 +112,11 @@ class PendingFile : public Callbackable<std::string>,
   bool IsCompleted() const { return processing_complete_ && uploading_complete_; }
   bool IsCompletedSuccessfully() const { return IsCompleted() && errors_ == 0; }
 
+  inline const std::string& local_path() const { return local_path_; }
+
  private:
   const std::string      local_path_;
-  const callback_t      *finished_callback_;
+  FileProcessor         *delegate_;
 
   TemporaryFileChunkMap  file_chunks_;
   TemporaryFileChunk     bulk_chunk_;
@@ -201,6 +204,8 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
   FileProcessor(const worker_context *context);
   void operator()(const Parameters &data);
 
+  void TearDown();
+
  protected:
   int GenerateFileChunks(const MemoryMappedFile &mmf,
                                PendingFile      *file) const;
@@ -213,18 +218,23 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
   void UploadChunk(const TemporaryFileChunk &file_chunk,
                          PendingFile        *file) const;
 
-  void ProcessingCompleted(const std::string &local_path);
+  friend class PendingFile;
+  void ProcessingCompleted(PendingFile *pending_file);
+  void RemoveCompletedFiles();
 
  private:
-  class PendingFiles : public std::map<std::string, PendingFile*>,
-                       public Lockable {};
+  class PendingFilesMap  : public std::map<std::string, PendingFile*>,
+                           public Lockable {};
+  class PendingFilesList : public std::vector<PendingFile*>,
+                           public Lockable {};
 
  private:
   const std::string                     temporary_path_;
   const bool                            use_file_chunking_;
   mutable AbstractUploader              *uploader_;
 
-  PendingFiles                          pending_files_;
+  PendingFilesMap                        pending_files_;
+  PendingFilesList                       completed_files_;
 };
 
 }
