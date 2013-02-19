@@ -378,34 +378,6 @@ static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
 
 
 /**
- * Returns a read-only file descriptor for a specific catalog entry.
- * After successful call, the file resides in local cache.
- *
- * @param[in] d           Demanded catalog entry
- * @param[in] cvmfs_path  Path of the chunk as seen in cvmfs
- * \return Read-only file descriptor for the file pointing into local cache.
- *         On failure a negative error code.
- */
-int FetchDirent(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
-  return Fetch(d.checksum(), "", d.size(), cvmfs_path);
-}
-
-
-/**
- * Returns a read-only file descriptor for a specific file chunk
- * After successful call, the file chunk resides in local cache.
- *
- * @param[in] chunk       Demanded file chunk
- * @param[in] cvmfs_path  Path of the full file as seen in cvmfs
- * \return Read-only file descriptor for the file pointing into local cache.
- *         On failure a negative error code.
- */
-int FetchChunk(const FileChunk &chunk, const string &cvmfs_path) {
-  return Fetch(chunk.content_hash(), "", chunk.size(), cvmfs_path);
-}
-
-
-/**
  * Returns a read-only file descriptor for a specific catalog entry, which could
  * be a complete file in the CAS as well as a chunk of a file.
  * After successful call, the data resides in local cache.
@@ -421,10 +393,10 @@ int FetchChunk(const FileChunk &chunk, const string &cvmfs_path) {
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int Fetch(const hash::Any &checksum,
-          const string    &hash_suffix,
-          const uint64_t   size,
-          const string    &cvmfs_path)
+static int Fetch(const hash::Any &checksum,
+                 const string    &hash_suffix,
+                 const uint64_t   size,
+                 const string    &cvmfs_path)
 {
   CallGuard call_guard;
   int fd_return;  // Read-only file descriptor that is returned
@@ -585,6 +557,34 @@ int Fetch(const hash::Any &checksum,
   pthread_mutex_unlock(&lock_queues_download_);
 
   return result;
+}
+
+
+/**
+ * Returns a read-only file descriptor for a specific catalog entry.
+ * After successful call, the file resides in local cache.
+ *
+ * @param[in] d           Demanded catalog entry
+ * @param[in] cvmfs_path  Path of the chunk as seen in cvmfs
+ * \return Read-only file descriptor for the file pointing into local cache.
+ *         On failure a negative error code.
+ */
+int FetchDirent(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
+  return Fetch(d.checksum(), "", d.size(), cvmfs_path);
+}
+
+
+/**
+ * Returns a read-only file descriptor for a specific file chunk
+ * After successful call, the file chunk resides in local cache.
+ *
+ * @param[in] chunk       Demanded file chunk
+ * @param[in] cvmfs_path  Path of the full file as seen in cvmfs
+ * \return Read-only file descriptor for the file pointing into local cache.
+ *         On failure a negative error code.
+ */
+int FetchChunk(const FileChunk &chunk, const string &cvmfs_path) {
+  return Fetch(chunk.content_hash(), "", chunk.size(), cvmfs_path);
 }
 
 

@@ -57,9 +57,9 @@ bool CompressMem2File(const unsigned char *buf, const size_t size,
 
 // User of these functions has to free out_buf, if successful
 bool CompressMem2Mem(const void *buf, const int64_t size,
-                     void **out_buf, int64_t *out_size);
+                     void **out_buf, uint64_t *out_size);
 bool DecompressMem2Mem(const void *buf, const int64_t size,
-                       void **out_buf, int64_t *out_size);
+                       void **out_buf, uint64_t *out_size);
 
 }  // namespace zlib
 
