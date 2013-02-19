@@ -287,10 +287,16 @@ is_stratum1() {
 # @return       0 if it is a stratum0 repository and replicable
 is_master_replica() {
   local name=$1
-  is_stratum0 $name || return 1
+  local is_master_replica
 
-  . /etc/cvmfs/repositories.d/${name}/server.conf
-  local is_master_replica=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -m 2>/dev/null)
+  if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
+    is_master_replica=$(cvmfs_swissknife info -r $name -m 2>/dev/null)
+  else
+    is_stratum0 $name || return 1
+    . /etc/cvmfs/repositories.d/${name}/server.conf
+    is_master_replica=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -m 2>/dev/null)
+  fi
+  
   [ "x$is_master_replica" = "xtrue" ]
 }
 
@@ -943,7 +949,7 @@ add_replica() {
   name=$(cvmfs_swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
 
   # sanity checks
-  is_master_replica $name || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
+  is_master_replica $stratum0 || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
   if check_repository_existence $name; then
     if is_stratum0 $name; then
       die "Repository $name already exists as a Stratum0 repository.\nYou cannot create a Stratum1 replica for $name on this machine."
