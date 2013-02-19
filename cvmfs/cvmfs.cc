@@ -106,6 +106,7 @@ const unsigned kDefaultTimeout = 2;
 const double kDefaultKCacheTimeout = 60.0;
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
+const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
@@ -1401,7 +1402,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool rebuild_cachedb = false;
   bool nfs_source = false;
   bool shared_cache = false;
-  int64_t quota_limit;
+  int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
   string proxies = "";
   string public_keys = "";

@@ -6,6 +6,7 @@
   * Experimental support for cache read-only mode
   * Multi-threaded, extensible storage backend
   * Improved error reporting on mount failures
+  * Fix: cvmfs-internal 1G default for cache size
   * Fix: file permissions for local storage backend
   * Fix: prevent double mount block with private mount points
   * Fix: store compressed certificate in replication
