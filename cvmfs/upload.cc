@@ -96,6 +96,11 @@ void Spooler::Upload(const std::string &local_path,
 }
 
 
+bool Spooler::Remove(const std::string &file_to_delete) {
+  return uploader_->Remove(file_to_delete);
+}
+
+
 bool Spooler::Peek(const std::string &path) const {
   return uploader_->Peek(path);
 }

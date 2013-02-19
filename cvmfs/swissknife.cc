@@ -65,6 +65,7 @@ void swissknife::Usage() {
 int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandCreate());
   command_list.push_back(new swissknife::CommandUpload());
+  command_list.push_back(new swissknife::CommandRemove());
   command_list.push_back(new swissknife::CommandSync());
   command_list.push_back(new swissknife::CommandSign());
   command_list.push_back(new swissknife::CommandCheck());
