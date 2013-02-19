@@ -169,6 +169,7 @@ bool FileProcessor::ProcessFileChunk(const MemoryMappedFile       &mmf,
              chunk.offset(),
              chunk.size(),
              mmf.file_path().c_str());
+    fclose(fcas);
     return false;
   }
   chunk.set_content_hash(content_hash);
