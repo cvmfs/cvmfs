@@ -1077,7 +1077,8 @@ void MemoryMappedFile::Unmap() {
       (close(file_descriptor_) != 0))
   {
     LogCvmfs(kLogUtility, kLogStderr, "failed to unmap %s", file_path_.c_str());
-    return;
+    const bool munmap_failed = false;
+    assert (munmap_failed);
   }
 
   // reset (resettable) data
