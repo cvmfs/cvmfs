@@ -550,7 +550,7 @@ static int Fetch(const hash::Any &checksum,
   // Signal the waiting threads and remove the queue
   pthread_mutex_lock(&lock_queues_download_);
   for (unsigned i = 0, s = tls->other_pipes_waiting.size(); i < s; ++i) {
-    int fd_dup = dup(result);
+    int fd_dup = (result >= 0) ? dup(result) : result;
     WritePipe(tls->other_pipes_waiting[i], &fd_dup, sizeof(int));
   }
   tls->other_pipes_waiting.clear();
