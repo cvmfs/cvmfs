@@ -112,7 +112,8 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
           ConcurrentWorkers<WorkerT>::worker_context_t *worker_context) :
   number_of_workers_(number_of_workers),
   maximal_queue_length_(maximal_queue_length),
-  desired_free_slots_(maximal_queue_length / 2 + 1), // TODO: consider to remove this magic numbers
+  desired_free_slots_(maximal_queue_length / 2 + 1), // TODO: consider to remove
+                                                     //       this magic number
   worker_context_(worker_context),
   thread_context_(this, worker_context_),
   initialized_(false),

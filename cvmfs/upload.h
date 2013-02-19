@@ -120,7 +120,8 @@ namespace upload
 
     int         return_code;  //!< the return value of the spooler operation
     std::string local_path;   //!< the local_path previously given as input
-    hash::Any   content_hash; //!< the content_hash of the bulk file derived during processing
+    hash::Any   content_hash; //!< the content_hash of the bulk file derived
+                              //!< during processing
     FileChunks  file_chunks;  //!< the file chunks generated during processing
   };
 

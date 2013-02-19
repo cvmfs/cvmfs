@@ -29,8 +29,8 @@ namespace upload
      * Upload() is not done concurrently in the current implementation of the
      * LocalSpooler, since it is a simple move or copy of a file without CPU
      * intensive operation
-     * This method calls NotifyListeners and invokes a callback for all registered
-     * listeners (see the Observable template for details).
+     * This method calls NotifyListeners and invokes a callback for all
+     * registered listeners (see the Observable template for details).
      */
     void Upload(const std::string  &local_path,
                 const std::string  &remote_path,
@@ -59,7 +59,8 @@ namespace upload
     // state information
     const std::string    upstream_path_;
     const std::string    temporary_path_;
-    mutable atomic_int32 copy_errors_;   //!< counts the number of occured errors in Upload()
+    mutable atomic_int32 copy_errors_;   //!< counts the number of occured
+                                         //!< errors in Upload()
   };
 }
 
