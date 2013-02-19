@@ -22,6 +22,8 @@ void FileProcessor::operator()(const FileProcessor::Parameters &data) {
   const std::string &local_path     = data.local_path;
   const bool         allow_chunking = data.allow_chunking;
 
+  RemoveCompletedFiles();
+
   // map the file to process into memory
   MemoryMappedFile mmf(local_path);
   if (!mmf.Map()) {
@@ -33,7 +35,7 @@ void FileProcessor::operator()(const FileProcessor::Parameters &data) {
   PendingFile *file = new PendingFile(local_path,
           PendingFile::MakeCallback(&FileProcessor::ProcessingCompleted, this));
   {
-    LockGuard<PendingFiles> lock(pending_files_);
+    LockGuard<PendingFilesMap> lock(pending_files_);
     pending_files_[local_path] = file;
   }
 
@@ -190,11 +192,12 @@ bool FileProcessor::ProcessFileChunk(const MemoryMappedFile       &mmf,
   return true;
 }
 
+
 void FileProcessor::ProcessingCompleted(const std::string &local_path) {
   PendingFile* file = NULL;
   {
-    LockGuard<PendingFiles> lock(pending_files_);
-    PendingFiles::iterator file_itr = pending_files_.find(local_path);
+    LockGuard<PendingFilesMap> lock(pending_files_);
+    PendingFilesMap::iterator file_itr = pending_files_.find(local_path);
     assert (file_itr != pending_files_.end());
     file = file_itr->second;
     pending_files_.erase(local_path);
@@ -208,8 +211,31 @@ void FileProcessor::ProcessingCompleted(const std::string &local_path) {
   Results final_result(local_path, 0);
   final_result.file_chunks = file->GetFinalizedFileChunks();
   final_result.bulk_file   = file->GetFinalizedBulkFile();
+  {
+    LockGuard<PendingFilesList> lock(completed_files_);
+    completed_files_.push_back(file);
+  }
 
   master()->JobSuccessful(final_result);
+}
+
+void FileProcessor::RemoveCompletedFiles() {
+  LockGuard<PendingFilesList> lock(completed_files_);
+  if (completed_files_.empty()) {
+    return;
+  }
+
+  PendingFilesList::iterator       i    = completed_files_.begin();
+  PendingFilesList::const_iterator iend = completed_files_.end();
+  for (; i != iend; ++i) {
+    delete *i;
+  }
+  completed_files_.clear();
+}
+
+
+void FileProcessor::TearDown() {
+  RemoveCompletedFiles();
 }
 
 

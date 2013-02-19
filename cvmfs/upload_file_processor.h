@@ -201,6 +201,8 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
   FileProcessor(const worker_context *context);
   void operator()(const Parameters &data);
 
+  void TearDown();
+
  protected:
   int GenerateFileChunks(const MemoryMappedFile &mmf,
                                PendingFile      *file) const;
@@ -214,17 +216,21 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
                          PendingFile        *file) const;
 
   void ProcessingCompleted(const std::string &local_path);
+  void RemoveCompletedFiles();
 
  private:
-  class PendingFiles : public std::map<std::string, PendingFile*>,
-                       public Lockable {};
+  class PendingFilesMap  : public std::map<std::string, PendingFile*>,
+                           public Lockable {};
+  class PendingFilesList : public std::vector<PendingFile*>,
+                           public Lockable {};
 
  private:
   const std::string                     temporary_path_;
   const bool                            use_file_chunking_;
   mutable AbstractUploader              *uploader_;
 
-  PendingFiles                          pending_files_;
+  PendingFilesMap                        pending_files_;
+  PendingFilesList                       completed_files_;
 };
 
 }
