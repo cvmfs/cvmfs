@@ -76,6 +76,16 @@ void LocalUploader::Upload(const std::string  &local_path,
 }
 
 
+bool LocalUploader::Remove(const std::string& file_to_delete) {
+  if (! Peek(file_to_delete)) {
+    return false;
+  }
+
+  const int retval = unlink((upstream_path_ + "/" + file_to_delete).c_str());
+  return retval == 0;
+}
+
+
 bool LocalUploader::Peek(const std::string& path) const {
   return FileExists(upstream_path_ + "/" + path);
 }

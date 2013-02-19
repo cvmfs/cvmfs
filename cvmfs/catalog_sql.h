@@ -33,7 +33,7 @@ class Catalog;
 
 /**
  * Content-addressable chunks can be entire files, micro catalogs (ending L) or
- * pieces of large files (ending C)
+ * pieces of large files
  */
 enum ChunkTypes {
   kChunkFile = 0,

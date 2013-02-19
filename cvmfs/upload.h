@@ -190,6 +190,15 @@ namespace upload
                  const bool         allow_chunking = true);
 
     /**
+     * Deletes the given file from the repository backend storage. This is done
+     * synchronous, in any case.
+     *
+     * @param file_to_delete   path to the file to be deleted
+     * @return                 true if file was successfully removed
+     */
+    bool Remove(const std::string &file_to_delete);
+
+    /**
      * Checks if a file is already present in the backend storage
      *
      * @param path  the path of the file to be peeked
