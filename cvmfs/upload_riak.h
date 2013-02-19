@@ -86,10 +86,14 @@ namespace upload {
           is_critical(false),
           callback(NULL) {}
 
-        const std::string   local_path;          //!< local path of file to be uploaded (for identification only)
-        const std::string   riak_key;            //!< Riak conform key the file should be stored under
-        const bool          delete_after_upload; //!< might unlink a file after upload (temporary files)
-        const bool          is_critical;         //!< should the upload be performed with special care?
+        const std::string   local_path;          //!< local path of file to be
+                                                 //!<  uploaded (identification)
+        const std::string   riak_key;            //!< Riak conform key the file
+                                                 //!<  should be stored under
+        const bool          delete_after_upload; //!< might unlink a file after
+                                                 //!<  upload (temporary files)
+        const bool          is_critical;         //!< should the upload be per-
+                                                 //!<  formed with special care?
         const callback_t   *callback;
       };
 
@@ -103,7 +107,8 @@ namespace upload {
 
         bool IsSuccessful() const { return return_code == 0; }
 
-        const std::string   local_path;    //!< local path of the uploaded file (might also be just a chunk of it)
+        const std::string   local_path;    //!< local path of the uploaded file
+                                           //!< (might be just a chunk of it)
         const int           return_code;   //!< 0 if job was successful
         const callback_t   *callback;
       };
@@ -131,8 +136,10 @@ namespace upload {
          */
         const std::string& AcquireUpstreamUrl() const;
 
-        const std::vector<std::string> upstream_urls;      //!< list of available upstream URLs
-        mutable unsigned int           next_upstream_url_; //!< state variable for the round robin allocation
+        const std::vector<std::string> upstream_urls;      //!< list of available
+                                                           //!<  upstream URLs
+        mutable unsigned int           next_upstream_url_; //!< state variable for
+                                                           //!<  round robin alloc
       };
 
      public:
@@ -152,10 +159,10 @@ namespace upload {
        * is returned.
        *
        * @param key           the Riak key to be queried
-       * @param vector_clock  output parameter: is set to the vector clock string
+       * @param vector_clock  output parameter: set to the vector clock string
        *                                        after a successful read
        * @return  true if the key was found (and a vector clock was set), other-
-       *          wise the vector clock is not set. False could also mean failure
+       *          wise the vector clock is not set. False can also mean failure
        */
       bool GetVectorClock(const std::string &key, std::string &vector_clock);
 
@@ -166,7 +173,7 @@ namespace upload {
        *
        * @param key          the key which should reference the data in the file
        * @param file_path    the path to the file to be stored into Riak
-       * @param is_critical  a flag marking files as 'critical' (default = false)
+       * @param is_critical  a flag marking files as 'critical' (default: false)
        * @return             0 on success, > 0 otherwise
        */
       int PushFileToRiak(const std::string &key,
@@ -174,7 +181,7 @@ namespace upload {
                          const bool         is_critical = false);
 
       /*
-       * Generates a request URL out of the known Riak base URL and the given key.
+       * Generates a request URL out of the known Riak base URL and a given key.
        * Additionally it can set the W-value to 'all' if a consistent write must
        * be ensured. (see http://docs.basho.com/riak/1.2.1/tutorials/
        *                  fast-track/Tunable-CAP-Controls-in-Riak/ for details)
