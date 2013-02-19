@@ -119,26 +119,32 @@ inline void LockGuardAdapter<pthread_mutex_t>::Unlock() const {
   pthread_mutex_unlock(ref_);
 }
 template <> /// Read-Locks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::ReadLock>::Lock() const {
+inline void LockGuardAdapter<pthread_rwlock_t,
+                             _LGA_Polymorphism::ReadLock>::Lock() const {
   pthread_rwlock_rdlock(ref_);
 }
 template <> /// Read-Unlocks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::ReadLock>::Unlock() const {
+inline void LockGuardAdapter<pthread_rwlock_t,
+                             _LGA_Polymorphism::ReadLock>::Unlock() const {
   pthread_rwlock_unlock(ref_);
 }
 template <> /// Write-Locks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::WriteLock>::Lock() const {
+inline void LockGuardAdapter<pthread_rwlock_t,
+                             _LGA_Polymorphism::WriteLock>::Lock() const {
   pthread_rwlock_wrlock(ref_);
 }
 template <> /// Read-Unlocks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::WriteLock>::Unlock() const {
+inline void LockGuardAdapter<pthread_rwlock_t,
+                             _LGA_Polymorphism::WriteLock>::Unlock() const {
   pthread_rwlock_unlock(ref_);
 }
 
 // convenience typedefs to use special locks with the LockGuard template
 typedef LockGuard<LockGuardAdapter<pthread_mutex_t> > MutexLockGuard;
-typedef LockGuard<LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::ReadLock> > ReadLockGuard;
-typedef LockGuard<LockGuardAdapter<pthread_rwlock_t, _LGA_Polymorphism::WriteLock> > WriteLockGuard;
+typedef LockGuard<LockGuardAdapter<pthread_rwlock_t,
+                                   _LGA_Polymorphism::ReadLock> > ReadLockGuard;
+typedef LockGuard<LockGuardAdapter<pthread_rwlock_t,
+                                   _LGA_Polymorphism::WriteLock> > WriteLockGuard;
 
 
 //
@@ -322,7 +328,8 @@ class Observable : public Callbackable<ParamT>,
   void NotifyListeners(const ParamT &parameter);
 
  private:
-  Callbacks                    listeners_;         //!< the set of registered callback objects
+  Callbacks                    listeners_;         //!< the set of registered
+                                                   //!< callback objects
   mutable pthread_rwlock_t     listeners_rw_lock_;
 };
 
@@ -413,8 +420,10 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
       delegate(delegate),
       worker_context(worker_context) {}
 
-    ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the ConcurrentWorkers master
-    const worker_context_t     *worker_context; //!< WorkerT defined context objects for worker initialization
+    ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the Concurrent-
+                                                //!<  Workers master
+    const worker_context_t     *worker_context; //!< WorkerT defined context ob-
+                                                //!<  jects for worker init.
   };
 
  public:
@@ -423,7 +432,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * workers.
    *
    * @param number_of_workers     the number of concurrent workers to be spawned
-   * @param maximal_queue_length  the maximal length of the job queue (>= number_of_workers)
+   * @param maximal_queue_length  the maximal length of the job queue
+   *                              (>= number_of_workers)
    * @param worker_context        a pointer to the WorkerT defined context object
    */
   ConcurrentWorkers(const size_t      number_of_workers,
@@ -474,7 +484,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   void WaitForTermination();
 
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
-  inline unsigned int GetNumberOfFailedJobs() const { return atomic_read32(&jobs_failed_); }
+  inline unsigned int GetNumberOfFailedJobs() const {
+    return atomic_read32(&jobs_failed_);
+  }
 
   /**
    * Defines a job as successfully finished.
@@ -543,37 +555,49 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   void JobDone(const returned_data_t& data, const bool success = true);
 
-  inline void StartRunning()    { MutexLockGuard guard(status_mutex_); running_ = true; }
-  inline void StopRunning()     { MutexLockGuard guard(status_mutex_); running_ = false; }
-  inline bool IsRunning() const { MutexLockGuard guard(status_mutex_); return running_; }
+  inline void StartRunning()    {
+    MutexLockGuard guard(status_mutex_);
+    running_ = true;
+  }
+  inline void StopRunning()     {
+    MutexLockGuard guard(status_mutex_);
+    running_ = false;
+  }
+  inline bool IsRunning() const {
+    MutexLockGuard guard(status_mutex_);
+    return running_;
+  }
 
  private:
   // general configuration
-  const size_t                 number_of_workers_;    //!< number of concurrent worker threads
-  const size_t                 maximal_queue_length_;
-  const size_t                 desired_free_slots_;   //!< number of free spots before a blocked Schedule() is resumed
-  const worker_context_t      *worker_context_;       //!< the WorkerT defined context object
-  const RunBinding             thread_context_;       //!< the thread context passed to newly spawned threads
+  const size_t             number_of_workers_;    //!< number of concurrent
+                                                  //!<  worker threads
+  const size_t             maximal_queue_length_;
+  const size_t             desired_free_slots_;   //!< Schedule() blocks until
+                                                  //!<  xx slots are available
+  const worker_context_t  *worker_context_;       //!< the WorkerT defined context
+  const RunBinding         thread_context_;       //!< the thread context passed
+                                                  //!<  to newly spawned threads
 
   // status information
-  bool                         initialized_;
-  bool                         running_;
-  mutable unsigned int         workers_started_;
-  mutable pthread_mutex_t      status_mutex_;
-  mutable pthread_cond_t       worker_started_;
+  bool                     initialized_;
+  bool                     running_;
+  mutable unsigned int     workers_started_;
+  mutable pthread_mutex_t  status_mutex_;
+  mutable pthread_cond_t   worker_started_;
 
   // worker threads
-  WorkerThreads                worker_threads_;       //!< list of worker threads
+  WorkerThreads            worker_threads_;       //!< list of worker threads
 
   // job queue
-  JobQueue                     job_queue_;
-  mutable pthread_mutex_t      job_queue_mutex_;
-  mutable pthread_cond_t       job_queue_cond_not_empty_;
-  mutable pthread_cond_t       job_queue_cond_not_full_;
-  mutable pthread_cond_t       jobs_all_done_;
-  mutable atomic_int32         jobs_pending_;
-  mutable atomic_int32         jobs_failed_;
-  mutable atomic_int64         jobs_processed_;
+  JobQueue                 job_queue_;
+  mutable pthread_mutex_t  job_queue_mutex_;
+  mutable pthread_cond_t   job_queue_cond_not_empty_;
+  mutable pthread_cond_t   job_queue_cond_not_full_;
+  mutable pthread_cond_t   jobs_all_done_;
+  mutable atomic_int32     jobs_pending_;
+  mutable atomic_int32     jobs_failed_;
+  mutable atomic_int64     jobs_processed_;
 };
 
 

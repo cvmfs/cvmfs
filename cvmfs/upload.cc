@@ -48,9 +48,9 @@ bool Spooler::Initialize() {
   // create and configure a file processor worker environment
   const unsigned int number_of_cpus = GetNumberOfCpuCores();
   concurrent_processing_ =
-     new ConcurrentWorkers<FileProcessor>(number_of_cpus,
-                                          number_of_cpus * 500, // TODO: magic number (?)
-                                          concurrent_processing_context_.weak_ref());
+   new ConcurrentWorkers<FileProcessor>(number_of_cpus,
+                                        number_of_cpus * 500, // TODO: magic number (?)
+                                        concurrent_processing_context_.weak_ref());
   assert(concurrent_processing_);
   concurrent_processing_->RegisterListener(&Spooler::ProcessingCallback, this);
 
@@ -92,7 +92,8 @@ void Spooler::Upload(const std::string &local_path,
                      const std::string &remote_path) {
   uploader_->Upload(local_path,
                     remote_path,
-                    AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
+                    AbstractUploader::MakeCallback(&Spooler::UploadingCallback,
+                                                   this));
 }
 
 

@@ -246,7 +246,8 @@ void PendingFile::UploadCallback(const UploaderResults &data) {
   if (bulk_chunk_.temporary_path() == data.local_path) {
     chunk = &bulk_chunk_;
   } else {
-    TemporaryFileChunkMap::iterator chunk_itr = file_chunks_.find(data.local_path);
+    TemporaryFileChunkMap::iterator chunk_itr =
+                                          file_chunks_.find(data.local_path);
     assert (chunk_itr != file_chunks_.end());
     chunk = &chunk_itr->second;
   }

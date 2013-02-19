@@ -49,7 +49,8 @@ class Xor32ChunkGenerator : public ChunkGenerator {
 }
 
 /*
- * [1] "The Decentralized File System Igor-FS as an Application for Overlay-Networks"
+ * [1]     "The Decentralized File System Igor-FS
+ *          as an Application for Overlay-Networks"
  *     Dissertation of Dipl.-Ing. Kendy Kutzner - 14. Februar 2008
  */
 

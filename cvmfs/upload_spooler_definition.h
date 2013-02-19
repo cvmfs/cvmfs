@@ -41,8 +41,9 @@ struct SpoolerDefinition {
 
   DriverType  driver_type;           //!< the type of the spooler driver
   std::string temporary_path;        //!< scratch space for the FileProcessor
-  std::string spooler_configuration; //!< a driver specific spooler configuration string
-                                     //!< (interpreted by the concrete spooler object)
+  std::string spooler_configuration; //!< a driver specific spooler
+                                     //!<  configuration string
+                                     //!<  (interpreted by the concrete spooler)
   bool        use_file_chunking;
   size_t      min_file_chunk_size;
   size_t      avg_file_chunk_size;
