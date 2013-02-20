@@ -98,6 +98,51 @@ change_files_in() {
   popdir
 }
 
+make_path() {
+  local catalog_hash=$1
+  local base_path="/srv/cvmfs/${CVMFS_TEST_REPO}/data"
+  local cas_path="$(echo $catalog_hash | cut --bytes=1,2)"
+  local clg_path="$(echo $catalog_hash | cut --bytes=3-)C"
+  local path="${base_path}/${cas_path}/${clg_path}"
+  echo $path
+}
+
+decompress() {
+  local catalog_path=$1
+  local tmp_file_path=$2
+  cat $catalog_path | cvmfs_swissknife zpipe -d > $tmp_file_path  
+}
+
+check_chunk_alignment() {
+  local old_clg_phat=$1
+  local new_clg_path=$2
+
+  old_clg_path=$(make_path $old_root_catalog)
+  new_clg_path=$(make_path $new_root_catalog)
+
+  local old_catalog="old.db"
+  local new_catalog="new.db"
+  local big_file="50megabyte" # see change_files_in()
+
+  decompress $old_clg_path $old_catalog
+  decompress $new_clg_path $new_catalog
+
+  # compare the chunk sizes of associated chunks in the old and the new version
+  # of the updated file.
+  # the final output is the chunk difference which occured most frequently
+  # --> in the best case this is 0 :-)
+  most_common_size_difference=$(echo " \
+  ATTACH '${old_catalog}' AS old; \
+  ATTACH '${new_catalog}' AS new; \
+  CREATE TEMPORARY TABLE old_offsets (rownum INTEGER PRIMARY KEY AUTOINCREMENT, offset INTEGER, size INTEGER); \
+  CREATE TEMPORARY TABLE new_offsets (rownum INTEGER PRIMARY KEY AUTOINCREMENT, offset INTEGER, size INTEGER); \
+  INSERT INTO old_offsets (offset, size) SELECT offset, size FROM old.chunks WHERE md5path_1 = (SELECT md5path_1 FROM old.catalog WHERE name = '${big_file}') ORDER BY offset; \
+  INSERT INTO new_offsets (offset, size) SELECT offset, size FROM new.chunks WHERE md5path_1 = (SELECT md5path_1 FROM new.catalog WHERE name = '${big_file}') ORDER BY offset; \
+  SELECT new.size - old.size FROM old_offsets AS old, new_offsets AS new WHERE old.rownum = new.rownum GROUP BY new.size - old.size ORDER BY count(new.size - old.size) DESC LIMIT 1;" | sqlite3)
+
+  [ $most_common_size_difference -eq 0 ]
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -127,6 +172,9 @@ cvmfs_run_test() {
   echo "check catalog integrity" >> $logfile
   check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
 
+  echo "retrieving name of root catalog for later comparison" >> $logfile
+  local old_root_catalog=$(cvmfs_swissknife info -r /srv/cvmfs/${CVMFS_TEST_REPO} -c)
+
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "starting transaction to edit repository" >> $logfile
@@ -147,6 +195,13 @@ cvmfs_run_test() {
   echo "check catalog integrity" >> $logfile
   check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
 
+  echo "retrieving name of new root catalog" >> $logfile
+  local new_root_catalog=$(cvmfs_swissknife info -r /srv/cvmfs/${CVMFS_TEST_REPO} -c)
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "check if most chunks are still aligned after the edit" >> $logfile
+  check_chunk_alignment $old_root_catalog $new_root_catalog || return 7
+
   return 0
 }
-
