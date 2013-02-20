@@ -415,10 +415,6 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "tear down to read-only") {
         cache::TearDown2ReadOnly();
         Answer(con_fd, "In read-only mode\n");
-
-        // Self-shutdown
-        spawned_ = false;  // Avoid block on pthread_join
-        Fini();
       } else {
         Answer(con_fd, "unknown command\n");
       }
