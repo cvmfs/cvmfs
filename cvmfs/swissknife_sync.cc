@@ -92,8 +92,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-  upload::Spooler *spooler =
-    upload::Spooler::Construct(spooler_definition);
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
   // TODO: consider using the unique pointer to come in Github Pull Request 46
@@ -121,8 +121,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   const string dest = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
-  upload::Spooler *spooler =
-    upload::Spooler::Construct(spooler_definition);
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   spooler->Upload(source, dest);
   spooler->WaitForUpload();
@@ -140,8 +140,8 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   const string file_to_delete     = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
-  upload::Spooler *spooler =
-    upload::Spooler::Construct(spooler_definition);
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Remove(file_to_delete);
   spooler->WaitForTermination();
