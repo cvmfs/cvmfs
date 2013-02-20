@@ -176,7 +176,7 @@ manifest::Manifest *SyncMediator::Commit() {
     {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "Spooling hardlink group %s",
                i->master.GetUnionPath().c_str());
-      params_->spooler->Process(i->master.GetUnionPath(), "data");
+      params_->spooler->Process(i->master.GetUnionPath());
     }
 
     params_->spooler->WaitForUpload();
@@ -506,7 +506,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
     file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->Process(entry.GetUnionPath(), "data");
+    params_->spooler->Process(entry.GetUnionPath());
   }
 }
 

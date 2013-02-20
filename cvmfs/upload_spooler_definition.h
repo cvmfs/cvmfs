@@ -32,11 +32,11 @@ struct SpoolerDefinition {
    * @param definition_string   the spooler definition string to be inter-
    *                            preted by the constructor
    */
-  SpoolerDefinition(const std::string& definition_string,
-                    const bool          use_file_chunking   = false,
-                    const size_t        min_file_chunk_size = 0,
-                    const size_t        avg_file_chunk_size = 0,
-                    const size_t        max_file_chunk_size = 0);
+  explicit SpoolerDefinition(const std::string  &definition_string,
+                             const bool          use_file_chunking   = false,
+                             const size_t        min_file_chunk_size = 0,
+                             const size_t        avg_file_chunk_size = 0,
+                             const size_t        max_file_chunk_size = 0);
   bool IsValid() const { return valid_; }
 
   DriverType  driver_type;           //!< the type of the spooler driver
