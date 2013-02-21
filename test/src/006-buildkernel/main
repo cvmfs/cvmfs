@@ -16,7 +16,7 @@ cvmfs_run_test() {
   ./compileKernel.sh 2.6.32.57 $outdir 8 >> $logfile 2>&1 || return 5
 
   ps aux | grep cvmfs2 | grep sft.cern.ch >> $logfile
-  check_memory sft.cern.ch 35000 || return 6
+  check_memory sft.cern.ch 35000 >> $logfile || return 6
   cvmfs_config stat -v sft.cern.ch >> $logfile
 
   return 0
