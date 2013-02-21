@@ -245,7 +245,7 @@ check_memory() {
 
   if [ $rss_kb -gt $limit ]; then
     echo "Memory limit exceeded" >&2
-    echo "Memory limit of $limit was exceeded by $instance"
+    echo "Memory limit of $limit kB was exceeded by $instance which used $rss_kb kB"
     echo "Output of cat /proc/$pid/status:"
     sudo cat /proc/$pid/status 2>&1
     return 102
