@@ -240,10 +240,14 @@ check_memory() {
   limit=$2
 
   pid=$(attr -qg pid /cvmfs/$instance) || return 100
-  rss=$(sudo cat /proc/$pid/status | grep VmRSS | awk '{print $2}') || return 101
+  rss=$(sudo cat /proc/$pid/status | grep VmRSS) || return 101
+  rss_kb=$(echo $rss | awk '{print $2}')
 
-  if [ $rss -gt $limit ]; then
+  if [ $rss_kb -gt $limit ]; then
     echo "Memory limit exceeded" >&2
+    echo "Memory limit of $limit kB was exceeded by $instance which used $rss_kb kB"
+    echo "Output of cat /proc/$pid/status:"
+    sudo cat /proc/$pid/status 2>&1
     return 102
   fi
 
