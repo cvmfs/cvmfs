@@ -9,9 +9,12 @@
 #ifndef CVMFS_FILE_CHUNK_H_
 #define CVMFS_FILE_CHUNK_H_
 
-#include "hash.h"
+#include <sys/types.h>
+
 #include <vector>
 #include <string>
+
+#include "hash.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
