@@ -172,7 +172,12 @@ cvmfs_chksetup() {
     fi
   done
 
-  for library in libcvmfs_fuse.so libcvmfs_fuse_debug.so
+  if [ "$sys_arch" = "Darwin" ]; then
+    cvmfs_libs="libcvmfs_fuse.dylib libcvmfs_fuse_debug.dylib"
+  else
+    cvmfs_libs="libcvmfs_fuse.so libcvmfs_fuse_debug.so"
+  fi
+  for library in $cvmfs_libs
   do
     if ! test -f /usr/lib/$library && ! test -f /usr/lib64/$library; then
       echo "Error: $library not found"
