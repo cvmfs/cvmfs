@@ -1,3 +1,5 @@
+2.1.8:
+
 2.1.7:
   * Added support for CVMFS_KEYS_DIR, which has precedence over
     CVMFS_PUBLIC_KEY 
