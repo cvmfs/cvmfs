@@ -928,7 +928,6 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
-  command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(GetLogDebugFile());
 
   vector<int> preserve_filedes;
@@ -1019,6 +1018,7 @@ int MainCacheManager(int argc, char **argv) {
   int syslog_level = String2Int64(argv[8]);
   int syslog_facility = String2Int64(argv[9]);
   const string logfile = argv[10];
+
   SetLogSyslogLevel(syslog_level);
   SetLogSyslogFacility(syslog_facility);
   if (logfile != "")

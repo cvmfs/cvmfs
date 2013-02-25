@@ -1,5 +1,6 @@
 2.1.8:
-  * Fix: False chksetup error about missing library on Mac
+  * Fixed wrong location for cache manager debug log
+  * Fixed chksetup error about missing library on Mac
 
 2.1.7:
   * Added support for CVMFS_KEYS_DIR, which has precedence over
