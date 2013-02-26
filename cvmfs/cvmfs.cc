@@ -509,8 +509,11 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   } else {
     // Retrieve the parent path recursively
     PathString parent_path;
-    if (!GetPathForInode(dirent.parent_inode(), &parent_path))
+    if (!GetPathForInode(dirent.parent_inode(), &parent_path)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "GetPathForInode, failed at %s (%"PRIu64")",
+               dirent.name().c_str(), dirent.parent_inode());
       return false;
+    }
 
     path->Assign(parent_path);
     path->Append("/", 1);
@@ -1408,6 +1411,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   bool ignore_signature = false;
   string root_hash = "";
+  bool inodes_64bit = true;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
 
@@ -1438,6 +1442,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", options::Dump().c_str());
 
   // Overwrite default options
+  if (options::GetValue("CVMFS_64BIT_INODES", &parameter))
+    inodes_64bit = options::IsOn(parameter);
   if (options::GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
     mem_cache_size = String2Uint64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_TIMEOUT", &parameter))
@@ -1767,7 +1773,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
   cvmfs::inode_annotation_ =
-    new catalog::InodeRevisionAnnotation(sizeof(fuse_ino_t)*8);
+    new catalog::InodeRevisionAnnotation(inodes_64bit ?
+                                         sizeof(fuse_ino_t)*8 : 32);
   cvmfs::catalog_manager_ =
       new cache::CatalogManager(*cvmfs::repository_name_, ignore_signature);
   if (!nfs_source) {
