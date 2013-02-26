@@ -215,7 +215,14 @@ void FileProcessor::RemoveCompletedPendingFiles() {
 
   PendingFilesList::iterator       i    = completed_files_.begin();
   PendingFilesList::const_iterator iend = completed_files_.end();
+  PendingFile *file_to_delete;
   for (; i != iend; ++i) {
+    file_to_delete = *i;
+
+    // Prevent a race condition with ProcessingCompleted()
+    // makes sure that this PendingFile is not deleted too early by locking it
+    // before deleting it. The locked mutex will be destroyed by the delete
+    file_to_delete->Lock();
     delete *i;
   }
   completed_files_.clear();
