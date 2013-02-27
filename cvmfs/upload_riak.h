@@ -104,6 +104,7 @@ namespace upload {
           local_path(local_path),
           return_code(return_code),
           callback(callback) {}
+        Results() : return_code(-1), callback(NULL) {}
 
         bool IsSuccessful() const { return return_code == 0; }
 

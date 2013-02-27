@@ -223,7 +223,8 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
   initialized_(false),
   running_(false),
   workers_started_(0),
-  jobs_queue_(maximal_queue_length, maximal_queue_length / 2 + 1)
+  jobs_queue_(maximal_queue_length, maximal_queue_length / 2 + 1),
+  results_queue_(maximal_queue_length, maximal_queue_length)
 {
   assert (maximal_queue_length  >= number_of_workers);
   assert (number_of_workers     >  0);
@@ -299,11 +300,17 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
     }
   }
 
+  // spawn the callback processing thread
+  pthread_create(&callback_thread_,
+                 NULL,
+                 &ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper,
+          (void*)&thread_context_);
+
   // wait for all workers to report in...
   {
     MutexLockGuard guard(status_mutex_);
 
-    while (workers_started_ < number_of_workers_) {
+    while (workers_started_ < number_of_workers_ + 1) { // +1 -> callback thread
       pthread_cond_wait(&worker_started_, &status_mutex_);
     }
   }
@@ -322,7 +329,8 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   /////////////////
 
   // get contextual information
-  const RunBinding binding = *(static_cast<RunBinding*>(run_binding));
+  const WorkerRunBinding &binding =
+    *(static_cast<WorkerRunBinding*>(run_binding));
   ConcurrentWorkers<WorkerT> *master         = binding.delegate;
   const worker_context_t     *worker_context = binding.worker_context;
 
@@ -348,7 +356,7 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Starting Worker...");
   while (master->IsRunning()) {
     // acquire a new job
-    Job job = master->Acquire();
+    WorkerJob job = master->Acquire();
 
     // check if we need to terminate
     if (job.is_death_sentence)
@@ -372,6 +380,46 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
 
 
 template <class WorkerT>
+void* ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper(void *run_binding) {
+  const RunBinding           &binding = *(static_cast<RunBinding*>(run_binding));
+  ConcurrentWorkers<WorkerT> *master  = binding.delegate;
+
+  master->ReportStartedWorker();
+
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Started dedicated callback worker");
+  master->RunCallbackThread();
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Terminating Callback Worker...");
+
+  return NULL;
+}
+
+
+template <class WorkerT>
+void ConcurrentWorkers<WorkerT>::RunCallbackThread() {
+  while (IsRunning()) {
+    const CallbackJob callback_job = results_queue_.Dequeue();
+
+    // stop callback processing if needed
+    if (callback_job.is_death_sentence) {
+      break;
+    }
+
+    // notify all observers about the finished job
+    this->NotifyListeners(callback_job.data);
+
+    // remove the job from the pending 'list' and add it to the ready 'list'
+    atomic_dec32(&jobs_pending_);
+    atomic_inc64(&jobs_processed_);
+
+    // signal the Spooler that all jobs are done...
+    if (atomic_read32(&jobs_pending_) == 0) {
+      pthread_cond_broadcast(&jobs_all_done_);
+    }
+  }
+}
+
+
+template <class WorkerT>
 void ConcurrentWorkers<WorkerT>::ReportStartedWorker() const {
   MutexLockGuard lock(status_mutex_);
   ++workers_started_;
@@ -380,7 +428,7 @@ void ConcurrentWorkers<WorkerT>::ReportStartedWorker() const {
 
 
 template <class WorkerT>
-void ConcurrentWorkers<WorkerT>::Schedule(Job job) {
+void ConcurrentWorkers<WorkerT>::Schedule(WorkerJob job) {
   // Note: This method can be called from arbitrary threads. Thus we do not
   //       necessarily have just one producer in the system.
 
@@ -408,13 +456,18 @@ void ConcurrentWorkers<WorkerT>::ScheduleDeathSentences() {
   // schedule a death sentence for each running thread
   const unsigned int number_of_workers = GetNumberOfWorkers();
   for (unsigned int i = 0; i < number_of_workers; ++i) {
-    Schedule(Job());
+    Schedule(WorkerJob());
   }
+
+  // schedule a death sentence for the callback thread
+  results_queue_.Enqueue(CallbackJob());
 }
 
 
 template <class WorkerT>
-typename ConcurrentWorkers<WorkerT>::Job ConcurrentWorkers<WorkerT>::Acquire() {
+typename ConcurrentWorkers<WorkerT>::WorkerJob
+  ConcurrentWorkers<WorkerT>::Acquire()
+{
   // Note: This method is exclusively called inside the worker threads!
   //       Any other usage might produce undefined behavior.
   return jobs_queue_.Dequeue();
@@ -455,6 +508,9 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   for (; i != iend; ++i) {
     pthread_join(*i, NULL);
   }
+
+  // wait for the callback worker thread
+  pthread_join(callback_thread_, NULL);
 
   // check if we finished all pending jobs
   const int pending = atomic_read32(&jobs_pending_);
@@ -519,17 +575,8 @@ void ConcurrentWorkers<WorkerT>::JobDone(
     LogCvmfs(kLogConcurrency, kLogWarning, "Job failed");
   }
 
-  // notify all observers about the finished job
-  this->NotifyListeners(data);
-
-  // remove the job from the pending 'list' and add it to the ready 'list'
-  atomic_dec32(&jobs_pending_);
-  atomic_inc64(&jobs_processed_);
-
-  // Signal the Spooler that all jobs are done...
-  if (atomic_read32(&jobs_pending_) == 0) {
-    pthread_cond_broadcast(&jobs_all_done_);
-  }
+  // queue the result in the callback channel
+  results_queue_.Enqueue(CallbackJob(data));
 }
 
 

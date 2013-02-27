@@ -190,6 +190,7 @@ class FileProcessor : public ConcurrentWorker<FileProcessor> {
             const int          return_code = -1) :
       return_code(return_code),
       local_path(local_path) {}
+    Results() : return_code(-1) {}
 
     int                return_code; //!< 0 if job was successful
     FileChunk          bulk_file;   //!< results of the bulk file processing

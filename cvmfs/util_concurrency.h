@@ -453,26 +453,29 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * are then processed concurrently by the workers.
    */
   struct Job {
-    /**
-     * Creates a usual Job structure by copying the provided input data.
-     *
-     * @param data  the data to be processed by one of the workers
-     */
-    explicit Job(const expected_data_t &data) :
-      data(data),
-      is_death_sentence(false) {}
-
-    /**
-     * Creates an empty Job structure that works as a 'death sentence' to the
-     * worker that will acquire it. When acquired, the worker will immediately
-     * terminate.
-     */
-    Job() :
-      data(),
-      is_death_sentence(true) {}
-
-    const expected_data_t data;              //!< data to be processed
+    explicit Job(const bool is_death_sentence) :
+      is_death_sentence(is_death_sentence) {}
     const bool            is_death_sentence; //!< death sentence flag
+  };
+
+  struct WorkerJob : Job {
+    explicit WorkerJob(const expected_data_t &data) :
+      Job(false),
+      data(data) {}
+    WorkerJob() :
+      Job(true), // <= this is a death sentence!
+      data() {}
+    const expected_data_t data;              //!< data to be processed
+  };
+
+  struct CallbackJob : Job {
+    explicit CallbackJob(const returned_data_t &data) :
+      Job(false),
+      data(data) {}
+    CallbackJob() :
+      Job(true), // <= this is a death sentence!
+      data() {}
+    const returned_data_t data;
   };
 
   /**
@@ -483,13 +486,17 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * spawned.
    */
   struct RunBinding {
-    RunBinding(ConcurrentWorkers<WorkerT> *delegate,
-               const worker_context_t     *worker_context) :
-      delegate(delegate),
-      worker_context(worker_context) {}
-
+    RunBinding(ConcurrentWorkers<WorkerT> *delegate) :
+      delegate(delegate) {}
     ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the Concurrent-
                                                 //!<  Workers master
+  };
+
+  struct WorkerRunBinding : RunBinding {
+    WorkerRunBinding(ConcurrentWorkers<WorkerT> *delegate,
+                     const worker_context_t     *worker_context) :
+      RunBinding(delegate),
+      worker_context(worker_context) {}
     const worker_context_t     *worker_context; //!< WorkerT defined context ob-
                                                 //!<  jects for worker init.
   };
@@ -523,7 +530,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @param data  the data to be processed
    */
-  inline void Schedule(const expected_data_t &data) { Schedule(Job(data)); }
+  inline void Schedule(const expected_data_t &data) {
+    Schedule(WorkerJob(data));
+  }
 
   /**
    * Shuts down the ConcurrentWorkers object as well as the encapsulated workers
@@ -576,6 +585,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   inline void JobFailed(const returned_data_t& data) { JobDone(data, false); }
 
+  void RunCallbackThread();
+
  protected:
   bool SpawnWorkers();
 
@@ -589,13 +600,15 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   static void* RunWorker(void *run_binding);
 
+  static void* RunCallbackThreadWrapper(void *run_binding);
+
   /**
    * Tells the master that a worker thread did start. This does not mean, that
    * it was initialized successfully.
    */
   void ReportStartedWorker() const;
 
-  void Schedule(Job job);
+  void Schedule(WorkerJob job);
   void ScheduleDeathSentences();
 
   /**
@@ -612,7 +625,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @return  a job to be processed by a worker
    */
-  inline Job Acquire();
+  inline WorkerJob Acquire();
 
   /**
    * Controls the asynchronous finishing of a job.
@@ -641,7 +654,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   const size_t             number_of_workers_;    //!< number of concurrent
                                                   //!<  worker threads
   const worker_context_t  *worker_context_;       //!< the WorkerT defined context
-  const RunBinding         thread_context_;       //!< the thread context passed
+  const WorkerRunBinding   thread_context_;       //!< the thread context passed
                                                   //!<  to newly spawned threads
 
   // status information
@@ -655,12 +668,16 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
   // worker threads
   WorkerThreads            worker_threads_;       //!< list of worker threads
+  pthread_t                callback_thread_;      //!< handles callback invokes
 
   // job queue
-  FifoChannel<Job>         jobs_queue_;
+  FifoChannel<WorkerJob>   jobs_queue_;
   mutable atomic_int32     jobs_pending_;
   mutable atomic_int32     jobs_failed_;
   mutable atomic_int64     jobs_processed_;
+
+  // callback channel
+  FifoChannel<CallbackJob> results_queue_;
 };
 
 
