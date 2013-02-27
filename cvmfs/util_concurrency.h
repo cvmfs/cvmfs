@@ -352,6 +352,64 @@ unsigned int GetNumberOfCpuCores();
 static const unsigned int kFallbackNumberOfCpus = 1;
 
 
+//
+// -----------------------------------------------------------------------------
+//
+
+
+/**
+ * Asynchronous FIFO channel template
+ * Implements a thread safe FIFO queue that handles thread blocking if the queue
+ * is full or empty.
+ *
+ * @param T   the data type to be enqueued in the queue
+ */
+template <class T>
+class FifoChannel : protected std::queue<T> {
+ public:
+  /**
+   * Creates a new FIFO channel.
+   *
+   * @param maximal_length      the maximal number of items that can be enqueued
+   * @param drainout_threshold  if less than xx elements are in the queue it is
+   *                            considered to be "not full"
+   */
+  FifoChannel(const size_t maximal_length,
+              const size_t drainout_threshold);
+  virtual ~FifoChannel();
+
+  /**
+   * Adds a new item to the end of the FIFO channel. If the queue is full, this
+   * call will block until items were dequeued by another thread allowing the
+   * desired insertion.
+   *
+   * @param data  the data to be enqueued into the FIFO channel
+   */
+  void Enqueue(const T &data);
+
+  /**
+   * Removes the next element from the channel. If the queue is empty, this will
+   * block until another thread enqueues an item into the channel.
+   *
+   * @return  the first item in the channel queue
+   */
+  const T Dequeue();
+
+  inline size_t GetItemCount() const;
+  inline bool   IsEmpty() const;
+
+ private:
+  // general configuration
+  const size_t               maximal_queue_length_;
+  const size_t               queue_drainout_threshold_;
+
+  // thread synchronisation structures
+  mutable pthread_mutex_t    mutex_;
+  mutable pthread_cond_t     queue_is_not_empty_;
+  mutable pthread_cond_t     queue_is_not_full_;
+};
+
+
 /**
  * This template implements a generic producer/consumer approach to concurrent
  * worker tasks. It spawns a given number of Workers derived from the base class

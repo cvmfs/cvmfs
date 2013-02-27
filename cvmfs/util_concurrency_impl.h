@@ -101,6 +101,89 @@ void Observable<ParamT>::NotifyListeners(const ParamT &parameter) {
 
 //
 // +----------------------------------------------------------------------------
+// |  FifoChannel
+//
+
+
+template <class T>
+FifoChannel<T>::FifoChannel(const size_t maximal_length,
+                        const size_t drainout_threshold) :
+  maximal_queue_length_(maximal_length),
+  queue_drainout_threshold_(drainout_threshold)
+{
+  const bool successful = (
+    pthread_mutex_init(&mutex_, NULL)              == 0 &&
+    pthread_cond_init(&queue_is_not_empty_, NULL)  == 0 &&
+    pthread_cond_init(&queue_is_not_full_, NULL)   == 0
+  );
+
+  assert (successful);
+}
+
+
+template <class T>
+FifoChannel<T>::~FifoChannel() {
+  pthread_mutex_destroy(&mutex_);
+  pthread_cond_destroy(&queue_is_not_empty_);
+  pthread_cond_destroy(&queue_is_not_full_);
+}
+
+
+template <class T>
+void FifoChannel<T>::Enqueue(const T &data) {
+  MutexLockGuard lock(mutex_);
+
+  // wait for space in the queue
+  while (this->size() >= maximal_queue_length_) {
+    pthread_cond_wait(&queue_is_not_full_, &mutex_);
+  }
+
+  // put something into the queue
+  this->push(data);
+
+  // wake all waiting threads
+  pthread_cond_broadcast(&queue_is_not_empty_);
+}
+
+
+template <class T>
+const T FifoChannel<T>::Dequeue() {
+  MutexLockGuard guard(mutex_);
+
+  // wait until there is something to do
+  while (this->empty()) {
+    pthread_cond_wait(&queue_is_not_empty_, &mutex_);
+  }
+
+  // get the item from the queue
+  T data = this->front(); this->pop();
+
+  // signal waiting threads about the free space
+  if (this->size() < queue_drainout_threshold_) {
+    pthread_cond_broadcast(&queue_is_not_full_);
+  }
+
+  // return the acquired job
+  return data;
+}
+
+
+template <class T>
+size_t FifoChannel<T>::GetItemCount() const {
+  MutexLockGuard lock(mutex_);
+  return this->size();
+}
+
+
+template <class T>
+bool FifoChannel<T>::IsEmpty() const {
+  MutexLockGuard lock(mutex_);
+  return this->empty();
+}
+
+
+//
+// +----------------------------------------------------------------------------
 // |  ConcurrentWorkers
 //
 
