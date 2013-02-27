@@ -402,14 +402,6 @@ class FifoChannel : protected std::queue<T> {
    */
   unsigned int Drop();
 
-  /**
-   * Blocks the calling thread until all items are taken out of the channel.
-   * Note: this releases the waiting thread as soon as the last item was taken
-   *       out of the channel... it DOES NOT imply that no new items are en-
-   *       queued somewhere after this event.
-   */
-  void WaitUntilEmpty() const;
-
   inline size_t GetItemCount() const;
   inline bool   IsEmpty() const;
   inline size_t GetMaximalItemCount() const;
@@ -423,7 +415,6 @@ class FifoChannel : protected std::queue<T> {
   mutable pthread_mutex_t    mutex_;
   mutable pthread_cond_t     queue_is_not_empty_;
   mutable pthread_cond_t     queue_is_not_full_;
-  mutable pthread_cond_t     queue_is_empty_;
 };
 
 
@@ -659,6 +650,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   mutable unsigned int     workers_started_;
   mutable pthread_mutex_t  status_mutex_;
   mutable pthread_cond_t   worker_started_;
+  mutable pthread_mutex_t  jobs_all_done_mutex_;
+  mutable pthread_cond_t   jobs_all_done_;
 
   // worker threads
   WorkerThreads            worker_threads_;       //!< list of worker threads

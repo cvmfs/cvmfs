@@ -116,8 +116,7 @@ FifoChannel<T>::FifoChannel(const size_t maximal_length,
   const bool successful = (
     pthread_mutex_init(&mutex_, NULL)              == 0 &&
     pthread_cond_init(&queue_is_not_empty_, NULL)  == 0 &&
-    pthread_cond_init(&queue_is_not_full_, NULL)   == 0 &&
-    pthread_cond_init(&queue_is_empty_, NULL)      == 0
+    pthread_cond_init(&queue_is_not_full_, NULL)   == 0
   );
 
   assert (successful);
@@ -128,7 +127,6 @@ template <class T>
 FifoChannel<T>::~FifoChannel() {
   pthread_cond_destroy(&queue_is_not_empty_);
   pthread_cond_destroy(&queue_is_not_full_);
-  pthread_cond_destroy(&queue_is_empty_);
   pthread_mutex_destroy(&mutex_);
 }
 
@@ -166,9 +164,6 @@ const T FifoChannel<T>::Dequeue() {
   if (this->size() < queue_drainout_threshold_) {
     pthread_cond_broadcast(&queue_is_not_full_);
   }
-  if (this->empty()) {
-    pthread_cond_broadcast(&queue_is_empty_);
-  }
 
   // return the acquired job
   return data;
@@ -188,15 +183,6 @@ unsigned int FifoChannel<T>::Drop() {
   pthread_cond_broadcast(&queue_is_not_full_);
 
   return dropped_items;
-}
-
-
-template <class T>
-void FifoChannel<T>::WaitUntilEmpty() const {
-  MutexLockGuard lock(mutex_);
-  while (!this->empty()) {
-    pthread_cond_wait(&queue_is_empty_, &mutex_);
-  }
 }
 
 
@@ -256,7 +242,9 @@ ConcurrentWorkers<WorkerT>::~ConcurrentWorkers() {
 
   // destroy some synchronisation data structures
   pthread_cond_destroy(&worker_started_);
+  pthread_cond_destroy(&jobs_all_done_);
   pthread_mutex_destroy(&status_mutex_);
+  pthread_mutex_destroy(&jobs_all_done_mutex_);
 }
 
 
@@ -268,8 +256,10 @@ bool ConcurrentWorkers<WorkerT>::Initialize() {
            number_of_workers_, jobs_queue_.GetMaximalItemCount());
 
   // initialize synchronisation for job queue (Workers)
-  if (pthread_mutex_init(&status_mutex_, NULL)  != 0 ||
-      pthread_cond_init(&worker_started_, NULL) != 0) {
+  if (pthread_mutex_init(&status_mutex_, NULL)          != 0 ||
+      pthread_mutex_init(&jobs_all_done_mutex_, NULL)   != 0 ||
+      pthread_cond_init(&worker_started_, NULL)         != 0 ||
+      pthread_cond_init(&jobs_all_done_, NULL)          != 0) {
     return false;
   }
 
@@ -494,7 +484,13 @@ void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Waiting for %d jobs to be finished",
            atomic_read32(&jobs_pending_));
 
-  jobs_queue_.WaitUntilEmpty();
+  // wait until all pending jobs are processed
+  {
+    MutexLockGuard lock(jobs_all_done_mutex_);
+    while (atomic_read32(&jobs_pending_) > 0) {
+      pthread_cond_wait(&jobs_all_done_, &jobs_all_done_mutex_);
+    }
+  }
 
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Jobs are done... go on");
 }
@@ -529,6 +525,11 @@ void ConcurrentWorkers<WorkerT>::JobDone(
   // remove the job from the pending 'list' and add it to the ready 'list'
   atomic_dec32(&jobs_pending_);
   atomic_inc64(&jobs_processed_);
+
+  // Signal the Spooler that all jobs are done...
+  if (atomic_read32(&jobs_pending_) == 0) {
+    pthread_cond_broadcast(&jobs_all_done_);
+  }
 }
 
 
