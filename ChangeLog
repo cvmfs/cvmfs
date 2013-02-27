@@ -1,4 +1,6 @@
 2.1.8:
+  * Fix: evaluation of symlinks could lead to wrong
+    empty or 1-byte symlinks
   * Use 32bit inodes by default
   * Fixed wrong location for cache manager debug log
   * Fixed chksetup error about missing library on Mac

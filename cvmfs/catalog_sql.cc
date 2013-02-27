@@ -378,7 +378,7 @@ uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
 void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
   const char *c = raw_symlink->GetChars();
   const char *cEnd = c+raw_symlink->GetLength();
-  for (; c <= cEnd; ++c) {
+  for (; c < cEnd; ++c) {
     if (*c == '$')
       goto expand_symlink;
   }
@@ -386,17 +386,18 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
 
  expand_symlink:
   LinkString result;
-  for (; c <= cEnd; ++c) {
+  for (c = raw_symlink->GetChars(); c < cEnd; ++c) {
     if ((*c == '$') && (c < cEnd-2) && (*(c+1) == '(')) {
       c += 2;
       const char *rpar = c;
-      while (rpar <= cEnd) {
+      while (rpar < cEnd) {
         if (*rpar == ')')
           goto expand_symlink_getenv;
         rpar++;
       }
       // right parenthesis missing
       result.Append("$(", 2);
+      result.Append(c, 1);
       continue;
 
      expand_symlink_getenv:
@@ -407,7 +408,7 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
       const char *environ_value = getenv(environ_var);  // Don't free!
       if (environ_value)
         result.Append(environ_value, strlen(environ_value));
-      c = rpar+1;
+      c = rpar;
       continue;
     }
     result.Append(c, 1);

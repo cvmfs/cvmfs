@@ -1411,7 +1411,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   bool ignore_signature = false;
   string root_hash = "";
-  bool inodes_64bit = true;
+  bool inodes_64bit = false;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
 
