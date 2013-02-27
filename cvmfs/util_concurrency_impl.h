@@ -107,11 +107,17 @@ void Observable<ParamT>::NotifyListeners(const ParamT &parameter) {
 
 template <class T>
 FifoChannel<T>::FifoChannel(const size_t maximal_length,
-                            const size_t drainout_threshold) :
+                            const size_t drainout_threshold,
+                            const size_t prefill_threshold) :
   maximal_queue_length_(maximal_length),
-  queue_drainout_threshold_(drainout_threshold)
+  queue_drainout_threshold_(drainout_threshold),
+  queue_prefill_threshold_(prefill_threshold),
+  drainout_mode_(false)
 {
-  assert (drainout_threshold > 0);
+  assert (drainout_threshold <= maximal_length);
+  assert (drainout_threshold >  0);
+  assert (prefill_threshold  >= 0);
+  assert (prefill_threshold  <  maximal_length);
 
   const bool successful = (
     pthread_mutex_init(&mutex_, NULL)              == 0 &&
@@ -134,6 +140,7 @@ FifoChannel<T>::~FifoChannel() {
 template <class T>
 void FifoChannel<T>::Enqueue(const T &data) {
   MutexLockGuard lock(mutex_);
+  //LogCvmfs(kLogSpooler, kLogStdout, "--> ENQUEUED (%d): %d", sizeof(T), this->size());
 
   // wait for space in the queue
   while (this->size() >= maximal_queue_length_) {
@@ -144,13 +151,16 @@ void FifoChannel<T>::Enqueue(const T &data) {
   this->push(data);
 
   // wake all waiting threads
-  pthread_cond_broadcast(&queue_is_not_empty_);
+  if (drainout_mode_ || this->size() > queue_prefill_threshold_) {
+    pthread_cond_broadcast(&queue_is_not_empty_);
+  }
 }
 
 
 template <class T>
 const T FifoChannel<T>::Dequeue() {
   MutexLockGuard lock(mutex_);
+  //LogCvmfs(kLogSpooler, kLogStdout, "--> DEQUEUED (%d): %d", sizeof(T), this->size());
 
   // wait until there is something to do
   while (this->empty()) {
@@ -206,6 +216,19 @@ size_t FifoChannel<T>::GetMaximalItemCount() const {
 }
 
 
+template <class T>
+void FifoChannel<T>::EnableDrainoutMode() const {
+  drainout_mode_ = true;
+  pthread_cond_broadcast(&queue_is_not_empty_);
+}
+
+
+template <class T>
+void FifoChannel<T>::DisableDrainoutMode() const {
+  drainout_mode_ = false;
+}
+
+
 //
 // +----------------------------------------------------------------------------
 // |  ConcurrentWorkers
@@ -223,8 +246,8 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
   initialized_(false),
   running_(false),
   workers_started_(0),
-  jobs_queue_(maximal_queue_length, maximal_queue_length / 2 + 1),
-  results_queue_(maximal_queue_length, maximal_queue_length)
+  jobs_queue_(maximal_queue_length, maximal_queue_length / 4 + 1),
+  results_queue_(maximal_queue_length, 1, maximal_queue_length - 1)
 {
   assert (maximal_queue_length  >= number_of_workers);
   assert (number_of_workers     >  0);
@@ -255,6 +278,9 @@ bool ConcurrentWorkers<WorkerT>::Initialize() {
                                             "object with %d worker threads "
                                             "and a queue length of %d",
            number_of_workers_, jobs_queue_.GetMaximalItemCount());
+  // LogCvmfs(kLogConcurrency, kLogStdout, "sizeof(expected_data_t): %d\n"
+  //                                           "sizeof(returned_data_t): %d",
+  //          sizeof(expected_data_t), sizeof(returned_data_t));
 
   // initialize synchronisation for job queue (Workers)
   if (pthread_mutex_init(&status_mutex_, NULL)          != 0 ||
@@ -317,6 +343,20 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
 
   // all done...
   return success;
+}
+
+
+template <class WorkerT>
+void ConcurrentWorkers<WorkerT>::EnableDrainoutMode() const {
+  jobs_queue_.EnableDrainoutMode();
+  results_queue_.EnableDrainoutMode();
+}
+
+
+template <class WorkerT>
+void ConcurrentWorkers<WorkerT>::DisableDrainoutMode() const {
+  jobs_queue_.DisableDrainoutMode();
+  results_queue_.DisableDrainoutMode();
 }
 
 
@@ -452,6 +492,7 @@ void ConcurrentWorkers<WorkerT>::ScheduleDeathSentences() {
 
   // make sure that the queue is empty before we schedule a death sentence
   TruncateJobQueue();
+  EnableDrainoutMode();
 
   // schedule a death sentence for each running thread
   const unsigned int number_of_workers = GetNumberOfWorkers();
@@ -541,12 +582,14 @@ void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
            atomic_read32(&jobs_pending_));
 
   // wait until all pending jobs are processed
+  EnableDrainoutMode();
   {
     MutexLockGuard lock(jobs_all_done_mutex_);
     while (atomic_read32(&jobs_pending_) > 0) {
       pthread_cond_wait(&jobs_all_done_, &jobs_all_done_mutex_);
     }
   }
+  DisableDrainoutMode();
 
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Jobs are done... go on");
 }
