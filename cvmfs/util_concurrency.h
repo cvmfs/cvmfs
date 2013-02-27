@@ -452,31 +452,18 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * scheduled jobs. Job structures are scheduled into a central FIFO queue and
    * are then processed concurrently by the workers.
    */
+  template <class DataT>
   struct Job {
-    explicit Job(const bool is_death_sentence) :
-      is_death_sentence(is_death_sentence) {}
-    const bool            is_death_sentence; //!< death sentence flag
+    explicit Job(const DataT &data) :
+      data(data),
+      is_death_sentence(false) {}
+    Job() :
+      is_death_sentence(true) {}
+    const DataT  data;              //!< job payload
+    const bool   is_death_sentence; //!< death sentence flag
   };
-
-  struct WorkerJob : Job {
-    explicit WorkerJob(const expected_data_t &data) :
-      Job(false),
-      data(data) {}
-    WorkerJob() :
-      Job(true), // <= this is a death sentence!
-      data() {}
-    const expected_data_t data;              //!< data to be processed
-  };
-
-  struct CallbackJob : Job {
-    explicit CallbackJob(const returned_data_t &data) :
-      Job(false),
-      data(data) {}
-    CallbackJob() :
-      Job(true), // <= this is a death sentence!
-      data() {}
-    const returned_data_t data;
-  };
+  typedef Job<expected_data_t> WorkerJob;
+  typedef Job<returned_data_t> CallbackJob;
 
   /**
    * Provides a wrapper for initialization data passed to newly spawned worker
@@ -671,13 +658,15 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   pthread_t                callback_thread_;      //!< handles callback invokes
 
   // job queue
-  FifoChannel<WorkerJob>   jobs_queue_;
+  typedef FifoChannel<WorkerJob > JobQueue;
+  JobQueue                 jobs_queue_;
   mutable atomic_int32     jobs_pending_;
   mutable atomic_int32     jobs_failed_;
   mutable atomic_int64     jobs_processed_;
 
   // callback channel
-  FifoChannel<CallbackJob> results_queue_;
+  typedef FifoChannel<CallbackJob > CallbackQueue;
+  CallbackQueue results_queue_;
 };
 
 
