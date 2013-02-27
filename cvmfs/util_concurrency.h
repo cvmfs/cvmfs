@@ -395,8 +395,24 @@ class FifoChannel : protected std::queue<T> {
    */
   const T Dequeue();
 
+  /**
+   * Clears all items in the FIFO channel. The cleared items will be lost.
+   *
+   * @return  the number of dropped items
+   */
+  unsigned int Drop();
+
+  /**
+   * Blocks the calling thread until all items are taken out of the channel.
+   * Note: this releases the waiting thread as soon as the last item was taken
+   *       out of the channel... it DOES NOT imply that no new items are en-
+   *       queued somewhere after this event.
+   */
+  void WaitUntilEmpty() const;
+
   inline size_t GetItemCount() const;
   inline bool   IsEmpty() const;
+  inline size_t GetMaximalItemCount() const;
 
  private:
   // general configuration
@@ -407,6 +423,7 @@ class FifoChannel : protected std::queue<T> {
   mutable pthread_mutex_t    mutex_;
   mutable pthread_cond_t     queue_is_not_empty_;
   mutable pthread_cond_t     queue_is_not_full_;
+  mutable pthread_cond_t     queue_is_empty_;
 };
 
 
@@ -466,7 +483,6 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
     const expected_data_t data;              //!< data to be processed
     const bool            is_death_sentence; //!< death sentence flag
   };
-  typedef std::queue<Job> JobQueue;
 
   /**
    * Provides a wrapper for initialization data passed to newly spawned worker
@@ -605,7 +621,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @return  a job to be processed by a worker
    */
-  Job Acquire();
+  inline Job Acquire();
 
   /**
    * Controls the asynchronous finishing of a job.
@@ -633,9 +649,6 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   // general configuration
   const size_t             number_of_workers_;    //!< number of concurrent
                                                   //!<  worker threads
-  const size_t             maximal_queue_length_;
-  const size_t             desired_free_slots_;   //!< Schedule() blocks until
-                                                  //!<  xx slots are available
   const worker_context_t  *worker_context_;       //!< the WorkerT defined context
   const RunBinding         thread_context_;       //!< the thread context passed
                                                   //!<  to newly spawned threads
@@ -651,11 +664,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   WorkerThreads            worker_threads_;       //!< list of worker threads
 
   // job queue
-  JobQueue                 job_queue_;
-  mutable pthread_mutex_t  job_queue_mutex_;
-  mutable pthread_cond_t   job_queue_cond_not_empty_;
-  mutable pthread_cond_t   job_queue_cond_not_full_;
-  mutable pthread_cond_t   jobs_all_done_;
+  FifoChannel<Job>         jobs_queue_;
   mutable atomic_int32     jobs_pending_;
   mutable atomic_int32     jobs_failed_;
   mutable atomic_int64     jobs_processed_;

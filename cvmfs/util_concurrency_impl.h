@@ -107,14 +107,17 @@ void Observable<ParamT>::NotifyListeners(const ParamT &parameter) {
 
 template <class T>
 FifoChannel<T>::FifoChannel(const size_t maximal_length,
-                        const size_t drainout_threshold) :
+                            const size_t drainout_threshold) :
   maximal_queue_length_(maximal_length),
   queue_drainout_threshold_(drainout_threshold)
 {
+  assert (drainout_threshold > 0);
+
   const bool successful = (
     pthread_mutex_init(&mutex_, NULL)              == 0 &&
     pthread_cond_init(&queue_is_not_empty_, NULL)  == 0 &&
-    pthread_cond_init(&queue_is_not_full_, NULL)   == 0
+    pthread_cond_init(&queue_is_not_full_, NULL)   == 0 &&
+    pthread_cond_init(&queue_is_empty_, NULL)      == 0
   );
 
   assert (successful);
@@ -123,9 +126,10 @@ FifoChannel<T>::FifoChannel(const size_t maximal_length,
 
 template <class T>
 FifoChannel<T>::~FifoChannel() {
-  pthread_mutex_destroy(&mutex_);
   pthread_cond_destroy(&queue_is_not_empty_);
   pthread_cond_destroy(&queue_is_not_full_);
+  pthread_cond_destroy(&queue_is_empty_);
+  pthread_mutex_destroy(&mutex_);
 }
 
 
@@ -148,7 +152,7 @@ void FifoChannel<T>::Enqueue(const T &data) {
 
 template <class T>
 const T FifoChannel<T>::Dequeue() {
-  MutexLockGuard guard(mutex_);
+  MutexLockGuard lock(mutex_);
 
   // wait until there is something to do
   while (this->empty()) {
@@ -162,9 +166,37 @@ const T FifoChannel<T>::Dequeue() {
   if (this->size() < queue_drainout_threshold_) {
     pthread_cond_broadcast(&queue_is_not_full_);
   }
+  if (this->empty()) {
+    pthread_cond_broadcast(&queue_is_empty_);
+  }
 
   // return the acquired job
   return data;
+}
+
+
+template <class T>
+unsigned int FifoChannel<T>::Drop() {
+  MutexLockGuard lock(mutex_);
+
+  unsigned int dropped_items = 0;
+  while (!this->empty()) {
+    this->pop();
+    ++dropped_items;
+  }
+
+  pthread_cond_broadcast(&queue_is_not_full_);
+
+  return dropped_items;
+}
+
+
+template <class T>
+void FifoChannel<T>::WaitUntilEmpty() const {
+  MutexLockGuard lock(mutex_);
+  while (!this->empty()) {
+    pthread_cond_wait(&queue_is_empty_, &mutex_);
+  }
 }
 
 
@@ -182,6 +214,12 @@ bool FifoChannel<T>::IsEmpty() const {
 }
 
 
+template <class T>
+size_t FifoChannel<T>::GetMaximalItemCount() const {
+  return maximal_queue_length_;
+}
+
+
 //
 // +----------------------------------------------------------------------------
 // |  ConcurrentWorkers
@@ -194,17 +232,14 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
           const size_t                                  maximal_queue_length,
           ConcurrentWorkers<WorkerT>::worker_context_t *worker_context) :
   number_of_workers_(number_of_workers),
-  maximal_queue_length_(maximal_queue_length),
-  desired_free_slots_(maximal_queue_length / 2 + 1), // TODO: consider to remove
-                                                     //       this magic number
   worker_context_(worker_context),
   thread_context_(this, worker_context_),
   initialized_(false),
   running_(false),
-  workers_started_(0)
+  workers_started_(0),
+  jobs_queue_(maximal_queue_length, maximal_queue_length / 2 + 1)
 {
-  assert (maximal_queue_length_ >= number_of_workers_);
-  assert (desired_free_slots_   >  0);
+  assert (maximal_queue_length  >= number_of_workers);
   assert (number_of_workers     >  0);
 
   atomic_init32(&jobs_pending_);
@@ -220,12 +255,8 @@ ConcurrentWorkers<WorkerT>::~ConcurrentWorkers() {
   }
 
   // destroy some synchronisation data structures
-  pthread_cond_destroy(&job_queue_cond_not_full_);
-  pthread_cond_destroy(&job_queue_cond_not_empty_);
-  pthread_cond_destroy(&jobs_all_done_);
   pthread_cond_destroy(&worker_started_);
   pthread_mutex_destroy(&status_mutex_);
-  pthread_mutex_destroy(&job_queue_mutex_);
 }
 
 
@@ -234,15 +265,11 @@ bool ConcurrentWorkers<WorkerT>::Initialize() {
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Initializing ConcurrentWorker "
                                             "object with %d worker threads "
                                             "and a queue length of %d",
-           number_of_workers_, maximal_queue_length_);
+           number_of_workers_, jobs_queue_.GetMaximalItemCount());
 
   // initialize synchronisation for job queue (Workers)
-  if (pthread_mutex_init(&job_queue_mutex_, NULL)         != 0 ||
-      pthread_mutex_init(&status_mutex_, NULL)            != 0 ||
-      pthread_cond_init(&job_queue_cond_not_full_, NULL)  != 0 ||
-      pthread_cond_init(&job_queue_cond_not_empty_, NULL) != 0 ||
-      pthread_cond_init(&jobs_all_done_, NULL)            != 0 ||
-      pthread_cond_init(&worker_started_, NULL)) {
+  if (pthread_mutex_init(&status_mutex_, NULL)  != 0 ||
+      pthread_cond_init(&worker_started_, NULL) != 0) {
     return false;
   }
 
@@ -374,24 +401,10 @@ void ConcurrentWorkers<WorkerT>::Schedule(Job job) {
     return;
   }
 
-  // lock the job queue
-  {
-    MutexLockGuard guard(job_queue_mutex_);
-
-    // wait until there is space in the job queue
-    while (job_queue_.size() >= maximal_queue_length_) {
-      pthread_cond_wait(&job_queue_cond_not_full_, &job_queue_mutex_);
-    }
-
-    // put something into the job queue
-    job_queue_.push(job);
-    if (!job.is_death_sentence) {
-      atomic_inc32(&jobs_pending_);
-    }
+  jobs_queue_.Enqueue(job);
+  if (!job.is_death_sentence) {
+    atomic_inc32(&jobs_pending_);
   }
-
-  // wake all waiting threads
-  pthread_cond_broadcast(&job_queue_cond_not_empty_);
 }
 
 
@@ -414,26 +427,7 @@ template <class WorkerT>
 typename ConcurrentWorkers<WorkerT>::Job ConcurrentWorkers<WorkerT>::Acquire() {
   // Note: This method is exclusively called inside the worker threads!
   //       Any other usage might produce undefined behavior.
-
-  // lock the job queue
-  MutexLockGuard guard(job_queue_mutex_);
-
-  // wait until there is something to do
-  while (job_queue_.empty()) {
-    pthread_cond_wait(&job_queue_cond_not_empty_, &job_queue_mutex_);
-  }
-
-  // get the job and remove it from the queue
-  Job job = job_queue_.front();
-  job_queue_.pop();
-
-  // signal the Scheduler that there is a fair amount of free space now
-  if (job_queue_.size() < desired_free_slots_) {
-    pthread_cond_broadcast(&job_queue_cond_not_full_);
-  }
-
-  // return the acquired job
-  return job;
+  return jobs_queue_.Dequeue();
 }
 
 
@@ -441,23 +435,12 @@ template <class WorkerT>
 void ConcurrentWorkers<WorkerT>::TruncateJobQueue(const bool forget_pending) {
   // Note: This method will throw away all jobs currently waiting in the job
   //       queue. These jobs will not be processed!
+  const unsigned int dropped_jobs = jobs_queue_.Drop();
 
-  // lock the job queue
-  {
-    MutexLockGuard guard(job_queue_mutex_);
-
-    // clear the job queue
-    while (!job_queue_.empty()) job_queue_.pop();
-
-    // if desired, we remove the jobs from the pending 'list'
-    if (forget_pending) {
-      const int pending = atomic_read32(&jobs_pending_);
-      atomic_xadd32(&jobs_pending_, -pending);
-    }
+  // if desired, we remove the jobs from the pending 'list'
+  if (forget_pending) {
+    atomic_xadd32(&jobs_pending_, -dropped_jobs);
   }
-
-  // signal the scheduler that the queue is now empty
-  pthread_cond_broadcast(&job_queue_cond_not_full_);
 }
 
 
@@ -511,15 +494,7 @@ void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Waiting for %d jobs to be finished",
            atomic_read32(&jobs_pending_));
 
-  // lock the job queue
-  {
-    MutexLockGuard guard(job_queue_mutex_);
-
-    // wait until all pending jobs are processed
-    while (atomic_read32(&jobs_pending_) > 0) {
-      pthread_cond_wait(&jobs_all_done_, &job_queue_mutex_);
-    }
-  }
+  jobs_queue_.WaitUntilEmpty();
 
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Jobs are done... go on");
 }
@@ -554,11 +529,6 @@ void ConcurrentWorkers<WorkerT>::JobDone(
   // remove the job from the pending 'list' and add it to the ready 'list'
   atomic_dec32(&jobs_pending_);
   atomic_inc64(&jobs_processed_);
-
-  // Signal the Spooler that all jobs are done...
-  if (atomic_read32(&jobs_pending_) == 0) {
-    pthread_cond_broadcast(&jobs_all_done_);
-  }
 }
 
 
