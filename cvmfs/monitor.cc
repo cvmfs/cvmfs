@@ -295,7 +295,7 @@ static bool CreateStacktraceScript(const std::string &cache_dir,
 "   GDB=${GDB:-gdb}\n"
 "\n"
 "   # Run GDB, strip out unwanted noise.\n"
-"   $GDB -q -batch -x $3 -n /proc/$2/exe $2 |\n"
+"   $GDB -q -batch -x $3 -n $1 $2 |\n"
 "   /bin/sed -n \\\n"
 "      -e 's/^(gdb) //' \\\n"
 "      -e '/^#/p' \\\n"
