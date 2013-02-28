@@ -38,6 +38,8 @@
 #include "logging.h"
 #include "smalloc.h"
 
+#include "cvmfs.h"
+
 using namespace std;  // NOLINT
 
 namespace monitor {
@@ -57,6 +59,15 @@ unsigned max_open_files_;
 int pipe_wd_[2];
 platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
+pid_t watchdog_pid_ = 0;
+
+pid_t GetPid() {
+  if (!spawned_) {
+    return cvmfs::pid_;
+  }
+
+  return watchdog_pid_;
+}
 
 
 /**
@@ -141,7 +152,7 @@ static string GenerateStackTraceAndKill(const string &exe_path,
   // Let the shell execute the stacktrace extraction script
   const string bt_cmd = *helper_script_path_ + " " + exe_path + " " +
                         StringifyInt(pid) + " " +
-                        *helper_script_gdb_cmd_path_ + "\n";
+                        *helper_script_gdb_cmd_path_ + " 2>&1\n";
   WritePipe(fd_stdin, bt_cmd.data(), bt_cmd.length());
 
   // close the standard in to close the shell
@@ -434,7 +445,9 @@ void Fini() {
  * Fork watchdog.
  */
 void Spawn() {
+  int pipe_pid[2];
   MakePipe(pipe_wd_);
+  MakePipe(pipe_pid);
 
   pid_t pid;
   int statloc;
@@ -449,6 +462,10 @@ void Spawn() {
         case 0: {
           close(pipe_wd_[1]);
           Daemonize();
+          // send the watchdog PID to cvmfs
+          pid_t watchdog_pid = getpid();
+          WritePipe(pipe_pid[1], (const void*)&watchdog_pid, sizeof(pid_t));
+          close(pipe_pid[1]);
           // Close all unused file descriptors
           for (int fd = 0; fd < max_fd; fd++) {
             if (fd != pipe_wd_[0])
@@ -465,6 +482,10 @@ void Spawn() {
       if (waitpid(pid, &statloc, 0) != pid) abort();
       if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
   }
+
+  // retrieve the watchdog PID from the pipe
+  ReadPipe(pipe_pid[0], (void*)&watchdog_pid_, sizeof(pid_t));
+  close(pipe_pid[0]);
 
   // Extra stack for signal handlers
   int stack_size = kSignalHandlerStacksize;  // 2 MB
