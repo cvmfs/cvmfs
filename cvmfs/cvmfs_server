@@ -1470,6 +1470,9 @@ publish() {
      -a $CVMFS_AVG_CHUNK_SIZE \
      -h $CVMFS_MAX_CHUNK_SIZE"
   fi
+  if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
+    sync_command="$sync_command -i"
+  fi
   local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \

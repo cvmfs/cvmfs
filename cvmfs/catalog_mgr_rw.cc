@@ -397,9 +397,9 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
            parent_directory.c_str(), entries[0].name().c_str());
 
-	// Hardlink groups have to reside in the same directory.
-	// Therefore we only have one parent directory here
-	const string parent_path = MakeRelativePath(parent_directory);
+  // Hardlink groups have to reside in the same directory.
+  // Therefore we only have one parent directory here
+  const string parent_path = MakeRelativePath(parent_directory);
 
   SyncLock();
   WritableCatalog *catalog;
@@ -410,18 +410,18 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
     assert(false);
   }
 
-	// Get a valid hardlink group id for the catalog the group will end up in
+  // Get a valid hardlink group id for the catalog the group will end up in
   // TODO: Compaction
-	uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
+  uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "hardlink group id %u issued",
            new_group_id);
-	assert(new_group_id > 0);
+  assert(new_group_id > 0);
 
-	// Add the file entries to the catalog
-	for (DirectoryEntryBaseList::iterator i = entries.begin(), iEnd = entries.end();
+  // Add the file entries to the catalog
+  for (DirectoryEntryBaseList::iterator i = entries.begin(), iEnd = entries.end();
        i != iEnd; ++i)
   {
-	  string file_path = parent_path + "/";
+    string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
 
     // create a full fledged DirectoryEntry to add the hardlink group to it
@@ -430,8 +430,8 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
     hardlink.set_hardlink_group(new_group_id);
     hardlink.set_linkcount(entries.size());
 
-	  catalog->AddEntry(hardlink, file_path, parent_path);
-	}
+    catalog->AddEntry(hardlink, file_path, parent_path);
+  }
   SyncUnlock();
 }
 

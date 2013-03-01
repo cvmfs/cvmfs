@@ -191,7 +191,7 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
 
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
-	SyncParameters params;
+  SyncParameters params;
 
   // Initialization
   params.dir_union = MakeCanonicalPath(*args.find('u')->second);
@@ -206,6 +206,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;
+  if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -224,7 +225,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-	if (!CheckParams(params)) return 2;
+  if (!CheckParams(params)) return 2;
 
   // Start spooler
   const upload::SpoolerDefinition spooler_definition(
