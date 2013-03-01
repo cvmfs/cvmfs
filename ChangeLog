@@ -1,4 +1,6 @@
 2.1.8:
+  * Support for ignoring x-directory hardlinks in the
+    server toolkit
   * Fix: evaluation of symlinks could lead to wrong
     empty or 1-byte symlinks
   * Use 32bit inodes by default
