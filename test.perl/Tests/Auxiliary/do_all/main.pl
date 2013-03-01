@@ -54,7 +54,12 @@ sub get_daemon_output {
 			return "RUN_SETUP";
 		}
 		
-		print $data if $data ne "END\n" and $data !~ m/READ_RETURN_CODE/;
+		if ($data ne "END\n" and $data !~ m/READ_RETURN_CODE/) {
+			print $data;
+		}
+		else {
+			print "MSG_RECEIVED: $data";
+		}
 	}
 }
 
@@ -86,6 +91,9 @@ if (defined ($pid) and $pid == 0) {
 	# Sending a command to the daemon for each main.pl file found to start different test
 	foreach (@main_pl) {
 		my $command = (split /\//, $_)[-2];
+		
+		print "Sending command: $command.\n";
+		
 		if (exists $options{$command}) {
 			$socket->send("$command --do-all $options{$command}");
 		}
@@ -93,7 +101,7 @@ if (defined ($pid) and $pid == 0) {
 			$socket->send("$command --do-all");
 		}
 		my $ret_value = get_daemon_output($socket, $shell_socket);
-		if ($ret_value eq "RUN_SETUP") {
+		if ($ret_value eq "RUN_SETUP") {			
 			if (exists $options{$command}) {
 				$socket->send("$command --setup --do-all $options{$command}");
 			}
