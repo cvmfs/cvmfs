@@ -38,11 +38,15 @@ sub get_daemon_output {
 	
 	my ($data, $reply) = ('', '');
 	
+	# This variable will be used to check if a re-run with --setup is required
+	my $rerun = 0;
+	
 	while ($data ne "END\n") {
 		$reply = $socket->recv();
 		$data = $reply->data;
 		
 		if ($data =~ m/PROCESSING/) {
+			print $data;
 			my $process_name = (split /:/,$data)[-1];
 			chomp($process_name);
 			$shell_socket->send($data);
@@ -51,16 +55,15 @@ sub get_daemon_output {
 			}
 		}
 		elsif ($data =~ m/RUN_SETUP/) {
-			return "RUN_SETUP";
+			$rerun= 1;
 		}
 		
-		if ($data ne "END\n" and $data !~ m/READ_RETURN_CODE/) {
+		if ($data ne "END\n" and $data !~ m/READ_RETURN_CODE/ and $data !~ m/RUN_SETUP/ and $data !~ m/PROCESSING/) {
 			print $data;
 		}
-		else {
-			print "MSG_RECEIVED: $data";
-		}
 	}
+	
+	return $rerun;
 }
 
 # Forking the process
@@ -100,8 +103,8 @@ if (defined ($pid) and $pid == 0) {
 		else {
 			$socket->send("$command --do-all");
 		}
-		my $ret_value = get_daemon_output($socket, $shell_socket);
-		if ($ret_value eq "RUN_SETUP") {			
+		my $rerun = get_daemon_output($socket, $shell_socket);
+		if ($rerun) {			
 			if (exists $options{$command}) {
 				$socket->send("$command --setup --do-all $options{$command}");
 			}
