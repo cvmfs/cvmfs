@@ -550,17 +550,17 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
  * SyncMediator::RemoveDirectoryRecursively instead.
  */
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
-	if (params_->print_changeset)
+  if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
-	if (!params_->dry_run)
+  if (!params_->dry_run)
     catalog_manager_->RemoveDirectory(entry.GetRelativePath());
 }
 
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
-	if (params_->print_changeset)
+  if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
-	if (!params_->dry_run)
+  if (!params_->dry_run)
     catalog_manager_->TouchDirectory(entry.CreateBasicCatalogDirent(),
                                      entry.GetRelativePath());
 }
@@ -571,29 +571,30 @@ void SyncMediator::TouchDirectory(SyncItem &entry) {
  * added to the catalogs.
  */
 void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
-	for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
+  for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
     if (i->second.hardlinks.size() != i->second.master.GetUnionLinkcount()) {
       LogCvmfs(kLogPublish, kLogStderr, "Hardlinks across directories (%s)",
                i->second.master.GetUnionPath().c_str());
-      abort();
+      if (!params_->ignore_xdir_hardlinks)
+        abort();
     }
 
     if (params_->print_changeset) {
       LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak,
                "[add] hardlink group around: (%s)",
                i->second.master.GetUnionPath().c_str());
-			for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
+      for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
       {
-				LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, " %s",
+        LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, " %s",
                  j->second.filename().c_str());
-			}
-			LogCvmfs(kLogPublish, kLogStdout, "");
-		}
+      }
+      LogCvmfs(kLogPublish, kLogStdout, "");
+    }
 
-		if (params_->dry_run)
+    if (params_->dry_run)
       continue;
 
     if (i->second.master.IsSymlink())
