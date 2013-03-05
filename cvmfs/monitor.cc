@@ -141,6 +141,13 @@ static string GenerateStackTraceAndKill(const string &exe_path,
                                         const pid_t pid)
 {
   int retval;
+  string result = "";
+
+  // re-gain root permissions to allow for ptrace of died cvmfs2 process
+  const bool retrievable = true;
+  if (! SwitchCredentials(0, getgid(), retrievable)) {
+    result += "failed to re-gain root permissions... still give it a try\n";
+  }
 
   int fd_stdin;
   int fd_stdout;
@@ -158,7 +165,6 @@ static string GenerateStackTraceAndKill(const string &exe_path,
   close(fd_stdin);
 
   // read the stack trace from the stdout of our shell
-  string result = "";
   char mini_buffer;
   int chars_io;
   while (1) {
