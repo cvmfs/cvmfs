@@ -52,8 +52,6 @@ const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 string *cache_dir_ = NULL;
 string *process_name_ = NULL;
 string *exe_path_ = NULL;
-string *helper_script_path_ = NULL;
-string *helper_script_gdb_cmd_path_;
 bool spawned_ = false;
 int pipe_wd_[2];
 platform_spinlock lock_handler_;
@@ -132,6 +130,38 @@ static void LogEmergency(string msg) {
   LogCvmfs(kLogMonitor, kLogSyslog, "%s", msg.c_str());
 }
 
+static std::string ReadUntilGdbPrompt(int fd_pipe) {
+  static const std::string gdb_prompt = "\n(gdb) ";
+
+  std::string result;
+
+  char mini_buffer;
+  int  chars_io;
+  int  ring_buffer_pos = 0;
+  // read from stdout of gdb until gdb prompt occures --> (gdb)
+  while (1) {
+    chars_io = read(fd_pipe, &mini_buffer, 1);
+
+    // in case something goes wrong...
+    if (chars_io <= 0) break;
+
+    result += mini_buffer;
+
+    // find the gdb_promt in the stdout data
+    if (mini_buffer == gdb_prompt[ring_buffer_pos]) {
+      ++ring_buffer_pos;
+      if (ring_buffer_pos == gdb_prompt.size()) {
+        break;
+      }
+    } else {
+      ring_buffer_pos = 0;
+    }
+  }
+
+  return result;
+}
+
+
 
 /**
  * Uses an external shell and gdb to create a full stack trace of the dying
@@ -149,38 +179,31 @@ static string GenerateStackTraceAndKill(const string &exe_path,
     result += "failed to re-gain root permissions... still give it a try\n";
   }
 
+  // run gdb and attach to the dying cvmfs2 process
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
-  retval = Shell(&fd_stdin, &fd_stdout, &fd_stderr);
+  std::vector<std::string> argv; // TODO: C++11 initializer list...
+  argv.push_back("-q");
+  argv.push_back("-n");
+  argv.push_back(exe_path);
+  argv.push_back(StringifyInt(pid));
+  retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, "gdb", argv);
   assert(retval);
 
-  // Let the shell execute the stacktrace extraction script
-  const string bt_cmd = *helper_script_path_ + " " + exe_path + " " +
-                        StringifyInt(pid) + " " +
-                        *helper_script_gdb_cmd_path_ + " 2>&1\n";
-  WritePipe(fd_stdin, bt_cmd.data(), bt_cmd.length());
+  // skip the gdb startup rubbish
+  ReadUntilGdbPrompt(fd_stdout);
 
-  // close the standard in to close the shell
-  close(fd_stdin);
+  // send stacktrace command to gdb
+  const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
+                         "quit\n";               // stop gdb
+  WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
 
-  // read the stack trace from the stdout of our shell
-  char mini_buffer;
-  int chars_io;
-  while (1) {
-    chars_io = read(fd_stdout, &mini_buffer, 1);
-    if (chars_io <= 0) break;
-    result += mini_buffer;
-  }
-
-  // check if the stacktrace readout went fine
-  if (chars_io < 0) {
-    result += "failed to read stack traces";
-  }
-
-  // close the pipes to the shell
+  // read the stack trace from the stdout of our gdb process
+  result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
   close(fd_stderr);
   close(fd_stdout);
+  close(fd_stdin);
 
   // give the dying cvmfs client the finishing stroke
   if (kill(pid, SIGKILL) != 0) {
@@ -253,126 +276,13 @@ static void Watchdog() {
 }
 
 
-static bool CreateStacktraceScript(const std::string &cache_dir,
-                                   const std::string &process_name) {
-  const string script =
-"#!/bin/sh\n"
-"\n"
-"# This script is almost identical to /usr/bin/gstack.\n"
-"# It is used by monitor.cc on Linux and MacOS X.\n"
-"\n"
-"# Note: this script was taken from the ROOT svn repository\n"
-"#       and slightly adapted to print a stacktrace to stdout instead\n"
-"#       of an output file.\n"
-"\n"
-"tempname=`basename $0 .sh`\n"
-"\n"
-"if test $# -lt 3; then\n"
-"   echo \"Usage: ${tempname} <executable> <process-id> <gdb cmd file>\" 1>&2\n"
-"   exit 1\n"
-"fi\n"
-"\n"
-"if [ `uname -s` = \"Darwin\" ]; then\n"
-"\n"
-"   if test ! -x $1; then\n"
-"      echo \"${tempname}: process $1 not found.\" 1>&2\n"
-"      exit 1\n"
-"   fi\n"
-"\n"
-"   GDB=${GDB:-gdb}\n"
-"\n"
-"   # Run GDB, strip out unwanted noise.\n"
-"   $GDB -q -batch -x $3 -n $1 $2 2>&1  < /dev/null |\n"
-"   /usr/bin/sed -n \\\n"
-"    -e 's/^(gdb) //' \\\n"
-"    -e '/^#/p' \\\n"
-"    -e 's/\\(^Thread.*\\)/@\1/p' | tr \"@\" \"\\n\" > /dev/stdout\n"
-"\n"
-"   rm -f $TMPFILE\n"
-"\n"
-"else\n"
-"\n"
-"   if test ! -r /proc/$2; then\n"
-"      echo \"${tempname}: process $2 not found.\" 1>&2\n"
-"      exit 1\n"
-"   fi\n"
-"\n"
-"   GDB=${GDB:-gdb}\n"
-"\n"
-"   # Run GDB, strip out unwanted noise.\n"
-"   $GDB -q -batch -x $3 -n $1 $2 |\n"
-"   /bin/sed -n \\\n"
-"      -e 's/^(gdb) //' \\\n"
-"      -e '/^#/p' \\\n"
-"      -e '/^   /p' \\\n"
-"      -e 's/\\(^Thread.*\\)/@\1/p' | tr '@' '\\n' > /dev/stdout\n"
-"fi\n"
-"";
-
-  const string gdb = "thread apply all bt\n";
-
-  //
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  //
-
-  FILE *fp = fopen(helper_script_path_->c_str(), "w");
-
-  if (!fp ||
-      fwrite(script.data(), 1, script.length(), fp) != script.length() ||
-      (chmod(helper_script_path_->c_str(), S_IRUSR | S_IWUSR | S_IXUSR) != 0))
-  {
-    LogCvmfs(kLogMonitor, kLogStderr, "Failed to create gdb helper script (%d)",
-             errno);
-    goto create_stacktrace_fail;
-  }
-  fclose(fp);
-
-  fp = fopen(helper_script_gdb_cmd_path_->c_str(), "w");
-  if (!fp ||
-      fwrite(gdb.data(), 1, gdb.length(), fp) != gdb.length() ||
-      (chmod(helper_script_gdb_cmd_path_->c_str(), S_IRUSR | S_IWUSR) != 0))
-  {
-    LogCvmfs(kLogMonitor, kLogStderr,
-             "Failed to create gdb helper helper script (%d)");
-    goto create_stacktrace_fail;
-  }
-  fclose(fp);
-
-  return true;
-
- create_stacktrace_fail:
-  if (fp)
-    fclose(fp);
-  return false;
-}
-
-
 bool Init(const string &cache_dir, const std::string &process_name,
           const bool check_max_open_files)
 {
   monitor::cache_dir_ = new string(cache_dir);
   monitor::process_name_ = new string(process_name);
   monitor::exe_path_ = new string(platform_getexepath());
-  monitor::helper_script_path_ =
-    new string(cache_dir + "/gdb-helper." + process_name + ".sh");
-  monitor::helper_script_gdb_cmd_path_ =
-    new string(cache_dir + "/gdb-helper-gdb-cmd." + process_name);
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
-
-  // create stacktrace retrieve script in cache directory
-  if (!CreateStacktraceScript(cache_dir, process_name)) {
-    delete monitor::cache_dir_;
-    delete monitor::exe_path_;
-    delete monitor::process_name_;
-    delete monitor::helper_script_path_;
-    delete monitor::helper_script_gdb_cmd_path_;
-    monitor::cache_dir_ = NULL;
-    monitor::process_name_ = NULL;
-    monitor::exe_path_ = NULL;
-    monitor::helper_script_path_ = NULL;
-    monitor::helper_script_gdb_cmd_path_ = NULL;
-    return false;
-  }
 
   return true;
 }
@@ -397,19 +307,13 @@ void Fini() {
     char quit = 'Q';
     (void)write(pipe_wd_[1], &quit, 1);
     close(pipe_wd_[1]);
-    unlink(helper_script_path_->c_str());
-    unlink(helper_script_gdb_cmd_path_->c_str());
   }
   delete process_name_;
   delete cache_dir_;
   delete exe_path_;
-  delete helper_script_path_;
-  delete helper_script_gdb_cmd_path_;
   process_name_ = NULL;
   cache_dir_ = NULL;
   exe_path_ = NULL;
-  helper_script_path_ = NULL;
-  helper_script_gdb_cmd_path_ = NULL;
   platform_spinlock_destroy(&lock_handler_);
 }
 

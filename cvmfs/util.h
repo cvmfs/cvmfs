@@ -97,6 +97,11 @@ void BlockSignal(int signum);
 void WaitForSignal(int signum);
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
+bool ExecuteBinary(      int                       *fd_stdin,
+                         int                       *fd_stdout,
+                         int                       *fd_stderr,
+                   const std::string               &binary_path,
+                   const std::vector<std::string>  &argv = std::vector<std::string>());
 bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
                  const std::map<int, int> &map_fildes);
