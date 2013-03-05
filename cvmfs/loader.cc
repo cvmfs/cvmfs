@@ -124,7 +124,7 @@ static void Usage(const std::string &exename) {
                             "before mounting (required for autofs)\n"
     "  -o parse             Parse and print cvmfs parameters\n"
     "  -o cvmfs_suid        Enable suid mode\n\n"
-    "  -o disable_watchdog  Do not spawn a post mortem crash handler"
+    "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
