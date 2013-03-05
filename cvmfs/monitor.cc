@@ -171,11 +171,11 @@ static void LogEmergency(string msg) {
 static std::string ReadUntilGdbPrompt(int fd_pipe) {
   static const std::string gdb_prompt = "\n(gdb) ";
 
-  std::string result;
+  std::string   result;
+  char          mini_buffer;
+  int           chars_io;
+  unsigned int  ring_buffer_pos = 0;
 
-  char mini_buffer;
-  int  chars_io;
-  int  ring_buffer_pos = 0;
   // read from stdout of gdb until gdb prompt occures --> (gdb)
   while (1) {
     chars_io = read(fd_pipe, &mini_buffer, 1);
