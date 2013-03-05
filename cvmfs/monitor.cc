@@ -55,7 +55,6 @@ string *exe_path_ = NULL;
 string *helper_script_path_ = NULL;
 string *helper_script_gdb_cmd_path_;
 bool spawned_ = false;
-unsigned max_open_files_;
 int pipe_wd_[2];
 platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
@@ -369,39 +368,6 @@ bool Init(const string &cache_dir, const std::string &process_name,
     return false;
   }
 
-  /* check number of open files */
-  if (check_max_open_files) {
-    unsigned int soft_limit = 0;
-    int hard_limit = 0;
-
-    struct rlimit rpl;
-    memset(&rpl, 0, sizeof(rpl));
-    getrlimit(RLIMIT_NOFILE, &rpl);
-    soft_limit = rpl.rlim_cur;
-
-#ifdef __APPLE__
-    hard_limit = sysconf(_SC_OPEN_MAX);
-    if (hard_limit < 0) {
-      LogCvmfs(kLogMonitor, kLogStdout, "Warning: could not retrieve "
-               "hard limit for the number of open files");
-    }
-#else
-    hard_limit = rpl.rlim_max;
-#endif
-
-    if (soft_limit < kMinOpenFiles) {
-      LogCvmfs(kLogMonitor, kLogSyslog | kLogDebug,
-               "Warning: current limits for number of open files are "
-               "(%lu/%lu)\n"
-               "CernVM-FS is likely to run out of file descriptors, "
-               "set ulimit -n to at least %lu",
-               soft_limit, hard_limit, kMinOpenFiles);
-    }
-    max_open_files_ = soft_limit;
-  } else {
-    max_open_files_ = 0;
-  }
-
   return true;
 }
 
@@ -516,7 +482,42 @@ void Spawn() {
 }
 
 unsigned GetMaxOpenFiles() {
-  return max_open_files_;
+  static unsigned max_open_files;
+  static bool     already_done = false;
+
+  /* check number of open files (lazy evaluation) */
+  if (! already_done) {
+    unsigned int soft_limit = 0;
+    int hard_limit = 0;
+
+    struct rlimit rpl;
+    memset(&rpl, 0, sizeof(rpl));
+    getrlimit(RLIMIT_NOFILE, &rpl);
+    soft_limit = rpl.rlim_cur;
+
+#ifdef __APPLE__
+    hard_limit = sysconf(_SC_OPEN_MAX);
+    if (hard_limit < 0) {
+      LogCvmfs(kLogMonitor, kLogStdout, "Warning: could not retrieve "
+               "hard limit for the number of open files");
+    }
+#else
+    hard_limit = rpl.rlim_max;
+#endif
+
+    if (soft_limit < kMinOpenFiles) {
+      LogCvmfs(kLogMonitor, kLogSyslog | kLogDebug,
+               "Warning: current limits for number of open files are "
+               "(%lu/%lu)\n"
+               "CernVM-FS is likely to run out of file descriptors, "
+               "set ulimit -n to at least %lu",
+               soft_limit, hard_limit, kMinOpenFiles);
+    }
+    max_open_files = soft_limit;
+    already_done   = true;
+  }
+
+  return max_open_files;
 }
 
 }  // namespace monitor

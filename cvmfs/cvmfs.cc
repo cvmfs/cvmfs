@@ -1727,14 +1727,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Monitor, check for maximum number of open files
-  if (!monitor::Init(".", *cvmfs::repository_name_, true)) {
-    *g_boot_error = "failed to initialize watchdog.";
-    return loader::kFailMonitor;
+  if (! loader_exports->disable_watchdog) {
+    if (!monitor::Init(".", *cvmfs::repository_name_, true)) {
+      *g_boot_error = "failed to initialize watchdog.";
+      return loader::kFailMonitor;
+    }
+    g_monitor_ready = true;
   }
   cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
   atomic_init32(&cvmfs::open_files_);
   atomic_init32(&cvmfs::open_dirs_);
-  g_monitor_ready = true;
 
   // Control & command interface
   if (!talk::Init(".")) {
@@ -1824,7 +1826,9 @@ static void Spawn() {
   }
 
   cvmfs::pid_ = getpid();
-  monitor::Spawn();
+  if (! cvmfs::loader_exports_->disable_watchdog && g_monitor_ready) {
+    monitor::Spawn();
+  }
   download::Spawn();
   quota::Spawn();
   talk::Spawn();

@@ -87,18 +87,16 @@ typedef std::vector<LoadEvent *> EventList;
  * Whenever something changes, change the version number.
  */
 struct LoaderExports {
-  LoaderExports() {
-    version = 1;
-    size = sizeof(LoaderExports);
-    foreground = false;
-    boot_time = 0;
-  }
+  LoaderExports() :
+    version(2),
+    size(sizeof(LoaderExports)), boot_time(0), foreground(false) {}
 
   uint32_t version;
   uint32_t size;
   time_t boot_time;
   std::string loader_version;
   bool foreground;
+  bool disable_watchdog;
   std::string repository_name;
   std::string mount_point;
   std::string config_files;
