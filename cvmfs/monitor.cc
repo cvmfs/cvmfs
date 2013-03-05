@@ -27,6 +27,7 @@
 #include <time.h>
 
 #include <string>
+#include <map>
 
 #include <cstring>
 #include <cstdio>
@@ -58,12 +59,38 @@ platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
 pid_t watchdog_pid_ = 0;
 
+typedef std::map<int, struct sigaction> SigactionMap;
+SigactionMap old_signal_handlers_;
+
 pid_t GetPid() {
   if (!spawned_) {
     return cvmfs::pid_;
   }
 
   return watchdog_pid_;
+}
+
+
+/**
+ * Sets the signal handlers of the current process according to the ones
+ * defined in the given SigactionMap.
+ *
+ * @param signal_handlers  a map of SIGNAL -> struct sigaction
+ * @return                 a SigactionMap containing the old handlers
+ */
+static SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers) {
+  SigactionMap old_signal_handlers;
+  SigactionMap::const_iterator i     = signal_handlers.begin();
+  SigactionMap::const_iterator iend  = signal_handlers.end();
+  for (; i != iend; ++i) {
+    struct sigaction old_signal_handler;
+    if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
+      abort();
+    }
+    old_signal_handlers[i->first] = old_signal_handler;
+  }
+
+  return old_signal_handlers;
 }
 
 
@@ -80,6 +107,9 @@ static void SendTrace(int signal,
     // Concurrent call, wait for the first one to exit the process
     while (true) {}
   }
+
+  // reset the signal handler (watchdog process will raise this signal again)
+  SetSignalHandlers(old_signal_handlers_);
 
   char cflow = 'S';
   if (write(pipe_wd_[1], &cflow, 1) != 1)
@@ -130,6 +160,14 @@ static void LogEmergency(string msg) {
   LogCvmfs(kLogMonitor, kLogSyslog, "%s", msg.c_str());
 }
 
+
+/**
+ * reads from the file descriptor until the specific gdb prompt
+ * is reached or the pipe gets broken
+ *
+ * @param fd_pipe  the file descriptor of the pipe to be read
+ * @return         the data read from the pipe
+ */
 static std::string ReadUntilGdbPrompt(int fd_pipe) {
   static const std::string gdb_prompt = "\n(gdb) ";
 
@@ -167,9 +205,8 @@ static std::string ReadUntilGdbPrompt(int fd_pipe) {
  * Uses an external shell and gdb to create a full stack trace of the dying
  * cvmfs client. The same shell is used to force-quit the client afterwards.
  */
-static string GenerateStackTraceAndKill(const string &exe_path,
-                                        const pid_t pid)
-{
+static string GenerateStackTrace(const string &exe_path,
+                                 const pid_t   pid) {
   int retval;
   string result = "";
 
@@ -204,11 +241,6 @@ static string GenerateStackTraceAndKill(const string &exe_path,
   close(fd_stderr);
   close(fd_stdout);
   close(fd_stdin);
-
-  // give the dying cvmfs client the finishing stroke
-  if (kill(pid, SIGKILL) != 0) {
-    result += "Failed to kill cvmfs client!\n\n";
-  }
 
   return result;
 }
@@ -246,7 +278,12 @@ static string ReportStacktrace() {
 
   debug += "Executable path: " + *exe_path_ + "\n";
 
-  debug += GenerateStackTraceAndKill(*exe_path_, pid);
+  debug += GenerateStackTrace(*exe_path_, pid);
+
+  // give the dying cvmfs client the finishing stroke
+  if (kill(pid, recv_signal) != 0) {
+    debug += "Failed to kill cvmfs client!\n\n";
+  }
 
   return debug;
 }
@@ -371,23 +408,24 @@ void Spawn() {
   if (sigaltstack(&sighandler_stack_, NULL) != 0)
     abort();
 
+  // define our crash signal handler
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_sigaction = SendTrace;
   sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
   sigfillset(&sa.sa_mask);
 
-  if (sigaction(SIGQUIT, &sa, NULL) ||
-      sigaction(SIGILL, &sa, NULL) ||
-      sigaction(SIGABRT, &sa, NULL) ||
-      sigaction(SIGFPE, &sa, NULL) ||
-      sigaction(SIGSEGV, &sa, NULL) ||
-      sigaction(SIGBUS, &sa, NULL) ||
-      sigaction(SIGPIPE, &sa, NULL) ||
-      sigaction(SIGXFSZ, &sa, NULL))
-  {
-    abort();
-  }
+  SigactionMap signal_handlers;
+  signal_handlers[SIGQUIT] = sa;
+  signal_handlers[SIGILL]  = sa;
+  signal_handlers[SIGABRT] = sa;
+  signal_handlers[SIGFPE]  = sa;
+  signal_handlers[SIGSEGV] = sa;
+  signal_handlers[SIGBUS]  = sa;
+  signal_handlers[SIGPIPE] = sa;
+  signal_handlers[SIGXFSZ] = sa;
+  old_signal_handlers_ = SetSignalHandlers(signal_handlers);
+
   spawned_ = true;
 }
 
