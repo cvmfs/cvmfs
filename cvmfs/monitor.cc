@@ -109,7 +109,7 @@ static void SendTrace(int signal,
   }
 
   // reset the signal handler (watchdog process will raise this signal again)
-  SetSignalHandlers(old_signal_handlers_);
+  sigaction(signal, &old_signal_handlers_[signal], NULL);
 
   char cflow = 'S';
   if (write(pipe_wd_[1], &cflow, 1) != 1)
@@ -168,10 +168,10 @@ static void LogEmergency(string msg) {
  * @param fd_pipe  the file descriptor of the pipe to be read
  * @return         the data read from the pipe
  */
-static std::string ReadUntilGdbPrompt(int fd_pipe) {
-  static const std::string gdb_prompt = "\n(gdb) ";
+static string ReadUntilGdbPrompt(int fd_pipe) {
+  static const string gdb_prompt = "\n(gdb) ";
 
-  std::string   result;
+  string        result;
   char          mini_buffer;
   int           chars_io;
   unsigned int  ring_buffer_pos = 0;
