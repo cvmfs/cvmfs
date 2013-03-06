@@ -1,8 +1,24 @@
 #!/bin/sh
 
 usage() {
-  echo "$0 <logfile> [<test list>]"
+  echo "$0 <logfile> [<test list> | -x <exclusion list>]"
 }
+
+
+contains() {
+  local haystack=$1
+  local needle=$2
+
+  for elem in $haystack
+  do
+    if [ $(readlink --canonicalize $elem) = $(readlink --canonicalize $needle) ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 
 logfile=$1
 if [ -z $logfile ]; then
@@ -14,7 +30,13 @@ if ! echo "$logfile" | grep -q ^/; then
 fi
 
 shift
-testsuite=$@
+exclusions=""
+if [ x$1 = "x-x" ]; then
+  shift
+  exclusions=$@
+else
+  testsuite=$@
+fi
 if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
@@ -29,6 +51,10 @@ date >> $logfile
 num_failures=0
 for t in $testsuite
 do
+  if contains "$exclusions" $t; then
+    continue
+  fi
+
   cvmfs_clean || exit 2
   workdir="${CVMFS_TEST_SCRATCH}/workdir/$t"
   rm -rf "$workdir" && mkdir -p "$workdir" || exit 3
