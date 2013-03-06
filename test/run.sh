@@ -37,6 +37,7 @@ if [ x$1 = "x-x" ]; then
 else
   testsuite=$@
 fi
+exclusions="$exclusions $CVMFS_TEST_EXCLUDE"
 if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
@@ -51,10 +52,6 @@ date >> $logfile
 num_failures=0
 for t in $testsuite
 do
-  if contains "$exclusions" $t; then
-    continue
-  fi
-
   cvmfs_clean || exit 2
   workdir="${CVMFS_TEST_SCRATCH}/workdir/$t"
   rm -rf "$workdir" && mkdir -p "$workdir" || exit 3
@@ -63,16 +60,10 @@ do
   echo "-- Testing $t (${cvmfs_test_name})" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
   
-  exclude=0
-  if [ "x$CVMFS_TEST_EXCLUDE" != "x" ]; then
-    for testcase in $CVMFS_TEST_EXCLUDE; do
-      if echo $(basename $t) | grep -q "^$testcase"; then
-        exclude=1
-      fi
-    done
-  fi
+  contains "$exclusions" $t
+  exclude=$?
 
-  if [ $exclude -eq 0 ]; then
+  if [ $exclude -eq 1 ]; then
     if $cvmfs_test_autofs_on_startup; then
       autofs_switch on >> $logfile 2>&1 || exit 5
     else
