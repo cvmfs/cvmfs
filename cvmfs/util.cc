@@ -817,11 +817,11 @@ void Daemonize() {
 }
 
 
-/**
- * Opens /bin/sh and provides file descriptors to write into stdin and
- * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
- */
-bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
+bool ExecuteBinary(      int                       *fd_stdin,
+                         int                       *fd_stdout,
+                         int                       *fd_stderr,
+                   const std::string               &binary_path,
+                   const std::vector<std::string>  &argv) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -838,7 +838,8 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
   map_fildes[pipe_stderr[1]] = 2;  // Writing end of pipe_stderr
   vector<string> cmd_line;
-  cmd_line.push_back("/bin/sh");
+  cmd_line.push_back(binary_path);
+  cmd_line.insert(cmd_line.end(), argv.begin(), argv.end());
 
   if (!ManagedExec(cmd_line, preserve_fildes, map_fildes)) {
     ClosePipe(pipe_stdin);
@@ -854,6 +855,15 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   *fd_stdout = pipe_stdout[0];
   *fd_stderr = pipe_stderr[0];
   return true;
+}
+
+
+/**
+ * Opens /bin/sh and provides file descriptors to write into stdin and
+ * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
+ */
+bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
+  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh");
 }
 
 
