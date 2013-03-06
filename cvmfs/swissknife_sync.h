@@ -16,6 +16,7 @@ struct SyncParameters {
     dry_run(false),
     mucatalogs(false),
     use_file_chunking(false),
+    ignore_xdir_hardlinks(false),
     min_file_chunk_size(4*1024*1024),
     avg_file_chunk_size(8*1024*1024),
     max_file_chunk_size(16*1024*1024) {}
@@ -33,6 +34,7 @@ struct SyncParameters {
   bool             dry_run;
   bool             mucatalogs;
   bool             use_file_chunking;
+  bool             ignore_xdir_hardlinks;
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
   size_t           max_file_chunk_size;
@@ -121,6 +123,8 @@ class CommandSync : public Command {
     result.push_back(Parameter('x', "print change set", true, true));
     result.push_back(Parameter('y', "dry run", true, true));
     result.push_back(Parameter('m', "create micro catalogs", true, true));
+    result.push_back(Parameter('i', "ignore x-directory hardlinks", 
+                               true, true));
     result.push_back(Parameter('z', "log level (0-4, default: 2)",
                                true, false));
 

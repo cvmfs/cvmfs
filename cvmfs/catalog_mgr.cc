@@ -22,7 +22,7 @@ InodeRevisionAnnotation::InodeRevisionAnnotation(const unsigned inode_width) {
   inode_width_ = inode_width;
   switch (inode_width_) {
     case 32:
-      num_protected_bits_ = 24;
+      num_protected_bits_ = 26;
       break;
     case 64:
       num_protected_bits_ = 32;
