@@ -94,7 +94,8 @@ typedef std::vector<LoadEvent *> EventList;
 struct LoaderExports {
   LoaderExports() :
     version(2),
-    size(sizeof(LoaderExports)), boot_time(0), foreground(false) {}
+    size(sizeof(LoaderExports)), boot_time(0), foreground(false),
+    disable_watchdog(false) {}
 
   uint32_t version;
   uint32_t size;
