@@ -85,6 +85,11 @@ typedef std::vector<LoadEvent *> EventList;
 /**
  * This contains the public interface of the cvmfs loader.
  * Whenever something changes, change the version number.
+ *
+ * Note: Do not forget to check the version of LoaderExports in cvmfs.cc when
+ *       using fields that were not present in version 1
+ *
+ * CernVM-FS 2.1.8 --> Version 2
  */
 struct LoaderExports {
   LoaderExports() :
@@ -96,13 +101,15 @@ struct LoaderExports {
   time_t boot_time;
   std::string loader_version;
   bool foreground;
-  bool disable_watchdog;
   std::string repository_name;
   std::string mount_point;
   std::string config_files;
   std::string program_name;
   EventList history;
   StateList saved_states;
+
+  // added with CernVM-FS 2.1.8 (LoaderExports Version: 2)
+  bool disable_watchdog;
 };
 
 

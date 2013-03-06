@@ -290,6 +290,17 @@ void ResetErrorCounters() {
 }
 
 
+static bool UseWatchdog() {
+  if (loader_exports_ == NULL || loader_exports_->version < 2) {
+    return true; // spawn watchdog by default
+                 // Note: with library versions before 2.1.8 it might not create
+                 //       stack traces properly in all cases
+  }
+
+  return ! loader_exports_->disable_watchdog;
+}
+
+
 void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
                       lru::Statistics *md5path_stats)
 {
@@ -1727,7 +1738,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Monitor, check for maximum number of open files
-  if (! loader_exports->disable_watchdog) {
+  if (cvmfs::UseWatchdog()) {
     if (!monitor::Init(".", *cvmfs::repository_name_, true)) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
@@ -1826,7 +1837,7 @@ static void Spawn() {
   }
 
   cvmfs::pid_ = getpid();
-  if (! cvmfs::loader_exports_->disable_watchdog && g_monitor_ready) {
+  if (cvmfs::UseWatchdog() && g_monitor_ready) {
     monitor::Spawn();
   }
   download::Spawn();
