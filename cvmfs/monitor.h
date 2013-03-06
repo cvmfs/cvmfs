@@ -14,6 +14,8 @@ bool Init(const std::string &cache_dir, const std::string &process_name,
 void Fini();
 void Spawn();
 
+pid_t GetPid();
+
 unsigned GetMaxOpenFiles();
 
 }  // namespace monitor

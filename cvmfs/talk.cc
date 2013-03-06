@@ -44,6 +44,7 @@
 #include "loader.h"
 #include "options.h"
 #include "cache.h"
+#include "monitor.h"
 
 using namespace std;  // NOLINT
 
@@ -389,6 +390,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         Answer(con_fd, pid_str);
       } else if (line == "pid cachemgr") {
         const string pid_str = StringifyInt(quota::GetPid()) + "\n";
+        Answer(con_fd, pid_str);
+      } else if (line == "pid watchdog") {
+        const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "parameters") {
         Answer(con_fd, options::Dump());

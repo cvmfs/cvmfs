@@ -1,0 +1,55 @@
+
+cvmfs_test_name="Stacktrace from Private Mount Point"
+
+final_cleanup() {
+  local log=$1
+  sudo fusermount -u $(pwd)/mnt >> $log 2>&1
+  sudo umount $(pwd)/mnt >> $log 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo="atlas"
+  local fqrn="${repo}.cern.ch"
+
+  # create a mount point and a cache directory
+  mkdir mnt >> $logfile 2>&1 || return 1
+  mkdir cache >> $logfile 2>&1 || return 2
+
+  # create a local configuration file
+  cat > local.conf << EOF
+CVMFS_CACHE_BASE=$(pwd)/cache
+CVMFS_RELOAD_SOCKETS=$(pwd)/cache
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/opt/${repo}
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/cern.ch.pub:/etc/cvmfs/keys/cern-it1.cern.ch.pub:/etc/cvmfs/keys/cern-it2.cern.ch.pub:/etc/cvmfs/keys/cern-it3.cern.ch.pub
+EOF
+
+  # mount the private repository
+  cvmfs2 -o config=$(pwd)/local.conf $fqrn $(pwd)/mnt >> $logfile 2>&1 || return 4
+  ls mnt >> $logfile 2>&1 || return 5
+
+  # find out the PID of the mounted cvmfs process
+  local pid=$(sudo cvmfs_talk -p $(pwd)/cache/${fqrn}/cvmfs_io.${fqrn} pid)
+
+  # kill this cvmfs2 process
+  sudo kill -s SIGSEGV $pid >> $logfile 2>&1 || { final_cleanup $logfile; return 6; }
+  sleep 2
+
+  # check if we got a stacktrace of a decent length
+  local stacktrace_path="cache/${fqrn}/stacktrace.${fqrn}"
+  [ -f $stacktrace_path ] || { final_cleanup $logfile; return 7; }
+  [ $(sudo cat $stacktrace_path | wc -l) -gt 20 ] || { final_cleanup $logfile; return 8; }
+  if ! sudo cat $stacktrace_path | grep '(gdb)' >> /dev/null 2>&1; then
+  	 final_cleanup $logfile
+     return 9
+  fi
+  sudo cat $stacktrace_path >> $logfile 2>&1
+
+  # clean up the broken mount point
+  final_cleanup $logfile
+  
+  return 0
+}
+
