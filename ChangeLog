@@ -1,4 +1,5 @@
 2.1.8:
+  * Fix for crash handler / ptrace Linux security handling
   * Support for ignoring x-directory hardlinks in the
     server toolkit
   * Fix: evaluation of symlinks could lead to wrong
