@@ -1,4 +1,5 @@
 2.1.8:
+  * Added SElinux exception to allow unloading of cvmfs module
   * Run default signal handlers after custom crash handling
   * Fix for crash handler / ptrace Linux security handling
   * Support for ignoring x-directory hardlinks in the
