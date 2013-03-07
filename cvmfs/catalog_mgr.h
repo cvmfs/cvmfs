@@ -216,6 +216,7 @@ class AbstractCatalogManager {
    */
   CatalogList catalogs_;
   uint64_t inode_gauge_;  /**< highest issued inode */
+  uint64_t revision_cache_;
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;

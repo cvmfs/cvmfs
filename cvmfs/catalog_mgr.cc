@@ -42,6 +42,7 @@ void InodeRevisionAnnotation::SetRevision(const uint64_t new_revision) {
 
 AbstractCatalogManager::AbstractCatalogManager() {
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
+  revision_cache_ = 0;
   inode_annotation_ = NULL;
   rwlock_ =
     reinterpret_cast<pthread_rwlock_t *>(smalloc(sizeof(pthread_rwlock_t)));
@@ -82,7 +83,7 @@ bool AbstractCatalogManager::Init() {
   }
 
   if (attached && inode_annotation_) {
-    inode_annotation_->SetRevision(GetRootCatalog()->GetRevision());
+    inode_annotation_->SetRevision(revision_cache_);
   }
 
   return attached;
@@ -114,7 +115,7 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
     assert(retval);
 
     if (inode_annotation_) {
-      inode_annotation_->SetRevision(new_root->GetRevision());
+      inode_annotation_->SetRevision(revision_cache_);
     }
   }
   Unlock();
@@ -382,7 +383,7 @@ bool AbstractCatalogManager::ListingStat(const PathString &path,
 
 uint64_t AbstractCatalogManager::GetRevision() const {
   ReadLock();
-  const uint64_t revision = GetRootCatalog()->GetRevision();
+  const uint64_t revision = revision_cache_;
   Unlock();
   return revision;
 }
@@ -606,6 +607,10 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
     return false;
   }
 
+  // The revision of the catalog tree is given by the root catalog revision
+  if (catalogs_.empty())
+    revision_cache_ = new_catalog->GetRevision();
+  
   catalogs_.push_back(new_catalog);
   ActivateCatalog(new_catalog);
   return true;
