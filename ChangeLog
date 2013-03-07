@@ -1,3 +1,6 @@
+2.1.9:
+  * Log application of new file system snapshots to syslog
+
 2.1.8:
   * Run default signal handlers after custom crash handling
   * Fix for crash handler / ptrace Linux security handling
