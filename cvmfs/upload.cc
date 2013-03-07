@@ -49,7 +49,7 @@ bool Spooler::Initialize() {
   const unsigned int number_of_cpus = GetNumberOfCpuCores();
   concurrent_processing_ =
    new ConcurrentWorkers<FileProcessor>(number_of_cpus,
-                                        number_of_cpus * 500, // TODO: magic number (?)
+                                        number_of_cpus * 5000, // TODO: magic number (?)
                                         concurrent_processing_context_.weak_ref());
   assert(concurrent_processing_);
   concurrent_processing_->RegisterListener(&Spooler::ProcessingCallback, this);
