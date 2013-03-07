@@ -389,6 +389,40 @@ if (BUILD_SERVER)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
+
+add_executable(debug
+  smalloc.h atomic.h
+  platform.h platform_linux.h platform_osx.h
+  duplex_zlib.h duplex_sqlite3.h
+  logging.cc logging.h logging_internal.h
+  globals.cc globals.h
+  hash.h hash.cc
+  compression.h compression.cc
+  util.h util.cc
+  util_concurrency.h util_concurrency_impl.h util_concurrency.cc
+
+  file_chunk.h file_chunk.cc
+
+  upload_file_processor.cc upload_file_processor.h
+  upload_file_chunker.cc upload_file_chunker.h
+  upload_file_chunker_xor32.cc upload_file_chunker_xor32.h
+
+  upload_spooler_definition.h upload_spooler_definition.cc
+  upload_facility.h upload_facility.cc
+  upload_local.h upload_local.cc
+  upload_riak.h upload_riak.cc
+  json_document.h json_document.cc
+
+  duplex_curl.h download.h download.cc
+  signature.cc signature.h
+
+
+  debug.cc
+)
+set_target_properties (debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}")
+target_link_libraries (debug ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE} pthread dl)
+
+
 #
 # installation
 #
