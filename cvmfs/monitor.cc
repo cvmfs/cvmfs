@@ -108,8 +108,9 @@ static void SendTrace(int signal,
     while (true) {}
   }
 
-  // reset the signal handler (watchdog process will raise this signal again)
-  SetSignalHandlers(old_signal_handlers_);
+  // Set the original signal handler for the raised signal in
+  // SIGQUIT (watchdog process will raise SIGQUIT)
+  (void) sigaction(SIGQUIT, &old_signal_handlers_[signal], NULL);
 
   char cflow = 'S';
   if (write(pipe_wd_[1], &cflow, 1) != 1)
@@ -132,7 +133,7 @@ static void SendTrace(int signal,
   (void)write(pipe_wd_[1], &cflow, 1);
 
   // do not die before the stack trace was generated
-  // kill -9 <pid> will finish this
+  // kill -SIGQUIT <pid> will finish this
   while(true) {}
 
   _exit(1);
@@ -168,10 +169,10 @@ static void LogEmergency(string msg) {
  * @param fd_pipe  the file descriptor of the pipe to be read
  * @return         the data read from the pipe
  */
-static std::string ReadUntilGdbPrompt(int fd_pipe) {
-  static const std::string gdb_prompt = "\n(gdb) ";
+static string ReadUntilGdbPrompt(int fd_pipe) {
+  static const string gdb_prompt = "\n(gdb) ";
 
-  std::string   result;
+  string        result;
   char          mini_buffer;
   int           chars_io;
   unsigned int  ring_buffer_pos = 0;
@@ -281,7 +282,7 @@ static string ReportStacktrace() {
   debug += GenerateStackTrace(*exe_path_, pid);
 
   // give the dying cvmfs client the finishing stroke
-  if (kill(pid, recv_signal) != 0) {
+  if (kill(pid, SIGQUIT) != 0) {
     debug += "Failed to kill cvmfs client!\n\n";
   }
 

@@ -388,6 +388,8 @@ static void RemountFinish() {
       alarm(kShortTermTTL);
       catalogs_valid_until_ = time(NULL) + kShortTermTTL;
     } else {
+      LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %d",
+               catalog_manager_->GetRevision());
       alarm(GetEffectiveTTL());
       catalogs_valid_until_ = time(NULL) + GetEffectiveTTL();
     }
