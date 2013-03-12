@@ -77,6 +77,9 @@ class InodeRevisionAnnotation : public InodeAnnotation {
  public:
   InodeRevisionAnnotation(const unsigned inode_width);
   ~InodeRevisionAnnotation() { };
+  bool ValidInode(const uint64_t inode) {
+    return (inode & revision_annotation_) == revision_annotation_;
+  }
   inode_t Annotate(const inode_t raw_inode) {
     return raw_inode | revision_annotation_;
   }

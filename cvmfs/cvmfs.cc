@@ -461,6 +461,15 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       inode_cache_->Insert(ino, *dirent);
       return true;
     }
+    
+    // TODO: handling for ancient inodes from previous catalog revisions
+    // Inode should be translated into the new inode from the catalogs
+    if (cvmfs::inode_annotation_ && 
+        !cvmfs::inode_annotation_->ValidInode(ino)) 
+    {
+      LogCvmfs(kLogCvmfs, kLogDebug, "lookup for ancient inode");
+      //abort();
+    }
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode, no entry");
@@ -523,7 +532,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     // Retrieve the parent path recursively
     PathString parent_path;
     if (!GetPathForInode(dirent.parent_inode(), &parent_path)) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "GetPathForInode, failed at %s (%"PRIu64")",
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, 
+               "GetPathForInode, failed at %s (%"PRIu64")",
                dirent.name().c_str(), dirent.parent_inode());
       return false;
     }

@@ -138,6 +138,12 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
   EnforceSqliteMemLimit();
   ReadLock();
   bool found = false;
+  
+  // Don't lookup ancient inodes
+  if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
+    Unlock();
+    return false;
+  }
 
   // Get corresponding catalog
   Catalog *catalog = NULL;

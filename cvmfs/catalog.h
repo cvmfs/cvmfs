@@ -112,6 +112,9 @@ class InodeAnnotation {
   virtual ~InodeAnnotation() { };
   virtual inode_t Annotate(const inode_t raw_inode) = 0;
   virtual void SetRevision(const uint64_t new_revision) = 0;
+  // Used to detect ancient inodes from previous generations
+  virtual bool ValidInode(const uint64_t inode) { return true; }
+  
   inode_t Strip(const inode_t annotated_inode) {
     // Clear upper bits
     return ((uint64_t(1) << num_protected_bits_) - 1) & annotated_inode;
