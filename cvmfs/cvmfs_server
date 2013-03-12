@@ -218,9 +218,13 @@ check_repository_compatibility() {
     return 0 # trivial case... no update of CernVM-FS taken place
   fi
 
-  # all non-matching version numbers are treated as "incompatible" at the moment
-  # this might change from version to version and has to be considered here!
+  # repository format changed from 2.1.6 to 2.1.7
+  # Currently all other version updates do not need a migration
+  if [ "$creator" != "2.1.6" ] && version_greater_or_equal "2.1.7"; then
+    return 0
+  fi
 
+  # if 'nokill' is set, be silent and just return 1
   if [ $# -gt 0 ]; then
     return 1
   fi
@@ -1265,7 +1269,11 @@ list() {
     local version_info=""
     local creator_version=$(repository_creator_version)
     if ! version_equal $creator_version; then
-      version_info="(created by CernVM-FS $(mangle_version_string $creator_version))"
+      local compatible=""
+      if ! check_repository_compatibility "nokill"; then
+        compatible=" INCOMPATIBLE"
+      fi
+      version_info="(created by$compatible CernVM-FS $(mangle_version_string $creator_version))"
     else
       version_info=""
     fi
