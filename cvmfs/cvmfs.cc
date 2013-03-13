@@ -90,6 +90,7 @@
 #include "globals.h"
 #include "options.h"
 #include "loader.h"
+#include "glue_buffer.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -107,6 +108,7 @@ const double kDefaultKCacheTimeout = 60.0;
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
+const unsigned kDefaultGlueBufferSize = 8192;
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
@@ -191,6 +193,7 @@ cache::CatalogManager *catalog_manager_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
+GlueBuffer *glue_buffer_ = NULL;
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
 
@@ -307,6 +310,14 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
   *inode_stats = inode_cache_->statistics();
   *path_stats = path_cache_->statistics();
   *md5path_stats = md5path_cache_->statistics();
+}
+  
+
+string PrintGlueBufferStatistics() {
+  return "entries: " + StringifyInt(glue_buffer_->GetNumEntries()) + "  " +
+    "allocated: " + StringifyInt(glue_buffer_->GetNumBytes() / 1024) + "kB  " +
+    "inserts: " + StringifyInt(glue_buffer_->GetNumInserts()) + "  " +
+    glue_buffer_->GetStatistics().Print() + "\n";
 }
 
 
@@ -429,8 +440,10 @@ static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
   // Lookup inode in cache
-  if (inode_cache_->Lookup(ino, dirent))
+  if (inode_cache_->Lookup(ino, dirent)) {
+    glue_buffer_->AddDirent(*dirent);
     return true;
+  }
 
   // Lookup inode in catalog
   if (nfs_maps_) {
@@ -459,16 +472,36 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     // Normal mode
     if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
       inode_cache_->Insert(ino, *dirent);
+      glue_buffer_->AddDirent(*dirent);
       return true;
     }
     
-    // TODO: handling for ancient inodes from previous catalog revisions
+    // Handling of ancient inodes from previous catalog revisions
     // Inode should be translated into the new inode from the catalogs
     if (cvmfs::inode_annotation_ && 
-        !cvmfs::inode_annotation_->ValidInode(ino)) 
+        !cvmfs::inode_annotation_->ValidInode(ino))
     {
       LogCvmfs(kLogCvmfs, kLogDebug, "lookup for ancient inode");
-      //abort();
+      PathString recovered_path;
+      bool retval = 
+        glue_buffer_->AncientInode2Path(ino, catalog_manager_->GetRevision(), 
+                                        &recovered_path);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "internal error: " 
+                 "glue buffer lookup failure, partially reconstructed path %s",
+                 recovered_path.c_str());
+      } else {
+        // Path reconstructed, is it in the new file system snapshot?
+        retval = catalog_manager_->LookupPath(recovered_path, 
+                                              catalog::kLookupFull, dirent);
+        if (retval) {
+          LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
+                    "inode %"PRIu64, ino, dirent->inode());
+          inode_cache_->Insert(dirent->inode(), *dirent);
+          glue_buffer_->AddDirent(*dirent);
+          return true;
+        }
+      }
     }
   }
 
@@ -482,8 +515,12 @@ static bool GetDirentForPath(const PathString &path,
                              catalog::DirectoryEntry *dirent)
 {
   hash::Md5 md5path(path.GetChars(), path.GetLength());
-  if (md5path_cache_->Lookup(md5path, dirent))
-    return dirent->GetSpecial() != catalog::kDirentNegative;
+  if (md5path_cache_->Lookup(md5path, dirent)) {
+    if (dirent->GetSpecial() == catalog::kDirentNegative)
+      return false;
+    glue_buffer_->AddDirent(*dirent);
+    return true;
+  }
 
   // Lookup inode in catalog TODO: not twice md5 calculation
   if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
@@ -492,6 +529,7 @@ static bool GetDirentForPath(const PathString &path,
       dirent->set_inode(nfs_maps::GetInode(path));
     }
     dirent->set_parent_inode(parent_inode);
+    glue_buffer_->AddDirent(*dirent);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -1582,6 +1620,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
   cvmfs::md5path_cache_ =
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
+  cvmfs::glue_buffer_ = new GlueBuffer(cvmfs::kDefaultGlueBufferSize);
 
   // TODO: in loader
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
@@ -1892,6 +1931,7 @@ static void Fini() {
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::live_file_chunks_;
+  delete cvmfs::glue_buffer_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
@@ -1899,6 +1939,7 @@ static void Fini() {
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::live_file_chunks_ = NULL;
+  cvmfs::glue_buffer_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;

@@ -488,6 +488,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
   const unsigned database_flags = RetrieveInt(5);
   result.catalog_ = (Catalog*)catalog;
+  result.revision_ = catalog->GetTreeRevision();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);

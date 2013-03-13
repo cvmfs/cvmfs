@@ -181,6 +181,7 @@ class Catalog : public SingleCopy {
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
+  uint64_t GetTreeRevision() const { return tree_revision_; }
   uint64_t GetNumEntries() const;
   hash::Any GetPreviousRevision() const;
   bool GetCounters(Counters *counters) const;
@@ -252,6 +253,8 @@ class Catalog : public SingleCopy {
   PathString root_prefix_;
   PathString path_;
 
+  // The revision of the tree at the time the catalog was attached
+  uint64_t tree_revision_;
   Catalog *parent_;
   NestedCatalogMap children_;
   mutable NestedCatalogList *nested_catalog_cache_;

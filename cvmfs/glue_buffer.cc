@@ -26,7 +26,7 @@ GlueBuffer::GlueBuffer(const unsigned size) {
   version_ = kVersion;
   size_ = size;
   buffer_ = new BufferEntry[size_];
-  atomic_init32(&buffer_pos_);
+  atomic_init64(&buffer_pos_);
   
   InitLock();
 }
@@ -82,7 +82,7 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
     return true;
   
   // Construct path until buffer_idx
-  uint64_t needle_revision = buffer_[buffer_idx].revision;
+  uint32_t needle_revision = buffer_[buffer_idx].revision;
   uint64_t needle_inode = buffer_[buffer_idx].parent_inode;
   int parent_idx = -1;
   for (unsigned i = 0; i < size_; ++i) {
@@ -107,7 +107,7 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
 
 
 bool GlueBuffer::AncientInode2Path(const uint64_t inode, 
-                                   const uint64_t current_revision,
+                                   const uint32_t current_revision,
                                    PathString *path)
 {
   assert(path->IsEmpty());
@@ -127,6 +127,7 @@ bool GlueBuffer::AncientInode2Path(const uint64_t inode,
   }
   if (index < 0) {
     Unlock();
+    atomic_inc64(&statistics_.num_ancient_misses);
     return false;
   }
   
@@ -134,6 +135,10 @@ bool GlueBuffer::AncientInode2Path(const uint64_t inode,
   bool retval = ConstructPath(index, path);
   Unlock();
   
-  return retval;
+  if (retval) {
+    atomic_inc64(&statistics_.num_ancient_hits);
+    return true;
+  }
+  atomic_inc64(&statistics_.num_ancient_misses);
+  return false;
 }
-

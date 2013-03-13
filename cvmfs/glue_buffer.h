@@ -16,15 +16,38 @@
 #include <sched.h>
 
 #include <cassert>
+#include <string>
 
 #include "shortstring.h"
 #include "atomic.h"
+#include "dirent.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
 
 class GlueBuffer {
  public:
+  struct Statistics {
+    Statistics() {
+      atomic_init64(&num_ancient_hits);
+      atomic_init64(&num_ancient_misses);
+      atomic_init64(&num_busywait_cycles);
+    }
+    std::string Print() {
+      return 
+        "ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
+        "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses)) +
+        "  busy-wait-cycles: " + StringifyInt(atomic_read64(&num_busywait_cycles));
+    }
+    atomic_int64 num_ancient_hits;
+    atomic_int64 num_ancient_misses;
+    atomic_int64 num_busywait_cycles;
+  };
+  uint64_t GetNumInserts() { return atomic_read64(&buffer_pos_); }
+  unsigned GetNumEntries() { return size_; }
+  unsigned GetNumBytes() { return size_*sizeof(BufferEntry); }
+  Statistics GetStatistics() { return statistics_; }
+  
   GlueBuffer(const unsigned size);
   GlueBuffer(const GlueBuffer &other);
   GlueBuffer &operator= (const GlueBuffer &other);
@@ -32,12 +55,13 @@ class GlueBuffer {
   void Resize(const unsigned new_size);
   
   inline void Add(const uint64_t inode, const uint64_t parent_inode, 
-                  const uint64_t revision, const NameString &name)
+                  const uint32_t revision, const NameString &name)
   {
     ReadLock();
     
-    uint32_t pos = atomic_xadd32(&buffer_pos_, 1) % size_;
+    uint32_t pos = atomic_xadd64(&buffer_pos_, 1) % size_;
     while (!atomic_cas32(&buffer_[pos].busy_flag, 0, 1)) {
+      atomic_inc64(&statistics_.num_busywait_cycles);
       sched_yield();
     }
     buffer_[pos].revision = revision;
@@ -49,7 +73,12 @@ class GlueBuffer {
     Unlock();
   }
   
-  bool AncientInode2Path(const uint64_t inode, const uint64_t current_revision,
+  inline void AddDirent(const catalog::DirectoryEntry &dirent) {
+    Add(dirent.inode(), dirent.parent_inode(), dirent.revision(), 
+        dirent.name());
+  }
+  
+  bool AncientInode2Path(const uint64_t inode, const uint32_t current_revision,
                          PathString *path);
   
  private:
@@ -57,9 +86,10 @@ class GlueBuffer {
   struct BufferEntry {
     BufferEntry() {
       atomic_init32(&busy_flag);
-      revision = inode = parent_inode = 0;
+      revision = 0;
+      inode = parent_inode = 0;
     }
-    uint64_t revision;
+    uint32_t revision;
     uint64_t inode;
     uint64_t parent_inode;
     NameString name;
@@ -84,9 +114,10 @@ class GlueBuffer {
   
   pthread_rwlock_t *rwlock_;
   BufferEntry *buffer_;
-  atomic_int32 buffer_pos_;
+  atomic_int64 buffer_pos_;
   unsigned size_;
   unsigned version_;
+  Statistics statistics_;
 };
 
 #endif  // CVMFS_GLUE_BUFFER_H_

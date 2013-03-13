@@ -302,6 +302,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
                   string("  inode cache:   ") + inode_stats.Print() +
                   string("  path cache:    ") + path_stats.Print() +
                   string("  md5path cache: ") + md5path_stats.Print();
+        
+        result += string("  glue buffer:   ") + 
+                  cvmfs::PrintGlueBufferStatistics();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
         result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();

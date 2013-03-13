@@ -616,6 +616,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty())
     revision_cache_ = new_catalog->GetRevision();
+  new_catalog->tree_revision_ = revision_cache_;
   
   catalogs_.push_back(new_catalog);
   ActivateCatalog(new_catalog);
