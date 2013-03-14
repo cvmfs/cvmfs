@@ -6,8 +6,15 @@ script_location=$(dirname $(readlink --canonicalize $0))
 
 # install RPM packages
 echo "installing RPM packages... "
-install_rpm "CernVM-FS client" $CLIENT_PACKAGE $KEYS_PACKAGE
-install_rpm "CernVM-FS server" $SERVER_PACKAGE $KEYS_PACKAGE
+install_rpm "CernVM-FS keys"   $KEYS_PACKAGE
+install_rpm "CernVM-FS client" $CLIENT_PACKAGE
+install_rpm "CernVM-FS server" $SERVER_PACKAGE
+
+# setup environment
+echo "setting up CernVM-FS environment..."
+sudo cvmfs_config setup
+sudo cvmfs_config chksetup
+sudo httpd
 
 # run tests
 echo ""
