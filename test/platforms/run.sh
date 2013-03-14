@@ -112,7 +112,7 @@ fi
 # check that the script is running under the correct user account
 if [ $(id --user --name) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
-  exit 101
+  exit 3
 fi
 
 # download the needed packages
@@ -129,14 +129,14 @@ keys_package=$(basename $keys_package)
 source_tarball=$(basename $source_tarball)
 
 # extract the source tarball
-source_directory=$(echo $source_tarball | sed -e 's/\.tar\.gz$//' -e 's/_/-/')
+source_directory=$(basename $source_tarball .tar.gz | sed 's/_/-/')
 echo -n "extracting the CernVM-FS source file into $source_directory... "
 tar_output=$(tar -xzf $source_tarball)
 if [ $? -ne 0 ] || [ ! -d $source_directory ]; then
   echo "fail"
   echo "tar said:"
   echo $tar_output
-  exit 3
+  exit 4
 else
   echo "done"
 fi
@@ -150,7 +150,7 @@ platform_script_abs=${platform_script_path}/${platform_script}
 if [ ! -f $platform_script_abs ]; then
   echo "platform specific script $platform_script not found here:"
   echo $platform_script_abs
-  exit 4
+  exit 5
 fi
 
 # run the platform specific script to perform CernVM-FS tests

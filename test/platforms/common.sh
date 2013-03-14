@@ -6,6 +6,7 @@
 #
 #    SERVER_PACKAGE     location of the CernVM-FS server package to install
 #    CLIENT_PACKAGE     location of the CernVM-FS client package to install
+#    KEYS_PACKAGE       location of the CernVM-FS public keys package
 #    SOURCE_DIRECTORY   location of the CernVM-FS sources forming above packages
 #    TEST_LOGFILE       location of the test logfile to be used
 #
@@ -57,13 +58,26 @@ fi
 
 install_rpm() {
   local rpm_name=$1
-  shift
-  echo -n "Installing RPM $rpm_name ... "
-  local ret=$(sudo rpm -ivh $1 $@ 2>&1)
+  local rpm_output
+  shift 1
+
+  # check if one of the given rpms is already installed
+  for rpm in $@; do
+    local rpm_package=$(basename $rpm .rpm)
+    if rpm -q $rpm_package > /dev/null 2>&1; then
+      echo "RPM '$rpm_name' is already installed"
+      exit 101
+    fi
+  done
+
+  # install the RPM
+  echo -n "Installing RPM '$rpm_name' ... "
+  rpm_output=$(sudo rpm -ivh $@ 2>&1)
   if [ $? -ne 0 ]; then
     echo "fail"
     echo "RPM said:"
-    echo $ret
+    echo $rpm_output
+    exit 102
   else
     echo "done"
   fi
