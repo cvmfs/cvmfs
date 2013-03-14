@@ -109,10 +109,10 @@ if [ x$platform_script = "x" ] ||
   usage "Missing parameter(s)"
 fi
 
-# check that the script is running under the correct user account
-if [ $(id --user --name) != "sftnight" ]; then
-  echo "test cases need to run under user 'sftnight'... aborting"
-  exit 3
+# create the user sftnight (if not already present)
+if ! cat /etc/passwd | grep -q sftnight; do
+  useradd sftnight
+  echo -e "sftnight\tALL=(ALL)\tNOPASSWD: ALL" >> /etc/sudoers
 fi
 
 # download the needed packages
@@ -156,11 +156,11 @@ fi
 # run the platform specific script to perform CernVM-FS tests
 echo "running platform specific script $platform_script ..."
 touch .running # flag to signal a running test system
-sh $platform_script_abs -s $server_package   \
-                        -c $client_package   \
-                        -k $keys_package     \
-                        -t $source_directory \
-                        -l $test_logfile
+sudo -u sftnight sh $platform_script_abs -s $server_package   \
+                                         -c $client_package   \
+                                         -k $keys_package     \
+                                         -t $source_directory \
+                                         -l $test_logfile
 retval=$?
 rm .running
 

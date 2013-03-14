@@ -52,6 +52,12 @@ if [ x$SERVER_PACKAGE   = "x" ] ||
   exit 100
 fi
 
+# check that the script is running under the correct user account
+if [ $(id --user --name) != "sftnight" ]; then
+  echo "test cases need to run under user 'sftnight'... aborting"
+  exit 3
+fi
+
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
@@ -81,4 +87,11 @@ install_rpm() {
   else
     echo "done"
   fi
+}
+
+
+die() {
+  local msg=$1
+  echo $msg
+  exit 103
 }
