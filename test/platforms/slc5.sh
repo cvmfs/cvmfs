@@ -45,7 +45,7 @@ install_rpm "CernVM-FS server" $SERVER_PACKAGE
 echo "setting up CernVM-FS environment..."
 sudo cvmfs_config setup
 sudo cvmfs_config chksetup
-sudo /usr/sbin httpd
+sudo /usr/sbin/httpd
 
 sudo mkdir -p /var/log/cvmfs-test
 sudo chown sftnight:sftnight /var/log/cvmfs-test
@@ -55,5 +55,5 @@ echo ""
 echo ""
 echo ""
 echo "running CernVM-FS test cases..."
-cd ${SOURCE_DIRECTORY}/tests
+cd ${SOURCE_DIRECTORY}/test
 ./run.sh $TEST_LOGFILE -x src/5*
