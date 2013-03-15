@@ -17,8 +17,9 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-InodeRevisionAnnotation::InodeRevisionAnnotation(const unsigned inode_width) {
-  revision_annotation_ = 0;
+InodeGenerationAnnotation::InodeGenerationAnnotation(const unsigned inode_width) 
+{
+  generation_annotation_ = 0;
   inode_width_ = inode_width;
   switch (inode_width_) {
     case 32:
@@ -33,10 +34,14 @@ InodeRevisionAnnotation::InodeRevisionAnnotation(const unsigned inode_width) {
 }
 
 
-void InodeRevisionAnnotation::SetRevision(const uint64_t new_revision) {
-  const unsigned revision_width = inode_width_ - num_protected_bits_;
-  const uint64_t revision_cut = new_revision % (uint64_t(1) << revision_width);
-  revision_annotation_ = revision_cut << num_protected_bits_;
+void InodeGenerationAnnotation::SetGeneration(const uint64_t new_generation) {
+  LogCvmfs(kLogCatalog, kLogDebug, "new inode generation: %"PRIu64, 
+           new_generation);
+  
+  const unsigned generation_width = inode_width_ - num_protected_bits_;
+  const uint64_t generation_cut = 
+    new_generation % (uint64_t(1) << generation_width);
+  generation_annotation_ = generation_cut << num_protected_bits_;
 }
 
 
@@ -44,6 +49,7 @@ AbstractCatalogManager::AbstractCatalogManager() {
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
   revision_cache_ = 0;
   inode_annotation_ = NULL;
+  incarnation_ = 0;
   rwlock_ =
     reinterpret_cast<pthread_rwlock_t *>(smalloc(sizeof(pthread_rwlock_t)));
   int retval = pthread_rwlock_init(rwlock_, NULL);
@@ -83,10 +89,24 @@ bool AbstractCatalogManager::Init() {
   }
 
   if (attached && inode_annotation_) {
-    inode_annotation_->SetRevision(revision_cache_);
+    inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
   }
 
   return attached;
+}
+  
+  
+void AbstractCatalogManager::SetIncarnation(const uint64_t new_incarnation) { 
+  WriteLock();
+  incarnation_ = new_incarnation;
+  if (inode_annotation_)
+    inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
+  for (CatalogList::const_iterator i = catalogs_.begin(),
+       iEnd = catalogs_.end(); i != iEnd; ++i)
+  {
+    (*i)->generation_ = revision_cache_ + incarnation_;
+  }
+  Unlock();
 }
 
 
@@ -115,7 +135,7 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
     assert(retval);
 
     if (inode_annotation_) {
-      inode_annotation_->SetRevision(revision_cache_);
+      inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
     }
   }
   Unlock();
@@ -616,7 +636,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty())
     revision_cache_ = new_catalog->GetRevision();
-  new_catalog->tree_revision_ = revision_cache_;
+  new_catalog->generation_ = revision_cache_ + incarnation_;
   
   catalogs_.push_back(new_catalog);
   ActivateCatalog(new_catalog);

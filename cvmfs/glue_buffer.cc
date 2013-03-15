@@ -2,14 +2,19 @@
  * This file is part of the CernVM File System.
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "cvmfs_config.h"
 #include "glue_buffer.h"
+
+#include <inttypes.h>
 
 #include <cstdlib>
 #include <cstring>
 #include <cassert>
 
 #include "smalloc.h"
+#include "logging.h"
 
 using namespace std;  // NOLINT
 
@@ -38,9 +43,9 @@ void GlueBuffer::CopyFrom(const GlueBuffer &other) {
   
   version_ = kVersion;
   size_ = other.size_;
-  const unsigned num_bytes = size_ * sizeof(BufferEntry);
   buffer_ = new BufferEntry[size_];
-  memcpy(buffer_, other.buffer_, num_bytes);
+  for (unsigned i = 0; i < size_; ++i)
+    buffer_[i] = other.buffer_[i];
   buffer_pos_ = other.buffer_pos_;
 }
 
@@ -82,12 +87,15 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
     return true;
   
   // Construct path until buffer_idx
-  uint32_t needle_revision = buffer_[buffer_idx].revision;
+  LogCvmfs(kLogCvmfs, kLogDebug, "construct inode %u, parent %u, name %s", 
+           buffer_[buffer_idx].inode, buffer_[buffer_idx].parent_inode, 
+           buffer_[buffer_idx].name.c_str());
+  uint32_t needle_generation = buffer_[buffer_idx].generation;
   uint64_t needle_inode = buffer_[buffer_idx].parent_inode;
   int parent_idx = -1;
   for (unsigned i = 0; i < size_; ++i) {
     if ((buffer_[i].inode == needle_inode) && 
-        (buffer_[i].revision == needle_revision))
+        (buffer_[i].generation == needle_generation))
     {
       parent_idx = i;
       break;
@@ -107,25 +115,31 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
 
 
 bool GlueBuffer::AncientInode2Path(const uint64_t inode, 
-                                   const uint32_t current_revision,
+                                   const uint32_t current_generation,
                                    PathString *path)
 {
   assert(path->IsEmpty());
   WriteLock();
   
   // Find inode with highest revision < new_revision
-  unsigned max_revision = 0;
+  unsigned max_generation = 0;
   int index = -1;
   for (unsigned i = 0; i < size_; ++i) {
+    //LogCvmfs(kLogCvmfs, kLogDebug, "GLUE: idx %d, inode %u, parent %u, "
+    //         "revision %u, name %s",
+    //         i, buffer_[i].inode, buffer_[i].parent_inode, buffer_[i].revision, 
+    //         buffer_[i].name.c_str());
     if ((buffer_[i].inode == inode) && 
-        (buffer_[i].revision < current_revision) &&
-        (buffer_[i].revision > max_revision))
+        ((buffer_[i].generation < current_generation)) &&
+        (buffer_[i].generation >= max_generation))
     {
-      max_revision = buffer_[i].revision;
+      max_generation = buffer_[i].generation;
       index = i;
     }
   }
   if (index < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to find initial needle for "
+             "ancient inode %"PRIu64, inode);
     Unlock();
     atomic_inc64(&statistics_.num_ancient_misses);
     return false;

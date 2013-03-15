@@ -7,6 +7,7 @@
 
 #include <time.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include <string>
 #include <vector>

@@ -48,6 +48,8 @@ enum StateId {
   kStateUnknown = 0,
   kStateOpenDirs,
   kStateOpenFiles,
+  kStateGlueBuffer,
+  kStateInodeGeneration,
 };
 
 

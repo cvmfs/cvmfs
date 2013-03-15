@@ -73,21 +73,21 @@ struct Statistics {
 };
 
 
-class InodeRevisionAnnotation : public InodeAnnotation {
+class InodeGenerationAnnotation : public InodeAnnotation {
  public:
-  InodeRevisionAnnotation(const unsigned inode_width);
-  ~InodeRevisionAnnotation() { };
+  InodeGenerationAnnotation(const unsigned inode_width);
+  ~InodeGenerationAnnotation() { };
   bool ValidInode(const uint64_t inode) {
-    return (inode & revision_annotation_) == revision_annotation_;
+    return (inode & generation_annotation_) == generation_annotation_;
   }
   inode_t Annotate(const inode_t raw_inode) {
-    return raw_inode | revision_annotation_;
+    return raw_inode | generation_annotation_;
   }
-  void SetRevision(const uint64_t new_revision);
+  void SetGeneration(const uint64_t new_generation);
 
  private:
   unsigned inode_width_;
-  uint64_t revision_annotation_;
+  uint64_t generation_annotation_;
 };
 
 
@@ -135,6 +135,8 @@ class AbstractCatalogManager {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
+  void SetIncarnation(const uint64_t new_incarnation);
+  
   Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
@@ -220,6 +222,7 @@ class AbstractCatalogManager {
   CatalogList catalogs_;
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
+  uint64_t incarnation_;  /**< counts how often the inodes have been invalidated */
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;

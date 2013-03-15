@@ -55,8 +55,9 @@ class GlueBuffer {
   void Resize(const unsigned new_size);
   
   inline void Add(const uint64_t inode, const uint64_t parent_inode, 
-                  const uint32_t revision, const NameString &name)
+                  const uint32_t generation, const NameString &name)
   {
+    //assert((parent_inode == 0) || ((parent_inode & ((1<<26)-1)) != 0));
     ReadLock();
     
     uint32_t pos = atomic_xadd64(&buffer_pos_, 1) % size_;
@@ -64,7 +65,7 @@ class GlueBuffer {
       atomic_inc64(&statistics_.num_busywait_cycles);
       sched_yield();
     }
-    buffer_[pos].revision = revision;
+    buffer_[pos].generation = generation;
     buffer_[pos].inode = inode;
     buffer_[pos].parent_inode = parent_inode;
     buffer_[pos].name = name;
@@ -74,11 +75,12 @@ class GlueBuffer {
   }
   
   inline void AddDirent(const catalog::DirectoryEntry &dirent) {
-    Add(dirent.inode(), dirent.parent_inode(), dirent.revision(), 
+    Add(dirent.inode(), dirent.parent_inode(), dirent.generation(), 
         dirent.name());
   }
   
-  bool AncientInode2Path(const uint64_t inode, const uint32_t current_revision,
+  bool AncientInode2Path(const uint64_t inode, 
+                         const uint32_t current_generation,
                          PathString *path);
   
  private:
@@ -86,10 +88,10 @@ class GlueBuffer {
   struct BufferEntry {
     BufferEntry() {
       atomic_init32(&busy_flag);
-      revision = 0;
+      generation = 0;
       inode = parent_inode = 0;
     }
-    uint32_t revision;
+    uint32_t generation;
     uint64_t inode;
     uint64_t parent_inode;
     NameString name;
