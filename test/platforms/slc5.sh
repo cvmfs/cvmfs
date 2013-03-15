@@ -28,10 +28,10 @@ sudo make install                                   || die "Failed to install Ze
 sudo curl -o /usr/bin/cpanm -L http://cpanmin.us    || die "Failed to download cpanm"
 sudo chmod 555 /usr/bin/cpanm
 
-sudo cpanm --prompt ZeroMQ                          || die "Failed to install ZeroMQ perl bindings"
-sudo cpanm --prompt IO::Interface                   || die "Failed to install IO::Interface"
-sudo cpanm --prompt Socket                          || die "Failed to install Socket"
-sudo cpanm --prompt URI                             || die "Failed to install URI"
+sudo cpanm ZeroMQ        2>&1                       || die "Failed to install ZeroMQ perl bindings"
+sudo cpanm IO::Interface 2>&1                       || die "Failed to install IO::Interface"
+sudo cpanm Socket        2>&1                       || die "Failed to install Socket"
+sudo cpanm URI           2>&1                       || die "Failed to install URI"
 
 cd $prev_dir
 
