@@ -1,4 +1,5 @@
 2.1.9:
+  * Fix: handling of "-n" option in mount helper
   * Log application of new file system snapshots to syslog
 
 2.1.8:

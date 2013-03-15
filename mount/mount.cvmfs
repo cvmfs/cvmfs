@@ -29,7 +29,7 @@ while [ $# -ge 1 ]; do
     -o ) add_mount_option $2; shift 2 ;;
     -v ) shift ;;
     -f ) dryrun=true; shift ;;
-    -n ) echo "Note: fusermount _does_ modify /etc/mtab in case it is writable." ;;
+    -n ) echo "Note: fusermount _does_ modify /etc/mtab in case it is writable."; shift ;;
     -h ) usage 1>&2; exit 1 ;;
     -* ) echo "$0: unrecognised option $1, use -h for help" 1>&2; exit 1 ;;
     *  ) args="$args;$1"; shift ;;
