@@ -109,12 +109,6 @@ if [ x$platform_script = "x" ] ||
   usage "Missing parameter(s)"
 fi
 
-# create the user sftnight (if not already present)
-if ! cat /etc/passwd | grep -q sftnight; then
-  useradd sftnight
-  echo -e "sftnight\tALL=(ALL)\tNOPASSWD: ALL" >> /etc/sudoers
-fi
-
 # download the needed packages
 echo "downloading packages..."
 download $server_package
