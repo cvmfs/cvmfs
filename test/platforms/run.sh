@@ -56,7 +56,7 @@ keys_package=""
 source_tarball=""
 
 # create a workspace
-workspace=$(mktemp --directory)
+workspace=$(mktemp -d)
 cd $workspace
 
 # create log files
@@ -110,7 +110,7 @@ if [ x$platform_script = "x" ] ||
 fi
 
 # create the user sftnight (if not already present)
-if ! cat /etc/passwd | grep -q sftnight; do
+if ! cat /etc/passwd | grep -q sftnight; then
   useradd sftnight
   echo -e "sftnight\tALL=(ALL)\tNOPASSWD: ALL" >> /etc/sudoers
 fi
@@ -141,6 +141,9 @@ else
   echo "done"
 fi
 source_directory=$(readlink --canonicalize $source_directory)
+
+# chown the source tree to allow sftnight to work with it
+chown -R sftnight:sftnight $workspace
 
 # find the platform specific script
 if [ x$platform_script_path = "x" ]; then

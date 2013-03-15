@@ -26,12 +26,12 @@ make                                                || die "Failed to compile Ze
 sudo make install                                   || die "Failed to install ZeroMQ"
 
 sudo curl -o /usr/bin/cpanm -L http://cpanmin.us    || die "Failed to download cpanm"
-chmod 555 /usr/bin/cpanm
+sudo chmod 555 /usr/bin/cpanm
 
-cpanm ZeroMQ                                        || die "Failed to install ZeroMQ perl bindings"
-cpanm IO::Interface                                 || die "Failed to install IO::Interface"
-cpanm Socket                                        || die "Failed to install Socket"
-cpanm URI                                           || die "Failed to install URI"
+sudo cpanm ZeroMQ                                        || die "Failed to install ZeroMQ perl bindings"
+sudo cpanm IO::Interface                                 || die "Failed to install IO::Interface"
+sudo cpanm Socket                                        || die "Failed to install Socket"
+sudo cpanm URI                                           || die "Failed to install URI"
 
 cd $prev_dir
 
@@ -45,9 +45,10 @@ install_rpm "CernVM-FS server" $SERVER_PACKAGE
 echo "setting up CernVM-FS environment..."
 sudo cvmfs_config setup
 sudo cvmfs_config chksetup
-sudo httpd
+sudo /usr/sbin httpd
 
-mkdir /var/log/cvmfs-test
+sudo mkdir /var/log/cvmfs-test
+sudo chown sftnight:sftnight /var/log/cvmfs-test
 
 # run tests
 echo ""

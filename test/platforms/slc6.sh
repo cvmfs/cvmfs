@@ -14,7 +14,7 @@ install_rpm "CernVM-FS server" $SERVER_PACKAGE
 echo "setting up CernVM-FS environment..."
 sudo cvmfs_config setup
 sudo cvmfs_config chksetup
-sudo httpd
+sudo /usr/sbin/httpd
 
 # run tests
 echo ""
