@@ -4,7 +4,7 @@
 # failure debugging.
 #
 # To allow for online debugging, export CVMFS_TEST_SRVDEBUG like so:
-# 
+#
 # `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
 # `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
@@ -18,7 +18,7 @@ CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
 
 CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
-CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing 
+CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
 
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 
@@ -121,7 +121,7 @@ service_should_switch() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 autofs_switch() {
-  sudo $service_binary autofs status | grep -q "running"
+  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
   service_should_switch $1 $?
   if [ $? -eq 0 ]; then
     service_switch autofs $1
@@ -152,8 +152,8 @@ cvmfs_clean() {
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
   sudo rm -f /etc/cvmfs/default.local
   sudo sh -c "rm -f /etc/cvmfs/config.d/*"
-  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" 
- 
+  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET"
+
   timeout=5
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
@@ -180,7 +180,7 @@ cvmfs_mount() {
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
   cvmfs_config probe > /dev/null 2>&1 || return 101
-  
+
   return 0
 }
 
@@ -230,7 +230,7 @@ check_time() {
     echo "Time limit exceeded" >&2
     return 100
   fi
-  
+
   return 0
 }
 
@@ -492,7 +492,7 @@ restore_normal_dns_configuration() {
   echo -n "Restoring resolv.conf backup... "
   sudo cp $tmp_dir/resolv.conf /etc/resolv.conf || return 101
   echo "Done."
-  
+
   # Restarting iptables, it will load previously saved rules
   echo -n "Restoring iptables rules... "
   iptables_rules restore || return 102
@@ -631,7 +631,7 @@ publish_repo() {
   return 0
 }
 
-# runs the given command and measures the time it took to execute 
+# runs the given command and measures the time it took to execute
 stop_watch() {
   begin=$(date +%s)
   cmd="$@"
