@@ -11,7 +11,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common.sh
 
 # install dependencies
-sudo yum -y install autofs gdb fuse fuse-devel fuse-libs gcc gcc-c++ openssl-devel libattr-devel
+sudo yum -y install autofs gdb fuse fuse-devel fuse-libs gcc gcc-c++ openssl-devel libattr-devel httpd
 
 # install perl environment
 prev_dir=$(pwd)
@@ -28,10 +28,10 @@ sudo make install                                   || die "Failed to install Ze
 sudo curl -o /usr/bin/cpanm -L http://cpanmin.us    || die "Failed to download cpanm"
 sudo chmod 555 /usr/bin/cpanm
 
-sudo cpanm ZeroMQ                                        || die "Failed to install ZeroMQ perl bindings"
-sudo cpanm IO::Interface                                 || die "Failed to install IO::Interface"
-sudo cpanm Socket                                        || die "Failed to install Socket"
-sudo cpanm URI                                           || die "Failed to install URI"
+sudo cpanm ZeroMQ        --prompt                   || die "Failed to install ZeroMQ perl bindings"
+sudo cpanm IO::Interface --prompt                   || die "Failed to install IO::Interface"
+sudo cpanm Socket        --prompt                   || die "Failed to install Socket"
+sudo cpanm URI           --prompt                   || die "Failed to install URI"
 
 cd $prev_dir
 
@@ -47,7 +47,7 @@ sudo cvmfs_config setup
 sudo cvmfs_config chksetup
 sudo /usr/sbin httpd
 
-sudo mkdir /var/log/cvmfs-test
+sudo mkdir -p /var/log/cvmfs-test
 sudo chown sftnight:sftnight /var/log/cvmfs-test
 
 # run tests
