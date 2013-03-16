@@ -108,7 +108,7 @@ const double kDefaultKCacheTimeout = 60.0;
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
-const unsigned kDefaultGlueBufferSize = 8192;
+const unsigned kDefaultGlueBufferSize = 16384;
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
@@ -210,6 +210,7 @@ cache::CatalogManager *catalog_manager_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
+uint32_t glue_buffer_size_ = kDefaultGlueBufferSize;
 GlueBuffer *glue_buffer_ = NULL;
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
@@ -569,9 +570,12 @@ static bool GetDirentForPath(const PathString &path,
 static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   // Check the path cache first
   if (path_cache_->Lookup(ino, path)) {
-    if (ino == catalog_manager_->GetRootInode())
+    if ((atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_)) &&
+        (ino == catalog_manager_->GetRootInode())) 
+    {
       // Race condition is not ciritcal, no "wrong" data is written
       glue_buffer_->Add(ino, 0, catalog_manager_->GetRevision(), NameString());
+    }
     return true;
   }
 
@@ -777,11 +781,13 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOENT);
     return;
   }
-
   if (!d.IsDirectory()) {
     fuse_reply_err(req, ENOTDIR);
     return;
   }
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d, path %s", 
+           ino, path.c_str());
+
 
   // Build listing
   DirectoryListing listing;
@@ -1536,6 +1542,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Overwrite default options
   if (options::GetValue("CVMFS_64BIT_INODES", &parameter))
     inodes_64bit = options::IsOn(parameter);
+  if (options::GetValue("CVMFS_GLUEBUFFER_SIZE", &parameter))
+    cvmfs::glue_buffer_size_ = String2Uint64(parameter);
   if (options::GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
     mem_cache_size = String2Uint64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_TIMEOUT", &parameter))
@@ -1651,7 +1659,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
   cvmfs::md5path_cache_ =
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
-  cvmfs::glue_buffer_ = new GlueBuffer(cvmfs::kDefaultGlueBufferSize);
+  cvmfs::glue_buffer_ = new GlueBuffer(cvmfs::glue_buffer_size_);
 
   // TODO: in loader
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
@@ -2081,6 +2089,7 @@ static bool RestoreState(const int fd_progress,
       delete cvmfs::glue_buffer_;
       GlueBuffer *saved_glue_buffer = (GlueBuffer *)saved_states[i]->state;
       cvmfs::glue_buffer_ = new GlueBuffer(*saved_glue_buffer);
+      cvmfs::glue_buffer_->Resize(cvmfs::glue_buffer_size_);
       SendMsg2Socket(fd_progress, " done\n");
     }
     

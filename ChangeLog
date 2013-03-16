@@ -1,4 +1,6 @@
 2.1.9:
+  * Omit autofs warnings in NFS mode
+  * Added "glue buffer" to smoothly connect catalog reloads
   * Fix: handling of "-n" option in mount helper
   * Log application of new file system snapshots to syslog
 

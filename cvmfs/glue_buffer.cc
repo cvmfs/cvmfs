@@ -28,6 +28,7 @@ void GlueBuffer::InitLock() {
 
 
 GlueBuffer::GlueBuffer(const unsigned size) {
+  assert(size >= 2);
   version_ = kVersion;
   size_ = size;
   buffer_ = new BufferEntry[size_];
@@ -77,6 +78,25 @@ void GlueBuffer::Resize(const unsigned new_size) {
   if (size_ == new_size)
     return;
   
+  assert(new_size >= 2);
+  BufferEntry *new_buffer = new BufferEntry[new_size];
+
+  WriteLock();
+  unsigned num_entries = size_ > new_size ? new_size : size_;
+  for (unsigned i = 0; i < num_entries; ++i) {
+    int64_t from_pos = 
+      ((int64_t)(buffer_pos_) - (int64_t)(num_entries-i)) % size_;
+    if (from_pos < 0)
+      from_pos = size_ - (-from_pos);
+    new_buffer[i] = buffer_[from_pos];
+  }
+  delete[] buffer_;
+  buffer_ = new_buffer;
+  if (buffer_pos_ >= new_size)
+    buffer_pos_ = num_entries;
+  size_ = new_size;
+  Unlock();
+  
   // TODO
 }
 
@@ -103,14 +123,12 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
   }
   if (parent_idx < 0)
     return false;
-  bool retval = ConstructPath(parent_idx, path);
-  if (!retval)
-    return false;
   
+  bool retval = ConstructPath(parent_idx, path);
   path->Append("/", 1);
   path->Append(buffer_[buffer_idx].name.GetChars(), 
-               buffer_[buffer_idx].name.GetLength());
-  return true;
+               buffer_[buffer_idx].name.GetLength());  
+  return retval;
 }
 
 
