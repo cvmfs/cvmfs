@@ -452,13 +452,20 @@ static void RemountCheck() {
   }
 }
   
+
+
+static inline void AddToGlueBuffer(const catalog::DirectoryEntry &dirent) {
+  if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_))
+    glue_buffer_->AddDirent(dirent);
+}
+  
   
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
   // Lookup inode in cache
   if (inode_cache_->Lookup(ino, dirent)) {
-    glue_buffer_->AddDirent(*dirent);
+    AddToGlueBuffer(*dirent);
     return true;
   }
 
@@ -489,7 +496,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     // Normal mode
     if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
       inode_cache_->Insert(ino, *dirent);
-      glue_buffer_->AddDirent(*dirent);
+      AddToGlueBuffer(*dirent);
       return true;
     }
     
@@ -516,7 +523,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
           LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
                     "inode %"PRIu64, ino, dirent->inode());
           inode_cache_->Insert(dirent->inode(), *dirent);
-          glue_buffer_->AddDirent(*dirent);
+          AddToGlueBuffer(*dirent);
           return true;
         }
       }
@@ -537,7 +544,7 @@ static bool GetDirentForPath(const PathString &path,
   if (md5path_cache_->Lookup(md5path, dirent)) {
     if (dirent->GetSpecial() == catalog::kDirentNegative)
       return false;
-    glue_buffer_->AddDirent(*dirent);
+    AddToGlueBuffer(*dirent);
     return true;
   }
 
@@ -548,7 +555,7 @@ static bool GetDirentForPath(const PathString &path,
       dirent->set_inode(nfs_maps::GetInode(path));
     }
     dirent->set_parent_inode(parent_inode);
-    glue_buffer_->AddDirent(*dirent);
+    AddToGlueBuffer(*dirent);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -827,6 +834,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Save the directory listing and return a handle to the listing
   pthread_mutex_lock(&lock_directory_handles_);
+  LogCvmfs(kLogCvmfs, kLogDebug, "linking directory handle %d to dir inode: %d", 
+           next_directory_handle_, ino);
   (*directory_handles_)[next_directory_handle_] = listing;
   fi->fh = next_directory_handle_;
   ++next_directory_handle_;
@@ -844,8 +853,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
                              struct fuse_file_info *fi)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode: %d",
-           catalog_manager_->MangleInode(ino));
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %d, handle %d",
+           catalog_manager_->MangleInode(ino), fi->fh);
 
   int reply = 0;
 
@@ -2010,6 +2019,14 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   
   unsigned num_open_dirs = cvmfs::directory_handles_->size();
   if (num_open_dirs != 0) {
+#ifdef DEBUGMSG
+    for (cvmfs::DirectoryHandles::iterator i = cvmfs::directory_handles_->begin(),
+         iEnd = cvmfs::directory_handles_->end(); i != iEnd; ++i)
+    {
+      LogCvmfs(kLogCvmfs, kLogDebug, "saving dirhandle %d", i->first);
+    }
+#endif
+    
     msg_progress = "Saving open directory handles (" +
       StringifyInt(num_open_dirs) + " handles)\n";
     SendMsg2Socket(fd_progress, msg_progress);
