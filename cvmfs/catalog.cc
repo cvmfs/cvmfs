@@ -117,6 +117,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   read_only_ = true;
   path_ = path;
   parent_ = parent;
+  generation_ = 0;
   max_row_id_ = 0;
   inode_annotation = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));

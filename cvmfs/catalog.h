@@ -106,12 +106,17 @@ struct Counters {
  *      the new content completely, thereby fills the kernel caches.
  *   4) Process A reads the rest of /foo, which is now served in the new version
  *      from the kernel caches.
+ * Also, reloading of the fuse module increases the generation (it invalidates)
+ * the inodes
  */
 class InodeAnnotation {
  public:
   virtual ~InodeAnnotation() { };
   virtual inode_t Annotate(const inode_t raw_inode) = 0;
-  virtual void SetRevision(const uint64_t new_revision) = 0;
+  virtual void SetGeneration(const uint64_t new_generation) = 0;
+  // Used to detect ancient inodes from previous generations
+  virtual bool ValidInode(const uint64_t inode) { return true; }
+  
   inode_t Strip(const inode_t annotated_inode) {
     // Clear upper bits
     return ((uint64_t(1) << num_protected_bits_) - 1) & annotated_inode;
@@ -178,6 +183,7 @@ class Catalog : public SingleCopy {
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
+  uint64_t GetGeneration() const { return generation_; }
   uint64_t GetNumEntries() const;
   hash::Any GetPreviousRevision() const;
   bool GetCounters(Counters *counters) const;
@@ -249,6 +255,10 @@ class Catalog : public SingleCopy {
   PathString root_prefix_;
   PathString path_;
 
+  // The revision of the tree at the time the catalog was attached plus the
+  // "reload counter", i.e. how often the tree inodes have been invalidated
+  // e.g. by reloading cvmfs
+  uint64_t generation_;
   Catalog *parent_;
   NestedCatalogMap children_;
   mutable NestedCatalogList *nested_catalog_cache_;

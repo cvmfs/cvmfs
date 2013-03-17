@@ -49,7 +49,9 @@ set (CVMFS2_DEBUG_SOURCES
   options.cc options.h
   talk.h talk.cc
   nfs_maps.h nfs_maps.cc
+  glue_buffer.h glue_buffer.cc
   loader.h
+  history.h history.cc
   cvmfs.h cvmfs.cc
 )
 
@@ -112,6 +114,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_rw.h catalog_rw.cc
   catalog_mgr.h catalog_mgr.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
+  history.h history.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
@@ -120,6 +123,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_sign.h swissknife_sign.cc
   swissknife_sync.h swissknife_sync.cc
   swissknife_info.h swissknife_info.cc
+  swissknife_history.h swissknife_history.cc
   swissknife.h swissknife.cc)
 
 

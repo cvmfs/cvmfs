@@ -1,4 +1,13 @@
+2.1.9:
+  * Omit autofs warnings in NFS mode
+  * Added "glue buffer" to smoothly connect catalog reloads
+  * Fix: handling of "-n" option in mount helper
+  * Log application of new file system snapshots to syslog
+
 2.1.8:
+  * Added SElinux exception to allow unloading of cvmfs module
+  * Run default signal handlers after custom crash handling
+  * Fix for crash handler / ptrace Linux security handling
   * Support for ignoring x-directory hardlinks in the
     server toolkit
   * Fix: evaluation of symlinks could lead to wrong

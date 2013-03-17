@@ -21,6 +21,7 @@ require {
 #============= mount_t ==============
 allow mount_t fusermount_exec_t:file execute_no_trans;
 allow mount_t mount_var_run_t:sock_file { create unlink };
+allow mount_t var_run_t:file { create unlink };
 allow mount_t var_run_t:sock_file { create unlink };
 allow mount_t self:capability fowner;
 allow mount_t self:netlink_audit_socket create;

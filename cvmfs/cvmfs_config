@@ -48,7 +48,8 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_KEYS_DIR \
           CVMFS_MAX_TTL CVMFS_RELOAD_SOCKETS CVMFS_DEFAULT_DOMAIN \
           CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORIES \
-          CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX"
+          CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX \
+          CVMFS_GLUEBUFFER_SIZE"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE CVMFS_64BIT_INODES"
 required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
@@ -216,9 +217,11 @@ cvmfs_chksetup() {
   global_mount_dir=$CVMFS_MOUNT_DIR
   case $sys_arch in
     Linux )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" /etc/auto.master 2> /dev/null; then
-        echo "Warning: CernVM-FS map is not referenced from autofs master map"
-        num_warnings=$(($num_warnings+1))
+      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" /etc/auto.master 2> /dev/null; then        
+        if ! check_is_on CVMFS_NFS_SOURCE; then
+          echo "Warning: CernVM-FS map is not referenced from autofs master map"
+          num_warnings=$(($num_warnings+1))
+        fi
       fi
 
       # Check that /etc/auto.cvmfs is executable
@@ -261,8 +264,10 @@ cvmfs_chksetup() {
 
   # Check that automount is running
   if ! check_auto_mounter; then
-    echo "Warning: autofs service is not running"
-    num_warnings=$(($num_warnings+1))
+    if ! check_is_on CVMFS_NFS_SOURCE; then
+      echo "Warning: autofs service is not running"
+      num_warnings=$(($num_warnings+1))
+    fi  
   fi
 
   # Check fuse configuration

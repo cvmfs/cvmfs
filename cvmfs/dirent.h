@@ -56,6 +56,7 @@ class DirectoryEntryBase {
   inline DirectoryEntryBase() :
     inode_(kInvalidInode),
     parent_inode_(kInvalidInode),
+    generation_(0),
     mode_(0),
     uid_(0),
     gid_(0),
@@ -71,6 +72,7 @@ class DirectoryEntryBase {
 
   inline inode_t inode() const                 { return inode_; }
   inline inode_t parent_inode() const          { return parent_inode_; }
+  inline uint32_t generation() const           { return generation_; }
   inline uint32_t linkcount() const            { return linkcount_; }
   inline NameString name() const               { return name_; }
   inline LinkString symlink() const            { return symlink_; }
@@ -134,6 +136,7 @@ class DirectoryEntryBase {
   inode_t inode_;        // inodes are generated on the fly by the cvmfs client.
   inode_t parent_inode_; // since they are file system stuff, we have them here
                          // Though, they are NOT written to any catalog.
+  uint32_t generation_;
 
   // stat like information
   NameString name_;

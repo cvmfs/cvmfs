@@ -44,6 +44,7 @@
 #include "loader.h"
 #include "options.h"
 #include "cache.h"
+#include "monitor.h"
 
 using namespace std;  // NOLINT
 
@@ -301,6 +302,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
                   string("  inode cache:   ") + inode_stats.Print() +
                   string("  path cache:    ") + path_stats.Print() +
                   string("  md5path cache: ") + md5path_stats.Print();
+        
+        result += string("  glue buffer:   ") + 
+                  cvmfs::PrintGlueBufferStatistics();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
         result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
@@ -389,6 +393,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         Answer(con_fd, pid_str);
       } else if (line == "pid cachemgr") {
         const string pid_str = StringifyInt(quota::GetPid()) + "\n";
+        Answer(con_fd, pid_str);
+      } else if (line == "pid watchdog") {
+        const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "parameters") {
         Answer(con_fd, options::Dump());
