@@ -97,7 +97,7 @@ void Fini() {
   close(socket_fd_);
   if (spawned_) pthread_join(thread_talk_, NULL);
 
-  free(socket_path_);
+  delete socket_path_;
   socket_path_ = NULL;
   spawned_ = false;
   socket_fd_ = -1;

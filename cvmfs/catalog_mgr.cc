@@ -56,6 +56,8 @@ AbstractCatalogManager::AbstractCatalogManager() {
   assert(retval == 0);
   retval = pthread_key_create(&pkey_sqlitemem_, NULL);
   assert(retval == 0);
+  disable_locks_ = false;
+  remount_listener_ = NULL;
 }
 
 
@@ -122,6 +124,12 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
     return LoadCatalog(PathString("", 0), hash::Any(), NULL);
 
   WriteLock();
+  if (remount_listener_) {
+    disable_locks_ = true;
+    remount_listener_->BeforeRemount(this);
+    disable_locks_ = false;
+  }
+  
   string catalog_path;
   const LoadError load_error = LoadCatalog(PathString("", 0), hash::Any(),
                                            &catalog_path);

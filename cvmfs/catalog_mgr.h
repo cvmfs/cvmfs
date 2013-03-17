@@ -89,6 +89,18 @@ class InodeGenerationAnnotation : public InodeAnnotation {
   unsigned inode_width_;
   uint64_t generation_annotation_;
 };
+  
+
+class AbstractCatalogManager;
+/**
+ * Here, the Cwd Buffer is registered in order to save the inodes of 
+ * processes' cwd before a new catalog snapshot is applied
+ */
+class RemountListener {
+ public:
+  virtual ~RemountListener() { }
+  virtual void BeforeRemount(AbstractCatalogManager *source) = 0;
+};
 
 
 /**
@@ -136,6 +148,11 @@ class AbstractCatalogManager {
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
   void SetIncarnation(const uint64_t new_incarnation);
+  void RegisterRemountListener(RemountListener *listener) {
+    WriteLock();
+    remount_listener_ = listener;
+    Unlock();
+  }
   
   Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;
@@ -199,18 +216,23 @@ class AbstractCatalogManager {
   Catalog *FindCatalog(const PathString &path) const;
 
   inline void ReadLock() const {
+    if (disable_locks_)
+      return;
     int retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);
   }
   inline void WriteLock() const {
+    if (disable_locks_)
+      return;
     int retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
   }
   inline void Unlock() const {
+    if (disable_locks_)
+      return;
     int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
-  // inline void DowngradeLock() const {  } TODO
   virtual void EnforceSqliteMemLimit();
 
  private:
@@ -227,6 +249,9 @@ class AbstractCatalogManager {
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
+  // Avoid double locking when we know the manager is locked
+  bool disable_locks_;
+  RemountListener *remount_listener_;
 
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;

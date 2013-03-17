@@ -17,10 +17,13 @@
 
 #include <cassert>
 #include <string>
+#include <map>
+#include <vector>
 
 #include "shortstring.h"
 #include "atomic.h"
 #include "dirent.h"
+#include "catalog_mgr.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
@@ -119,6 +122,66 @@ class GlueBuffer {
   atomic_int64 buffer_pos_;
   unsigned size_;
   unsigned version_;
+  Statistics statistics_;
+};
+
+
+/**
+ * Saves the inodes of current working directories on this Fuse volume.
+ * Required for catalog reloads and reloads of the Fuse module.
+ */
+class CwdBuffer : public catalog::RemountListener {
+ public:
+  struct Statistics {
+    Statistics() {
+      atomic_init64(&num_inserts);
+      atomic_init64(&num_removes);
+      atomic_init64(&num_ancient_hits);
+      atomic_init64(&num_ancient_misses);
+    }
+    std::string Print() {
+      return 
+      "inserts: " + StringifyInt(atomic_read64(&num_inserts)) +
+      "  removes: " + StringifyInt(atomic_read64(&num_removes)) +
+      "  ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
+      "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses));
+    }
+    atomic_int64 num_inserts;
+    atomic_int64 num_removes;
+    atomic_int64 num_ancient_hits;
+    atomic_int64 num_ancient_misses;
+  };
+  Statistics GetStatistics() { return statistics_; }
+  
+  explicit CwdBuffer(const std::string mountpoint);
+  explicit CwdBuffer(const CwdBuffer &other);
+  CwdBuffer &operator= (const CwdBuffer &other);
+  ~CwdBuffer();
+  
+  std::vector<PathString> GatherCwds();
+  void Add(const uint64_t inode, const PathString &path);
+  void Remove(const uint64_t);
+  bool Find(const uint64_t inode, PathString *path);
+  
+  void BeforeRemount(catalog::AbstractCatalogManager *source);
+ 
+ private: 
+  static const unsigned kVersion = 1;
+  void InitLock();
+  void CopyFrom(const CwdBuffer &other);
+  inline void Lock() const {
+    int retval = pthread_mutex_lock(lock_);
+    assert(retval == 0);
+  }
+  inline void Unlock() const {
+    int retval = pthread_mutex_unlock(lock_);
+    assert(retval == 0);
+  }
+  
+  pthread_mutex_t *lock_;
+  unsigned version_; 
+  std::map<uint64_t, PathString> inode2cwd_;
+  std::string mountpoint_;
   Statistics statistics_;
 };
 
