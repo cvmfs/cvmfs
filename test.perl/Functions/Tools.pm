@@ -20,7 +20,7 @@ sub get_interface_address {
 	my $if = undef;
 	
 	if ($iface eq 'any') {
-		my %iface_address = undef;
+		my %iface_address;
 		my @if_list = IO::Interface::Simple->interfaces;
 		foreach (@if_list) {
 			$if = IO::Interface::Simple->new("$_"); 
