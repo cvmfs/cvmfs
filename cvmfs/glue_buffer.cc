@@ -233,7 +233,7 @@ vector<PathString> CwdBuffer::GatherCwds() {
   gid_t save_gid = getegid();
   
   Lock();
-  bool retval = SwitchCredentials(0, 0, true);
+  bool retval = SwitchCredentials(0, save_gid, true);
   if (!retval) {
     LogCvmfs(kLogGlueBuffer, kLogDebug, 
              "failed to switch to root for gathering cwds");
