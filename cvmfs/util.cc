@@ -259,6 +259,9 @@ void SendMsg2Socket(const int fd, const string &msg) {
 bool SwitchCredentials(const uid_t uid, const gid_t gid,
                        const bool temporarily)
 {
+  LogCvmfs(kLogCvmfs, kLogDebug, "current credentials uid %d gid %d "
+           "euid %d ugid %d, switching to %d %d (temp: %d)", 
+           getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
   int retval;
   if (temporarily) {
     retval = setegid(gid) || seteuid(uid);
@@ -271,6 +274,8 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
     }
     retval = setgid(gid) || setuid(uid);
   }
+  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)", 
+           retval, errno); 
   return retval == 0;
 }
 

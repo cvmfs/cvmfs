@@ -41,7 +41,7 @@ if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
 elif which apache2 >/dev/null 2>&1; then # Debian based
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
-else 
+else
   APACHE_SERVICE="httpd" # EL based
   APACHE_CONF=${APACHE_SERVICE}
 fi
@@ -231,7 +231,7 @@ check_repository_compatibility() {
 
   echo "\
 This Repository was created with CernVM-FS $(mangle_version_string $creator).
-You are currently running CernVM-FS $(mangle_version_string $current), which is 
+You are currently running CernVM-FS $(mangle_version_string $current), which is
 incompatible to $(mangle_version_string $creator).
 
 Please run \`cvmfs_server migrate\` to update your repository before proceeding."
@@ -300,7 +300,7 @@ is_master_replica() {
     . /etc/cvmfs/repositories.d/${name}/server.conf
     is_master_replica=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -m 2>/dev/null)
   fi
-  
+
   [ "x$is_master_replica" = "xtrue" ]
 }
 
@@ -317,6 +317,25 @@ check_user() {
 
 has_selinux() {
   [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
+}
+
+# for some reason `mount -o remount,(ro|rw) /cvmfs/$name` does not work on older
+# platforms if we set the SELinux context=... parameter in /etc/fstab
+# this dry-runs the whole mount, remount, unmount cycle to find out if it works
+# correctly
+# @returns  0 if the whole cycle worked as expected
+try_mount_remount_cycle() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
+  mount -t aufs \
+    -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
+    try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
+  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
+  rm -fR ${tmpdir}
+  return 0
 }
 
 
@@ -644,7 +663,7 @@ alterfs() {
   check_repository_existence $name || die "The repository $name does not exist"
   [ $master_replica -ne -1 ] || usage "Command alterfs: What should I change?"
   is_root || die "Only root can alter a repository"
-  
+
   # gather repository information
   . /etc/cvmfs/repositories.d/${name}/server.conf
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
@@ -880,7 +899,7 @@ EOF
 
   echo -n "Mounting CernVM-FS Storage... "
   local selinux_context=""
-  if has_selinux; then
+  if has_selinux && try_mount_remount_cycle; then
     selinux_context="context=\"system_u:object_r:default_t:s0\""
   fi
   cat >> /etc/fstab << EOF
@@ -1580,7 +1599,7 @@ migrate_2_1_6() {
   # before 2.1.6 there were only local backends... no need to differentiate here
   local storage_path=$(echo $CVMFS_UPSTREAM_STORAGE | cut --delimiter=: --fields=2)
   local new_upstream="local,${storage_path}/data/txn,${storage_path}"
-  
+
   echo "--> removing spooler pipes"
   local pipe_pathes="${CVMFS_SPOOL_DIR}/paths"
   local pipe_digests="${CVMFS_SPOOL_DIR}/digests"
