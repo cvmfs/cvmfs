@@ -233,7 +233,7 @@ vector<PathString> CwdBuffer::GatherCwds() {
   gid_t save_gid = getegid();
   
   Lock();
-  bool retval = SwitchCredentials(0, save_gid, true);
+  bool retval = SwitchCredentials(0, 0, true);
   if (!retval) {
     LogCvmfs(kLogGlueBuffer, kLogDebug, 
              "failed to switch to root for gathering cwds");
@@ -245,6 +245,8 @@ vector<PathString> CwdBuffer::GatherCwds() {
   if (!dirp) {
     LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "failed to open /proc");
     Unlock();
+    retval = SwitchCredentials(save_uid, save_gid, true);
+    assert(retval);
     return result;
   }
   platform_dirent64 *d;
