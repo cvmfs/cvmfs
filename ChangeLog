@@ -1,4 +1,5 @@
 2.1.9:
+  * Fixed selinux context for SL5 in cvmfs_server
   * Omit autofs warnings in NFS mode
   * Added "glue buffer" and "cwd buffer" to smoothly connect 
     catalog reloads and reloads of the Fuse module
