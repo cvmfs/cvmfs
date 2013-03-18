@@ -319,12 +319,23 @@ has_selinux() {
   [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
 }
 
-is_slc5() {
-  [ -f /etc/issue ] && cat /etc/issue | grep -q "CERN SLC.*5\.[0-9]"
-}
-
-is_slc6() {
-  [ -f /etc/issue ] && cat /etc/issue | grep -q "CERN SLC.*6\.[0-9]"
+# for some reason `mount -o remount,(ro|rw) /cvmfs/$name` does not work on older
+# platforms if we set the SELinux context=... parameter in /etc/fstab
+# this dry-runs the whole mount, remount, unmount cycle to find out if it works
+# correctly
+# @returns  0 if the whole cycle worked as expected
+try_mount_remount_cycle() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
+  mount -t aufs \
+    -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
+    try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
+  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
+  rm -fR ${tmpdir}
+  return 0
 }
 
 
@@ -888,7 +899,7 @@ EOF
 
   echo -n "Mounting CernVM-FS Storage... "
   local selinux_context=""
-  if has_selinux && ! is_slc5; then
+  if has_selinux && try_mount_remount_cycle; then
     selinux_context="context=\"system_u:object_r:default_t:s0\""
   fi
   cat >> /etc/fstab << EOF
