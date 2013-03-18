@@ -20,6 +20,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "logging.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -216,6 +217,9 @@ CwdBuffer::CwdBuffer(const CwdBuffer &other) {
 
 
 CwdBuffer &CwdBuffer::operator= (const CwdBuffer &other) {
+  if (&other == this)
+    return *this;
+  
   assert(other.version_ == kVersion);
   CopyFrom(other);
   return *this;
@@ -343,10 +347,9 @@ bool CwdBuffer::Find(const uint64_t inode, PathString *path) {
 void CwdBuffer::BeforeRemount(catalog::AbstractCatalogManager *source) {
   vector<PathString> open_cwds = GatherCwds();
   for (unsigned i = 0; i < open_cwds.size(); ++i) {
-    catalog::DirectoryEntry dirent;
-    bool retval = source->LookupPath(open_cwds[i], catalog::kLookupSole,
-                                     &dirent);
+    catalog::inode_t inode;
+    bool retval = source->Path2InodeUnprotected(open_cwds[i], &inode);
     if (retval)
-      Add(dirent.inode(), open_cwds[i]);
+      Add(inode, open_cwds[i]);
   }
 }
