@@ -16,6 +16,9 @@ sudo cvmfs_config setup
 sudo cvmfs_config chksetup
 sudo /usr/sbin/httpd
 
+sudo mkdir -p /var/log/cvmfs-test
+sudo chown sftnight:sftnight /var/log/cvmfs-test
+
 # run tests
 echo ""
 echo ""
