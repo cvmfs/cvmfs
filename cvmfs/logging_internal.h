@@ -60,7 +60,8 @@ enum LogSource {
   kLogPublish,
   kLogSpooler,
   kLogConcurrency,
-  kLogUtility
+  kLogUtility,
+  kLogGlueBuffer,
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
