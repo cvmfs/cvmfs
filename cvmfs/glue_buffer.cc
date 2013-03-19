@@ -47,7 +47,7 @@ GlueBuffer::GlueBuffer(const unsigned size) {
   size_ = size;
   buffer_ = new BufferEntry[size_];
   atomic_init64(&buffer_pos_);
-  
+  cwd_buffer_ = NULL;
   InitLock();
 }
 
@@ -63,6 +63,7 @@ void GlueBuffer::CopyFrom(const GlueBuffer &other) {
     buffer_[i] = other.buffer_[i];
   buffer_pos_ = other.buffer_pos_;
   statistics_ = other.statistics_;
+  cwd_buffer_ = other.cwd_buffer_;
 }
 
 
@@ -136,8 +137,16 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
       break;
     }
   }
-  if (parent_idx < 0)
+  if (parent_idx < 0) {
+    if (cwd_buffer_) {
+      LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
+               "cwd buffer, inode: %u", needle_inode);
+      bool retval = cwd_buffer_->Find(needle_inode, path);
+      if (retval)
+        return true;
+    }
     return false;
+  }
   
   bool retval = ConstructPath(parent_idx, path);
   path->Append("/", 1);

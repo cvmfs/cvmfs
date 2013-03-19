@@ -32,6 +32,8 @@ namespace catalog {
   class AbstractCatalogManager;
 }
 
+
+class CwdBuffer;
 class GlueBuffer {
  public:
   struct Statistics {
@@ -60,6 +62,7 @@ class GlueBuffer {
   GlueBuffer &operator= (const GlueBuffer &other);
   ~GlueBuffer();
   void Resize(const unsigned new_size);
+  void SetCwdBuffer(CwdBuffer *cwd_buffer) { cwd_buffer_ = cwd_buffer; }
   
   inline void Add(const uint64_t inode, const uint64_t parent_inode, 
                   const uint32_t generation, const NameString &name)
@@ -126,6 +129,8 @@ class GlueBuffer {
   atomic_int64 buffer_pos_;
   unsigned size_;
   unsigned version_;
+  // If reconstructing fails, there might be a hit in the cwd buffer
+  CwdBuffer *cwd_buffer_;
   Statistics statistics_;
 };
 

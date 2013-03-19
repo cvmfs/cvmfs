@@ -1692,6 +1692,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
   cvmfs::glue_buffer_ = new GlueBuffer(cvmfs::glue_buffer_size_);
   cvmfs::cwd_buffer_ = new CwdBuffer(*cvmfs::mountpoint_);
+  cvmfs::glue_buffer_->SetCwdBuffer(cvmfs::cwd_buffer_);
   cvmfs::cwd_remount_listener_ = new CwdRemountListener(cvmfs::cwd_buffer_);
 
   // TODO: in loader
@@ -2136,6 +2137,7 @@ static bool RestoreState(const int fd_progress,
       GlueBuffer *saved_glue_buffer = (GlueBuffer *)saved_states[i]->state;
       cvmfs::glue_buffer_ = new GlueBuffer(*saved_glue_buffer);
       cvmfs::glue_buffer_->Resize(cvmfs::glue_buffer_size_);
+      cvmfs::glue_buffer_->SetCwdBuffer(cvmfs::cwd_buffer_);
       SendMsg2Socket(fd_progress, " done\n");
     }
     
@@ -2145,6 +2147,7 @@ static bool RestoreState(const int fd_progress,
       delete cvmfs::cwd_buffer_;
       CwdBuffer *saved_cwd_buffer = (CwdBuffer *)saved_states[i]->state;
       cvmfs::cwd_buffer_ = new CwdBuffer(*saved_cwd_buffer);
+      cvmfs::glue_buffer_->SetCwdBuffer(cvmfs::cwd_buffer_);
       cvmfs::cwd_remount_listener_ = new CwdRemountListener(cvmfs::cwd_buffer_);
       cvmfs::catalog_manager_->RegisterRemountListener(
         cvmfs::cwd_remount_listener_);
