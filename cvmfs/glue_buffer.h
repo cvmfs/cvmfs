@@ -28,6 +28,10 @@
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
 
+namespace catalog {
+  class AbstractCatalogManager;
+}
+
 class GlueBuffer {
  public:
   struct Statistics {
@@ -130,7 +134,7 @@ class GlueBuffer {
  * Saves the inodes of current working directories on this Fuse volume.
  * Required for catalog reloads and reloads of the Fuse module.
  */
-class CwdBuffer : public catalog::RemountListener {
+class CwdBuffer {
  public:
   struct Statistics {
     Statistics() {
@@ -183,6 +187,19 @@ class CwdBuffer : public catalog::RemountListener {
   std::map<uint64_t, PathString> inode2cwd_;
   std::string mountpoint_;
   Statistics statistics_;
+};
+
+
+class CwdRemountListener : public catalog::RemountListener {
+ public:
+  explicit CwdRemountListener(CwdBuffer *cwd_buffer) {
+    cwd_buffer_ = cwd_buffer;
+  }
+  void BeforeRemount(catalog::AbstractCatalogManager *source) {
+    cwd_buffer_->BeforeRemount(source);
+  }
+ private:
+  CwdBuffer *cwd_buffer_;
 };
 
 #endif  // CVMFS_GLUE_BUFFER_H_

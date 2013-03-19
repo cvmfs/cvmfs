@@ -56,7 +56,6 @@ AbstractCatalogManager::AbstractCatalogManager() {
   assert(retval == 0);
   retval = pthread_key_create(&pkey_sqlitemem_, NULL);
   assert(retval == 0);
-  disable_locks_ = false;
   remount_listener_ = NULL;
 }
 
@@ -124,11 +123,8 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
     return LoadCatalog(PathString("", 0), hash::Any(), NULL);
 
   WriteLock();
-  if (remount_listener_) {
-    disable_locks_ = true;
+  if (remount_listener_)
     remount_listener_->BeforeRemount(this);
-    disable_locks_ = false;
-  }
   
   string catalog_path;
   const LoadError load_error = LoadCatalog(PathString("", 0), hash::Any(),
@@ -338,6 +334,36 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   Unlock();
   atomic_inc64(&statistics_.num_lookup_path_negative);
   return false;
+}
+  
+  
+/**
+ * Don't use.  Only for the CwdBuffer.
+ */
+bool AbstractCatalogManager::Path2InodeUnprotected(const PathString &path, 
+                                                   inode_t *inode)
+{
+  EnforceSqliteMemLimit();
+  
+  Catalog *best_fit = FindCatalog(path);
+  assert(best_fit != NULL);
+  
+  atomic_inc64(&statistics_.num_lookup_path);
+  LogCvmfs(kLogCatalog, kLogDebug, "inode lookup for '%s' in catalog: '%s'",
+           path.c_str(), best_fit->path().c_str());
+  DirectoryEntry dirent;
+  bool found = best_fit->LookupPath(path, &dirent);
+  
+  if (!found) {
+    LogCvmfs(kLogCatalog, kLogDebug, "ENOENT: %s", path.c_str());
+    atomic_inc64(&statistics_.num_lookup_path_negative);
+    return false;
+  }
+  
+  LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s",
+           path.c_str(), best_fit->path().c_str());
+  *inode = dirent.inode();
+  return true;
 }
 
 

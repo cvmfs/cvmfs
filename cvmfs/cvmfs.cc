@@ -213,6 +213,7 @@ lru::Md5PathCache *md5path_cache_ = NULL;
 uint32_t glue_buffer_size_ = kDefaultGlueBufferSize;
 GlueBuffer *glue_buffer_ = NULL;
 CwdBuffer *cwd_buffer_ = NULL;
+CwdRemountListener *cwd_remount_listener_ = NULL;
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
 
@@ -1691,6 +1692,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
   cvmfs::glue_buffer_ = new GlueBuffer(cvmfs::glue_buffer_size_);
   cvmfs::cwd_buffer_ = new CwdBuffer(*cvmfs::mountpoint_);
+  cvmfs::cwd_remount_listener_ = new CwdRemountListener(cvmfs::cwd_buffer_);
 
   // TODO: in loader
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
@@ -1914,7 +1916,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
-  cvmfs::catalog_manager_->RegisterRemountListener(cvmfs::cwd_buffer_);
+  cvmfs::catalog_manager_->RegisterRemountListener(cvmfs::cwd_remount_listener_);  
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
@@ -2008,6 +2010,7 @@ static void Fini() {
   delete cvmfs::live_file_chunks_;
   delete cvmfs::glue_buffer_;
   delete cvmfs::cwd_buffer_;
+  delete cvmfs::cwd_remount_listener_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
@@ -2017,6 +2020,7 @@ static void Fini() {
   cvmfs::live_file_chunks_ = NULL;
   cvmfs::glue_buffer_ = NULL;
   cvmfs::cwd_buffer_ = NULL;
+  cvmfs::cwd_remount_listener_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
@@ -2074,7 +2078,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 
     // TODO: should rather be saved just in a malloc'd memory block
     cvmfs::DirectoryHandles *saved_handles =
-    new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
+      new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
     loader::SavedState *save_open_dirs = new loader::SavedState();
     save_open_dirs->state_id = loader::kStateOpenDirs;
     save_open_dirs->state = saved_handles;
@@ -2137,10 +2141,13 @@ static bool RestoreState(const int fd_progress,
     
     if (saved_states[i]->state_id == loader::kStateCwdBuffer) {
       SendMsg2Socket(fd_progress, "Restoring cwd buffer... ");
+      delete cvmfs::cwd_remount_listener_;
       delete cvmfs::cwd_buffer_;
       CwdBuffer *saved_cwd_buffer = (CwdBuffer *)saved_states[i]->state;
       cvmfs::cwd_buffer_ = new CwdBuffer(*saved_cwd_buffer);
-      cvmfs::catalog_manager_->RegisterRemountListener(cvmfs::cwd_buffer_);
+      cvmfs::cwd_remount_listener_ = new CwdRemountListener(cvmfs::cwd_buffer_);
+      cvmfs::catalog_manager_->RegisterRemountListener(
+        cvmfs::cwd_remount_listener_);
       SendMsg2Socket(fd_progress, " done\n");
     }
     
@@ -2172,8 +2179,7 @@ static void FreeSavedState(const int fd_progress,
         break;
       case loader::kStateCwdBuffer:
         SendMsg2Socket(fd_progress, "Releasing saved cwd buffer\n");
-        // TODO: why does it segfault?
-        //delete static_cast<CwdBuffer *>(saved_states[i]->state);
+        delete static_cast<CwdBuffer *>(saved_states[i]->state);
         break;
       case loader::kStateInodeGeneration:
         SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");
