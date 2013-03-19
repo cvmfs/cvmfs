@@ -475,8 +475,11 @@ static inline void AddToGlueBuffer(const catalog::DirectoryEntry &dirent) {
   
   
 static bool GetDirentForInode(const fuse_ino_t ino,
-                              catalog::DirectoryEntry *dirent)
+                              catalog::DirectoryEntry *dirent,
+                              bool *volatile_inode)
 {
+  if (volatile_inode)
+    *volatile_inode = false;
   // Lookup inode in cache
   if (inode_cache_->Lookup(ino, dirent)) {
     AddToGlueBuffer(*dirent);
@@ -543,8 +546,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
         if (retval) {
           LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
                     "inode %"PRIu64, ino, dirent->inode());
-          inode_cache_->Insert(dirent->inode(), *dirent);
-          AddToGlueBuffer(*dirent);
+          dirent->set_inode(ino);
+          if (volatile_inode)
+            *volatile_inode = true;
           return true;
         }
       }
@@ -613,7 +617,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 
   // Find out the parent path recursively and rebuild the absolute path
   catalog::DirectoryEntry dirent;
-  if (!GetDirentForInode(ino, &dirent))
+  bool volatile_inode;
+  if (!GetDirentForInode(ino, &dirent, &volatile_inode))
     return false;
 
   // Check if we reached the root node
@@ -634,7 +639,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     path->Append(dirent.name().GetChars(), dirent.name().GetLength());
   }
 
-  path_cache_->Insert(dirent.inode(), *path);
+  if (!volatile_inode)
+    path_cache_->Insert(dirent.inode(), *path);
   return true;
 }
 
@@ -666,7 +672,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
 
   // Special NFS lookups
   if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
-    if (GetDirentForInode(parent, &dirent)) {
+    if (GetDirentForInode(parent, &dirent, NULL)) {
       if (strcmp(name, ".") == 0) {
         goto reply_positive;
       } else {
@@ -674,7 +680,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
           dirent.set_inode(1);
           goto reply_positive;
         }
-        if (GetDirentForInode(dirent.parent_inode(), &dirent))
+        if (GetDirentForInode(dirent.parent_inode(), &dirent, NULL))
           goto reply_positive;
         else
           goto reply_negative;
@@ -723,7 +729,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %"PRIu64, ino);
 
   catalog::DirectoryEntry dirent;
-  const bool found = GetDirentForInode(ino, &dirent);
+  bool volatile_inode;
+  const bool found = GetDirentForInode(ino, &dirent, &volatile_inode);
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -732,7 +739,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   struct stat info = dirent.GetStatStructure();
 
-  fuse_reply_attr(req, &info, GetKcacheTimeout());
+  fuse_reply_attr(req, &info, volatile_inode ? 0.0 : GetKcacheTimeout());
 }
 
 
@@ -746,7 +753,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
 
   catalog::DirectoryEntry dirent;
-  const bool found = GetDirentForInode(ino, &dirent);
+  const bool found = GetDirentForInode(ino, &dirent, NULL);
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -795,7 +802,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   PathString path;
   catalog::DirectoryEntry d;
-  const bool found = GetPathForInode(ino, &path) && GetDirentForInode(ino, &d);
+  const bool found = GetPathForInode(ino, &path) && 
+                     GetDirentForInode(ino, &d, NULL);
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -820,7 +828,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != catalog_manager_->GetRootInode() &&
-      GetDirentForInode(d.parent_inode(), &p))
+      GetDirentForInode(d.parent_inode(), &p, NULL))
   {
     info = p.GetStatStructure();
     AddToDirListing(req, "..", &info, &listing);
@@ -961,7 +969,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   catalog::DirectoryEntry dirent;
   PathString path;
 
-  const bool found = GetDirentForInode(ino, &dirent) &&
+  const bool found = GetDirentForInode(ino, &dirent, NULL) &&
                      GetPathForInode(ino, &path);
 
   if (!found) {
@@ -1275,7 +1283,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
   const string attr = name;
   catalog::DirectoryEntry d;
-  const bool found = GetDirentForInode(ino, &d);
+  const bool found = GetDirentForInode(ino, &d, NULL);
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -1413,7 +1421,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
            ino, size);
 
   catalog::DirectoryEntry d;
-  const bool found = GetDirentForInode(ino, &d);
+  const bool found = GetDirentForInode(ino, &d, NULL);
   if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
