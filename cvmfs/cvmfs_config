@@ -719,7 +719,8 @@ cvmfs_reload() {
     get_attr fqrn ${m}; fqrn=$attr_value
     get_attr pid ${m}; pid=$attr_value
     echo "Pausing ${fqrn} on ${m}"
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go &
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+      awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
     echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
   done
