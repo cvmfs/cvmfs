@@ -259,9 +259,15 @@ void SendMsg2Socket(const int fd, const string &msg) {
 bool SwitchCredentials(const uid_t uid, const gid_t gid,
                        const bool temporarily)
 {
-  int retval;
+  LogCvmfs(kLogCvmfs, kLogDebug, "current credentials uid %d gid %d "
+           "euid %d egid %d, switching to %d %d (temp: %d)", 
+           getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
+  int retval = 0;
   if (temporarily) {
-    retval = setegid(gid) || seteuid(uid);
+    if (gid != getegid())
+      retval = setegid(gid);
+    if ((retval == 0) && (uid != geteuid()))
+      retval = seteuid(uid);
   } else {
     // If effective uid is not root, we must first gain root access back
     if ((getuid() == 0) && (getuid() != geteuid())) {
@@ -271,6 +277,8 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
     }
     retval = setgid(gid) || setuid(uid);
   }
+  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)", 
+           retval, errno); 
   return retval == 0;
 }
 

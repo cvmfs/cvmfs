@@ -245,6 +245,8 @@ vector<PathString> CwdBuffer::GatherCwds() {
   if (!dirp) {
     LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "failed to open /proc");
     Unlock();
+    retval = SwitchCredentials(save_uid, save_gid, true);
+    assert(retval);
     return result;
   }
   platform_dirent64 *d;
