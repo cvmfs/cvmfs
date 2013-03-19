@@ -12,14 +12,23 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
+#ifdef __APPLE__
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <libproc.h>
+#endif
 
 #include <cstdlib>
 #include <cstring>
 #include <cassert>
 
+#include <vector>
+#include <string>
+
 #include "platform.h"
 #include "smalloc.h"
 #include "logging.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -233,14 +242,61 @@ vector<PathString> CwdBuffer::GatherCwds() {
   gid_t save_gid = getegid();
   
   Lock();
-  bool retval = SwitchCredentials(0, save_gid, true);
+  int retval = SwitchCredentials(0, save_gid, true);
   if (!retval) {
     LogCvmfs(kLogGlueBuffer, kLogDebug, 
              "failed to switch to root for gathering cwds");
   }
   
   vector<PathString> result;
+#ifdef __APPLE__
+  // TODO: list cwds without stating them
+  // List PIDs
+/*  vector<pid_t> pids;
+  int buf_size = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
+  if (buf_size <= 0) {
+    LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, 
+             "failed to gather pid buffer (%d)", errno);
+  }
+  int *all_pids = static_cast<pid_t *>(smalloc(buf_size));
+  buf_size = proc_listpids(PROC_ALL_PIDS, 0, all_pids, buf_size);
+  if (buf_size <= 0) {
+    LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, 
+             "failed to gather pids (%d)", errno);
+  } else {
+    int num_procs = buf_size / sizeof(pid_t);
+    for (int i = 0; i < num_procs; ++i)
+      pids.push_back(all_pids[i]);
+  }
+  free(all_pids);
   
+  // Gather cwd for pids
+  // Blocks on cvmfs because it also tries to get the stat information
+  for (unsigned i = 0; i < pids.size(); ++i) {
+    struct proc_vnodepathinfo vpi;
+    buf_size = proc_pidinfo(pids[i], PROC_PIDVNODEPATHINFO, 0, 
+                            &vpi, sizeof(vpi));
+    if (buf_size < (int)sizeof(vpi)) {
+      LogCvmfs(kLogGlueBuffer, kLogDebug, "failed to gather cwd for "
+               "pid %d (%d)", pids[i], errno);
+    } else {
+      if (!vpi.pvi_cdir.vip_path[0]) {
+        LogCvmfs(kLogGlueBuffer, kLogDebug, "no cwd for pid %d (%d)", pids[i]);
+        continue;
+      }
+      string cwd(vpi.pvi_cdir.vip_path);
+      LogCvmfs(kLogGlueBuffer, kLogDebug, "cwd of pid %d is %s", 
+               pids[i], cwd.c_str());
+      if (HasPrefix(cwd, mountpoint_ + "/", false)) {
+        string relative_cwd = cwd.substr(mountpoint_.length());
+        result.push_back(PathString(relative_cwd));
+        while ((relative_cwd = GetParentPath(relative_cwd)) != "") {
+          result.push_back(PathString(relative_cwd));
+        }
+      }
+    }
+  }*/
+#else
   DIR *dirp = opendir("/proc");
   if (!dirp) {
     LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "failed to open /proc");
@@ -275,6 +331,8 @@ vector<PathString> CwdBuffer::GatherCwds() {
     }
   }
   closedir(dirp);
+#endif
+  
   if (!result.empty())
     result.push_back(PathString());
   

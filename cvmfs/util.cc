@@ -880,7 +880,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
  * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
  */
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
-  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh");
+  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
+                       vector<string>());
 }
 
 
