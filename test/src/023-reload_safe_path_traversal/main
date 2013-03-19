@@ -21,7 +21,6 @@ cvmfs_run_test() {
 
   # decrease the kernel cache timeout to safe some time
   sudo sh -c "echo \"CVMFS_KCACHE_TIMEOUT=5\" >> /etc/cvmfs/default.local" || return 3
-  sudo sh -c "echo \"CVMFS_DEBUGLOG=/tmp/cvmfs_dbglog\" >> /etc/cvmfs/default.local" || return 3
   sudo cvmfs_config umount >> $logfile 2>&1 || return 4
   sudo cvmfs_config probe  >> $logfile 2>&1 || return 5
 
