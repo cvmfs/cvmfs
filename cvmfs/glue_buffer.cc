@@ -142,9 +142,12 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
       LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
                "cwd buffer, inode: %u", needle_inode);
       bool retval = cwd_buffer_->Find(needle_inode, path);
-      if (retval)
+      if (retval) {
+        atomic_inc64(&statistics_.num_jump_hits);
         return true;
+      }
     }
+    atomic_inc64(&statistics_.num_jump_misses);
     return false;
   }
   

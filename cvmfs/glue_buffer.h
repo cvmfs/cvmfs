@@ -41,16 +41,22 @@ class GlueBuffer {
       atomic_init64(&num_ancient_hits);
       atomic_init64(&num_ancient_misses);
       atomic_init64(&num_busywait_cycles);
+      atomic_init64(&num_jump_hits);
+      atomic_init64(&num_jump_misses);
     }
     std::string Print() {
       return 
         "ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
         "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses)) +
+        "  cwd-jump(hits): " + StringifyInt(atomic_read64(&num_jump_hits)) +
+        "  cwd-jump(misses): " + StringifyInt(atomic_read64(&num_jump_misses)) +
         "  busy-wait-cycles: " + StringifyInt(atomic_read64(&num_busywait_cycles));
     }
     atomic_int64 num_ancient_hits;
     atomic_int64 num_ancient_misses;
     atomic_int64 num_busywait_cycles;
+    atomic_int64 num_jump_hits;
+    atomic_int64 num_jump_misses;
   };
   uint64_t GetNumInserts() { return atomic_read64(&buffer_pos_); }
   unsigned GetNumEntries() { return size_; }
@@ -150,10 +156,10 @@ class CwdBuffer {
     }
     std::string Print() {
       return 
-      "inserts: " + StringifyInt(atomic_read64(&num_inserts)) +
-      "  removes: " + StringifyInt(atomic_read64(&num_removes)) +
-      "  ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
-      "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses));
+        "inserts: " + StringifyInt(atomic_read64(&num_inserts)) +
+        "  removes: " + StringifyInt(atomic_read64(&num_removes)) +
+        "  ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
+        "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses));
     }
     atomic_int64 num_inserts;
     atomic_int64 num_removes;
