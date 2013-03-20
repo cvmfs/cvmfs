@@ -65,8 +65,7 @@ bool Spooler::Initialize() {
 
 
 void Spooler::TearDown() {
-  file_processor_->WaitForTermination();
-  uploader_->WaitForUpload();
+  WaitForTermination();
 }
 
 
@@ -105,14 +104,14 @@ void Spooler::UploadingCallback(const UploaderResults &data) {
 
 
 void Spooler::WaitForUpload() const {
-  file_processor_->WaitForProcessing();
   uploader_->WaitForUpload();
+  file_processor_->WaitForProcessing();
 }
 
 
 void Spooler::WaitForTermination() const {
-  file_processor_->WaitForTermination();
   uploader_->WaitForUpload();
+  file_processor_->WaitForTermination();
 }
 
 

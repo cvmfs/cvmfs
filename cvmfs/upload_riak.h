@@ -286,6 +286,8 @@ namespace upload {
     bool Peek(const std::string& path) const;
 
     void WaitForUpload() const;
+    void DisablePrecaching();
+    void EnablePrecaching();
 
     unsigned int GetNumberOfErrors() const;
 

@@ -184,6 +184,18 @@ void RiakUploader::WaitForUpload() const {
 }
 
 
+void RiakUploader::DisablePrecaching() {
+  AbstractUploader::DisablePrecaching();
+  concurrent_upload_->EnableDrainoutMode();
+}
+
+
+void RiakUploader::EnablePrecaching() {
+  AbstractUploader::EnablePrecaching();
+  concurrent_upload_->DisableDrainoutMode();
+}
+
+
 unsigned int RiakUploader::GetNumberOfErrors() const {
   return concurrent_upload_->GetNumberOfFailedJobs();
 }

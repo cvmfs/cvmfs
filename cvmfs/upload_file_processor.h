@@ -266,7 +266,7 @@ class FileProcessor : public Observable<SpoolerResult> {
  public:
   FileProcessor(const SpoolerDefinition  &spooler_definition,
                 AbstractUploader         *uploader_);
-  virtual ~FileProcessor();
+  virtual ~FileProcessor() {}
 
   bool Initialize();
 
@@ -286,13 +286,8 @@ class FileProcessor : public Observable<SpoolerResult> {
     return workers_->GetNumberOfFailedJobs();
   }
 
-  inline void WaitForProcessing() const {
-    workers_->WaitForEmptyQueue();
-  }
-
-  inline void WaitForTermination() const {
-    workers_->WaitForTermination();
-  }
+  void WaitForProcessing() const;
+  void WaitForTermination() const;
 
  protected:
   void ProcessingCallback(const FileProcessorWorker::Results  &data);
@@ -300,6 +295,8 @@ class FileProcessor : public Observable<SpoolerResult> {
  private:
   UniquePtr<ConcurrentWorkers<FileProcessorWorker> >  workers_;
   UniquePtr<FileProcessorWorker::worker_context>      worker_context_;
+
+  AbstractUploader                                   *uploader_;
 };
 
 

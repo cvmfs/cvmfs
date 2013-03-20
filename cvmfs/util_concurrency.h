@@ -560,6 +560,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   void WaitForTermination();
 
+  void EnableDrainoutMode() const;
+  void DisableDrainoutMode() const;
+
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
   inline unsigned int GetNumberOfFailedJobs() const {
     return atomic_read32(&jobs_failed_);
@@ -589,9 +592,6 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
  protected:
   bool SpawnWorkers();
-
-  void EnableDrainoutMode() const;
-  void DisableDrainoutMode() const;
 
   /**
    * POSIX conform function for thread entry point. Is invoked for every new

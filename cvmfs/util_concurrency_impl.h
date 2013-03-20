@@ -140,7 +140,6 @@ FifoChannel<T>::~FifoChannel() {
 template <class T>
 void FifoChannel<T>::Enqueue(const T &data) {
   MutexLockGuard lock(mutex_);
-  //LogCvmfs(kLogSpooler, kLogStdout, "--> ENQUEUED (%d): %d", sizeof(T), this->size());
 
   // wait for space in the queue
   while (this->size() >= maximal_queue_length_) {
@@ -160,7 +159,6 @@ void FifoChannel<T>::Enqueue(const T &data) {
 template <class T>
 const T FifoChannel<T>::Dequeue() {
   MutexLockGuard lock(mutex_);
-  //LogCvmfs(kLogSpooler, kLogStdout, "--> DEQUEUED (%d): %d", sizeof(T), this->size());
 
   // wait until there is something to do
   while (this->empty()) {

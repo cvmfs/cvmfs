@@ -13,7 +13,9 @@ using namespace upload;
 
 
 FileProcessor::FileProcessor(const SpoolerDefinition  &spooler_definition,
-                             AbstractUploader         *uploader) {
+                             AbstractUploader         *uploader) :
+  uploader_(uploader)
+{
   worker_context_ = new FileProcessorWorker::worker_context(
                                       spooler_definition.temporary_path,
                                       spooler_definition.use_file_chunking,
@@ -28,11 +30,6 @@ FileProcessor::FileProcessor(const SpoolerDefinition  &spooler_definition,
 }
 
 
-FileProcessor::~FileProcessor() {
-  workers_->WaitForTermination();
-}
-
-
 bool FileProcessor::Initialize() {
   return workers_->Initialize();
 }
@@ -43,6 +40,20 @@ void FileProcessor::ProcessingCallback(const FileProcessorWorker::Results  &data
                                 data.local_path,
                                 data.bulk_file.content_hash(),
                                 data.file_chunks));
+}
+
+
+void FileProcessor::WaitForProcessing() const {
+  uploader_->DisablePrecaching();
+  workers_->WaitForEmptyQueue();
+  uploader_->EnablePrecaching();
+}
+
+
+void FileProcessor::WaitForTermination() const {
+  uploader_->DisablePrecaching();
+  workers_->WaitForTermination();
+  uploader_->EnablePrecaching();
 }
 
 
