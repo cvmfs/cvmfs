@@ -12,8 +12,7 @@ cvmfs_run_test() {
   logfile=$1
 
   # process IDs of concurrent processes
-  local find_cmd_1
-  local find_cmd_2
+  local find_cmd
   local reload_cmd
 
   # mount sft repository
@@ -21,30 +20,26 @@ cvmfs_run_test() {
 
   # decrease the kernel cache timeout to safe some time
   sudo sh -c "echo \"CVMFS_KCACHE_TIMEOUT=5\" >> /etc/cvmfs/default.local" || return 3
+  sudo sh -c "echo \"CVMFS_DEBUGLOG=/tmp/cvmfs_readdir_dbg\" >> /etc/cvmfs/default.local" || return 3
   sudo cvmfs_config umount >> $logfile 2>&1 || return 4
   sudo cvmfs_config probe  >> $logfile 2>&1 || return 5
 
   # do some concurrent find calls
-  find /cvmfs/sft.cern.ch > /tmp/find1 2>>$logfile &
-  find_cmd_1=$!
-  find /cvmfs/sft.cern.ch > /tmp/find2 2>>$logfile &
-  find_cmd_2=$!
+  find /cvmfs/sft.cern.ch > /tmp/find1 2>>$logfile -ignore_readdir_race &
+  find_cmd=$!
 
   # reload the catalog every now and than
   reload_catalogs >> $logfile 2>&1 &
   reload_cmd=$!
 
   # always kill the detached processes
-  trap "kill -9 $find_cmd_1 $find_cmd_2 $reload_cmd > /dev/null 2>&1; exit" SIGHUP SIGINT SIGTERM
+  trap "kill -9 $find_cmd $reload_cmd > /dev/null 2>&1; exit" SIGHUP SIGINT SIGTERM
 
   # wait for the find calls to succeed
-  wait $find_cmd_1
-  if [ $? -ne 0 ]; then
-    kill -9 $reload_cmd
-    return 6
-  fi
-  wait $find_cmd_2
-  if [ $? -ne 0 ]; then
+  wait $find_cmd
+  local retval=$?
+  if [ $retval -ne 0 ]; then
+    echo "Find failed with return code: $retval" >> $logfile
     kill -9 $reload_cmd
     return 6
   fi
