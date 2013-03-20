@@ -84,6 +84,9 @@ class InodeGenerationAnnotation : public InodeAnnotation {
     return raw_inode | generation_annotation_;
   }
   void SetGeneration(const uint64_t new_generation);
+  void CheckForOverflow(const uint64_t new_generation, 
+                        const uint64_t initial_generation,
+                        uint32_t *overflow_counter);
 
  private:
   unsigned inode_width_;

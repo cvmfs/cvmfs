@@ -34,14 +34,33 @@ InodeGenerationAnnotation::InodeGenerationAnnotation(const unsigned inode_width)
 }
 
 
-void InodeGenerationAnnotation::SetGeneration(const uint64_t new_generation) {
+void InodeGenerationAnnotation::SetGeneration(const uint64_t new_generation) 
+{
   LogCvmfs(kLogCatalog, kLogDebug, "new inode generation: %"PRIu64, 
            new_generation);
   
   const unsigned generation_width = inode_width_ - num_protected_bits_;
-  const uint64_t generation_cut = 
-    new_generation % (uint64_t(1) << generation_width);
+  const uint64_t generation_max = uint64_t(1) << generation_width;
+  
+  const uint64_t generation_cut = new_generation % generation_max;
   generation_annotation_ = generation_cut << num_protected_bits_;
+}
+  
+  
+void InodeGenerationAnnotation::CheckForOverflow( 
+  const uint64_t new_generation, 
+  const uint64_t initial_generation,
+  uint32_t *overflow_counter)
+{
+  const unsigned generation_width = inode_width_ - num_protected_bits_;
+  const uint64_t generation_max = uint64_t(1) << generation_width;
+  const uint64_t generation_span = new_generation - initial_generation;
+  if ((generation_span >= generation_max) &&
+      ((generation_span / generation_max) > *overflow_counter)) 
+  {
+    *overflow_counter = generation_span / generation_max;
+    LogCvmfs(kLogCatalog, kLogSyslog, "inode generation overflow");
+  }  
 }
 
 

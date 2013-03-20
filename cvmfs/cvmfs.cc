@@ -137,10 +137,12 @@ struct InodeGenerationInfo {
     version = 1;
     initial_revision = 0;
     incarnation = 0;
+    overflow_counter = 0;
   }
   unsigned version;
   uint64_t initial_revision;
   uint32_t incarnation;
+  uint32_t overflow_counter;
 };
 InodeGenerationInfo inode_generation_info_;
 
@@ -349,7 +351,9 @@ string PrintCwdBufferStatistics() {
 std::string PrintInodeGeneration() {
   return "init-catalog-revision: " + 
     StringifyInt(inode_generation_info_.initial_revision) + "  " +
-    "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "\n";
+    "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
+    "overflow-counter: " + StringifyInt(inode_generation_info_.overflow_counter) 
+    + "\n";
 }
 
   
@@ -419,6 +423,10 @@ static void RemountFinish() {
     md5path_cache_->Pause();
     md5path_cache_->Drop();
     catalog::LoadError retval = catalog_manager_->Remount(false);
+    inode_annotation_->CheckForOverflow(
+      catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
+      inode_generation_info_.initial_revision, 
+      &inode_generation_info_.overflow_counter);
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
@@ -2171,6 +2179,12 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, " done\n");
     }
   }
+  cvmfs::inode_annotation_->CheckForOverflow(
+    cvmfs::catalog_manager_->GetRevision() + 
+      cvmfs::inode_generation_info_.incarnation, 
+    cvmfs::inode_generation_info_.initial_revision, 
+    &cvmfs::inode_generation_info_.overflow_counter);
+
   return true;
 }
 
