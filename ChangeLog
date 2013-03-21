@@ -1,4 +1,11 @@
 2.1.9:
+  * Log inode generation overflows to syslog
+  * Pretty printing for 'cvmfs_config reload'
+  * Fixed selinux context for SL5 in cvmfs_server
+  * Omit autofs warnings in NFS mode
+  * Added "glue buffer" and "cwd buffer" to smoothly connect 
+    catalog reloads and reloads of the Fuse module
+  * Fix: handling of "-n" option in mount helper
   * Log application of new file system snapshots to syslog
 
 2.1.8:

@@ -259,9 +259,15 @@ void SendMsg2Socket(const int fd, const string &msg) {
 bool SwitchCredentials(const uid_t uid, const gid_t gid,
                        const bool temporarily)
 {
-  int retval;
+  LogCvmfs(kLogCvmfs, kLogDebug, "current credentials uid %d gid %d "
+           "euid %d egid %d, switching to %d %d (temp: %d)", 
+           getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
+  int retval = 0;
   if (temporarily) {
-    retval = setegid(gid) || seteuid(uid);
+    if (gid != getegid())
+      retval = setegid(gid);
+    if ((retval == 0) && (uid != geteuid()))
+      retval = seteuid(uid);
   } else {
     // If effective uid is not root, we must first gain root access back
     if ((getuid() == 0) && (getuid() != geteuid())) {
@@ -271,6 +277,8 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
     }
     retval = setgid(gid) || setuid(uid);
   }
+  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)", 
+           retval, errno); 
   return retval == 0;
 }
 
@@ -611,6 +619,15 @@ bool HasPrefix(const string &str, const string &prefix,
   }
   return true;
 }
+  
+  
+bool IsNumeric(const std::string &str) {
+  for (unsigned i = 0; i < str.length(); ++i) {
+    if ((str[i] < '0') || (str[i] > '9'))
+      return false;
+  }
+  return true;
+}
 
 
 vector<string> SplitString(const string &str,
@@ -863,7 +880,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
  * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
  */
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
-  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh");
+  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
+                       vector<string>());
 }
 
 

@@ -73,18 +73,36 @@ struct Statistics {
 };
 
 
-class InodeRevisionAnnotation : public InodeAnnotation {
+class InodeGenerationAnnotation : public InodeAnnotation {
  public:
-  InodeRevisionAnnotation(const unsigned inode_width);
-  ~InodeRevisionAnnotation() { };
-  inode_t Annotate(const inode_t raw_inode) {
-    return raw_inode | revision_annotation_;
+  InodeGenerationAnnotation(const unsigned inode_width);
+  ~InodeGenerationAnnotation() { };
+  bool ValidInode(const uint64_t inode) {
+    return (inode & generation_annotation_) == generation_annotation_;
   }
-  void SetRevision(const uint64_t new_revision);
+  inode_t Annotate(const inode_t raw_inode) {
+    return raw_inode | generation_annotation_;
+  }
+  void SetGeneration(const uint64_t new_generation);
+  void CheckForOverflow(const uint64_t new_generation, 
+                        const uint64_t initial_generation,
+                        uint32_t *overflow_counter);
 
  private:
   unsigned inode_width_;
-  uint64_t revision_annotation_;
+  uint64_t generation_annotation_;
+};
+  
+
+class AbstractCatalogManager;
+/**
+ * Here, the Cwd Buffer is registered in order to save the inodes of 
+ * processes' cwd before a new catalog snapshot is applied
+ */
+class RemountListener {
+ public:
+  virtual ~RemountListener() { }
+  virtual void BeforeRemount(AbstractCatalogManager *source) = 0;
 };
 
 
@@ -132,6 +150,18 @@ class AbstractCatalogManager {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
+  /**
+   * Don't use.  Only for the CwdBuffer.
+   */
+  bool Path2InodeUnprotected(const PathString &path, inode_t *inode);
+  
+  void SetIncarnation(const uint64_t new_incarnation);
+  void RegisterRemountListener(RemountListener *listener) {
+    WriteLock();
+    remount_listener_ = listener;
+    Unlock();
+  }
+  
   Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
@@ -205,7 +235,6 @@ class AbstractCatalogManager {
     int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
-  // inline void DowngradeLock() const {  } TODO
   virtual void EnforceSqliteMemLimit();
 
  private:
@@ -216,10 +245,13 @@ class AbstractCatalogManager {
    */
   CatalogList catalogs_;
   uint64_t inode_gauge_;  /**< highest issued inode */
+  uint64_t revision_cache_;
+  uint64_t incarnation_;  /**< counts how often the inodes have been invalidated */
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
+  RemountListener *remount_listener_;
 
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;

@@ -7,6 +7,7 @@
 
 #include <time.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include <string>
 #include <vector>
@@ -35,6 +36,9 @@ void SetMaxTTL(const unsigned value);  // in minutes
 void ResetErrorCounters();
 void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
                       lru::Statistics *md5path_stats);
+std::string PrintGlueBufferStatistics();
+std::string PrintCwdBufferStatistics();
+std::string PrintInodeGeneration();
 catalog::Statistics GetCatalogStatistics();
 std::string GetCertificateStats();
 std::string GetFsStats();
