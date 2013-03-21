@@ -4,6 +4,9 @@
 
 #include "upload_file_processor.h"
 
+#include <unistd.h>
+#include <errno.h>
+
 #include "upload_file_chunker.h"
 #include "upload_facility.h"
 
@@ -323,6 +326,7 @@ void FileProcessor::PendingFile::FinalizeProcessing() {
 void FileProcessor::PendingFile::UploadCallback(const UploaderResults &data) {
   LockGuard<PendingFile> lock(this);
 
+  // find the chunk structure for the uploaded file
   TemporaryFileChunk *chunk = NULL;
   if (bulk_chunk_.temporary_path() == data.local_path) {
     chunk = &bulk_chunk_;
@@ -332,9 +336,15 @@ void FileProcessor::PendingFile::UploadCallback(const UploaderResults &data) {
     assert (chunk_itr != file_chunks_.end());
     chunk = &chunk_itr->second;
   }
-
   assert (chunk != NULL);
 
+  // remove the temporary file for this chunk
+  if (unlink(data.local_path.c_str()) != 0 && errno != ENOENT) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to delete temporary '%s' (%d)",
+             data.local_path.c_str(), errno);
+  }
+
+  // bookkeeping for newly uploaded file
   ++chunks_uploaded_;
   if (data.return_code == 0) {
     chunk->set_upload_state(TemporaryFileChunk::kUploadSuccessful);
@@ -343,6 +353,7 @@ void FileProcessor::PendingFile::UploadCallback(const UploaderResults &data) {
     ++errors_;
   }
 
+  // check if all chunks were uploaded for this PendingFile
   CheckForCompletionAndNotify();
 }
 
