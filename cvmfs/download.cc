@@ -726,6 +726,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->error_code = kFailLocalIO;
         goto verify_and_finalize_stop;
       }
+      rewind(info->destination_file);
     }
     if (info->expected_hash)
       hash::Init(info->hash_context);
@@ -947,7 +948,7 @@ static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
 
 
 /**
- * Worker thread event loop. Waits on new JobInfo structs on a pipe.
+ * Worker thread event loop.  Waits on new JobInfo structs on a pipe.
  */
 static void *MainDownload(void *data __attribute__((unused))) {
   LogCvmfs(kLogDownload, kLogDebug, "download I/O thread started");
