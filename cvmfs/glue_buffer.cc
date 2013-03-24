@@ -355,6 +355,8 @@ vector<PathString> CwdBuffer::GatherCwds() {
   assert(retval);
   
   // Clean garbage
+  // Note: just dropping the buffer is wrong because it is unclear
+  // in which generation a cwd has been acquired
   for (std::map<uint64_t, PathString>::iterator i = inode2cwd_.begin(),
        iEnd = inode2cwd_.end(); i != iEnd; )
   {
