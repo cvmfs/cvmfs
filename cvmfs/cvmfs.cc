@@ -266,7 +266,39 @@ unsigned max_open_files_; /**< maximum allowed number of open files */
 const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
 
-
+/**
+ * Ensures that within a callback all operations take place on the same
+ * catalog revision.
+ */
+class RemountFence : public SingleCopy {
+ public:
+  RemountFence() {
+    atomic_init64(&counter_);
+    atomic_init32(&blocking_);
+  }
+  void Enter() {
+    while (atomic_read32(&blocking_)) {
+      SafeSleepMs(100);
+    }
+    atomic_inc64(&counter_);
+  }
+  void Leave() {
+    atomic_dec64(&counter_);
+  }
+  void Block() {
+    atomic_cas32(&blocking_, 0, 1);
+    while (atomic_read64(&counter_) > 0) {
+      SafeSleepMs(100);
+    }
+  }
+  void Unblock() {
+    atomic_cas32(&blocking_, 1, 0);
+  }
+ private:
+  atomic_int64 counter_;
+  atomic_int32 blocking_;
+};
+RemountFence *remount_fence_;
 
 
 unsigned GetMaxTTL() {
@@ -351,6 +383,8 @@ string PrintCwdBufferStatistics() {
 std::string PrintInodeGeneration() {
   return "init-catalog-revision: " + 
     StringifyInt(inode_generation_info_.initial_revision) + "  " +
+    "current-catalog-revision: " + 
+    StringifyInt(catalog_manager_->GetRevision()) + "  " +
     "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
     "overflow-counter: " + StringifyInt(inode_generation_info_.overflow_counter) 
     + "\n";
@@ -416,13 +450,17 @@ static void RemountFinish() {
 
   if (time(NULL) > drainout_deadline_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
-    inode_cache_->Pause();
     inode_cache_->Drop();
-    path_cache_->Pause();
     path_cache_->Drop();
-    md5path_cache_->Pause();
     md5path_cache_->Drop();
+    inode_cache_->Pause();
+    path_cache_->Pause();
+    md5path_cache_->Pause();
+
+    remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
+    remount_fence_->Unblock();
+    
     inode_annotation_->CheckForOverflow(
       catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
       inode_generation_info_.initial_revision, 
@@ -430,6 +468,7 @@ static void RemountFinish() {
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
+    
     atomic_cas32(&drainout_mode_, 1, 0);
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
         catalog_manager_->offline_mode())
@@ -483,11 +522,8 @@ static inline void AddToGlueBuffer(const catalog::DirectoryEntry &dirent) {
   
   
 static bool GetDirentForInode(const fuse_ino_t ino,
-                              catalog::DirectoryEntry *dirent,
-                              bool *volatile_inode)
+                              catalog::DirectoryEntry *dirent)
 {
-  if (volatile_inode)
-    *volatile_inode = false;
   // Lookup inode in cache
   if (inode_cache_->Lookup(ino, dirent)) {
     AddToGlueBuffer(*dirent);
@@ -555,8 +591,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
           LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
                     "inode %"PRIu64, ino, dirent->inode());
           dirent->set_inode(ino);
-          if (volatile_inode)
-            *volatile_inode = true;
+          inode_cache_->Insert(ino, *dirent);
+          path_cache_->Insert(ino, recovered_path);
+          AddToGlueBuffer(*dirent);
           return true;
         }
       }
@@ -625,8 +662,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 
   // Find out the parent path recursively and rebuild the absolute path
   catalog::DirectoryEntry dirent;
-  bool volatile_inode;
-  if (!GetDirentForInode(ino, &dirent, &volatile_inode))
+  if (!GetDirentForInode(ino, &dirent))
     return false;
 
   // Check if we reached the root node
@@ -647,8 +683,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     path->Append(dirent.name().GetChars(), dirent.name().GetLength());
   }
 
-  if (!volatile_inode)
-    path_cache_->Insert(dirent.inode(), *path);
+  path_cache_->Insert(dirent.inode(), *path);
   return true;
 }
 
@@ -664,6 +699,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   atomic_inc64(&num_fs_lookup_);
   RemountCheck();
 
+  remount_fence_->Enter();
   parent = catalog_manager_->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
@@ -680,7 +716,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
 
   // Special NFS lookups
   if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
-    if (GetDirentForInode(parent, &dirent, NULL)) {
+    if (GetDirentForInode(parent, &dirent)) {
       if (strcmp(name, ".") == 0) {
         goto reply_positive;
       } else {
@@ -688,7 +724,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
           dirent.set_inode(1);
           goto reply_positive;
         }
-        if (GetDirentForInode(dirent.parent_inode(), &dirent, NULL))
+        if (GetDirentForInode(dirent.parent_inode(), &dirent))
           goto reply_positive;
         else
           goto reply_negative;
@@ -712,12 +748,14 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   }
 
  reply_positive:
+  remount_fence_->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
   fuse_reply_entry(req, &result);
   return;
 
  reply_negative:
+  remount_fence_->Leave();
   atomic_inc64(&num_fs_lookup_negative_);
   result.ino = 0;
   fuse_reply_entry(req, &result);
@@ -733,12 +771,13 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   atomic_inc64(&num_fs_stat_);
   RemountCheck();
 
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %"PRIu64, ino);
 
   catalog::DirectoryEntry dirent;
-  bool volatile_inode;
-  const bool found = GetDirentForInode(ino, &dirent, &volatile_inode);
+  const bool found = GetDirentForInode(ino, &dirent);
+  remount_fence_->Leave();
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -747,7 +786,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   struct stat info = dirent.GetStatStructure();
 
-  fuse_reply_attr(req, &info, volatile_inode ? 0.0 : GetKcacheTimeout());
+  fuse_reply_attr(req, &info, GetKcacheTimeout());
 }
 
 
@@ -757,11 +796,13 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   atomic_inc64(&num_fs_readlink_);
 
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
 
   catalog::DirectoryEntry dirent;
-  const bool found = GetDirentForInode(ino, &dirent, NULL);
+  const bool found = GetDirentForInode(ino, &dirent);
+  remount_fence_->Leave();
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -805,25 +846,27 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
   RemountCheck();
+  
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
 
   PathString path;
   catalog::DirectoryEntry d;
-  const bool found = GetPathForInode(ino, &path) && 
-                     GetDirentForInode(ino, &d, NULL);
+  const bool found = GetPathForInode(ino, &path) &&  GetDirentForInode(ino, &d);
 
   if (!found) {
+    remount_fence_->Leave();
     fuse_reply_err(req, ENOENT);
     return;
   }
   if (!d.IsDirectory()) {
+    remount_fence_->Leave();
     fuse_reply_err(req, ENOTDIR);
     return;
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d, path %s", 
            ino, path.c_str());
-
 
   // Build listing
   DirectoryListing listing;
@@ -836,7 +879,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != catalog_manager_->GetRootInode() &&
-      GetDirentForInode(d.parent_inode(), &p, NULL))
+      GetDirentForInode(d.parent_inode(), &p))
   {
     info = p.GetStatStructure();
     AddToDirListing(req, "..", &info, &listing);
@@ -844,7 +887,10 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
-  if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
+  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog);
+  remount_fence_->Leave();
+  
+  if (!retval) {
     free(listing.buffer);
     fuse_reply_err(req, EIO);
     return;
@@ -970,6 +1016,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi)
 {
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
 
@@ -977,9 +1024,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   catalog::DirectoryEntry dirent;
   PathString path;
 
-  const bool found = GetDirentForInode(ino, &dirent, NULL) &&
+  const bool found = GetDirentForInode(ino, &dirent) && 
                      GetPathForInode(ino, &path);
-
+  remount_fence_->Leave();
+  
   if (!found) {
     if (fi->flags & O_CREAT)
       fuse_reply_err(req, EROFS);
@@ -1269,9 +1317,11 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info.f_bfree = info.f_bavail = available;
 
   // Inodes / entries
+  remount_fence_->Enter();
   info.f_files = catalog_manager_->all_inodes();
   info.f_ffree = info.f_favail =
     catalog_manager_->all_inodes() - catalog_manager_->loaded_inodes();
+  remount_fence_->Leave();
 
   fuse_reply_statfs(req, &info);
 }
@@ -1285,14 +1335,16 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                            size_t size)
 #endif
 {
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
 
   const string attr = name;
   catalog::DirectoryEntry d;
-  const bool found = GetDirentForInode(ino, &d, NULL);
-
+  const bool found = GetDirentForInode(ino, &d);
+  remount_fence_->Leave();
+  
   if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
@@ -1429,7 +1481,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
            ino, size);
 
   catalog::DirectoryEntry d;
-  const bool found = GetDirentForInode(ino, &d, NULL);
+  const bool found = GetDirentForInode(ino, &d);
   if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
@@ -1456,16 +1508,6 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
   
   
-static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) 
-{
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_forget on inode: %"PRIu64", nlookup %u",
-           ino, nlookup);
-  // TODO: remove from cwd buffer if applicable
-  fuse_reply_none(req);
-}
-
-
-
 /**
  * Do after-daemon() initialization
  */
@@ -1504,7 +1546,6 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->statfs      = cvmfs_statfs;
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
-  cvmfs_operations->forget      = cvmfs_forget;
 }
 
 }  // namespace cvmfs
@@ -1949,6 +1990,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::catalog_manager_->GetRevision();
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %"PRIu64, 
            cvmfs::catalog_manager_->GetRootInode());
+  
+  cvmfs::remount_fence_ = new cvmfs::RemountFence();
 
   return loader::kFailOk;
 }
@@ -2021,6 +2064,7 @@ static void Fini() {
   if (g_peers_ready) peers::Fini();
   if (g_options_ready) options::Fini();
 
+  delete cvmfs::remount_fence_;
   delete cvmfs::catalog_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
@@ -2031,6 +2075,7 @@ static void Fini() {
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
+  cvmfs::remount_fence_ = NULL;
   cvmfs::catalog_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;

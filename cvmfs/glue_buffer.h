@@ -1,14 +1,19 @@
 /**
  * This file is part of the CernVM File System.
  *
- * The snapshot glue buffer is a data structure providing fast writes and
- * slow reads.  It is used to connect to consequtively loaded file system
- * snapshots: the previous snapshots' inodes are stored in the glue buffer
- * and a full path can be constructed from the data in the glue buffer.  This
- * full path can be looked up in the new file system snapshot.
+ * This module provides three data structures to save "active inodes".
+ * These are inodes with a reference counter > 0 in the VFS layer, which
+ * can be asked for even if the caches are drained.  Such inodes must be
+ * kept in buffers during a catalog reload and a reload of the fuse module,
+ * since in these cases the inode generation changes and all current inodes
+ * become invalid.
  *
- * Note: the read-write lock has reversed meaning.  Many concurrent writers are
- * allowed but only serialized reading is permitted.
+ * The glue buffer saves inodes of "lookup chains" that happen to be cut
+ * by a reload (i.e. stat() calls from user land perspective).
+ * The cwd buffer saves all current directories of processes on the cvmfs
+ * mount point.
+ * The active inode buffer saves inodes from directories that are held open
+ * (opendir) or that contain currently open files.
  */
 
 #include <stdint.h>
@@ -34,6 +39,15 @@ namespace catalog {
 
 
 class CwdBuffer;
+/* The snapshot glue buffer is a data structure providing fast writes and
+ * slow reads.  It is used to connect to consequtively loaded file system
+ * snapshots: the previous snapshots' inodes are stored in the glue buffer
+ * and a full path can be constructed from the data in the glue buffer.  This
+ * full path can be looked up in the new file system snapshot.
+ *
+ * Note: the read-write lock has reversed meaning.  Many concurrent writers are
+ * allowed but only serialized reading is permitted.
+ */
 class GlueBuffer {
  public:
   struct Statistics {
@@ -211,6 +225,13 @@ class CwdRemountListener : public catalog::RemountListener {
   }
  private:
   CwdBuffer *cwd_buffer_;
+};
+
+
+class ActiveInodeBuffer {
+ public:
+ private:
+  pthread_mutex_t *lock_;
 };
 
 #endif  // CVMFS_GLUE_BUFFER_H_

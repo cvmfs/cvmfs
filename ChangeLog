@@ -1,4 +1,7 @@
 2.1.9:
+  * Added "remount fence" in order to ensure consistent
+    catalog operations
+  * Fix: Rewind file descriptor on download retries
   * Log inode generation overflows to syslog
   * Pretty printing for 'cvmfs_config reload'
   * Fixed selinux context for SL5 in cvmfs_server

@@ -501,13 +501,13 @@ static int Fetch(const hash::Any &checksum,
     if ((platform_fstat(fileno(f), &stat_info) != 0) ||
         (stat_info.st_size != (int64_t)size))
     {
-      LogCvmfs(kLogCache, kLogSyslog,
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
                "size check failure for %s, expected %lu, got %ld",
                url.c_str(), size, stat_info.st_size);
-      if (CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
-                        checksum.ToString()) != 0)
+      if (!CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
+                         checksum.ToString()))
       {
-        LogCvmfs(kLogCache, kLogSyslog,
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
                  "failed to move %s to quarantaine", temp_path.c_str());
       }
       result = -EIO;

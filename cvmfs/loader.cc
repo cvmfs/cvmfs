@@ -649,14 +649,17 @@ int main(int argc, char *argv[]) {
     struct rlimit rpl;
     memset(&rpl, 0, sizeof(rpl));
     getrlimit(RLIMIT_NOFILE, &rpl);
-    if (rpl.rlim_max < nfiles)
-      rpl.rlim_max = nfiles;
-    rpl.rlim_cur = nfiles;
-    retval = setrlimit(RLIMIT_NOFILE, &rpl);
-    if (retval != 0) {
-      PrintError("Failed to set maximum number of open files, "
-                 "insufficient permissions");
-      return kFailPermission;
+    if (rpl.rlim_cur < nfiles) {
+      if (rpl.rlim_max < nfiles)
+        rpl.rlim_max = nfiles;
+      rpl.rlim_cur = nfiles;
+      retval = setrlimit(RLIMIT_NOFILE, &rpl);
+      if (retval != 0) {
+        PrintError("Failed to set maximum number of open files, "
+                   "insufficient permissions");
+        // TODO detect valgrind and don't fail
+        return kFailPermission;
+      }
     }
   }
 
