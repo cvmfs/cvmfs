@@ -1113,7 +1113,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
+      fi->keep_cache = 1;//kcache_timeout_ == 0.0 ? 0 : 1;
       /*if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "file might be new or changed, invalidating cache (%d %d %d)",
@@ -2213,6 +2213,14 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_inode_generation->state = saved_inode_generation;
   saved_states->push_back(state_inode_generation);  
 
+  msg_progress = "Saving open files counter\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  uint32_t *saved_num_fd = new uint32_t(cvmfs::open_files_);
+  loader::SavedState *state_num_fd = new loader::SavedState();
+  state_num_fd->state_id = loader::kStateOpenFilesCounter;
+  state_num_fd->state = saved_num_fd;
+  saved_states->push_back(state_num_fd);    
+  
   return true;
 }
 
@@ -2227,7 +2235,8 @@ static bool RestoreState(const int fd_progress,
       cvmfs::DirectoryHandles *saved_handles =
         (cvmfs::DirectoryHandles *)saved_states[i]->state;
       cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
-
+      cvmfs::open_dirs_ = cvmfs::directory_handles_->size();
+      
       SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
     }
@@ -2279,6 +2288,12 @@ static bool RestoreState(const int fd_progress,
       cvmfs::catalog_manager_->SetIncarnation(incarnation);
       SendMsg2Socket(fd_progress, " done\n");
     }
+    
+    if (saved_states[i]->state_id == loader::kStateOpenFilesCounter) {
+      SendMsg2Socket(fd_progress, "Restoring open files counter... ");
+      cvmfs::open_files_ = *((uint32_t *)saved_states[i]->state);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
   }
   cvmfs::inode_annotation_->CheckForOverflow(
     cvmfs::catalog_manager_->GetRevision() + 
@@ -2315,6 +2330,10 @@ static void FreeSavedState(const int fd_progress,
         SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");
         delete static_cast<cvmfs::InodeGenerationInfo *>(saved_states[i]->state);
         break;
+      case loader::kStateOpenFilesCounter:
+        SendMsg2Socket(fd_progress, "Releasing open files counter\n");
+        delete static_cast<uint32_t *>(saved_states[i]->state);
+        break;        
       default:
         break;
     }
