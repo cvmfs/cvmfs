@@ -19,6 +19,8 @@
 #include <map>
 #include <vector>
 
+#include "MurmurHash2.h"
+
 #include "platform.h"
 #include "hash.h"
 #include "shortstring.h"
@@ -108,6 +110,19 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::map<int, int> &map_fildes);
 
 void SafeSleepMs(const unsigned ms);
+  
+
+template <typename hashed_type>
+struct hash_murmur {
+  size_t operator() (const hashed_type key) const {
+#ifdef __x86_64__
+    return MurmurHash64A(&key, sizeof(key), 0x9ce603115bba659bLLU);
+#else
+    return MurmurHash2(&key, sizeof(key), 0x07387a4f);
+#endif
+  }
+};
+  
 
 /**
  * Generic base class to mark an inheriting class as 'non-copyable'

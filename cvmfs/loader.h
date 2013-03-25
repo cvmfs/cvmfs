@@ -50,6 +50,7 @@ enum StateId {
   kStateOpenFiles,
   kStateGlueBuffer,
   kStateCwdBuffer,
+  kStateActiveInodes,
   kStateInodeGeneration,
 };
 

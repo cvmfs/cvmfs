@@ -25,10 +25,13 @@
 #include <map>
 #include <vector>
 
+#include <google/sparse_hash_map>
+
 #include "shortstring.h"
 #include "atomic.h"
 #include "dirent.h"
 #include "catalog_mgr.h"
+#include "util.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
@@ -39,6 +42,7 @@ namespace catalog {
 
 
 class CwdBuffer;
+class ActiveInodesBuffer;
 /* The snapshot glue buffer is a data structure providing fast writes and
  * slow reads.  It is used to connect to consequtively loaded file system
  * snapshots: the previous snapshots' inodes are stored in the glue buffer
@@ -55,22 +59,28 @@ class GlueBuffer {
       atomic_init64(&num_ancient_hits);
       atomic_init64(&num_ancient_misses);
       atomic_init64(&num_busywait_cycles);
-      atomic_init64(&num_jump_hits);
-      atomic_init64(&num_jump_misses);
+      atomic_init64(&num_jmpcwd_hits);
+      atomic_init64(&num_jmpcwd_misses);
+      atomic_init64(&num_jmpai_hits);
+      atomic_init64(&num_jmpai_misses);
     }
     std::string Print() {
       return 
-        "ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
-        "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses)) +
-        "  cwd-jump(hits): " + StringifyInt(atomic_read64(&num_jump_hits)) +
-        "  cwd-jump(misses): " + StringifyInt(atomic_read64(&num_jump_misses)) +
-        "  busy-wait-cycles: " + StringifyInt(atomic_read64(&num_busywait_cycles));
+        "hits: " + StringifyInt(atomic_read64(&num_ancient_hits)) +
+        "  misses: " + StringifyInt(atomic_read64(&num_ancient_misses)) +
+        "  cwd-jmp(hits): " + StringifyInt(atomic_read64(&num_jmpcwd_hits)) +
+        "  cwd-jmp(misses): " + StringifyInt(atomic_read64(&num_jmpcwd_misses)) +
+        "  ai-jmp(hits): " + StringifyInt(atomic_read64(&num_jmpai_hits)) +
+        "  ai-jmp(misses): " + StringifyInt(atomic_read64(&num_jmpai_misses)) +
+        "  busy-waits: " + StringifyInt(atomic_read64(&num_busywait_cycles));
     }
     atomic_int64 num_ancient_hits;
     atomic_int64 num_ancient_misses;
     atomic_int64 num_busywait_cycles;
-    atomic_int64 num_jump_hits;
-    atomic_int64 num_jump_misses;
+    atomic_int64 num_jmpcwd_hits;
+    atomic_int64 num_jmpcwd_misses;
+    atomic_int64 num_jmpai_hits;
+    atomic_int64 num_jmpai_misses;
   };
   uint64_t GetNumInserts() { return atomic_read64(&buffer_pos_); }
   unsigned GetNumEntries() { return size_; }
@@ -83,6 +93,9 @@ class GlueBuffer {
   ~GlueBuffer();
   void Resize(const unsigned new_size);
   void SetCwdBuffer(CwdBuffer *cwd_buffer) { cwd_buffer_ = cwd_buffer; }
+  void SetActiveInodesBuffer(ActiveInodesBuffer *active_inodes) { 
+    active_inodes_ = active_inodes; 
+  }
   
   inline void Add(const uint64_t inode, const uint64_t parent_inode, 
                   const uint32_t generation, const NameString &name)
@@ -109,9 +122,8 @@ class GlueBuffer {
         dirent.name());
   }
   
-  bool AncientInode2Path(const uint64_t inode, 
-                         const uint32_t current_generation,
-                         PathString *path);
+  bool Find(const uint64_t inode,  const uint32_t current_generation,
+            PathString *path);
   
  private:
   static const unsigned kVersion = 1;
@@ -151,6 +163,7 @@ class GlueBuffer {
   unsigned version_;
   // If reconstructing fails, there might be a hit in the cwd buffer
   CwdBuffer *cwd_buffer_;
+  ActiveInodesBuffer *active_inodes_;
   Statistics statistics_;
 };
 
@@ -182,7 +195,7 @@ class CwdBuffer {
   };
   Statistics GetStatistics() { return statistics_; }
   
-  explicit CwdBuffer(const std::string mountpoint);
+  explicit CwdBuffer(const std::string &mountpoint);
   explicit CwdBuffer(const CwdBuffer &other);
   CwdBuffer &operator= (const CwdBuffer &other);
   ~CwdBuffer();
@@ -215,23 +228,113 @@ class CwdBuffer {
 };
 
 
-class CwdRemountListener : public catalog::RemountListener {
+/**
+ * Stores reference counters to active inodes (open directories and 
+ * directories of open files).
+ * At a certain point in time (before reloads), the set of active inodes can be 
+ * transformed into an inode --> path map by MaterializePaths().
+ */
+class ActiveInodesBuffer {
  public:
-  explicit CwdRemountListener(CwdBuffer *cwd_buffer) {
-    cwd_buffer_ = cwd_buffer;
-  }
-  void BeforeRemount(catalog::AbstractCatalogManager *source) {
-    cwd_buffer_->BeforeRemount(source);
-  }
+  struct Statistics {
+    Statistics() {
+      atomic_init64(&num_inserts);
+      atomic_init64(&num_removes);
+      atomic_init64(&num_references);
+      atomic_init64(&num_ancient_hits);
+      atomic_init64(&num_ancient_misses);
+      atomic_init64(&num_dirent_lookups);
+    }
+    std::string Print() {
+      return 
+      "inserts: " + StringifyInt(atomic_read64(&num_inserts)) +
+      "  removes: " + StringifyInt(atomic_read64(&num_removes)) +
+      "  references: " + StringifyInt(atomic_read64(&num_references)) +
+      "  dirent-lookups: " + StringifyInt(atomic_read64(&num_dirent_lookups)) +
+      "  ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
+      "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses));
+    }
+    atomic_int64 num_inserts;
+    atomic_int64 num_removes;
+    atomic_int64 num_references;
+    atomic_int64 num_ancient_hits;
+    atomic_int64 num_ancient_misses;
+    atomic_int64 num_dirent_lookups;
+  };
+  Statistics GetStatistics() { return statistics_; }
+  
+  ActiveInodesBuffer();
+  explicit ActiveInodesBuffer(const ActiveInodesBuffer &other);
+  ActiveInodesBuffer &operator= (const ActiveInodesBuffer &other);
+  ~ActiveInodesBuffer();
+  
+  void VfsGet(const uint64_t inode);
+  void VfsPut(const uint64_t inode);
+  void MaterializePaths(catalog::AbstractCatalogManager *source);
+  bool Find(const uint64_t inode, PathString *path);
+  
  private:
-  CwdBuffer *cwd_buffer_;
+  static const unsigned kVersion = 1;
+  struct MinimalDirent {
+    MinimalDirent() { parent_inode = 0; }
+    MinimalDirent(const uint64_t p, const NameString &n) { 
+      parent_inode = p; 
+      name = n;
+    }
+    uint64_t parent_inode;
+    NameString name;
+  };
+  typedef google::sparse_hash_map<uint64_t, uint32_t, hash_murmur<uint64_t> >
+          InodeReferences;
+  typedef google::sparse_hash_map<uint64_t, MinimalDirent, 
+                                  hash_murmur<uint64_t> >
+          PathMap;
+  
+  void InitLocks();
+  void InitSpecialInodes();
+  void CopyFrom(const ActiveInodesBuffer &other);
+  inline void LockInodes() const {
+    int retval = pthread_mutex_lock(lock_inodes_);
+    assert(retval == 0);
+  }
+  inline void UnlockInodes() const {
+    int retval = pthread_mutex_unlock(lock_inodes_);
+    assert(retval == 0);
+  }
+  inline void LockPaths() const {
+    int retval = pthread_mutex_lock(lock_paths_);
+    assert(retval == 0);
+  }
+  inline void UnlockPaths() const {
+    int retval = pthread_mutex_unlock(lock_paths_);
+    assert(retval == 0);
+  }
+  bool ConstructPath(const uint64_t inode, PathString *path);
+  
+  unsigned version_; 
+  pthread_mutex_t *lock_inodes_;
+  pthread_mutex_t *lock_paths_;
+  PathMap *inode2path_;
+  InodeReferences inode_references_;
+  Statistics statistics_;
 };
 
 
-class ActiveInodeBuffer {
- public:
- private:
-  pthread_mutex_t *lock_;
+class GlueRemountListener : public catalog::RemountListener {
+public:
+  GlueRemountListener(CwdBuffer *cwd_buffer, 
+                      ActiveInodesBuffer *active_inodes) 
+  {
+    cwd_buffer_ = cwd_buffer;
+    active_inodes_ = active_inodes;
+  }
+  void BeforeRemount(catalog::AbstractCatalogManager *source) {
+    cwd_buffer_->BeforeRemount(source);
+    active_inodes_->MaterializePaths(source);
+  }
+private:
+  CwdBuffer *cwd_buffer_;
+  ActiveInodesBuffer *active_inodes_;
 };
 
 #endif  // CVMFS_GLUE_BUFFER_H_

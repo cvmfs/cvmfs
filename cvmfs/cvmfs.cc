@@ -48,7 +48,6 @@
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
 #include <google/dense_hash_map>
-#include "MurmurHash2.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -215,7 +214,8 @@ lru::Md5PathCache *md5path_cache_ = NULL;
 uint32_t glue_buffer_size_ = kDefaultGlueBufferSize;
 GlueBuffer *glue_buffer_ = NULL;
 CwdBuffer *cwd_buffer_ = NULL;
-CwdRemountListener *cwd_remount_listener_ = NULL;
+ActiveInodesBuffer *active_inodes_ = NULL;
+GlueRemountListener *glue_remount_listener_ = NULL;
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
 
@@ -229,25 +229,15 @@ atomic_int32 reload_critical_section_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
-template <typename hashed_type>
-struct hash_handle {
-  size_t operator() (const hashed_type handle) const {
-#ifdef __x86_64__
-    return MurmurHash64A(&handle, sizeof(handle), 0x9ce603115bba659bLLU);
-#else
-    return MurmurHash2(&handle, sizeof(handle), 0x07387a4f);
-#endif
-  }
-};
 typedef google::dense_hash_map<uint64_t, DirectoryListing,
-                               hash_handle<uint64_t> >
+                               hash_murmur<uint64_t> >
         DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
 typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks,
-                               hash_handle<fuse_ino_t> >
+                               hash_murmur<fuse_ino_t> >
         LiveFileChunksMap;
 LiveFileChunksMap *live_file_chunks_ = NULL;
 pthread_rwlock_t live_file_chunks_mutex_ = PTHREAD_RWLOCK_INITIALIZER;
@@ -368,15 +358,21 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
   
 
 string PrintGlueBufferStatistics() {
-  return "entries: " + StringifyInt(glue_buffer_->GetNumEntries()) + "  " +
+  return "glue buffer: "
+    "entries: " + StringifyInt(glue_buffer_->GetNumEntries()) + "  " +
     "allocated: " + StringifyInt(glue_buffer_->GetNumBytes() / 1024) + "kB  " +
     "inserts: " + StringifyInt(glue_buffer_->GetNumInserts()) + "  " +
     glue_buffer_->GetStatistics().Print() + "\n";
 }
-
+  
   
 string PrintCwdBufferStatistics() {
   return cwd_buffer_->GetStatistics().Print() + "\n";
+}
+  
+
+string PrintActiveInodesBufferStatistics() {
+  return active_inodes_->GetStatistics().Print() + "\n";
 }
 
   
@@ -450,21 +446,24 @@ static void RemountFinish() {
 
   if (time(NULL) > drainout_deadline_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
+    
+    // No new inserts into caches
+    inode_cache_->Pause();
+    path_cache_->Pause();
+    md5path_cache_->Pause();    
     inode_cache_->Drop();
     path_cache_->Drop();
     md5path_cache_->Drop();
-    inode_cache_->Pause();
-    path_cache_->Pause();
-    md5path_cache_->Pause();
-
+  
+    // Ensure that all Fuse callbacks left the catalog query code
     remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
-    remount_fence_->Unblock();
-    
     inode_annotation_->CheckForOverflow(
       catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
       inode_generation_info_.initial_revision, 
       &inode_generation_info_.overflow_counter);
+    remount_fence_->Unblock();
+    
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
@@ -568,15 +567,20 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     if (inode_annotation_ && !inode_annotation_->ValidInode(ino)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "lookup for ancient inode %"PRIu64, ino);
       PathString recovered_path;
-      bool found = cwd_buffer_->Find(ino, &recovered_path);
+      bool found = active_inodes_->Find(ino, &recovered_path);
       if (found) {
-        LogCvmfs(kLogCvmfs, kLogDebug, "found path %s in cwd buffer for "
-                 "ancient inode %"PRIu64, recovered_path.c_str(), ino);
+        LogCvmfs(kLogCvmfs, kLogDebug, "found path %s in active inodes buffer "
+                 "for ancient inode %"PRIu64, recovered_path.c_str(), ino);
       } else {
-        uint32_t generation = 
-          catalog_manager_->GetRevision() + inode_generation_info_.incarnation;
-        found = glue_buffer_->AncientInode2Path(ino, generation, 
-                                                &recovered_path);
+        found = cwd_buffer_->Find(ino, &recovered_path);
+        if (found) {
+          LogCvmfs(kLogCvmfs, kLogDebug, "found path %s in cwd buffer for "
+                   "ancient inode %"PRIu64, recovered_path.c_str(), ino);
+        } else {
+          uint32_t generation = 
+            catalog_manager_->GetRevision() + inode_generation_info_.incarnation;
+          found = glue_buffer_->Find(ino, generation, &recovered_path);
+        }
       }
       if (!found) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "internal error: " 
@@ -867,6 +871,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d, path %s", 
            ino, path.c_str());
+  active_inodes_->VfsGet(ino);
 
   // Build listing
   DirectoryListing listing;
@@ -941,8 +946,10 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
                              struct fuse_file_info *fi)
 {
+  ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %d, handle %d",
-           catalog_manager_->MangleInode(ino), fi->fh);
+           ino, fi->fh);
+  active_inodes_->VfsPut(ino);
 
   int reply = 0;
 
@@ -1016,6 +1023,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi)
 {
+  // TODO active inode buffer inside fence
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
@@ -1026,27 +1034,32 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   const bool found = GetDirentForInode(ino, &dirent) && 
                      GetPathForInode(ino, &path);
-  remount_fence_->Leave();
-  
+    
   if (!found) {
+    remount_fence_->Leave();
     if (fi->flags & O_CREAT)
       fuse_reply_err(req, EROFS);
     else
       fuse_reply_err(req, ENOENT);
     return;
   }
+  active_inodes_->VfsGet(ino);
+  remount_fence_->Leave();
 
   if ((fi->flags & 3) != O_RDONLY) {
+    active_inodes_->VfsPut(ino);
     fuse_reply_err(req, EROFS);
     return;
   }
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
+    active_inodes_->VfsPut(ino);
     fuse_reply_err(req, EOPNOTSUPP);
     return;
   }
 #endif
   if (fi->flags & O_EXCL) {
+    active_inodes_->VfsPut(ino);
     fuse_reply_err(req, EEXIST);
     return;
   }
@@ -1066,6 +1079,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                       "chunks found in the catalog %s.",
                path.c_str(),
                dirent.catalog()->path().c_str());
+      active_inodes_->VfsPut(ino);
       fuse_reply_err(req, EIO);
       return;
     }
@@ -1117,17 +1131,21 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     } else {
       if (close(fd) == 0) atomic_dec32(&open_files_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
+      active_inodes_->VfsPut(ino);
       fuse_reply_err(req, EMFILE);
       return;
     }
-  } else {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "failed to open inode: %d, CAS key %s, error code %d",
-             ino, dirent.checksum().ToString().c_str(), errno);
-    if (errno == EMFILE) {
-      fuse_reply_err(req, EMFILE);
-      return;
-    }
+    assert(false);
+  } 
+  
+  // fd < 0
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+           "failed to open inode: %d, CAS key %s, error code %d",
+           ino, dirent.checksum().ToString().c_str(), errno);
+  active_inodes_->VfsPut(ino);
+  if (errno == EMFILE) {
+    fuse_reply_err(req, EMFILE);
+    return;
   }
 
   // Prevent Squid DoS
@@ -1261,8 +1279,9 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d",
-           catalog_manager_->MangleInode(ino));
+  ino = catalog_manager_->MangleInode(ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d", ino);
+  active_inodes_->VfsPut(ino);
 
   const int64_t fd = fi->fh;
 
@@ -1749,10 +1768,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
   cvmfs::glue_buffer_ = new GlueBuffer(cvmfs::glue_buffer_size_);
   cvmfs::cwd_buffer_ = new CwdBuffer(*cvmfs::mountpoint_);
+  cvmfs::active_inodes_ = new ActiveInodesBuffer();
   cvmfs::glue_buffer_->SetCwdBuffer(cvmfs::cwd_buffer_);
-  cvmfs::cwd_remount_listener_ = new CwdRemountListener(cvmfs::cwd_buffer_);
+  cvmfs::glue_buffer_->SetActiveInodesBuffer(cvmfs::active_inodes_);
+  cvmfs::glue_remount_listener_ = 
+    new GlueRemountListener(cvmfs::cwd_buffer_, cvmfs::active_inodes_);
 
-  // TODO: in loader
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
@@ -1974,7 +1995,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
-  cvmfs::catalog_manager_->RegisterRemountListener(cvmfs::cwd_remount_listener_);  
+  cvmfs::catalog_manager_->RegisterRemountListener(cvmfs::glue_remount_listener_);  
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
@@ -2071,7 +2092,8 @@ static void Fini() {
   delete cvmfs::live_file_chunks_;
   delete cvmfs::glue_buffer_;
   delete cvmfs::cwd_buffer_;
-  delete cvmfs::cwd_remount_listener_;
+  delete cvmfs::active_inodes_;
+  delete cvmfs::glue_remount_listener_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
@@ -2082,7 +2104,8 @@ static void Fini() {
   cvmfs::live_file_chunks_ = NULL;
   cvmfs::glue_buffer_ = NULL;
   cvmfs::cwd_buffer_ = NULL;
-  cvmfs::cwd_remount_listener_ = NULL;
+  cvmfs::active_inodes_ = NULL;
+  cvmfs::glue_remount_listener_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
@@ -2164,6 +2187,16 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_cwd_buffer->state = saved_cwd_buffer;
   saved_states->push_back(state_cwd_buffer);
   
+  msg_progress = "Saving active inodes buffer\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  cvmfs::active_inodes_->MaterializePaths(cvmfs::catalog_manager_);
+  ActiveInodesBuffer *saved_active_inodes = 
+    new ActiveInodesBuffer(*cvmfs::active_inodes_);
+  loader::SavedState *state_active_inodes = new loader::SavedState();
+  state_active_inodes->state_id = loader::kStateActiveInodes;
+  state_active_inodes->state = saved_active_inodes;
+  saved_states->push_back(state_active_inodes);  
+  
   msg_progress = "Saving inode generation\n";
   SendMsg2Socket(fd_progress, msg_progress);
   cvmfs::InodeGenerationInfo *saved_inode_generation = 
@@ -2204,14 +2237,30 @@ static bool RestoreState(const int fd_progress,
     
     if (saved_states[i]->state_id == loader::kStateCwdBuffer) {
       SendMsg2Socket(fd_progress, "Restoring cwd buffer... ");
-      delete cvmfs::cwd_remount_listener_;
+      delete cvmfs::glue_remount_listener_;
       delete cvmfs::cwd_buffer_;
       CwdBuffer *saved_cwd_buffer = (CwdBuffer *)saved_states[i]->state;
       cvmfs::cwd_buffer_ = new CwdBuffer(*saved_cwd_buffer);
       cvmfs::glue_buffer_->SetCwdBuffer(cvmfs::cwd_buffer_);
-      cvmfs::cwd_remount_listener_ = new CwdRemountListener(cvmfs::cwd_buffer_);
+      cvmfs::glue_remount_listener_ = 
+        new GlueRemountListener(cvmfs::cwd_buffer_, cvmfs::active_inodes_);
       cvmfs::catalog_manager_->RegisterRemountListener(
-        cvmfs::cwd_remount_listener_);
+        cvmfs::glue_remount_listener_);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+    
+    if (saved_states[i]->state_id == loader::kStateActiveInodes) {
+      SendMsg2Socket(fd_progress, "Restoring active inodes buffer... ");
+      delete cvmfs::glue_remount_listener_;
+      delete cvmfs::active_inodes_;
+      ActiveInodesBuffer *saved_active_inodes = 
+        (ActiveInodesBuffer *)saved_states[i]->state;
+      cvmfs::active_inodes_ = new ActiveInodesBuffer(*saved_active_inodes);
+      cvmfs::glue_buffer_->SetActiveInodesBuffer(cvmfs::active_inodes_);
+      cvmfs::glue_remount_listener_ = 
+      new GlueRemountListener(cvmfs::cwd_buffer_, cvmfs::active_inodes_);
+      cvmfs::catalog_manager_->RegisterRemountListener(
+        cvmfs::glue_remount_listener_);
       SendMsg2Socket(fd_progress, " done\n");
     }
     
@@ -2250,6 +2299,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateCwdBuffer:
         SendMsg2Socket(fd_progress, "Releasing saved cwd buffer\n");
         delete static_cast<CwdBuffer *>(saved_states[i]->state);
+        break;
+      case loader::kStateActiveInodes:
+        SendMsg2Socket(fd_progress, "Releasing saved active inodes buffer\n");
+        delete static_cast<ActiveInodesBuffer *>(saved_states[i]->state);
         break;
       case loader::kStateInodeGeneration:
         SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");

@@ -306,8 +306,10 @@ static void *MainTalk(void *data __attribute__((unused))) {
         
         result += string("  glue buffer:   ") + 
                   cvmfs::PrintGlueBufferStatistics();
-        result += string("  cwd buffer:    ") +  
-          cvmfs::PrintCwdBufferStatistics();
+        result += string("  cwd buffer:    ") + 
+                  cvmfs::PrintCwdBufferStatistics();
+        result += string("  inodes buffer: ") + 
+                  cvmfs::PrintActiveInodesBufferStatistics();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
         result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();

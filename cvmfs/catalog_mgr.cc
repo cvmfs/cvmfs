@@ -167,6 +167,26 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
 }
 
 
+Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
+  Catalog *result = NULL;
+  const inode_t raw_inode =
+    inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
+  for (CatalogList::const_iterator i = catalogs_.begin(),
+       iEnd = catalogs_.end(); i != iEnd; ++i)
+  {
+    if ((*i)->inode_range().ContainsInode(raw_inode)) {
+      result = *i;
+      break;
+    }
+  }
+  if (result == NULL) {
+    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %"PRIu64" "
+             "(raw inode: %"PRIu64")", inode, raw_inode);
+  }
+  return result;
+}
+
+  
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param inode the inode to find in the catalogs
@@ -189,22 +209,9 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
   }
 
   // Get corresponding catalog
-  Catalog *catalog = NULL;
-  const inode_t raw_inode =
-    inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
-  for (CatalogList::const_iterator i = catalogs_.begin(),
-       iEnd = catalogs_.end(); i != iEnd; ++i)
-  {
-    if ((*i)->inode_range().ContainsInode(raw_inode)) {
-      catalog = *i;
-      break;
-    }
-  }
-  if (catalog == NULL) {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %"PRIu64" "
-             "(raw inode: %"PRIu64")", inode, raw_inode);
+  Catalog *catalog = Inode2Catalog(inode);
+  if (catalog == NULL)
     goto lookup_inode_fini;
-  }
 
   if ((options == kLookupSole) || (inode == GetRootInode())) {
     atomic_inc64(&statistics_.num_lookup_inode);
@@ -357,7 +364,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   
   
 /**
- * Don't use.  Only for the CwdBuffer.
+ * Don't use.  Only for the glue buffers.
  */
 bool AbstractCatalogManager::Path2InodeUnprotected(const PathString &path, 
                                                    inode_t *inode)
@@ -383,6 +390,64 @@ bool AbstractCatalogManager::Path2InodeUnprotected(const PathString &path,
            path.c_str(), best_fit->path().c_str());
   *inode = dirent.inode();
   return true;
+}
+  
+  
+/**
+ * Don't use.  Only for the glue buffers.
+ */  
+bool AbstractCatalogManager::Inode2DirentUnprotected(const inode_t inode, 
+                                                     DirectoryEntry *dirent)
+{
+  EnforceSqliteMemLimit();
+  
+  // Don't lookup ancient inodes
+  if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
+    Unlock();
+    return false;
+  }
+  
+  // Get corresponding catalog
+  Catalog *catalog = Inode2Catalog(inode);
+  if (catalog == NULL)
+    return false;
+  
+  bool found;
+  if (inode == GetRootInode()) {
+    atomic_inc64(&statistics_.num_lookup_inode);
+    found = catalog->LookupInode(inode, dirent, NULL);
+    return found;
+  } else {
+    atomic_inc64(&statistics_.num_lookup_inode);
+    // Lookup including parent entry
+    hash::Md5 parent_md5path;
+    DirectoryEntry parent;
+    bool found_parent = false;
+    
+    found = catalog->LookupInode(inode, dirent, &parent_md5path);
+    if (!found)
+      return false;
+    
+    // Parent is possibly in the parent catalog
+    atomic_inc64(&statistics_.num_lookup_path);
+    if (dirent->IsNestedCatalogRoot() && !catalog->IsRoot()) {
+      Catalog *parent_catalog = catalog->parent();
+      found_parent = parent_catalog->LookupMd5Path(parent_md5path, &parent);
+    } else {
+      found_parent = catalog->LookupMd5Path(parent_md5path, &parent);
+    }
+    
+    // If there is no parent entry, it might be data corruption
+    if (!found_parent) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+               "cannot find parent entry for inode %"PRIu64" --> data corrupt?",
+               inode);
+      return false;
+    }
+      
+    dirent->set_parent_inode(parent.inode());
+    return true;
+  }
 }
 
 

@@ -209,6 +209,8 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   retval = signature::VerifyLetter(ensemble->raw_manifest_buf,
                                    ensemble->raw_manifest_size, false);
   if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "failed to verify repository manifest");
     result = kFailBadSignature;
     goto cleanup;
   }
@@ -225,12 +227,16 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   retval = signature::VerifyLetter(ensemble->whitelist_buf,
                                    ensemble->whitelist_size, true);
   if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "failed to verify repository whitelist");
     result = kFailBadWhitelist;
     goto cleanup;
   }
   retval = VerifyWhitelist(ensemble->whitelist_buf, ensemble->whitelist_size,
                            repository_name);
   if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "failed to verify repository certificate against whitelist");
     result = kFailBadWhitelist;
     goto cleanup;
   }
