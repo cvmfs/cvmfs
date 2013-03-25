@@ -1,0 +1,57 @@
+
+cvmfs_test_name="Path Traversal while Catalog Reloading"
+
+reload_catalogs() {
+  while true; do
+    sudo cvmfs_config reload sft.cern.ch
+    sleep 15
+  done
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  # process IDs of concurrent processes
+  local find_cmd_1
+  local find_cmd_2
+  local reload_cmd
+
+  # mount sft repository
+  cvmfs_mount sft.cern.ch || return 1
+
+  # decrease the kernel cache timeout to safe some time
+  sudo sh -c "echo \"CVMFS_KCACHE_TIMEOUT=5\" >> /etc/cvmfs/default.local" || return 3
+  sudo cvmfs_config umount >> $logfile 2>&1 || return 4
+  sudo cvmfs_config probe  >> $logfile 2>&1 || return 5
+
+  # do some concurrent find calls
+  find /cvmfs/sft.cern.ch > /tmp/find1 2>>$logfile &
+  find_cmd_1=$!
+  find /cvmfs/sft.cern.ch > /tmp/find2 2>>$logfile &
+  find_cmd_2=$!
+
+  # reload the catalog every now and than
+  reload_catalogs >> $logfile 2>&1 &
+  reload_cmd=$!
+
+  # always kill the detached processes
+  trap "kill -9 $find_cmd_1 $find_cmd_2 $reload_cmd > /dev/null 2>&1; exit" SIGHUP SIGINT SIGTERM
+
+  # wait for the find calls to succeed
+  wait $find_cmd_1
+  if [ $? -ne 0 ]; then
+    kill -9 $reload_cmd
+    return 6
+  fi
+  wait $find_cmd_2
+  if [ $? -ne 0 ]; then
+    kill -9 $reload_cmd
+    return 6
+  fi
+
+  # stop the reload cycle, it seemed to work fine...
+  kill -9 $reload_cmd
+
+  return 0
+}
+

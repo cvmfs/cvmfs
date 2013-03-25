@@ -26,7 +26,7 @@ cvmfs_run_test() {
     return 4
   fi
 
-  check_memory sft.cern.ch 50000 || return 5 
+  check_memory sft.cern.ch 50000 >> $logfile || return 5 
 
   return 0
 }

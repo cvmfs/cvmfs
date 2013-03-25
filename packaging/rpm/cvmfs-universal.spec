@@ -13,7 +13,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.7
+Version: 2.1.9
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -29,6 +29,7 @@ BuildRequires: cmake
 BuildRequires: fuse-devel
 BuildRequires: pkgconfig
 BuildRequires: openssl-devel
+BuildRequires: libattr-devel
 %{?el5:BuildRequires: buildsys-macros}
 
 Requires: bash
@@ -287,6 +288,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Mon Feb 18 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
+- Added libattr-devel as a build requirement
 * Tue Feb 12 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
 - Avoid reloading when the reload sockets are missing (upgrade from 2.0)
 * Tue Jan 29 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7

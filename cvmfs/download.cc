@@ -505,7 +505,10 @@ static void SetUrlOptions(JobInfo *info) {
   // Check if proxy group needs to be reset from backup to primary
   if (opt_timestamp_backup_proxies_ > 0) {
     const time_t now = time(NULL);
-    if (now > opt_timestamp_backup_proxies_ + opt_proxy_groups_reset_after_) {
+    if (static_cast<int64_t>(now) >
+        static_cast<int64_t>(opt_timestamp_backup_proxies_ +
+                             opt_proxy_groups_reset_after_))
+    {
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
                "reset proxy groups");
       opt_proxy_groups_current_ = 0;
@@ -627,7 +630,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // Decompress memory in a single run
       if ((info->destination == kDestinationMem) && info->compressed) {
         void *buf;
-        int64_t size;
+        uint64_t size;
         bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
                                               info->destination_mem.size,
                                               &buf, &size);
@@ -723,6 +726,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->error_code = kFailLocalIO;
         goto verify_and_finalize_stop;
       }
+      rewind(info->destination_file);
     }
     if (info->expected_hash)
       hash::Init(info->hash_context);
@@ -944,7 +948,7 @@ static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
 
 
 /**
- * Worker thread event loop. Waits on new JobInfo structs on a pipe.
+ * Worker thread event loop.  Waits on new JobInfo structs on a pipe.
  */
 static void *MainDownload(void *data __attribute__((unused))) {
   LogCvmfs(kLogDownload, kLogDebug, "download I/O thread started");

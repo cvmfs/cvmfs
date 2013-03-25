@@ -53,6 +53,7 @@ struct CvmfsOptions {
   int gid;
   int grab_mountpoint;
   int cvmfs_suid;
+  int disable_watchdog;
 };
 
 enum {
@@ -67,11 +68,12 @@ enum {
 #define CVMFS_OPT(t, p, v) { t, offsetof(struct CvmfsOptions, p), v }
 #define CVMFS_SWITCH(t, p) { t, offsetof(struct CvmfsOptions, p), 1 }
 static struct fuse_opt cvmfs_array_opts[] = {
-  CVMFS_OPT("config=%s",          config, 0),
-  CVMFS_OPT("uid=%d",             uid, 0),
-  CVMFS_OPT("gid=%d",             gid, 0),
-  CVMFS_SWITCH("grab_mountpoint", grab_mountpoint),
-  CVMFS_SWITCH("cvmfs_suid",      cvmfs_suid),
+  CVMFS_OPT("config=%s",           config, 0),
+  CVMFS_OPT("uid=%d",              uid, 0),
+  CVMFS_OPT("gid=%d",              gid, 0),
+  CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
+  CVMFS_SWITCH("cvmfs_suid",       cvmfs_suid),
+  CVMFS_SWITCH("disable_watchdog", disable_watchdog),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -99,6 +101,7 @@ bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
+bool disable_watchdog_ = false;
 atomic_int32 blocking_;
 atomic_int64 num_operations_;
 void *library_handle_;
@@ -121,6 +124,7 @@ static void Usage(const std::string &exename) {
                             "before mounting (required for autofs)\n"
     "  -o parse             Parse and print cvmfs parameters\n"
     "  -o cvmfs_suid        Enable suid mode\n\n"
+    "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -247,8 +251,8 @@ static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
   cvmfs_exports_->cvmfs_operations.statfs(req, ino);
   atomic_dec64(&num_operations_);
 }
-
-
+  
+  
 #ifdef __APPLE__
 static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                           size_t size, uint32_t position)
@@ -274,6 +278,14 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   cvmfs_exports_->cvmfs_operations.listxattr(req, ino, size);
   atomic_dec64(&num_operations_);
 }
+  
+  
+/*static void stub_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+  FileSystemFence();
+  atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
+  atomic_dec64(&num_operations_);
+}*/
 
 
 /**
@@ -365,6 +377,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   gid_ = cvmfs_options.gid;
   grab_mountpoint_ = cvmfs_options.grab_mountpoint;
   suid_mode_ = cvmfs_options.cvmfs_suid;
+  disable_watchdog_ = cvmfs_options.disable_watchdog;
 
   return mount_options;
 }
@@ -388,6 +401,7 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   loader_operations->statfs      = stub_statfs;
   loader_operations->getxattr    = stub_getxattr;
   loader_operations->listxattr   = stub_listxattr;
+  //loader_operations->forget      = stub_forget;
 }
 
 
@@ -599,6 +613,7 @@ int main(int argc, char *argv[]) {
   loader_exports_->foreground = foreground_;
   loader_exports_->repository_name = *repository_name_;
   loader_exports_->mount_point = *mount_point_;
+  loader_exports_->disable_watchdog = disable_watchdog_;
   if (config_files_)
     loader_exports_->config_files = *config_files_;
   else
@@ -634,14 +649,17 @@ int main(int argc, char *argv[]) {
     struct rlimit rpl;
     memset(&rpl, 0, sizeof(rpl));
     getrlimit(RLIMIT_NOFILE, &rpl);
-    if (rpl.rlim_max < nfiles)
-      rpl.rlim_max = nfiles;
-    rpl.rlim_cur = nfiles;
-    retval = setrlimit(RLIMIT_NOFILE, &rpl);
-    if (retval != 0) {
-      PrintError("Failed to set maximum number of open files, "
-                 "insufficient permissions");
-      return kFailPermission;
+    if (rpl.rlim_cur < nfiles) {
+      if (rpl.rlim_max < nfiles)
+        rpl.rlim_max = nfiles;
+      rpl.rlim_cur = nfiles;
+      retval = setrlimit(RLIMIT_NOFILE, &rpl);
+      if (retval != 0) {
+        PrintError("Failed to set maximum number of open files, "
+                   "insufficient permissions");
+        // TODO detect valgrind and don't fail
+        return kFailPermission;
+      }
     }
   }
 
@@ -659,7 +677,8 @@ int main(int argc, char *argv[]) {
   if ((uid_ != 0) || (gid_ != 0)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
              uid_, gid_);
-    if (!SwitchCredentials(uid_, gid_, suid_mode_)) {
+    const bool retrievable = (suid_mode_ || ! disable_watchdog_);
+    if (!SwitchCredentials(uid_, gid_, retrievable)) {
       PrintError("Failed to drop credentials");
       return kFailPermission;
     }
@@ -699,6 +718,13 @@ int main(int argc, char *argv[]) {
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
   if (retval != kFailOk) {
+    if (retval == kFailDoubleMount) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "\nCernVM-FS: repository %s already mounted on %s",
+               loader_exports_->repository_name.c_str(),
+               loader_exports_->mount_point.c_str());
+      return 0;
+    }
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslog, "%s (%d)",
              cvmfs_exports_->fnGetErrorMsg().c_str(), retval);
     return retval;
@@ -713,7 +739,8 @@ int main(int argc, char *argv[]) {
   atomic_init32(&blocking_);
 
   if (suid_mode_) {
-    if (!SwitchCredentials(0, getgid(), true)) {
+    const bool retrievable = true;
+    if (!SwitchCredentials(0, getgid(), retrievable)) {
       PrintError("failed to re-gain root permissions for mounting");
       return kFailPermission;
     }
@@ -728,9 +755,10 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
            mount_point_->c_str());
 
-  // Ultimately drop credentials
+  // drop credentials
   if (suid_mode_) {
-    if (!SwitchCredentials(uid_, gid_, false)) {
+    const bool retrievable = ! disable_watchdog_;
+    if (!SwitchCredentials(uid_, gid_, retrievable)) {
       PrintError("failed to drop permissions after mounting");
       return kFailPermission;
     }

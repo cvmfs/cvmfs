@@ -351,6 +351,9 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   else
     database_flags |= kFlagFile;
 
+  if (entry.IsChunkedFile())
+    database_flags |= kFlagFileChunk;
+
   return database_flags;
 }
 
@@ -375,7 +378,7 @@ uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
 void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
   const char *c = raw_symlink->GetChars();
   const char *cEnd = c+raw_symlink->GetLength();
-  for (; c <= cEnd; ++c) {
+  for (; c < cEnd; ++c) {
     if (*c == '$')
       goto expand_symlink;
   }
@@ -383,17 +386,18 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
 
  expand_symlink:
   LinkString result;
-  for (; c <= cEnd; ++c) {
+  for (c = raw_symlink->GetChars(); c < cEnd; ++c) {
     if ((*c == '$') && (c < cEnd-2) && (*(c+1) == '(')) {
       c += 2;
       const char *rpar = c;
-      while (rpar <= cEnd) {
+      while (rpar < cEnd) {
         if (*rpar == ')')
           goto expand_symlink_getenv;
         rpar++;
       }
       // right parenthesis missing
       result.Append("$(", 2);
+      result.Append(c, 1);
       continue;
 
      expand_symlink_getenv:
@@ -404,7 +408,7 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
       const char *environ_value = getenv(environ_var);  // Don't free!
       if (environ_value)
         result.Append(environ_value, strlen(environ_value));
-      c = rpar+1;
+      c = rpar;
       continue;
     }
     result.Append(c, 1);
@@ -484,6 +488,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
   const unsigned database_flags = RetrieveInt(5);
   result.catalog_ = (Catalog*)catalog;
+  result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
@@ -500,6 +505,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
     result.uid_ = g_uid;
     result.gid_ = g_gid;
+    result.is_chunked_file_ = false;
   } else {
     const uint64_t hardlinks = RetrieveInt64(1);
     result.linkcount_ = Hardlinks2Linkcount(hardlinks);
@@ -508,6 +514,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
                                                          result.hardlink_group_);
     result.uid_ = RetrieveInt64(13);
     result.gid_ = RetrieveInt64(14);
+    result.is_chunked_file_ = (database_flags & kFlagFileChunk);
   }
   result.mode_ = RetrieveInt(3);
   result.size_ = RetrieveInt64(2);
@@ -749,9 +756,77 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
+SqlChunkInsert::SqlChunkInsert(const Database &database) {
+  const string statememt =
+    "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
+    //                       1          2        3      4     5
+    "VALUES (:md5_1, :md5_2, :offset, :size, :hash);";
+  Init(database.sqlite_db(), statememt);
+}
+
+
+bool SqlChunkInsert::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
+  return
+    BindInt64(3,    chunk.offset())       &&
+    BindInt64(4,    chunk.size())         &&
+    BindSha1Blob(5, chunk.content_hash());
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlChunksRemove::SqlChunksRemove(const Database &database) {
+  const string statement =
+    "DELETE FROM chunks "
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlChunksRemove::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlChunksListing::SqlChunksListing(const Database &database) {
+  const string statement =
+    "SELECT offset, size, hash FROM chunks "
+    //         0      1     2
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2) "
+    //                    1                          2
+    "ORDER BY offset ASC;";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlChunksListing::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+FileChunk SqlChunksListing::GetFileChunk() const {
+  return FileChunk(RetrieveSha1Blob(2),
+                   RetrieveInt64(0),
+                   RetrieveInt64(1));
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
+
 
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
   return RetrieveInt64(0) >> 32;

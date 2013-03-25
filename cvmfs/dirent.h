@@ -56,6 +56,7 @@ class DirectoryEntryBase {
   inline DirectoryEntryBase() :
     inode_(kInvalidInode),
     parent_inode_(kInvalidInode),
+    generation_(0),
     mode_(0),
     uid_(0),
     gid_(0),
@@ -71,6 +72,7 @@ class DirectoryEntryBase {
 
   inline inode_t inode() const                 { return inode_; }
   inline inode_t parent_inode() const          { return parent_inode_; }
+  inline uint32_t generation() const           { return generation_; }
   inline uint32_t linkcount() const            { return linkcount_; }
   inline NameString name() const               { return name_; }
   inline LinkString symlink() const            { return symlink_; }
@@ -85,6 +87,12 @@ class DirectoryEntryBase {
 
   inline uint64_t size() const {
     return (IsLink()) ? symlink().GetLength() : size_;
+  }
+
+  inline std::string GetFullPath(const std::string &parent_directory) const {
+    std::string file_path = parent_directory + "/";
+    file_path.append(name().GetChars(), name().GetLength());
+    return file_path;
   }
 
   // some reasonable setters
@@ -128,6 +136,7 @@ class DirectoryEntryBase {
   inode_t inode_;        // inodes are generated on the fly by the cvmfs client.
   inode_t parent_inode_; // since they are file system stuff, we have them here
                          // Though, they are NOT written to any catalog.
+  uint32_t generation_;
 
   // stat like information
   NameString name_;
@@ -172,14 +181,16 @@ class DirectoryEntry : public DirectoryEntryBase {
     cached_mtime_(0),
     hardlink_group_(0),
     is_nested_catalog_root_(false),
-    is_nested_catalog_mountpoint_(false) {}
+    is_nested_catalog_mountpoint_(false),
+    is_chunked_file_(false) {}
 
   inline DirectoryEntry() :
     catalog_(NULL),
     cached_mtime_(0),
     hardlink_group_(0),
     is_nested_catalog_root_(false),
-    is_nested_catalog_mountpoint_(false) {}
+    is_nested_catalog_mountpoint_(false),
+    is_chunked_file_(false) {}
 
   inline explicit DirectoryEntry(SpecialDirents special_type) :
     catalog_((Catalog *)(-1)) { };
@@ -192,6 +203,7 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline bool IsNestedCatalogMountpoint() const {
     return is_nested_catalog_mountpoint_;
   }
+  inline bool IsChunkedFile() const { return is_chunked_file_; }
 
   inline const Catalog *catalog() const  { return catalog_; }
   inline uint32_t hardlink_group() const { return hardlink_group_; }
@@ -205,6 +217,10 @@ class DirectoryEntry : public DirectoryEntryBase {
   }
   inline void set_is_nested_catalog_root(const bool val) {
     is_nested_catalog_root_ = val;
+  }
+
+  inline void set_is_chunked_file(const bool val) {
+    is_chunked_file_ = val;
   }
 
 private:
@@ -221,6 +237,7 @@ private:
   // Administrative data
   bool is_nested_catalog_root_;
   bool is_nested_catalog_mountpoint_;
+  bool is_chunked_file_;
 };
 
 /**

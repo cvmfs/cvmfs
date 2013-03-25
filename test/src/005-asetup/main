@@ -20,7 +20,7 @@ cvmfs_run_test() {
   echo "$(($end_time-$start_time)) seconds required" >> $logfile
 
   check_time $start_time $end_time 30 || return 5
-  check_memory atlas.cern.ch 25000 || return 6
+  check_memory atlas.cern.ch 25000 >> $logfile || return 6
  
   return 0
 }

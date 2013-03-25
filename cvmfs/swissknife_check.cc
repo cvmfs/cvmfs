@@ -19,14 +19,15 @@
 
 #include "logging.h"
 #include "manifest.h"
+#include "file_chunk.h"
 #include "util.h"
-#include "hash.h"
-#include "catalog.h"
+#include "catalog_sql.h"
 #include "compression.h"
 #include "shortstring.h"
 #include "download.h"
 
 using namespace std;  // NOLINT
+using namespace swissknife;
 
 namespace {
 bool check_chunks;
@@ -34,9 +35,9 @@ std::string *remote_repository;
 }
 
 
-static bool CompareEntries(const catalog::DirectoryEntry &a,
-                           const catalog::DirectoryEntry &b,
-                           const bool compare_names)
+bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
+                                  const catalog::DirectoryEntry &b,
+                                  const bool compare_names)
 {
   bool retval = true;
   if (compare_names) {
@@ -86,8 +87,8 @@ static bool CompareEntries(const catalog::DirectoryEntry &a,
 }
 
 
-static bool CompareCounters(const catalog::Counters &a,
-                            const catalog::Counters &b)
+bool CommandCheck::CompareCounters(const catalog::Counters &a,
+                                   const catalog::Counters &b)
 {
   bool retval = true;
   if (a.self_regular != b.self_regular) {
@@ -152,7 +153,7 @@ static bool CompareCounters(const catalog::Counters &a,
 /**
  * Checks for existance of a file either locally or via HTTP head
  */
-static bool Exists(const string &file) {
+bool CommandCheck::Exists(const string &file) {
   if (remote_repository == NULL)
     return FileExists(file);
   else {
@@ -166,10 +167,9 @@ static bool Exists(const string &file) {
 /**
  * Recursive catalog walk-through
  */
-static bool Find(const catalog::Catalog *catalog,
-                 const PathString &path,
-                 catalog::DeltaCounters *computed_counters)
-{
+bool CommandCheck::Find(const catalog::Catalog *catalog,
+                        const PathString &path,
+                        catalog::DeltaCounters *computed_counters) {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
 
@@ -244,11 +244,11 @@ static bool Find(const catalog::Catalog *catalog,
       computed_counters->d_self_dir++;
       num_subdirs++;
       // Directory size
-      if (entries[i].size() < 4096) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "invalid file size for %s",
-                 full_path.c_str());
-        retval = false;
-      }
+      // if (entries[i].size() < 4096) {
+      //   LogCvmfs(kLogCvmfs, kLogStderr, "invalid file size for %s",
+      //            full_path.c_str());
+      //   retval = false;
+      // }
       // No directory hardlinks
       if (entries[i].hardlink_group() != 0) {
         LogCvmfs(kLogCvmfs, kLogStderr, "directory hardlink found at %s",
@@ -291,6 +291,62 @@ static bool Find(const catalog::Catalog *catalog,
                full_path.c_str());
       retval = false;
     }
+
+    // checking file chunk integrity
+    if (entries[i].IsChunkedFile()) {
+      FileChunks chunks;
+      catalog->ListFileChunks(full_path, &chunks);
+
+      // do we find file chunks for the chunked file in this catalog?
+      if (chunks.size() == 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "no file chunks found for big file %s",
+                 full_path.c_str());
+        retval = false;
+      }
+
+      size_t aggregated_file_size = 0;
+      off_t  next_offset          = 0;
+
+      FileChunks::const_iterator c    = chunks.begin();
+      FileChunks::const_iterator cend = chunks.end();
+      for (; c != cend; ++c) {
+        // check if the chunk boundaries fit together...
+        if (next_offset != c->offset()) {
+          LogCvmfs(kLogCvmfs, kLogStderr, "misaligned chunk offsets for %s",
+                   full_path.c_str());
+          retval = false;
+        }
+        next_offset = c->offset() + c->size();
+        aggregated_file_size += c->size();
+
+        // are all data chunks in the data store?
+        const string chunk_path = "data"                           +
+                                  c->content_hash().MakePath(1, 2) +
+                                  FileChunk::kCasSuffix;
+        if (!Exists(chunk_path)) {
+          const std::string chunk_name = c->content_hash().ToString() +
+                                         FileChunk::kCasSuffix;
+          LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
+                                          "offset: %d | size: %d) missing",
+                   chunk_name.c_str(),
+                   full_path.c_str(),
+                   c->offset(),
+                   c->size());
+          retval = false;
+        }
+      }
+
+      // is the aggregated chunk size equal to the actual file size?
+      if (aggregated_file_size != entries[i].size()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "chunks of file %s produce a size "
+                                        "mismatch. Calculated %d bytes | %d "
+                                        "bytes expected",
+                 full_path.c_str(),
+                 aggregated_file_size,
+                 entries[i].size());
+        retval = false;
+      }
+    }
   }
 
   // Check directory linkcount
@@ -298,6 +354,7 @@ static bool Find(const catalog::Catalog *catalog,
     LogCvmfs(kLogCvmfs, kLogStderr, "wrong linkcount for %s; "
              "expected %lu, got %lu",
              path.c_str(), num_subdirs + 2, this_directory.linkcount());
+    retval = false;
   }
 
   // Check hardlink linkcounts
@@ -317,9 +374,8 @@ static bool Find(const catalog::Catalog *catalog,
 }
 
 
-static std::string DownloadCatalog(const string &path,
-                                   const hash::Any catalog_hash)
-{
+std::string CommandCheck::DownloadCatalog(const string &path,
+                                          const hash::Any catalog_hash) {
   const string source = "data" + catalog_hash.MakePath(1,2) + "C";
   const string dest = "/tmp/" + catalog_hash.ToString();
   const string url = *remote_repository + "/" + source;
@@ -335,9 +391,8 @@ static std::string DownloadCatalog(const string &path,
 }
 
 
-static std::string DecompressCatalog(const string &path,
-                                     const hash::Any catalog_hash)
-{
+std::string CommandCheck::DecompressCatalog(const string &path,
+                                            const hash::Any catalog_hash) {
   const string source = "data" + catalog_hash.MakePath(1,2) + "C";
   const string dest = "/tmp/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
@@ -350,10 +405,10 @@ static std::string DecompressCatalog(const string &path,
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
-static bool InspectTree(const string &path, const hash::Any &catalog_hash,
-                        const catalog::DirectoryEntry *transition_point,
-                        catalog::DeltaCounters *computed_counters)
-{
+bool CommandCheck::InspectTree(const string &path,
+                               const hash::Any &catalog_hash,
+                               const catalog::DirectoryEntry *transition_point,
+                               catalog::DeltaCounters *computed_counters) {
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
@@ -480,7 +535,7 @@ static bool InspectTree(const string &path, const hash::Any &catalog_hash,
 }
 
 
-int swissknife::CommandCheck::Main(const swissknife::ArgumentList &args) {
+int CommandCheck::Main(const swissknife::ArgumentList &args) {
   check_chunks = false;
   if (args.find('c') != args.end())
     check_chunks = true;

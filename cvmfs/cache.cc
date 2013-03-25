@@ -378,36 +378,44 @@ static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
 
 
 /**
- * Returns a read-only file descriptor for a specific catalog entry.
- * After successful call, the file resides in local cache.
+ * Returns a read-only file descriptor for a specific catalog entry, which could
+ * be a complete file in the CAS as well as a chunk of a file.
+ * After successful call, the data resides in local cache.
  * File is downloaded via HTTP if it is not in the local cache.
  * If multiple concurrent requests arrive for a file, the requests are queued
  * and only the first one performs the download.
  *
- * @param[in] d Demanded catalog entry
- * @param[in] cvmfs_path Path of the chunk as seen in cvmfs
+ * @param[in] checksum     content hash of the file to be fetched
+ * @param[in] hash_suffix  optional hash suffix to append in the download job
+ * @param[in] size         the required disk size of the downloaded data chunk
+ * @param[in] cvmfs_path   Path of the chunk as seen in cvmfs
+ *
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
+static int Fetch(const hash::Any &checksum,
+                 const string    &hash_suffix,
+                 const uint64_t   size,
+                 const string    &cvmfs_path)
 {
   CallGuard call_guard;
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
 
   // Try to open from local cache
-  if ((fd_return = cache::Open(d.checksum())) >= 0) {
+  if ((fd_return = cache::Open(checksum)) >= 0) {
     if (cache_mode_ == kCacheReadWrite)
-      quota::Touch(d.checksum());
+      quota::Touch(checksum);
     return fd_return;
   }
 
   if (cache_mode_ == kCacheReadOnly)
     return -EROFS;
 
-  if (d.size() > quota::GetMaxFileSize()) {
-    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64")",
-             d.size());
+  if (size > quota::GetMaxFileSize()) {
+    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
+                                   "requested but only %"PRIu64" bytes free)",
+             size, quota::GetMaxFileSize());
     return -ENOSPC;
   }
 
@@ -427,7 +435,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
 
   // Lock queue and start downloading or enqueue
   pthread_mutex_lock(&lock_queues_download_);
-  ThreadQueues::iterator iDownloadQueue = queues_download_->find(d.checksum());
+  ThreadQueues::iterator iDownloadQueue = queues_download_->find(checksum);
   if (iDownloadQueue != queues_download_->end()) {
     LogCvmfs(kLogCache, kLogDebug, "waiting for download of %s",
              cvmfs_path.c_str());
@@ -441,15 +449,15 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
     return fd_return;
   } else {
     // Seems we are the first one, check again in the cache (race condition)
-    fd_return = cache::Open(d.checksum());
+    fd_return = cache::Open(checksum);
     if (fd_return >= 0) {
       pthread_mutex_unlock(&lock_queues_download_);
-      quota::Touch(d.checksum());
+      quota::Touch(checksum);
       return fd_return;
     }
 
     // Create a new queue for this chunk
-    (*queues_download_)[d.checksum()] = &tls->other_pipes_waiting;
+    (*queues_download_)[checksum] = &tls->other_pipes_waiting;
     pthread_mutex_unlock(&lock_queues_download_);
   }
 
@@ -457,14 +465,14 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", cvmfs_path.c_str());
   atomic_inc64(&num_download_);
 
-  const string url = "/data" + d.checksum().MakePath(1, 2);
+  const string url = "/data" + checksum.MakePath(1, 2) + hash_suffix;
   string final_path;
   string temp_path;
   int fd;  // Used to write the downloaded file
   FILE *f = NULL;
   int result = -EIO;
 
-  fd = StartTransaction(d.checksum(), &final_path, &temp_path);
+  fd = StartTransaction(checksum, &final_path, &temp_path);
   if (fd < 0) {
     LogCvmfs(kLogCache, kLogDebug, "could not start transaction on %s",
              final_path.c_str());
@@ -481,7 +489,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
 
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
-  tls->download_job.expected_hash = d.checksum_ptr();
+  tls->download_job.expected_hash = &checksum;
   download::Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {
@@ -491,15 +499,15 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
     platform_stat64 stat_info;
     stat_info.st_size = -1;
     if ((platform_fstat(fileno(f), &stat_info) != 0) ||
-        (stat_info.st_size != (int64_t)d.size()))
+        (stat_info.st_size != (int64_t)size))
     {
-      LogCvmfs(kLogCache, kLogSyslog,
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
                "size check failure for %s, expected %lu, got %ld",
-               url.c_str(), d.size(), stat_info.st_size);
-      if (CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
-                        d.checksum().ToString()) != 0)
+               url.c_str(), size, stat_info.st_size);
+      if (!CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
+                         checksum.ToString()))
       {
-        LogCvmfs(kLogCache, kLogSyslog,
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
                  "failed to move %s to quarantaine", temp_path.c_str());
       }
       result = -EIO;
@@ -515,7 +523,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
       goto fetch_finalize;
     }
     result = cache::CommitTransaction(final_path, temp_path, cvmfs_path,
-                                      d.checksum(), d.size());
+                                      checksum, size);
     if (result == 0) {
       platform_disable_kcache(fd_return);
       result = fd_return;
@@ -530,7 +538,7 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
            cvmfs_path.c_str());
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "failed to fetch %s (hash: %s, "
-             "error %d)", cvmfs_path.c_str(), d.checksum().ToString().c_str(),
+             "error %d)", cvmfs_path.c_str(), checksum.ToString().c_str(),
              tls->download_job.error_code);
   }
   if (fd >= 0) {
@@ -542,14 +550,45 @@ int Fetch(const catalog::DirectoryEntry &d, const string &cvmfs_path)
   // Signal the waiting threads and remove the queue
   pthread_mutex_lock(&lock_queues_download_);
   for (unsigned i = 0, s = tls->other_pipes_waiting.size(); i < s; ++i) {
-    int fd_dup = dup(result);
+    int fd_dup = (result >= 0) ? dup(result) : result;
     WritePipe(tls->other_pipes_waiting[i], &fd_dup, sizeof(int));
   }
   tls->other_pipes_waiting.clear();
-  queues_download_->erase(d.checksum());
+  queues_download_->erase(checksum);
   pthread_mutex_unlock(&lock_queues_download_);
 
   return result;
+}
+
+
+/**
+ * Returns a read-only file descriptor for a specific catalog entry.
+ * After successful call, the file resides in local cache.
+ *
+ * @param[in] d           Demanded catalog entry
+ * @param[in] cvmfs_path  Path of the chunk as seen in cvmfs
+ * \return Read-only file descriptor for the file pointing into local cache.
+ *         On failure a negative error code.
+ */
+int FetchDirent(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
+  return Fetch(d.checksum(), "", d.size(), cvmfs_path);
+}
+
+
+/**
+ * Returns a read-only file descriptor for a specific file chunk
+ * After successful call, the file chunk resides in local cache.
+ *
+ * @param[in] chunk       Demanded file chunk
+ * @param[in] cvmfs_path  Path of the full file as seen in cvmfs
+ * \return Read-only file descriptor for the file pointing into local cache.
+ *         On failure a negative error code.
+ */
+int FetchChunk(const FileChunk &chunk, const string &cvmfs_path) {
+  return Fetch(chunk.content_hash(),
+               FileChunk::kCasSuffix,
+               chunk.size(),
+               cvmfs_path);
 }
 
 

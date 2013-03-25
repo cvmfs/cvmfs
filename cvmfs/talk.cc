@@ -44,6 +44,7 @@
 #include "loader.h"
 #include "options.h"
 #include "cache.h"
+#include "monitor.h"
 
 using namespace std;  // NOLINT
 
@@ -57,6 +58,7 @@ string *socket_path_ = NULL;  /**< $cache_dir/cvmfs_io */
 int socket_fd_;
 pthread_t thread_talk_;
 bool spawned_;
+bool initialized_ = false;
 
 
 static void Answer(const int con_fd, const string &msg) {
@@ -89,7 +91,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
     if ((con_fd = accept(socket_fd_, (struct sockaddr *)&remote, &socket_size))
          < 0)
     {
-      LogCvmfs(kLogTalk, kLogDebug, "terminating talk thead (fd %d, errno %d)",
+      LogCvmfs(kLogTalk, kLogDebug, "terminating talk thread (fd %d, errno %d)",
                con_fd, errno);
       break;
     }
@@ -293,6 +295,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         catalog::Statistics catalog_stats;
         string result;
 
+        result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
         result += "File System Call Statistics:\n  " + cvmfs::GetFsStats();
 
         cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
@@ -300,6 +303,11 @@ static void *MainTalk(void *data __attribute__((unused))) {
                   string("  inode cache:   ") + inode_stats.Print() +
                   string("  path cache:    ") + path_stats.Print() +
                   string("  md5path cache: ") + md5path_stats.Print();
+        
+        result += string("  glue buffer:   ") + 
+                  cvmfs::PrintGlueBufferStatistics();
+        result += string("  cwd buffer:    ") +  
+          cvmfs::PrintCwdBufferStatistics();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
         result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
@@ -389,6 +397,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "pid cachemgr") {
         const string pid_str = StringifyInt(quota::GetPid()) + "\n";
         Answer(con_fd, pid_str);
+      } else if (line == "pid watchdog") {
+        const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
+        Answer(con_fd, pid_str);
       } else if (line == "parameters") {
         Answer(con_fd, options::Dump());
       } else if (line == "hotpatch history") {
@@ -428,6 +439,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
  * Init the socket.
  */
 bool Init(const string &cachedir) {
+  if (initialized_) return true;
   spawned_ = false;
   cachedir_ = new string(cachedir);
   socket_path_ = new string(cachedir + "/cvmfs_io." + *cvmfs::repository_name_);
@@ -442,6 +454,7 @@ bool Init(const string &cachedir) {
   LogCvmfs(kLogTalk, kLogDebug, "socket created at %s (fd %d)",
            socket_path_->c_str(), socket_fd_);
 
+  initialized_ = true;
   return true;
 }
 
@@ -461,6 +474,7 @@ void Spawn() {
  * Terminates command-listener thread.  Removes socket.
  */
 void Fini() {
+  if (!initialized_) return;
   int result;
   result = unlink(socket_path_->c_str());
   if (result != 0) {
@@ -477,6 +491,7 @@ void Fini() {
   close(socket_fd_);
   if (spawned_) pthread_join(thread_talk_, NULL);
   LogCvmfs(kLogTalk, kLogDebug, "talk thread stopped");
+  initialized_ = false;
 }
 
 }  // namespace talk

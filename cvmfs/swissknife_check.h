@@ -6,6 +6,8 @@
 #define CVMFS_SWISSKNIFE_CHECK_H_
 
 #include "swissknife.h"
+#include "hash.h"
+#include "catalog.h"
 
 namespace swissknife {
 
@@ -28,6 +30,25 @@ class CommandCheck : public Command {
     return result;
   }
   int Main(const ArgumentList &args);
+
+ protected:
+  bool InspectTree(const std::string &path,
+                   const hash::Any &catalog_hash,
+                   const catalog::DirectoryEntry *transition_point,
+                   catalog::DeltaCounters *computed_counters);
+  std::string DecompressCatalog(const std::string &path,
+                                const hash::Any catalog_hash);
+  std::string DownloadCatalog(const std::string &path,
+                              const hash::Any catalog_hash);
+  bool Find(const catalog::Catalog *catalog,
+            const PathString &path,
+            catalog::DeltaCounters *computed_counters);
+  bool Exists(const std::string &file);
+  bool CompareCounters(const catalog::Counters &a,
+                       const catalog::Counters &b);
+  bool CompareEntries(const catalog::DirectoryEntry &a,
+                      const catalog::DirectoryEntry &b,
+                      const bool compare_names);
 };
 
 }

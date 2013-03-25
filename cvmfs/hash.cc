@@ -20,6 +20,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace hash {
 
+
 /**
  * Allows the caller to create the context on the stack.
  */
@@ -30,6 +31,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kSha1:
       return sizeof(SHA_CTX);
     default:
+      LogCvmfs(kLogHash, kLogDebug | kLogSyslog, "tried to generate hash "
+               "context for unspecified hash. Aborting...");
       abort();  // Undefined hash
   }
 }
@@ -98,22 +101,6 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
   Update(buffer, buffer_size, context);
   Final(context, any_digest);
 }
-
-
-  /**
-  * TODO: deprecate
-  */
-  /*void HashMemSha1(const unsigned char *buffer, const unsigned buffer_size,
-   Sha1 *sha1_digest)
-   {
-   ContextPtr context;
-   context.size = GetContextSize(kSha1);
-   context.buffer = reinterpret_cast<unsigned char *>(alloca(context.size));
-
-   Init(kSha1, context);
-   Update(kSha1, buffer, buffer_size, context);
-   Final(kSha1, context, any_digest);
-   }*/
 
 
 bool HashFile(const std::string filename, Any *any_digest) {

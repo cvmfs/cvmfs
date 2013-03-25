@@ -117,6 +117,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   read_only_ = true;
   path_ = path;
   parent_ = parent;
+  generation_ = 0;
   max_row_id_ = 0;
   inode_annotation = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -131,6 +132,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   sql_lookup_nested_ = NULL;
   sql_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
+  sql_chunks_listing_ = NULL;
 }
 
 
@@ -150,16 +152,18 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_ = new SqlListing(database());
-  sql_lookup_md5path_ = new SqlLookupPathHash(database());
-  sql_lookup_inode_ = new SqlLookupInode(database());
-  sql_lookup_nested_ = new SqlNestedCatalogLookup(database());
-  sql_list_nested_ = new SqlNestedCatalogListing(database());
-  sql_all_chunks_ = new SqlAllChunks(database());
+  sql_listing_         = new SqlListing(database());
+  sql_lookup_md5path_  = new SqlLookupPathHash(database());
+  sql_lookup_inode_    = new SqlLookupInode(database());
+  sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
+  sql_list_nested_     = new SqlNestedCatalogListing(database());
+  sql_all_chunks_      = new SqlAllChunks(database());
+  sql_chunks_listing_  = new SqlChunksListing(database());
 }
 
 
 void Catalog::FinalizePreparedStatements() {
+  delete sql_chunks_listing_;
   delete sql_all_chunks_;
   delete sql_listing_;
   delete sql_lookup_md5path_;
@@ -344,6 +348,23 @@ bool Catalog::AllChunksNext(hash::Any *hash, ChunkTypes *type) {
 
 bool Catalog::AllChunksEnd() {
   return sql_all_chunks_->Close();
+}
+
+
+bool Catalog::ListMd5PathChunks(const hash::Md5  &md5path,
+                                FileChunks       *chunks) const
+{
+  assert(IsInitialized() && chunks->empty());
+
+  pthread_mutex_lock(lock_);
+  sql_chunks_listing_->BindPathHash(md5path);
+  while (sql_chunks_listing_->FetchRow()) {
+    chunks->push_back(sql_chunks_listing_->GetFileChunk());
+  }
+  sql_chunks_listing_->Reset();
+  pthread_mutex_unlock(lock_);
+
+  return true;
 }
 
 

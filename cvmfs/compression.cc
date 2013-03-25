@@ -10,6 +10,7 @@
 
 #include "cvmfs_config.h"
 #include "compression.h"
+#include "platform.h"
 
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -17,6 +18,7 @@
 
 #include <cstring>
 #include <cassert>
+#include <algorithm>
 
 #include "logging.h"
 #include "hash.h"
@@ -466,11 +468,68 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
 }
 
 
+bool CompressMem2File(const unsigned char *buf, const size_t size,
+                      FILE *fdest, hash::Any *compressed_hash) {
+  int z_ret, flush;
+  bool result = false;
+  unsigned have;
+  z_stream strm;
+  size_t offset = 0;
+  size_t used   = 0;
+  unsigned char out[kZChunk];
+  hash::ContextPtr hash_context(compressed_hash->algorithm);
+
+  CompressInit(&strm);
+  hash_context.buffer = alloca(hash_context.size);
+  hash::Init(hash_context);
+
+  // Compress the given memory buffer
+  do {
+    used = min((size_t)kZChunk, size - offset);
+    strm.avail_in = used;
+
+    flush = (strm.avail_in < kZChunk) ? Z_FINISH : Z_NO_FLUSH;
+    strm.next_in = const_cast<unsigned char*>(buf + offset);
+
+    // Run deflate() on input until output buffer not full, finish
+    // compression if all of source has been read in
+    do {
+      strm.avail_out = kZChunk;
+      strm.next_out = out;
+      z_ret = deflate(&strm, flush);  // no bad return value
+      if (z_ret == Z_STREAM_ERROR)
+        goto compress_file2file_hashed_final;  // state not clobbered
+      have = kZChunk - strm.avail_out;
+      if (fwrite(out, 1, have, fdest) != have || ferror(fdest))
+        goto compress_file2file_hashed_final;
+      hash::Update(out, have, hash_context);
+    } while (strm.avail_out == 0);
+
+    offset += used;
+
+    // Done when last data in file processed
+  } while (flush != Z_FINISH);
+
+  // Stream will be complete
+  if (z_ret != Z_STREAM_END) goto compress_file2file_hashed_final;
+
+  hash::Final(hash_context, compressed_hash);
+  result = true;
+
+  // Clean up and return
+ compress_file2file_hashed_final:
+  CompressFini(&strm);
+  LogCvmfs(kLogCompress, kLogDebug, "file compression finished with result %d",
+           result);
+  return result;
+}
+
+
 /**
  * User of this function has to free out_buf.
  */
 bool CompressMem2Mem(const void *buf, const int64_t size,
-                    void **out_buf, int64_t *out_size)
+                    void **out_buf, uint64_t *out_size)
 {
   unsigned char out[kZChunk];
   int z_ret;
@@ -528,7 +587,7 @@ bool CompressMem2Mem(const void *buf, const int64_t size,
  * User of this function has to free out_buf.
  */
 bool DecompressMem2Mem(const void *buf, const int64_t size,
-                       void **out_buf, int64_t *out_size)
+                       void **out_buf, uint64_t *out_size)
 {
   unsigned char out[kZChunk];
   int z_ret;

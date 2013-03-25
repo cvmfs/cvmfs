@@ -16,10 +16,12 @@
 
 #include "catalog_sql.h"
 #include "dirent.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "shortstring.h"
 #include "duplex_sqlite3.h"
 #include "util.h"
+
 
 namespace catalog {
 
@@ -90,7 +92,6 @@ struct Counters {
   uint64_t subtree_nested;
 };
 
-
 /**
  * Allows to define a class that stores additional information in the upper
  * bits of an inode.  Cvmfs will abort if the inode is too large to fit into
@@ -105,12 +106,17 @@ struct Counters {
  *      the new content completely, thereby fills the kernel caches.
  *   4) Process A reads the rest of /foo, which is now served in the new version
  *      from the kernel caches.
+ * Also, reloading of the fuse module increases the generation (it invalidates)
+ * the inodes
  */
 class InodeAnnotation {
  public:
   virtual ~InodeAnnotation() { };
   virtual inode_t Annotate(const inode_t raw_inode) = 0;
-  virtual void SetRevision(const uint64_t new_revision) = 0;
+  virtual void SetGeneration(const uint64_t new_generation) = 0;
+  // Used to detect ancient inodes from previous generations
+  virtual bool ValidInode(const uint64_t inode) { return true; }
+  
   inode_t Strip(const inode_t annotated_inode) {
     // Clear upper bits
     return ((uint64_t(1) << num_protected_bits_) - 1) & annotated_inode;
@@ -169,8 +175,15 @@ class Catalog : public SingleCopy {
   bool AllChunksNext(hash::Any *hash, ChunkTypes *type);
   bool AllChunksEnd();
 
+  inline bool ListFileChunks(const PathString &path, FileChunks *chunks) const {
+    return ListMd5PathChunks(hash::Md5(path.GetChars(), path.GetLength()),
+                             chunks);
+  }
+  bool ListMd5PathChunks(const hash::Md5 &md5path, FileChunks *chunks) const;
+
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
+  uint64_t GetGeneration() const { return generation_; }
   uint64_t GetNumEntries() const;
   hash::Any GetPreviousRevision() const;
   bool GetCounters(Counters *counters) const;
@@ -242,6 +255,10 @@ class Catalog : public SingleCopy {
   PathString root_prefix_;
   PathString path_;
 
+  // The revision of the tree at the time the catalog was attached plus the
+  // "reload counter", i.e. how often the tree inodes have been invalidated
+  // e.g. by reloading cvmfs
+  uint64_t generation_;
   Catalog *parent_;
   NestedCatalogMap children_;
   mutable NestedCatalogList *nested_catalog_cache_;
@@ -250,12 +267,13 @@ class Catalog : public SingleCopy {
   uint64_t max_row_id_;
   InodeAnnotation *inode_annotation;
 
-  SqlListing *sql_listing_;
-  SqlLookupPathHash *sql_lookup_md5path_;
-  SqlLookupInode *sql_lookup_inode_;
-  SqlNestedCatalogLookup *sql_lookup_nested_;
-  SqlNestedCatalogListing *sql_list_nested_;
-  SqlAllChunks *sql_all_chunks_;
+  SqlListing               *sql_listing_;
+  SqlLookupPathHash        *sql_lookup_md5path_;
+  SqlLookupInode           *sql_lookup_inode_;
+  SqlNestedCatalogLookup   *sql_lookup_nested_;
+  SqlNestedCatalogListing  *sql_list_nested_;
+  SqlAllChunks             *sql_all_chunks_;
+  SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
 
 Catalog *AttachFreely(const std::string &root_path, const std::string &file);

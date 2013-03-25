@@ -44,31 +44,29 @@ struct ChunkJob {
 };
 
 
-class AbortSpoolerOnError : public upload::SpoolerCallback {
- public:
-  void Callback(const string &path, int retval, const string &digest) {
-    if (retval != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
-               retval, path.c_str(), digest.c_str());
-      abort();
-    }
+static void AbortSpoolerOnError(const upload::SpoolerResult &result) {
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
+             result.return_code,
+             result.local_path.c_str(),
+             result.content_hash.ToString().c_str());
+    abort();
   }
-};
+}
 
 
-string *stratum0_url = NULL;
-string *temp_dir = NULL;
-unsigned num_parallel = 1;
-bool pull_history = false;
-upload::Spooler *spooler = NULL;
-int pipe_chunks[2];
+string              *stratum0_url = NULL;
+string              *temp_dir = NULL;
+unsigned             num_parallel = 1;
+bool                 pull_history = false;
+upload::Spooler     *spooler = NULL;
+int                  pipe_chunks[2];
 // required for concurrent reading
-pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-upload::BackendStat *backend_stat = NULL;
-unsigned retries = 3;
-atomic_int64 overall_chunks;
-atomic_int64 overall_new;
-atomic_int64 chunk_queue;
+pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
+unsigned             retries = 3;
+atomic_int64         overall_chunks;
+atomic_int64         overall_new;
+atomic_int64         chunk_queue;
 
 }
 
@@ -90,7 +88,7 @@ static void *MainWorker(void *data) {
     if (next_chunk.type != 0)
       chunk_path.push_back(next_chunk.type);
 
-    if (!backend_stat->Stat(chunk_path)) {
+    if (!spooler->Peek(chunk_path)) {
       string tmp_file;
       FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                     &tmp_file);
@@ -111,7 +109,7 @@ static void *MainWorker(void *data) {
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
-      spooler->SpoolCopy(tmp_file, chunk_path);
+      spooler->Upload(tmp_file, chunk_path);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -128,7 +126,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   int retval;
 
   // Check if the catalog already exists
-  if (backend_stat->Stat("data" + catalog_hash.MakePath(1, 2) + "C")) {
+  if (spooler->Peek("data" + catalog_hash.MakePath(1, 2) + "C")) {
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
     return true;
   }
@@ -153,7 +151,6 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
                                           &file_catalog_vanilla);
   if (!fcatalog_vanilla) {
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
-    fclose(fcatalog_vanilla);
     unlink(file_catalog.c_str());
     return false;
   }
@@ -197,7 +194,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
         next_chunk.type = 'L';
         break;
       case catalog::kChunkPiece:
-        next_chunk.type = 'C';
+        next_chunk.type = FileChunk::kCasSuffix.c_str()[0];
         break;
       default:
         next_chunk.type = '\0';
@@ -249,9 +246,9 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
   delete catalog;
   unlink(file_catalog.c_str());
-  spooler->WaitFor();
-  spooler->SpoolCopy(file_catalog_vanilla,
-                     "data" + catalog_hash.MakePath(1, 2) + "C");
+  spooler->WaitForUpload();
+  spooler->Upload(file_catalog_vanilla,
+                  "data" + catalog_hash.MakePath(1, 2) + "C");
   return true;
 
  pull_cleanup:
@@ -263,15 +260,21 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
 
 static void UploadBuffer(const unsigned char *buffer, const unsigned size,
-                         const std::string dest_path)
+                         const std::string dest_path, const bool compress)
 {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
-  int retval = CopyMem2File(buffer, size, ftmp);
+  int retval;
+  if (compress) {
+    hash::Any dummy(hash::kSha1);
+    retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
+  } else {
+    retval = CopyMem2File(buffer, size, ftmp);
+  }
   assert(retval);
   fclose(ftmp);
-  spooler->SpoolCopy(tmp_file, dest_path);
+  spooler->Upload(tmp_file, dest_path);
 }
 
 
@@ -292,12 +295,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   stratum0_url = args.find('u')->second;
   temp_dir = args.find('x')->second;
-  spooler = upload::MakeSpoolerEnsemble(*args.find('r')->second);
+  const upload::SpoolerDefinition spooler_definition(*args.find('r')->second);
+  spooler = upload::Spooler::Construct(spooler_definition);
   assert(spooler);
-  backend_stat = upload::GetBackendStat(*args.find('r')->second);
-  assert(backend_stat);
-  spooler->set_move_mode(true);
-  spooler->SetCallback(new AbortSpoolerOnError());
+  spooler->RegisterListener(&AbortSpoolerOnError);
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
   if (args.find('n') != args.end())
@@ -386,19 +387,20 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Upload manifest ensemble
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
-    spooler->WaitFor();
+    spooler->WaitForUpload();
     const string certificate_path =
       "data" + ensemble.manifest->certificate().MakePath(1, 2) + "X";
-    if (!backend_stat->Stat(certificate_path)) {
-      UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path);
+    if (!spooler->Peek(certificate_path)) {
+      UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path,
+                   true);
     }
     UploadBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                 ".cvmfswhitelist");
+                 ".cvmfswhitelist", false);
     UploadBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                 ".cvmfspublished");
+                 ".cvmfspublished", false);
   }
 
-  spooler->WaitFor();
+  spooler->WaitForUpload();
   LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %"PRId64" new chunks out of %"
            PRId64" processed chunks",
            atomic_read64(&overall_new), atomic_read64(&overall_chunks));
@@ -408,7 +410,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   free(workers);
   signature::Fini();
   download::Fini();
-  delete backend_stat;
   delete spooler;
   return result;
 }

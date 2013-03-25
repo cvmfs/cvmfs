@@ -27,6 +27,7 @@
 #include <time.h>
 
 #include <string>
+#include <map>
 
 #include <cstring>
 #include <cstdio>
@@ -37,6 +38,8 @@
 #include "util.h"
 #include "logging.h"
 #include "smalloc.h"
+
+#include "cvmfs.h"
 
 using namespace std;  // NOLINT
 
@@ -50,13 +53,45 @@ const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 string *cache_dir_ = NULL;
 string *process_name_ = NULL;
 string *exe_path_ = NULL;
-string *helper_script_path_ = NULL;
-string *helper_script_gdb_cmd_path_;
 bool spawned_ = false;
-unsigned max_open_files_;
 int pipe_wd_[2];
 platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
+pid_t watchdog_pid_ = 0;
+
+typedef std::map<int, struct sigaction> SigactionMap;
+SigactionMap old_signal_handlers_;
+
+pid_t GetPid() {
+  if (!spawned_) {
+    return cvmfs::pid_;
+  }
+
+  return watchdog_pid_;
+}
+
+
+/**
+ * Sets the signal handlers of the current process according to the ones
+ * defined in the given SigactionMap.
+ *
+ * @param signal_handlers  a map of SIGNAL -> struct sigaction
+ * @return                 a SigactionMap containing the old handlers
+ */
+static SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers) {
+  SigactionMap old_signal_handlers;
+  SigactionMap::const_iterator i     = signal_handlers.begin();
+  SigactionMap::const_iterator iend  = signal_handlers.end();
+  for (; i != iend; ++i) {
+    struct sigaction old_signal_handler;
+    if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
+      abort();
+    }
+    old_signal_handlers[i->first] = old_signal_handler;
+  }
+
+  return old_signal_handlers;
+}
 
 
 /**
@@ -72,6 +107,10 @@ static void SendTrace(int signal,
     // Concurrent call, wait for the first one to exit the process
     while (true) {}
   }
+
+  // Set the original signal handler for the raised signal in
+  // SIGQUIT (watchdog process will raise SIGQUIT)
+  (void) sigaction(SIGQUIT, &old_signal_handlers_[signal], NULL);
 
   char cflow = 'S';
   if (write(pipe_wd_[1], &cflow, 1) != 1)
@@ -94,7 +133,7 @@ static void SendTrace(int signal,
   (void)write(pipe_wd_[1], &cflow, 1);
 
   // do not die before the stack trace was generated
-  // kill -9 <pid> will finish this
+  // kill -SIGQUIT <pid> will finish this
   while(true) {}
 
   _exit(1);
@@ -124,52 +163,85 @@ static void LogEmergency(string msg) {
 
 
 /**
+ * reads from the file descriptor until the specific gdb prompt
+ * is reached or the pipe gets broken
+ *
+ * @param fd_pipe  the file descriptor of the pipe to be read
+ * @return         the data read from the pipe
+ */
+static string ReadUntilGdbPrompt(int fd_pipe) {
+  static const string gdb_prompt = "\n(gdb) ";
+
+  string        result;
+  char          mini_buffer;
+  int           chars_io;
+  unsigned int  ring_buffer_pos = 0;
+
+  // read from stdout of gdb until gdb prompt occures --> (gdb)
+  while (1) {
+    chars_io = read(fd_pipe, &mini_buffer, 1);
+
+    // in case something goes wrong...
+    if (chars_io <= 0) break;
+
+    result += mini_buffer;
+
+    // find the gdb_promt in the stdout data
+    if (mini_buffer == gdb_prompt[ring_buffer_pos]) {
+      ++ring_buffer_pos;
+      if (ring_buffer_pos == gdb_prompt.size()) {
+        break;
+      }
+    } else {
+      ring_buffer_pos = 0;
+    }
+  }
+
+  return result;
+}
+
+
+
+/**
  * Uses an external shell and gdb to create a full stack trace of the dying
  * cvmfs client. The same shell is used to force-quit the client afterwards.
  */
-static string GenerateStackTraceAndKill(const string &exe_path,
-                                        const pid_t pid)
-{
+static string GenerateStackTrace(const string &exe_path,
+                                 const pid_t   pid) {
   int retval;
+  string result = "";
 
+  // re-gain root permissions to allow for ptrace of died cvmfs2 process
+  const bool retrievable = true;
+  if (! SwitchCredentials(0, getgid(), retrievable)) {
+    result += "failed to re-gain root permissions... still give it a try\n";
+  }
+
+  // run gdb and attach to the dying cvmfs2 process
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
-  retval = Shell(&fd_stdin, &fd_stdout, &fd_stderr);
+  std::vector<std::string> argv; // TODO: C++11 initializer list...
+  argv.push_back("-q");
+  argv.push_back("-n");
+  argv.push_back(exe_path);
+  argv.push_back(StringifyInt(pid));
+  retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, "gdb", argv);
   assert(retval);
 
-  // Let the shell execute the stacktrace extraction script
-  const string bt_cmd = *helper_script_path_ + " " + exe_path + " " +
-                        StringifyInt(pid) + " " +
-                        *helper_script_gdb_cmd_path_ + "\n";
-  WritePipe(fd_stdin, bt_cmd.data(), bt_cmd.length());
+  // skip the gdb startup rubbish
+  ReadUntilGdbPrompt(fd_stdout);
 
-  // close the standard in to close the shell
-  close(fd_stdin);
+  // send stacktrace command to gdb
+  const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
+                         "quit\n";               // stop gdb
+  WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
 
-  // read the stack trace from the stdout of our shell
-  string result = "";
-  char mini_buffer;
-  int chars_io;
-  while (1) {
-    chars_io = read(fd_stdout, &mini_buffer, 1);
-    if (chars_io <= 0) break;
-    result += mini_buffer;
-  }
-
-  // check if the stacktrace readout went fine
-  if (chars_io < 0) {
-    result += "failed to read stack traces";
-  }
-
-  // close the pipes to the shell
+  // read the stack trace from the stdout of our gdb process
+  result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
   close(fd_stderr);
   close(fd_stdout);
-
-  // give the dying cvmfs client the finishing stroke
-  if (kill(pid, SIGKILL) != 0) {
-    result += "Failed to kill cvmfs client!\n\n";
-  }
+  close(fd_stdin);
 
   return result;
 }
@@ -207,7 +279,12 @@ static string ReportStacktrace() {
 
   debug += "Executable path: " + *exe_path_ + "\n";
 
-  debug += GenerateStackTraceAndKill(*exe_path_, pid);
+  debug += GenerateStackTrace(*exe_path_, pid);
+
+  // give the dying cvmfs client the finishing stroke
+  if (kill(pid, SIGQUIT) != 0) {
+    debug += "Failed to kill cvmfs client!\n\n";
+  }
 
   return debug;
 }
@@ -237,129 +314,128 @@ static void Watchdog() {
 }
 
 
-static bool CreateStacktraceScript(const std::string &cache_dir,
-                                   const std::string &process_name) {
-  const string script =
-"#!/bin/sh\n"
-"\n"
-"# This script is almost identical to /usr/bin/gstack.\n"
-"# It is used by monitor.cc on Linux and MacOS X.\n"
-"\n"
-"# Note: this script was taken from the ROOT svn repository\n"
-"#       and slightly adapted to print a stacktrace to stdout instead\n"
-"#       of an output file.\n"
-"\n"
-"tempname=`basename $0 .sh`\n"
-"\n"
-"if test $# -lt 3; then\n"
-"   echo \"Usage: ${tempname} <executable> <process-id> <gdb cmd file>\" 1>&2\n"
-"   exit 1\n"
-"fi\n"
-"\n"
-"if [ `uname -s` = \"Darwin\" ]; then\n"
-"\n"
-"   if test ! -x $1; then\n"
-"      echo \"${tempname}: process $1 not found.\" 1>&2\n"
-"      exit 1\n"
-"   fi\n"
-"\n"
-"   GDB=${GDB:-gdb}\n"
-"\n"
-"   # Run GDB, strip out unwanted noise.\n"
-"   $GDB -q -batch -x $3 -n $1 $2 2>&1  < /dev/null |\n"
-"   /usr/bin/sed -n \\\n"
-"    -e 's/^(gdb) //' \\\n"
-"    -e '/^#/p' \\\n"
-"    -e 's/\\(^Thread.*\\)/@\1/p' | tr \"@\" \"\\n\" > /dev/stdout\n"
-"\n"
-"   rm -f $TMPFILE\n"
-"\n"
-"else\n"
-"\n"
-"   if test ! -r /proc/$2; then\n"
-"      echo \"${tempname}: process $2 not found.\" 1>&2\n"
-"      exit 1\n"
-"   fi\n"
-"\n"
-"   GDB=${GDB:-gdb}\n"
-"\n"
-"   # Run GDB, strip out unwanted noise.\n"
-"   $GDB -q -batch -x $3 -n /proc/$2/exe $2 |\n"
-"   /bin/sed -n \\\n"
-"      -e 's/^(gdb) //' \\\n"
-"      -e '/^#/p' \\\n"
-"      -e '/^   /p' \\\n"
-"      -e 's/\\(^Thread.*\\)/@\1/p' | tr '@' '\\n' > /dev/stdout\n"
-"fi\n"
-"";
-
-  const string gdb = "thread apply all bt\n";
-
-  //
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  //
-
-  FILE *fp = fopen(helper_script_path_->c_str(), "w");
-
-  if (!fp ||
-      fwrite(script.data(), 1, script.length(), fp) != script.length() ||
-      (chmod(helper_script_path_->c_str(), S_IRUSR | S_IWUSR | S_IXUSR) != 0))
-  {
-    LogCvmfs(kLogMonitor, kLogStderr, "Failed to create gdb helper script (%d)",
-             errno);
-    goto create_stacktrace_fail;
-  }
-  fclose(fp);
-
-  fp = fopen(helper_script_gdb_cmd_path_->c_str(), "w");
-  if (!fp ||
-      fwrite(gdb.data(), 1, gdb.length(), fp) != gdb.length() ||
-      (chmod(helper_script_gdb_cmd_path_->c_str(), S_IRUSR | S_IWUSR) != 0))
-  {
-    LogCvmfs(kLogMonitor, kLogStderr,
-             "Failed to create gdb helper helper script (%d)");
-    goto create_stacktrace_fail;
-  }
-  fclose(fp);
-
-  return true;
-
- create_stacktrace_fail:
-  if (fp)
-    fclose(fp);
-  return false;
-}
-
-
 bool Init(const string &cache_dir, const std::string &process_name,
           const bool check_max_open_files)
 {
   monitor::cache_dir_ = new string(cache_dir);
   monitor::process_name_ = new string(process_name);
   monitor::exe_path_ = new string(platform_getexepath());
-  monitor::helper_script_path_ =
-    new string(cache_dir + "/gdb-helper." + process_name + ".sh");
-  monitor::helper_script_gdb_cmd_path_ =
-    new string(cache_dir + "/gdb-helper-gdb-cmd." + process_name);
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
 
-  // create stacktrace retrieve script in cache directory
-  if (!CreateStacktraceScript(cache_dir, process_name)) {
-    delete monitor::cache_dir_;
-    delete monitor::exe_path_;
-    delete monitor::process_name_;
-    delete monitor::helper_script_path_;
-    delete monitor::helper_script_gdb_cmd_path_;
-    monitor::cache_dir_ = NULL;
-    monitor::process_name_ = NULL;
-    monitor::exe_path_ = NULL;
-    monitor::helper_script_path_ = NULL;
-    monitor::helper_script_gdb_cmd_path_ = NULL;
-    return false;
+  return true;
+}
+
+
+void Fini() {
+  // Reset signal handlers
+  if (spawned_) {
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGILL, SIG_DFL);
+    signal(SIGABRT, SIG_DFL);
+    signal(SIGFPE, SIG_DFL);
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    signal(SIGPIPE, SIG_DFL);
+    signal(SIGXFSZ, SIG_DFL);
+    free(sighandler_stack_.ss_sp);
+    sighandler_stack_.ss_size = 0;
   }
 
-  /* check number of open files */
-  if (check_max_open_files) {
+  if (spawned_) {
+    char quit = 'Q';
+    (void)write(pipe_wd_[1], &quit, 1);
+    close(pipe_wd_[1]);
+  }
+  delete process_name_;
+  delete cache_dir_;
+  delete exe_path_;
+  process_name_ = NULL;
+  cache_dir_ = NULL;
+  exe_path_ = NULL;
+  platform_spinlock_destroy(&lock_handler_);
+}
+
+/**
+ * Fork watchdog.
+ */
+void Spawn() {
+  int pipe_pid[2];
+  MakePipe(pipe_wd_);
+  MakePipe(pipe_pid);
+
+  pid_t pid;
+  int statloc;
+  int max_fd = sysconf(_SC_OPEN_MAX);
+  assert(max_fd >= 0);
+  switch (pid = fork()) {
+    case -1: abort();
+    case 0:
+      // Double fork to avoid zombie
+      switch (fork()) {
+        case -1: exit(1);
+        case 0: {
+          close(pipe_wd_[1]);
+          Daemonize();
+          // send the watchdog PID to cvmfs
+          pid_t watchdog_pid = getpid();
+          WritePipe(pipe_pid[1], (const void*)&watchdog_pid, sizeof(pid_t));
+          close(pipe_pid[1]);
+          // Close all unused file descriptors
+          for (int fd = 0; fd < max_fd; fd++) {
+            if (fd != pipe_wd_[0])
+              close(fd);
+          }
+          Watchdog();
+          exit(0);
+        }
+        default:
+          exit(0);
+      }
+    default:
+      close(pipe_wd_[0]);
+      if (waitpid(pid, &statloc, 0) != pid) abort();
+      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
+  }
+
+  // retrieve the watchdog PID from the pipe
+  ReadPipe(pipe_pid[0], (void*)&watchdog_pid_, sizeof(pid_t));
+  close(pipe_pid[0]);
+
+  // Extra stack for signal handlers
+  int stack_size = kSignalHandlerStacksize;  // 2 MB
+  sighandler_stack_.ss_sp = smalloc(stack_size);
+  sighandler_stack_.ss_size = stack_size;
+  sighandler_stack_.ss_flags = 0;
+  if (sigaltstack(&sighandler_stack_, NULL) != 0)
+    abort();
+
+  // define our crash signal handler
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = SendTrace;
+  sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+  sigfillset(&sa.sa_mask);
+
+  SigactionMap signal_handlers;
+  signal_handlers[SIGQUIT] = sa;
+  signal_handlers[SIGILL]  = sa;
+  signal_handlers[SIGABRT] = sa;
+  signal_handlers[SIGFPE]  = sa;
+  signal_handlers[SIGSEGV] = sa;
+  signal_handlers[SIGBUS]  = sa;
+  signal_handlers[SIGPIPE] = sa;
+  signal_handlers[SIGXFSZ] = sa;
+  old_signal_handlers_ = SetSignalHandlers(signal_handlers);
+
+  spawned_ = true;
+}
+
+unsigned GetMaxOpenFiles() {
+  static unsigned max_open_files;
+  static bool     already_done = false;
+
+  /* check number of open files (lazy evaluation) */
+  if (! already_done) {
     unsigned int soft_limit = 0;
     int hard_limit = 0;
 
@@ -386,116 +462,11 @@ bool Init(const string &cache_dir, const std::string &process_name,
                "set ulimit -n to at least %lu",
                soft_limit, hard_limit, kMinOpenFiles);
     }
-    max_open_files_ = soft_limit;
-  } else {
-    max_open_files_ = 0;
+    max_open_files = soft_limit;
+    already_done   = true;
   }
 
-  return true;
-}
-
-
-void Fini() {
-  // Reset signal handlers
-  if (spawned_) {
-    signal(SIGQUIT, SIG_DFL);
-    signal(SIGILL, SIG_DFL);
-    signal(SIGABRT, SIG_DFL);
-    signal(SIGFPE, SIG_DFL);
-    signal(SIGSEGV, SIG_DFL);
-    signal(SIGBUS, SIG_DFL);
-    signal(SIGPIPE, SIG_DFL);
-    signal(SIGXFSZ, SIG_DFL);
-    free(sighandler_stack_.ss_sp);
-    sighandler_stack_.ss_size = 0;
-  }
-
-  if (spawned_) {
-    char quit = 'Q';
-    (void)write(pipe_wd_[1], &quit, 1);
-    close(pipe_wd_[1]);
-    unlink(helper_script_path_->c_str());
-    unlink(helper_script_gdb_cmd_path_->c_str());
-  }
-  delete process_name_;
-  delete cache_dir_;
-  delete exe_path_;
-  delete helper_script_path_;
-  delete helper_script_gdb_cmd_path_;
-  process_name_ = NULL;
-  cache_dir_ = NULL;
-  exe_path_ = NULL;
-  helper_script_path_ = NULL;
-  helper_script_gdb_cmd_path_ = NULL;
-  platform_spinlock_destroy(&lock_handler_);
-}
-
-/**
- * Fork watchdog.
- */
-void Spawn() {
-  MakePipe(pipe_wd_);
-
-  pid_t pid;
-  int statloc;
-  int max_fd = sysconf(_SC_OPEN_MAX);
-  assert(max_fd >= 0);
-  switch (pid = fork()) {
-    case -1: abort();
-    case 0:
-      // Double fork to avoid zombie
-      switch (fork()) {
-        case -1: exit(1);
-        case 0: {
-          close(pipe_wd_[1]);
-          Daemonize();
-          // Close all unused file descriptors
-          for (int fd = 0; fd < max_fd; fd++) {
-            if (fd != pipe_wd_[0])
-              close(fd);
-          }
-          Watchdog();
-          exit(0);
-        }
-        default:
-          exit(0);
-      }
-    default:
-      close(pipe_wd_[0]);
-      if (waitpid(pid, &statloc, 0) != pid) abort();
-      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
-  }
-
-  // Extra stack for signal handlers
-  int stack_size = kSignalHandlerStacksize;  // 2 MB
-  sighandler_stack_.ss_sp = smalloc(stack_size);
-  sighandler_stack_.ss_size = stack_size;
-  sighandler_stack_.ss_flags = 0;
-  if (sigaltstack(&sighandler_stack_, NULL) != 0)
-    abort();
-
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_sigaction = SendTrace;
-  sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-  sigfillset(&sa.sa_mask);
-
-  if (sigaction(SIGQUIT, &sa, NULL) ||
-      sigaction(SIGILL, &sa, NULL) ||
-      sigaction(SIGABRT, &sa, NULL) ||
-      sigaction(SIGFPE, &sa, NULL) ||
-      sigaction(SIGSEGV, &sa, NULL) ||
-      sigaction(SIGBUS, &sa, NULL) ||
-      sigaction(SIGPIPE, &sa, NULL) ||
-      sigaction(SIGXFSZ, &sa, NULL))
-  {
-    abort();
-  }
-  spawned_ = true;
-}
-
-unsigned GetMaxOpenFiles() {
-  return max_open_files_;
+  return max_open_files;
 }
 
 }  // namespace monitor

@@ -13,17 +13,31 @@ project (${PROJECT_NAME})
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.1.7
+## CVMFS_VERSION 2.1.9
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 1)
-set (CernVM-FS_VERSION_PATCH 7)
+set (CernVM-FS_VERSION_PATCH 9)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #
 # set the path where cmake looks for additional modules
 #
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
+#
+# Set install prefix to /usr.  Cvmfs is not relocatable.
+#
+if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  SET(CMAKE_INSTALL_PREFIX
+    "/usr" CACHE PATH "/usr install prefix" FORCE
+  )
+else (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  if (NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr")
+    Message("Warning: CernVM-FS is not relotable and expects to be installed under /usr")
+  endif ()
+endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+
 
 #
 # check if we are on Mac OS X
@@ -33,6 +47,13 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 else ()
 	set (MACOSX FALSE)
 endif ()
+
+#
+# check if we use Clang
+#
+if (CMAKE_CXX_COMPILER MATCHES ".*clang")
+	set(USING_CLANG 1)
+endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
 #
 # provide some options to the user
@@ -67,6 +88,7 @@ set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libcurl/src")
 set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")
 set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/sparsehash/src")
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/leveldb/src")
+set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/vjson/src")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -88,8 +110,13 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+
+if (NOT USING_CLANG)
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
+	set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
+endif (NOT USING_CLANG)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
@@ -124,9 +151,7 @@ check_include_file (execinfo.h HAVE_EXECINFO_H)
 check_include_file (poll.h HAVE_POLL_H)
 if (NOT MACOSX)
 	check_include_file (sys/statfs.h HAVE_SYS_STATFS_H)
-	check_include_file (ucontext.h HAVE_UCONTEXT_H)
-else ()
-	check_include_file (sys/ucontext.h HAVE_UCONTEXT_H)
+  check_include_file (attr/xattr.h HAVE_ATTR_XATTR_H)
 endif ()
 
 #

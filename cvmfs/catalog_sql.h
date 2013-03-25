@@ -23,6 +23,7 @@
 
 #include "hash.h"
 #include "dirent.h"
+#include "file_chunk.h"
 #include "shortstring.h"
 #include "duplex_sqlite3.h"
 
@@ -32,7 +33,7 @@ class Catalog;
 
 /**
  * Content-addressable chunks can be entire files, micro catalogs (ending L) or
- * pieces of large files (ending C)
+ * pieces of large files
  */
 enum ChunkTypes {
   kChunkFile = 0,
@@ -278,7 +279,7 @@ class SqlDirent : public Sql {
   const static int kFlagFile                = 4;
   const static int kFlagLink                = 8;
   const static int kFlagFileStat            = 16;  // currently unused
-  const static int kFlagFileChunk           = 64;  // currently unused
+  const static int kFlagFileChunk           = 64;
 
  protected:
   /**
@@ -486,6 +487,38 @@ class SqlIncLinkcount : public Sql {
   SqlIncLinkcount(const Database &database);
   bool BindPathHash(const hash::Md5 &hash);
   bool BindDelta(const int delta);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlChunkInsert : public Sql {
+ public:
+  SqlChunkInsert(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  bool BindFileChunk(const FileChunk &chunk);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlChunksRemove : public Sql {
+ public:
+  SqlChunksRemove(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlChunksListing : public Sql {
+ public:
+  SqlChunksListing(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  FileChunk GetFileChunk() const;
 };
 
 
