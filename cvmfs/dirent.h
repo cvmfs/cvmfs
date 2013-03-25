@@ -178,7 +178,7 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline explicit DirectoryEntry(const DirectoryEntryBase& base) :
     DirectoryEntryBase(base),
     catalog_(NULL),
-    cached_mtime_(0),
+    //cached_mtime_(0),
     hardlink_group_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false),
@@ -186,7 +186,7 @@ class DirectoryEntry : public DirectoryEntryBase {
 
   inline DirectoryEntry() :
     catalog_(NULL),
-    cached_mtime_(0),
+    //cached_mtime_(0),
     hardlink_group_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false),
@@ -207,10 +207,10 @@ class DirectoryEntry : public DirectoryEntryBase {
 
   inline const Catalog *catalog() const  { return catalog_; }
   inline uint32_t hardlink_group() const { return hardlink_group_; }
-  inline time_t cached_mtime() const     { return cached_mtime_; }
+  //inline time_t cached_mtime() const     { return cached_mtime_; }
 
   inline void set_hardlink_group(const uint32_t group) { hardlink_group_ = group; }
-  inline void set_cached_mtime(const time_t value)     { cached_mtime_ = value; }
+  //inline void set_cached_mtime(const time_t value)     { cached_mtime_ = value; }
 
   inline void set_is_nested_catalog_mountpoint(const bool val) {
     is_nested_catalog_mountpoint_ = val;
@@ -227,8 +227,8 @@ private:
   // Associated cvmfs catalog
   Catalog* catalog_;
 
-  time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
-                              need to be invalidated (file has changed) */
+  //time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
+  //                            need to be invalidated (file has changed) */
 
   // Hardlink handling is a bit unsual in CVMFS. Since inodes are allocated
   // on demand we only save hardlink relationships using a `hardlink_group`

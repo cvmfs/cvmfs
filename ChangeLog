@@ -1,4 +1,5 @@
 2.1.9:
+  * Fixed several memory leaks when reloading the Fuse module
   * Improved logging for whitelist verification errors
   * Added "remount fence" in order to ensure consistent
     catalog operations

@@ -1113,18 +1113,15 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      // If file has changed with a new catalog, the kernel data cache needs
-      // to be invalidated.  Special case: 0s metadata timeout includes no page
-      // cache
       fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
-      if (dirent.cached_mtime() != dirent.mtime()) {
+      /*if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "file might be new or changed, invalidating cache (%d %d %d)",
                  dirent.mtime(), dirent.cached_mtime(), ino);
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
         inode_cache_->Insert(ino, dirent);
-      }
+      }*/
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
@@ -2097,6 +2094,10 @@ static void Fini() {
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
+  delete cvmfs::cachedir_;
+  delete cvmfs::tracefile_;
+  delete cvmfs::repository_name_;
+  delete cvmfs::mountpoint_;
   cvmfs::remount_fence_ = NULL;
   cvmfs::catalog_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
@@ -2109,6 +2110,11 @@ static void Fini() {
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
+  cvmfs::cachedir_ = NULL;
+  cvmfs::tracefile_ = NULL;
+  cvmfs::repository_name_ = NULL;
+  cvmfs::mountpoint_= NULL;
+
 
   sqlite3_shutdown();
   if (g_sqlite_page_cache) free(g_sqlite_page_cache);
@@ -2118,6 +2124,7 @@ static void Fini() {
 
   delete g_boot_error;
   g_boot_error = NULL;
+  SetLogSyslogPrefix("");
 }
 
 
