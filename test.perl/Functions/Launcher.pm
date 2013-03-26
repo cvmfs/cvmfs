@@ -57,10 +57,8 @@ sub launch {
 			$error_found = 1;
 			send_msg($err);
 		}
-		unless ($error_found) {
-			while (defined(my $line = $outfh->getline)){
-				send_msg($line);
-			}
+		while (defined(my $line = $outfh->getline)){
+			send_msg($line);
 		}
 	}
 	else {
