@@ -48,6 +48,7 @@ GlueBuffer::GlueBuffer(const unsigned size) {
   buffer_ = new BufferEntry[size_];
   atomic_init64(&buffer_pos_);
   cwd_buffer_ = NULL;
+  active_inodes_ = NULL;
   InitLock();
 }
 
@@ -64,6 +65,7 @@ void GlueBuffer::CopyFrom(const GlueBuffer &other) {
   buffer_pos_ = other.buffer_pos_;
   statistics_ = other.statistics_;
   cwd_buffer_ = other.cwd_buffer_;
+  active_inodes_ = other.active_inodes_;
 }
 
 
@@ -138,16 +140,28 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
     }
   }
   if (parent_idx < 0) {
+    if (active_inodes_) {
+      LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
+               "active inodes buffer, inode: %u", needle_inode);
+      bool retval = active_inodes_->Find(needle_inode, path);
+      if (retval) {
+        atomic_inc64(&statistics_.num_jmpai_hits);
+        return true;
+      }
+      atomic_inc64(&statistics_.num_jmpai_misses);
+    }
+    
     if (cwd_buffer_) {
       LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
                "cwd buffer, inode: %u", needle_inode);
       bool retval = cwd_buffer_->Find(needle_inode, path);
       if (retval) {
-        atomic_inc64(&statistics_.num_jump_hits);
+        atomic_inc64(&statistics_.num_jmpcwd_hits);
         return true;
       }
+      atomic_inc64(&statistics_.num_jmpcwd_misses);
     }
-    atomic_inc64(&statistics_.num_jump_misses);
+    
     return false;
   }
   
@@ -159,9 +173,8 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
 }
 
 
-bool GlueBuffer::AncientInode2Path(const uint64_t inode, 
-                                   const uint32_t current_generation,
-                                   PathString *path)
+bool GlueBuffer::Find(const uint64_t inode, const uint32_t current_generation,
+                      PathString *path)
 {
   assert(path->IsEmpty());
   WriteLock();
@@ -221,7 +234,7 @@ void CwdBuffer::CopyFrom(const CwdBuffer &other) {
 }
 
 
-CwdBuffer::CwdBuffer(const std::string mountpoint) { 
+CwdBuffer::CwdBuffer(const std::string &mountpoint) { 
   version_ = kVersion;
   mountpoint_ = mountpoint;
   InitLock();
@@ -425,4 +438,198 @@ void CwdBuffer::BeforeRemount(catalog::AbstractCatalogManager *source) {
     if (retval)
       Add(inode, open_cwds[i]);
   }
+}
+
+
+//------------------------------------------------------------------------------
+
+
+void ActiveInodesBuffer::InitLocks() {
+  lock_inodes_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_inodes_, NULL);
+  assert(retval == 0);
+  lock_paths_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(lock_paths_, NULL);
+  assert(retval == 0);
+}
+
+
+void ActiveInodesBuffer::InitSpecialInodes() {
+  inode_references_.set_deleted_key(0);
+  inode2path_->set_deleted_key(0);
+  //inode_references_.set_empty_key(1);  Only required for densemap
+}
+
+
+void ActiveInodesBuffer::CopyFrom(const ActiveInodesBuffer &other) {
+  inode2path_ = new PathMap(*other.inode2path_);
+  inode_references_ = other.inode_references_;
+  statistics_ = other.statistics_;
+}
+
+
+ActiveInodesBuffer::ActiveInodesBuffer() { 
+  version_ = kVersion;
+  inode2path_ = new PathMap();
+  InitLocks();
+  InitSpecialInodes();
+}
+
+
+ActiveInodesBuffer::ActiveInodesBuffer(const ActiveInodesBuffer &other) {
+  assert(other.version_ == kVersion);
+  version_ = kVersion;
+  CopyFrom(other);
+  InitLocks();
+  InitSpecialInodes();
+}
+
+
+ActiveInodesBuffer &ActiveInodesBuffer::operator= (
+  const ActiveInodesBuffer &other) 
+{
+  if (&other == this)
+    return *this;
+  
+  assert(other.version_ == kVersion);
+  delete inode2path_;
+  CopyFrom(other);
+  return *this;
+}
+
+
+ActiveInodesBuffer::~ActiveInodesBuffer() {
+  delete inode2path_;
+  pthread_mutex_destroy(lock_inodes_);
+  pthread_mutex_destroy(lock_paths_);
+  free(lock_inodes_);
+  free(lock_paths_);
+}
+
+
+void ActiveInodesBuffer::VfsGet(const uint64_t inode) {
+  LockInodes();
+  InodeReferences::iterator iter_inodes = inode_references_.find(inode);
+  if (iter_inodes != inode_references_.end()) {
+    (*iter_inodes).second = (*iter_inodes).second + 1;
+  } else {
+    inode_references_[inode] = 1;
+    atomic_inc64(&statistics_.num_inserts);
+  }
+  UnlockInodes();
+  atomic_inc64(&statistics_.num_references);
+}
+
+
+void ActiveInodesBuffer::VfsPut(const uint64_t inode) {
+  LockInodes();
+  InodeReferences::iterator iter_inodes = inode_references_.find(inode);
+  if (iter_inodes == inode_references_.end()) {
+    LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "failed to locate inode %"
+             PRIu64" in VfsPut", inode);
+    UnlockInodes();
+    return;
+  }
+  uint32_t new_references = (*iter_inodes).second - 1;
+  if (new_references == 0) {
+    inode_references_.erase(iter_inodes);
+    atomic_inc64(&statistics_.num_removes);
+  } else {
+    (*iter_inodes).second = new_references;
+  }
+  UnlockInodes();
+  atomic_dec64(&statistics_.num_references);
+}
+
+
+bool ActiveInodesBuffer::Find(const uint64_t inode, PathString *path) {
+  assert(path->IsEmpty());
+  bool result = false;
+  LockPaths();
+  result = ConstructPath(inode, path);
+  UnlockPaths();
+  
+  if (result) {
+    atomic_inc64(&statistics_.num_ancient_hits);
+    return true;
+  }
+  atomic_inc64(&statistics_.num_ancient_misses);
+  return false;
+}
+
+
+bool ActiveInodesBuffer::ConstructPath(const uint64_t inode, PathString *path) {
+  PathMap::const_iterator needle = inode2path_->find(inode);
+  if (needle == inode2path_->end())
+    return false;
+  if (needle->second.name.IsEmpty())
+    return true;
+  
+  bool retval = ConstructPath(needle->second.parent_inode, path);
+  path->Append("/", 1);
+  path->Append(needle->second.name.GetChars(), needle->second.name.GetLength());  
+  if (!retval) {
+    LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "internal error: "
+             "active inode buffer inconsistent (path %s)", path->c_str());
+  }
+  return retval;
+}
+
+
+void ActiveInodesBuffer::MaterializePaths(
+  catalog::AbstractCatalogManager *source)
+{
+  LockInodes();
+  LockPaths();
+  PathMap *new_map = new PathMap();
+  for (InodeReferences::const_iterator i = inode_references_.begin(),
+       iEnd = inode_references_.end(); i != iEnd; ++i)
+  {
+    PathMap::const_iterator hit = inode2path_->find(i->first);
+    if (hit != inode2path_->end()) {
+      // Rescue the old inode including its parents
+      (*new_map)[i->first] = hit->second;
+      while (!hit->second.name.IsEmpty()) {
+        hit = inode2path_->find(hit->second.parent_inode);
+        if (hit == inode2path_->end()) {
+          LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog,
+                   "internal error: reconstruction error for inode %"PRIu64,
+                   i->first);
+          break;
+        }
+        (*new_map)[hit->first] = hit->second;
+      }
+      continue;
+    }
+    
+    // Recover the path step by step from catalog and existing entries
+    uint64_t needle_inode = i->first;
+    do {
+      hit = new_map->find(needle_inode);
+      if (hit != new_map->end())
+        break;
+      
+      catalog::DirectoryEntry dirent;
+      bool retval = source->Inode2DirentUnprotected(needle_inode, &dirent);
+      atomic_inc64(&statistics_.num_dirent_lookups);
+      if (!retval) {
+        LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "internal error: "
+                 "active inode buffer lookup failure inode %"PRIu64, i->first);
+        break;
+      }
+      
+      MinimalDirent new_entry(dirent.parent_inode(), dirent.name());
+      (*new_map)[needle_inode] = new_entry;
+      // Root inode reached
+      if (dirent.name().IsEmpty())
+        break;
+      needle_inode = dirent.parent_inode();
+    } while (true);
+  }
+  delete inode2path_;
+  inode2path_ = new_map;
+  UnlockPaths();
+  UnlockInodes();
 }

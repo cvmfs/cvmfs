@@ -38,6 +38,7 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
                       lru::Statistics *md5path_stats);
 std::string PrintGlueBufferStatistics();
 std::string PrintCwdBufferStatistics();
+std::string PrintActiveInodesBufferStatistics();
 std::string PrintInodeGeneration();
 catalog::Statistics GetCatalogStatistics();
 std::string GetCertificateStats();

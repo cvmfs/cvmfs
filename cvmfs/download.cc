@@ -1063,6 +1063,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
     curl_multi_cleanup(*i);
   }
   pool_handles_inuse_->clear();
+  free(watch_fds_);
 
   LogCvmfs(kLogDownload, kLogDebug, "download I/O thread terminated");
   return NULL;

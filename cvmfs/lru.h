@@ -689,6 +689,7 @@ class LruCache {
 
   virtual ~LruCache() {
     delete lru_list_;
+    delete LruCache<Key, Value>::allocator_;
 #ifdef LRU_CACHE_THREAD_SAFE
     pthread_mutex_destroy(&lock_);
 #endif

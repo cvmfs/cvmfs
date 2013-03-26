@@ -1,4 +1,8 @@
 2.1.9:
+  * Fix: save and restore open dir and open file counters
+    when the fuse module is reloaded
+  * Fixed several memory leaks when reloading the Fuse module
+  * Improved logging for whitelist verification errors
   * Added "remount fence" in order to ensure consistent
     catalog operations
   * Fix: Rewind file descriptor on download retries
@@ -6,8 +10,9 @@
   * Pretty printing for 'cvmfs_config reload'
   * Fixed selinux context for SL5 in cvmfs_server
   * Omit autofs warnings in NFS mode
-  * Added "glue buffer" and "cwd buffer" to smoothly connect 
-    catalog reloads and reloads of the Fuse module
+  * Added "glue buffer", "cwd buffer", and "active inodes buffer" 
+    to smoothly connect catalog reloads and reloads of the 
+    Fuse module
   * Fix: handling of "-n" option in mount helper
   * Log application of new file system snapshots to syslog
 
