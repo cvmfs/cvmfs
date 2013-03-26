@@ -97,9 +97,11 @@ uint64_t Counters::GetAllEntries() const {
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string &root_path, const string &file) {
+Catalog *AttachFreely(const string  &root_path,
+                      const string  &file,
+                            Catalog *parent) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()), NULL);
+    new Catalog(PathString(root_path.data(), root_path.length()), parent);
   bool retval = catalog->OpenDatabase(file);
   if (!retval) {
     delete catalog;

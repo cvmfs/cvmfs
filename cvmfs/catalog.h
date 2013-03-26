@@ -116,7 +116,7 @@ class InodeAnnotation {
   virtual void SetGeneration(const uint64_t new_generation) = 0;
   // Used to detect ancient inodes from previous generations
   virtual bool ValidInode(const uint64_t inode) { return true; }
-  
+
   inode_t Strip(const inode_t annotated_inode) {
     // Clear upper bits
     return ((uint64_t(1) << num_protected_bits_) - 1) & annotated_inode;
@@ -276,7 +276,9 @@ class Catalog : public SingleCopy {
   SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
 
-Catalog *AttachFreely(const std::string &root_path, const std::string &file);
+Catalog *AttachFreely(const std::string  &root_path,
+                      const std::string  &file,
+                            Catalog      *parent = NULL);
 
 }  // namespace catalog
 
