@@ -21,6 +21,7 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_info.h"
+#include "swissknife_migrate.h"
 
 using namespace std;  // NOLINT
 using namespace swissknife;
@@ -74,6 +75,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandZpipe());
   command_list.push_back(new swissknife::CommandInfo());
   command_list.push_back(new swissknife::CommandVersion());
+  command_list.push_back(new swissknife::CommandMigrate());
 
   if (argc < 2) {
     swissknife::Usage();

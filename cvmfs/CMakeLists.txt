@@ -124,6 +124,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_sync.h swissknife_sync.cc
   swissknife_info.h swissknife_info.cc
   swissknife_history.h swissknife_history.cc
+  swissknife_migrate.h swissknife_migrate.cc
   swissknife.h swissknife.cc)
 
 
