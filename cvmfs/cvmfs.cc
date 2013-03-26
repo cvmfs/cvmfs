@@ -623,12 +623,18 @@ static bool GetDirentForPath(const PathString &path,
   }
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+  bool retval;
+  if (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode)) {
+    retval = catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent);
+  } else {
+    retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
+    dirent->set_parent_inode(parent_inode);
+  }
+  if (retval) {
     if (nfs_maps_) {
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
     }
-    dirent->set_parent_inode(parent_inode);
     AddToGlueBuffer(*dirent);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
