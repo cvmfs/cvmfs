@@ -493,6 +493,25 @@ get_expiry() {
 }
 
 
+check_upstream_validity() {
+  local upstream=$1
+  local silent=0
+  if [ $# -gt 1 ]; then
+    silent=1;
+  fi
+
+  # checks if $upstream contains _exactly three_ comma separated data fields
+  if echo $upstream | grep -q "^[^,]*,[^,]*,[^,]*$"; then
+    return 0
+  fi
+
+  if [ $silent -ne 1 ]; then
+    usage "The given upstream definition (-u) is invalid. Should look like:
+      <spooler type> , <tmp directory> , <spooler configuration>"
+  fi
+  return 1
+}
+
 check_upstream_type() {
   local upstream=$1
   local needle_type=$2
@@ -740,6 +759,7 @@ mkfs() {
   # sanity checks
   check_repository_existence $name && die "The repository $name already exists"
   is_root || die "Only root can create a new repository"
+  check_upstream_validity $upstream
 
   # other configurations
   local cvmfs_user=`get_cvmfs_owner $name $owner`
@@ -999,6 +1019,7 @@ add_replica() {
   if is_local_upstream $upstream; then
     [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
   fi
+  check_upstream_validity $upstream
 
   echo -n "Creating configuration files... "
   mkdir -p /etc/cvmfs/repositories.d/${name}
