@@ -139,14 +139,18 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
       break;
     }
   }
-  if (parent_idx < 0) {
+  bool retval;
+  if (parent_idx >= 0) {
+    retval = ConstructPath(parent_idx, path);
+  } else {
     if (active_inodes_) {
       LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
                "active inodes buffer, inode: %u", needle_inode);
       bool retval = active_inodes_->Find(needle_inode, path);
       if (retval) {
         atomic_inc64(&statistics_.num_jmpai_hits);
-        return true;
+        retval = true;
+        goto construct_path_append;
       }
       atomic_inc64(&statistics_.num_jmpai_misses);
     }
@@ -157,15 +161,16 @@ bool GlueBuffer::ConstructPath(const unsigned buffer_idx, PathString *path) {
       bool retval = cwd_buffer_->Find(needle_inode, path);
       if (retval) {
         atomic_inc64(&statistics_.num_jmpcwd_hits);
-        return true;
+        retval = true;
+        goto construct_path_append;
       }
       atomic_inc64(&statistics_.num_jmpcwd_misses);
     }
     
-    return false;
+    retval = false;
   }
   
-  bool retval = ConstructPath(parent_idx, path);
+ construct_path_append:
   path->Append("/", 1);
   path->Append(buffer_[buffer_idx].name.GetChars(), 
                buffer_[buffer_idx].name.GetLength());  

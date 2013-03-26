@@ -321,7 +321,7 @@ class ActiveInodesBuffer {
 
 
 class GlueRemountListener : public catalog::RemountListener {
-public:
+ public:
   GlueRemountListener(CwdBuffer *cwd_buffer, 
                       ActiveInodesBuffer *active_inodes) 
   {
@@ -332,7 +332,7 @@ public:
     cwd_buffer_->BeforeRemount(source);
     active_inodes_->MaterializePaths(source);
   }
-private:
+ private:
   CwdBuffer *cwd_buffer_;
   ActiveInodesBuffer *active_inodes_;
 };

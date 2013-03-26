@@ -519,7 +519,7 @@ static inline void AddToGlueBuffer(const catalog::DirectoryEntry &dirent) {
     glue_buffer_->AddDirent(dirent);
 }
   
-  
+
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -623,18 +623,14 @@ static bool GetDirentForPath(const PathString &path,
   }
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  bool retval;
-  if (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode)) {
-    retval = catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent);
-  } else {
-    retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
-    dirent->set_parent_inode(parent_inode);
-  }
+  bool retval = 
+    catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
   if (retval) {
     if (nfs_maps_) {
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
     }
+    dirent->set_parent_inode(parent_inode);
     AddToGlueBuffer(*dirent);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
