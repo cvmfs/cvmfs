@@ -512,6 +512,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     }
   }
 
+  if (shared_)
+    unlink(((*cache_dir_) + "/cachemgr").c_str());
   LogCvmfs(kLogQuota, kLogDebug, "stopping cache manager (%d)", errno);
   close(pipe_lru_[0]);
   ProcessCommandBunch(num_commands, command_buffer, path_buffer);
@@ -1043,7 +1045,8 @@ int MainCacheManager(int argc, char **argv) {
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
-    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO (%d)", errno);
+    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO %s (%d)",
+             fifo_path.c_str(), errno);
     return 1;
   }
   Nonblock2Block(pipe_lru_[0]);
@@ -1058,7 +1061,8 @@ int MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
 
   MainCommandServer(NULL);
-  unlink(fifo_path.c_str());
+  //unlink(fifo_path.c_str());  Has to happen in shutdown command in order to
+  // avoid race
   CloseDatabase();
   unlink(crash_guard.c_str());
 
