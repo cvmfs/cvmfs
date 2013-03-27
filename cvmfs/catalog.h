@@ -22,6 +22,9 @@
 #include "duplex_sqlite3.h"
 #include "util.h"
 
+namespace swissknife {
+  class CommandMigrate;
+}
 
 namespace catalog {
 
@@ -138,7 +141,8 @@ class InodeAnnotation {
  */
 class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
-  friend class SqlLookup;  // for mangled inode
+  friend class SqlLookup;                  // for mangled inode
+  friend class swissknife::CommandMigrate; // for catalog version migration
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
 
