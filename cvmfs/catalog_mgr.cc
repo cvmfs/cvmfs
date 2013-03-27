@@ -402,10 +402,8 @@ bool AbstractCatalogManager::Inode2DirentUnprotected(const inode_t inode,
   EnforceSqliteMemLimit();
   
   // Don't lookup ancient inodes
-  if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
-    Unlock();
+  if (inode_annotation_ && !inode_annotation_->ValidInode(inode))
     return false;
-  }
   
   // Get corresponding catalog
   Catalog *catalog = Inode2Catalog(inode);
