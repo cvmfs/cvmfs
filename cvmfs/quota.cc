@@ -954,7 +954,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     UnlockFile(fd_lockfile);
     close(pipe_boot[0]);
     close(pipe_handshake[1]);
-    LogCvmfs(kLogQuota, kLogDebug, "cache manager did not start");
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "cache manager did not start");
     return false;
   }
   close(pipe_boot[0]);
