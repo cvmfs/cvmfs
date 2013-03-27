@@ -188,7 +188,9 @@ class CatalogTraversal
     catalog::Catalog *catalog = catalog::AttachFreely(job.path,
                                                       tmp_file,
                                                       job.parent);
-    unlink(tmp_file.c_str());
+    if (! no_close_) {
+      unlink(tmp_file.c_str());
+    }
     if (catalog == NULL) {
       LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to open catalog %s",
                job.hash.ToString().c_str());
