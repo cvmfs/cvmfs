@@ -58,8 +58,9 @@ class Database {
   Database(const std::string filename, const OpenMode open_mode);
   ~Database();
   static bool Create(const std::string &filename,
-                     const DirectoryEntry &root_entry,
-                     const std::string &root_path);
+                     const std::string &root_path,
+                     const DirectoryEntry &root_entry
+                                             = DirectoryEntry(kDirentNegative));
 
   sqlite3 *sqlite_db() const { return sqlite_db_; }
   std::string filename() const { return filename_; }

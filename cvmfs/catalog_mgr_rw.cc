@@ -137,7 +137,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   string root_path = "";
 
   // Create the database schema and the inital root entry
-  if (!Database::Create(file_path, root_entry, root_path)) {
+  if (!Database::Create(file_path, root_path, root_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
              file_path.c_str());
     return NULL;
@@ -574,7 +574,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   const string database_file_path = CreateTempPath(dir_temp_ + "/catalog",
                                                    0666);
   retval =
-    Database::Create(database_file_path, new_root_entry, nested_root_path);
+    Database::Create(database_file_path, nested_root_path, new_root_entry);
   assert(retval);
 
   // Attach the just created nested catalog

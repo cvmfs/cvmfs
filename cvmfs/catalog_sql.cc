@@ -124,9 +124,8 @@ Database::~Database() {
  * This method creates a new database file and initializes the database schema.
  */
 bool Database::Create(const string &filename,
-                      const DirectoryEntry &root_entry,
-                      const string &root_path)
-{
+                      const string &root_path,
+                      const DirectoryEntry &root_entry) {
   sqlite3 *sqlite_db;
   SqlDirentInsert *sql_insert;
   Sql *sql_schema;
@@ -222,14 +221,16 @@ bool Database::Create(const string &filename,
     goto create_schema_fail;
 
   // Insert root entry
-  sql_insert = new SqlDirentInsert(database);
-  retval = sql_insert->BindPathHash(root_path_hash) &&
-           sql_insert->BindParentPathHash(root_parent_hash) &&
-           sql_insert->BindDirent(root_entry) &&
-           sql_insert->Execute();
-  delete sql_insert;
-  if (!retval)
-    goto create_schema_fail;
+  if (!root_entry.IsNegative()) {
+    sql_insert = new SqlDirentInsert(database);
+    retval = sql_insert->BindPathHash(root_path_hash) &&
+             sql_insert->BindParentPathHash(root_parent_hash) &&
+             sql_insert->BindDirent(root_entry) &&
+             sql_insert->Execute();
+    delete sql_insert;
+    if (!retval)
+      goto create_schema_fail;
+  }
 
   if (root_path != "") {
     retval = Sql(database, "INSERT INTO properties "
