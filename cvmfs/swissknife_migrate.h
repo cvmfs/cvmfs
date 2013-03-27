@@ -10,6 +10,9 @@
 #include "hash.h"
 #include "util_concurrency.h"
 #include "catalog.h"
+#include "upload.h"
+
+#include <map>
 
 namespace catalog {
   class WritableCatalog;
@@ -23,28 +26,42 @@ class CommandMigrate : public Command {
     std::vector<Future<catalog::Catalog::NestedCatalog>* >
     FutureNestedCatalogList;
 
+  struct PendingCatalog {
+    PendingCatalog(const bool                               success        = false,
+                   catalog::WritableCatalog                *new_catalog    = NULL,
+                   Future<catalog::Catalog::NestedCatalog> *new_nested_ref = NULL) :
+      success(success),
+      new_catalog(new_catalog),
+      new_nested_ref(new_nested_ref) {}
+
+    bool                                      success;
+    catalog::WritableCatalog                 *new_catalog;
+    Future<catalog::Catalog::NestedCatalog>  *new_nested_ref;
+  };
+
+  class PendingCatalogMap : public std::map<std::string, PendingCatalog>,
+                            public Lockable {};
+
   class MigrationWorker : public ConcurrentWorker<MigrationWorker> {
    public:
     struct expected_data {
       expected_data(
         const catalog::Catalog                         *catalog,
-              Future<catalog::Catalog::NestedCatalog>  *new_catalog,
+              Future<catalog::Catalog::NestedCatalog>  *new_nested_ref,
         const FutureNestedCatalogList                  &future_nested_catalogs) :
         catalog(catalog),
-        new_catalog(new_catalog),
+        new_nested_ref(new_nested_ref),
         future_nested_catalogs(future_nested_catalogs) {}
       expected_data() :
         catalog(NULL),
-        new_catalog(NULL) {}
+        new_nested_ref(NULL) {}
 
       const catalog::Catalog                         *catalog;
-            Future<catalog::Catalog::NestedCatalog>  *new_catalog;
+            Future<catalog::Catalog::NestedCatalog>  *new_nested_ref;
       const FutureNestedCatalogList                   future_nested_catalogs;
     };
 
-    struct returned_data {
-
-    };
+    typedef PendingCatalog returned_data;
 
     struct worker_context {
       worker_context(const std::string temporary_directory) :
@@ -69,7 +86,6 @@ class CommandMigrate : public Command {
     const std::string temporary_directory_;
   };
 
-
  public:
   CommandMigrate();
   ~CommandMigrate() { };
@@ -82,12 +98,13 @@ class CommandMigrate : public Command {
 
   int Main(const ArgumentList &args);
 
-  void MigrationCallback(const MigrationWorker::returned_data &data);
 
  protected:
   void CatalogCallback(const catalog::Catalog* catalog,
                        const hash::Any&        catalog_hash,
                        const unsigned          tree_level);
+  void MigrationCallback(const PendingCatalog &data);
+  void UploadCallback(const upload::SpoolerResult &result);
 
   void ConvertCatalogsRecursively(
               const catalog::Catalog                         *catalog,
@@ -103,6 +120,8 @@ class CommandMigrate : public Command {
 
   catalog::Catalog const*                        root_catalog_;
   UniquePtr<ConcurrentWorkers<MigrationWorker> > concurrent_migration;
+  UniquePtr<upload::Spooler>                     spooler_;
+  PendingCatalogMap                              pending_catalogs_;
 };
 
 }

@@ -7,6 +7,7 @@
 #include "catalog_traversal.h"
 #include "catalog_sql.h"
 #include "catalog_rw.h"
+
 #include "logging.h"
 
 using namespace swissknife;
@@ -35,13 +36,23 @@ ParameterList CommandMigrate::GetParams() {
 
 int CommandMigrate::Main(const ArgumentList &args) {
   // parameter parsing
-  const std::string &repo_url = *args.find('r')->second;
+  const std::string &repo_url  = *args.find('r')->second;
+  const std::string &spooler   = *args.find('u')->second;
   const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second : "";
   const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
 
+  // create an upstream spooler
+  const upload::SpoolerDefinition spooler_definition(spooler);
+  spooler_ = upload::Spooler::Construct(spooler_definition);
+  if (!spooler_) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create upstream Spooler.");
+    return 2;
+  }
+  spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
+
   // create a concurrent catalog migration facility
   const unsigned int cpus = GetNumberOfCpuCores();
-  MigrationWorker::worker_context context("/tmp"); // TODO: this is a bit senseless (look into the upstream definition)
+  MigrationWorker::worker_context context(spooler_definition.temporary_path);
   concurrent_migration = new ConcurrentWorkers<MigrationWorker>(
                                 cpus,
                                 cpus * 10,
@@ -49,13 +60,13 @@ int CommandMigrate::Main(const ArgumentList &args) {
   if (! concurrent_migration->Initialize()) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to initialize worker migration "
                                       "system.");
-    return 2;
+    return 3;
   }
   concurrent_migration->RegisterListener(&CommandMigrate::MigrationCallback,
                                          this);
 
   // load the full catalog hierarchy
-  LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree");
+  LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
   CatalogTraversal<CommandMigrate> traversal(
     this,
@@ -68,18 +79,28 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   if (!loading_successful) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to load catalog tree");
-    return 3;
+    return 4;
   }
 
   assert (root_catalog_ != NULL);
 
   // migrate catalogs recursively (starting with the deepest nested catalogs)
-  LogCvmfs(kLogCatalog, kLogStdout, "\nConverting catalogs");
+  LogCvmfs(kLogCatalog, kLogStdout, "\nMigrating catalogs...");
   Future<Catalog::NestedCatalog> *new_root_catalog =
                                              new Future<Catalog::NestedCatalog>;
   ConvertCatalogsRecursively(root_catalog_, new_root_catalog);
-
   concurrent_migration->WaitForEmptyQueue();
+  spooler_->WaitForUpload();
+
+  const unsigned int errors = concurrent_migration->GetNumberOfFailedJobs() +
+                              spooler_->GetNumberOfErrors();
+
+  LogCvmfs(kLogCatalog, kLogStdout, "\nMigration finished with %d errors.",
+           errors);
+
+  if (errors > 0) {
+    return 5;
+  }
 
   return 0;
 }
@@ -115,18 +136,72 @@ void CommandMigrate::CatalogCallback(const Catalog*    catalog,
 }
 
 
-void CommandMigrate::MigrationCallback(const MigrationWorker::returned_data &data) {
-  LogCvmfs(kLogCatalog, kLogStdout, "got callback. failed jobs: %d",
-           concurrent_migration->GetNumberOfFailedJobs());
+void CommandMigrate::MigrationCallback(
+                                  const CommandMigrate::PendingCatalog &data) {
+  const std::string &path = data.new_catalog->database_path();
+
+  // check if the migration of the catalog was successful
+  if (!data.success) {
+    LogCvmfs(kLogCatalog, kLogStderr, "FAILED migration of %s", path.c_str());
+    return;
+  }
+
+  // save the processed catalog in the pending map
+  {
+    LockGuard<PendingCatalogMap> guard(pending_catalogs_);
+    assert (pending_catalogs_.find(path) == pending_catalogs_.end());
+    pending_catalogs_[path] = data;
+  }
+
+  // schedule the compression and upload of the catalog
+  const bool chunking = false;
+  spooler_->Process(path, chunking);
+}
+
+
+void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
+  const std::string &path = result.local_path;
+
+  // remove the just uploaded file
+  unlink(path.c_str());
+
+  // check if the upload was successful
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "FAILED upload of %s", path.c_str());
+    return;
+  }
+  assert (result.file_chunks.size() == 0);
+
+  // find the catalog path in the pending catalogs and remove it from the list
+  PendingCatalog catalog;
+  {
+    LockGuard<PendingCatalogMap> guard(pending_catalogs_);
+    PendingCatalogMap::iterator i = pending_catalogs_.find(path);
+    assert (i != pending_catalogs_.end());
+    catalog = i->second;
+    pending_catalogs_.erase(i);
+  }
+
+  // the catalog is completely processed... fill the future to allow the
+  // processing of parent catalogs
+  Catalog::NestedCatalog nested_catalog;
+  nested_catalog.path = PathString(path);
+  nested_catalog.hash = result.content_hash;
+  catalog.new_nested_ref->Set(nested_catalog);
+
+  // TODO: do some more cleanup
+  LogCvmfs(kLogCatalog, kLogStdout, "migrated and uploaded %sC %s",
+           result.content_hash.ToString().c_str(),
+           catalog.new_catalog->path().ToString().c_str());
 }
 
 
 void CommandMigrate::ConvertCatalog(
                 const Catalog                         *catalog,
-                      Future<Catalog::NestedCatalog>  *new_catalog,
+                      Future<Catalog::NestedCatalog>  *new_nested_ref,
                 const FutureNestedCatalogList         &future_nested_catalogs) {
   MigrationWorker::expected_data data(catalog,
-                                      new_catalog,
+                                      new_nested_ref,
                                       future_nested_catalogs);
   concurrent_migration->Schedule(data);
 }
@@ -134,7 +209,7 @@ void CommandMigrate::ConvertCatalog(
 
 void CommandMigrate::ConvertCatalogsRecursively(
                            const Catalog                         *catalog,
-                                 Future<Catalog::NestedCatalog>  *new_catalog) {
+                                 Future<Catalog::NestedCatalog>  *new_nested_ref) {
   // first migrate all nested catalogs (depth first traversal)
   const CatalogList nested_catalogs = catalog->GetChildren();
   FutureNestedCatalogList future_nested_catalogs;
@@ -142,14 +217,14 @@ void CommandMigrate::ConvertCatalogsRecursively(
   CatalogList::const_iterator i    = nested_catalogs.begin();
   CatalogList::const_iterator iend = nested_catalogs.end();
   for (; i != iend; ++i) {
-    Future<Catalog::NestedCatalog> *new_catalog =
+    Future<Catalog::NestedCatalog> *new_nested_ref =
                                          new Future<Catalog::NestedCatalog>;
-    future_nested_catalogs.push_back(new_catalog);
-    ConvertCatalogsRecursively(*i, new_catalog);
+    future_nested_catalogs.push_back(new_nested_ref);
+    ConvertCatalogsRecursively(*i, new_nested_ref);
   }
 
   // migrate this catalog referencing all it's (already migrated) children
-  ConvertCatalog(catalog, new_catalog, future_nested_catalogs);
+  ConvertCatalog(catalog, new_nested_ref, future_nested_catalogs);
 }
 
 
@@ -166,7 +241,7 @@ CommandMigrate::MigrationWorker::~MigrationWorker() {
 void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   // unbox data structure for convenience
   const Catalog                        *catalog     = data.catalog;
-        Future<Catalog::NestedCatalog> *new_catalog = data.new_catalog;
+        Future<Catalog::NestedCatalog> *new_nested_ref = data.new_nested_ref;
   const FutureNestedCatalogList        &future_nested_catalogs =
                                                     data.future_nested_catalogs;
 
@@ -174,14 +249,14 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   WritableCatalog *writable_catalog = CreateNewEmptyCatalog(
                                                     catalog->path().ToString());
   if (writable_catalog == NULL) {
-    master()->JobFailed(returned_data());
+    master()->JobFailed(returned_data(false));
     return;
   }
 
   // migrate the catalog data (file meta data)
   const bool retval = MigrateFileMetadata(catalog, writable_catalog);
   if (!retval) {
-    master()->JobFailed(returned_data());
+    master()->JobFailed(returned_data(false));
     return;
   }
 
@@ -194,13 +269,9 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     nested_catalogs.push_back((*i)->Get());
   }
 
-  // TODO: move this to a more reasonable place
-  Catalog::NestedCatalog nested_catalog;
-  nested_catalog.path = catalog->path();
-  nested_catalog.hash = hash::Any(hash::kSha1);
-  new_catalog->Set(nested_catalog);
-
-  master()->JobSuccessful(returned_data());
+  master()->JobSuccessful(returned_data(true,
+                                        writable_catalog,
+                                        new_nested_ref));
 }
 
 
@@ -359,6 +430,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   }
 
   writable_catalog->SetDirty();
+  writable_catalog->Commit();
 
   return true;
 }
