@@ -848,6 +848,7 @@ CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
 CVMFS_NFS_SOURCE=no
+CVMFS_NFS_SHARED=no
 EOF
   cat >> /etc/sudoers << EOF
 $cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
