@@ -49,6 +49,7 @@ set (CVMFS2_DEBUG_SOURCES
   options.cc options.h
   talk.h talk.cc
   nfs_maps.h nfs_maps.cc
+  nfs_shared_maps.h nfs_shared_maps.cc
   glue_buffer.h glue_buffer.cc
   loader.h
   history.h history.cc
