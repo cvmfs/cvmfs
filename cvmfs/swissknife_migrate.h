@@ -8,6 +8,8 @@
 #include "swissknife.h"
 
 #include "hash.h"
+#include "util_concurrency.h"
+#include "catalog.h"
 
 namespace catalog {
   class Catalog;
@@ -16,6 +18,46 @@ namespace catalog {
 namespace swissknife {
 
 class CommandMigrate : public Command {
+ protected:
+  typedef
+    std::vector<Future<catalog::Catalog::NestedCatalog>* >
+    FutureNestedCatalogList;
+
+  class MigrationWorker : public ConcurrentWorker<MigrationWorker> {
+   public:
+    struct expected_data {
+      expected_data(
+        const catalog::Catalog                         *catalog,
+              Future<catalog::Catalog::NestedCatalog>  *new_catalog,
+        const FutureNestedCatalogList                  &future_nested_catalogs) :
+        catalog(catalog),
+        new_catalog(new_catalog),
+        future_nested_catalogs(future_nested_catalogs) {}
+      expected_data() :
+        catalog(NULL),
+        new_catalog(NULL) {}
+
+      const catalog::Catalog                         *catalog;
+            Future<catalog::Catalog::NestedCatalog>  *new_catalog;
+      const FutureNestedCatalogList                   future_nested_catalogs;
+    };
+
+    struct returned_data {
+
+    };
+
+    struct worker_context {
+
+    };
+
+   public:
+    MigrationWorker(const worker_context *context);
+    virtual ~MigrationWorker();
+
+    void operator()(const expected_data &data);
+  };
+
+
  public:
   CommandMigrate();
   ~CommandMigrate() { };
@@ -28,14 +70,27 @@ class CommandMigrate : public Command {
 
   int Main(const ArgumentList &args);
 
+  void MigrationCallback(const MigrationWorker::returned_data &data);
+
  protected:
   void CatalogCallback(const catalog::Catalog* catalog,
                        const hash::Any&        catalog_hash,
                        const unsigned          tree_level);
 
+  void ConvertCatalogsRecursively(
+              const catalog::Catalog                         *catalog,
+                    Future<catalog::Catalog::NestedCatalog>  *new_catalog);
+  void ConvertCatalog(
+        const catalog::Catalog                         *catalog,
+              Future<catalog::Catalog::NestedCatalog>  *new_catalog,
+        const FutureNestedCatalogList                  &future_nested_catalogs);
+
  private:
-  bool print_tree_;
-  bool print_hash_;
+  bool              print_tree_;
+  bool              print_hash_;
+
+  catalog::Catalog const*                        root_catalog_;
+  UniquePtr<ConcurrentWorkers<MigrationWorker> > concurrent_migration;
 };
 
 }
