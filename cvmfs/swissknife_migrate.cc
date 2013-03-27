@@ -5,6 +5,8 @@
 #include "swissknife_migrate.h"
 
 #include "catalog_traversal.h"
+#include "catalog_sql.h"
+#include "catalog_rw.h"
 #include "logging.h"
 
 using namespace swissknife;
@@ -18,7 +20,8 @@ CommandMigrate::CommandMigrate() :
 
 ParameterList CommandMigrate::GetParams() {
   ParameterList result;
-  result.push_back(Parameter('r', "repository URL (absolute local path or remote URL)",
+  result.push_back(Parameter('r', "repository URL (absolute local path "
+                                  "or remote URL)",
                              false, false));
   result.push_back(Parameter('u', "upstream definition string",
                              false, false));
@@ -38,7 +41,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   // create a concurrent catalog migration facility
   const unsigned int cpus = GetNumberOfCpuCores();
-  MigrationWorker::worker_context context;
+  MigrationWorker::worker_context context("/tmp"); // TODO: this is a bit senseless (look into the upstream definition)
   concurrent_migration = new ConcurrentWorkers<MigrationWorker>(
                                 cpus,
                                 cpus * 10,
@@ -113,7 +116,8 @@ void CommandMigrate::CatalogCallback(const Catalog*    catalog,
 
 
 void CommandMigrate::MigrationCallback(const MigrationWorker::returned_data &data) {
-  LogCvmfs(kLogCatalog, kLogStdout, "got callback");
+  LogCvmfs(kLogCatalog, kLogStdout, "got callback. failed jobs: %d",
+           concurrent_migration->GetNumberOfFailedJobs());
 }
 
 
@@ -149,9 +153,9 @@ void CommandMigrate::ConvertCatalogsRecursively(
 }
 
 
-CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) {
-
-}
+CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) :
+  temporary_directory_(context->temporary_directory)
+{}
 
 
 CommandMigrate::MigrationWorker::~MigrationWorker() {
@@ -166,6 +170,21 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   const FutureNestedCatalogList        &future_nested_catalogs =
                                                     data.future_nested_catalogs;
 
+  // create and attach an empty catalog with the newest schema
+  WritableCatalog *writable_catalog = CreateNewEmptyCatalog(
+                                                    catalog->path().ToString());
+  if (writable_catalog == NULL) {
+    master()->JobFailed(returned_data());
+    return;
+  }
+
+  // migrate the catalog data (file meta data)
+  const bool retval = MigrateFileMetadata(catalog, writable_catalog);
+  if (!retval) {
+    master()->JobFailed(returned_data());
+    return;
+  }
+
   // unbox the nested catalogs (possibly waiting for migration of them first)
   Catalog::NestedCatalogList nested_catalogs;
   nested_catalogs.reserve(future_nested_catalogs.size());
@@ -175,11 +194,171 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     nested_catalogs.push_back((*i)->Get());
   }
 
-  // migrate the catalog
-  Catalog::NestedCatalog migrated_catalog;
-  migrated_catalog.path = catalog->path();
-  migrated_catalog.hash = hash::Any(hash::kSha1);
-  new_catalog->Set(migrated_catalog);
+  // TODO: move this to a more reasonable place
+  Catalog::NestedCatalog nested_catalog;
+  nested_catalog.path = catalog->path();
+  nested_catalog.hash = hash::Any(hash::kSha1);
+  new_catalog->Set(nested_catalog);
 
   master()->JobSuccessful(returned_data());
+}
+
+
+WritableCatalog* CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
+                                           const std::string &root_path) const {
+  // create a new catalog database schema
+  bool retval;
+  const std::string catalog_db = CreateTempPath(temporary_directory_ + "/catalog",
+                                                0666);
+  retval = Database::Create(catalog_db, root_path);
+  if (!retval) {
+    unlink(catalog_db.c_str());
+    return NULL;
+  }
+
+  // Attach the just created nested catalog database
+  WritableCatalog *writable_catalog = new WritableCatalog(root_path, NULL);
+  retval = writable_catalog->OpenDatabase(catalog_db);
+  if (!retval) {
+    delete writable_catalog;
+    unlink(catalog_db.c_str());
+    return NULL;
+  }
+
+  return writable_catalog;
+}
+
+
+bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
+                      const catalog::Catalog          *catalog,
+                            catalog::WritableCatalog  *writable_catalog) const {
+  assert (!writable_catalog->IsDirty());
+  bool retval;
+
+  const int uid = 0;
+  const int gid = 0; // TODO: make this configurable
+
+  // get the fresh database of the writable catalog and do some checks
+  const Database &writable = writable_catalog->database();
+  const Database &readable = catalog->database();
+  assert (writable.ready());
+  assert (writable.schema_version() >= Database::kLatestSupportedSchema -
+                                        Database::kSchemaEpsilon &&
+          writable.schema_version() <= Database::kLatestSupportedSchema +
+                                        Database::kSchemaEpsilon);
+  assert (readable.schema_version() < 2.1-Database::kSchemaEpsilon);
+
+  // ATTACH '/tmp/catalog.2qzUCN' as new;
+  // CREATE TEMPORARY TABLE hardlinks AS SELECT rowid as groupid, inode, COUNT(*) as linkcount FROM (SELECT DISTINCT c1.inode as inode, c1.md5path_1, c1.md5path_2 FROM catalog as c1, catalog as c2 WHERE c1.inode == c2.inode AND (c1.md5path_1 != c2.md5path_1 OR c1.md5path_2 != c2.md5path_2)) GROUP BY inode;
+  // SELECT name, IFNULL(groupid, 0) << 32 | IFNULL(linkcount, 1) as hardlinks FROM catalog LEFT JOIN hardlinks ON catalog.inode = hardlinks.inode ORDER BY linkcount DESC LIMIT 30;
+
+  // Old Schema:
+  // CREATE TABLE catalog (
+  //    md5path_1 INTEGER,
+  //    md5path_2 INTEGER,
+  //    parent_1 INTEGER,
+  //    parent_2 INTEGER,
+  //    inode INTEGER,
+  //    hash BLOB,
+  //    size INTEGER,
+  //    mode INTEGER,
+  //    mtime INTEGER,
+  //    flags INTEGER,
+  //    name TEXT,
+  //    symlink TEXT,
+  //    CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));
+
+
+  // New Schema:
+  // CREATE TABLE catalog (
+  //    md5path_1 INTEGER,
+  //    md5path_2 INTEGER,
+  //    parent_1 INTEGER,
+  //    parent_2 INTEGER,
+  //    hardlinks INTEGER,
+  //    hash BLOB,
+  //    size INTEGER,
+  //    mode INTEGER,
+  //    mtime INTEGER,
+  //    flags INTEGER,
+  //    name TEXT,
+  //    symlink TEXT,
+  //    uid INTEGER,
+  //    gid INTEGER,  CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));
+
+
+  // attach the new catalog database into the old one to perform the migration
+  // after attaching, the readable catalog is unlinked since the temporary hard-
+  // link is not needed anymore
+  Sql sql_attach_new(writable,
+    "ATTACH '" + readable.filename() + "' AS old;"
+  );
+  retval = sql_attach_new.Execute();
+  unlink(readable.filename().c_str());
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Attaching database '%s' failed.\n"
+                                      "SQLite: %d - %s",
+             readable.filename().c_str(),
+             sql_attach_new.GetLastError(),
+             sql_attach_new.GetLastErrorMsg().c_str());
+    return false;
+  }
+
+
+  // analyze the hardlink relationships in the old catalog
+  //   inodes used to be assigned at publishing time, implicitly constituating
+  //   those relationships. We now need them explicitly in the file catalogs
+  // This looks for catalog entries with matching inodes but different pathes
+  // and saves the results in a temporary table called 'hardlinks'
+  //   Hardlinks:
+  //     groupid   : this group id can be used for the new catalog schema
+  //     inode     : the inodes that were part of a hardlink group before
+  //     linkcount : the linkcount for hardlink group id members
+  Sql sql_tmp_hardlinks(writable,
+    "CREATE TEMPORARY TABLE hardlinks AS "
+    "  SELECT rowid AS groupid, inode, COUNT(*) AS linkcount "
+    "  FROM ( "
+    "    SELECT DISTINCT c1.inode AS inode, c1.md5path_1, c1.md5path_2 "
+    "    FROM old.catalog AS c1, old.catalog AS c2 "
+    "      WHERE c1.inode == c2.inode "
+    "      AND (c1.md5path_1 != c2.md5path_1 OR c1.md5path_2 != c2.md5path_2) "
+    "  ) "
+    "  GROUP BY inode;"
+  );
+
+  retval = sql_tmp_hardlinks.Execute();
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Creating temporary table 'hardlinks' "
+                                      "failed:\n SQLite: %d - %s",
+             sql_tmp_hardlinks.GetLastError(),
+             sql_tmp_hardlinks.GetLastErrorMsg().c_str());
+    return false;
+  }
+
+  Sql migrate_step1(writable,
+    "INSERT INTO catalog "
+    "  SELECT md5path_1, md5path_2, "
+    "         parent_1, parent_2, "
+    "         IFNULL(groupid, 0) << 32 | IFNULL(linkcount, 1) AS hardlinks, "
+    "         hash, size, mode, mtime, "
+    "         flags, name, symlink, "
+    "         :uid, "
+    "         :gid "
+    "  FROM old.catalog "
+    "  LEFT JOIN hardlinks ON catalog.inode = hardlinks.inode;"
+  );
+  retval = migrate_step1.BindInt64(1, uid) &&
+           migrate_step1.BindInt64(2, gid) &&
+           migrate_step1.Execute();
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Doing first migration step failed.\n"
+                                      "SQLite: %d - %s",
+             migrate_step1.GetLastError(),
+             migrate_step1.GetLastErrorMsg().c_str());
+    return false;
+  }
+
+  writable_catalog->SetDirty();
+
+  return true;
 }

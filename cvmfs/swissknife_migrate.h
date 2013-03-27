@@ -12,7 +12,7 @@
 #include "catalog.h"
 
 namespace catalog {
-  class Catalog;
+  class WritableCatalog;
 }
 
 namespace swissknife {
@@ -47,7 +47,10 @@ class CommandMigrate : public Command {
     };
 
     struct worker_context {
+      worker_context(const std::string temporary_directory) :
+        temporary_directory(temporary_directory) {}
 
+      const std::string temporary_directory;
     };
 
    public:
@@ -55,6 +58,15 @@ class CommandMigrate : public Command {
     virtual ~MigrationWorker();
 
     void operator()(const expected_data &data);
+
+   protected:
+    catalog::WritableCatalog* CreateNewEmptyCatalog(
+                                            const std::string &root_path) const;
+    bool MigrateFileMetadata(const catalog::Catalog    *catalog,
+                             catalog::WritableCatalog  *writable_catalog) const;
+
+   private:
+    const std::string temporary_directory_;
   };
 
 
