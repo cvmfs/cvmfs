@@ -543,7 +543,6 @@ void WritableCatalog::CopyToParent() {
   // Update hardlink group IDs in this nested catalog.
   // To avoid collisions we add the maximal present hardlink group ID in parent
   // to all hardlink group IDs in the nested catalog.
-  // (CAUTION: hardlink group ID is saved in the inode field --> legacy :-) )
   const uint64_t offset = static_cast<uint64_t>(parent->GetMaxLinkId()) << 32;
   const string update_link_ids =
     "UPDATE catalog SET hardlinks = hardlinks + " + StringifyInt(offset) +

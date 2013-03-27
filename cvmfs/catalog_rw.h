@@ -22,12 +22,17 @@
 
 #include "catalog.h"
 
+namespace swissknife {
+  class CommandMigrate;
+}
+
 namespace catalog {
 
 class WritableCatalogManager;
 
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
+  friend class swissknife::CommandMigrate; // needed for catalog migrations
 
  public:
   WritableCatalog(const std::string &path, Catalog *parent);
