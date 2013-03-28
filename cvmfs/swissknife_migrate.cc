@@ -138,13 +138,12 @@ void CommandMigrate::CatalogCallback(const Catalog*    catalog,
 
 void CommandMigrate::MigrationCallback(
                                   const CommandMigrate::PendingCatalog &data) {
-  const std::string &path = data.new_catalog->database_path();
-
   // check if the migration of the catalog was successful
   if (!data.success) {
-    LogCvmfs(kLogCatalog, kLogStderr, "FAILED migration of %s", path.c_str());
     return;
   }
+
+  const std::string &path = data.new_catalog->database_path();
 
   // save the processed catalog in the pending map
   {
@@ -245,7 +244,8 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
         FutureNestedCatalogReference      *new_nested_ref = data.new_nested_ref;
   const FutureNestedCatalogReferenceList  &future_nested_catalogs =
                                                     data.future_nested_catalogs;
-  bool retval;
+  bool retval                       = false;
+  unsigned int mountpoint_linkcount = 0;
 
   // create and attach an empty catalog with the newest schema
   WritableCatalog *writable_catalog = CreateNewEmptyCatalog(
@@ -258,64 +258,73 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   // get the fresh database of the writable catalog and do some checks
   const Database &new_catalog = writable_catalog->database();
   const Database &old_catalog = catalog->database();
-  if (! new_catalog.ready()                                                ||
-        (new_catalog.schema_version() < Database::kLatestSupportedSchema -
-                                        Database::kSchemaEpsilon         ||
-         new_catalog.schema_version() > Database::kLatestSupportedSchema +
-                                        Database::kSchemaEpsilon)          ||
-        (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to meet database requirements "
-                                      "for migration.");
-    master()->JobFailed(PendingCatalog(false));
-    return;
-  }
+  retval = CheckDatabaseSchemaCompatibility(new_catalog, old_catalog);
+  if (! retval) goto fail;
 
   // attach the new catalog database into the old one to perform the migration
   // after attaching, the readable catalog is unlinked since the temporary hard-
   // link is not needed anymore
-  Sql sql_attach_new(new_catalog,
-    "ATTACH '" + old_catalog.filename() + "' AS old;"
-  );
-  retval = sql_attach_new.Execute();
+  retval = AttachOldCatalogDatabase(new_catalog, old_catalog);
   unlink(old_catalog.filename().c_str());
-  if (! retval) {
-    SqlError("Failed to attach database of old catalog", sql_attach_new);
-    master()->JobFailed(PendingCatalog(false));
-    return;
-  }
+  if (! retval) goto fail;
 
   // migrate the catalog data (file meta data)
   retval = MigrateFileMetadata(catalog, writable_catalog);
-  if (! retval) {
-    master()->JobFailed(PendingCatalog(false));
-    return;
-  }
+  if (! retval) goto fail;
 
   // migrate nested catalog references. We need to wait until all nested cata-
   // logs are successfully processed before we can do this.
   retval = MigrateNestedCatalogReferences(writable_catalog,
                                           future_nested_catalogs);
-  if (! retval) {
-    master()->JobFailed(PendingCatalog(false));
-    return;
-  }
+  if (! retval) goto fail;
 
   // find out about the catalog's mountpoint's linkcount that needs to be passed
   // to the parent, in order to synchronize it's respective directory entry
-  unsigned int mountpoint_linkcount = 0;
   retval = FindMountpointLinkcount(writable_catalog, &mountpoint_linkcount);
-  if (! retval) {
-    master()->JobFailed(PendingCatalog(false));
-    return;
-  }
+  if (! retval) goto fail;
 
   // all went well... migration of this catalog has finished
   master()->JobSuccessful(PendingCatalog(true,
                                          mountpoint_linkcount,
                                          writable_catalog,
                                          new_nested_ref));
+  return;
+
+fail:
+  master()->JobFailed(PendingCatalog(false));
+  return;
 }
 
+
+bool CommandMigrate::MigrationWorker::CheckDatabaseSchemaCompatibility(
+                                   const catalog::Database &new_catalog,
+                                   const catalog::Database &old_catalog) const {
+  if (! new_catalog.ready()                                                  ||
+      (new_catalog.schema_version() < Database::kLatestSupportedSchema -
+                                      Database::kSchemaEpsilon         ||
+       new_catalog.schema_version() > Database::kLatestSupportedSchema +
+                                      Database::kSchemaEpsilon)              ||
+      (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to meet database requirements "
+                                      "for migration.");
+    return false;
+  }
+  return true;
+}
+
+bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
+                                   const catalog::Database &new_catalog,
+                                   const catalog::Database &old_catalog) const {
+  Sql sql_attach_new(new_catalog,
+    "ATTACH '" + old_catalog.filename() + "' AS old;"
+  );
+  bool retval = sql_attach_new.Execute();
+  if (! retval) {
+    SqlError("Failed to attach database of old catalog", sql_attach_new);
+    return false;
+  }
+  return true;
+}
 
 WritableCatalog* CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
                                            const std::string &root_path) const {
@@ -324,7 +333,9 @@ WritableCatalog* CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
   const std::string catalog_db = CreateTempPath(temporary_directory_ + "/catalog",
                                                 0666);
   retval = Database::Create(catalog_db, root_path);
-  if (!retval) {
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create database for new "
+                                      "catalog");
     unlink(catalog_db.c_str());
     return NULL;
   }
@@ -334,7 +345,8 @@ WritableCatalog* CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
                                                           hash::Any(hash::kSha1),
                                                           NULL);
   retval = writable_catalog->OpenDatabase(catalog_db);
-  if (!retval) {
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to open database for new catalog");
     delete writable_catalog;
     unlink(catalog_db.c_str());
     return NULL;

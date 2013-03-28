@@ -86,6 +86,11 @@ class CommandMigrate : public Command {
    protected:
     catalog::WritableCatalog* CreateNewEmptyCatalog(
                                             const std::string &root_path) const;
+    bool CheckDatabaseSchemaCompatibility(
+                                    const catalog::Database &new_catalog,
+                                    const catalog::Database &old_catalog) const;
+    bool AttachOldCatalogDatabase(const catalog::Database &new_catalog,
+                                  const catalog::Database &old_catalog) const;
     bool MigrateFileMetadata(const catalog::Catalog    *catalog,
                              catalog::WritableCatalog  *writable_catalog) const;
     bool MigrateNestedCatalogReferences(
