@@ -146,7 +146,9 @@ class Catalog : public SingleCopy {
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
 
-  Catalog(const PathString &path, Catalog *parent);
+  Catalog(const PathString  &path,
+          const hash::Any   &catalog_hash,
+                Catalog     *parent);
   virtual ~Catalog();
 
   bool OpenDatabase(const std::string &db_path);
@@ -201,6 +203,7 @@ class Catalog : public SingleCopy {
   inline void set_inode_range(const InodeRange value) { inode_range_ = value; }
   inline std::string database_path() const { return database_->filename(); }
   inline PathString root_prefix() const { return root_prefix_; }
+  inline hash::Any hash() const { return catalog_hash_; }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && (max_row_id_ > 0);
@@ -256,6 +259,7 @@ class Catalog : public SingleCopy {
   Database *database_;
   pthread_mutex_t *lock_;
 
+  const hash::Any catalog_hash_;
   PathString root_prefix_;
   PathString path_;
 
@@ -282,6 +286,7 @@ class Catalog : public SingleCopy {
 
 Catalog *AttachFreely(const std::string  &root_path,
                       const std::string  &file,
+                      const hash::Any    &catalog_hash,
                             Catalog      *parent = NULL);
 
 }  // namespace catalog

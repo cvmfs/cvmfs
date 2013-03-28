@@ -84,7 +84,7 @@ class InodeGenerationAnnotation : public InodeAnnotation {
     return raw_inode | generation_annotation_;
   }
   void SetGeneration(const uint64_t new_generation);
-  void CheckForOverflow(const uint64_t new_generation, 
+  void CheckForOverflow(const uint64_t new_generation,
                         const uint64_t initial_generation,
                         uint32_t *overflow_counter);
 
@@ -92,11 +92,11 @@ class InodeGenerationAnnotation : public InodeAnnotation {
   unsigned inode_width_;
   uint64_t generation_annotation_;
 };
-  
+
 
 class AbstractCatalogManager;
 /**
- * Here, the Cwd Buffer is registered in order to save the inodes of 
+ * Here, the Cwd Buffer is registered in order to save the inodes of
  * processes' cwd before a new catalog snapshot is applied
  */
 class RemountListener {
@@ -155,14 +155,14 @@ class AbstractCatalogManager {
    */
   bool Path2InodeUnprotected(const PathString &path, inode_t *inode);
   bool Inode2DirentUnprotected(const inode_t inode, DirectoryEntry *dirent);
-  
+
   void SetIncarnation(const uint64_t new_incarnation);
   void RegisterRemountListener(RemountListener *listener) {
     WriteLock();
     remount_listener_ = listener;
     Unlock();
   }
-  
+
   Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
@@ -190,12 +190,14 @@ class AbstractCatalogManager {
 
  protected:
   /**
-   * Load the catalog and return a file name.  Derived class can decide if it
-   * wants to use the hash or the path.  The hash can be 0.
+   * Load the catalog and return a file name and the catalog hash. Derived
+   * class can decide if it wants to use the hash or the path.
+   * Both the input as well as the output hash can be 0.
    */
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const hash::Any &hash,
-                                std::string *catalog_path) = 0;
+                                std::string *catalog_path,
+                                hash::Any   *catalog_hash) = 0;
   virtual void UnloadCatalog(const Catalog *catalog) { };
   virtual void ActivateCatalog(const Catalog *catalog) { };
 
@@ -203,11 +205,13 @@ class AbstractCatalogManager {
    * Create a new Catalog object.
    * Every derived class has to implement this and return a newly
    * created (derived) Catalog structure of it's desired type.
-   * @param mountpoint the future mountpoint of the catalog to create
-   * @param parent_catalog the parent of the catalog to create
+   * @param mountpoint      the future mountpoint of the catalog to create
+   * @param catalog_hash    the content hash of the catalog database
+   * @param parent_catalog  the parent of the catalog to create
    * @return a newly created (derived) Catalog
    */
   virtual Catalog* CreateCatalog(const PathString &mountpoint,
+                                 const hash::Any  &catalog_hash,
                                  Catalog *parent_catalog) = 0;
 
   Catalog *MountCatalog(const PathString &mountpoint, const hash::Any &hash,

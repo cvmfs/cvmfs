@@ -35,7 +35,9 @@ class WritableCatalog : public Catalog {
   friend class swissknife::CommandMigrate; // needed for catalog migrations
 
  public:
-  WritableCatalog(const std::string &path, Catalog *parent);
+  WritableCatalog(const std::string &path,
+                  const hash::Any   &catalog_hash,
+                  Catalog           *parent);
   virtual ~WritableCatalog();
 
   void Transaction();

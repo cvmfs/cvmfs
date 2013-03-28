@@ -97,11 +97,14 @@ uint64_t Counters::GetAllEntries() const {
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string  &root_path,
-                      const string  &file,
-                            Catalog *parent) {
+Catalog *AttachFreely(const string     &root_path,
+                      const string     &file,
+                      const hash::Any  &catalog_hash,
+                            Catalog    *parent) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()), parent);
+    new Catalog(PathString(root_path.data(), root_path.length()),
+                catalog_hash,
+                parent);
   bool retval = catalog->OpenDatabase(file);
   if (!retval) {
     delete catalog;
@@ -115,10 +118,14 @@ Catalog *AttachFreely(const string  &root_path,
 }
 
 
-Catalog::Catalog(const PathString &path, Catalog *parent) {
-  read_only_ = true;
-  path_ = path;
-  parent_ = parent;
+Catalog::Catalog(const PathString &path,
+                 const hash::Any &catalog_hash,
+                 Catalog *parent) :
+  read_only_(true),
+  catalog_hash_(catalog_hash),
+  path_(path),
+  parent_(parent)
+{
   generation_ = 0;
   max_row_id_ = 0;
   inode_annotation = NULL;

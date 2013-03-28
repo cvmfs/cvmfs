@@ -66,7 +66,8 @@ bool WritableCatalogManager::Init() {
  */
 LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
                                               const hash::Any &hash,
-                                              std::string *catalog_path)
+                                              std::string *catalog_path,
+                                              hash::Any   *catalog_hash)
 {
   hash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
   const string url = stratum0_ + "/data" + effective_hash.MakePath(1, 2) + "C";
@@ -90,6 +91,7 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
     assert(false);
   }
 
+  *catalog_hash = effective_hash;
   return kLoadNew;
 }
 
@@ -98,14 +100,18 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
  * This method is virtual in AbstractCatalogManager.  It returns a new catalog
  * structure in the form the different CatalogManagers need it.
  * In this case it returns a stub for a WritableCatalog.
- * @param mountpoint the mount point of the catalog stub to create
+ * @param mountpoint     the mount point of the catalog stub to create
+ * @param catalog_hash   the content hash of the catalog to create
  * @param parent_catalog the parent of the catalog stub to create
  * @return a pointer to the catalog stub structure created
  */
 Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
-                                               Catalog *parent_catalog)
+                                               const hash::Any  &catalog_hash,
+                                               Catalog          *parent_catalog)
 {
-  return new WritableCatalog(mountpoint.ToString(), parent_catalog);
+  return new WritableCatalog(mountpoint.ToString(),
+                             catalog_hash,
+                             parent_catalog);
 }
 
 
@@ -580,6 +586,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Attach the just created nested catalog
   Catalog *new_catalog =
     CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()),
+                  hash::Any(),
                   old_catalog);
   retval = AttachCatalog(database_file_path, new_catalog);
   assert(retval);

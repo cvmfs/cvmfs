@@ -423,7 +423,9 @@ bool CommandCheck::InspectTree(const string &path,
     return false;
   }
 
-  catalog::Catalog *catalog = catalog::AttachFreely(path, tmp_file);
+  catalog::Catalog *catalog = catalog::AttachFreely(path,
+                                                    tmp_file,
+                                                    catalog_hash);
   unlink(tmp_file.c_str());
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",

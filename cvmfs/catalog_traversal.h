@@ -187,6 +187,7 @@ class CatalogTraversal
     // open the catalog
     catalog::Catalog *catalog = catalog::AttachFreely(job.path,
                                                       tmp_file,
+                                                      job.hash,
                                                       job.parent);
     if (! no_close_) {
       unlink(tmp_file.c_str());
