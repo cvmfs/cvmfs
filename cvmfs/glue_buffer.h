@@ -14,6 +14,9 @@
  * mount point.
  * The active inode buffer saves inodes from directories that are held open
  * (opendir) or that contain currently open files.
+ *
+ * These objects have to survive reloading of the library, so no virtual
+ * functions.
  */
 
 #include <stdint.h>
@@ -39,6 +42,38 @@
 namespace catalog {
   class AbstractCatalogManager;
 }
+
+
+struct GlueDirent {
+  GlueDirent() { parent_inode = 0; }
+  GlueDirent(const uint64_t p, const NameString &n) { 
+    parent_inode = p; 
+    name = n;
+  }
+  uint64_t parent_inode;
+  NameString name;
+};
+
+
+class GlueContainer {
+ public:
+  void Add(const uint64_t inode, const uint64_t parent_inode, 
+           const NameString &name) 
+  {
+    inode2path_[inode] = GlueDirent(parent_inode, name);
+  }
+  
+  bool ConstructPath(const uint64_t inode, PathString *path);
+  
+ private:
+  typedef google::sparse_hash_map<uint64_t, GlueDirent, 
+          hash_murmur<uint64_t> >
+          PathMap;
+  PathMap inode2path_;
+};
+
+//AncientInode2Path(GlueBuffer *glue_buffer, CwdBuffer *cwd_buffer,
+//                  ActiveInodesBuffer *active_inodes);
 
 
 class CwdBuffer;
@@ -268,6 +303,7 @@ class ActiveInodesBuffer {
   ActiveInodesBuffer &operator= (const ActiveInodesBuffer &other);
   ~ActiveInodesBuffer();
   
+  // TODO: split into VfsGetLiving, VfsGetDeprecated
   void VfsGet(const uint64_t inode);
   void VfsPut(const uint64_t inode);
   void MaterializePaths(catalog::AbstractCatalogManager *source);

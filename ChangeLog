@@ -1,4 +1,5 @@
 2.1.9:
+  * Fix: handling of log level parameter in snapshot
   * Fix: save and restore open dir and open file counters
     when the fuse module is reloaded
   * Fixed several memory leaks when reloading the Fuse module

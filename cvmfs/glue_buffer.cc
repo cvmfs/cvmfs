@@ -32,6 +32,24 @@
 
 using namespace std;  // NOLINT
 
+bool GlueContainer::ConstructPath(const uint64_t inode, PathString *path) {
+  PathMap::const_iterator needle = inode2path_.find(inode);
+  if (needle == inode2path_.end())
+    return false;
+  
+  if (needle->second.name.IsEmpty())
+    return true;
+  
+  bool retval = ConstructPath(needle->second.parent_inode, path);
+  path->Append("/", 1);
+  path->Append(needle->second.name.GetChars(), 
+               needle->second.name.GetLength());
+  if (!retval) {
+    // Logging
+  }
+  return retval;
+}
+
 
 void GlueBuffer::InitLock() {
   rwlock_ =
@@ -583,6 +601,7 @@ bool ActiveInodesBuffer::ConstructPath(const uint64_t inode, PathString *path) {
 }
 
 
+// TODO: add ancient inodes to cwd buffer if necessary
 void ActiveInodesBuffer::MaterializePaths(
   catalog::AbstractCatalogManager *source)
 {
