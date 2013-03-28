@@ -279,11 +279,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   retval = sql_attach_new.Execute();
   unlink(old_catalog.filename().c_str());
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Attaching database '%s' failed.\n"
-                                      "SQLite: %d - %s",
-             old_catalog.filename().c_str(),
-             sql_attach_new.GetLastError(),
-             sql_attach_new.GetLastErrorMsg().c_str());
+    SqlError("Failed to attach database of old catalog", sql_attach_new);
     master()->JobFailed(PendingCatalog(false));
     return;
   }
@@ -383,10 +379,8 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   );
   retval = sql_tmp_hardlinks.Execute();
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Creating temporary table 'hardlinks' "
-                                      "failed:\n SQLite: %d - %s",
-             sql_tmp_hardlinks.GetLastError(),
-             sql_tmp_hardlinks.GetLastErrorMsg().c_str());
+    SqlError("Failed to analyze hardlink relationships",
+             sql_tmp_hardlinks);
     return false;
   }
 
@@ -416,10 +410,8 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     sql_dir_linkcounts.BindInt64(3, SqlDirent::kFlagDirNestedMountpoint) &&
     sql_dir_linkcounts.Execute();
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Creating temporary table 'dir_linkcounts' "
-                                      "failed:\n SQLite: %d - %s",
-             sql_dir_linkcounts.GetLastError(),
-             sql_dir_linkcounts.GetLastErrorMsg().c_str());
+    SqlError("Failed to analyze directory specific link counts",
+             sql_dir_linkcounts);
     return false;
   }
 
@@ -427,7 +419,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   //   here we add the previously analyzed hardlink/linkcount information
   //
   // Note: nested catalog mountpoint still need to be treated separately
-  Sql migrate_step1(writable,
+  Sql migrate_file_meta_data(writable,
     "INSERT INTO catalog "
     "  SELECT md5path_1, md5path_2, "
     "         parent_1, parent_2, "
@@ -439,14 +431,12 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     "  FROM old.catalog "
     "  LEFT JOIN hardlinks ON catalog.inode = hardlinks.inode;"
   );
-  retval = migrate_step1.BindInt64(1, uid) &&
-           migrate_step1.BindInt64(2, gid) &&
-           migrate_step1.Execute();
+  retval = migrate_file_meta_data.BindInt64(1, uid) &&
+           migrate_file_meta_data.BindInt64(2, gid) &&
+           migrate_file_meta_data.Execute();
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Doing first migration step failed.\n"
-                                      "SQLite: %d - %s",
-             migrate_step1.GetLastError(),
-             migrate_step1.GetLastErrorMsg().c_str());
+    SqlError("Failed to migrate the file system meta data",
+             migrate_file_meta_data);
     return false;
   }
 
@@ -463,10 +453,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   );
   retval = copy_properties.Execute();
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to migrate properties.\n"
-                                      "SQLite: %d - %s",
-             copy_properties.GetLastError(),
-             copy_properties.GetLastErrorMsg().c_str());
+    SqlError("Failed to migrate the properties table.", copy_properties);
     return false;
   }
 
@@ -517,11 +504,8 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
       update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
       update_mntpnt_linkcount.Execute();
     if (! retval) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Failed to update linkcount of nested "
-                                        "catalog mountpoint\n"
-                                        "SQLite: %d - %s",
-               update_mntpnt_linkcount.GetLastError(),
-               update_mntpnt_linkcount.GetLastErrorMsg().c_str());
+      SqlError("Failed to update linkcount of nested catalog mountpoint",
+               update_mntpnt_linkcount);
       return false;
     }
     update_mntpnt_linkcount.Reset();
@@ -532,10 +516,7 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
       add_nested_catalog.BindText(2, nested_catalog.hash.ToString()) &&
       add_nested_catalog.Execute();
     if (! retval) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Failed to add nested catalog link\n"
-                                        "SQLite: %d - %s",
-               add_nested_catalog.GetLastError(),
-               add_nested_catalog.GetLastErrorMsg().c_str());
+      SqlError("Failed to add nested catalog link", add_nested_catalog);
       return false;
     }
     add_nested_catalog.Reset();
@@ -565,11 +546,8 @@ bool CommandMigrate::MigrationWorker::FindMountpointLinkcount(
   retval = find_mountpoint_linkcount.BindMd5(1, 2, root_path_hash) &&
            find_mountpoint_linkcount.Execute();
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to retrieve linkcount of catalog "
-                                      "root entry\n"
-                                      "SQLite: %d - %s",
-             find_mountpoint_linkcount.GetLastError(),
-             find_mountpoint_linkcount.GetLastErrorMsg().c_str());
+    SqlError("Failed to retrieve linkcount of catalog root entry",
+             find_mountpoint_linkcount);
     return false;
   }
 
@@ -584,3 +562,14 @@ bool CommandMigrate::MigrationWorker::FindMountpointLinkcount(
   *mountpoint_linkcount = linkcount;
   return true;
 }
+
+
+void CommandMigrate::MigrationWorker::SqlError(
+                                          const std::string  &message,
+                                          const catalog::Sql &statement) const {
+  LogCvmfs(kLogCatalog, kLogStderr, "%s\nSQLite: %d - %s",
+           message.c_str(),
+           statement.GetLastError(),
+           statement.GetLastErrorMsg().c_str());
+}
+

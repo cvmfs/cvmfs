@@ -96,6 +96,10 @@ class CommandMigrate : public Command {
                    unsigned int                    *mountpoint_linkcount) const;
 
    private:
+    void SqlError(const std::string &message,
+                  const catalog::Sql &statement) const;
+
+   private:
     const std::string temporary_directory_;
   };
 
