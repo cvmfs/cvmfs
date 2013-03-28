@@ -390,19 +390,53 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     "  SELECT rowid AS groupid, inode, COUNT(*) AS linkcount "
     "  FROM ( "
     "    SELECT DISTINCT c1.inode AS inode, c1.md5path_1, c1.md5path_2 "
-    "    FROM old.catalog AS c1, old.catalog AS c2 "
-    "      WHERE c1.inode == c2.inode "
-    "      AND (c1.md5path_1 != c2.md5path_1 OR c1.md5path_2 != c2.md5path_2) "
+    "    FROM old.catalog AS c1 "
+    "    INNER JOIN old.catalog AS c2 "
+    "      ON c1.inode == c2.inode AND "
+    "        (c1.md5path_1 != c2.md5path_1 OR "
+    "         c1.md5path_2 != c2.md5path_2) "
     "  ) "
     "  GROUP BY inode;"
   );
-
   retval = sql_tmp_hardlinks.Execute();
   if (! retval) {
     LogCvmfs(kLogCatalog, kLogStderr, "Creating temporary table 'hardlinks' "
                                       "failed:\n SQLite: %d - %s",
              sql_tmp_hardlinks.GetLastError(),
              sql_tmp_hardlinks.GetLastErrorMsg().c_str());
+    return false;
+  }
+
+  // analyze the linkcounts of directories
+  //   - each directory has a linkcount of at least 2 (empty directory)
+  //     (link in parent directory and self reference (cd .) )
+  //   - for each child directory, the parent's link count is incremented by 1
+  //     (parent reference in child (cd ..) )
+  //
+  // Note: we deliberately exclude nested catalog mountpoints here, since we
+  //       cannot check the number of containing directories here
+  Sql sql_dir_linkcounts(writable,
+    "INSERT INTO hardlinks "
+    "  SELECT 0, c1.inode as inode, "
+    "         SUM(IFNULL(MIN(c2.inode,1),0)) + 2 as linkcount "
+    "  FROM old.catalog as c1 "
+    "  LEFT JOIN old.catalog as c2 "
+    "    ON c2.parent_1 = c1.md5path_1 AND "
+    "       c2.parent_2 = c1.md5path_2 AND "
+    "       c2.flags & :flag_dir_1 "
+    "  WHERE c1.flags & :flag_dir_2 AND "
+    "        NOT c1.flags & :flag_nested_mountpoint "
+    "  GROUP BY c1.inode;");
+  retval =
+    sql_dir_linkcounts.BindInt64(1, SqlDirent::kFlagDir)                 &&
+    sql_dir_linkcounts.BindInt64(2, SqlDirent::kFlagDir)                 &&
+    sql_dir_linkcounts.BindInt64(3, SqlDirent::kFlagDirNestedMountpoint) &&
+    sql_dir_linkcounts.Execute();
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Creating temporary table 'dir_linkcounts' "
+                                      "failed:\n SQLite: %d - %s",
+             sql_dir_linkcounts.GetLastError(),
+             sql_dir_linkcounts.GetLastErrorMsg().c_str());
     return false;
   }
 
