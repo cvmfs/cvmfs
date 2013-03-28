@@ -151,6 +151,34 @@ class Sql {
     return Successful();
   }
 
+  /**
+   * Wrapper for binding a MD5 hash.
+   * @param idx_high offset of most significant bits in database query
+   * @param idx_low offset of least significant bits in database query
+   * @param hash the hash to bind in the query
+   * @result true on success, false otherwise
+   */
+  inline bool BindMd5(const int idx_high, const int idx_low, const hash::Md5 &hash) {
+    uint64_t high, low;
+    hash.ToIntPair(&high, &low);
+    const bool retval = BindInt64(idx_high, high) && BindInt64(idx_low, low);
+    return retval;
+  }
+
+  /**
+   * Wrapper for binding a SHA1 hash.
+   * @param idx_column offset of the blob field in database query
+   * @param hash the hash to bind in the query
+   * @result true on success, false otherwise
+   */
+  inline bool BindSha1Blob(const int idx_column, const struct hash::Any &hash) {
+    if (hash.IsNull()) {
+      return BindNull(idx_column);
+    } else {
+      return BindBlob(idx_column, hash.digest, hash.GetDigestSize());
+    }
+  }
+
 
   int RetrieveType(const int idx_column) const {
     return sqlite3_column_type(statement_, idx_column);
@@ -226,34 +254,6 @@ class Sql {
     return SQLITE_OK   == last_error_code_ ||
            SQLITE_ROW  == last_error_code_ ||
            SQLITE_DONE == last_error_code_;
-  }
-
-  /**
-   * Wrapper for binding a MD5 hash.
-   * @param idx_high offset of most significant bits in database query
-   * @param idx_low offset of least significant bits in database query
-   * @param hash the hash to bind in the query
-   * @result true on success, false otherwise
-   */
-  inline bool BindMd5(const int idx_high, const int idx_low, const hash::Md5 &hash) {
-    uint64_t high, low;
-    hash.ToIntPair(&high, &low);
-    const bool retval = BindInt64(idx_high, high) && BindInt64(idx_low, low);
-    return retval;
-  }
-
-  /**
-   * Wrapper for binding a SHA1 hash.
-   * @param idx_column offset of the blob field in database query
-   * @param hash the hash to bind in the query
-   * @result true on success, false otherwise
-   */
-  inline bool BindSha1Blob(const int idx_column, const struct hash::Any &hash) {
-    if (hash.IsNull()) {
-      return BindNull(idx_column);
-    } else {
-      return BindBlob(idx_column, hash.digest, hash.GetDigestSize());
-    }
   }
 
  private:
