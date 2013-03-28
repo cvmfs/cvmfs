@@ -244,6 +244,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
         Future<Catalog::NestedCatalog> *new_nested_ref = data.new_nested_ref;
   const FutureNestedCatalogList        &future_nested_catalogs =
                                                     data.future_nested_catalogs;
+  bool retval;
 
   // create and attach an empty catalog with the newest schema
   WritableCatalog *writable_catalog = CreateNewEmptyCatalog(
@@ -253,9 +254,42 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     return;
   }
 
+  // get the fresh database of the writable catalog and do some checks
+  const Database &new_catalog = writable_catalog->database();
+  const Database &old_catalog = catalog->database();
+  if (! new_catalog.ready()                                                ||
+        (new_catalog.schema_version() < Database::kLatestSupportedSchema -
+                                        Database::kSchemaEpsilon         ||
+         new_catalog.schema_version() > Database::kLatestSupportedSchema +
+                                        Database::kSchemaEpsilon)          ||
+        (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to meet database requirements "
+                                      "for migration.");
+    master()->JobFailed(returned_data(false));
+    return;
+  }
+
+  // attach the new catalog database into the old one to perform the migration
+  // after attaching, the readable catalog is unlinked since the temporary hard-
+  // link is not needed anymore
+  Sql sql_attach_new(new_catalog,
+    "ATTACH '" + old_catalog.filename() + "' AS old;"
+  );
+  retval = sql_attach_new.Execute();
+  unlink(old_catalog.filename().c_str());
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Attaching database '%s' failed.\n"
+                                      "SQLite: %d - %s",
+             old_catalog.filename().c_str(),
+             sql_attach_new.GetLastError(),
+             sql_attach_new.GetLastErrorMsg().c_str());
+    master()->JobFailed(returned_data(false));
+    return;
+  }
+
   // migrate the catalog data (file meta data)
-  const bool retval = MigrateFileMetadata(catalog, writable_catalog);
-  if (!retval) {
+  retval = MigrateFileMetadata(catalog, writable_catalog);
+  if (! retval) {
     master()->JobFailed(returned_data(false));
     return;
   }
@@ -305,38 +339,13 @@ WritableCatalog* CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
 bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
                       const catalog::Catalog          *catalog,
                             catalog::WritableCatalog  *writable_catalog) const {
-  assert (!writable_catalog->IsDirty());
+  assert (! writable_catalog->IsDirty());
   bool retval;
 
   const int uid = 0;
   const int gid = 0; // TODO: make this configurable
 
-  // get the fresh database of the writable catalog and do some checks
   const Database &writable = writable_catalog->database();
-  const Database &readable = catalog->database();
-  assert (writable.ready());
-  assert (writable.schema_version() >= Database::kLatestSupportedSchema -
-                                        Database::kSchemaEpsilon &&
-          writable.schema_version() <= Database::kLatestSupportedSchema +
-                                        Database::kSchemaEpsilon);
-  assert (readable.schema_version() < 2.1-Database::kSchemaEpsilon);
-
-  // attach the new catalog database into the old one to perform the migration
-  // after attaching, the readable catalog is unlinked since the temporary hard-
-  // link is not needed anymore
-  Sql sql_attach_new(writable,
-    "ATTACH '" + readable.filename() + "' AS old;"
-  );
-  retval = sql_attach_new.Execute();
-  unlink(readable.filename().c_str());
-  if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Attaching database '%s' failed.\n"
-                                      "SQLite: %d - %s",
-             readable.filename().c_str(),
-             sql_attach_new.GetLastError(),
-             sql_attach_new.GetLastErrorMsg().c_str());
-    return false;
-  }
 
   // analyze the hardlink relationships in the old catalog
   //   inodes used to be assigned at publishing time, implicitly constituating
