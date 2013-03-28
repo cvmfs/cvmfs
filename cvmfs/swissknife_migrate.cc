@@ -86,8 +86,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   // migrate catalogs recursively (starting with the deepest nested catalogs)
   LogCvmfs(kLogCatalog, kLogStdout, "\nMigrating catalogs...");
-  Future<Catalog::NestedCatalog> *new_root_catalog =
-                                             new Future<Catalog::NestedCatalog>;
+  FutureNestedCatalogReference *new_root_catalog =
+                                             new FutureNestedCatalogReference;
   ConvertCatalogsRecursively(root_catalog_, new_root_catalog);
   concurrent_migration->WaitForEmptyQueue();
   spooler_->WaitForUpload();
@@ -184,9 +184,10 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 
   // the catalog is completely processed... fill the future to allow the
   // processing of parent catalogs
-  Catalog::NestedCatalog nested_catalog;
-  nested_catalog.path = catalog.new_catalog->path();
-  nested_catalog.hash = result.content_hash;
+  NestedCatalogReference nested_catalog;
+  nested_catalog.path                 = catalog.new_catalog->path();
+  nested_catalog.hash                 = result.content_hash;
+  nested_catalog.mountpoint_linkcount = catalog.mountpoint_linkcount;
   catalog.new_nested_ref->Set(nested_catalog);
 
   // TODO: do some more cleanup
@@ -197,9 +198,9 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 
 
 void CommandMigrate::ConvertCatalog(
-                const Catalog                         *catalog,
-                      Future<Catalog::NestedCatalog>  *new_nested_ref,
-                const FutureNestedCatalogList         &future_nested_catalogs) {
+              const Catalog                           *catalog,
+                    FutureNestedCatalogReference      *new_nested_ref,
+              const FutureNestedCatalogReferenceList  &future_nested_catalogs) {
   MigrationWorker::expected_data data(catalog,
                                       new_nested_ref,
                                       future_nested_catalogs);
@@ -208,17 +209,17 @@ void CommandMigrate::ConvertCatalog(
 
 
 void CommandMigrate::ConvertCatalogsRecursively(
-                           const Catalog                         *catalog,
-                                 Future<Catalog::NestedCatalog>  *new_nested_ref) {
+                           const Catalog                       *catalog,
+                                 FutureNestedCatalogReference  *new_nested_ref) {
   // first migrate all nested catalogs (depth first traversal)
   const CatalogList nested_catalogs = catalog->GetChildren();
-  FutureNestedCatalogList future_nested_catalogs;
+  FutureNestedCatalogReferenceList future_nested_catalogs;
   future_nested_catalogs.reserve(nested_catalogs.size());
   CatalogList::const_iterator i    = nested_catalogs.begin();
   CatalogList::const_iterator iend = nested_catalogs.end();
   for (; i != iend; ++i) {
-    Future<Catalog::NestedCatalog> *new_nested_ref =
-                                         new Future<Catalog::NestedCatalog>;
+    FutureNestedCatalogReference *new_nested_ref =
+                                               new FutureNestedCatalogReference;
     future_nested_catalogs.push_back(new_nested_ref);
     ConvertCatalogsRecursively(*i, new_nested_ref);
   }
@@ -240,9 +241,9 @@ CommandMigrate::MigrationWorker::~MigrationWorker() {
 
 void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   // unbox data structure for convenience
-  const Catalog                        *catalog     = data.catalog;
-        Future<Catalog::NestedCatalog> *new_nested_ref = data.new_nested_ref;
-  const FutureNestedCatalogList        &future_nested_catalogs =
+  const Catalog                           *catalog        = data.catalog;
+        FutureNestedCatalogReference      *new_nested_ref = data.new_nested_ref;
+  const FutureNestedCatalogReferenceList  &future_nested_catalogs =
                                                     data.future_nested_catalogs;
   bool retval;
 
@@ -250,7 +251,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   WritableCatalog *writable_catalog = CreateNewEmptyCatalog(
                                                     catalog->path().ToString());
   if (writable_catalog == NULL) {
-    master()->JobFailed(returned_data(false));
+    master()->JobFailed(PendingCatalog(false));
     return;
   }
 
@@ -265,7 +266,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
         (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon)) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to meet database requirements "
                                       "for migration.");
-    master()->JobFailed(returned_data(false));
+    master()->JobFailed(PendingCatalog(false));
     return;
   }
 
@@ -283,14 +284,14 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
              old_catalog.filename().c_str(),
              sql_attach_new.GetLastError(),
              sql_attach_new.GetLastErrorMsg().c_str());
-    master()->JobFailed(returned_data(false));
+    master()->JobFailed(PendingCatalog(false));
     return;
   }
 
   // migrate the catalog data (file meta data)
   retval = MigrateFileMetadata(catalog, writable_catalog);
   if (! retval) {
-    master()->JobFailed(returned_data(false));
+    master()->JobFailed(PendingCatalog(false));
     return;
   }
 
@@ -299,13 +300,24 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   retval = MigrateNestedCatalogReferences(writable_catalog,
                                           future_nested_catalogs);
   if (! retval) {
-    master()->JobFailed(returned_data(false));
+    master()->JobFailed(PendingCatalog(false));
     return;
   }
 
-  master()->JobSuccessful(returned_data(true,
-                                        writable_catalog,
-                                        new_nested_ref));
+  // find out about the catalog's mountpoint's linkcount that needs to be passed
+  // to the parent, in order to synchronize it's respective directory entry
+  unsigned int mountpoint_linkcount = 0;
+  retval = FindMountpointLinkcount(writable_catalog, &mountpoint_linkcount);
+  if (! retval) {
+    master()->JobFailed(PendingCatalog(false));
+    return;
+  }
+
+  // all went well... migration of this catalog has finished
+  master()->JobSuccessful(PendingCatalog(true,
+                                         mountpoint_linkcount,
+                                         writable_catalog,
+                                         new_nested_ref));
 }
 
 
@@ -473,21 +485,46 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
 }
 
 bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
-                const catalog::WritableCatalog *writable_catalog,
-                const FutureNestedCatalogList  &future_nested_catalogs) const {
+        const catalog::WritableCatalog          *writable_catalog,
+        const FutureNestedCatalogReferenceList  &future_nested_catalogs) const {
   const Database &writable = writable_catalog->database();
   bool retval;
 
-  // preparing an SQL statement for nested catalog addition
+  // preparing a SQL statements for nested catalog addition
   Sql add_nested_catalog(writable,
     "INSERT INTO nested_catalogs (path, sha1) VALUES (:path, :sha1);"
   );
+  Sql update_mntpnt_linkcount(writable,
+    "UPDATE catalog "
+    "SET hardlinks = :linkcount "
+    "WHERE md5path_1 = :md5_1 AND md5path_2 = :md5_2;"
+  );
 
   // unbox the nested catalogs (possibly waiting for migration of them first)
-  FutureNestedCatalogList::const_iterator i    = future_nested_catalogs.begin();
-  FutureNestedCatalogList::const_iterator iend = future_nested_catalogs.end();
+  FutureNestedCatalogReferenceList::const_iterator i    =
+                                                 future_nested_catalogs.begin();
+  FutureNestedCatalogReferenceList::const_iterator iend =
+                                                 future_nested_catalogs.end();
   for (; i != iend; ++i) {
-    catalog::Catalog::NestedCatalog &nested_catalog = (*i)->Get();
+    NestedCatalogReference &nested_catalog = (*i)->Get();
+
+    // update the nested catalog mountpoint directory entry with the correct
+    // linkcount that was determined while processing the nested catalog
+    hash::Md5 mountpoint_hash = hash::Md5(nested_catalog.path.GetChars(),
+                                          nested_catalog.path.GetLength());
+    retval =
+      update_mntpnt_linkcount.BindInt64(1, nested_catalog.mountpoint_linkcount);
+      update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
+      update_mntpnt_linkcount.Execute();
+    if (! retval) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to update linkcount of nested "
+                                        "catalog mountpoint\n"
+                                        "SQLite: %d - %s",
+               update_mntpnt_linkcount.GetLastError(),
+               update_mntpnt_linkcount.GetLastErrorMsg().c_str());
+      return false;
+    }
+    update_mntpnt_linkcount.Reset();
 
     // insert the updated nested catalog reference into the new catalog
     retval =
@@ -504,5 +541,46 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
     add_nested_catalog.Reset();
   }
 
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker::FindMountpointLinkcount(
+                  const catalog::WritableCatalog  *writable_catalog,
+                  unsigned int                    *mountpoint_linkcount) const {
+  const Database &writable = writable_catalog->database();
+  bool retval;
+
+  PathString root_path = writable_catalog->path();
+  hash::Md5 root_path_hash = hash::Md5(root_path.GetChars(),
+                                       root_path.GetLength());
+
+  Sql find_mountpoint_linkcount(writable,
+    "SELECT hardlinks "
+    "FROM catalog "
+    "WHERE md5path_1 = :md5_1 AND "
+    "      md5path_2 = :md5_2 "
+    "LIMIT 1;"
+  );
+  retval = find_mountpoint_linkcount.BindMd5(1, 2, root_path_hash) &&
+           find_mountpoint_linkcount.Execute();
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to retrieve linkcount of catalog "
+                                      "root entry\n"
+                                      "SQLite: %d - %s",
+             find_mountpoint_linkcount.GetLastError(),
+             find_mountpoint_linkcount.GetLastErrorMsg().c_str());
+    return false;
+  }
+
+  int linkcount = find_mountpoint_linkcount.RetrieveInt64(0);
+  if (linkcount < 2 || linkcount >= (1l << 32)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Retrieved linkcount of catalog root "
+                                      "entry is not sane. (found: %d)",
+             linkcount);
+    return false;
+  }
+
+  *mountpoint_linkcount = linkcount;
   return true;
 }

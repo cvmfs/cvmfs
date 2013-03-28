@@ -22,21 +22,28 @@ namespace swissknife {
 
 class CommandMigrate : public Command {
  protected:
-  typedef
-    std::vector<Future<catalog::Catalog::NestedCatalog>* >
-    FutureNestedCatalogList;
+  struct NestedCatalogReference : public catalog::Catalog::NestedCatalog {
+    unsigned int mountpoint_linkcount;
+  };
+
+  typedef Future<NestedCatalogReference> FutureNestedCatalogReference;
+  typedef std::vector<FutureNestedCatalogReference* >
+          FutureNestedCatalogReferenceList;
 
   struct PendingCatalog {
-    PendingCatalog(const bool                               success        = false,
-                   catalog::WritableCatalog                *new_catalog    = NULL,
-                   Future<catalog::Catalog::NestedCatalog> *new_nested_ref = NULL) :
+    PendingCatalog(const bool                     success        = false,
+                   const unsigned int             mntpnt_lnkcnt  = 0,
+                   catalog::WritableCatalog      *new_catalog    = NULL,
+                   FutureNestedCatalogReference  *new_nested_ref = NULL) :
       success(success),
+      mountpoint_linkcount(mntpnt_lnkcnt),
       new_catalog(new_catalog),
       new_nested_ref(new_nested_ref) {}
 
-    bool                                      success;
-    catalog::WritableCatalog                 *new_catalog;
-    Future<catalog::Catalog::NestedCatalog>  *new_nested_ref;
+    bool                           success;
+    unsigned int                   mountpoint_linkcount;
+    catalog::WritableCatalog      *new_catalog;
+    FutureNestedCatalogReference  *new_nested_ref;
   };
 
   class PendingCatalogMap : public std::map<std::string, PendingCatalog>,
@@ -46,9 +53,9 @@ class CommandMigrate : public Command {
    public:
     struct expected_data {
       expected_data(
-        const catalog::Catalog                         *catalog,
-              Future<catalog::Catalog::NestedCatalog>  *new_nested_ref,
-        const FutureNestedCatalogList                  &future_nested_catalogs) :
+        const catalog::Catalog                  *catalog,
+              FutureNestedCatalogReference      *new_nested_ref,
+        const FutureNestedCatalogReferenceList  &future_nested_catalogs) :
         catalog(catalog),
         new_nested_ref(new_nested_ref),
         future_nested_catalogs(future_nested_catalogs) {}
@@ -56,9 +63,9 @@ class CommandMigrate : public Command {
         catalog(NULL),
         new_nested_ref(NULL) {}
 
-      const catalog::Catalog                         *catalog;
-            Future<catalog::Catalog::NestedCatalog>  *new_nested_ref;
-      const FutureNestedCatalogList                   future_nested_catalogs;
+      const catalog::Catalog                  *catalog;
+            FutureNestedCatalogReference      *new_nested_ref;
+      const FutureNestedCatalogReferenceList   future_nested_catalogs;
     };
 
     typedef PendingCatalog returned_data;
@@ -82,8 +89,11 @@ class CommandMigrate : public Command {
     bool MigrateFileMetadata(const catalog::Catalog    *catalog,
                              catalog::WritableCatalog  *writable_catalog) const;
     bool MigrateNestedCatalogReferences(
-                  const catalog::WritableCatalog *writable_catalog,
-                  const FutureNestedCatalogList  &future_nested_catalogs) const;
+         const catalog::WritableCatalog          *writable_catalog,
+         const FutureNestedCatalogReferenceList  &future_nested_catalogs) const;
+    bool FindMountpointLinkcount(
+                   const catalog::WritableCatalog  *writable_catalog,
+                   unsigned int                    *mountpoint_linkcount) const;
 
    private:
     const std::string temporary_directory_;
@@ -110,12 +120,12 @@ class CommandMigrate : public Command {
   void UploadCallback(const upload::SpoolerResult &result);
 
   void ConvertCatalogsRecursively(
-              const catalog::Catalog                         *catalog,
-                    Future<catalog::Catalog::NestedCatalog>  *new_catalog);
+              const catalog::Catalog              *catalog,
+                    FutureNestedCatalogReference  *new_catalog);
   void ConvertCatalog(
-        const catalog::Catalog                         *catalog,
-              Future<catalog::Catalog::NestedCatalog>  *new_catalog,
-        const FutureNestedCatalogList                  &future_nested_catalogs);
+        const catalog::Catalog                  *catalog,
+              FutureNestedCatalogReference      *new_catalog,
+        const FutureNestedCatalogReferenceList  &future_nested_catalogs);
 
  private:
   bool              print_tree_;
