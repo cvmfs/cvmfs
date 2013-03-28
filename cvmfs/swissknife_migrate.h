@@ -81,6 +81,9 @@ class CommandMigrate : public Command {
                                             const std::string &root_path) const;
     bool MigrateFileMetadata(const catalog::Catalog    *catalog,
                              catalog::WritableCatalog  *writable_catalog) const;
+    bool MigrateNestedCatalogReferences(
+                  const catalog::WritableCatalog *writable_catalog,
+                  const FutureNestedCatalogList  &future_nested_catalogs) const;
 
    private:
     const std::string temporary_directory_;

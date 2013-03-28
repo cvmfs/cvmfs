@@ -185,7 +185,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
   // the catalog is completely processed... fill the future to allow the
   // processing of parent catalogs
   Catalog::NestedCatalog nested_catalog;
-  nested_catalog.path = PathString(path);
+  nested_catalog.path = catalog.new_catalog->path();
   nested_catalog.hash = result.content_hash;
   catalog.new_nested_ref->Set(nested_catalog);
 
@@ -294,13 +294,13 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     return;
   }
 
-  // unbox the nested catalogs (possibly waiting for migration of them first)
-  Catalog::NestedCatalogList nested_catalogs;
-  nested_catalogs.reserve(future_nested_catalogs.size());
-  FutureNestedCatalogList::const_iterator i    = future_nested_catalogs.begin();
-  FutureNestedCatalogList::const_iterator iend = future_nested_catalogs.end();
-  for (; i != iend; ++i) {
-    nested_catalogs.push_back((*i)->Get());
+  // migrate nested catalog references. We need to wait until all nested cata-
+  // logs are successfully processed before we can do this.
+  retval = MigrateNestedCatalogReferences(writable_catalog,
+                                          future_nested_catalogs);
+  if (! retval) {
+    master()->JobFailed(returned_data(false));
+    return;
   }
 
   master()->JobSuccessful(returned_data(true,
@@ -468,6 +468,41 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   writable_catalog->UpdateLastModified();
 
   writable_catalog->Commit();
+
+  return true;
+}
+
+bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
+                const catalog::WritableCatalog *writable_catalog,
+                const FutureNestedCatalogList  &future_nested_catalogs) const {
+  const Database &writable = writable_catalog->database();
+  bool retval;
+
+  // preparing an SQL statement for nested catalog addition
+  Sql add_nested_catalog(writable,
+    "INSERT INTO nested_catalogs (path, sha1) VALUES (:path, :sha1);"
+  );
+
+  // unbox the nested catalogs (possibly waiting for migration of them first)
+  FutureNestedCatalogList::const_iterator i    = future_nested_catalogs.begin();
+  FutureNestedCatalogList::const_iterator iend = future_nested_catalogs.end();
+  for (; i != iend; ++i) {
+    catalog::Catalog::NestedCatalog &nested_catalog = (*i)->Get();
+
+    // insert the updated nested catalog reference into the new catalog
+    retval =
+      add_nested_catalog.BindText(1, nested_catalog.path.ToString()) &&
+      add_nested_catalog.BindText(2, nested_catalog.hash.ToString()) &&
+      add_nested_catalog.Execute();
+    if (! retval) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to add nested catalog link\n"
+                                        "SQLite: %d - %s",
+               add_nested_catalog.GetLastError(),
+               add_nested_catalog.GetLastErrorMsg().c_str());
+      return false;
+    }
+    add_nested_catalog.Reset();
+  }
 
   return true;
 }
