@@ -288,7 +288,9 @@ WritableCatalog* CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
   }
 
   // Attach the just created nested catalog database
-  WritableCatalog *writable_catalog = new WritableCatalog(root_path, NULL);
+  WritableCatalog *writable_catalog = new WritableCatalog(root_path,
+                                                          hash::Any(hash::kSha1),
+                                                          NULL);
   retval = writable_catalog->OpenDatabase(catalog_db);
   if (!retval) {
     delete writable_catalog;
@@ -319,45 +321,6 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
                                         Database::kSchemaEpsilon);
   assert (readable.schema_version() < 2.1-Database::kSchemaEpsilon);
 
-  // ATTACH '/tmp/catalog.2qzUCN' as new;
-  // CREATE TEMPORARY TABLE hardlinks AS SELECT rowid as groupid, inode, COUNT(*) as linkcount FROM (SELECT DISTINCT c1.inode as inode, c1.md5path_1, c1.md5path_2 FROM catalog as c1, catalog as c2 WHERE c1.inode == c2.inode AND (c1.md5path_1 != c2.md5path_1 OR c1.md5path_2 != c2.md5path_2)) GROUP BY inode;
-  // SELECT name, IFNULL(groupid, 0) << 32 | IFNULL(linkcount, 1) as hardlinks FROM catalog LEFT JOIN hardlinks ON catalog.inode = hardlinks.inode ORDER BY linkcount DESC LIMIT 30;
-
-  // Old Schema:
-  // CREATE TABLE catalog (
-  //    md5path_1 INTEGER,
-  //    md5path_2 INTEGER,
-  //    parent_1 INTEGER,
-  //    parent_2 INTEGER,
-  //    inode INTEGER,
-  //    hash BLOB,
-  //    size INTEGER,
-  //    mode INTEGER,
-  //    mtime INTEGER,
-  //    flags INTEGER,
-  //    name TEXT,
-  //    symlink TEXT,
-  //    CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));
-
-
-  // New Schema:
-  // CREATE TABLE catalog (
-  //    md5path_1 INTEGER,
-  //    md5path_2 INTEGER,
-  //    parent_1 INTEGER,
-  //    parent_2 INTEGER,
-  //    hardlinks INTEGER,
-  //    hash BLOB,
-  //    size INTEGER,
-  //    mode INTEGER,
-  //    mtime INTEGER,
-  //    flags INTEGER,
-  //    name TEXT,
-  //    symlink TEXT,
-  //    uid INTEGER,
-  //    gid INTEGER,  CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));
-
-
   // attach the new catalog database into the old one to perform the migration
   // after attaching, the readable catalog is unlinked since the temporary hard-
   // link is not needed anymore
@@ -374,7 +337,6 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
              sql_attach_new.GetLastErrorMsg().c_str());
     return false;
   }
-
 
   // analyze the hardlink relationships in the old catalog
   //   inodes used to be assigned at publishing time, implicitly constituating
@@ -440,6 +402,10 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
+  // copy the old file meta information into the new catalog schema
+  //   here we add the previously analyzed hardlink/linkcount information
+  //
+  // Note: nested catalog mountpoint still need to be treated separately
   Sql migrate_step1(writable,
     "INSERT INTO catalog "
     "  SELECT md5path_1, md5path_2, "
@@ -463,7 +429,35 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
+  // copy (and update) the properties fields
+  //
+  // Note: The schema is explicitly not copied to the new catalog.
+  //       Each catalog contains a revision, which is also copied here and that
+  //       is later updated by calling catalog->IncrementRevision()
+  Sql copy_properties(writable,
+    "INSERT OR REPLACE INTO properties "
+    "  SELECT key, value "
+    "  FROM old.properties "
+    "  WHERE key != 'schema';"
+  );
+  retval = copy_properties.Execute();
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to migrate properties.\n"
+                                      "SQLite: %d - %s",
+             copy_properties.GetLastError(),
+             copy_properties.GetLastErrorMsg().c_str());
+    return false;
+  }
+
   writable_catalog->SetDirty();
+
+  // set the previous revision hash in the new catalog to the old catalog
+  //   we are doing the whole migration as a new snapshot that does not change
+  //   any files, but just bumpes the catalog schema to the latest version
+  writable_catalog->SetPreviousRevision(catalog->hash());
+  writable_catalog->IncrementRevision();
+  writable_catalog->UpdateLastModified();
+
   writable_catalog->Commit();
 
   return true;
