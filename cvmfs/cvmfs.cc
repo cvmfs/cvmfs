@@ -778,6 +778,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
+  // TODO: inject ancient directory into cwd buffer
   remount_fence_->Leave();
 
   if (!found) {
@@ -1110,15 +1111,20 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      fi->keep_cache = 1;//kcache_timeout_ == 0.0 ? 0 : 1;
-      /*if (dirent.cached_mtime() != dirent.mtime()) {
-        LogCvmfs(kLogCvmfs, kLogDebug,
-                 "file might be new or changed, invalidating cache (%d %d %d)",
-                 dirent.mtime(), dirent.cached_mtime(), ino);
-        fi->keep_cache = 0;
-        dirent.set_cached_mtime(dirent.mtime());
-        inode_cache_->Insert(ino, dirent);
-      }*/
+      if (cvmfs::inode_annotation_) {
+        // Inodes are unique, we can safely cache
+        fi->keep_cache = 1;
+      } else  {
+        fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
+        if (dirent.cached_mtime() != dirent.mtime()) {
+          LogCvmfs(kLogCvmfs, kLogDebug,
+                   "file might be new or changed, invalidating cache (%d %d "
+                   "%"PRIu64")", dirent.mtime(), dirent.cached_mtime(), ino);
+          fi->keep_cache = 0;
+          dirent.set_cached_mtime(dirent.mtime());
+          inode_cache_->Insert(ino, dirent);
+        }
+      }
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
@@ -2171,6 +2177,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   
   msg_progress = "Saving glue buffer\n";
   SendMsg2Socket(fd_progress, msg_progress);
+  cvmfs::glue_remount_listener_->BeforeRemount(cvmfs::catalog_manager_);
   glue::Ensemble *saved_glue_buffer = 
     new glue::Ensemble(*cvmfs::glue_ensemble_);
   loader::SavedState *state_glue_buffer = new loader::SavedState();

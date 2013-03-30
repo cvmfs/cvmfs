@@ -103,6 +103,25 @@ string GetFileName(const string &path) {
   else
     return path;
 }
+  
+
+NameString GetFileName(const PathString &path) {
+  NameString name;
+  int length = path.GetLength();
+  const char *chars  = path.GetChars();
+  
+  int i;
+  for (i = length-1; i >= 0; --i) {
+    if (chars[i] == '/')
+      break;
+  }
+  i++;
+  if (i < length) {
+    name.Append(chars+i, length-i);
+  }
+  
+  return name;
+}
 
 
 /**

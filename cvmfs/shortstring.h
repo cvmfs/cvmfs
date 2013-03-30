@@ -91,6 +91,12 @@ class ShortString {
       memcpy(&stack_[this->length_], chars, length);
     this->length_ = new_length;
   }
+  
+  void Clear() {
+    delete long_string_;
+    long_string_ = NULL;
+    length_ = 0;
+  }
 
   const char *GetChars() const {
     if (long_string_)
