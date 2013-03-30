@@ -397,7 +397,7 @@ private:
     int retval = pthread_mutex_unlock(lock_paths_);
     assert(retval == 0);
   }
-  void IncInodeReference(const uint64_t inode);
+  uint32_t IncInodeReference(const uint64_t inode);
   void AddChainbuffer(const uint64_t initial_inode, 
                       InodeContainer *container);
   

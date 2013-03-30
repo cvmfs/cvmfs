@@ -669,14 +669,18 @@ OpenTracker::~OpenTracker() {
 }
   
   
-void OpenTracker::IncInodeReference(const uint64_t inode) {
+uint32_t OpenTracker::IncInodeReference(const uint64_t inode) {
   InodeReferences::iterator iter_inodes = inode_references_.find(inode);
+  uint32_t result;
   if (iter_inodes != inode_references_.end()) {
-    (*iter_inodes).second = (*iter_inodes).second + 1;
+    result = (*iter_inodes).second + 1;
+    (*iter_inodes).second = result;
   } else {
     inode_references_[inode] = 1;
+    result = 1;
   }
   atomic_inc64(&statistics_.num_references);
+  return result;
 }
   
   
@@ -697,8 +701,9 @@ void OpenTracker::AddChainbuffer(const uint64_t initial_inode,
 
 void OpenTracker::VfsGetLiving(const uint64_t inode) {
   LockInodes();
-  IncInodeReference(inode);
-  atomic_inc64(&statistics_.num_inserts_living);
+  uint32_t references = IncInodeReference(inode);
+  if (references == 1)
+    atomic_inc64(&statistics_.num_inserts_living);
   UnlockInodes();
 }
   
@@ -716,8 +721,9 @@ void OpenTracker::VfsGetDeprecated(const uint64_t inode) {
     LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "internal error: "
              "failed to materialize path for ancient inode %"PRIu64, inode);
   }
-  IncInodeReference(inode);
-  atomic_inc64(&statistics_.num_inserts_deprecated);
+  uint32_t references = IncInodeReference(inode);
+  if (references == 1)
+    atomic_inc64(&statistics_.num_inserts_deprecated);
   UnlockInodes();
 }
   
