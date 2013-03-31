@@ -1111,19 +1111,14 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      if (cvmfs::inode_annotation_) {
-        // Inodes are unique, we can safely cache
-        fi->keep_cache = 1;
-      } else  {
-        fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
-        if (dirent.cached_mtime() != dirent.mtime()) {
-          LogCvmfs(kLogCvmfs, kLogDebug,
-                   "file might be new or changed, invalidating cache (%d %d "
-                   "%"PRIu64")", dirent.mtime(), dirent.cached_mtime(), ino);
-          fi->keep_cache = 0;
-          dirent.set_cached_mtime(dirent.mtime());
-          inode_cache_->Insert(ino, dirent);
-        }
+      fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
+      if (dirent.cached_mtime() != dirent.mtime()) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "file might be new or changed, invalidating cache (%d %d "
+                 "%"PRIu64")", dirent.mtime(), dirent.cached_mtime(), ino);
+        fi->keep_cache = 0;
+        dirent.set_cached_mtime(dirent.mtime());
+        inode_cache_->Insert(ino, dirent);
       }
       fi->fh = fd;
       fuse_reply_open(req, fi);
@@ -2123,6 +2118,7 @@ static void Fini() {
   delete g_boot_error;
   g_boot_error = NULL;
   SetLogSyslogPrefix("");
+  SetLogDebugFile("");
 }
 
 
