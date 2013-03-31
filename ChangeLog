@@ -1,4 +1,5 @@
 2.1.9:
+  * Fix: shared cache manager race during load-unload cycles
   * Fix: file descriptor leaks during Fuse module reload
   * Fix: handling of log level parameter in snapshot
   * Fix: save and restore open dir and open file counters

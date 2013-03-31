@@ -512,8 +512,6 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     }
   }
 
-  if (shared_)
-    unlink(((*cache_dir_) + "/cachemgr").c_str());
   LogCvmfs(kLogQuota, kLogDebug, "stopping cache manager (%d)", errno);
   close(pipe_lru_[0]);
   ProcessCommandBunch(num_commands, command_buffer, path_buffer);
@@ -868,7 +866,7 @@ static void CloseDatabase() {
 
 
 /**
- * Connects to a running peer server.  Creates a peer server, if necessary.
+ * Connects to a running cache manager.  Creates one if necessary.
  */
 bool InitShared(const std::string &exe_path, const std::string &cache_dir,
                 const uint64_t limit, const uint64_t cleanup_threshold)
@@ -877,7 +875,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   spawned_ = true;
   cache_dir_ = new string(cache_dir);
 
-  // Create lock file
+  // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(*cache_dir_ + "/lock_cachemgr");
   if (fd_lockfile < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
@@ -899,7 +897,19 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
              limit_, cleanup_threshold_);
     return true;
   }
-  if (errno == ENXIO) {
+  const int connect_error = errno;
+  
+  // Lock file: let existing cache manager finish first
+  const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
+             (*cache_dir_ + "/lock_cachemgr.fifo").c_str(), errno);
+    UnlockFile(fd_lockfile);
+    return false;
+  }
+  UnlockFile(fd_lockfile_fifo);
+  
+  if (connect_error == ENXIO) {
     LogCvmfs(kLogQuota, kLogDebug, "left-over FIFO found, unlinking");
     unlink(fifo_path.c_str());
   }
@@ -1030,6 +1040,12 @@ int MainCacheManager(int argc, char **argv) {
     Daemonize();
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
+  const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "could not open lock file "
+             "%s (%d)", (*cache_dir_ + "/lock_cachemgr.fifo").c_str(), errno);
+    return 1;
+  }
   const string crash_guard = *cache_dir_ + "/cachemgr.running";
   const bool rebuild = FileExists(crash_guard);
   retval = open(crash_guard.c_str(), O_RDONLY | O_CREAT, 0600);
@@ -1061,10 +1077,10 @@ int MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
 
   MainCommandServer(NULL);
-  //unlink(fifo_path.c_str());  Has to happen in shutdown command in order to
-  // avoid race
+  unlink(fifo_path.c_str());
   CloseDatabase();
   unlink(crash_guard.c_str());
+  UnlockFile(fd_lockfile_fifo);
 
   monitor::Fini();
 
