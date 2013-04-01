@@ -458,10 +458,12 @@ static void RemountFinish() {
     // Ensure that all Fuse callbacks left the catalog query code
     remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
-    inode_annotation_->CheckForOverflow(
-      catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
-      inode_generation_info_.initial_revision, 
-      &inode_generation_info_.overflow_counter);
+    if (inode_annotation_) {
+      inode_annotation_->CheckForOverflow(
+        catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
+        inode_generation_info_.initial_revision, 
+        &inode_generation_info_.overflow_counter);
+    }
     remount_fence_->Unblock();
     
     inode_cache_->Resume();
@@ -515,12 +517,16 @@ static void RemountCheck() {
   
 
 static inline void AddToGlueLookups(const catalog::DirectoryEntry &dirent) {
+  if (nfs_maps_)
+    return;
   if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_))
     glue_ensemble_->lookup_tracker()->AddDirent(dirent);
 }
 
   
 static inline void AddToGlueOpens(const uint64_t inode) {
+  if (nfs_maps_)
+    return;
   if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
     glue_ensemble_->open_tracker()->VfsGetDeprecated(inode);
   } else {
@@ -1765,8 +1771,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     new glue::Ensemble(new glue::LookupTracker(cvmfs::glue_lookups_size_),
                        new glue::CwdTracker(*cvmfs::mountpoint_),
                        new glue::OpenTracker());
-  cvmfs::glue_remount_listener_ = 
-    new glue::RemountListener(cvmfs::glue_ensemble_);
+  if (!nfs_source) {
+    cvmfs::glue_remount_listener_ = 
+      new glue::RemountListener(cvmfs::glue_ensemble_);
+  }
 
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
@@ -2171,15 +2179,17 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     saved_states->push_back(save_open_dirs);
   }
   
-  msg_progress = "Saving glue buffer\n";
-  SendMsg2Socket(fd_progress, msg_progress);
-  cvmfs::glue_remount_listener_->BeforeRemount(cvmfs::catalog_manager_);
-  glue::Ensemble *saved_glue_buffer = 
-    new glue::Ensemble(*cvmfs::glue_ensemble_);
-  loader::SavedState *state_glue_buffer = new loader::SavedState();
-  state_glue_buffer->state_id = loader::kStateGlueBuffer;
-  state_glue_buffer->state = saved_glue_buffer;
-  saved_states->push_back(state_glue_buffer);
+  if (!cvmfs::nfs_maps_) {
+    msg_progress = "Saving glue buffer\n";
+    SendMsg2Socket(fd_progress, msg_progress);
+    cvmfs::glue_remount_listener_->BeforeRemount(cvmfs::catalog_manager_);
+    glue::Ensemble *saved_glue_buffer = 
+      new glue::Ensemble(*cvmfs::glue_ensemble_);
+    loader::SavedState *state_glue_buffer = new loader::SavedState();
+    state_glue_buffer->state_id = loader::kStateGlueBuffer;
+    state_glue_buffer->state = saved_glue_buffer;
+    saved_states->push_back(state_glue_buffer);
+  }
   
   msg_progress = "Saving inode generation\n";
   SendMsg2Socket(fd_progress, msg_progress);
@@ -2228,8 +2238,10 @@ static bool RestoreState(const int fd_progress,
       cvmfs::glue_ensemble_->lookup_tracker()->Resize(cvmfs::glue_lookups_size_);
       cvmfs::glue_remount_listener_ = 
         new glue::RemountListener(cvmfs::glue_ensemble_);
-      cvmfs::catalog_manager_->RegisterRemountListener(
-        cvmfs::glue_remount_listener_);
+      if (!cvmfs::nfs_maps_) {
+        cvmfs::catalog_manager_->RegisterRemountListener(
+          cvmfs::glue_remount_listener_);
+      }
       SendMsg2Socket(fd_progress, " done\n");
     }
     
@@ -2248,11 +2260,13 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, " done\n");
     }
   }
-  cvmfs::inode_annotation_->CheckForOverflow(
-    cvmfs::catalog_manager_->GetRevision() + 
-      cvmfs::inode_generation_info_.incarnation, 
-    cvmfs::inode_generation_info_.initial_revision, 
-    &cvmfs::inode_generation_info_.overflow_counter);
+  if (cvmfs::inode_annotation_) {
+    cvmfs::inode_annotation_->CheckForOverflow(
+      cvmfs::catalog_manager_->GetRevision() + 
+        cvmfs::inode_generation_info_.incarnation, 
+      cvmfs::inode_generation_info_.initial_revision, 
+      &cvmfs::inode_generation_info_.overflow_counter);
+  }
 
   return true;
 }
