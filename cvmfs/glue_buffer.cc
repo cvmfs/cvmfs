@@ -227,7 +227,7 @@ bool LookupTracker::ConstructPath(const unsigned buffer_idx, PathString *path) {
     result = false;
   }
   
-construct_path_append:
+ construct_path_append:
   path->Append("/", 1);
   path->Append(buffer_[buffer_idx].name.GetChars(), 
                buffer_[buffer_idx].name.GetLength());  
@@ -589,17 +589,16 @@ void CwdTracker::Inject(const uint64_t initial_inode,
   if (chain.empty())
     return;
   
-  uint64_t inode = initial_inode;
-  unsigned idx = 0;
   Lock();
-  do {
+  uint64_t inode = initial_inode;
+  for (unsigned i = 0; i < chain.size(); ++i) {
     if (inode2cwd_.Contains(inode))
       break;
     
-    inode2cwd_.AddDirent(inode, chain[idx]);
+    inode2cwd_.AddDirent(inode, chain[i]);
+    inode = chain[i].parent_inode;
     atomic_inc64(&statistics_.num_injects);
-    idx++;
-  } while (idx < chain.size());
+  }
   Unlock();
 }
   
