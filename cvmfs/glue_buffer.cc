@@ -818,6 +818,7 @@ bool Ensemble::Find(const uint64_t inode, PathString *path) {
              "for ancient inode %"PRIu64, path->c_str(), inode);
     return true;
   }
+  path->Clear();
   
   found = cwd_tracker_->Find(inode, path);
   if (found) {
@@ -825,6 +826,7 @@ bool Ensemble::Find(const uint64_t inode, PathString *path) {
              "ancient inode %"PRIu64, path->c_str(), inode);
     return true;
   }
+  path->Clear();
   
   found = lookup_tracker_->Find(inode, path);
   if (found) {
@@ -852,6 +854,7 @@ bool Ensemble::FindChain(const uint64_t inode,
              "for ancient inode %"PRIu64, inode);
     return true;
   }
+  chain->clear();
   
   found = cwd_tracker_->FindChain(inode, chain);
   if (found) {
@@ -859,6 +862,7 @@ bool Ensemble::FindChain(const uint64_t inode,
              "ancient inode %"PRIu64, inode);
     return true;
   }
+  chain->clear();
   
   found = lookup_tracker_->FindChain(inode, chain);
   return found;
