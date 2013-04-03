@@ -1589,8 +1589,7 @@ snapshot() {
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
   local with_history=
-  local peek_result=`$user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" 2>/dev/null 2>&1`
-  if echo $peek_result | grep -q "available"; then
+  if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -q "available"; then
     with_history="-p"
   else
     echo "Initial snapshot"
