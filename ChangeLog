@@ -1,4 +1,6 @@
 2.1.9:
+  * Fix handling of "last_snapshot" sentinel in replication
+    when not executed as root
   * Asynchronous catalog updates in the server toolkit
   * Fix: shared cache manager race during load-unload cycles
   * Fix: file descriptor leaks during Fuse module reload

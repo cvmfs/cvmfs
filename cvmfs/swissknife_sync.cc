@@ -136,6 +136,29 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
 }
 
 
+int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
+  const string file_to_peek = *args.find('d')->second;
+  const string spooler_definition = *args.find('r')->second;
+  
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
+  assert(spooler);
+  const bool success = spooler->Peek(file_to_peek);
+  spooler->WaitForTermination();
+  if (spooler->GetNumberOfErrors() > 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to peek for %s",
+             file_to_peek.c_str());
+    return 2;
+  }
+  if (!success) {
+    LogCvmfs(kLogCatalog, kLogStdout, "%s not found", file_to_peek.c_str());
+    return 1;
+  }
+  LogCvmfs(kLogCatalog, kLogStdout, "%s available", file_to_peek.c_str());
+  return 0;
+}
+
+
 int swissknife::CommandRemove::Main(const ArgumentList &args) {
   const string file_to_delete     = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;

@@ -1589,7 +1589,8 @@ snapshot() {
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
   local with_history=
-  if [ -f /etc/cvmfs/repositories.d/{$name}/last_snapshot ]; then
+  local peek_result=`$user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" 2>/dev/null 2>&1`
+  if echo $peek_result | grep -q "available"; then
     with_history="-p"
   else
     echo "Initial snapshot"
@@ -1603,7 +1604,10 @@ snapshot() {
     -n $num_workers \
     -t $timeout \
     -a $retries $with_history $log_level"
-  date > /etc/cvmfs/repositories.d/${name}/last_snapshot
+  $user_shell "sh -c \"date > ${spool_dir}/tmp/last_snapshot\""
+  $user_shell "cvmfs_swissknife upload -r ${upstream} \
+    -i ${spool_dir}/tmp/last_snapshot \
+    -o .cvmfs_last_snapshot"
 }
 
 
