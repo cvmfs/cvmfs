@@ -1610,6 +1610,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool diskless = false;
   bool rebuild_cachedb = false;
   bool nfs_source = false;
+  bool nfs_shared = false;
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
@@ -1695,6 +1696,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       options::IsOn(parameter))
   {
     nfs_source = true;
+    if (options::GetValue("CVMFS_NFS_SHARED", &parameter) &&
+        options::IsOn(parameter))
+    { 
+      nfs_shared = true;
+    }
   }
   if (options::GetValue("CVMFS_IGNORE_SIGNATURE", &parameter) &&
       options::IsOn(parameter))
@@ -1893,7 +1899,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
     if (!nfs_maps::Init(leveldb_cache_dir,
                         catalog::AbstractCatalogManager::kInodeOffset+1,
-                        rebuild_cachedb))
+                        rebuild_cachedb, nfs_shared))
     {
       *g_boot_error = "Failed to initialize NFS maps";
       return loader::kFailNfsMaps;
