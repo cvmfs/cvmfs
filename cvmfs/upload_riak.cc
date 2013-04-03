@@ -137,11 +137,9 @@ RiakUploader::~RiakUploader() {
 void RiakUploader::Upload(const std::string  &local_path,
                           const std::string  &remote_path,
                           const callback_t   *callback) {
-  const bool delete_after_upload = false;
   const bool is_critical         = true;
   UploadWorker::Parameters input(local_path,
                                  MakeRiakKey(remote_path),
-                                 delete_after_upload,
                                  is_critical,
                                  callback);
   concurrent_upload_->Schedule(input);
@@ -152,11 +150,9 @@ void RiakUploader::Upload(const std::string  &local_path,
                           const hash::Any    &content_hash,
                           const std::string  &hash_suffix,
                           const callback_t   *callback) {
-  const bool delete_after_upload = true;
   const bool is_critical         = false;
   UploadWorker::Parameters input(local_path,
                                  MakeRiakKey(content_hash, hash_suffix),
-                                 delete_after_upload,
                                  is_critical,
                                  callback);
   concurrent_upload_->Schedule(input);
@@ -181,6 +177,18 @@ void RiakUploader::UploadWorkerCallback(const UploadWorker::Results &result) {
 void RiakUploader::WaitForUpload() const {
   AbstractUploader::WaitForUpload();
   concurrent_upload_->WaitForEmptyQueue();
+}
+
+
+void RiakUploader::DisablePrecaching() {
+  AbstractUploader::DisablePrecaching();
+  concurrent_upload_->EnableDrainoutMode();
+}
+
+
+void RiakUploader::EnablePrecaching() {
+  AbstractUploader::EnablePrecaching();
+  concurrent_upload_->DisableDrainoutMode();
 }
 
 
@@ -421,11 +429,6 @@ void RiakUploader::UploadWorker::operator()(
                                     input.is_critical);
   upload_stopwatch_.Stop();
   upload_time_aggregated_ += upload_stopwatch_.GetTime();
-
-  // clean up
-  if (input.delete_after_upload) {
-    unlink(input.local_path.c_str());
-  }
 
   // generate reponse
   UploadWorker::Results return_value(input.local_path,
