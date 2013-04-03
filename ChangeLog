@@ -1,4 +1,5 @@
 2.1.9:
+  * Asynchronous catalog updates in the server toolkit
   * Fix: shared cache manager race during load-unload cycles
   * Fix: file descriptor leaks during Fuse module reload
   * Fix: handling of log level parameter in snapshot

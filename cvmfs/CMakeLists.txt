@@ -96,6 +96,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_facility.h upload_facility.cc
   upload_local.h upload_local.cc
   upload_riak.h upload_riak.cc
+  upload_spooler_result.h
   json_document.h json_document.cc
 
   duplex_curl.h download.h download.cc

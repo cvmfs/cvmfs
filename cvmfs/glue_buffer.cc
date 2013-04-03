@@ -750,7 +750,6 @@ void OpenTracker::VfsPut(const uint64_t inode) {
 
 
 bool OpenTracker::Find(const uint64_t inode, PathString *path) {
-  assert(path->IsEmpty());
   bool result = false;
   LockPaths();
   result = inode2path_->ConstructPath(inode, path);
