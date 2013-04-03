@@ -1,4 +1,6 @@
 2.1.9:
+  * Recognize CVMFS_IPV4_ONLY environment variable and, if set
+    to a non-empty value, don't use IPv6 addresses
   * Recognize http_proxy in cvmfs server toolkit
   * Fix handling of "last_snapshot" sentinel in replication
     when not executed as root
