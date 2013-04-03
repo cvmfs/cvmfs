@@ -1052,17 +1052,21 @@ int MainCacheManager(int argc, char **argv) {
   if (retval < 0) {
     LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
              "failed to create shared cache manager crash guard");
+    UnlockFile(fd_lockfile_fifo);
     return 1;
   }
   close(retval);
-  if (!InitDatabase(rebuild))
+  if (!InitDatabase(rebuild)) {
+    UnlockFile(fd_lockfile_fifo);
     return 1;
+  }
 
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO %s (%d)",
              fifo_path.c_str(), errno);
+    UnlockFile(fd_lockfile_fifo);
     return 1;
   }
   Nonblock2Block(pipe_lru_[0]);
