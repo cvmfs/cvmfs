@@ -92,40 +92,13 @@
 #include "file_chunk.h"
 
 #include "upload_spooler_definition.h"
+#include "upload_spooler_result.h"
 
 #include "upload_file_processor.h"
 #include "upload_facility.h"
 
 namespace upload
 {
-  /**
-   * This data structure will be passed to every callback spoolers will invoke.
-   * It encapsulates the results of a spooler command along with the given
-   * local_path to identify the spooler action performed.
-   *
-   * Note: When the return_code is different from 0 the content_hash is most
-   *       likely undefined, Null or rubbish.
-   */
-  struct SpoolerResult {
-    SpoolerResult(const int           return_code = -1,
-                  const std::string  &local_path  = "",
-                  const hash::Any    &digest      = hash::Any(),
-                  const FileChunks   &file_chunks = FileChunks()) :
-      return_code(return_code),
-      local_path(local_path),
-      content_hash(digest),
-      file_chunks(file_chunks) {}
-
-    inline bool IsChunked() const { return !file_chunks.empty(); }
-
-    int         return_code;  //!< the return value of the spooler operation
-    std::string local_path;   //!< the local_path previously given as input
-    hash::Any   content_hash; //!< the content_hash of the bulk file derived
-                              //!< during processing
-    FileChunks  file_chunks;  //!< the file chunks generated during processing
-  };
-
-
   /**
    * The Spooler takes care of the upload procedure of files into a backend
    * storage. It can be extended to multiple supported backend storage types,
@@ -278,7 +251,7 @@ namespace upload
      * Automatically takes care of processed files and prepares them for upload
      * by calling AbstractSpooler::Upload(FileProcessor::Results)
      */
-    void ProcessingCallback(const FileProcessor::Results &data);
+    void ProcessingCallback(const SpoolerResult &data);
 
     void UploadingCallback(const UploaderResults &data);
 
@@ -292,14 +265,10 @@ namespace upload
 
    private:
     // Status Information
-    const SpoolerDefinition                      spooler_definition_;
+    const SpoolerDefinition      spooler_definition_;
 
-    // File processor
-    UniquePtr<ConcurrentWorkers<FileProcessor> > concurrent_processing_;
-    UniquePtr<FileProcessor::worker_context >    concurrent_processing_context_;
-
-    // Uploader facility
-    UniquePtr<AbstractUploader>                  uploader_;
+    UniquePtr<FileProcessor>     file_processor_;
+    UniquePtr<AbstractUploader>  uploader_;
   };
 
 }
