@@ -1411,7 +1411,7 @@ abort() {
 
   # do it!
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   abort_before_hook $name
   sudo umount /cvmfs/$name
@@ -1497,7 +1497,7 @@ publish() {
   fi
 
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   publish_before_hook $name
   sudo /bin/mount -o remount,ro /cvmfs/$name
@@ -1584,7 +1584,7 @@ snapshot() {
 
   # do it!
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"

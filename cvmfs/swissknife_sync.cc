@@ -261,7 +261,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  download::Init(1);
+  download::Init(1, true);
 
   catalog::WritableCatalogManager
     catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),

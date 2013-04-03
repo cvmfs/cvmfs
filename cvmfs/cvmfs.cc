@@ -1962,7 +1962,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   g_talk_ready = true;
 
   // Network initialization
-  download::Init(cvmfs::kDefaultNumConnections);
+  download::Init(cvmfs::kDefaultNumConnections, false);
   download::SetHostChain(hostname);
   download::SetProxyChain(proxies);
   download::SetTimeout(timeout, timeout_direct);

@@ -1070,7 +1070,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
 }
 
 
-void Init(const unsigned max_pool_handles) {
+void Init(const unsigned max_pool_handles, const bool use_system_proxy) {
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
@@ -1116,6 +1116,14 @@ void Init(const unsigned max_pool_handles) {
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
   srandom(tv_now.tv_usec);
+  
+  if (use_system_proxy) {
+    if (getenv("http_proxy") == NULL) {
+      SetProxyChain("");
+    } else {
+      SetProxyChain(string(getenv("http_proxy")));
+    }
+  }
 }
 
 

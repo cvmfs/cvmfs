@@ -1,4 +1,5 @@
 2.1.9:
+  * Recognize http_proxy in cvmfs server toolkit
   * Fix handling of "last_snapshot" sentinel in replication
     when not executed as root
   * Asynchronous catalog updates in the server toolkit

@@ -500,7 +500,7 @@ int cvmfs_int_init(
   atomic_init32(&cvmfs::open_dirs_);
 
   // Network initialization
-  download::Init(16);
+  download::Init(16, false);
   download::SetHostChain(string(cvmfs_opts_hostname));
   download::SetProxyChain(cvmfs_opts_proxies);
   download::SetTimeout(cvmfs_opts_timeout, cvmfs_opts_timeout_direct);
