@@ -74,6 +74,7 @@ struct BusyHandlerInfo {
     accumulated_ms = 0;
   }
   static const unsigned max_wait_ms = 60000;
+  static const unsigned max_backoff_ms = 100;
   unsigned accumulated_ms;
 };
 BusyHandlerInfo *busy_handler_info_ = NULL;
@@ -234,6 +235,9 @@ static int BusyHandler(void *data, int attempt) {
   unsigned backoff_ms = random() % backoff_range_ms;
   if (handler_info->accumulated_ms + backoff_ms > handler_info->max_wait_ms)
     backoff_ms = handler_info->max_wait_ms - handler_info->accumulated_ms;
+  if (backoff_ms > handler_info->max_backoff_ms)
+    backoff_ms = handler_info->max_backoff_ms;
+  
   SafeSleepMs(backoff_ms);
   handler_info->accumulated_ms += backoff_ms;
   return 1;
