@@ -1895,10 +1895,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
     cvmfs::nfs_maps_ = true;
     const string leveldb_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
-    /*if (!MkdirDeep(leveldb_cache_dir, 0700)) {
+    if (!MkdirDeep(leveldb_cache_dir, 0700)) {
       *g_boot_error = "Failed to initialize NFS maps";
       return loader::kFailNfsMaps;
-    }*/
+    }
     if (!nfs_maps::Init(leveldb_cache_dir,
                         catalog::AbstractCatalogManager::kInodeOffset+1,
                         rebuild_cachedb, nfs_shared))
