@@ -458,6 +458,7 @@ static void RemountFinish() {
     // Ensure that all Fuse callbacks left the catalog query code
     remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
+    glue_ensemble_->lookup_tracker()->SwapBuffers();
     if (inode_annotation_) {
       inode_annotation_->CheckForOverflow(
         catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
@@ -2244,6 +2245,7 @@ static bool RestoreState(const int fd_progress,
         (glue::Ensemble *)saved_states[i]->state;
       cvmfs::glue_ensemble_ = new glue::Ensemble(*saved_glue_buffer);
       cvmfs::glue_ensemble_->lookup_tracker()->Resize(cvmfs::glue_lookups_size_);
+      cvmfs::glue_ensemble_->lookup_tracker()->SwapBuffers();
       cvmfs::glue_remount_listener_ = 
         new glue::RemountListener(cvmfs::glue_ensemble_);
       if (!cvmfs::nfs_maps_) {

@@ -150,9 +150,9 @@ class LookupTracker {
     atomic_int64 num_jmpai_hits;
     atomic_int64 num_jmpai_misses;
   };
-  uint64_t GetNumInserts() { return atomic_read64(&buffer_pos_); }
+  uint64_t GetNumInserts() { return atomic_read64(&buffer_write_pos_); }
   unsigned GetNumEntries() { return size_; }
-  unsigned GetNumBytes() { return size_*sizeof(BufferEntry); }
+  unsigned GetNumBytes() { return 2*size_*sizeof(BufferEntry); }
   Statistics GetStatistics() { return statistics_; }
   
   LookupTracker(const unsigned size);
@@ -168,20 +168,15 @@ class LookupTracker {
   inline void Add(const uint64_t inode, const uint64_t parent_inode, 
                   const NameString &name)
   {
-    //assert((parent_inode == 0) || ((parent_inode & ((1<<26)-1)) != 0));
-    ReadLock();
-    
-    uint32_t pos = atomic_xadd64(&buffer_pos_, 1) % size_;
-    while (!atomic_cas32(&buffer_[pos].busy_flag, 0, 1)) {
+    uint32_t pos = atomic_xadd64(&buffer_write_pos_, 1) % size_;
+    while (!atomic_cas32(&buffer_write_[pos].busy_flag, 0, 1)) {
       atomic_inc64(&statistics_.num_busywait_cycles);
       sched_yield();
     }
-    buffer_[pos].inode = inode;
-    buffer_[pos].parent_inode = parent_inode;
-    buffer_[pos].name = name;
-    atomic_dec32(&buffer_[pos].busy_flag);
-    
-    Unlock();
+    buffer_write_[pos].inode = inode;
+    buffer_write_[pos].parent_inode = parent_inode;
+    buffer_write_[pos].name = name;
+    atomic_dec32(&buffer_write_[pos].busy_flag);
   }
   
   inline void AddDirent(const catalog::DirectoryEntry &dirent) {
@@ -189,6 +184,11 @@ class LookupTracker {
   }
   bool Find(const uint64_t inode, PathString *path);
   bool FindChain(const uint64_t inode, std::vector<Dirent> *chain);
+  void SwapBuffers() {
+    BufferEntry *tmp = buffer_write_;
+    buffer_write_ = buffer_read_;
+    buffer_read_ = tmp;
+  }
   
  private:
   static const unsigned kVersion = 1;
@@ -203,27 +203,14 @@ class LookupTracker {
     atomic_int32 busy_flag;
   };
   
-  void InitLock();
   void CopyFrom(const LookupTracker &other);
-  inline void ReadLock() const {
-    int retval = pthread_rwlock_rdlock(rwlock_);
-    assert(retval == 0);
-  }
-  inline void WriteLock() const {
-    int retval = pthread_rwlock_wrlock(rwlock_);
-    assert(retval == 0);
-  }
-  inline void Unlock() const {
-    int retval = pthread_rwlock_unlock(rwlock_);
-    assert(retval == 0);
-  }
   bool ConstructPath(const unsigned buffer_idx, PathString *path);
   bool ConstructChain(const unsigned buffer_idx, std::vector<Dirent> *chain);
   bool FindIndex(const uint64_t inode, unsigned *index);
   
-  pthread_rwlock_t *rwlock_;
-  BufferEntry *buffer_;
-  atomic_int64 buffer_pos_;
+  BufferEntry *buffer_read_;
+  BufferEntry *buffer_write_;
+  atomic_int64 buffer_write_pos_;
   unsigned size_;
   unsigned version_;
   Ensemble *ensemble_;
