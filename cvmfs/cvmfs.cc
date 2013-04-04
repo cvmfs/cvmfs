@@ -199,6 +199,7 @@ bool foreground_ = false;
 bool nfs_maps_ = false;
 string *mountpoint_ = NULL;
 string *cachedir_ = NULL;
+string *nfs_shared_dir_ = NULL;
 string *tracefile_ = NULL;
 string *repository_name_ = NULL;  /**< Expected repository name,
                                        e.g. atlas.cern.ch */
@@ -1611,6 +1612,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool rebuild_cachedb = false;
   bool nfs_source = false;
   bool nfs_shared = false;
+  string nfs_shared_dir = string(cvmfs::kDefaultCachedir);
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
@@ -1696,10 +1698,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
       options::IsOn(parameter))
   {
     nfs_source = true;
-    if (options::GetValue("CVMFS_NFS_SHARED", &parameter) &&
-        options::IsOn(parameter))
+    if (options::GetValue("CVMFS_NFS_SHARED", &parameter))
     { 
       nfs_shared = true;
+      nfs_shared_dir = MakeCanonicalPath(parameter);
     }
   }
   if (options::GetValue("CVMFS_IGNORE_SIGNATURE", &parameter) &&
@@ -1735,6 +1737,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
   cvmfs::cachedir_ = new string(cachedir);
+  cvmfs::nfs_shared_dir_ = new string(nfs_shared_dir);
   cvmfs::tracefile_ = new string(tracefile);
   cvmfs::repository_name_ = new string(loader_exports->repository_name);
   cvmfs::mountpoint_ = new string(loader_exports->mount_point);
@@ -1894,12 +1897,17 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
 
     cvmfs::nfs_maps_ = true;
-    const string leveldb_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
-    if (!MkdirDeep(leveldb_cache_dir, 0700)) {
+
+    string inode_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
+    if (nfs_shared) {
+      inode_cache_dir = (*cvmfs::nfs_shared_dir_) + "/nfs_maps."
+                          + (*cvmfs::repository_name_);
+    }
+    if (!MkdirDeep(inode_cache_dir, 0700)) {
       *g_boot_error = "Failed to initialize NFS maps";
       return loader::kFailNfsMaps;
     }
-    if (!nfs_maps::Init(leveldb_cache_dir,
+    if (!nfs_maps::Init(inode_cache_dir,
                         catalog::AbstractCatalogManager::kInodeOffset+1,
                         rebuild_cachedb, nfs_shared))
     {
@@ -2106,6 +2114,7 @@ static void Fini() {
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
   delete cvmfs::cachedir_;
+  delete cvmfs::nfs_shared_dir_;
   delete cvmfs::tracefile_;
   delete cvmfs::repository_name_;
   delete cvmfs::mountpoint_;
@@ -2120,6 +2129,7 @@ static void Fini() {
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
   cvmfs::cachedir_ = NULL;
+  cvmfs::nfs_shared_dir_ = NULL;
   cvmfs::tracefile_ = NULL;
   cvmfs::repository_name_ = NULL;
   cvmfs::mountpoint_= NULL;
