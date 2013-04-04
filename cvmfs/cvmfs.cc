@@ -1748,8 +1748,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            int(cvmfs::kcache_timeout_));
 
-  // Tune SQlite3 memory
+  // Tune SQlite3
   sqlite3_shutdown();  // Make sure SQlite starts clean after initialization
+  retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+  assert(retval == SQLITE_OK);
   g_sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   g_sqlite_page_cache = smalloc(1280*3275);  // 4MB
   retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, g_sqlite_scratch, 8192, 16);
@@ -1893,10 +1895,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
     cvmfs::nfs_maps_ = true;
     const string leveldb_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
-    if (!MkdirDeep(leveldb_cache_dir, 0700)) {
+    /*if (!MkdirDeep(leveldb_cache_dir, 0700)) {
       *g_boot_error = "Failed to initialize NFS maps";
       return loader::kFailNfsMaps;
-    }
+    }*/
     if (!nfs_maps::Init(leveldb_cache_dir,
                         catalog::AbstractCatalogManager::kInodeOffset+1,
                         rebuild_cachedb, nfs_shared))
