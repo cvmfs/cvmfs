@@ -336,25 +336,7 @@ bool LookupTracker::FindChain(const uint64_t inode,
   atomic_inc64(&statistics_.num_ancient_misses);
   return false;
 }
-  
-  
-void LookupTracker::AddDeprecated(const catalog::DirectoryEntry &dirent) {
-  Add(dirent.inode(), dirent.parent_inode(), dirent.name());
-  atomic_inc64(&statistics_.num_insert_deprecated);
-  
-  uint64_t needle_inode = dirent.parent_inode();
-  NameString name = dirent.name();
-  unsigned idx;
-  while (!name.IsEmpty() && !FindIndex(needle_inode, &idx)) {
-    Add(needle_inode, buffer_read_[idx].parent_inode, 
-        buffer_read_[idx].name);
-    atomic_inc64(&statistics_.num_insert_deprecated);
-    needle_inode = buffer_read_[idx].parent_inode;
-    name = buffer_read_[idx].name;
-  }
-}
 
-  
 
 //------------------------------------------------------------------------------
 

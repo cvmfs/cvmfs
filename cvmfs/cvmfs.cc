@@ -521,11 +521,7 @@ static inline void AddToGlueLookups(const catalog::DirectoryEntry &dirent) {
   if (nfs_maps_)
     return;
   if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_)) {
-    if (inode_annotation_ && !inode_annotation_->ValidInode(dirent.inode())) {
-      glue_ensemble_->lookup_tracker()->AddDirent(dirent);
-    } else {
-      glue_ensemble_->lookup_tracker()->AddDeprecated(dirent);
-    }
+    glue_ensemble_->lookup_tracker()->AddDirent(dirent);
   }
 }
 
