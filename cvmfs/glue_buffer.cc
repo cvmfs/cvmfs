@@ -710,19 +710,20 @@ void OpenTracker::VfsGetLiving(const uint64_t inode) {
 void OpenTracker::VfsGetDeprecated(const uint64_t inode) {  
   LockInodes();
   // Materialize ancient path immediately
-  chain_buffer_.clear();
-  bool retval = ensemble_->FindChain(inode, &chain_buffer_);
-  if (retval) {
-    LockPaths();
-    AddChainbuffer(inode, inode2path_);
-    UnlockPaths();
-  } else {
-    LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "internal error: "
-             "failed to materialize path for ancient inode %"PRIu64, inode);
-  }
   uint32_t references = IncInodeReference(inode);
-  if (references == 1)
+  if (references == 1) {
     atomic_inc64(&statistics_.num_inserts_deprecated);
+    chain_buffer_.clear();
+    bool retval = ensemble_->FindChain(inode, &chain_buffer_);
+    if (retval) {
+      LockPaths();
+      AddChainbuffer(inode, inode2path_);
+      UnlockPaths();
+    } else {
+      LogCvmfs(kLogGlueBuffer, kLogDebug | kLogSyslog, "internal error: "
+               "failed to materialize path for ancient inode %"PRIu64, inode);
+    }
+  }
   UnlockInodes();
 }
   
