@@ -83,6 +83,9 @@ class InodeContainer {
   
   inline InodeMap *map() { return &map_; }
   
+  inline size_t Size() { return map_.size(); }
+  inline void Clear() { map_.clear(); }
+  
  private:
   InodeMap map_;
 };
@@ -124,9 +127,10 @@ class LookupTracker {
  public:
   struct Statistics {
     Statistics() {
+      atomic_init64(&num_inserts);
+      atomic_init64(&num_removes);
       atomic_init64(&num_ancient_hits);
       atomic_init64(&num_ancient_misses);
-      atomic_init64(&num_busywait_cycles);
       atomic_init64(&num_jmpcwd_hits);
       atomic_init64(&num_jmpcwd_misses);
       atomic_init64(&num_jmpai_hits);
@@ -134,83 +138,90 @@ class LookupTracker {
     }
     std::string Print() {
       return 
-      "hits: " + StringifyInt(atomic_read64(&num_ancient_hits)) +
+      "inserts: " + StringifyInt(atomic_read64(&num_inserts)) +
+      "  removes: " + StringifyInt(atomic_read64(&num_removes)) +
+      "  hits: " + StringifyInt(atomic_read64(&num_ancient_hits)) +
       "  misses: " + StringifyInt(atomic_read64(&num_ancient_misses)) +
       "  cwd-jmp(hits): " + StringifyInt(atomic_read64(&num_jmpcwd_hits)) +
       "  cwd-jmp(misses): " + StringifyInt(atomic_read64(&num_jmpcwd_misses)) +
       "  ai-jmp(hits): " + StringifyInt(atomic_read64(&num_jmpai_hits)) +
-      "  ai-jmp(misses): " + StringifyInt(atomic_read64(&num_jmpai_misses)) +
-      "  busy-waits: " + StringifyInt(atomic_read64(&num_busywait_cycles));
+      "  ai-jmp(misses): " + StringifyInt(atomic_read64(&num_jmpai_misses));
     }
+    atomic_int64 num_inserts;
+    atomic_int64 num_removes;
     atomic_int64 num_ancient_hits;
     atomic_int64 num_ancient_misses;
-    atomic_int64 num_busywait_cycles;
     atomic_int64 num_jmpcwd_hits;
     atomic_int64 num_jmpcwd_misses;
     atomic_int64 num_jmpai_hits;
     atomic_int64 num_jmpai_misses;
   };
-  uint64_t GetNumInserts() { return atomic_read64(&buffer_write_pos_); }
-  unsigned GetNumEntries() { return size_; }
-  unsigned GetNumBytes() { return 2*size_*sizeof(BufferEntry); }
   Statistics GetStatistics() { return statistics_; }
   
-  LookupTracker(const unsigned size);
+  LookupTracker();
   LookupTracker(const LookupTracker &other);
   LookupTracker &operator= (const LookupTracker &other);
   ~LookupTracker();
-  void Resize(const unsigned new_size);
   void SetEnsemble(Ensemble *ensemble) {
     assert(ensemble->lookup_tracker() == this);
     ensemble_ = ensemble;
   }
   
-  inline void Add(const uint64_t inode, const uint64_t parent_inode, 
-                  const NameString &name)
+  inline void Add(const uint64_t inode, const uint64_t parent_inode,
+                  const NameString &name) 
   {
-    uint32_t pos = atomic_xadd64(&buffer_write_pos_, 1) % size_;
-    while (!atomic_cas32(&buffer_write_[pos].busy_flag, 0, 1)) {
-      atomic_inc64(&statistics_.num_busywait_cycles);
-      sched_yield();
+    LockWrite();
+    if (!buffer_write_->Contains(inode)) {
+      buffer_write_->Add(inode, parent_inode, name);
+      atomic_inc64(&statistics_.num_inserts);
     }
-    buffer_write_[pos].inode = inode;
-    buffer_write_[pos].parent_inode = parent_inode;
-    buffer_write_[pos].name = name;
-    atomic_dec32(&buffer_write_[pos].busy_flag);
+    UnlockWrite();
   }
   inline void AddDirent(const catalog::DirectoryEntry &dirent) {
-    Add(dirent.inode(), dirent.parent_inode(), dirent.name());
+    LockWrite();
+    if (!buffer_write_->Contains(dirent.inode())) {
+      buffer_write_->AddCatalogDirent(dirent);
+      atomic_inc64(&statistics_.num_inserts);
+    }
+    UnlockWrite();
   }
   bool Find(const uint64_t inode, PathString *path);
   bool FindChain(const uint64_t inode, std::vector<Dirent> *chain);
   void SwapBuffers() {
-    BufferEntry *tmp = buffer_write_;
+    InodeContainer *tmp = buffer_write_;
     buffer_write_ = buffer_read_;
     buffer_read_ = tmp;
+    atomic_xadd64(&statistics_.num_removes, buffer_write_->Size());
+    buffer_write_->Clear();
   }
   
  private:
   static const unsigned kVersion = 1;
-  struct BufferEntry {
-    BufferEntry() {
-      atomic_init32(&busy_flag);
-      inode = parent_inode = 0;
-    }
-    uint64_t inode;
-    uint64_t parent_inode;
-    NameString name;
-    atomic_int32 busy_flag;
-  };
-  
+  void InitLocks();
   void CopyFrom(const LookupTracker &other);
-  bool ConstructPath(const unsigned buffer_idx, PathString *path);
-  bool ConstructChain(const unsigned buffer_idx, std::vector<Dirent> *chain);
-  bool FindIndex(const uint64_t inode, unsigned *index);
+  bool ConstructPath(const uint64_t inode, PathString *path);
+  bool ConstructChain(const uint64_t inode, std::vector<Dirent> *chain);
+  inline void LockRead() {
+    int retval = pthread_mutex_lock(lock_buffer_read_);
+    assert(retval == 0);
+  }
+  inline void LockWrite() {
+    int retval = pthread_mutex_lock(lock_buffer_write_);
+    assert(retval == 0);
+  }
+  inline void UnlockRead() {
+    int retval = pthread_mutex_unlock(lock_buffer_read_);
+    assert(retval == 0);
+  }
+  inline void UnlockWrite() {
+    int retval = pthread_mutex_unlock(lock_buffer_write_);
+    assert(retval == 0);
+  }
   
-  BufferEntry *buffer_read_;
-  BufferEntry *buffer_write_;
-  atomic_int64 buffer_write_pos_;
-  unsigned size_;
+  pthread_mutex_t *lock_buffer_read_;
+  pthread_mutex_t *lock_buffer_write_;
+  InodeContainer *buffer_read_;
+  InodeContainer *buffer_write_;
   unsigned version_;
   Ensemble *ensemble_;
   Statistics statistics_; 

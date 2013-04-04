@@ -107,7 +107,6 @@ const double kDefaultKCacheTimeout = 60.0;
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
-const unsigned kDefaultGlueLookupsSize = 8192;
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
@@ -212,7 +211,6 @@ lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
 
-uint32_t glue_lookups_size_ = kDefaultGlueLookupsSize;
 glue::Ensemble *glue_ensemble_ = NULL;
 glue::RemountListener *glue_remount_listener_ = NULL;
 
@@ -359,10 +357,7 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
 
 string PrintGlueBufferStatistics() {
   glue::LookupTracker *glue_lookups = glue_ensemble_->lookup_tracker();
-  return "entries: " + StringifyInt(glue_lookups->GetNumEntries()) + "  " +
-    "allocated: " + StringifyInt(glue_lookups->GetNumBytes() / 1024) + "kB  " +
-    "inserts: " + StringifyInt(glue_lookups->GetNumInserts()) + "  " +
-    glue_lookups->GetStatistics().Print() + "\n";
+  return glue_lookups->GetStatistics().Print() + "\n";
 }
   
   
@@ -1654,8 +1649,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Overwrite default options
   if (options::GetValue("CVMFS_64BIT_INODES", &parameter))
     inodes_64bit = options::IsOn(parameter);
-  if (options::GetValue("CVMFS_GLUEBUFFER_SIZE", &parameter))
-    cvmfs::glue_lookups_size_ = String2Uint64(parameter);
   if (options::GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
     mem_cache_size = String2Uint64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_TIMEOUT", &parameter))
@@ -1779,7 +1772,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::md5path_cache_ =
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
   cvmfs::glue_ensemble_ = 
-    new glue::Ensemble(new glue::LookupTracker(cvmfs::glue_lookups_size_),
+    new glue::Ensemble(new glue::LookupTracker(),
                        new glue::CwdTracker(*cvmfs::mountpoint_),
                        new glue::OpenTracker());
   if (!nfs_source) {
@@ -2246,7 +2239,6 @@ static bool RestoreState(const int fd_progress,
       glue::Ensemble *saved_glue_buffer = 
         (glue::Ensemble *)saved_states[i]->state;
       cvmfs::glue_ensemble_ = new glue::Ensemble(*saved_glue_buffer);
-      cvmfs::glue_ensemble_->lookup_tracker()->Resize(cvmfs::glue_lookups_size_);
       cvmfs::glue_ensemble_->lookup_tracker()->SwapBuffers();
       cvmfs::glue_remount_listener_ = 
         new glue::RemountListener(cvmfs::glue_ensemble_);

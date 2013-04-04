@@ -109,28 +109,31 @@ uint32_t InodeContainer::TransferAll(const PathString &path,
 //------------------------------------------------------------------------------
 
 
-LookupTracker::LookupTracker(const unsigned size) {
-  assert(size >= 2);
+void LookupTracker::InitLocks() {
+  lock_buffer_read_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_buffer_read_, NULL);
+  assert(retval == 0);
+  lock_buffer_write_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(lock_buffer_write_, NULL);
+  assert(retval == 0);
+}
+
+  
+LookupTracker::LookupTracker() {
   version_ = kVersion;
-  size_ = size;
-  buffer_read_ = new BufferEntry[size_];
-  buffer_write_ = new BufferEntry[size_];
-  atomic_init64(&buffer_write_pos_);
+  buffer_read_ = new InodeContainer();
+  buffer_write_ = new InodeContainer();
+  InitLocks();
 }
 
 
 void LookupTracker::CopyFrom(const LookupTracker &other) {
   assert(other.version_ == kVersion);
   version_ = kVersion;
-  size_ = other.size_;
-  buffer_read_ = new BufferEntry[size_];
-  buffer_write_ = new BufferEntry[size_];
-  unsigned copyable_size = size_ > other.size_ ? other.size_ : size_;
-  for (unsigned i = 0; i < copyable_size; ++i)
-    buffer_read_[i] = other.buffer_read_[i];
-  for (unsigned i = 0; i < copyable_size; ++i)
-    buffer_write_[i] = other.buffer_write_[i];
-  buffer_write_pos_ = other.buffer_write_pos_;
+  buffer_read_ = new InodeContainer(*other.buffer_read_);
+  buffer_write_ = new InodeContainer(*other.buffer_write_);
   ensemble_ = other.ensemble_;
   statistics_ = other.statistics_;
 }
@@ -138,6 +141,7 @@ void LookupTracker::CopyFrom(const LookupTracker &other) {
 
 LookupTracker::LookupTracker(const LookupTracker &other) {
   CopyFrom(other);
+  InitLocks();
 }
 
 
@@ -145,113 +149,68 @@ LookupTracker &LookupTracker::operator= (const LookupTracker &other) {
   if (&other == this)
     return *this;
   
-  delete[] buffer_read_;
-  delete[] buffer_write_;
+  delete buffer_read_;
+  delete buffer_write_;
   CopyFrom(other);
   return *this;
 }
 
 
 LookupTracker::~LookupTracker() {
-  delete[] buffer_read_;
-  delete[] buffer_write_;
+  delete buffer_read_;
+  delete buffer_write_;
+  pthread_mutex_destroy(lock_buffer_read_);
+  pthread_mutex_destroy(lock_buffer_write_);
+  free(lock_buffer_read_);
+  free(lock_buffer_write_);
 }
 
 
-void LookupTracker::Resize(const unsigned new_size) {
-  if (size_ == new_size)
-    return;
-  
-  assert(new_size >= 2);
-  BufferEntry *new_buffer_read = new BufferEntry[new_size];
-  BufferEntry *new_buffer_write = new BufferEntry[new_size];
-  unsigned num_entries = size_ > new_size ? new_size : size_;
-  
-  for (unsigned i = 0; i < num_entries; ++i) {
-    int64_t from_pos = 
-    ((int64_t)(buffer_write_pos_) - (int64_t)(num_entries-i)) % size_;
-    if (from_pos < 0)
-      from_pos = size_ - (-from_pos);
-    new_buffer_write[i] = buffer_write_[from_pos];
-  }
-  delete[] buffer_write_;
-  buffer_write_ = new_buffer_write;
-  if (buffer_write_pos_ >= new_size)
-    buffer_write_pos_ = num_entries;
-  
-  for (unsigned i = 0; i < num_entries; ++i) {
-    new_buffer_read[i] = buffer_read_[i];
-  }
-  delete[] buffer_read_;
-  buffer_read_ = new_buffer_read;
-  
-  size_ = new_size;
-}
-
-
-bool LookupTracker::ConstructPath(const unsigned buffer_idx, PathString *path) {
-  // Root inode found?
-  if (buffer_read_[buffer_idx].name.IsEmpty())
-    return true;
-  
-  // Construct path until buffer_idx
-  LogCvmfs(kLogGlueBuffer, kLogDebug, "construct inode %u, parent %u, name %s", 
-           buffer_read_[buffer_idx].inode, buffer_read_[buffer_idx].parent_inode, 
-           buffer_read_[buffer_idx].name.c_str());
-  unsigned parent_idx;
-  uint64_t needle_inode = buffer_read_[buffer_idx].parent_inode;
-  bool retval = FindIndex(needle_inode, &parent_idx);
-  bool result;
-  if (retval) {
-    result = ConstructPath(parent_idx, path);
-  } else {
-    LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
-             "active inodes buffer, inode: %u", needle_inode);
-    bool retval = ensemble_->open_tracker()->Find(needle_inode, path);
+bool LookupTracker::ConstructPath(const uint64_t inode, PathString *path) {
+  InodeContainer::InodeMap::const_iterator needle = 
+    buffer_read_->map()->find(inode);
+  if (needle == buffer_read_->map()->end()) {
+    LogCvmfs(kLogGlueBuffer, kLogDebug, "jumping from glue buffer to "
+             "active inodes buffer, inode: %u", inode);
+    bool retval = ensemble_->open_tracker()->Find(inode, path);
     if (retval) {
       atomic_inc64(&statistics_.num_jmpai_hits);
-      result = true;
-      goto construct_path_append;
+      return true;
     }
     atomic_inc64(&statistics_.num_jmpai_misses);
     
     LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
-             "cwd buffer, inode: %u", needle_inode);
-    retval = ensemble_->cwd_tracker()->Find(needle_inode, path);
+             "cwd buffer, inode: %u", inode);
+    retval = ensemble_->cwd_tracker()->Find(inode, path);
     if (retval) {
       atomic_inc64(&statistics_.num_jmpcwd_hits);
-      result = true;
-      goto construct_path_append;
+      return true;
     }
     atomic_inc64(&statistics_.num_jmpcwd_misses);
     
-    result = false;
-  }
+    return false;
+  } 
   
- construct_path_append:
+  if (needle->second.name.IsEmpty())
+    return true;
+  bool retval = ConstructPath(needle->second.parent_inode, path);
   path->Append("/", 1);
-  path->Append(buffer_read_[buffer_idx].name.GetChars(), 
-               buffer_read_[buffer_idx].name.GetLength());  
-  return result;
+  path->Append(needle->second.name.GetChars(), 
+               needle->second.name.GetLength());
+  return retval;
 }
 
 
-bool LookupTracker::ConstructChain(const unsigned buffer_idx, 
-                                   std::vector<Dirent> *chain) 
+bool LookupTracker::ConstructChain(const uint64_t inode, vector<Dirent> *chain) 
 {
-  unsigned index = buffer_idx;
+  uint64_t needle_inode = inode;
+  InodeContainer::InodeMap::const_iterator needle;
   do {
-    chain->push_back(Dirent(buffer_read_[index].parent_inode, 
-                            buffer_read_[index].name));
-    if (buffer_read_[index].name.IsEmpty())
-      return true;
-    
-    uint64_t needle_inode = buffer_read_[index].parent_inode;
-    bool retval = FindIndex(needle_inode, &index);
-    if (!retval) {
+    needle = buffer_read_->map()->find(needle_inode);
+    if (needle == buffer_read_->map()->end()) {
       LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
-               "active inodes buffer, inode: %u", needle_inode);
-      bool retval = ensemble_->open_tracker()->FindChain(needle_inode, chain);
+               "active inodes buffer, inode: %u", inode);
+      bool retval = ensemble_->open_tracker()->FindChain(inode, chain);
       if (retval) {
         atomic_inc64(&statistics_.num_jmpai_hits);
         return true;
@@ -259,8 +218,8 @@ bool LookupTracker::ConstructChain(const unsigned buffer_idx,
       atomic_inc64(&statistics_.num_jmpai_misses);
       
       LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
-               "cwd buffer, inode: %u", needle_inode);
-      retval = ensemble_->cwd_tracker()->FindChain(needle_inode, chain);
+               "cwd buffer, inode: %u", inode);
+      retval = ensemble_->cwd_tracker()->FindChain(inode, chain);
       if (retval) {
         atomic_inc64(&statistics_.num_jmpcwd_hits);
         return true;
@@ -268,67 +227,36 @@ bool LookupTracker::ConstructChain(const unsigned buffer_idx,
       atomic_inc64(&statistics_.num_jmpcwd_misses);
       return false;
     }
-  } while (true);
-}
+    
+    chain->push_back(needle->second);    
+    needle_inode = needle->second.parent_inode;
+  } while (!needle->second.name.IsEmpty());
   
-  
-bool LookupTracker::FindIndex(const uint64_t inode, unsigned *index) {
-  bool found = false;
-  for (unsigned i = 0; i < size_; ++i) {
-    //LogCvmfs(kLogGlueBuffer, kLogDebug, "GLUE: idx %d, inode %u, parent %u, "
-    //         "revision %u, name %s",
-    //         i, buffer_[i].inode, buffer_[i].parent_inode, buffer_[i].revision, 
-    //         buffer_[i].name.c_str());
-    if (buffer_read_[i].inode == inode) {
-      *index = i;
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    LogCvmfs(kLogGlueBuffer, kLogDebug, "failed to find index for "
-             "ancient inode %"PRIu64, inode);
-    return false;
-  }
   return true;
 }
-
-
+  
+  
 bool LookupTracker::Find(const uint64_t inode, PathString *path) {
   assert(path->IsEmpty());
   
-  // Find initial buffer index
-  unsigned index;
-  bool retval = FindIndex(inode, &index);
+  LockRead();
+  bool retval = ConstructPath(inode, path);
+  UnlockRead();
   if (!retval) {
     atomic_inc64(&statistics_.num_ancient_misses);
     return false;
   }
-    
-  // Recursively build path
-  retval = ConstructPath(index, path);
-  if (retval) {
-    atomic_inc64(&statistics_.num_ancient_hits);
-    return true;
-  }
-  atomic_inc64(&statistics_.num_ancient_misses);
-  return false;
+  atomic_inc64(&statistics_.num_ancient_hits);
+  return true;
 }
   
   
 bool LookupTracker::FindChain(const uint64_t inode, 
                               std::vector<Dirent> *chain) 
 {
-  // Find initial buffer index
-  unsigned index;
-  bool retval = FindIndex(inode, &index);
-  if (!retval) {
-    atomic_inc64(&statistics_.num_ancient_misses);
-    return false;
-  }
-  
-  // Recursively build path
-  retval = ConstructChain(index, chain);
+  LockRead();
+  bool retval = ConstructChain(inode, chain);
+  UnlockRead();
   if (retval) {
     atomic_inc64(&statistics_.num_ancient_hits);
     return true;
@@ -828,7 +756,7 @@ bool Ensemble::Find(const uint64_t inode, PathString *path) {
       cwd_tracker_->Inject(inode, chain);
     } else {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "internal error: "
-               "failed to inject %"PRIu64" into cwd tracker");
+               "failed to inject %"PRIu64" into cwd tracker", inode);
     }
   }
   
