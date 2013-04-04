@@ -520,8 +520,13 @@ static void RemountCheck() {
 static inline void AddToGlueLookups(const catalog::DirectoryEntry &dirent) {
   if (nfs_maps_)
     return;
-  if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_))
-    glue_ensemble_->lookup_tracker()->AddDirent(dirent);
+  if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_)) {
+    if (inode_annotation_ && !inode_annotation_->ValidInode(dirent.inode())) {
+      glue_ensemble_->lookup_tracker()->AddDirent(dirent);
+    } else {
+      glue_ensemble_->lookup_tracker()->AddDeprecated(dirent);
+    }
+  }
 }
 
   
@@ -599,6 +604,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
           dirent->set_inode(ino);
           inode_cache_->Insert(ino, *dirent);
           path_cache_->Insert(ino, recovered_path);
+          // Insert entire history of this ancient inode
           AddToGlueLookups(*dirent);
           return true;
         }

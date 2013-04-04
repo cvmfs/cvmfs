@@ -124,6 +124,7 @@ class LookupTracker {
  public:
   struct Statistics {
     Statistics() {
+      atomic_init64(&num_insert_deprecated);
       atomic_init64(&num_ancient_hits);
       atomic_init64(&num_ancient_misses);
       atomic_init64(&num_busywait_cycles);
@@ -134,7 +135,8 @@ class LookupTracker {
     }
     std::string Print() {
       return 
-      "hits: " + StringifyInt(atomic_read64(&num_ancient_hits)) +
+      "ins-depr: " + StringifyInt(atomic_read64(&num_insert_deprecated)) +
+      "  hits: " + StringifyInt(atomic_read64(&num_ancient_hits)) +
       "  misses: " + StringifyInt(atomic_read64(&num_ancient_misses)) +
       "  cwd-jmp(hits): " + StringifyInt(atomic_read64(&num_jmpcwd_hits)) +
       "  cwd-jmp(misses): " + StringifyInt(atomic_read64(&num_jmpcwd_misses)) +
@@ -142,6 +144,7 @@ class LookupTracker {
       "  ai-jmp(misses): " + StringifyInt(atomic_read64(&num_jmpai_misses)) +
       "  busy-waits: " + StringifyInt(atomic_read64(&num_busywait_cycles));
     }
+    atomic_int64 num_insert_deprecated;
     atomic_int64 num_ancient_hits;
     atomic_int64 num_ancient_misses;
     atomic_int64 num_busywait_cycles;
@@ -178,10 +181,10 @@ class LookupTracker {
     buffer_write_[pos].name = name;
     atomic_dec32(&buffer_write_[pos].busy_flag);
   }
-  
   inline void AddDirent(const catalog::DirectoryEntry &dirent) {
     Add(dirent.inode(), dirent.parent_inode(), dirent.name());
   }
+  void AddDeprecated(const catalog::DirectoryEntry &dirent);
   bool Find(const uint64_t inode, PathString *path);
   bool FindChain(const uint64_t inode, std::vector<Dirent> *chain);
   void SwapBuffers() {
