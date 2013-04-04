@@ -210,7 +210,7 @@ bool LookupTracker::ConstructChain(const uint64_t inode, vector<Dirent> *chain)
     if (needle == buffer_read_->map()->end()) {
       LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
                "active inodes buffer, inode: %u", inode);
-      bool retval = ensemble_->open_tracker()->FindChain(inode, chain);
+      bool retval = ensemble_->open_tracker()->FindChain(needle_inode, chain);
       if (retval) {
         atomic_inc64(&statistics_.num_jmpai_hits);
         return true;
@@ -219,7 +219,7 @@ bool LookupTracker::ConstructChain(const uint64_t inode, vector<Dirent> *chain)
       
       LogCvmfs(kLogGlueBuffer, kLogDebug,  "jumping from glue buffer to "
                "cwd buffer, inode: %u", inode);
-      retval = ensemble_->cwd_tracker()->FindChain(inode, chain);
+      retval = ensemble_->cwd_tracker()->FindChain(needle_inode, chain);
       if (retval) {
         atomic_inc64(&statistics_.num_jmpcwd_hits);
         return true;
@@ -251,18 +251,16 @@ bool LookupTracker::Find(const uint64_t inode, PathString *path) {
 }
   
   
-bool LookupTracker::FindChain(const uint64_t inode, 
-                              std::vector<Dirent> *chain) 
-{
+bool LookupTracker::FindChain(const uint64_t inode, vector<Dirent> *chain) {
   LockRead();
   bool retval = ConstructChain(inode, chain);
   UnlockRead();
-  if (retval) {
-    atomic_inc64(&statistics_.num_ancient_hits);
-    return true;
+  if (!retval) {
+    atomic_inc64(&statistics_.num_ancient_misses);
+    return false;
   }
-  atomic_inc64(&statistics_.num_ancient_misses);
-  return false;
+  atomic_inc64(&statistics_.num_ancient_hits);
+  return true;
 }
 
 
@@ -764,9 +762,7 @@ bool Ensemble::Find(const uint64_t inode, PathString *path) {
 }
   
   
-bool Ensemble::FindChain(const uint64_t inode, 
-                         std::vector<glue::Dirent> *chain) 
-{
+bool Ensemble::FindChain(const uint64_t inode, vector<Dirent> *chain) {
   bool found = open_tracker_->FindChain(inode, chain);
   if (found) {
     LogCvmfs(kLogCvmfs, kLogDebug, "found chain in active inodes buffer "
