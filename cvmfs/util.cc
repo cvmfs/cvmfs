@@ -814,7 +814,10 @@ void BlockSignal(int signum) {
  * Threads inherit their parent's signal mask.
  */
 void WaitForSignal(int signum) {
-  int retval = platform_sigwait(signum);
+  int retval;
+  do {
+    retval = platform_sigwait(signum);
+  } while ((retval != signum) && (errno = EINTR));
   assert(retval == signum);
 }
 
