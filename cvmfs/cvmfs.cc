@@ -532,6 +532,14 @@ static inline void AddToGlueOpens(const uint64_t inode) {
 }
 
 
+static inline void RemoveFromGlueOpens(const uint64_t inode) {
+  if (nfs_maps_)
+    return;
+  glue_ensemble_->open_tracker()->VfsPut(inode);
+}
+
+  
+
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -951,7 +959,7 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %d, handle %d",
            ino, fi->fh);
-  glue_ensemble_->open_tracker()->VfsPut(ino);
+  RemoveFromGlueOpens(ino);
 
   int reply = 0;
 
@@ -1049,19 +1057,19 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   remount_fence_->Leave();
 
   if ((fi->flags & 3) != O_RDONLY) {
-    glue_ensemble_->open_tracker()->VfsPut(ino);
+    RemoveFromGlueOpens(ino);
     fuse_reply_err(req, EROFS);
     return;
   }
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
-    glue_ensemble_->open_tracker()->VfsPut(ino);
+    RemoveFromGlueOpens(ino);
     fuse_reply_err(req, EOPNOTSUPP);
     return;
   }
 #endif
   if (fi->flags & O_EXCL) {
-    glue_ensemble_->open_tracker()->VfsPut(ino);
+    RemoveFromGlueOpens(ino);
     fuse_reply_err(req, EEXIST);
     return;
   }
@@ -1081,7 +1089,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                       "chunks found in the catalog %s.",
                path.c_str(),
                dirent.catalog()->path().c_str());
-      glue_ensemble_->open_tracker()->VfsPut(ino);
+      RemoveFromGlueOpens(ino);
       fuse_reply_err(req, EIO);
       return;
     }
@@ -1130,7 +1138,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     } else {
       if (close(fd) == 0) atomic_dec32(&open_files_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
-      glue_ensemble_->open_tracker()->VfsPut(ino);
+      RemoveFromGlueOpens(ino);
       fuse_reply_err(req, EMFILE);
       return;
     }
@@ -1141,7 +1149,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
            "failed to open inode: %d, CAS key %s, error code %d",
            ino, dirent.checksum().ToString().c_str(), errno);
-  glue_ensemble_->open_tracker()->VfsPut(ino);
+  RemoveFromGlueOpens(ino);
   if (errno == EMFILE) {
     fuse_reply_err(req, EMFILE);
     return;
@@ -1280,7 +1288,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d", ino);
-  glue_ensemble_->open_tracker()->VfsPut(ino);
+  RemoveFromGlueOpens(ino);
 
   const int64_t fd = fi->fh;
 
