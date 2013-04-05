@@ -418,7 +418,7 @@ cvmfs_chksetup() {
         fi
       fi
 
-      if check_is_on CVMFS_NFS_SHARED; then
+      if [ ! -z "$CVMFS_NFS_SHARED" ]; then
         if ! check_is_on CVMFS_NFS_SOURCE; then
           echo "Warning: Setting CVMFS_NFS_SHARED has no effect without CVMFS_NFS_SOURCE."
           num_warnings=$(($num_warnings+1)) 
