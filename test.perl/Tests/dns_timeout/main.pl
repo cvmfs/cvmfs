@@ -128,6 +128,9 @@ if (defined ($pid) and $pid == 0) {
 			$shell_socket->send("Exiting at breakpoint $break_point. Good debug.\n");
 			$shell_socket->send("END\n");
 			close_test_socket($shell_socket, $shell_ctxt);
+			
+			system("sudo cp $resolv_temp $RealBin/last_resolv.conf");
+			
 			exit 0;
 	}
 
@@ -168,6 +171,9 @@ if (defined ($pid) and $pid == 0) {
 			$shell_socket->send("Exiting at breakpoint $break_point. Good debug.\n");
 			$shell_socket->send("END\n");
 			close_test_socket($shell_socket, $shell_ctxt);
+			
+			system("sudo cp $resolv_temp $RealBin/last_resolv.conf");
+			
 			exit 0;
 	}
 
@@ -209,6 +215,9 @@ if (defined ($pid) and $pid == 0) {
 			$shell_socket->send("Exiting at breakpoint $break_point. Good debug.\n");
 			$shell_socket->send("END\n");
 			close_test_socket($shell_socket, $shell_ctxt);
+			
+			system("sudo cp $resolv_temp $RealBin/last_resolv.conf");
+			
 			exit 0;
 	}
 

@@ -9,7 +9,7 @@ use warnings;
 use File::Find;
 use File::Copy;
 use ZeroMQ qw/:all/;
-use FindBin qw($Bin);
+use FindBin qw($RealBin);
 
 use base 'Exporter';
 use vars qw/ @EXPORT_OK /;
@@ -348,7 +348,12 @@ sub restore_dns {
 	
 	# Restoring resolv.conf
 	print 'Restoring resolv.conf backup... ';
-	system("sudo cp $resolv_temp /etc/resolv.conf");
+	if ($resolv_temp) {
+		system("sudo cp $resolv_temp /etc/resolv.conf");
+	}
+	else {
+		system("sudo cp $RealBin/last_resolv.conf /etc/resolv.conf");
+	}
 	print "Done.\n";
 	
 	# Restarting iptables, it will load previously saved rules
