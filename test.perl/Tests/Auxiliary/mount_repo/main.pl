@@ -86,10 +86,10 @@ if (defined ($pid) and $pid == 0) {
 	if ($break_point == 1) {
 			close_test_socket($socket, $ctxt);
 			
-			$shell_socket->send("Exiting at breakpoint 1. Good debug.\n");
+			$shell_socket->send("Exiting at breakpoint $break_point. Good debug.\n");
 			$shell_socket->send("END\n");
 			close_test_socket($shell_socket, $shell_ctxt);
-			exit 1;
+			exit 0;
 	}
 	
 	# For this first test, we should be able to mount the repo. So, if possibile, setting its variable

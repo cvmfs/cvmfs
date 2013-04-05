@@ -10,5 +10,7 @@ ipv6_fallback:	  --stdout FILE	Redirect STDOUT to FILE.
 ipv6_fallback:			Default to /var/log/cvmfs-test/ipv6_fallback.out.
 ipv6_fallback:	  --stderr FILE Redirect STDERR to FILE.
 ipv6_fallback:			Default to /var/log/cvmfs-test/ipv6_fallback.err.
+ipv6_fallback:	  --restore	Doesn't run the test, but restore dns and
+ipv6_fallback:			iptables settings.
 ipv6_fallback:	  --no-clean	Skip environment cleaning.
 ipv6_fallback:
