@@ -49,6 +49,7 @@ set (CVMFS2_DEBUG_SOURCES
   options.cc options.h
   talk.h talk.cc
   nfs_maps.h nfs_maps.cc
+  nfs_shared_maps.h nfs_shared_maps.cc
   glue_buffer.h glue_buffer.cc
   loader.h
   history.h history.cc
@@ -96,6 +97,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_facility.h upload_facility.cc
   upload_local.h upload_local.cc
   upload_riak.h upload_riak.cc
+  upload_spooler_result.h
   json_document.h json_document.cc
 
   duplex_curl.h download.h download.cc

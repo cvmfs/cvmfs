@@ -44,7 +44,7 @@ string *path_debug = NULL;
 const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
   "fuse stub", "signature", "peers", "fs traversal", "catalog traversal",
-  "nfs maps", "publish", "spooler", "concurrency", "utility" };
+  "nfs maps", "publish", "spooler", "concurrency", "utility", "glue buffer" };
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
@@ -180,6 +180,14 @@ void SetLogVerbosity(const LogLevels min_level) {
  */
 #ifdef DEBUGMSG
 void SetLogDebugFile(const string &filename) {
+  if (filename == "") {
+    if ((file_debug != NULL) && (file_debug != stderr))
+      fclose(file_debug);
+    delete path_debug;
+    path_debug = NULL;
+    return;
+  }
+  
   if ((file_debug != NULL) && (file_debug != stderr)) {
     if ((fclose(file_debug) < 0)) {
       fprintf(stderr, "could not close current log file (%d), aborting\n",

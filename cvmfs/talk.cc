@@ -295,6 +295,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         catalog::Statistics catalog_stats;
         string result;
 
+        result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
         result += "File System Call Statistics:\n  " + cvmfs::GetFsStats();
 
         cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
@@ -305,6 +306,10 @@ static void *MainTalk(void *data __attribute__((unused))) {
         
         result += string("  glue buffer:   ") + 
                   cvmfs::PrintGlueBufferStatistics();
+        result += string("  cwd buffer:    ") + 
+                  cvmfs::PrintCwdBufferStatistics();
+        result += string("  inodes buffer: ") + 
+                  cvmfs::PrintActiveInodesBufferStatistics();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
         result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
@@ -333,7 +338,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         result += "\n";
 
         if (cvmfs::nfs_maps_) {
-          result += "\nLEVELDB Statistics:\n";
+          result += "\nNFS Map Statistics:\n";
           result += nfs_maps::GetStatistics();
         }
 

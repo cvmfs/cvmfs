@@ -114,16 +114,33 @@ ThreadQueues *queues_download_ = NULL;  /**< maps currently
   threads when the download has finished */
 pthread_mutex_t lock_queues_download_ = PTHREAD_MUTEX_INITIALIZER;
 pthread_key_t thread_local_storage_;
+vector<ThreadLocalStorage *> *tls_blocks_;
+pthread_mutex_t lock_tls_blocks_ = PTHREAD_MUTEX_INITIALIZER;
 atomic_int64 num_download_;
 
 CacheModes cache_mode_;
 
 
-static void CleanupTLS(void *data) {
-  ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(data);
+static void CleanupTLS(ThreadLocalStorage *tls) {
   close(tls->pipe_wait[0]);
   close(tls->pipe_wait[1]);
   delete tls;
+}
+  
+  
+static void TLSDestructor(void *data) {
+  ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(data);
+  pthread_mutex_lock(&lock_tls_blocks_);
+  for (vector<ThreadLocalStorage *>::iterator i = tls_blocks_->begin(), 
+       iEnd = tls_blocks_->end(); i != iEnd; ++i)
+  {
+    if ((*i) == tls) {
+      tls_blocks_->erase(i);
+      break;
+    }
+  }
+  pthread_mutex_unlock(&lock_tls_blocks_);
+  CleanupTLS(tls);
 }
 
 /**
@@ -135,6 +152,7 @@ bool Init(const string &cache_path) {
   cache_mode_ = kCacheReadWrite;
   cache_path_ = new string(cache_path);
   queues_download_ = new ThreadQueues();
+  tls_blocks_ = new vector<ThreadLocalStorage *>();
   atomic_init64(&num_download_);
 
   if (!MakeCacheDirectories(cache_path, 0700))
@@ -146,7 +164,7 @@ bool Init(const string &cache_path) {
     return false;
   }
 
-  int retval = pthread_key_create(&thread_local_storage_, CleanupTLS);
+  int retval = pthread_key_create(&thread_local_storage_, TLSDestructor);
   assert(retval == 0);
 
   return true;
@@ -154,13 +172,17 @@ bool Init(const string &cache_path) {
 
 
 void Fini() {
-  // TODO: wait for file transfers to finish
-  // (they are canceled by finilizing the download thread)
+  pthread_mutex_lock(&lock_tls_blocks_);
+  for (unsigned i = 0; i < tls_blocks_->size(); ++i)
+    CleanupTLS((*tls_blocks_)[i]);
+  pthread_mutex_unlock(&lock_tls_blocks_);
   pthread_key_delete(thread_local_storage_);
   delete cache_path_;
   delete queues_download_;
+  delete tls_blocks_;
   cache_path_ = NULL;
   queues_download_ = NULL;
+  tls_blocks_ = NULL;
 }
 
 
@@ -431,6 +453,9 @@ static int Fetch(const hash::Any &checksum,
     tls->download_job.probe_hosts = true;
     retval = pthread_setspecific(thread_local_storage_, tls);
     assert(retval == 0);
+    pthread_mutex_lock(&lock_tls_blocks_);
+    tls_blocks_->push_back(tls);
+    pthread_mutex_unlock(&lock_tls_blocks_);
   }
 
   // Lock queue and start downloading or enqueue
@@ -501,13 +526,13 @@ static int Fetch(const hash::Any &checksum,
     if ((platform_fstat(fileno(f), &stat_info) != 0) ||
         (stat_info.st_size != (int64_t)size))
     {
-      LogCvmfs(kLogCache, kLogSyslog,
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
                "size check failure for %s, expected %lu, got %ld",
                url.c_str(), size, stat_info.st_size);
-      if (CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
-                        checksum.ToString()) != 0)
+      if (!CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
+                         checksum.ToString()))
       {
-        LogCvmfs(kLogCache, kLogSyslog,
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
                  "failed to move %s to quarantaine", temp_path.c_str());
       }
       result = -EIO;

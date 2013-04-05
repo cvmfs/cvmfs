@@ -84,10 +84,25 @@ class InodeGenerationAnnotation : public InodeAnnotation {
     return raw_inode | generation_annotation_;
   }
   void SetGeneration(const uint64_t new_generation);
+  void CheckForOverflow(const uint64_t new_generation, 
+                        const uint64_t initial_generation,
+                        uint32_t *overflow_counter);
 
  private:
   unsigned inode_width_;
   uint64_t generation_annotation_;
+};
+  
+
+class AbstractCatalogManager;
+/**
+ * Here, the Cwd Buffer is registered in order to save the inodes of 
+ * processes' cwd before a new catalog snapshot is applied
+ */
+class RemountListener {
+ public:
+  virtual ~RemountListener() { }
+  virtual void BeforeRemount(AbstractCatalogManager *source) = 0;
 };
 
 
@@ -114,7 +129,7 @@ class AbstractCatalogManager {
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadError Remount(const bool dry_run);
-  void DetachAll() { DetachSubtree(GetRootCatalog()); }
+  void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
 
   bool LookupInode(const inode_t inode, const LookupOptions options,
                    DirectoryEntry *entry);
@@ -135,7 +150,18 @@ class AbstractCatalogManager {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
+  /**
+   * Don't use.  Only for the glue buffers.
+   */
+  bool Path2InodeUnprotected(const PathString &path, inode_t *inode);
+  bool Inode2DirentUnprotected(const inode_t inode, DirectoryEntry *dirent);
+  
   void SetIncarnation(const uint64_t new_incarnation);
+  void RegisterRemountListener(RemountListener *listener) {
+    WriteLock();
+    remount_listener_ = listener;
+    Unlock();
+  }
   
   Statistics statistics() const { return statistics_; }
   uint64_t GetRevision() const;
@@ -210,7 +236,6 @@ class AbstractCatalogManager {
     int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
-  // inline void DowngradeLock() const {  } TODO
   virtual void EnforceSqliteMemLimit();
 
  private:
@@ -227,7 +252,9 @@ class AbstractCatalogManager {
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
+  RemountListener *remount_listener_;
 
+  Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;
 

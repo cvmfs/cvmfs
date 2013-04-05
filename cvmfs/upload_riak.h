@@ -67,12 +67,10 @@ namespace upload {
       struct Parameters {
         Parameters(const std::string  &local_path,
                    const std::string  &riak_key,
-                   const bool          delete_after_upload,
                    const bool          is_critical,
                    const callback_t  *callback) :
           local_path(local_path),
           riak_key(riak_key),
-          delete_after_upload(delete_after_upload),
           is_critical(is_critical),
           callback(callback) {}
 
@@ -82,7 +80,6 @@ namespace upload {
          * See the documentation of the ConcurrentWorkers template for details.
          */
         Parameters() :
-          delete_after_upload(false),
           is_critical(false),
           callback(NULL) {}
 
@@ -90,8 +87,6 @@ namespace upload {
                                                  //!<  uploaded (identification)
         const std::string   riak_key;            //!< Riak conform key the file
                                                  //!<  should be stored under
-        const bool          delete_after_upload; //!< might unlink a file after
-                                                 //!<  upload (temporary files)
         const bool          is_critical;         //!< should the upload be per-
                                                  //!<  formed with special care?
         const callback_t   *callback;
@@ -104,6 +99,7 @@ namespace upload {
           local_path(local_path),
           return_code(return_code),
           callback(callback) {}
+        Results() : return_code(-1), callback(NULL) {}
 
         bool IsSuccessful() const { return return_code == 0; }
 
@@ -285,6 +281,8 @@ namespace upload {
     bool Peek(const std::string& path) const;
 
     void WaitForUpload() const;
+    void DisablePrecaching();
+    void EnablePrecaching();
 
     unsigned int GetNumberOfErrors() const;
 

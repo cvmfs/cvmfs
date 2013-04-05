@@ -51,7 +51,8 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX \
           CVMFS_GLUEBUFFER_SIZE"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
-          CVMFS_NFS_SOURCE CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE CVMFS_64BIT_INODES"
+          CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
+          CVMFS_64BIT_INODES"
 required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
                CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
@@ -417,6 +418,13 @@ cvmfs_chksetup() {
         fi
       fi
 
+      if [ ! -z "$CVMFS_NFS_SHARED" ]; then
+        if ! check_is_on CVMFS_NFS_SOURCE; then
+          echo "Warning: Setting CVMFS_NFS_SHARED has no effect without CVMFS_NFS_SOURCE."
+          num_warnings=$(($num_warnings+1)) 
+        fi
+      fi
+
       # Check CVMFS_MOUNT_DIR
       if [ -z $CVMFS_MOUNT_DIR ] || [ ! -d $CVMFS_MOUNT_DIR ] || [ "$global_mount_dir" != "$CVMFS_MOUNT_DIR" ]; then
         echo "Error: invalid CVMFS_MOUNT_DIR for $fqrn"
@@ -719,7 +727,8 @@ cvmfs_reload() {
     get_attr fqrn ${m}; fqrn=$attr_value
     get_attr pid ${m}; pid=$attr_value
     echo "Pausing ${fqrn} on ${m}"
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go &
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+      awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
     echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
   done

@@ -398,6 +398,7 @@ void Spawn() {
   }
 
   // retrieve the watchdog PID from the pipe
+  close(pipe_pid[1]);
   ReadPipe(pipe_pid[0], (void*)&watchdog_pid_, sizeof(pid_t));
   close(pipe_pid[0]);
 

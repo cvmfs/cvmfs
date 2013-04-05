@@ -128,7 +128,7 @@ struct JobInfo {
 };
 
 
-void Init(const unsigned max_pool_handles);
+void Init(const unsigned max_pool_handles, const bool use_system_proxy);
 void Fini();
 void Spawn();
 Failures Fetch(JobInfo *info);

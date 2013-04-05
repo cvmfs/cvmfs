@@ -86,9 +86,9 @@ class WritableCatalogManager : public AbstractCatalogManager {
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
 
-	/**
-	 * TODO
-	 */
+  /**
+   * TODO
+   */
   void PrecalculateListings();
 
   manifest::Manifest *Commit();

@@ -115,7 +115,14 @@ static void Usage(const std::string &exename) {
     "Version %s\n"
     "Copyright (c) 2009- CERN, all rights reserved\n\n"
     "Please visit http://cernvm.cern.ch for details.\n\n"
-    "Usage: %s [-s] [-d] [-k] [-o mount options] <repository name> <mount point>\n"
+    "Usage: %s [-h] [-V] [-s] [-f] [-d] [-k] [-o mount options] <repository name> <mount point>\n\n"
+    "CernVM-FS general options:\n"
+    "  --help|-h            Print Help output (this)\n"
+    "  --version|-V         Print CernVM-FS version\n"
+    "  -s                   Run singlethreaded\n"
+    "  -f                   Run in foreground\n"
+    "  -d                   Enable debugging\n"
+    "  -k                   Parse options\n"
     "CernVM-FS mount options:\n"
     "  -o config=FILES      colon-separated path list of config files\n"
     "  -o uid=UID           Drop credentials to another user\n"
@@ -251,8 +258,8 @@ static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
   cvmfs_exports_->cvmfs_operations.statfs(req, ino);
   atomic_dec64(&num_operations_);
 }
-
-
+  
+  
 #ifdef __APPLE__
 static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                           size_t size, uint32_t position)
@@ -278,6 +285,14 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   cvmfs_exports_->cvmfs_operations.listxattr(req, ino, size);
   atomic_dec64(&num_operations_);
 }
+  
+  
+/*static void stub_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+  FileSystemFence();
+  atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
+  atomic_dec64(&num_operations_);
+}*/
 
 
 /**
@@ -393,6 +408,7 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   loader_operations->statfs      = stub_statfs;
   loader_operations->getxattr    = stub_getxattr;
   loader_operations->listxattr   = stub_listxattr;
+  //loader_operations->forget      = stub_forget;
 }
 
 
@@ -640,14 +656,17 @@ int main(int argc, char *argv[]) {
     struct rlimit rpl;
     memset(&rpl, 0, sizeof(rpl));
     getrlimit(RLIMIT_NOFILE, &rpl);
-    if (rpl.rlim_max < nfiles)
-      rpl.rlim_max = nfiles;
-    rpl.rlim_cur = nfiles;
-    retval = setrlimit(RLIMIT_NOFILE, &rpl);
-    if (retval != 0) {
-      PrintError("Failed to set maximum number of open files, "
-                 "insufficient permissions");
-      return kFailPermission;
+    if (rpl.rlim_cur < nfiles) {
+      if (rpl.rlim_max < nfiles)
+        rpl.rlim_max = nfiles;
+      rpl.rlim_cur = nfiles;
+      retval = setrlimit(RLIMIT_NOFILE, &rpl);
+      if (retval != 0) {
+        PrintError("Failed to set maximum number of open files, "
+                   "insufficient permissions");
+        // TODO detect valgrind and don't fail
+        return kFailPermission;
+      }
     }
   }
 

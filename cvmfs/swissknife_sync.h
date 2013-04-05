@@ -43,7 +43,6 @@ struct SyncParameters {
 
 namespace swissknife {
 
-
 class CommandCreate : public Command {
  public:
   ~CommandCreate() { };
@@ -76,6 +75,23 @@ class CommandUpload : public Command {
     ParameterList result;
     result.push_back(Parameter('i', "local file", false, false));
     result.push_back(Parameter('o', "destination path", false, false));
+    result.push_back(Parameter('r', "spooler definition", false, false));
+    return result;
+  }
+  int Main(const ArgumentList &args);
+};
+  
+
+class CommandPeek : public Command {
+public:
+  ~CommandPeek() { };
+  std::string GetName() { return "peek"; };
+  std::string GetDescription() {
+    return "Checks whether a file exists in the repository.";
+  };
+  ParameterList GetParams() {
+    ParameterList result;
+    result.push_back(Parameter('d', "destination path", false, false));
     result.push_back(Parameter('r', "spooler definition", false, false));
     return result;
   }

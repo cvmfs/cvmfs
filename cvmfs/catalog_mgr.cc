@@ -34,14 +34,33 @@ InodeGenerationAnnotation::InodeGenerationAnnotation(const unsigned inode_width)
 }
 
 
-void InodeGenerationAnnotation::SetGeneration(const uint64_t new_generation) {
+void InodeGenerationAnnotation::SetGeneration(const uint64_t new_generation) 
+{
   LogCvmfs(kLogCatalog, kLogDebug, "new inode generation: %"PRIu64, 
            new_generation);
   
   const unsigned generation_width = inode_width_ - num_protected_bits_;
-  const uint64_t generation_cut = 
-    new_generation % (uint64_t(1) << generation_width);
+  const uint64_t generation_max = uint64_t(1) << generation_width;
+  
+  const uint64_t generation_cut = new_generation % generation_max;
   generation_annotation_ = generation_cut << num_protected_bits_;
+}
+  
+  
+void InodeGenerationAnnotation::CheckForOverflow( 
+  const uint64_t new_generation, 
+  const uint64_t initial_generation,
+  uint32_t *overflow_counter)
+{
+  const unsigned generation_width = inode_width_ - num_protected_bits_;
+  const uint64_t generation_max = uint64_t(1) << generation_width;
+  const uint64_t generation_span = new_generation - initial_generation;
+  if ((generation_span >= generation_max) &&
+      ((generation_span / generation_max) > *overflow_counter)) 
+  {
+    *overflow_counter = generation_span / generation_max;
+    LogCvmfs(kLogCatalog, kLogSyslog, "inode generation overflow");
+  }  
 }
 
 
@@ -56,6 +75,7 @@ AbstractCatalogManager::AbstractCatalogManager() {
   assert(retval == 0);
   retval = pthread_key_create(&pkey_sqlitemem_, NULL);
   assert(retval == 0);
+  remount_listener_ = NULL;
 }
 
 
@@ -101,11 +121,6 @@ void AbstractCatalogManager::SetIncarnation(const uint64_t new_incarnation) {
   incarnation_ = new_incarnation;
   if (inode_annotation_)
     inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
-  for (CatalogList::const_iterator i = catalogs_.begin(),
-       iEnd = catalogs_.end(); i != iEnd; ++i)
-  {
-    (*i)->generation_ = revision_cache_ + incarnation_;
-  }
   Unlock();
 }
 
@@ -122,6 +137,9 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
     return LoadCatalog(PathString("", 0), hash::Any(), NULL);
 
   WriteLock();
+  if (remount_listener_)
+    remount_listener_->BeforeRemount(this);
+  
   string catalog_path;
   const LoadError load_error = LoadCatalog(PathString("", 0), hash::Any(),
                                            &catalog_path);
@@ -144,6 +162,26 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
 }
 
 
+Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
+  Catalog *result = NULL;
+  const inode_t raw_inode =
+    inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
+  for (CatalogList::const_iterator i = catalogs_.begin(),
+       iEnd = catalogs_.end(); i != iEnd; ++i)
+  {
+    if ((*i)->inode_range().ContainsInode(raw_inode)) {
+      result = *i;
+      break;
+    }
+  }
+  if (result == NULL) {
+    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %"PRIu64" "
+             "(raw inode: %"PRIu64")", inode, raw_inode);
+  }
+  return result;
+}
+
+  
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param inode the inode to find in the catalogs
@@ -166,22 +204,9 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
   }
 
   // Get corresponding catalog
-  Catalog *catalog = NULL;
-  const inode_t raw_inode =
-    inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
-  for (CatalogList::const_iterator i = catalogs_.begin(),
-       iEnd = catalogs_.end(); i != iEnd; ++i)
-  {
-    if ((*i)->inode_range().ContainsInode(raw_inode)) {
-      catalog = *i;
-      break;
-    }
-  }
-  if (catalog == NULL) {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %"PRIu64" "
-             "(raw inode: %"PRIu64")", inode, raw_inode);
+  Catalog *catalog = Inode2Catalog(inode);
+  if (catalog == NULL)
     goto lookup_inode_fini;
-  }
 
   if ((options == kLookupSole) || (inode == GetRootInode())) {
     atomic_inc64(&statistics_.num_lookup_inode);
@@ -330,6 +355,92 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   Unlock();
   atomic_inc64(&statistics_.num_lookup_path_negative);
   return false;
+}
+  
+  
+/**
+ * Don't use.  Only for the glue buffers.
+ */
+bool AbstractCatalogManager::Path2InodeUnprotected(const PathString &path, 
+                                                   inode_t *inode)
+{
+  EnforceSqliteMemLimit();
+  
+  Catalog *best_fit = FindCatalog(path);
+  assert(best_fit != NULL);
+  
+  atomic_inc64(&statistics_.num_lookup_path);
+  LogCvmfs(kLogCatalog, kLogDebug, "inode lookup for '%s' in catalog: '%s'",
+           path.c_str(), best_fit->path().c_str());
+  DirectoryEntry dirent;
+  bool found = best_fit->LookupPath(path, &dirent);
+  
+  if (!found) {
+    LogCvmfs(kLogCatalog, kLogDebug, "ENOENT: %s", path.c_str());
+    atomic_inc64(&statistics_.num_lookup_path_negative);
+    return false;
+  }
+  
+  LogCvmfs(kLogCatalog, kLogDebug, "found entry %s in catalog %s",
+           path.c_str(), best_fit->path().c_str());
+  *inode = dirent.inode();
+  return true;
+}
+  
+  
+/**
+ * Don't use.  Only for the glue buffers.
+ */  
+bool AbstractCatalogManager::Inode2DirentUnprotected(const inode_t inode, 
+                                                     DirectoryEntry *dirent)
+{
+  EnforceSqliteMemLimit();
+  
+  // Don't lookup ancient inodes
+  if (inode_annotation_ && !inode_annotation_->ValidInode(inode))
+    return false;
+  
+  // Get corresponding catalog
+  Catalog *catalog = Inode2Catalog(inode);
+  if (catalog == NULL)
+    return false;
+  
+  bool found;
+  if (inode == GetRootInode()) {
+    atomic_inc64(&statistics_.num_lookup_inode);
+    found = catalog->LookupInode(inode, dirent, NULL);
+    return found;
+  } else {
+    atomic_inc64(&statistics_.num_lookup_inode);
+    // Lookup including parent entry
+    hash::Md5 parent_md5path;
+    DirectoryEntry parent;
+    bool found_parent = false;
+    
+    found = catalog->LookupInode(inode, dirent, &parent_md5path);
+    if (!found)
+      return false;
+    
+    // Parent is possibly in the parent catalog
+    atomic_inc64(&statistics_.num_lookup_path);
+    if (dirent->IsNestedCatalogRoot() && !catalog->IsRoot()) {
+      Catalog *parent_catalog = catalog->parent();
+      found_parent = parent_catalog->LookupMd5Path(parent_md5path, &parent);
+    } else {
+      found_parent = catalog->LookupMd5Path(parent_md5path, &parent);
+    }
+    
+    // If there is no parent entry, it might be data corruption
+    if (!found_parent) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+               "cannot find parent entry for inode %"PRIu64" --> data corrupt?",
+               inode);
+      return false;
+    }
+      
+    dirent->set_parent_inode(parent.inode());
+    return true;
+  }
 }
 
 
@@ -636,7 +747,6 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty())
     revision_cache_ = new_catalog->GetRevision();
-  new_catalog->generation_ = revision_cache_ + incarnation_;
   
   catalogs_.push_back(new_catalog);
   ActivateCatalog(new_catalog);

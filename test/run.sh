@@ -1,8 +1,24 @@
 #!/bin/sh
 
 usage() {
-  echo "$0 <logfile> [<test list>]"
+  echo "$0 <logfile> [<test list> | -x <exclusion list>]"
 }
+
+
+contains() {
+  local haystack=$1
+  local needle=$2
+
+  for elem in $haystack
+  do
+    if [ $(readlink --canonicalize $elem) = $(readlink --canonicalize $needle) ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 
 logfile=$1
 if [ -z $logfile ]; then
@@ -14,7 +30,14 @@ if ! echo "$logfile" | grep -q ^/; then
 fi
 
 shift
-testsuite=$@
+exclusions=""
+if [ x$1 = "x-x" ]; then
+  shift
+  exclusions=$@
+else
+  testsuite=$@
+fi
+exclusions="$exclusions $CVMFS_TEST_EXCLUDE"
 if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
@@ -37,16 +60,10 @@ do
   echo "-- Testing $t (${cvmfs_test_name})" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
   
-  exclude=0
-  if [ "x$CVMFS_TEST_EXCLUDE" != "x" ]; then
-    for testcase in $CVMFS_TEST_EXCLUDE; do
-      if echo $(basename $t) | grep -q "^$testcase"; then
-        exclude=1
-      fi
-    done
-  fi
+  contains "$exclusions" $t
+  exclude=$?
 
-  if [ $exclude -eq 0 ]; then
+  if [ $exclude -eq 1 ]; then
     if $cvmfs_test_autofs_on_startup; then
       autofs_switch on >> $logfile 2>&1 || exit 5
     else
