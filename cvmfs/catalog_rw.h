@@ -137,7 +137,10 @@ class WritableCatalog : public Catalog {
   void CopyToParent();
   void CopyCatalogsToParent();
 
-  void UpdateCounters();
+  void UpdateCounters() const;
+  bool UpdateCounter(      SqlUpdateCounter &sql,
+                     const std::string      &counter_name,
+                     const int64_t           delta) const;
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;

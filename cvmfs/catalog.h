@@ -251,6 +251,10 @@ class Catalog : public SingleCopy {
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
 
+  bool GetCounter(      SqlGetCounter  &sql,
+                  const std::string    &counter_name,
+                  uint64_t *counter) const;
+
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
