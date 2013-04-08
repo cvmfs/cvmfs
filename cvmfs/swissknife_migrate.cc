@@ -88,6 +88,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   LogCvmfs(kLogCatalog, kLogStdout, "\nMigrating catalogs...");
   FutureNestedCatalogReference *new_root_catalog =
                                              new FutureNestedCatalogReference;
+  spooler_->DisablePrecaching();
   ConvertCatalogsRecursively(root_catalog_, new_root_catalog);
   concurrent_migration->WaitForEmptyQueue();
   spooler_->WaitForUpload();

@@ -286,6 +286,8 @@ class FileProcessor : public Observable<SpoolerResult> {
     return workers_->GetNumberOfFailedJobs();
   }
 
+  void DisablePrecaching();
+
   void WaitForProcessing() const;
   void WaitForTermination() const;
 

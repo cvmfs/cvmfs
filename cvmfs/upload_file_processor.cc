@@ -60,6 +60,12 @@ void FileProcessor::WaitForTermination() const {
 }
 
 
+void FileProcessor::DisablePrecaching() {
+  uploader_->DisablePrecaching();
+  workers_->EnableDrainoutMode();
+}
+
+
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //

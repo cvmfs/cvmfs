@@ -114,6 +114,11 @@ void Spooler::WaitForTermination() const {
   file_processor_->WaitForTermination();
 }
 
+void Spooler::DisablePrecaching() {
+  uploader_->DisablePrecaching();
+  file_processor_->DisablePrecaching();
+}
+
 
 unsigned int Spooler::GetNumberOfErrors() const {
   return file_processor_->GetNumberOfErrors() +
