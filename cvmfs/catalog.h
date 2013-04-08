@@ -72,6 +72,17 @@ struct DeltaCounters {
 };
 
 
+/**
+ * Catalog files keep track of summary counters of their catalog entries
+ *
+ * self_*     - number of specific entries in the _current_ catalog
+ * subtree_*  - aggregated number of specific entries in all nested catalogs of
+ *              the current catalog (_excluding_ self_* entries)
+ *
+ * Note: every nested-catalog-transition-point is defined by a mountpoint and a
+ *       catalog-root, resulting in an extra entry per nested catalog. Keep that
+ *       in mind when using these numbers in POSIX file system semantics.
+ */
 struct Counters {
   Counters() {
     self_regular = self_symlink = self_dir = self_nested =
