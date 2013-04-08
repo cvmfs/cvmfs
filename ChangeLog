@@ -1,4 +1,15 @@
 2.1.9:
+  * Experimental support for "shared NFS maps", which are handled
+    by sqlite and allow for NFS HA setups at the cost of performance
+  * Recognize CVMFS_IPV4_ONLY environment variable and, if set
+    to a non-empty value, don't use IPv6 addresses
+  * Recognize http_proxy in cvmfs server toolkit
+  * Fix handling of "last_snapshot" sentinel in replication
+    when not executed as root
+  * Asynchronous catalog updates in the server toolkit
+  * Fix: shared cache manager race during load-unload cycles
+  * Fix: file descriptor leaks during Fuse module reload
+  * Fix: handling of log level parameter in snapshot
   * Fix: save and restore open dir and open file counters
     when the fuse module is reloaded
   * Fixed several memory leaks when reloading the Fuse module
@@ -10,7 +21,7 @@
   * Pretty printing for 'cvmfs_config reload'
   * Fixed selinux context for SL5 in cvmfs_server
   * Omit autofs warnings in NFS mode
-  * Added "glue buffer", "cwd buffer", and "active inodes buffer" 
+  * Added "lookup tracker", "cwd tracker", and "open files tracker" 
     to smoothly connect catalog reloads and reloads of the 
     Fuse module
   * Fix: handling of "-n" option in mount helper

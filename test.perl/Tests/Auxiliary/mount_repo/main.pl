@@ -120,7 +120,7 @@ if (defined ($pid) and $pid != 0) {
 	print "PROCESSING:$testname\n";
 	# This is the line that makes the shell waiting for test output.
 	# Change whatever you want, but don't change this line or the shell will ignore exit status.
-	print "READ_RETURN_CODE";
+	print "READ_RETURN_CODE\n";
 }
 
 exit 0;

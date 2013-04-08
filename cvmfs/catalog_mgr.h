@@ -129,7 +129,7 @@ class AbstractCatalogManager {
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadError Remount(const bool dry_run);
-  void DetachAll() { DetachSubtree(GetRootCatalog()); }
+  void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
 
   bool LookupInode(const inode_t inode, const LookupOptions options,
                    DirectoryEntry *entry);

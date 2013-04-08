@@ -338,7 +338,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         result += "\n";
 
         if (cvmfs::nfs_maps_) {
-          result += "\nLEVELDB Statistics:\n";
+          result += "\nNFS Map Statistics:\n";
           result += nfs_maps::GetStatistics();
         }
 

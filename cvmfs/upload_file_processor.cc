@@ -4,6 +4,9 @@
 
 #include "upload_file_processor.h"
 
+#include <unistd.h>
+#include <errno.h>
+
 #include "upload_file_chunker.h"
 #include "upload_facility.h"
 
@@ -11,13 +14,67 @@
 
 using namespace upload;
 
-FileProcessor::FileProcessor(const worker_context *context) :
+
+FileProcessor::FileProcessor(const SpoolerDefinition  &spooler_definition,
+                             AbstractUploader         *uploader) :
+  uploader_(uploader)
+{
+  worker_context_ = new FileProcessorWorker::worker_context(
+                                      spooler_definition.temporary_path,
+                                      spooler_definition.use_file_chunking,
+                                      uploader);
+
+  const unsigned int number_of_cpus = GetNumberOfCpuCores();
+  workers_ = new ConcurrentWorkers<FileProcessor::FileProcessorWorker>(
+                                      number_of_cpus,
+                                      number_of_cpus * 5000,
+                                      worker_context_.weak_ref());
+  workers_->RegisterListener(&FileProcessor::ProcessingCallback, this);
+}
+
+
+bool FileProcessor::Initialize() {
+  return workers_->Initialize();
+}
+
+
+void FileProcessor::ProcessingCallback(const FileProcessorWorker::Results  &data) {
+  NotifyListeners(SpoolerResult(data.return_code,
+                                data.local_path,
+                                data.bulk_file.content_hash(),
+                                data.file_chunks));
+}
+
+
+void FileProcessor::WaitForProcessing() const {
+  uploader_->DisablePrecaching();
+  workers_->WaitForEmptyQueue();
+  uploader_->EnablePrecaching();
+}
+
+
+void FileProcessor::WaitForTermination() const {
+  uploader_->DisablePrecaching();
+  workers_->WaitForTermination();
+  uploader_->EnablePrecaching();
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+
+FileProcessor::FileProcessorWorker::FileProcessorWorker(
+                                                const worker_context *context) :
   temporary_path_(context->temporary_path),
   use_file_chunking_(context->use_file_chunking),
   uploader_(context->uploader) {}
 
 
-void FileProcessor::operator()(const FileProcessor::Parameters &parameters) {
+void FileProcessor::FileProcessorWorker::operator()(
+                            const FileProcessorWorker::Parameters &parameters) {
   // asynchrously remove already finished processing jobs
   RemoveCompletedPendingFiles();
 
@@ -43,7 +100,8 @@ void FileProcessor::operator()(const FileProcessor::Parameters &parameters) {
 }
 
 
-bool FileProcessor::ProcessFile(const Parameters       &parameters,
+bool FileProcessor::FileProcessorWorker::ProcessFile(
+                                const Parameters       &parameters,
                                 const MemoryMappedFile &mmf,
                                       PendingFile      *file) const {
   assert (mmf.IsMapped());
@@ -110,7 +168,8 @@ bool FileProcessor::ProcessFile(const Parameters       &parameters,
 }
 
 
-void FileProcessor::UploadChunk(const TemporaryFileChunk &file_chunk,
+void FileProcessor::FileProcessorWorker::UploadChunk(
+                                const TemporaryFileChunk &file_chunk,
                                       PendingFile        *file,
                                 const std::string        &cas_suffix) const {
   // schedule the chunk for upload
@@ -123,8 +182,9 @@ void FileProcessor::UploadChunk(const TemporaryFileChunk &file_chunk,
 }
 
 
-bool FileProcessor::ProcessFileChunk(const MemoryMappedFile       &mmf,
-                                           TemporaryFileChunk     &chunk) const {
+bool FileProcessor::FileProcessorWorker::ProcessFileChunk(
+                                          const MemoryMappedFile       &mmf,
+                                          TemporaryFileChunk     &chunk) const {
   // create a temporary to store the compression result of this chunk
   std::string temporary_path;
   FILE *fcas = CreateTempFile(temporary_path_ + "/chunk", 0666, "w",
@@ -168,7 +228,8 @@ bool FileProcessor::ProcessFileChunk(const MemoryMappedFile       &mmf,
 }
 
 
-void FileProcessor::ProcessingCompleted(PendingFile *pending_file) {
+void FileProcessor::FileProcessorWorker::ProcessingCompleted(
+                                                    PendingFile *pending_file) {
   const std::string &local_path = pending_file->local_path();
   {
     LockGuard<PendingFilesMap> lock(pending_files_);
@@ -192,7 +253,9 @@ void FileProcessor::ProcessingCompleted(PendingFile *pending_file) {
   master()->JobSuccessful(final_result);
 }
 
-PendingFile* FileProcessor::CreatePendingFile(const std::string &local_path) {
+FileProcessor::PendingFile*
+FileProcessor::FileProcessorWorker::CreatePendingFile(
+                                                const std::string &local_path) {
   PendingFile *file = new PendingFile(local_path, this);
   {
     LockGuard<PendingFilesMap> lock(pending_files_);
@@ -202,12 +265,13 @@ PendingFile* FileProcessor::CreatePendingFile(const std::string &local_path) {
   return file;
 }
 
-void FileProcessor::FinalizeProcessing(PendingFile *pending_file) {
+void FileProcessor::FileProcessorWorker::FinalizeProcessing(
+                                                    PendingFile *pending_file) {
   LockGuard<PendingFile> lock(pending_file);
   pending_file->FinalizeProcessing();
 }
 
-void FileProcessor::RemoveCompletedPendingFiles() {
+void FileProcessor::FileProcessorWorker::RemoveCompletedPendingFiles() {
   LockGuard<PendingFilesList> lock(completed_files_);
   if (completed_files_.empty()) {
     return;
@@ -229,7 +293,7 @@ void FileProcessor::RemoveCompletedPendingFiles() {
 }
 
 
-void FileProcessor::TearDown() {
+void FileProcessor::FileProcessorWorker::TearDown() {
   RemoveCompletedPendingFiles();
 }
 
@@ -239,29 +303,30 @@ void FileProcessor::TearDown() {
 //
 
 
-void PendingFile::AddChunk(const TemporaryFileChunk  &file_chunk) {
+void FileProcessor::PendingFile::AddChunk(const TemporaryFileChunk &file_chunk) {
   assert (file_chunks_.find(file_chunk.temporary_path()) == file_chunks_.end());
   file_chunks_[file_chunk.temporary_path()] = file_chunk;
 }
 
 
-void PendingFile::AddBulk(const TemporaryFileChunk  &file_chunk) {
+void FileProcessor::PendingFile::AddBulk(const TemporaryFileChunk &file_chunk) {
   assert (! has_bulk_chunk_);
   bulk_chunk_     = file_chunk;
   has_bulk_chunk_ = true;
 }
 
 
-void PendingFile::FinalizeProcessing() {
+void FileProcessor::PendingFile::FinalizeProcessing() {
   assert (has_bulk_chunk_);
   processing_complete_ = true;
   CheckForCompletionAndNotify();
 }
 
 
-void PendingFile::UploadCallback(const UploaderResults &data) {
+void FileProcessor::PendingFile::UploadCallback(const UploaderResults &data) {
   LockGuard<PendingFile> lock(this);
 
+  // find the chunk structure for the uploaded file
   TemporaryFileChunk *chunk = NULL;
   if (bulk_chunk_.temporary_path() == data.local_path) {
     chunk = &bulk_chunk_;
@@ -271,9 +336,15 @@ void PendingFile::UploadCallback(const UploaderResults &data) {
     assert (chunk_itr != file_chunks_.end());
     chunk = &chunk_itr->second;
   }
-
   assert (chunk != NULL);
 
+  // remove the temporary file for this chunk
+  if (unlink(data.local_path.c_str()) != 0 && errno != ENOENT) {
+    LogCvmfs(kLogSpooler, kLogWarning, "Failed to delete temporary '%s' (%d)",
+             data.local_path.c_str(), errno);
+  }
+
+  // bookkeeping for newly uploaded file
   ++chunks_uploaded_;
   if (data.return_code == 0) {
     chunk->set_upload_state(TemporaryFileChunk::kUploadSuccessful);
@@ -282,11 +353,12 @@ void PendingFile::UploadCallback(const UploaderResults &data) {
     ++errors_;
   }
 
+  // check if all chunks were uploaded for this PendingFile
   CheckForCompletionAndNotify();
 }
 
 
-void PendingFile::CheckForCompletionAndNotify() {
+void FileProcessor::PendingFile::CheckForCompletionAndNotify() {
   if (!uploading_complete_ &&
       processing_complete_ &&
       chunks_uploaded_ == file_chunks_.size() + 1) {
@@ -296,7 +368,7 @@ void PendingFile::CheckForCompletionAndNotify() {
 }
 
 
-FileChunks PendingFile::GetFinalizedFileChunks() const {
+FileChunks FileProcessor::PendingFile::GetFinalizedFileChunks() const {
   FileChunks final_chunks;
   TemporaryFileChunkMap::const_iterator i    = file_chunks_.begin();
   TemporaryFileChunkMap::const_iterator iend = file_chunks_.end();
@@ -307,7 +379,7 @@ FileChunks PendingFile::GetFinalizedFileChunks() const {
 }
 
 
-FileChunk PendingFile::GetFinalizedBulkFile() const {
+FileChunk FileProcessor::PendingFile::GetFinalizedBulkFile() const {
   assert (has_bulk_chunk_);
   return static_cast<FileChunk>(bulk_chunk_);
 }

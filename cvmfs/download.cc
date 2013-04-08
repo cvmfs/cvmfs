@@ -92,6 +92,8 @@ unsigned opt_num_proxies_;
 unsigned opt_max_retries_ = 0;
 unsigned opt_backoff_init_ms_ = 0;
 unsigned opt_backoff_max_ms_ = 0;
+  
+bool opt_ipv4_only_ = false;
 
 
 /**
@@ -491,6 +493,8 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
   else
     curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
+  if (opt_ipv4_only_)
+    curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 }
 
 
@@ -1070,7 +1074,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
 }
 
 
-void Init(const unsigned max_pool_handles) {
+void Init(const unsigned max_pool_handles, const bool use_system_proxy) {
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
@@ -1116,6 +1120,20 @@ void Init(const unsigned max_pool_handles) {
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
   srandom(tv_now.tv_usec);
+  
+  // Parsing environment variables
+  if (use_system_proxy) {
+    if (getenv("http_proxy") == NULL) {
+      SetProxyChain("");
+    } else {
+      SetProxyChain(string(getenv("http_proxy")));
+    }
+  }
+  if ((getenv("CVMFS_IPV4_ONLY") != NULL) && 
+      (strlen(getenv("CVMFS_IPV4_ONLY")) > 0))
+  {
+    opt_ipv4_only_ = true;
+  }
 }
 
 

@@ -401,6 +401,85 @@ unsigned int GetNumberOfCpuCores();
 static const unsigned int kFallbackNumberOfCpus = 1;
 
 
+//
+// -----------------------------------------------------------------------------
+//
+
+
+/**
+ * Asynchronous FIFO channel template
+ * Implements a thread safe FIFO queue that handles thread blocking if the queue
+ * is full or empty.
+ *
+ * @param T   the data type to be enqueued in the queue
+ */
+template <class T>
+class FifoChannel : protected std::queue<T> {
+ public:
+  /**
+   * Creates a new FIFO channel.
+   *
+   * @param maximal_length      the maximal number of items that can be enqueued
+   * @param drainout_threshold  if less than xx elements are in the queue it is
+   *                            considered to be "not full"
+   */
+  FifoChannel(const size_t maximal_length,
+              const size_t drainout_threshold,
+              const size_t prefill_threshold = 0);
+  virtual ~FifoChannel();
+
+  /**
+   * Adds a new item to the end of the FIFO channel. If the queue is full, this
+   * call will block until items were dequeued by another thread allowing the
+   * desired insertion.
+   *
+   * @param data  the data to be enqueued into the FIFO channel
+   */
+  void Enqueue(const T &data);
+
+  /**
+   * Removes the next element from the channel. If the queue is empty, this will
+   * block until another thread enqueues an item into the channel.
+   *
+   * @return  the first item in the channel queue
+   */
+  const T Dequeue();
+
+  /**
+   * Clears all items in the FIFO channel. The cleared items will be lost.
+   *
+   * @return  the number of dropped items
+   */
+  unsigned int Drop();
+
+  /**
+   * Sets the prefill threshold of the channel to 0 in order to drain it out
+   */
+  void EnableDrainoutMode() const;
+
+  /**
+   * Resets the prefill threshold to it's initial value
+   */
+  void DisableDrainoutMode() const;
+
+  inline size_t GetItemCount() const;
+  inline bool   IsEmpty() const;
+  inline size_t GetMaximalItemCount() const;
+
+ private:
+  // general configuration
+  const   size_t             maximal_queue_length_;
+  const   size_t             queue_drainout_threshold_;
+  const   size_t             queue_prefill_threshold_;
+  mutable bool               drainout_mode_;
+
+  // thread synchronisation structures
+  mutable pthread_mutex_t    mutex_;
+  mutable pthread_cond_t     queue_is_not_empty_;
+  mutable pthread_cond_t     queue_is_not_full_;
+};
+
+
 /**
  * This template implements a generic producer/consumer approach to concurrent
  * worker tasks. It spawns a given number of Workers derived from the base class
@@ -435,29 +514,18 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * scheduled jobs. Job structures are scheduled into a central FIFO queue and
    * are then processed concurrently by the workers.
    */
+  template <class DataT>
   struct Job {
-    /**
-     * Creates a usual Job structure by copying the provided input data.
-     *
-     * @param data  the data to be processed by one of the workers
-     */
-    explicit Job(const expected_data_t &data) :
+    explicit Job(const DataT &data) :
       data(data),
       is_death_sentence(false) {}
-
-    /**
-     * Creates an empty Job structure that works as a 'death sentence' to the
-     * worker that will acquire it. When acquired, the worker will immediately
-     * terminate.
-     */
     Job() :
-      data(),
       is_death_sentence(true) {}
-
-    const expected_data_t data;              //!< data to be processed
-    const bool            is_death_sentence; //!< death sentence flag
+    const DataT  data;              //!< job payload
+    const bool   is_death_sentence; //!< death sentence flag
   };
-  typedef std::queue<Job> JobQueue;
+  typedef Job<expected_data_t> WorkerJob;
+  typedef Job<returned_data_t> CallbackJob;
 
   /**
    * Provides a wrapper for initialization data passed to newly spawned worker
@@ -467,13 +535,17 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * spawned.
    */
   struct RunBinding {
-    RunBinding(ConcurrentWorkers<WorkerT> *delegate,
-               const worker_context_t     *worker_context) :
-      delegate(delegate),
-      worker_context(worker_context) {}
-
+    RunBinding(ConcurrentWorkers<WorkerT> *delegate) :
+      delegate(delegate) {}
     ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the Concurrent-
                                                 //!<  Workers master
+  };
+
+  struct WorkerRunBinding : RunBinding {
+    WorkerRunBinding(ConcurrentWorkers<WorkerT> *delegate,
+                     const worker_context_t     *worker_context) :
+      RunBinding(delegate),
+      worker_context(worker_context) {}
     const worker_context_t     *worker_context; //!< WorkerT defined context ob-
                                                 //!<  jects for worker init.
   };
@@ -507,7 +579,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @param data  the data to be processed
    */
-  inline void Schedule(const expected_data_t &data) { Schedule(Job(data)); }
+  inline void Schedule(const expected_data_t &data) {
+    Schedule(WorkerJob(data));
+  }
 
   /**
    * Shuts down the ConcurrentWorkers object as well as the encapsulated workers
@@ -535,6 +609,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   void WaitForTermination();
 
+  void EnableDrainoutMode() const;
+  void DisableDrainoutMode() const;
+
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
   inline unsigned int GetNumberOfFailedJobs() const {
     return atomic_read32(&jobs_failed_);
@@ -560,6 +637,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   inline void JobFailed(const returned_data_t& data) { JobDone(data, false); }
 
+  void RunCallbackThread();
+
  protected:
   bool SpawnWorkers();
 
@@ -573,13 +652,15 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    */
   static void* RunWorker(void *run_binding);
 
+  static void* RunCallbackThreadWrapper(void *run_binding);
+
   /**
    * Tells the master that a worker thread did start. This does not mean, that
    * it was initialized successfully.
    */
   void ReportStartedWorker() const;
 
-  void Schedule(Job job);
+  void Schedule(WorkerJob job);
   void ScheduleDeathSentences();
 
   /**
@@ -596,7 +677,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @return  a job to be processed by a worker
    */
-  Job Acquire();
+  inline WorkerJob Acquire();
 
   /**
    * Controls the asynchronous finishing of a job.
@@ -624,11 +705,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   // general configuration
   const size_t             number_of_workers_;    //!< number of concurrent
                                                   //!<  worker threads
-  const size_t             maximal_queue_length_;
-  const size_t             desired_free_slots_;   //!< Schedule() blocks until
-                                                  //!<  xx slots are available
   const worker_context_t  *worker_context_;       //!< the WorkerT defined context
-  const RunBinding         thread_context_;       //!< the thread context passed
+  const WorkerRunBinding   thread_context_;       //!< the thread context passed
                                                   //!<  to newly spawned threads
 
   // status information
@@ -637,19 +715,23 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   mutable unsigned int     workers_started_;
   mutable pthread_mutex_t  status_mutex_;
   mutable pthread_cond_t   worker_started_;
+  mutable pthread_mutex_t  jobs_all_done_mutex_;
+  mutable pthread_cond_t   jobs_all_done_;
 
   // worker threads
   WorkerThreads            worker_threads_;       //!< list of worker threads
+  pthread_t                callback_thread_;      //!< handles callback invokes
 
   // job queue
-  JobQueue                 job_queue_;
-  mutable pthread_mutex_t  job_queue_mutex_;
-  mutable pthread_cond_t   job_queue_cond_not_empty_;
-  mutable pthread_cond_t   job_queue_cond_not_full_;
-  mutable pthread_cond_t   jobs_all_done_;
+  typedef FifoChannel<WorkerJob > JobQueue;
+  JobQueue                 jobs_queue_;
   mutable atomic_int32     jobs_pending_;
   mutable atomic_int32     jobs_failed_;
   mutable atomic_int64     jobs_processed_;
+
+  // callback channel
+  typedef FifoChannel<CallbackJob > CallbackQueue;
+  CallbackQueue results_queue_;
 };
 
 

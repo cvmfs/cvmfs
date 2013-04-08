@@ -618,7 +618,9 @@ create_repository_skeleton() {
     i=$(($i+1))
   done
   mkdir ${directory}/data/txn
-  chown -R $user $directory
+  if [ x$(id -un) != x$user ]; then
+    chown -R $user $directory
+  fi
   if has_selinux; then
     chcon -Rv --type=httpd_sys_content_t $directory > /dev/null
   fi
@@ -1409,7 +1411,7 @@ abort() {
 
   # do it!
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   abort_before_hook $name
   sudo umount /cvmfs/$name
@@ -1495,7 +1497,7 @@ publish() {
   fi
 
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   publish_before_hook $name
   sudo /bin/mount -o remount,ro /cvmfs/$name
@@ -1582,12 +1584,12 @@ snapshot() {
 
   # do it!
   local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -H -u $user sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   local log_level=
-  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
   local with_history=
-  if [ -f /etc/cvmfs/repositories.d/{$name}/last_snapshot ]; then
+  if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -q "available"; then
     with_history="-p"
   else
     echo "Initial snapshot"
@@ -1601,7 +1603,10 @@ snapshot() {
     -n $num_workers \
     -t $timeout \
     -a $retries $with_history $log_level"
-  date > /etc/cvmfs/repositories.d/${name}/last_snapshot
+  $user_shell "sh -c \"date > ${spool_dir}/tmp/last_snapshot\""
+  $user_shell "cvmfs_swissknife upload -r ${upstream} \
+    -i ${spool_dir}/tmp/last_snapshot \
+    -o .cvmfs_last_snapshot"
 }
 
 
@@ -1711,20 +1716,39 @@ skeleton() {
   local skeleton_dir
   local skeleton_user
 
+  # get optional parameters
+  OPTIND=1
+  while getopts "o:" option
+  do
+    case $option in
+      o)
+        skeleton_user=$OPTARG
+        ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command skeleton: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get skeleton destination directory
+  shift $(($OPTIND-1))
+
   # get skeleton destination directory
   if [ $# -eq 0 ]; then
-    die "Command skeleton: Please provide a skeleton destination directory"
+    usage "Command skeleton: Please provide a skeleton destination directory"
   fi
   if [ $# -gt 1 ]; then
-    die "Command skeleton: Too many arguments"
+    usage "Command skeleton: Too many arguments"
   fi
   skeleton_dir=$1
 
   # ask for the skeleton dir owern
-  read -p "Owner of $skeleton_dir [$(whoami)]: " skeleton_user
-
-  # default values
-  [ x"$skeleton_user" = x ] && skeleton_user=$(whoami)
+  if [ x$skeleton_user = "x" ]; then
+    read -p "Owner of $skeleton_dir [$(whoami)]: " skeleton_user
+    # default value
+    [ x"$skeleton_user" = x ] && skeleton_user=$(whoami)
+  fi
 
   # sanity checks
   check_user $skeleton_user || die "No user $skeleton_user"

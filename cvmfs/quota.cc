@@ -866,7 +866,7 @@ static void CloseDatabase() {
 
 
 /**
- * Connects to a running peer server.  Creates a peer server, if necessary.
+ * Connects to a running cache manager.  Creates one if necessary.
  */
 bool InitShared(const std::string &exe_path, const std::string &cache_dir,
                 const uint64_t limit, const uint64_t cleanup_threshold)
@@ -875,7 +875,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   spawned_ = true;
   cache_dir_ = new string(cache_dir);
 
-  // Create lock file
+  // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(*cache_dir_ + "/lock_cachemgr");
   if (fd_lockfile < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
@@ -897,7 +897,19 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
              limit_, cleanup_threshold_);
     return true;
   }
-  if (errno == ENXIO) {
+  const int connect_error = errno;
+  
+  // Lock file: let existing cache manager finish first
+  const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
+             (*cache_dir_ + "/lock_cachemgr.fifo").c_str(), errno);
+    UnlockFile(fd_lockfile);
+    return false;
+  }
+  UnlockFile(fd_lockfile_fifo);
+  
+  if (connect_error == ENXIO) {
     LogCvmfs(kLogQuota, kLogDebug, "left-over FIFO found, unlinking");
     unlink(fifo_path.c_str());
   }
@@ -954,7 +966,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     UnlockFile(fd_lockfile);
     close(pipe_boot[0]);
     close(pipe_handshake[1]);
-    LogCvmfs(kLogQuota, kLogDebug, "cache manager did not start");
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "cache manager did not start");
     return false;
   }
   close(pipe_boot[0]);
@@ -1028,22 +1040,33 @@ int MainCacheManager(int argc, char **argv) {
     Daemonize();
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
+  const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "could not open lock file "
+             "%s (%d)", (*cache_dir_ + "/lock_cachemgr.fifo").c_str(), errno);
+    return 1;
+  }
   const string crash_guard = *cache_dir_ + "/cachemgr.running";
   const bool rebuild = FileExists(crash_guard);
   retval = open(crash_guard.c_str(), O_RDONLY | O_CREAT, 0600);
   if (retval < 0) {
     LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
              "failed to create shared cache manager crash guard");
+    UnlockFile(fd_lockfile_fifo);
     return 1;
   }
   close(retval);
-  if (!InitDatabase(rebuild))
+  if (!InitDatabase(rebuild)) {
+    UnlockFile(fd_lockfile_fifo);
     return 1;
+  }
 
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
-    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO (%d)", errno);
+    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO %s (%d)",
+             fifo_path.c_str(), errno);
+    UnlockFile(fd_lockfile_fifo);
     return 1;
   }
   Nonblock2Block(pipe_lru_[0]);
@@ -1061,6 +1084,7 @@ int MainCacheManager(int argc, char **argv) {
   unlink(fifo_path.c_str());
   CloseDatabase();
   unlink(crash_guard.c_str());
+  UnlockFile(fd_lockfile_fifo);
 
   monitor::Fini();
 

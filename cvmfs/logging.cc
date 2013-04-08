@@ -180,6 +180,14 @@ void SetLogVerbosity(const LogLevels min_level) {
  */
 #ifdef DEBUGMSG
 void SetLogDebugFile(const string &filename) {
+  if (filename == "") {
+    if ((file_debug != NULL) && (file_debug != stderr))
+      fclose(file_debug);
+    delete path_debug;
+    path_debug = NULL;
+    return;
+  }
+  
   if ((file_debug != NULL) && (file_debug != stderr)) {
     if ((fclose(file_debug) < 0)) {
       fprintf(stderr, "could not close current log file (%d), aborting\n",

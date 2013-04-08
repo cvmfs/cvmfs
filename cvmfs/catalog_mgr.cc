@@ -121,11 +121,6 @@ void AbstractCatalogManager::SetIncarnation(const uint64_t new_incarnation) {
   incarnation_ = new_incarnation;
   if (inode_annotation_)
     inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
-  for (CatalogList::const_iterator i = catalogs_.begin(),
-       iEnd = catalogs_.end(); i != iEnd; ++i)
-  {
-    (*i)->generation_ = revision_cache_ + incarnation_;
-  }
   Unlock();
 }
 
@@ -406,7 +401,6 @@ bool AbstractCatalogManager::Inode2DirentUnprotected(const inode_t inode,
 
   // Don't lookup ancient inodes
   if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
-    Unlock();
     return false;
   }
 
@@ -761,7 +755,6 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty())
     revision_cache_ = new_catalog->GetRevision();
-  new_catalog->generation_ = revision_cache_ + incarnation_;
 
   catalogs_.push_back(new_catalog);
   ActivateCatalog(new_catalog);

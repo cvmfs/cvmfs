@@ -323,7 +323,21 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
-  download::Init(num_parallel+1);
+  download::Init(num_parallel+1, true);
+  unsigned current_group;
+  vector< vector<string> > proxies;
+  download::GetProxyInfo(&proxies, &current_group);
+  if (proxies.size() > 0) {
+    string proxy_str = "\nWarning, replicating through proxies\n";
+    proxy_str += "  Load-balance groups:\n";
+    for (unsigned i = 0; i < proxies.size(); ++i) {
+      proxy_str += "  [" + StringifyInt(i) + "] " +
+      JoinStrings(proxies[i], ", ") + "\n";
+    }
+    proxy_str += "  Active proxy: [" + StringifyInt(current_group) + "] " +
+    proxies[current_group][0];
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s\n", proxy_str.c_str());
+  }
   download::SetTimeout(timeout, timeout);
   download::SetRetryParameters(retries, timeout, 3*timeout);
   download::Spawn();

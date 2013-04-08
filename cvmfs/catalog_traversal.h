@@ -109,7 +109,7 @@ class CatalogTraversal
     no_close_(no_close)
   {
     if (is_remote_)
-      download::Init(1);
+      download::Init(1, true);
   }
 
   virtual ~CatalogTraversal() {

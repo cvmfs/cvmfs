@@ -32,6 +32,7 @@
 
 #include "logging.h"
 #include "util.h"
+#include "nfs_shared_maps.h"
 
 using namespace std;  // NOLINT
 
@@ -49,6 +50,9 @@ uint64_t root_inode_;
 uint64_t seq_;
 pthread_mutex_t lock_ = PTHREAD_MUTEX_INITIALIZER;
 bool spawned_ = false;  // Set to true after fork()
+// If true, use sqlite db that can be put on a shared NFS volume.  
+// See nfs_shared_maps
+bool use_shared_db_ = false;
 
 
 // Leveldb's background threads must not be started before cvmfs has forked.
@@ -184,6 +188,9 @@ static uint64_t FindInode(const hash::Md5 &path) {
  * Finds the inode for path or issues a new inode.
  */
 uint64_t GetInode(const PathString &path) {
+  if (use_shared_db_)
+    return nfs_shared_maps::GetInode(path);
+  
   const hash::Md5 md5_path(path.GetChars(), path.GetLength());
   uint64_t inode = FindInode(md5_path);
   if (inode != 0)
@@ -214,6 +221,9 @@ uint64_t GetInode(const PathString &path) {
  * \return false if not found
  */
 bool GetPath(const uint64_t inode, PathString *path) {
+  if (use_shared_db_)
+    return nfs_shared_maps::GetPath(inode, path);
+  
   leveldb::Status status;
   leveldb::Slice key(reinterpret_cast<const char *>(&inode), sizeof(inode));
   string result;
@@ -240,6 +250,9 @@ bool GetPath(const uint64_t inode, PathString *path) {
 
 
 string GetStatistics() {
+  if (use_shared_db_)
+    return nfs_shared_maps::GetStatistics();
+  
   string result = "Total number of issued inodes: " +
                   StringifyInt(seq_-root_inode_) + "\n";
 
@@ -255,8 +268,12 @@ string GetStatistics() {
 
 
 bool Init(const string &leveldb_dir, const uint64_t root_inode,
-          const bool rebuild)
+          const bool rebuild, const bool shared_db) 
 {
+  use_shared_db_ = shared_db;
+  if (shared_db)
+    return nfs_shared_maps::Init(leveldb_dir, root_inode, rebuild);
+
   assert(root_inode > 0);
   root_inode_ = root_inode;
   fork_aware_env_ = new ForkAwareEnv();
@@ -328,11 +345,18 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode,
  * Start real work only after fork() because leveldb has background threads.
  */
 void Spawn() {
+  if (use_shared_db_) {
+    nfs_shared_maps::Spawn();
+    return;
+  }
   spawned_ = true;
 }
 
 
 void Fini() {
+  if (use_shared_db_)
+    return nfs_shared_maps::Fini();
+  
   // Write highest issued sequence number
   PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_);
 
