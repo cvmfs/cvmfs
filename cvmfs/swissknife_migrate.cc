@@ -218,7 +218,7 @@ void CommandMigrate::ConvertCatalogsRecursively(
   CatalogList::const_iterator i    = nested_catalogs.begin();
   CatalogList::const_iterator iend = nested_catalogs.end();
   for (; i != iend; ++i) {
-    FutureNestedCatalogReference *new_nested_ref =
+    FutureNestedCatalogReference *new_nested_ref = // TODO: this might produce a memory leak (??)
                                                new FutureNestedCatalogReference;
     future_nested_catalogs.push_back(new_nested_ref);
     ConvertCatalogsRecursively(*i, new_nested_ref);
@@ -245,8 +245,9 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
         FutureNestedCatalogReference      *new_nested_ref = data.new_nested_ref;
   const FutureNestedCatalogReferenceList  &future_nested_catalogs =
                                                     data.future_nested_catalogs;
-  bool retval                       = false;
-  unsigned int mountpoint_linkcount = 0;
+  bool                                     retval               = false;
+  unsigned int                             mountpoint_linkcount = 0;
+  catalog::DeltaCounters                   nested_statistics;
 
   // create and attach an empty catalog with the newest schema
   WritableCatalog *writable_catalog = CreateNewEmptyCatalog(
@@ -279,6 +280,12 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
                                           future_nested_catalogs);
   if (! retval) goto fail;
 
+  // generate statistics for the current catalog
+  retval = GenerateCatalogStatistics(writable_catalog,
+                                     future_nested_catalogs,
+                                     &nested_statistics);
+  if (! retval) goto fail;
+
   // find out about the catalog's mountpoint's linkcount that needs to be passed
   // to the parent, in order to synchronize it's respective directory entry
   retval = FindMountpointLinkcount(writable_catalog, &mountpoint_linkcount);
@@ -287,6 +294,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   // all went well... migration of this catalog has finished
   master()->JobSuccessful(PendingCatalog(true,
                                          mountpoint_linkcount,
+                                         nested_statistics,
                                          writable_catalog,
                                          new_nested_ref));
   return;
@@ -484,6 +492,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   return true;
 }
 
+
 bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
         const catalog::WritableCatalog          *writable_catalog,
         const FutureNestedCatalogReferenceList  &future_nested_catalogs) const {
@@ -533,6 +542,48 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
       return false;
     }
     add_nested_catalog.Reset();
+  }
+
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
+        catalog::WritableCatalog                *writable_catalog,
+        const FutureNestedCatalogReferenceList  &future_nested_catalogs,
+        catalog::DeltaCounters                  *nested_statistics) const {
+  const Database &writable = writable_catalog->database();
+
+  Sql generate_stats(writable,
+    "INSERT OR REPLACE INTO statistics "
+    "SELECT 'self_regular', count(*) FROM old.catalog "
+    "                                WHERE     flags & :flag_file  "
+    "                                  AND NOT flags & :flag_link_1 "
+    "  UNION "
+    "SELECT 'self_symlink', count(*) FROM old.catalog "
+    "                                WHERE flags & :flag_link_2 "
+    "  UNION "
+    "SELECT 'self_dir',     count(*) FROM old.catalog "
+    "                                WHERE flags & :flag_dir "
+    "  UNION "
+    "SELECT 'self_nested',  count(*) FROM old.nested_catalogs "
+    "  UNION "
+    "SELECT 'subtree_regular', 0 "  // subtree entries will be updated later
+    "  UNION "                      //  currently we have no idea of them...
+    "SELECT 'subtree_symlink', 0 "
+    "  UNION "
+    "SELECT 'subtree_dir',     0 "
+    "  UNION "
+    "SELECT 'subtree_nested',  0;");
+  const bool retval =
+    generate_stats.BindInt64(1, SqlDirent::kFlagFile) &&
+    generate_stats.BindInt64(2, SqlDirent::kFlagLink) &&
+    generate_stats.BindInt64(3, SqlDirent::kFlagLink) &&
+    generate_stats.BindInt64(4, SqlDirent::kFlagDir)  &&
+    generate_stats.Execute();
+  if (! retval) {
+    SqlError("Failed to generate catalog statistics.", generate_stats);
+    return false;
   }
 
   return true;

@@ -23,7 +23,8 @@ namespace swissknife {
 class CommandMigrate : public Command {
  protected:
   struct NestedCatalogReference : public catalog::Catalog::NestedCatalog {
-    unsigned int mountpoint_linkcount;
+    unsigned int            mountpoint_linkcount;
+    catalog::DeltaCounters  statistics;
   };
 
   typedef Future<NestedCatalogReference> FutureNestedCatalogReference;
@@ -31,17 +32,21 @@ class CommandMigrate : public Command {
           FutureNestedCatalogReferenceList;
 
   struct PendingCatalog {
-    PendingCatalog(const bool                     success        = false,
-                   const unsigned int             mntpnt_lnkcnt  = 0,
-                   catalog::WritableCatalog      *new_catalog    = NULL,
-                   FutureNestedCatalogReference  *new_nested_ref = NULL) :
+    PendingCatalog(const bool                     success           = false,
+                   const unsigned int             mntpnt_lnkcnt     = 0,
+                   const catalog::DeltaCounters  &nested_statistics =
+                                                       catalog::DeltaCounters(),
+                   catalog::WritableCatalog      *new_catalog       = NULL,
+                   FutureNestedCatalogReference  *new_nested_ref    = NULL) :
       success(success),
       mountpoint_linkcount(mntpnt_lnkcnt),
+      nested_statistics(nested_statistics),
       new_catalog(new_catalog),
       new_nested_ref(new_nested_ref) {}
 
     bool                           success;
     unsigned int                   mountpoint_linkcount;
+    catalog::DeltaCounters         nested_statistics;
     catalog::WritableCatalog      *new_catalog;
     FutureNestedCatalogReference  *new_nested_ref;
   };
@@ -96,6 +101,10 @@ class CommandMigrate : public Command {
     bool MigrateNestedCatalogReferences(
          const catalog::WritableCatalog          *writable_catalog,
          const FutureNestedCatalogReferenceList  &future_nested_catalogs) const;
+    bool GenerateCatalogStatistics(
+         catalog::WritableCatalog                *writable_catalog,
+         const FutureNestedCatalogReferenceList  &future_nested_catalogs,
+         catalog::DeltaCounters                  *nested_statistics) const;
     bool FindMountpointLinkcount(
                    const catalog::WritableCatalog  *writable_catalog,
                    unsigned int                    *mountpoint_linkcount) const;
