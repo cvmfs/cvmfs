@@ -1,4 +1,5 @@
 2.1.9:
+  * Fix removal of temporary files in replication tools
   * Experimental support for "shared NFS maps", which are handled
     by sqlite and allow for NFS HA setups at the cost of performance
   * Recognize CVMFS_IPV4_ONLY environment variable and, if set

@@ -104,6 +104,7 @@ namespace cvmfs {
 const char *kDefaultCachedir = "/var/lib/cvmfs/default";
 const unsigned kDefaultTimeout = 2;
 const double kDefaultKCacheTimeout = 60.0;
+const unsigned kReloadSafetyMargin = 500;
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
@@ -421,7 +422,10 @@ catalog::LoadError RemountStart() {
   if (retval == catalog::kLoadNew) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "new catalog revision available, draining out meta-data caches");
-    drainout_deadline_ = time(NULL) + int(kcache_timeout_);
+    unsigned safety_margin = kReloadSafetyMargin/1000;
+    if (safety_margin == 0)
+      safety_margin = 1;
+    drainout_deadline_ = time(NULL) + int(kcache_timeout_) + safety_margin;
     atomic_cas32(&drainout_mode_, 0, 1);
   }
   return retval;
@@ -2170,7 +2174,7 @@ static bool MaintenanceMode(const int fd_progress) {
   string msg_progress = "Draining out kernel caches (" +
                         StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  SafeSleepMs((int)cvmfs::kcache_timeout_*1000);
+  SafeSleepMs((int)cvmfs::kcache_timeout_*1000 + cvmfs::kReloadSafetyMargin);
   return true;
 }
 
