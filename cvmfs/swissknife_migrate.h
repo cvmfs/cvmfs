@@ -30,6 +30,10 @@ class CommandMigrate : public Command {
       old_catalog(old_catalog),
       new_catalog(NULL) {}
 
+    const std::string root_path() const {
+      return old_catalog->path().ToString();
+    }
+
     bool                              success;
 
     const catalog::Catalog           *old_catalog;

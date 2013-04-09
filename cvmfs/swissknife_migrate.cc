@@ -26,6 +26,8 @@ ParameterList CommandMigrate::GetParams() {
                              false, false));
   result.push_back(Parameter('u', "upstream definition string",
                              false, false));
+  result.push_back(Parameter('o', "manifest output file",
+                             false, false));
   result.push_back(Parameter('n', "fully qualified repository name",
                              true, false));
   result.push_back(Parameter('k', "repository master key(s)",
@@ -36,10 +38,15 @@ ParameterList CommandMigrate::GetParams() {
 
 int CommandMigrate::Main(const ArgumentList &args) {
   // parameter parsing
-  const std::string &repo_url  = *args.find('r')->second;
-  const std::string &spooler   = *args.find('u')->second;
-  const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second : "";
-  const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
+  const std::string &repo_url      = *args.find('r')->second;
+  const std::string &spooler       = *args.find('u')->second;
+  const std::string &manifest_path = *args.find('o')->second;
+  const std::string &repo_name     = (args.count('n') > 0)      ?
+                                        *args.find('n')->second :
+                                        "";
+  const std::string &repo_keys     = (args.count('k') > 0)      ?
+                                        *args.find('k')->second :
+                                        "";
 
   // create an upstream spooler
   const upload::SpoolerDefinition spooler_definition(spooler);
@@ -95,7 +102,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const unsigned int errors = concurrent_migration_->GetNumberOfFailedJobs() +
                               spooler_->GetNumberOfErrors();
 
-  LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration finished with %d "
+  LogCvmfs(kLogCatalog, kLogStdout, "Catalog Migration finished with %d "
                                     "errors.",
            errors);
   if (errors > 0) {
@@ -105,17 +112,21 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
 
   // commit the new (migrated) repository revision...
-  // const NestedCatalogReference &root_catalog = new_root_catalog->Get();
-  // const hash::Any         &root_catalog_hash = root_catalog.hash;
-  // const std::string       &root_catalog_path = root_catalog.path.ToString() ;
-  // manifest::Manifest *manifest = new manifest::Manifest(root_catalog_hash,
-  //                                                       root_catalog_path);
-  // manifest->set_ttl();
-  // manifest->set_revision();
-  // manifest->Export();
+  LogCvmfs(kLogCatalog, kLogStdout, "\nCommitting migrated repository "
+                                    "revision...");
+  const hash::Any   &root_catalog_hash = root_catalog->new_catalog_hash.Get();
+  const std::string &root_catalog_path = root_catalog->root_path();
+  manifest::Manifest manifest(root_catalog_hash,
+                              root_catalog_path);
+  manifest.set_ttl(root_catalog->new_catalog->GetTTL());
+  manifest.set_revision(root_catalog->new_catalog->GetRevision());
+  if (! manifest.Export(manifest_path)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Manifest export failed.\nAborting...");
+    return 6;
+  }
 
-  // spooler_->Upload(manifest_file);
-
+  // all done...
+  LogCvmfs(kLogCatalog, kLogStdout, "Catalog Migration succeeded");
   return 0;
 }
 
@@ -204,7 +215,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
   // TODO: do some more cleanup
   LogCvmfs(kLogCatalog, kLogStdout, "migrated and uploaded %sC %s",
            result.content_hash.ToString().c_str(),
-           catalog->new_catalog->path().ToString().c_str());
+           catalog->root_path().c_str());
 }
 
 
@@ -230,9 +241,7 @@ CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) 
 {}
 
 
-CommandMigrate::MigrationWorker::~MigrationWorker() {
-
-}
+CommandMigrate::MigrationWorker::~MigrationWorker() {}
 
 
 void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
@@ -257,7 +266,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
 
 bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
                                                    PendingCatalog *data) const {
-  const std::string root_path = data->old_catalog->path().ToString();
+  const std::string root_path = data->root_path();
 
   // create a new catalog database schema
   bool retval;
@@ -475,12 +484,12 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
     PendingCatalog *nested_catalog = *i;
-    const PathString &root_path = nested_catalog->old_catalog->path();
+    const std::string &root_path = nested_catalog->root_path();
 
     // update the nested catalog mountpoint directory entry with the correct
     // linkcount that was determined while processing the nested catalog
-    const hash::Md5 mountpoint_hash = hash::Md5(root_path.GetChars(),
-                                                root_path.GetLength());
+    const hash::Md5 mountpoint_hash = hash::Md5(root_path.data(),
+                                                root_path.size());
     const unsigned int linkcount = nested_catalog->mountpoint_linkcount.Get();
     retval =
       update_mntpnt_linkcount.BindInt64(1, linkcount);
@@ -496,7 +505,7 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
     // insert the updated nested catalog reference into the new catalog
     const hash::Any catalog_hash = nested_catalog->new_catalog_hash.Get();
     retval =
-      add_nested_catalog.BindText(1, root_path.ToString()) &&
+      add_nested_catalog.BindText(1, root_path) &&
       add_nested_catalog.BindText(2, catalog_hash.ToString()) &&
       add_nested_catalog.Execute();
     if (! retval) {
@@ -585,9 +594,8 @@ bool CommandMigrate::MigrationWorker::FindMountpointLinkcount(
   const Database &writable = data->new_catalog->database();
   bool retval;
 
-  PathString root_path = data->new_catalog->path();
-  hash::Md5 root_path_hash = hash::Md5(root_path.GetChars(),
-                                       root_path.GetLength());
+  std::string root_path = data->root_path();
+  hash::Md5 root_path_hash = hash::Md5(root_path.data(), root_path.size());
 
   Sql find_mountpoint_linkcount(writable,
     "SELECT hardlinks "
