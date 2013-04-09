@@ -9,13 +9,13 @@ use warnings;
 use File::Find;
 use File::Copy;
 use ZeroMQ qw/:all/;
-use FindBin qw($Bin);
+use FindBin qw($RealBin);
 
 use base 'Exporter';
 use vars qw/ @EXPORT_OK /;
 @EXPORT_OK = qw(get_daemon_output killing_services check_repo setup_environment restart_cvmfs_services
 				 check_mount_timeout find_files recursive_mkdir recursive_rm open_test_socket close_test_socket
-				 set_stdout_stderr multiple_rm open_shellout_socket);
+				 set_stdout_stderr multiple_rm open_shellout_socket restore_dns);
 
 # This function will set STDOUT and STDERR for forked process
 sub set_stdout_stderr {
@@ -340,6 +340,26 @@ sub open_shellout_socket {
 	print "Done.\n";
 	
 	return ($socket, $ctxt);
+}
+
+# This functions restores resolv.conf backup and erase iptabes rules added for dns test
+sub restore_dns {
+	my $resolv_temp = shift;
+	
+	# Restoring resolv.conf
+	print 'Restoring resolv.conf backup... ';
+	if ($resolv_temp) {
+		system("sudo cp $resolv_temp /etc/resolv.conf");
+	}
+	else {
+		system("sudo cp $RealBin/last_resolv.conf /etc/resolv.conf");
+	}
+	print "Done.\n";
+	
+	# Restarting iptables, it will load previously saved rules
+	print 'Restoring iptables rules... ';
+	system('sudo Tests/Common/iptables_rules.sh restore');
+	print "Done.\n";
 }
 
 1;
