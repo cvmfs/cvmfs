@@ -520,6 +520,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
       data(data),
       is_death_sentence(false) {}
     Job() :
+      data(),
       is_death_sentence(true) {}
     const DataT  data;              //!< job payload
     const bool   is_death_sentence; //!< death sentence flag
