@@ -114,7 +114,7 @@ bool Counters::GetCounter(      SqlGetCounter  &sql,
                           const std::string    &counter_name,
                           uint64_t *counter) const {
   const bool retval = sql.BindCounter(counter_name) &&
-                      sql.Execute();
+                      sql.FetchRow();
   if (!retval) return false;
   *counter = sql.GetCounter();
   sql.Reset();
