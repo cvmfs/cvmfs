@@ -94,6 +94,34 @@ uint64_t Counters::GetAllEntries() const {
 }
 
 
+bool Counters::ReadCounters(const Database &database) {
+  SqlGetCounter sql_counter(database);
+  bool retval =
+    GetCounter(sql_counter, "self_regular",    &self_regular)    &&
+    GetCounter(sql_counter, "self_symlink",    &self_symlink)    &&
+    GetCounter(sql_counter, "self_dir",        &self_dir)        &&
+    GetCounter(sql_counter, "self_nested",     &self_nested)     &&
+    GetCounter(sql_counter, "subtree_regular", &subtree_regular) &&
+    GetCounter(sql_counter, "subtree_symlink", &subtree_symlink) &&
+    GetCounter(sql_counter, "subtree_dir",     &subtree_dir)     &&
+    GetCounter(sql_counter, "subtree_nested",  &subtree_nested);
+
+  return retval;
+}
+
+
+bool Counters::GetCounter(      SqlGetCounter  &sql,
+                          const std::string    &counter_name,
+                          uint64_t *counter) const {
+  const bool retval = sql.BindCounter(counter_name) &&
+                      sql.Execute();
+  if (!retval) return false;
+  *counter = sql.GetCounter();
+  sql.Reset();
+  return true;
+}
+
+
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
@@ -434,31 +462,7 @@ hash::Any Catalog::GetPreviousRevision() const {
 bool Catalog::GetCounters(Counters *counters) const {
   if (!database_)
     return false;
-
-  SqlGetCounter sql_counter(database());
-  bool retval =
-    GetCounter(sql_counter, "self_regular",    &counters->self_regular)    &&
-    GetCounter(sql_counter, "self_symlink",    &counters->self_symlink)    &&
-    GetCounter(sql_counter, "self_dir",        &counters->self_dir)        &&
-    GetCounter(sql_counter, "self_nested",     &counters->self_nested)     &&
-    GetCounter(sql_counter, "subtree_regular", &counters->subtree_regular) &&
-    GetCounter(sql_counter, "subtree_symlink", &counters->subtree_symlink) &&
-    GetCounter(sql_counter, "subtree_dir",     &counters->subtree_dir)     &&
-    GetCounter(sql_counter, "subtree_nested",  &counters->subtree_nested);
-
-  return retval;
-}
-
-
-bool Catalog::GetCounter(      SqlGetCounter  &sql,
-                         const std::string    &counter_name,
-                         uint64_t *counter) const {
-  const bool retval = sql.BindCounter(counter_name) &&
-                      sql.Execute();
-  if (!retval) return false;
-  *counter = sql.GetCounter();
-  sql.Reset();
-  return true;
+  return counters->ReadCounters(database());
 }
 
 

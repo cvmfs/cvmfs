@@ -83,7 +83,8 @@ struct DeltaCounters {
  *       catalog-root, resulting in an extra entry per nested catalog. Keep that
  *       in mind when using these numbers in POSIX file system semantics.
  */
-struct Counters {
+class Counters {
+ public:
   Counters() {
     self_regular = self_symlink = self_dir = self_nested =
       subtree_regular = subtree_symlink = subtree_dir = subtree_nested = 0;
@@ -96,6 +97,14 @@ struct Counters {
   uint64_t GetSubtreeEntries() const;
   uint64_t GetAllEntries() const;
 
+  bool ReadCounters(const Database &database);
+
+ protected:
+  bool GetCounter(      SqlGetCounter  &sql,
+                  const std::string    &counter_name,
+                  uint64_t *counter) const;
+
+ public:
   uint64_t self_regular;
   uint64_t self_symlink;
   uint64_t self_dir;
@@ -250,10 +259,6 @@ class Catalog : public SingleCopy {
   CatalogList GetChildren() const;
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
-
-  bool GetCounter(      SqlGetCounter  &sql,
-                  const std::string    &counter_name,
-                  uint64_t *counter) const;
 
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
