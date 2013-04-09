@@ -169,7 +169,7 @@ bool FileProcessor::FileProcessorWorker::ProcessFile(
   }
 
   // in any case we need to upload the bulk version of the file
-  UploadChunk(file->bulk_chunk(), file);
+  UploadChunk(file->bulk_chunk(), file, parameters.hash_suffix);
   return true;
 }
 

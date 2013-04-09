@@ -156,8 +156,7 @@ void CommandMigrate::MigrationCallback(
   }
 
   // schedule the compression and upload of the catalog
-  const bool chunking = false;
-  spooler_->Process(path, chunking);
+  spooler_->ProcessCatalog(path);
 }
 
 
@@ -301,6 +300,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   if (! retval) goto fail;
 
   // all went well... migration of this catalog has finished
+  // Note: MigrationCallback() will take care of the result...
   master()->JobSuccessful(PendingCatalog(true,
                                          mountpoint_linkcount,
                                          nested_statistics,

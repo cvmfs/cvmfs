@@ -75,6 +75,11 @@ void Spooler::Process(const std::string &local_path,
 }
 
 
+void Spooler::ProcessCatalog(const std::string &local_path) {
+  file_processor_->Process(local_path, false, "C");
+}
+
+
 void Spooler::Upload(const std::string &local_path,
                      const std::string &remote_path) {
   uploader_->Upload(local_path,
