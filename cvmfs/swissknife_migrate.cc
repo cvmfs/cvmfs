@@ -553,6 +553,8 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
         catalog::WritableCatalog                *writable_catalog,
         const FutureNestedCatalogReferenceList  &future_nested_catalogs,
         catalog::DeltaCounters                  *nested_statistics) const {
+  bool retval = false;
+
   // Aggregated the statistics counters of all nested catalogs
   // Note: we might need to wait until nested catalogs are sucessfully processed
   DeltaCounters aggregated_counters;
@@ -589,7 +591,7 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
     "SELECT 'subtree_dir',     :subtree_dir "
     "  UNION "
     "SELECT 'subtree_nested',  :subtree_nested;");
-  const bool retval =
+  retval =
     generate_stats.BindInt64(1, SqlDirent::kFlagFile)                  &&
     generate_stats.BindInt64(2, SqlDirent::kFlagLink)                  &&
     generate_stats.BindInt64(3, SqlDirent::kFlagLink)                  &&
@@ -606,7 +608,12 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
 
   // read out the generated information in order to pass it to parent catalog
   catalog::Counters statistics;
-  statistics.ReadCounters(writable);
+  retval = statistics.ReadCounters(writable);
+  if (! retval) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to read out generated statistics "
+                                      "counters");
+    return false;
+  }
   nested_statistics->InitWithCounters(statistics);
 
   return true;
