@@ -236,55 +236,23 @@ CommandMigrate::MigrationWorker::~MigrationWorker() {
 
 
 void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
-  bool                                     retval               = false;
+  const bool success =
+    CreateNewEmptyCatalog            (data) &&
+    CheckDatabaseSchemaCompatibility (data) &&
+    AttachOldCatalogDatabase         (data) &&
+    MigrateFileMetadata              (data) &&
+    MigrateNestedCatalogReferences   (data) &&
+    GenerateCatalogStatistics        (data) &&
+    FindMountpointLinkcount          (data) &&
+    DetachOldCatalogDatabase         (data);
+  data->success = success;
 
-  // create and attach an empty catalog with the newest schema
-  retval = CreateNewEmptyCatalog(data);
-  if (! retval) goto fail;
-
-  // get the fresh database of the writable catalog and do some checks
-  retval = CheckDatabaseSchemaCompatibility(data);
-  if (! retval) goto fail;
-
-  // attach the new catalog database into the old one to perform the migration
-  // after attaching, the readable catalog is unlinked since the temporary hard-
-  // link is not needed anymore
-  retval = AttachOldCatalogDatabase(data);
-  unlink(data->old_catalog->database().filename().c_str());
-  if (! retval) goto fail;
-
-  // migrate the catalog data (file meta data)
-  retval = MigrateFileMetadata(data);
-  if (! retval) goto fail;
-
-  // migrate nested catalog references. We need to wait until all nested cata-
-  // logs are successfully processed before we can do this.
-  retval = MigrateNestedCatalogReferences(data);
-  if (! retval) goto fail;
-
-  // generate statistics for the current catalog
-  retval = GenerateCatalogStatistics(data);
-  if (! retval) goto fail;
-
-  // find out about the catalog's mountpoint's linkcount that needs to be passed
-  // to the parent, in order to synchronize it's respective directory entry
-  retval = FindMountpointLinkcount(data);
-  if (! retval) goto fail;
-
-  // detach the old catalog from the database handle
-  retval = DetachOldCatalogDatabase(data);
-  if (! retval) goto fail;
-
-  // all went well... migration of this catalog has finished
   // Note: MigrationCallback() will take care of the result...
-  data->success = true;
-  master()->JobSuccessful(data);
-  return;
-
-fail:
-  data->success = false;
-  master()->JobFailed(data);
-  return;
+  if (success) {
+    master()->JobSuccessful(data);
+  } else {
+    master()->JobFailed(data);
+  }
 }
 
 bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
@@ -347,6 +315,11 @@ bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
     "ATTACH '" + old_catalog.filename() + "' AS old;"
   );
   bool retval = sql_attach_new.Execute();
+
+  // remove the hardlink to the old database file (temporary file), it will not
+  // be needed anymore... data will get deleted when the database is closed
+  unlink(data->old_catalog->database().filename().c_str());
+
   if (! retval) {
     SqlError("Failed to attach database of old catalog", sql_attach_new);
     return false;
