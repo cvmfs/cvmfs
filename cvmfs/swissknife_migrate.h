@@ -94,20 +94,22 @@ class CommandMigrate : public Command {
     bool CheckDatabaseSchemaCompatibility(
                                     const catalog::Database &new_catalog,
                                     const catalog::Database &old_catalog) const;
-    bool AttachOldCatalogDatabase(const catalog::Database &new_catalog,
-                                  const catalog::Database &old_catalog) const;
+    bool AttachOldCatalogDatabase(  const catalog::Database &new_catalog,
+                                    const catalog::Database &old_catalog) const;
     bool MigrateFileMetadata(const catalog::Catalog    *catalog,
                              catalog::WritableCatalog  *writable_catalog) const;
     bool MigrateNestedCatalogReferences(
          const catalog::WritableCatalog          *writable_catalog,
          const FutureNestedCatalogReferenceList  &future_nested_catalogs) const;
     bool GenerateCatalogStatistics(
-         catalog::WritableCatalog                *writable_catalog,
-         const FutureNestedCatalogReferenceList  &future_nested_catalogs,
-         catalog::DeltaCounters                  *nested_statistics) const;
+              catalog::WritableCatalog                *writable_catalog,
+              const FutureNestedCatalogReferenceList  &future_nested_catalogs,
+              catalog::DeltaCounters                  *nested_statistics) const;
     bool FindMountpointLinkcount(
                    const catalog::WritableCatalog  *writable_catalog,
                    unsigned int                    *mountpoint_linkcount) const;
+    bool DetachOldCatalogDatabase(
+                       const catalog::WritableCatalog  *writable_catalog) const;
 
    private:
     void SqlError(const std::string &message,

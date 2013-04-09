@@ -141,6 +141,8 @@ void CommandMigrate::MigrationCallback(
                                   const CommandMigrate::PendingCatalog &data) {
   // check if the migration of the catalog was successful
   if (!data.success) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Catalog migration failed! Aborting...");
+    exit(1);
     return;
   }
 
@@ -167,7 +169,9 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 
   // check if the upload was successful
   if (result.return_code != 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "FAILED upload of %s", path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to upload catalog %s\nAborting...",
+             path.c_str());
+    exit(2);
     return;
   }
   assert (result.file_chunks.size() == 0);
@@ -290,6 +294,10 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   // find out about the catalog's mountpoint's linkcount that needs to be passed
   // to the parent, in order to synchronize it's respective directory entry
   retval = FindMountpointLinkcount(writable_catalog, &mountpoint_linkcount);
+  if (! retval) goto fail;
+
+  // detach the old catalog from the database handle
+  retval = DetachOldCatalogDatabase(writable_catalog);
   if (! retval) goto fail;
 
   // all went well... migration of this catalog has finished
@@ -654,6 +662,19 @@ bool CommandMigrate::MigrationWorker::FindMountpointLinkcount(
   }
 
   *mountpoint_linkcount = linkcount;
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker::DetachOldCatalogDatabase(
+                      const catalog::WritableCatalog  *writable_catalog) const {
+  const Database &writable = writable_catalog->database();
+  Sql detach_old_catalog(writable, "DETACH old;");
+  const bool retval = detach_old_catalog.Execute();
+  if (! retval) {
+    SqlError("Failed to detach old catalog database.", detach_old_catalog);
+    return false;
+  }
   return true;
 }
 
