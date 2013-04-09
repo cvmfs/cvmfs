@@ -55,7 +55,7 @@ void LocalUploader::Upload(const std::string &local_path,
     return;
   }
 
-  // move the file in place
+  // move the file in place (atomic operation)
   retcode = Move(tmp_path, remote_path);
   if (retcode != 0) {
     atomic_inc32(&copy_errors_);
