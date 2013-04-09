@@ -188,6 +188,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
   nested_catalog.path                 = catalog.new_catalog->path();
   nested_catalog.hash                 = result.content_hash;
   nested_catalog.mountpoint_linkcount = catalog.mountpoint_linkcount;
+  nested_catalog.nested_statistics    = catalog.nested_statistics;
   catalog.new_nested_ref->Set(nested_catalog);
 
   // TODO: do some more cleanup
@@ -552,8 +553,21 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
         catalog::WritableCatalog                *writable_catalog,
         const FutureNestedCatalogReferenceList  &future_nested_catalogs,
         catalog::DeltaCounters                  *nested_statistics) const {
-  const Database &writable = writable_catalog->database();
+  // Aggregated the statistics counters of all nested catalogs
+  // Note: we might need to wait until nested catalogs are sucessfully processed
+  DeltaCounters aggregated_counters;
+  FutureNestedCatalogReferenceList::const_iterator i    =
+                                                 future_nested_catalogs.begin();
+  FutureNestedCatalogReferenceList::const_iterator iend =
+                                                 future_nested_catalogs.end();
+  for (; i != iend; ++i) {
+    const NestedCatalogReference &nested_catalog = (*i)->Get();
+    nested_catalog.nested_statistics.PopulateToParent(&aggregated_counters);
+  }
 
+  // generate statistics for the current catalog and store the aggregated stats
+  // for the child catalog tree
+  const Database &writable = writable_catalog->database();
   Sql generate_stats(writable,
     "INSERT OR REPLACE INTO statistics "
     "SELECT 'self_regular', count(*) FROM old.catalog "
@@ -568,23 +582,32 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
     "  UNION "
     "SELECT 'self_nested',  count(*) FROM old.nested_catalogs "
     "  UNION "
-    "SELECT 'subtree_regular', 0 "  // subtree entries will be updated later
-    "  UNION "                      //  currently we have no idea of them...
-    "SELECT 'subtree_symlink', 0 "
+    "SELECT 'subtree_regular', :subtree_regular "
     "  UNION "
-    "SELECT 'subtree_dir',     0 "
+    "SELECT 'subtree_symlink', :subtree_symlink "
     "  UNION "
-    "SELECT 'subtree_nested',  0;");
+    "SELECT 'subtree_dir',     :subtree_dir "
+    "  UNION "
+    "SELECT 'subtree_nested',  :subtree_nested;");
   const bool retval =
-    generate_stats.BindInt64(1, SqlDirent::kFlagFile) &&
-    generate_stats.BindInt64(2, SqlDirent::kFlagLink) &&
-    generate_stats.BindInt64(3, SqlDirent::kFlagLink) &&
-    generate_stats.BindInt64(4, SqlDirent::kFlagDir)  &&
+    generate_stats.BindInt64(1, SqlDirent::kFlagFile)                  &&
+    generate_stats.BindInt64(2, SqlDirent::kFlagLink)                  &&
+    generate_stats.BindInt64(3, SqlDirent::kFlagLink)                  &&
+    generate_stats.BindInt64(4, SqlDirent::kFlagDir)                   &&
+    generate_stats.BindInt64(5, aggregated_counters.d_subtree_regular) &&
+    generate_stats.BindInt64(6, aggregated_counters.d_subtree_symlink) &&
+    generate_stats.BindInt64(7, aggregated_counters.d_subtree_dir)     &&
+    generate_stats.BindInt64(8, aggregated_counters.d_subtree_nested)  &&
     generate_stats.Execute();
   if (! retval) {
     SqlError("Failed to generate catalog statistics.", generate_stats);
     return false;
   }
+
+  // read out the generated information in order to pass it to parent catalog
+  catalog::Counters statistics;
+  statistics.ReadCounters(writable);
+  nested_statistics->InitWithCounters(statistics);
 
   return true;
 }

@@ -24,7 +24,7 @@ class CommandMigrate : public Command {
  protected:
   struct NestedCatalogReference : public catalog::Catalog::NestedCatalog {
     unsigned int            mountpoint_linkcount;
-    catalog::DeltaCounters  statistics;
+    catalog::DeltaCounters  nested_statistics;
   };
 
   typedef Future<NestedCatalogReference> FutureNestedCatalogReference;

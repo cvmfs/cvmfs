@@ -53,13 +53,17 @@ struct InodeRange {
 };
 
 
+class Counters;
+
 struct DeltaCounters {
   DeltaCounters() {
     SetZero();
   }
   void SetZero();
-  void PopulateToParent(DeltaCounters *parent);
+  void PopulateToParent(DeltaCounters *parent) const;
   void DeltaDirent(const DirectoryEntry &dirent, const int delta);
+
+  void InitWithCounters(const Counters &counters);
 
   int64_t d_self_regular;
   int64_t d_self_symlink;

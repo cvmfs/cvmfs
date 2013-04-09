@@ -39,7 +39,19 @@ void DeltaCounters::DeltaDirent(const DirectoryEntry &dirent, const int delta) {
 }
 
 
-void DeltaCounters::PopulateToParent(DeltaCounters *parent) {
+void DeltaCounters::InitWithCounters(const Counters &counters) {
+  d_self_regular    = counters.self_regular;
+  d_self_symlink    = counters.self_symlink;
+  d_self_dir        = counters.self_dir;
+  d_self_nested     = counters.self_nested;
+  d_subtree_regular = counters.subtree_regular;
+  d_subtree_symlink = counters.subtree_symlink;
+  d_subtree_dir     = counters.subtree_dir;
+  d_subtree_nested  = counters.subtree_nested;
+}
+
+
+void DeltaCounters::PopulateToParent(DeltaCounters *parent) const {
   parent->d_subtree_regular += d_self_regular + d_subtree_regular;
   parent->d_subtree_symlink += d_self_symlink + d_subtree_symlink;
   parent->d_subtree_dir += d_self_dir + d_subtree_dir;
