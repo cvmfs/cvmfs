@@ -424,8 +424,7 @@ class FifoChannel : protected std::queue<T> {
    *                            considered to be "not full"
    */
   FifoChannel(const size_t maximal_length,
-              const size_t drainout_threshold,
-              const size_t prefill_threshold = 0);
+              const size_t drainout_threshold);
   virtual ~FifoChannel();
 
   /**
@@ -452,16 +451,6 @@ class FifoChannel : protected std::queue<T> {
    */
   unsigned int Drop();
 
-  /**
-   * Sets the prefill threshold of the channel to 0 in order to drain it out
-   */
-  void EnableDrainoutMode() const;
-
-  /**
-   * Resets the prefill threshold to it's initial value
-   */
-  void DisableDrainoutMode() const;
-
   inline size_t GetItemCount() const;
   inline bool   IsEmpty() const;
   inline size_t GetMaximalItemCount() const;
@@ -470,8 +459,6 @@ class FifoChannel : protected std::queue<T> {
   // general configuration
   const   size_t             maximal_queue_length_;
   const   size_t             queue_drainout_threshold_;
-  const   size_t             queue_prefill_threshold_;
-  mutable bool               drainout_mode_;
 
   // thread synchronisation structures
   mutable pthread_mutex_t    mutex_;
@@ -609,9 +596,6 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *       schedule jobs in the mean time.
    */
   void WaitForTermination();
-
-  void EnableDrainoutMode() const;
-  void DisableDrainoutMode() const;
 
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
   inline unsigned int GetNumberOfFailedJobs() const {

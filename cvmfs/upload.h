@@ -207,12 +207,6 @@ namespace upload
     void WaitForTermination() const;
 
     /**
-     * Disables precaching behaviour of work item queues. Call this once, if you
-     * rely on direct upload and success callback in your user-code.
-     */
-    void DisablePrecaching();
-
-    /**
      * Checks how many of the already processed jobs have failed.
      *
      * @return   the number of failed jobs at the time this method is invoked

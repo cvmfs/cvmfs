@@ -47,22 +47,12 @@ void FileProcessor::ProcessingCallback(const FileProcessorWorker::Results  &data
 
 
 void FileProcessor::WaitForProcessing() const {
-  uploader_->DisablePrecaching();
   workers_->WaitForEmptyQueue();
-  uploader_->EnablePrecaching();
 }
 
 
 void FileProcessor::WaitForTermination() const {
-  uploader_->DisablePrecaching();
   workers_->WaitForTermination();
-  uploader_->EnablePrecaching();
-}
-
-
-void FileProcessor::DisablePrecaching() {
-  uploader_->DisablePrecaching();
-  workers_->EnableDrainoutMode();
 }
 
 

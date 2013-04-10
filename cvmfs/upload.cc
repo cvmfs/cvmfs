@@ -98,9 +98,11 @@ bool Spooler::Peek(const std::string &path) const {
   return uploader_->Peek(path);
 }
 
+
 void Spooler::ProcessingCallback(const SpoolerResult &data) {
   NotifyListeners(data);
 }
+
 
 void Spooler::UploadingCallback(const UploaderResults &data) {
   NotifyListeners(SpoolerResult(data.return_code,
@@ -117,11 +119,6 @@ void Spooler::WaitForUpload() const {
 void Spooler::WaitForTermination() const {
   uploader_->WaitForUpload();
   file_processor_->WaitForTermination();
-}
-
-void Spooler::DisablePrecaching() {
-  uploader_->DisablePrecaching();
-  file_processor_->DisablePrecaching();
 }
 
 
