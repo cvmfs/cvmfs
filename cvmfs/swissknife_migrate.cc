@@ -71,6 +71,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
   concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
                                           this);
+  concurrent_migration_->EnableDrainoutMode();
 
   // load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
