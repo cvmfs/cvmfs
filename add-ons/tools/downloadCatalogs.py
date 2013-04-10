@@ -95,7 +95,7 @@ def decompressCatalog(filename, destination):
 	f.close()
 
 
-def findNestedCatalogs(catalogName, catalogDirectory):
+def findNestedCatalogs(catalogName, catalogDirectory, getHistory):
 	catalogFile = getCatalogFilePath(catalogName, catalogDirectory)
 	tempFile    = tempfile.NamedTemporaryFile('wb')
 	decompressCatalog(catalogFile, tempFile.name)
@@ -111,17 +111,18 @@ def findNestedCatalogs(catalogName, catalogDirectory):
 		catalogs.append(catalog[0])
 
 	# history references
-	cursor.execute("SELECT value FROM properties WHERE key = 'previous_revision' LIMIT 1")
-	result = cursor.fetchall()
-	if result:
-		catalogs.append(result[0][0])
+	if getHistory:
+		cursor.execute("SELECT value FROM properties WHERE key = 'previous_revision' LIMIT 1")
+		result = cursor.fetchall()
+		if result:
+			catalogs.append(result[0][0])
 
 	dbHandle.close()
 	tempFile.close()
 	return catalogs
 
 
-def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, beVerbose):
+def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, beVerbose, getHistory):
 	catalogs = [catalogName]
 	downloads = 0
 	while catalogs:
@@ -132,7 +133,7 @@ def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, be
 			continue
 
 		downloadCatalog(repositoryUrl, catalog, catalogDirectory, beVerbose)
-		nestedCatalogs = findNestedCatalogs(catalog, catalogDirectory)
+		nestedCatalogs = findNestedCatalogs(catalog, catalogDirectory, getHistory)
 		downloads += 1
 
 		if beVerbose:
@@ -148,6 +149,7 @@ def main():
 	parser.add_option("-d", "--directory", dest="catalogDirectory", default="catalogs", help="the directory to download catalogs to")
 	parser.add_option("-m", "--merge", metavar="FILE", dest="mergeToFile", help="merge all catalogs into one given file")
 	parser.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="don't print status messages to stdout")
+	parser.add_option("-l", "--history", action="store_true", dest="history", default=False, help="download the catalog history")
 	(options, args) = parser.parse_args()
 
 	if len(args) != 1:
@@ -158,6 +160,7 @@ def main():
 	catalogDirectory = options.catalogDirectory
 	merge = options.mergeToFile
 	verbose = options.verbose
+	history = options.history
 
 	# check option consistency
 	if os.path.exists(catalogDirectory) and os.listdir(catalogDirectory) != []:
@@ -168,7 +171,7 @@ def main():
 
 	# do the job
 	rootCatalog = getRootCatalogName(repositoryUrl)
-	numCatalogs = retrieveCatalogsRecursively(repositoryUrl, rootCatalog, catalogDirectory, verbose)
+	numCatalogs = retrieveCatalogsRecursively(repositoryUrl, rootCatalog, catalogDirectory, verbose, history)
 
 	print "downloaded" , numCatalogs , "catalogs"
 
