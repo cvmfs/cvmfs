@@ -76,7 +76,7 @@ class Database {
    */
   std::string GetLastErrorMsg() const;
  private:
-  Database(sqlite3 *sqlite_db, const float schema, const bool rw);
+  Database(const std::string &filename, const float schema);
 
   sqlite3 *sqlite_db_;
   std::string filename_;
