@@ -10,12 +10,15 @@
 
 #include "logging.h"
 
+#include <sys/resource.h>
+
 using namespace swissknife;
 using namespace catalog;
 
 CommandMigrate::CommandMigrate() :
   print_tree_(false),
   print_hash_(false),
+  file_descriptor_limit_(8192),
   root_catalog_(NULL) {}
 
 
@@ -48,12 +51,18 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                         *args.find('k')->second :
                                         "";
 
+  // we might need a lot of file descriptors
+  if (! RaiseFileDescriptorLimit()) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to raise file descriptor limits");
+    return 2;
+  }
+
   // create an upstream spooler
   const upload::SpoolerDefinition spooler_definition(spooler);
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to create upstream Spooler.");
-    return 2;
+    return 3;
   }
   spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
 
@@ -67,7 +76,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   if (! concurrent_migration_->Initialize()) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to initialize worker migration "
                                       "system.");
-    return 3;
+    return 4;
   }
   concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
                                           this);
@@ -87,7 +96,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   if (!loading_successful) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to load catalog tree");
-    return 4;
+    return 5;
   }
 
   assert (root_catalog_ != NULL);
@@ -109,7 +118,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   if (errors > 0) {
     LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration produced errors\n"
                                       "Aborting...");
-    return 5;
+    return 6;
   }
 
   // commit the new (migrated) repository revision...
@@ -123,7 +132,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   manifest.set_revision(root_catalog->new_catalog->GetRevision());
   if (! manifest.Export(manifest_path)) {
     LogCvmfs(kLogCatalog, kLogStderr, "Manifest export failed.\nAborting...");
-    return 6;
+    return 7;
   }
 
   // get rid of the open root catalog
@@ -237,6 +246,23 @@ void CommandMigrate::ConvertCatalogsRecursively(PendingCatalog *catalog) {
 
   // migrate this catalog referencing all it's (already migrated) children
   concurrent_migration_->Schedule(catalog);
+}
+
+
+bool CommandMigrate::RaiseFileDescriptorLimit() const {
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  getrlimit(RLIMIT_NOFILE, &rpl);
+  if (rpl.rlim_cur < file_descriptor_limit_) {
+    if (rpl.rlim_max < file_descriptor_limit_)
+      rpl.rlim_max = file_descriptor_limit_;
+    rpl.rlim_cur = file_descriptor_limit_;
+    const bool retval = setrlimit(RLIMIT_NOFILE, &rpl);
+    if (retval != 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 

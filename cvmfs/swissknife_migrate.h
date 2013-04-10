@@ -97,7 +97,6 @@ class CommandMigrate : public Command {
 
   int Main(const ArgumentList &args);
 
-
  protected:
   void CatalogCallback(const catalog::Catalog* catalog,
                        const hash::Any&        catalog_hash,
@@ -106,10 +105,12 @@ class CommandMigrate : public Command {
   void UploadCallback(const upload::SpoolerResult &result);
 
   void ConvertCatalogsRecursively(PendingCatalog *catalog);
+  bool RaiseFileDescriptorLimit() const;
 
  private:
   bool              print_tree_;
   bool              print_hash_;
+  unsigned int      file_descriptor_limit_;
 
   catalog::Catalog const*                        root_catalog_;
   UniquePtr<ConcurrentWorkers<MigrationWorker> > concurrent_migration_;
