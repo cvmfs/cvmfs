@@ -29,8 +29,9 @@ class CommandMigrate : public Command {
       success(false),
       old_catalog(old_catalog),
       new_catalog(NULL) {}
+    virtual ~PendingCatalog();
 
-    const std::string root_path() const {
+    inline const std::string root_path() const {
       return old_catalog->path().ToString();
     }
 

@@ -61,7 +61,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const unsigned int cpus = GetNumberOfCpuCores();
   MigrationWorker::worker_context context(spooler_definition.temporary_path);
   concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
-                                cpus,
+                                cpus * 2,
                                 cpus * 10,
                                 &context);
   if (! concurrent_migration_->Initialize()) {
@@ -125,6 +125,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
     LogCvmfs(kLogCatalog, kLogStderr, "Manifest export failed.\nAborting...");
     return 6;
   }
+
+  // get rid of the open root catalog
+  delete root_catalog;
 
   // all done...
   LogCvmfs(kLogCatalog, kLogStdout, "Catalog Migration succeeded");
@@ -234,6 +237,17 @@ void CommandMigrate::ConvertCatalogsRecursively(PendingCatalog *catalog) {
 
   // migrate this catalog referencing all it's (already migrated) children
   concurrent_migration_->Schedule(catalog);
+}
+
+
+CommandMigrate::PendingCatalog::~PendingCatalog() {
+  delete old_catalog;
+  old_catalog = NULL;
+
+  if (new_catalog != NULL) {
+    delete new_catalog;
+    new_catalog = NULL;
+  }
 }
 
 
@@ -484,14 +498,20 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
+    // collect information about the nested catalog
     PendingCatalog *nested_catalog = *i;
-    const std::string &root_path = nested_catalog->root_path();
+    const unsigned int linkcount   = nested_catalog->mountpoint_linkcount.Get();
+    const std::string &root_path   = nested_catalog->root_path();
+    const hash::Any catalog_hash   = nested_catalog->new_catalog_hash.Get();
+
+    // from now on the nested catalog is not needed anymore and can safely
+    // be deleted (open database connections will get closed)
+    delete nested_catalog;
 
     // update the nested catalog mountpoint directory entry with the correct
     // linkcount that was determined while processing the nested catalog
     const hash::Md5 mountpoint_hash = hash::Md5(root_path.data(),
                                                 root_path.size());
-    const unsigned int linkcount = nested_catalog->mountpoint_linkcount.Get();
     retval =
       update_mntpnt_linkcount.BindInt64(1, linkcount);
       update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
@@ -504,7 +524,6 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
     update_mntpnt_linkcount.Reset();
 
     // insert the updated nested catalog reference into the new catalog
-    const hash::Any catalog_hash = nested_catalog->new_catalog_hash.Get();
     retval =
       add_nested_catalog.BindText(1, root_path) &&
       add_nested_catalog.BindText(2, catalog_hash.ToString()) &&
