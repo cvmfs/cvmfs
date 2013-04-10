@@ -57,31 +57,6 @@ int CommandMigrate::Main(const ArgumentList &args) {
     return 2;
   }
 
-  // create an upstream spooler
-  const upload::SpoolerDefinition spooler_definition(spooler);
-  spooler_ = upload::Spooler::Construct(spooler_definition);
-  if (!spooler_) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create upstream Spooler.");
-    return 3;
-  }
-  spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
-
-  // create a concurrent catalog migration facility
-  const unsigned int cpus = GetNumberOfCpuCores();
-  MigrationWorker::worker_context context(spooler_definition.temporary_path);
-  concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
-                                cpus * 2,
-                                cpus * 10,
-                                &context);
-  if (! concurrent_migration_->Initialize()) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to initialize worker migration "
-                                      "system.");
-    return 4;
-  }
-  concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
-                                          this);
-  concurrent_migration_->EnableDrainoutMode();
-
   // load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
@@ -101,10 +76,33 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   assert (root_catalog_ != NULL);
 
+  // create an upstream spooler
+  const upload::SpoolerDefinition spooler_definition(spooler);
+  spooler_ = upload::Spooler::Construct(spooler_definition);
+  if (!spooler_) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create upstream Spooler.");
+    return 3;
+  }
+  spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
+
+  // create a concurrent catalog migration facility
+  const unsigned int cpus = GetNumberOfCpuCores();
+  MigrationWorker::worker_context context(spooler_definition.temporary_path);
+  concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
+                                cpus,
+                                cpus * 10,
+                                &context);
+  if (! concurrent_migration_->Initialize()) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to initialize worker migration "
+                                      "system.");
+    return 4;
+  }
+  concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
+                                          this);
+
   // migrate catalogs recursively (starting with the deepest nested catalogs)
   LogCvmfs(kLogCatalog, kLogStdout, "\nMigrating catalogs...");
   PendingCatalog *root_catalog = new PendingCatalog(root_catalog_);
-  spooler_->DisablePrecaching();
   ConvertCatalogsRecursively(root_catalog);
   concurrent_migration_->WaitForEmptyQueue();
   spooler_->WaitForUpload();
@@ -294,7 +292,8 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     MigrateNestedCatalogReferences   (data) &&
     GenerateCatalogStatistics        (data) &&
     FindMountpointLinkcount          (data) &&
-    DetachOldCatalogDatabase         (data);
+    DetachOldCatalogDatabase         (data) &&
+    CleanupNestedCatalogs            (data);
   data->success = success;
 
   // Note: MigrationCallback() will take care of the result...
@@ -530,10 +529,6 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
     const std::string &root_path   = nested_catalog->root_path();
     const hash::Any catalog_hash   = nested_catalog->new_catalog_hash.Get();
 
-    // from now on the nested catalog is not needed anymore and can safely
-    // be deleted (open database connections will get closed)
-    delete nested_catalog;
-
     // update the nested catalog mountpoint directory entry with the correct
     // linkcount that was determined while processing the nested catalog
     const hash::Md5 mountpoint_hash = hash::Md5(root_path.data(),
@@ -683,6 +678,21 @@ bool CommandMigrate::MigrationWorker::DetachOldCatalogDatabase(
   return true;
 }
 
+
+bool CommandMigrate::MigrationWorker::CleanupNestedCatalogs(
+                                                   PendingCatalog *data) const {
+  // All nested catalogs of PendingCatalog 'data' are fully processed and
+  // accounted. It is safe to get rid of their data structures here!
+  DeltaCounters aggregated_counters;
+  PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
+  PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
+  for (; i != iend; ++i) {
+    delete *i;
+  }
+
+  data->nested_catalogs.clear();
+  return true;
+}
 
 void CommandMigrate::MigrationWorker::SqlError(
                                           const std::string  &message,

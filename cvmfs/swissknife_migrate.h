@@ -76,6 +76,7 @@ class CommandMigrate : public Command {
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
     bool FindMountpointLinkcount          (PendingCatalog *data) const;
     bool DetachOldCatalogDatabase         (PendingCatalog *data) const;
+    bool CleanupNestedCatalogs            (PendingCatalog *data) const;
 
    private:
     void SqlError(const std::string &message,
