@@ -44,7 +44,8 @@ struct ChunkJob {
 };
 
 
-static void AbortSpoolerOnError(const upload::SpoolerResult &result) {
+static void SpoolerOnUpload(const upload::SpoolerResult &result) {
+  unlink(result.local_path.c_str());
   if (result.return_code != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
              result.return_code,
@@ -298,7 +299,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   const upload::SpoolerDefinition spooler_definition(*args.find('r')->second);
   spooler = upload::Spooler::Construct(spooler_definition);
   assert(spooler);
-  spooler->RegisterListener(&AbortSpoolerOnError);
+  spooler->RegisterListener(&SpoolerOnUpload);
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
   if (args.find('n') != args.end())

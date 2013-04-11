@@ -78,7 +78,8 @@ class InodeGenerationAnnotation : public InodeAnnotation {
   InodeGenerationAnnotation(const unsigned inode_width);
   ~InodeGenerationAnnotation() { };
   bool ValidInode(const uint64_t inode) {
-    return (inode & generation_annotation_) == generation_annotation_;
+    uint64_t raw_mask = (uint64_t(1) << num_protected_bits_) - 1;
+    return (inode & ~raw_mask) == generation_annotation_;
   }
   inode_t Annotate(const inode_t raw_inode) {
     return raw_inode | generation_annotation_;
