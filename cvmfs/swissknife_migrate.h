@@ -103,6 +103,10 @@ class CommandMigrate : public Command {
 
   int Main(const ArgumentList &args);
 
+  static void FixNestedCatalogTransitionPoint(
+                          catalog::DirectoryEntry &mountpoint,
+                    const catalog::DirectoryEntry &nested_root);
+
  protected:
   void CatalogCallback(const catalog::Catalog* catalog,
                        const hash::Any&        catalog_hash,
