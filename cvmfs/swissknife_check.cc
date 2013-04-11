@@ -39,51 +39,49 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
                                   const catalog::DirectoryEntry &b,
                                   const bool compare_names)
 {
-  bool retval = true;
-  if (compare_names) {
-    if (a.name() != b.name()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s",
-               a.name().c_str(), b.name().c_str());
-      retval = false;
-    }
-  }
-  if (a.linkcount() != b.linkcount()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %lu / %lu",
-             a.linkcount(), b.linkcount());
-    retval = false;
-  }
-  if (a.hardlink_group() != b.hardlink_group()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %lu / %lu",
-             a.hardlink_group(), b.hardlink_group());
-    retval = false;
-  }
-  if (a.size() != b.size()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %"PRIu64" / %"PRIu64,
-             a.size(), b.size());
-    retval = false;
-  }
-  if (a.mode() != b.mode()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %lu / %lu",
-             a.mode(), b.mode());
-    retval = false;
-  }
-  if (a.mtime() != b.mtime()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "timestamps differ: %lu / %lu",
-             a.mtime(), b.mtime());
-    retval = false;
-  }
-  if (a.checksum() != b.checksum()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "content hashes differ: %s / %s",
-             a.checksum().ToString().c_str(), b.checksum().ToString().c_str());
-    retval = false;
-  }
-  if (a.symlink() != b.symlink()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "symlinks differ: %s / %s",
-             a.symlink().c_str(), b.symlink().c_str());
-    retval = false;
+  typedef catalog::DirectoryEntry::Difference Difference;
+
+  catalog::DirectoryEntry::Differences diffs = a.CompareTo(b);
+  if (diffs == Difference::kIdentical) {
+    return true;
   }
 
-  return retval;
+  if (compare_names) {
+    if (diffs & Difference::kName) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s",
+               a.name().c_str(), b.name().c_str());
+    }
+  }
+  if (diffs & Difference::kLinkcount) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %lu / %lu",
+             a.linkcount(), b.linkcount());
+  }
+  if (diffs & Difference::kHardlinkGroup) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %lu / %lu",
+             a.hardlink_group(), b.hardlink_group());
+  }
+  if (diffs & Difference::kSize) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %"PRIu64" / %"PRIu64,
+             a.size(), b.size());
+  }
+  if (diffs & Difference::kMode) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %lu / %lu",
+             a.mode(), b.mode());
+  }
+  if (diffs & Difference::kMtime) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "timestamps differ: %lu / %lu",
+             a.mtime(), b.mtime());
+  }
+  if (diffs & Difference::kChecksum) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "content hashes differ: %s / %s",
+             a.checksum().ToString().c_str(), b.checksum().ToString().c_str());
+  }
+  if (diffs & Difference::kSymlink) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "symlinks differ: %s / %s",
+             a.symlink().c_str(), b.symlink().c_str());
+  }
+
+  return false;
 }
 
 
