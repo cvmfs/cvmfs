@@ -41,7 +41,7 @@ class CommandMigrate : public Command {
     catalog::WritableCatalog         *new_catalog;
 
     PendingCatalogList                nested_catalogs;
-    Future<unsigned int>              mountpoint_linkcount;
+    Future<catalog::DirectoryEntry>   root_entry;
     Future<catalog::DeltaCounters>    nested_statistics;
 
     Future<hash::Any>                 new_catalog_hash;
@@ -56,9 +56,12 @@ class CommandMigrate : public Command {
     typedef CommandMigrate::PendingCatalog* returned_data;
 
     struct worker_context {
-      worker_context(const std::string temporary_directory) :
-        temporary_directory(temporary_directory) {}
+      worker_context(const std::string  &temporary_directory,
+                     const bool          fix_nested_catalog_transitions) :
+        temporary_directory(temporary_directory),
+        fix_nested_catalog_transitions(fix_nested_catalog_transitions) {}
       const std::string temporary_directory;
+      const bool        fix_nested_catalog_transitions;
     };
 
    public:
@@ -73,8 +76,9 @@ class CommandMigrate : public Command {
     bool AttachOldCatalogDatabase         (PendingCatalog *data) const;
     bool MigrateFileMetadata              (PendingCatalog *data) const;
     bool MigrateNestedCatalogReferences   (PendingCatalog *data) const;
+    bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
-    bool FindMountpointLinkcount          (PendingCatalog *data) const;
+    bool FindRootEntryInformation         (PendingCatalog *data) const;
     bool DetachOldCatalogDatabase         (PendingCatalog *data) const;
     bool CleanupNestedCatalogs            (PendingCatalog *data) const;
 
@@ -84,6 +88,7 @@ class CommandMigrate : public Command {
 
    private:
     const std::string temporary_directory_;
+    const bool        fix_nested_catalog_transitions_;
   };
 
  public:
@@ -109,8 +114,6 @@ class CommandMigrate : public Command {
   bool RaiseFileDescriptorLimit() const;
 
  private:
-  bool              print_tree_;
-  bool              print_hash_;
   unsigned int      file_descriptor_limit_;
 
   catalog::Catalog const*                        root_catalog_;
