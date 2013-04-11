@@ -92,6 +92,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // create a concurrent catalog migration facility
   const unsigned int cpus = GetNumberOfCpuCores();
   MigrationWorker::worker_context context(spooler_definition.temporary_path,
+                                          catalog_statistics_list_,
                                           fix_transition_points,
                                           collect_catalog_statistics);
   concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
@@ -142,8 +143,14 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // get rid of the open root catalog
   delete root_catalog;
 
+  // analyze collected statistics
+  if (collect_catalog_statistics) {
+    LogCvmfs(kLogCatalog, kLogStdout, "\nCollected statistics results:");
+    AnalyzeCatalogStatistics();
+  }
+
   // all done...
-  LogCvmfs(kLogCatalog, kLogStdout, "Catalog Migration succeeded");
+  LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration succeeded");
   return 0;
 }
 
@@ -270,6 +277,29 @@ bool CommandMigrate::RaiseFileDescriptorLimit() const {
 }
 
 
+void CommandMigrate::AnalyzeCatalogStatistics() const {
+  unsigned int aggregated_entry_count = 0;
+  unsigned int aggregated_max_row_id  = 0;
+
+  CatalogStatisticsList::const_iterator i    = catalog_statistics_list_.begin();
+  CatalogStatisticsList::const_iterator iend = catalog_statistics_list_.end();
+  for (; i != iend; ++i) {
+    aggregated_entry_count += i->entry_count;
+    aggregated_max_row_id  += i->max_row_id;
+  }
+
+  const unsigned int unused_inodes =
+                                 aggregated_max_row_id - aggregated_entry_count;
+  const float        ratio = ((float)unused_inodes           /
+                              (float)aggregated_max_row_id) * 100.0f;
+  LogCvmfs(kLogCatalog, kLogStdout, "Actual Entries:                %d\n"
+                                    "Allocated Inodes:              %d\n"
+                                    "  Unused Inodes:               %d\n"
+                                    "  Percentage of wasted Inodes: %.1f%%",
+           aggregated_entry_count, aggregated_max_row_id, unused_inodes, ratio);
+}
+
+
 CommandMigrate::PendingCatalog::~PendingCatalog() {
   delete old_catalog;
   old_catalog = NULL;
@@ -283,6 +313,7 @@ CommandMigrate::PendingCatalog::~PendingCatalog() {
 
 CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) :
   temporary_directory_(context->temporary_directory),
+  catalog_statistics_list_(context->catalog_statistics_list),
   fix_nested_catalog_transitions_(context->fix_nested_catalog_transitions),
   collect_catalog_statistics_(context->collect_catalog_statistics)
 {}
@@ -787,6 +818,27 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
   if (! collect_catalog_statistics_) {
     return true;
   }
+
+  const Database &writable = data->new_catalog->database();
+  bool retval;
+
+  // find out the discrepancy between MAX(rowid) and COUNT(*)
+  Sql wasted_inodes(writable,
+    "SELECT COUNT(*), MAX(rowid) FROM old.catalog;");
+  retval = wasted_inodes.FetchRow();
+  if (! retval) {
+    SqlError("Failed to count entries in catalog", wasted_inodes);
+    return false;
+  }
+  const unsigned int entry_count = wasted_inodes.RetrieveInt64(0);
+  const unsigned int max_row_id  = wasted_inodes.RetrieveInt64(1);
+
+  // save collected information into the central statistics aggregator
+  CatalogStatistics stats;
+  stats.root_path   = data->root_path();
+  stats.max_row_id  = max_row_id;
+  stats.entry_count = entry_count;
+  catalog_statistics_list_.Insert(stats);
 
   return true;
 }
