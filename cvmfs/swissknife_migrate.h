@@ -57,11 +57,14 @@ class CommandMigrate : public Command {
 
     struct worker_context {
       worker_context(const std::string  &temporary_directory,
-                     const bool          fix_nested_catalog_transitions) :
+                     const bool          fix_nested_catalog_transitions,
+                     const bool          collect_catalog_statistics) :
         temporary_directory(temporary_directory),
-        fix_nested_catalog_transitions(fix_nested_catalog_transitions) {}
+        fix_nested_catalog_transitions(fix_nested_catalog_transitions),
+        collect_catalog_statistics(collect_catalog_statistics) {}
       const std::string temporary_directory;
       const bool        fix_nested_catalog_transitions;
+      const bool        collect_catalog_statistics;
     };
 
    public:
@@ -79,6 +82,7 @@ class CommandMigrate : public Command {
     bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
     bool FindRootEntryInformation         (PendingCatalog *data) const;
+    bool CollectAndAggregateStatistics    (PendingCatalog *data) const;
     bool DetachOldCatalogDatabase         (PendingCatalog *data) const;
     bool CleanupNestedCatalogs            (PendingCatalog *data) const;
 
@@ -89,6 +93,7 @@ class CommandMigrate : public Command {
    private:
     const std::string temporary_directory_;
     const bool        fix_nested_catalog_transitions_;
+    const bool        collect_catalog_statistics_;
   };
 
  public:

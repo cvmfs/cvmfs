@@ -35,22 +35,25 @@ ParameterList CommandMigrate::GetParams() {
                              true, false));
   result.push_back(Parameter('t', "fix nested catalog transition points",
                              true, true));
+  result.push_back(Parameter('s', "enable collection of catalog statistics",
+                             true, true));
   return result;
 }
 
 
 int CommandMigrate::Main(const ArgumentList &args) {
   // parameter parsing
-  const std::string &repo_url      = *args.find('r')->second;
-  const std::string &spooler       = *args.find('u')->second;
-  const std::string &manifest_path = *args.find('o')->second;
-  const std::string &repo_name     = (args.count('n') > 0)      ?
-                                        *args.find('n')->second :
-                                        "";
-  const std::string &repo_keys     = (args.count('k') > 0)      ?
-                                        *args.find('k')->second :
-                                        "";
-  const bool fix_transition_points = (args.count('t') > 0);
+  const std::string &repo_url           = *args.find('r')->second;
+  const std::string &spooler            = *args.find('u')->second;
+  const std::string &manifest_path      = *args.find('o')->second;
+  const std::string &repo_name          = (args.count('n') > 0)      ?
+                                             *args.find('n')->second :
+                                             "";
+  const std::string &repo_keys          = (args.count('k') > 0)      ?
+                                             *args.find('k')->second :
+                                             "";
+  const bool fix_transition_points      = (args.count('t') > 0);
+  const bool collect_catalog_statistics = (args.count('s') > 0);
 
   // we might need a lot of file descriptors
   if (! RaiseFileDescriptorLimit()) {
@@ -89,7 +92,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // create a concurrent catalog migration facility
   const unsigned int cpus = GetNumberOfCpuCores();
   MigrationWorker::worker_context context(spooler_definition.temporary_path,
-                                          fix_transition_points);
+                                          fix_transition_points,
+                                          collect_catalog_statistics);
   concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
                                 cpus,
                                 cpus * 10,
@@ -279,7 +283,8 @@ CommandMigrate::PendingCatalog::~PendingCatalog() {
 
 CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) :
   temporary_directory_(context->temporary_directory),
-  fix_nested_catalog_transitions_(context->fix_nested_catalog_transitions)
+  fix_nested_catalog_transitions_(context->fix_nested_catalog_transitions),
+  collect_catalog_statistics_(context->collect_catalog_statistics)
 {}
 
 
@@ -296,6 +301,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     FixNestedCatalogTransitionPoints (data) &&
     GenerateCatalogStatistics        (data) &&
     FindRootEntryInformation         (data) &&
+    CollectAndAggregateStatistics    (data) &&
     DetachOldCatalogDatabase         (data) &&
     CleanupNestedCatalogs            (data);
   data->success = success;
@@ -772,6 +778,16 @@ bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
   }
 
   data->root_entry.Set(entry);
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
+                                                   PendingCatalog *data) const {
+  if (! collect_catalog_statistics_) {
+    return true;
+  }
+
   return true;
 }
 
