@@ -48,7 +48,8 @@ class CommandCheck : public Command {
                        const catalog::Counters &b);
   bool CompareEntries(const catalog::DirectoryEntry &a,
                       const catalog::DirectoryEntry &b,
-                      const bool compare_names);
+                      const bool compare_names,
+                      const bool is_transition_point = false);
 };
 
 }
