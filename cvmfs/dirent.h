@@ -48,6 +48,22 @@ class DirectoryEntryBase {
   friend class SqlDirentTouch;
 
  public:
+  struct Difference {
+    static const unsigned int kIdentical                    = 0x000; // 000000000000
+    static const unsigned int kName                         = 0x001; // 000000000001
+    static const unsigned int kLinkcount                    = 0x002; // 000000000010
+    static const unsigned int kSize                         = 0x004; // 000000000100
+    static const unsigned int kMode                         = 0x008; // 000000001000
+    static const unsigned int kMtime                        = 0x010; // 000000010000
+    static const unsigned int kSymlink                      = 0x020; // 000000100000
+    static const unsigned int kChecksum                     = 0x040; // 000001000000
+    static const unsigned int kHardlinkGroup                = 0x080; // 000010000000
+    static const unsigned int kNestedCatalogTransitionFlags = 0x100; // 000100000000
+    static const unsigned int kChunkedFileFlag              = 0x200; // 001000000000
+  };
+  typedef unsigned int Differences;
+
+ public:
   const static inode_t kInvalidInode = 0;
 
   /**
@@ -131,6 +147,14 @@ class DirectoryEntryBase {
     return s;
   }
 
+  Differences CompareTo(const DirectoryEntryBase &other) const;
+  inline bool operator==(const DirectoryEntryBase &other) const {
+    return CompareTo(other) == Difference::kIdentical;
+  }
+  inline bool operator!=(const DirectoryEntryBase &other) const {
+    return !(*this == other);
+  }
+
  protected:
 
   inode_t inode_;        // inodes are generated on the fly by the cvmfs client.
@@ -197,6 +221,14 @@ class DirectoryEntry : public DirectoryEntryBase {
 
   inline SpecialDirents GetSpecial() const {
     return (catalog_ == (Catalog *)(-1)) ? kDirentNegative : kDirentNormal;
+  }
+
+  Differences CompareTo(const DirectoryEntry &other) const;
+  inline bool operator==(const DirectoryEntry &other) const {
+    return CompareTo(other) == Difference::kIdentical;
+  }
+  inline bool operator!=(const DirectoryEntry &other) const {
+    return !(*this == other);
   }
 
   inline bool IsNegative() const { return GetSpecial() == kDirentNegative; }
