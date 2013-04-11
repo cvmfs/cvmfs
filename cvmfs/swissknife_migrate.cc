@@ -576,6 +576,8 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
     return true;
   }
 
+  typedef DirectoryEntry::Difference Difference;
+
   const Database &writable = data->new_catalog->database();
   bool retval;
 
@@ -613,18 +615,18 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
     // we MUST deal with two directory entries that are a pair of nested cata-
     // log mountpoint and root entry! Thus we expect their transition flags to
     // differ and their name to be the same.
-    assert (diffs & DirectoryEntry::Difference::kNestedCatalogTransitionFlags);
-    assert ((diffs & DirectoryEntry::Difference::kName) == 0);
+    assert (diffs & Difference::kNestedCatalogTransitionFlags);
+    assert ((diffs & Difference::kName) == 0);
 
     // check if there are other differences except the nested catalog transition
     // flags and fix them...
-    if (diffs ^ DirectoryEntry::Difference::kNestedCatalogTransitionFlags) {
+    if ((diffs ^ Difference::kNestedCatalogTransitionFlags) != 0) {
       // if we found differences, we still assume a couple of directory entry
       // fields to be the same, otherwise some severe stuff would be wrong...
-      if ((diffs & DirectoryEntry::Difference::kChecksum)        ||
-          (diffs & DirectoryEntry::Difference::kLinkcount)       ||
-          (diffs & DirectoryEntry::Difference::kSymlink)         ||
-          (diffs & DirectoryEntry::Difference::kChunkedFileFlag)    ) {
+      if ((diffs & Difference::kChecksum)        ||
+          (diffs & Difference::kLinkcount)       ||
+          (diffs & Difference::kSymlink)         ||
+          (diffs & Difference::kChunkedFileFlag)    ) {
         LogCvmfs(kLogCatalog, kLogStderr, "Found an irreparable mismatch in a "
                                           "nested catalog transtion point at "
                                           "'%s'  Aborting...",
@@ -633,17 +635,19 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
 
       // copy the properties from the nested catalog root entry into the mount-
       // point entry to bring them in sync again
-     CommandMigrate::FixNestedCatalogTransitionPoint(mountpoint_entry,
-                                                     nested_root_entry);
+      CommandMigrate::FixNestedCatalogTransitionPoint(mountpoint_entry,
+                                                      nested_root_entry);
 
       // save the nested catalog mountpoint entry into the catalog
       retval = update_directory_entry.BindPathHash(mountpoint_path_hash) &&
-               update_directory_entry.BindDirent(mountpoint_entry);
+               update_directory_entry.BindDirent(mountpoint_entry)       &&
+               update_directory_entry.Execute();
       if (! retval) {
         SqlError("Failed to save resynchronized nested catalog mountpoint into "
                  "catalog database", update_directory_entry);
         return false;
       }
+      update_directory_entry.Reset();
 
       // fixing of this mountpoint went well... inform the user that this minor
       // issue occured
