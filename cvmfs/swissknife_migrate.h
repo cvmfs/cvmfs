@@ -47,6 +47,24 @@ class CommandMigrate : public Command {
     Future<hash::Any>                 new_catalog_hash;
   };
 
+  struct CatalogStatistics {
+    unsigned int max_row_id;
+    unsigned int entry_count;
+
+    std::string root_path;
+  };
+
+  class CatalogStatisticsList : protected std::vector<CatalogStatistics>,
+                                public    Lockable {
+    friend class CommandMigrate;
+
+   public:
+    inline void Insert(const CatalogStatistics &statistics) {
+      LockGuard<CatalogStatisticsList> lock(this);
+      this->push_back(statistics);
+    }
+  };
+
   class PendingCatalogMap : public std::map<std::string, const PendingCatalog*>,
                             public Lockable {};
 
@@ -56,15 +74,18 @@ class CommandMigrate : public Command {
     typedef CommandMigrate::PendingCatalog* returned_data;
 
     struct worker_context {
-      worker_context(const std::string  &temporary_directory,
-                     const bool          fix_nested_catalog_transitions,
-                     const bool          collect_catalog_statistics) :
+      worker_context(const std::string      &temporary_directory,
+                     CatalogStatisticsList  &catalog_statistics_list,
+                     const bool              fix_nested_catalog_transitions,
+                     const bool              collect_catalog_statistics) :
         temporary_directory(temporary_directory),
+        catalog_statistics_list(catalog_statistics_list),
         fix_nested_catalog_transitions(fix_nested_catalog_transitions),
         collect_catalog_statistics(collect_catalog_statistics) {}
-      const std::string temporary_directory;
-      const bool        fix_nested_catalog_transitions;
-      const bool        collect_catalog_statistics;
+      const std::string       temporary_directory;
+      CatalogStatisticsList  &catalog_statistics_list;
+      const bool              fix_nested_catalog_transitions;
+      const bool              collect_catalog_statistics;
     };
 
    public:
@@ -91,9 +112,10 @@ class CommandMigrate : public Command {
                   const catalog::Sql &statement) const;
 
    private:
-    const std::string temporary_directory_;
-    const bool        fix_nested_catalog_transitions_;
-    const bool        collect_catalog_statistics_;
+    const std::string       temporary_directory_;
+    CatalogStatisticsList  &catalog_statistics_list_;
+    const bool              fix_nested_catalog_transitions_;
+    const bool              collect_catalog_statistics_;
   };
 
  public:
@@ -121,9 +143,11 @@ class CommandMigrate : public Command {
 
   void ConvertCatalogsRecursively(PendingCatalog *catalog);
   bool RaiseFileDescriptorLimit() const;
+  void AnalyzeCatalogStatistics() const;
 
  private:
-  unsigned int      file_descriptor_limit_;
+  unsigned int          file_descriptor_limit_;
+  CatalogStatisticsList catalog_statistics_list_;
 
   catalog::Catalog const*                        root_catalog_;
   UniquePtr<ConcurrentWorkers<MigrationWorker> > concurrent_migration_;
