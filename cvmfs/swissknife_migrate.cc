@@ -29,11 +29,13 @@ ParameterList CommandMigrate::GetParams() {
                              false, false));
   result.push_back(Parameter('o', "manifest output file",
                              false, false));
+  result.push_back(Parameter('t', "temporary directory for catalog decompress",
+                             false, false));
   result.push_back(Parameter('n', "fully qualified repository name",
                              true, false));
   result.push_back(Parameter('k', "repository master key(s)",
                              true, false));
-  result.push_back(Parameter('t', "fix nested catalog transition points",
+  result.push_back(Parameter('f', "fix nested catalog transition points",
                              true, true));
   result.push_back(Parameter('s', "enable collection of catalog statistics",
                              true, true));
@@ -46,13 +48,14 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const std::string &repo_url           = *args.find('r')->second;
   const std::string &spooler            = *args.find('u')->second;
   const std::string &manifest_path      = *args.find('o')->second;
+  const std::string &decompress_tmp_dir = *args.find('t')->second;
   const std::string &repo_name          = (args.count('n') > 0)      ?
                                              *args.find('n')->second :
                                              "";
   const std::string &repo_keys          = (args.count('k') > 0)      ?
                                              *args.find('k')->second :
                                              "";
-  const bool fix_transition_points      = (args.count('t') > 0);
+  const bool fix_transition_points      = (args.count('f') > 0);
   const bool collect_catalog_statistics = (args.count('s') > 0);
 
   // we might need a lot of file descriptors
@@ -70,7 +73,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
     repo_url,
     repo_name,
     repo_keys,
-    generate_full_catalog_tree);
+    generate_full_catalog_tree,
+    decompress_tmp_dir);
   const bool loading_successful = traversal.Traverse();
 
   if (!loading_successful) {
@@ -210,9 +214,6 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
 void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
   const std::string &path = result.local_path;
 
-  // remove the just uploaded file
-  unlink(path.c_str());
-
   // check if the upload was successful
   if (result.return_code != 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to upload catalog %s\nAborting...",
@@ -221,6 +222,9 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
     return;
   }
   assert (result.file_chunks.size() == 0);
+
+  // remove the just uploaded file
+  unlink(path.c_str());
 
   // find the catalog path in the pending catalogs and remove it from the list
   PendingCatalog *catalog;
