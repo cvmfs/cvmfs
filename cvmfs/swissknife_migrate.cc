@@ -316,6 +316,11 @@ bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
   bool retval;
   const std::string catalog_db = CreateTempPath(temporary_directory_ + "/catalog",
                                                 0666);
+  if (catalog_db.empty()) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create temporary file for the "
+                                      "new catalog database.");
+    return false;
+  }
   retval = Database::Create(catalog_db, root_path);
   if (! retval) {
     LogCvmfs(kLogCatalog, kLogStderr, "Failed to create database for new "
@@ -575,6 +580,7 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
   bool retval;
 
   SqlLookupPathHash lookup_mountpoint(writable);
+  SqlDirentUpdate   update_directory_entry(writable);
 
   // unbox the nested catalogs (possibly waiting for migration of them first)
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
@@ -591,17 +597,56 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
     retval = lookup_mountpoint.BindPathHash(mountpoint_path_hash) &&
              lookup_mountpoint.FetchRow();
     if (! retval) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Failed to fetch nested catalog "
-                                        "mountpoint to check for compatible "
-                                        "transition points");
+      SqlError("Failed to fetch nested catalog mountpoint to check for "
+               "compatible transition points", lookup_mountpoint);
       return false;
     }
 
-    const DirectoryEntry mountpoint_entry = lookup_mountpoint.GetDirent(
-                                                             data->new_catalog);
+    DirectoryEntry mountpoint_entry =
+                                 lookup_mountpoint.GetDirent(data->new_catalog);
+    lookup_mountpoint.Reset();
 
     // compare nested catalog mountpoint and nested catalog root entries
-    if (mountpoint_entry != nested_root_entry) {
+    DirectoryEntry::Differences diffs =
+                                  mountpoint_entry.CompareTo(nested_root_entry);
+
+    // we MUST deal with two directory entries that are a pair of nested cata-
+    // log mountpoint and root entry! Thus we expect their transition flags to
+    // differ and their name to be the same.
+    assert (diffs & DirectoryEntry::Difference::kNestedCatalogTransitionFlags);
+    assert ((diffs & DirectoryEntry::Difference::kName) == 0);
+
+    // check if there are other differences except the nested catalog transition
+    // flags and fix them...
+    if (diffs ^ DirectoryEntry::Difference::kNestedCatalogTransitionFlags) {
+      // if we found differences, we still assume a couple of directory entry
+      // fields to be the same, otherwise some severe stuff would be wrong...
+      if ((diffs & DirectoryEntry::Difference::kChecksum)        ||
+          (diffs & DirectoryEntry::Difference::kLinkcount)       ||
+          (diffs & DirectoryEntry::Difference::kSymlink)         ||
+          (diffs & DirectoryEntry::Difference::kChunkedFileFlag)    ) {
+        LogCvmfs(kLogCatalog, kLogStderr, "Found an irreparable mismatch in a "
+                                          "nested catalog transtion point at "
+                                          "'%s'  Aborting...",
+                 nested_root_path.c_str());
+      }
+
+      // copy the properties from the nested catalog root entry into the mount-
+      // point entry to bring them in sync again
+     CommandMigrate::FixNestedCatalogTransitionPoint(mountpoint_entry,
+                                                     nested_root_entry);
+
+      // save the nested catalog mountpoint entry into the catalog
+      retval = update_directory_entry.BindPathHash(mountpoint_path_hash) &&
+               update_directory_entry.BindDirent(mountpoint_entry);
+      if (! retval) {
+        SqlError("Failed to save resynchronized nested catalog mountpoint into "
+                 "catalog database", update_directory_entry);
+        return false;
+      }
+
+      // fixing of this mountpoint went well... inform the user that this minor
+      // issue occured
       LogCvmfs(kLogCatalog, kLogStdout, "NOTE: fixed incompatible nested "
                                         "catalog transition point at: '%s' ",
                nested_root_path.c_str());
@@ -609,6 +654,21 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
   }
 
   return true;
+}
+
+
+void CommandMigrate::FixNestedCatalogTransitionPoint(
+                        catalog::DirectoryEntry &mountpoint,
+                  const catalog::DirectoryEntry &nested_root) {
+  // replace some file system parameters in the mountpoint to resync it with
+  // the nested root of the corresponding nested catalog
+  //
+  // Note: this method relies on CommandMigrate being a friend of DirectoryEntry
+  mountpoint.mode_  = nested_root.mode_;
+  mountpoint.uid_   = nested_root.uid_;
+  mountpoint.gid_   = nested_root.gid_;
+  mountpoint.size_  = nested_root.size_;
+  mountpoint.mtime_ = nested_root.mtime_;
 }
 
 
