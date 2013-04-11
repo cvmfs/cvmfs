@@ -37,7 +37,8 @@ std::string *remote_repository;
 
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
                                   const catalog::DirectoryEntry &b,
-                                  const bool compare_names)
+                                  const bool compare_names,
+                                  const bool is_transition_point)
 {
   typedef catalog::DirectoryEntry::Difference Difference;
 
@@ -46,42 +47,58 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     return true;
   }
 
+  // in case of a nested catalog transition point the controlling flags are
+  // supposed to differ. If this is the only difference we are done...
+  if (is_transition_point &&
+      (diffs ^ Difference::kNestedCatalogTransitionFlags) == 0) {
+    return true;
+  }
+
+  bool retval = true;
   if (compare_names) {
     if (diffs & Difference::kName) {
       LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s",
                a.name().c_str(), b.name().c_str());
+      retval = false;
     }
   }
   if (diffs & Difference::kLinkcount) {
     LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %lu / %lu",
              a.linkcount(), b.linkcount());
+    retval = false;
   }
   if (diffs & Difference::kHardlinkGroup) {
     LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %lu / %lu",
              a.hardlink_group(), b.hardlink_group());
+    retval = false;
   }
   if (diffs & Difference::kSize) {
     LogCvmfs(kLogCvmfs, kLogStderr, "sizes differ: %"PRIu64" / %"PRIu64,
              a.size(), b.size());
+    retval = false;
   }
   if (diffs & Difference::kMode) {
     LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %lu / %lu",
              a.mode(), b.mode());
+    retval = false;
   }
   if (diffs & Difference::kMtime) {
     LogCvmfs(kLogCvmfs, kLogStderr, "timestamps differ: %lu / %lu",
              a.mtime(), b.mtime());
+    retval = false;
   }
   if (diffs & Difference::kChecksum) {
     LogCvmfs(kLogCvmfs, kLogStderr, "content hashes differ: %s / %s",
              a.checksum().ToString().c_str(), b.checksum().ToString().c_str());
+    retval = false;
   }
   if (diffs & Difference::kSymlink) {
     LogCvmfs(kLogCvmfs, kLogStderr, "symlinks differ: %s / %s",
              a.symlink().c_str(), b.symlink().c_str());
+    retval = false;
   }
 
-  return false;
+  return retval;
 }
 
 
@@ -453,7 +470,7 @@ bool CommandCheck::InspectTree(const string &path,
     retval = false;
   }
   if (transition_point != NULL) {
-    if (!CompareEntries(*transition_point, root_entry, true)) {
+    if (!CompareEntries(*transition_point, root_entry, true, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "transition point and root entry differ (%s)", path.c_str());
       retval = false;
