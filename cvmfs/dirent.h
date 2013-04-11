@@ -219,7 +219,7 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline explicit DirectoryEntry(SpecialDirents special_type) :
     catalog_((Catalog *)(-1)) { };
 
-  inline SpecialDirents GetSpecial() {
+  inline SpecialDirents GetSpecial() const {
     return (catalog_ == (Catalog *)(-1)) ? kDirentNegative : kDirentNormal;
   }
 
