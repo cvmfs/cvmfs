@@ -21,6 +21,28 @@ namespace catalog {
 namespace swissknife {
 
 class CommandMigrate : public Command {
+ protected:
+  struct CatalogStatistics {
+    unsigned int max_row_id;
+    unsigned int entry_count;
+
+    unsigned int hardlink_group_count;
+    unsigned int aggregated_linkcounts;
+
+    std::string root_path;
+  };
+
+  class CatalogStatisticsList : protected std::vector<CatalogStatistics>,
+                                public    Lockable {
+    friend class CommandMigrate;
+
+   public:
+    inline void Insert(const CatalogStatistics &statistics) {
+      LockGuard<CatalogStatisticsList> lock(this);
+      this->push_back(statistics);
+    }
+  };
+
  public:
   struct PendingCatalog;
   typedef std::vector<PendingCatalog*> PendingCatalogList;
@@ -44,26 +66,9 @@ class CommandMigrate : public Command {
     Future<catalog::DirectoryEntry>   root_entry;
     Future<catalog::DeltaCounters>    nested_statistics;
 
+    CatalogStatistics                 statistics;
+
     Future<hash::Any>                 new_catalog_hash;
-  };
-
- protected:
-  struct CatalogStatistics {
-    unsigned int max_row_id;
-    unsigned int entry_count;
-
-    std::string root_path;
-  };
-
-  class CatalogStatisticsList : protected std::vector<CatalogStatistics>,
-                                public    Lockable {
-    friend class CommandMigrate;
-
-   public:
-    inline void Insert(const CatalogStatistics &statistics) {
-      LockGuard<CatalogStatisticsList> lock(this);
-      this->push_back(statistics);
-    }
   };
 
   class PendingCatalogMap : public std::map<std::string, const PendingCatalog*>,

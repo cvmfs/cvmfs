@@ -313,16 +313,21 @@ bool CommandMigrate::RaiseFileDescriptorLimit() const {
 
 
 void CommandMigrate::AnalyzeCatalogStatistics() const {
-  unsigned int aggregated_entry_count = 0;
-  unsigned int aggregated_max_row_id  = 0;
+  unsigned int aggregated_entry_count    = 0;
+  unsigned int aggregated_max_row_id     = 0;
+  unsigned int aggregated_hardlink_count = 0;
+  unsigned int aggregated_linkcounts     = 0;
 
   CatalogStatisticsList::const_iterator i    = catalog_statistics_list_.begin();
   CatalogStatisticsList::const_iterator iend = catalog_statistics_list_.end();
   for (; i != iend; ++i) {
-    aggregated_entry_count += i->entry_count;
-    aggregated_max_row_id  += i->max_row_id;
+    aggregated_entry_count    += i->entry_count;
+    aggregated_max_row_id     += i->max_row_id;
+    aggregated_hardlink_count += i->hardlink_group_count;
+    aggregated_linkcounts     += i->aggregated_linkcounts;
   }
 
+  // Inode quantization
   const unsigned int unused_inodes =
                                  aggregated_max_row_id - aggregated_entry_count;
   const float        ratio = ((float)unused_inodes           /
@@ -330,8 +335,17 @@ void CommandMigrate::AnalyzeCatalogStatistics() const {
   LogCvmfs(kLogCatalog, kLogStdout, "Actual Entries:                %d\n"
                                     "Allocated Inodes:              %d\n"
                                     "  Unused Inodes:               %d\n"
-                                    "  Percentage of wasted Inodes: %.1f%%",
+                                    "  Percentage of wasted Inodes: %.1f%%\n",
            aggregated_entry_count, aggregated_max_row_id, unused_inodes, ratio);
+
+  // Hardlink statistics
+  const float average_linkcount = (aggregated_hardlink_count > 0)
+                                  ? aggregated_linkcounts /
+                                    aggregated_hardlink_count
+                                  : 0.0f;
+  LogCvmfs(kLogCatalog, kLogStdout, "Generated Hardlink Groups:     %d\n"
+                                    "Average Linkcount per Group:   %.1f",
+           aggregated_hardlink_count, average_linkcount);
 }
 
 
@@ -494,6 +508,21 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     retval = AnalyzeFileLinkcounts(data);
     if (! retval) {
       return false;
+    }
+
+    // do some statistics if asked for...
+    if (collect_catalog_statistics_) {
+      Sql count_hardlinks(writable,
+        "SELECT count(*), sum(linkcount) FROM hardlinks;");
+      retval = count_hardlinks.FetchRow();
+      if (! retval) {
+        Error("Failed to count the generated file hardlinks for statistics",
+              count_hardlinks, data);
+        return false;
+      }
+
+      data->statistics.hardlink_group_count  += count_hardlinks.RetrieveInt64(0);
+      data->statistics.aggregated_linkcounts += count_hardlinks.RetrieveInt64(1);
     }
   }
 
@@ -966,11 +995,10 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
   const unsigned int max_row_id  = wasted_inodes.RetrieveInt64(1);
 
   // save collected information into the central statistics aggregator
-  CatalogStatistics stats;
-  stats.root_path   = data->root_path();
-  stats.max_row_id  = max_row_id;
-  stats.entry_count = entry_count;
-  catalog_statistics_list_.Insert(stats);
+  data->statistics.root_path         = data->root_path();
+  data->statistics.max_row_id  = max_row_id;
+  data->statistics.entry_count = entry_count;
+  catalog_statistics_list_.Insert(data->statistics);
 
   return true;
 }
