@@ -21,7 +21,7 @@ namespace catalog {
 namespace swissknife {
 
 class CommandMigrate : public Command {
- protected:
+ public:
   struct PendingCatalog;
   typedef std::vector<PendingCatalog*> PendingCatalogList;
   struct PendingCatalog {
@@ -47,6 +47,7 @@ class CommandMigrate : public Command {
     Future<hash::Any>                 new_catalog_hash;
   };
 
+ protected:
   struct CatalogStatistics {
     unsigned int max_row_id;
     unsigned int entry_count;
@@ -106,10 +107,6 @@ class CommandMigrate : public Command {
     bool CollectAndAggregateStatistics    (PendingCatalog *data) const;
     bool DetachOldCatalogDatabase         (PendingCatalog *data) const;
     bool CleanupNestedCatalogs            (PendingCatalog *data) const;
-
-   private:
-    void SqlError(const std::string &message,
-                  const catalog::Sql &statement) const;
 
    private:
     const std::string       temporary_directory_;

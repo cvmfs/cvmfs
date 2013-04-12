@@ -11,6 +11,7 @@
 #include "logging.h"
 
 #include <sys/resource.h>
+#include <sstream>
 
 using namespace swissknife;
 using namespace catalog;
@@ -43,6 +44,31 @@ ParameterList CommandMigrate::GetParams() {
 }
 
 
+void Error(const std::string &message) {
+  LogCvmfs(kLogCatalog, kLogStderr, message.c_str());
+}
+
+
+void Error(const std::string                     &message,
+           const CommandMigrate::PendingCatalog  *catalog) {
+  std::stringstream ss;
+  ss << message << std::endl
+     << "Catalog: " << catalog->root_path();
+  Error(ss.str());
+}
+
+
+void Error(const std::string                     &message,
+           const catalog::Sql                    &statement,
+           const CommandMigrate::PendingCatalog  *catalog) {
+  std::stringstream ss;
+  ss << message << std::endl
+     << "SQLite:  " << statement.GetLastError() << " - "
+                    << statement.GetLastErrorMsg();
+  Error(ss.str(), catalog);
+}
+
+
 int CommandMigrate::Main(const ArgumentList &args) {
   // parameter parsing
   const std::string &repo_url           = *args.find('r')->second;
@@ -60,7 +86,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   // we might need a lot of file descriptors
   if (! RaiseFileDescriptorLimit()) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to raise file descriptor limits");
+    Error("Failed to raise file descriptor limits");
     return 2;
   }
 
@@ -78,7 +104,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const bool loading_successful = traversal.Traverse();
 
   if (!loading_successful) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to load catalog tree");
+    Error("Failed to load catalog tree");
     return 5;
   }
 
@@ -88,7 +114,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const upload::SpoolerDefinition spooler_definition(spooler);
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create upstream Spooler.");
+    Error("Failed to create upstream Spooler.");
     return 3;
   }
   spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
@@ -104,8 +130,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                 cpus * 10,
                                 &context);
   if (! concurrent_migration_->Initialize()) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to initialize worker migration "
-                                      "system.");
+    Error("Failed to initialize worker migration system.");
     return 4;
   }
   concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
@@ -140,7 +165,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   manifest.set_ttl(root_catalog->new_catalog->GetTTL());
   manifest.set_revision(root_catalog->new_catalog->GetRevision());
   if (! manifest.Export(manifest_path)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Manifest export failed.\nAborting...");
+    Error("Manifest export failed.\nAborting...");
     return 7;
   }
 
@@ -192,7 +217,7 @@ void CommandMigrate::CatalogCallback(const Catalog*    catalog,
 void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
   // check if the migration of the catalog was successful
   if (!data->success) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Catalog migration failed! Aborting...");
+    Error("Catalog migration failed! Aborting...");
     exit(1);
     return;
   }
@@ -216,8 +241,10 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 
   // check if the upload was successful
   if (result.return_code != 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to upload catalog %s\nAborting...",
-             path.c_str());
+    std::stringstream ss;
+    ss << "Failed to upload catalog " << path << std::endl
+       << "Aborting...";
+    Error(ss.str());
     exit(2);
     return;
   }
@@ -358,14 +385,12 @@ bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
   const std::string catalog_db = CreateTempPath(temporary_directory_ + "/catalog",
                                                 0666);
   if (catalog_db.empty()) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create temporary file for the "
-                                      "new catalog database.");
+    Error("Failed to create temporary file for the new catalog database.");
     return false;
   }
   retval = Database::Create(catalog_db, root_path);
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to create database for new "
-                                      "catalog");
+    Error("Failed to create database for new catalog");
     unlink(catalog_db.c_str());
     return false;
   }
@@ -376,7 +401,7 @@ bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
                                                           NULL);
   retval = writable_catalog->OpenDatabase(catalog_db);
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to open database for new catalog");
+    Error("Failed to open database for new catalog");
     delete writable_catalog;
     unlink(catalog_db.c_str());
     return false;
@@ -398,8 +423,7 @@ bool CommandMigrate::MigrationWorker::CheckDatabaseSchemaCompatibility(
        new_catalog.schema_version() > Database::kLatestSupportedSchema +
                                       Database::kSchemaEpsilon)              ||
       (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to meet database requirements "
-                                      "for migration.");
+    Error("Failed to meet database requirements for migration.", data);
     return false;
   }
   return true;
@@ -420,7 +444,7 @@ bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
   unlink(data->old_catalog->database().filename().c_str());
 
   if (! retval) {
-    SqlError("Failed to attach database of old catalog", sql_attach_new);
+    Error("Failed to attach database of old catalog", sql_attach_new, data);
     return false;
   }
   return true;
@@ -461,8 +485,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   );
   retval = sql_tmp_hardlinks.Execute();
   if (! retval) {
-    SqlError("Failed to analyze hardlink relationships",
-             sql_tmp_hardlinks);
+    Error("Failed to analyze hardlink relationships", sql_tmp_hardlinks, data);
     return false;
   }
 
@@ -492,8 +515,8 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     sql_dir_linkcounts.BindInt64(3, SqlDirent::kFlagDirNestedMountpoint) &&
     sql_dir_linkcounts.Execute();
   if (! retval) {
-    SqlError("Failed to analyze directory specific link counts",
-             sql_dir_linkcounts);
+    Error("Failed to analyze directory specific link counts",
+          sql_dir_linkcounts, data);
     return false;
   }
 
@@ -517,8 +540,8 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
            migrate_file_meta_data.BindInt64(2, gid) &&
            migrate_file_meta_data.Execute();
   if (! retval) {
-    SqlError("Failed to migrate the file system meta data",
-             migrate_file_meta_data);
+    Error("Failed to migrate the file system meta data",
+          migrate_file_meta_data, data);
     return false;
   }
 
@@ -535,7 +558,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   );
   retval = copy_properties.Execute();
   if (! retval) {
-    SqlError("Failed to migrate the properties table.", copy_properties);
+    Error("Failed to migrate the properties table.", copy_properties, data);
     return false;
   }
 
@@ -588,8 +611,8 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
       update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
       update_mntpnt_linkcount.Execute();
     if (! retval) {
-      SqlError("Failed to update linkcount of nested catalog mountpoint",
-               update_mntpnt_linkcount);
+      Error("Failed to update linkcount of nested catalog mountpoint",
+            update_mntpnt_linkcount, data);
       return false;
     }
     update_mntpnt_linkcount.Reset();
@@ -600,7 +623,7 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
       add_nested_catalog.BindText(2, catalog_hash.ToString()) &&
       add_nested_catalog.Execute();
     if (! retval) {
-      SqlError("Failed to add nested catalog link", add_nested_catalog);
+      Error("Failed to add nested catalog link", add_nested_catalog, data);
       return false;
     }
     add_nested_catalog.Reset();
@@ -640,8 +663,8 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
     retval = lookup_mountpoint.BindPathHash(mountpoint_path_hash) &&
              lookup_mountpoint.FetchRow();
     if (! retval) {
-      SqlError("Failed to fetch nested catalog mountpoint to check for "
-               "compatible transition points", lookup_mountpoint);
+      Error("Failed to fetch nested catalog mountpoint to check for compatible"
+            "transition points", lookup_mountpoint, data);
       return false;
     }
 
@@ -668,10 +691,11 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
           (diffs & Difference::kLinkcount)       ||
           (diffs & Difference::kSymlink)         ||
           (diffs & Difference::kChunkedFileFlag)    ) {
-        LogCvmfs(kLogCatalog, kLogStderr, "Found an irreparable mismatch in a "
-                                          "nested catalog transtion point at "
-                                          "'%s'  Aborting...",
-                 nested_root_path.c_str());
+        std::stringstream ss;
+        ss << "Found an irreparable mismatch in a nested catalog transition "
+              "point at '" << nested_root_path << "'" << std::endl
+           << "Aborting..." << std::endl;
+        Error(ss.str());
       }
 
       // copy the properties from the nested catalog root entry into the mount-
@@ -684,8 +708,8 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
                update_directory_entry.BindDirent(mountpoint_entry)       &&
                update_directory_entry.Execute();
       if (! retval) {
-        SqlError("Failed to save resynchronized nested catalog mountpoint into "
-                 "catalog database", update_directory_entry);
+        Error("Failed to save resynchronized nested catalog mountpoint into "
+              "catalog database", update_directory_entry, data);
         return false;
       }
       update_directory_entry.Reset();
@@ -767,7 +791,7 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
     generate_stats.BindInt64(8, aggregated_counters.d_subtree_nested)  &&
     generate_stats.Execute();
   if (! retval) {
-    SqlError("Failed to generate catalog statistics.", generate_stats);
+    Error("Failed to generate catalog statistics.", generate_stats, data);
     return false;
   }
 
@@ -775,8 +799,7 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
   catalog::Counters catalog_statistics;
   retval = catalog_statistics.ReadCounters(writable);
   if (! retval) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to read out generated statistics "
-                                      "counters");
+    Error("Failed to read out generated statistics counters", data);
     return false;
   }
   catalog::DeltaCounters statistics;
@@ -799,16 +822,14 @@ bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
   retval = lookup_root_entry.BindPathHash(root_path_hash) &&
            lookup_root_entry.FetchRow();
   if (! retval) {
-    SqlError("Failed to retrieve root directory entry of migrated catalog",
-             lookup_root_entry);
+    Error("Failed to retrieve root directory entry of migrated catalog",
+          lookup_root_entry, data);
     return false;
   }
 
   DirectoryEntry entry = lookup_root_entry.GetDirent(data->new_catalog);
   if (entry.linkcount() < 2 || entry.linkcount() >= (1l << 32)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Retrieved linkcount of catalog root "
-                                      "entry is not sane. (found: %d)",
-             entry.linkcount());
+    Error("Retrieved linkcount of catalog root entry is not sane.", data);
     return false;
   }
 
@@ -831,7 +852,7 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
     "SELECT COUNT(*), MAX(rowid) FROM old.catalog;");
   retval = wasted_inodes.FetchRow();
   if (! retval) {
-    SqlError("Failed to count entries in catalog", wasted_inodes);
+    Error("Failed to count entries in catalog", wasted_inodes, data);
     return false;
   }
   const unsigned int entry_count = wasted_inodes.RetrieveInt64(0);
@@ -854,7 +875,7 @@ bool CommandMigrate::MigrationWorker::DetachOldCatalogDatabase(
   Sql detach_old_catalog(writable, "DETACH old;");
   const bool retval = detach_old_catalog.Execute();
   if (! retval) {
-    SqlError("Failed to detach old catalog database.", detach_old_catalog);
+    Error("Failed to detach old catalog database.", detach_old_catalog, data);
     return false;
   }
   return true;
@@ -874,14 +895,5 @@ bool CommandMigrate::MigrationWorker::CleanupNestedCatalogs(
 
   data->nested_catalogs.clear();
   return true;
-}
-
-void CommandMigrate::MigrationWorker::SqlError(
-                                          const std::string  &message,
-                                          const catalog::Sql &statement) const {
-  LogCvmfs(kLogCatalog, kLogStderr, "%s\nSQLite: %d - %s",
-           message.c_str(),
-           statement.GetLastError(),
-           statement.GetLastErrorMsg().c_str());
 }
 
