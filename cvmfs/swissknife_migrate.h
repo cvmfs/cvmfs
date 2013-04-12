@@ -78,14 +78,17 @@ class CommandMigrate : public Command {
       worker_context(const std::string      &temporary_directory,
                      CatalogStatisticsList  &catalog_statistics_list,
                      const bool              fix_nested_catalog_transitions,
+                     const bool              analyze_file_linkcounts,
                      const bool              collect_catalog_statistics) :
         temporary_directory(temporary_directory),
         catalog_statistics_list(catalog_statistics_list),
         fix_nested_catalog_transitions(fix_nested_catalog_transitions),
+        analyze_file_linkcounts(analyze_file_linkcounts),
         collect_catalog_statistics(collect_catalog_statistics) {}
       const std::string       temporary_directory;
       CatalogStatisticsList  &catalog_statistics_list;
       const bool              fix_nested_catalog_transitions;
+      const bool              analyze_file_linkcounts;
       const bool              collect_catalog_statistics;
     };
 
@@ -100,6 +103,7 @@ class CommandMigrate : public Command {
     bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
     bool AttachOldCatalogDatabase         (PendingCatalog *data) const;
     bool MigrateFileMetadata              (PendingCatalog *data) const;
+    bool   AnalyzeFileLinkcounts          (PendingCatalog *data) const;
     bool MigrateNestedCatalogReferences   (PendingCatalog *data) const;
     bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
@@ -112,6 +116,7 @@ class CommandMigrate : public Command {
     const std::string       temporary_directory_;
     CatalogStatisticsList  &catalog_statistics_list_;
     const bool              fix_nested_catalog_transitions_;
+    const bool              analyze_file_linkcounts_;
     const bool              collect_catalog_statistics_;
   };
 

@@ -38,6 +38,8 @@ ParameterList CommandMigrate::GetParams() {
                              true, false));
   result.push_back(Parameter('f', "fix nested catalog transition points",
                              true, true));
+  result.push_back(Parameter('l', "disable linkcount analysis of files",
+                             true, true));
   result.push_back(Parameter('s', "enable collection of catalog statistics",
                              true, true));
   return result;
@@ -82,6 +84,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                              *args.find('k')->second :
                                              "";
   const bool fix_transition_points      = (args.count('f') > 0);
+  const bool analyze_file_linkcounts    = (args.count('l') == 0);
   const bool collect_catalog_statistics = (args.count('s') > 0);
 
   // we might need a lot of file descriptors
@@ -124,6 +127,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   MigrationWorker::worker_context context(spooler_definition.temporary_path,
                                           catalog_statistics_list_,
                                           fix_transition_points,
+                                          analyze_file_linkcounts,
                                           collect_catalog_statistics);
   concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
                                 cpus,
@@ -343,10 +347,11 @@ CommandMigrate::PendingCatalog::~PendingCatalog() {
 
 
 CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) :
-  temporary_directory_(context->temporary_directory),
-  catalog_statistics_list_(context->catalog_statistics_list),
-  fix_nested_catalog_transitions_(context->fix_nested_catalog_transitions),
-  collect_catalog_statistics_(context->collect_catalog_statistics)
+  temporary_directory_            (context->temporary_directory),
+  catalog_statistics_list_        (context->catalog_statistics_list),
+  fix_nested_catalog_transitions_ (context->fix_nested_catalog_transitions),
+  analyze_file_linkcounts_        (context->analyze_file_linkcounts),
+  collect_catalog_statistics_     (context->collect_catalog_statistics)
 {}
 
 
@@ -482,88 +487,14 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
-  // analyze the hardlink relationships in the old catalog
-  //   inodes used to be assigned at publishing time, implicitly constituating
-  //   those relationships. We now need them explicitly in the file catalogs
-  // This looks for directory entries with matching inodes but differing path-
-  // hashes and saves the results in a temporary table called 'hl_scratch'
-  //
-  // Note: We only support hardlink groups that reside in the same directory!
-  //       Therefore we first need to figure out hardlink candidates (which
-  //       might still contain hardlink groups spanning more than one directory)
-  //       In a second step these candidates will be analyzed to kick out un-
-  //       supported hardlink groups.
-  //       Unsupported hardlink groups will be be treated as normal files with
-  //       the same content
-  Sql sql_create_hardlinks_scratch_table(writable,
-    "CREATE TEMPORARY TABLE hl_scratch AS "
-    "  SELECT c1.inode AS inode, c1.md5path_1, c1.md5path_2, "
-    "         c1.parent_1 as c1p1, c1.parent_2 as c1p2, "
-    "         c2.parent_1 as c2p1, c2.parent_2 as c2p2 "
-    "  FROM old.catalog AS c1 "
-    "  INNER JOIN old.catalog AS c2 "
-    "  ON c1.inode == c2.inode AND "
-    "     (c1.md5path_1 != c2.md5path_1 OR "
-    "      c1.md5path_2 != c2.md5path_2);");
-  retval = sql_create_hardlinks_scratch_table.Execute();
-  if (! retval) {
-    Error("Failed to create temporary scratch table for hardlink analysis",
-          sql_create_hardlinks_scratch_table, data);
-    return false;
-  }
-
-  // Figures out which hardlink candidates are supported by CVMFS and can be
-  // transferred into the new catalog as so called hardlink groups. Unsupported
-  // hardlinks need to be discarded and treated as normal files containing the
-  // exact same data
-  Sql fill_linkcount_table_for_files(writable,
-    "INSERT INTO hardlinks "
-    "  SELECT inode, rowid as hardlink_group_id, count(*) as linkcount "
-    "  FROM ( "
-         // recombine supported hardlink inodes with their actual manifested hard-
-         // links in the catalog.
-         // Note: for each directory entry pointing to the same supported hardlink
-         //       inode we have a distinct MD5 path hash
-    "    SELECT DISTINCT hl.inode, hl.md5path_1, hl.md5path_2 "
-    "    FROM ( "
-           // sort out supported hardlink inodes from unsupported ones by locality
-           // Note: see the next comment for the nested SELECT
-    "      SELECT inode "
-    "      FROM ( "
-    "        SELECT inode, count(*) AS cnt "
-    "        FROM ( "
-               // go through the potential hardlinks and collect location infor-
-               // mation about them.
-               // Note: we only support hardlinks that all reside in the same
-               //       directory, thus having the same parent (c1p* == c2p*)
-               //   --> For supported hardlink candidates the SELECT DISTINCT will
-               //       produce only a single row, whereas others produce more
-    "          SELECT DISTINCT inode,c1p1,c1p1,c2p1,c2p2 "
-    "          FROM hl_scratch AS hl "
-    "        ) "
-    "        GROUP BY inode "
-    "      ) "
-    "      WHERE cnt = 1 "
-    "    ) AS supported_hardlinks "
-    "    LEFT JOIN hl_scratch AS hl "
-    "    ON supported_hardlinks.inode = hl.inode "
-    "  ) "
-    "  GROUP BY inode;");
-  retval = fill_linkcount_table_for_files.Execute();
-  if (! retval) {
-    Error("Failed to analyze hardlink relationships for files.",
-          fill_linkcount_table_for_files, data);
-    return false;
-  }
-
-  // The file linkcount and hardlink analysis is finished and the scratch table
-  // can be deleted...
-  Sql drop_hardlink_scratch_space(writable, "DROP TABLE hl_scratch;");
-  retval = drop_hardlink_scratch_space.Execute();
-  if (! retval) {
-    Error("Failed to remove file linkcount analysis scratch table",
-          drop_hardlink_scratch_space, data);
-    return false;
+  // it is possible to skip this step
+  // in that case all hardlink inodes with a (potential) linkcount > 1 will get
+  // degraded to files containing the same content
+  if (analyze_file_linkcounts_) {
+    retval = AnalyzeFileLinkcounts(data);
+    if (! retval) {
+      return false;
+    }
   }
 
   // analyze the linkcounts of directories
@@ -655,6 +586,99 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   data->new_catalog->UpdateLastModified();
 
   data->new_catalog->Commit();
+
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
+                                                   PendingCatalog *data) const {
+  const Database &writable = data->new_catalog->database();
+  bool retval;
+
+  // analyze the hardlink relationships in the old catalog
+  //   inodes used to be assigned at publishing time, implicitly constituating
+  //   those relationships. We now need them explicitly in the file catalogs
+  // This looks for directory entries with matching inodes but differing path-
+  // hashes and saves the results in a temporary table called 'hl_scratch'
+  //
+  // Note: We only support hardlink groups that reside in the same directory!
+  //       Therefore we first need to figure out hardlink candidates (which
+  //       might still contain hardlink groups spanning more than one directory)
+  //       In a second step these candidates will be analyzed to kick out un-
+  //       supported hardlink groups.
+  //       Unsupported hardlink groups will be be treated as normal files with
+  //       the same content
+  Sql sql_create_hardlinks_scratch_table(writable,
+    "CREATE TEMPORARY TABLE hl_scratch AS "
+    "  SELECT c1.inode AS inode, c1.md5path_1, c1.md5path_2, "
+    "         c1.parent_1 as c1p1, c1.parent_2 as c1p2, "
+    "         c2.parent_1 as c2p1, c2.parent_2 as c2p2 "
+    "  FROM old.catalog AS c1 "
+    "  INNER JOIN old.catalog AS c2 "
+    "  ON c1.inode == c2.inode AND "
+    "     (c1.md5path_1 != c2.md5path_1 OR "
+    "      c1.md5path_2 != c2.md5path_2);");
+  retval = sql_create_hardlinks_scratch_table.Execute();
+  if (! retval) {
+    Error("Failed to create temporary scratch table for hardlink analysis",
+          sql_create_hardlinks_scratch_table, data);
+    return false;
+  }
+
+  // Figures out which hardlink candidates are supported by CVMFS and can be
+  // transferred into the new catalog as so called hardlink groups. Unsupported
+  // hardlinks need to be discarded and treated as normal files containing the
+  // exact same data
+  Sql fill_linkcount_table_for_files(writable,
+    "INSERT INTO hardlinks "
+    "  SELECT inode, rowid as hardlink_group_id, count(*) as linkcount "
+    "  FROM ( "
+         // recombine supported hardlink inodes with their actual manifested hard-
+         // links in the catalog.
+         // Note: for each directory entry pointing to the same supported hardlink
+         //       inode we have a distinct MD5 path hash
+    "    SELECT DISTINCT hl.inode, hl.md5path_1, hl.md5path_2 "
+    "    FROM ( "
+           // sort out supported hardlink inodes from unsupported ones by locality
+           // Note: see the next comment for the nested SELECT
+    "      SELECT inode "
+    "      FROM ( "
+    "        SELECT inode, count(*) AS cnt "
+    "        FROM ( "
+               // go through the potential hardlinks and collect location infor-
+               // mation about them.
+               // Note: we only support hardlinks that all reside in the same
+               //       directory, thus having the same parent (c1p* == c2p*)
+               //   --> For supported hardlink candidates the SELECT DISTINCT will
+               //       produce only a single row, whereas others produce more
+    "          SELECT DISTINCT inode,c1p1,c1p1,c2p1,c2p2 "
+    "          FROM hl_scratch AS hl "
+    "        ) "
+    "        GROUP BY inode "
+    "      ) "
+    "      WHERE cnt = 1 "
+    "    ) AS supported_hardlinks "
+    "    LEFT JOIN hl_scratch AS hl "
+    "    ON supported_hardlinks.inode = hl.inode "
+    "  ) "
+    "  GROUP BY inode;");
+  retval = fill_linkcount_table_for_files.Execute();
+  if (! retval) {
+    Error("Failed to analyze hardlink relationships for files.",
+          fill_linkcount_table_for_files, data);
+    return false;
+  }
+
+  // The file linkcount and hardlink analysis is finished and the scratch table
+  // can be deleted...
+  Sql drop_hardlink_scratch_space(writable, "DROP TABLE hl_scratch;");
+  retval = drop_hardlink_scratch_space.Execute();
+  if (! retval) {
+    Error("Failed to remove file linkcount analysis scratch table",
+          drop_hardlink_scratch_space, data);
+    return false;
+  }
 
   return true;
 }
