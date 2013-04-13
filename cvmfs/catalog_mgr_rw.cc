@@ -397,8 +397,11 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
                                               const std::string &parent_directory)
 {
   assert(entries.size() >= 1);
-  if (entries.size() == 1)
-    return AddFile(entries[0], parent_directory);
+  if (entries.size() == 1) {
+    DirectoryEntry fix_linkcount(entries[0]);
+    fix_linkcount.set_linkcount(1);
+    return AddFile(fix_linkcount, parent_directory);
+  }
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
            parent_directory.c_str(), entries[0].name().c_str());
@@ -430,7 +433,7 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
     string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
 
-    // create a full fledged DirectoryEntry to add the hardlink group to it
+    // create a fully fledged DirectoryEntry to add the hardlink group to it
     // which is CVMFS specific meta data.
     DirectoryEntry hardlink(*i);
     hardlink.set_hardlink_group(new_group_id);
