@@ -91,7 +91,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
    */
   void PrecalculateListings();
 
-  manifest::Manifest *Commit();
+  manifest::Manifest *Commit(const bool stop_for_tweaks);
 
  protected:
   void EnforceSqliteMemLimit() { }

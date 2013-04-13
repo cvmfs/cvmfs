@@ -230,6 +230,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
+  if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));

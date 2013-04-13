@@ -171,11 +171,11 @@ class SyncMediator {
    * compression.  A spooler callback adds them to the catalogs, once processed.
 	 */
   pthread_mutex_t lock_file_queue_;
-	SyncItemList file_queue_;
+  SyncItemList file_queue_;
 
-	HardlinkGroupList hardlink_queue_;
+  HardlinkGroupList hardlink_queue_;
 
-	const SyncParameters *params_;
+  const SyncParameters *params_;
 };  // class SyncMediator
 
 }  // namespace publish

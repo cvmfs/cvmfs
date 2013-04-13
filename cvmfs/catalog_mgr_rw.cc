@@ -671,16 +671,22 @@ void WritableCatalogManager::PrecalculateListings() {
 }
 
 
-manifest::Manifest *WritableCatalogManager::Commit() {
+manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
-
+  
   manifest::Manifest *result = NULL;
   for (WritableCatalogList::iterator i = catalogs_to_snapshot.begin(),
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
   {
     (*i)->Commit();
+    if (stop_for_tweaks) {
+      LogCvmfs(kLogCatalog, kLogStdout, "Allowing for tweaks in %s at %s "
+               "(hit return to continue)", 
+               (*i)->database_path().c_str(), (*i)->path().c_str());
+      getchar();
+    }
     hash::Any hash = SnapshotCatalog(*i);
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
