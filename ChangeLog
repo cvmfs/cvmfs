@@ -1,4 +1,6 @@
 2.1.9:
+  * Added "pause mode" to 'cvmfs_server publish' in order to allow
+    for manually fixing file catalogs
   * Fix removal of temporary files in replication tools
   * Experimental support for "shared NFS maps", which are handled
     by sqlite and allow for NFS HA setups at the cost of performance

@@ -198,8 +198,8 @@ manifest::Manifest *SyncMediator::Commit() {
     return NULL;
   }
 
-	catalog_manager_->PrecalculateListings();
-	return catalog_manager_->Commit();
+  catalog_manager_->PrecalculateListings();
+  return catalog_manager_->Commit(params_->stop_for_catalog_tweaks);
 }
 
 

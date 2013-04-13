@@ -143,7 +143,7 @@ Supported Commands:
   add-replica   [-u stratum1 upstream storage] [-o owner]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
-  publish       [-d debug mode | -D blocking debug mode]
+  publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -1453,10 +1453,11 @@ publish() {
   local stratum0
   local upstream
   local debug=0
+  local tweaks_option=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dD" option
+  while getopts "dDp" option
   do
     case $option in
       d)
@@ -1465,6 +1466,9 @@ publish() {
       D)
         debug=2
       ;;
+      p)
+        tweaks_option="-d"
+      ;;  
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
@@ -1532,7 +1536,7 @@ publish() {
     -r ${upstream} \
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
-    $log_level"
+    $log_level $tweaks_option"
   if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
     sync_command="$sync_command -p \
      -l $CVMFS_MIN_CHUNK_SIZE \
