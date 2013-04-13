@@ -526,9 +526,9 @@ void SyncMediator::RemoveFile(SyncItem &entry) {
 
 
 void SyncMediator::TouchFile(SyncItem &entry) {
-	if (params_->print_changeset)
+  if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogDebug, "[tou] %s", entry.GetUnionPath().c_str());
-	if (!params_->dry_run) {
+  if (!params_->dry_run) {
     catalog_manager_->TouchFile(entry.CreateBasicCatalogDirent(),
                                 entry.GetRelativePath());
   }
