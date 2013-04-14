@@ -203,6 +203,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   bool retval = true;
   typedef map< uint32_t, vector<catalog::DirectoryEntry> > HardlinkMap;
   HardlinkMap hardlinks;
+  bool found_nested_marker = false;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
     PathString full_path(path);
@@ -217,6 +218,17 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       LogCvmfs(kLogCvmfs, kLogStderr, "empty path at %s",
                full_path.c_str());
       retval = false;
+    }
+    
+    // Catalog markers should indicate nested catalogs
+    if (entries[i].name() == NameString(string(".cvmfscatalog"))) {
+      if (catalog->path() != path) {
+        LogCvmfs(kLogCvmfs, kLogStderr, 
+                 "found abandoned nested catalog marker at %s",
+                 full_path.c_str());
+        retval = false;
+      }
+      found_nested_marker = true;
     }
 
     // Check if the chunk is there
@@ -362,6 +374,13 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         retval = false;
       }
     }
+  }  // Loop through entries
+  
+  // Check if nested catalog marker has been found
+  if (!path.IsEmpty() && (path == catalog->path()) && !found_nested_marker) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog without marker at %s",
+             path.c_str());
+    retval = false;
   }
 
   // Check directory linkcount
