@@ -517,11 +517,27 @@ static void RemountCheck() {
 }
   
 
+static bool GetDirentForInode(const fuse_ino_t ino,
+                              catalog::DirectoryEntry *dirent);
 static inline void AddToGlueLookups(const catalog::DirectoryEntry &dirent) {
   if (nfs_maps_)
     return;
   if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_)) {
-    glue_ensemble_->lookup_tracker()->AddDirent(dirent);
+    bool parent_found = glue_ensemble_->lookup_tracker()->AddDirent(dirent);
+    
+    uint64_t parent_inode = dirent.parent_inode();
+    while (!parent_found && !dirent.name().IsEmpty()) {
+      catalog::DirectoryEntry parent_dirent;
+      bool retval = GetDirentForInode(parent_inode, &parent_dirent);
+      if (!retval) {
+        // Should not happen
+        break;
+      }
+      parent_found = glue_ensemble_->lookup_tracker()->AddDirent(parent_dirent);
+      parent_inode = parent_dirent.parent_inode();
+      if (parent_dirent.name().IsEmpty())
+        break;
+    }
   }
 }
 
@@ -595,8 +611,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       bool found = glue_ensemble_->Find(ino, &recovered_path);
       if (!found) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "internal error: " 
-                 "glue buffer lookup failure (%"PRIu64"), reconstructed path %s",
-                  ino, recovered_path.c_str());
+                 "glue buffer lookup failure (%"PRIu64"), reconstructed path %s,"
+                 " catalog revision %u",
+                 ino, recovered_path.c_str(), catalog_manager_->GetRevision());
       } else {
         // Path reconstructed, is it in the new file system snapshot?
         bool retval = 
@@ -684,7 +701,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     return false;
 
   // Check if we reached the root node
-  if (dirent.inode() == catalog_manager_->GetRootInode()) {
+  if (dirent.name().IsEmpty()) {
     path->Assign("", 0);
   } else {
     // Retrieve the parent path recursively

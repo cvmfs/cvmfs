@@ -167,7 +167,7 @@ class LookupTracker {
     ensemble_ = ensemble;
   }
   
-  inline void Add(const uint64_t inode, const uint64_t parent_inode,
+  inline bool Add(const uint64_t inode, const uint64_t parent_inode,
                   const NameString &name) 
   {
     LockWrite();
@@ -175,15 +175,12 @@ class LookupTracker {
       buffer_write_->Add(inode, parent_inode, name);
       atomic_inc64(&statistics_.num_inserts);
     }
+    bool result = buffer_write_->Contains(parent_inode);
     UnlockWrite();
+    return result;
   }
-  inline void AddDirent(const catalog::DirectoryEntry &dirent) {
-    LockWrite();
-    if (!buffer_write_->Contains(dirent.inode())) {
-      buffer_write_->AddCatalogDirent(dirent);
-      atomic_inc64(&statistics_.num_inserts);
-    }
-    UnlockWrite();
+  inline bool AddDirent(const catalog::DirectoryEntry &dirent) {
+    return Add(dirent.inode(), dirent.parent_inode(), dirent.name());
   }
   bool Find(const uint64_t inode, PathString *path);
   bool FindChain(const uint64_t inode, std::vector<Dirent> *chain);
@@ -233,7 +230,7 @@ class LookupTracker {
  * Required for catalog reloads and reloads of the Fuse module.
  */
 class CwdTracker {
-public:
+ public:
   struct Statistics {
     Statistics() {
       atomic_init64(&num_inserts);
@@ -282,7 +279,7 @@ public:
 
   void MaterializePaths(catalog::AbstractCatalogManager *source);
   
-private: 
+ private: 
   static const unsigned kVersion = 1;
   
   void InitLock();
@@ -370,7 +367,7 @@ class OpenTracker {
   
   InodeContainer *inode2path() { return inode2path_; }
   
-private:
+ private:
   static const unsigned kVersion = 1;
   typedef google::sparse_hash_map<uint64_t, uint32_t, hash_murmur<uint64_t> >
           InodeReferences;
@@ -410,7 +407,7 @@ private:
 
 
 class RemountListener : public catalog::RemountListener {
-public:
+ public:
   RemountListener(Ensemble *ensemble) {
     ensemble_ = ensemble;
   }
@@ -418,7 +415,7 @@ public:
     ensemble_->cwd_tracker()->MaterializePaths(source);
     ensemble_->open_tracker()->MaterializePaths(source);
   }
-private:
+ private:
   Ensemble *ensemble_;
 };
 
