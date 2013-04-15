@@ -113,12 +113,20 @@ int LocalUploader::Move(const std::string &local_path,
   int retval  = chmod(local_path.c_str(), 0666);
   int retcode = (retval == 0) ? 0 : 101;
   if (retcode != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to set file permission '%s' "
+                                          "errno: %d",
+             local_path.c_str(), errno);
     return retcode;
   }
 
   // move the file in place
   retval  = rename(local_path.c_str(), destination_path.c_str());
   retcode = (retval == 0) ? 0 : errno;
+  if (retcode != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move file '%s' to '%s' "
+                                          "errno: %d",
+             local_path.c_str(), remote_path.c_str(), errno);
+  }
 
   return retcode;
 }
