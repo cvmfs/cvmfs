@@ -115,6 +115,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     return 5;
   }
 
+  LogCvmfs(kLogCatalog, kLogStdout, "Loaded %d catalogs", catalog_count_);
   assert (root_catalog_ != NULL);
 
   // create an upstream spooler
