@@ -219,16 +219,23 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                full_path.c_str());
       retval = false;
     }
-    
+
     // Catalog markers should indicate nested catalogs
     if (entries[i].name() == NameString(string(".cvmfscatalog"))) {
       if (catalog->path() != path) {
-        LogCvmfs(kLogCvmfs, kLogStderr, 
+        LogCvmfs(kLogCvmfs, kLogStderr,
                  "found abandoned nested catalog marker at %s",
                  full_path.c_str());
         retval = false;
       }
       found_nested_marker = true;
+    }
+
+    // Check if checksum is not null
+    if (entries[i].IsRegular() && entries[i].checksum().IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "regular file pointing to zero-hash: '%s'",
+               full_path.c_str());
+      retval = false;
     }
 
     // Check if the chunk is there
@@ -375,7 +382,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
     }
   }  // Loop through entries
-  
+
   // Check if nested catalog marker has been found
   if (!path.IsEmpty() && (path == catalog->path()) && !found_nested_marker) {
     LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog without marker at %s",
