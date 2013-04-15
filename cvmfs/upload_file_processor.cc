@@ -215,10 +215,12 @@ bool FileProcessor::FileProcessorWorker::ProcessFileChunk(
   fclose(fcas);
 
   // all done... thanks
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "compressed chunk: %d %d | hash: %s",
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "compressed chunk: %d %d | hash: %s "
+                                        "into temporary file: %s",
            chunk.offset(),
            chunk.size(),
-           chunk.content_hash().ToString().c_str());
+           chunk.content_hash().ToString().c_str(),
+           temporary_path.c_str());
 
   return true;
 }
