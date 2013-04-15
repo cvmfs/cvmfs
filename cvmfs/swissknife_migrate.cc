@@ -18,7 +18,11 @@ using namespace catalog;
 
 CommandMigrate::CommandMigrate() :
   file_descriptor_limit_(8192),
-  root_catalog_(NULL) {}
+  catalog_count_(0),
+  root_catalog_(NULL)
+{
+  atomic_init32(&catalogs_processed_);
+}
 
 
 ParameterList CommandMigrate::GetParams() {
@@ -215,6 +219,8 @@ void CommandMigrate::CatalogCallback(const Catalog*    catalog,
     tree_indent.c_str(),
     hash_string.c_str(),
     path.c_str());
+
+  ++catalog_count_;
 }
 
 
@@ -271,8 +277,11 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
   // processing of parent catalogs
   catalog->new_catalog_hash.Set(result.content_hash);
 
-  // TODO: do some more cleanup
-  LogCvmfs(kLogCatalog, kLogStdout, "migrated and uploaded %sC %s",
+  atomic_inc32(&catalogs_processed_);
+  const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
+                                 catalog_count_;
+  LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] migrated and uploaded %sC %s",
+           processed,
            result.content_hash.ToString().c_str(),
            catalog->root_path().c_str());
 }
