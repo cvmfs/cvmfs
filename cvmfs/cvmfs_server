@@ -1255,11 +1255,11 @@ info() {
   local replication_allowed="yes"
   is_master_replica $name || replication_allowed="no"
   echo "Stratum1 Replication Allowed: $replication_allowed"
-  expire_countdown=$(get_expiry $stratum0)
-  valid_time=$(( $expire_countdown/(3600*24) ))
+  local expire_countdown=$(get_expiry $stratum0)
   if [ $expire_countdown -le 0 ]; then
     echo "Whitelist is expired"
   else
+    local valid_time=$(( $expire_countdown/(3600*24) ))
     echo "Whitelist is valid for another $valid_time days"
   fi
   echo
