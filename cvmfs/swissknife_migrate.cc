@@ -995,7 +995,7 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
   const unsigned int max_row_id  = wasted_inodes.RetrieveInt64(1);
 
   // save collected information into the central statistics aggregator
-  data->statistics.root_path         = data->root_path();
+  data->statistics.root_path   = data->root_path();
   data->statistics.max_row_id  = max_row_id;
   data->statistics.entry_count = entry_count;
   catalog_statistics_list_.Insert(data->statistics);
