@@ -287,12 +287,12 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
   
   
-/*static void stub_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+static void stub_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
   cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
   atomic_dec64(&num_operations_);
-}*/
+}
 
 
 /**
@@ -408,7 +408,7 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   loader_operations->statfs      = stub_statfs;
   loader_operations->getxattr    = stub_getxattr;
   loader_operations->listxattr   = stub_listxattr;
-  //loader_operations->forget      = stub_forget;
+  loader_operations->forget      = stub_forget;
 }
 
 

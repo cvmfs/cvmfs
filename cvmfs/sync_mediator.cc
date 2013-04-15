@@ -83,7 +83,8 @@ void SyncMediator::Touch(SyncItem &entry) {
   }
 
   if (entry.IsCatalogMarker()) {
-    TouchFile(entry);
+    RemoveFile(entry);
+    AddFile(entry);
     return;
   }
   
@@ -501,12 +502,12 @@ void SyncMediator::AddFile(SyncItem &entry) {
   if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
 
-	if (entry.IsSymlink() && !params_->dry_run) {
-    // Symlinks are completely stored in the catalog
+  if (entry.IsSymlink() && !params_->dry_run) {
+  // Symlinks are completely stored in the catalog
     catalog_manager_->AddFile(entry.CreateBasicCatalogDirent(),
-                              entry.relative_parent_path());
-	} else {
-	  // Push the file to the spooler, remember the entry for the path
+                             entry.relative_parent_path());
+  } else {
+    // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);
     file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
