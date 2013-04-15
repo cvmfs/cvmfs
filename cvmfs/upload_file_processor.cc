@@ -234,6 +234,8 @@ void FileProcessor::FileProcessorWorker::ProcessingCompleted(
   }
 
   if (!pending_file->IsCompletedSuccessfully()) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to process file: '%s'",
+             pending_file->local_path().c_str());
     master()->JobFailed(Results(local_path, 4));
     return;
   }
@@ -246,6 +248,9 @@ void FileProcessor::FileProcessorWorker::ProcessingCompleted(
     completed_files_.push_back(pending_file);
   }
 
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "successfully processed file: '%s', "
+                                        "generated %d file chunks",
+           pending_file->local_path().c_str(), final_result.file_chunks.size());
   master()->JobSuccessful(final_result);
 }
 
