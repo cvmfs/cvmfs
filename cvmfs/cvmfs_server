@@ -478,19 +478,27 @@ create_whitelist() {
 
 
 get_expiry() {
-  local name=$1
-  local stratum0=$2
+  local stratum0=$1
 
   local expires=$(curl $stratum0/.cvmfswhitelist 2>/dev/null | head -2 | tail -1 | tail -c15)
   local year=$(echo $expires | head -c4)
   local month=$(echo $expires | head -c6 | tail -c2)
   local day=$(echo $expires | head -c8 | tail -c2)
-  local expires_fmt="${year}-${month}-${day}"
-  local expires_num=$(date -u -d $expires_fmt +%s)
+  local hour=$(echo $expires | head -c10 | tail -c2)
+  local minute=$(echo $expires | head -c12 | tail -c2)
+  local second=$(echo $expires | head -c14 | tail -c2)
+  local expires_fmt="${year}-${month}-${day} ${hour}:${minute}:${second}"
+  local expires_num=$(date -u -d "$expires_fmt" +%s)
 
   local now=$(/bin/date -u +%s)
-  local valid_time=$(( ($expires_num-$now)/(3600*24) ))
-  echo "Whitelist is valid for another $valid_time days"
+  local valid_countdown=$(( $expires_num-$now ))
+  echo $valid_countdown
+}
+
+
+check_expiry() {
+  local stratum0=$1
+  [ $(get_expiry $stratum0) -ge 0 ]
 }
 
 
@@ -1247,7 +1255,13 @@ info() {
   local replication_allowed="yes"
   is_master_replica $name || replication_allowed="no"
   echo "Stratum1 Replication Allowed: $replication_allowed"
-  get_expiry $name $stratum0
+  expire_countdown=$(get_expiry $stratum0)
+  valid_time=$(( $expire_countdown/(3600*24) ))
+  if [ $expire_countdown -le 0 ]; then
+    echo "Whitelist is expired"
+  else
+    echo "Whitelist is valid for another $valid_time days"
+  fi
   echo
 
   echo "\
@@ -1351,6 +1365,7 @@ list() {
 transaction() {
   local name
   local spool_dir
+  local stratum0
 
   # get repository name
   check_parameter_count_with_guessing $#
@@ -1363,9 +1378,11 @@ transaction() {
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
   spool_dir=$CVMFS_SPOOL_DIR
+  stratum0=$CVMFS_STRATUM0
 
   # more sanity checks
   check_repository_compatibility
+  check_expiry $stratum0 || die "Repository whitelist is expired!"
   [ -f ${spool_dir}/in_transaction ] && die "Repository $name in already in a transaction"
 
   # do it!
@@ -1468,7 +1485,7 @@ publish() {
       ;;
       p)
         tweaks_option="-d"
-      ;;  
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
@@ -1494,6 +1511,7 @@ publish() {
 
   # more sanity checks
   check_repository_compatibility
+  check_expiry $stratum0 || die "Repository whitelist is expired!"
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
