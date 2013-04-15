@@ -11,6 +11,7 @@
 #include "util_concurrency.h"
 #include "catalog.h"
 #include "upload.h"
+#include "atomic.h"
 
 #include <map>
 
@@ -155,6 +156,8 @@ class CommandMigrate : public Command {
  private:
   unsigned int          file_descriptor_limit_;
   CatalogStatisticsList catalog_statistics_list_;
+  unsigned int          catalog_count_;
+  atomic_int32          catalogs_processed_;
 
   catalog::Catalog const*                        root_catalog_;
   UniquePtr<ConcurrentWorkers<MigrationWorker> > concurrent_migration_;
