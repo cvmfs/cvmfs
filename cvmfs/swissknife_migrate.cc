@@ -120,7 +120,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
     repo_keys,
     generate_full_catalog_tree,
     decompress_tmp_dir);
+  catalog_loading_stopwatch_.Start();
   const bool loading_successful = traversal.Traverse();
+  catalog_loading_stopwatch_.Stop();
 
   if (!loading_successful) {
     Error("Failed to load catalog tree");
@@ -149,7 +151,6 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // create a concurrent catalog migration facility
   const unsigned int cpus = GetNumberOfCpuCores();
   MigrationWorker::worker_context context(spooler_definition.temporary_path,
-                                          catalog_statistics_list_,
                                           fix_transition_points,
                                           analyze_file_linkcounts,
                                           collect_catalog_statistics);
@@ -167,9 +168,11 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // migrate catalogs recursively (starting with the deepest nested catalogs)
   LogCvmfs(kLogCatalog, kLogStdout, "\nMigrating catalogs...");
   PendingCatalog *root_catalog = new PendingCatalog(root_catalog_);
+  migration_stopwatch_.Start();
   ConvertCatalogsRecursively(root_catalog);
   concurrent_migration_->WaitForEmptyQueue();
   spooler_->WaitForUpload();
+  migration_stopwatch_.Stop();
 
   const unsigned int errors = concurrent_migration_->GetNumberOfFailedJobs() +
                               spooler_->GetNumberOfErrors();
@@ -260,6 +263,7 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     assert (pending_catalogs_.find(path) == pending_catalogs_.end());
     pending_catalogs_[path] = data;
   }
+  catalog_statistics_list_.Insert(data->statistics);
 
   // schedule the compression and upload of the catalog
   spooler_->ProcessCatalog(path);
@@ -356,10 +360,12 @@ bool CommandMigrate::ConfigureSQLite() const {
 
 
 void CommandMigrate::AnalyzeCatalogStatistics() const {
-  unsigned int aggregated_entry_count    = 0;
-  unsigned int aggregated_max_row_id     = 0;
-  unsigned int aggregated_hardlink_count = 0;
-  unsigned int aggregated_linkcounts     = 0;
+  const unsigned int number_of_catalogs        = catalog_statistics_list_.size();
+  unsigned int       aggregated_entry_count    = 0;
+  unsigned int       aggregated_max_row_id     = 0;
+  unsigned int       aggregated_hardlink_count = 0;
+  unsigned int       aggregated_linkcounts     = 0;
+  double             aggregated_migration_time = 0.0;
 
   CatalogStatisticsList::const_iterator i    = catalog_statistics_list_.begin();
   CatalogStatisticsList::const_iterator iend = catalog_statistics_list_.end();
@@ -368,6 +374,7 @@ void CommandMigrate::AnalyzeCatalogStatistics() const {
     aggregated_max_row_id     += i->max_row_id;
     aggregated_hardlink_count += i->hardlink_group_count;
     aggregated_linkcounts     += i->aggregated_linkcounts;
+    aggregated_migration_time += i->migration_time;
   }
 
   // Inode quantization
@@ -387,8 +394,20 @@ void CommandMigrate::AnalyzeCatalogStatistics() const {
                                     aggregated_hardlink_count
                                   : 0.0f;
   LogCvmfs(kLogCatalog, kLogStdout, "Generated Hardlink Groups:     %d\n"
-                                    "Average Linkcount per Group:   %.1f",
+                                    "Average Linkcount per Group:   %.1f\n",
            aggregated_hardlink_count, average_linkcount);
+
+  // Performance measures
+  const double average_migration_time = aggregated_migration_time /
+                                        (double)number_of_catalogs;
+  LogCvmfs(kLogCatalog, kLogStdout, "Catalog Loading Time:          %.2fs\n"
+                                    "Average Migration Time:        %.2fs\n"
+                                    "Overall Migration Time:        %.2fs\n"
+                                    "Aggregated Migration Time:     %.2fs\n",
+           catalog_loading_stopwatch_.GetTime(),
+           average_migration_time,
+           migration_stopwatch_.GetTime(),
+           aggregated_migration_time);
 }
 
 
@@ -405,7 +424,6 @@ CommandMigrate::PendingCatalog::~PendingCatalog() {
 
 CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) :
   temporary_directory_            (context->temporary_directory),
-  catalog_statistics_list_        (context->catalog_statistics_list),
   fix_nested_catalog_transitions_ (context->fix_nested_catalog_transitions),
   analyze_file_linkcounts_        (context->analyze_file_linkcounts),
   collect_catalog_statistics_     (context->collect_catalog_statistics)
@@ -416,6 +434,7 @@ CommandMigrate::MigrationWorker::~MigrationWorker() {}
 
 
 void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
+  migration_stopwatch_.Start();
   const bool success =
     CreateNewEmptyCatalog            (data) &&
     CheckDatabaseSchemaCompatibility (data) &&
@@ -431,6 +450,10 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     DetachOldCatalogDatabase         (data) &&
     CleanupNestedCatalogs            (data);
   data->success = success;
+  migration_stopwatch_.Stop();
+
+  data->statistics.migration_time = migration_stopwatch_.GetTime();
+  migration_stopwatch_.Reset();
 
   // Note: MigrationCallback() will take care of the result...
   if (success) {
@@ -1118,7 +1141,6 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
   data->statistics.root_path   = data->root_path();
   data->statistics.max_row_id  = max_row_id;
   data->statistics.entry_count = entry_count;
-  catalog_statistics_list_.Insert(data->statistics);
 
   return true;
 }

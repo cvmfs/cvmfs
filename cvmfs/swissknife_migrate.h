@@ -30,6 +30,8 @@ class CommandMigrate : public Command {
     unsigned int hardlink_group_count;
     unsigned int aggregated_linkcounts;
 
+    double       migration_time;
+
     std::string root_path;
   };
 
@@ -83,17 +85,14 @@ class CommandMigrate : public Command {
 
     struct worker_context {
       worker_context(const std::string      &temporary_directory,
-                     CatalogStatisticsList  &catalog_statistics_list,
                      const bool              fix_nested_catalog_transitions,
                      const bool              analyze_file_linkcounts,
                      const bool              collect_catalog_statistics) :
         temporary_directory(temporary_directory),
-        catalog_statistics_list(catalog_statistics_list),
         fix_nested_catalog_transitions(fix_nested_catalog_transitions),
         analyze_file_linkcounts(analyze_file_linkcounts),
         collect_catalog_statistics(collect_catalog_statistics) {}
       const std::string       temporary_directory;
-      CatalogStatisticsList  &catalog_statistics_list;
       const bool              fix_nested_catalog_transitions;
       const bool              analyze_file_linkcounts;
       const bool              collect_catalog_statistics;
@@ -123,10 +122,11 @@ class CommandMigrate : public Command {
 
    private:
     const std::string       temporary_directory_;
-    CatalogStatisticsList  &catalog_statistics_list_;
     const bool              fix_nested_catalog_transitions_;
     const bool              analyze_file_linkcounts_;
     const bool              collect_catalog_statistics_;
+
+    StopWatch               migration_stopwatch_;
   };
 
  public:
@@ -178,6 +178,9 @@ class CommandMigrate : public Command {
   UniquePtr<ConcurrentWorkers<MigrationWorker> > concurrent_migration_;
   UniquePtr<upload::Spooler>                     spooler_;
   PendingCatalogMap                              pending_catalogs_;
+
+  StopWatch  catalog_loading_stopwatch_;
+  StopWatch  migration_stopwatch_;
 };
 
 }
