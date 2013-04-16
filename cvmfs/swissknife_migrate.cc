@@ -387,11 +387,13 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
     CreateNewEmptyCatalog            (data) &&
     CheckDatabaseSchemaCompatibility (data) &&
     AttachOldCatalogDatabase         (data) &&
+    StartDatabaseTransaction         (data) &&
     MigrateFileMetadata              (data) &&
     MigrateNestedCatalogReferences   (data) &&
     FixNestedCatalogTransitionPoints (data) &&
     GenerateCatalogStatistics        (data) &&
     FindRootEntryInformation         (data) &&
+    CommitDatabaseTransaction        (data) &&
     CollectAndAggregateStatistics    (data) &&
     DetachOldCatalogDatabase         (data) &&
     CleanupNestedCatalogs            (data);
@@ -476,6 +478,13 @@ bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
     Error("Failed to attach database of old catalog", sql_attach_new, data);
     return false;
   }
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker::StartDatabaseTransaction(
+                                                   PendingCatalog *data) const {
+  data->new_catalog->Transaction();
   return true;
 }
 
@@ -615,16 +624,12 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
-  data->new_catalog->SetDirty();
-
   // set the previous revision hash in the new catalog to the old catalog
   //   we are doing the whole migration as a new snapshot that does not change
   //   any files, but just bumpes the catalog schema to the latest version
   data->new_catalog->SetPreviousRevision(data->old_catalog->hash());
   data->new_catalog->IncrementRevision();
   data->new_catalog->UpdateLastModified();
-
-  data->new_catalog->Commit();
 
   return true;
 }
@@ -980,6 +985,13 @@ bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
   }
 
   data->root_entry.Set(entry);
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker::CommitDatabaseTransaction(
+                                                   PendingCatalog *data) const {
+  data->new_catalog->Commit();
   return true;
 }
 
