@@ -103,6 +103,12 @@ int CommandMigrate::Main(const ArgumentList &args) {
     return 2;
   }
 
+  // put SQLite into multithreaded mode
+  if (! ConfigureSQLite()) {
+    Error("Failed to preconfigure SQLite library");
+    return 3;
+  }
+
   // load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
@@ -118,7 +124,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   if (!loading_successful) {
     Error("Failed to load catalog tree");
-    return 3;
+    return 4;
   }
 
   LogCvmfs(kLogCatalog, kLogStdout, "Loaded %d catalogs", catalog_count_);
@@ -129,14 +135,14 @@ int CommandMigrate::Main(const ArgumentList &args) {
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
     Error("Failed to create upstream Spooler.");
-    return 4;
+    return 5;
   }
   spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
 
   // generate and upload a nested catalog marker
   if (! GenerateNestedCatalogMarkerChunk()) {
     Error("Failed to create a nested catalog marker.");
-    return 5;
+    return 6;
   }
   spooler_->WaitForUpload();
 
@@ -153,7 +159,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                 &context);
   if (! concurrent_migration_->Initialize()) {
     Error("Failed to initialize worker migration system.");
-    return 6;
+    return 7;
   }
   concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
                                           this);
@@ -174,7 +180,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   if (errors > 0) {
     LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration produced errors\n"
                                       "Aborting...");
-    return 7;
+    return 8;
   }
 
   // commit the new (migrated) repository revision...
@@ -188,7 +194,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   manifest.set_revision(root_catalog->new_catalog->GetRevision());
   if (! manifest.Export(manifest_path)) {
     Error("Manifest export failed.\nAborting...");
-    return 8;
+    return 9;
   }
 
   // get rid of the open root catalog
@@ -340,6 +346,12 @@ bool CommandMigrate::RaiseFileDescriptorLimit() const {
     }
   }
   return true;
+}
+
+
+bool CommandMigrate::ConfigureSQLite() const {
+  int retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+  return (retval == SQLITE_OK);
 }
 
 
