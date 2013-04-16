@@ -16,9 +16,13 @@
 using namespace swissknife;
 using namespace catalog;
 
+catalog::DirectoryEntry  CommandMigrate::nested_catalog_marker_;
+
 CommandMigrate::CommandMigrate() :
   file_descriptor_limit_(8192),
   catalog_count_(0),
+  uid_(0), // TODO: make this configurable!
+  gid_(0),
   root_catalog_(NULL)
 {
   atomic_init32(&catalogs_processed_);
@@ -91,6 +95,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const bool analyze_file_linkcounts    = (args.count('l') == 0);
   const bool collect_catalog_statistics = (args.count('s') > 0);
 
+  temporary_directory_ = decompress_tmp_dir;
+
   // we might need a lot of file descriptors
   if (! RaiseFileDescriptorLimit()) {
     Error("Failed to raise file descriptor limits");
@@ -112,7 +118,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   if (!loading_successful) {
     Error("Failed to load catalog tree");
-    return 5;
+    return 3;
   }
 
   LogCvmfs(kLogCatalog, kLogStdout, "Loaded %d catalogs", catalog_count_);
@@ -123,9 +129,16 @@ int CommandMigrate::Main(const ArgumentList &args) {
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
     Error("Failed to create upstream Spooler.");
-    return 3;
+    return 4;
   }
   spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
+
+  // generate and upload a nested catalog marker
+  if (! GenerateNestedCatalogMarkerChunk()) {
+    Error("Failed to create a nested catalog marker.");
+    return 5;
+  }
+  spooler_->WaitForUpload();
 
   // create a concurrent catalog migration facility
   const unsigned int cpus = GetNumberOfCpuCores();
@@ -140,7 +153,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                 &context);
   if (! concurrent_migration_->Initialize()) {
     Error("Failed to initialize worker migration system.");
-    return 4;
+    return 6;
   }
   concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
                                           this);
@@ -161,7 +174,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   if (errors > 0) {
     LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration produced errors\n"
                                       "Aborting...");
-    return 6;
+    return 7;
   }
 
   // commit the new (migrated) repository revision...
@@ -175,7 +188,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   manifest.set_revision(root_catalog->new_catalog->GetRevision());
   if (! manifest.Export(manifest_path)) {
     Error("Manifest export failed.\nAborting...");
-    return 7;
+    return 8;
   }
 
   // get rid of the open root catalog
@@ -253,7 +266,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
   // check if the upload was successful
   if (result.return_code != 0) {
     std::stringstream ss;
-    ss << "Failed to upload catalog " << path << std::endl
+    ss << "Failed to upload file " << path << std::endl
        << "Aborting...";
     Error(ss.str());
     exit(2);
@@ -264,27 +277,35 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
   // remove the just uploaded file
   unlink(path.c_str());
 
-  // find the catalog path in the pending catalogs and remove it from the list
-  PendingCatalog *catalog;
-  {
-    LockGuard<PendingCatalogMap> guard(pending_catalogs_);
-    PendingCatalogMap::iterator i = pending_catalogs_.find(path);
-    assert (i != pending_catalogs_.end());
-    catalog = const_cast<PendingCatalog*>(i->second);
-    pending_catalogs_.erase(i);
+  // uploaded nested catalog marker... generate and cache DirectoryEntry for it
+  if (path == nested_catalog_marker_tmp_path_) {
+    CreateNestedCatalogMarkerDirent(result.content_hash);
+    return;
+
+  } else {
+
+    // find the catalog path in the pending catalogs and remove it from the list
+    PendingCatalog *catalog;
+    {
+      LockGuard<PendingCatalogMap> guard(pending_catalogs_);
+      PendingCatalogMap::iterator i = pending_catalogs_.find(path);
+      assert (i != pending_catalogs_.end());
+      catalog = const_cast<PendingCatalog*>(i->second);
+      pending_catalogs_.erase(i);
+    }
+
+    // the catalog is completely processed... fill the hash-future to allow the
+    // processing of parent catalogs
+    catalog->new_catalog_hash.Set(result.content_hash);
+
+    atomic_inc32(&catalogs_processed_);
+    const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
+                                   catalog_count_;
+    LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] migrated and uploaded %sC %s",
+             processed,
+             result.content_hash.ToString().c_str(),
+             catalog->root_path().c_str());
   }
-
-  // the catalog is completely processed... fill the hash-future to allow the
-  // processing of parent catalogs
-  catalog->new_catalog_hash.Set(result.content_hash);
-
-  atomic_inc32(&catalogs_processed_);
-  const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
-                                 catalog_count_;
-  LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] migrated and uploaded %sC %s",
-           processed,
-           result.content_hash.ToString().c_str(),
-           catalog->root_path().c_str());
 }
 
 
@@ -607,6 +628,31 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
+  // if we deal with a nested catalog, we need to add a .cvmfscatalog entry
+  // since it was not present in the old repository specification but is needed
+  // now!
+  if (! data->IsRoot()) {
+    const DirectoryEntry &nested_marker =
+                                 CommandMigrate::GetNestedCatalogMarkerDirent();
+    SqlDirentInsert insert_nested_marker(writable);
+    const std::string   root_path   = data->root_path();
+    const std::string   file_path   = root_path +
+                                      "/" + nested_marker.name().ToString();
+    const hash::Md5    &path_hash   = hash::Md5(file_path.data(),
+                                                file_path.size());
+    const hash::Md5    &parent_hash = hash::Md5(root_path.data(),
+                                                root_path.size());
+    retval = insert_nested_marker.BindPathHash(path_hash)         &&
+             insert_nested_marker.BindParentPathHash(parent_hash) &&
+             insert_nested_marker.BindDirent(nested_marker)       &&
+             insert_nested_marker.Execute();
+    if (! retval) {
+      Error("Failed to insert nested catalog marker into new nested catalog.",
+            insert_nested_marker, data);
+      return false;
+    }
+  }
+
   // copy (and update) the properties fields
   //
   // Note: The schema is explicitly not copied to the new catalog.
@@ -892,6 +938,46 @@ void CommandMigrate::FixNestedCatalogTransitionPoint(
 }
 
 
+const catalog::DirectoryEntry& CommandMigrate::GetNestedCatalogMarkerDirent() {
+  // this is pre-initialized singleton... it MUST be already there...
+  assert (nested_catalog_marker_.name_ == ".cvmfscatalog");
+  return nested_catalog_marker_;
+}
+
+
+bool CommandMigrate::GenerateNestedCatalogMarkerChunk() {
+  // create an empty nested catalog marker file
+  nested_catalog_marker_tmp_path_ =
+                         CreateTempPath(temporary_directory_ + "/.cvmfscatalog",
+                                        0644);
+  if (nested_catalog_marker_tmp_path_.empty()) {
+    Error("Failed to create temp file for nested catalog marker dummy.");
+    return false;
+  }
+
+  // process and upload it to the backend storage
+  spooler_->Process(nested_catalog_marker_tmp_path_);
+  return true;
+}
+
+
+void CommandMigrate::CreateNestedCatalogMarkerDirent(
+                                                const hash::Any &content_hash) {
+  // generate it only once
+  assert (nested_catalog_marker_.name_ != ".cvmfscatalog");
+
+  // fill the DirectoryEntry structure will all needed information
+  nested_catalog_marker_.name_      = ".cvmfscatalog";
+  nested_catalog_marker_.mode_      = 33188;
+  nested_catalog_marker_.uid_       = uid_;
+  nested_catalog_marker_.gid_       = gid_;
+  nested_catalog_marker_.size_      = 0;
+  nested_catalog_marker_.mtime_     = time(NULL);
+  nested_catalog_marker_.linkcount_ = 1;
+  nested_catalog_marker_.checksum_  = content_hash;
+}
+
+
 bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
                                                    PendingCatalog *data) const {
   bool retval = false;
@@ -912,17 +998,17 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
   const Database &writable = data->new_catalog->database();
   Sql generate_stats(writable,
     "INSERT OR REPLACE INTO statistics "
-    "SELECT 'self_regular', count(*) FROM old.catalog "
+    "SELECT 'self_regular', count(*) FROM catalog "
     "                                WHERE     flags & :flag_file  "
     "                                  AND NOT flags & :flag_link_1 "
     "  UNION "
-    "SELECT 'self_symlink', count(*) FROM old.catalog "
+    "SELECT 'self_symlink', count(*) FROM catalog "
     "                                WHERE flags & :flag_link_2 "
     "  UNION "
-    "SELECT 'self_dir',     count(*) FROM old.catalog "
+    "SELECT 'self_dir',     count(*) FROM catalog "
     "                                WHERE flags & :flag_dir "
     "  UNION "
-    "SELECT 'self_nested',  count(*) FROM old.nested_catalogs "
+    "SELECT 'self_nested',  count(*) FROM nested_catalogs "
     "  UNION "
     "SELECT 'subtree_regular', :subtree_regular "
     "  UNION "
