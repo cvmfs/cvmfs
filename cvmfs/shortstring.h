@@ -143,8 +143,16 @@ class ShortString {
     return memcmp(this->GetChars(), other.GetChars(), this_length) == 0;
   }
 
+  bool operator ==(const std::string &other) const {
+    return (*this == ShortString(other));
+  }
+
   bool operator !=(const ShortString &other) const {
     return !(*this == other);
+  }
+
+  bool operator !=(const std::string &other) const {
+    return (*this != ShortString(other));
   }
 
   bool operator <(const ShortString &other) const {
