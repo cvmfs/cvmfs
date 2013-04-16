@@ -37,10 +37,14 @@
 #define CVMFS_LRU_H_
 
 #define FUSE_USE_VERSION 26
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
 
 // If defined the cache is secured by a posix mutex
 #define LRU_CACHE_THREAD_SAFE
 
+#include <inttypes.h>
 #include <stdint.h>
 
 #include <cstring>
@@ -918,7 +922,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
   }
 
   bool Insert(const fuse_ino_t &inode, const catalog::DirectoryEntry &dirent) {
-    LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %d -> '%s'",
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %"PRIu64" -> '%s'",
              inode, dirent.name().c_str());
     const bool result =
       LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
@@ -928,7 +932,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
   bool Lookup(const fuse_ino_t &inode, catalog::DirectoryEntry *dirent) {
     const bool result =
       LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(inode, dirent);
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %d (%s)",
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %"PRIu64" (%s)",
              inode, result ? "hit" : "miss");
     return result;
   }
@@ -948,7 +952,7 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
   }
 
   bool Insert(const fuse_ino_t &inode, const PathString &path) {
-    LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %d -> '%s'",
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %"PRIu64" -> '%s'",
              inode, path.c_str());
     const bool result =
       LruCache<fuse_ino_t, PathString>::Insert(inode, path);
@@ -958,7 +962,7 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
   bool Lookup(const fuse_ino_t &inode, PathString *path) {
     const bool found =
       LruCache<fuse_ino_t, PathString>::Lookup(inode, path);
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %d (%s)",
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %"PRIu64" (%s)",
              inode, found ? "hit" : "miss");
     return found;
   }
