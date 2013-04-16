@@ -155,6 +155,7 @@ class CommandMigrate : public Command {
 
   void ConvertCatalogsRecursively(PendingCatalog *catalog);
   bool RaiseFileDescriptorLimit() const;
+  bool ConfigureSQLite() const;
   void AnalyzeCatalogStatistics() const;
 
   bool GenerateNestedCatalogMarkerChunk();
