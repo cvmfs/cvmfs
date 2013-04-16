@@ -52,7 +52,7 @@ class InodeContainer {
   InodeContainer() {
     map_.set_deleted_key(0);
   }
-  void Add(const uint64_t inode, const uint64_t parent_inode, 
+  bool Add(const uint64_t inode, const uint64_t parent_inode, 
            const NameString &name);
   bool Get(const uint64_t inode, const uint64_t parent_inode, 
            const NameString &name);
@@ -76,6 +76,8 @@ public:
   struct Statistics {
     Statistics() {
       atomic_init64(&num_inserts);
+      atomic_init64(&num_dangling_try);
+      atomic_init64(&num_double_add);
       atomic_init64(&num_removes);
       atomic_init64(&num_references);
       atomic_init64(&num_ancient_hits);
@@ -84,12 +86,16 @@ public:
     std::string Print() {
       return 
       "inserts: " + StringifyInt(atomic_read64(&num_inserts)) +
+      "  dangling-try: " + StringifyInt(atomic_read64(&num_dangling_try)) +
+      "  double-add: " + StringifyInt(atomic_read64(&num_double_add)) +
       "  removes: " + StringifyInt(atomic_read64(&num_removes)) +
       "  references: " + StringifyInt(atomic_read64(&num_references)) +
       "  ancient(hits): " + StringifyInt(atomic_read64(&num_ancient_hits)) +
       "  ancient(misses): " + StringifyInt(atomic_read64(&num_ancient_misses));
     }
     atomic_int64 num_inserts;
+    atomic_int64 num_dangling_try;
+    atomic_int64 num_double_add;
     atomic_int64 num_removes;
     atomic_int64 num_references;
     atomic_int64 num_ancient_hits;
@@ -104,7 +110,7 @@ public:
   
   bool VfsGet(const uint64_t inode, const uint64_t parent_inode,
               const NameString &name);
-  void VfsAdd(const uint64_t inode, const uint64_t parent_inode,
+  bool VfsAdd(const uint64_t inode, const uint64_t parent_inode,
               const NameString &name);
   void VfsPut(const uint64_t inode, const uint32_t by);
   bool Find(const uint64_t inode, PathString *path);

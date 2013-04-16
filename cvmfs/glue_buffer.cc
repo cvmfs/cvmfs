@@ -63,8 +63,9 @@ bool InodeContainer::Get(const uint64_t inode, const uint64_t parent_inode,
   
 /**
  * Same as Get() but don't add parent inodes reference (done before);
+ * \return true if it is a new inode, false otherwise
  */
-void InodeContainer::Add(const uint64_t inode, const uint64_t parent_inode, 
+bool InodeContainer::Add(const uint64_t inode, const uint64_t parent_inode, 
                          const NameString &name)
 {
   LogCvmfs(kLogGlueBuffer, kLogDebug, "add inode %"PRIu64", name %s", 
@@ -72,10 +73,12 @@ void InodeContainer::Add(const uint64_t inode, const uint64_t parent_inode,
   InodeMap::iterator iter_inode = map_.find(inode);
   if (iter_inode != map_.end()) {
     (*iter_inode).second.references++;
-  } else {
-    // New inode
-    map_[inode] = Dirent(parent_inode, name);
+    return false;
   }
+  
+  // New inode
+  map_[inode] = Dirent(parent_inode, name);
+  return true;
 }
   
 
@@ -180,12 +183,17 @@ InodeTracker::~InodeTracker() {
 }
 
 
+/**
+ * \return true if inode was processed, false otherwise if parent_inode was not
+ *         present
+ */
 bool InodeTracker::VfsGet(const uint64_t inode, const uint64_t parent_inode,
                           const NameString &name) 
 {
   Lock();
   if (!name.IsEmpty() && !inode2path_.Contains(parent_inode)) {
     Unlock();
+    atomic_inc64(&statistics_.num_dangling_try);
     return false;
   }
   bool new_inode = inode2path_.Get(inode, parent_inode, name);
@@ -198,13 +206,23 @@ bool InodeTracker::VfsGet(const uint64_t inode, const uint64_t parent_inode,
 }
   
   
-void InodeTracker::VfsAdd(const uint64_t inode, const uint64_t parent_inode,
+/**
+ * Assumes that the parent is already present
+ * \return true if it is a new inode, false otherwise
+ */
+bool InodeTracker::VfsAdd(const uint64_t inode, const uint64_t parent_inode,
                           const NameString &name) 
 {
   Lock();
-  inode2path_.Add(inode, parent_inode, name);
+  bool new_inode = inode2path_.Add(inode, parent_inode, name);
   Unlock();
-  atomic_inc64(&statistics_.num_inserts);
+  if (new_inode) {
+    atomic_inc64(&statistics_.num_inserts);
+  } else {
+    atomic_inc64(&statistics_.num_references);
+    atomic_inc64(&statistics_.num_double_add);
+  }
+  return new_inode;
 }
 
 

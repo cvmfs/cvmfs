@@ -561,9 +561,10 @@ static bool GetDirentForInode(const fuse_ino_t ino,
         if (retval) {
           LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
                     "inode %"PRIu64, ino, dirent->inode());
-          dirent->set_inode(ino);
+          // Only insert fresh and recoverable data into caches
           inode_cache_->Insert(ino, *dirent);
           path_cache_->Insert(ino, recovered_path);
+          dirent->set_inode(ino);
           return true;
         }
       }
@@ -588,14 +589,20 @@ static bool GetDirentForPath(const PathString &path,
   }
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  bool retval = 
-    catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
+  bool retval;
+  if (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode)) {
+    // The parent inode can be resolved just now, but we shouldn't put it in
+    // caches as it can be forgotten soon
+    retval = catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent);
+  } else {
+    retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
+    dirent->set_parent_inode(parent_inode);
+  }
   if (retval) {
     if (nfs_maps_) {
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
     }
-    dirent->set_parent_inode(parent_inode);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -662,8 +669,13 @@ static inline void AddToInodeTracker(const catalog::DirectoryEntry &dirent) {
     retval = GetDirentForInode(dirent.parent_inode(), &parent_dirent);
     assert(retval);
     AddToInodeTracker(parent_dirent);
-    inode_tracker_->VfsAdd(dirent.inode(), dirent.parent_inode(), 
-                           dirent.name());
+    bool new_inode = 
+      inode_tracker_->VfsAdd(dirent.inode(), dirent.parent_inode(), 
+                             dirent.name());
+    if (!new_inode) {
+      // inode has been already inserted by another thread, drop parent refcnt
+      inode_tracker_->VfsPut(dirent.parent_inode(), 1);
+    }
   }
 }
   
