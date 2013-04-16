@@ -108,12 +108,14 @@ class CommandMigrate : public Command {
     bool CreateNewEmptyCatalog            (PendingCatalog *data) const;
     bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
     bool AttachOldCatalogDatabase         (PendingCatalog *data) const;
+    bool StartDatabaseTransaction         (PendingCatalog *data) const;
     bool MigrateFileMetadata              (PendingCatalog *data) const;
     bool   AnalyzeFileLinkcounts          (PendingCatalog *data) const;
     bool MigrateNestedCatalogReferences   (PendingCatalog *data) const;
     bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
     bool FindRootEntryInformation         (PendingCatalog *data) const;
+    bool CommitDatabaseTransaction        (PendingCatalog *data) const;
     bool CollectAndAggregateStatistics    (PendingCatalog *data) const;
     bool DetachOldCatalogDatabase         (PendingCatalog *data) const;
     bool CleanupNestedCatalogs            (PendingCatalog *data) const;
