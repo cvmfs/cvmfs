@@ -57,6 +57,7 @@ class CommandMigrate : public Command {
     inline const std::string root_path() const {
       return old_catalog->path().ToString();
     }
+    inline const bool IsRoot() const { return old_catalog->IsRoot(); }
 
     bool                              success;
 
@@ -143,6 +144,7 @@ class CommandMigrate : public Command {
   static void FixNestedCatalogTransitionPoint(
                           catalog::DirectoryEntry &mountpoint,
                     const catalog::DirectoryEntry &nested_root);
+  static const catalog::DirectoryEntry& GetNestedCatalogMarkerDirent();
 
  protected:
   void CatalogCallback(const catalog::Catalog* catalog,
@@ -155,11 +157,21 @@ class CommandMigrate : public Command {
   bool RaiseFileDescriptorLimit() const;
   void AnalyzeCatalogStatistics() const;
 
+  bool GenerateNestedCatalogMarkerChunk();
+  void CreateNestedCatalogMarkerDirent(const hash::Any &content_hash);
+
  private:
-  unsigned int          file_descriptor_limit_;
-  CatalogStatisticsList catalog_statistics_list_;
-  unsigned int          catalog_count_;
-  atomic_int32          catalogs_processed_;
+  unsigned int           file_descriptor_limit_;
+  CatalogStatisticsList  catalog_statistics_list_;
+  unsigned int           catalog_count_;
+  atomic_int32           catalogs_processed_;
+
+  uid_t                  uid_;
+  gid_t                  gid_;
+
+  std::string                     temporary_directory_;
+  std::string                     nested_catalog_marker_tmp_path_;
+  static catalog::DirectoryEntry  nested_catalog_marker_;
 
   catalog::Catalog const*                        root_catalog_;
   UniquePtr<ConcurrentWorkers<MigrationWorker> > concurrent_migration_;
