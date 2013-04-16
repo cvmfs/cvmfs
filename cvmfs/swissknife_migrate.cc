@@ -21,7 +21,7 @@ catalog::DirectoryEntry  CommandMigrate::nested_catalog_marker_;
 CommandMigrate::CommandMigrate() :
   file_descriptor_limit_(8192),
   catalog_count_(0),
-  uid_(0), // TODO: make this configurable!
+  uid_(0),
   gid_(0),
   root_catalog_(NULL)
 {
@@ -39,6 +39,10 @@ ParameterList CommandMigrate::GetParams() {
   result.push_back(Parameter('o', "manifest output file",
                              false, false));
   result.push_back(Parameter('t', "temporary directory for catalog decompress",
+                             false, false));
+  result.push_back(Parameter('p', "user id to be used for this repository",
+                             false, false));
+  result.push_back(Parameter('g', "group id to be used for this repository",
                              false, false));
   result.push_back(Parameter('n', "fully qualified repository name",
                              true, false));
@@ -85,6 +89,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const std::string &spooler            = *args.find('u')->second;
   const std::string &manifest_path      = *args.find('o')->second;
   const std::string &decompress_tmp_dir = *args.find('t')->second;
+  const std::string &uid                = *args.find('p')->second;
+  const std::string &gid                = *args.find('g')->second;
   const std::string &repo_name          = (args.count('n') > 0)      ?
                                              *args.find('n')->second :
                                              "";
@@ -96,6 +102,16 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const bool collect_catalog_statistics = (args.count('s') > 0);
 
   temporary_directory_ = decompress_tmp_dir;
+  std::istringstream uid_ss(uid); uid_ss >> uid_;
+  if (uid_ss.fail()) {
+    Error("Failed to parse user ID");
+    return 1;
+  }
+  std::istringstream gid_ss(gid); gid_ss >> gid_;
+  if (gid_ss.fail()) {
+    Error("Failed to parse group ID");
+    return 1;
+  }
 
   // we might need a lot of file descriptors
   if (! RaiseFileDescriptorLimit()) {
@@ -153,7 +169,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
   MigrationWorker::worker_context context(spooler_definition.temporary_path,
                                           fix_transition_points,
                                           analyze_file_linkcounts,
-                                          collect_catalog_statistics);
+                                          collect_catalog_statistics,
+                                          uid_,
+                                          gid_);
   concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
                                 cpus,
                                 cpus * 10,
@@ -426,7 +444,9 @@ CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) 
   temporary_directory_            (context->temporary_directory),
   fix_nested_catalog_transitions_ (context->fix_nested_catalog_transitions),
   analyze_file_linkcounts_        (context->analyze_file_linkcounts),
-  collect_catalog_statistics_     (context->collect_catalog_statistics)
+  collect_catalog_statistics_     (context->collect_catalog_statistics),
+  uid_                            (context->uid),
+  gid_                            (context->gid)
 {}
 
 
@@ -550,9 +570,6 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   assert (! data->new_catalog->IsDirty());
   bool retval;
 
-  const int uid = 0;
-  const int gid = 0; // TODO: make this configurable
-
   const Database &writable = data->new_catalog->database();
 
   // Linkcount scratch space.
@@ -654,8 +671,8 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     "  FROM old.catalog "
     "  LEFT JOIN hardlinks ON catalog.inode = hardlinks.inode;"
   );
-  retval = migrate_file_meta_data.BindInt64(1, uid) &&
-           migrate_file_meta_data.BindInt64(2, gid) &&
+  retval = migrate_file_meta_data.BindInt64(1, uid_) &&
+           migrate_file_meta_data.BindInt64(2, gid_) &&
            migrate_file_meta_data.Execute();
   if (! retval) {
     Error("Failed to migrate the file system meta data",

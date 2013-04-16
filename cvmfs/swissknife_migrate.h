@@ -84,18 +84,24 @@ class CommandMigrate : public Command {
     typedef CommandMigrate::PendingCatalog* returned_data;
 
     struct worker_context {
-      worker_context(const std::string      &temporary_directory,
-                     const bool              fix_nested_catalog_transitions,
-                     const bool              analyze_file_linkcounts,
-                     const bool              collect_catalog_statistics) :
+      worker_context(const std::string  &temporary_directory,
+                     const bool          fix_nested_catalog_transitions,
+                     const bool          analyze_file_linkcounts,
+                     const bool          collect_catalog_statistics,
+                     const uid_t         uid,
+                     const gid_t         gid) :
         temporary_directory(temporary_directory),
         fix_nested_catalog_transitions(fix_nested_catalog_transitions),
         analyze_file_linkcounts(analyze_file_linkcounts),
-        collect_catalog_statistics(collect_catalog_statistics) {}
-      const std::string       temporary_directory;
-      const bool              fix_nested_catalog_transitions;
-      const bool              analyze_file_linkcounts;
-      const bool              collect_catalog_statistics;
+        collect_catalog_statistics(collect_catalog_statistics),
+        uid(uid),
+        gid(gid) {}
+      const std::string  temporary_directory;
+      const bool         fix_nested_catalog_transitions;
+      const bool         analyze_file_linkcounts;
+      const bool         collect_catalog_statistics;
+      const uid_t        uid;
+      const gid_t        gid;
     };
 
    public:
@@ -121,10 +127,12 @@ class CommandMigrate : public Command {
     bool CleanupNestedCatalogs            (PendingCatalog *data) const;
 
    private:
-    const std::string       temporary_directory_;
-    const bool              fix_nested_catalog_transitions_;
-    const bool              analyze_file_linkcounts_;
-    const bool              collect_catalog_statistics_;
+    const std::string  temporary_directory_;
+    const bool         fix_nested_catalog_transitions_;
+    const bool         analyze_file_linkcounts_;
+    const bool         collect_catalog_statistics_;
+    const uid_t        uid_;
+    const gid_t        gid_;
 
     StopWatch               migration_stopwatch_;
   };
