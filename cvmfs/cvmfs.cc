@@ -562,9 +562,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
           LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
                     "inode %"PRIu64, ino, dirent->inode());
           // Only insert fresh and recoverable data into caches
+          dirent->set_inode(ino);
           inode_cache_->Insert(ino, *dirent);
           path_cache_->Insert(ino, recovered_path);
-          dirent->set_inode(ino);
           return true;
         }
       }
@@ -830,7 +830,7 @@ static void AddToDirListing(const fuse_req_t req,
                             const char *name, const struct stat *stat_info,
                             struct DirectoryListing *listing)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s [inode %"PRIu64"]", 
+  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s, inode %"PRIu64, 
            name, stat_info->st_ino);
   size_t remaining_size = listing->capacity - listing->size;
   const size_t entry_size = fuse_add_direntry(req, NULL, 0, name, stat_info, 0);
