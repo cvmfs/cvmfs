@@ -1,4 +1,6 @@
 2.1.9:
+  * Fixed potential endless loop in automatic cache cleanup
+  * Switched to SQlite 3.7.16.2
   * Fixed touching of .cvmfscatalog in server toolkit
   * Added "pause mode" to 'cvmfs_server publish' in order to allow
     for manually fixing file catalogs
