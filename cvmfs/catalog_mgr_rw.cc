@@ -397,8 +397,11 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
                                               const std::string &parent_directory)
 {
   assert(entries.size() >= 1);
-  if (entries.size() == 1)
-    return AddFile(entries[0], parent_directory);
+  if (entries.size() == 1) {
+    DirectoryEntry fix_linkcount(entries[0]);
+    fix_linkcount.set_linkcount(1);
+    return AddFile(fix_linkcount, parent_directory);
+  }
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
            parent_directory.c_str(), entries[0].name().c_str());
@@ -430,7 +433,7 @@ void WritableCatalogManager::AddHardlinkGroup(DirectoryEntryBaseList &entries,
     string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
 
-    // create a full fledged DirectoryEntry to add the hardlink group to it
+    // create a fully fledged DirectoryEntry to add the hardlink group to it
     // which is CVMFS specific meta data.
     DirectoryEntry hardlink(*i);
     hardlink.set_hardlink_group(new_group_id);
@@ -675,16 +678,22 @@ void WritableCatalogManager::PrecalculateListings() {
 }
 
 
-manifest::Manifest *WritableCatalogManager::Commit() {
+manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
-
+  
   manifest::Manifest *result = NULL;
   for (WritableCatalogList::iterator i = catalogs_to_snapshot.begin(),
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
   {
     (*i)->Commit();
+    if (stop_for_tweaks) {
+      LogCvmfs(kLogCatalog, kLogStdout, "Allowing for tweaks in %s at %s "
+               "(hit return to continue)", 
+               (*i)->database_path().c_str(), (*i)->path().c_str());
+      getchar();
+    }
     hash::Any hash = SnapshotCatalog(*i);
     if ((*i)->IsRoot()) {
       base_hash_ = hash;

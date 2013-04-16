@@ -212,9 +212,7 @@ cache::CatalogManager *catalog_manager_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
-
-glue::Ensemble *glue_ensemble_ = NULL;
-glue::RemountListener *glue_remount_listener_ = NULL;
+glue::InodeTracker *inode_tracker_ = NULL;
 
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
@@ -357,21 +355,10 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
 }
   
 
-string PrintGlueBufferStatistics() {
-  glue::LookupTracker *glue_lookups = glue_ensemble_->lookup_tracker();
-  return glue_lookups->GetStatistics().Print() + "\n";
+string PrintInodeTrackerStatistics() {
+  return inode_tracker_->GetStatistics().Print() + "\n";
 }
   
-  
-string PrintCwdBufferStatistics() {
-  return glue_ensemble_->cwd_tracker()->GetStatistics().Print() + "\n";
-}
-  
-
-string PrintActiveInodesBufferStatistics() {
-  return glue_ensemble_->open_tracker()->GetStatistics().Print() + "\n";
-}
-
   
 std::string PrintInodeGeneration() {
   return "init-catalog-revision: " + 
@@ -458,7 +445,6 @@ static void RemountFinish() {
     // Ensure that all Fuse callbacks left the catalog query code
     remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
-    glue_ensemble_->lookup_tracker()->SwapBuffers();
     if (inode_annotation_) {
       inode_annotation_->CheckForOverflow(
         catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
@@ -517,42 +503,12 @@ static void RemountCheck() {
 }
   
 
-static inline void AddToGlueLookups(const catalog::DirectoryEntry &dirent) {
-  if (nfs_maps_)
-    return;
-  if (atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_)) {
-    glue_ensemble_->lookup_tracker()->AddDirent(dirent);
-  }
-}
-
-  
-static inline void AddToGlueOpens(const uint64_t inode) {
-  if (nfs_maps_)
-    return;
-  if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
-    glue_ensemble_->open_tracker()->VfsGetDeprecated(inode);
-  } else {
-    glue_ensemble_->open_tracker()->VfsGetLiving(inode);
-  }
-}
-
-
-static inline void RemoveFromGlueOpens(const uint64_t inode) {
-  if (nfs_maps_)
-    return;
-  glue_ensemble_->open_tracker()->VfsPut(inode);
-}
-
-  
-
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
   // Lookup inode in cache
-  if (inode_cache_->Lookup(ino, dirent)) {
-    AddToGlueLookups(*dirent);
+  if (inode_cache_->Lookup(ino, dirent))
     return true;
-  }
 
   // Lookup inode in catalog
   if (nfs_maps_) {
@@ -581,7 +537,6 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     // Normal mode
     if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
       inode_cache_->Insert(ino, *dirent);
-      AddToGlueLookups(*dirent);
       return true;
     }
     
@@ -592,11 +547,12 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     if (inode_annotation_ && !inode_annotation_->ValidInode(ino)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "lookup for ancient inode %"PRIu64, ino);
       PathString recovered_path;
-      bool found = glue_ensemble_->Find(ino, &recovered_path);
+      bool found = inode_tracker_->Find(ino, &recovered_path);
       if (!found) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "internal error: " 
-                 "glue buffer lookup failure (%"PRIu64"), reconstructed path %s",
-                  ino, recovered_path.c_str());
+                 "inode tracker lookup failure (%"PRIu64"), "
+                 "reconstructed path %s, catalog revision %u",
+                 ino, recovered_path.c_str(), catalog_manager_->GetRevision());
       } else {
         // Path reconstructed, is it in the new file system snapshot?
         bool retval = 
@@ -608,8 +564,6 @@ static bool GetDirentForInode(const fuse_ino_t ino,
           dirent->set_inode(ino);
           inode_cache_->Insert(ino, *dirent);
           path_cache_->Insert(ino, recovered_path);
-          // Insert entire history of this ancient inode
-          AddToGlueLookups(*dirent);
           return true;
         }
       }
@@ -630,7 +584,6 @@ static bool GetDirentForPath(const PathString &path,
   if (md5path_cache_->Lookup(md5path, dirent)) {
     if (dirent->GetSpecial() == catalog::kDirentNegative)
       return false;
-    AddToGlueLookups(*dirent);
     return true;
   }
 
@@ -643,7 +596,6 @@ static bool GetDirentForPath(const PathString &path,
       dirent->set_inode(nfs_maps::GetInode(path));
     }
     dirent->set_parent_inode(parent_inode);
-    AddToGlueLookups(*dirent);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -656,15 +608,8 @@ static bool GetDirentForPath(const PathString &path,
 
 static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   // Check the path cache first
-  if (path_cache_->Lookup(ino, path)) {
-    if ((atomic_read32(&drainout_mode_) || atomic_read32(&maintenance_mode_)) &&
-        (ino == catalog_manager_->GetRootInode())) 
-    {
-      // Race condition is not ciritcal, no "wrong" data is written
-      glue_ensemble_->lookup_tracker()->Add(ino, 0, NameString());
-    }
+  if (path_cache_->Lookup(ino, path))
     return true;
-  }
 
   if (nfs_maps_) {
     // NFS mode, just a lookup
@@ -684,7 +629,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     return false;
 
   // Check if we reached the root node
-  if (dirent.inode() == catalog_manager_->GetRootInode()) {
+  if (dirent.name().IsEmpty()) {
     path->Assign("", 0);
   } else {
     // Retrieve the parent path recursively
@@ -704,6 +649,24 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   path_cache_->Insert(dirent.inode(), *path);
   return true;
 }
+
+  
+static inline void AddToInodeTracker(const catalog::DirectoryEntry &dirent) {
+  if (nfs_maps_)
+    return;
+
+  bool retval = inode_tracker_->VfsGet(dirent.inode(), dirent.parent_inode(), 
+                                       dirent.name());
+  if (!retval) {
+    catalog::DirectoryEntry parent_dirent;
+    retval = GetDirentForInode(dirent.parent_inode(), &parent_dirent);
+    assert(retval);
+    AddToInodeTracker(parent_dirent);
+    inode_tracker_->VfsAdd(dirent.inode(), dirent.parent_inode(), 
+                           dirent.name());
+  }
+}
+  
 
 
 /**
@@ -766,6 +729,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   }
 
  reply_positive:
+  AddToInodeTracker(dirent);
   remount_fence_->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
@@ -777,6 +741,19 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   atomic_inc64(&num_fs_lookup_negative_);
   result.ino = 0;
   fuse_reply_entry(req, &result);
+}
+  
+  
+/**
+ *
+ */
+static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) 
+{
+  LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %"PRIu64" by %u", 
+           ino, nlookup);
+  if (!nfs_maps_)
+    inode_tracker_->VfsPut(ino, nlookup);
+  fuse_reply_none(req);
 }
 
 
@@ -886,8 +863,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d, path %s", 
            ino, path.c_str());
-  AddToGlueOpens(ino);
-
+  
   // Build listing
   DirectoryListing listing;
 
@@ -964,7 +940,6 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %d, handle %d",
            ino, fi->fh);
-  RemoveFromGlueOpens(ino);
 
   int reply = 0;
 
@@ -1058,23 +1033,19 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fuse_reply_err(req, ENOENT);
     return;
   }
-  AddToGlueOpens(ino);
   remount_fence_->Leave();
 
   if ((fi->flags & 3) != O_RDONLY) {
-    RemoveFromGlueOpens(ino);
     fuse_reply_err(req, EROFS);
     return;
   }
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
-    RemoveFromGlueOpens(ino);
     fuse_reply_err(req, EOPNOTSUPP);
     return;
   }
 #endif
   if (fi->flags & O_EXCL) {
-    RemoveFromGlueOpens(ino);
     fuse_reply_err(req, EEXIST);
     return;
   }
@@ -1094,7 +1065,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                       "chunks found in the catalog %s.",
                path.c_str(),
                dirent.catalog()->path().c_str());
-      RemoveFromGlueOpens(ino);
       fuse_reply_err(req, EIO);
       return;
     }
@@ -1143,7 +1113,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     } else {
       if (close(fd) == 0) atomic_dec32(&open_files_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
-      RemoveFromGlueOpens(ino);
       fuse_reply_err(req, EMFILE);
       return;
     }
@@ -1154,7 +1123,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
            "failed to open inode: %d, CAS key %s, error code %d",
            ino, dirent.checksum().ToString().c_str(), errno);
-  RemoveFromGlueOpens(ino);
   if (errno == EMFILE) {
     fuse_reply_err(req, EMFILE);
     return;
@@ -1293,8 +1261,6 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d", ino);
-  RemoveFromGlueOpens(ino);
-
   const int64_t fd = fi->fh;
 
   // do we haveh a chunked file?
@@ -1577,6 +1543,8 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->statfs      = cvmfs_statfs;
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
+  cvmfs_operations->forget      = cvmfs_forget;
+
 }
 
 }  // namespace cvmfs
@@ -1786,14 +1754,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
   cvmfs::md5path_cache_ =
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
-  cvmfs::glue_ensemble_ = 
-    new glue::Ensemble(new glue::LookupTracker(),
-                       new glue::CwdTracker(*cvmfs::mountpoint_),
-                       new glue::OpenTracker());
-  if (!nfs_source) {
-    cvmfs::glue_remount_listener_ = 
-      new glue::RemountListener(cvmfs::glue_ensemble_);
-  }
+  cvmfs::inode_tracker_ = new glue::InodeTracker();
 
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
@@ -2021,7 +1982,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
-  cvmfs::catalog_manager_->RegisterRemountListener(cvmfs::glue_remount_listener_);  
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
@@ -2116,8 +2076,7 @@ static void Fini() {
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::live_file_chunks_;
-  delete cvmfs::glue_remount_listener_;
-  delete cvmfs::glue_ensemble_;
+  delete cvmfs::inode_tracker_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
@@ -2131,8 +2090,7 @@ static void Fini() {
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::live_file_chunks_ = NULL;
-  cvmfs::glue_remount_listener_ = NULL;
-  cvmfs::glue_ensemble_ = NULL;
+  cvmfs::inode_tracker_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
@@ -2206,14 +2164,13 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   }
   
   if (!cvmfs::nfs_maps_) {
-    msg_progress = "Saving glue buffer\n";
+    msg_progress = "Saving inode tracker\n";
     SendMsg2Socket(fd_progress, msg_progress);
-    cvmfs::glue_remount_listener_->BeforeRemount(cvmfs::catalog_manager_);
-    glue::Ensemble *saved_glue_buffer = 
-      new glue::Ensemble(*cvmfs::glue_ensemble_);
+    glue::InodeTracker *saved_inode_tracker = 
+      new glue::InodeTracker(*cvmfs::inode_tracker_);
     loader::SavedState *state_glue_buffer = new loader::SavedState();
     state_glue_buffer->state_id = loader::kStateGlueBuffer;
-    state_glue_buffer->state = saved_glue_buffer;
+    state_glue_buffer->state = saved_inode_tracker;
     saved_states->push_back(state_glue_buffer);
   }
   
@@ -2255,19 +2212,11 @@ static bool RestoreState(const int fd_progress,
     }
     
     if (saved_states[i]->state_id == loader::kStateGlueBuffer) {
-      SendMsg2Socket(fd_progress, "Restoring glue buffer... ");
-      delete cvmfs::glue_remount_listener_;
-      delete cvmfs::glue_ensemble_;
-      glue::Ensemble *saved_glue_buffer = 
-        (glue::Ensemble *)saved_states[i]->state;
-      cvmfs::glue_ensemble_ = new glue::Ensemble(*saved_glue_buffer);
-      cvmfs::glue_ensemble_->lookup_tracker()->SwapBuffers();
-      cvmfs::glue_remount_listener_ = 
-        new glue::RemountListener(cvmfs::glue_ensemble_);
-      if (!cvmfs::nfs_maps_) {
-        cvmfs::catalog_manager_->RegisterRemountListener(
-          cvmfs::glue_remount_listener_);
-      }
+      SendMsg2Socket(fd_progress, "Restoring inode tracker... ");
+      delete cvmfs::inode_tracker_;
+      glue::InodeTracker *saved_inode_tracker = 
+        (glue::InodeTracker *)saved_states[i]->state;
+      cvmfs::inode_tracker_ = new glue::InodeTracker(*saved_inode_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
     
@@ -2309,7 +2258,7 @@ static void FreeSavedState(const int fd_progress,
         break;
       case loader::kStateGlueBuffer:
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
-        delete static_cast<glue::Ensemble *>(saved_states[i]->state);
+        delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
         break;
       case loader::kStateInodeGeneration:
         SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");

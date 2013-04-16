@@ -82,8 +82,14 @@ void SyncMediator::Touch(SyncItem &entry) {
     return;
   }
 
+  if (entry.IsCatalogMarker()) {
+    RemoveFile(entry);
+    AddFile(entry);
+    return;
+  }
+  
   if (entry.IsRegularFile() || entry.IsSymlink()) {
-    Replace(entry);
+    Replace(entry);  // This way, hardlink processing is correct
     return;
   }
 
@@ -102,16 +108,16 @@ void SyncMediator::Remove(SyncItem &entry) {
   }
 
   if (entry.IsRegularFile() || entry.IsSymlink()) {
-		// First remove the file...
-		RemoveFile(entry);
+    // First remove the file...
+    RemoveFile(entry);
 
-		// ... then the nested catalog (if needed)
+    // ... then the nested catalog (if needed)
     if (entry.IsCatalogMarker() && !entry.IsNew()) {
       RemoveNestedCatalog(entry);
     }
 
     return;
-	}
+  }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be deleted. "
                "Unregcognized file type.");
@@ -122,14 +128,14 @@ void SyncMediator::Remove(SyncItem &entry) {
  * Remove the old entry and add the new one.
  */
 void SyncMediator::Replace(SyncItem &entry) {
-	Remove(entry);
-	Add(entry);
+  Remove(entry);
+  Add(entry);
 }
 
 
 void SyncMediator::EnterDirectory(SyncItem &entry) {
-	HardlinkGroupMap new_map;
-	hardlink_stack_.push(new_map);
+  HardlinkGroupMap new_map;
+  hardlink_stack_.push(new_map);
 }
 
 
@@ -198,8 +204,8 @@ manifest::Manifest *SyncMediator::Commit() {
     return NULL;
   }
 
-	catalog_manager_->PrecalculateListings();
-	return catalog_manager_->Commit();
+  catalog_manager_->PrecalculateListings();
+  return catalog_manager_->Commit(params_->stop_for_catalog_tweaks);
 }
 
 
@@ -496,12 +502,12 @@ void SyncMediator::AddFile(SyncItem &entry) {
   if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
 
-	if (entry.IsSymlink() && !params_->dry_run) {
-    // Symlinks are completely stored in the catalog
+  if (entry.IsSymlink() && !params_->dry_run) {
+  // Symlinks are completely stored in the catalog
     catalog_manager_->AddFile(entry.CreateBasicCatalogDirent(),
-                              entry.relative_parent_path());
-	} else {
-	  // Push the file to the spooler, remember the entry for the path
+                             entry.relative_parent_path());
+  } else {
+    // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);
     file_queue_[entry.GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
@@ -512,9 +518,9 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
-	if (params_->print_changeset)
+  if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
-	if (!params_->dry_run) {
+  if (!params_->dry_run) {
     if (entry.GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
                entry.GetUnionPath().c_str());
@@ -526,9 +532,9 @@ void SyncMediator::RemoveFile(SyncItem &entry) {
 
 
 void SyncMediator::TouchFile(SyncItem &entry) {
-	if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogDebug, "[tou] %s", entry.GetUnionPath().c_str());
-	if (!params_->dry_run) {
+  if (params_->print_changeset)
+    LogCvmfs(kLogPublish, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
+  if (!params_->dry_run) {
     catalog_manager_->TouchFile(entry.CreateBasicCatalogDirent(),
                                 entry.GetRelativePath());
   }
@@ -536,9 +542,9 @@ void SyncMediator::TouchFile(SyncItem &entry) {
 
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
-	if (params_->print_changeset)
+  if (params_->print_changeset)
     LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
-	if (!params_->dry_run) {
+  if (!params_->dry_run) {
     catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());
   }
