@@ -144,8 +144,8 @@ Supported Commands:
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
-                < -k path to keys> < -s storage location>
-                <fully qualified repository name>
+                [-s show migration statistics]
+                < -k path to keys> <fully qualified repository name>
                 Imports a CernVM-FS 2.0.x repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
                 <fully qualified name>
@@ -1195,9 +1195,9 @@ import() {
   local name
   local stratum0
   local keys_location
-  local storage_location
   local upstream
   local owner
+  local show_statistics=0
   local replicable=0
 
   # parameter handling
@@ -1217,7 +1217,7 @@ import() {
         keys_location=$OPTARG
       ;;
       s)
-        storage_location=$OPTARG
+        show_statistics=1
       ;;
       m)
         replicable=1
@@ -1243,6 +1243,7 @@ import() {
   local private_key="${name}.key"
   local certificate="${name}.crt"
   local public_key="${name}.pub"
+  local pki_keys="$masterkey $private_key $certificate $public_key"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
@@ -1255,12 +1256,16 @@ import() {
   is_local_upstream $upstream       || die "Import only works locally for the moment"
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
-  for pki_file in "$masterkey $private_key $certificate $public_key"; do
+  for pki_file in $pki_keys; do
     [ -f "${keys_location}/$pki_file" ] || die "Cannot find $pki_file in $keys_location"
   done
-  [ x$storage_location == x ] && die "Please provide the location of the 2.0.x storage"
-  [ x$keys_location    == x ] && die "Please provide the location of the 2.0.x repository security keys"
-  [ x$storage_location == x$(get_upstream_config $upstream) ] || die "Upstream and storage location do not match."
+  [ x$keys_location    == x ] && die "Please provide the location of the 2.0.x repository security keys (-k)"
+
+  # investigate the given repository storage for sanity
+  local storage_location=$(get_upstream_config $upstream)
+  [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
+  [ -f "${storage_location}/.cvmfspublished" ] && \
+  [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
@@ -1275,7 +1280,7 @@ import() {
   echo -n "Importing the given key files... "
   local global_key_dir="/etc/cvmfs/keys"
   mkdir -p $global_key_dir
-  for pki_file in "$masterkey $private_key $certificate $public_key"; do
+  for pki_file in $pki_keys; do
     cp "${keys_location}/$pki_file" $global_key_dir    || die "fail! (cannot copy $pki_file)"
     chmod 444 "${global_key_dir}/${pki_file}"          || die "fail! (cannot chmod $pki_file)"
     chown $cvmfs_user  "${global_key_dir}/${pki_file}" || die "fail! (cannot chown $pki_file)"
@@ -1293,10 +1298,14 @@ import() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
 
   # migrate old catalogs
-  echo -n "Importing and Migrating old catalogs (may take a while)... "
+  echo "Importing and Migrating old catalogs (may take a while)... "
   local new_manifest="${temp_dir}/new_manifest"
+  local statistics_flag
+  if [ $show_statistics -ne 0 ]; then
+    statistics_flag="-s"
+  fi
   cvmfs_swissknife migrate \
-    -r $CVMFS_STRATUM0 \
+    -r $storage_location \
     -n $name \
     -u $upstream \
     -t $temp_dir \
@@ -1304,8 +1313,8 @@ import() {
     -o $new_manifest \
     -p 0 \
     -g 0 \
-    -f -s || die "fail!" # TODO: fix uid and gid
-  echo "done"
+    -f \
+    $statistics_flag || die "fail!" # TODO: fix uid and gid
 
   echo -n "Signing newly imported Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
