@@ -144,7 +144,7 @@ Supported Commands:
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
-                [-s show migration statistics]
+                [-s show migration statistics] [-c file ownership (UID:GID)]
                 < -k path to keys> <fully qualified repository name>
                 Imports a CernVM-FS 2.0.x repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
@@ -860,6 +860,23 @@ EOF
 }
 
 
+print_new_repository_notice() {
+  local name=$1
+  local cvmfs_user=$2
+
+  echo "\
+
+Before you can install anything, call \`cvmfs_server transaction\`
+to enable write access on your repository. Then install your
+software in /cvmfs/$name as user $cvmfs_user.
+Once you're happy, publish using \`cvmfs_server publish\`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
+}
+
+
 ################################################################################
 #                                                                              #
 #                                Sub Commands                                  #
@@ -1042,16 +1059,7 @@ mkfs() {
   publish $name > /dev/null
   cat $rdonly_dir/new_repository
 
-  echo "\
-
-Before you can install anything, call \`cvmfs_server transaction\`
-to enable write access on your repository. Then install your
-software in /cvmfs/$name as user $cvmfs_user.
-Once you're happy, publish using \`cvmfs_server publish\`
-
-For client configuration, have a look at 'cvmfs_server info'
-
-If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
+  print_new_repository_notice $name $cvmfs_user
 }
 
 
@@ -1197,18 +1205,22 @@ import() {
   local keys_location
   local upstream
   local owner
+  local file_ownership
   local show_statistics=0
   local replicable=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:u:k:s:m" option; do
+  while getopts "w:o:c:u:k:s:m" option; do
     case $option in
       w)
         stratum0=$OPTARG
       ;;
       o)
         owner=$OPTARG
+      ;;
+      c)
+        file_ownership=$OPTARG
       ;;
       u)
         upstream=$OPTARG
@@ -1259,7 +1271,7 @@ import() {
   for pki_file in $pki_keys; do
     [ -f "${keys_location}/$pki_file" ] || die "Cannot find $pki_file in $keys_location"
   done
-  [ x$keys_location    == x ] && die "Please provide the location of the 2.0.x repository security keys (-k)"
+  [ x$keys_location == x ] && die "Please provide the location of the 2.0.x repository security keys (-k)"
 
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
@@ -1270,6 +1282,10 @@ import() {
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
   check_user $cvmfs_user || die "No user $cvmfs_user"
+  [ x"$file_ownership" = x ] && file_ownership="$(id -u $cvmfs_user):$(id -g $cvmfs_user)"
+  echo $file_ownership | grep -q "^[0-9][0-9]*:[0-9][0-9]*$" || die "Unrecognized file ownership: $file_ownership | expected: <uid>:<gid>"
+  local cvmfs_uid=$(echo $file_ownership | cut -d: -f1)
+  local cvmfs_gid=$(echo $file_ownership | cut -d: -f2)
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
@@ -1283,7 +1299,7 @@ import() {
   for pki_file in $pki_keys; do
     cp "${keys_location}/$pki_file" $global_key_dir    || die "fail! (cannot copy $pki_file)"
     chmod 444 "${global_key_dir}/${pki_file}"          || die "fail! (cannot chmod $pki_file)"
-    chown $cvmfs_user  "${global_key_dir}/${pki_file}" || die "fail! (cannot chown $pki_file)"
+    chown $cvmfs_user "${global_key_dir}/${pki_file}"  || die "fail! (cannot chown $pki_file)"
   done
   echo "done"
 
@@ -1299,6 +1315,7 @@ import() {
 
   # migrate old catalogs
   echo "Importing and Migrating old catalogs (may take a while)... "
+  chown -R $cvmfs_user $storage_location
   local new_manifest="${temp_dir}/new_manifest"
   local statistics_flag
   if [ $show_statistics -ne 0 ]; then
@@ -1311,11 +1328,13 @@ import() {
     -t $temp_dir \
     -k "${global_key_dir}/$public_key" \
     -o $new_manifest \
-    -p 0 \
-    -g 0 \
+    -p $cvmfs_uid \
+    -g $cvmfs_gid \
     -f \
-    $statistics_flag || die "fail!" # TODO: fix uid and gid
+    $statistics_flag || die "fail!"
+  chown $cvmfs_user $new_manifest
 
+  # sign new (migrated) repository revision
   echo -n "Signing newly imported Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
@@ -1324,27 +1343,20 @@ import() {
     -n $name \
     -m $new_manifest \
     -t $temp_dir \
-    -r $upstream" > /dev/null || die "fail! (cannot sign repo"
+    -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
   echo "done"
 
+  # do final setup
   echo -n "Mounting CernVM-FS Storage... "
   setup_and_mount_new_repository $name || die "fail!"
   echo "done"
 
+  # make stratum0 repository replicable if requested
   if [ $replicable -eq 1 ]; then
     alterfs -m on $name
   fi
 
-  echo "\
-
-Before you can install anything, call \`cvmfs_server transaction\`
-to enable write access on your repository. Then install your
-software in /cvmfs/$name as user $cvmfs_user.
-Once you're happy, publish using \`cvmfs_server publish\`
-
-For client configuration, have a look at 'cvmfs_server info'
-
-If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
+  print_new_repository_notice $name $cvmfs_user
 }
 
 
