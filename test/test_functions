@@ -401,9 +401,11 @@ compare_directories() {
   listing2=$(create_listing $dir2)
 
   echo "check if directory structure and file meta data fits"
-  echo -e "$listing1" > listingFile1
-  echo -e "$listing2" > listingFile2
-  diff -uN listingFile1 listingFile2 2>&1 || return 101
+  local listingFile1="listing_$(basename $dir1)"
+  local listingFile2="listing_$(basename $dir2)"
+  echo -e "$listing1" > $listingFile1
+  echo -e "$listing2" > $listingFile2
+  diff -uN $listingFile1 $listingFile2 2>&1 || return 101
 
   echo "check if the file contents in both directories are the same"
   diff -ruN $dir1 $dir2 2>&1 || return 102
