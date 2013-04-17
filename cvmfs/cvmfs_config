@@ -29,6 +29,13 @@ case $sys_arch in
     else
       fuser="/bin/fuser"  # Ubuntu, SuSE
     fi
+    if [ ! -x /usr/bin/attr ]; then
+      # Fedora
+      if [ ! -x /bin/attr ]; then
+        echo "attr utility required"
+        exit 1
+      fi
+    fi
     fuse_fs_type="fuse"
     ;;
 
