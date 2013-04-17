@@ -561,6 +561,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
         if (retval) {
           LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
                     "inode %"PRIu64, ino, dirent->inode());
+          // Only insert fresh and recoverable data into caches
           dirent->set_inode(ino);
           inode_cache_->Insert(ino, *dirent);
           path_cache_->Insert(ino, recovered_path);
@@ -588,14 +589,20 @@ static bool GetDirentForPath(const PathString &path,
   }
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  bool retval = 
-    catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
+  bool retval;
+  if (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode)) {
+    // The parent inode can be resolved just now, but we shouldn't put it in
+    // caches as it can be forgotten soon
+    retval = catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent);
+  } else {
+    retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
+    dirent->set_parent_inode(parent_inode);
+  }
   if (retval) {
     if (nfs_maps_) {
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
     }
-    dirent->set_parent_inode(parent_inode);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -662,8 +669,13 @@ static inline void AddToInodeTracker(const catalog::DirectoryEntry &dirent) {
     retval = GetDirentForInode(dirent.parent_inode(), &parent_dirent);
     assert(retval);
     AddToInodeTracker(parent_dirent);
-    inode_tracker_->VfsAdd(dirent.inode(), dirent.parent_inode(), 
-                           dirent.name());
+    bool new_inode = 
+      inode_tracker_->VfsAdd(dirent.inode(), dirent.parent_inode(), 
+                             dirent.name());
+    if (!new_inode) {
+      // inode has been already inserted by another thread, drop parent refcnt
+      inode_tracker_->VfsPut(dirent.parent_inode(), 1);
+    }
   }
 }
   
@@ -683,7 +695,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   remount_fence_->Enter();
   parent = catalog_manager_->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
+           "cvmfs_lookup in parent inode: %"PRIu64" for name: %s", parent, name);
 
   PathString path;
   PathString parent_path;
@@ -794,7 +806,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %"PRIu64, ino);
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
@@ -818,7 +830,8 @@ static void AddToDirListing(const fuse_req_t req,
                             const char *name, const struct stat *stat_info,
                             struct DirectoryListing *listing)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s", name);
+  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s, inode %"PRIu64, 
+           name, stat_info->st_ino);
   size_t remaining_size = listing->capacity - listing->size;
   const size_t entry_size = fuse_add_direntry(req, NULL, 0, name, stat_info, 0);
 
@@ -845,7 +858,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64, ino);
 
   PathString path;
   catalog::DirectoryEntry d;
@@ -861,7 +874,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOTDIR);
     return;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d, path %s", 
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64", path %s", 
            ino, path.c_str());
   
   // Build listing
@@ -918,7 +931,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Save the directory listing and return a handle to the listing
   pthread_mutex_lock(&lock_directory_handles_);
-  LogCvmfs(kLogCvmfs, kLogDebug, "linking directory handle %d to dir inode: %d", 
+  LogCvmfs(kLogCvmfs, kLogDebug, 
+           "linking directory handle %d to dir inode: %"PRIu64, 
            next_directory_handle_, ino);
   (*directory_handles_)[next_directory_handle_] = listing;
   fi->fh = next_directory_handle_;
@@ -938,8 +952,8 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
                              struct fuse_file_info *fi)
 {
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %d, handle %d",
-           ino, fi->fh);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %"PRIu64
+           ", handle %d", ino, fi->fh);
 
   int reply = 0;
 
@@ -983,7 +997,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                           off_t off, struct fuse_file_info *fi)
 {
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_readdir on inode %d reading %d bytes from offset %d",
+           "cvmfs_readdir on inode %"PRIu64" reading %d bytes from offset %d",
            catalog_manager_->MangleInode(ino), size, off);
 
   DirectoryListing listing;
@@ -1016,7 +1030,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   // TODO active inode buffer inside fence
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %"PRIu64, ino);
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -1121,7 +1135,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   
   // fd < 0
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-           "failed to open inode: %d, CAS key %s, error code %d",
+           "failed to open inode: %"PRIu64", CAS key %s, error code %d",
            ino, dirent.checksum().ToString().c_str(), errno);
   if (errno == EMFILE) {
     fuse_reply_err(req, EMFILE);
@@ -1152,7 +1166,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi)
 {
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_read on inode: %d reading %d bytes from offset %d fd %d",
+           "cvmfs_read on inode: %"PRIu64" reading %d bytes from offset %d fd %d",
            catalog_manager_->MangleInode(ino), size, off, fi->fh);
   atomic_inc64(&num_fs_read_);
 
@@ -1203,9 +1217,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       // download and open chunk on demand
       if (!chunk.IsOpen() && !chunk.Fetch()) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to load chunk for "
-                                                    "inode: %d, CAS key: %s, "
-                                                    "error code: %d",
-           ino, chunk.content_hash().ToString().c_str(), errno);
+                 "inode: %"PRIu64", CAS key: %s, error code: %d",
+                 ino, chunk.content_hash().ToString().c_str(), errno);
 
         if (errno == EMFILE) {
           fuse_reply_err(req, EMFILE);
@@ -1260,7 +1273,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %"PRIu64, ino);
   const int64_t fd = fi->fh;
 
   // do we haveh a chunked file?
@@ -1280,7 +1293,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 
 static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %"PRIu64, ino);
 
   // If we return 0 it will cause the fs to be ignored in "df"
   struct statvfs info;
@@ -1335,7 +1348,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
+           "cvmfs_getxattr on inode: %"PRIu64" for xattr: %s", ino, name);
 
   const string attr = name;
   catalog::DirectoryEntry d;
@@ -1474,7 +1487,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %d, size %u",
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %"PRIu64", size %u",
            ino, size);
 
   catalog::DirectoryEntry d;

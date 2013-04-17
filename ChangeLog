@@ -1,4 +1,6 @@
 2.1.9:
+  * Fixed potential endless loop in automatic cache cleanup
+  * Switched to SQlite 3.7.16.2
   * Fixed touching of .cvmfscatalog in server toolkit
   * Added "pause mode" to 'cvmfs_server publish' in order to allow
     for manually fixing file catalogs
@@ -25,9 +27,8 @@
   * Pretty printing for 'cvmfs_config reload'
   * Fixed selinux context for SL5 in cvmfs_server
   * Omit autofs warnings in NFS mode
-  * Added "lookup tracker", "cwd tracker", and "open files tracker" 
-    to smoothly connect catalog reloads and reloads of the 
-    Fuse module
+  * Added "inode tracker" to smoothly connect catalog reloads 
+    and reloads of the Fuse module
   * Fix: handling of "-n" option in mount helper
   * Log application of new file system snapshots to syslog
 

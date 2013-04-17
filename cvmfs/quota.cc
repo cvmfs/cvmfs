@@ -202,13 +202,17 @@ static bool DoCleanup(const uint64_t leave_size) {
     LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
     hash::Any hash(hash::kSha1, hash::HexPtr(
       hash_str.substr(0, 2*hash::kDigestSizes[hash::kSha1])));
-    if (pinned_chunks_->find(hash) != pinned_chunks_->end())
-      continue;
-
-    trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
-    gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
-    LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
-             hash_str.c_str(), gauge_);
+    
+    // That's a critical condition.  We must not delete a not yet inserted
+    // pinned file as it is already reserved (but will be inserted later).  
+    // However, we must remove it temporarily from the cache database in order 
+    // to not run into an endless loop
+    if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
+      trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
+      gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
+      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
+               hash_str.c_str(), gauge_);
+    }
 
     sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
                       SQLITE_STATIC);
