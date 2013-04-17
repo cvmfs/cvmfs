@@ -272,7 +272,7 @@ create_repo() {
   sudo cvmfs_server mkfs -o $uid -m $repo || return 102
 
   if [ x$debug_log != x ]; then
-    echo "CVMFS_DEBUGLOG=$debug_log" >> /etc/cvmfs/repositories.d/${repo}/client.conf
+    echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a /etc/cvmfs/repositories.d/${repo}/client.conf
   fi
 }
 
