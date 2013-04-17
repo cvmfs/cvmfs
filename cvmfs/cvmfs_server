@@ -1316,6 +1316,9 @@ import() {
   # migrate old catalogs
   echo "Importing and Migrating old catalogs (may take a while)... "
   chown -R $cvmfs_user $storage_location
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null
+  fi
   local new_manifest="${temp_dir}/new_manifest"
   local statistics_flag
   if [ $show_statistics -ne 0 ]; then
