@@ -1,0 +1,83 @@
+
+cvmfs_test_name="Import Legacy Repository"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  local guinea_pig="http://cvmfs-stratum-zero.cern.ch/opt/boss"
+  local download_location="${scratch_dir}/guinea_pig_repo"
+  local keys_location="${scratch_dir}/keys"
+  local temp_dir="${scratch_dir}/tmp"
+  local upstream="local,${download_location}/data/txn,${download_location}"
+
+  # create a test repository (to steal its keys)
+  echo "create dummy repository and steal its keys" >> $logfile
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return 1
+  mkdir $keys_location >> $logfile 2>&1 || return 2
+  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.* $keys_location >> $logfile 2>&1 || return 3
+  destroy_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return 4
+
+  # download a 2.0 repository
+  echo "download Guinea Pig repository $guinea_pig" >> $logfile
+  python ${script_location}/downloadCatalogs.py \
+    --directory ${download_location}/data \
+    $guinea_pig >> $logfile 2>&1 || return 5
+  wget \
+    --directory-prefix $download_location \
+    ${guinea_pig}/.cvmfspublished >> $logfile 2>&1 || return 6
+  cvmfs_server skeleton -o $CVMFS_TEST_USER ${download_location} >> $logfile 2>&1 || return 7
+
+  # resign freshly downloaded repository (since we lack its private keys)
+  echo "remove original repository signature and resign it with the stolen keys" >> $logfile
+  cat ${download_location}/.cvmfspublished | head -n6 > ${download_location}/.cvmfspublished_unsigned || return 8
+  mkdir $temp_dir >> $logfile 2>&1 || return 9
+  cvmfs_swissknife sign \
+    -c ${keys_location}/${CVMFS_TEST_REPO}.crt \
+    -k ${keys_location}/${CVMFS_TEST_REPO}.key \
+    -n ${CVMFS_TEST_REPO} \
+    -m ${download_location}/.cvmfspublished_unsigned \
+    -t $temp_dir \
+    -r $upstream >> $logfile 2>&1 || return 10
+
+  # import the prepared guinea pig legacy repository into a fresh repository
+  echo "import legacy repository into fresh repository" >> $logfile
+  sudo cvmfs_server import \
+    -o $CVMFS_TEST_USER \
+    -u $upstream \
+    -k $keys_location \
+    -s \
+    $CVMFS_TEST_REPO >> $logfile 2>&1 || return 11
+
+  # check if the migrated and imported catalogs are sane
+  echo "check migrated catalogs without checking data chunks (we did not download them)" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO -c >> $logfile 2>&1 || return 12
+
+  # cheate a new repository revision of the migrated catalogs
+  echo "create a new repository revision" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  cd $repo_dir >> $logfile 2>&1
+    rm -fR $(ls -d */ | head -n1) >> $logfile 2>&1
+    mkdir -p foo bar >> $logfile 2>&1
+    echo "no meaningful stuff" > foo/bar
+    echo "even less meaning"   > bar/foo
+    ln foo/bar foo/baz >> $logfile 2>&1
+    ln -s ../foo/baz bar/baz >> $logfile 2>&1
+  cd $scratch_dir >> $logfile 2>&1
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  # check if still everything is fine
+  echo "check catalogs again" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO -c >> $logfile 2>&1 || return 13
+
+  # see if the files ended up in the catalog
+  echo "check created files" >> $logfile
+  local content=$(cat ${repo_dir}/foo/bar)
+  [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 14
+  [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 15
+
+  return 0
+}
