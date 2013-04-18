@@ -59,7 +59,7 @@ do
   . $t/main || exit 4
   echo "-- Testing $t (${cvmfs_test_name})" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
-  
+
   contains "$exclusions" $t
   exclude=$?
 
@@ -70,7 +70,7 @@ do
       autofs_switch off >> $logfile 2>&1 || exit 5
     fi
 
-    sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && retval=$? && kill_all_perl_services && exit $retval"
+    sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile $(pwd)/${t} && retval=$? && kill_all_perl_services && exit $retval"
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
       rm -rf "$workdir"
