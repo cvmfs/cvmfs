@@ -255,6 +255,12 @@ check_memory() {
 }
 
 
+destroy_repo() {
+  local repo=$1
+  sudo cvmfs_server rmfs -f $repo || return 100
+}
+
+
 create_repo() {
   local repo=$1
   local uid=$2
@@ -265,7 +271,7 @@ create_repo() {
 
   if cvmfs_server list | grep -q $repo; then
     echo "Repository $repo is already present... removing it"
-    sudo cvmfs_server rmfs -f $repo || return 101
+    destroy_repo $repo || return 101
   fi
 
   echo "Creating new repository $repo..."
@@ -603,8 +609,9 @@ get_catalog_count() {
 # @param repo    the repository to be checked
 check_catalogs() {
   local repo=$1
+  shift 1
 
-  cvmfs_server check $repo || return 100
+  cvmfs_server check $@ $repo || return 100
   return 0
 }
 
