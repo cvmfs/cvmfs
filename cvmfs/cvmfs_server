@@ -663,10 +663,10 @@ create_repository_skeleton() {
   local i=0
   while [ $i -lt 256 ]
   do
-    mkdir ${directory}/data/$(printf "%02x" $i)
+    mkdir -p ${directory}/data/$(printf "%02x" $i)
     i=$(($i+1))
   done
-  mkdir ${directory}/data/txn
+  mkdir -p ${directory}/data/txn
   if [ x$(id -un) != x$user ]; then
     chown -R $user $directory
   fi
@@ -1211,7 +1211,7 @@ import() {
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:s:m" option; do
+  while getopts "w:o:c:u:k:sm" option; do
     case $option in
       w)
         stratum0=$OPTARG
