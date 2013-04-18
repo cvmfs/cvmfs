@@ -1,0 +1,201 @@
+
+cvmfs_test_name="Hardlinks"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+	local working_dir=$1
+
+	pushdir $working_dir
+
+  echo "Die polyglotte Katze"                       >  heinz
+  echo ""                                           >> heinz
+  echo "Die Katze sitzt vorm Mauseloch,"            >> heinz
+  echo "in das die Maus vor kurzem kroch,"          >> heinz
+  echo "und denkt: \"Da wart nicht lang ich,"       >> heinz
+  echo "die Maus, die fang ich!\""                  >> heinz
+  echo ""                                           >> heinz
+  echo "Die Maus jedoch spricht in dem Bau:"        >> heinz
+  echo "\"Ich bin zwar klein, doch bin ich schlau!" >> heinz
+  echo "Ich rühr mich nicht von hinnen,"            >> heinz
+  echo "ich bleibe drinnen!\""                      >> heinz
+  echo ""                                           >> heinz
+  echo "Da plötzlich hört sie - statt \"miau\" -"   >> heinz
+  echo "ein laut vernehmliches \"wau-wau\""         >> heinz
+  echo "und lacht: \"Die arme Katze,"               >> heinz
+  echo "der Hund, der hatse!"                       >> heinz
+  echo "Jetzt muß sie aber schleunigst flitzen,"    >> heinz
+  echo "anstatt vor meinem Loch zu sitzen!\""       >> heinz
+  echo ""                                           >> heinz
+  echo "Doch leider - nun, man ahnt’s bereits -"    >> heinz
+  echo "war das ein Irrtum ihrerseits,"             >> heinz
+  echo "denn als die Maus vors Loch hintritt -"     >> heinz
+  echo "es war nur ein ganz kleiner Schritt -"      >> heinz
+  echo "wird sie durch Katzenpfotenkraft"           >> heinz
+  echo "hinweggerafft! - - -"                       >> heinz
+  echo ""                                           >> heinz
+  echo "Danach wäscht sich die Katz die Pfote"      >> heinz
+  echo "und spricht mit der ihr eignen Note:"       >> heinz
+  echo "\"Wie nützlich ist es dann und wann,"       >> heinz
+  echo "wenn man ’ne fremde Sprache kann ...!\""    >> heinz
+  echo ""                                           >> heinz
+#  echo "              Heinz Erhardt"                >> heinz
+
+	ln heinz erhardt
+  ln heinz musiker
+  ln heinz entertainer
+  ln heinz schauspieler
+
+	popdir
+}
+
+change_files_1_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  ln erhardt deutscher_dichter
+  ln erhardt dicker_dichter
+  ln heinz   dicker_deutscher_dichter
+
+  ln -s dicker_deutscher_dichter lustiger_deutscher_dichter
+
+  popdir
+}
+
+change_files_2_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm dicker_dichter
+  rm entertainer
+
+  ln lustiger_deutscher_dichter lustiger_dicker_dichter
+  ln lustiger_dicker_dichter    lustiger_deutscher_dicker_dichter
+
+  popdir
+}
+
+change_files_3_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "Die Made "                            >  erhardt
+  echo ""                                     >> deutscher_dichter
+  echo "Hinter eines Baumes Rinde"            >> dicker_deutscher_dichter
+  echo "wohnt die Made mit dem Kinde."        >> erhardt
+  echo "Sie ist Witwe, denn der Gatte,"       >> heinz
+  echo "den sie hatte, fiel vom Blatte."      >> lustiger_deutscher_dichter
+  echo "Diente so auf diese Weise"            >> musiker
+  echo "einer Ameise als Speise."             >> schauspieler
+  echo ""                                     >> erhardt
+  echo "Eines Morgens sprach die Made:"       >> deutscher_dichter
+  echo "Liebes Kind, ich sehe grade,"         >> dicker_deutscher_dichter
+  echo "drüben gibt es frischen Kohl,"        >> erhardt
+  echo "den ich hol. So leb denn wohl."       >> heinz
+  echo "Halt! Noch eins, denk, was geschah,"  >> lustiger_deutscher_dichter
+  echo "geh nicht aus, denk an Papa!"         >> musiker
+  echo ""                                     >> schauspieler
+  echo "Also sprach sie und entwich -"        >> erhardt
+  echo "Made junior jedoch schlich"           >> deutscher_dichter
+  echo "hinterdrein, und das war schlecht,"   >> dicker_deutscher_dichter
+  echo "denn schon kam ein bunter Specht"     >> erhardt
+  echo "und verschlang die kleine fade"       >> heinz
+  echo "Made ohne Gnade. - Schade."           >> lustiger_deutscher_dichter
+  echo ""                                     >> musiker
+  echo "Hinter eines Baumes Rinde"            >> schauspieler
+  echo "ruft die Made nach dem Kinde."        >> deutscher_dichter
+  echo ""                                     >> dicker_deutscher_dichter
+  echo "            Heinz Erhardt"            >> erhardt
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "putting some stuff in the new repository" >> $logfile
+  produce_files_in $repo_dir >> $logfile 2>&1 || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison" >> $logfile
+  produce_files_in $reference_dir >> $logfile 2>&1 || return 4
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "compare the results of cvmfs to our reference copy" >> $logfile
+  compare_directories $repo_dir $reference_dir >> $logfile || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "change stuff in the repository" >> $logfile
+  change_files_1_in $repo_dir >> $logfile 2>&1 || return 7
+
+  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
+  change_files_1_in $reference_dir >> $logfile 2>&1 || return 8
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "compare the changed directories" >> $logfile
+  compare_directories $repo_dir $reference_dir >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "change stuff in the repository" >> $logfile
+  change_files_2_in $repo_dir >> $logfile 2>&1 || return 7
+
+  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
+  change_files_2_in $reference_dir >> $logfile 2>&1 || return 8
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "compare the changed directories" >> $logfile
+  compare_directories $repo_dir $reference_dir >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "change stuff in the repository" >> $logfile
+  change_files_3_in $repo_dir >> $logfile 2>&1 || return 7
+
+  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
+  change_files_3_in $reference_dir >> $logfile 2>&1 || return 8
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "compare the changed directories" >> $logfile
+  compare_directories $repo_dir $reference_dir >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  return 0
+}
+

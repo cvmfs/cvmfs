@@ -761,10 +761,19 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
  */
 static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) 
 {
+  // The libfuse high-level library does the same
+  if (ino == FUSE_ROOT_ID) {
+    fuse_reply_none(req);
+    return;
+  }
+  
+  remount_fence_->Enter();
+  ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %"PRIu64" by %u", 
            ino, nlookup);
   if (!nfs_maps_)
     inode_tracker_->VfsPut(ino, nlookup);
+  remount_fence_->Leave();
   fuse_reply_none(req);
 }
 
