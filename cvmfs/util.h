@@ -71,6 +71,7 @@ std::vector<std::string> FindFiles(const std::string &dir,
                                    const std::string &suffix);
 
 std::string StringifyInt(const int64_t value);
+std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
 std::string StringifyIpv4(const uint32_t ip_address);
@@ -111,7 +112,7 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::map<int, int> &map_fildes);
 
 void SafeSleepMs(const unsigned ms);
-  
+
 
 template <typename hashed_type>
 struct hash_murmur {
@@ -123,7 +124,7 @@ struct hash_murmur {
 #endif
   }
 };
-  
+
 
 /**
  * Generic base class to mark an inheriting class as 'non-copyable'
