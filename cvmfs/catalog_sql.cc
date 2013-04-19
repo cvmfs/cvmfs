@@ -297,6 +297,59 @@ bool Sql::FetchRow() {
 }
 
 
+std::string Sql::DebugResultTable() {
+  std::string line;
+  std::string result;
+  unsigned int rows = 0;
+
+  // go through all data rows
+  while (FetchRow()) {
+    // retrieve the table header (once)
+    const unsigned int cols = sqlite3_column_count(statement_);
+    if (rows == 0) {
+      for (unsigned int col = 0; col < cols; ++col) {
+        const char *name = sqlite3_column_name(statement_, col);
+        line += name;
+        if (col + 1 < cols) line += " | ";
+      }
+      result += line + "\n";
+      line.clear();
+    }
+
+    // retrieve the data fields for each row
+    for (unsigned int col = 0; col < cols; ++col) {
+      const int type = sqlite3_column_type(statement_, col);
+      switch(type) {
+        case SQLITE_INTEGER:
+          line += StringifyInt(RetrieveInt64(col));
+          break;
+        case SQLITE_FLOAT:
+          line += StringifyDouble(RetrieveDouble(col));
+          break;
+        case SQLITE_TEXT:
+          line += (char*)RetrieveText(col);
+          break;
+        case SQLITE_BLOB:
+          line += "[BLOB data]";
+          break;
+        case SQLITE_NULL:
+          line += "[NULL]";
+          break;
+      }
+      if (col + 1 < cols) line += " | ";
+    }
+
+    result += line + "\n";
+    line.clear();
+    ++rows;
+  }
+
+  // print the result
+  result += "Retrieved Rows: " + StringifyInt(rows);
+  return result;
+}
+
+
 /**
  * Reset a prepared statement to make it reusable.
  * @return true on success otherwise false
