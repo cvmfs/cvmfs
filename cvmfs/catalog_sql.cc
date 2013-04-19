@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdlib>
-#include <sstream>
 
 #include "platform.h"
 #include "catalog.h"
@@ -298,8 +297,9 @@ bool Sql::FetchRow() {
 }
 
 
-bool Sql::DebugPrintResultTable() {
-  std::stringstream result;
+std::string Sql::DebugResultTable() {
+  std::string line;
+  std::string result;
   unsigned int rows = 0;
 
   // go through all data rows
@@ -309,10 +309,11 @@ bool Sql::DebugPrintResultTable() {
     if (rows == 0) {
       for (unsigned int col = 0; col < cols; ++col) {
         const char *name = sqlite3_column_name(statement_, col);
-        result << name;
-        if (col + 1 < cols) result << " | ";
+        line += name;
+        if (col + 1 < cols) line += " | ";
       }
-      result << std::endl;
+      result += line + "\n";
+      line.clear();
     }
 
     // retrieve the data fields for each row
@@ -320,32 +321,32 @@ bool Sql::DebugPrintResultTable() {
       const int type = sqlite3_column_type(statement_, col);
       switch(type) {
         case SQLITE_INTEGER:
-          result << RetrieveInt64(col);
+          line += StringifyInt(RetrieveInt64(col));
           break;
         case SQLITE_FLOAT:
-          result << RetrieveDouble(col);
+          line += StringifyDouble(RetrieveDouble(col));
           break;
         case SQLITE_TEXT:
-          result << RetrieveText(col);
+          line += (char*)RetrieveText(col);
           break;
         case SQLITE_BLOB:
-          result << "[BLOB data]";
+          line += "[BLOB data]";
           break;
         case SQLITE_NULL:
-          result << "[NULL]";
+          line += "[NULL]";
           break;
       }
-      if (col + 1 < cols) result << " | ";
+      if (col + 1 < cols) line += " | ";
     }
 
-    result << std::endl;
+    result += line + "\n";
+    line.clear();
     ++rows;
   }
 
   // print the result
-  LogCvmfs(kLogSql, kLogStdout, "%sRetrieved Rows: %d",
-           result.str().c_str(), rows);
-  return true;
+  result += "Retrieved Rows: " + StringifyInt(rows);
+  return result;
 }
 
 
