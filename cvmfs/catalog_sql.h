@@ -109,7 +109,7 @@ class Sql {
 
   bool Execute();
   bool FetchRow();
-  bool DebugPrintResultTable();
+  std::string DebugResultTable();
   bool Reset();
   inline int GetLastError() const { return last_error_code_; }
 
