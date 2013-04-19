@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdlib>
+#include <sstream>
 
 #include "platform.h"
 #include "catalog.h"
@@ -298,6 +299,57 @@ bool Sql::Execute() {
 bool Sql::FetchRow() {
   last_error_code_ = sqlite3_step(statement_);
   return SQLITE_ROW == last_error_code_;
+}
+
+
+bool Sql::DebugPrintResultTable() {
+  std::stringstream result;
+  unsigned int rows = 0;
+
+  // go through all data rows
+  while (FetchRow()) {
+    // retrieve the table header (once)
+    const unsigned int cols = sqlite3_column_count(statement_);
+    if (rows == 0) {
+      for (unsigned int col = 0; col < cols; ++col) {
+        const char *name = sqlite3_column_name(statement_, col);
+        result << name;
+        if (col + 1 < cols) result << " | ";
+      }
+      result << std::endl;
+    }
+
+    // retrieve the data fields for each row
+    for (unsigned int col = 0; col < cols; ++col) {
+      const int type = sqlite3_column_type(statement_, col);
+      switch(type) {
+        case SQLITE_INTEGER:
+          result << RetrieveInt64(col);
+          break;
+        case SQLITE_FLOAT:
+          result << RetrieveDouble(col);
+          break;
+        case SQLITE_TEXT:
+          result << RetrieveText(col);
+          break;
+        case SQLITE_BLOB:
+          result << "[BLOB data]";
+          break;
+        case SQLITE_NULL:
+          result << "[NULL]";
+          break;
+      }
+      if (col + 1 < cols) result << " | ";
+    }
+
+    result << std::endl;
+    ++rows;
+  }
+
+  // print the result
+  LogCvmfs(kLogSql, kLogStdout, "%sRetrieved Rows: %d",
+           result.str().c_str(), rows);
+  return true;
 }
 
 
