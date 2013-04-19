@@ -103,13 +103,13 @@ string GetFileName(const string &path) {
   else
     return path;
 }
-  
+
 
 NameString GetFileName(const PathString &path) {
   NameString name;
   int length = path.GetLength();
   const char *chars  = path.GetChars();
-  
+
   int i;
   for (i = length-1; i >= 0; --i) {
     if (chars[i] == '/')
@@ -119,7 +119,7 @@ NameString GetFileName(const PathString &path) {
   if (i < length) {
     name.Append(chars+i, length-i);
   }
-  
+
   return name;
 }
 
@@ -279,7 +279,7 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
                        const bool temporarily)
 {
   LogCvmfs(kLogCvmfs, kLogDebug, "current credentials uid %d gid %d "
-           "euid %d egid %d, switching to %d %d (temp: %d)", 
+           "euid %d egid %d, switching to %d %d (temp: %d)",
            getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
   int retval = 0;
   if (temporarily) {
@@ -296,8 +296,8 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
     }
     retval = setgid(gid) || setuid(uid);
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)", 
-           retval, errno); 
+  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)",
+           retval, errno);
   return retval == 0;
 }
 
@@ -563,6 +563,13 @@ string StringifyInt(const int64_t value) {
 }
 
 
+string StringifyDouble(const double value) {
+  char buffer[64];
+  snprintf(buffer, sizeof(buffer), "%.03f", value);
+  return string(buffer);
+}
+
+
 /**
  * Converts seconds since UTC 0 into something readable
  */
@@ -638,8 +645,8 @@ bool HasPrefix(const string &str, const string &prefix,
   }
   return true;
 }
-  
-  
+
+
 bool IsNumeric(const std::string &str) {
   for (unsigned i = 0; i < str.length(); ++i) {
     if ((str[i] < '0') || (str[i] > '9'))
