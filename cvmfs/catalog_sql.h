@@ -108,6 +108,7 @@ class Sql {
 
   bool Execute();
   bool FetchRow();
+  bool DebugPrintResultTable();
   bool Reset();
   inline int GetLastError() const { return last_error_code_; }
 
