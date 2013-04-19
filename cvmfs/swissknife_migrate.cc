@@ -574,25 +574,42 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
 
   const Database &writable = data->new_catalog->database();
 
-  // Linkcount scratch space.
-  // This temporary table is used for the linkcount analysis results.
-  // The old catalog format did not have a direct notion of linkcounts but this
-  // information can be partly retrieved from the underlying file system
-  // semantics
+  // Hardlinks scratch space.
+  // This temporary table is used for the hardlink analysis results.
+  // The old catalog format did not have a direct notion of hardlinks and their
+  // linkcounts,  but this information can be partly retrieved from the under-
+  // lying file system semantics.
   //
   //   Hardlinks:
-  //     inode     : the inodes that were part of a hardlink group before
   //     groupid   : this group id can be used for the new catalog schema
+  //     inode     : the inodes that were part of a hardlink group before
   //     linkcount : the linkcount for hardlink group id members
   Sql sql_create_hardlinks_table(writable,
     "CREATE TEMPORARY TABLE hardlinks "
-    "  (inode INTEGER, hardlink_group_id INTEGER, linkcount INTEGER, "
-    "   CONSTRAINT pk_inode PRIMARY KEY (inode));");
+    "  (  hardlink_group_id  INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "     inode              INTEGER, "
+    "     linkcount          INTEGER, "
+    "     CONSTRAINT unique_inode UNIQUE (inode)  );");
   retval = sql_create_hardlinks_table.Execute();
   if (! retval) {
-    Error("Failed to create temporary linkcount analysis table",
+    Error("Failed to create temporary hardlink analysis table",
           sql_create_hardlinks_table, data);
     return false;
+  }
+
+  // Directory Linkcount scratch space.
+  // Directory linkcounts can be obtained from the directory hierarchy reflected
+  // in the old style catalogs. The new catalog schema asks for this specific
+  // linkcount. Directory linkcount analysis results will be put into this
+  // temporary table
+  Sql sql_create_linkcounts_table(writable,
+    "CREATE TEMPORARY TABLE dir_linkcounts "
+    "  (  inode      INTEGER PRIMARY KEY, "
+    "     linkcount  INTEGER  );");
+  retval = sql_create_linkcounts_table.Execute();
+  if (! retval) {
+    Error("Failed to create tmeporary directory linkcount analysis table",
+          sql_create_linkcounts_table, data);
   }
 
   // it is possible to skip this step
@@ -602,21 +619,6 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     retval = AnalyzeFileLinkcounts(data);
     if (! retval) {
       return false;
-    }
-
-    // do some statistics if asked for...
-    if (collect_catalog_statistics_) {
-      Sql count_hardlinks(writable,
-        "SELECT count(*), sum(linkcount) FROM hardlinks;");
-      retval = count_hardlinks.FetchRow();
-      if (! retval) {
-        Error("Failed to count the generated file hardlinks for statistics",
-              count_hardlinks, data);
-        return false;
-      }
-
-      data->statistics.hardlink_group_count  += count_hardlinks.RetrieveInt64(0);
-      data->statistics.aggregated_linkcounts += count_hardlinks.RetrieveInt64(1);
     }
   }
 
@@ -629,9 +631,8 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   // Note: we deliberately exclude nested catalog mountpoints here, since we
   //       cannot check the number of containing directories here
   Sql sql_dir_linkcounts(writable,
-    "INSERT INTO hardlinks "
+    "INSERT INTO dir_linkcounts "
     "  SELECT c1.inode as inode, "
-    "         0, " // hardlink group of directories is always 0
     "         SUM(IFNULL(MIN(c2.inode,1),0)) + 2 as linkcount "
     "  FROM old.catalog as c1 "
     "  LEFT JOIN old.catalog as c2 "
@@ -657,21 +658,27 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
   }
 
   // copy the old file meta information into the new catalog schema
-  //   here we add the previously analyzed hardlink/linkcount information
+  //   here we also add the previously analyzed hardlink/linkcount information
+  //   from both temporary tables "hardlinks" and "dir_linkcounts".
   //
-  // Note: nested catalog mountpoint still need to be treated separately
+  // Note: nested catalog mountpoints still need to be treated separately
+  //       (see MigrateNestedCatalogReferences() for details)
   Sql migrate_file_meta_data(writable,
     "INSERT INTO catalog "
     "  SELECT md5path_1, md5path_2, "
     "         parent_1, parent_2, "
-    "         IFNULL(hardlink_group_id, 0) << 32 | IFNULL(linkcount, 1) "
+    "         IFNULL(hardlink_group_id, 0) << 32 | "
+    "         COALESCE(hardlinks.linkcount, dir_linkcounts.linkcount, 1) "
     "           AS hardlinks, "
     "         hash, size, mode, mtime, "
     "         flags, name, symlink, "
     "         :uid, "
     "         :gid "
     "  FROM old.catalog "
-    "  LEFT JOIN hardlinks ON catalog.inode = hardlinks.inode;"
+    "  LEFT JOIN hardlinks "
+    "    ON catalog.inode = hardlinks.inode "
+    "  LEFT JOIN dir_linkcounts "
+    "    ON catalog.inode = dir_linkcounts.inode;"
   );
   retval = migrate_file_meta_data.BindInt64(1, uid_) &&
            migrate_file_meta_data.BindInt64(2, gid_) &&
@@ -709,7 +716,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
 
   // copy (and update) the properties fields
   //
-  // Note: The schema is explicitly not copied to the new catalog.
+  // Note: The 'schema' is explicitly not copied to the new catalog.
   //       Each catalog contains a revision, which is also copied here and that
   //       is later updated by calling catalog->IncrementRevision()
   Sql copy_properties(writable,
@@ -775,8 +782,8 @@ bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
   // hardlinks need to be discarded and treated as normal files containing the
   // exact same data
   Sql fill_linkcount_table_for_files(writable,
-    "INSERT INTO hardlinks "
-    "  SELECT inode, rowid as hardlink_group_id, count(*) as linkcount "
+    "INSERT INTO hardlinks (inode, linkcount)"
+    "  SELECT inode, count(*) as linkcount "
     "  FROM ( "
          // recombine supported hardlink inodes with their actual manifested hard-
          // links in the catalog.
@@ -822,6 +829,21 @@ bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
     Error("Failed to remove file linkcount analysis scratch table",
           drop_hardlink_scratch_space, data);
     return false;
+  }
+
+  // do some statistics if asked for...
+  if (collect_catalog_statistics_) {
+    Sql count_hardlinks(writable,
+      "SELECT count(*), sum(linkcount) FROM hardlinks;");
+    retval = count_hardlinks.FetchRow();
+    if (! retval) {
+      Error("Failed to count the generated file hardlinks for statistics",
+            count_hardlinks, data);
+      return false;
+    }
+
+    data->statistics.hardlink_group_count  += count_hardlinks.RetrieveInt64(0);
+    data->statistics.aggregated_linkcounts += count_hardlinks.RetrieveInt64(1);
   }
 
   return true;
