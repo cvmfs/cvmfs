@@ -483,6 +483,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
   }
 }
 
+
 bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
                                                    PendingCatalog *data) const {
   const std::string root_path = data->root_path();
@@ -535,6 +536,7 @@ bool CommandMigrate::MigrationWorker::CheckDatabaseSchemaCompatibility(
   }
   return true;
 }
+
 
 bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
                                                    PendingCatalog *data) const {
@@ -648,7 +650,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     Error("Failed to analyze directory specific linkcounts",
           sql_dir_linkcounts, data);
     if (sql_dir_linkcounts.GetLastError() == SQLITE_CONSTRAINT) {
-      Error("Obviously your catalogs are corrupted, since we found an directory"
+      Error("Obviously your catalogs are corrupted, since we found a directory"
             "inode that is a file inode at the same time!");
     }
     return false;
