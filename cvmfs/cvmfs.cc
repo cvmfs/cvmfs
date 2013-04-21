@@ -104,7 +104,7 @@ namespace cvmfs {
 const char *kDefaultCachedir = "/var/lib/cvmfs/default";
 const unsigned kDefaultTimeout = 2;
 const double kDefaultKCacheTimeout = 60.0;
-const unsigned kReloadSafetyMargin = 500;
+const unsigned kReloadSafetyMargin = 500;  // in milliseconds
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
@@ -1540,6 +1540,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
+  // The debug log is already closed at this point
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
 }
 
@@ -1566,7 +1567,6 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
   cvmfs_operations->forget      = cvmfs_forget;
-
 }
 
 }  // namespace cvmfs

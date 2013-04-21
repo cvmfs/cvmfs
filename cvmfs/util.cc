@@ -817,7 +817,7 @@ void WaitForSignal(int signum) {
   int retval;
   do {
     retval = platform_sigwait(signum);
-  } while ((retval != signum) && (errno = EINTR));
+  } while ((retval != signum) && (errno == EINTR));
   assert(retval == signum);
 }
 
