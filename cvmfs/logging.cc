@@ -181,9 +181,10 @@ void SetLogVerbosity(const LogLevels min_level) {
 #ifdef DEBUGMSG
 void SetLogDebugFile(const string &filename) {
   if (filename == "") {
-    if ((file_debug != NULL) && (file_debug != stderr))
+    if ((file_debug != NULL) && (file_debug != stderr)) {
       fclose(file_debug);
-    file_debug = NULL;
+      file_debug = NULL;
+    }
     delete path_debug;
     path_debug = NULL;
     return;
