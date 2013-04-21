@@ -686,9 +686,7 @@ static inline void AddToInodeTracker(const catalog::DirectoryEntry &dirent) {
  * This or getattr is called as kind of prerequisit to every operation.
  * We do check catalog TTL here (and reload, if necessary).
  */
-static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
-                         const char *name)
-{
+static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   atomic_inc64(&num_fs_lookup_);
   RemountCheck();
 
