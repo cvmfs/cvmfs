@@ -151,12 +151,6 @@ class AbstractCatalogManager {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
-  /**
-   * Don't use.  Only for the glue buffers.
-   */
-  bool Path2InodeUnprotected(const PathString &path, inode_t *inode);
-  bool Inode2DirentUnprotected(const inode_t inode, DirectoryEntry *dirent);
-  
   void SetIncarnation(const uint64_t new_incarnation);
   void RegisterRemountListener(RemountListener *listener) {
     WriteLock();
