@@ -905,6 +905,14 @@ cvmfs_bugreport() {
         tar cfz quarantaine-${repo}.tar.gz "$qdir" 2>/dev/null
       fi
   done
+  
+  echo "Gathering stack traces"
+  for repo in `ls "$CVMFS_CACHE_BASE"`
+  do
+    mkdir -p stacktraces-$repo
+    find ${CVMFS_CACHE_BASE}/${repo} -maxdepth 1 -name 'stacktrace*' \
+      -exec cp {} stacktraces-$repo/ \;
+  done
 
   local commands
 
