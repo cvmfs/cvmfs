@@ -251,6 +251,7 @@ check_memory() {
 
     echo "Memory limit exceeded ($rss_kb kB / $limit kB | $elements items in inode tracker)" >&2
     echo "Memory limit of $limit kB was exceeded by $instance which used $rss_kb kB"
+    echo "We've had $elements items in the inode tracker"
     echo "Output of cat /proc/$pid/status:"
     sudo cat /proc/$pid/status 2>&1
     return 102
