@@ -1,6 +1,6 @@
 2.1.9:
   * RHEL 6.4 SELinux rules for generating stack traces
-  * Inlcude stacktrace files in bugreport tarball
+  * Include stacktrace files in bugreport tarball
   * Check for attr utility in cvmfs_config
   * Fixed potential endless loop in automatic cache cleanup
   * Switched to SQlite 3.7.16.2
