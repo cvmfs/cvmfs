@@ -245,8 +245,8 @@ check_memory() {
 
   if [ $rss_kb -gt $limit ]; then
     local inode_tracker=$(sudo cvmfs_talk -i $instance internal affairs | grep "inode tracker")
-    local inserts=$(echo $inode_tracker | grep -o "inserts: [0-9]*" | grep -o "[0-9]*")
-    local removes=$(echo $inode_tracker | grep -o "removes: [0-9]*" | grep -o "[0-9]*")
+    local inserts=$(echo $inode_tracker | grep -o "inserts: [0-9]*" | grep -o "[0-9]*$")
+    local removes=$(echo $inode_tracker | grep -o "removes: [0-9]*" | grep -o "[0-9]*$")
     local elements=$(( $inserts - $removes ))
 
     echo "Memory limit exceeded ($rss_kb kB / $limit kB | $elements items in inode tracker)" >&2
