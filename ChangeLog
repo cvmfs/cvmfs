@@ -1,3 +1,5 @@
+2.1.10:
+
 2.1.9:
   * RHEL 6.4 SELinux rules for generating stack traces
   * Include stacktrace files in bugreport tarball
