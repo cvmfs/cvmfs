@@ -1,4 +1,5 @@
 2.1.10:
+  * Fix restoring directory handle gauge
   * Prevent the leveldb build system to pick up the system's
     snappy library
 

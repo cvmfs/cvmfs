@@ -2226,6 +2226,12 @@ static bool RestoreState(const int fd_progress,
         (cvmfs::DirectoryHandles *)saved_states[i]->state;
       cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
       cvmfs::open_dirs_ = cvmfs::directory_handles_->size();
+      cvmfs::DirectoryHandles::const_iterator i = 
+        cvmfs::directory_handles_->begin();
+      for (; i != cvmfs::directory_handles_->end(); ++i) {
+        if (i->first >= cvmfs::next_directory_handle_)
+          cvmfs::next_directory_handle_ = i->first + 1;
+      }
       
       SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
