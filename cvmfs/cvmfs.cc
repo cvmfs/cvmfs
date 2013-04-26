@@ -104,7 +104,7 @@ namespace cvmfs {
 const char *kDefaultCachedir = "/var/lib/cvmfs/default";
 const unsigned kDefaultTimeout = 2;
 const double kDefaultKCacheTimeout = 60.0;
-const unsigned kReloadSafetyMargin = 500;
+const unsigned kReloadSafetyMargin = 500;  // in milliseconds
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
 const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
@@ -686,9 +686,7 @@ static inline void AddToInodeTracker(const catalog::DirectoryEntry &dirent) {
  * This or getattr is called as kind of prerequisit to every operation.
  * We do check catalog TTL here (and reload, if necessary).
  */
-static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
-                         const char *name)
-{
+static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   atomic_inc64(&num_fs_lookup_);
   RemountCheck();
 
@@ -1540,6 +1538,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
+  // The debug log is already closed at this point
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
 }
 
@@ -1566,7 +1565,6 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
   cvmfs_operations->forget      = cvmfs_forget;
-
 }
 
 }  // namespace cvmfs
@@ -2228,6 +2226,12 @@ static bool RestoreState(const int fd_progress,
         (cvmfs::DirectoryHandles *)saved_states[i]->state;
       cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
       cvmfs::open_dirs_ = cvmfs::directory_handles_->size();
+      cvmfs::DirectoryHandles::const_iterator i = 
+        cvmfs::directory_handles_->begin();
+      for (; i != cvmfs::directory_handles_->end(); ++i) {
+        if (i->first >= cvmfs::next_directory_handle_)
+          cvmfs::next_directory_handle_ = i->first + 1;
+      }
       
       SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");

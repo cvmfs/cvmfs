@@ -74,6 +74,7 @@ tar xvfz leveldb-${LEVELDB_VERSION}.tar.gz
 mkdir -p "$outOfSource/leveldb/src"
 mv leveldb-${LEVELDB_VERSION}/* "$outOfSource/leveldb/src"
 cp src/* "$outOfSource/leveldb/src"
+cd "$outOfSource/leveldb/src" && patch < dont_search_snappy.patch
 rm -rf leveldb-${LEVELDB_VERSION}
 cd ../..
 

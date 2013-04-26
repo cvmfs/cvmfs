@@ -1,4 +1,11 @@
+2.1.10:
+  * Fix restoring directory handle gauge
+  * Prevent the leveldb build system to pick up the system's
+    snappy library
+
 2.1.9:
+  * RHEL 6.4 SELinux rules for generating stack traces
+  * Include stacktrace files in bugreport tarball
   * Check for attr utility in cvmfs_config
   * Fixed potential endless loop in automatic cache cleanup
   * Switched to SQlite 3.7.16.2

@@ -55,8 +55,7 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_KEYS_DIR \
           CVMFS_MAX_TTL CVMFS_RELOAD_SOCKETS CVMFS_DEFAULT_DOMAIN \
           CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORIES \
-          CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX \
-          CVMFS_GLUEBUFFER_SIZE"
+          CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_64BIT_INODES"
@@ -905,6 +904,14 @@ cvmfs_bugreport() {
       if [ -d "$qdir" ]; then
         tar cfz quarantaine-${repo}.tar.gz "$qdir" 2>/dev/null
       fi
+  done
+  
+  echo "Gathering stack traces"
+  for repo in `ls "$CVMFS_CACHE_BASE"`
+  do
+    mkdir -p stacktraces-$repo
+    find ${CVMFS_CACHE_BASE}/${repo} -maxdepth 1 -name 'stacktrace*' \
+      -exec cp {} stacktraces-$repo/ \;
   done
 
   local commands

@@ -812,7 +812,7 @@ int main(int argc, char *argv[]) {
   dlclose(library_handle_);
   library_handle_ = NULL;
 
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
 
   CleanupLibcryptoMt();
