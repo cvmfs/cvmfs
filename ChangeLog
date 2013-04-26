@@ -1,4 +1,5 @@
 2.1.10:
+  * Fix deadlock in 'cvmfs_config reload' when cwd is on cvmfs
   * Fix reloading with wiping out the cache directory in case
     the cache base directory is not owned by the cvmfs user
   * Fix restoring directory handle gauge
