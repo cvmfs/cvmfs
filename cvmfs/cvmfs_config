@@ -848,8 +848,8 @@ cvmfs_wipecache() {
        list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
     fi
 
-    local org
-    for org in $list
+    local org shared
+    for org in $list shared
     do
       case $org in
         none)
@@ -857,27 +857,29 @@ cvmfs_wipecache() {
         *)
           . /etc/cvmfs/config.sh # start with fresh repository_... functions
           cvmfs_readconfig
-          fqrn=`cvmfs_mkfqrn $org`
-          cvmfs_readconfig $fqrn
+          if [ "$org" != "shared" ]; then
+            fqrn=`cvmfs_mkfqrn $org`
+            cvmfs_readconfig $fqrn
+          else
+            fqrn=shared
+          fi
           echo -n "Wiping out $CVMFS_CACHE_BASE/$fqrn ... "
-          [ ! -d "$CVMFS_CACHE_BASE/$fqrn" ] || rm -rf "$CVMFS_CACHE_BASE/$fqrn"
-          if [ $? -ne 0 ]; then
-            echo "Failed!"
-            RETVAL=1
+          if [ -d "$CVMFS_CACHE_BASE/$fqrn" ]; then
+            rm -rf "$CVMFS_CACHE_BASE/$fqrn" && \
+              mkdir -p "$CVMFS_CACHE_BASE/$fqrn" && \
+              chown $CVMFS_USER "$CVMFS_CACHE_BASE/$fqrn"
+            if [ $? -ne 0 ]; then
+              echo "Failed!"
+              RETVAL=1
+            else
+              echo "OK"
+            fi
           else
             echo "OK"
           fi
         ;;
       esac
     done
-  fi
-  echo -n "Wiping out $CVMFS_CACHE_BASE/shared ... "
-  [ ! -d "$CVMFS_CACHE_BASE/shared" ] || rm -rf "$CVMFS_CACHE_BASE/shared"
-  if [ $? -ne 0 ]; then
-    echo "Failed!"
-    RETVAL=1
-  else
-    echo "OK"
   fi
 
   return $RETVAL
