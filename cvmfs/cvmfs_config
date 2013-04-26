@@ -703,6 +703,8 @@ cvmfs_reload() {
     return $?
   fi
 
+  # Avoid deadlock if cwd is on cvmfs
+  cd /
   # Organized reload of all repositories
   if [ ! -d "$CVMFS_RELOAD_SOCKETS" ]; then
     local mount_list
