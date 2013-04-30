@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <fcntl.h>
 #include <errno.h>
 
 #include <cstring>
@@ -169,16 +170,18 @@ static void *MainCheck(void *data __attribute__((unused))) {
       continue;
     }
 
-    FILE *fsrc = fopen(relative_path.c_str() , "r");
-    if (!fsrc) {
+    int fd_src = open(relative_path.c_str() , O_RDONLY);
+    if (!fd_src < 0) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: cannot open %s", path.c_str());
       atomic_inc32(&g_num_err_operational);
       continue;
     }
-
+    // Don't thrash kernel buffers
+    platform_disable_kcache(fd_src);
+    
     // Compress every file and calculate SHA-1 of stream
     hash::Any hash(hash::kSha1);
-    if (!zlib::CompressFile2Null(fsrc, &hash)) {
+    if (!zlib::CompressFd2Null(fd_src, &hash)) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",
                path.c_str());
       atomic_inc32(&g_num_err_operational);
@@ -224,7 +227,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
         }
       }
     }
-    fclose(fsrc);
+    close(fd_src);
   }
 
   return NULL;

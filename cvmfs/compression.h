@@ -46,6 +46,7 @@ bool CompressPath2Path(const std::string &src, const std::string &dest,
 bool DecompressPath2Path(const std::string &src, const std::string &dest);
 
 bool CompressFile2Null(FILE *fsrc, hash::Any *compressed_hash);
+bool CompressFd2Null(int fd_src, hash::Any *compressed_hash);
 bool CompressFile2File(FILE *fsrc, FILE *fdest);
 bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash);
 bool CompressPath2File(const std::string &src, FILE *fdest,

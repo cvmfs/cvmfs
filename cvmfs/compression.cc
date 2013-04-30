@@ -326,6 +326,58 @@ bool CompressFile2Null(FILE *fsrc, hash::Any *compressed_hash) {
            result);
   return result;
 }
+  
+  
+bool CompressFd2Null(int fd_src, hash::Any *compressed_hash) {
+  int z_ret, flush;
+  bool result = -1;
+  unsigned have;
+  z_stream strm;
+  unsigned char in[kZChunk];
+  unsigned char out[kZChunk];
+  hash::ContextPtr hash_context(compressed_hash->algorithm);
+  
+  CompressInit(&strm);
+  hash_context.buffer = alloca(hash_context.size);
+  hash::Init(hash_context);
+  
+  // Compress until end of file
+  do {
+    ssize_t bytes_read = read(fd_src, in, kZChunk);
+    if (bytes_read < 0) goto compress_fd2null_final;
+    strm.avail_in = bytes_read;
+    
+    flush = (bytes_read < kZChunk) ? Z_FINISH : Z_NO_FLUSH;
+    strm.next_in = in;
+    
+    // Run deflate() on input until output buffer not full, finish
+    // compression if all of source has been read in
+    do {
+      strm.avail_out = kZChunk;
+      strm.next_out = out;
+      z_ret = deflate(&strm, flush);  // no bad return value
+      if (z_ret == Z_STREAM_ERROR)
+        goto compress_fd2null_final;  // state not clobbered
+      have = kZChunk - strm.avail_out;
+      hash::Update(out, have, hash_context);
+    } while (strm.avail_out == 0);
+    
+    // Done when last data in file processed
+  } while (flush != Z_FINISH);
+  
+  // stream will be complete
+  if (z_ret != Z_STREAM_END) goto compress_fd2null_final;
+  
+  hash::Final(hash_context, compressed_hash);
+  result = true;
+  
+  // Clean up and return
+ compress_fd2null_final:
+  CompressFini(&strm);
+  LogCvmfs(kLogCompress, kLogDebug, "file compression finished with result %d",
+           result);
+  return result;
+}
 
 
 bool CompressFile2File(FILE *fsrc, FILE *fdest) {

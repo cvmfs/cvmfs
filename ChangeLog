@@ -1,4 +1,6 @@
 2.1.10:
+  * Advise the kernel not to cache pages for files verified
+    by cvmfs_fsck
   * Fix deadlock in 'cvmfs_config reload' when cwd is on cvmfs
   * Fix reloading with wiping out the cache directory in case
     the cache base directory is not owned by the cvmfs user
