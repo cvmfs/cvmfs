@@ -1,4 +1,5 @@
 2.1.10:
+  * Add number of forget() calls to file system statistics
   * Advise the kernel not to cache pages for files verified
     by cvmfs_fsck
   * Fix deadlock in 'cvmfs_config reload' when cwd is on cvmfs

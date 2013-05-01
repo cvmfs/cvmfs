@@ -59,6 +59,7 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
   sqlite3_extended_result_codes(sqlite_db_, 1);
 
   // Read-ahead into file system buffers
+  // TODO: mmap, re-readahead
   int fd_readahead = open(filename_.c_str(), O_RDONLY);
   if (fd_readahead < 0) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to open %s for read-ahead (%d)",

@@ -247,6 +247,7 @@ atomic_int64 num_fs_lookup_negative_;
 atomic_int64 num_fs_stat_;
 atomic_int64 num_fs_read_;
 atomic_int64 num_fs_readlink_;
+atomic_int64 num_fs_forget_;
 atomic_int32 num_io_error_;
 atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
 atomic_int32 open_dirs_; /**< number of currently open directories */
@@ -387,7 +388,8 @@ string GetFsStats() {
     "open(): " + StringifyInt(atomic_read64(&num_fs_open_)) + "  " +
     "diropen(): " + StringifyInt(atomic_read64(&num_fs_dir_open_)) + "  " +
     "read(): " + StringifyInt(atomic_read64(&num_fs_read_)) + "  " +
-    "readlink(): " + StringifyInt(atomic_read64(&num_fs_readlink_)) + "\n";
+    "readlink(): " + StringifyInt(atomic_read64(&num_fs_readlink_)) + "  " +
+    "forget(): " + StringifyInt(atomic_read64(&num_fs_forget_)) + "\n";
 }
 
 
@@ -759,6 +761,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
  */
 static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) 
 {
+  atomic_inc64(&cvmfs::num_fs_forget_);
+  
   // The libfuse high-level library does the same
   if (ino == FUSE_ROOT_ID) {
     fuse_reply_none(req);
@@ -1791,6 +1795,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   atomic_init64(&cvmfs::num_fs_stat_);
   atomic_init64(&cvmfs::num_fs_read_);
   atomic_init64(&cvmfs::num_fs_readlink_);
+  atomic_init64(&cvmfs::num_fs_forget_);
   atomic_init32(&cvmfs::num_io_error_);
   cvmfs::previous_io_error_.timestamp = 0;
   cvmfs::previous_io_error_.delay = 0;
