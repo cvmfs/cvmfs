@@ -556,6 +556,11 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
 }
 
 
+string StringifyBool(const bool value) {
+  return value ? "yes" : "no";
+}
+  
+  
 string StringifyInt(const int64_t value) {
   char buffer[48];
   snprintf(buffer, sizeof(buffer), "%"PRId64, value);

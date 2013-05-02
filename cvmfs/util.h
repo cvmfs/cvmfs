@@ -70,6 +70,7 @@ bool RemoveTree(const std::string &path);
 std::vector<std::string> FindFiles(const std::string &dir,
                                    const std::string &suffix);
 
+std::string StringifyBool(const bool value);
 std::string StringifyInt(const int64_t value);
 std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);

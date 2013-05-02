@@ -319,6 +319,12 @@ static inline double GetKcacheTimeout() {
     return 0.0;
   return kcache_timeout_;
 }
+  
+  
+void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
+  *drainout_mode = atomic_read32(&drainout_mode_);
+  *maintenance_mode = atomic_read32(&maintenance_mode_);
+}
 
 
 unsigned GetRevision() {

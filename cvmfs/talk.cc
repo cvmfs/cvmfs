@@ -330,7 +330,11 @@ static void *MainTalk(void *data __attribute__((unused))) {
           default:
             result += "unknown";
         }
-        result += "\n";
+        bool drainout_mode;
+        bool maintenance_mode;
+        cvmfs::GetReloadStatus(&drainout_mode, &maintenance_mode);
+        result += "\nDrainout Mode: " + StringifyBool(drainout_mode) + "\n";
+        result += "Maintenance Mode: " + StringifyBool(maintenance_mode) + "\n";
 
         if (cvmfs::nfs_maps_) {
           result += "\nNFS Map Statistics:\n";

@@ -29,6 +29,7 @@ extern bool foreground_;
 extern bool nfs_maps_;
 
 catalog::LoadError RemountStart();
+void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode);
 unsigned GetRevision();
 std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes

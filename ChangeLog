@@ -1,4 +1,5 @@
 2.1.10:
+  * Add drainout mode and maintenance mode to internal affairs
   * Use md5path cache for lookups of ancient inodes
   * Add number of forget() calls to file system statistics
   * Advise the kernel not to cache pages for files verified
