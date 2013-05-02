@@ -1,4 +1,5 @@
 2.1.10:
+  * Improved logging for fatal cachedb update errors
   * Fix potential endless loop in signal handler
   * Add drainout mode and maintenance mode to internal affairs
   * Use md5path cache for lookups of ancient inodes
@@ -9,7 +10,7 @@
   * Fix reloading with wiping out the cache directory in case
     the cache base directory is not owned by the cvmfs user
   * Fix restoring directory handle gauge
-  * Prevent the leveldb build system to pick up the system's
+  * Prevent the leveldb build system from picking up the system's
     snappy library
 
 2.1.9:

@@ -289,8 +289,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_touch_);
         LogCvmfs(kLogQuota, kLogDebug, "touching %s (%ld): %d",
                  hash_str.c_str(), seq_-1, retval);
-        errno = retval;
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslog, 
+                   "failed to update %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_touch_);
         break;
       case kUnpin:
@@ -299,8 +303,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_unpin_);
         LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d",
                  hash_str.c_str(), retval);
-        errno = retval;
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslog, 
+                   "failed to unpin %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_unpin_);
         break;
       case kPin:
@@ -330,7 +338,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_new_);
         LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, pin %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslog, 
+                   "failed to insert %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_new_);
 
         if (!exists) gauge_ += size;
