@@ -287,7 +287,7 @@ static string ReportStacktrace() {
   debug += GenerateStackTrace(*exe_path_, pid);
 
   // give the dying cvmfs client the finishing stroke
-  if (kill(pid, SIGQUIT) != 0) {
+  if (kill(pid, SIGKILL) != 0) {
     debug += "Failed to kill cvmfs client!\n\n";
   }
 
@@ -306,6 +306,7 @@ static void Watchdog() {
     if (cflow == 'S') {
       const string debug = ReportStacktrace();
       LogEmergency(debug);
+      break;
     } else if (cflow == 'Q') {
       break;
     } else {

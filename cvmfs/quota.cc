@@ -945,7 +945,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   int pipe_handshake[2];
   MakePipe(pipe_boot);
   MakePipe(pipe_handshake);
-
+  
   vector<string> command_line;
   command_line.push_back(exe_path);
   command_line.push_back("__cachemgr__");
@@ -966,7 +966,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(pipe_handshake[0]);
 
-  retval = ManagedExec(command_line, preserve_filedes, map<int, int>());
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);

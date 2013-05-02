@@ -1508,12 +1508,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %"PRIu64", size %u",
            ino, size);
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
+  remount_fence_->Leave();
+
   if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
@@ -1537,6 +1540,19 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   } else {
     fuse_reply_err(req, ERANGE);
   }
+}
+  
+
+bool Evict(const string &path) {
+  catalog::DirectoryEntry dirent;
+  remount_fence_->Enter();
+  const bool found = GetDirentForPath(PathString(path), 0, &dirent);
+  remount_fence_->Leave();
+
+  if (!found && dirent.IsRegular())
+    return false;
+  quota::Remove(dirent.checksum());
+  return true;
 }
   
   

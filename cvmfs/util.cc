@@ -892,7 +892,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
   cmd_line.push_back(binary_path);
   cmd_line.insert(cmd_line.end(), argv.begin(), argv.end());
 
-  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes)) {
+  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes, true)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);
@@ -932,7 +932,8 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
  */
 bool ManagedExec(const vector<string> &command_line,
                  const vector<int> &preserve_fildes,
-                 const map<int, int> &map_fildes)
+                 const map<int, int> &map_fildes,
+                 const bool drop_credentials)
 {
   assert(command_line.size() >= 1);
 
@@ -998,7 +999,7 @@ bool ManagedExec(const vector<string> &command_line,
 #ifdef DEBUGMSG
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
-    if (!SwitchCredentials(geteuid(), getegid(), false)) {
+    if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false)) {
       failed = 'X';
       goto fork_failure;
     }

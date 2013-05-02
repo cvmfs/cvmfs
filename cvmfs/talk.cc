@@ -154,6 +154,17 @@ static void *MainTalk(void *data __attribute__((unused))) {
             }
           }
         }
+      } else if (line.substr(0, 5) == "evict") {
+        if (line.length() < 7) {
+          Answer(con_fd, "Usage: evict <path>\n");
+        } else {
+          const string path = line.substr(6);
+          const bool found_regular = cvmfs::Evict(path);
+          if (found_regular)
+            Answer(con_fd, "OK\n");
+          else
+            Answer(con_fd, "No such regular file\n");
+        }
       } else if (line == "mountpoint") {
         Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {

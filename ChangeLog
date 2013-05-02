@@ -1,4 +1,7 @@
 2.1.10:
+  * Fix uid/euid of shared cache manager
+  * Add 'evict' command to cvmfs_talk in order to remove specific
+    files from cache
   * Improve logging for fatal cachedb update errors
   * Fix potential endless loop in signal handler
   * Add drainout mode and maintenance mode to internal affairs
