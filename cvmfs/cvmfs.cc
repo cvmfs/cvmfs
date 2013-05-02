@@ -505,6 +505,10 @@ static void RemountCheck() {
 }
   
 
+static bool GetDirentForPath(const PathString &path,
+                             const fuse_ino_t parent_inode,
+                             catalog::DirectoryEntry *dirent);
+  
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -557,13 +561,13 @@ static bool GetDirentForInode(const fuse_ino_t ino,
                  ino, recovered_path.c_str(), catalog_manager_->GetRevision());
       } else {
         // Path reconstructed, is it in the new file system snapshot?
-        bool retval = 
-          catalog_manager_->LookupPath(recovered_path, catalog::kLookupFull, 
-                                       dirent);
+        // TODO: use caches
+        bool retval = GetDirentForPath(recovered_path, 0, dirent);
         if (retval) {
           LogCvmfs (kLogCvmfs, kLogDebug, "translated inode %"PRIu64" to "
                     "inode %"PRIu64, ino, dirent->inode());
           // Only insert fresh and recoverable data into caches
+          // TODO: insert into md5 pathcache
           dirent->set_inode(ino);
           inode_cache_->Insert(ino, *dirent);
           path_cache_->Insert(ino, recovered_path);
@@ -592,7 +596,9 @@ static bool GetDirentForPath(const PathString &path,
 
   // Lookup inode in catalog TODO: not twice md5 calculation
   bool retval;
-  if (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode)) {
+  if ((parent_inode == 0) ||
+      (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode))) 
+  {
     // The parent inode can be resolved just now, but we shouldn't put it in
     // caches as it can be forgotten soon
     retval = catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent);
