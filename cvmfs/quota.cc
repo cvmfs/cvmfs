@@ -453,6 +453,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           const string hash_str = hash.ToString();
           LogCvmfs(kLogQuota, kLogDebug, "manually removing %s",
                    hash_str.c_str());
+          bool success = false;
 
           sqlite3_bind_text(stmt_size_, 1, &hash_str[0], hash_str.length(),
                             SQLITE_STATIC);
@@ -465,6 +466,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                               SQLITE_STATIC);
             retval = sqlite3_step(stmt_rm_);
             if ((retval == SQLITE_DONE) || (retval == SQLITE_OK)) {
+              success = true;
               gauge_ -= size;
               if (is_pinned) {
                 pinned_chunks_->erase(hash);
@@ -475,8 +477,13 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                        hash_str.c_str(), retval);
             }
             sqlite3_reset(stmt_rm_);
+          } else {
+            // File does not exist
+            success = true;
           }
           sqlite3_reset(stmt_size_);
+          
+          WritePipe(return_pipe, &success, sizeof(success));
           break; }
         case kCleanup:
           retval = DoCleanup(size);
@@ -1362,10 +1369,18 @@ void Remove(const hash::Any &hash) {
   string hash_str = hash.ToString();
 
   if (limit_ != 0) {
+    int pipe_remove[2];
+    MakeReturnPipe(pipe_remove);
+    
     LruCommand cmd;
     cmd.command_type = kRemove;
+    cmd.return_pipe = pipe_remove[1];
     memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+    
+    bool success;
+    ReadHalfPipe(pipe_remove[0], &success, sizeof(success));
+    CloseReturnPipe(pipe_remove);
   }
 
   unlink(((*cache_dir_) + hash.MakePath(1, 2)).c_str());

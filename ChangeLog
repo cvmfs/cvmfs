@@ -1,4 +1,5 @@
 2.1.10:
+  * Fix remove command in cache manager
   * Fix uid/euid of shared cache manager
   * Add 'evict' command to cvmfs_talk in order to remove specific
     files from cache
