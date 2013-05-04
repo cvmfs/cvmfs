@@ -31,7 +31,8 @@ set (CVMFS_CLIENT_SOURCES
   download.cc download.h
   manifest.h manifest.cc
   manifest_fetch.h manifest_fetch.cc
-  lru.h lru.cc
+  smallhash.cc smallhash.h
+  lru.h
   globals.h globals.cc
   peers.h peers.cc
   catalog_sql.h catalog_sql.cc
