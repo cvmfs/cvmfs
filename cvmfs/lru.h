@@ -160,7 +160,7 @@ class LruCache {
    * deleted to obtain some space.
    */
   ListEntryHead<Key> *lru_list_;
-  SmallHash<Key, CacheEntry> cache_;
+  SmallHashFixed<Key, CacheEntry> cache_;
 #ifdef LRU_CACHE_THREAD_SAFE
   pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
 #endif
@@ -556,7 +556,7 @@ class LruCache {
   }
 
   static double GetEntrySize() {
-    return SmallHash<Key, CacheEntry>::GetEntrySize() +
+    return SmallHashFixed<Key, CacheEntry>::GetEntrySize() +
            ConcreteMemoryAllocator::GetEntrySize();
   }
 
