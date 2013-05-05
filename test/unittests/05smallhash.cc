@@ -122,9 +122,17 @@ int main() {
   }
   printf("overall size: %u\n", overallsize);
 
-  printf("MULTI-HASH MultiThreaded Erase:\n");
+  printf("MULTI-HASH MultiThreaded Insert + Erase:\n");
   pthread_t threads[2*THREADS];
   start = time(NULL);
+  for (int i = 0; i < 2*THREADS; i++) {
+    pthread_create(&threads[i], NULL, tf_insert, (void *)i);
+    i++;
+    pthread_create(&threads[i], NULL, tf_insert, (void *)i);
+  }
+  for (int i = 0; i < 2*THREADS; i += 1) {
+    pthread_join(threads[i], NULL);
+  }
   for (int i = 0; i < 2*THREADS; i++) {
     pthread_create(&threads[i], NULL, tf_erase, (void *)i);
     i++;
@@ -148,10 +156,10 @@ int main() {
   printf("SPARSEMAP\n");
   google::sparse_hash_map<int, int, hash_murmur<int> > sparsemap;
   sparsemap.set_deleted_key(-1);
-  start = time(NULL);
   for (int i = 0; i < N; ++i) {
     sparsemap[i] = i;
   }
+  start = time(NULL);
   for (int i = 0; i < N; ++i) {
     sparsemap.erase(i);
   }
