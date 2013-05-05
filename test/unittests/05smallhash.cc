@@ -6,7 +6,6 @@
 //   05smallhash.cc -pthread
 
 #include "smallhash.h"
-#include "MurmurHash2.h"
 #include <cassert>
 #include <time.h>
 #include <google/sparse_hash_map>
