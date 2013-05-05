@@ -58,6 +58,7 @@
 #include <fuse/fuse_lowlevel.h>
 
 #include "platform.h"
+#include "murmur.h"
 #include "logging.h"
 #include "smalloc.h"
 #include "dirent.h"
@@ -777,8 +778,16 @@ typename LruCache<Key, Value>::ConcreteMemoryAllocator
   *LruCache<Key, Value>::allocator_ = NULL;
 
 // Hash functions
-uint32_t hasher_md5(const hash::Md5 &key);
-uint32_t hasher_inode(const fuse_ino_t &inode);
+static inline uint32_t hasher_md5(const hash::Md5 &key) {
+  // Don't start with the first bytes, because == is using them as well
+  return (uint32_t) *((uint32_t *)key.digest + 1);
+}
+
+static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
+  return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
+}
+//uint32_t hasher_md5(const hash::Md5 &key);
+//uint32_t hasher_inode(const fuse_ino_t &inode);
 
 
 class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>

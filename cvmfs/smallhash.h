@@ -19,7 +19,7 @@
 
 #include "smalloc.h"
 #include "atomic.h"
-#include "MurmurHash2.h"
+#include "murmur.h"
 
 /**
  * Hash table with linear probing as collision resolution.  Works only for
@@ -108,8 +108,8 @@ class SmallHashBase {
   }
 
   ~SmallHashBase() {
-    free(keys_);
-    free(values_);
+    delete[] keys_;
+    delete[] values_;
   }
 
  protected:
@@ -120,8 +120,8 @@ class SmallHashBase {
   }
 
   void InitMemory() {
-    keys_ = static_cast<Key *>(smalloc(capacity_ * sizeof(Key)));
-    values_ = static_cast<Value *>(smalloc(capacity_ * sizeof(Value)));
+    keys_ = new Key[capacity_];
+    values_ = new Value[capacity_];
     bytes_allocated_ = (sizeof(Key) + sizeof(Value)) * capacity_;
   }
 
@@ -235,8 +235,8 @@ class SmallHashDynamic :
   }
 
   void ResetCapacity() {
-    free(Base::keys_);
-    free(Base::values_);
+    delete[] Base::keys_;
+    delete[] Base::values_;
     Base::capacity_ = Base::initial_capacity_;
     Base::InitMemory();
     SetThresholds();
@@ -259,8 +259,8 @@ class SmallHashDynamic :
     }
     assert(size() == old_size);
 
-    free(old_keys);
-    free(old_values);
+    delete[] old_keys;
+    delete[] old_values;
     num_migrates_++;
   }
 

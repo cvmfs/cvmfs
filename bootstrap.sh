@@ -25,7 +25,7 @@ cd ../..
 
 # CURL
 cd externals/libcurl
-tar xfz curl-${CURL_VERSION}.tar.gz 
+tar xfz curl-${CURL_VERSION}.tar.gz
 mkdir -p "$outOfSource/libcurl/src"
 mv curl-${CURL_VERSION}/* "$outOfSource/libcurl/src"
 cp src/* "$outOfSource/libcurl/src"
@@ -47,12 +47,6 @@ mkdir -p "$outOfSource/sqlite3/src"
 cp src/* "$outOfSource/sqlite3/src"
 cd ../..
 
-# Murmur
-cd externals/murmur
-mkdir -p "$outOfSource/murmur/src"
-cp src/* "$outOfSource/murmur/src"
-cd ../..
-
 # vjson
 cd externals/vjson
 mkdir -p "$outOfSource/vjson/src"
@@ -61,7 +55,7 @@ cd ../..
 
 # google sparse hash
 cd externals/sparsehash
-tar xfz sparsehash-${SPARSEHASH_VERSION}.tar.gz 
+tar xfz sparsehash-${SPARSEHASH_VERSION}.tar.gz
 mkdir -p "$outOfSource/sparsehash/src"
 mv sparsehash-${SPARSEHASH_VERSION}/* "$outOfSource/sparsehash/src"
 cp src/* "$outOfSource/sparsehash/src"
