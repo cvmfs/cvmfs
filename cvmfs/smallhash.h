@@ -11,12 +11,15 @@
 
 #include <inttypes.h>
 #include <stdint.h>
+#include <pthread.h>
 
 #include <cassert>
 #include <cstdlib>
 #include <algorithm>
 
 #include "smalloc.h"
+#include "atomic.h"
+#include "MurmurHash2.h"
 
 /**
  * Hash table with linear probing as collision resolution.  Works only for
@@ -61,13 +64,14 @@ class SmallHashBase {
     return found;
   }
 
-  void Insert(const Key &key, const Value &value) {
+  bool Insert(const Key &key, const Value &value) {
     static_cast<Derived *>(this)->Grow();  // No-op if fixed-size
     const bool overwritten = DoInsert(key, value, true);
     size_ += !overwritten;  // size + 1 if the key was not yet in the map
+    return overwritten;
   }
 
-  void Erase(const Key &key) {
+  bool Erase(const Key &key) {
     uint32_t bucket;
     uint32_t collisions;
     const bool found = DoLookup(key, &bucket, &collisions);
@@ -83,6 +87,7 @@ class SmallHashBase {
       }
       static_cast<Derived *>(this)->Shrink();  // No-op if fixed-size
     }
+    return found;
   }
 
   void Clear() {
@@ -271,15 +276,114 @@ class SmallHashDynamic :
  */
 template<class Key, class Value>
 class MultiHash {
+ public:
+  MultiHash() {
+    num_hashmaps_ = 0;
+    hashmaps_ = NULL;
+    locks_ = NULL;
+  }
 
+  void Init(const uint8_t num_hashmaps, const Key &empty_key,
+            uint32_t (*hasher)(const Key &key))
+  {
+    assert(num_hashmaps > 0);
+    const uint8_t N = num_hashmaps;
+    num_hashmaps_ = N;
+    hashmaps_ = new SmallHashDynamic<Key, Value>[N]();
+    locks_ =
+      static_cast<pthread_mutex_t *>(smalloc(N * sizeof(pthread_mutex_t)));
+    sizes_ =
+      static_cast<atomic_int32 *>(smalloc(N * sizeof(atomic_int32)));
+    for (uint8_t i = 0; i < N; ++i) {
+      int retval = pthread_mutex_init(&locks_[i], NULL);
+      assert(retval == 0);
+      hashmaps_[i].Init(128, empty_key, hasher);
+      atomic_init32(&sizes_[i]);
+    }
+  }
+
+  ~MultiHash() {
+    for (uint8_t i = 0; i < num_hashmaps_; ++i) {
+      pthread_mutex_destroy(&locks_[i]);
+    }
+    free(locks_);
+    free(sizes_);
+    delete[] hashmaps_;
+  }
+
+  bool Lookup(const Key &key, Value *value) {
+    uint8_t target = SelectHashmap(key);
+    Lock(target);
+    const bool result = hashmaps_[target].Lookup(key, value);
+    Unlock(target);
+    return result;
+  }
+
+  void Insert(const Key &key, const Value &value) {
+    uint8_t target = SelectHashmap(key);
+    Lock(target);
+    const bool overwritten = hashmaps_[target].Insert(key, value);
+    Unlock(target);
+    if (!overwritten)
+      atomic_inc32(&sizes_[target]);
+  }
+
+  void Erase(const Key &key) {
+    uint8_t target = SelectHashmap(key);
+    Lock(target);
+    const bool existed = hashmaps_[target].Erase(key);
+    Unlock(target);
+    if (existed)
+      atomic_dec32(&sizes_[target]);
+  }
+
+  void Clear() {
+    for (uint8_t i = 0; i < num_hashmaps_; ++i)
+      Lock(i);
+    for (uint8_t i = 0; i < num_hashmaps_; ++i)
+      hashmaps_[i].Clear();
+    for (uint8_t i = 0; i < num_hashmaps_; ++i)
+      Unlock(i);
+  }
+
+  uint8_t num_hashmaps() const { return num_hashmaps_; }
+  void GetSizes(uint32_t *sizes) {
+    for (uint8_t i = 0; i < num_hashmaps_; ++i)
+      sizes[i] = atomic_read32(&sizes_[i]);
+  }
+
+ private:
+  inline uint8_t SelectHashmap(const Key &key) {
+    uint32_t hash = MurmurHash2(&key, sizeof(key), 0x37);
+    double bucket = (double(hash) * double(num_hashmaps_) /
+                    double((uint32_t)(-1)));
+    return (uint32_t)bucket % num_hashmaps_;
+  }
+
+  inline void Lock(const uint8_t target) {
+    int retval = pthread_mutex_lock(&locks_[target]);
+    assert(retval == 0);
+  }
+
+  inline void Unlock(const uint8_t target) {
+    int retval = pthread_mutex_unlock(&locks_[target]);
+    assert(retval == 0);
+  }
+
+  uint8_t num_hashmaps_;
+  SmallHashDynamic<Key, Value> *hashmaps_;
+  atomic_int32 *sizes_;
+  pthread_mutex_t *locks_;
 };
 
 
 // initialize the static fields
 template<class Key, class Value, class Derived>
 const double SmallHashBase<Key, Value, Derived>::kLoadFactor = 0.7;
+
 template<class Key, class Value>
 const double SmallHashDynamic<Key, Value>::kThresholdGrow = 0.7;
+
 template<class Key, class Value>
 const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.15;
 
