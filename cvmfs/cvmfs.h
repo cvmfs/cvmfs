@@ -28,7 +28,9 @@ extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;
 
+bool Evict(const std::string &path);
 catalog::LoadError RemountStart();
+void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode);
 unsigned GetRevision();
 std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes

@@ -70,6 +70,7 @@ bool RemoveTree(const std::string &path);
 std::vector<std::string> FindFiles(const std::string &dir,
                                    const std::string &suffix);
 
+std::string StringifyBool(const bool value);
 std::string StringifyInt(const int64_t value);
 std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
@@ -109,7 +110,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
                    const std::vector<std::string>  &argv);
 bool ManagedExec(const std::vector<std::string> &command_line,
                  const std::vector<int> &preserve_fildes,
-                 const std::map<int, int> &map_fildes);
+                 const std::map<int, int> &map_fildes,
+                 const bool drop_credentials);
 
 void SafeSleepMs(const unsigned ms);
 

@@ -289,8 +289,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_touch_);
         LogCvmfs(kLogQuota, kLogDebug, "touching %s (%ld): %d",
                  hash_str.c_str(), seq_-1, retval);
-        errno = retval;
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslog, 
+                   "failed to update %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_touch_);
         break;
       case kUnpin:
@@ -299,8 +303,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_unpin_);
         LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d",
                  hash_str.c_str(), retval);
-        errno = retval;
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslog, 
+                   "failed to unpin %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_unpin_);
         break;
       case kPin:
@@ -330,7 +338,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_new_);
         LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, pin %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslog, 
+                   "failed to insert %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_new_);
 
         if (!exists) gauge_ += size;
@@ -440,6 +453,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           const string hash_str = hash.ToString();
           LogCvmfs(kLogQuota, kLogDebug, "manually removing %s",
                    hash_str.c_str());
+          bool success = false;
 
           sqlite3_bind_text(stmt_size_, 1, &hash_str[0], hash_str.length(),
                             SQLITE_STATIC);
@@ -452,6 +466,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                               SQLITE_STATIC);
             retval = sqlite3_step(stmt_rm_);
             if ((retval == SQLITE_DONE) || (retval == SQLITE_OK)) {
+              success = true;
               gauge_ -= size;
               if (is_pinned) {
                 pinned_chunks_->erase(hash);
@@ -462,8 +477,13 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                        hash_str.c_str(), retval);
             }
             sqlite3_reset(stmt_rm_);
+          } else {
+            // File does not exist
+            success = true;
           }
           sqlite3_reset(stmt_size_);
+          
+          WritePipe(return_pipe, &success, sizeof(success));
           break; }
         case kCleanup:
           retval = DoCleanup(size);
@@ -932,7 +952,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   int pipe_handshake[2];
   MakePipe(pipe_boot);
   MakePipe(pipe_handshake);
-
+  
   vector<string> command_line;
   command_line.push_back(exe_path);
   command_line.push_back("__cachemgr__");
@@ -953,7 +973,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(pipe_handshake[0]);
 
-  retval = ManagedExec(command_line, preserve_filedes, map<int, int>());
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -1349,10 +1369,18 @@ void Remove(const hash::Any &hash) {
   string hash_str = hash.ToString();
 
   if (limit_ != 0) {
+    int pipe_remove[2];
+    MakeReturnPipe(pipe_remove);
+    
     LruCommand cmd;
     cmd.command_type = kRemove;
+    cmd.return_pipe = pipe_remove[1];
     memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+    
+    bool success;
+    ReadHalfPipe(pipe_remove[0], &success, sizeof(success));
+    CloseReturnPipe(pipe_remove);
   }
 
   unlink(((*cache_dir_) + hash.MakePath(1, 2)).c_str());

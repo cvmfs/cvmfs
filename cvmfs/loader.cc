@@ -258,8 +258,8 @@ static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
   cvmfs_exports_->cvmfs_operations.statfs(req, ino);
   atomic_dec64(&num_operations_);
 }
-  
-  
+
+
 #ifdef __APPLE__
 static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                           size_t size, uint32_t position)
@@ -285,8 +285,8 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   cvmfs_exports_->cvmfs_operations.listxattr(req, ino, size);
   atomic_dec64(&num_operations_);
 }
-  
-  
+
+
 static void stub_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
@@ -797,7 +797,6 @@ int main(int argc, char *argv[]) {
     retval = fuse_session_loop_mt(session);
 
   loader_talk::Fini();
-  cvmfs_exports_->fnFini();
 
   // Unmount
   fuse_session_remove_chan(channel);
@@ -808,6 +807,8 @@ int main(int argc, char *argv[]) {
   channel = NULL;
   session = NULL;
   mount_options = NULL;
+
+  cvmfs_exports_->fnFini();
 
   dlclose(library_handle_);
   library_handle_ = NULL;

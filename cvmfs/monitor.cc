@@ -129,12 +129,17 @@ static void SendTrace(int signal,
   if (write(pipe_wd_[1], &pid, sizeof(pid_t)) != sizeof(pid_t))
     _exit(1);
 
-  cflow = 'Q';
-  (void)write(pipe_wd_[1], &cflow, 1);
-
   // do not die before the stack trace was generated
   // kill -SIGQUIT <pid> will finish this
-  while(true) {}
+  int counter = 0;
+  while(true) {
+    SafeSleepMs(100);
+    // quit anyway after 30 seconds
+    if (++counter == 300) {
+      LogCvmfs(kLogCvmfs, kLogSyslog, "stack trace generation failed");
+      _exit(1);
+    }
+  }
 
   _exit(1);
 }
@@ -213,7 +218,7 @@ static string GenerateStackTrace(const string &exe_path,
 
   // re-gain root permissions to allow for ptrace of died cvmfs2 process
   const bool retrievable = true;
-  if (! SwitchCredentials(0, getgid(), retrievable)) {
+  if (!SwitchCredentials(0, getgid(), retrievable)) {
     result += "failed to re-gain root permissions... still give it a try\n";
   }
 
@@ -229,7 +234,7 @@ static string GenerateStackTrace(const string &exe_path,
   retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, "gdb", argv);
   assert(retval);
 
-  // skip the gdb startup rubbish
+  // skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
 
   // send stacktrace command to gdb
@@ -282,7 +287,7 @@ static string ReportStacktrace() {
   debug += GenerateStackTrace(*exe_path_, pid);
 
   // give the dying cvmfs client the finishing stroke
-  if (kill(pid, SIGQUIT) != 0) {
+  if (kill(pid, SIGKILL) != 0) {
     debug += "Failed to kill cvmfs client!\n\n";
   }
 
@@ -301,6 +306,7 @@ static void Watchdog() {
     if (cflow == 'S') {
       const string debug = ReportStacktrace();
       LogEmergency(debug);
+      break;
     } else if (cflow == 'Q') {
       break;
     } else {
