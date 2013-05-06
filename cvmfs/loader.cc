@@ -797,6 +797,7 @@ int main(int argc, char *argv[]) {
     retval = fuse_session_loop_mt(session);
 
   loader_talk::Fini();
+  cvmfs_exports_->fnFini();
 
   // Unmount
   fuse_session_remove_chan(channel);
@@ -807,8 +808,6 @@ int main(int argc, char *argv[]) {
   channel = NULL;
   session = NULL;
   mount_options = NULL;
-
-  cvmfs_exports_->fnFini();
 
   dlclose(library_handle_);
   library_handle_ = NULL;
