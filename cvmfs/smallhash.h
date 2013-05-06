@@ -64,14 +64,20 @@ class SmallHashBase {
     return found;
   }
 
-  bool Insert(const Key &key, const Value &value) {
+  bool Contains(const Key &key) const {
+    uint32_t bucket;
+    uint32_t collisions;
+    const bool found = DoLookup(key, &bucket, &collisions);
+    return found;
+  }
+
+  void Insert(const Key &key, const Value &value) {
     static_cast<Derived *>(this)->Grow();  // No-op if fixed-size
     const bool overwritten = DoInsert(key, value, true);
     size_ += !overwritten;  // size + 1 if the key was not yet in the map
-    return overwritten;
   }
 
-  bool Erase(const Key &key) {
+  void Erase(const Key &key) {
     uint32_t bucket;
     uint32_t collisions;
     const bool found = DoLookup(key, &bucket, &collisions);
@@ -87,7 +93,6 @@ class SmallHashBase {
       }
       static_cast<Derived *>(this)->Shrink();  // No-op if fixed-size
     }
-    return found;
   }
 
   void Clear() {
@@ -292,13 +297,10 @@ class MultiHash {
     hashmaps_ = new SmallHashDynamic<Key, Value>[N]();
     locks_ =
       static_cast<pthread_mutex_t *>(smalloc(N * sizeof(pthread_mutex_t)));
-    sizes_ =
-      static_cast<atomic_int32 *>(smalloc(N * sizeof(atomic_int32)));
     for (uint8_t i = 0; i < N; ++i) {
       int retval = pthread_mutex_init(&locks_[i], NULL);
       assert(retval == 0);
       hashmaps_[i].Init(128, empty_key, hasher);
-      atomic_init32(&sizes_[i]);
     }
   }
 
@@ -307,7 +309,6 @@ class MultiHash {
       pthread_mutex_destroy(&locks_[i]);
     }
     free(locks_);
-    free(sizes_);
     delete[] hashmaps_;
   }
 
@@ -322,19 +323,15 @@ class MultiHash {
   void Insert(const Key &key, const Value &value) {
     uint8_t target = SelectHashmap(key);
     Lock(target);
-    const bool overwritten = hashmaps_[target].Insert(key, value);
+    hashmaps_[target].Insert(key, value);
     Unlock(target);
-    if (!overwritten)
-      atomic_inc32(&sizes_[target]);
   }
 
   void Erase(const Key &key) {
     uint8_t target = SelectHashmap(key);
     Lock(target);
-    const bool existed = hashmaps_[target].Erase(key);
+    hashmaps_[target].Erase(key);
     Unlock(target);
-    if (existed)
-      atomic_dec32(&sizes_[target]);
   }
 
   void Clear() {
@@ -347,9 +344,21 @@ class MultiHash {
   }
 
   uint8_t num_hashmaps() const { return num_hashmaps_; }
+
   void GetSizes(uint32_t *sizes) {
-    for (uint8_t i = 0; i < num_hashmaps_; ++i)
-      sizes[i] = atomic_read32(&sizes_[i]);
+    for (uint8_t i = 0; i < num_hashmaps_; ++i) {
+      Lock(i);
+      sizes[i] = hashmaps_[i].size();
+      Unlock(i);
+    }
+  }
+
+  void GetCollisionStats(uint64_t *num_collisions, uint32_t *max_collisions) {
+    for (uint8_t i = 0; i < num_hashmaps_; ++i) {
+      Lock(i);
+      hashmaps_[i].GetCollisionStats(&num_collisions[i], &max_collisions[i]);
+      Unlock(i);
+    }
   }
 
  private:
@@ -372,7 +381,6 @@ class MultiHash {
 
   uint8_t num_hashmaps_;
   SmallHashDynamic<Key, Value> *hashmaps_;
-  atomic_int32 *sizes_;
   pthread_mutex_t *locks_;
 };
 
