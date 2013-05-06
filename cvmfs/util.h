@@ -19,8 +19,7 @@
 #include <map>
 #include <vector>
 
-#include "MurmurHash2.h"
-
+#include "murmur.h"
 #include "platform.h"
 #include "hash.h"
 #include "shortstring.h"

@@ -46,7 +46,6 @@
 
 #include <openssl/crypto.h>
 #include <google/dense_hash_map>
-#include "MurmurHash2.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -62,6 +61,7 @@
 #include <functional>
 
 #include "platform.h"
+#include "murmur.h"
 #include "logging.h"
 #include "tracer.h"
 #include "download.h"
