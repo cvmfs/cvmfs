@@ -2205,11 +2205,16 @@ static bool RestoreState(const int fd_progress,
 
     if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
       SendMsg2Socket(fd_progress, "Restoring inode generation... ");
-      cvmfs::inode_generation_info_ =
-        *((cvmfs::InodeGenerationInfo *)saved_states[i]->state);
-      // Seemless migration
-      if (cvmfs::inode_generation_info_.version == 1)
-        cvmfs::inode_generation_info_.version = 2;
+      cvmfs::InodeGenerationInfo *old_info =
+        (cvmfs::InodeGenerationInfo *)saved_states[i]->state;
+      if (old_info->version == 1) {
+        // Migration
+        cvmfs::inode_generation_info_.initial_revision =
+          old_info->initial_revision;
+        cvmfs::inode_generation_info_.incarnation = old_info->incarnation;
+      } else {
+        cvmfs::inode_generation_info_ = *old_info;
+      }
       ++cvmfs::inode_generation_info_.incarnation;
       SendMsg2Socket(fd_progress, " done\n");
     }
