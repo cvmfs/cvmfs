@@ -42,6 +42,11 @@ class SmallHashBase {
     max_collisions_ = 0;
   }
 
+  ~SmallHashBase() {
+    delete[] keys_;
+    delete[] values_;
+  }
+
   void Init(uint32_t expected_size, Key empty,
             uint32_t (*hasher)(const Key &key))
   {
@@ -110,11 +115,6 @@ class SmallHashBase {
   {
     *num_collisions = num_collisions_;
     *max_collisions = max_collisions_;
-  }
-
-  ~SmallHashBase() {
-    delete[] keys_;
-    delete[] values_;
   }
 
  protected:
@@ -214,6 +214,22 @@ class SmallHashDynamic :
     num_migrates_ = 0;
   }
 
+  explicit SmallHashDynamic(const SmallHashDynamic<Key, Value> &other) : Base()
+  {
+    num_migrates_ = 0;
+    CopyFrom(other);
+  }
+
+  SmallHashDynamic<Key, Value> &operator= (
+    const SmallHashDynamic<Key, Value> &other)
+  {
+    if (&other == this)
+      return *this;
+
+    CopyFrom(other);
+    return *this;
+  }
+
   uint32_t capacity() const { return Base::capacity_; }
   uint32_t size() const { return Base::size_; }
   uint32_t num_migrates() const { return num_migrates_; }
@@ -267,6 +283,13 @@ class SmallHashDynamic :
     delete[] old_keys;
     delete[] old_values;
     num_migrates_++;
+  }
+
+  void CopyFrom(const SmallHashDynamic<Key, Value> &other) {
+    for (uint32_t i = 0; i < other.capacity_; ++i) {
+      if (other.keys_[i] != other.empty_key_)
+        Insert(other.keys_[i], other.values_[i]);
+    }
   }
 
   uint32_t num_migrates_;
