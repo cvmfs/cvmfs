@@ -123,7 +123,7 @@ class InodeReferences {
     const bool found = map_.Lookup(inode, &refcounter);
     const bool new_inode = !found;
     refcounter++;  // This is 0 if the inode is not found
-    map_.Insert(inode, ++refcounter);
+    map_.Insert(inode, refcounter);
     return new_inode;
   }
 
