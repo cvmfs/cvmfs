@@ -125,8 +125,8 @@ static struct {
   time_t timestamp;
   int delay;
 } previous_io_error_;
-  
-  
+
+
 /**
  * Stores the initial catalog revision (in order to detect overflows) and
  * the incarnation (number of reloads) of the Fuse module
@@ -319,8 +319,8 @@ static inline double GetKcacheTimeout() {
     return 0.0;
   return kcache_timeout_;
 }
-  
-  
+
+
 void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
   *drainout_mode = atomic_read32(&drainout_mode_);
   *maintenance_mode = atomic_read32(&maintenance_mode_);
@@ -360,24 +360,24 @@ void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
   *path_stats = path_cache_->statistics();
   *md5path_stats = md5path_cache_->statistics();
 }
-  
+
 
 string PrintInodeTrackerStatistics() {
   return inode_tracker_->GetStatistics().Print() + "\n";
 }
-  
-  
+
+
 std::string PrintInodeGeneration() {
-  return "init-catalog-revision: " + 
+  return "init-catalog-revision: " +
     StringifyInt(inode_generation_info_.initial_revision) + "  " +
-    "current-catalog-revision: " + 
+    "current-catalog-revision: " +
     StringifyInt(catalog_manager_->GetRevision()) + "  " +
     "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
-    "overflow-counter: " + StringifyInt(inode_generation_info_.overflow_counter) 
+    "overflow-counter: " + StringifyInt(inode_generation_info_.overflow_counter)
     + "\n";
 }
 
-  
+
 catalog::Statistics GetCatalogStatistics() {
   return catalog_manager_->statistics();
 }
@@ -441,30 +441,30 @@ static void RemountFinish() {
 
   if (time(NULL) > drainout_deadline_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
-    
+
     // No new inserts into caches
     inode_cache_->Pause();
     path_cache_->Pause();
-    md5path_cache_->Pause();    
+    md5path_cache_->Pause();
     inode_cache_->Drop();
     path_cache_->Drop();
     md5path_cache_->Drop();
-  
+
     // Ensure that all Fuse callbacks left the catalog query code
     remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
     if (inode_annotation_) {
       inode_annotation_->CheckForOverflow(
-        catalog_manager_->GetRevision() + inode_generation_info_.incarnation, 
-        inode_generation_info_.initial_revision, 
+        catalog_manager_->GetRevision() + inode_generation_info_.incarnation,
+        inode_generation_info_.initial_revision,
         &inode_generation_info_.overflow_counter);
     }
     remount_fence_->Unblock();
-    
+
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
-    
+
     atomic_cas32(&drainout_mode_, 1, 0);
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
         catalog_manager_->offline_mode())
@@ -509,12 +509,12 @@ static void RemountCheck() {
     }
   }
 }
-  
+
 
 static bool GetDirentForPath(const PathString &path,
                              const fuse_ino_t parent_inode,
                              catalog::DirectoryEntry *dirent);
-  
+
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -551,17 +551,17 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       inode_cache_->Insert(ino, *dirent);
       return true;
     }
-    
+
     // Lookup failed.  It might be in the glue buffer or in the cwd buffer.
     // Handling of ancient inodes from previous catalog revisions of after
     // reloading of the cvmfs module.
-    // Inode should be translated into the new inode from the catalogs   
+    // Inode should be translated into the new inode from the catalogs
     if (inode_annotation_ && !inode_annotation_->ValidInode(ino)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "lookup for ancient inode %"PRIu64, ino);
       PathString recovered_path;
       bool found = inode_tracker_->Find(ino, &recovered_path);
       if (!found) {
-        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "internal error: " 
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "internal error: "
                  "inode tracker lookup failure (%"PRIu64"), "
                  "reconstructed path %s, catalog revision %u",
                  ino, recovered_path.c_str(), catalog_manager_->GetRevision());
@@ -603,11 +603,16 @@ static bool GetDirentForPath(const PathString &path,
   // Lookup inode in catalog TODO: not twice md5 calculation
   bool retval;
   if ((parent_inode == 0) ||
-      (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode))) 
+      (inode_annotation_ && !inode_annotation_->ValidInode(parent_inode)))
   {
     // The parent inode can be resolved just now, but we shouldn't put it in
     // caches as it can be forgotten soon
     retval = catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent);
+    if (retval && (parent_inode != 0)) {
+      uint64_t ancient_inode = inode_tracker_->Lookup(path);
+      if (ancient_inode != 0)
+        dirent->set_inode(ancient_inode);
+    }
   } else {
     retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
     dirent->set_parent_inode(parent_inode);
@@ -656,7 +661,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     // Retrieve the parent path recursively
     PathString parent_path;
     if (!GetPathForInode(dirent.parent_inode(), &parent_path)) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, 
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
                "GetPathForInode, failed at %s (%"PRIu64")",
                dirent.name().c_str(), dirent.parent_inode());
       return false;
@@ -671,20 +676,20 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   return true;
 }
 
-  
+
 static inline void AddToInodeTracker(const catalog::DirectoryEntry &dirent) {
   if (nfs_maps_)
     return;
 
-  bool retval = inode_tracker_->VfsGet(dirent.inode(), dirent.parent_inode(), 
+  bool retval = inode_tracker_->VfsGet(dirent.inode(), dirent.parent_inode(),
                                        dirent.name());
   if (!retval) {
     catalog::DirectoryEntry parent_dirent;
     retval = GetDirentForInode(dirent.parent_inode(), &parent_dirent);
     assert(retval);
     AddToInodeTracker(parent_dirent);
-    bool new_inode = 
-      inode_tracker_->VfsAdd(dirent.inode(), dirent.parent_inode(), 
+    bool new_inode =
+      inode_tracker_->VfsAdd(dirent.inode(), dirent.parent_inode(),
                              dirent.name());
     if (!new_inode) {
       // inode has been already inserted by another thread, drop parent refcnt
@@ -692,7 +697,7 @@ static inline void AddToInodeTracker(const catalog::DirectoryEntry &dirent) {
     }
   }
 }
-  
+
 
 
 /**
@@ -766,24 +771,24 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   result.ino = 0;
   fuse_reply_entry(req, &result);
 }
-  
-  
+
+
 /**
  *
  */
-static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) 
+static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup)
 {
   atomic_inc64(&cvmfs::num_fs_forget_);
-  
+
   // The libfuse high-level library does the same
   if (ino == FUSE_ROOT_ID) {
     fuse_reply_none(req);
     return;
   }
-  
+
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %"PRIu64" by %u", 
+  LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %"PRIu64" by %u",
            ino, nlookup);
   if (!nfs_maps_)
     inode_tracker_->VfsPut(ino, nlookup);
@@ -853,7 +858,7 @@ static void AddToDirListing(const fuse_req_t req,
                             const char *name, const struct stat *stat_info,
                             struct DirectoryListing *listing)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s, inode %"PRIu64, 
+  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s, inode %"PRIu64,
            name, stat_info->st_ino);
   size_t remaining_size = listing->capacity - listing->size;
   const size_t entry_size = fuse_add_direntry(req, NULL, 0, name, stat_info, 0);
@@ -878,7 +883,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
   RemountCheck();
-  
+
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64, ino);
@@ -897,9 +902,9 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOTDIR);
     return;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64", path %s", 
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64", path %s",
            ino, path.c_str());
-  
+
   // Build listing
   DirectoryListing listing;
 
@@ -921,7 +926,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   catalog::StatEntryList listing_from_catalog;
   bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog);
   remount_fence_->Leave();
-  
+
   if (!retval) {
     free(listing.buffer);
     fuse_reply_err(req, EIO);
@@ -954,8 +959,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Save the directory listing and return a handle to the listing
   pthread_mutex_lock(&lock_directory_handles_);
-  LogCvmfs(kLogCvmfs, kLogDebug, 
-           "linking directory handle %d to dir inode: %"PRIu64, 
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "linking directory handle %d to dir inode: %"PRIu64,
            next_directory_handle_, ino);
   (*directory_handles_)[next_directory_handle_] = listing;
   fi->fh = next_directory_handle_;
@@ -1058,9 +1063,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   catalog::DirectoryEntry dirent;
   PathString path;
 
-  const bool found = GetDirentForInode(ino, &dirent) && 
+  const bool found = GetDirentForInode(ino, &dirent) &&
                      GetPathForInode(ino, &path);
-    
+
   if (!found) {
     remount_fence_->Leave();
     if (fi->flags & O_CREAT)
@@ -1153,8 +1158,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       return;
     }
     assert(false);
-  } 
-  
+  }
+
   // fd < 0
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
            "failed to open inode: %"PRIu64", CAS key %s, error code %d",
@@ -1376,7 +1381,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   remount_fence_->Leave();
-  
+
   if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
@@ -1541,7 +1546,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     fuse_reply_err(req, ERANGE);
   }
 }
-  
+
 
 bool Evict(const string &path) {
   catalog::DirectoryEntry dirent;
@@ -1554,8 +1559,8 @@ bool Evict(const string &path) {
   quota::Remove(dirent.checksum());
   return true;
 }
-  
-  
+
+
 /**
  * Do after-daemon() initialization
  */
@@ -1726,7 +1731,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   {
     nfs_source = true;
     if (options::GetValue("CVMFS_NFS_SHARED", &parameter))
-    { 
+    {
       nfs_shared = true;
       nfs_shared_dir = MakeCanonicalPath(parameter);
     }
@@ -2045,11 +2050,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
     *g_boot_error = "Failed to initialize root file catalog";
     return loader::kFailCatalog;
   }
-  cvmfs::inode_generation_info_.initial_revision = 
+  cvmfs::inode_generation_info_.initial_revision =
     cvmfs::catalog_manager_->GetRevision();
-  LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %"PRIu64, 
+  LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %"PRIu64,
            cvmfs::catalog_manager_->GetRootInode());
-  
+
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
 
   return loader::kFailOk;
@@ -2191,7 +2196,7 @@ static bool MaintenanceMode(const int fd_progress) {
 
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress;
-  
+
   unsigned num_open_dirs = cvmfs::directory_handles_->size();
   if (num_open_dirs != 0) {
 #ifdef DEBUGMSG
@@ -2201,7 +2206,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
       LogCvmfs(kLogCvmfs, kLogDebug, "saving dirhandle %d", i->first);
     }
 #endif
-    
+
     msg_progress = "Saving open directory handles (" +
       StringifyInt(num_open_dirs) + " handles)\n";
     SendMsg2Socket(fd_progress, msg_progress);
@@ -2214,26 +2219,26 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     save_open_dirs->state = saved_handles;
     saved_states->push_back(save_open_dirs);
   }
-  
+
   if (!cvmfs::nfs_maps_) {
     msg_progress = "Saving inode tracker\n";
     SendMsg2Socket(fd_progress, msg_progress);
-    glue::InodeTracker *saved_inode_tracker = 
+    glue::InodeTracker *saved_inode_tracker =
       new glue::InodeTracker(*cvmfs::inode_tracker_);
     loader::SavedState *state_glue_buffer = new loader::SavedState();
     state_glue_buffer->state_id = loader::kStateGlueBuffer;
     state_glue_buffer->state = saved_inode_tracker;
     saved_states->push_back(state_glue_buffer);
   }
-  
+
   msg_progress = "Saving inode generation\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  cvmfs::InodeGenerationInfo *saved_inode_generation = 
+  cvmfs::InodeGenerationInfo *saved_inode_generation =
     new cvmfs::InodeGenerationInfo(cvmfs::inode_generation_info_);
   loader::SavedState *state_inode_generation = new loader::SavedState();
   state_inode_generation->state_id = loader::kStateInodeGeneration;
   state_inode_generation->state = saved_inode_generation;
-  saved_states->push_back(state_inode_generation);  
+  saved_states->push_back(state_inode_generation);
 
   msg_progress = "Saving open files counter\n";
   SendMsg2Socket(fd_progress, msg_progress);
@@ -2241,8 +2246,8 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   loader::SavedState *state_num_fd = new loader::SavedState();
   state_num_fd->state_id = loader::kStateOpenFilesCounter;
   state_num_fd->state = saved_num_fd;
-  saved_states->push_back(state_num_fd);    
-  
+  saved_states->push_back(state_num_fd);
+
   return true;
 }
 
@@ -2258,35 +2263,35 @@ static bool RestoreState(const int fd_progress,
         (cvmfs::DirectoryHandles *)saved_states[i]->state;
       cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
       cvmfs::open_dirs_ = cvmfs::directory_handles_->size();
-      cvmfs::DirectoryHandles::const_iterator i = 
+      cvmfs::DirectoryHandles::const_iterator i =
         cvmfs::directory_handles_->begin();
       for (; i != cvmfs::directory_handles_->end(); ++i) {
         if (i->first >= cvmfs::next_directory_handle_)
           cvmfs::next_directory_handle_ = i->first + 1;
       }
-      
+
       SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
     }
-    
+
     if (saved_states[i]->state_id == loader::kStateGlueBuffer) {
       SendMsg2Socket(fd_progress, "Restoring inode tracker... ");
       delete cvmfs::inode_tracker_;
-      glue::InodeTracker *saved_inode_tracker = 
+      glue::InodeTracker *saved_inode_tracker =
         (glue::InodeTracker *)saved_states[i]->state;
       cvmfs::inode_tracker_ = new glue::InodeTracker(*saved_inode_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
-    
+
     if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
       SendMsg2Socket(fd_progress, "Restoring inode generation... ");
-      cvmfs::inode_generation_info_ = 
+      cvmfs::inode_generation_info_ =
         *((cvmfs::InodeGenerationInfo *)saved_states[i]->state);
       uint32_t incarnation = ++cvmfs::inode_generation_info_.incarnation;
       cvmfs::catalog_manager_->SetIncarnation(incarnation);
       SendMsg2Socket(fd_progress, " done\n");
     }
-    
+
     if (saved_states[i]->state_id == loader::kStateOpenFilesCounter) {
       SendMsg2Socket(fd_progress, "Restoring open files counter... ");
       cvmfs::open_files_ = *((uint32_t *)saved_states[i]->state);
@@ -2295,9 +2300,9 @@ static bool RestoreState(const int fd_progress,
   }
   if (cvmfs::inode_annotation_) {
     cvmfs::inode_annotation_->CheckForOverflow(
-      cvmfs::catalog_manager_->GetRevision() + 
-        cvmfs::inode_generation_info_.incarnation, 
-      cvmfs::inode_generation_info_.initial_revision, 
+      cvmfs::catalog_manager_->GetRevision() +
+        cvmfs::inode_generation_info_.incarnation,
+      cvmfs::inode_generation_info_.initial_revision,
       &cvmfs::inode_generation_info_.overflow_counter);
   }
 
@@ -2325,7 +2330,7 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateOpenFilesCounter:
         SendMsg2Socket(fd_progress, "Releasing open files counter\n");
         delete static_cast<uint32_t *>(saved_states[i]->state);
-        break;        
+        break;
       default:
         break;
     }
