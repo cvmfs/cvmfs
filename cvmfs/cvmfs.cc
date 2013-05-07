@@ -581,7 +581,7 @@ static bool GetDirentForPath(const PathString &path,
     } else {
       // Ensure that regular files get a new inode on order to avoid
       // page cache mixup
-      if ((live_inode != 0) && (!dirent->IsRegular()))
+      if (live_inode != 0)
         dirent->set_inode(live_inode);
     }
     md5path_cache_->Insert(md5path, *dirent);
@@ -858,26 +858,22 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   for (catalog::StatEntryList::const_iterator i = listing_from_catalog.begin(),
        iEnd = listing_from_catalog.end(); i != iEnd; ++i)
   {
-    if (nfs_maps_) {
-      // Fix inodes
-      PathString entry_path;
-      entry_path.Assign(path);
-      entry_path.Append("/", 1);
-      entry_path.Append(i->name.GetChars(), i->name.GetLength());
+    // Fix inodes
+    PathString entry_path;
+    entry_path.Assign(path);
+    entry_path.Append("/", 1);
+    entry_path.Append(i->name.GetChars(), i->name.GetLength());
 
-      catalog::DirectoryEntry entry_dirent;
-      if (!GetDirentForPath(entry_path, &entry_dirent)) {
-        LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
-                 entry_path.c_str());
-        continue;
-      }
-
-      struct stat fixed_info = i->info;
-      fixed_info.st_ino = entry_dirent.inode();
-      AddToDirListing(req, i->name.c_str(), &fixed_info, &listing);
-    } else {
-      AddToDirListing(req, i->name.c_str(), &(i->info), &listing);
+    catalog::DirectoryEntry entry_dirent;
+    if (!GetDirentForPath(entry_path, &entry_dirent)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
+               entry_path.c_str());
+      continue;
     }
+
+    struct stat fixed_info = i->info;
+    fixed_info.st_ino = entry_dirent.inode();
+    AddToDirListing(req, i->name.c_str(), &fixed_info, &listing);
   }
 
   // Save the directory listing and return a handle to the listing
