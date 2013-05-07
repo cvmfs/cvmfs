@@ -133,15 +133,17 @@ static struct {
  */
 struct InodeGenerationInfo {
   InodeGenerationInfo() {
-    version = 1;
+    version = 2;
     initial_revision = 0;
     incarnation = 0;
     overflow_counter = 0;
+    inode_generation = 0;
   }
   unsigned version;
   uint64_t initial_revision;
   uint32_t incarnation;
-  uint32_t overflow_counter;
+  uint32_t overflow_counter;  // not used any more
+  uint64_t inode_generation;
 };
 InodeGenerationInfo inode_generation_info_;
 
@@ -373,7 +375,7 @@ std::string PrintInodeGeneration() {
     "current-catalog-revision: " +
     StringifyInt(catalog_manager_->GetRevision()) + "  " +
     "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
-    "overflow-counter: " + StringifyInt(inode_generation_info_.overflow_counter)
+    "inode generation: " + StringifyInt(inode_generation_info_.inode_generation)
     + "\n";
 }
 
@@ -454,10 +456,8 @@ static void RemountFinish() {
     remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
     if (inode_annotation_) {
-      inode_annotation_->CheckForOverflow(
-        catalog_manager_->GetRevision() + inode_generation_info_.incarnation,
-        inode_generation_info_.initial_revision,
-        &inode_generation_info_.overflow_counter);
+      inode_generation_info_.inode_generation =
+        inode_annotation_->GetGeneration();
     }
     remount_fence_->Unblock();
 
@@ -1951,9 +1951,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Load initial file catalog
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
-  cvmfs::inode_annotation_ =
-    new catalog::InodeGenerationAnnotation(inodes_64bit ?
-                                           sizeof(fuse_ino_t)*8 : 32);
+  cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
   cvmfs::catalog_manager_ =
       new cache::CatalogManager(*cvmfs::repository_name_, ignore_signature);
   if (!nfs_source) {
@@ -2153,6 +2151,8 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 
   msg_progress = "Saving inode generation\n";
   SendMsg2Socket(fd_progress, msg_progress);
+  cvmfs::inode_generation_info_.inode_generation +=
+    cvmfs::catalog_manager_->inode_gauge();
   cvmfs::InodeGenerationInfo *saved_inode_generation =
     new cvmfs::InodeGenerationInfo(cvmfs::inode_generation_info_);
   loader::SavedState *state_inode_generation = new loader::SavedState();
@@ -2207,8 +2207,10 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, "Restoring inode generation... ");
       cvmfs::inode_generation_info_ =
         *((cvmfs::InodeGenerationInfo *)saved_states[i]->state);
-      uint32_t incarnation = ++cvmfs::inode_generation_info_.incarnation;
-      cvmfs::catalog_manager_->SetIncarnation(incarnation);
+      // Seemless migration
+      if (cvmfs::inode_generation_info_.version == 1)
+        cvmfs::inode_generation_info_.version = 2;
+      ++cvmfs::inode_generation_info_.incarnation;
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2219,11 +2221,8 @@ static bool RestoreState(const int fd_progress,
     }
   }
   if (cvmfs::inode_annotation_) {
-    cvmfs::inode_annotation_->CheckForOverflow(
-      cvmfs::catalog_manager_->GetRevision() +
-        cvmfs::inode_generation_info_.incarnation,
-      cvmfs::inode_generation_info_.initial_revision,
-      &cvmfs::inode_generation_info_.overflow_counter);
+    uint64_t saved_generation = cvmfs::inode_generation_info_.inode_generation;
+    cvmfs::inode_annotation_->IncGeneration(saved_generation);
   }
 
   return true;

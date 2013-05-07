@@ -5,6 +5,11 @@
 #ifndef CVMFS_CATALOG_MGR_H_
 #define CVMFS_CATALOG_MGR_H_
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
+#include <inttypes.h>
 #include <pthread.h>
 #include <cassert>
 
@@ -16,6 +21,7 @@
 #include "hash.h"
 #include "atomic.h"
 #include "util.h"
+#include "logging.h"
 
 namespace catalog {
 
@@ -75,29 +81,31 @@ struct Statistics {
 
 class InodeGenerationAnnotation : public InodeAnnotation {
  public:
-  InodeGenerationAnnotation(const unsigned inode_width);
+  InodeGenerationAnnotation() { inode_offset_ = 0; };
   ~InodeGenerationAnnotation() { };
   bool ValidInode(const uint64_t inode) {
-    uint64_t raw_mask = (uint64_t(1) << num_protected_bits_) - 1;
-    return (inode & ~raw_mask) == generation_annotation_;
+    return inode >= inode_offset_;
   }
   inode_t Annotate(const inode_t raw_inode) {
-    return raw_inode | generation_annotation_;
+    return raw_inode + inode_offset_;
   }
-  void SetGeneration(const uint64_t new_generation);
-  void CheckForOverflow(const uint64_t new_generation, 
-                        const uint64_t initial_generation,
-                        uint32_t *overflow_counter);
-
+  inode_t Strip(const inode_t annotated_inode) {
+    return annotated_inode - inode_offset_;
+  }
+  void IncGeneration(const uint64_t by) {
+    inode_offset_ += by;
+    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %"PRIu64,
+             inode_offset_);
+  }
+  inode_t GetGeneration() { return inode_offset_; };
  private:
-  unsigned inode_width_;
-  uint64_t generation_annotation_;
+  uint64_t inode_offset_;
 };
-  
+
 
 class AbstractCatalogManager;
 /**
- * Here, the Cwd Buffer is registered in order to save the inodes of 
+ * Here, the Cwd Buffer is registered in order to save the inodes of
  * processes' cwd before a new catalog snapshot is applied
  */
 class RemountListener {
@@ -151,14 +159,16 @@ class AbstractCatalogManager {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
-  void SetIncarnation(const uint64_t new_incarnation);
   void RegisterRemountListener(RemountListener *listener) {
     WriteLock();
     remount_listener_ = listener;
     Unlock();
   }
-  
+
   Statistics statistics() const { return statistics_; }
+  uint64_t inode_gauge() {
+    ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;
+  }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
   int GetNumCatalogs() const;

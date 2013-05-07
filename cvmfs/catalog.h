@@ -93,38 +93,19 @@ struct Counters {
 };
 
 /**
- * Allows to define a class that stores additional information in the upper
- * bits of an inode.  Cvmfs will abort if the inode is too large to fit into
- * the protected lower bits.
- * Currently, annotation is used to mangle the catalog revision number into
- * the inode.  The implementation is in the catalog manager.  Mangling of the
- * revision number is necessary in order to avoid the following situation:
- *   1) Process A opens file /foo and starts to read it.
- *   2) The catalog is reloaded, all caches are flushed.  In the new catalog,
- *      file /foo has another content.
- *   3) Process B opens file /foo (same inode, different content) and reads
- *      the new content completely, thereby fills the kernel caches.
- *   4) Process A reads the rest of /foo, which is now served in the new version
- *      from the kernel caches.
- * Also, reloading of the fuse module increases the generation (it invalidates)
- * the inodes
+ * Allows to define a class that transforms the inode in order to ensure
+ * that inodes are not reused after reloads (catalog or fuse module).
+ * Currently, annotation is used to set an offset starting at the highest
+ * so far issued inode.  The implementation is in the catalog manager.
  */
 class InodeAnnotation {
  public:
   virtual ~InodeAnnotation() { };
   virtual inode_t Annotate(const inode_t raw_inode) = 0;
-  virtual void SetGeneration(const uint64_t new_generation) = 0;
-  // Used to detect ancient inodes from previous generations
-  virtual bool ValidInode(const uint64_t inode) { return true; }
-  
-  inode_t Strip(const inode_t annotated_inode) {
-    // Clear upper bits
-    return ((uint64_t(1) << num_protected_bits_) - 1) & annotated_inode;
-  }
-  unsigned num_protected_bits() { return num_protected_bits_; }
-
- protected:
-  unsigned num_protected_bits_;
+  virtual void IncGeneration(const uint64_t by) = 0;
+  virtual inode_t GetGeneration() = 0;
+  virtual bool ValidInode(const uint64_t inode) = 0;
+  virtual inode_t Strip(const inode_t annotated_inode) = 0;
 };
 
 
@@ -260,7 +241,7 @@ class Catalog : public SingleCopy {
 
   InodeRange inode_range_;
   uint64_t max_row_id_;
-  InodeAnnotation *inode_annotation;
+  InodeAnnotation *inode_annotation_;
 
   SqlListing               *sql_listing_;
   SqlLookupPathHash        *sql_lookup_md5path_;

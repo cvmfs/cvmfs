@@ -17,53 +17,6 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-InodeGenerationAnnotation::InodeGenerationAnnotation(const unsigned inode_width) 
-{
-  generation_annotation_ = 0;
-  inode_width_ = inode_width;
-  switch (inode_width_) {
-    case 32:
-      num_protected_bits_ = 26;
-      break;
-    case 64:
-      num_protected_bits_ = 32;
-      break;
-    default:
-      abort();
-  }
-}
-
-
-void InodeGenerationAnnotation::SetGeneration(const uint64_t new_generation) 
-{
-  LogCvmfs(kLogCatalog, kLogDebug, "new inode generation: %"PRIu64, 
-           new_generation);
-  
-  const unsigned generation_width = inode_width_ - num_protected_bits_;
-  const uint64_t generation_max = uint64_t(1) << generation_width;
-  
-  const uint64_t generation_cut = new_generation % generation_max;
-  generation_annotation_ = generation_cut << num_protected_bits_;
-}
-  
-  
-void InodeGenerationAnnotation::CheckForOverflow( 
-  const uint64_t new_generation, 
-  const uint64_t initial_generation,
-  uint32_t *overflow_counter)
-{
-  const unsigned generation_width = inode_width_ - num_protected_bits_;
-  const uint64_t generation_max = uint64_t(1) << generation_width;
-  const uint64_t generation_span = new_generation - initial_generation;
-  if ((generation_span >= generation_max) &&
-      ((generation_span / generation_max) > *overflow_counter)) 
-  {
-    *overflow_counter = generation_span / generation_max;
-    LogCvmfs(kLogCatalog, kLogSyslog, "inode generation overflow");
-  }  
-}
-
-
 AbstractCatalogManager::AbstractCatalogManager() {
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
   revision_cache_ = 0;
@@ -108,20 +61,7 @@ bool AbstractCatalogManager::Init() {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to initialize root catalog");
   }
 
-  if (attached && inode_annotation_) {
-    inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
-  }
-
   return attached;
-}
-  
-  
-void AbstractCatalogManager::SetIncarnation(const uint64_t new_incarnation) { 
-  WriteLock();
-  incarnation_ = new_incarnation;
-  if (inode_annotation_)
-    inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
-  Unlock();
 }
 
 
@@ -139,11 +79,12 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
   WriteLock();
   if (remount_listener_)
     remount_listener_->BeforeRemount(this);
-  
+
   string catalog_path;
   const LoadError load_error = LoadCatalog(PathString("", 0), hash::Any(),
                                            &catalog_path);
   if (load_error == kLoadNew) {
+    inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager::kInodeOffset;
 
@@ -153,7 +94,7 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
     assert(retval);
 
     if (inode_annotation_) {
-      inode_annotation_->SetGeneration(revision_cache_ + incarnation_);
+      inode_annotation_->IncGeneration(old_inode_gauge);
     }
   }
   Unlock();
@@ -181,7 +122,7 @@ Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
   return result;
 }
 
-  
+
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param inode the inode to find in the catalogs
@@ -196,7 +137,7 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
   EnforceSqliteMemLimit();
   ReadLock();
   bool found = false;
-  
+
   // Don't lookup ancient inodes
   if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
     Unlock();
@@ -356,8 +297,8 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   atomic_inc64(&statistics_.num_lookup_path_negative);
   return false;
 }
-  
-  
+
+
 /**
  * Do a listing of the specified directory.
  * @param path the path of the directory to list
@@ -661,7 +602,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty())
     revision_cache_ = new_catalog->GetRevision();
-  
+
   catalogs_.push_back(new_catalog);
   ActivateCatalog(new_catalog);
   return true;
