@@ -579,7 +579,9 @@ static bool GetDirentForPath(const PathString &path,
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
     } else {
-      if (live_inode != 0)
+      // Ensure that regular files get a new inode on order to avoid
+      // page cache mixup
+      if ((live_inode != 0) && (!dirent->IsRegular()))
         dirent->set_inode(live_inode);
     }
     md5path_cache_->Insert(md5path, *dirent);
