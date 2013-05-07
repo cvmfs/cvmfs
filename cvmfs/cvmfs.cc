@@ -579,7 +579,7 @@ static bool GetDirentForPath(const PathString &path,
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
     } else {
-      // Ensure that regular files get a new inode on order to avoid
+      // TODO: Ensure that regular files get a new inode on order to avoid
       // page cache mixup
       if (live_inode != 0)
         dirent->set_inode(live_inode);
@@ -1058,15 +1058,16 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
-      if (dirent.cached_mtime() != dirent.mtime()) {
+      //fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
+      /*if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "file might be new or changed, invalidating cache (%d %d "
                  "%"PRIu64")", dirent.mtime(), dirent.cached_mtime(), ino);
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
         inode_cache_->Insert(ino, dirent);
-      }
+      }*/
+      fi->keep_cache = 0;
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;

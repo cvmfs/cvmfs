@@ -126,12 +126,12 @@ static void CleanupTLS(ThreadLocalStorage *tls) {
   close(tls->pipe_wait[1]);
   delete tls;
 }
-  
-  
+
+
 static void TLSDestructor(void *data) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(data);
   pthread_mutex_lock(&lock_tls_blocks_);
-  for (vector<ThreadLocalStorage *>::iterator i = tls_blocks_->begin(), 
+  for (vector<ThreadLocalStorage *>::iterator i = tls_blocks_->begin(),
        iEnd = tls_blocks_->end(); i != iEnd; ++i)
   {
     if ((*i) == tls) {
@@ -233,7 +233,7 @@ int Open(const hash::Any &id) {
 
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
-    platform_disable_kcache(result);
+    //platform_disable_kcache(result);
   } else {
     result = -errno;
     LogCvmfs(kLogCache, kLogDebug, "miss %s (%d)", path.c_str(), result);
