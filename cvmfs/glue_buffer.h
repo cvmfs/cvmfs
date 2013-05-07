@@ -210,7 +210,7 @@ public:
       atomic_inc64(&statistics_.num_removes);
     }
     Unlock();
-    atomic_xadd64(&statistics_.num_references, -by);
+    atomic_xadd64(&statistics_.num_references, -int32_t(by));
   }
 
   bool FindPath(const uint64_t inode, PathString *path) {
