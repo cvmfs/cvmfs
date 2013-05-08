@@ -2212,6 +2212,8 @@ static bool RestoreState(const int fd_progress,
         cvmfs::inode_generation_info_.initial_revision =
           old_info->initial_revision;
         cvmfs::inode_generation_info_.incarnation = old_info->incarnation;
+        // Note: in the rare case of inode generation being 0 before, inode
+        // can clash after reload before remount
       } else {
         cvmfs::inode_generation_info_ = *old_info;
       }
