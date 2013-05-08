@@ -20,7 +20,8 @@ usage() {
   echo "-r <run script>            platform specific script (inside the tarball)"
   echo
   echo "Optional parameters:"
-  echo "-p <platform path>         custom search path for platfor specific script"
+  echo "-p <platform path>         custom search path for platform specific script"
+  echo "-u <user name>             user name to use for test run"
   echo
   echo "You must provide http addresses for all packages and tar balls. They will"
   echo "be downloaded and executed to test CVMFS on various platforms"
@@ -54,6 +55,7 @@ server_package=""
 client_package=""
 keys_package=""
 source_tarball=""
+test_username="sftnight"
 
 # create a workspace
 workspace=$(mktemp -d)
@@ -73,7 +75,7 @@ echo $test_logfile
 exec &> $run_logfile
 
 # read parameters
-while getopts "r:s:c:t:k:p:" option; do
+while getopts "r:s:c:t:k:p:u:" option; do
   case $option in
     r)
       platform_script=$OPTARG
@@ -93,6 +95,9 @@ while getopts "r:s:c:t:k:p:" option; do
     p)
       platform_script_path=$OPTARG
       ;;
+    u)
+      test_username=$OPTARG
+      ;;
     ?)
       shift $(($OPTIND-2))
       usage "Unrecognized option: $1"
@@ -107,6 +112,23 @@ if [ x$platform_script = "x" ] ||
    [ x$keys_package    = "x" ] ||
    [ x$source_tarball  = "x" ]; then
   usage "Missing parameter(s)"
+fi
+
+# create test user account if necessary
+id $test_username > /dev/null
+if [ $? -ne 0 ]; then
+  adduser $test_username
+  if [ $? -ne 0 ]; then
+    echo "cannot create user account $test_username"
+    exit 4
+  fi
+  echo "$test_username ALL = NOPASSWD: ALL"  | tee --append /etc/sudoers
+  echo "Defaults:$test_username !requiretty" | tee --append /etc/sudoers
+fi
+
+# adapt sudo configuration for non-tty usage if necessary
+if ! cat /etc/sudoers | grep -q "Defaults:root !requiretty"; then
+  echo "Defaults:root !requiretty" | tee --append /etc/sudoers
 fi
 
 # download the needed packages
@@ -130,14 +152,14 @@ if [ $? -ne 0 ] || [ ! -d $source_directory ]; then
   echo "fail"
   echo "tar said:"
   echo $tar_output
-  exit 4
+  exit 5
 else
   echo "done"
 fi
 source_directory=$(readlink --canonicalize $source_directory)
 
-# chown the source tree to allow sftnight to work with it
-chown -R sftnight:sftnight $workspace
+# chown the source tree to allow $test_username to work with it
+chown -R $test_username:$test_username $workspace
 
 # find the platform specific script
 if [ x$platform_script_path = "x" ]; then
@@ -147,13 +169,13 @@ platform_script_abs=${platform_script_path}/${platform_script}
 if [ ! -f $platform_script_abs ]; then
   echo "platform specific script $platform_script not found here:"
   echo $platform_script_abs
-  exit 5
+  exit 6
 fi
 
 # run the platform specific script to perform CernVM-FS tests
 echo "running platform specific script $platform_script ..."
 touch .running # flag to signal a running test system
-sudo -u sftnight sh $platform_script_abs -s $server_package   \
+sudo -u $test_username sh $platform_script_abs -s $server_package   \
                                          -c $client_package   \
                                          -k $keys_package     \
                                          -t $source_directory \
