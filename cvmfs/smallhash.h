@@ -288,7 +288,7 @@ class SmallHashDynamic :
   void CopyFrom(const SmallHashDynamic<Key, Value> &other) {
     for (uint32_t i = 0; i < other.capacity_; ++i) {
       if (other.keys_[i] != other.empty_key_)
-        Insert(other.keys_[i], other.values_[i]);
+        this->Insert(other.keys_[i], other.values_[i]);
     }
   }
 
