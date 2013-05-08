@@ -78,11 +78,11 @@ install_rpm() {
 
   # install the RPM
   echo -n "Installing RPM '$rpm_name' ... "
-  rpm_output=$(sudo rpm -ivh $@ 2>&1)
+  yum_output=$(sudo yum -y install $@ 2>&1)
   if [ $? -ne 0 ]; then
     echo "fail"
-    echo "RPM said:"
-    echo $rpm_output
+    echo "Yum said:"
+    echo $yum_output
     exit 102
   else
     echo "done"
