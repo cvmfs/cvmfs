@@ -118,11 +118,11 @@ class InodeReferences {
     map_.Init(16, 0, hasher_inode);
   }
 
-  bool Get(const uint64_t inode) {
+  bool Get(const uint64_t inode, const uint32_t by) {
     uint32_t refcounter = 0;
     const bool found = map_.Lookup(inode, &refcounter);
     const bool new_inode = !found;
-    refcounter++;  // This is 0 if the inode is not found
+    refcounter += by;  // This is 0 if the inode is not found
     map_.Insert(inode, refcounter);
     return new_inode;
   }
@@ -186,15 +186,20 @@ public:
   InodeTracker &operator= (const InodeTracker &other);
   ~InodeTracker();
 
-  void VfsGet(const uint64_t inode, const PathString &path) {
+  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
+  {
     Lock();
-    bool new_inode = inode_references_.Get(inode);
+    bool new_inode = inode_references_.Get(inode, by);
     hash::Md5 md5path = path_map_.Insert(path, inode);
     inode_map_.Insert(inode, md5path);
     Unlock();
 
-    atomic_inc64(&statistics_.num_references);
+    atomic_xadd64(&statistics_.num_references, by);
     if (new_inode) atomic_inc64(&statistics_.num_inserts);
+  }
+
+  void VfsGet(const uint64_t inode, const PathString &path) {
+    VfsGetBy(inode, 1, path);
   }
 
   void VfsPut(const uint64_t inode, const uint32_t by) {

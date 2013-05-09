@@ -90,6 +90,7 @@
 #include "options.h"
 #include "loader.h"
 #include "glue_buffer.h"
+#include "compat.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -2146,7 +2147,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     glue::InodeTracker *saved_inode_tracker =
       new glue::InodeTracker(*cvmfs::inode_tracker_);
     loader::SavedState *state_glue_buffer = new loader::SavedState();
-    state_glue_buffer->state_id = loader::kStateGlueBuffer;
+    state_glue_buffer->state_id = loader::kStateGlueBufferV2;
     state_glue_buffer->state = saved_inode_tracker;
     saved_states->push_back(state_glue_buffer);
   }
@@ -2195,6 +2196,14 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateGlueBuffer) {
+      SendMsg2Socket(fd_progress, "Migrating inode tracker... ");
+      compat::inode_tracker::InodeTracker *saved_inode_tracker =
+        (compat::inode_tracker::InodeTracker *)saved_states[i]->state;
+      compat::inode_tracker::Migrate(saved_inode_tracker, cvmfs::inode_tracker_);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateGlueBufferV2) {
       SendMsg2Socket(fd_progress, "Restoring inode tracker... ");
       delete cvmfs::inode_tracker_;
       glue::InodeTracker *saved_inode_tracker =
@@ -2240,6 +2249,11 @@ static void FreeSavedState(const int fd_progress,
         delete static_cast<cvmfs::DirectoryHandles *>(saved_states[i]->state);
         break;
       case loader::kStateGlueBuffer:
+        SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
+        delete static_cast<compat::inode_tracker::InodeTracker *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateGlueBufferV2:
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
         break;

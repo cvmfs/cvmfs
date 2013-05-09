@@ -53,7 +53,7 @@ set (CVMFS2_DEBUG_SOURCES
   nfs_maps.h nfs_maps.cc
   nfs_shared_maps.h nfs_shared_maps.cc
   glue_buffer.h glue_buffer.cc
-  loader.h
+  loader.h compat.cc compat.h
   history.h history.cc
   cvmfs.h cvmfs.cc
 )
