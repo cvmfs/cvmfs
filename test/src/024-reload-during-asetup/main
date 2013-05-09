@@ -1,0 +1,85 @@
+
+cvmfs_test_name="Reload during overcommitted asetup"
+
+reload_cvmfs() {
+  while true; do
+    sudo cvmfs_config reload
+    sleep 15
+  done
+}
+
+asetup17X() {
+  local pidsfile=$1
+  for iterations in 1 2 3 4 5; do
+    local i=0
+    for v in /cvmfs/atlas.cern.ch/repo/sw/software/17*; do
+      versions[$i]=`basename $v`
+      i=$(($i+1))
+    done
+    local num_versions=$i
+
+    local idx=$(($RANDOM % $num_versions))
+    local this_version=${versions[$idx]}
+
+    echo "asetup for version $this_version"
+    sh -c "source /cvmfs/atlas.cern.ch/repo/sw/software/i686-slc5-gcc43-opt/${this_version}/cmtsite/asetup.sh ${this_version},notest --cmtconfig i686-slc5-gcc43-opt"
+    local retval=$?
+    if [ $retval -ne 0 ]; then
+      return $retval
+    fi
+  done
+  return 0
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local num_cpus=$(cat /proc/cpuinfo | grep ^processor | wc -l)
+  local num_asetup=$((2*$num_cpus))
+
+  # mount atlas repository
+  cvmfs_mount atlas.cern.ch || return 1
+
+  # decrease the kernel cache timeout to safe some time
+  sudo sh -c "echo \"CVMFS_KCACHE_TIMEOUT=5\" >> /etc/cvmfs/default.local" || return 3
+  sudo cvmfs_config umount >> $logfile 2>&1 || return 4
+  sudo cvmfs_config probe  >> $logfile 2>&1 || return 5
+
+  pidsfile=`mktemp` || return 6
+
+  # do some concurrent asetup calls
+  echo "running with $num_asetup parallel tasks" >> $logfile
+  for i in $(seq 1 $num_asetup); do
+    asetup17X $pidsfile >> $logfile 2>&1 &
+    echo $! >> $pidsfile
+  done
+
+  # reload the catalog every now and than
+  reload_cvmfs >> $logfile 2>&1 &
+  reload_pid=$!
+
+  # always kill the detached processes
+  trap "kill -9 $(cat $pidsfile | tr '\n' " ") $reload_pid > /dev/null 2>&1; rm -f $pidsfile; exit" SIGHUP SIGINT SIGTERM
+
+  # wait for the find calls to succeed
+  wait $(cat $pidsfile | tr '\n' " ")
+  local retval=$?
+  rm -f $pidsfile
+
+  # stop the reload cycle, it seemed to work fine...
+  kill -9 $reload_pid
+
+  if [ $retval -ne 0 ]; then
+    echo "asetup failed with return code: $retval" >> $logfile
+    return 6
+  fi
+
+  local num_forget=$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | grep -o "forget(): [0-9]*" | awk '{print $2}')
+  echo "Number of forget(): $num_forget" >> $logfile
+  if [ $num_forget -gt 50000 ]; then
+    return 10
+  fi
+
+  return 0
+}
+
