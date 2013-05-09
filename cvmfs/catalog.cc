@@ -118,7 +118,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   path_ = path;
   parent_ = parent;
   max_row_id_ = 0;
-  inode_annotation = NULL;
+  inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
@@ -502,14 +502,8 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
     }
   }
 
-  if (inode_annotation) {
-    // Abort if inode is too large and overlaps with annotation
-    if (inode >= (uint64_t(1) << inode_annotation->num_protected_bits())) {
-      LogCvmfs(kLogCatalog, kLogSyslog, "inode violation");
-      abort();
-    }
-
-    inode = inode_annotation->Annotate(inode);
+  if (inode_annotation_) {
+    inode = inode_annotation_->Annotate(inode);
   }
 
   return inode;
@@ -521,8 +515,8 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
  */
 uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
   inode_t row_id = inode;
-  if (inode_annotation)
-    row_id = inode_annotation->Strip(row_id);
+  if (inode_annotation_)
+    row_id = inode_annotation_->Strip(row_id);
 
   return row_id - inode_range_.offset;
 }
@@ -588,8 +582,8 @@ void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
   pthread_mutex_lock(lock_);
   // Since annotated inodes could come back to the catalog in order to
   // get stripped, exchanging the annotation is not allowed
-  assert((inode_annotation == NULL) || (inode_annotation == new_annotation));
-  inode_annotation = new_annotation;
+  assert((inode_annotation_ == NULL) || (inode_annotation_ == new_annotation));
+  inode_annotation_ = new_annotation;
   pthread_mutex_unlock(lock_);
 }
 
