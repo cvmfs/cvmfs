@@ -1058,7 +1058,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
+      /*fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
       if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "file might be new or changed, invalidating cache (%d %d "
@@ -1066,8 +1066,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
         inode_cache_->Insert(ino, dirent);
-      }
-      //fi->keep_cache = 0;
+      }*/
+      fi->keep_cache = 0;
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;

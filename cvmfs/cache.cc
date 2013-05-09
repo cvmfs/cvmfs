@@ -233,7 +233,7 @@ int Open(const hash::Any &id) {
 
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
-    platform_disable_kcache(result);
+    //platform_disable_kcache(result);
   } else {
     result = -errno;
     LogCvmfs(kLogCache, kLogDebug, "miss %s (%d)", path.c_str(), result);
