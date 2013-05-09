@@ -1,4 +1,9 @@
 2.1.10:
+  * Use continuous inodes on inode generation change instead of
+    fixed bit fields.  This increases the usable inode space.
+  * Ensure unique inode--path relationship during kernel-imposed
+    lifetime of inodes.  Avoiding multiple inodes for the same path
+    avoids large hangs of 100% system load.
   * Fix remove command in cache manager
   * Fix uid/euid of shared cache manager
   * Add 'evict' command to cvmfs_talk in order to remove specific
@@ -6,7 +11,6 @@
   * Improve logging for fatal cachedb update errors
   * Fix potential endless loop in signal handler
   * Add drainout mode and maintenance mode to internal affairs
-  * Use md5path cache for lookups of ancient inodes
   * Add number of forget() calls to file system statistics
   * Advise the kernel not to cache pages for files verified
     by cvmfs_fsck

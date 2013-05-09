@@ -94,7 +94,7 @@ class InodeGenerationAnnotation : public InodeAnnotation {
   }
   void IncGeneration(const uint64_t by) {
     inode_offset_ += by;
-    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %"PRIu64,
+    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu",
              inode_offset_);
   }
   inode_t GetGeneration() { return inode_offset_; };
