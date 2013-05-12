@@ -682,7 +682,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
 
  reply_positive:
-  inode_tracker_->VfsGet(dirent.inode(), path);
+  if (!nfs_maps_)
+    inode_tracker_->VfsGet(dirent.inode(), path);
   remount_fence_->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
