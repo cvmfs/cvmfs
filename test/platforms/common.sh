@@ -90,6 +90,24 @@ install_rpm() {
 }
 
 
+uninstall_rpm() {
+  local rpm_name=$1
+  local rpm_output
+  shift 1
+
+  echo -n "Uninstalling RPM '$rpm_name' ... "
+  yum_output=$(sudo yum -y erase $@ 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "fail"
+    echo "Yum said:"
+    echo $yum_output
+    exit 103
+  else
+    echo "done"
+  fi
+}
+
+
 die() {
   local msg=$1
   echo $msg
