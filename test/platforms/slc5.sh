@@ -8,7 +8,6 @@ script_location=$(dirname $(readlink --canonicalize $0))
 echo "installing RPM packages... "
 install_rpm $KEYS_PACKAGE
 install_rpm $CLIENT_PACKAGE
-install_rpm $SERVER_PACKAGE
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
@@ -26,7 +25,7 @@ cd ${SOURCE_DIRECTORY}/test
 result=$?
 
 # remove RPM packages
-uninstall_rpm $SERVER_PACKAGE
+echo "uninstalling RPM packages... "
 uninstall_rpm $CLIENT_PACKAGE
 uninstall_rpm $KEYS_PACKAGE
 
