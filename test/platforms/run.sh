@@ -175,11 +175,11 @@ fi
 # run the platform specific script to perform CernVM-FS tests
 echo "running platform specific script $platform_script ..."
 touch .running # flag to signal a running test system
-sudo -u $test_username sh $platform_script_abs -s $server_package   \
-                                               -c $client_package   \
-                                               -k $keys_package     \
-                                               -t $source_directory \
-                                               -l $test_logfile
+sudo -H -u $test_username sh $platform_script_abs -s $server_package   \
+                                                  -c $client_package   \
+                                                  -k $keys_package     \
+                                                  -t $source_directory \
+                                                  -l $test_logfile
 retval=$?
 rm .running
 
