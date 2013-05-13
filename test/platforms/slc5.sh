@@ -12,11 +12,13 @@ install_rpm $CLIENT_PACKAGE
 # setup environment
 echo -n "setting up CernVM-FS environment..."
 sudo cvmfs_config setup
-sudo cvmfs_config chksetup
-sudo /usr/sbin/httpd
-
 sudo mkdir -p /var/log/cvmfs-test
 sudo chown sftnight:sftnight /var/log/cvmfs-test
+sudo cvmfs_config chksetup
+
+# install test dependencies
+echo "installing test dependencies..."
+install_from_repo gcc
 
 # run tests
 echo "running CernVM-FS test cases..."
