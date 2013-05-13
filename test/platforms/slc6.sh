@@ -6,9 +6,9 @@ script_location=$(dirname $(readlink --canonicalize $0))
 
 # install RPM packages
 echo "installing RPM packages... "
-install_rpm "CernVM-FS keys"   $KEYS_PACKAGE
-install_rpm "CernVM-FS client" $CLIENT_PACKAGE
-install_rpm "CernVM-FS server" $SERVER_PACKAGE
+install_rpm $KEYS_PACKAGE
+install_rpm $CLIENT_PACKAGE
+install_rpm $SERVER_PACKAGE
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
@@ -23,3 +23,12 @@ sudo chown sftnight:sftnight /var/log/cvmfs-test
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
 ./run.sh $TEST_LOGFILE
+result=$?
+
+# remove RPM packages
+uninstall_rpm $SERVER_PACKAGE
+uninstall_rpm $CLIENT_PACKAGE
+uninstall_rpm $KEYS_PACKAGE
+
+# return the test result code
+exit $result

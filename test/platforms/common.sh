@@ -62,23 +62,27 @@ fi
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 
-install_rpm() {
-  local rpm_name=$1
-  local rpm_output
-  shift 1
 
-  # check if one of the given rpms is already installed
-  for rpm in $@; do
-    local rpm_package=$(basename $rpm .rpm)
-    if rpm -q $rpm_package > /dev/null 2>&1; then
-      echo "RPM '$rpm_name' is already installed"
-      exit 101
-    fi
-  done
+rpm_name_string() {
+  local rpm_file=$1
+  echo $(rpm -qp --queryformat '%{NAME}' $rpm_file)
+}
+
+
+install_rpm() {
+  local rpm_file=$1
+  local yum_output
+  local rpm_name=$(rpm_name_string $rpm_file)
+
+  # check if the given rpm is already installed
+  if rpm -q $rpm_name > /dev/null 2>&1; then
+    echo "RPM '$rpm_name' is already installed"
+    exit 101
+  fi
 
   # install the RPM
   echo -n "Installing RPM '$rpm_name' ... "
-  yum_output=$(sudo yum -y install --nogpgcheck $@ 2>&1)
+  yum_output=$(sudo yum -y install --nogpgcheck $rpm_file 2>&1)
   if [ $? -ne 0 ]; then
     echo "fail"
     echo "Yum said:"
@@ -91,12 +95,12 @@ install_rpm() {
 
 
 uninstall_rpm() {
-  local rpm_name=$1
-  local rpm_output
-  shift 1
+  local rpm_file=$1
+  local yum_output
+  local rpm_name=$(rpm_name_string $rpm_file)
 
   echo -n "Uninstalling RPM '$rpm_name' ... "
-  yum_output=$(sudo yum -y erase $@ 2>&1)
+  yum_output=$(sudo yum -y erase $rpm_name 2>&1)
   if [ $? -ne 0 ]; then
     echo "fail"
     echo "Yum said:"

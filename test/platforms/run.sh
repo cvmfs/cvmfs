@@ -138,11 +138,11 @@ download $client_package
 download $keys_package
 download $source_tarball
 
-# get local file names of downloaded files
-server_package=$(basename $server_package)
-client_package=$(basename $client_package)
-keys_package=$(basename $keys_package)
-source_tarball=$(basename $source_tarball)
+# get local file path of downloaded files
+server_package=$(readlink --canonicalize $(basename $server_package))
+client_package=$(readlink --canonicalize $(basename $client_package))
+keys_package=$(readlink --canonicalize $(basename $keys_package))
+source_tarball=$(readlink --canonicalize $(basename $source_tarball))
 
 # extract the source tarball
 source_directory=$(basename $source_tarball .tar.gz | sed 's/_/-/')
