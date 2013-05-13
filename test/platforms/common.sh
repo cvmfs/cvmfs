@@ -78,7 +78,7 @@ install_rpm() {
 
   # install the RPM
   echo -n "Installing RPM '$rpm_name' ... "
-  yum_output=$(sudo yum -y install $@ 2>&1)
+  yum_output=$(sudo yum -y install --nogpgcheck $@ 2>&1)
   if [ $? -ne 0 ]; then
     echo "fail"
     echo "Yum said:"
