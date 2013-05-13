@@ -69,6 +69,21 @@ rpm_name_string() {
 }
 
 
+check_yum_response() {
+  local retcode=$1
+  local yum_output=$2
+
+  if [ $retcode -ne 0 ]; then
+    echo "fail"
+    echo "Yum said:"
+    echo $yum_output
+    exit 102
+  else
+    echo "done"
+  fi
+}
+
+
 install_rpm() {
   local rpm_file=$1
   local yum_output
@@ -83,14 +98,18 @@ install_rpm() {
   # install the RPM
   echo -n "Installing RPM '$rpm_name' ... "
   yum_output=$(sudo yum -y install --nogpgcheck $rpm_file 2>&1)
-  if [ $? -ne 0 ]; then
-    echo "fail"
-    echo "Yum said:"
-    echo $yum_output
-    exit 102
-  else
-    echo "done"
-  fi
+  check_yum_response $? $yum_output
+}
+
+
+install_from_repo() {
+  local package_name=$1
+  local yum_output
+
+  # install package from repository
+  echo -n "Installing Package '$package_name' ... "
+  yum_output=$(sudo yum -y install $package_name 2>&1)
+  check_yum_response $? $yum_output
 }
 
 
@@ -101,14 +120,7 @@ uninstall_rpm() {
 
   echo -n "Uninstalling RPM '$rpm_name' ... "
   yum_output=$(sudo yum -y erase $rpm_name 2>&1)
-  if [ $? -ne 0 ]; then
-    echo "fail"
-    echo "Yum said:"
-    echo $yum_output
-    exit 103
-  else
-    echo "done"
-  fi
+  check_yum_response $? $yum_output
 }
 
 
