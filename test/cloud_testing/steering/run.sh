@@ -163,7 +163,7 @@ chown -R $test_username:$test_username $workspace
 
 # find the platform specific script
 if [ x$platform_script_path = "x" ]; then
-  platform_script_path=${source_directory}/test/platforms
+  platform_script_path=${source_directory}/test/cloud_testing/platforms
 fi
 platform_script_abs=${platform_script_path}/${platform_script}
 if [ ! -f $platform_script_abs ]; then
