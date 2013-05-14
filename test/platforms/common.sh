@@ -98,7 +98,7 @@ install_rpm() {
   # install the RPM
   echo -n "Installing RPM '$rpm_name' ... "
   yum_output=$(sudo yum -y install --nogpgcheck $rpm_file 2>&1)
-  check_yum_response $? $yum_output
+  check_yum_response $? "$yum_output"
 }
 
 
@@ -109,7 +109,7 @@ install_from_repo() {
   # install package from repository
   echo -n "Installing Package '$package_name' ... "
   yum_output=$(sudo yum -y install $package_name 2>&1)
-  check_yum_response $? $yum_output
+  check_yum_response $? "$yum_output"
 }
 
 
@@ -120,7 +120,7 @@ uninstall_rpm() {
 
   echo -n "Uninstalling RPM '$rpm_name' ... "
   yum_output=$(sudo yum -y erase $rpm_name 2>&1)
-  check_yum_response $? $yum_output
+  check_yum_response $? "$yum_output"
 }
 
 
