@@ -10,11 +10,13 @@ install_rpm $KEYS_PACKAGE
 install_rpm $CLIENT_PACKAGE
 
 # setup environment
-echo -n "setting up CernVM-FS environment..."
-sudo cvmfs_config setup
-sudo mkdir -p /var/log/cvmfs-test
-sudo chown sftnight:sftnight /var/log/cvmfs-test
-sudo cvmfs_config chksetup
+echo -n "setting up CernVM-FS environment... "
+sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
+sudo mkdir -p /var/log/cvmfs-test                || die "fail (mkdir /var/log/cvmfs-test)"
+sudo chown sftnight:sftnight /var/log/cvmfs-test || die "fail (chown /var/log/cvmfs-test)"
+test_username=$(id --user --name)
+sudo /usr/sbin/usermod -a -G fuse $test_username || die "fail (add $test_username to fuse group)"
+sudo cvmfs_config chksetup                       || die "fail (cvmfs_config chksetup)"
 
 # install test dependencies
 echo "installing test dependencies..."
