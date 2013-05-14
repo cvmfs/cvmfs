@@ -122,6 +122,11 @@ if [ $? -ne 0 ]; then
     echo "cannot create user account $test_username"
     exit 4
   fi
+  usermod -a -G fuse $test_username
+  if [ $? -ne 0 ]; then
+    echo "cannot add $test_username to fuse group"
+    exit 5
+  fi
   echo "$test_username ALL = NOPASSWD: ALL"  | tee --append /etc/sudoers
   echo "Defaults:$test_username !requiretty" | tee --append /etc/sudoers
 fi
@@ -152,7 +157,7 @@ if [ $? -ne 0 ] || [ ! -d $source_directory ]; then
   echo "fail"
   echo "tar said:"
   echo $tar_output
-  exit 5
+  exit 6
 else
   echo "done"
 fi
@@ -169,7 +174,7 @@ platform_script_abs=${platform_script_path}/${platform_script}
 if [ ! -f $platform_script_abs ]; then
   echo "platform specific script $platform_script not found here:"
   echo $platform_script_abs
-  exit 6
+  exit 7
 fi
 
 # run the platform specific script to perform CernVM-FS tests
