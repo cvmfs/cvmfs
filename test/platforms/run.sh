@@ -122,6 +122,11 @@ if [ $? -ne 0 ]; then
     echo "cannot create user account $test_username"
     exit 4
   fi
+  usermod -a -G fuse $test_username
+  if [ $? -ne 0 ]; then
+    echo "cannot add $test_username to fuse group"
+    exit 5
+  fi
   echo "$test_username ALL = NOPASSWD: ALL"  | tee --append /etc/sudoers
   echo "Defaults:$test_username !requiretty" | tee --append /etc/sudoers
 fi
@@ -138,11 +143,11 @@ download $client_package
 download $keys_package
 download $source_tarball
 
-# get local file names of downloaded files
-server_package=$(basename $server_package)
-client_package=$(basename $client_package)
-keys_package=$(basename $keys_package)
-source_tarball=$(basename $source_tarball)
+# get local file path of downloaded files
+server_package=$(readlink --canonicalize $(basename $server_package))
+client_package=$(readlink --canonicalize $(basename $client_package))
+keys_package=$(readlink --canonicalize $(basename $keys_package))
+source_tarball=$(readlink --canonicalize $(basename $source_tarball))
 
 # extract the source tarball
 source_directory=$(basename $source_tarball .tar.gz | sed 's/_/-/')
@@ -152,7 +157,7 @@ if [ $? -ne 0 ] || [ ! -d $source_directory ]; then
   echo "fail"
   echo "tar said:"
   echo $tar_output
-  exit 5
+  exit 6
 else
   echo "done"
 fi
@@ -169,17 +174,17 @@ platform_script_abs=${platform_script_path}/${platform_script}
 if [ ! -f $platform_script_abs ]; then
   echo "platform specific script $platform_script not found here:"
   echo $platform_script_abs
-  exit 6
+  exit 7
 fi
 
 # run the platform specific script to perform CernVM-FS tests
 echo "running platform specific script $platform_script ..."
 touch .running # flag to signal a running test system
-sudo -u $test_username sh $platform_script_abs -s $server_package   \
-                                         -c $client_package   \
-                                         -k $keys_package     \
-                                         -t $source_directory \
-                                         -l $test_logfile
+sudo -H -u $test_username sh $platform_script_abs -s $server_package   \
+                                                  -c $client_package   \
+                                                  -k $keys_package     \
+                                                  -t $source_directory \
+                                                  -l $test_logfile
 retval=$?
 rm .running
 
