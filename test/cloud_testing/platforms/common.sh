@@ -124,6 +124,26 @@ uninstall_rpm() {
 }
 
 
+attach_user_group() {
+  local groupname=$1
+  local username
+  local original_group
+
+  # add the group to the user's list of groups
+  username=$(id --user --name)
+  sudo /usr/sbin/usermod -a -G $groupname $username || return 1
+
+  # Hack! make the new group effective without re-login
+  # See: superuser.com/questions/272061/reload-a-linux-users-group-assignments-without-logging-out
+  original_group=$(id --group --name)
+  newgrp $groupname      || return 2
+  newgrp $original_group || return 3
+
+  # check if the group is now visible in groups
+  [ groups | grep -q $groupname ] || return 4
+}
+
+
 die() {
   local msg=$1
   echo $msg
