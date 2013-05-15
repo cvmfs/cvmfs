@@ -28,6 +28,10 @@ ami_name=""
 ip_address=""
 instance_id=""
 
+# global variables (get filled by setup_and_run_test_cases)
+remote_run_log_file=""
+remote_test_log_file=""
+
 
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -138,12 +142,30 @@ tear_down_virtual_machine() {
 setup_and_run_test_cases() {
   local ip=$1
 
-  echo "maybe later: $ip"
+  echo -n "setting up and running test cases on VM ($ip)... "
+  log_files=$(ssh -i $EC2_KEY_LOCATION root@$ip 'cat | bash /dev/stdin'        \
+                         -s $server_package                                    \
+                         -c $client_package                                    \
+                         -t $source_tarball                                    \
+                         -k $keys_package                                      \
+                         -r $platform_script < ${script_location}/remote_run.sh)
+  local retcode=$?
+  remote_run_log_file=$(echo $log_files | head -n1)
+  remote_test_log_file=$(echo $log_files | head -n2 | tail -n1)
+
+  if [ $retcode -ne 0 ]; then
+    echo "fail"
+    return 1
+  else
+    echo "done"
+  fi
 }
 
 
 handle_test_failure() {
   echo "handling failure later..."
+  echo "run log:  $remote_run_log_file"
+  echo "test log: $remote_test_log_file"
 }
 
 
