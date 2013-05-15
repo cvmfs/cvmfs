@@ -3,18 +3,21 @@
 # This script spawns a virtual machine of a specific platform type on ibex and
 # runs the associated test cases on this machine
 
-# TODO: put this configuration separate
-EC2_ACCESS_KEY="074d214e8f884d93a3efe71ad0640d4b"
-EC2_SECRET_KEY="f4fe3774b1d845ffbeede409ec664cdc"
-EC2_KEY="ibex_key"
-EC2_INSTANCE_TYPE="m1.medium"
-EC2_KEY_LOCATION="/home/rene/ibex/ibex_key.pem"
-
-
 # internal script configuration
 script_location=$(dirname $(readlink --canonicalize $0))
 reachability_timeout=60  # * 10 seconds
 accessibility_timeout=60 # * 10 seconds
+
+# Load configuration
+#
+# Example:
+# EC2_ACCESS_KEY="..."
+# EC2_SECRET_KEY="..."
+# EC2_ENDPOINT="..."
+# EC2_KEY="..."
+# EC2_INSTANCE_TYPE="..."
+# EC2_KEY_LOCATION="/home/.../ibex_key.pem"
+. ec2_config.sh
 
 # global variables for external script parameters
 platform_script=""
@@ -85,6 +88,7 @@ spawn_virtual_machine() {
   spawn_results=$(${script_location}/instance_handler.py spawn                 \
                                          --access-key       $EC2_ACCESS_KEY    \
                                          --secret-key       $EC2_SECRET_KEY    \
+                                         --cloud-endpoint   $EC2_ENDPOINT      \
                                          --key              $EC2_KEY           \
                                          --instance-type    $EC2_INSTANCE_TYPE \
                                          --ami              $ami)
@@ -129,6 +133,7 @@ tear_down_virtual_machine() {
   teardown_results=$(${script_location}/instance_handler.py terminate          \
                                          --access-key       $EC2_ACCESS_KEY    \
                                          --secret-key       $EC2_SECRET_KEY    \
+                                         --cloud-endpoint   $EC2_ENDPOINT      \
                                          --instance-id      $instance)
   if [ $? -ne 0 ]; then
     echo "fail"

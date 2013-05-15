@@ -5,8 +5,6 @@ import time
 import argparse
 import sys
 
-# global configuration
-ibex_endpoint = "ibex-cloud-controller.cern.ch"
 
 def print_error(msg):
   print >> sys.stderr , "[Error]" , msg
@@ -21,9 +19,9 @@ def wait_for_instance(instance):
   return end - start
 
 
-def connect_to_ibex(access_key, secret_key):
+def connect_to_ibex(access_key, secret_key, endpoint):
   region = boto.ec2.regioninfo.RegionInfo(name        = "nova",
-                                          endpoint    = ibex_endpoint)
+                                          endpoint    = endpoint)
   connection = boto.connect_ec2(aws_access_key_id     = access_key,
                                 aws_secret_access_key = secret_key,
                                 is_secure=False,
@@ -92,11 +90,12 @@ def create_instance(parent_parser, argv):
 
   access_key = arguments.access_key[0]
   secret_key = arguments.secret_key[0]
+  endpoint   = arguments.cloud_endpoint[0]
   ami        = arguments.ami[0]
   key_name   = arguments.key[0]
   flavor     = arguments.flavor[0]
 
-  connection = connect_to_ibex(access_key, secret_key)
+  connection = connect_to_ibex(access_key, secret_key, endpoint)
   instance   = spawn_instance(connection, ami, key_name, flavor)
 
   if instance != None:
@@ -118,9 +117,10 @@ def terminate_instance(parent_parser, argv):
 
   access_key  = arguments.access_key[0]
   secret_key  = arguments.secret_key[0]
+  endpoint    = arguments.cloud_endpoint[0]
   instance_id = arguments.instance_id[0]
 
-  connection = connect_to_ibex(access_key, secret_key)
+  connection = connect_to_ibex(access_key, secret_key, endpoint)
   successful = kill_instance(connection, instance_id)
 
   if not successful:
@@ -146,6 +146,12 @@ parser.add_argument("--secret-key",
                        required = True,
                        dest     = "secret_key",
                        help     = "EC2 Secret Key String")
+parser.add_argument("--cloud-endpoint",
+                       nargs    = 1,
+                       metavar  = "<url to cloud controller endpoint>",
+                       required = True,
+                       dest     = "cloud_endpoint",
+                       help     = "URL to the cloud controller")
 
 subcommand = sys.argv[1]
 argv = sys.argv[2:]
