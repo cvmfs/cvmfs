@@ -140,7 +140,7 @@ attach_user_group() {
   newgrp $original_group || return 3
 
   # check if the group is now visible in groups
-  [ groups | grep -q $groupname ] || return 4
+  groups | grep -q $groupname || return 4
 }
 
 
