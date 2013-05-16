@@ -172,7 +172,8 @@ retrieve_file_from_virtual_machine() {
   local file_path=$2
   local dest_path=$3
 
-  scp -i $EC2_KEY_LOCATION root@${ip}:${file_path} ${dest_path} > /dev/null 2>&1
+  scp -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no \
+      root@${ip}:${file_path} ${dest_path} > /dev/null 2>&1
 }
 
 
@@ -188,9 +189,15 @@ setup_virtual_machine() {
       -c $client_package                                 \
       -t $source_tarball                                 \
       -k $keys_package                                   \
-      -r $platform_setup_script                          \
-      -p /opt
+      -r $platform_setup_script
   check_retcode $?
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+
+  echo -n "giving the dust time to settle... "
+  sleep 15
+  echo "done"
 }
 
 
@@ -204,8 +211,7 @@ run_test_cases() {
 
   echo -n "running test cases on VM ($ip)... "
   run_script_on_virtual_machine $ip $remote_run_script \
-      -r $platform_run_script                          \
-      -p /opt
+      -r $platform_run_script
   check_retcode $?
 
   if [ $? -ne 0 ]; then
@@ -308,7 +314,6 @@ fi
 # test suite on the VM.
 spawn_virtual_machine     $ami_name    || die "Aborting..."
 wait_for_virtual_machine  $ip_address  || die "Aborting..."
-scp -i ~/ibex/ibex_yek.pem /home/rene/Documents/Schweinestall/cvmfs/test/cloud_testing/platforms/*.sh root@$ip_address:/opt
 setup_virtual_machine     $ip_address  || die "Aborting..."
 wait_for_virtual_machine  $ip_address  || die "Aborting..."
 run_test_cases            $ip_address  || die "Aborting..."

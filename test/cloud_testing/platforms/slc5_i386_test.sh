@@ -15,6 +15,5 @@ cd ${SOURCE_DIRECTORY}/test
                           src/018-dns_injection    \
                           src/019-faulty_proxy     \
                           src/020-server_timeout   \
-                          src/023-*                \
                           src/024-*                \
                           src/5*
