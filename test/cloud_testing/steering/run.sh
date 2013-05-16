@@ -17,7 +17,7 @@ accessibility_timeout=60 # * 10 seconds
 # EC2_KEY="..."
 # EC2_INSTANCE_TYPE="..."
 # EC2_KEY_LOCATION="/home/.../ibex_key.pem"
-. ec2_config.sh
+. ${script_location}/ec2_config.sh
 
 # global variables for external script parameters
 platform_script=""
@@ -155,8 +155,8 @@ setup_and_run_test_cases() {
                          -k $keys_package                                      \
                          -r $platform_script < ${script_location}/remote_run.sh)
   local retcode=$?
-  remote_run_log_file=$(echo $log_files | head -n1)
-  remote_test_log_file=$(echo $log_files | head -n2 | tail -n1)
+  remote_run_log_file=$(echo $log_files  | awk '{print $1}')
+  remote_test_log_file=$(echo $log_files | awk '{print $2}')
 
   if [ $retcode -ne 0 ]; then
     echo "fail"
@@ -168,7 +168,18 @@ setup_and_run_test_cases() {
 
 
 handle_test_failure() {
+  local ip=$1
+
   echo "handling failure later..."
+  echo "run log:  $remote_run_log_file"
+  echo "test log: $remote_test_log_file"
+}
+
+
+get_test_results() {
+  local ip=$1
+
+  echo "retrieving test results..."
   echo "run log:  $remote_run_log_file"
   echo "test log: $remote_test_log_file"
 }
@@ -227,9 +238,12 @@ fi
 setup_and_run_test_cases $ip_address
 if [ $? -ne 0 ]; then
   echo "Errors occured during test run. Investigating..."
-  handle_test_failure
+  handle_test_failure $ip_address
   exit 3
 fi
+
+# get the test results
+get_test_results $ip_address
 
 # tear down virtual machine after successful test run
 tear_down_virtual_machine $instance_id

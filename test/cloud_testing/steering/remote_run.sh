@@ -70,8 +70,7 @@ test_logfile=$(readlink --canonicalize $test_logfile)
 # from now on everything is logged to the logfile
 # Note: the only output of this script is the absolute path to the generated
 #       log files
-echo $run_logfile
-echo $test_logfile
+echo "$run_logfile $test_logfile"
 exec &> $run_logfile
 
 # read parameters
