@@ -1,4 +1,5 @@
 2.1.11:
+  * SLES11 build system compatibility fixes
 
 2.1.10:
   * Use continuous inodes on inode generation change instead of

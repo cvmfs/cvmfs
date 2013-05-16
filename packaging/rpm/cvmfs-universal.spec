@@ -52,16 +52,21 @@ Requires: libfuse2
 Requires: glibc
 Requires: util-linux
 Requires: pwdutils
+  %if 0%{?suse_version} < 1200
+Requires: sysvinit
+  %else
+Requires: sysvinit-tools
+  %endif
 %else
 Requires: fuse-libs
 Requires: glibc-common
 Requires: which
 Requires: shadow-utils
-%endif
-%if 0%{?el5}
+  %if 0%{?el5}
 Requires: SysVinit
-%else
+  %else
 Requires: sysvinit-tools
+  %endif
 %endif
 Requires: cvmfs-keys >= 1.2
 
