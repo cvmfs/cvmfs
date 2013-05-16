@@ -19,21 +19,26 @@ accessibility_timeout=60 # * 10 seconds
 # EC2_KEY_LOCATION="/home/.../ibex_key.pem"
 . ${script_location}/ec2_config.sh
 
+# static information (check also remote_setup.sh and remote_run.sh)
+cvmfs_workspace="/tmp/cvmfs-test-workspace"
+cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
+cvmfs_setup_log="${cvmfs_workspace}/setup.log"
+cvmfs_run_log="${cvmfs_workspace}/run.log"
+cvmfs_test_log="${cvmfs_workspace}/test.log"
+
 # global variables for external script parameters
-platform_script=""
+platform_run_script=""
+platform_setup_script=""
 server_package=""
 client_package=""
 keys_package=""
 source_tarball=""
 ami_name=""
+log_destination="."
 
 # global variables (get filled by spawn_virtual_machine)
 ip_address=""
 instance_id=""
-
-# global variables (get filled by setup_and_run_test_cases)
-remote_run_log_file=""
-remote_test_log_file=""
 
 
 #
@@ -54,12 +59,16 @@ usage() {
   echo "$msg"
   echo
   echo "Mandatory options:"
-  echo "-s <cvmfs server package>  CernVM-FS server package to be tested"
-  echo "-c <cvmfs client package>  CernVM-FS client package to be tested"
-  echo "-t <cvmfs source tarball>  CernVM-FS sources containing associated tests"
-  echo "-k <cvmfs keys package>    CernVM-FS public keys package"
-  echo "-r <run script>            platform specific script (inside the tarball)"
-  echo "-a <AMI name>              the virtual machine image to spawn on ibex"
+  echo " -s <cvmfs server package>  CernVM-FS server package to be tested"
+  echo " -c <cvmfs client package>  CernVM-FS client package to be tested"
+  echo " -t <cvmfs source tarball>  CernVM-FS sources containing associated tests"
+  echo " -k <cvmfs keys package>    CernVM-FS public keys package"
+  echo " -b <setup script>          platform specific setup script (inside the tarball)"
+  echo " -r <run script>            platform specific test script (inside the tarball)"
+  echo " -a <AMI name>              the virtual machine image to spawn"
+  echo
+  echo "Optional parameters:"
+  echo " -d <results destination>   Directory to store final test session logs"
   echo
   echo "You must provide http addresses for all packages and tar balls. They will"
   echo "be downloaded and executed to test CVMFS on the specified platform"
@@ -68,19 +77,30 @@ usage() {
 }
 
 
-check_timeout() {
-  timeout_state=$1
-  if [ $timeout_state -eq 0 ]; then
+check_retcode() {
+  local retcode=$1
+
+  if [ $retcode -ne 0 ]; then
     echo "fail"
-    return 1
   else
     echo "okay"
   fi
+
+  return $retcode
+}
+
+
+check_timeout() {
+  timeout_state=$1
+  [ $timeout_state -ne 0 ]
+  check_retcode $?
 }
 
 
 spawn_virtual_machine() {
   local ami=$1
+
+  local retcode
 
   # spawn the virtual machine on ibex
   echo -n "spawning virtual machine from $ami... "
@@ -92,36 +112,35 @@ spawn_virtual_machine() {
                                          --key              $EC2_KEY           \
                                          --instance-type    $EC2_INSTANCE_TYPE \
                                          --ami              $ami)
-  if [ $? -ne 0 ]; then
-    echo "fail"
-    return 1
-  else
-    instance_id=$(echo $spawn_results | awk '{print $1}')
-    ip_address=$(echo $spawn_results | awk '{print $2}')
-    echo "okay"
-  fi
+  retcode=$?
+  instance_id=$(echo $spawn_results | awk '{print $1}')
+  ip_address=$(echo $spawn_results | awk '{print $2}')
+
+  check_retcode $retcode
+}
+
+
+wait_for_virtual_machine() {
+  local ip=$1
 
   # wait for the virtual machine to respond to pings
-  echo -n "waiting for IP ($ip_address) to become reachable... "
+  echo -n "waiting for IP ($ip) to become reachable... "
   local timeout=$reachability_timeout
-  while [ $timeout -gt 0 ] && ! ping -c 1 $ip_address > /dev/null 2>&1; do
+  while [ $timeout -gt 0 ] && ! ping -c 1 $ip > /dev/null 2>&1; do
     sleep 10
     timeout=$(( $timeout - 1 ))
   done
   if ! check_timeout $timeout; then return 1; fi
 
   # wait for the virtual machine to become accessible via ssh
-  echo -n "waiting for VM ($instance_id) to become accessible... "
+  echo -n "waiting for VM ($ip) to become accessible... "
   timeout=$accessibility_timeout
   while [ $timeout -gt 0 ] && \
-        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip_address 'echo hallo' > /dev/null 2>&1; do
+        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'echo hallo' > /dev/null 2>&1; do
     sleep 10
     timeout=$(( $timeout - 1 ))
   done
   if ! check_timeout $timeout; then return 1; fi
-
-  # all done...
-  return 0
 }
 
 
@@ -135,34 +154,62 @@ tear_down_virtual_machine() {
                                          --secret-key       $EC2_SECRET_KEY    \
                                          --cloud-endpoint   $EC2_ENDPOINT      \
                                          --instance-id      $instance)
-  if [ $? -ne 0 ]; then
-    echo "fail"
-    return 1
-  else
-    echo "okay"
-  fi
+  check_retcode $?
 }
 
 
-setup_and_run_test_cases() {
+run_script_on_virtual_machine() {
+  local ip=$1
+  local script_path=$2
+  shift 2
+
+  ssh -i $EC2_KEY_LOCATION root@$ip 'cat | bash /dev/stdin' $@ < $script_path
+}
+
+
+retrieve_file_from_virtual_machine() {
+  local ip=$1
+  local file_path=$2
+  local dest_path=$3
+
+  scp -i $EC2_KEY_LOCATION root@${ip}:${file_path} ${dest_path} > /dev/null 2>&1
+}
+
+
+setup_virtual_machine() {
   local ip=$1
 
-  echo -n "setting up and running test cases on VM ($ip)... "
-  log_files=$(ssh -i $EC2_KEY_LOCATION root@$ip 'cat | bash /dev/stdin'        \
-                         -s $server_package                                    \
-                         -c $client_package                                    \
-                         -t $source_tarball                                    \
-                         -k $keys_package                                      \
-                         -r $platform_script < ${script_location}/remote_run.sh)
-  local retcode=$?
-  remote_run_log_file=$(echo $log_files  | awk '{print $1}')
-  remote_test_log_file=$(echo $log_files | awk '{print $2}')
+  local remote_setup_script
+  remote_setup_script="${script_location}/remote_setup.sh"
 
-  if [ $retcode -ne 0 ]; then
-    echo "fail"
-    return 1
-  else
-    echo "done"
+  echo -n "setting up VM ($ip) for CernVM-FS test suite... "
+  run_script_on_virtual_machine $ip $remote_setup_script \
+      -s $server_package                                 \
+      -c $client_package                                 \
+      -t $source_tarball                                 \
+      -k $keys_package                                   \
+      -r $platform_setup_script                          \
+      -p /opt
+  check_retcode $?
+}
+
+
+run_test_cases() {
+  local ip=$1
+
+  local retcode
+  local log_files
+  local remote_run_script
+  remote_run_script="${script_location}/remote_run.sh"
+
+  echo -n "running test cases on VM ($ip)... "
+  run_script_on_virtual_machine $ip $remote_run_script \
+      -r $platform_run_script                          \
+      -p /opt
+  check_retcode $?
+
+  if [ $? -ne 0 ]; then
+    handle_test_failure $ip
   fi
 }
 
@@ -170,18 +217,40 @@ setup_and_run_test_cases() {
 handle_test_failure() {
   local ip=$1
 
-  echo "handling failure later..."
-  echo "run log:  $remote_run_log_file"
-  echo "test log: $remote_test_log_file"
+  get_test_results $ip
+
+  echo "at least one test case failed... skipping destructions of VM!"
+  exit 100
 }
 
 
 get_test_results() {
   local ip=$1
+  local retval_run_log
+  local retval_test_log
+  local retval_setup_log
 
-  echo "retrieving test results..."
-  echo "run log:  $remote_run_log_file"
-  echo "test log: $remote_test_log_file"
+  echo -n "retrieving test results... "
+  retrieve_file_from_virtual_machine                  \
+      $ip                                             \
+      $cvmfs_test_log                                 \
+      ${log_destination}/$(basename $cvmfs_test_log)
+  retval_test_log=$?
+  retrieve_file_from_virtual_machine                  \
+      $ip                                             \
+      $cvmfs_run_log                                  \
+      ${log_destination}/$(basename $cvmfs_run_log)
+  retval_run_log=$?
+  retrieve_file_from_virtual_machine                  \
+      $ip                                             \
+      $cvmfs_setup_log                                \
+      ${log_destination}/$(basename $cvmfs_setup_log)
+  retval_setup_log=$?
+
+  [ $retval_test_log  -eq 0 ] && \
+  [ $retval_run_log   -eq 0 ] && \
+  [ $retval_setup_log -eq 0 ]
+  check_retcode $?
 }
 
 
@@ -190,10 +259,13 @@ get_test_results() {
 #
 
 
-while getopts "r:s:c:t:k:a:" option; do
+while getopts "r:b:s:c:t:k:a:" option; do
   case $option in
     r)
-      platform_script=$OPTARG
+      platform_run_script=$OPTARG
+      ;;
+    b)
+      platform_setup_script=$OPTARG
       ;;
     s)
       server_package=$OPTARG
@@ -210,6 +282,9 @@ while getopts "r:s:c:t:k:a:" option; do
     a)
       ami_name=$OPTARG
       ;;
+    d)
+      log_destination=$OPTARG
+      ;;
     ?)
       shift $(($OPTIND-2))
       usage "Unrecognized option: $1"
@@ -218,38 +293,26 @@ while getopts "r:s:c:t:k:a:" option; do
 done
 
 # check if we have all bits and pieces
-if [ x$platform_script = "x" ] ||
-   [ x$server_package  = "x" ] ||
-   [ x$client_package  = "x" ] ||
-   [ x$keys_package    = "x" ] ||
-   [ x$source_tarball  = "x" ] ||
-   [ x$ami_name        = "x" ]; then
+if [ x$platform_run_script   = "x" ] ||
+   [ x$platform_setup_script = "x" ] ||
+   [ x$server_package        = "x" ] ||
+   [ x$client_package        = "x" ] ||
+   [ x$keys_package          = "x" ] ||
+   [ x$source_tarball        = "x" ] ||
+   [ x$ami_name              = "x" ]; then
   usage "Missing parameter(s)"
 fi
 
-# spawn the virtual machine image
-spawn_virtual_machine $ami_name
-if [ $? -ne 0 ]; then
-  echo "Aborting..."
-  exit 2
-fi
+# spawn the virtual machine image, run the platform specific setup script
+# on it, wait for the spawning and setup to be complete and run the actual
+# test suite on the VM.
+spawn_virtual_machine     $ami_name    || die "Aborting..."
+wait_for_virtual_machine  $ip_address  || die "Aborting..."
+scp -i ~/ibex/ibex_yek.pem /home/rene/Documents/Schweinestall/cvmfs/test/cloud_testing/platforms/*.sh root@$ip_address:/opt
+setup_virtual_machine     $ip_address  || die "Aborting..."
+wait_for_virtual_machine  $ip_address  || die "Aborting..."
+run_test_cases            $ip_address  || die "Aborting..."
+get_test_results          $ip_address  || die "Aborting..."
+tear_down_virtual_machine $instance_id || die "Aborting..."
 
-# run the test cases on the spawned virtual machine
-setup_and_run_test_cases $ip_address
-if [ $? -ne 0 ]; then
-  echo "Errors occured during test run. Investigating..."
-  handle_test_failure $ip_address
-  exit 3
-fi
-
-# get the test results
-get_test_results $ip_address
-
-# tear down virtual machine after successful test run
-tear_down_virtual_machine $instance_id
-if [ $? -ne 0 ]; then
-  exit 4
-fi
-
-# done with the test run
 echo "all done"
