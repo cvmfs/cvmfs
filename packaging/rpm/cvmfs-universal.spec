@@ -13,7 +13,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.10
+Version: 2.1.11
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
