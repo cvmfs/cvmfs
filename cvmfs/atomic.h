@@ -49,11 +49,11 @@ static void inline __attribute__((used)) atomic_inc64(atomic_int64 *a) {
 
 
 static void inline __attribute__((used)) atomic_dec32(atomic_int32 *a) {
-  (void) __sync_fetch_and_add(a, -1);
+  (void) __sync_fetch_and_sub(a, 1);
 }
 
 static void inline __attribute__((used)) atomic_dec64(atomic_int64 *a) {
-  (void) __sync_fetch_and_add(a, -1);
+  (void) __sync_fetch_and_sub(a, 1);
 }
 
 static int32_t inline __attribute__((used)) atomic_xadd32(atomic_int32 *a,
