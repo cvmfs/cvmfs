@@ -163,7 +163,7 @@ run_script_on_virtual_machine() {
   local script_path=$2
   shift 2
 
-  ssh -i $EC2_KEY_LOCATION root@$ip 'cat | bash /dev/stdin' $@ < $script_path
+  ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'cat | bash /dev/stdin' $@ < $script_path
 }
 
 
