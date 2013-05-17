@@ -594,16 +594,8 @@ int main(int argc, char *argv[]) {
     Usage(argv[0]);
     return kFailOptions;
   }
-  fuse_opt_add_arg(mount_options, "-oro");
-  fuse_opt_add_arg(mount_options, "-onodev");
-  if (suid_mode_) {
-    if (getuid() != 0) {
-      PrintError("must be root to mount with suid option");
-      abort();
-    }
-    fuse_opt_add_arg(mount_options, "-osuid");
-    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
-  }
+
+  string parameter;
   options::Init();
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
@@ -612,6 +604,23 @@ int main(int argc, char *argv[]) {
     }
   } else {
     options::ParseDefault(*repository_name_);
+  }
+
+  if (options::GetValue("CVMFS_MOUNT_RW", &parameter) &&
+      options::IsOn(parameter))
+  {
+    fuse_opt_add_arg(mount_options, "-orw");
+  } else {
+    fuse_opt_add_arg(mount_options, "-oro");
+  }
+  fuse_opt_add_arg(mount_options, "-onodev");
+  if (suid_mode_) {
+    if (getuid() != 0) {
+      PrintError("must be root to mount with suid option");
+      abort();
+    }
+    fuse_opt_add_arg(mount_options, "-osuid");
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
   }
   loader_exports_ = new LoaderExports();
   loader_exports_->loader_version = PACKAGE_VERSION;
@@ -631,8 +640,6 @@ int main(int argc, char *argv[]) {
              options::Dump().c_str());
     return 0;
   }
-
-  string parameter;
 
   // Logging
   if (options::GetValue("CVMFS_SYSLOG_LEVEL", &parameter))

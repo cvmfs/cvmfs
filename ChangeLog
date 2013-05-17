@@ -1,4 +1,7 @@
 2.1.11:
+  * Add CVMFS_MOUNT_RW switch parameter.  A read/write mount point
+    can workaround problematic open flags (O_RDWR, O_TRUNC, ...)
+  * Remove unused CVMFS_64BIT_INODES parameter
   * Avoid __sync_fetch_and_add on 64bit integers with a negative
     offset.  This breaks on 32bit systems.  It affects the counter
     for active file system calls in the loader.

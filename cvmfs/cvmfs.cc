@@ -989,18 +989,17 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   if (!found) {
     remount_fence_->Leave();
-    if (fi->flags & O_CREAT)
-      fuse_reply_err(req, EROFS);
-    else
-      fuse_reply_err(req, ENOENT);
+    fuse_reply_err(req, ENOENT);
     return;
   }
   remount_fence_->Leave();
 
-  if ((fi->flags & 3) != O_RDONLY) {
-    fuse_reply_err(req, EROFS);
-    return;
-  }
+  // Don't check.  Either done by the OS or one wants to purposefully work
+  // around wrong open flags
+  //if ((fi->flags & 3) != O_RDONLY) {
+  //  fuse_reply_err(req, EROFS);
+  //  return;
+  //}
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
     fuse_reply_err(req, EOPNOTSUPP);
@@ -1576,7 +1575,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   bool ignore_signature = false;
   string root_hash = "";
-  bool inodes_64bit = false;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
 
@@ -1607,8 +1605,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", options::Dump().c_str());
 
   // Overwrite default options
-  if (options::GetValue("CVMFS_64BIT_INODES", &parameter))
-    inodes_64bit = options::IsOn(parameter);
   if (options::GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
     mem_cache_size = String2Uint64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_TIMEOUT", &parameter))
