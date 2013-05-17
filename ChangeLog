@@ -1,4 +1,7 @@
 2.1.11:
+  * Avoid __sync_fetch_and_add on 64bit integers with a negative
+    offset.  This breaks on 32bit systems.  It affects the counter
+    for active file system calls in the loader.
   * SLES11 build system compatibility fixes
 
 2.1.10:
