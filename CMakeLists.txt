@@ -112,6 +112,11 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 
+if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
+	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+
 if (NOT USING_CLANG)
 	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
 	set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
