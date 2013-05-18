@@ -1594,6 +1594,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     SetLogSyslogLevel(3);
   if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
     SetLogSyslogFacility(String2Int64(parameter));
+  if (options::GetValue("CVMFS_USYSLOG", &parameter))
+    SetLogMicroSyslog(parameter);
   if (options::GetValue("CVMFS_DEBUGLOG", &parameter))
     SetLogDebugFile(parameter);
   SetLogSyslogPrefix(loader_exports->repository_name);
@@ -2079,6 +2081,7 @@ static void Fini() {
   delete g_boot_error;
   g_boot_error = NULL;
   SetLogSyslogPrefix("");
+  SetLogMicroSyslog("");
   SetLogDebugFile("");
 }
 

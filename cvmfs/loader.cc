@@ -649,6 +649,7 @@ int main(int argc, char *argv[]) {
   if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
     SetLogSyslogFacility(String2Int64(parameter));
   SetLogSyslogPrefix(*repository_name_);
+  // Deferr setting usyslog until credentials are dropped
 
   // Permissions check
   if (options::GetValue("CVMFS_CHECK_PERMISSIONS", &parameter)) {
@@ -697,6 +698,10 @@ int main(int argc, char *argv[]) {
       return kFailPermission;
     }
   }
+
+  // Only set usyslog now, otherwise file permissions are wrong
+  if (options::GetValue("CVMFS_USYSLOG", &parameter))
+    SetLogMicroSyslog(parameter);
 
   if (single_threaded_) {
     LogCvmfs(kLogCvmfs, kLogStdout,

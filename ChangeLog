@@ -1,4 +1,7 @@
 2.1.11:
+  * Add experimental support for "micro-syslog" implementation that
+    writes syslog messages to a file.  Add CVMFS_USYSLOG parameter
+    to specify the destination file.
   * Distinguish information, warning, and error records when
     writing to syslog
   * Add -march=i686 to CFLAGS and CXXFLAGS for 32bit builds 

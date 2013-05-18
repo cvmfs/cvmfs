@@ -83,7 +83,7 @@ bool HasPrefix(const std::string &str, const std::string &prefix,
 bool IsNumeric(const std::string &str);
 
 std::vector<std::string> SplitString(const std::string &str,
-	                                   const char delim,
+                                     const char delim,
                                      const unsigned max_chunks = 0);
 std::string JoinStrings(const std::vector<std::string> &strings,
                         const std::string &joint);

@@ -195,6 +195,7 @@ void TearDown2ReadOnly() {
   CallGuard::Drainout();
   quota::Fini();
   LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
+  SetLogMicroSyslog("");
 }
 
 
