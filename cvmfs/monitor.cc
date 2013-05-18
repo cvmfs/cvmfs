@@ -136,7 +136,7 @@ static void SendTrace(int signal,
     SafeSleepMs(100);
     // quit anyway after 30 seconds
     if (++counter == 300) {
-      LogCvmfs(kLogCvmfs, kLogSyslog, "stack trace generation failed");
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
       _exit(1);
     }
   }
@@ -163,7 +163,7 @@ static void LogEmergency(string msg) {
   } else {
     msg += " (failed to open log file in cache directory)";
   }
-  LogCvmfs(kLogMonitor, kLogSyslog, "%s", msg.c_str());
+  LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
 }
 
 
@@ -462,7 +462,7 @@ unsigned GetMaxOpenFiles() {
 #endif
 
     if (soft_limit < kMinOpenFiles) {
-      LogCvmfs(kLogMonitor, kLogSyslog | kLogDebug,
+      LogCvmfs(kLogMonitor, kLogSyslogWarn | kLogDebug,
                "Warning: current limits for number of open files are "
                "(%lu/%lu)\n"
                "CernVM-FS is likely to run out of file descriptors, "

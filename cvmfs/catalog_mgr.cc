@@ -175,7 +175,7 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
 
     // If there is no parent entry, it might be data corruption
     if (!found_parent) {
-      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
                "cannot find parent entry for inode %"PRIu64" --> data corrupt?",
                inode);
       found = false;
@@ -281,7 +281,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
       found = best_fit->LookupPath(parent_path, &parent);
     }
     if (!found) {
-      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
                "cannot find parent '%s' for entry '%s' --> data corrupt?",
                parent_path.c_str(), path.c_str());
       goto lookup_path_notfound;

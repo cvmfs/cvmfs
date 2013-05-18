@@ -313,8 +313,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
         result += "File Catalog Memory Cache:\n" +
                   string("  inode cache:   ") + inode_stats.Print() +
                   string("  path cache:    ") + path_stats.Print() +
-                  string("  md5path cache: ") + md5path_stats.Print();        
-        result += string("  inode tracker: ") + 
+                  string("  md5path cache: ") + md5path_stats.Print();
+        result += string("  inode tracker: ") +
                   cvmfs::PrintInodeTrackerStatistics();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
@@ -490,7 +490,7 @@ void Fini() {
   int result;
   result = unlink(socket_path_->c_str());
   if (result != 0) {
-    LogCvmfs(kLogTalk, kLogSyslog,
+    LogCvmfs(kLogTalk, kLogSyslogWarn,
              "Could not remove cvmfs_io socket from cache directory.");
   }
 

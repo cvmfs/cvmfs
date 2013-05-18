@@ -69,8 +69,8 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
   }
   retval = platform_readahead(fd_readahead);
   if (retval != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslog, "failed to read-ahead %s (%d)",
-             filename_.c_str(), errno);
+    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn,
+             "failed to read-ahead %s (%d)", filename_.c_str(), errno);
     //close(fd_readahead);
     //goto database_failure;
   }

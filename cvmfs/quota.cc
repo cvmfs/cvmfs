@@ -202,10 +202,10 @@ static bool DoCleanup(const uint64_t leave_size) {
     LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
     hash::Any hash(hash::kSha1, hash::HexPtr(
       hash_str.substr(0, 2*hash::kDigestSizes[hash::kSha1])));
-    
+
     // That's a critical condition.  We must not delete a not yet inserted
-    // pinned file as it is already reserved (but will be inserted later).  
-    // However, we must remove it temporarily from the cache database in order 
+    // pinned file as it is already reserved (but will be inserted later).
+    // However, we must remove it temporarily from the cache database in order
     // to not run into an endless loop
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
       trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
@@ -290,7 +290,7 @@ static void ProcessCommandBunch(const unsigned num,
         LogCvmfs(kLogQuota, kLogDebug, "touching %s (%ld): %d",
                  hash_str.c_str(), seq_-1, retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
-          LogCvmfs(kLogQuota, kLogSyslog, 
+          LogCvmfs(kLogQuota, kLogSyslogErr,
                    "failed to update %s in cachedb, error %d",
                    hash_str.c_str(), retval);
           abort();
@@ -304,7 +304,7 @@ static void ProcessCommandBunch(const unsigned num,
         LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d",
                  hash_str.c_str(), retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
-          LogCvmfs(kLogQuota, kLogSyslog, 
+          LogCvmfs(kLogQuota, kLogSyslogErr,
                    "failed to unpin %s in cachedb, error %d",
                    hash_str.c_str(), retval);
           abort();
@@ -339,7 +339,7 @@ static void ProcessCommandBunch(const unsigned num,
         LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, pin %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
-          LogCvmfs(kLogQuota, kLogSyslog, 
+          LogCvmfs(kLogQuota, kLogSyslogErr,
                    "failed to insert %s in cachedb, error %d",
                    hash_str.c_str(), retval);
           abort();
@@ -482,7 +482,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
             success = true;
           }
           sqlite3_reset(stmt_size_);
-          
+
           WritePipe(return_pipe, &success, sizeof(success));
           break; }
         case kCleanup:
@@ -618,7 +618,7 @@ bool RebuildDatabase() {
     snprintf(hex, sizeof(hex), "%02x", i);
     path = (*cache_dir_) + "/" + string(hex);
     if ((dirp = opendir(path.c_str())) == NULL) {
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
                "failed to open directory %s (tmpwatch interfering?)",
                path.c_str());
       goto build_return;
@@ -735,7 +735,8 @@ init_recover:
       sqlite3_close(db_);
       unlink(db_file.c_str());
       unlink((db_file + "-journal").c_str());
-      LogCvmfs(kLogQuota, kLogSyslog, "LRU database corrupted, re-building");
+      LogCvmfs(kLogQuota, kLogSyslogWarn,
+               "LRU database corrupted, re-building");
       goto init_recover;
     }
     LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
@@ -922,7 +923,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     return true;
   }
   const int connect_error = errno;
-  
+
   // Lock file: let existing cache manager finish first
   const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
   if (fd_lockfile_fifo < 0) {
@@ -932,7 +933,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     return false;
   }
   UnlockFile(fd_lockfile_fifo);
-  
+
   if (connect_error == ENXIO) {
     LogCvmfs(kLogQuota, kLogDebug, "left-over FIFO found, unlinking");
     unlink(fifo_path.c_str());
@@ -952,7 +953,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   int pipe_handshake[2];
   MakePipe(pipe_boot);
   MakePipe(pipe_handshake);
-  
+
   vector<string> command_line;
   command_line.push_back(exe_path);
   command_line.push_back("__cachemgr__");
@@ -990,7 +991,8 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     UnlockFile(fd_lockfile);
     close(pipe_boot[0]);
     close(pipe_handshake[1]);
-    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "cache manager did not start");
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+             "cache manager did not start");
     return false;
   }
   close(pipe_boot[0]);
@@ -1066,7 +1068,7 @@ int MainCacheManager(int argc, char **argv) {
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
   if (fd_lockfile_fifo < 0) {
-    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "could not open lock file "
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr, "could not open lock file "
              "%s (%d)", (*cache_dir_ + "/lock_cachemgr.fifo").c_str(), errno);
     return 1;
   }
@@ -1074,7 +1076,7 @@ int MainCacheManager(int argc, char **argv) {
   const bool rebuild = FileExists(crash_guard);
   retval = open(crash_guard.c_str(), O_RDONLY | O_CREAT, 0600);
   if (retval < 0) {
-    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to create shared cache manager crash guard");
     UnlockFile(fd_lockfile_fifo);
     return 1;
@@ -1371,13 +1373,13 @@ void Remove(const hash::Any &hash) {
   if (limit_ != 0) {
     int pipe_remove[2];
     MakeReturnPipe(pipe_remove);
-    
+
     LruCommand cmd;
     cmd.command_type = kRemove;
     cmd.return_pipe = pipe_remove[1];
     memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-    
+
     bool success;
     ReadHalfPipe(pipe_remove[0], &success, sizeof(success));
     CloseReturnPipe(pipe_remove);

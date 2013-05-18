@@ -92,7 +92,7 @@ unsigned opt_num_proxies_;
 unsigned opt_max_retries_ = 0;
 unsigned opt_backoff_init_ms_ = 0;
 unsigned opt_backoff_max_ms_ = 0;
-  
+
 bool opt_ipv4_only_ = false;
 
 
@@ -229,11 +229,11 @@ static void SwitchProxy(JobInfo *info) {
       if (opt_proxy_groups_reset_after_ > 0) {
         if (opt_proxy_groups_current_ > 0) {
           opt_timestamp_backup_proxies_ = time(NULL);
-          LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+          LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                    "switched to (another) backup proxy group");
         } else {
           opt_timestamp_backup_proxies_ = 0;
-          LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+          LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                    "switched back to primary proxy group");
         }
       }
@@ -513,7 +513,7 @@ static void SetUrlOptions(JobInfo *info) {
         static_cast<int64_t>(opt_timestamp_backup_proxies_ +
                              opt_proxy_groups_reset_after_))
     {
-      LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                "reset proxy groups");
       opt_proxy_groups_current_ = 0;
       opt_proxy_groups_current_burned_ = 1;
@@ -675,7 +675,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // Error set by callback
       break;
     default:
-      LogCvmfs(kLogDownload, kLogSyslog, "unexpected curl error (%d) while "
+      LogCvmfs(kLogDownload, kLogSyslogErr, "unexpected curl error (%d) while "
                "trying to fetch %s", curl_error, info->url->c_str());
       info->error_code = kFailOther;
       break;
@@ -1120,7 +1120,7 @@ void Init(const unsigned max_pool_handles, const bool use_system_proxy) {
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
   srandom(tv_now.tv_usec);
-  
+
   // Parsing environment variables
   if (use_system_proxy) {
     if (getenv("http_proxy") == NULL) {
@@ -1129,7 +1129,7 @@ void Init(const unsigned max_pool_handles, const bool use_system_proxy) {
       SetProxyChain(string(getenv("http_proxy")));
     }
   }
-  if ((getenv("CVMFS_IPV4_ONLY") != NULL) && 
+  if ((getenv("CVMFS_IPV4_ONLY") != NULL) &&
       (strlen(getenv("CVMFS_IPV4_ONLY")) > 0))
   {
     opt_ipv4_only_ = true;

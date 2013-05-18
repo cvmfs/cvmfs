@@ -58,17 +58,17 @@ static const char *kSQL_GetInode =
   "SELECT rowid FROM inodes where path = ?;";
 static const char *kSQL_GetPath =
   "SELECT path FROM inodes where rowid = ?;";
-  
+
 sqlite3_stmt *stmt_get_path_ = NULL;
-sqlite3_stmt *stmt_get_inode_ = NULL;  
-sqlite3_stmt *stmt_add_ = NULL;  
+sqlite3_stmt *stmt_get_inode_ = NULL;
+sqlite3_stmt *stmt_add_ = NULL;
 
 // Statistics to keep
 atomic_int64 dbstat_seq_;
 atomic_int64 dbstat_added_;
 atomic_int64 dbstat_path_found_;
 atomic_int64 dbstat_inode_found_;
-  
+
 struct BusyHandlerInfo {
   BusyHandlerInfo() {
     accumulated_ms = 0;
@@ -86,7 +86,7 @@ BusyHandlerInfo *busy_handler_info_ = NULL;
 static uint64_t FindInode(const PathString &path) {
   int sqlite_state;
   uint64_t inode;
-  sqlite_state = sqlite3_bind_text(stmt_get_inode_, 1, path.GetChars(), 
+  sqlite_state = sqlite3_bind_text(stmt_get_inode_, 1, path.GetChars(),
                                    path.GetLength(), SQLITE_TRANSIENT);
   assert(sqlite_state == SQLITE_OK);
   sqlite_state = sqlite3_step(stmt_get_inode_);
@@ -114,10 +114,10 @@ static uint64_t FindInode(const PathString &path) {
 static uint64_t IssueInode(const PathString &path) {
   int sqlite_state;
   uint64_t inode;
-  sqlite_state = sqlite3_prepare_v2(db_, kSQL_AddInode, kMaxDBSqlLen, 
+  sqlite_state = sqlite3_prepare_v2(db_, kSQL_AddInode, kMaxDBSqlLen,
                                     &stmt_add_, NULL);
   assert(sqlite_state == SQLITE_OK);
-  sqlite_state = sqlite3_bind_text(stmt_add_, 1, path.GetChars(), 
+  sqlite_state = sqlite3_bind_text(stmt_add_, 1, path.GetChars(),
                                    path.GetLength(), SQLITE_TRANSIENT);
   if (sqlite_state != SQLITE_OK) {
     LogCvmfs(kLogNfsMaps, kLogDebug,
@@ -144,7 +144,7 @@ static uint64_t IssueInode(const PathString &path) {
 uint64_t RetryGetInode(const PathString &path, int attempt) {
   if (attempt > 2) {
     // We have to give up eventually
-    LogCvmfs(kLogNfsMaps, kLogSyslog, "Failed to find & create path (%s)",
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr, "Failed to find & create path (%s)",
              path.c_str());
     return 0;
   }
@@ -194,7 +194,7 @@ bool GetPath(const uint64_t inode, PathString *path) {
     return false;
   }
   if (sqlite_state != SQLITE_ROW) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
              "Failed to execute SQL for GetPath (%"PRIu64"): %s",
              inode, sqlite3_errmsg(db_));
     pthread_mutex_unlock(&lock_);
@@ -212,32 +212,32 @@ bool GetPath(const uint64_t inode, PathString *path) {
 string GetStatistics() {
   string result = "Total number of issued inodes: " +
                   StringifyInt(atomic_read64(&dbstat_added_)) + "\n";
-  result += "Last inode issued: " + 
+  result += "Last inode issued: " +
             StringifyInt(atomic_read64(&dbstat_seq_)) + "\n";
-  result += "inode --> path hits: " + 
+  result += "inode --> path hits: " +
             StringifyInt(atomic_read64(&dbstat_path_found_)) + "\n";
-  result += "path --> inode hits: " + 
+  result += "path --> inode hits: " +
             StringifyInt(atomic_read64(&dbstat_inode_found_)) + "\n";
 
   return result;
 }
-  
-  
+
+
 static int BusyHandler(void *data, int attempt) {
   BusyHandlerInfo *handler_info = static_cast<BusyHandlerInfo *>(data);
-  LogCvmfs(kLogNfsMaps, kLogDebug, 
+  LogCvmfs(kLogNfsMaps, kLogDebug,
            "busy handler, attempt %d, accumulated waiting time %u",
            attempt, handler_info->accumulated_ms);
   if (handler_info->accumulated_ms >= handler_info->max_wait_ms)
     return 0;
-  
+
   const unsigned backoff_range_ms = 1 << attempt;
   unsigned backoff_ms = random() % backoff_range_ms;
   if (handler_info->accumulated_ms + backoff_ms > handler_info->max_wait_ms)
     backoff_ms = handler_info->max_wait_ms - handler_info->accumulated_ms;
   if (backoff_ms > handler_info->max_backoff_ms)
     backoff_ms = handler_info->max_backoff_ms;
-  
+
   SafeSleepMs(backoff_ms);
   handler_info->accumulated_ms += backoff_ms;
   return 1;
@@ -245,19 +245,19 @@ static int BusyHandler(void *data, int attempt) {
 
 
 bool Init(const string &db_dir, const uint64_t root_inode,
-          const bool rebuild) 
+          const bool rebuild)
 {
   assert(root_inode > 0);
   string db_path = db_dir + "/inode_maps.db";
-  
+
   atomic_init64(&dbstat_seq_);
   atomic_init64(&dbstat_added_);
   atomic_init64(&dbstat_path_found_);
   atomic_init64(&dbstat_inode_found_);
-  
+
   sqlite3_stmt *stmt;
   if (rebuild) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogWarn,
              "Ignoring rebuild flag as this may crash other cluster nodes.");
   }
   // We don't want the shared cache, we want minimal caching so sync is kept
@@ -284,14 +284,14 @@ bool Init(const string &db_dir, const uint64_t root_inode,
   // Set-up the main inode table if it doesn't exist
   retval = sqlite3_prepare_v2(db_, kSQL_CreateTable, kMaxDBSqlLen, &stmt, NULL);
   if (retval != SQLITE_OK) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog | kLogDebug, 
-             "Failed to prepare create table statement: %s", 
+    LogCvmfs(kLogNfsMaps, kLogDebug | kLogSyslogErr,
+             "Failed to prepare create table statement: %s",
              sqlite3_errmsg(db_));
     Fini();
     return false;
   }
   if (sqlite3_step(stmt) != SQLITE_DONE) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
              "Failed to create main inode table: %s", sqlite3_errmsg(db_));
     sqlite3_finalize(stmt);
     Fini();
@@ -299,15 +299,15 @@ bool Init(const string &db_dir, const uint64_t root_inode,
   }
   sqlite3_finalize(stmt);
   stmt = NULL;
-  
+
   // Prepare lookup and add-inode statements
-  retval = sqlite3_prepare_v2(db_, kSQL_GetPath, kMaxDBSqlLen, &stmt_get_path_, 
+  retval = sqlite3_prepare_v2(db_, kSQL_GetPath, kMaxDBSqlLen, &stmt_get_path_,
                               NULL);
   assert(retval == SQLITE_OK);
-  retval = sqlite3_prepare_v2(db_, kSQL_GetInode, kMaxDBSqlLen, 
+  retval = sqlite3_prepare_v2(db_, kSQL_GetInode, kMaxDBSqlLen,
                               &stmt_get_inode_, NULL);
   assert(retval == SQLITE_OK);
-  retval = sqlite3_prepare_v2(db_, kSQL_AddInode, kMaxDBSqlLen, &stmt_add_, 
+  retval = sqlite3_prepare_v2(db_, kSQL_AddInode, kMaxDBSqlLen, &stmt_add_,
                               NULL);
   assert(retval == SQLITE_OK);
 
@@ -319,13 +319,13 @@ bool Init(const string &db_dir, const uint64_t root_inode,
     sqlite3_bind_int64(stmt, 1, root_inode);
     assert(retval == SQLITE_OK);
     if (sqlite3_step(stmt) != SQLITE_DONE) {
-      LogCvmfs(kLogNfsMaps, kLogSyslog | kLogDebug, 
+      LogCvmfs(kLogNfsMaps, kLogDebug | kLogSyslogErr,
                "Failed to execute CreateRoot: %s", sqlite3_errmsg(db_));
       abort();
     }
     sqlite3_finalize(stmt);
   }
-  
+
   return true;
 }
 

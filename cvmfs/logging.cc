@@ -189,7 +189,7 @@ void SetLogDebugFile(const string &filename) {
     path_debug = NULL;
     return;
   }
-  
+
   if ((file_debug != NULL) && (file_debug != stderr)) {
     if ((fclose(file_debug) < 0)) {
       fprintf(stderr, "could not close current log file (%d), aborting\n",
@@ -302,12 +302,15 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     pthread_mutex_unlock(&lock_stderr);
   }
 
-  if (mask & kLogSyslog) {
+  if (mask & (kLogSyslog | kLogSyslogWarn | kLogSyslogErr)) {
+    int level = syslog_level;
+    if (mask & kLogSyslogWarn) level = LOG_WARNING;
+    if (mask & kLogSyslogErr) level = LOG_ERR;
     if (syslog_prefix) {
-      syslog(syslog_facility | syslog_level, "(%s) %s",
+      syslog(syslog_facility | level, "(%s) %s",
              syslog_prefix, msg);
     } else {
-      syslog(syslog_facility | syslog_level, "%s", msg);
+      syslog(syslog_facility | level, "%s", msg);
     }
   }
 

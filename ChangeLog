@@ -1,4 +1,6 @@
 2.1.11:
+  * Distinguish information, warning, and error records when
+    writing to syslog
   * Add -march=i686 to CFLAGS and CXXFLAGS for 32bit builds 
   * Add CVMFS_MOUNT_RW switch parameter.  A read/write mount point
     can workaround problematic open flags (O_RDWR, O_TRUNC, ...)

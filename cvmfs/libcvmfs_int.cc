@@ -431,7 +431,7 @@ int cvmfs_int_init(
     if (platform_stat((relative_cachedir + "/running." + *cvmfs::repository_name_).c_str(),
                       &info) == 0)
     {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "looks like cvmfs has been "
                "crashed previously, rebuilding cache database");
       cvmfs_opts_rebuild_cachedb = 1;
     }
@@ -628,11 +628,11 @@ int cvmfs_open(const char *c_path)
       return fd;
     } else {
       if (close(fd) == 0) atomic_dec32(&open_files_);
-      LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       return -EMFILE;
     }
   } else {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to open path: %s, CAS key %s, error code %d",
              c_path, dirent.checksum().ToString().c_str(), errno);
     if (errno == EMFILE) {

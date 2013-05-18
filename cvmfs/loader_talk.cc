@@ -72,7 +72,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk) {
-        LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module failed (%d)",
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "reloading Fuse module failed (%d)",
                  retval);
         abort();
       }

@@ -50,7 +50,7 @@ uint64_t root_inode_;
 uint64_t seq_;
 pthread_mutex_t lock_ = PTHREAD_MUTEX_INITIALIZER;
 bool spawned_ = false;  // Set to true after fork()
-// If true, use sqlite db that can be put on a shared NFS volume.  
+// If true, use sqlite db that can be put on a shared NFS volume.
 // See nfs_shared_maps
 bool use_shared_db_ = false;
 
@@ -127,7 +127,7 @@ static void PutPath2Inode(const hash::Md5 &path, const uint64_t inode) {
 
   status = db_path2inode_->Put(leveldb_write_options_, key, value);
   if (!status.ok()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
              "failed to write path2inode entry (%s --> %"PRIu64"): %s",
              path.ToString().c_str(), inode, status.ToString().c_str());
     abort();
@@ -144,7 +144,7 @@ static void PutInode2Path(const uint64_t inode, const PathString &path) {
 
   status = db_inode2path_->Put(leveldb_write_options_, key, value);
   if (!status.ok()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
              "failed to write inode2path entry (%"PRIu64" --> %s): %s",
              inode, path.c_str(), status.ToString().c_str());
     abort();
@@ -165,7 +165,7 @@ static uint64_t FindInode(const hash::Md5 &path) {
 
   status = db_path2inode_->Get(leveldb_read_options_, key, &result);
   if (!status.ok() && !status.IsNotFound()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
              "failed to read from path2inode db (path %s): %s",
              path.ToString().c_str(), status.ToString().c_str());
     abort();
@@ -190,7 +190,7 @@ static uint64_t FindInode(const hash::Md5 &path) {
 uint64_t GetInode(const PathString &path) {
   if (use_shared_db_)
     return nfs_shared_maps::GetInode(path);
-  
+
   const hash::Md5 md5_path(path.GetChars(), path.GetLength());
   uint64_t inode = FindInode(md5_path);
   if (inode != 0)
@@ -223,7 +223,7 @@ uint64_t GetInode(const PathString &path) {
 bool GetPath(const uint64_t inode, PathString *path) {
   if (use_shared_db_)
     return nfs_shared_maps::GetPath(inode, path);
-  
+
   leveldb::Status status;
   leveldb::Slice key(reinterpret_cast<const char *>(&inode), sizeof(inode));
   string result;
@@ -236,7 +236,7 @@ bool GetPath(const uint64_t inode, PathString *path) {
     return false;
   }
   if (!status.ok()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
              "failed to read from inode2path db inode %"PRIu64": %s",
              inode, status.ToString().c_str());
     abort();
@@ -252,7 +252,7 @@ bool GetPath(const uint64_t inode, PathString *path) {
 string GetStatistics() {
   if (use_shared_db_)
     return nfs_shared_maps::GetStatistics();
-  
+
   string result = "Total number of issued inodes: " +
                   StringifyInt(seq_-root_inode_) + "\n";
 
@@ -268,7 +268,7 @@ string GetStatistics() {
 
 
 bool Init(const string &leveldb_dir, const uint64_t root_inode,
-          const bool rebuild, const bool shared_db) 
+          const bool rebuild, const bool shared_db)
 {
   use_shared_db_ = shared_db;
   if (shared_db)
@@ -284,7 +284,7 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode,
 
   // Remove previous database traces
   if (rebuild) {
-    LogCvmfs(kLogNfsMaps, kLogSyslog,
+    LogCvmfs(kLogNfsMaps, kLogSyslogWarn,
              "rebuilding NFS maps, might result in stale entries");
     bool retval = RemoveTree(leveldb_dir + "/inode2path") &&
                   RemoveTree(leveldb_dir + "/path2inode");
@@ -356,7 +356,7 @@ void Spawn() {
 void Fini() {
   if (use_shared_db_)
     return nfs_shared_maps::Fini();
-  
+
   // Write highest issued sequence number
   PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_);
 

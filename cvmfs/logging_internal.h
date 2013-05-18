@@ -19,19 +19,21 @@ enum LogFacilities {
   kLogStdout = 2,
   kLogStderr = 4,
   kLogSyslog = 8,
+  kLogSyslogWarn = 16,
+  kLogSyslogErr = 32,
 };
 
 enum LogFlags {
-  kLogNoLinebreak = 16,
-  kLogShowSource = 32,
+  kLogNoLinebreak = 128,
+  kLogShowSource = 256,
 };
 
 enum LogLevels {
-  kLogLevel0 = 128,
-  kLogVerbose = 256,
-  kLogNormal = 512,
-  kLogDiscrete = 1024,
-  kLogNone = 2048,
+  kLogLevel0 = 1024,
+  kLogVerbose = 2048,
+  kLogNormal = 4096,
+  kLogDiscrete = 8192,
+  kLogNone = 16384,
 };
 
 /**

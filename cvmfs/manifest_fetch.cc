@@ -113,7 +113,7 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
     signature::GetBlacklistedCertificates();
   for (unsigned i = 0; i < blacklisted_certificates.size(); ++i) {
     if (blacklisted_certificates[i].substr(0, 59) == fingerprint) {
-      LogCvmfs(kLogSignature, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
                "blacklisted fingerprint (%s)", fingerprint.c_str());
       return false;
     }
@@ -147,7 +147,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
 
   retval = download::Fetch(&download_manifest);
   if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "failed to download repository manifest (%d)", retval);
     return kFailLoad;
   }
@@ -164,7 +164,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
 
   // Basic manifest sanity check
   if (ensemble->manifest->repository_name() != repository_name) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "repository name does not match (found %s, expected %s)",
              ensemble->manifest->repository_name().c_str(),
              repository_name.c_str());
@@ -209,7 +209,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   retval = signature::VerifyLetter(ensemble->raw_manifest_buf,
                                    ensemble->raw_manifest_size, false);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository manifest");
     result = kFailBadSignature;
     goto cleanup;
@@ -227,7 +227,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   retval = signature::VerifyLetter(ensemble->whitelist_buf,
                                    ensemble->whitelist_size, true);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository whitelist");
     result = kFailBadWhitelist;
     goto cleanup;
@@ -235,7 +235,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   retval = VerifyWhitelist(ensemble->whitelist_buf, ensemble->whitelist_size,
                            repository_name);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository certificate against whitelist");
     result = kFailBadWhitelist;
     goto cleanup;

@@ -1022,9 +1022,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     // Retrieve File chunks from the catalog
     FileChunks chunks;
     if (!dirent.catalog()->ListFileChunks(path, &chunks) || chunks.empty()) {
-      LogCvmfs(kLogCvmfs, kLogSyslog, "file %s is marked as 'chunked', but no "
-                                      "chunks found in the catalog %s.",
-               path.c_str(),
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
+               "but no chunks found in the catalog %s.", path.c_str(),
                dirent.catalog()->path().c_str());
       fuse_reply_err(req, EIO);
       return;
@@ -1074,7 +1073,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       return;
     } else {
       if (close(fd) == 0) atomic_dec32(&open_files_);
-      LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
       return;
     }
@@ -1082,7 +1081,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   // fd < 0
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
            "failed to open inode: %"PRIu64", CAS key %s, error code %d",
            ino, dirent.checksum().ToString().c_str(), errno);
   if (errno == EMFILE) {
@@ -1132,9 +1131,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     // find the file chunk descriptions for the requested inode
     LiveFileChunksMap::iterator chunks_itr = live_file_chunks_->find(ino);
     if (chunks_itr == live_file_chunks_->end()) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find file chunk "
-                                                  "data for ino: %d",
-               ino);
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "failed to find file chunk data for ino: %d", ino);
       fuse_reply_err(req, EINVAL);
       return;
     }
@@ -1147,11 +1145,9 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                                  chunks.end(),
                                  off);
     if (chunk_itr == chunks.end()) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to find specific "
-                                                  "file chunk for "
-                                                  "ino: %d starting at offset: "
-                                                  "%d",
-               ino, off);
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "failed to find specific file chunk for ino: %d "
+               "starting at offset: %d", ino, off);
       fuse_reply_err(req, EIO);
       return;
     }
@@ -1164,8 +1160,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
       // download and open chunk on demand
       if (!chunk.IsOpen() && !chunk.Fetch()) {
-        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "failed to load chunk for "
-                 "inode: %"PRIu64", CAS key: %s, error code: %d",
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "failed to load chunk "
+                 "for inode: %"PRIu64", CAS key: %s, error code: %d",
                  ino, chunk.content_hash().ToString().c_str(), errno);
 
         if (errno == EMFILE) {
@@ -1791,12 +1787,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
       }
     } else {
       if (fqrn == *cvmfs::repository_name_) {
-        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
                  "repository already mounted on %s",
                  cvmfs::mountpoint_->c_str());
         return loader::kFailDoubleMount;
       } else {
-        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
                  "CernVM-FS repository %s already mounted on %s",
                  fqrn.c_str(), cvmfs::mountpoint_->c_str());
         return loader::kFailOtherMount;
@@ -1808,7 +1804,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (platform_stat(("running." + *cvmfs::repository_name_).c_str(),
                     &info) == 0)
   {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "looks like cvmfs has been "
              "crashed previously, rebuilding cache database");
     rebuild_cachedb = true;
   }

@@ -159,7 +159,7 @@ bool Init(const string &cache_path) {
     return false;
 
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
-    LogCvmfs(kLogCache, kLogStderr | kLogSyslog,
+    LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr,
              "Not mounting on cvmfs 2.0.X cache");
     return false;
   }
@@ -526,13 +526,13 @@ static int Fetch(const hash::Any &checksum,
     if ((platform_fstat(fileno(f), &stat_info) != 0) ||
         (stat_info.st_size != (int64_t)size))
     {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                "size check failure for %s, expected %lu, got %ld",
                url.c_str(), size, stat_info.st_size);
       if (!CopyPath2Path(temp_path, *cache_path_ + "/quarantaine/" +
                          checksum.ToString()))
       {
-        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                  "failed to move %s to quarantaine", temp_path.c_str());
       }
       result = -EIO;
@@ -562,9 +562,9 @@ static int Fetch(const hash::Any &checksum,
   LogCvmfs(kLogCache, kLogDebug, "finalizing download of %s",
            cvmfs_path.c_str());
   if (result < 0) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "failed to fetch %s (hash: %s, "
-             "error %d)", cvmfs_path.c_str(), checksum.ToString().c_str(),
-             tls->download_job.error_code);
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "failed to fetch %s (hash: %s, error %d)", cvmfs_path.c_str(),
+             checksum.ToString().c_str(), tls->download_job.error_code);
   }
   if (fd >= 0) {
     if (f) fclose(f);
@@ -731,7 +731,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
   download::Fetch(&download_catalog);
   fclose(catalog_file);
   if (download_catalog.error_code != download::kFailOk) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "unable to load catalog with key %s (%d)",
              hash.ToString().c_str(), download_catalog.error_code);
     AbortTransaction(temp_path);
@@ -831,7 +831,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
           retval = quota::Pin(cache_hash, uint64_t(size),
                               cvmfs_path);
           if (!retval) {
-            LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+            LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                      "failed to pin cached root catalog");
             return catalog::kLoadFail;
           }
@@ -860,7 +860,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
         retval = quota::Pin(cache_hash, uint64_t(size),
                             cvmfs_path);
         if (!retval) {
-          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+          LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                    "failed to pin cached root catalog");
           return catalog::kLoadFail;
         }
