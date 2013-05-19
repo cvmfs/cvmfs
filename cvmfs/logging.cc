@@ -426,7 +426,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
       time(&rawtime);
       char fmt_time[26];
       ctime_r(&rawtime, fmt_time);
-      fmt_msg = string(fmt_time, 24) + " " + msg;
+      fmt_msg = string(fmt_time, 24) + " " + fmt_msg;
       fmt_msg.push_back('\n');
       LogMicroSyslog(fmt_msg);
     } else {
