@@ -1,4 +1,6 @@
 2.1.11:
+  * Improve host/proxy failover logging
+  * Fix host failover
   * Perform a host failover instead of a proxy failover 
     on HTTP 502, 504 errors
   * Add experimental support for "micro-syslog" implementation that

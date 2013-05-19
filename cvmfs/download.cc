@@ -167,21 +167,24 @@ void SwitchHost(JobInfo *info) {
     char *effective_url;
     curl_easy_getinfo(info->curl_handle, CURLINFO_EFFECTIVE_URL,
                       &effective_url);
-    LogCvmfs(kLogDownload, kLogDebug, "switch host (?), effective url: %s",
-             effective_url);
-    if (!HasPrefix(string(effective_url),
-                   "HTTP://" + (*opt_host_chain_)[opt_host_chain_current_],
+    if (!HasPrefix(string(effective_url) + "/",
+                   (*opt_host_chain_)[opt_host_chain_current_] + "/",
                    true))
     {
       do_switch = false;
+      LogCvmfs(kLogDownload, kLogDebug, "don't switch host, "
+               "effective url: %s, current host: %s", effective_url,
+               (*opt_host_chain_)[opt_host_chain_current_].c_str());
     }
   }
 
   if (do_switch) {
+    string old_host = (*opt_host_chain_)[opt_host_chain_current_];
     opt_host_chain_current_ = (opt_host_chain_current_+1) %
                               opt_host_chain_->size();
     statistics_->num_host_failover++;
-    LogCvmfs(kLogDownload, kLogDebug, "switching host to %s",
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+             "switching host from %s to %s", old_host.c_str(),
              (*opt_host_chain_)[opt_host_chain_current_].c_str());
   }
   pthread_mutex_unlock(&lock_options_);
@@ -215,6 +218,7 @@ static void SwitchProxy(JobInfo *info) {
   }
 
   statistics_->num_proxy_failover++;
+  string old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
 
   // If all proxies from the current load-balancing group are burned, switch to
   // another group
@@ -229,12 +233,12 @@ static void SwitchProxy(JobInfo *info) {
       if (opt_proxy_groups_reset_after_ > 0) {
         if (opt_proxy_groups_current_ > 0) {
           opt_timestamp_backup_proxies_ = time(NULL);
-          LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                   "switched to (another) backup proxy group");
+          //LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+          //         "switched to (another) backup proxy group");
         } else {
           opt_timestamp_backup_proxies_ = 0;
-          LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                   "switched back to primary proxy group");
+          //LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+          //         "switched back to primary proxy group");
         }
       }
     }
@@ -261,9 +265,11 @@ static void SwitchProxy(JobInfo *info) {
     (*group)[0] = swap;
   }
 
-  LogCvmfs(kLogDownload, kLogDebug, "switched to proxy %s, %d remaining in "
-           "the group",
-           (*group)[0].c_str(), group_size - opt_proxy_groups_current_burned_);
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+           "switching proxy from %s to %s",
+           old_proxy.c_str(), (*group)[0].c_str());
+  LogCvmfs(kLogDownload, kLogDebug, "%d proxies remain in group",
+           group_size - opt_proxy_groups_current_burned_);
 
   pthread_mutex_unlock(&lock_options_);
 }
@@ -287,6 +293,9 @@ void RebalanceProxies() {
   const string swap = (*group)[select];
   (*group)[select] = (*group)[0];
   (*group)[0] = swap;
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+           "switching proxy from %s to %s (rebalance)",
+           (*group)[select].c_str(), swap.c_str());
 
   pthread_mutex_unlock(&lock_options_);
 }
@@ -303,10 +312,15 @@ void SwitchProxyGroup() {
     return;
   }
 
+  string old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
   opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
                               opt_proxy_groups_->size();
   opt_proxy_groups_current_burned_ = 1;
   opt_timestamp_backup_proxies_ = time(NULL);
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+           "switching proxy from %s to %s (manual group change)",
+           old_proxy.c_str(),
+           (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str());
 
   pthread_mutex_unlock(&lock_options_);
 }
@@ -520,8 +534,12 @@ static void SetUrlOptions(JobInfo *info) {
         static_cast<int64_t>(opt_timestamp_backup_proxies_ +
                              opt_proxy_groups_reset_after_))
     {
-      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-               "reset proxy groups");
+      if (opt_proxy_groups_) {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "switching proxy from %s to %s (reset proxy group)",
+                 (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str(),
+                 (*opt_proxy_groups_)[0][0].c_str());
+      }
       opt_proxy_groups_current_ = 0;
       opt_proxy_groups_current_burned_ = 1;
       opt_timestamp_backup_proxies_ = 0;
@@ -944,10 +962,12 @@ static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
           (watch_fds_inuse_ < watch_fds_size_/2))
       {
         watch_fds_size_ /= 2;
-        //LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ (%d)", watch_fds_size_);
+        //LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ (%d)",
+        //         watch_fds_size_);
         watch_fds_ = static_cast<struct pollfd *>(
                    srealloc(watch_fds_, watch_fds_size_*sizeof(struct pollfd)));
-        //LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ done", watch_fds_size_);
+        //LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ done",
+        //         watch_fds_size_);
       }
       break;
     default:
@@ -1266,6 +1286,8 @@ void SetHostChain(const string &host_list) {
 
   opt_host_chain_ = new vector<string>(SplitString(host_list, ';'));
   opt_host_chain_rtt_ = new vector<int>();
+  //LogCvmfs(kLogDownload, kLogSyslog, "using host %s",
+  //         (*opt_host_chain_)[0].c_str());
   for (unsigned i = 0, s = opt_host_chain_->size(); i < s; ++i)
     opt_host_chain_rtt_->push_back(-1);
   pthread_mutex_unlock(&lock_options_);
@@ -1324,6 +1346,8 @@ void SetProxyChain(const std::string &proxy_list) {
     (*opt_proxy_groups_)[0][0] = (*opt_proxy_groups_)[0][random_index];
     (*opt_proxy_groups_)[0][random_index] = tmp;
   }
+  //LogCvmfs(kLogDownload, kLogSyslog, "using proxy %s",
+  //         (*opt_proxy_groups_)[0][0].c_str());
   pthread_mutex_unlock(&lock_options_);
 }
 
