@@ -293,9 +293,9 @@ void RebalanceProxies() {
   const string swap = (*group)[select];
   (*group)[select] = (*group)[0];
   (*group)[0] = swap;
-  LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
-           "switching proxy from %s to %s (rebalance)",
-           (*group)[select].c_str(), swap.c_str());
+  //LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+  //         "switching proxy from %s to %s (rebalance)",
+  //         (*group)[select].c_str(), swap.c_str());
 
   pthread_mutex_unlock(&lock_options_);
 }
@@ -317,10 +317,10 @@ void SwitchProxyGroup() {
                               opt_proxy_groups_->size();
   opt_proxy_groups_current_burned_ = 1;
   opt_timestamp_backup_proxies_ = time(NULL);
-  LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
-           "switching proxy from %s to %s (manual group change)",
-           old_proxy.c_str(),
-           (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str());
+  //LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+  //         "switching proxy from %s to %s (manual group change)",
+  //         old_proxy.c_str(),
+  //         (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str());
 
   pthread_mutex_unlock(&lock_options_);
 }
@@ -352,7 +352,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
                header_line.c_str());
-      if ((header_line.length() > i+2) &&
+      if ((header_line.length() >= i+2) &&
           (header_line[i] == '5') && (header_line[i+1] == '0') &&
           ((header_line[i+2] == '2') || (header_line[i+2] == '4')))
       {
