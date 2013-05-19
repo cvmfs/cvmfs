@@ -338,7 +338,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
                header_line.c_str());
-      if ((header_line.length() >= i+2) &&
+      if ((header_line.length() > i+2) &&
           (header_line[i] == '5') && (header_line[i+1] == '0') &&
           ((header_line[i+2] == '2') || (header_line[i+2] == '4')))
       {
