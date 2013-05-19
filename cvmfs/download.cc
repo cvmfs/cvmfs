@@ -167,21 +167,24 @@ void SwitchHost(JobInfo *info) {
     char *effective_url;
     curl_easy_getinfo(info->curl_handle, CURLINFO_EFFECTIVE_URL,
                       &effective_url);
-    LogCvmfs(kLogDownload, kLogDebug, "switch host (?), effective url: %s",
-             effective_url);
-    if (!HasPrefix(string(effective_url),
-                   "HTTP://" + (*opt_host_chain_)[opt_host_chain_current_],
+    if (!HasPrefix(string(effective_url) + "/",
+                   (*opt_host_chain_)[opt_host_chain_current_] + "/",
                    true))
     {
       do_switch = false;
+      LogCvmfs(kLogDownload, kLogDebug, "don't switch host, "
+               "effective url: %s, current host: %s", effective_url,
+               (*opt_host_chain_)[opt_host_chain_current_].c_str());
     }
   }
 
   if (do_switch) {
+    string old_host = (*opt_host_chain_)[opt_host_chain_current_];
     opt_host_chain_current_ = (opt_host_chain_current_+1) %
                               opt_host_chain_->size();
     statistics_->num_host_failover++;
-    LogCvmfs(kLogDownload, kLogDebug, "switching host to %s",
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+             "switching host from %s to %s", old_host.c_str(),
              (*opt_host_chain_)[opt_host_chain_current_].c_str());
   }
   pthread_mutex_unlock(&lock_options_);
