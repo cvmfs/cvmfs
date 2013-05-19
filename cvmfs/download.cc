@@ -340,8 +340,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
                header_line.c_str());
       if ((header_line.length() >= i+2) &&
           (header_line[i] == '5') && (header_line[i+1] == '0') &&
-          (header_line[i+2] == '4'))
+          ((header_line[i+2] == '2') || (header_line[i+2] == '4')))
       {
+        // 502 Bad Gateway, 504 Fateway Time-out
         info->error_code = kFailHostHttp;
       } else {
         info->error_code = (info->proxy == "") ? kFailHostHttp :
