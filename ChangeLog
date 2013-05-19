@@ -1,4 +1,5 @@
 2.1.11:
+  * Perform a host failover on HTTP 504 errors
   * Add experimental support for "micro-syslog" implementation that
     writes syslog messages to a file.  Add CVMFS_USYSLOG parameter
     to specify the destination file.
