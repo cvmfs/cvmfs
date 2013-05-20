@@ -103,6 +103,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   hash::Any micro_catalog_hash;
   string repository_name;
   hash::Any certificate;
+  hash::Any history;
   uint64_t publish_timestamp = 0;
 
   if ((iter = content.find('L')) != content.end())
@@ -111,12 +112,14 @@ Manifest *Manifest::Load(const map<char, string> &content) {
     repository_name = iter->second;
   if ((iter = content.find('X')) != content.end())
     certificate = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+  if ((iter = content.find('H')) != content.end())
+    history = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
 
   return new Manifest(catalog_hash, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      publish_timestamp);
+                      history, publish_timestamp);
 }
 
 
@@ -145,6 +148,8 @@ string Manifest::ExportString() const {
     manifest += "N" + repository_name_ + "\n";
   if (!certificate_.IsNull())
     manifest += "X" + certificate_.ToString() + "\n";
+  if (!history_.IsNull())
+    manifest += "H" + history_.ToString() + "\n";
   if (publish_timestamp_ > 0)
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
 

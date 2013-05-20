@@ -81,7 +81,8 @@ CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 # @return   0 if the command was recognized
 is_subcommand() {
   subcommand=$1
-  supported_commands="mkfs add-replica publish rmfs alterfs resign list info check transaction abort snapshot skeleton migrate"
+  supported_commands="mkfs add-replica publish rmfs alterfs resign list \
+    info lstags check transaction abort snapshot skeleton migrate"
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
@@ -144,6 +145,8 @@ Supported Commands:
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
+                [-a tag name] [-c tag channel] [ -t tag description ]
+                [-r tag name]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -156,6 +159,8 @@ Supported Commands:
                 Re-sign the 30 day whitelist
   info          <fully qualified name>
                 Print summary about the repository
+  lstags        <fully qualified name>
+                Print named tags (snapshots) of the reoppsitory
   check         [-c disable data chunk existence check]
                 <fully qualified name>
                 Checks if the repository is sane
@@ -1274,6 +1279,33 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 }
 
 
+################################################################################
+
+
+lstags() {
+  local name
+
+  # get repository name
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
+  cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
+    -i 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
+    -k /etc/cvmfs/keys/${name}.pub -l
+  rm -f ${CVMFS_SPOOL_DIR}/show_history
+}
+
+
+################################################################################
+
+
 check() {
   local name
   local upstream
@@ -1471,10 +1503,15 @@ publish() {
   local upstream
   local debug=0
   local tweaks_option=
+  local tag_name=
+  local tag_channel=00
+  local tag_description=
+  local add_tag=
+  local remove_tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDp" option
+  while getopts "dDpa:c:t:r:" option
   do
     case $option in
       d)
@@ -1486,12 +1523,38 @@ publish() {
       p)
         tweaks_option="-d"
       ;;
+      a)
+        add_tag="-a"
+        tag_name="$OPTARG"
+      ;;
+      c)
+        add_tag="-a"
+        tag_channel="$OPTARG"
+      ;;
+      t)
+        add_tag="-a"
+        tag_description="$OPTARG"
+      ;;
+      r)
+        remove_tag="-d $OPTARG"
+        if [ "x$OPTARG" = "xtrunk" ]; then
+          echo "Warning: won't delete trunk tag"
+        fi
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
       ;;
     esac
   done
+
+  if [ "x$add_tag" != "x" ]; then
+    if [ "x$tag_name" = "x" ]; then
+      echo "Tag name missing"
+      return 1
+    fi
+    add_tag="-a ${tag_name}@${tag_channel}@${tag_description}"
+  fi
 
   # get repository name
   shift $(($OPTIND-1))
@@ -1564,14 +1627,26 @@ publish() {
   if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
     sync_command="$sync_command -i"
   fi
+  local tag_command="$swissknife tag -r $stratum0 \
+    -b $base_hash \
+    -n $name \
+    -o ${spool_dir}/tmp/history \
+    -k /etc/cvmfs/keys/${name}.pub \
+    $add_tag $remove_tag"
   local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${spool_dir}/tmp/manifest \
+    -h ${spool_dir}/tmp/history \
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
   $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
+  local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
+  local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
+  tag_command="$tag_command -t $trunk_hash -i $trunk_revision"
+  echo "Tagging $name"
+  $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name

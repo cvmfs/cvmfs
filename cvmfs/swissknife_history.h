@@ -23,10 +23,15 @@ class CommandTag : public Command {
                                false, false));
     result.push_back(Parameter('b', "base hash", false, false));
     result.push_back(Parameter('t', "trunk hash", false, false));
+    result.push_back(Parameter('i', "trunk revision", false, false));
+    result.push_back(Parameter('n', "repository name", false, false));
+    result.push_back(Parameter('k', "repository public key", false, false));
     result.push_back(Parameter('o', "history db output file",
                                false, false));
     result.push_back(Parameter('d', "delete a tag", true, false));
-    result.push_back(Parameter('a', "add a tag", true, false));
+    result.push_back(Parameter('a', "add a tag (format: \"name@channel@desc\")",
+                               true, false));
+    result.push_back(Parameter('l', "list tags", true, true));
 
     return result;
   }
