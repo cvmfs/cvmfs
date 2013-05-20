@@ -35,6 +35,7 @@ set (CVMFS_CLIENT_SOURCES
   lru.h
   globals.h globals.cc
   peers.h peers.cc
+  sql.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
@@ -114,6 +115,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   dirent.h dirent.cc
   shortstring.h
   catalog_traversal.h
+  sql.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc

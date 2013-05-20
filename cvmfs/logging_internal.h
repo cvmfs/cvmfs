@@ -37,7 +37,6 @@ enum LogLevels {
 };
 
 /**
- * CAUTION!
  * Changes in this enum must be done in logging.cc as well!
  * (see const char *module_names[] = {....})
  */
@@ -64,6 +63,7 @@ enum LogSource {
   kLogConcurrency,
   kLogUtility,
   kLogGlueBuffer,
+  kLogHistory,
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
