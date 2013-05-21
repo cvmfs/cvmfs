@@ -1,4 +1,5 @@
 2.1.11:
+  * Add missing execmod SELinux exception for 32bit SL6
   * Improve host/proxy failover logging
   * Fix host failover
   * Perform a host failover instead of a proxy failover 
