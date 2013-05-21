@@ -10,5 +10,10 @@ cd ${SOURCE_DIRECTORY}/test
 ./run.sh $TEST_LOGFILE -x src/004-davinci              \
                           src/005-asetup               \
                           src/007-testjobs             \
+                          src/016-perl_environment     \
+                          src/017-dns_timeout          \
+                          src/018-dns_injection        \
+                          src/019-faulty_proxy         \
+                          src/020-server_timeout       \
                           src/024-reload-during-asetup \
                           src/5*
