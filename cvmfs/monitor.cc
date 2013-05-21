@@ -231,7 +231,13 @@ static string GenerateStackTrace(const string &exe_path,
   argv.push_back("-n");
   argv.push_back(exe_path);
   argv.push_back(StringifyInt(pid));
-  retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, "gdb", argv);
+  pid_t gdb_pid;
+  retval = ExecuteBinary(&fd_stdin,
+                         &fd_stdout,
+                         &fd_stderr,
+                          "gdb",
+                          argv,
+                         &gdb_pid);
   assert(retval);
 
   // skip the gdb startup output
@@ -247,6 +253,19 @@ static string GenerateStackTrace(const string &exe_path,
   close(fd_stderr);
   close(fd_stdout);
   close(fd_stdin);
+
+  // make sure gdb has quitted (wait for it for a short while)
+  unsigned int timeout = 5;
+  while (timeout > 0 && kill(gdb_pid, 0) == 0) {
+    --timeout;
+    sleep(1);
+  }
+
+  // when the timeout expired, gdb probably hangs... we need to kill it
+  if (timeout == 0) {
+    result += "gdb did not exit as expected. sending SIGKILL... ";
+    result += (kill(gdb_pid, SIGKILL) != 0) ? "failed\n" : "okay\n";
+  }
 
   return result;
 }
