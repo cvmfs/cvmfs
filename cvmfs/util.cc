@@ -949,6 +949,7 @@ bool ManagedExec(const vector<string>  &command_line,
     int max_fd;
     int fd_flags;
     char failed = 'U';
+    char send_pid = 'P';
     const char *argv[command_line.size() + 1];
     for (unsigned i = 0; i < command_line.size(); ++i)
       argv[i] = command_line[i].c_str();
@@ -1010,6 +1011,7 @@ bool ManagedExec(const vector<string>  &command_line,
     // retrieve the PID of the new grand child process and send it to the
     // grand father
     pid_grand_child = getpid();
+    (void)write(pipe_fork[1], &send_pid, 1);
     (void)write(pipe_fork[1], &pid_grand_child, sizeof(pid_t));
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
@@ -1025,18 +1027,22 @@ bool ManagedExec(const vector<string>  &command_line,
 
   close(pipe_fork[1]);
 
+  // The character is either P, in which case the pid is sent, or
+  // a failure code
+  char buf;
+  ReadPipe(pipe_fork[0], &buf, 1);
+  if (buf != 'P') {
+    close(pipe_fork[0]);
+    LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%c)", buf);
+    return false;
+  }
+
   // read the PID of the spawned process if requested
   // (the actual read needs to be done in any case!)
   pid_t buf_child_pid = 0;
-  read(pipe_fork[0], &buf_child_pid, sizeof(pid_t));
+  ReadPipe(pipe_fork[0], &buf_child_pid, sizeof(pid_t));
   if (child_pid != NULL) {
     *child_pid = buf_child_pid;
-  }
-
-  char buf;
-  if (read(pipe_fork[0], &buf, 1) == 1) {
-    LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%c)", buf);
-    return false;
   }
   close(pipe_fork[0]);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
