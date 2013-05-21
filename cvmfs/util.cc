@@ -872,7 +872,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stdout,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
-                   const std::vector<std::string>  &argv) {
+                   const std::vector<std::string>  &argv,
+                         pid_t                     *child_pid) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -892,7 +893,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
   cmd_line.push_back(binary_path);
   cmd_line.insert(cmd_line.end(), argv.begin(), argv.end());
 
-  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes, true)) {
+  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes, true, child_pid)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);

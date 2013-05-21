@@ -106,7 +106,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stdout,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
-                   const std::vector<std::string>  &argv);
+                   const std::vector<std::string>  &argv,
+                         pid_t                     *child_pid = NULL);
 bool ManagedExec(const std::vector<std::string>  &command_line,
                  const std::vector<int>          &preserve_fildes,
                  const std::map<int, int>        &map_fildes,
