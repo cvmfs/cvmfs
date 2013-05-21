@@ -296,4 +296,34 @@ TagList::Failures TagList::Insert(const Tag &tag) {
   return kFailOk;
 }
 
+
+set<hash::Any> TagList::GetAllHashes() {
+  set<hash::Any> result;
+  for (unsigned i = 0; i < list_.size(); ++i) {
+    result.insert(list_[i].root_hash);
+  }
+  return result;
+}
+
+
+map<UpdateChannel, hash::Any> TagList::GetChannelTops() {
+  map<UpdateChannel, hash::Any> result;
+  map<UpdateChannel, unsigned> channel_revisions;
+  for (unsigned i = 0; i < list_.size(); ++i) {
+    UpdateChannel channel = list_[i].channel;
+    hash::Any hash = list_[i].root_hash;
+    unsigned rev = list_[i].revision;
+    if (result.find(channel) == result.end()) {
+      result[channel] = hash;
+      channel_revisions[channel] = rev;
+    } else {
+      if (channel_revisions[channel] < rev) {
+        result[channel] = hash;
+        channel_revisions[channel] = rev;
+      }
+    }
+  }
+  return result;
+}
+
 }  // namespace history

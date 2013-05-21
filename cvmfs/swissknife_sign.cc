@@ -162,6 +162,18 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     // Safe history database
     hash::Any history_hash(hash::kSha1);
     if (history_path != "") {
+      history::Database tag_db;
+      if (!tag_db.Open(history_path, sqlite::kDbOpenReadOnly)) {
+        delete manifest;
+        goto sign_fail;
+      }
+      history::TagList tag_list;
+      if (!tag_list.Load(&tag_db)) {
+        delete manifest;
+        goto sign_fail;
+      }
+      manifest->set_channel_tops(tag_list.GetChannelTops());
+
       FILE *fcompressed_history = CreateTempFile(temp_dir, 0600, "w",
                                                  &hist_compressed_path);
       if (!zlib::CompressPath2File(history_path, fcompressed_history,

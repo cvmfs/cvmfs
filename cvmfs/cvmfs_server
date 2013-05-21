@@ -1537,8 +1537,8 @@ publish() {
       ;;
       r)
         remove_tag="-d $OPTARG"
-        if [ "x$OPTARG" = "xtrunk" ]; then
-          echo "Warning: won't delete trunk tag"
+        if [ "x$OPTARG" = "xtrunk" -o "x$OPTARG" = "xtrunk-previous" ]; then
+          echo "Warning: won't delete $OPTARG tag"
         fi
       ;;
       ?)

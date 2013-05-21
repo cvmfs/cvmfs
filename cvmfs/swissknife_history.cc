@@ -146,7 +146,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
 
   // Update trunk, trunk-previous tag
   {
-    Tag trunk_previous;
+    history::Tag trunk_previous;
     bool trunk_found = tag_list.FindTag("trunk", &trunk_previous);
     tag_list.Remove("trunk-previous");
     tag_list.Remove("trunk");

@@ -7,6 +7,8 @@
 
 #include <string>
 #include <vector>
+#include <set>
+#include <map>
 
 #include "sql.h"
 #include "hash.h"
@@ -105,6 +107,8 @@ class TagList {
   bool FindRevision(const unsigned revision, Tag *tag);
   Failures Insert(const Tag &tag);
   void Remove(const std::string &name);
+  std::set<hash::Any> GetAllHashes();
+  std::map<UpdateChannel, hash::Any> GetChannelTops();
   std::string List();
 
   bool Load(Database *database);

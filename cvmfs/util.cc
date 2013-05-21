@@ -568,6 +568,13 @@ string StringifyInt(const int64_t value) {
 }
 
 
+string StringifyByteAsHex(const unsigned char value) {
+  char buffer[3];
+  snprintf(buffer, sizeof(buffer), "%02x", value);
+  return string(buffer);
+}
+
+
 string StringifyDouble(const double value) {
   char buffer[64];
   snprintf(buffer, sizeof(buffer), "%.03f", value);
@@ -625,6 +632,14 @@ uint64_t String2Uint64(const string &value) {
   uint64_t result;
   sscanf(value.c_str(), "%"PRIu64, &result);
   return result;
+}
+
+
+int HexDigit2Int(const char digit) {
+  if ((digit >= '0') && (digit <= '9')) return digit - '0';
+  if ((digit >= 'A') && (digit <= 'F')) return 10 + digit - 'A';
+  if ((digit >= 'a') && (digit <= 'f')) return 10 + digit - 'a';
+  return -1;
 }
 
 
