@@ -7,10 +7,10 @@ script_location=$(dirname $(readlink --canonicalize $0))
 # run tests
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-./run.sh $TEST_LOGFILE -x src/016-perl_environment \
-                          src/017-dns_timeout      \
-                          src/018-dns_injection    \
-                          src/019-faulty_proxy     \
-                          src/020-server_timeout   \
-                          src/024-*                \
+./run.sh $TEST_LOGFILE -x src/016-perl_environment      \
+                          src/017-dns_timeout           \
+                          src/018-dns_injection         \
+                          src/019-faulty_proxy          \
+                          src/020-server_timeout        \
+                          src/024-reload-during-asetup  \
                           src/5*
