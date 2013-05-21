@@ -144,14 +144,24 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
     assert(retval == history::TagList::kFailOk);
   }
 
-  // Update trunk tag
+  // Update trunk, trunk-previous tag
   {
+    Tag trunk_previous;
+    bool trunk_found = tag_list.FindTag("trunk", &trunk_previous);
+    tag_list.Remove("trunk-previous");
     tag_list.Remove("trunk");
     history::Tag tag_trunk(
-                           "trunk", trunk_hash, trunk_revision, time(NULL), history::kChannelTrunk,
-                           "latest published snapshot, automatically updated");
+      "trunk", trunk_hash, trunk_revision, time(NULL), history::kChannelTrunk,
+      "latest published snapshot, automatically updated");
     retval = tag_list.Insert(tag_trunk);
     assert(retval == history::TagList::kFailOk);
+    if (trunk_found) {
+      trunk_previous.name = "trunk-previous";
+      trunk_previous.description =
+        "published next to trunk, automatically updated";
+      retval = tag_list.Insert(trunk_previous);
+      assert(retval == history::TagList::kFailOk);
+    }
   }
 
   //LogCvmfs(kLogCvmfs, kLogStdout, "%s", tag_list.List().c_str());
