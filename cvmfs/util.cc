@@ -929,12 +929,14 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
  * Does a double fork to detach child.
  * The command_line parameter contains the binary at index 0 and the arguments
  * in the rest of the vector.
+ * Using the optional parameter *pid it is possible to retrieve the process ID
+ * of the spawned process.
  */
-bool ManagedExec(const vector<string> &command_line,
-                 const vector<int> &preserve_fildes,
-                 const map<int, int> &map_fildes,
-                 const bool drop_credentials)
-{
+bool ManagedExec(const vector<string>  &command_line,
+                 const vector<int>     &preserve_fildes,
+                 const map<int, int>   &map_fildes,
+                 const bool             drop_credentials,
+                       pid_t           *child_pid) {
   assert(command_line.size() >= 1);
 
   int pipe_fork[2];
@@ -1003,6 +1005,11 @@ bool ManagedExec(const vector<string> &command_line,
       failed = 'X';
       goto fork_failure;
     }
+
+    // retrieve the PID of the new child process and send it to the parent
+    pid_grand_child = getpid();
+    (void)write(pipe_fork[1], &pid_grand_child, sizeof(pid_t));
+
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = 'E';
@@ -1015,13 +1022,24 @@ bool ManagedExec(const vector<string> &command_line,
   waitpid(pid, &statloc, 0);
 
   close(pipe_fork[1]);
+
+  // read the PID of the spawned process if requested
+  // (the actual read needs to be done in any case!)
+  pid_t buf_child_pid = 0;
+  read(pipe_fork[0], &buf_child_pid, sizeof(pid_t));
+  if (child_pid != NULL) {
+    *child_pid = buf_child_pid;
+  }
+
   char buf;
   if (read(pipe_fork[0], &buf, 1) == 1) {
     LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%c)", buf);
     return false;
   }
   close(pipe_fork[0]);
-  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
+           command_line[0].c_str(),
+           (int)buf_child_pid);
   return true;
 }
 

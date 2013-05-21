@@ -107,10 +107,11 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
                    const std::vector<std::string>  &argv);
-bool ManagedExec(const std::vector<std::string> &command_line,
-                 const std::vector<int> &preserve_fildes,
-                 const std::map<int, int> &map_fildes,
-                 const bool drop_credentials);
+bool ManagedExec(const std::vector<std::string>  &command_line,
+                 const std::vector<int>          &preserve_fildes,
+                 const std::map<int, int>        &map_fildes,
+                 const bool                       drop_credentials,
+                       pid_t                     *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
 
