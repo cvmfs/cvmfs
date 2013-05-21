@@ -1,4 +1,5 @@
 2.1.11:
+  * Fix occasional hangs of gdb when generating stack traces
   * Improve host/proxy failover logging
   * Fix host failover
   * Perform a host failover instead of a proxy failover 
