@@ -1007,7 +1007,8 @@ bool ManagedExec(const vector<string>  &command_line,
       goto fork_failure;
     }
 
-    // retrieve the PID of the new child process and send it to the parent
+    // retrieve the PID of the new grand child process and send it to the
+    // grand father
     pid_grand_child = getpid();
     (void)write(pipe_fork[1], &pid_grand_child, sizeof(pid_t));
 

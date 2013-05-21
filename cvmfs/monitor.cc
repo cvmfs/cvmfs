@@ -255,10 +255,10 @@ static string GenerateStackTrace(const string &exe_path,
   close(fd_stdin);
 
   // make sure gdb has quitted (wait for it for a short while)
-  unsigned int timeout = 5;
+  unsigned int timeout = 15;
   while (timeout > 0 && kill(gdb_pid, 0) == 0) {
     --timeout;
-    sleep(1);
+    SafeSleepMs(1000);
   }
 
   // when the timeout expired, gdb probably hangs... we need to kill it
