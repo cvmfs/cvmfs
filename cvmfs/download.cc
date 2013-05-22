@@ -105,6 +105,14 @@ bool opt_ipv4_only_ = false;
 time_t opt_timestamp_backup_proxies_ = 0;
 unsigned opt_proxy_groups_reset_after_ = 0;
 
+/**
+ * Similarly to proxy group reset, we'd also like to reset the host after a
+ * failover.  Host outages can last longer and might come with a separate
+ * reset delay.
+ */
+time_t opt_timestamp_backup_host_ = 0;
+unsigned opt_host_reset_after_ = 0;
+
 // Writes and reads should be atomic because reading happens in a different
 // thread than writing.
 Statistics *statistics_;
@@ -186,6 +194,14 @@ void SwitchHost(JobInfo *info) {
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
              "switching host from %s to %s", old_host.c_str(),
              (*opt_host_chain_)[opt_host_chain_current_].c_str());
+
+    // Remeber the timestamp of switching to backup host
+    if (opt_host_reset_after_ > 0) {
+      if (opt_host_chain_current_ != 0)
+        opt_timestamp_backup_host_ = time(NULL);
+      else
+        opt_timestamp_backup_host_ = 0;
+    }
   }
   pthread_mutex_unlock(&lock_options_);
 }
@@ -279,9 +295,7 @@ static void SwitchProxy(JobInfo *info) {
  * Selects a new random proxy in the current load-balancing group.  Resets the
  * "burned" counter.
  */
-void RebalanceProxies() {
-  pthread_mutex_lock(&lock_options_);
-
+static void RebalanceProxiesUnlocked() {
   if (!opt_proxy_groups_) {
     pthread_mutex_unlock(&lock_options_);
     return;
@@ -296,7 +310,12 @@ void RebalanceProxies() {
   //LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
   //         "switching proxy from %s to %s (rebalance)",
   //         (*group)[select].c_str(), swap.c_str());
+}
 
+
+void RebalanceProxies() {
+  pthread_mutex_lock(&lock_options_);
+  RebalanceProxiesUnlocked();
   pthread_mutex_unlock(&lock_options_);
 }
 
@@ -541,8 +560,23 @@ static void SetUrlOptions(JobInfo *info) {
                  (*opt_proxy_groups_)[0][0].c_str());
       }
       opt_proxy_groups_current_ = 0;
-      opt_proxy_groups_current_burned_ = 1;
+      RebalanceProxiesUnlocked();
       opt_timestamp_backup_proxies_ = 0;
+    }
+  }
+  // Check if hosts need to be reset
+  if (opt_timestamp_backup_host_ > 0) {
+    const time_t now = time(NULL);
+    if (static_cast<int64_t>(now) >
+        static_cast<int64_t>(opt_timestamp_backup_host_ +
+                             opt_host_reset_after_))
+    {
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+               "switching host from %s to %s (reset host)",
+               (*opt_host_chain_)[opt_host_chain_current_].c_str(),
+               (*opt_host_chain_)[0].c_str());
+      opt_host_chain_current_ = 0;
+      opt_timestamp_backup_host_ = 0;
     }
   }
 
@@ -1273,6 +1307,7 @@ const Statistics &GetStatistics() {
  */
 void SetHostChain(const string &host_list) {
   pthread_mutex_lock(&lock_options_);
+  opt_timestamp_backup_host_ = 0;
   delete opt_host_chain_;
   delete opt_host_chain_rtt_;
   opt_host_chain_current_ = 0;
@@ -1450,6 +1485,21 @@ void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover) {
   pthread_mutex_lock(&lock_options_);
   *reset_delay = opt_proxy_groups_reset_after_;
   *timestamp_failover = opt_timestamp_backup_proxies_;
+  pthread_mutex_unlock(&lock_options_);
+}
+
+
+void SetHostResetDelay(const unsigned seconds) {
+  pthread_mutex_lock(&lock_options_);
+  opt_host_reset_after_ = seconds;
+  pthread_mutex_unlock(&lock_options_);
+}
+
+
+void GetHostBackupInfo(unsigned *reset_delay, time_t *timestamp_failover) {
+  pthread_mutex_lock(&lock_options_);
+  *reset_delay = opt_host_reset_after_;
+  *timestamp_failover = opt_timestamp_backup_host_;
   pthread_mutex_unlock(&lock_options_);
 }
 
