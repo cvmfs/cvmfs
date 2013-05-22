@@ -354,12 +354,17 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
         result += "\nNetwork Statistics:\n";
         result += download::GetStatistics().Print();
-        unsigned proxy_reset_delay;
-        time_t proxy_timestamp_failover;
+        unsigned proxy_reset_delay, host_reset_delay;
+        time_t proxy_timestamp_failover, host_timestamp_failover;
         download::GetProxyBackupInfo(&proxy_reset_delay,
                                      &proxy_timestamp_failover);
+        download::GetHostBackupInfo(&host_reset_delay,
+                                    &host_timestamp_failover);
         result += "Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
           ("Backup since " + StringifyTime(proxy_timestamp_failover, true)) :
+          "Primary") + "\n";
+        result += "Backup host: " + ((host_timestamp_failover > 0) ?
+          ("Backup since " + StringifyTime(host_timestamp_failover, true)) :
           "Primary");
         result += "\n\n";
 
