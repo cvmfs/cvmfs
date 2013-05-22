@@ -66,6 +66,7 @@ else ()
 endif()
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
+option (BUILD_UNITTESTS "Build the CernVM-FS unit test set" OFF)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
@@ -88,6 +89,7 @@ set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")
 set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/sparsehash/src")
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/leveldb/src")
 set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/vjson/src")
+set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/googletest/src")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -177,6 +179,13 @@ add_subdirectory (cvmfs)
 if (INSTALL_MOUNT_SCRIPTS)
 	add_subdirectory (mount)
 endif (INSTALL_MOUNT_SCRIPTS)
+
+#
+# compile the unit tests
+#
+if (BUILD_UNITTESTS)
+	add_subdirectory (test/unittests)
+endif (BUILD_UNITTESTS)
 
 #
 # Documentation
