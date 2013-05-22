@@ -887,7 +887,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stdout,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
-                   const std::vector<std::string>  &argv) {
+                   const std::vector<std::string>  &argv,
+                         pid_t                     *child_pid) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -907,7 +908,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
   cmd_line.push_back(binary_path);
   cmd_line.insert(cmd_line.end(), argv.begin(), argv.end());
 
-  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes, true)) {
+  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes, true, child_pid)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);
@@ -944,12 +945,14 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
  * Does a double fork to detach child.
  * The command_line parameter contains the binary at index 0 and the arguments
  * in the rest of the vector.
+ * Using the optional parameter *pid it is possible to retrieve the process ID
+ * of the spawned process.
  */
-bool ManagedExec(const vector<string> &command_line,
-                 const vector<int> &preserve_fildes,
-                 const map<int, int> &map_fildes,
-                 const bool drop_credentials)
-{
+bool ManagedExec(const vector<string>  &command_line,
+                 const vector<int>     &preserve_fildes,
+                 const map<int, int>   &map_fildes,
+                 const bool             drop_credentials,
+                       pid_t           *child_pid) {
   assert(command_line.size() >= 1);
 
   int pipe_fork[2];
@@ -961,6 +964,7 @@ bool ManagedExec(const vector<string> &command_line,
     int max_fd;
     int fd_flags;
     char failed = 'U';
+    char send_pid = 'P';
     const char *argv[command_line.size() + 1];
     for (unsigned i = 0; i < command_line.size(); ++i)
       argv[i] = command_line[i].c_str();
@@ -1018,6 +1022,13 @@ bool ManagedExec(const vector<string> &command_line,
       failed = 'X';
       goto fork_failure;
     }
+
+    // retrieve the PID of the new grand child process and send it to the
+    // grand father
+    pid_grand_child = getpid();
+    (void)write(pipe_fork[1], &send_pid, 1);
+    (void)write(pipe_fork[1], &pid_grand_child, sizeof(pid_t));
+
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = 'E';
@@ -1030,13 +1041,28 @@ bool ManagedExec(const vector<string> &command_line,
   waitpid(pid, &statloc, 0);
 
   close(pipe_fork[1]);
+
+  // The character is either P, in which case the pid is sent, or
+  // a failure code
   char buf;
-  if (read(pipe_fork[0], &buf, 1) == 1) {
+  ReadPipe(pipe_fork[0], &buf, 1);
+  if (buf != 'P') {
+    close(pipe_fork[0]);
     LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%c)", buf);
     return false;
   }
+
+  // read the PID of the spawned process if requested
+  // (the actual read needs to be done in any case!)
+  pid_t buf_child_pid = 0;
+  ReadPipe(pipe_fork[0], &buf_child_pid, sizeof(pid_t));
+  if (child_pid != NULL) {
+    *child_pid = buf_child_pid;
+  }
   close(pipe_fork[0]);
-  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
+           command_line[0].c_str(),
+           (int)buf_child_pid);
   return true;
 }
 

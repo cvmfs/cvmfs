@@ -1,4 +1,9 @@
 2.1.11:
+  * Add network path reset within the same proxy group
+    (re-balance proxies)
+  * Add network path reset for failover hosts
+  * Add missing execmod SELinux exception for 32bit SL6
+  * Fix occasional hangs of gdb when generating stack traces
   * Improve host/proxy failover logging
   * Fix host failover
   * Perform a host failover instead of a proxy failover 
