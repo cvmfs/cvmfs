@@ -127,7 +127,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
     publish_timestamp = String2Uint64(iter->second);
 
   // Z expands to a pipe-separated string of channel-hash pairs
-  map<history::UpdateChannel, hash::Any> channel_tops;
+  vector<history::TagList::ChannelTag> channel_tops;
   if ((iter = content.find('Z')) != content.end()) {
     vector<string> elements = SplitString(iter->second, '|');
     for (unsigned i = 0; i < elements.size(); ++i) {
@@ -136,8 +136,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
                         HexDigit2Int(elements[i][1]);
       history::UpdateChannel channel =
         static_cast<history::UpdateChannel>(channel_int);
-      channel_tops[channel] =
-        hash::Any(hash::kSha1, hash::HexPtr(elements[i].substr(2)));
+      channel_tops.push_back(history::TagList::ChannelTag(
+        channel, hash::Any(hash::kSha1, hash::HexPtr(elements[i].substr(2)))));
     }
   }
 
@@ -177,11 +177,9 @@ string Manifest::ExportString() const {
   if (publish_timestamp_ > 0)
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
 
-  map<history::UpdateChannel, hash::Any>::const_iterator i =
-    channel_tops_.begin();
-  for (; i != channel_tops_.end(); ++i) {
-    manifest += "Z" + StringifyByteAsHex(i->first) +
-                i->second.ToString() + "\n";
+  for (unsigned i; i < channel_tops_.size(); ++i) {
+    manifest += "Z" + StringifyByteAsHex(channel_tops_[i].channel) +
+                channel_tops_[i].root_hash.ToString() + "\n";
   }
 
   return manifest;

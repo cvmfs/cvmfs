@@ -31,7 +31,7 @@ class Manifest {
            const hash::Any certificate,
            const hash::Any history,
            const uint64_t publish_timestamp,
-           const std::map<history::UpdateChannel, hash::Any> &channel_tops) :
+           const std::vector<history::TagList::ChannelTag> &channel_tops) :
     catalog_hash_(catalog_hash), root_path_(root_path), ttl_(ttl),
     revision_(revision), micro_catalog_hash_(micro_catalog_hash),
     repository_name_(repository_name), certificate_(certificate),
@@ -55,7 +55,7 @@ class Manifest {
   void set_publish_timestamp(const uint32_t publish_timestamp) {
     publish_timestamp_ = publish_timestamp;
   }
-  void set_channel_tops(const std::map<history::UpdateChannel, hash::Any> &v) {
+  void set_channel_tops(const std::vector<history::TagList::ChannelTag> &v) {
     channel_tops_ = v;
   }
 
@@ -76,7 +76,8 @@ class Manifest {
   hash::Any certificate_;
   hash::Any history_;
   uint64_t publish_timestamp_;
-  std::map<history::UpdateChannel, hash::Any> channel_tops_;
+  // ordered, newest releases first
+  std::vector<history::TagList::ChannelTag> channel_tops_;
 };  // class Manifest
 
 }  // namespace manifest

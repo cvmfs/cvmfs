@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 #include <set>
-#include <map>
 
 #include "sql.h"
 #include "hash.h"
@@ -17,9 +16,9 @@ namespace history {
 
 enum UpdateChannel {
   kChannelTrunk = 0,
-  kChannelDevel = 0x10,
-  kChannelTest = 0x20,
-  kChannelProd = 0x30,
+  kChannelDevel = 4,
+  kChannelTest = 16,
+  kChannelProd = 64,
 };
 
 
@@ -39,6 +38,14 @@ struct Tag {
     timestamp = t;
     channel = c;
     description = d;
+  }
+
+  bool operator ==(const Tag &other) const {
+    return this->revision == other.revision;
+  }
+
+  bool operator <(const Tag &other) const {
+    return this->revision < other.revision;
   }
 
   std::string name;
@@ -98,6 +105,13 @@ class SqlTag : public sqlite::Sql {
 
 class TagList {
  public:
+  struct ChannelTag {
+    ChannelTag(const UpdateChannel c, const hash::Any &h) :
+      channel(c), root_hash(h) { }
+    UpdateChannel channel;
+    hash::Any root_hash;
+  };
+
   enum Failures {
     kFailOk = 0,
     kFailTagExists,
@@ -108,7 +122,8 @@ class TagList {
   Failures Insert(const Tag &tag);
   void Remove(const std::string &name);
   std::set<hash::Any> GetAllHashes();
-  std::map<UpdateChannel, hash::Any> GetChannelTops();
+  // Ordered list, newest releases first
+  std::vector<ChannelTag> GetChannelTops();
   std::string List();
 
   bool Load(Database *database);

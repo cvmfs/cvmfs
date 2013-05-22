@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <cassert>
 
+#include <algorithm>
+
 #include "logging.h"
 #include "util.h"
 
@@ -306,21 +308,23 @@ set<hash::Any> TagList::GetAllHashes() {
 }
 
 
-map<UpdateChannel, hash::Any> TagList::GetChannelTops() {
-  map<UpdateChannel, hash::Any> result;
-  map<UpdateChannel, unsigned> channel_revisions;
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    UpdateChannel channel = list_[i].channel;
-    hash::Any hash = list_[i].root_hash;
-    unsigned rev = list_[i].revision;
-    if (result.find(channel) == result.end()) {
-      result[channel] = hash;
-      channel_revisions[channel] = rev;
-    } else {
-      if (channel_revisions[channel] < rev) {
-        result[channel] = hash;
-        channel_revisions[channel] = rev;
-      }
+// Ordered list, newest releases first
+vector<TagList::ChannelTag> TagList::GetChannelTops() {
+  vector<ChannelTag> result;
+  if (list_.size() == 0)
+    return result;
+
+  vector<Tag> sorted_tag_list(list_);
+  sort(sorted_tag_list.begin(), sorted_tag_list.end());
+
+  set<UpdateChannel> processed_channels;
+  for (int i = sorted_tag_list.size()-1; i >= 0; --i) {
+    UpdateChannel channel = sorted_tag_list[i].channel;
+    if (channel == kChannelTrunk)
+      continue;
+    if (processed_channels.find(channel) == processed_channels.end()) {
+      result.push_back(ChannelTag(channel, sorted_tag_list[i].root_hash));
+      processed_channels.insert(channel);
     }
   }
   return result;
