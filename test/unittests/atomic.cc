@@ -164,11 +164,14 @@ TEST_F(AtomicTest, ConcurrentWriteOfAtomicInts) {
   pthread_t threads32[pthreads];
   pthread_t threads64[pthreads];
 
+  int pthread_result;
+
   for (int i = 0; i < pthreads; ++i) {
-    pthread_create(&threads32[i],
-                    NULL,
-                   &AtomicTest::concurrent_writer32,
-                    static_cast<void*>(&atomic32_));
+    pthread_result = pthread_create(&threads32[i],
+                                     NULL,
+                                    &AtomicTest::concurrent_writer32,
+                                     static_cast<void*>(&atomic32_));
+    ASSERT_EQ(0, pthread_result);
   }
 
   for (int i = 0; i < pthreads; ++i) {
@@ -179,10 +182,11 @@ TEST_F(AtomicTest, ConcurrentWriteOfAtomicInts) {
   EXPECT_EQ (AtomicTest::concurrent_writer_result * pthreads, result32);
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_create(&threads64[i],
-                    NULL,
-                   &AtomicTest::concurrent_writer64,
-                    static_cast<void*>(&atomic64_));
+    pthread_result = pthread_create(&threads64[i],
+                                     NULL,
+                                    &AtomicTest::concurrent_writer64,
+                                     static_cast<void*>(&atomic64_));
+    ASSERT_EQ(0, pthread_result);
   }
 
   for (int i = 0; i < pthreads; ++i) {
