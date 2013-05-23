@@ -72,7 +72,7 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
   LogCvmfs(kLogSignature, kLogDebug,  "local time: %s",
            StringifyTime(local_timestamp, true).c_str());
   if (local_timestamp > timestamp) {
-    LogCvmfs(kLogSignature, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
              "whitelist lifetime verification failed, expired");
     return false;
   }
@@ -82,7 +82,7 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
   line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
                     whitelist_size-payload_bytes);
   if ((expected_repository != "") && ("N" + expected_repository != line)) {
-    LogCvmfs(kLogSignature, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
              "repository name on the whitelist does not match "
              "(found %s, expected %s)",
              line.c_str(), expected_repository.c_str());

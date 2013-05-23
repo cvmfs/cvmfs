@@ -372,7 +372,7 @@ if (BUILD_SERVER)
 
     if (LIBCURL_BUILTIN)
       add_dependencies (cvmfs_swissknife_debug libcares libcurl)
-      endif (LIBCURL_BUILTIN)
+    endif (LIBCURL_BUILTIN)
 
     if (SQLITE3_BUILTIN)
       add_dependencies (cvmfs_swissknife_debug sqlite3)
