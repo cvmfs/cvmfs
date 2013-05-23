@@ -4,6 +4,8 @@
 #
 set (CVMFS_UNITTEST_SOURCES
   main.cc
+
+  atomic.cc
 )
 
 #
