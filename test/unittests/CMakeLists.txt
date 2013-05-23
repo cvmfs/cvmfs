@@ -4,6 +4,9 @@
 #
 set (CVMFS_UNITTEST_SOURCES
   main.cc
+
+  t_atomic.cc
+  t_smallhash.cc
 )
 
 #
@@ -15,7 +18,7 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/i
 #
 # Compiler and Linker Flags for unit tests
 #
-set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS}")
+set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -I ${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 #
