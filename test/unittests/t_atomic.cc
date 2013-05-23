@@ -4,7 +4,7 @@
 
 #include "atomic.h"
 
-class AtomicTest : public ::testing::Test {
+class T_Atomic : public ::testing::Test {
  protected:
   virtual void SetUp() {
     atomic_init32(&atomic32_);
@@ -16,7 +16,7 @@ class AtomicTest : public ::testing::Test {
 
 
   static void *concurrent_writer32(void *atomic) {
-    const int cycles = AtomicTest::concurrent_writer_cycles;
+    const int cycles = T_Atomic::concurrent_writer_cycles;
 
     atomic_int32 *atomic32 = static_cast<atomic_int32*>(atomic);
     for (int i = 0; i < cycles; ++i) {
@@ -32,7 +32,7 @@ class AtomicTest : public ::testing::Test {
 
 
   static void *concurrent_writer64(void *atomic) {
-    const int cycles = AtomicTest::concurrent_writer_cycles;
+    const int cycles = T_Atomic::concurrent_writer_cycles;
 
     atomic_int64 *atomic32 = static_cast<atomic_int64*>(atomic);
     for (int i = 0; i < cycles; ++i) {
@@ -56,7 +56,7 @@ class AtomicTest : public ::testing::Test {
 };
 
 
-TEST_F(AtomicTest, InitialReadAtomicInts) {
+TEST_F(T_Atomic, InitialReadAtomicInts) {
   const int32_t i32 = atomic_read32(&atomic32_);
   const int64_t i64 = atomic_read64(&atomic64_);
 
@@ -65,7 +65,7 @@ TEST_F(AtomicTest, InitialReadAtomicInts) {
 }
 
 
-TEST_F(AtomicTest, IncrementAtomicInts) {
+TEST_F(T_Atomic, IncrementAtomicInts) {
   const int cycles = 100;
 
   int32_t i32;
@@ -84,7 +84,7 @@ TEST_F(AtomicTest, IncrementAtomicInts) {
 }
 
 
-TEST_F(AtomicTest, AddToAtomicInts) {
+TEST_F(T_Atomic, AddToAtomicInts) {
   const int32_t off1 = 1337;
   const int32_t off2 = 42;
 
@@ -99,7 +99,7 @@ TEST_F(AtomicTest, AddToAtomicInts) {
 }
 
 
-TEST_F(AtomicTest, SubtractFromAtomicInts) {
+TEST_F(T_Atomic, SubtractFromAtomicInts) {
   const int32_t off1 = 1337;
   const int32_t off2 = 42;
 
@@ -117,7 +117,7 @@ TEST_F(AtomicTest, SubtractFromAtomicInts) {
 }
 
 
-TEST_F(AtomicTest, DecrementAtomicInts) {
+TEST_F(T_Atomic, DecrementAtomicInts) {
   const int cycles = 100;
 
   atomic_xadd32(&atomic32_, cycles + 1);
@@ -139,7 +139,7 @@ TEST_F(AtomicTest, DecrementAtomicInts) {
 }
 
 
-TEST_F(AtomicTest, CompareAndSetAtomicInts) {
+TEST_F(T_Atomic, CompareAndSetAtomicInts) {
   const int32_t off1 = 31415;
   const int32_t off2 = 2;
   const int32_t off3 = 217;
@@ -158,7 +158,7 @@ TEST_F(AtomicTest, CompareAndSetAtomicInts) {
 }
 
 
-TEST_F(AtomicTest, ConcurrentWriteOfAtomicInts) {
+TEST_F(T_Atomic, ConcurrentWriteOfAtomicInts) {
   const int pthreads = 100;
 
   pthread_t threads32[pthreads];
@@ -169,7 +169,7 @@ TEST_F(AtomicTest, ConcurrentWriteOfAtomicInts) {
   for (int i = 0; i < pthreads; ++i) {
     pthread_result = pthread_create(&threads32[i],
                                      NULL,
-                                    &AtomicTest::concurrent_writer32,
+                                    &T_Atomic::concurrent_writer32,
                                      static_cast<void*>(&atomic32_));
     ASSERT_EQ(0, pthread_result);
   }
@@ -179,12 +179,12 @@ TEST_F(AtomicTest, ConcurrentWriteOfAtomicInts) {
   }
 
   const int32_t result32 = atomic_read32(&atomic32_);
-  EXPECT_EQ (AtomicTest::concurrent_writer_result * pthreads, result32);
+  EXPECT_EQ (T_Atomic::concurrent_writer_result * pthreads, result32);
 
   for (int i = 0; i < pthreads; ++i) {
     pthread_result = pthread_create(&threads64[i],
                                      NULL,
-                                    &AtomicTest::concurrent_writer64,
+                                    &T_Atomic::concurrent_writer64,
                                      static_cast<void*>(&atomic64_));
     ASSERT_EQ(0, pthread_result);
   }
@@ -194,5 +194,5 @@ TEST_F(AtomicTest, ConcurrentWriteOfAtomicInts) {
   }
 
   const int64_t result64 = atomic_read64(&atomic64_);
-  EXPECT_EQ (AtomicTest::concurrent_writer_result * pthreads, result64);
+  EXPECT_EQ (T_Atomic::concurrent_writer_result * pthreads, result64);
 }

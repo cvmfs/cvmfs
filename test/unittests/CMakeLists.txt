@@ -5,7 +5,8 @@
 set (CVMFS_UNITTEST_SOURCES
   main.cc
 
-  atomic.cc
+  t_atomic.cc
+  t_smallhash.cc
 )
 
 #
