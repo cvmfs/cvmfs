@@ -130,7 +130,7 @@ Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
  * @param dirent the resulting DirectoryEntry
  * @return true if lookup succeeded otherwise false
  */
-bool AbstractCatalogManager::LookupInode(const inode_t inode,
+/*bool AbstractCatalogManager::LookupInode(const inode_t inode,
                                          const LookupOptions options,
                                          DirectoryEntry *dirent)
 {
@@ -188,7 +188,7 @@ bool AbstractCatalogManager::LookupInode(const inode_t inode,
  lookup_inode_fini:
   Unlock();
   return found;
-}
+}*/
 
 
 /**
