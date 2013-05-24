@@ -248,7 +248,7 @@ string TagList::List() {
     Tag tag(list_[i]);
     result += tag.name + " | " + tag.root_hash.ToString() + " | " +
               StringifyInt(tag.revision) + " | " +
-              StringifyTime(tag.timestamp, false) + " | " +
+              StringifyTime(tag.timestamp, true) + " | " +
               StringifyInt(tag.channel) + " | " + tag.description + "\n";
   }
   return result;
@@ -299,10 +299,10 @@ TagList::Failures TagList::Insert(const Tag &tag) {
 }
 
 
-set<hash::Any> TagList::GetAllHashes() {
-  set<hash::Any> result;
+map<string, hash::Any> TagList::GetAllHashes() {
+  map<string, hash::Any> result;
   for (unsigned i = 0; i < list_.size(); ++i) {
-    result.insert(list_[i].root_hash);
+    result[list_[i].name] = list_[i].root_hash;
   }
   return result;
 }

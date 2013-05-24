@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <map>
 
 #include "sql.h"
 #include "hash.h"
@@ -122,10 +123,10 @@ class TagList {
   Failures Insert(const Tag &tag);
   void Remove(const std::string &name);
   void Rollback(const unsigned until_revision);
-  std::set<hash::Any> GetAllHashes();
   // Ordered list, newest releases first
   std::vector<ChannelTag> GetChannelTops();
   std::string List();
+  std::map<std::string, hash::Any> GetAllHashes();
 
   bool Load(Database *database);
   bool Store(Database *database);

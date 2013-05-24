@@ -78,7 +78,7 @@ static bool FetchTagList(const string &repository_url,
   int retval;
   if (!history_hash.IsNull()) {
     const string url = repository_url + "/data" +
-    history_hash.MakePath(1, 2) + "H";
+      history_hash.MakePath(1, 2) + "H";
     download::JobInfo download_history(&url, true, false, &tmp_path,
                                        &history_hash);
     retval = download::Fetch(&download_history);

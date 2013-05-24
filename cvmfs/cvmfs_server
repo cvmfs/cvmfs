@@ -155,7 +155,7 @@ Supported Commands:
   abort         [-f don't ask again]
                 <fully qualified name>
                 Abort transaction and return to the state before
-  rollback     [-t tag] [-f don't ask again]
+  rollback      [-t tag] [-f don't ask again]
                 <fully qualified name>
                 Re-publishes the given tag as the new latest revision.
                 All snapshots between trunk and the target tag become
