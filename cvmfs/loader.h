@@ -41,6 +41,7 @@ enum Failures {
   kFailRestoreState,
   kFailOtherMount,
   kFailDoubleMount,
+  kFailHistory,
 };
 
 
