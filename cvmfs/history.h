@@ -121,6 +121,7 @@ class TagList {
   bool FindRevision(const unsigned revision, Tag *tag);
   Failures Insert(const Tag &tag);
   void Remove(const std::string &name);
+  void Rollback(const unsigned until_revision);
   std::set<hash::Any> GetAllHashes();
   // Ordered list, newest releases first
   std::vector<ChannelTag> GetChannelTops();

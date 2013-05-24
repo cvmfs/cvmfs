@@ -64,6 +64,7 @@ class WritableCatalog : public Catalog {
 
   void UpdateLastModified();
   void IncrementRevision();
+  void SetRevision(const uint64_t new_revision);
   void SetPreviousRevision(const hash::Any &hash);
 
  protected:
@@ -134,6 +135,9 @@ class WritableCatalog : public Catalog {
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
+
+WritableCatalog *AttachFreelyRw(const std::string &root_path,
+                                const std::string &file);
 
 }  // namespace catalog
 

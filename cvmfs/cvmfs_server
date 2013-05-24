@@ -81,7 +81,7 @@ CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 # @return   0 if the command was recognized
 is_subcommand() {
   subcommand=$1
-  supported_commands="mkfs add-replica publish rmfs alterfs resign list \
+  supported_commands="mkfs add-replica publish rollback rmfs alterfs resign list \
     info lstags check transaction abort snapshot skeleton migrate"
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -155,6 +155,11 @@ Supported Commands:
   abort         [-f don't ask again]
                 <fully qualified name>
                 Abort transaction and return to the state before
+  rollback     [-t tag] [-f don't ask again]
+                <fully qualified name>
+                Re-publishes the given tag as the new latest revision.
+                All snapshots between trunk and the target tag become
+                inaccessible.  Without a tag name, trunk-previous is used.
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   info          <fully qualified name>
@@ -1647,6 +1652,104 @@ publish() {
   tag_command="$tag_command -t $trunk_hash -i $trunk_revision"
   echo "Tagging $name"
   $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
+  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+  echo "Remounting newly created repository revision"
+  sudo umount /cvmfs/$name
+  sudo umount ${spool_dir}/rdonly
+  sudo rm -rf ${spool_dir}/scratch
+  rm -rf ${spool_dir}/tmp/*
+  $user_shell "mkdir ${spool_dir}/scratch"
+  sudo mount ${spool_dir}/rdonly > /dev/null
+  sudo mount /cvmfs/$name
+  rm -f ${spool_dir}/in_transaction
+  publish_after_hook $name
+}
+
+
+################################################################################
+
+
+rollback() {
+  local name
+  local user
+  local spool_dir
+  local stratum0
+  local upstream
+  local target_tag="trunk-previous"
+  local force=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "t:f" option
+  do
+    case $option in
+      t)
+        target_tag=$OPTARG
+      ;;
+      f)
+        force=1
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  user=$CVMFS_USER
+  spool_dir=$CVMFS_SPOOL_DIR
+  stratum0=$CVMFS_STRATUM0
+  upstream=$CVMFS_UPSTREAM_STORAGE
+
+  # more sanity checks
+  check_repository_compatibility
+  check_expiry $stratum0 || die "Repository whitelist is expired!"
+  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+
+  if [ $force -ne 1 ]; then
+    local reply
+    read -p "You are about to IRREVERSIBLY ROLLBACK AND REPUBLISH TAG $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      return 1
+    fi
+  fi
+
+  # do it!
+  local swissknife="cvmfs_swissknife"
+
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+
+  publish_before_hook
+  sudo /bin/mount -o remount,ro /cvmfs/$name
+  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+
+  local rollback_command="$swissknife rollback -u $stratum0 \
+    -r $upstream \
+    -b $base_hash \
+    -n $name \
+    -k /etc/cvmfs/keys/${name}.pub \
+    -o ${spool_dir}/tmp/history \
+    -m ${spool_dir}/tmp/manifest \
+    -d ${spool_dir}/tmp \
+    -t $target_tag"
+  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    -m ${spool_dir}/tmp/manifest \
+    -h ${spool_dir}/tmp/history \
+    -t ${spool_dir}/tmp \
+    -r ${upstream}"
+
+  $user_shell "$rollback_command" || die "Rollback failed\n\nExecuted Command:\n$rollback_command"
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name

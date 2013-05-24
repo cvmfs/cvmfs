@@ -330,4 +330,14 @@ vector<TagList::ChannelTag> TagList::GetChannelTops() {
   return result;
 }
 
+
+void TagList::Rollback(const unsigned until_revision) {
+  for (vector<Tag>::iterator i = list_.begin(); i < list_.end(); ) {
+    if (i->revision >= until_revision)
+      i = list_.erase(i);
+    else
+      ++i;
+  }
+}
+
 }  // namespace history

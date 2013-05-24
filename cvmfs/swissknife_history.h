@@ -50,6 +50,16 @@ class CommandRollback : public Command {
   ParameterList GetParams() {
     ParameterList result;
     result.push_back(Parameter('r', "spooler definition", false, false));
+    result.push_back(Parameter('u', "repository directory / url",
+                               false, false));
+    result.push_back(Parameter('b', "base hash", false, false));
+    result.push_back(Parameter('n', "repository name", false, false));
+    result.push_back(Parameter('k', "repository public key", false, false));
+    result.push_back(Parameter('o', "history db output file",
+                               false, false));
+    result.push_back(Parameter('m', "manifest output file", false, false));
+    result.push_back(Parameter('t', "revert to this tag", false, false));
+    result.push_back(Parameter('d', "temp directory", false, false));
     return result;
   }
   int Main(const ArgumentList &args);
