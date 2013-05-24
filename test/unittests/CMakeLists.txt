@@ -1,5 +1,10 @@
 
 #
+# global test configuration
+#
+set (PROJECT_TEST_NAME "${PROJECT_NAME}_test")
+
+#
 # unit test source files
 #
 set (CVMFS_UNITTEST_SOURCES
@@ -24,10 +29,15 @@ set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 #
 # build CernVM-FS test cases
 #
-add_executable (cvmfs_unittests ${CVMFS_UNITTEST_SOURCES})
-add_dependencies (cvmfs_unittests googletest)
+add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+add_dependencies (${PROJECT_TEST_NAME} googletest)
 
-set_target_properties (cvmfs_unittests PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
-target_link_libraries (cvmfs_unittests ${GOOGLETEST_ARCHIVE} pthread)
+target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} pthread)
+
+#
+# Integrate the test running into CMake
+#
+add_test (NAME unittests COMMAND ${PROJECT_TEST_NAME})
