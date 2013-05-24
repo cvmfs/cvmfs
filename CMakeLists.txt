@@ -184,6 +184,7 @@ endif (INSTALL_MOUNT_SCRIPTS)
 # compile the unit tests
 #
 if (BUILD_UNITTESTS)
+	enable_testing ()
 	add_subdirectory (test/unittests)
 endif (BUILD_UNITTESTS)
 
