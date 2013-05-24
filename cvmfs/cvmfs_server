@@ -167,6 +167,7 @@ Supported Commands:
   lstags        <fully qualified name>
                 Print named tags (snapshots) of the reoppsitory
   check         [-c disable data chunk existence check]
+                [-t tag (check only specific tag)]
                 <fully qualified name>
                 Checks if the repository is sane
   transaction   <fully qualified name>
@@ -1316,14 +1317,18 @@ check() {
   local upstream
   local repository_dir
   local check_chunks=1
+  local tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "c" option
+  while getopts "ct:" option
   do
     case $option in
       c)
         check_chunks=0
+      ;;
+      t)
+        tag="-t $OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1360,7 +1365,7 @@ check() {
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying $name"
-  cvmfs_swissknife check $check_chunks_param $log_level_param -r $repository_dir
+  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
 }
 
 

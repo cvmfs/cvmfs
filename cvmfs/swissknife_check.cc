@@ -25,6 +25,7 @@
 #include "compression.h"
 #include "shortstring.h"
 #include "download.h"
+#include "history.h"
 
 using namespace std;  // NOLINT
 using namespace swissknife;
@@ -415,9 +416,11 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 }
 
 
-std::string CommandCheck::DownloadCatalog(const string &path,
-                                          const hash::Any catalog_hash) {
-  const string source = "data" + catalog_hash.MakePath(1,2) + "C";
+string CommandCheck::DownloadPiece(const hash::Any catalog_hash,
+                                   const char suffix)
+{
+  string source = "data" + catalog_hash.MakePath(1,2);
+  source.push_back(suffix);
   const string dest = "/tmp/" + catalog_hash.ToString();
   const string url = *remote_repository + "/" + source;
   download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
@@ -432,9 +435,11 @@ std::string CommandCheck::DownloadCatalog(const string &path,
 }
 
 
-std::string CommandCheck::DecompressCatalog(const string &path,
-                                            const hash::Any catalog_hash) {
-  const string source = "data" + catalog_hash.MakePath(1,2) + "C";
+string CommandCheck::DecompressPiece(const hash::Any catalog_hash,
+                                     const char suffix)
+{
+  string source = "data" + catalog_hash.MakePath(1,2);
+  source.push_back(suffix);
   const string dest = "/tmp/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
     return "";
@@ -455,9 +460,9 @@ bool CommandCheck::InspectTree(const string &path,
 
   string tmp_file;
   if (remote_repository == NULL)
-    tmp_file = DecompressCatalog(path, catalog_hash);
+    tmp_file = DecompressPiece(catalog_hash, 'C');
   else
-    tmp_file = DownloadCatalog(path, catalog_hash);
+    tmp_file = DownloadPiece(catalog_hash, 'C');
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
              catalog_hash.ToString().c_str());
@@ -577,7 +582,10 @@ bool CommandCheck::InspectTree(const string &path,
 
 
 int CommandCheck::Main(const swissknife::ArgumentList &args) {
+  string tag_name;
   check_chunks = false;
+  if (args.find('t') != args.end())
+    tag_name = *args.find('t')->second;
   if (args.find('c') != args.end())
     check_chunks = true;
   if (args.find('l') != args.end()) {
@@ -640,9 +648,48 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  hash::Any root_hash = manifest->catalog_hash();
+  if (tag_name != "") {
+    if (manifest->history().IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "no history");
+      delete manifest;
+      return 1;
+    }
+    string tmp_file;
+    if (remote_repository == NULL)
+      tmp_file = DecompressPiece(manifest->history(), 'H');
+    else
+      tmp_file = DownloadPiece(manifest->history(), 'H');
+    if (tmp_file == "") {
+      LogCvmfs(kLogCvmfs, kLogStdout, "failed to load history database %s",
+               manifest->history().ToString().c_str());
+      return 1;
+    }
+    history::Database tag_db;
+    int retval = tag_db.Open(tmp_file, sqlite::kDbOpenReadOnly);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "failed to open history database");
+      unlink(tmp_file.c_str());
+      return 1;
+    }
+    history::TagList tag_list;
+    retval = tag_list.Load(&tag_db);
+    assert(retval);
+    unlink(tmp_file.c_str());
+    history::Tag tag;
+    retval = tag_list.FindTag(tag_name, &tag);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "no such tag: %s", tag_name.c_str());
+      unlink(tmp_file.c_str());
+      return 1;
+    }
+    root_hash = tag.root_hash;
+    LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting repository tag %s",
+             tag_name.c_str());
+  }
+
   catalog::DeltaCounters computed_counters;
-  bool retval = InspectTree("", manifest->catalog_hash(), NULL,
-                            &computed_counters);
+  bool retval = InspectTree("", root_hash, NULL, &computed_counters);
 
   delete manifest;
   return retval ? 0 : 1;
