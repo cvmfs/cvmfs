@@ -1,0 +1,180 @@
+#include <gtest/gtest.h>
+
+#include <pthread.h>
+
+#include "smallhash.h"
+#include "murmur.h"
+
+static uint32_t hasher_int(const int &key) {
+  return MurmurHash2(&key, sizeof(key), 0x07387a4f);
+}
+
+class T_Smallhash : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    smallhash_.Init(16, -1, hasher_int);
+    multihash_.Init(kNumHashmaps, -1, hasher_int);
+    active_multihash = &multihash_;
+
+    unsigned num_hashmaps = kNumHashmaps;
+    EXPECT_EQ(num_hashmaps, multihash_.num_hashmaps());
+  }
+
+  uint32_t GetMultiSize() {
+    uint32_t individual_sizes[kNumHashmaps];
+    multihash_.GetSizes(individual_sizes);
+    uint32_t overall_size = 0;
+    for (uint8_t i = 0; i < kNumHashmaps; ++i)
+      overall_size += individual_sizes[i];
+    return overall_size;
+  }
+
+  static void *tf_insert(void *data) {
+    int ID = (long)data;
+
+    unsigned chunk = kNumElements/kNumThreads;
+    for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
+      active_multihash->Insert(i, i);
+    }
+    return NULL;
+  }
+
+  static void *tf_erase(void *data) {
+    int ID = (long)data;
+
+    unsigned chunk = kNumElements/kNumThreads;
+    for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
+      active_multihash->Erase(i);
+    }
+    return NULL;
+  }
+
+  static const unsigned kNumElements = 1000000;
+  static const unsigned kNumHashmaps = 42;
+  static const unsigned kNumThreads = 8;
+  SmallHashDynamic<int, int> smallhash_;
+  MultiHash<int, int> multihash_;
+  static MultiHash<int, int> *active_multihash;
+};
+MultiHash<int, int> *T_Smallhash::active_multihash = NULL;
+
+
+TEST_F(T_Smallhash, Insert) {
+  unsigned N = kNumElements;
+  for (unsigned i = 0; i < N; ++i) {
+    smallhash_.Insert(i, i);
+  }
+
+  EXPECT_EQ(N, smallhash_.size());
+}
+
+
+TEST_F(T_Smallhash, InsertAndErase) {
+  unsigned N = kNumElements;
+  unsigned initial_capacity = smallhash_.capacity();
+  for (unsigned i = 0; i < N; ++i) {
+    smallhash_.Insert(i, i);
+  }
+  EXPECT_EQ(N, smallhash_.size());
+  for (unsigned i = 0; i < N; ++i) {
+    smallhash_.Erase(i);
+  }
+  EXPECT_EQ(unsigned(0), smallhash_.size());
+  EXPECT_EQ(initial_capacity, smallhash_.capacity());
+
+  for (unsigned i = 0; i < N; ++i) {
+    smallhash_.Insert(i, i);
+  }
+  EXPECT_EQ(N, smallhash_.size());
+  smallhash_.Clear();
+  EXPECT_EQ(unsigned(0), smallhash_.size());
+  EXPECT_EQ(initial_capacity, smallhash_.capacity());
+}
+
+
+TEST_F(T_Smallhash, EraseUnknown) {
+  unsigned N = kNumElements;
+  for (unsigned i = 0; i < N; ++i) {
+    smallhash_.Insert(i, i);
+  }
+  smallhash_.Erase(N+1);
+
+  EXPECT_EQ(N, smallhash_.size());
+}
+
+
+TEST_F(T_Smallhash, Lookup) {
+  unsigned N = kNumElements;
+  for (unsigned i = 0; i < N; ++i) {
+    smallhash_.Insert(i, i);
+  }
+  for (unsigned i = 0; i < N; ++i) {
+    int value;
+    bool found = smallhash_.Lookup(i, &value);
+    EXPECT_TRUE(found);
+    EXPECT_EQ(unsigned(value), i);
+  }
+}
+
+
+TEST_F(T_Smallhash, MultihashCycle) {
+  unsigned N = kNumElements;
+  for (unsigned i = 0; i < N; ++i) {
+    multihash_.Insert(i, i);
+  }
+  EXPECT_EQ(N, GetMultiSize());
+  for (unsigned i = 0; i < N; ++i) {
+    int value;
+    bool found = multihash_.Lookup(i, &value);
+    EXPECT_TRUE(found);
+    EXPECT_EQ(unsigned(value), i);
+  }
+  for (unsigned i = 0; i < N; ++i) {
+    multihash_.Erase(i);
+  }
+  EXPECT_EQ(unsigned(0), GetMultiSize());
+
+  for (unsigned i = 0; i < N; ++i) {
+    multihash_.Insert(i, i);
+  }
+  EXPECT_EQ(N, GetMultiSize());
+  multihash_.Clear();
+  EXPECT_EQ(unsigned(0), GetMultiSize());
+}
+
+
+TEST_F(T_Smallhash, MultihashBalance) {
+  unsigned N = kNumElements;
+  for (unsigned i = 0; i < N; ++i) {
+    multihash_.Insert(i, i);
+  }
+  EXPECT_EQ(N, GetMultiSize());
+
+  uint32_t individual_sizes[kNumHashmaps];
+  multihash_.GetSizes(individual_sizes);
+  for (uint8_t i = 0; i < kNumHashmaps; ++i)
+    ASSERT_GT(individual_sizes[i], unsigned(0));
+}
+
+
+TEST_F(T_Smallhash, MultihashMultithread) {
+  unsigned N = kNumElements;
+
+  pthread_t threads[kNumThreads];
+  for (unsigned i = 0; i < kNumThreads; ++i) {
+    pthread_create(&threads[i], NULL, tf_insert, (void *)i);
+  }
+  for (unsigned i = 0; i < kNumThreads; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+  EXPECT_EQ(N, GetMultiSize());
+
+  for (unsigned i = 0; i < kNumThreads; ++i) {
+    pthread_create(&threads[i], NULL, tf_erase, (void *)i);
+  }
+  for (unsigned i = 0; i < kNumThreads; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+  EXPECT_EQ(unsigned(0), GetMultiSize());
+}
+
