@@ -67,6 +67,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         continue;
       }
 
+      SetLogMicroSyslog(*usyslog_path_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module");
       int retval = Reload(con_fd, command == 'S');
       SendMsg2Socket(con_fd, "~");
@@ -76,6 +77,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
                  retval);
         abort();
       }
+      SetLogMicroSyslog("");
     }
   }
 
