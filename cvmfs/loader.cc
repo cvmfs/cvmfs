@@ -447,7 +447,6 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 
 Failures Reload(const int fd_progress, const bool stop_and_go) {
   int retval;
-  SetLogMicroSyslog(*usyslog_path_);
 
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
@@ -504,7 +503,6 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   SendMsg2Socket(fd_progress, "Activating Fuse module\n");
   cvmfs_exports_->fnSpawn();
 
-  SetLogMicroSyslog("");
   atomic_cas32(&blocking_, 1, 0);
   return kFailOk;
 }
