@@ -167,7 +167,7 @@ Supported Commands:
   lstags        <fully qualified name>
                 Print named tags (snapshots) of the reoppsitory
   check         [-c disable data chunk existence check]
-                [-t tag (check only specific tag)]
+                [-t tag (check given tag instead of trunk)]
                 <fully qualified name>
                 Checks if the repository is sane
   transaction   <fully qualified name>
@@ -661,6 +661,19 @@ get_cvmfs_owner() {
   fi
   check_user $cvmfs_user || return 1
   echo $cvmfs_owner
+}
+
+
+set_ro_root_hash() {
+  local name=$1
+  local root_hash=$2
+  local client_config=/etc/cvmfs/repositories.d/${name}/client.conf
+
+  if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
+    sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
+  else
+    echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
+  fi
 }
 
 
@@ -1408,6 +1421,8 @@ transaction() {
   local name
   local spool_dir
   local stratum0
+  local base_hash
+  local remote_hash
   local force=0
 
   # optional parameter handling
@@ -1438,6 +1453,8 @@ transaction() {
   . /etc/cvmfs/repositories.d/$name/server.conf
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
+  base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+  remote_hash=$(cvmfs_swissknife info -r $stratum0 -c)
 
   # more sanity checks
   check_repository_compatibility
@@ -1448,6 +1465,14 @@ transaction() {
 
   # do it!
   transaction_before_hook $name
+  if [ "$base_hash" != "$remote_hash" ]; then
+    echo "Repository has changed!  Remounting remote hash $remote_hash"
+    sudo umount /cvmfs/$name
+    sudo umount ${spool_dir}/rdonly
+    set_ro_root_hash $name $remote_hash
+    sudo mount ${spool_dir}/rdonly
+    sudo mount /cvmfs/$name
+  fi
   sudo mount -o remount,rw /cvmfs/$name
   touch ${spool_dir}/in_transaction
   transaction_after_hook $name
@@ -1680,6 +1705,7 @@ publish() {
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
+  set_ro_root_hash $name $trunk_hash
   sudo rm -rf ${spool_dir}/scratch
   rm -rf ${spool_dir}/tmp/*
   $user_shell "mkdir ${spool_dir}/scratch"
@@ -1778,10 +1804,12 @@ rollback() {
     -r ${upstream}"
 
   $user_shell "$rollback_command" || die "Rollback failed\n\nExecuted Command:\n$rollback_command"
+  local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
+  set_ro_root_hash $name $trunk_hash
   sudo rm -rf ${spool_dir}/scratch
   rm -rf ${spool_dir}/tmp/*
   $user_shell "mkdir ${spool_dir}/scratch"
