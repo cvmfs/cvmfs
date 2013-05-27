@@ -25,6 +25,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/smalloc.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
 )
 
 #
