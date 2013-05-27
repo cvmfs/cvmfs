@@ -2,6 +2,9 @@
 
 #include "../../cvmfs/util_concurrency.h"
 
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
 
 class DummyLocker {
  public:
@@ -30,6 +33,11 @@ TEST(T_UtilConcurrency, ArbitraryLockGurad) {
 }
 
 
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
 TEST(T_UtilConcurrency, MutexLockGuard) {
   pthread_mutex_t mutex;
   int retcode = pthread_mutex_init(&mutex, NULL);
@@ -51,6 +59,11 @@ TEST(T_UtilConcurrency, MutexLockGuard) {
   retcode = pthread_mutex_destroy(&mutex);
   EXPECT_EQ (0, retcode);
 }
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
 
 
 TEST(T_UtilConcurrency, ReadLockGuard) {
@@ -80,6 +93,11 @@ TEST(T_UtilConcurrency, ReadLockGuard) {
   retcode = pthread_rwlock_destroy(&rwlock);
   EXPECT_EQ (0, retcode);
 }
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
 
 
 TEST(T_UtilConcurrency, WriteLockGuard) {
@@ -116,6 +134,11 @@ TEST(T_UtilConcurrency, WriteLockGuard) {
 }
 
 
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
 class DummyLockable : public Lockable {};
 
 TEST(T_UtilConcurrency, Lockable) {
@@ -132,6 +155,11 @@ TEST(T_UtilConcurrency, Lockable) {
   retcode = lockable.TryLock();
   EXPECT_EQ (0, retcode) << "Lockable didn't unlock";
 }
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
 
 
 void CallbackFn(bool* const &param) { *param = true; }
@@ -166,6 +194,11 @@ TEST(T_UtilConcurrency, BoundCallback) {
 }
 
 
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
 class DummyCallbackable : public Callbackable<int> {
  public:
   DummyCallbackable() : callback_result(-1) {}
@@ -186,6 +219,11 @@ TEST(T_UtilConcurrency, Callbackable) {
 
   EXPECT_EQ (1337, callbackable.callback_result);
 }
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
 
 
 class DummyObservable : public Observable<int> {
@@ -256,5 +294,3 @@ TEST(T_UtilConcurrency, Observable) {
   EXPECT_EQ (123457, observer.observation_result);
   EXPECT_EQ (123457, g_fn_observation_result);
 }
-
-
