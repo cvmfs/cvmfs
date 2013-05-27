@@ -38,7 +38,7 @@ set (CVMFS_CLIENT_SOURCES
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
-  dirent.h dirent.cc
+  directory_entry.h directory_entry.cc
   shortstring.h
   file_chunk.h file_chunk.cc
   fs_traversal.h
@@ -111,7 +111,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sync_mediator.h sync_mediator.cc
 
   file_chunk.h file_chunk.cc
-  dirent.h dirent.cc
+  directory_entry.h directory_entry.cc
   shortstring.h
   catalog_traversal.h
   catalog_sql.h catalog_sql.cc

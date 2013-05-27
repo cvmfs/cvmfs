@@ -45,7 +45,7 @@
 #include <vector>
 
 #include "platform.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "quota.h"
 #include "util.h"
 #include "hash.h"
