@@ -294,3 +294,140 @@ TEST(T_UtilConcurrency, Observable) {
   EXPECT_EQ (123457, observer.observation_result);
   EXPECT_EQ (123457, g_fn_observation_result);
 }
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+TEST(T_UtilConcurrency, SingleThreadedFifoChannel) {
+  const size_t max_length = 100;
+  FifoChannel<int> fifo_queue(max_length, 1);
+  ASSERT_TRUE (fifo_queue.IsEmpty());
+  EXPECT_EQ   (max_length, fifo_queue.GetMaximalItemCount());
+
+  for (int i = 0; i < static_cast<int>(max_length) - 1; ++i) {
+    fifo_queue.Enqueue(i * 10);
+  }
+  EXPECT_FALSE (fifo_queue.IsEmpty());
+  EXPECT_EQ    (size_t(max_length - 1), fifo_queue.GetItemCount());
+
+  for (int i = 0; i < static_cast<int>(max_length) - 1; ++i) {
+    const int result = fifo_queue.Dequeue();
+    EXPECT_EQ (i * 10, result);
+  }
+  EXPECT_TRUE (fifo_queue.IsEmpty());
+
+  for (int i = 0; i < static_cast<int>(max_length) - 1; ++i) {
+    fifo_queue.Enqueue(1);
+  }
+  const unsigned int dropped_items = fifo_queue.Drop();
+  EXPECT_EQ   (max_length - 1, dropped_items);
+  EXPECT_TRUE (fifo_queue.IsEmpty());
+  EXPECT_EQ   (size_t(0), fifo_queue.GetItemCount());
+}
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+const int g_kill_signal     = -1;
+const int g_base_value      = 5;
+const int g_cpu_burn_cycles = 100;
+const int g_insert_cycles   = 1000000;
+
+struct consumer_data {
+  consumer_data(FifoChannel<int> *channel) :
+    channel(channel), checksum(0) {}
+
+  FifoChannel<int>  *channel;
+  unsigned int       checksum;
+};
+
+void* producer(void *data) {
+  FifoChannel<int> *channel = static_cast<FifoChannel<int>*>(data);
+
+  for (int i = 0; i < g_insert_cycles; ++i) {
+    channel->Enqueue(g_base_value);
+  }
+
+  return data;
+}
+
+void* consumer(void *data) {
+  consumer_data *params = static_cast<consumer_data*>(data);
+  int value = 0;
+
+  while (true) {
+    value = params->channel->Dequeue();
+    if (value == g_kill_signal) break;
+    for (int i = 0; i < g_cpu_burn_cycles; ++i) ++value;
+    params->checksum += value;
+  }
+
+  return data;
+}
+
+TEST(T_UtilConcurrency, MultiThreadedFifoChannel) {
+  const int consumer_thread_count = 10;
+
+  FifoChannel<int> channel(300, 100);
+
+  pthread_t       producer_thread;
+  pthread_t       consumer_threads[consumer_thread_count];
+  consumer_data  *output_data[consumer_thread_count];
+
+  int retval = 0;
+
+  // create output data structures
+  for (int i = 0; i < consumer_thread_count; ++i) {
+    output_data[i] = new consumer_data(&channel);
+  }
+
+  // spawn producer thread
+  retval = pthread_create(&producer_thread,
+                          NULL,
+                          &producer,
+                          static_cast<void*>(&channel));
+  ASSERT_EQ (0, retval);
+
+  // spawn consumer threads
+  for (int i = 0; i < consumer_thread_count; ++i) {
+    retval = pthread_create(&consumer_threads[i],
+                            NULL,
+                            &consumer,
+                            static_cast<void*>(output_data[i]));
+    ASSERT_EQ (0, retval);
+  }
+
+  // wait for the producer to finish producing
+  retval = pthread_join(producer_thread, NULL);
+  ASSERT_EQ (0, retval);
+
+  // send kill signals for the consumers to finish
+  for (int i = 0; i < consumer_thread_count; ++i) {
+    channel.Enqueue(g_kill_signal);
+  }
+
+  // wait for the consumers to terminate
+  for (int i = 0; i < consumer_thread_count; ++i) {
+    retval = pthread_join(consumer_threads[i], NULL);
+    ASSERT_EQ (0, retval);
+  }
+
+  // do the checks
+  EXPECT_TRUE (channel.IsEmpty());
+
+  unsigned int checksum = 0;
+  for (int i = 0; i < consumer_thread_count; ++i) {
+    checksum += output_data[i]->checksum;
+    delete output_data[i];
+    output_data[i] = NULL;
+  }
+  const unsigned int expected_checksum = g_insert_cycles * g_base_value      +
+                                         g_insert_cycles * g_cpu_burn_cycles;
+  EXPECT_EQ (expected_checksum, checksum);
+}
