@@ -7,11 +7,19 @@ set (PROJECT_TEST_NAME "${PROJECT_NAME}_test")
 #
 # unit test source files
 #
+set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTEST_SOURCES
+  # test steering
   main.cc
 
+  # unit test files
   t_atomic.cc
   t_smallhash.cc
+
+  # test dependencies
+  ${CVMFS_SOURCE_DIR}/atomic.h
+  ${CVMFS_SOURCE_DIR}/murmur.h
+  ${CVMFS_SOURCE_DIR}/smalloc.h
 )
 
 #
