@@ -6,8 +6,8 @@
  * bookkeeping data like the associated catalog.
  */
 
-#ifndef CVMFS_DIRENT_H_
-#define CVMFS_DIRENT_H_
+#ifndef CVMFS_DIRECTORY_ENTRY_H_
+#define CVMFS_DIRECTORY_ENTRY_H_
 
 #include <sys/types.h>
 
@@ -291,4 +291,4 @@ typedef std::vector<StatEntry> StatEntryList;
 
 } // namespace catalog
 
-#endif  // CVMFS_DIRENT_H_
+#endif  // CVMFS_DIRECTORY_ENTRY_H_

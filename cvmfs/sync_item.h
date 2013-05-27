@@ -9,7 +9,7 @@
 
 #include "platform.h"
 #include "hash.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "sync_union.h"
 #include "util.h"
 

@@ -61,7 +61,7 @@
 #include "murmur.h"
 #include "logging.h"
 #include "smalloc.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "hash.h"
 #include "atomic.h"
 #include "util.h"

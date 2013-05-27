@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "shortstring.h"

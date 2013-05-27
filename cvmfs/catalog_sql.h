@@ -26,7 +26,7 @@
 #include <sstream>
 
 #include "hash.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "file_chunk.h"
 #include "shortstring.h"
 #include "duplex_sqlite3.h"

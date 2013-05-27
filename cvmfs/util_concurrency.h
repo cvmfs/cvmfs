@@ -29,10 +29,11 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class Lockable : SingleCopy {
  public:
-  inline virtual ~Lockable() { pthread_mutex_destroy(&mutex_);    }
+  inline virtual ~Lockable() {        pthread_mutex_destroy(&mutex_); }
 
-  void Lock() const          { pthread_mutex_lock(&mutex_);       }
-  void Unlock() const        { pthread_mutex_unlock(&mutex_);     }
+  void Lock()    const       {        pthread_mutex_lock(&mutex_);    }
+  int  TryLock() const       { return pthread_mutex_trylock(&mutex_); }
+  void Unlock()  const       {        pthread_mutex_unlock(&mutex_);  }
 
  protected:
   Lockable() {

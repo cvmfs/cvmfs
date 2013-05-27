@@ -7,11 +7,25 @@ set (PROJECT_TEST_NAME "${PROJECT_NAME}_test")
 #
 # unit test source files
 #
+set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTEST_SOURCES
+  # test steering
   main.cc
 
+  # unit test files
   t_atomic.cc
   t_smallhash.cc
+  t_util_concurrency.cc 
+
+  # test dependencies
+  ${CVMFS_SOURCE_DIR}/atomic.h
+  ${CVMFS_SOURCE_DIR}/logging.h
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/murmur.h
+  ${CVMFS_SOURCE_DIR}/smalloc.h
+  ${CVMFS_SOURCE_DIR}/util_concurrency.h
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
 )
 
 #
@@ -23,7 +37,7 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/i
 #
 # Compiler and Linker Flags for unit tests
 #
-set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -I ${CMAKE_SOURCE_DIR}/cvmfs")
+set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS}")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 #
