@@ -18,6 +18,8 @@
 
 namespace loader {
 
+extern std::string *usyslog_path_;
+
 enum Failures {
   kFailOk = 0,
   kFailUnknown,

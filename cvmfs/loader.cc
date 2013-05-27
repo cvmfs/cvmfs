@@ -93,6 +93,7 @@ string *repository_name_ = NULL;
 string *mount_point_ = NULL;
 string *config_files_ = NULL;
 string *socket_path_ = NULL;
+string *usyslog_path_ = NULL;
 uid_t uid_ = 0;
 gid_t gid_ = 0;
 bool single_threaded_ = false;
@@ -446,6 +447,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 
 Failures Reload(const int fd_progress, const bool stop_and_go) {
   int retval;
+
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
     return kFailMaintenanceMode;
@@ -700,8 +702,10 @@ int main(int argc, char *argv[]) {
   }
 
   // Only set usyslog now, otherwise file permissions are wrong
+  usyslog_path_ = new string();
   if (options::GetValue("CVMFS_USYSLOG", &parameter))
-    SetLogMicroSyslog(parameter);
+    *usyslog_path_ = parameter;
+  SetLogMicroSyslog(*usyslog_path_);
 
   if (single_threaded_) {
     LogCvmfs(kLogCvmfs, kLogStdout,
@@ -800,6 +804,7 @@ int main(int argc, char *argv[]) {
   cvmfs_exports_->fnSpawn();
   loader_talk::Spawn();
 
+  SetLogMicroSyslog("");
   retval = fuse_set_signal_handlers(session);
   assert(retval == 0);
   fuse_session_add_chan(session, channel);
@@ -807,6 +812,7 @@ int main(int argc, char *argv[]) {
     retval = fuse_session_loop(session);
   else
     retval = fuse_session_loop_mt(session);
+  SetLogMicroSyslog(*usyslog_path_);
 
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
