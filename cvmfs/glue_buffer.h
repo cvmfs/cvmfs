@@ -26,6 +26,7 @@
 #include "util.h"
 #include "hash.h"
 #include "smallhash.h"
+#include "smalloc.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
@@ -43,6 +44,86 @@ static inline uint32_t hasher_inode(const uint64_t &inode) {
 }
 
 
+class PathStore {
+ private:
+  struct TrieNode;
+ public:
+  typedef TrieNode * PathHandle;
+
+  ~PathStore() {
+    Clear();
+  }
+
+  PathHandle Insert(const PathString &path) {
+    if (path.IsEmpty()) {
+      trie_.refcnt++;
+      return &trie_;
+    }
+    TrieNode *parent = Insert(GetParentPath(path));
+    NameString name = GetFileName(path);
+    for (unsigned i = 0; i < parent->children.size(); ++i) {
+      if (parent->children[i]->name == name) {
+        parent->children[i]->refcnt++;
+        return parent->children[i];
+      }
+    }
+
+    TrieNode *new_node = new TrieNode();
+    new_node->name = name;
+    new_node->parent = parent;
+    parent->children.push_back(new_node);
+    return new_node;
+  }
+
+  void Retrieve(const PathHandle handle, PathString *path) {
+    if (handle->parent == NULL)
+      return;
+    Retrieve(handle->parent, path);
+    path->Append("/", 1);
+    path->Append(handle->name.GetChars(), handle->name.GetLength());
+  }
+
+  void Erase(const PathHandle handle) {
+    handle->refcnt--;
+    TrieNode *parent = handle->parent;
+    if (parent == NULL)
+      return;
+
+    if (handle->refcnt == 0) {
+      assert(handle->children.size() == 0);
+      for (std::vector<TrieNode *>::iterator i = parent->children.begin(); ;
+           ++i)
+      {
+        if ((*i)->name == handle->name) {
+          parent->children.erase(i);
+          break;
+        }
+      }
+      delete handle;
+    }
+    Erase(parent);
+  }
+
+  void Clear() {
+    // TOOD
+  }
+
+ private:
+  struct TrieNode {
+    TrieNode() {
+      refcnt = 1;
+      parent = NULL;
+    }
+    NameString name;
+    uint32_t refcnt;
+    TrieNode *parent;
+    std::vector<TrieNode *> children;
+  };
+
+  TrieNode trie_;
+};
+
+
 class PathMap {
  public:
   PathMap() {
@@ -52,7 +133,7 @@ class PathMap {
   bool LookupPath(const hash::Md5 &md5path, PathString *path) {
     PathInfo value;
     bool found = map_.Lookup(md5path, &value);
-    path->Assign(value.path);
+    if (found) path_store_.Retrieve(value.path_handle, path);
     return found;
   }
 
@@ -66,24 +147,37 @@ class PathMap {
 
   hash::Md5 Insert(const PathString &path, const uint64_t inode) {
     hash::Md5 md5path(path.GetChars(), path.GetLength());
-    map_.Insert(md5path, PathInfo(inode, path));
+    PathStore::PathHandle path_handle = path_store_.Insert(path);
+    map_.Insert(md5path, PathInfo(inode, path_handle));
     return md5path;
   }
 
   void Erase(const hash::Md5 &md5path) {
-    map_.Erase(md5path);
+    PathInfo value;
+    bool found = map_.Lookup(md5path, &value);
+    if (found) {
+      path_store_.Erase(value.path_handle);
+      map_.Erase(md5path);
+    }
   }
 
-  void Clear() { map_.Clear(); }
+  void Clear() {
+    map_.Clear();
+    path_store_.Clear();
+  }
  private:
   struct PathInfo {
     PathInfo() { inode = 0; }
-    PathInfo(const uint64_t i, const PathString &p) { inode = i; path = p; }
+    PathInfo(const uint64_t i, const PathStore::PathHandle h) {
+      inode = i;
+      path_handle = h;
+    }
     uint64_t inode;
-    PathString path;
+    PathStore::PathHandle path_handle;
   };
 
   SmallHashDynamic<hash::Md5, PathInfo> map_;
+  PathStore path_store_;
 };
 
 
