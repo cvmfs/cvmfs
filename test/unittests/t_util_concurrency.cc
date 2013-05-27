@@ -188,4 +188,73 @@ TEST(T_UtilConcurrency, Callbackable) {
 }
 
 
+class DummyObservable : public Observable<int> {
+ public:
+  void DoNotification(const int value) {
+    NotifyListeners(value);
+  }
+};
+
+class DummyObserver {
+ public:
+  DummyObserver() : observation_result(-1) {}
+  void CallbackMd(const int &value) { observation_result = value; }
+
+ public:
+  int observation_result;
+};
+
+int g_fn_observation_result = -1;
+void ObserverFn(const int &value) { g_fn_observation_result = value; }
+
+TEST(T_UtilConcurrency, Observable) {
+  DummyObserver   observer;
+  DummyObservable observee;
+
+  ASSERT_EQ (-1, observer.observation_result);
+  ASSERT_EQ (-1, g_fn_observation_result);
+
+  DummyObservable::callback_t *bound_callback =
+    observee.RegisterListener(&DummyObserver::CallbackMd, &observer);
+  DummyObservable::callback_t *static_callback =
+    observee.RegisterListener(&ObserverFn);
+
+  static const DummyObservable::callback_t *null_clb = NULL;
+
+  ASSERT_NE (null_clb, bound_callback);
+  ASSERT_NE (null_clb, static_callback);
+
+  observee.DoNotification(314);
+  EXPECT_EQ (314, observer.observation_result) << "observing class not notified";
+  EXPECT_EQ (314, g_fn_observation_result) << "observing static function not notified";
+
+  observee.UnregisterListener(static_callback);
+  observee.DoNotification(1);
+  EXPECT_EQ (1,   observer.observation_result);
+  EXPECT_EQ (314, g_fn_observation_result);
+
+  observee.UnregisterListener(bound_callback);
+  observee.DoNotification(-100);
+  EXPECT_EQ (1,   observer.observation_result);
+  EXPECT_EQ (314, g_fn_observation_result);
+
+  bound_callback =
+    observee.RegisterListener(&DummyObserver::CallbackMd, &observer);
+  ASSERT_NE (null_clb, bound_callback);
+  observee.DoNotification(4);
+  EXPECT_EQ (4,   observer.observation_result);
+  EXPECT_EQ (314, g_fn_observation_result);
+
+  static_callback = observee.RegisterListener(&ObserverFn);
+  ASSERT_NE (null_clb, static_callback);
+  observee.DoNotification(123457);
+  EXPECT_EQ (123457, observer.observation_result);
+  EXPECT_EQ (123457, g_fn_observation_result);
+
+  observee.UnregisterListeners();
+  observee.DoNotification(0);
+  EXPECT_EQ (123457, observer.observation_result);
+  EXPECT_EQ (123457, g_fn_observation_result);
+}
+
 
