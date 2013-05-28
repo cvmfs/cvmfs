@@ -234,6 +234,38 @@ get_cvmfs_cachedir() {
 }
 
 
+CVMFS_MEMORY_WARNING_FLAG=0
+CVMFS_TIME_WARNING_FLAG=0
+CVMFS_MEMORY_WARNING=254
+CVMFS_TIME_WARNING=253
+mangle_test_retval() {
+  local prior_retval=$1
+
+  # if the test case failed... report the retval right away
+  if [ $prior_retval -ne 0 ]; then
+    return $prior_retval
+  fi
+
+  # check if the test case produced memory warnings and report them
+  if [ $CVMFS_MEMORY_WARNING_FLAG -ne 0 ]; then
+    return $CVMFS_MEMORY_WARNING
+  fi
+
+  # check if the test case produced timeout warnings
+  if [ $CVMFS_TIME_WARNING_FLAG -ne 0 ]; then
+    return $CVMFS_TIME_WARNING
+  fi
+
+  # return 0 if all is good
+  return 0
+}
+
+reset_test_warning_flags() {
+  CVMFS_MEMORY_WARNING_FLAG=0
+  CVMFS_TIME_WARNING_FLAG=0
+}
+
+
 check_time() {
   start_time=$1
   end_time=$2
@@ -243,6 +275,8 @@ check_time() {
 
   if [ $diff_time -gt $limit ]; then
     echo "Time limit exceeded" >&2
+    echo "Limit was $limit but it took $diff_time seconds"
+    CVMFS_TIME_WARNING_FLAG=1
     return 100
   fi
 
@@ -264,11 +298,12 @@ check_memory() {
     local removes=$(echo $inode_tracker | grep -o "removes: [0-9]*" | grep -o "[0-9]*$")
     local elements=$(( $inserts - $removes ))
 
-    echo "Memory limit exceeded ($rss_kb kB / $limit kB | $elements items in inode tracker)" >&2
     echo "Memory limit of $limit kB was exceeded by $instance which used $rss_kb kB"
     echo "We've had $elements items in the inode tracker"
     echo "Output of cat /proc/$pid/status:"
     sudo cat /proc/$pid/status 2>&1
+    CVMFS_MEMORY_WARNING_FLAG=1
+
     return 102
   fi
 

@@ -34,20 +34,32 @@ fi
 TEST_ROOT=$(readlink -f $(dirname $0))
 export TEST_ROOT
 
-# test failure handling
-# this function should EXCLUSIVELY be called in the run loop (global state)
+num_tests=0
+num_skipped=0
 num_failures=0
+num_warnings=0
+
+# test failure handling
+# this functions should EXCLUSIVELY be called in the run loop (global state)
 report_failure() {
   local message=$1
   local workdir=$2
-
   echo $message
   if [ x$workdir != x ]; then
     sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
   fi
   num_failures=$(($num_failures+1))
 }
-
+report_warning() {
+  local message=$1
+  echo $message
+  num_warnings=$(($num_warnings+1))
+}
+report_skipped() {
+  local message=$1
+  echo $message
+  num_skipped=$(($num_skipped+1))
+}
 
 # makes sure the test environment for the test case is sane
 setup_environment() {
@@ -80,6 +92,9 @@ setup_environment() {
     fi
   fi
 
+  # reset the test warning flags
+  reset_test_warning_flags
+
   return 0
 }
 
@@ -89,6 +104,9 @@ setup_environment() {
 # run the tests
 for t in $testsuite
 do
+  # count the tests
+  num_tests=$(($num_tests+1))
+
   # add some whitespace between tests in the log
   i=0
   while [ $i -lt 10 ]; do
@@ -110,7 +128,7 @@ do
 
   # check if test should be skipped
   if contains "$exclusions" $t; then
-    echo "Skipped" >> $logfile
+    report_skipped "test case was marked to be skipped" >> $logfile
     echo "Skipped"
     continue
   fi
@@ -123,25 +141,47 @@ do
   fi
 
   # run the test
-  sh -c ". ./test_functions && . $t/main && cd $workdir && cvmfs_run_test $logfile && retval=$? && kill_all_perl_services && exit $retval"
+  sh -c ". ./test_functions                     && \
+         . $t/main                              && \
+         cd $workdir                            && \
+         cvmfs_run_test $logfile                && \
+         retval=\$?                             && \
+         kill_all_perl_services                 && \
+         retval=\$(mangle_test_retval \$retval) && \
+         exit \$retval"
   RETVAL=$?
 
   # check the final test result
-  if [ $RETVAL -eq 0 ]; then
-    rm -rf "$workdir"
-    echo "OK"
-  else
-    report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
-    echo "Failed!"
-  fi
+  case $RETVAL in
+    0)
+      rm -rf "$workdir"
+      echo "OK"
+      ;;
+    $CVMFS_MEMORY_WARNING)
+      rm -rf "$workdir"
+      report_warning "Memory limit exceeded!" >> $logfile
+      echo "Memory Warning!"
+      ;;
+    $CVMFS_TIME_WARNING)
+      rm -rf "$workdir"
+      report_warning "Time limit exceeded!" >> $logfile
+      echo "Time Warning!"
+      ;;
+    *)
+      report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
+      echo "Failed!"
+      ;;
+  esac
 done
 
 # print final status information
 date >> $logfile
 echo "Finished test suite" >> $logfile
 
-if [ $num_failures -ne 0 ]; then
-  echo "$num_failures tests failed!"
-fi
+echo ""
+echo "Tests:    $num_tests"
+echo "Skipped:  $num_skipped"
+echo "Warnings: $num_warnings"
+echo "Failures: $num_failures"
 
 exit $num_failures
