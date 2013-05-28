@@ -44,13 +44,12 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   return mem + sizeof(size_t);
 }
 
-static inline void * __attribute__((used)) smunmap(void *mem) {
+static inline void __attribute__((used)) smunmap(void *mem) {
   unsigned char *area = static_cast<unsigned char *>(mem);
   area = area - sizeof(size_t);
   size_t pages = *((size_t *)(area));
   int retval = munmap(area, pages*4096);
   assert((retval == 0) && "Invalid umnmap");
-  return mem;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
