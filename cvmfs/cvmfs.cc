@@ -1965,8 +1965,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
 
-  // Load specific tag
-  if (*cvmfs::repository_tag_ != "") {
+  // Load specific tag (root hash has precedence)
+  if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
     manifest::ManifestEnsemble ensemble;
     retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL, &ensemble);
     if (retval != manifest::kFailOk) {
