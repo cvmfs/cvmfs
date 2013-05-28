@@ -150,6 +150,7 @@ InodeGenerationInfo inode_generation_info_;
 
 /**
  * For cvmfs_opendir / cvmfs_readdir
+ * TODO: use mmap for very large listings
  */
 struct DirectoryListing {
   char *buffer;  /**< Filled by fuse_add_direntry */

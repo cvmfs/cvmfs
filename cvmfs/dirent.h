@@ -287,7 +287,7 @@ struct StatEntry {
 
 typedef std::vector<DirectoryEntry> DirectoryEntryList;         // TODO: rename!
 typedef std::vector<DirectoryEntryBase> DirectoryEntryBaseList; //       these are NOT lists.
-typedef std::vector<StatEntry> StatEntryList;
+typedef std::vector<StatEntry> StatEntryList;  // TODO: use mmap for large listings
 
 } // namespace catalog
 
