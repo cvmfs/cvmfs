@@ -148,7 +148,7 @@ apache_switch() {
 
 
 contains() {
-  local haystack=$1
+  local haystack="$1"
   local needle=$2
 
   for elem in $haystack
