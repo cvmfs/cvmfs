@@ -28,6 +28,7 @@ class CommandSign : public Command {
     result.push_back(Parameter('s', "password for the private key",
                                true, false));
     result.push_back(Parameter('n', "repository name", true, false));
+    result.push_back(Parameter('h', "history path", true, false));
     return result;
   }
   int Main(const ArgumentList &args);

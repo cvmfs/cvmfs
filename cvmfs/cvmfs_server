@@ -81,7 +81,8 @@ CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 # @return   0 if the command was recognized
 is_subcommand() {
   subcommand=$1
-  supported_commands="mkfs add-replica publish rmfs alterfs resign list info check transaction abort snapshot skeleton migrate"
+  supported_commands="mkfs add-replica publish rollback rmfs alterfs resign list \
+    info lstags check transaction abort snapshot skeleton migrate"
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
@@ -144,6 +145,8 @@ Supported Commands:
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
+                [-a tag name] [-c tag channel] [ -t tag description ]
+                [-r tag name]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -152,11 +155,19 @@ Supported Commands:
   abort         [-f don't ask again]
                 <fully qualified name>
                 Abort transaction and return to the state before
+  rollback      [-t tag] [-f don't ask again]
+                <fully qualified name>
+                Re-publishes the given tag as the new latest revision.
+                All snapshots between trunk and the target tag become
+                inaccessible.  Without a tag name, trunk-previous is used.
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   info          <fully qualified name>
                 Print summary about the repository
+  lstags        <fully qualified name>
+                Print named tags (snapshots) of the reoppsitory
   check         [-c disable data chunk existence check]
+                [-t tag (check given tag instead of trunk)]
                 <fully qualified name>
                 Checks if the repository is sane
   transaction   <fully qualified name>
@@ -650,6 +661,19 @@ get_cvmfs_owner() {
   fi
   check_user $cvmfs_user || return 1
   echo $cvmfs_owner
+}
+
+
+set_ro_root_hash() {
+  local name=$1
+  local root_hash=$2
+  local client_config=/etc/cvmfs/repositories.d/${name}/client.conf
+
+  if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
+    sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
+  else
+    echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
+  fi
 }
 
 
@@ -1274,19 +1298,50 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 }
 
 
+################################################################################
+
+
+lstags() {
+  local name
+
+  # get repository name
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
+  cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
+    -i 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
+    -k /etc/cvmfs/keys/${name}.pub -l
+  rm -f ${CVMFS_SPOOL_DIR}/show_history
+}
+
+
+################################################################################
+
+
 check() {
   local name
   local upstream
   local repository_dir
   local check_chunks=1
+  local tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "c" option
+  while getopts "ct:" option
   do
     case $option in
       c)
         check_chunks=0
+      ;;
+      t)
+        tag="-t $OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1323,7 +1378,7 @@ check() {
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying $name"
-  cvmfs_swissknife check $check_chunks_param $log_level_param -r $repository_dir
+  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
 }
 
 
@@ -1366,8 +1421,27 @@ transaction() {
   local name
   local spool_dir
   local stratum0
+  local base_hash
+  local remote_hash
+  local force=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "f" option
+  do
+    case $option in
+      f)
+        force=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command transaction: Unrecognized option: $1"
+      ;;
+    esac
+  done
 
   # get repository name
+  shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
   name=$(get_or_guess_repository_name $1)
 
@@ -1379,14 +1453,26 @@ transaction() {
   . /etc/cvmfs/repositories.d/$name/server.conf
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
+  base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+  remote_hash=$(cvmfs_swissknife info -r $stratum0 -c)
 
   # more sanity checks
   check_repository_compatibility
   check_expiry $stratum0 || die "Repository whitelist is expired!"
-  [ -f ${spool_dir}/in_transaction ] && die "Repository $name in already in a transaction"
+  if [ $force -eq 0 ]; then
+    [ -f ${spool_dir}/in_transaction ] && die "Repository $name in already in a transaction"
+  fi
 
   # do it!
   transaction_before_hook $name
+  if [ "$base_hash" != "$remote_hash" ]; then
+    echo "Repository has changed!  Remounting remote hash $remote_hash"
+    sudo umount /cvmfs/$name
+    sudo umount ${spool_dir}/rdonly
+    set_ro_root_hash $name $remote_hash
+    sudo mount ${spool_dir}/rdonly
+    sudo mount /cvmfs/$name
+  fi
   sudo mount -o remount,rw /cvmfs/$name
   touch ${spool_dir}/in_transaction
   transaction_after_hook $name
@@ -1471,10 +1557,15 @@ publish() {
   local upstream
   local debug=0
   local tweaks_option=
+  local tag_name=
+  local tag_channel=00
+  local tag_description=
+  local add_tag=
+  local remove_tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDp" option
+  while getopts "dDpa:c:t:r:" option
   do
     case $option in
       d)
@@ -1486,12 +1577,38 @@ publish() {
       p)
         tweaks_option="-d"
       ;;
+      a)
+        add_tag="-a"
+        tag_name="$OPTARG"
+      ;;
+      c)
+        add_tag="-a"
+        tag_channel="$OPTARG"
+      ;;
+      t)
+        add_tag="-a"
+        tag_description="$OPTARG"
+      ;;
+      r)
+        remove_tag="-d $OPTARG"
+        if [ "x$OPTARG" = "xtrunk" -o "x$OPTARG" = "xtrunk-previous" ]; then
+          echo "Warning: won't delete $OPTARG tag"
+        fi
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
       ;;
     esac
   done
+
+  if [ "x$add_tag" != "x" ]; then
+    if [ "x$tag_name" = "x" ]; then
+      echo "Tag name missing"
+      return 1
+    fi
+    add_tag="-a ${tag_name}@${tag_channel}@${tag_description}"
+  fi
 
   # get repository name
   shift $(($OPTIND-1))
@@ -1564,18 +1681,135 @@ publish() {
   if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
     sync_command="$sync_command -i"
   fi
+  local tag_command="$swissknife tag -r $stratum0 \
+    -b $base_hash \
+    -n $name \
+    -o ${spool_dir}/tmp/history \
+    -k /etc/cvmfs/keys/${name}.pub \
+    $add_tag $remove_tag"
   local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${spool_dir}/tmp/manifest \
+    -h ${spool_dir}/tmp/history \
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
   $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
+  local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
+  local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
+  tag_command="$tag_command -t $trunk_hash -i $trunk_revision"
+  echo "Tagging $name"
+  $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
   sudo umount /cvmfs/$name
   sudo umount ${spool_dir}/rdonly
+  set_ro_root_hash $name $trunk_hash
+  sudo rm -rf ${spool_dir}/scratch
+  rm -rf ${spool_dir}/tmp/*
+  $user_shell "mkdir ${spool_dir}/scratch"
+  sudo mount ${spool_dir}/rdonly > /dev/null
+  sudo mount /cvmfs/$name
+  rm -f ${spool_dir}/in_transaction
+  publish_after_hook $name
+}
+
+
+################################################################################
+
+
+rollback() {
+  local name
+  local user
+  local spool_dir
+  local stratum0
+  local upstream
+  local target_tag="trunk-previous"
+  local force=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "t:f" option
+  do
+    case $option in
+      t)
+        target_tag=$OPTARG
+      ;;
+      f)
+        force=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command rollback: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+  user=$CVMFS_USER
+  spool_dir=$CVMFS_SPOOL_DIR
+  stratum0=$CVMFS_STRATUM0
+  upstream=$CVMFS_UPSTREAM_STORAGE
+
+  # more sanity checks
+  check_repository_compatibility
+  check_expiry $stratum0 || die "Repository whitelist is expired!"
+  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
+  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+
+  if [ $force -ne 1 ]; then
+    local reply
+    read -p "You are about to IRREVERSIBLY ROLLBACK AND REPUBLISH TAG $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      return 1
+    fi
+  fi
+
+  # do it!
+  local swissknife="cvmfs_swissknife"
+
+  local user_shell="sh -c"
+  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+
+  publish_before_hook
+  sudo /bin/mount -o remount,ro /cvmfs/$name
+  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+
+  local rollback_command="$swissknife rollback -u $stratum0 \
+    -r $upstream \
+    -b $base_hash \
+    -n $name \
+    -k /etc/cvmfs/keys/${name}.pub \
+    -o ${spool_dir}/tmp/history \
+    -m ${spool_dir}/tmp/manifest \
+    -d ${spool_dir}/tmp \
+    -t $target_tag"
+  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    -m ${spool_dir}/tmp/manifest \
+    -h ${spool_dir}/tmp/history \
+    -t ${spool_dir}/tmp \
+    -r ${upstream}"
+
+  $user_shell "$rollback_command" || die "Rollback failed\n\nExecuted Command:\n$rollback_command"
+  local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
+  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+  echo "Remounting newly created repository revision"
+  sudo umount /cvmfs/$name
+  sudo umount ${spool_dir}/rdonly
+  set_ro_root_hash $name $trunk_hash
   sudo rm -rf ${spool_dir}/scratch
   rm -rf ${spool_dir}/tmp/*
   $user_shell "mkdir ${spool_dir}/scratch"

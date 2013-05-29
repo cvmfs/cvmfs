@@ -675,7 +675,7 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
-  
+
   manifest::Manifest *result = NULL;
   for (WritableCatalogList::iterator i = catalogs_to_snapshot.begin(),
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
@@ -683,7 +683,7 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
     (*i)->Commit();
     if (stop_for_tweaks) {
       LogCvmfs(kLogCatalog, kLogStdout, "Allowing for tweaks in %s at %s "
-               "(hit return to continue)", 
+               "(hit return to continue)",
                (*i)->database_path().c_str(), (*i)->path().c_str());
       getchar();
     }
@@ -761,7 +761,7 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   catalog->UpdateLastModified();
   catalog->IncrementRevision();
 
-	// Previous revision
+  // Previous revision
   if (catalog->IsRoot()) {
     catalog->SetPreviousRevision(base_hash_);
   } else {
@@ -772,26 +772,26 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
     catalog->SetPreviousRevision(hash_previous);
   }
 
-	// Compress catalog
+  // Compress catalog
   hash::Any hash_catalog(hash::kSha1);
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_catalog))
   {
-		PrintError("could not compress catalog " + catalog->path().ToString());
+    PrintError("could not compress catalog " + catalog->path().ToString());
     assert(false);
-	}
+  }
 
   // Upload catalog
   spooler_->Upload(catalog->database_path() + ".compressed",
                    "data" + hash_catalog.MakePath(1, 2) + "C");
 
-	// Update registered catalog SHA1 in nested catalog
-	if (!catalog->IsRoot()) {
-		LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
+  // Update registered catalog SHA1 in nested catalog
+  if (!catalog->IsRoot()) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());
-		parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog);
-	}
+    parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog);
+  }
 
   return hash_catalog;
 }

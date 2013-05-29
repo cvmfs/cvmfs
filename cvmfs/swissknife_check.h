@@ -24,6 +24,8 @@ class CommandCheck : public Command {
     ParameterList result;
     result.push_back(Parameter('r', "repository directory / url",
                                false, false));
+    result.push_back(Parameter('t', "check specific repository tag",
+                               true, false));
     result.push_back(Parameter('l', "log level (0-4, default: 2)", true, false));
     result.push_back(Parameter('c', "check availability of data chunks",
                                true, true));
@@ -36,10 +38,10 @@ class CommandCheck : public Command {
                    const hash::Any &catalog_hash,
                    const catalog::DirectoryEntry *transition_point,
                    catalog::DeltaCounters *computed_counters);
-  std::string DecompressCatalog(const std::string &path,
-                                const hash::Any catalog_hash);
-  std::string DownloadCatalog(const std::string &path,
-                              const hash::Any catalog_hash);
+  std::string DecompressPiece(const hash::Any catalog_hash,
+                              const char suffix);
+  std::string DownloadPiece(const hash::Any catalog_hash,
+                            const char suffix);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,
             catalog::DeltaCounters *computed_counters);

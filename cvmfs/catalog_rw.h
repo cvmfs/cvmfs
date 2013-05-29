@@ -64,11 +64,12 @@ class WritableCatalog : public Catalog {
 
   void UpdateLastModified();
   void IncrementRevision();
+  void SetRevision(const uint64_t new_revision);
   void SetPreviousRevision(const hash::Any &hash);
 
  protected:
-  Database::OpenMode DatabaseOpenMode() const {
-    return Database::kOpenReadWrite;
+  sqlite::DbOpenMode DatabaseOpenMode() const {
+    return sqlite::kDbOpenReadWrite;
   }
 
   void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
@@ -134,6 +135,9 @@ class WritableCatalog : public Catalog {
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
+
+WritableCatalog *AttachFreelyRw(const std::string &root_path,
+                                const std::string &file);
 
 }  // namespace catalog
 

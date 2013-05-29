@@ -19,7 +19,7 @@
 #include "file_chunk.h"
 #include "hash.h"
 #include "shortstring.h"
-#include "duplex_sqlite3.h"
+#include "sql.h"
 #include "util.h"
 
 
@@ -201,8 +201,8 @@ class Catalog : public SingleCopy {
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
    */
-  virtual Database::OpenMode DatabaseOpenMode() const {
-    return Database::kOpenReadOnly;
+  virtual sqlite::DbOpenMode DatabaseOpenMode() const {
+    return sqlite::kDbOpenReadOnly;
   }
 
   virtual void InitPreparedStatements();
