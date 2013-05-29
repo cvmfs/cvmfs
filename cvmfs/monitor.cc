@@ -307,7 +307,21 @@ static string ReportStacktrace() {
 
   // give the dying cvmfs client the finishing stroke
   if (kill(pid, SIGKILL) != 0) {
-    debug += "Failed to kill cvmfs client!\n\n";
+    debug += "Failed to kill cvmfs client! (";
+    switch (errno) {
+      case EINVAL:
+        debug += "invalid signal";
+        break;
+      case EPERM:
+        debug += "permission denied";
+        break;
+      case ESRCH:
+        debug += "no such process";
+        break;
+      default:
+        debug += "unknown error " + StringifyInt(errno);
+    }
+    debug += ")\n\n";
   }
 
   return debug;
