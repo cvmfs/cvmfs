@@ -24,7 +24,8 @@ cvmfs_run_test() {
   sudo cvmfs_config probe  >> $logfile 2>&1 || return 5
 
   # do some concurrent find calls
-  find /cvmfs/sft.cern.ch > /tmp/find1 2>>$logfile -ignore_readdir_race &
+  # (sudo because sometimes the permissions in the repo are scrambled)
+  sudo find /cvmfs/sft.cern.ch > /tmp/find1 2>>$logfile -ignore_readdir_race &
   find_cmd=$!
 
   # reload the catalog every now and than
@@ -32,7 +33,7 @@ cvmfs_run_test() {
   reload_cmd=$!
 
   # always kill the detached processes
-  trap "{ kill -9 $find_cmd $reload_cmd > /dev/null 2>&1; exit; }" HUP INT TERM
+  trap "{ sudo kill -9 $find_cmd $reload_cmd > /dev/null 2>&1; exit; }" HUP INT TERM
 
   # wait for the find calls to succeed
   wait $find_cmd
