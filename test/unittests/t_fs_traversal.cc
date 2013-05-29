@@ -168,7 +168,7 @@ class T_FsTraversal : public ::testing::Test {
   void MakeDirectory(const std::string &relative_path) {
     const std::string path = testbed_path_ + "/" + relative_path;
     const int retval = mkdir(path.c_str(), 0755);
-    ASSERT_EQ (0, retval) << path << " errno: " << errno;
+    ASSERT_EQ (0, retval) << path << "errno: " << errno;
     reference_[relative_path] = Checklist(relative_path, Checklist::Directory);
   }
 
@@ -181,67 +181,78 @@ class T_FsTraversal : public ::testing::Test {
     reference_[relative_path] = Checklist(relative_path, Checklist::File);
   }
 
+  void MakeSymlink(const std::string &relative_path,
+                   const std::string &link_destination) {
+    const std::string path = testbed_path_ + "/" + relative_path;
+    const int retval = symlink(link_destination.c_str(), path.c_str());
+    ASSERT_EQ (0, retval) << "errno: " << errno;
+    reference_[relative_path] = Checklist(relative_path, Checklist::Symlink);
+  }
+
   void GenerateReferenceDirectoryStructure() {
-    MakeDirectory( "a"             );
-    MakeDirectory( "a/a"           );
-    MakeFile     ( "a/a/foo"       );
-    MakeFile     ( "a/a/bar"       );
-    MakeDirectory( "a/b"           );
-    MakeFile     ( "a/b/foo"       );
-    MakeFile     ( "a/b/bar"       );
-    MakeDirectory( "a/c"           );
-    MakeDirectory( "a/c/a"         );
-    MakeFile     ( "a/c/a/foo"     );
-    MakeFile     ( "a/c/a/bar"     );
-    MakeFile     ( "a/c/a/baz"     );
-    MakeDirectory( "a/c/b"         );
-    MakeDirectory( "a/c/c"         );
-    MakeDirectory( "a/c/d"         );
-    MakeFile     ( "a/c/foo"       );
-    MakeFile     ( "a/c/bar"       );
-    MakeFile     ( "a/c/baz"       );
-    MakeDirectory( "a/d"           );
-    MakeDirectory( "b"             );
-    MakeDirectory( "b/a"           );
-    MakeDirectory( "b/b"           );
-    MakeDirectory( "b/b/a"         );
-    MakeDirectory( "b/b/a/a"       );
-    MakeDirectory( "b/b/a/b"       );
-    MakeDirectory( "b/b/a/c"       );
-    MakeDirectory( "b/b/a/c/a"     );
-    MakeDirectory( "b/b/a/c/b"     );
-    MakeDirectory( "b/b/a/c/c"     );
-    MakeFile     ( "b/b/a/c/c/foo" );
-    MakeFile     ( "b/b/a/c/c/bar" );
-    MakeFile     ( "b/b/a/c/c/baz" );
-    MakeDirectory( "b/b/a/c/d"     );
-    MakeDirectory( "b/b/a/c/e"     );
-    MakeDirectory( "b/b/a/d"       );
-    MakeDirectory( "b/b/a/d/a"     );
-    MakeDirectory( "b/b/a/d/b"     );
-    MakeDirectory( "b/b/a/d/c"     );
-    MakeDirectory( "b/b/a/d/d"     );
-    MakeDirectory( "b/b/a/d/e"     );
-    MakeDirectory( "b/b/b"         );
-    MakeDirectory( "b/b/b/e"       );
-    MakeDirectory( "b/b/c"         );
-    MakeDirectory( "b/c"           );
-    MakeDirectory( "b/d"           );
-    MakeDirectory( "b/e"           );
-    MakeDirectory( "c"             );
-    MakeDirectory( "c/a"           );
-    MakeFile     ( "c/a/foo"       );
-    MakeDirectory( "c/b"           );
-    MakeFile     ( "c/b/foo"       );
-    MakeDirectory( "c/c"           );
-    MakeFile     ( "c/c/foo"       );
-    MakeDirectory( "c/d"           );
-    MakeFile     ( "c/d/foo"       );
-    MakeDirectory( "c/e"           );
-    MakeFile     ( "c/e/foo"       );
-    MakeDirectory( "c/f"           );
-    MakeFile     ( "c/f/foo"       );
-    MakeFile     ( "c/foo"         );
+    MakeDirectory( "a"                     );
+    MakeDirectory( "a/a"                   );
+    MakeFile     ( "a/a/foo"               );
+    MakeFile     ( "a/a/bar"               );
+    MakeDirectory( "a/b"                   );
+    MakeFile     ( "a/b/foo"               );
+    MakeFile     ( "a/b/bar"               );
+    MakeDirectory( "a/c"                   );
+    MakeDirectory( "a/c/a"                 );
+    MakeFile     ( "a/c/a/foo"             );
+    MakeFile     ( "a/c/a/bar"             );
+    MakeFile     ( "a/c/a/baz"             );
+    MakeDirectory( "a/c/b"                 );
+    MakeDirectory( "a/c/c"                 );
+    MakeDirectory( "a/c/d"                 );
+    MakeFile     ( "a/c/foo"               );
+    MakeFile     ( "a/c/bar"               );
+    MakeFile     ( "a/c/baz"               );
+    MakeSymlink  ( "a/c/lnk", "baz"        );
+    MakeDirectory( "a/d"                   );
+    MakeDirectory( "b"                     );
+    MakeDirectory( "b/a"                   );
+    MakeDirectory( "b/b"                   );
+    MakeDirectory( "b/b/a"                 );
+    MakeDirectory( "b/b/a/a"               );
+    MakeDirectory( "b/b/a/b"               );
+    MakeDirectory( "b/b/a/c"               );
+    MakeDirectory( "b/b/a/c/a"             );
+    MakeDirectory( "b/b/a/c/b"             );
+    MakeDirectory( "b/b/a/c/c"             );
+    MakeFile     ( "b/b/a/c/c/foo"         );
+    MakeFile     ( "b/b/a/c/c/bar"         );
+    MakeFile     ( "b/b/a/c/c/baz"         );
+    MakeSymlink  ( "b/b/a/c/c/2b", "../b"  );
+    MakeDirectory( "b/b/a/c/d"             );
+    MakeDirectory( "b/b/a/c/e"             );
+    MakeDirectory( "b/b/a/d"               );
+    MakeDirectory( "b/b/a/d/a"             );
+    MakeDirectory( "b/b/a/d/b"             );
+    MakeDirectory( "b/b/a/d/c"             );
+    MakeDirectory( "b/b/a/d/d"             );
+    MakeDirectory( "b/b/a/d/e"             );
+    MakeDirectory( "b/b/b"                 );
+    MakeDirectory( "b/b/b/e"               );
+    MakeDirectory( "b/b/c"                 );
+    MakeDirectory( "b/c"                   );
+    MakeDirectory( "b/d"                   );
+    MakeDirectory( "b/e"                   );
+    MakeDirectory( "c"                     );
+    MakeDirectory( "c/a"                   );
+    MakeFile     ( "c/a/foo"               );
+    MakeSymlink  ( "c/a/bfoo", "../b/foo"  );
+    MakeDirectory( "c/b"                   );
+    MakeFile     ( "c/b/foo"               );
+    MakeDirectory( "c/c"                   );
+    MakeFile     ( "c/c/foo"               );
+    MakeDirectory( "c/d"                   );
+    MakeFile     ( "c/d/foo"               );
+    MakeDirectory( "c/e"                   );
+    MakeFile     ( "c/e/foo"               );
+    MakeDirectory( "c/f"                   );
+    MakeFile     ( "c/f/foo"               );
+    MakeFile     ( "c/foo"                 );
   }
 
  protected:
@@ -514,6 +525,7 @@ class SteeringTraversalDelegate : public BaseTraversalDelegate {
     fully_ignored_pathes.insert("b/b/a/c/c/foo");
     fully_ignored_pathes.insert("b/b/a/c/c/bar");
     fully_ignored_pathes.insert("b/b/a/c/c/baz");
+    fully_ignored_pathes.insert("b/b/a/c/c/2b");
     fully_ignored_pathes.insert("b/b/a/c/d");
     fully_ignored_pathes.insert("b/b/a/c/e");
 
