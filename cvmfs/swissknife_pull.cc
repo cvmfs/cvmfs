@@ -312,6 +312,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
+  map<string, hash::Any> historic_tags;
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
@@ -359,6 +360,42 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     goto fini;
   }
 
+  // Fetch tag list
+  if (!ensemble.manifest->history().IsNull()) {
+    hash::Any history_hash = ensemble.manifest->history();
+    const string history_url = *stratum0_url + "/data" +
+      history_hash.MakePath(1, 2) + "H";
+    const string history_path = *temp_dir + "/" + history_hash.ToString();
+    download::JobInfo download_history(&history_url, false, false,
+                                       &history_path,
+                                       &history_hash);
+    retval = download::Fetch(&download_history);
+    if (retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d)",
+               retval);
+      goto fini;
+    }
+    retval = zlib::DecompressPath2Path(history_path,
+                                       history_path + ".uncompressed");
+    assert(retval);
+    history::Database history_db;
+    history::TagList tag_list;
+    retval = history_db.Open(history_path + ".uncompressed",
+                             sqlite::kDbOpenReadWrite);
+    assert(retval);
+    retval = tag_list.Load(&history_db);
+    assert(retval);
+    unlink((history_path + ".uncompressed").c_str());
+    historic_tags = tag_list.GetAllHashes();
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
+             historic_tags.size());
+    LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
+    spooler->Upload(history_path, "data" + history_hash.MakePath(1, 2) + "H");
+    spooler->WaitForUpload();
+    unlink(history_path.c_str());
+  }
+
   // Check if we have a replica-ready server
   retval = download::Fetch(&download_sentinel);
   if (retval != download::kFailOk) {
@@ -375,8 +412,16 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     assert(retval == 0);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at /");
+  LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "", true);
+  for (map<string, hash::Any>::const_iterator i = historic_tags.begin(),
+       iEnd = historic_tags.end(); i != iEnd; ++i)
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
+             i->first.c_str());
+    bool retval2 = Pull(i->second, "", true);
+    retval = retval && retval2;
+  }
 
   // Stopping threads
   LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);

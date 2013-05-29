@@ -2,7 +2,7 @@
 
 #include <pthread.h>
 
-#include "atomic.h"
+#include "../../cvmfs/atomic.h"
 
 class T_Atomic : public ::testing::Test {
  protected:

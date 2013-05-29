@@ -17,7 +17,7 @@
 #include <string>
 
 #include "catalog.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "hash.h"
 #include "atomic.h"
 #include "util.h"
@@ -140,8 +140,8 @@ class AbstractCatalogManager {
   LoadError Remount(const bool dry_run);
   void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
 
-  bool LookupInode(const inode_t inode, const LookupOptions options,
-                   DirectoryEntry *entry);
+  //bool LookupInode(const inode_t inode, const LookupOptions options,
+  //                 DirectoryEntry *entry);
   bool LookupPath(const PathString &path, const LookupOptions options,
                   DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,

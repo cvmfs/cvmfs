@@ -21,7 +21,7 @@
 
 #include "shortstring.h"
 #include "atomic.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "catalog_mgr.h"
 #include "util.h"
 #include "hash.h"

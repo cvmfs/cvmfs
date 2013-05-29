@@ -33,6 +33,22 @@ WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
 }
 
 
+WritableCatalog *AttachFreelyRw(const string &root_path, const string &file) {
+  WritableCatalog *catalog =
+    new WritableCatalog(root_path, NULL);
+  bool retval = catalog->OpenDatabase(file);
+  if (!retval) {
+    delete catalog;
+    return NULL;
+  }
+  InodeRange inode_range;
+  inode_range.offset = 256;
+  inode_range.size = 256 + catalog->max_row_id();
+  catalog->set_inode_range(inode_range);
+  return catalog;
+}
+
+
 WritableCatalog::~WritableCatalog() {
   // CAUTION HOT!
   // (see Catalog.h - near the definition of FinalizePreparedStatements)
@@ -248,6 +264,15 @@ void WritableCatalog::UpdateLastModified() {
 void WritableCatalog::IncrementRevision() {
   const string sql =
     "UPDATE properties SET value=value+1 WHERE key='revision';";
+  bool retval = Sql(database(), sql).Execute();
+  assert(retval);
+}
+
+
+void WritableCatalog::SetRevision(const uint64_t new_revision) {
+  const string sql =
+    "UPDATE properties SET value=" + StringifyInt(new_revision) +
+    " WHERE key='revision';";
   bool retval = Sql(database(), sql).Execute();
   assert(retval);
 }

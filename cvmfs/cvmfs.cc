@@ -80,7 +80,7 @@
 #include "atomic.h"
 #include "lru.h"
 #include "peers.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "file_chunk.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
@@ -91,6 +91,8 @@
 #include "loader.h"
 #include "glue_buffer.h"
 #include "compat.h"
+#include "history.h"
+#include "manifest_fetch.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -150,6 +152,7 @@ InodeGenerationInfo inode_generation_info_;
 
 /**
  * For cvmfs_opendir / cvmfs_readdir
+ * TODO: use mmap for very large listings
  */
 struct DirectoryListing {
   char *buffer;  /**< Filled by fuse_add_direntry */
@@ -206,6 +209,7 @@ string *nfs_shared_dir_ = NULL;
 string *tracefile_ = NULL;
 string *repository_name_ = NULL;  /**< Expected repository name,
                                        e.g. atlas.cern.ch */
+string *repository_tag_ = NULL;
 pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
 unsigned max_ttl_ = 0;
@@ -1572,6 +1576,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   bool ignore_signature = false;
   string root_hash = "";
+  string repository_tag = "";
 
   cvmfs::boot_time_ = loader_exports->boot_time;
 
@@ -1640,6 +1645,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   if (options::GetValue("CVMFS_ROOT_HASH", &parameter))
     root_hash = parameter;
+  if (options::GetValue("CVMFS_REPOSITORY_TAG", &parameter))
+    repository_tag = parameter;
   if (options::GetValue("CVMFS_DISKLESS", &parameter) &&
       options::IsOn(parameter))
   {
@@ -1691,6 +1698,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::nfs_shared_dir_ = new string(nfs_shared_dir);
   cvmfs::tracefile_ = new string(tracefile);
   cvmfs::repository_name_ = new string(loader_exports->repository_name);
+  cvmfs::repository_tag_ = new string(repository_tag);
   cvmfs::mountpoint_ = new string(loader_exports->mount_point);
   g_uid = geteuid();
   g_gid = getegid();
@@ -1957,6 +1965,48 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
+
+  // Load specific tag (root hash has precedence)
+  if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
+    manifest::ManifestEnsemble ensemble;
+    retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL, &ensemble);
+    if (retval != manifest::kFailOk) {
+      *g_boot_error = "Failed to fetch manifest";
+      return loader::kFailHistory;
+    }
+    hash::Any history_hash = ensemble.manifest->history();
+    if (history_hash.IsNull()) {
+      *g_boot_error = "No history";
+      return loader::kFailHistory;
+    }
+    string history_path = "txn/historydb" + history_hash.ToString() + "." +
+                          *cvmfs::repository_name_;
+    string history_url = "/data" + history_hash.MakePath(1, 2) + "H";
+    download::JobInfo download_history(&history_url, true, true, &history_path,
+                                       &history_hash);
+    retval = download::Fetch(&download_history);
+    if (retval != download::kFailOk) {
+      *g_boot_error = "failed to download history: " + StringifyInt(retval);
+      return loader::kFailHistory;
+    }
+    history::Database tag_db;
+    history::TagList tag_list;
+    retval = tag_db.Open(history_path, sqlite::kDbOpenReadOnly) &&
+             tag_list.Load(&tag_db);
+    unlink(history_path.c_str());
+    if (!retval) {
+      *g_boot_error = "failed to open history";
+      return loader::kFailHistory;
+    }
+    history::Tag tag;
+    retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
+    if (!retval) {
+      *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
+      return loader::kFailHistory;
+    }
+    root_hash = tag.root_hash.ToString();
+  }
+
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
@@ -2059,6 +2109,7 @@ static void Fini() {
   delete cvmfs::nfs_shared_dir_;
   delete cvmfs::tracefile_;
   delete cvmfs::repository_name_;
+  delete cvmfs::repository_tag_;
   delete cvmfs::mountpoint_;
   cvmfs::remount_fence_ = NULL;
   cvmfs::catalog_manager_ = NULL;
@@ -2073,8 +2124,8 @@ static void Fini() {
   cvmfs::nfs_shared_dir_ = NULL;
   cvmfs::tracefile_ = NULL;
   cvmfs::repository_name_ = NULL;
+  cvmfs::repository_tag_ = NULL;
   cvmfs::mountpoint_= NULL;
-
 
   sqlite3_shutdown();
   if (g_sqlite_page_cache) free(g_sqlite_page_cache);

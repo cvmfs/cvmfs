@@ -47,6 +47,9 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('n') != args.end()) repo_name = *args.find('n')->second;
   string pwd = "";
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
+  string history_path = "";
+  string hist_compressed_path;
+  if (args.find('h') != args.end()) history_path = *args.find('h')->second;
   upload::Spooler *spooler = NULL;
 
   if (!DirectoryExists(temp_dir)) {
@@ -156,6 +159,37 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
                                   + "X";
     spooler->Upload(cert_path_tmp, cert_hash_path);
 
+    // Safe history database
+    hash::Any history_hash(hash::kSha1);
+    if (history_path != "") {
+      history::Database tag_db;
+      if (!tag_db.Open(history_path, sqlite::kDbOpenReadOnly)) {
+        delete manifest;
+        goto sign_fail;
+      }
+      history::TagList tag_list;
+      if (!tag_list.Load(&tag_db)) {
+        delete manifest;
+        goto sign_fail;
+      }
+      manifest->set_channel_tops(tag_list.GetChannelTops());
+
+      FILE *fcompressed_history = CreateTempFile(temp_dir, 0600, "w",
+                                                 &hist_compressed_path);
+      if (!zlib::CompressPath2File(history_path, fcompressed_history,
+                                   &history_hash))
+      {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to compress history");
+        delete manifest;
+        goto sign_fail;
+      }
+      fclose(fcompressed_history);
+
+      const string history_url = "data" + history_hash.MakePath(1, 2) + "H";
+      spooler->Upload(hist_compressed_path, history_url);
+      manifest->set_history(history_hash);
+    }
+
     // Update manifest
     manifest->set_certificate(certificate_hash);
     manifest->set_repository_name(repo_name);
@@ -207,6 +241,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     spooler->WaitForUpload();
     spooler->WaitForTermination();
     unlink(cert_path_tmp.c_str());
+    if (hist_compressed_path != "")
+      unlink(hist_compressed_path.c_str());
     unlink(manifest_path.c_str());
     if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest");
@@ -222,6 +258,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   return 0;
 
  sign_fail:
+  if (hist_compressed_path != "")
+    unlink(hist_compressed_path.c_str());
   delete spooler;
   signature::Fini();
   return 1;

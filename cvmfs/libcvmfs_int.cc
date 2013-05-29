@@ -74,7 +74,7 @@
 #include "atomic.h"
 #include "lru.h"
 #include "peers.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
 #include "shortstring.h"

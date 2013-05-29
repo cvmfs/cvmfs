@@ -1,3 +1,8 @@
+2.1.12:
+  * Experimental support for repository tags (named snapshots).
+    Allows to mount a specific repository version and to rollback
+    and re-publish previous repository states.
+
 2.1.11:
   * Improve logging for whitelist expiry and fqrn errors
   * Add network path reset within the same proxy group

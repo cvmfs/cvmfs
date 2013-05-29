@@ -45,7 +45,7 @@
 #include <vector>
 
 #include "platform.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "quota.h"
 #include "util.h"
 #include "hash.h"
@@ -58,6 +58,7 @@
 #include "shortstring.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "cvmfs.h"
 
 using namespace std;  // NOLINT
 
@@ -194,6 +195,7 @@ void TearDown2ReadOnly() {
   cache_mode_ = kCacheReadOnly;
   CallGuard::Drainout();
   quota::Fini();
+  unlink(("running." + *cvmfs::repository_name_).c_str());
   LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
   SetLogMicroSyslog("");
 }

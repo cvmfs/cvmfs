@@ -42,12 +42,12 @@ def spawn_instance(connection, ami, key_name, flavor):
 
     instance = reservation.instances[0]
     if instance.state != "pending":
-      print_error("Instance ended up in an unexpected state: " + instance.state)
+      print_error("Instance failed at startup (State: " + instance.state + ")")
       return None
 
     waiting_time = wait_for_instance(instance)
     if instance.state != "running":
-      print_error("Failed to boot up instance")
+      print_error("Failed to boot up instance (State: " + instance.state + ")")
       return None
 
     return instance
@@ -153,12 +153,16 @@ parser.add_argument("--cloud-endpoint",
                        dest     = "cloud_endpoint",
                        help     = "URL to the cloud controller")
 
+if len(sys.argv) < 2:
+    print_error("please provide 'spawn' or 'terminate' as a subcommand...")
+    exit(1)
+
 subcommand = sys.argv[1]
-argv = sys.argv[2:]
-if subcommand == "spawn":
+argv       = sys.argv[2:]
+if   subcommand == "spawn":
   create_instance(parser, argv)
 elif subcommand == "terminate":
   terminate_instance(parser, argv)
 else:
-  print_error("give 'spawn' or 'terminate' as subcommand...")
+  print_error("unrecognized subcommand '" + subcommand + "'")
   exit(1)

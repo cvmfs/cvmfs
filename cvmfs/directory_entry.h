@@ -6,8 +6,8 @@
  * bookkeeping data like the associated catalog.
  */
 
-#ifndef CVMFS_DIRENT_H_
-#define CVMFS_DIRENT_H_
+#ifndef CVMFS_DIRECTORY_ENTRY_H_
+#define CVMFS_DIRECTORY_ENTRY_H_
 
 #include <sys/types.h>
 
@@ -287,8 +287,8 @@ struct StatEntry {
 
 typedef std::vector<DirectoryEntry> DirectoryEntryList;         // TODO: rename!
 typedef std::vector<DirectoryEntryBase> DirectoryEntryBaseList; //       these are NOT lists.
-typedef std::vector<StatEntry> StatEntryList;
+typedef std::vector<StatEntry> StatEntryList;  // TODO: use mmap for large listings
 
 } // namespace catalog
 
-#endif  // CVMFS_DIRENT_H_
+#endif  // CVMFS_DIRECTORY_ENTRY_H_

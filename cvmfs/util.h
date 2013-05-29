@@ -71,12 +71,14 @@ std::vector<std::string> FindFiles(const std::string &dir,
 
 std::string StringifyBool(const bool value);
 std::string StringifyInt(const int64_t value);
+std::string StringifyByteAsHex(const unsigned char value);
 std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
 std::string StringifyIpv4(const uint32_t ip_address);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
+int HexDigit2Int(const char digit);
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
