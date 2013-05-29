@@ -217,6 +217,11 @@ class T_FsTraversal : public ::testing::Test {
     MakeDirectory( "b/b/a/c/d"     );
     MakeDirectory( "b/b/a/c/e"     );
     MakeDirectory( "b/b/a/d"       );
+    MakeDirectory( "b/b/a/d/a"     );
+    MakeDirectory( "b/b/a/d/b"     );
+    MakeDirectory( "b/b/a/d/c"     );
+    MakeDirectory( "b/b/a/d/d"     );
+    MakeDirectory( "b/b/a/d/e"     );
     MakeDirectory( "b/b/b"         );
     MakeDirectory( "b/b/b/e"       );
     MakeDirectory( "b/b/c"         );
@@ -436,6 +441,20 @@ class IgnoringTraversalDelegate : public BaseTraversalDelegate {
     ignored_pathes.insert("a/c/a/baz");
     ignored_pathes.insert("a/c/baz");
     ignored_pathes.insert("b/b/a/c/c/baz");
+    ignored_pathes.insert("a/d");
+    ignored_pathes.insert("a/c/d");
+    ignored_pathes.insert("b/b/a/c/d");
+    ignored_pathes.insert("b/b/a/d");
+    ignored_pathes.insert("b/b/a/d/a");
+    ignored_pathes.insert("b/b/a/d/b");
+    ignored_pathes.insert("b/b/a/d/c");
+    ignored_pathes.insert("b/b/a/d/d");
+    ignored_pathes.insert("b/b/a/d/e");
+    ignored_pathes.insert("b/d");
+    ignored_pathes.insert("c/d");
+    ignored_pathes.insert("c/d/foo");
+
+    std::set<std::string> ignored_but_seen_dirs;
     CheckAllExcept(ignored_pathes);
     CheckPathes(ignored_pathes, Checklist::Untouched);
   }
@@ -445,6 +464,7 @@ TEST_F(T_FsTraversal, IgnoringTraversal) {
   // ignore all files call "baz"
   std::set<std::string> ignored_filenames;
   ignored_filenames.insert("baz");
+  ignored_filenames.insert("d");
 
   IgnoringTraversalDelegate delegate(reference_);
   FileSystemTraversal<IgnoringTraversalDelegate> traverse(&delegate,
