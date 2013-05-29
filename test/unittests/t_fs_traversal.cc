@@ -477,3 +477,72 @@ TEST_F(T_FsTraversal, IgnoringTraversal) {
   delegate.Check();
 }
 
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+class SteeringTraversalDelegate : public BaseTraversalDelegate {
+ public:
+  SteeringTraversalDelegate(ChecklistMap &reference) :
+    BaseTraversalDelegate(reference) {}
+
+
+  virtual bool DirPrefix(const std::string &relative_path,
+                         const std::string &dir_name) {
+    BaseTraversalDelegate::DirPrefix(relative_path, dir_name);
+
+    const std::string path = CombinePath(relative_path, dir_name);
+    if (path == "a/c/a" || path == "b/b/a/c") {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+
+  void Check() const {
+    std::set<std::string> fully_ignored_pathes;
+    fully_ignored_pathes.insert("a/c/a/foo");
+    fully_ignored_pathes.insert("a/c/a/bar");
+    fully_ignored_pathes.insert("a/c/a/baz");
+
+    fully_ignored_pathes.insert("b/b/a/c/a");
+    fully_ignored_pathes.insert("b/b/a/c/b");
+    fully_ignored_pathes.insert("b/b/a/c/c");
+    fully_ignored_pathes.insert("b/b/a/c/c/foo");
+    fully_ignored_pathes.insert("b/b/a/c/c/bar");
+    fully_ignored_pathes.insert("b/b/a/c/c/baz");
+    fully_ignored_pathes.insert("b/b/a/c/d");
+    fully_ignored_pathes.insert("b/b/a/c/e");
+
+    std::set<std::string> seen_but_non_traversed_dirs;
+    seen_but_non_traversed_dirs.insert("a/c/a");
+    seen_but_non_traversed_dirs.insert("b/b/a/c");
+
+    std::set<std::string> all_special_cases;
+    all_special_cases.insert(fully_ignored_pathes.begin(),
+                             fully_ignored_pathes.end());
+    all_special_cases.insert(seen_but_non_traversed_dirs.begin(),
+                             seen_but_non_traversed_dirs.end());
+
+    CheckAllExcept(all_special_cases);
+    CheckPathes(fully_ignored_pathes, Checklist::Untouched);
+    CheckPathes(seen_but_non_traversed_dirs, Checklist::NonTraversedDirectory);
+  }
+};
+
+TEST_F(T_FsTraversal, SteeredTraversal) {
+  SteeringTraversalDelegate delegate(reference_);
+  FileSystemTraversal<SteeringTraversalDelegate> traverse(
+                                                      &delegate,
+                                                       testbed_path_,
+                                                       true,
+                                                       std::set<std::string>());
+  RegisterDelegate(traverse, delegate);
+
+  traverse.Recurse(testbed_path_);
+  delegate.Check();
+}
+
