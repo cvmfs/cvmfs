@@ -274,6 +274,8 @@ class BaseTraversalDelegate {
   BaseTraversalDelegate(ChecklistMap &reference) :
     reference_(reference) {}
 
+  virtual ~BaseTraversalDelegate() { }
+
   virtual void EnterDir(const std::string &relative_path,
                         const std::string &dir_name) {
     Checklist& checklist = GetChecklist(CombinePath(relative_path, dir_name));
