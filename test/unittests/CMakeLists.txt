@@ -22,6 +22,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/logging.h
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/murmur.h
+  ${CVMFS_SOURCE_DIR}/smallhash.h
   ${CVMFS_SOURCE_DIR}/smalloc.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
