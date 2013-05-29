@@ -319,11 +319,13 @@ class BaseTraversalDelegate {
   }
 
 
-  void CheckPathes(const std::set<std::string> &pathes) const {
+  void CheckPathes(
+         const std::set<std::string> &pathes,
+         const Checklist::Type        for_type = Checklist::Unspecified) const {
     std::set<std::string>::const_iterator i    = pathes.begin();
     std::set<std::string>::const_iterator iend = pathes.end();
     for (; i != iend; ++i) {
-      GetChecklist(*i).Check();
+      GetChecklist(*i).Check(for_type);
     }
   }
 
@@ -416,3 +418,41 @@ TEST_F(T_FsTraversal, RootTraversal) {
   traverse.Recurse(testbed_path_);
   delegate.Check();
 }
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+class IgnoringTraversalDelegate : public BaseTraversalDelegate {
+ public:
+  IgnoringTraversalDelegate(ChecklistMap &reference) :
+    BaseTraversalDelegate(reference) {}
+
+  void Check() const {
+    std::set<std::string> ignored_pathes;
+    ignored_pathes.insert("a/c/a/baz");
+    ignored_pathes.insert("a/c/baz");
+    ignored_pathes.insert("b/b/a/c/c/baz");
+    CheckAllExcept(ignored_pathes);
+    CheckPathes(ignored_pathes, Checklist::Untouched);
+  }
+};
+
+TEST_F(T_FsTraversal, IgnoringTraversal) {
+  // ignore all files call "baz"
+  std::set<std::string> ignored_filenames;
+  ignored_filenames.insert("baz");
+
+  IgnoringTraversalDelegate delegate(reference_);
+  FileSystemTraversal<IgnoringTraversalDelegate> traverse(&delegate,
+                                                           testbed_path_,
+                                                           true,
+                                                           ignored_filenames);
+  RegisterDelegate(traverse, delegate);
+
+  traverse.Recurse(testbed_path_);
+  delegate.Check();
+}
+
