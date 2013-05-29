@@ -16,6 +16,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_atomic.cc
   t_smallhash.cc
   t_util_concurrency.cc 
+  t_fs_traversal.cc
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
@@ -27,6 +28,15 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util_concurrency.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
+
+  ${CVMFS_SOURCE_DIR}/platform.h
+  ${CVMFS_SOURCE_DIR}/platform_linux.h
+  ${CVMFS_SOURCE_DIR}/platform_osx.h
+  ${CVMFS_SOURCE_DIR}/util.h
+  ${CVMFS_SOURCE_DIR}/util.cc
+  ${CVMFS_SOURCE_DIR}/hash.h
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/shortstring.h
 )
 
 #
