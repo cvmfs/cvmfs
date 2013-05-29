@@ -42,7 +42,7 @@ num_warnings=0
 # test failure handling
 # this functions should EXCLUSIVELY be called in the run loop (global state)
 report_failure() {
-  local message=$1
+  local message="$1"
   local workdir=$2
   echo $message
   if [ x$workdir != x ]; then
@@ -51,12 +51,12 @@ report_failure() {
   num_failures=$(($num_failures+1))
 }
 report_warning() {
-  local message=$1
+  local message="$1"
   echo $message
   num_warnings=$(($num_warnings+1))
 }
 report_skipped() {
-  local message=$1
+  local message="$1"
   echo $message
   num_skipped=$(($num_skipped+1))
 }
