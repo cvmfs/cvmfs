@@ -365,6 +365,23 @@ class BaseTraversalDelegate {
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 //
 
+TEST_F(T_FsTraversal, FullTraversal) {
+  BaseTraversalDelegate delegate(reference_);
+  FileSystemTraversal<BaseTraversalDelegate> traverse(&delegate,
+                                                       testbed_path_,
+                                                       true,
+                                                       std::set<std::string>());
+  RegisterDelegate(traverse, delegate);
+
+  traverse.Recurse(testbed_path_);
+  delegate.Check();
+}
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
 
 class RootTraversalDelegate : public BaseTraversalDelegate {
  public:
