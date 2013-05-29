@@ -46,7 +46,7 @@ fi
 
 
 die() {
-  local msg=$1
+  local msg="$1"
   echo $msg
   exit 103
 }
