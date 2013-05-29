@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "dirent.h"
+#include "directory_entry.h"
 
 using namespace catalog;
 

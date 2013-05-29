@@ -17,7 +17,7 @@
 #include <string>
 
 #include "catalog.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "hash.h"
 #include "atomic.h"
 #include "util.h"
