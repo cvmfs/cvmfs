@@ -32,7 +32,7 @@ cvmfs_run_test() {
   reload_cmd=$!
 
   # always kill the detached processes
-  trap "kill -9 $find_cmd $reload_cmd > /dev/null 2>&1; exit" SIGHUP SIGINT SIGTERM
+  trap "{ kill -9 $find_cmd $reload_cmd > /dev/null 2>&1; exit; }" HUP INT TERM
 
   # wait for the find calls to succeed
   wait $find_cmd
