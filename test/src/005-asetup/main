@@ -19,8 +19,8 @@ cvmfs_run_test() {
   rm -f '<undefined>'
   echo "$(($end_time-$start_time)) seconds required" >> $logfile
 
-  check_time $start_time $end_time 30 || return 5
-  check_memory atlas.cern.ch 25000 >> $logfile || return 6
+  check_time $start_time $end_time 30 >> $logfile 2>&1
+  check_memory atlas.cern.ch 25000 >> $logfile 2>&1
  
   return 0
 }

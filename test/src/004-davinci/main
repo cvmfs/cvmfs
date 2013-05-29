@@ -14,7 +14,7 @@ cvmfs_run_test() {
   start_time=$(date -u +%s)
   ( time SetupProject.sh Davinci ) >> $logfile 2>&1 || return 4
   end_time=`date -u +%s`
-  check_time $start_time $end_time 180 || return 5
+  check_time $start_time $end_time 180 >> $logfile 2>&1
 
   all_catalogs=$(sudo cvmfs_talk -i lhcb.cern.ch open catalogs | awk '{print $2}' | sort) || return 6
   uniq_catalogs=$(echo "$all_catalogs" | uniq) || return 7
@@ -28,7 +28,7 @@ cvmfs_run_test() {
   echo "All catalogs: $all_catalogs" >> $logfile
   sudo cvmfs_talk -i lhcb.cern.ch internal affairs >> $logfile || return 9
 
-  check_memory lhcb.cern.ch 50000 >> $logfile || return 10
+  check_memory lhcb.cern.ch 50000 >> $logfile 2>&1
  
   return 0
 }
