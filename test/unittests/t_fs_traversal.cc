@@ -28,7 +28,7 @@ class T_FsTraversal : public ::testing::Test {
     Checklist() : type(Unspecified) {
       Init();
     }
-    Checklist(Type type) : type(type) {
+    Checklist(const std::string &path, Type type) : type(type), path(path) {
       Init();
     }
 
@@ -48,43 +48,44 @@ class T_FsTraversal : public ::testing::Test {
 
       switch (type_to_check) {
         case Directory:
-          EXPECT_TRUE (enter_dir);
-          EXPECT_TRUE (leave_dir);
-          EXPECT_TRUE (dir_prefix);
-          EXPECT_TRUE (dir_postfix);
+          EXPECT_TRUE (enter_dir)     << path;
+          EXPECT_TRUE (leave_dir)     << path;
+          EXPECT_TRUE (dir_prefix)    << path;
+          EXPECT_TRUE (dir_postfix)   << path;
           break;
         case RootDirectory:
-          EXPECT_TRUE (enter_dir);
-          EXPECT_TRUE (leave_dir);
-          EXPECT_FALSE(dir_prefix);
-          EXPECT_FALSE(dir_postfix);
+          EXPECT_TRUE (enter_dir)     << path;
+          EXPECT_TRUE (leave_dir)     << path;
+          EXPECT_FALSE(dir_prefix)    << path;
+          EXPECT_FALSE(dir_postfix)   << path;
           break;
         case NonTraversedDirectory:
-          EXPECT_TRUE (dir_prefix);
-          EXPECT_TRUE (dir_postfix);
-          EXPECT_FALSE(enter_dir);
-          EXPECT_FALSE(leave_dir);
+          EXPECT_TRUE (dir_prefix)    << path;
+          EXPECT_TRUE (dir_postfix)   << path;
+          EXPECT_FALSE(enter_dir)     << path;
+          EXPECT_FALSE(leave_dir)     << path;
           break;
         case File:
-          EXPECT_TRUE (file_found);
+          EXPECT_TRUE (file_found)    << path;
           break;
         case Symlink:
-          EXPECT_TRUE (symlink_found);
+          EXPECT_TRUE (symlink_found) << path;
           break;
         case Untouched:
-          EXPECT_FALSE(enter_dir);
-          EXPECT_FALSE(leave_dir);
-          EXPECT_FALSE(file_found);
-          EXPECT_FALSE(symlink_found);
-          EXPECT_FALSE(dir_prefix);
-          EXPECT_FALSE(dir_postfix);
+          EXPECT_FALSE(enter_dir)     << path;
+          EXPECT_FALSE(leave_dir)     << path;
+          EXPECT_FALSE(file_found)    << path;
+          EXPECT_FALSE(symlink_found) << path;
+          EXPECT_FALSE(dir_prefix)    << path;
+          EXPECT_FALSE(dir_postfix)   << path;
           break;
         default:
           FAIL() << "Encountered an unexpected file type";
       }
     }
 
-    Type type;
+    Type        type;
+    std::string path;
 
     // callback flags
     bool enter_dir;
@@ -109,7 +110,7 @@ class T_FsTraversal : public ::testing::Test {
     testbed_path_ = std::string(testbed_path);
 
     // save the root entry (the testbed) into the reference list
-    reference_[""] = Checklist(Checklist::RootDirectory);
+    reference_[""] = Checklist("", Checklist::RootDirectory);
 
     // define a reference directory structure
     GenerateReferenceDirectoryStructure();
@@ -168,7 +169,7 @@ class T_FsTraversal : public ::testing::Test {
     const std::string path = testbed_path_ + "/" + relative_path;
     const int retval = mkdir(path.c_str(), 0755);
     ASSERT_EQ (0, retval) << path << " errno: " << errno;
-    reference_[relative_path] = Checklist(Checklist::Directory);
+    reference_[relative_path] = Checklist(relative_path, Checklist::Directory);
   }
 
   void MakeFile(const std::string &relative_path) {
@@ -177,7 +178,7 @@ class T_FsTraversal : public ::testing::Test {
     ASSERT_NE (static_cast<FILE*>(NULL), file);
     const int retval = fclose(file);
     ASSERT_EQ (0, retval);
-    reference_[relative_path] = Checklist(Checklist::File);
+    reference_[relative_path] = Checklist(relative_path, Checklist::File);
   }
 
   void GenerateReferenceDirectoryStructure() {
