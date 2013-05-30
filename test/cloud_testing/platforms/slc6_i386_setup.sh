@@ -18,6 +18,6 @@ attach_user_group fuse                           || die "fail (add fuse group to
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
 
-# install additional stuff (needed for perl testing tools)
+# install test dependencies
 echo "installing additional RPM packages..."
 install_from_repo gcc

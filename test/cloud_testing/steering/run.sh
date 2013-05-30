@@ -31,6 +31,7 @@ platform_run_script=""
 platform_setup_script=""
 server_package=""
 client_package=""
+old_client_package="notprovided"
 keys_package=""
 source_tarball=""
 ami_name=""
@@ -68,6 +69,7 @@ usage() {
   echo " -a <AMI name>              the virtual machine image to spawn"
   echo
   echo "Optional parameters:"
+  echo " -o <old client package>    CernVM-FS client package to be hotpatched on"
   echo " -d <results destination>   Directory to store final test session logs"
   echo
   echo "You must provide http addresses for all packages and tar balls. They will"
@@ -187,11 +189,13 @@ setup_virtual_machine() {
   run_script_on_virtual_machine $ip $remote_setup_script \
       -s $server_package                                 \
       -c $client_package                                 \
+      -o $old_client_package                             \
       -t $source_tarball                                 \
       -k $keys_package                                   \
       -r $platform_setup_script
   check_retcode $?
   if [ $? -ne 0 ]; then
+    handle_test_failure $ip
     return 1
   fi
 
@@ -265,7 +269,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:s:c:t:k:a:d:" option; do
+while getopts "r:b:s:c:o:t:k:a:d:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -278,6 +282,9 @@ while getopts "r:b:s:c:t:k:a:d:" option; do
       ;;
     c)
       client_package=$OPTARG
+      ;;
+    o)
+      old_client_package=$OPTARG
       ;;
     t)
       source_tarball=$OPTARG
