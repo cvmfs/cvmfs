@@ -20,6 +20,7 @@
 #endif
 #include <sys/types.h>
 #include <sys/uio.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/wait.h>
