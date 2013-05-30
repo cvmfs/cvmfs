@@ -95,6 +95,31 @@ static SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers) {
 
 
 /**
+ * Grants the watchdog process ID with some necessary capabilites
+ *
+ * @return  true when successful
+ */
+static bool GrantWatchdogCapabilities(const pid_t pid) {
+  // In Ubuntu yama prevents all processes from ptracing other processes, even
+  // when they are owned by the same user. Therefore the watchdog would not be
+  // able to create a stacktrace, without this formal permission:
+#ifdef PR_SET_PTRACER
+  int retval = 0;
+  retval = prctl(PR_SET_PTRACER, pid, 0, 0, 0);
+  if (retval != 0) {
+    LogCvmfs (kLogMonitor, kLogSyslogErr, "Failed to provide watchdog process "
+                                          "(PID: %d) with yama-specific PTRACER "
+                                          "capability.",
+              pid);
+    return false;
+  }
+#endif
+
+  return true;
+}
+
+
+/**
  * Signal handler for signals that indicate a cvmfs crash.
  * Sends debug information to watchdog.
  */
