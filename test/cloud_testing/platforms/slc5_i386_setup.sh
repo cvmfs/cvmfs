@@ -18,11 +18,6 @@ attach_user_group fuse                           || die "fail (add fuse group to
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
 
-# we need to disable SELinux for the x86 version of SLC5
-echo -n "disabling SELinux enforcing for SLC5 x86... "
-echo 0 | sudo tee /selinux/enforce || die "fail"
-echo "done"
-
 # install test dependencies
 echo "installing test dependencies..."
 install_from_repo gcc

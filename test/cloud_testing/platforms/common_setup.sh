@@ -4,27 +4,35 @@
 # Common functionality for cloud platform test execution engine (test setup)
 # After sourcing this file the following variables are set:
 #
-#    SERVER_PACKAGE     location of the CernVM-FS server package to install
-#    CLIENT_PACKAGE     location of the CernVM-FS client package to install
-#    KEYS_PACKAGE       location of the CernVM-FS public keys package
-#    SOURCE_DIRECTORY   location of the CernVM-FS sources forming above packages
-#    TEST_LOGFILE       location of the test logfile to be used
+#  SERVER_PACKAGE       location of the CernVM-FS server package to install
+#  CLIENT_PACKAGE       location of the CernVM-FS client package to install
+#  OLD_CLIENT_PACKAGE   location of an old CernVM-FS client package for hotpatch
+#  KEYS_PACKAGE         location of the CernVM-FS public keys package
+#  SOURCE_DIRECTORY     location of the CernVM-FS sources forming above packages
+#  TEST_LOGFILE         location of the test logfile to be used
+#
+# NOTE: the OLD_CLIENT_PACKAGE is not mandatory and should be checked for exist-
+#       ance before usage
 #
 
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
+OLD_CLIENT_PACKAGE=""
 KEYS_PACKAGE=""
 SOURCE_DIRECTORY=""
 TEST_LOGFILE=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:k:t:l:" option; do
+while getopts "s:c:o:k:t:l:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
       ;;
     c)
       CLIENT_PACKAGE=$OPTARG
+      ;;
+    o)
+      OLD_CLIENT_PACKAGE=$OPTARG
       ;;
     k)
       KEYS_PACKAGE=$OPTARG

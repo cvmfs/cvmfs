@@ -40,12 +40,12 @@ cvmfs_run_test() {
   local retval=$?
   if [ $retval -ne 0 ]; then
     echo "Find failed with return code: $retval" >> $logfile
-    kill -9 $reload_cmd
+    kill -9 $reload_cmd >> $logfile 2>&1
     return 6
   fi
 
   # stop the reload cycle, it seemed to work fine...
-  kill -9 $reload_cmd
+  kill -9 $reload_cmd >> $logfile 2>&1
 
   return 0
 }
