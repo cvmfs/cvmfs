@@ -192,6 +192,7 @@ setup_virtual_machine() {
       -r $platform_setup_script
   check_retcode $?
   if [ $? -ne 0 ]; then
+    handle_test_failure $ip
     return 1
   fi
 
