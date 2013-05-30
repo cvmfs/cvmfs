@@ -55,6 +55,7 @@ string *process_name_ = NULL;
 string *exe_path_ = NULL;
 bool spawned_ = false;
 int pipe_wd_[2];
+int pipe_gdb_pid_[2];
 platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
 pid_t watchdog_pid_ = 0;
@@ -152,6 +153,20 @@ static void SendTrace(int signal,
   // write the PID
   pid_t pid = getpid();
   if (write(pipe_wd_[1], &pid, sizeof(pid_t)) != sizeof(pid_t))
+    _exit(1);
+
+  // read the PID of the gdb that will try to attach soon
+  pid_t gdb_pid = 0;
+  if (read(pipe_gdb_pid_[0], &gdb_pid, sizeof(pid_t)) != sizeof(pid_t))
+    _exit(1);
+
+  // provide the gdb with additional capabilities
+  if (! GrantWatchdogCapabilities(gdb_pid))
+    _exit(1);
+
+  // tell the watchdog to do it's buisness
+  cflow = 'D';
+  if (write(pipe_wd_[1], &cflow, 1) != 1)
     _exit(1);
 
   // do not die before the stack trace was generated
@@ -255,7 +270,6 @@ static string GenerateStackTrace(const string &exe_path,
   argv.push_back("-q");
   argv.push_back("-n");
   argv.push_back(exe_path);
-  argv.push_back(StringifyInt(pid));
   pid_t gdb_pid;
   retval = ExecuteBinary(&fd_stdin,
                          &fd_stdout,
@@ -268,13 +282,29 @@ static string GenerateStackTrace(const string &exe_path,
   // skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
 
-  // send stacktrace command to gdb
-  const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
-                         "quit\n";               // stop gdb
-  WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
+  // send gdb PID to cvmfs, wait until it responded positively and generate
+  // the stacktrace by issuing a command to gdb
+  char cflow = ' ';
+  if (write(pipe_gdb_pid_[1], &gdb_pid, sizeof(pid_t)) == sizeof(pid_t) &&
+      read(pipe_wd_[0], &cflow, 1)                     == 1             &&
+      cflow                                            == 'D')
+  {
+    // attach to cvmfs, generate a stack trace and kill gdb
+    const string gdb_cmd = "attach " + StringifyInt(pid) + "\n"
+                           "thread apply all bt\n"
+                           "quit\n";
+    WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
 
-  // read the stack trace from the stdout of our gdb process
-  result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
+    // read over the `attach <pid>` garbage
+    ReadUntilGdbPrompt(fd_stdout);
+
+    // read the actual stack trace
+    result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
+  } else {
+    result += "gdb command to generate stacktrace failed.\n\n";
+  }
+
+  // close the connection to the terminated gdb process
   close(fd_stderr);
   close(fd_stdout);
   close(fd_stdin);
@@ -375,6 +405,7 @@ static void Watchdog() {
   if (num_read <= 0) LogEmergency("unexpected termination");
 
   close(pipe_wd_[0]);
+  close(pipe_gdb_pid_[1]);
 }
 
 
@@ -409,6 +440,7 @@ void Fini() {
     char quit = 'Q';
     (void)write(pipe_wd_[1], &quit, 1);
     close(pipe_wd_[1]);
+    close(pipe_gdb_pid_[0]);
   }
   delete process_name_;
   delete cache_dir_;
@@ -425,6 +457,7 @@ void Fini() {
 void Spawn() {
   int pipe_pid[2];
   MakePipe(pipe_wd_);
+  MakePipe(pipe_gdb_pid_);
   MakePipe(pipe_pid);
 
   pid_t pid;
@@ -439,6 +472,7 @@ void Spawn() {
         case -1: exit(1);
         case 0: {
           close(pipe_wd_[1]);
+          close(pipe_gdb_pid_[0]);
           Daemonize();
           // send the watchdog PID to cvmfs
           pid_t watchdog_pid = getpid();
@@ -446,7 +480,7 @@ void Spawn() {
           close(pipe_pid[1]);
           // Close all unused file descriptors
           for (int fd = 0; fd < max_fd; fd++) {
-            if (fd != pipe_wd_[0])
+            if (fd != pipe_wd_[0] && fd != pipe_gdb_pid_[1])
               close(fd);
           }
           Watchdog();
@@ -457,6 +491,7 @@ void Spawn() {
       }
     default:
       close(pipe_wd_[0]);
+      close(pipe_gdb_pid_[1]);
       if (waitpid(pid, &statloc, 0) != pid) abort();
       if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
   }
