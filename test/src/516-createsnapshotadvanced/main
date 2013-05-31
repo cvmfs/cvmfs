@@ -165,6 +165,7 @@ cvmfs_run_test() {
   mkdir $mnt_point cache
   cat > private.conf << EOF
 CVMFS_CACHE_BASE=$(pwd)/cache
+CVMFS_RELOAD_SOCKETS=$(pwd)/cache
 CVMFS_SERVER_URL=http://127.0.0.1/cvmfs/${CVMFS_TEST_REPO}
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=$(pwd)/keys/${CVMFS_TEST_REPO}.pub
