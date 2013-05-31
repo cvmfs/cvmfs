@@ -16,7 +16,7 @@ wget $knl          > /dev/null 2>&1 || die "fail"
 echo "done"
 
 # install custom kernel
-echo - "install custom kernel RPMs... "
+echo -n "install custom kernel RPMs... "
 sudo rpm -ivh $(basename $knl_firmware) > /dev/null 2>&1 || die "fail"
 sudo rpm -ivh $(basename $knl)          > /dev/null 2>&1 || die "fail"
 echo "done"
