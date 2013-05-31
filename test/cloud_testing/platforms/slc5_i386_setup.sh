@@ -9,6 +9,11 @@ echo "installing RPM packages... "
 install_rpm $KEYS_PACKAGE
 install_rpm $CLIENT_PACKAGE
 
+# we need to disable SELinux for the x86 version of SLC5
+echo -n "disabling SELinux enforcing for SLC5 x86... "
+echo 0 | sudo tee /selinux/enforce || die "fail"
+echo "done"
+
 # setup environment
 echo -n "setting up CernVM-FS environment... "
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
