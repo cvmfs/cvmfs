@@ -80,6 +80,18 @@ inline int platform_sigwait(const int signum) {
   return result;
 }
 
+/**
+ * Grants a PID with some necessary capabilites for ptrace() usage
+ *
+ * @param PID  the PID of the process to be granted ptrace()-access
+ *             (may be ignored)
+ * @return     true when successful
+ */
+inline bool platform_allow_ptrace(const pid_t pid) {
+  // No-op on Mac OS X
+  return true;
+}
+
 
 /**
  * File system functions, Mac OS X has 64bit functions by default.
