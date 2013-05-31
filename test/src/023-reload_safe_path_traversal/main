@@ -45,6 +45,7 @@ cvmfs_run_test() {
 
   # gracefully get rid of the catalog reload worker
   kill -s HUP $reload_cmd >> $logfile 2>&1
+  wait $reload_cmd
 
   # check if all went well
   if [ $retval -ne 0 ]; then
