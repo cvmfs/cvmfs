@@ -137,8 +137,12 @@ wait_for_virtual_machine() {
   # wait for the virtual machine to become accessible via ssh
   echo -n "waiting for VM ($ip) to become accessible... "
   timeout=$accessibility_timeout
-  while [ $timeout -gt 0 ] && \
-        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'echo hallo' > /dev/null 2>&1; do
+  while [ $timeout -gt 0 ] &&                                      \
+        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
+                                   -o UserKnownHostsFile=/dev/null \
+                                   -o LogLevel=ERROR               \
+                                   -o BatchMode=yes                \
+              root@$ip 'echo hallo' > /dev/null 2>&1; do
     sleep 10
     timeout=$(( $timeout - 1 ))
   done
@@ -165,7 +169,11 @@ run_script_on_virtual_machine() {
   local script_path=$2
   shift 2
 
-  ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'cat | bash /dev/stdin' $@ < $script_path
+  ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
+                           -o UserKnownHostsFile=/dev/null \
+                           -o LogLevel=ERROR               \
+                           -o BatchMode=yes                \
+      root@$ip 'cat | bash /dev/stdin' $@ < $script_path
 }
 
 
