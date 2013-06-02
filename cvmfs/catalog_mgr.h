@@ -259,7 +259,7 @@ class AbstractCatalogManager {
   pthread_key_t pkey_sqlitemem_;
   RemountListener *remount_listener_;
 
-  Catalog *Inode2Catalog(const inode_t inode);
+  //Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;
 
