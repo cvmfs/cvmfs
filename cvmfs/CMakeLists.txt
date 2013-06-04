@@ -32,6 +32,7 @@ set (CVMFS_CLIENT_SOURCES
   manifest.h manifest.cc
   manifest_fetch.h manifest_fetch.cc
   murmur.h smallhash.h
+  bigvector.h
   lru.h
   globals.h globals.cc
   peers.h peers.cc
