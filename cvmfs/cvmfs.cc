@@ -785,23 +785,25 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 
 static void AddToDirListing(const fuse_req_t req,
                             const char *name, const struct stat *stat_info,
-                            struct DirectoryListing *listing)
+                            BigVector<char> *listing)
 {
   LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s, inode %"PRIu64,
            name, stat_info->st_ino);
-  size_t remaining_size = listing->capacity - listing->size;
+  size_t remaining_size = listing->capacity() - listing->size();
   const size_t entry_size = fuse_add_direntry(req, NULL, 0, name, stat_info, 0);
 
   while (entry_size > remaining_size) {
-    listing->capacity = listing->capacity ? 2*listing->capacity : 512;
-    listing->buffer =
-      reinterpret_cast<char *>(srealloc(listing->buffer, listing->capacity));
-    remaining_size = listing->capacity - listing->size;
+    listing->DoubleCapacity();
+    remaining_size = listing->capacity() - listing->size();
   }
-  fuse_add_direntry(req, listing->buffer + listing->size,
+
+  char *buffer;
+  bool large_alloc;
+  listing->ShareBuffer(&buffer, &large_alloc);
+  fuse_add_direntry(req, buffer + listing->size(),
                     remaining_size, name, stat_info,
-                    listing->size + entry_size);
-  listing->size += entry_size;
+                    listing->size() + entry_size);
+  listing->SetSize(listing->size() + entry_size);
 }
 
 
@@ -835,12 +837,12 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
            ino, path.c_str());
 
   // Build listing
-  DirectoryListing listing;
+  BigVector<char> fuse_listing(512);
 
   // Add current directory link
   struct stat info;
   info = d.GetStatStructure();
-  AddToDirListing(req, ".", &info, &listing);
+  AddToDirListing(req, ".", &info, &fuse_listing);
 
   // Add parent directory link
   catalog::DirectoryEntry p;
@@ -848,27 +850,26 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
       GetDirentForPath(GetParentPath(path), &p))
   {
     info = p.GetStatStructure();
-    AddToDirListing(req, "..", &info, &listing);
+    AddToDirListing(req, "..", &info, &fuse_listing);
   }
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
   bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog);
-  remount_fence_->Leave();
 
   if (!retval) {
-    free(listing.buffer);
+    remount_fence_->Leave();
+    fuse_listing.Clear();  // Buffer is shared, empty manually
     fuse_reply_err(req, EIO);
     return;
   }
-  for (catalog::StatEntryList::const_iterator i = listing_from_catalog.begin(),
-       iEnd = listing_from_catalog.end(); i != iEnd; ++i)
-  {
+  for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
     // Fix inodes
     PathString entry_path;
     entry_path.Assign(path);
     entry_path.Append("/", 1);
-    entry_path.Append(i->name.GetChars(), i->name.GetLength());
+    entry_path.Append(listing_from_catalog.AtPtr(i)->name.GetChars(),
+                      listing_from_catalog.AtPtr(i)->name.GetLength());
 
     catalog::DirectoryEntry entry_dirent;
     if (!GetDirentForPath(entry_path, &entry_dirent)) {
@@ -877,17 +878,27 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
       continue;
     }
 
-    struct stat fixed_info = i->info;
+    struct stat fixed_info = listing_from_catalog.AtPtr(i)->info;
     fixed_info.st_ino = entry_dirent.inode();
-    AddToDirListing(req, i->name.c_str(), &fixed_info, &listing);
+    AddToDirListing(req, listing_from_catalog.AtPtr(i)->name.c_str(),
+                    &fixed_info, &fuse_listing);
   }
+  remount_fence_->Leave();
+
+  DirectoryListing stream_listing;
+  stream_listing.size = fuse_listing.size();
+  stream_listing.capacity = fuse_listing.capacity();
+  bool large_alloc;
+  fuse_listing.ShareBuffer(&stream_listing.buffer, &large_alloc);
+  if (large_alloc)
+    stream_listing.capacity = 0;
 
   // Save the directory listing and return a handle to the listing
   pthread_mutex_lock(&lock_directory_handles_);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "linking directory handle %d to dir inode: %"PRIu64,
            next_directory_handle_, ino);
-  (*directory_handles_)[next_directory_handle_] = listing;
+  (*directory_handles_)[next_directory_handle_] = stream_listing;
   fi->fh = next_directory_handle_;
   ++next_directory_handle_;
   pthread_mutex_unlock(&lock_directory_handles_);
@@ -914,7 +925,10 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
   DirectoryHandles::iterator iter_handle =
     directory_handles_->find(fi->fh);
   if (iter_handle != directory_handles_->end()) {
-    free(iter_handle->second.buffer);
+    if (iter_handle->second.capacity == 0)
+      smunmap(iter_handle->second.buffer);
+    else
+      free(iter_handle->second.buffer);
     directory_handles_->erase(iter_handle);
     pthread_mutex_unlock(&lock_directory_handles_);
     atomic_dec32(&open_dirs_);

@@ -300,7 +300,7 @@ bool Catalog::ListingMd5PathStat(const hash::Md5 &md5path,
     FixTransitionPoint(md5path, &dirent);
     entry.name = dirent.name();
     entry.info = dirent.GetStatStructure();
-    listing->push_back(entry);
+    listing->PushBack(entry);
   }
   sql_listing_->Reset();
   pthread_mutex_unlock(lock_);

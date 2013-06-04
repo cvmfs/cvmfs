@@ -21,6 +21,13 @@ class BigVector {
     shared_buffer_ = false;
   }
 
+  explicit BigVector(const size_t num_items) {
+    assert(num_items > 0);
+    Alloc(num_items);
+    size_ = 0;
+    shared_buffer_ = false;
+  }
+
   ~BigVector() {
     if (!shared_buffer_)
       Dealloc();
@@ -31,19 +38,15 @@ class BigVector {
     return buffer_[index];
   }
 
+  const Item *AtPtr(const size_t index) const {
+    assert(index < size_);
+    return &buffer_[index];
+  }
+
   void PushBack(const Item &item) {
-    if (size_ == capacity_) {
-      Item *old_buffer = buffer_;
-      bool old_large_alloc = large_alloc_;
-
-      assert(capacity_ > 0);
-      Alloc(capacity_ * 2);
-      for (size_t i = 0; i < size_; ++i)
-        buffer_[i] = old_buffer[i];
-
-      FreeBuffer(old_buffer, old_large_alloc);
-    }
-    buffer_[size_] = item;
+    if (size_ == capacity_)
+      DoubleCapacity();
+    new (buffer_ + size_) Item(item);
     size_++;
   }
 
@@ -58,10 +61,28 @@ class BigVector {
     shared_buffer_ = true;
   }
 
+  void DoubleCapacity() {
+    Item *old_buffer = buffer_;
+    bool old_large_alloc = large_alloc_;
+
+    assert(capacity_ > 0);
+    Alloc(capacity_ * 2);
+    for (size_t i = 0; i < size_; ++i)
+      new (buffer_ + i) Item(old_buffer[i]);
+
+    FreeBuffer(old_buffer, size_, old_large_alloc);
+  }
+
+  // Careful!  Only for externally modified buffer.
+  void SetSize(const size_t new_size) {
+    assert(new_size <= capacity_);
+    size_ = new_size;
+  }
+
   size_t size() const { return size_; }
   size_t capacity() const { return capacity_; }
  private:
-  static const size_t kNumInit = 4;
+  static const size_t kNumInit = 16;
   static const size_t kMmapThreshold = 128*1024;
 
   void Alloc(const size_t num_elements) {
@@ -77,16 +98,16 @@ class BigVector {
   }
 
   void Dealloc() {
-    for (size_t i = 0; i < size_; ++i)
-      buffer_[i].~Item();
-
-    FreeBuffer(buffer_, large_alloc_);
+    FreeBuffer(buffer_, size_, large_alloc_);
     buffer_ = NULL;
     capacity_ = 0;
     size_ = 0;
   }
 
-  void FreeBuffer(Item *buf, const bool large) {
+  void FreeBuffer(Item *buf, const size_t size, const bool large) {
+    for (size_t i = 0; i < size; ++i)
+      buf[i].~Item();
+
     if (buf) {
       if (large)
         smunmap(buf);
