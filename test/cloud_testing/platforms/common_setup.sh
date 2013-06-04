@@ -4,27 +4,35 @@
 # Common functionality for cloud platform test execution engine (test setup)
 # After sourcing this file the following variables are set:
 #
-#    SERVER_PACKAGE     location of the CernVM-FS server package to install
-#    CLIENT_PACKAGE     location of the CernVM-FS client package to install
-#    KEYS_PACKAGE       location of the CernVM-FS public keys package
-#    SOURCE_DIRECTORY   location of the CernVM-FS sources forming above packages
-#    TEST_LOGFILE       location of the test logfile to be used
+#  SERVER_PACKAGE       location of the CernVM-FS server package to install
+#  CLIENT_PACKAGE       location of the CernVM-FS client package to install
+#  OLD_CLIENT_PACKAGE   location of an old CernVM-FS client package for hotpatch
+#  KEYS_PACKAGE         location of the CernVM-FS public keys package
+#  SOURCE_DIRECTORY     location of the CernVM-FS sources forming above packages
+#  TEST_LOGFILE         location of the test logfile to be used
+#
+# NOTE: the OLD_CLIENT_PACKAGE is not mandatory and should be checked for exist-
+#       ance before usage
 #
 
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
+OLD_CLIENT_PACKAGE=""
 KEYS_PACKAGE=""
 SOURCE_DIRECTORY=""
 TEST_LOGFILE=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:k:t:l:" option; do
+while getopts "s:c:o:k:t:l:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
       ;;
     c)
       CLIENT_PACKAGE=$OPTARG
+      ;;
+    o)
+      OLD_CLIENT_PACKAGE=$OPTARG
       ;;
     k)
       KEYS_PACKAGE=$OPTARG
@@ -69,18 +77,27 @@ rpm_name_string() {
 }
 
 
-check_yum_response() {
+deb_name_string() {
+  local deb_file=$1
+  echo $(dpkg --info $deb_file | grep " Package: " | sed 's/ Package: //')
+}
+
+
+check_package_manager_response() {
   local retcode=$1
-  local yum_output=$2
+  local pkg_mgr_name="$2"
+  local pkg_mgr_output="$3"
 
   if [ $retcode -ne 0 ]; then
     echo "fail"
-    echo "Yum said:"
-    echo $yum_output
+    echo "$pkg_mgr_name said:"
+    echo $package_mgr_output
     exit 102
   else
     echo "done"
   fi
+
+  return $retcode
 }
 
 
@@ -98,29 +115,38 @@ install_rpm() {
   # install the RPM
   echo -n "Installing RPM '$rpm_name' ... "
   yum_output=$(sudo yum -y install --nogpgcheck $rpm_file 2>&1)
-  check_yum_response $? "$yum_output"
+  check_package_manager_response $? "Yum" "$yum_output"
+}
+
+
+install_deb() {
+  local deb_file=$1
+  local deb_output
+  local deb_name=$(deb_name_string $deb_file)
+
+  # install DEB package
+  echo -n "Installing DEB package '$deb_name' ... "
+  deb_output=$(sudo gdebi --non-interactive --quiet $deb_file)
+  check_package_manager_response $? "DPKG" "$deb_output"
 }
 
 
 install_from_repo() {
   local package_name=$1
-  local yum_output
+  local pkg_mgr
+  local pkg_mgr_output
+
+  # find out which package manager to use
+  if which apt-get > /dev/null 2>&1; then
+    pkg_mgr="apt-get"
+  else
+    pkg_mgr="yum"
+  fi
 
   # install package from repository
   echo -n "Installing Package '$package_name' ... "
-  yum_output=$(sudo yum -y install $package_name 2>&1)
-  check_yum_response $? "$yum_output"
-}
-
-
-uninstall_rpm() {
-  local rpm_file=$1
-  local yum_output
-  local rpm_name=$(rpm_name_string $rpm_file)
-
-  echo -n "Uninstalling RPM '$rpm_name' ... "
-  yum_output=$(sudo yum -y erase $rpm_name 2>&1)
-  check_yum_response $? "$yum_output"
+  pkg_mgr_output=$(sudo $pkg_mgr -y install $package_name 2>&1)
+  check_package_manager_response $? $pkg_mgr "$pkg_mgr_output"
 }
 
 
@@ -135,7 +161,7 @@ attach_user_group() {
 
 
 die() {
-  local msg=$1
+  local msg="$1"
   echo $msg
   exit 103
 }

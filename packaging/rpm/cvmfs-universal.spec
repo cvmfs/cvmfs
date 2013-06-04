@@ -115,6 +115,12 @@ Requires: cvmfs-keys >= 1.2
 %description server
 CernVM-FS tools to maintain Stratum 0/1 repositories
 
+%package unittests
+Summary: CernVM-FS unit tests binary
+Group: Application/System
+%description unittests
+CernVM-FS unit tests binary.  This RPM is not required except for testing.
+
 %prep
 %setup -q
 
@@ -130,9 +136,9 @@ export CFLAGS="-march=i686"
 export CXXFLAGS="-march=i686"
 %endif
 %if 0%{?suse_version}
-cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes .
+%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes .
 %endif
 make %{?_smp_mflags}
 
@@ -181,6 +187,7 @@ export DONT_STRIP=1
 rm -rf $RPM_BUILD_ROOT
 
 make DESTDIR=$RPM_BUILD_ROOT install
+cp test/unittests/CernVM-FS_test $RPM_BUILD_ROOT/usr/bin/cvmfs_unittests
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
@@ -287,12 +294,20 @@ fi
 %files server
 %defattr(-,root,root)
 %{_bindir}/cvmfs_swissknife
+%{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_server
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 %doc COPYING AUTHORS README ChangeLog
 
+%files unittests
+%defattr(-,root,root)
+%{_bindir}/cvmfs_unittests
+
 %changelog
+* Tue Jun 04 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.12
+- Add cvmfs_swissknife_debug binary
+- Add cvmfs-unittests package
 * Mon Feb 18 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
 - Added libattr-devel as a build requirement
 * Tue Feb 12 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7

@@ -31,6 +31,7 @@ platform_run_script=""
 platform_setup_script=""
 server_package=""
 client_package=""
+old_client_package="notprovided"
 keys_package=""
 source_tarball=""
 ami_name=""
@@ -68,6 +69,7 @@ usage() {
   echo " -a <AMI name>              the virtual machine image to spawn"
   echo
   echo "Optional parameters:"
+  echo " -o <old client package>    CernVM-FS client package to be hotpatched on"
   echo " -d <results destination>   Directory to store final test session logs"
   echo
   echo "You must provide http addresses for all packages and tar balls. They will"
@@ -135,8 +137,12 @@ wait_for_virtual_machine() {
   # wait for the virtual machine to become accessible via ssh
   echo -n "waiting for VM ($ip) to become accessible... "
   timeout=$accessibility_timeout
-  while [ $timeout -gt 0 ] && \
-        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'echo hallo' > /dev/null 2>&1; do
+  while [ $timeout -gt 0 ] &&                                      \
+        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
+                                   -o UserKnownHostsFile=/dev/null \
+                                   -o LogLevel=ERROR               \
+                                   -o BatchMode=yes                \
+              root@$ip 'echo hallo' > /dev/null 2>&1; do
     sleep 10
     timeout=$(( $timeout - 1 ))
   done
@@ -163,7 +169,11 @@ run_script_on_virtual_machine() {
   local script_path=$2
   shift 2
 
-  ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'cat | bash /dev/stdin' $@ < $script_path
+  ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
+                           -o UserKnownHostsFile=/dev/null \
+                           -o LogLevel=ERROR               \
+                           -o BatchMode=yes                \
+      root@$ip 'cat | bash /dev/stdin' $@ < $script_path
 }
 
 
@@ -187,11 +197,13 @@ setup_virtual_machine() {
   run_script_on_virtual_machine $ip $remote_setup_script \
       -s $server_package                                 \
       -c $client_package                                 \
+      -o $old_client_package                             \
       -t $source_tarball                                 \
       -k $keys_package                                   \
       -r $platform_setup_script
   check_retcode $?
   if [ $? -ne 0 ]; then
+    handle_test_failure $ip
     return 1
   fi
 
@@ -265,7 +277,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:s:c:t:k:a:d:" option; do
+while getopts "r:b:s:c:o:t:k:a:d:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -278,6 +290,9 @@ while getopts "r:b:s:c:t:k:a:d:" option; do
       ;;
     c)
       client_package=$OPTARG
+      ;;
+    o)
+      old_client_package=$OPTARG
       ;;
     t)
       source_tarball=$OPTARG

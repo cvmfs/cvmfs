@@ -58,8 +58,8 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-set<CURL *>  *pool_handles_idle_ = NULL;
-set<CURL *>  *pool_handles_inuse_ = NULL;
+set<CURL *> *pool_handles_idle_ = NULL;
+set<CURL *> *pool_handles_inuse_ = NULL;
 uint32_t pool_max_handles_;
 CURLM *curl_multi_ = NULL;
 curl_slist *http_headers_ = NULL;
