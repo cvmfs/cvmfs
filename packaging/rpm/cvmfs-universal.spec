@@ -130,9 +130,9 @@ export CFLAGS="-march=i686"
 export CXXFLAGS="-march=i686"
 %endif
 %if 0%{?suse_version}
-cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -BUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes .
+%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes BUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes .
 %endif
 make %{?_smp_mflags}
 
@@ -287,12 +287,15 @@ fi
 %files server
 %defattr(-,root,root)
 %{_bindir}/cvmfs_swissknife
+%{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_server
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Jun 04 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.12
+- Add cvmfs_swissknife_debug binary
 * Mon Feb 18 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
 - Added libattr-devel as a build requirement
 * Tue Feb 12 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
