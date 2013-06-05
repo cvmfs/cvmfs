@@ -156,6 +156,9 @@ InodeGenerationInfo inode_generation_info_;
  */
 struct DirectoryListing {
   char *buffer;  /**< Filled by fuse_add_direntry */
+
+  // Not really used anymore.  But directory listing needs to be migrated during
+  // hotpatch. If buffer is allocated by smmap, capacity is zero.
   size_t size;
   size_t capacity;
 

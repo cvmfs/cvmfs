@@ -427,12 +427,12 @@ class MultiHash {
 
 // initialize the static fields
 template<class Key, class Value, class Derived>
-const double SmallHashBase<Key, Value, Derived>::kLoadFactor = 0.7;
+const double SmallHashBase<Key, Value, Derived>::kLoadFactor = 0.75;
 
 template<class Key, class Value>
-const double SmallHashDynamic<Key, Value>::kThresholdGrow = 0.7;
+const double SmallHashDynamic<Key, Value>::kThresholdGrow = 0.75;
 
 template<class Key, class Value>
-const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.15;
+const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.25;
 
 #endif  // CVMFS_SMALLHASH_H_
