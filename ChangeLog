@@ -1,3 +1,6 @@
+2.1.12:
+  * Drop config.sh dependency from cvmfs_server
+
 2.1.11:
   * Improve logging for whitelist expiry and fqrn errors
   * Add network path reset within the same proxy group

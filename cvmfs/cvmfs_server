@@ -31,7 +31,6 @@ abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
 
-. /etc/cvmfs/config.sh
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
 
 # Find out about Apache's name and configuration Directory depending on the Distribution
@@ -73,6 +72,19 @@ CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 #                              Utility Functions                               #
 #                                                                              #
 ################################################################################
+
+
+cvmfs_mkfqrn() {
+   local repo=$1
+
+   if [ -z "$repo" ]; then
+      echo
+      return 0
+   fi
+
+   echo $repo | grep \\. || echo "${repo}.${CVMFS_DEFAULT_DOMAIN}"
+   return 0
+}
 
 
 # checks if the given command name is a supported command of cvmfs_server
