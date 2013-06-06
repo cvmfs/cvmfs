@@ -282,6 +282,7 @@ static void UploadBuffer(const unsigned char *buffer, const unsigned size,
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   unsigned timeout = 10;
+  int fd_lockfile = -1;
   manifest::ManifestEnsemble ensemble;
 
   // Option parsing
@@ -315,6 +316,18 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
+
+  // Wait for another instance to finish
+  fd_lockfile = TryLockFile(*temp_dir + "/lock_snapshot");
+  if (fd_lockfile < 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "waiting for another snapshot to finish...");
+    fd_lockfile = LockFile(*temp_dir + "/lock_snapshot");
+    if (fd_lockfile < 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to lock on %s",
+               (*temp_dir + "/lock_snapshot").c_str());
+      return 1;
+    }
+  }
 
   int result = 1;
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
@@ -422,6 +435,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   result = 0;
 
  fini:
+  if (fd_lockfile >= 0)
+    UnlockFile(fd_lockfile);
   free(workers);
   signature::Fini();
   download::Fini();
