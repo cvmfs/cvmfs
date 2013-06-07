@@ -13,6 +13,10 @@
 #include <sys/stat.h>
 #include <signal.h>
 
+#include <attr/xattr.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <cassert>
 
 #include <string>
@@ -89,6 +93,29 @@ inline int platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
 }
 
+inline std::string platform_readlink32(std::string const& path) {
+  char buf[32];
+  ssize_t len = ::readlink(path.c_str(), buf, sizeof(buf)-1);
+  if (len != -1) {
+    buf[len] = '\0';
+    return std::string(buf);
+  } else {
+    // error
+    return std::string();
+  }
+}
+
+inline std::string platform_lgetxattr32(std::string const& path, std::string const& name) {
+  char buf[32];
+  ssize_t len = ::getxattr(path.c_str(), name.c_str(), buf, sizeof(buf)-1);
+  if (len != -1) {
+    buf[len] = '\0';
+    return std::string(buf);
+  } else {
+    // error
+    return std::string();
+  }
+}
 
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".so";

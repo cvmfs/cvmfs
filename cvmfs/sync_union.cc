@@ -149,4 +149,47 @@ set<string> SyncUnionAufs::GetIgnoreFilenames() const {
 };
 
 
+SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
+                             const std::string &rdonly_path,
+                             const std::string &union_path,
+                             const std::string &scratch_path) :
+SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
+
+}
+
+
+void SyncUnionOverlayfs::Traverse() {
+  FileSystemTraversal<SyncUnionOverlayfs>
+    traversal(this, scratch_path(), true, this->GetIgnoreFilenames());
+
+  traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
+  traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
+  traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
+  traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
+  traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
+  
+  traversal.Recurse(scratch_path());
+}
+
+
+bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
+  return (entry.IsSymlink() && 
+	  (platform_readlink32(entry.GetScratchPath()) == "(overlay-whiteout)") && 
+	  (platform_lgetxattr32(entry.GetScratchPath(), "trusted.overlay.whiteout") == "y"));
+}
+
+bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
+  return (platform_lgetxattr32(directory.GetScratchPath(), "trusted.overlay.opaque") == "y");
+}
+
+string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const {
+  return filename;
+}
+
+set<string> SyncUnionOverlayfs::GetIgnoreFilenames() const {
+  std::set<string> empty;
+  return empty;
+}
+
+
 }  // namespace sync

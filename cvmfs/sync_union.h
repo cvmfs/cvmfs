@@ -24,7 +24,7 @@
  * for internal bookkeeping which should be ignored.
  *
  * Classes that derive from UnionSync implement the specifics of a concrete
- * union file system (e.g. AUFS1).
+ * union file system (e.g. AUFS1, overlayfs).
  */
 
 #ifndef CVMFS_SYNC_UNION_H_
@@ -32,6 +32,8 @@
 
 #include <string>
 #include <set>
+
+#include "platform.h"
 
 namespace publish {
 
@@ -179,6 +181,27 @@ class SyncUnionAufs : public SyncUnion {
 	std::set<std::string> ignore_filenames_;
 	std::string whiteout_prefix_;
 };  // class SyncUnionAufs
+
+/**
+ * Syncing a CVMFS repository by the help of an overlayed overlayfs
+ * read-write volume.
+ */
+class SyncUnionOverlayfs : public SyncUnion {
+ public:
+	SyncUnionOverlayfs(SyncMediator *mediator,
+  	            const std::string &rdonly_path,
+  	            const std::string &union_path,
+                const std::string &scratch_path);
+
+	void Traverse();
+
+ protected:
+	bool IsWhiteoutEntry(const SyncItem &entry) const;
+	bool IsOpaqueDirectory(const SyncItem &directory) const;
+	std::string UnwindWhiteoutFilename(const std::string &filename) const;
+	std::set<std::string> GetIgnoreFilenames() const;
+
+};  // class SyncUnionOverlayfs
 
 }  // namespace publish
 

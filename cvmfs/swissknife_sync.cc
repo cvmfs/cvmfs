@@ -163,8 +163,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
                     params.stratum0, params.dir_temp, params.spooler);
   publish::SyncMediator mediator(&catalog_manager, &params);
-  publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
+  publish::SyncUnionOverlayfs sync(&mediator, params.dir_rdonly, params.dir_union,
                               params.dir_scratch);
+  //  publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
+  //                            params.dir_scratch);
 
   sync.Traverse();
   // TODO: consider using the unique pointer to come in Github Pull Request 46
