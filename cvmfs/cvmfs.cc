@@ -1436,7 +1436,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %"PRIu64", size %u",
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr TEST on inode: %"PRIu64", size %u",
            ino, size);
 
   catalog::DirectoryEntry d;
@@ -1453,10 +1453,10 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
     "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
     "user.ndiropen\0";
-  string attribute_list(base_list, sizeof(base_list));
+  string attribute_list(base_list, sizeof(base_list)-1);
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
-    attribute_list += string(regular_file_list, sizeof(regular_file_list));
+    attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
   }
 
   if (size == 0) {
