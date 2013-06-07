@@ -7,7 +7,9 @@ cvmfs_run_test() {
   cvmfs_mount sft.cern.ch || return 1
   
   sudo du -ch --max-depth=3 /cvmfs/sft.cern.ch >> $logfile 2>&1 || return 2
-  check_memory sft.cern.ch 50000 || return 3
+  sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
+  sleep 60
+  check_memory sft.cern.ch 50000 >> $logfile 2>&1
   
   return 0
 }

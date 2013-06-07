@@ -5,6 +5,11 @@
 #ifndef CVMFS_CATALOG_MGR_H_
 #define CVMFS_CATALOG_MGR_H_
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
+#include <inttypes.h>
 #include <pthread.h>
 #include <cassert>
 
@@ -12,10 +17,11 @@
 #include <string>
 
 #include "catalog.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "hash.h"
 #include "atomic.h"
 #include "util.h"
+#include "logging.h"
 
 namespace catalog {
 
@@ -72,6 +78,43 @@ struct Statistics {
   }
 };
 
+
+class InodeGenerationAnnotation : public InodeAnnotation {
+ public:
+  InodeGenerationAnnotation() { inode_offset_ = 0; };
+  ~InodeGenerationAnnotation() { };
+  bool ValidInode(const uint64_t inode) {
+    return inode >= inode_offset_;
+  }
+  inode_t Annotate(const inode_t raw_inode) {
+    return raw_inode + inode_offset_;
+  }
+  inode_t Strip(const inode_t annotated_inode) {
+    return annotated_inode - inode_offset_;
+  }
+  void IncGeneration(const uint64_t by) {
+    inode_offset_ += by;
+    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu",
+             inode_offset_);
+  }
+  inode_t GetGeneration() { return inode_offset_; };
+ private:
+  uint64_t inode_offset_;
+};
+
+
+class AbstractCatalogManager;
+/**
+ * Here, the Cwd Buffer is registered in order to save the inodes of
+ * processes' cwd before a new catalog snapshot is applied
+ */
+class RemountListener {
+ public:
+  virtual ~RemountListener() { }
+  virtual void BeforeRemount(AbstractCatalogManager *source) = 0;
+};
+
+
 /**
  * This class provides the read-only interface to a tree of catalogs
  * representing a (subtree of a) repository.
@@ -88,15 +131,17 @@ struct Statistics {
  */
 class AbstractCatalogManager {
  public:
+  const static inode_t kInodeOffset = 255;
   AbstractCatalogManager();
   virtual ~AbstractCatalogManager();
 
+  void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadError Remount(const bool dry_run);
-  void DetachAll() { DetachSubtree(GetRootCatalog()); }
+  void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
 
-  bool LookupInode(const inode_t inode, const LookupOptions options,
-                   DirectoryEntry *entry);
+  //bool LookupInode(const inode_t inode, const LookupOptions options,
+  //                 DirectoryEntry *entry);
   bool LookupPath(const PathString &path, const LookupOptions options,
                   DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,
@@ -114,7 +159,16 @@ class AbstractCatalogManager {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
+  void RegisterRemountListener(RemountListener *listener) {
+    WriteLock();
+    remount_listener_ = listener;
+    Unlock();
+  }
+
   Statistics statistics() const { return statistics_; }
+  uint64_t inode_gauge() {
+    ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;
+  }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
   int GetNumCatalogs() const;
@@ -125,7 +179,10 @@ class AbstractCatalogManager {
    * ('root' means the root of the whole file system)
    * @return the root inode number
    */
-  static inline inode_t GetRootInode() { return kInodeOffset + 1; }
+  inline inode_t GetRootInode() const {
+    return inode_annotation_ ?
+      inode_annotation_->Annotate(kInodeOffset + 1) : kInodeOffset + 1;
+  }
   /**
    * Inodes are ambiquitous under some circumstances, to prevent problems
    * they must be passed through this method first
@@ -184,11 +241,9 @@ class AbstractCatalogManager {
     int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
-  // inline void DowngradeLock() const {  } TODO
   virtual void EnforceSqliteMemLimit();
 
  private:
-  const static inode_t kInodeOffset = 255;
   /**
    * This list is only needed to find a catalog given an inode.
    * This might possibly be done by walking the catalog tree, similar to
@@ -196,10 +251,15 @@ class AbstractCatalogManager {
    */
   CatalogList catalogs_;
   uint64_t inode_gauge_;  /**< highest issued inode */
+  uint64_t revision_cache_;
+  uint64_t incarnation_;  /**< counts how often the inodes have been invalidated */
+  InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
+  RemountListener *remount_listener_;
 
+  Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;
 

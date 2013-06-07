@@ -9,6 +9,7 @@
 #include <string>
 #include <map>
 #include "hash.h"
+#include "history.h"
 
 namespace manifest {
 
@@ -28,11 +29,14 @@ class Manifest {
            const hash::Any &micro_catalog_hash,
            const std::string &repository_name,
            const hash::Any certificate,
-           const uint64_t publish_timestamp) :
+           const hash::Any history,
+           const uint64_t publish_timestamp,
+           const std::vector<history::TagList::ChannelTag> &channel_tops) :
     catalog_hash_(catalog_hash), root_path_(root_path), ttl_(ttl),
     revision_(revision), micro_catalog_hash_(micro_catalog_hash),
     repository_name_(repository_name), certificate_(certificate),
-    publish_timestamp_(publish_timestamp) { };
+    history_(history), publish_timestamp_(publish_timestamp),
+    channel_tops_(channel_tops) { };
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
@@ -42,17 +46,24 @@ class Manifest {
   void set_certificate(const hash::Any &certificate) {
     certificate_ = certificate;
   }
+  void set_history(const hash::Any &history_db) {
+    history_ = history_db;
+  }
   void set_repository_name(const std::string &repository_name) {
     repository_name_ = repository_name;
   }
   void set_publish_timestamp(const uint32_t publish_timestamp) {
     publish_timestamp_ = publish_timestamp;
   }
+  void set_channel_tops(const std::vector<history::TagList::ChannelTag> &v) {
+    channel_tops_ = v;
+  }
 
   std::string repository_name() const { return repository_name_; }
   hash::Md5 root_path() const { return root_path_; }
   hash::Any catalog_hash() const { return catalog_hash_; }
   hash::Any certificate() const { return certificate_; }
+  hash::Any history() const { return history_; }
   uint64_t publish_timestamp() const { return publish_timestamp_; }
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
@@ -63,7 +74,10 @@ class Manifest {
   hash::Any micro_catalog_hash_;
   std::string repository_name_;
   hash::Any certificate_;
+  hash::Any history_;
   uint64_t publish_timestamp_;
+  // ordered, newest releases first
+  std::vector<history::TagList::ChannelTag> channel_tops_;
 };  // class Manifest
 
 }  // namespace manifest
