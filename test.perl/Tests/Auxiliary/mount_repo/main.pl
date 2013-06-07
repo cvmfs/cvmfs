@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use ZeroMQ qw/:all/;
-use Tests::Common qw (get_daemon_output killing_services check_repo setup_environment restart_cvmfs_services check_mount_timeout set_stdout_stderr open_test_socket close_test_socket);
+use Tests::Common qw (get_daemon_output killing_services check_repo setup_environment restart_cvmfs_services check_mount_timeout set_stdout_stderr open_test_socket close_test_socket open_shellout_socket);
 use Getopt::Long;
 use FindBin qw($RealBin);
 
@@ -27,11 +27,15 @@ my $repo_name = '127.0.0.1';
 # for the other two tests.
 my ($mount_successful) = (0);
 
+# Variable use for debug purpose;
+my $break_point = undef;
+
 # Retrieving command line options
 my $ret = GetOptions ( "stdout=s" => \$outputfile,
 					   "stderr=s" => \$errorfile,
 					   "no-clean" => \$no_clean,
-					   "shell-path=s" => \$shell_path );
+					   "shell-path=s" => \$shell_path,
+					   "breakpoint|bp=i" => \$break_point );
 
 # Forking the process so the daemon can come back in listening mode.
 my $pid = fork();
@@ -78,6 +82,16 @@ if (defined ($pid) and $pid == 0) {
 	sleep 5;
 	print "Done.\n";
 	
+	# Exiting if break_point is set to 1
+	if ($break_point == 1) {
+			close_test_socket($socket, $ctxt);
+			
+			$shell_socket->send("Exiting at breakpoint $break_point. Good debug.\n");
+			$shell_socket->send("END\n");
+			close_test_socket($shell_socket, $shell_ctxt);
+			exit 0;
+	}
+	
 	# For this first test, we should be able to mount the repo. So, if possibile, setting its variable
 	# to 1.
 	if (check_repo("/cvmfs/$repo_name")){
@@ -106,7 +120,7 @@ if (defined ($pid) and $pid != 0) {
 	print "PROCESSING:$testname\n";
 	# This is the line that makes the shell waiting for test output.
 	# Change whatever you want, but don't change this line or the shell will ignore exit status.
-	print "READ_RETURN_CODE";
+	print "READ_RETURN_CODE\n";
 }
 
 exit 0;

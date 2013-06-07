@@ -100,7 +100,7 @@ class CatalogTraversal
     is_remote_(repo_url.substr(0, 7) == "http://")
   {
     if (is_remote_)
-      download::Init(1);
+      download::Init(1, true);
   }
 
   virtual ~CatalogTraversal() {

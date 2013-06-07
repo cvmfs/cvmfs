@@ -31,21 +31,19 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 {
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
 
-	if (entry.IsNew()) {
-		mediator_->Add(entry);
-		return false; // <-- recursion will stop here... all content of new directory
-		              //     will be added later on by the SyncMediator
-
-	} else { // directory already existed...
-		if (entry.IsOpaqueDirectory()) { // was directory completely overwritten?
-			mediator_->Replace(entry);
-			return false; // <-- replace does not need any further recursion
-
-		} else { // directory was just changed internally... only touch needed
-			mediator_->Touch(entry);
-			return true;
-		}
-	}
+  if (entry.IsNew()) {
+    mediator_->Add(entry);
+    return false; // <-- recursion will stop here... all content of new directory
+                  //     will be added later on by the SyncMediator
+  } else { // directory already existed...
+    if (entry.IsOpaqueDirectory()) { // was directory completely overwritten?
+      mediator_->Replace(entry);
+      return false; // <-- replace does not need any further recursion
+    } else { // directory was just changed internally... only touch needed
+      mediator_->Touch(entry);
+      return true;
+    }
+  }
 }
 
 
@@ -61,25 +59,24 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
                                const string &link_name)
 {
   SyncItem entry(parent_dir, link_name, kItemSymlink, this);
-	ProcessFile(entry);
+  ProcessFile(entry);
 }
 
 
 void SyncUnion::ProcessFile(SyncItem &entry) {
-	// Process whiteout prefix
-	if (IsWhiteoutEntry(entry)) {
+  // Process whiteout prefix
+  if (IsWhiteoutEntry(entry)) {
     string actual_filename = UnwindWhiteoutFilename(entry.filename());
-		entry.MarkAsWhiteout(actual_filename);
-		mediator_->Remove(entry);
-
-	// Process normal file
-	} else {
-		if (entry.IsNew()) {
-			mediator_->Add(entry);
-		} else {
-			mediator_->Replace(entry);
-		}
-	}
+    entry.MarkAsWhiteout(actual_filename);
+    mediator_->Remove(entry);
+  } else {
+    // Process normal file
+    if (entry.IsNew()) {
+      mediator_->Add(entry);
+    } else {
+      mediator_->Touch(entry);
+    }
+  }
 }
 
 

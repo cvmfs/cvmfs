@@ -40,6 +40,8 @@ enum Failures {
   kFailHostResolve,
   kFailProxyConnection,
   kFailHostConnection,
+  kFailProxyHttp,
+  kFailHostHttp,
   kFailBadData,
   kFailOther,
 };
@@ -126,7 +128,7 @@ struct JobInfo {
 };
 
 
-void Init(const unsigned max_pool_handles);
+void Init(const unsigned max_pool_handles, const bool use_system_proxy);
 void Fini();
 void Spawn();
 Failures Fetch(JobInfo *info);
@@ -148,6 +150,8 @@ void RebalanceProxies();
 void SwitchProxyGroup();
 void SetProxyGroupResetDelay(const unsigned seconds);
 void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover);
+void SetHostResetDelay(const unsigned seconds);
+void GetHostBackupInfo(unsigned *reset_delay, time_t *timestamp_failover);
 void SetRetryParameters(const unsigned max_retries,
                         const unsigned backoff_init_ms,
                         const unsigned backoff_max_ms);

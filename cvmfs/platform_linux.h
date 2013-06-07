@@ -11,7 +11,11 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <attr/xattr.h>
 #include <signal.h>
+#include <limits.h>
+#include <unistd.h>
 
 #include <attr/xattr.h>
 #include <sys/types.h>
@@ -19,7 +23,11 @@
 
 #include <cassert>
 
+#include <cstring>
 #include <string>
+#include <cstdlib>
+
+#include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -85,6 +93,27 @@ inline int platform_fstat(int filedes, platform_stat64 *buf) {
   return fstat64(filedes, buf);
 }
 
+inline bool platform_getxattr(const std::string &path, const std::string &name,
+                              std::string *value)
+{
+  int size = 0;
+  void *buffer = NULL;
+  int retval;
+  retval = getxattr(path.c_str(), name.c_str(), buffer, size);
+  if (retval > 1) {
+    size = retval;
+    buffer = smalloc(size);
+    retval = getxattr(path.c_str(), name.c_str(), buffer, size);
+  }
+  if ((retval < 0) || (retval > size)) {
+    free(buffer);
+    return false;
+  }
+  value->assign(static_cast<const char *>(buffer), size);
+  free(buffer);
+  return true;
+}
+
 inline void platform_disable_kcache(int filedes) {
   posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
@@ -119,6 +148,18 @@ inline std::string platform_lgetxattr32(std::string const& path, std::string con
 
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".so";
+}
+
+
+inline const char* platform_getexepath() {
+  static char buf[PATH_MAX] = {0};
+  if (strlen(buf) == 0) {
+    int ret = readlink("/proc/self/exe", buf, PATH_MAX);
+    if (ret > 0 && ret < (int)PATH_MAX) {
+       buf[ret] = 0;
+    }
+  }
+  return buf;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

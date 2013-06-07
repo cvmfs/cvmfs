@@ -13,7 +13,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.6
+Version: 2.1.12
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -29,6 +29,7 @@ BuildRequires: cmake
 BuildRequires: fuse-devel
 BuildRequires: pkgconfig
 BuildRequires: openssl-devel
+BuildRequires: libattr-devel
 %{?el5:BuildRequires: buildsys-macros}
 
 Requires: bash
@@ -44,22 +45,28 @@ Requires: fuse
 Requires: curl
 Requires: attr
 Requires: zlib
+Requires: gdb
 # Account for different package names
 %if 0%{?suse_version}
 Requires: libfuse2
 Requires: glibc
 Requires: util-linux
 Requires: pwdutils
+  %if 0%{?suse_version} < 1200
+Requires: sysvinit
+  %else
+Requires: sysvinit-tools
+  %endif
 %else
 Requires: fuse-libs
 Requires: glibc-common
 Requires: which
 Requires: shadow-utils
-%endif
-%if 0%{?el5}
+  %if 0%{?el5}
 Requires: SysVinit
-%else
+  %else
 Requires: sysvinit-tools
+  %endif
 %endif
 Requires: cvmfs-keys >= 1.2
 
@@ -79,11 +86,11 @@ HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch
 Copyright (c) CERN
 
-%package lib
+%package devel
 Summary: CernVM-FS static client library
 Group: Applications/System
 Requires: openssl
-%description lib
+%description devel
 CernVM-FS static client library for pure user-space use
 
 %package server
@@ -108,6 +115,12 @@ Requires: cvmfs-keys >= 1.2
 %description server
 CernVM-FS tools to maintain Stratum 0/1 repositories
 
+%package unittests
+Summary: CernVM-FS unit tests binary
+Group: Application/System
+%description unittests
+CernVM-FS unit tests binary.  This RPM is not required except for testing.
+
 %prep
 %setup -q
 
@@ -123,9 +136,9 @@ export CFLAGS="-march=i686"
 export CXXFLAGS="-march=i686"
 %endif
 %if 0%{?suse_version}
-cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_LIBCVMFS=yes .
+%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes .
 %endif
 make %{?_smp_mflags}
 
@@ -174,6 +187,7 @@ export DONT_STRIP=1
 rm -rf $RPM_BUILD_ROOT
 
 make DESTDIR=$RPM_BUILD_ROOT install
+cp test/unittests/CernVM-FS_test $RPM_BUILD_ROOT/usr/bin/cvmfs_unittests
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
@@ -214,7 +228,9 @@ do
 done
 %endif
 /sbin/ldconfig
-/usr/bin/cvmfs_config reload
+if [ -d /var/run/cvmfs ]; then
+  /usr/bin/cvmfs_config reload
+fi
 :
 
 %preun
@@ -269,7 +285,7 @@ fi
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %doc COPYING AUTHORS README ChangeLog
 
-%files lib
+%files devel 
 %defattr(-,root,root)
 %{_libdir}/libcvmfs.a
 %{_includedir}/libcvmfs.h
@@ -278,12 +294,26 @@ fi
 %files server
 %defattr(-,root,root)
 %{_bindir}/cvmfs_swissknife
+%{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_server
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 %doc COPYING AUTHORS README ChangeLog
 
+%files unittests
+%defattr(-,root,root)
+%{_bindir}/cvmfs_unittests
+
 %changelog
+* Tue Jun 04 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.12
+- Add cvmfs_swissknife_debug binary
+- Add cvmfs-unittests package
+* Mon Feb 18 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
+- Added libattr-devel as a build requirement
+* Tue Feb 12 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
+- Avoid reloading when the reload sockets are missing (upgrade from 2.0)
+* Tue Jan 29 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.7
+- Renamed cvmfs-lib package to cvmfs-devel package
 * Tue Jan 15 2013 Jakob Blomer <jblomer@cern.ch>
 - Package conflicts with the cvmfs 2.0 branch
 * Tue Oct 02 2012 Jakob Blomer <jblomer@cern.ch>
