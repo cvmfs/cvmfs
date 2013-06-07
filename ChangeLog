@@ -1,4 +1,5 @@
 2.1.12:
+  * Make repositories replicatable by default
   * Safe guard against concurrent snapshot processes
   * Drop config.sh dependency from cvmfs_server
   * Experimental support for repository tags (named snapshots).
