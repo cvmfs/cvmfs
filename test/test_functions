@@ -4,7 +4,7 @@
 # failure debugging.
 #
 # To allow for online debugging, export CVMFS_TEST_SRVDEBUG like so:
-# 
+#
 # `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
 # `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
@@ -18,7 +18,7 @@ CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
 
 CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
-CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing 
+CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
 
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 
@@ -121,7 +121,7 @@ service_should_switch() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 autofs_switch() {
-  sudo $service_binary autofs status | grep -q "running"
+  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
   service_should_switch $1 $?
   if [ $? -eq 0 ]; then
     service_switch autofs $1
@@ -147,13 +147,28 @@ apache_switch() {
 }
 
 
+contains() {
+  local haystack="$1"
+  local needle=$2
+
+  for elem in $haystack
+  do
+    if [ $(readlink --canonicalize $elem) = $(readlink --canonicalize $needle) ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
   sudo rm -f /etc/cvmfs/default.local
   sudo sh -c "rm -f /etc/cvmfs/config.d/*"
-  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" 
- 
+  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET"
+
   timeout=5
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
@@ -180,7 +195,7 @@ cvmfs_mount() {
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
   cvmfs_config probe > /dev/null 2>&1 || return 101
-  
+
   return 0
 }
 
@@ -219,6 +234,38 @@ get_cvmfs_cachedir() {
 }
 
 
+CVMFS_MEMORY_WARNING_FLAG=0
+CVMFS_TIME_WARNING_FLAG=0
+CVMFS_MEMORY_WARNING=254
+CVMFS_TIME_WARNING=253
+mangle_test_retval() {
+  local prior_retval=$1
+
+  # if the test case failed... report the retval right away
+  if [ $prior_retval -ne 0 ]; then
+    return $prior_retval
+  fi
+
+  # check if the test case produced memory warnings and report them
+  if [ $CVMFS_MEMORY_WARNING_FLAG -ne 0 ]; then
+    return $CVMFS_MEMORY_WARNING
+  fi
+
+  # check if the test case produced timeout warnings
+  if [ $CVMFS_TIME_WARNING_FLAG -ne 0 ]; then
+    return $CVMFS_TIME_WARNING
+  fi
+
+  # return 0 if all is good
+  return 0
+}
+
+reset_test_warning_flags() {
+  CVMFS_MEMORY_WARNING_FLAG=0
+  CVMFS_TIME_WARNING_FLAG=0
+}
+
+
 check_time() {
   start_time=$1
   end_time=$2
@@ -228,9 +275,11 @@ check_time() {
 
   if [ $diff_time -gt $limit ]; then
     echo "Time limit exceeded" >&2
+    echo "Limit was $limit but it took $diff_time seconds"
+    CVMFS_TIME_WARNING_FLAG=1
     return 100
   fi
-  
+
   return 0
 }
 
@@ -239,11 +288,22 @@ check_memory() {
   instance=$1
   limit=$2
 
-  pid=$(attr -qg pid /cvmfs/$instance) || return 100
-  rss=$(sudo cat /proc/$pid/status | grep VmRSS | awk '{print $2}') || return 101
+  pid=$(attr -qg pid /cvmfs/$instance)             || return 100
+  rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
+  rss_kb=$(echo $rss | awk '{print $2}')
 
-  if [ $rss -gt $limit ]; then
-    echo "Memory limit exceeded" >&2
+  if [ $rss_kb -gt $limit ]; then
+    local inode_tracker="$(sudo cvmfs_talk -i $instance internal affairs | grep 'inode tracker')"
+    local inserts=$(echo "$inode_tracker" | grep -o "inserts: [0-9]*" | grep -o "[0-9]*$")
+    local removes=$(echo "$inode_tracker" | grep -o "removes: [0-9]*" | grep -o "[0-9]*$")
+    local elements=$(( $inserts - $removes ))
+
+    echo "Memory limit of $limit kB was exceeded by $instance which used $rss_kb kB"
+    echo "We've had $elements items in the inode tracker"
+    echo "Output of cat /proc/$pid/status:"
+    sudo cat /proc/$pid/status 2>&1
+    CVMFS_MEMORY_WARNING_FLAG=1
+
     return 102
   fi
 
@@ -254,6 +314,7 @@ check_memory() {
 create_repo() {
   local repo=$1
   local uid=$2
+  local debug_log=$3
 
   echo "Shutting down autofs for the cvmfs mounts"
   autofs_switch off || return 100
@@ -264,15 +325,20 @@ create_repo() {
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs -o $uid $repo || return 102
+  sudo cvmfs_server mkfs -o $uid -m $repo || return 102
+
+  if [ x$debug_log != x ]; then
+    echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a /etc/cvmfs/repositories.d/${repo}/client.conf
+  fi
 }
 
 
 create_empty_repo() {
   local repo=$1
   local uid=$2
+  local debug_log=$3
 
-  create_repo $repo $uid || return 101
+  create_repo $repo $uid $debug_log || return 101
 
   sudo cvmfs_server transaction $repo || return 102
   rm -f /cvmfs/$repo/new_repository
@@ -287,8 +353,9 @@ create_empty_repo() {
 create_filled_repo() {
   local repo=$1
   local uid=$2
+  local debug_log=$3
 
-  create_empty_repo $repo $uid || return 101
+  create_empty_repo $repo $uid $debug_log || return 101
 
   sudo cvmfs_server transaction $repo || return 102
 
@@ -488,7 +555,7 @@ restore_normal_dns_configuration() {
   echo -n "Restoring resolv.conf backup... "
   sudo cp $tmp_dir/resolv.conf /etc/resolv.conf || return 101
   echo "Done."
-  
+
   # Restarting iptables, it will load previously saved rules
   echo -n "Restoring iptables rules... "
   iptables_rules restore || return 102
@@ -627,7 +694,7 @@ publish_repo() {
   return 0
 }
 
-# runs the given command and measures the time it took to execute 
+# runs the given command and measures the time it took to execute
 stop_watch() {
   begin=$(date +%s)
   cmd="$@"

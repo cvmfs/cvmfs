@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 2.6.4)
+cmake_minimum_required (VERSION 2.6.2)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -13,17 +13,31 @@ project (${PROJECT_NAME})
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.1.6
+## CVMFS_VERSION 2.1.12
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 1)
-set (CernVM-FS_VERSION_PATCH 6)
+set (CernVM-FS_VERSION_PATCH 12)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #
 # set the path where cmake looks for additional modules
 #
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
+#
+# Set install prefix to /usr.  Cvmfs is not relocatable.
+#
+if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  SET(CMAKE_INSTALL_PREFIX
+    "/usr" CACHE PATH "/usr install prefix" FORCE
+  )
+else (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  if (NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr")
+    Message("Warning: CernVM-FS is not relotable and expects to be installed under /usr")
+  endif ()
+endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+
 
 #
 # check if we are on Mac OS X
@@ -33,6 +47,13 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 else ()
 	set (MACOSX FALSE)
 endif ()
+
+#
+# check if we use Clang
+#
+if (CMAKE_CXX_COMPILER MATCHES ".*clang")
+	set(USING_CLANG 1)
+endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
 #
 # provide some options to the user
@@ -45,6 +66,7 @@ else ()
 endif()
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
+option (BUILD_UNITTESTS "Build the CernVM-FS unit test set" OFF)
 option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
 option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
 option (ZLIB_BUILTIN "Don't use system zlib" ON)
@@ -61,12 +83,13 @@ option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" 
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 set (EXTERNALS_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
 set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/sqlite3/src")
-set (MURMUR_LOCATION              "${EXTERNALS_BUILD_LOCATION}/murmur/src")
 set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/c-ares/src")
 set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libcurl/src")
 set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")
 set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/sparsehash/src")
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/leveldb/src")
+set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/vjson/src")
+set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/googletest/src")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -88,8 +111,18 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
+
+if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
+	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+
+if (NOT USING_CLANG)
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
+	set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
+endif (NOT USING_CLANG)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
@@ -124,9 +157,7 @@ check_include_file (execinfo.h HAVE_EXECINFO_H)
 check_include_file (poll.h HAVE_POLL_H)
 if (NOT MACOSX)
 	check_include_file (sys/statfs.h HAVE_SYS_STATFS_H)
-	check_include_file (ucontext.h HAVE_UCONTEXT_H)
-else ()
-	check_include_file (sys/ucontext.h HAVE_UCONTEXT_H)
+  check_include_file (attr/xattr.h HAVE_ATTR_XATTR_H)
 endif ()
 
 #
@@ -148,6 +179,14 @@ add_subdirectory (cvmfs)
 if (INSTALL_MOUNT_SCRIPTS)
 	add_subdirectory (mount)
 endif (INSTALL_MOUNT_SCRIPTS)
+
+#
+# compile the unit tests
+#
+if (BUILD_UNITTESTS)
+	enable_testing ()
+	add_subdirectory (test/unittests)
+endif (BUILD_UNITTESTS)
 
 #
 # Documentation

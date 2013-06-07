@@ -7,6 +7,7 @@
 
 #include <time.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include <string>
 #include <vector>
@@ -14,6 +15,8 @@
 #include "catalog_mgr.h"
 #include "lru.h"
 #include "loader.h"
+
+#include "util.h"
 
 namespace cvmfs {
 
@@ -25,7 +28,9 @@ extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;
 
+bool Evict(const std::string &path);
 catalog::LoadError RemountStart();
+void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode);
 unsigned GetRevision();
 std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes
@@ -33,6 +38,8 @@ void SetMaxTTL(const unsigned value);  // in minutes
 void ResetErrorCounters();
 void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
                       lru::Statistics *md5path_stats);
+std::string PrintInodeTrackerStatistics();
+std::string PrintInodeGeneration();
 catalog::Statistics GetCatalogStatistics();
 std::string GetCertificateStats();
 std::string GetFsStats();

@@ -19,6 +19,7 @@
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define FUSE_USE_VERSION 26
+#define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
 
@@ -41,12 +42,12 @@
 #include <sys/resource.h>
 #include <pthread.h>
 #include <sys/xattr.h>
+#include <inttypes.h>
 
 #include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
 #include <google/dense_hash_map>
-#include "MurmurHash2.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -61,6 +62,8 @@
 #include <algorithm>
 #include <functional>
 
+#include "cvmfs.h"
+
 #include "platform.h"
 #include "logging.h"
 #include "tracer.h"
@@ -73,10 +76,12 @@
 #include "signature.h"
 #include "quota.h"
 #include "util.h"
+#include "util_concurrency.h"
 #include "atomic.h"
 #include "lru.h"
 #include "peers.h"
-#include "dirent.h"
+#include "directory_entry.h"
+#include "file_chunk.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
 #include "shortstring.h"
@@ -84,6 +89,10 @@
 #include "globals.h"
 #include "options.h"
 #include "loader.h"
+#include "glue_buffer.h"
+#include "compat.h"
+#include "history.h"
+#include "manifest_fetch.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -98,8 +107,10 @@ namespace cvmfs {
 const char *kDefaultCachedir = "/var/lib/cvmfs/default";
 const unsigned kDefaultTimeout = 2;
 const double kDefaultKCacheTimeout = 60.0;
+const unsigned kReloadSafetyMargin = 500;  // in milliseconds
 const unsigned kDefaultNumConnections = 16;
 const uint64_t kDefaultMemcache = 16*1024*1024;  // 16M RAM for meta-data caches
+const uint64_t kDefaultCacheSizeMb = 1024*1024*1024;  // 1G
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
@@ -108,6 +119,8 @@ const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
                                      backoff */
 const int kMaxIoDelay = 2000; /**< Maximum 2 seconds */
 const int kForgetDos = 10000; /**< Clear DoS memory after 10 seconds */
+
+const uint64_t kChunkedFileHandle = static_cast<uint64_t>(-2);
 /**
  * Prevent DoS attacks on the Squid server
  */
@@ -116,8 +129,30 @@ static struct {
   int delay;
 } previous_io_error_;
 
+
+/**
+ * Stores the initial catalog revision (in order to detect overflows) and
+ * the incarnation (number of reloads) of the Fuse module
+ */
+struct InodeGenerationInfo {
+  InodeGenerationInfo() {
+    version = 2;
+    initial_revision = 0;
+    incarnation = 0;
+    overflow_counter = 0;
+    inode_generation = 0;
+  }
+  unsigned version;
+  uint64_t initial_revision;
+  uint32_t incarnation;
+  uint32_t overflow_counter;  // not used any more
+  uint64_t inode_generation;
+};
+InodeGenerationInfo inode_generation_info_;
+
 /**
  * For cvmfs_opendir / cvmfs_readdir
+ * TODO: use mmap for very large listings
  */
 struct DirectoryListing {
   char *buffer;  /**< Filled by fuse_add_direntry */
@@ -127,22 +162,65 @@ struct DirectoryListing {
   DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
 };
 
+/**
+ * For opening and reading chunked files
+ */
+class LiveFileChunk : public FileChunk {
+ public:
+  explicit LiveFileChunk(const FileChunk &chunk) :
+    FileChunk(chunk),
+    open_(false),
+    file_descriptor_(0) { }
+
+  bool Fetch() {
+    file_descriptor_ = cache::FetchChunk(*this, "file chunk TODO: of what");
+    if (file_descriptor_ >= 0)
+      open_ = true;
+    return IsOpen();
+  }
+  bool Close() {
+    if (!IsOpen()) return true;
+    open_ = close(file_descriptor_) != 0;
+    return !open_;
+  }
+  inline int file_descriptor() const { return file_descriptor_; }
+
+  inline bool IsOpen() const { return open_; }
+
+  /**
+   * exclusively used to find file chunks using std::lower_bound
+   */
+  inline bool operator<(const off_t offset) const {
+    return (off_t)(this->offset() + this->size()) <= offset;
+  }
+
+ private:
+  bool open_;
+  int  file_descriptor_;
+};
+typedef std::vector<LiveFileChunk> LiveFileChunks;
+
 const loader::LoaderExports *loader_exports_ = NULL;
 bool foreground_ = false;
 bool nfs_maps_ = false;
 string *mountpoint_ = NULL;
 string *cachedir_ = NULL;
+string *nfs_shared_dir_ = NULL;
 string *tracefile_ = NULL;
 string *repository_name_ = NULL;  /**< Expected repository name,
                                        e.g. atlas.cern.ch */
+string *repository_tag_ = NULL;
 pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
 unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
-cache::CatalogManager *catalog_manager_;
+catalog::InodeGenerationAnnotation *inode_annotation_ = NULL;
+cache::CatalogManager *catalog_manager_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
+glue::InodeTracker *inode_tracker_ = NULL;
+
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
 
@@ -156,20 +234,18 @@ atomic_int32 reload_critical_section_;
 time_t drainout_deadline_;
 time_t catalogs_valid_until_;
 
-struct hash_dirhandle {
-  size_t operator() (const uint64_t handle) const {
-#ifdef __x86_64__
-    return MurmurHash64A(&handle, sizeof(handle), 0x9ce603115bba659bLLU);
-#else
-    return MurmurHash2(&handle, sizeof(handle), 0x07387a4f);
-#endif
-  }
-};
-typedef google::dense_hash_map<uint64_t, DirectoryListing, hash_dirhandle>
-  DirectoryHandles;
+typedef google::dense_hash_map<uint64_t, DirectoryListing,
+                               hash_murmur<uint64_t> >
+        DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
+
+typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks,
+                               hash_murmur<fuse_ino_t> >
+        LiveFileChunksMap;
+LiveFileChunksMap *live_file_chunks_ = NULL;
+pthread_rwlock_t live_file_chunks_mutex_ = PTHREAD_RWLOCK_INITIALIZER;
 
 atomic_int64 num_fs_open_;
 atomic_int64 num_fs_dir_open_;
@@ -178,12 +254,47 @@ atomic_int64 num_fs_lookup_negative_;
 atomic_int64 num_fs_stat_;
 atomic_int64 num_fs_read_;
 atomic_int64 num_fs_readlink_;
+atomic_int64 num_fs_forget_;
 atomic_int32 num_io_error_;
 atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
 atomic_int32 open_dirs_; /**< number of currently open directories */
 unsigned max_open_files_; /**< maximum allowed number of open files */
 const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
+
+/**
+ * Ensures that within a callback all operations take place on the same
+ * catalog revision.
+ */
+class RemountFence : public SingleCopy {
+ public:
+  RemountFence() {
+    atomic_init64(&counter_);
+    atomic_init32(&blocking_);
+  }
+  void Enter() {
+    while (atomic_read32(&blocking_)) {
+      SafeSleepMs(100);
+    }
+    atomic_inc64(&counter_);
+  }
+  void Leave() {
+    atomic_dec64(&counter_);
+  }
+  void Block() {
+    atomic_cas32(&blocking_, 0, 1);
+    while (atomic_read64(&counter_) > 0) {
+      SafeSleepMs(100);
+    }
+  }
+  void Unblock() {
+    atomic_cas32(&blocking_, 1, 0);
+  }
+ private:
+  atomic_int64 counter_;
+  atomic_int32 blocking_;
+};
+RemountFence *remount_fence_;
 
 
 unsigned GetMaxTTL() {
@@ -217,6 +328,12 @@ static inline double GetKcacheTimeout() {
 }
 
 
+void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
+  *drainout_mode = atomic_read32(&drainout_mode_);
+  *maintenance_mode = atomic_read32(&maintenance_mode_);
+}
+
+
 unsigned GetRevision() {
   return catalog_manager_->GetRevision();
 };
@@ -232,12 +349,39 @@ void ResetErrorCounters() {
 }
 
 
+static bool UseWatchdog() {
+  if (loader_exports_ == NULL || loader_exports_->version < 2) {
+    return true; // spawn watchdog by default
+                 // Note: with library versions before 2.1.8 it might not create
+                 //       stack traces properly in all cases
+  }
+
+  return ! loader_exports_->disable_watchdog;
+}
+
+
 void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
                       lru::Statistics *md5path_stats)
 {
   *inode_stats = inode_cache_->statistics();
   *path_stats = path_cache_->statistics();
   *md5path_stats = md5path_cache_->statistics();
+}
+
+
+string PrintInodeTrackerStatistics() {
+  return inode_tracker_->GetStatistics().Print() + "\n";
+}
+
+
+std::string PrintInodeGeneration() {
+  return "init-catalog-revision: " +
+    StringifyInt(inode_generation_info_.initial_revision) + "  " +
+    "current-catalog-revision: " +
+    StringifyInt(catalog_manager_->GetRevision()) + "  " +
+    "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
+    "inode generation: " + StringifyInt(inode_generation_info_.inode_generation)
+    + "\n";
 }
 
 
@@ -257,7 +401,8 @@ string GetFsStats() {
     "open(): " + StringifyInt(atomic_read64(&num_fs_open_)) + "  " +
     "diropen(): " + StringifyInt(atomic_read64(&num_fs_dir_open_)) + "  " +
     "read(): " + StringifyInt(atomic_read64(&num_fs_read_)) + "  " +
-    "readlink(): " + StringifyInt(atomic_read64(&num_fs_readlink_)) + "\n";
+    "readlink(): " + StringifyInt(atomic_read64(&num_fs_readlink_)) + "  " +
+    "forget(): " + StringifyInt(atomic_read64(&num_fs_forget_)) + "\n";
 }
 
 
@@ -279,7 +424,10 @@ catalog::LoadError RemountStart() {
   if (retval == catalog::kLoadNew) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "new catalog revision available, draining out meta-data caches");
-    drainout_deadline_ = time(NULL) + int(kcache_timeout_);
+    unsigned safety_margin = kReloadSafetyMargin/1000;
+    if (safety_margin == 0)
+      safety_margin = 1;
+    drainout_deadline_ = time(NULL) + int(kcache_timeout_) + safety_margin;
     atomic_cas32(&drainout_mode_, 0, 1);
   }
   return retval;
@@ -300,16 +448,28 @@ static void RemountFinish() {
 
   if (time(NULL) > drainout_deadline_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
+
+    // No new inserts into caches
     inode_cache_->Pause();
-    inode_cache_->Drop();
     path_cache_->Pause();
-    path_cache_->Drop();
     md5path_cache_->Pause();
+    inode_cache_->Drop();
+    path_cache_->Drop();
     md5path_cache_->Drop();
+
+    // Ensure that all Fuse callbacks left the catalog query code
+    remount_fence_->Block();
     catalog::LoadError retval = catalog_manager_->Remount(false);
+    if (inode_annotation_) {
+      inode_generation_info_.inode_generation =
+        inode_annotation_->GetGeneration();
+    }
+    remount_fence_->Unblock();
+
     inode_cache_->Resume();
     path_cache_->Resume();
     md5path_cache_->Resume();
+
     atomic_cas32(&drainout_mode_, 1, 0);
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
         catalog_manager_->offline_mode())
@@ -319,6 +479,8 @@ static void RemountFinish() {
       alarm(kShortTermTTL);
       catalogs_valid_until_ = time(NULL) + kShortTermTTL;
     } else {
+      LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %d",
+               catalog_manager_->GetRevision());
       alarm(GetEffectiveTTL());
       catalogs_valid_until_ = time(NULL) + GetEffectiveTTL();
     }
@@ -366,52 +528,67 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     // NFS mode
     PathString path;
     if (nfs_maps::GetPath(ino, &path) &&
-        catalog_manager_->LookupPath(path, catalog::kLookupFull, dirent))
+        catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent))
     {
       // Fix inodes
       dirent->set_inode(ino);
-      catalog::DirectoryEntry parent_dirent;
-      const PathString parent_path = GetParentPath(path);
-      if (md5path_cache_->Lookup(hash::Md5(parent_path.GetChars(),
-                                           parent_path.GetLength()),
-                                 &parent_dirent))
-      {
-        dirent->set_parent_inode(parent_dirent.inode());
-      } else {
-        dirent->set_parent_inode(nfs_maps::GetInode(parent_path));
-      }
-
       inode_cache_->Insert(ino, *dirent);
       return true;
     }
   } else {
     // Normal mode
-    if (catalog_manager_->LookupInode(ino, catalog::kLookupFull, dirent)) {
+    PathString path;
+    if (ino == catalog_manager_->GetRootInode()) {
+      catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
+      dirent->set_inode(ino);
+      inode_cache_->Insert(ino, *dirent);
+      return true;
+    }
+    if (inode_tracker_->FindPath(ino, &path) &&
+        catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent))
+    {
+      // Fix inodes
+      dirent->set_inode(ino);
       inode_cache_->Insert(ino, *dirent);
       return true;
     }
   }
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode, no entry");
+  // Can happen after reload of catalogs
+  LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode lookup failure");
   return false;
 }
 
 
 static bool GetDirentForPath(const PathString &path,
-                             const fuse_ino_t parent_inode,
                              catalog::DirectoryEntry *dirent)
 {
+  uint64_t live_inode = 0;
+  if (!nfs_maps_)
+    live_inode = inode_tracker_->FindInode(path);
+
   hash::Md5 md5path(path.GetChars(), path.GetLength());
-  if (md5path_cache_->Lookup(md5path, dirent))
-    return dirent->GetSpecial() != catalog::kDirentNegative;
+  if (md5path_cache_->Lookup(md5path, dirent)) {
+    if (dirent->GetSpecial() == catalog::kDirentNegative)
+      return false;
+    if (!nfs_maps_ && (live_inode != 0))
+      dirent->set_inode(live_inode);
+    return true;
+  }
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+  bool retval;
+  retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
+  if (retval) {
     if (nfs_maps_) {
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
+    } else {
+      // TODO: Ensure that regular files get a new inode on order to avoid
+      // page cache mixup
+      if (live_inode != 0)
+        dirent->set_inode(live_inode);
     }
-    dirent->set_parent_inode(parent_inode);
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -424,9 +601,8 @@ static bool GetDirentForPath(const PathString &path,
 
 static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   // Check the path cache first
-  if (path_cache_->Lookup(ino, path)) {
+  if (path_cache_->Lookup(ino, path))
     return true;
-  }
 
   if (nfs_maps_) {
     // NFS mode, just a lookup
@@ -438,28 +614,13 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     return false;
   }
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - recursively building path", ino);
+  if (ino == catalog_manager_->GetRootInode())
+    return true;
 
-  // Find out the parent path recursively and rebuild the absolute path
-  catalog::DirectoryEntry dirent;
-  if (!GetDirentForInode(ino, &dirent))
-    return false;
-
-  // Check if we reached the root node
-  if (dirent.inode() == catalog_manager_->GetRootInode()) {
-    path->Assign("", 0);
-  } else {
-    // Retrieve the parent path recursively
-    PathString parent_path;
-    if (!GetPathForInode(dirent.parent_inode(), &parent_path))
-      return false;
-
-    path->Assign(parent_path);
-    path->Append("/", 1);
-    path->Append(dirent.name().GetChars(), dirent.name().GetLength());
-  }
-
-  path_cache_->Insert(dirent.inode(), *path);
+  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
+  bool retval = inode_tracker_->FindPath(ino, path);
+  assert(retval);
+  path_cache_->Insert(ino, *path);
   return true;
 }
 
@@ -469,15 +630,14 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
  * This or getattr is called as kind of prerequisit to every operation.
  * We do check catalog TTL here (and reload, if necessary).
  */
-static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
-                         const char *name)
-{
+static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   atomic_inc64(&num_fs_lookup_);
   RemountCheck();
 
+  remount_fence_->Enter();
   parent = catalog_manager_->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_lookup in parent inode: %d for name: %s", parent, name);
+           "cvmfs_lookup in parent inode: %"PRIu64" for name: %s", parent, name);
 
   PathString path;
   PathString parent_path;
@@ -499,10 +659,13 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
           dirent.set_inode(1);
           goto reply_positive;
         }
-        if (GetDirentForInode(dirent.parent_inode(), &dirent))
+        if (GetPathForInode(parent, &parent_path) &&
+            GetDirentForPath(GetParentPath(parent_path), &dirent))
+        {
           goto reply_positive;
-        else
+        } else {
           goto reply_negative;
+        }
       }
     } else {
       goto reply_negative;
@@ -518,20 +681,48 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent,
   path.Append("/", 1);
   path.Append(name, strlen(name));
   tracer::Trace(tracer::kFuseLookup, path, "lookup()");
-  if (!GetDirentForPath(path, parent, &dirent)) {
+  if (!GetDirentForPath(path, &dirent)) {
     goto reply_negative;
   }
 
  reply_positive:
+  if (!nfs_maps_)
+    inode_tracker_->VfsGet(dirent.inode(), path);
+  remount_fence_->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
   fuse_reply_entry(req, &result);
   return;
 
  reply_negative:
+  remount_fence_->Leave();
   atomic_inc64(&num_fs_lookup_negative_);
   result.ino = 0;
   fuse_reply_entry(req, &result);
+}
+
+
+/**
+ *
+ */
+static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup)
+{
+  atomic_inc64(&cvmfs::num_fs_forget_);
+
+  // The libfuse high-level library does the same
+  if (ino == FUSE_ROOT_ID) {
+    fuse_reply_none(req);
+    return;
+  }
+
+  remount_fence_->Enter();
+  ino = catalog_manager_->MangleInode(ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %"PRIu64" by %u",
+           ino, nlookup);
+  if (!nfs_maps_)
+    inode_tracker_->VfsPut(ino, nlookup);
+  remount_fence_->Leave();
+  fuse_reply_none(req);
 }
 
 
@@ -544,11 +735,14 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   atomic_inc64(&num_fs_stat_);
   RemountCheck();
 
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %"PRIu64, ino);
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
+  // TODO: inject ancient directory into cwd buffer
+  remount_fence_->Leave();
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -567,11 +761,13 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   atomic_inc64(&num_fs_readlink_);
 
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %"PRIu64, ino);
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
+  remount_fence_->Leave();
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -591,7 +787,8 @@ static void AddToDirListing(const fuse_req_t req,
                             const char *name, const struct stat *stat_info,
                             struct DirectoryListing *listing)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s", name);
+  LogCvmfs(kLogCvmfs, kLogDebug, "Add to listing: %s, inode %"PRIu64,
+           name, stat_info->st_ino);
   size_t remaining_size = listing->capacity - listing->size;
   const size_t entry_size = fuse_add_direntry(req, NULL, 0, name, stat_info, 0);
 
@@ -615,22 +812,27 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
   RemountCheck();
+
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64, ino);
 
   PathString path;
   catalog::DirectoryEntry d;
-  const bool found = GetPathForInode(ino, &path) && GetDirentForInode(ino, &d);
+  const bool found = GetPathForInode(ino, &path) &&  GetDirentForInode(ino, &d);
 
   if (!found) {
+    remount_fence_->Leave();
     fuse_reply_err(req, ENOENT);
     return;
   }
-
   if (!d.IsDirectory()) {
+    remount_fence_->Leave();
     fuse_reply_err(req, ENOTDIR);
     return;
   }
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64", path %s",
+           ino, path.c_str());
 
   // Build listing
   DirectoryListing listing;
@@ -643,7 +845,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != catalog_manager_->GetRootInode() &&
-      GetDirentForInode(d.parent_inode(), &p))
+      GetDirentForPath(GetParentPath(path), &p))
   {
     info = p.GetStatStructure();
     AddToDirListing(req, "..", &info, &listing);
@@ -651,7 +853,10 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
-  if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
+  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog);
+  remount_fence_->Leave();
+
+  if (!retval) {
     free(listing.buffer);
     fuse_reply_err(req, EIO);
     return;
@@ -659,30 +864,29 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   for (catalog::StatEntryList::const_iterator i = listing_from_catalog.begin(),
        iEnd = listing_from_catalog.end(); i != iEnd; ++i)
   {
-    if (nfs_maps_) {
-      // Fix inodes
-      PathString entry_path;
-      entry_path.Assign(path);
-      entry_path.Append("/", 1);
-      entry_path.Append(i->name.GetChars(), i->name.GetLength());
+    // Fix inodes
+    PathString entry_path;
+    entry_path.Assign(path);
+    entry_path.Append("/", 1);
+    entry_path.Append(i->name.GetChars(), i->name.GetLength());
 
-      catalog::DirectoryEntry entry_dirent;
-      if (!GetDirentForPath(entry_path, ino, &entry_dirent)) {
-        LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
-                 entry_path.c_str());
-        continue;
-      }
-
-      struct stat fixed_info = i->info;
-      fixed_info.st_ino = entry_dirent.inode();
-      AddToDirListing(req, i->name.c_str(), &fixed_info, &listing);
-    } else {
-      AddToDirListing(req, i->name.c_str(), &(i->info), &listing);
+    catalog::DirectoryEntry entry_dirent;
+    if (!GetDirentForPath(entry_path, &entry_dirent)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
+               entry_path.c_str());
+      continue;
     }
+
+    struct stat fixed_info = i->info;
+    fixed_info.st_ino = entry_dirent.inode();
+    AddToDirListing(req, i->name.c_str(), &fixed_info, &listing);
   }
 
   // Save the directory listing and return a handle to the listing
   pthread_mutex_lock(&lock_directory_handles_);
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "linking directory handle %d to dir inode: %"PRIu64,
+           next_directory_handle_, ino);
   (*directory_handles_)[next_directory_handle_] = listing;
   fi->fh = next_directory_handle_;
   ++next_directory_handle_;
@@ -700,8 +904,9 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
                              struct fuse_file_info *fi)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode: %d",
-           catalog_manager_->MangleInode(ino));
+  ino = catalog_manager_->MangleInode(ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %"PRIu64
+           ", handle %d", ino, fi->fh);
 
   int reply = 0;
 
@@ -745,7 +950,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                           off_t off, struct fuse_file_info *fi)
 {
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_readdir on inode %d reading %d bytes from offset %d",
+           "cvmfs_readdir on inode %"PRIu64" reading %d bytes from offset %d",
            catalog_manager_->MangleInode(ino), size, off);
 
   DirectoryListing listing;
@@ -769,13 +974,15 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
  *
- * \return Read-only file descriptor in fi->fh
+ * \return Read-only file descriptor in fi->fh or kChunkedFileHandle for
+ * chunked files
  */
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi)
 {
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %"PRIu64, ino);
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -785,17 +992,18 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                      GetPathForInode(ino, &path);
 
   if (!found) {
-    if (fi->flags & O_CREAT)
-      fuse_reply_err(req, EROFS);
-    else
-      fuse_reply_err(req, ENOENT);
+    remount_fence_->Leave();
+    fuse_reply_err(req, ENOENT);
     return;
   }
+  remount_fence_->Leave();
 
-  if ((fi->flags & 3) != O_RDONLY) {
-    fuse_reply_err(req, EROFS);
-    return;
-  }
+  // Don't check.  Either done by the OS or one wants to purposefully work
+  // around wrong open flags
+  //if ((fi->flags & 3) != O_RDONLY) {
+  //  fuse_reply_err(req, EROFS);
+  //  return;
+  //}
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
     fuse_reply_err(req, EOPNOTSUPP);
@@ -807,47 +1015,85 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
-  atomic_inc64(&num_fs_open_);
+  atomic_inc64(&num_fs_open_);  // Count actual open / fetch operations
+
+  if (dirent.IsChunkedFile()) {
+    // TODO: file descriptor pool and accounting
+    LogCvmfs(kLogCvmfs, kLogDebug, "chunked file %s opened (download delayed "
+                                   "to read() call)",
+             path.c_str());
+
+    // Retrieve File chunks from the catalog
+    FileChunks chunks;
+    if (!dirent.catalog()->ListFileChunks(path, &chunks) || chunks.empty()) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
+               "but no chunks found in the catalog %s.", path.c_str(),
+               dirent.catalog()->path().c_str());
+      fuse_reply_err(req, EIO);
+      return;
+    }
+
+    // Add process data to the retrieved chunks
+    LiveFileChunks live_chunks;
+    FileChunks::const_iterator i    = chunks.begin();
+    FileChunks::const_iterator iend = chunks.end();
+    for (; i != iend; ++i) {
+      live_chunks.push_back(LiveFileChunk(*i));
+    }
+
+    // Save the newly opened file chunks into the respective list
+    {
+      WriteLockGuard guard(live_file_chunks_mutex_);
+      if (live_file_chunks_->count(ino) == 0) {
+        (*live_file_chunks_)[ino] = live_chunks;
+      }
+    }
+
+    // Actual file chunks will be loaded on demand...
+    fi->fh = kChunkedFileHandle;
+    fuse_reply_open(req, fi);
+    return;
+  }
+
+  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      // If file has changed with a new catalog, the kernel data cache needs
-      // to be invalidated.  Special case: 0s metadata timeout includes no page
-      // cache
-      fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
+      /*fi->keep_cache = kcache_timeout_ == 0.0 ? 0 : 1;
       if (dirent.cached_mtime() != dirent.mtime()) {
         LogCvmfs(kLogCvmfs, kLogDebug,
-                 "file might be new or changed, invalidating cache (%d %d)",
-                 dirent.mtime(), dirent.cached_mtime());
+                 "file might be new or changed, invalidating cache (%d %d "
+                 "%"PRIu64")", dirent.mtime(), dirent.cached_mtime(), ino);
         fi->keep_cache = 0;
         dirent.set_cached_mtime(dirent.mtime());
         inode_cache_->Insert(ino, dirent);
-      }
+      }*/
+      fi->keep_cache = 0;
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
     } else {
       if (close(fd) == 0) atomic_dec32(&open_files_);
-      LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
       return;
     }
-  } else {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "failed to open inode: %d, CAS key %s, error code %d",
-             ino, dirent.checksum().ToString().c_str(), errno);
-    if (errno == EMFILE) {
-      fuse_reply_err(req, EMFILE);
-      return;
-    }
+    assert(false);
+  }
+
+  // fd < 0
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+           "failed to open inode: %"PRIu64", CAS key %s, error code %d",
+           ino, dirent.checksum().ToString().c_str(), errno);
+  if (errno == EMFILE) {
+    fuse_reply_err(req, EMFILE);
+    return;
   }
 
   // Prevent Squid DoS
-  // TODO: move to download
   time_t now = time(NULL);
   if (now - previous_io_error_.timestamp < kForgetDos) {
     SafeSleepMs(previous_io_error_.delay);
@@ -871,23 +1117,100 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi)
 {
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_read on inode: %d reading %d bytes from offset %d fd %d",
+           "cvmfs_read on inode: %"PRIu64" reading %d bytes from offset %d fd %d",
            catalog_manager_->MangleInode(ino), size, off, fi->fh);
   atomic_inc64(&num_fs_read_);
 
   // Get data chunk (<=4k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
-  const int64_t fd = fi->fh;
-  int result = pread(fd, data, size, off);
+
+  unsigned int overall_bytes_fetched = 0;
+
+  // Do we have a a chunked file?
+  if (fi->fh == kChunkedFileHandle) {
+    // TODO: file descriptor pool and accounting
+    // TODO: read-ahead thread for chunks
+    WriteLockGuard guard(live_file_chunks_mutex_);
+
+    // find the file chunk descriptions for the requested inode
+    LiveFileChunksMap::iterator chunks_itr = live_file_chunks_->find(ino);
+    if (chunks_itr == live_file_chunks_->end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "failed to find file chunk data for ino: %d", ino);
+      fuse_reply_err(req, EINVAL);
+      return;
+    }
+    LiveFileChunks &chunks = chunks_itr->second;
+
+    // TODO: unlock here?
+    // find the chunk that holds the beginning of the requested data
+    LiveFileChunks::iterator chunk_itr = chunks.begin();
+    chunk_itr = std::lower_bound(chunk_itr,
+                                 chunks.end(),
+                                 off);
+    if (chunk_itr == chunks.end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "failed to find specific file chunk for ino: %d "
+               "starting at offset: %d", ino, off);
+      fuse_reply_err(req, EIO);
+      return;
+    }
+
+    // fetch all needed chunks and read the requested data
+    off_t offset_in_chunk = off - chunk_itr->offset();
+    do {
+      assert (chunk_itr != chunks.end());
+      LiveFileChunk &chunk = *chunk_itr;
+
+      // download and open chunk on demand
+      if (!chunk.IsOpen() && !chunk.Fetch()) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "failed to load chunk "
+                 "for inode: %"PRIu64", CAS key: %s, error code: %d",
+                 ino, chunk.content_hash().ToString().c_str(), errno);
+
+        if (errno == EMFILE) {
+          fuse_reply_err(req, EMFILE);
+          return;
+        }
+
+        fuse_reply_err(req, EIO);
+        return;
+      }
+
+      // read data from the chunk
+      assert (chunk.IsOpen());
+      const size_t bytes_to_read            = size - overall_bytes_fetched;
+      const size_t remaining_bytes_in_chunk = chunk.size() - offset_in_chunk;
+      size_t bytes_to_read_in_chunk =
+        std::min(bytes_to_read, remaining_bytes_in_chunk);
+      const size_t bytes_fetched = pread(chunk.file_descriptor(),
+                                         data + overall_bytes_fetched,
+                                         bytes_to_read_in_chunk,
+                                         offset_in_chunk);
+
+      if (bytes_fetched == (size_t)-1) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d",
+                 errno, bytes_fetched);
+        fuse_reply_err(req, errno);
+        return;
+      }
+      overall_bytes_fetched += bytes_fetched;
+
+      // advance to the next chunk to keep on reading data
+      chunk.Close();
+      ++chunk_itr;
+      offset_in_chunk = 0;
+    } while (overall_bytes_fetched < size && chunk_itr != chunks.end());
+
+  } else {
+    const int64_t fd = fi->fh;
+    overall_bytes_fetched = pread(fd, data, size, off);
+  }
 
   // Push it to user
-  if (result >= 0) {
-    fuse_reply_buf(req, data, result);
-    LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user", result);
-  } else {
-    LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d", errno, result);
-    fuse_reply_err(req, errno);
-  }
+  fuse_reply_buf(req, data, overall_bytes_fetched);
+  LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user",
+           overall_bytes_fetched);
 }
 
 
@@ -897,19 +1220,28 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %d",
-           catalog_manager_->MangleInode(ino));
-
+  ino = catalog_manager_->MangleInode(ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %"PRIu64, ino);
   const int64_t fd = fi->fh;
-  if (close(fd) == 0) atomic_dec32(&open_files_);
 
+  // do we haveh a chunked file?
+  if (static_cast<uint64_t>(fd) == kChunkedFileHandle) {
+    WriteLockGuard guard(live_file_chunks_mutex_);
+    if (live_file_chunks_->erase(ino) > 0) {
+      atomic_dec32(&open_files_);
+    }
+  } else {
+    if (close(fd) == 0) {
+      atomic_dec32(&open_files_);
+    }
+  }
   fuse_reply_err(req, 0);
 }
 
 
 static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %d", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %"PRIu64, ino);
 
   // If we return 0 it will cause the fs to be ignored in "df"
   struct statvfs info;
@@ -943,9 +1275,11 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info.f_bfree = info.f_bavail = available;
 
   // Inodes / entries
+  remount_fence_->Enter();
   info.f_files = catalog_manager_->all_inodes();
   info.f_ffree = info.f_favail =
     catalog_manager_->all_inodes() - catalog_manager_->loaded_inodes();
+  remount_fence_->Leave();
 
   fuse_reply_statfs(req, &info);
 }
@@ -959,13 +1293,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                            size_t size)
 #endif
 {
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_getxattr on inode: %d for xattr: %s", ino, name);
+           "cvmfs_getxattr on inode: %"PRIu64" for xattr: %s", ino, name);
 
   const string attr = name;
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
+  remount_fence_->Leave();
 
   if (!found) {
     fuse_reply_err(req, ENOENT);
@@ -1098,12 +1434,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+  remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %d, size %u",
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %"PRIu64", size %u",
            ino, size);
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
+  remount_fence_->Leave();
+
   if (!found) {
     fuse_reply_err(req, ENOENT);
     return;
@@ -1130,6 +1469,19 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
 
 
+bool Evict(const string &path) {
+  catalog::DirectoryEntry dirent;
+  remount_fence_->Enter();
+  const bool found = GetDirentForPath(PathString(path), &dirent);
+  remount_fence_->Leave();
+
+  if (!found && dirent.IsRegular())
+    return false;
+  quota::Remove(dirent.checksum());
+  return true;
+}
+
+
 /**
  * Do after-daemon() initialization
  */
@@ -1143,6 +1495,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
+  // The debug log is already closed at this point
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
 }
 
@@ -1168,6 +1521,7 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->statfs      = cvmfs_statfs;
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
+  cvmfs_operations->forget      = cvmfs_forget;
 }
 
 }  // namespace cvmfs
@@ -1202,6 +1556,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
   unsigned proxy_reset_after = 0;
+  unsigned host_reset_after = 0;
   unsigned max_retries = 1;
   unsigned backoff_init = 2000;
   unsigned backoff_max = 10000;
@@ -1212,13 +1567,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool diskless = false;
   bool rebuild_cachedb = false;
   bool nfs_source = false;
+  bool nfs_shared = false;
+  string nfs_shared_dir = string(cvmfs::kDefaultCachedir);
   bool shared_cache = false;
-  int64_t quota_limit;
+  int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
   string proxies = "";
   string public_keys = "";
   bool ignore_signature = false;
   string root_hash = "";
+  string repository_tag = "";
 
   cvmfs::boot_time_ = loader_exports->boot_time;
 
@@ -1242,6 +1600,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     SetLogSyslogLevel(3);
   if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
     SetLogSyslogFacility(String2Int64(parameter));
+  if (options::GetValue("CVMFS_USYSLOG", &parameter))
+    SetLogMicroSyslog(parameter);
   if (options::GetValue("CVMFS_DEBUGLOG", &parameter))
     SetLogDebugFile(parameter);
   SetLogSyslogPrefix(loader_exports->repository_name);
@@ -1257,6 +1617,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     timeout_direct = String2Uint64(parameter);
   if (options::GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
     proxy_reset_after = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_HOST_RESET_AFTER", &parameter))
+    host_reset_after = String2Uint64(parameter);
   if (options::GetValue("CVMFS_MAX_RETRIES", &parameter))
     max_retries = String2Uint64(parameter);
   if (options::GetValue("CVMFS_BACKOFF_INIT", &parameter))
@@ -1273,10 +1635,18 @@ static int Init(const loader::LoaderExports *loader_exports) {
     quota_limit = String2Int64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
-  if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter))
+  if (options::GetValue("CVMFS_KEYS_DIR", &parameter)) {
+    // Collect .pub files from CVMFS_KEYS_DIR
+    public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
+  } else if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
     public_keys = parameter;
+  } else {
+    public_keys = JoinStrings(FindFiles("/etc/cvmfs/keys", ".pub"), ":");
+  }
   if (options::GetValue("CVMFS_ROOT_HASH", &parameter))
     root_hash = parameter;
+  if (options::GetValue("CVMFS_REPOSITORY_TAG", &parameter))
+    repository_tag = parameter;
   if (options::GetValue("CVMFS_DISKLESS", &parameter) &&
       options::IsOn(parameter))
   {
@@ -1286,6 +1656,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       options::IsOn(parameter))
   {
     nfs_source = true;
+    if (options::GetValue("CVMFS_NFS_SHARED", &parameter))
+    {
+      nfs_shared = true;
+      nfs_shared_dir = MakeCanonicalPath(parameter);
+    }
   }
   if (options::GetValue("CVMFS_IGNORE_SIGNATURE", &parameter) &&
       options::IsOn(parameter))
@@ -1320,8 +1695,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
   cvmfs::cachedir_ = new string(cachedir);
+  cvmfs::nfs_shared_dir_ = new string(nfs_shared_dir);
   cvmfs::tracefile_ = new string(tracefile);
   cvmfs::repository_name_ = new string(loader_exports->repository_name);
+  cvmfs::repository_tag_ = new string(repository_tag);
   cvmfs::mountpoint_ = new string(loader_exports->mount_point);
   g_uid = geteuid();
   g_gid = getegid();
@@ -1333,8 +1710,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            int(cvmfs::kcache_timeout_));
 
-  // Tune SQlite3 memory
+  // Tune SQlite3
   sqlite3_shutdown();  // Make sure SQlite starts clean after initialization
+  retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+  assert(retval == SQLITE_OK);
   g_sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   g_sqlite_page_cache = smalloc(1280*3275);  // 4MB
   retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, g_sqlite_scratch, 8192, 16);
@@ -1358,11 +1737,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
   cvmfs::md5path_cache_ =
     new lru::Md5PathCache((memcache_num_units*7) & mask_64);
+  cvmfs::inode_tracker_ = new glue::InodeTracker();
 
-  // TODO: in loader
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
+  cvmfs::live_file_chunks_  = new cvmfs::LiveFileChunksMap();
+  cvmfs::live_file_chunks_->set_empty_key((fuse_ino_t)(-1));
+  cvmfs::live_file_chunks_->set_deleted_key((fuse_ino_t)(-2));
 
   // Runtime counters
   atomic_init64(&cvmfs::num_fs_open_);
@@ -1372,6 +1754,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   atomic_init64(&cvmfs::num_fs_stat_);
   atomic_init64(&cvmfs::num_fs_read_);
   atomic_init64(&cvmfs::num_fs_readlink_);
+  atomic_init64(&cvmfs::num_fs_forget_);
   atomic_init32(&cvmfs::num_io_error_);
   cvmfs::previous_io_error_.timestamp = 0;
   cvmfs::previous_io_error_.delay = 0;
@@ -1401,16 +1784,40 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Create lock file and running sentinel
-  g_fd_lockfile = LockFile("lock." + *cvmfs::repository_name_);
-  if (g_fd_lockfile < 0) {
+  g_fd_lockfile = TryLockFile("lock." + *cvmfs::repository_name_);
+  if (g_fd_lockfile == -1) {
     *g_boot_error = "could not acquire lock (" + StringifyInt(errno) + ")";
     return loader::kFailCacheDir;
+  } else if (g_fd_lockfile == -2) {
+    // Prevent double mount
+    string fqrn;
+    retval = platform_getxattr(*cvmfs::mountpoint_, "user.fqrn", &fqrn);
+    if (!retval) {
+      g_fd_lockfile = LockFile("lock." + *cvmfs::repository_name_);
+      if (g_fd_lockfile < 0) {
+        *g_boot_error = "could not acquire lock (" + StringifyInt(errno) + ")";
+        return loader::kFailCacheDir;
+      }
+    } else {
+      if (fqrn == *cvmfs::repository_name_) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                 "repository already mounted on %s",
+                 cvmfs::mountpoint_->c_str());
+        return loader::kFailDoubleMount;
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+                 "CernVM-FS repository %s already mounted on %s",
+                 fqrn.c_str(), cvmfs::mountpoint_->c_str());
+        return loader::kFailOtherMount;
+
+      }
+    }
   }
   platform_stat64 info;
   if (platform_stat(("running." + *cvmfs::repository_name_).c_str(),
                     &info) == 0)
   {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "looks like cvmfs has been "
              "crashed previously, rebuilding cache database");
     rebuild_cachedb = true;
   }
@@ -1443,14 +1850,19 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
 
     cvmfs::nfs_maps_ = true;
-    const string leveldb_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
-    if (!MkdirDeep(leveldb_cache_dir, 0700)) {
+
+    string inode_cache_dir = "./nfs_maps." + (*cvmfs::repository_name_);
+    if (nfs_shared) {
+      inode_cache_dir = (*cvmfs::nfs_shared_dir_) + "/nfs_maps."
+                          + (*cvmfs::repository_name_);
+    }
+    if (!MkdirDeep(inode_cache_dir, 0700)) {
       *g_boot_error = "Failed to initialize NFS maps";
       return loader::kFailNfsMaps;
     }
-    if (!nfs_maps::Init(leveldb_cache_dir,
-                        catalog::AbstractCatalogManager::GetRootInode(),
-                        rebuild_cachedb))
+    if (!nfs_maps::Init(inode_cache_dir,
+                        catalog::AbstractCatalogManager::kInodeOffset+1,
+                        rebuild_cachedb, nfs_shared))
     {
       *g_boot_error = "Failed to initialize NFS maps";
       return loader::kFailNfsMaps;
@@ -1484,7 +1896,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   if (quota::GetSize() > quota::GetCapacity()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "cache is already beyond quota size, cleaning up");
+             "cache is already beyond quota size "
+             "(size: %"PRId64", capacity: %"PRId64"), cleaning up",
+             quota::GetSize(), quota::GetCapacity());
     if (!quota::Cleanup(quota_threshold)) {
       *g_boot_error = "Failed to clean up cache";
       return loader::kFailQuota;
@@ -1497,14 +1911,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Monitor, check for maximum number of open files
-  if (!monitor::Init(".", *cvmfs::repository_name_, true)) {
-    *g_boot_error = "failed to initialize watchdog.";
-    return loader::kFailMonitor;
+  if (cvmfs::UseWatchdog()) {
+    if (!monitor::Init(".", *cvmfs::repository_name_, true)) {
+      *g_boot_error = "failed to initialize watchdog.";
+      return loader::kFailMonitor;
+    }
+    g_monitor_ready = true;
   }
   cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
   atomic_init32(&cvmfs::open_files_);
   atomic_init32(&cvmfs::open_dirs_);
-  g_monitor_ready = true;
 
   // Control & command interface
   if (!talk::Init(".")) {
@@ -1515,11 +1931,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
   g_talk_ready = true;
 
   // Network initialization
-  download::Init(cvmfs::kDefaultNumConnections);
+  download::Init(cvmfs::kDefaultNumConnections, false);
   download::SetHostChain(hostname);
   download::SetProxyChain(proxies);
   download::SetTimeout(timeout, timeout_direct);
   download::SetProxyGroupResetDelay(proxy_reset_after);
+  download::SetHostResetDelay(host_reset_after);
   download::SetRetryParameters(max_retries, backoff_init, backoff_max);
   g_download_ready = true;
 
@@ -1540,8 +1957,56 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Load initial file catalog
+  LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
+           sizeof(fuse_ino_t) * 8);
+  cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
   cvmfs::catalog_manager_ =
       new cache::CatalogManager(*cvmfs::repository_name_, ignore_signature);
+  if (!nfs_source) {
+    cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
+  }
+
+  // Load specific tag (root hash has precedence)
+  if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
+    manifest::ManifestEnsemble ensemble;
+    retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL, &ensemble);
+    if (retval != manifest::kFailOk) {
+      *g_boot_error = "Failed to fetch manifest";
+      return loader::kFailHistory;
+    }
+    hash::Any history_hash = ensemble.manifest->history();
+    if (history_hash.IsNull()) {
+      *g_boot_error = "No history";
+      return loader::kFailHistory;
+    }
+    string history_path = "txn/historydb" + history_hash.ToString() + "." +
+                          *cvmfs::repository_name_;
+    string history_url = "/data" + history_hash.MakePath(1, 2) + "H";
+    download::JobInfo download_history(&history_url, true, true, &history_path,
+                                       &history_hash);
+    retval = download::Fetch(&download_history);
+    if (retval != download::kFailOk) {
+      *g_boot_error = "failed to download history: " + StringifyInt(retval);
+      return loader::kFailHistory;
+    }
+    history::Database tag_db;
+    history::TagList tag_list;
+    retval = tag_db.Open(history_path, sqlite::kDbOpenReadOnly) &&
+             tag_list.Load(&tag_db);
+    unlink(history_path.c_str());
+    if (!retval) {
+      *g_boot_error = "failed to open history";
+      return loader::kFailHistory;
+    }
+    history::Tag tag;
+    retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
+    if (!retval) {
+      *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
+      return loader::kFailHistory;
+    }
+    root_hash = tag.root_hash.ToString();
+  }
+
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
@@ -1553,6 +2018,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
     *g_boot_error = "Failed to initialize root file catalog";
     return loader::kFailCatalog;
   }
+  cvmfs::inode_generation_info_.initial_revision =
+    cvmfs::catalog_manager_->GetRevision();
+  LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %"PRIu64,
+           cvmfs::catalog_manager_->GetRootInode());
+
+  cvmfs::remount_fence_ = new cvmfs::RemountFence();
 
   return loader::kFailOk;
 }
@@ -1586,7 +2057,9 @@ static void Spawn() {
   }
 
   cvmfs::pid_ = getpid();
-  monitor::Spawn();
+  if (cvmfs::UseWatchdog() && g_monitor_ready) {
+    monitor::Spawn();
+  }
   download::Spawn();
   quota::Spawn();
   talk::Spawn();
@@ -1623,16 +2096,36 @@ static void Fini() {
   if (g_peers_ready) peers::Fini();
   if (g_options_ready) options::Fini();
 
+  delete cvmfs::remount_fence_;
   delete cvmfs::catalog_manager_;
+  delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
+  delete cvmfs::live_file_chunks_;
+  delete cvmfs::inode_tracker_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
   delete cvmfs::md5path_cache_;
+  delete cvmfs::cachedir_;
+  delete cvmfs::nfs_shared_dir_;
+  delete cvmfs::tracefile_;
+  delete cvmfs::repository_name_;
+  delete cvmfs::repository_tag_;
+  delete cvmfs::mountpoint_;
+  cvmfs::remount_fence_ = NULL;
   cvmfs::catalog_manager_ = NULL;
+  cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
+  cvmfs::live_file_chunks_ = NULL;
+  cvmfs::inode_tracker_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;
   cvmfs::md5path_cache_ = NULL;
+  cvmfs::cachedir_ = NULL;
+  cvmfs::nfs_shared_dir_ = NULL;
+  cvmfs::tracefile_ = NULL;
+  cvmfs::repository_name_ = NULL;
+  cvmfs::repository_tag_ = NULL;
+  cvmfs::mountpoint_= NULL;
 
   sqlite3_shutdown();
   if (g_sqlite_page_cache) free(g_sqlite_page_cache);
@@ -1640,8 +2133,11 @@ static void Fini() {
   g_sqlite_page_cache = NULL;
   g_sqlite_scratch = NULL;
 
-  if (g_boot_error) free(g_boot_error);
+  delete g_boot_error;
   g_boot_error = NULL;
+  SetLogSyslogPrefix("");
+  SetLogMicroSyslog("");
+  SetLogDebugFile("");
 }
 
 
@@ -1663,22 +2159,66 @@ static bool MaintenanceMode(const int fd_progress) {
   string msg_progress = "Draining out kernel caches (" +
                         StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  SafeSleepMs((int)cvmfs::kcache_timeout_*1000);
+  SafeSleepMs((int)cvmfs::kcache_timeout_*1000 + cvmfs::kReloadSafetyMargin);
   return true;
 }
 
 
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
-  string msg_progress = "Saving open directory handles (" +
-    StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
-  SendMsg2Socket(fd_progress, msg_progress);
+  string msg_progress;
 
-  cvmfs::DirectoryHandles *saved_handles =
-    new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
-  loader::SavedState *save_open_dirs = new loader::SavedState();
-  save_open_dirs->state_id = loader::kStateOpenDirs;
-  save_open_dirs->state = saved_handles;
-  saved_states->push_back(save_open_dirs);
+  unsigned num_open_dirs = cvmfs::directory_handles_->size();
+  if (num_open_dirs != 0) {
+#ifdef DEBUGMSG
+    for (cvmfs::DirectoryHandles::iterator i = cvmfs::directory_handles_->begin(),
+         iEnd = cvmfs::directory_handles_->end(); i != iEnd; ++i)
+    {
+      LogCvmfs(kLogCvmfs, kLogDebug, "saving dirhandle %d", i->first);
+    }
+#endif
+
+    msg_progress = "Saving open directory handles (" +
+      StringifyInt(num_open_dirs) + " handles)\n";
+    SendMsg2Socket(fd_progress, msg_progress);
+
+    // TODO: should rather be saved just in a malloc'd memory block
+    cvmfs::DirectoryHandles *saved_handles =
+      new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
+    loader::SavedState *save_open_dirs = new loader::SavedState();
+    save_open_dirs->state_id = loader::kStateOpenDirs;
+    save_open_dirs->state = saved_handles;
+    saved_states->push_back(save_open_dirs);
+  }
+
+  if (!cvmfs::nfs_maps_) {
+    msg_progress = "Saving inode tracker\n";
+    SendMsg2Socket(fd_progress, msg_progress);
+    glue::InodeTracker *saved_inode_tracker =
+      new glue::InodeTracker(*cvmfs::inode_tracker_);
+    loader::SavedState *state_glue_buffer = new loader::SavedState();
+    state_glue_buffer->state_id = loader::kStateGlueBufferV2;
+    state_glue_buffer->state = saved_inode_tracker;
+    saved_states->push_back(state_glue_buffer);
+  }
+
+  msg_progress = "Saving inode generation\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  cvmfs::inode_generation_info_.inode_generation +=
+    cvmfs::catalog_manager_->inode_gauge();
+  cvmfs::InodeGenerationInfo *saved_inode_generation =
+    new cvmfs::InodeGenerationInfo(cvmfs::inode_generation_info_);
+  loader::SavedState *state_inode_generation = new loader::SavedState();
+  state_inode_generation->state_id = loader::kStateInodeGeneration;
+  state_inode_generation->state = saved_inode_generation;
+  saved_states->push_back(state_inode_generation);
+
+  msg_progress = "Saving open files counter\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  uint32_t *saved_num_fd = new uint32_t(cvmfs::open_files_);
+  loader::SavedState *state_num_fd = new loader::SavedState();
+  state_num_fd->state_id = loader::kStateOpenFilesCounter;
+  state_num_fd->state = saved_num_fd;
+  saved_states->push_back(state_num_fd);
 
   return true;
 }
@@ -1694,11 +2234,64 @@ static bool RestoreState(const int fd_progress,
       cvmfs::DirectoryHandles *saved_handles =
         (cvmfs::DirectoryHandles *)saved_states[i]->state;
       cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
+      cvmfs::open_dirs_ = cvmfs::directory_handles_->size();
+      cvmfs::DirectoryHandles::const_iterator i =
+        cvmfs::directory_handles_->begin();
+      for (; i != cvmfs::directory_handles_->end(); ++i) {
+        if (i->first >= cvmfs::next_directory_handle_)
+          cvmfs::next_directory_handle_ = i->first + 1;
+      }
 
       SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
     }
+
+    if (saved_states[i]->state_id == loader::kStateGlueBuffer) {
+      SendMsg2Socket(fd_progress, "Migrating inode tracker... ");
+      compat::inode_tracker::InodeTracker *saved_inode_tracker =
+        (compat::inode_tracker::InodeTracker *)saved_states[i]->state;
+      compat::inode_tracker::Migrate(saved_inode_tracker, cvmfs::inode_tracker_);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateGlueBufferV2) {
+      SendMsg2Socket(fd_progress, "Restoring inode tracker... ");
+      delete cvmfs::inode_tracker_;
+      glue::InodeTracker *saved_inode_tracker =
+        (glue::InodeTracker *)saved_states[i]->state;
+      cvmfs::inode_tracker_ = new glue::InodeTracker(*saved_inode_tracker);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
+      SendMsg2Socket(fd_progress, "Restoring inode generation... ");
+      cvmfs::InodeGenerationInfo *old_info =
+        (cvmfs::InodeGenerationInfo *)saved_states[i]->state;
+      if (old_info->version == 1) {
+        // Migration
+        cvmfs::inode_generation_info_.initial_revision =
+          old_info->initial_revision;
+        cvmfs::inode_generation_info_.incarnation = old_info->incarnation;
+        // Note: in the rare case of inode generation being 0 before, inode
+        // can clash after reload before remount
+      } else {
+        cvmfs::inode_generation_info_ = *old_info;
+      }
+      ++cvmfs::inode_generation_info_.incarnation;
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateOpenFilesCounter) {
+      SendMsg2Socket(fd_progress, "Restoring open files counter... ");
+      cvmfs::open_files_ = *((uint32_t *)saved_states[i]->state);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
   }
+  if (cvmfs::inode_annotation_) {
+    uint64_t saved_generation = cvmfs::inode_generation_info_.inode_generation;
+    cvmfs::inode_annotation_->IncGeneration(saved_generation);
+  }
+
   return true;
 }
 
@@ -1707,9 +2300,30 @@ static void FreeSavedState(const int fd_progress,
                            const loader::StateList &saved_states)
 {
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
-    if (saved_states[i]->state_id == loader::kStateOpenDirs) {
-      SendMsg2Socket(fd_progress, "Releasing saved open directory handles\n");
-      delete (cvmfs::DirectoryHandles *)saved_states[i]->state;
+    switch (saved_states[i]->state_id) {
+      case loader::kStateOpenDirs:
+        SendMsg2Socket(fd_progress, "Releasing saved open directory handles\n");
+        delete static_cast<cvmfs::DirectoryHandles *>(saved_states[i]->state);
+        break;
+      case loader::kStateGlueBuffer:
+        SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
+        delete static_cast<compat::inode_tracker::InodeTracker *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateGlueBufferV2:
+        SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
+        delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
+        break;
+      case loader::kStateInodeGeneration:
+        SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");
+        delete static_cast<cvmfs::InodeGenerationInfo *>(saved_states[i]->state);
+        break;
+      case loader::kStateOpenFilesCounter:
+        SendMsg2Socket(fd_progress, "Releasing open files counter\n");
+        delete static_cast<uint32_t *>(saved_states[i]->state);
+        break;
+      default:
+        break;
     }
   }
 }

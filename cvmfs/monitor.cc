@@ -13,7 +13,6 @@
 
 #include <signal.h>
 #include <sys/resource.h>
-#include <execinfo.h>
 #ifdef __APPLE__
   #include <sys/ucontext.h>
 #else
@@ -28,6 +27,7 @@
 #include <time.h>
 
 #include <string>
+#include <map>
 
 #include <cstring>
 #include <cstdio>
@@ -38,6 +38,8 @@
 #include "util.h"
 #include "logging.h"
 #include "smalloc.h"
+
+#include "cvmfs.h"
 
 using namespace std;  // NOLINT
 
@@ -50,41 +52,51 @@ const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 
 string *cache_dir_ = NULL;
 string *process_name_ = NULL;
+string *exe_path_ = NULL;
 bool spawned_ = false;
-unsigned max_open_files_;
 int pipe_wd_[2];
 platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
+pid_t watchdog_pid_ = 0;
 
+typedef std::map<int, struct sigaction> SigactionMap;
+SigactionMap old_signal_handlers_;
 
-/**
- * Get the instruction pointer in a platform independant fashion.
- */
-static void* GetInstructionPointer(ucontext_t *uc) {
-  void *result;
+pid_t GetPid() {
+  if (!spawned_) {
+    return cvmfs::pid_;
+  }
 
-#ifdef __APPLE__
-#ifdef __x86_64__
-  result = reinterpret_cast<void *>(uc->uc_mcontext->__ss.__rip);
-#else
-  result = reinterpret_cast<void *>(uc-uc_mcontext->__ss.__eip);
-#endif
-
-#else  // Linux
-
-#ifdef __x86_64__
-  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_RIP]);
-#else
-  result = reinterpret_cast<void *>(uc->uc_mcontext.gregs[REG_EIP]);
-#endif
-#endif
-
-  return result;
+  return watchdog_pid_;
 }
 
 
 /**
- * Signal handler for bad things.  Send debug information to watchdog.
+ * Sets the signal handlers of the current process according to the ones
+ * defined in the given SigactionMap.
+ *
+ * @param signal_handlers  a map of SIGNAL -> struct sigaction
+ * @return                 a SigactionMap containing the old handlers
+ */
+static SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers) {
+  SigactionMap old_signal_handlers;
+  SigactionMap::const_iterator i     = signal_handlers.begin();
+  SigactionMap::const_iterator iend  = signal_handlers.end();
+  for (; i != iend; ++i) {
+    struct sigaction old_signal_handler;
+    if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
+      abort();
+    }
+    old_signal_handlers[i->first] = old_signal_handler;
+  }
+
+  return old_signal_handlers;
+}
+
+
+/**
+ * Signal handler for signals that indicate a cvmfs crash.
+ * Sends debug information to watchdog.
  */
 static void SendTrace(int signal,
                       siginfo_t *siginfo __attribute__((unused)),
@@ -96,28 +108,38 @@ static void SendTrace(int signal,
     while (true) {}
   }
 
-  void *adr_buf[kMaxBacktrace];
+  // Set the original signal handler for the raised signal in
+  // SIGQUIT (watchdog process will raise SIGQUIT)
+  (void) sigaction(SIGQUIT, &old_signal_handlers_[signal], NULL);
+
   char cflow = 'S';
   if (write(pipe_wd_[1], &cflow, 1) != 1)
     _exit(1);
 
+  // write the occured signal
   if (write(pipe_wd_[1], &signal, sizeof(signal)) != sizeof(signal))
     _exit(1);
+
+  // write the last error number
   if (write(pipe_wd_[1], &send_errno, sizeof(send_errno)) != sizeof(send_errno))
     _exit(1);
 
-  int stack_size = backtrace(adr_buf, kMaxBacktrace);
-  // Fix around sigaction
-  if (stack_size > 1) {
-    ucontext_t *uc = reinterpret_cast<ucontext_t *>(context);
-    adr_buf[1] = GetInstructionPointer(uc);
-  }
-  if (write(pipe_wd_[1], &stack_size, sizeof(stack_size)) != sizeof(stack_size))
+  // write the PID
+  pid_t pid = getpid();
+  if (write(pipe_wd_[1], &pid, sizeof(pid_t)) != sizeof(pid_t))
     _exit(1);
-  backtrace_symbols_fd(adr_buf, stack_size, pipe_wd_[1]);
 
-  cflow = 'Q';
-  (void)write(pipe_wd_[1], &cflow, 1);
+  // do not die before the stack trace was generated
+  // kill -SIGQUIT <pid> will finish this
+  int counter = 0;
+  while(true) {
+    SafeSleepMs(100);
+    // quit anyway after 30 seconds
+    if (++counter == 300) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
+      _exit(1);
+    }
+  }
 
   _exit(1);
 }
@@ -141,21 +163,110 @@ static void LogEmergency(string msg) {
   } else {
     msg += " (failed to open log file in cache directory)";
   }
-  LogCvmfs(kLogMonitor, kLogSyslog, "%s", msg.c_str());
+  LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
 }
 
 
 /**
- * Read a line from the pipe.
- * Quite inefficient but good enough for the purpose.
+ * reads from the file descriptor until the specific gdb prompt
+ * is reached or the pipe gets broken
+ *
+ * @param fd_pipe  the file descriptor of the pipe to be read
+ * @return         the data read from the pipe
  */
-static string ReadLineFromPipe() {
-  string result = "";
-  char next;
-  while (read(pipe_wd_[0], &next, 1) == 1) {
-    result += next;
-    if (next == '\n') break;
+static string ReadUntilGdbPrompt(int fd_pipe) {
+  static const string gdb_prompt = "\n(gdb) ";
+
+  string        result;
+  char          mini_buffer;
+  int           chars_io;
+  unsigned int  ring_buffer_pos = 0;
+
+  // read from stdout of gdb until gdb prompt occures --> (gdb)
+  while (1) {
+    chars_io = read(fd_pipe, &mini_buffer, 1);
+
+    // in case something goes wrong...
+    if (chars_io <= 0) break;
+
+    result += mini_buffer;
+
+    // find the gdb_promt in the stdout data
+    if (mini_buffer == gdb_prompt[ring_buffer_pos]) {
+      ++ring_buffer_pos;
+      if (ring_buffer_pos == gdb_prompt.size()) {
+        break;
+      }
+    } else {
+      ring_buffer_pos = 0;
+    }
   }
+
+  return result;
+}
+
+
+
+/**
+ * Uses an external shell and gdb to create a full stack trace of the dying
+ * cvmfs client. The same shell is used to force-quit the client afterwards.
+ */
+static string GenerateStackTrace(const string &exe_path,
+                                 const pid_t   pid) {
+  int retval;
+  string result = "";
+
+  // re-gain root permissions to allow for ptrace of died cvmfs2 process
+  const bool retrievable = true;
+  if (!SwitchCredentials(0, getgid(), retrievable)) {
+    result += "failed to re-gain root permissions... still give it a try\n";
+  }
+
+  // run gdb and attach to the dying cvmfs2 process
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  std::vector<std::string> argv; // TODO: C++11 initializer list...
+  argv.push_back("-q");
+  argv.push_back("-n");
+  argv.push_back(exe_path);
+  argv.push_back(StringifyInt(pid));
+  pid_t gdb_pid;
+  retval = ExecuteBinary(&fd_stdin,
+                         &fd_stdout,
+                         &fd_stderr,
+                          "gdb",
+                          argv,
+                         &gdb_pid);
+  assert(retval);
+
+  // skip the gdb startup output
+  ReadUntilGdbPrompt(fd_stdout);
+
+  // send stacktrace command to gdb
+  const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
+                         "quit\n";               // stop gdb
+  WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
+
+  // read the stack trace from the stdout of our gdb process
+  result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
+  close(fd_stderr);
+  close(fd_stdout);
+  close(fd_stdin);
+
+  // make sure gdb has quitted (wait for it for a short while)
+  unsigned int timeout = 15;
+  while (timeout > 0 && kill(gdb_pid, 0) == 0) {
+    --timeout;
+    SafeSleepMs(1000);
+  }
+
+  // when the timeout expired, gdb probably hangs... we need to kill it
+  if (timeout == 0) {
+    result += "gdb did not exit as expected. sending SIGKILL... ";
+    result += (kill(gdb_pid, SIGKILL) != 0) ? "failed\n" : "okay\n";
+  }
+
   return result;
 }
 
@@ -164,7 +275,6 @@ static string ReadLineFromPipe() {
  * Generates useful information from the backtrace log in the pipe.
  */
 static string ReportStacktrace() {
-  int stack_size;
   string debug = "--\n";
 
   int recv_signal;
@@ -181,19 +291,39 @@ static string ReportStacktrace() {
   {
     return "failure while reading errno";
   }
-  debug += ", errno: " + StringifyInt(errno) + "\n";
+  debug += ", errno: " + StringifyInt(errno);
 
-  debug += "version: " + string(VERSION) + "\n";
+  debug += ", version: " + string(VERSION);
 
-  if (read(pipe_wd_[0], &stack_size, sizeof(stack_size)) <
-      int(sizeof(stack_size)))
-  {
-    return "failure while reading stacktrace";
+  pid_t pid;
+  if (read(pipe_wd_[0], &pid, sizeof(pid_t)) < int(sizeof(pid_t))) {
+    return "failure while reading PID";
+  }
+  debug += ", PID: " + StringifyInt(pid) + "\n";
+
+  debug += "Executable path: " + *exe_path_ + "\n";
+
+  debug += GenerateStackTrace(*exe_path_, pid);
+
+  // give the dying cvmfs client the finishing stroke
+  if (kill(pid, SIGKILL) != 0) {
+    debug += "Failed to kill cvmfs client! (";
+    switch (errno) {
+      case EINVAL:
+        debug += "invalid signal";
+        break;
+      case EPERM:
+        debug += "permission denied";
+        break;
+      case ESRCH:
+        debug += "no such process";
+        break;
+      default:
+        debug += "unknown error " + StringifyInt(errno);
+    }
+    debug += ")\n\n";
   }
 
-  for (int i = 0; i < stack_size; ++i) {
-    debug += ReadLineFromPipe();
-  }
   return debug;
 }
 
@@ -209,6 +339,7 @@ static void Watchdog() {
     if (cflow == 'S') {
       const string debug = ReportStacktrace();
       LogEmergency(debug);
+      break;
     } else if (cflow == 'Q') {
       break;
     } else {
@@ -227,45 +358,8 @@ bool Init(const string &cache_dir, const std::string &process_name,
 {
   monitor::cache_dir_ = new string(cache_dir);
   monitor::process_name_ = new string(process_name);
+  monitor::exe_path_ = new string(platform_getexepath());
   if (platform_spinlock_init(&lock_handler_, 0) != 0) return false;
-
-  /* check number of open files */
-  if (check_max_open_files) {
-    unsigned int soft_limit = 0;
-    int hard_limit = 0;
-
-    struct rlimit rpl;
-    memset(&rpl, 0, sizeof(rpl));
-    getrlimit(RLIMIT_NOFILE, &rpl);
-    soft_limit = rpl.rlim_cur;
-
-#ifdef __APPLE__
-    hard_limit = sysconf(_SC_OPEN_MAX);
-    if (hard_limit < 0) {
-      LogCvmfs(kLogMonitor, kLogStdout, "Warning: could not retrieve "
-               "hard limit for the number of open files");
-    }
-#else
-    hard_limit = rpl.rlim_max;
-#endif
-
-    if (soft_limit < kMinOpenFiles) {
-      LogCvmfs(kLogMonitor, kLogSyslog | kLogDebug,
-               "Warning: current limits for number of open files are "
-               "(%lu/%lu)\n"
-               "CernVM-FS is likely to run out of file descriptors, "
-               "set ulimit -n to at least %lu",
-               soft_limit, hard_limit, kMinOpenFiles);
-    }
-    max_open_files_ = soft_limit;
-  } else {
-    max_open_files_ = 0;
-  }
-
-  // Dummy call to backtrace to load library
-  void *unused = NULL;
-  backtrace(&unused, 1);
-  if (!unused) return false;
 
   return true;
 }
@@ -286,15 +380,17 @@ void Fini() {
     sighandler_stack_.ss_size = 0;
   }
 
-  delete process_name_;
-  delete cache_dir_;
-  process_name_ = NULL;
-  cache_dir_ = NULL;
   if (spawned_) {
     char quit = 'Q';
     (void)write(pipe_wd_[1], &quit, 1);
     close(pipe_wd_[1]);
   }
+  delete process_name_;
+  delete cache_dir_;
+  delete exe_path_;
+  process_name_ = NULL;
+  cache_dir_ = NULL;
+  exe_path_ = NULL;
   platform_spinlock_destroy(&lock_handler_);
 }
 
@@ -302,10 +398,14 @@ void Fini() {
  * Fork watchdog.
  */
 void Spawn() {
+  int pipe_pid[2];
   MakePipe(pipe_wd_);
+  MakePipe(pipe_pid);
 
   pid_t pid;
   int statloc;
+  int max_fd = sysconf(_SC_OPEN_MAX);
+  assert(max_fd >= 0);
   switch (pid = fork()) {
     case -1: abort();
     case 0:
@@ -315,6 +415,15 @@ void Spawn() {
         case 0: {
           close(pipe_wd_[1]);
           Daemonize();
+          // send the watchdog PID to cvmfs
+          pid_t watchdog_pid = getpid();
+          WritePipe(pipe_pid[1], (const void*)&watchdog_pid, sizeof(pid_t));
+          close(pipe_pid[1]);
+          // Close all unused file descriptors
+          for (int fd = 0; fd < max_fd; fd++) {
+            if (fd != pipe_wd_[0])
+              close(fd);
+          }
           Watchdog();
           exit(0);
         }
@@ -327,6 +436,11 @@ void Spawn() {
       if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
   }
 
+  // retrieve the watchdog PID from the pipe
+  close(pipe_pid[1]);
+  ReadPipe(pipe_pid[0], (void*)&watchdog_pid_, sizeof(pid_t));
+  close(pipe_pid[0]);
+
   // Extra stack for signal handlers
   int stack_size = kSignalHandlerStacksize;  // 2 MB
   sighandler_stack_.ss_sp = smalloc(stack_size);
@@ -335,28 +449,64 @@ void Spawn() {
   if (sigaltstack(&sighandler_stack_, NULL) != 0)
     abort();
 
+  // define our crash signal handler
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_sigaction = SendTrace;
   sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
   sigfillset(&sa.sa_mask);
 
-  if (sigaction(SIGQUIT, &sa, NULL) ||
-      sigaction(SIGILL, &sa, NULL) ||
-      sigaction(SIGABRT, &sa, NULL) ||
-      sigaction(SIGFPE, &sa, NULL) ||
-      sigaction(SIGSEGV, &sa, NULL) ||
-      sigaction(SIGBUS, &sa, NULL) ||
-      sigaction(SIGPIPE, &sa, NULL) ||
-      sigaction(SIGXFSZ, &sa, NULL))
-  {
-    abort();
-  }
+  SigactionMap signal_handlers;
+  signal_handlers[SIGQUIT] = sa;
+  signal_handlers[SIGILL]  = sa;
+  signal_handlers[SIGABRT] = sa;
+  signal_handlers[SIGFPE]  = sa;
+  signal_handlers[SIGSEGV] = sa;
+  signal_handlers[SIGBUS]  = sa;
+  signal_handlers[SIGPIPE] = sa;
+  signal_handlers[SIGXFSZ] = sa;
+  old_signal_handlers_ = SetSignalHandlers(signal_handlers);
+
   spawned_ = true;
 }
 
 unsigned GetMaxOpenFiles() {
-  return max_open_files_;
+  static unsigned max_open_files;
+  static bool     already_done = false;
+
+  /* check number of open files (lazy evaluation) */
+  if (! already_done) {
+    unsigned int soft_limit = 0;
+    int hard_limit = 0;
+
+    struct rlimit rpl;
+    memset(&rpl, 0, sizeof(rpl));
+    getrlimit(RLIMIT_NOFILE, &rpl);
+    soft_limit = rpl.rlim_cur;
+
+#ifdef __APPLE__
+    hard_limit = sysconf(_SC_OPEN_MAX);
+    if (hard_limit < 0) {
+      LogCvmfs(kLogMonitor, kLogStdout, "Warning: could not retrieve "
+               "hard limit for the number of open files");
+    }
+#else
+    hard_limit = rpl.rlim_max;
+#endif
+
+    if (soft_limit < kMinOpenFiles) {
+      LogCvmfs(kLogMonitor, kLogSyslogWarn | kLogDebug,
+               "Warning: current limits for number of open files are "
+               "(%lu/%lu)\n"
+               "CernVM-FS is likely to run out of file descriptors, "
+               "set ulimit -n to at least %lu",
+               soft_limit, hard_limit, kMinOpenFiles);
+    }
+    max_open_files = soft_limit;
+    already_done   = true;
+  }
+
+  return max_open_files;
 }
 
 }  // namespace monitor

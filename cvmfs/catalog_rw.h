@@ -48,6 +48,7 @@ class WritableCatalog : public Catalog {
   }
   void RemoveEntry(const std::string &entry_path);
   void IncLinkcount(const std::string &path_within_group, const int delta);
+  void AddFileChunk(const std::string &entry_path, const FileChunk &chunk);
 
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
@@ -63,11 +64,12 @@ class WritableCatalog : public Catalog {
 
   void UpdateLastModified();
   void IncrementRevision();
+  void SetRevision(const uint64_t new_revision);
   void SetPreviousRevision(const hash::Any &hash);
 
  protected:
-  Database::OpenMode DatabaseOpenMode() const {
-    return Database::kOpenReadWrite;
+  sqlite::DbOpenMode DatabaseOpenMode() const {
+    return sqlite::kDbOpenReadWrite;
   }
 
   void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
@@ -93,6 +95,8 @@ class WritableCatalog : public Catalog {
   SqlDirentUnlink     *sql_unlink_;
   SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
+  SqlChunkInsert      *sql_chunk_insert_;
+  SqlChunksRemove     *sql_chunks_remove_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
 
@@ -121,6 +125,8 @@ class WritableCatalog : public Catalog {
                              std::vector<std::string> *grand_child_mountpoints);
   void MoveCatalogsToNested(const std::vector<std::string> &nested_catalogs,
                             WritableCatalog *new_nested_catalog);
+  void MoveFileChunksToNested(const std::string  &full_path,
+                              WritableCatalog    *new_nested_catalog);
 
   void CopyToParent();
   void CopyCatalogsToParent();
@@ -129,6 +135,9 @@ class WritableCatalog : public Catalog {
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
+
+WritableCatalog *AttachFreelyRw(const std::string &root_path,
+                                const std::string &file);
 
 }  // namespace catalog
 
