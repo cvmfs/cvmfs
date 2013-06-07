@@ -243,8 +243,14 @@ check_repository_compatibility() {
   fi
 
   # repository format changed from 2.1.6 to 2.1.7
-  # config files changed as of 2.1.12
+  # config files changed as of 2.1.12 for stratum 0
   # Currently all other version updates do not need a migration
+  if [ "$CVMFS_REPOSITORY_TYPE" != "stratum0" ] && [ "$creator" != "2.1.6" ] && \
+     version_greater_or_equal "2.1.7";
+  then
+    return 0
+  fi
+
   if [ "$creator" != "2.1.6" ] && [ "$creator" != "2.1.7" ] && \
      [ "$creator" != "2.1.8" ] && [ "$creator" != "2.1.9" ] && \
      [ "$creator" != "2.1.10" ] && [ "$creator" != "2.1.11" ] && \
