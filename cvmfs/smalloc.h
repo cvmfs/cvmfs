@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <cassert>
+//#include <cstdio>
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -39,6 +40,7 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   unsigned char *mem =
     static_cast<unsigned char *>(mmap(NULL, pages*4096, PROT_READ | PROT_WRITE,
                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  //printf("SMMAP %d bytes at %p\n", pages*4096, mem);
   assert((mem != MAP_FAILED) && "Out Of Memory");
   *((size_t *)(mem)) = pages;
   return mem + sizeof(size_t);
@@ -49,6 +51,7 @@ static inline void __attribute__((used)) smunmap(void *mem) {
   area = area - sizeof(size_t);
   size_t pages = *((size_t *)(area));
   int retval = munmap(area, pages*4096);
+  //printf("SUNMMAP %d bytes at %p\n", pages*4096, area);
   assert((retval == 0) && "Invalid umnmap");
 }
 

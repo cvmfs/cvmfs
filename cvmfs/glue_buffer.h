@@ -324,7 +324,7 @@ public:
 
 
 private:
-  static const unsigned kVersion = 2;
+  static const unsigned kVersion = 3;
 
   void InitLock();
   void CopyFrom(const InodeTracker &other);
