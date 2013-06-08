@@ -119,11 +119,12 @@ SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
 
 void SyncUnionAufs::Traverse() {
 	FileSystemTraversal<SyncUnionAufs>
-    traversal(this, scratch_path(), true, ignore_filenames_);
+    traversal(this, scratch_path(), true);
 
   traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
 	traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
 	traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
+	traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFileP;
 	traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
 	traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
 
@@ -144,9 +145,11 @@ string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
   return filename.substr(whiteout_prefix_.length());
 }
 
-set<string> SyncUnionAufs::GetIgnoreFilenames() const {
-  return ignore_filenames_;
-};
+bool SyncUnionAufs::IgnoreFileP(const string &parent_dir,
+                                const string &filename)
+{
+  return (ignore_filenames_.find(filename) != ignore_filenames_.end());
+}
 
 
 }  // namespace sync

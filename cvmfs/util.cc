@@ -466,9 +466,8 @@ bool RemoveTree(const string &path) {
     return false;
 
   RemoveTreeHelper *remove_tree_helper = new RemoveTreeHelper();
-  set<string> ignore_files;
   FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "",
-                                                  true, ignore_files);
+                                                  true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;

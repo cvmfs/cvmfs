@@ -159,6 +159,9 @@ class SyncMediator {
   void RemoveDirectoryCallback(const std::string &parent_dir,
                                const std::string &dir_name);
 
+  bool IgnoreFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
+
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
