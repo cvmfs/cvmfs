@@ -15,10 +15,7 @@
 #include <string>
 
 #include "hash.h"
-
-#ifdef CVMFS_NAMESPACE_GUARD
-namespace CVMFS_NAMESPACE_GUARD {
-#endif
+#include "bigvector.h"
 
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration
@@ -46,10 +43,6 @@ class FileChunk {
   off_t     offset_;       //!< byte offset in the uncompressed input file
   size_t    size_;         //!< uncompressed size of the data chunk
 };
-typedef std::vector<FileChunk> FileChunks;
-
-#ifdef CVMFS_NAMESPACE_GUARD
-}
-#endif
+typedef BigVector<FileChunk> FileChunks;
 
 #endif  // CVMFS_FILE_CHUNK_H_

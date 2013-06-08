@@ -50,6 +50,10 @@ class BigVector {
     size_++;
   }
 
+  bool IsEmpty() const {
+    return size_ == 0;
+  }
+
   void Clear() {
     Dealloc();
     Alloc(kNumInit);

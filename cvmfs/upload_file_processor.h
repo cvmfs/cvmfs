@@ -214,7 +214,7 @@ class FileProcessor : public Observable<SpoolerResult> {
       const std::string  local_path;  //!< path to the local file that was
                                       //!< processed (same as in Parameters)
 
-      inline bool IsChunked() const { return !file_chunks.empty(); }
+      inline bool IsChunked() const { return !file_chunks.IsEmpty(); }
     };
 
     // these typedefs are needed for the ConcurrentWorkers template

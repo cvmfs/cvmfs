@@ -1041,7 +1041,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
     // Retrieve File chunks from the catalog
     FileChunks chunks;
-    if (!dirent.catalog()->ListFileChunks(path, &chunks) || chunks.empty()) {
+    if (!dirent.catalog()->ListFileChunks(path, &chunks) || chunks.IsEmpty()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
                "but no chunks found in the catalog %s.", path.c_str(),
                dirent.catalog()->path().c_str());
@@ -1051,10 +1051,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
     // Add process data to the retrieved chunks
     LiveFileChunks live_chunks;
-    FileChunks::const_iterator i    = chunks.begin();
-    FileChunks::const_iterator iend = chunks.end();
-    for (; i != iend; ++i) {
-      live_chunks.push_back(LiveFileChunk(*i));
+    for (unsigned i = 0; i < chunks.size(); ++i) {
+      live_chunks.push_back(LiveFileChunk(*chunks.AtPtr(i)));
     }
 
     // Save the newly opened file chunks into the respective list

@@ -57,7 +57,6 @@ set (CVMFS2_DEBUG_SOURCES
   glue_buffer.h glue_buffer.cc
   loader.h compat.cc compat.h
   history.h history.cc
-  chunk.h chunk.cc
   cvmfs.h cvmfs.cc
 )
 

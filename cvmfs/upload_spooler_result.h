@@ -30,7 +30,7 @@ namespace upload
       content_hash(digest),
       file_chunks(file_chunks) {}
 
-    inline bool IsChunked() const { return !file_chunks.empty(); }
+    inline bool IsChunked() const { return !file_chunks.IsEmpty(); }
 
     int         return_code;  //!< the return value of the spooler operation
     std::string local_path;   //!< the local_path previously given as input
