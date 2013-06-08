@@ -780,10 +780,9 @@ int cvmfs_listdir(const char *c_path,char ***buf,size_t *buflen)
   if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
     return -EIO;
   }
-  for (catalog::StatEntryList::const_iterator i = listing_from_catalog.begin(),
-       iEnd = listing_from_catalog.end(); i != iEnd; ++i)
-  {
-    append_string_to_list(i->name.c_str(),buf,&listlen,buflen);
+  for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
+    append_string_to_list(listing_from_catalog.AtPtr(i)->name.c_str(),
+                          buf, &listlen, buflen);
   }
 
   return 0;
