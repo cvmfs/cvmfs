@@ -584,7 +584,7 @@ static bool GetDirentForPath(const PathString &path,
       // Fix inode
       dirent->set_inode(nfs_maps::GetInode(path));
     } else {
-      // TODO: Ensure that regular files get a new inode on order to avoid
+      // TODO: Ensure that regular files get a new inode in order to avoid
       // page cache mixup
       if (live_inode != 0)
         dirent->set_inode(live_inode);
@@ -741,7 +741,6 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
-  // TODO: inject ancient directory into cwd buffer
   remount_fence_->Leave();
 
   if (!found) {
@@ -1224,7 +1223,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %"PRIu64, ino);
   const int64_t fd = fi->fh;
 
-  // do we haveh a chunked file?
+  // do we have a chunked file?
   if (static_cast<uint64_t>(fd) == kChunkedFileHandle) {
     WriteLockGuard guard(live_file_chunks_mutex_);
     if (live_file_chunks_->erase(ino) > 0) {
