@@ -12,6 +12,13 @@
 #include <cassert>
 //#include <cstdio>
 
+#ifdef __APPLE__
+#define PLATFORM_MAP_ANONYMOUS MAP_ANON
+#else
+#define PLATFORM_MAP_ANONYMOUS MAP_ANONYMOUS
+#endif
+
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
@@ -39,7 +46,7 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   size_t pages = ((size + sizeof(size_t))+4095)/4096;
   unsigned char *mem =
     static_cast<unsigned char *>(mmap(NULL, pages*4096, PROT_READ | PROT_WRITE,
-                                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+                                 MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0));
   //printf("SMMAP %d bytes at %p\n", pages*4096, mem);
   assert((mem != MAP_FAILED) && "Out Of Memory");
   *((size_t *)(mem)) = pages;
