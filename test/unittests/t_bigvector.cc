@@ -73,3 +73,23 @@ TEST_F(T_Bigvector, ShareBuffer) {
   }
 }
 
+TEST_F(T_Bigvector, Copy) {
+  unsigned N = kNumBig;
+  for (unsigned i = 0; i < N; ++i) {
+    vec_->PushBack(i);
+  }
+  EXPECT_EQ(vec_->size(), N);
+  EXPECT_GE(vec_->capacity(), vec_->size());
+
+  BigVector<unsigned> new_vector(*vec_);
+  for (unsigned i = 0; i < N; ++i) {
+    unsigned value = new_vector.At(i);
+    EXPECT_EQ(value, i);
+  }
+
+  new_vector = *vec_;
+  for (unsigned i = 0; i < N; ++i) {
+    unsigned value = new_vector.At(i);
+    EXPECT_EQ(value, i);
+  }
+}

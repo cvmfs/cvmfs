@@ -28,6 +28,20 @@ class BigVector {
     shared_buffer_ = false;
   }
 
+  BigVector(const BigVector<Item> &other) {
+    CopyFrom(other);
+  }
+
+  BigVector<Item> operator= (const BigVector<Item> &other) {
+    if (&other == this)
+      return *this;
+
+    if (!shared_buffer_)
+      Dealloc();
+    CopyFrom(other);
+    return *this;
+  }
+
   ~BigVector() {
     if (!shared_buffer_)
       Dealloc();
@@ -118,6 +132,15 @@ class BigVector {
       else
         free(buf);
     }
+  }
+
+  void CopyFrom(const BigVector<Item> &other) {
+    Alloc(other.capacity_);
+    for (size_t i = 0; i < other.size_; ++i) {
+      new (buffer_ + i) Item(*other.AtPtr(i));
+    }
+    size_ = other.size_;
+    shared_buffer_ = false;
   }
 
   Item *buffer_;
