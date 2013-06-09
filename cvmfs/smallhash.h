@@ -275,7 +275,7 @@ class SmallHashDynamic :
   }
 
   void ResetCapacity() {
-    DeallocMemory(Base::keys_, Base::values_, Base::capacity_);
+    Base::DeallocMemory(Base::keys_, Base::values_, Base::capacity_);
     Base::capacity_ = Base::initial_capacity_;
     Base::AllocMemory();
     SetThresholds();
@@ -298,7 +298,7 @@ class SmallHashDynamic :
     }
     assert(size() == old_size);
 
-    DeallocMemory(old_keys, old_values, old_capacity);
+    Base::DeallocMemory(old_keys, old_values, old_capacity);
     num_migrates_++;
   }
 
