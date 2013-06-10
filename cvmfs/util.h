@@ -66,6 +66,9 @@ struct Pipe {
     write_end = pipe_fd[1];
   }
 
+  Pipe(const int fd_read, const int fd_write) :
+    read_end(fd_read), write_end(fd_write) {}
+
   void Close() {
     close (read_end);
     close (write_end);
