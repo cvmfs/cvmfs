@@ -169,6 +169,17 @@ static void *MainTalk(void *data __attribute__((unused))) {
           else
             Answer(con_fd, "No such regular file\n");
         }
+      } else if (line.substr(0, 3) == "pin") {
+        if (line.length() < 5) {
+          Answer(con_fd, "Usage: pin <path>\n");
+        } else {
+          const string path = line.substr(4);
+          const bool found_regular = cvmfs::Pin(path);
+          if (found_regular)
+            Answer(con_fd, "OK\n");
+          else
+            Answer(con_fd, "No such regular file or pinning failed\n");
+        }
       } else if (line == "mountpoint") {
         Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {

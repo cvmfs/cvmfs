@@ -1511,10 +1511,23 @@ bool Evict(const string &path) {
   const bool found = GetDirentForPath(PathString(path), &dirent);
   remount_fence_->Leave();
 
-  if (!found && dirent.IsRegular())
+  if (!found || !dirent.IsRegular())
     return false;
   quota::Remove(dirent.checksum());
   return true;
+}
+
+
+bool Pin(const string &path) {
+  catalog::DirectoryEntry dirent;
+  remount_fence_->Enter();
+  const bool found = GetDirentForPath(PathString(path), &dirent);
+  remount_fence_->Leave();
+
+  if (!found || !dirent.IsRegular())
+    return false;
+  bool retval = quota::Pin(dirent.checksum(), dirent.size(), path, false);
+  return retval;
 }
 
 
