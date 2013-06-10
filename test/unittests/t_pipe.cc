@@ -36,6 +36,16 @@ class T_Pipe : public ::testing::Test {
     double floating_point;
   };
 
+  struct TestEnum {
+    enum MyEnum {
+      kFirstChoice,
+      kSecondChoice,
+      kThirdChoice,
+      //...
+      kNthChoice
+    };
+  };
+
  protected:
   Pipe pipe;
 };
@@ -59,26 +69,31 @@ TEST_F(T_Pipe, WriteTemplate) {
 
 
 TEST_F(T_Pipe, ReadTemplate) {
-  const int  integer   = 100;
-  const char character = 'a';
-  const Foo  foobar;
+  const int              integer   = 100;
+  const char             character = 'a';
+  const Foo              foobar;
+  const TestEnum::MyEnum optional  = TestEnum::kThirdChoice;
 
   bool retval;
   retval = pipe.Write(integer);   EXPECT_TRUE (retval);
   retval = pipe.Write(character); EXPECT_TRUE (retval);
   retval = pipe.Write(foobar);    EXPECT_TRUE (retval);
+  retval = pipe.Write(optional);  EXPECT_TRUE (retval);
 
-  int  res_integer;
-  char res_character;
-  Foo  res_foobar;
+  int              res_integer;
+  char             res_character;
+  Foo              res_foobar;
+  TestEnum::MyEnum res_optional;
 
   retval = pipe.Read(&res_integer);   EXPECT_TRUE (retval);
   retval = pipe.Read(&res_character); EXPECT_TRUE (retval);
   retval = pipe.Read(&res_foobar);    EXPECT_TRUE (retval);
+  retval = pipe.Read(&res_optional);  EXPECT_TRUE (retval);
 
   EXPECT_EQ   (res_integer, integer)     << "Failed to retrieve integer";
   EXPECT_EQ   (res_character, character) << "Failed to retrieve character";
   EXPECT_TRUE (foobar.Check(res_foobar)) << "Failed to retrieve structure";
+  EXPECT_EQ   (res_optional, optional)   << "Failed to retrieve enum value";
 }
 
 
