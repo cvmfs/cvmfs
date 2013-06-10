@@ -26,6 +26,7 @@
 #include "util.h"
 #include "hash.h"
 #include "smallhash.h"
+#include "smalloc.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
@@ -43,47 +44,127 @@ static inline uint32_t hasher_inode(const uint64_t &inode) {
 }
 
 
+class PathStore {
+ public:
+  PathStore() {
+    map_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+  }
+
+  void Insert(const hash::Md5 &md5path, const PathString &path) {
+    PathInfo info;
+    bool found = map_.Lookup(md5path, &info);
+    if (found) {
+      info.refcnt++;
+      map_.Insert(md5path, info);
+      return;
+    }
+
+    PathInfo new_entry;
+    if (path.IsEmpty()) {
+      map_.Insert(md5path, new_entry);
+      return;
+    }
+
+    PathString parent_path = GetParentPath(path);
+    new_entry.parent = hash::Md5(parent_path.GetChars(),
+                                 parent_path.GetLength());
+    Insert(new_entry.parent, parent_path);
+    new_entry.name = GetFileName(path);
+    map_.Insert(md5path, new_entry);
+  }
+
+  bool Lookup(const hash::Md5 &md5path, PathString *path) {
+    PathInfo info;
+    bool retval = map_.Lookup(md5path, &info);
+    if (!retval)
+      return false;
+
+    if (info.parent.IsNull())
+      return true;
+
+    retval = Lookup(info.parent, path);
+    assert(retval);
+    path->Append("/", 1);
+    path->Append(info.name.GetChars(), info.name.GetLength());
+    return true;
+  }
+
+  void Erase(const hash::Md5 &md5path) {
+    PathInfo info;
+    bool found = map_.Lookup(md5path, &info);
+    if (!found)
+      return;
+
+    info.refcnt--;
+    if (info.refcnt == 0) {
+      map_.Erase(md5path);
+      Erase(info.parent);
+    } else {
+      map_.Insert(md5path, info);
+    }
+  }
+
+  void Clear() {
+    map_.Clear();
+  }
+
+ private:
+  struct PathInfo {
+    PathInfo() {
+      refcnt = 1;
+    }
+    hash::Md5 parent;
+    uint32_t refcnt;
+    NameString name;
+  };
+
+  SmallHashDynamic<hash::Md5, PathInfo> map_;
+};
+
+
 class PathMap {
  public:
   PathMap() {
-    map_.Init(16, hash::Md5(), hasher_md5);
+    map_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
   }
 
   bool LookupPath(const hash::Md5 &md5path, PathString *path) {
-    PathInfo value;
-    bool found = map_.Lookup(md5path, &value);
-    path->Assign(value.path);
+    bool found = path_store_.Lookup(md5path, path);
     return found;
   }
 
   uint64_t LookupInode(const PathString &path) {
-    PathInfo value;
+    uint64_t inode;
     bool found = map_.Lookup(hash::Md5(path.GetChars(), path.GetLength()),
-                             &value);
-    if (found) return value.inode;
+                             &inode);
+    if (found) return inode;
     return 0;
   }
 
   hash::Md5 Insert(const PathString &path, const uint64_t inode) {
     hash::Md5 md5path(path.GetChars(), path.GetLength());
-    map_.Insert(md5path, PathInfo(inode, path));
+    if (!map_.Contains(md5path)) {
+      path_store_.Insert(md5path, path);
+      map_.Insert(md5path, inode);
+    }
     return md5path;
   }
 
   void Erase(const hash::Md5 &md5path) {
-    map_.Erase(md5path);
+    bool found = map_.Contains(md5path);
+    if (found) {
+      path_store_.Erase(md5path);
+      map_.Erase(md5path);
+    }
   }
 
-  void Clear() { map_.Clear(); }
+  void Clear() {
+    map_.Clear();
+    path_store_.Clear();
+  }
  private:
-  struct PathInfo {
-    PathInfo() { inode = 0; }
-    PathInfo(const uint64_t i, const PathString &p) { inode = i; path = p; }
-    uint64_t inode;
-    PathString path;
-  };
-
-  SmallHashDynamic<hash::Md5, PathInfo> map_;
+  SmallHashDynamic<hash::Md5, uint64_t> map_;
+  PathStore path_store_;
 };
 
 
@@ -243,7 +324,7 @@ public:
 
 
 private:
-  static const unsigned kVersion = 2;
+  static const unsigned kVersion = 3;
 
   void InitLock();
   void CopyFrom(const InodeTracker &other);

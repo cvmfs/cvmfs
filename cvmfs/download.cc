@@ -1552,6 +1552,11 @@ void SetRetryParameters(const unsigned max_retries,
 }
 
 
+void ActivatePipelining() {
+  curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
+}
+
+
 void RestartNetwork() {
   // TODO: transfer special job
 }

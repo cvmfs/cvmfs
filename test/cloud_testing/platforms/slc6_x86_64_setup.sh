@@ -16,7 +16,7 @@ wget $knl          > /dev/null 2>&1 || die "fail"
 echo "done"
 
 # install custom kernel
-echo - "install custom kernel RPMs... "
+echo -n "install custom kernel RPMs... "
 sudo rpm -ivh $(basename $knl_firmware) > /dev/null 2>&1 || die "fail"
 sudo rpm -ivh $(basename $knl)          > /dev/null 2>&1 || die "fail"
 echo "done"
@@ -67,10 +67,10 @@ cd ..
 sudo curl -o /usr/bin/cpanm -L http://cpanmin.us > /dev/null || die "fail (download cpan)"
 sudo chmod 555 /usr/bin/cpanm                                || die "fail (chmod cpan)"
 
-sudo cpanm ZeroMQ          > /dev/null                    || die "fail (install ZeroMQ-perl)"
-sudo cpanm IO::Interface   > /dev/null                    || die "fail (install IO::Interface)"
-sudo cpanm Socket          > /dev/null                    || die "fail (install Socket)"
-sudo cpanm URI             > /dev/null                    || die "fail (install URI)"
+sudo cpanm --notest ZeroMQ          > /dev/null   || die "fail (install ZeroMQ-perl)"
+sudo cpanm --notest IO::Interface   > /dev/null   || die "fail (install IO::Interface)"
+sudo cpanm --notest Socket          > /dev/null   || die "fail (install Socket)"
+sudo cpanm --notest URI             > /dev/null   || die "fail (install URI)"
 cd ..
 echo "done"
 

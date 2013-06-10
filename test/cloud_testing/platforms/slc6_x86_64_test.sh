@@ -13,4 +13,5 @@ cd ${SOURCE_DIRECTORY}/test
 ./run.sh $TEST_LOGFILE -x src/004-davinci              \
                           src/005-asetup               \
                           src/007-testjobs             \
-                          src/024-reload-during-asetup
+                          src/024-reload-during-asetup \
+                          src/518-hardlinkstresstest
