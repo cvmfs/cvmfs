@@ -97,9 +97,13 @@ static void *MainTalk(void *data __attribute__((unused))) {
     }
 
     char buf[kMaxCommandSize];
-    if (recv(con_fd, buf, sizeof(buf), 0) > 0) {
-      const string line = string(buf);
-      LogCvmfs(kLogTalk, kLogDebug, "received %s", line.c_str());
+    int bytes_read;
+    if ((bytes_read = recv(con_fd, buf, sizeof(buf), 0)) > 0) {
+      if (buf[bytes_read-1] == '\0')
+        bytes_read--;
+      const string line = string(buf, bytes_read);
+      LogCvmfs(kLogTalk, kLogDebug, "received %s (length %u)",
+               line.c_str(), line.length());
 
       if (line == "tracebuffer flush") {
         tracer::Flush();
