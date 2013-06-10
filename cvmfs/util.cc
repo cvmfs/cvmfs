@@ -964,6 +964,41 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
                        vector<string>());
 }
 
+struct StatusCodes { // TODO: C++11 (type safe enum)
+  enum Names {
+    kSendingPID,
+    kUnknown,
+    kErrorDupFileDescriptors,
+    kErrorReadMaxFileDesciptor,
+    kErrorReadFileDescriptorFlags,
+    kErrorSetFileDescriptorFlags,
+    kErrorLowerCredentials,
+    kErrorInvokeExec
+  };
+
+  static std::string ToString(const Names name) {
+    switch (name) {
+      case kSendingPID:
+        return "Sending PID";
+
+      default:
+      case kUnknown:
+        return "Unknown Status";
+      case kErrorDupFileDescriptors:
+        return "Duplicate File Descriptor";
+      case kErrorReadMaxFileDesciptor:
+        return "Read maximal File Descriptor";
+      case kErrorReadFileDescriptorFlags:
+        return "Read File Descriptor Flags";
+      case kErrorSetFileDescriptorFlags:
+        return "Set File Descriptor Flags";
+      case kErrorLowerCredentials:
+        return "Lower User Permissions";
+      case kErrorInvokeExec:
+        return "Invoking execvp()";
+    }
+  }
+};
 
 /**
  * Execve to the given command line, preserving the given file descriptors.
@@ -984,42 +1019,6 @@ bool ManagedExec(const vector<string>  &command_line,
                  const bool             drop_credentials,
                        pid_t           *child_pid) {
   assert(command_line.size() >= 1);
-
-  struct StatusCodes { // TODO: C++11 (type safe enum)
-    enum Names {
-      kSendingPID,
-      kUnknown,
-      kErrorDupFileDescriptors,
-      kErrorReadMaxFileDesciptor,
-      kErrorReadFileDescriptorFlags,
-      kErrorSetFileDescriptorFlags,
-      kErrorLowerCredentials,
-      kErrorInvokeExec
-    };
-
-    static std::string ToString(const Names name) {
-      switch (name) {
-        case kSendingPID:
-          return "Sending PID";
-
-        default:
-        case kUnknown:
-          return "Unknown Status";
-        case kErrorDupFileDescriptors:
-          return "Duplicate File Descriptor";
-        case kErrorReadMaxFileDesciptor:
-          return "Read maximal File Descriptor";
-        case kErrorReadFileDescriptorFlags:
-          return "Read File Descriptor Flags";
-        case kErrorSetFileDescriptorFlags:
-          return "Set File Descriptor Flags";
-        case kErrorLowerCredentials:
-          return "Lower User Permissions";
-        case kErrorInvokeExec:
-          return "Invoking execvp()";
-      }
-    }
-  };
 
   Pipe pipe_fork;
   pid_t pid = fork();
