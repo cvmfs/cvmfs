@@ -502,6 +502,14 @@ void Spawn() {
   ReadPipe(pipe_pid[0], (void*)&watchdog_pid_, sizeof(pid_t));
   close(pipe_pid[0]);
 
+  // lower restrictions for ptrace
+  if (! platform_allow_ptrace(watchdog_pid_)) {
+    LogCvmfs(kLogMonitor, kLogSyslogWarn, "failed to allow ptrace() for watchdog"
+                                          "(PID: %d). Post crash stacktrace of "
+                                          "the CernVM-FS client might not work",
+             watchdog_pid_);
+  }
+
   // Extra stack for signal handlers
   int stack_size = kSignalHandlerStacksize;  // 2 MB
   sighandler_stack_.ss_sp = smalloc(stack_size);

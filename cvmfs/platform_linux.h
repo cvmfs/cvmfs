@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/prctl.h>
 #include <attr/xattr.h>
 #include <signal.h>
 #include <limits.h>
@@ -63,6 +64,27 @@ inline int platform_sigwait(const int signum) {
   assert(retval == 0);
   retval = sigwaitinfo(&sigset, NULL);
   return retval;
+}
+
+
+/**
+ * Grants a PID with some necessary capabilites for ptrace() usage
+ *
+ * @param PID  the PID of the process to be granted ptrace()-access
+ *             (may be ignored)
+ * @return     true when successful
+ */
+inline bool platform_allow_ptrace(const pid_t pid) {
+#ifdef PR_SET_PTRACER
+  // On Ubuntu, yama prevents all processes from ptracing other processes, even
+  // when they are owned by the same user. Therefore the watchdog would not be
+  // able to create a stacktrace, without this formal permission:
+  const int retval = prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
+  return (retval == 0);
+#else
+  // On other platforms this is currently a no-op
+  return true;
+#endif
 }
 
 
