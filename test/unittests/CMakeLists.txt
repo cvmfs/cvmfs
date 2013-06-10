@@ -19,6 +19,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_util_concurrency.cc 
   t_fs_traversal.cc
   t_pipe.cc
+  t_managed_exec.cc
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
