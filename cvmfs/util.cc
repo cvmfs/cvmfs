@@ -896,10 +896,10 @@ bool ExecuteBinary(      int                       *fd_stdin,
   MakePipe(pipe_stdout);
   MakePipe(pipe_stderr);
 
-  vector<int> preserve_fildes;
-  preserve_fildes.push_back(0);
-  preserve_fildes.push_back(1);
-  preserve_fildes.push_back(2);
+  set<int> preserve_fildes;
+  preserve_fildes.insert(0);
+  preserve_fildes.insert(1);
+  preserve_fildes.insert(2);
   map<int, int> map_fildes;
   map_fildes[pipe_stdin[0]] = 0;  // Reading end of pipe_stdin
   map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
@@ -949,7 +949,7 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
  * of the spawned process.
  */
 bool ManagedExec(const vector<string>  &command_line,
-                 const vector<int>     &preserve_fildes,
+                 const set<int>        &preserve_fildes,
                  const map<int, int>   &map_fildes,
                  const bool             drop_credentials,
                        pid_t           *child_pid) {
@@ -988,15 +988,10 @@ bool ManagedExec(const vector<string>  &command_line,
       goto fork_failure;
     }
     for (int fd = 0; fd < max_fd; fd++) {
-      bool close_fd = true;
-      for (unsigned i = 0; i < preserve_fildes.size(); ++i) {
-        if (fd == preserve_fildes[i]) {
-          close_fd = false;
-          break;
-        }
-      }
-      if (close_fd && (fd != pipe_fork[1]))
+      if (fd != pipe_fork[1]             &&
+          preserve_fildes.count(fd) == 0) {
         close(fd);
+      }
     }
 
     // Double fork to disconnect from parent

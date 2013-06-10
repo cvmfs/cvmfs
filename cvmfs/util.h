@@ -18,6 +18,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <set>
 
 #include "murmur.h"
 #include "platform.h"
@@ -161,7 +162,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
                    const std::vector<std::string>  &argv,
                          pid_t                     *child_pid = NULL);
 bool ManagedExec(const std::vector<std::string>  &command_line,
-                 const std::vector<int>          &preserve_fildes,
+                 const std::set<int>             &preserve_fildes,
                  const std::map<int, int>        &map_fildes,
                  const bool                       drop_credentials,
                        pid_t                     *child_pid = NULL);
