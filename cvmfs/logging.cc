@@ -16,7 +16,9 @@
 #include <pthread.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <syslog.h>
+#include <time.h>
 
 #include <cstdlib>
 #include <cstdio>
@@ -24,6 +26,7 @@
 #include <ctime>
 #include <cstring>
 
+#include "platform.h"
 #include "smalloc.h"
 
 using namespace std;  // NOLINT
@@ -33,6 +36,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 namespace {
+
+const unsigned kMicroSyslogMax = 500*1024;  // rotate after 500kB
 
 pthread_mutex_t lock_stdout = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t lock_stderr = PTHREAD_MUTEX_INITIALIZER;
@@ -44,10 +49,18 @@ string *path_debug = NULL;
 const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
   "fuse stub", "signature", "peers", "fs traversal", "catalog traversal",
-  "nfs maps", "publish", "spooler" };
+  "nfs maps", "publish", "spooler", "concurrency", "utility", "glue buffer",
+  "history" };
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
+
+string *usyslog_dest = NULL;
+int usyslog_fd = -1;
+int usyslog_fd1 = -1;
+unsigned usyslog_size = 0;
+pthread_mutex_t lock_usyslock = PTHREAD_MUTEX_INITIALIZER;
+
 LogLevels min_log_level = kLogNormal;
 static void (*alt_log_func)(const LogSource source, const int mask,
                             const char *msg) = NULL;
@@ -174,12 +187,124 @@ void SetLogVerbosity(const LogLevels min_level) {
   min_log_level = min_level;
 }
 
+/**
+ * "Micro-Syslog" write kLogSyslog messages into filename.  It rotates this
+ * file.  Requires for µCernVM
+ */
+void SetLogMicroSyslog(const std::string &filename) {
+  pthread_mutex_lock(&lock_usyslock);
+  if (usyslog_fd >= 0) {
+    close(usyslog_fd);
+    close(usyslog_fd1);
+    usyslog_fd = -1;
+    usyslog_fd1 = -1;
+  }
+
+  if (filename == "") {
+    delete usyslog_dest;
+    usyslog_dest = NULL;
+    pthread_mutex_unlock(&lock_usyslock);
+    return;
+  }
+
+  usyslog_fd = open(filename.c_str(), O_RDWR | O_APPEND | O_CREAT, 0600);
+  if (usyslog_fd < 0) {
+    fprintf(stderr, "could not open usyslog file %s (%d), aborting\n",
+            filename.c_str(), errno);
+    abort();
+  }
+  usyslog_fd1 = open((filename + ".1").c_str(), O_WRONLY | O_CREAT, 0600);
+  if (usyslog_fd1 < 0) {
+    fprintf(stderr, "could not open usyslog.1 file %s.1 (%d), aborting\n",
+            filename.c_str(), errno);
+    abort();
+  }
+  platform_stat64 info;
+  int retval = platform_fstat(usyslog_fd, &info);
+  assert(retval == 0);
+  usyslog_size = info.st_size;
+  usyslog_dest = new string(filename);
+  pthread_mutex_unlock(&lock_usyslock);
+}
+
+
+std::string GetLogMicroSyslog() {
+  pthread_mutex_lock(&lock_usyslock);
+  string result;
+  if (usyslog_dest)
+    result = *usyslog_dest;
+  pthread_mutex_unlock(&lock_usyslock);
+  return result;
+}
+
+
+static void LogMicroSyslog(const std::string &message) {
+  if (message.size() == 0)
+    return;
+
+  pthread_mutex_lock(&lock_usyslock);
+  if (usyslog_fd < 0) {
+    pthread_mutex_unlock(&lock_usyslock);
+    return;
+  }
+
+  int written = write(usyslog_fd, message.data(), message.size());
+  if ((written < 0) || (static_cast<unsigned>(written) != message.size())) {
+    close(usyslog_fd);
+    usyslog_fd = -1;
+    abort();
+  }
+  int retval = fsync(usyslog_fd);
+  assert(retval == 0);
+  usyslog_size += written;
+
+  if (usyslog_size >= kMicroSyslogMax) {
+    // Wipe out usyslog.1 file
+    retval = ftruncate(usyslog_fd1, 0);
+    assert(retval == 0);
+
+    // Copy from usyslog to usyslog.1
+    retval = lseek(usyslog_fd, 0, SEEK_SET);
+    assert(retval == 0);
+    unsigned char buf[4096];
+    int num_bytes;
+    do {
+      num_bytes = read(usyslog_fd, buf, 4096);
+      assert(num_bytes >= 0);
+      if (num_bytes == 0)
+        break;
+      int written = write(usyslog_fd1, buf, num_bytes);
+      assert(written == num_bytes);
+    } while (num_bytes == 4096);
+    retval = lseek(usyslog_fd1, 0, SEEK_SET);
+    assert(retval == 0);
+
+    // Reset usyslog
+    retval = lseek(usyslog_fd, 0, SEEK_SET);
+    assert(retval == 0);
+    retval = ftruncate(usyslog_fd, 0);
+    assert(retval == 0);
+    usyslog_size = 0;
+  }
+  pthread_mutex_unlock(&lock_usyslock);
+}
+
 
 /**
  * Changes the debug log file from stderr. No effect if DEBUGMSG is undefined.
  */
 #ifdef DEBUGMSG
 void SetLogDebugFile(const string &filename) {
+  if (filename == "") {
+    if ((file_debug != NULL) && (file_debug != stderr)) {
+      fclose(file_debug);
+      file_debug = NULL;
+    }
+    delete path_debug;
+    path_debug = NULL;
+    return;
+  }
+
   if ((file_debug != NULL) && (file_debug != stderr)) {
     if ((fclose(file_debug) < 0)) {
       fprintf(stderr, "could not close current log file (%d), aborting\n",
@@ -211,6 +336,7 @@ void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
 {
   alt_log_func = fn;
 }
+
 
 /**
  * Logs a message to one or multiple facilities specified by mask.
@@ -252,7 +378,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     if (file_debug == NULL)
       file_debug = stderr;
 
-    //  Get timestamp
+    // Get timestamp
     time_t rawtime;
     time(&rawtime);
     struct tm now;
@@ -292,12 +418,28 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     pthread_mutex_unlock(&lock_stderr);
   }
 
-  if (mask & kLogSyslog) {
-    if (syslog_prefix) {
-      syslog(syslog_facility | syslog_level, "(%s) %s",
-             syslog_prefix, msg);
+  if (mask & (kLogSyslog | kLogSyslogWarn | kLogSyslogErr)) {
+    if (usyslog_dest) {
+      string fmt_msg(msg);
+      if (syslog_prefix)
+        fmt_msg = "(" + string(syslog_prefix) + ") " + fmt_msg;
+      time_t rawtime;
+      time(&rawtime);
+      char fmt_time[26];
+      ctime_r(&rawtime, fmt_time);
+      fmt_msg = string(fmt_time, 24) + " " + fmt_msg;
+      fmt_msg.push_back('\n');
+      LogMicroSyslog(fmt_msg);
     } else {
-      syslog(syslog_facility | syslog_level, "%s", msg);
+      int level = syslog_level;
+      if (mask & kLogSyslogWarn) level = LOG_WARNING;
+      if (mask & kLogSyslogErr) level = LOG_ERR;
+      if (syslog_prefix) {
+        syslog(syslog_facility | level, "(%s) %s",
+               syslog_prefix, msg);
+      } else {
+        syslog(syslog_facility | level, "%s", msg);
+      }
     }
   }
 

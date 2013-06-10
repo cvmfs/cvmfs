@@ -97,6 +97,7 @@ pthread_t thread_lru_;
 int pipe_lru_[2];
 bool shared_;
 bool spawned_;
+bool initialized_ = false;
 map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
 int fd_lock_cachedb_;
 
@@ -201,13 +202,17 @@ static bool DoCleanup(const uint64_t leave_size) {
     LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
     hash::Any hash(hash::kSha1, hash::HexPtr(
       hash_str.substr(0, 2*hash::kDigestSizes[hash::kSha1])));
-    if (pinned_chunks_->find(hash) != pinned_chunks_->end())
-      continue;
 
-    trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
-    gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
-    LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
-             hash_str.c_str(), gauge_);
+    // That's a critical condition.  We must not delete a not yet inserted
+    // pinned file as it is already reserved (but will be inserted later).
+    // However, we must remove it temporarily from the cache database in order
+    // to not run into an endless loop
+    if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
+      trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
+      gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
+      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
+               hash_str.c_str(), gauge_);
+    }
 
     sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
                       SQLITE_STATIC);
@@ -284,8 +289,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_touch_);
         LogCvmfs(kLogQuota, kLogDebug, "touching %s (%ld): %d",
                  hash_str.c_str(), seq_-1, retval);
-        errno = retval;
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslogErr,
+                   "failed to update %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_touch_);
         break;
       case kUnpin:
@@ -294,8 +303,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_unpin_);
         LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d",
                  hash_str.c_str(), retval);
-        errno = retval;
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslogErr,
+                   "failed to unpin %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_unpin_);
         break;
       case kPin:
@@ -325,7 +338,12 @@ static void ProcessCommandBunch(const unsigned num,
         retval = sqlite3_step(stmt_new_);
         LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, pin %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
-        assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
+        if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
+          LogCvmfs(kLogQuota, kLogSyslogErr,
+                   "failed to insert %s in cachedb, error %d",
+                   hash_str.c_str(), retval);
+          abort();
+        }
         sqlite3_reset(stmt_new_);
 
         if (!exists) gauge_ += size;
@@ -435,6 +453,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           const string hash_str = hash.ToString();
           LogCvmfs(kLogQuota, kLogDebug, "manually removing %s",
                    hash_str.c_str());
+          bool success = false;
 
           sqlite3_bind_text(stmt_size_, 1, &hash_str[0], hash_str.length(),
                             SQLITE_STATIC);
@@ -447,6 +466,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                               SQLITE_STATIC);
             retval = sqlite3_step(stmt_rm_);
             if ((retval == SQLITE_DONE) || (retval == SQLITE_OK)) {
+              success = true;
               gauge_ -= size;
               if (is_pinned) {
                 pinned_chunks_->erase(hash);
@@ -457,8 +477,13 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                        hash_str.c_str(), retval);
             }
             sqlite3_reset(stmt_rm_);
+          } else {
+            // File does not exist
+            success = true;
           }
           sqlite3_reset(stmt_size_);
+
+          WritePipe(return_pipe, &success, sizeof(success));
           break; }
         case kCleanup:
           retval = DoCleanup(size);
@@ -593,7 +618,7 @@ bool RebuildDatabase() {
     snprintf(hex, sizeof(hex), "%02x", i);
     path = (*cache_dir_) + "/" + string(hex);
     if ((dirp = opendir(path.c_str())) == NULL) {
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
                "failed to open directory %s (tmpwatch interfering?)",
                path.c_str());
       goto build_return;
@@ -710,7 +735,8 @@ init_recover:
       sqlite3_close(db_);
       unlink(db_file.c_str());
       unlink((db_file + "-journal").c_str());
-      LogCvmfs(kLogQuota, kLogSyslog, "LRU database corrupted, re-building");
+      LogCvmfs(kLogQuota, kLogSyslogWarn,
+               "LRU database corrupted, re-building");
       goto init_recover;
     }
     LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
@@ -865,7 +891,7 @@ static void CloseDatabase() {
 
 
 /**
- * Connects to a running peer server.  Creates a peer server, if necessary.
+ * Connects to a running cache manager.  Creates one if necessary.
  */
 bool InitShared(const std::string &exe_path, const std::string &cache_dir,
                 const uint64_t limit, const uint64_t cleanup_threshold)
@@ -874,7 +900,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   spawned_ = true;
   cache_dir_ = new string(cache_dir);
 
-  // Create lock file
+  // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(*cache_dir_ + "/lock_cachemgr");
   if (fd_lockfile < 0) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
@@ -888,6 +914,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (pipe_lru_[1] >= 0) {
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
+    initialized_ = true;
     Nonblock2Block(pipe_lru_[1]);
     UnlockFile(fd_lockfile);
     GetLimits(&limit_, &cleanup_threshold_);
@@ -895,7 +922,19 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
              limit_, cleanup_threshold_);
     return true;
   }
-  if (errno == ENXIO) {
+  const int connect_error = errno;
+
+  // Lock file: let existing cache manager finish first
+  const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
+             (*cache_dir_ + "/lock_cachemgr.fifo").c_str(), errno);
+    UnlockFile(fd_lockfile);
+    return false;
+  }
+  UnlockFile(fd_lockfile_fifo);
+
+  if (connect_error == ENXIO) {
     LogCvmfs(kLogQuota, kLogDebug, "left-over FIFO found, unlinking");
     unlink(fifo_path.c_str());
   }
@@ -926,8 +965,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
-  command_line.push_back(StringifyInt(cvmfs::foreground_));
-  command_line.push_back(GetLogDebugFile());
+  command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
 
   vector<int> preserve_filedes;
   preserve_filedes.push_back(0);
@@ -936,7 +974,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   preserve_filedes.push_back(pipe_boot[1]);
   preserve_filedes.push_back(pipe_handshake[0]);
 
-  retval = ManagedExec(command_line, preserve_filedes, map<int, int>());
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -953,7 +991,8 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     UnlockFile(fd_lockfile);
     close(pipe_boot[0]);
     close(pipe_handshake[1]);
-    LogCvmfs(kLogQuota, kLogDebug, "cache manager did not start");
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+             "cache manager did not start");
     return false;
   }
   close(pipe_boot[0]);
@@ -983,6 +1022,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
 
   UnlockFile(fd_lockfile);
 
+  initialized_ = true;
   GetLimits(&limit_, &cleanup_threshold_);
   LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
            limit_, cleanup_threshold_);
@@ -1015,32 +1055,46 @@ int MainCacheManager(int argc, char **argv) {
   int foreground = String2Int64(argv[7]);
   int syslog_level = String2Int64(argv[8]);
   int syslog_facility = String2Int64(argv[9]);
-  const string logfile = argv[10];
+  vector<string> logfiles = SplitString(argv[10], ':');
+
   SetLogSyslogLevel(syslog_level);
   SetLogSyslogFacility(syslog_facility);
-  if (logfile != "")
-    SetLogDebugFile(logfile + ".cachemgr");
+  if ((logfiles.size() > 0) && (logfiles[0] != ""))
+    SetLogDebugFile(logfiles[0] + ".cachemgr");
+  if (logfiles.size() > 1)
+    SetLogMicroSyslog(logfiles[1]);
 
   if (!foreground)
     Daemonize();
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
+  const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr, "could not open lock file "
+             "%s (%d)", (*cache_dir_ + "/lock_cachemgr.fifo").c_str(), errno);
+    return 1;
+  }
   const string crash_guard = *cache_dir_ + "/cachemgr.running";
   const bool rebuild = FileExists(crash_guard);
   retval = open(crash_guard.c_str(), O_RDONLY | O_CREAT, 0600);
   if (retval < 0) {
-    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to create shared cache manager crash guard");
+    UnlockFile(fd_lockfile_fifo);
     return 1;
   }
   close(retval);
-  if (!InitDatabase(rebuild))
+  if (!InitDatabase(rebuild)) {
+    UnlockFile(fd_lockfile_fifo);
     return 1;
+  }
 
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
-    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO (%d)", errno);
+    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO %s (%d)",
+             fifo_path.c_str(), errno);
+    UnlockFile(fd_lockfile_fifo);
     return 1;
   }
   Nonblock2Block(pipe_lru_[0]);
@@ -1058,6 +1112,7 @@ int MainCacheManager(int argc, char **argv) {
   unlink(fifo_path.c_str());
   CloseDatabase();
   unlink(crash_guard.c_str());
+  UnlockFile(fd_lockfile_fifo);
 
   monitor::Fini();
 
@@ -1098,6 +1153,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
     return false;
 
   MakePipe(pipe_lru_);
+  initialized_ = true;
 
   return true;
 }
@@ -1123,12 +1179,15 @@ void Spawn() {
  * Cleanup, closes SQLite connections.
  */
 void Fini() {
+  if (!initialized_) return;
+
   delete cache_dir_;
   cache_dir_ = NULL;
 
   if (shared_) {
     // Most of cleanup is done elsewhen by shared cache manager
     close(pipe_lru_[1]);
+    initialized_ = false;
     return;
   }
 
@@ -1142,6 +1201,7 @@ void Fini() {
   }
 
   CloseDatabase();
+  initialized_ = false;
 }
 
 
@@ -1152,6 +1212,7 @@ void Fini() {
  * \return True on success, false otherwise
  */
 bool Cleanup(const uint64_t leave_size) {
+  if (!initialized_) return false;
   bool result;
 
   if (!spawned_) {
@@ -1202,6 +1263,7 @@ static void DoInsert(const hash::Any &hash, const uint64_t size,
 void Insert(const hash::Any &any_hash, const uint64_t size,
             const string &cvmfs_path)
 {
+  assert(initialized_);
   if (limit_ == 0) return;
   DoInsert(any_hash, size, cvmfs_path, false);
 }
@@ -1216,6 +1278,7 @@ void Insert(const hash::Any &any_hash, const uint64_t size,
 bool Pin(const hash::Any &hash, const uint64_t size,
          const string &cvmfs_path)
 {
+  assert(initialized_);
   if (limit_ == 0) return true;
 
   const string hash_str = hash.ToString();
@@ -1292,6 +1355,7 @@ void Unpin(const hash::Any &hash) {
  * Updates the sequence number of the file specified by the hash.
  */
 void Touch(const hash::Any &hash) {
+  assert(initialized_);
   if (limit_ == 0) return;
 
   LruCommand cmd;
@@ -1305,13 +1369,22 @@ void Touch(const hash::Any &hash) {
  * Removes a chunk from cache, if it exists.
  */
 void Remove(const hash::Any &hash) {
+  assert(initialized_);
   string hash_str = hash.ToString();
 
   if (limit_ != 0) {
+    int pipe_remove[2];
+    MakeReturnPipe(pipe_remove);
+
     LruCommand cmd;
     cmd.command_type = kRemove;
+    cmd.return_pipe = pipe_remove[1];
     memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+    bool success;
+    ReadHalfPipe(pipe_remove[0], &success, sizeof(success));
+    CloseReturnPipe(pipe_remove);
   }
 
   unlink(((*cache_dir_) + hash.MakePath(1, 2)).c_str());
@@ -1320,6 +1393,11 @@ void Remove(const hash::Any &hash) {
 
 static vector<string> DoList(const CommandType list_command) {
   vector<string> result;
+  if (!initialized_) {
+    result.push_back("--CACHE UNMANAGED--");
+    return result;
+  }
+
   int pipe_list[2];
   MakeReturnPipe(pipe_list);
   char path_buffer[kMaxCvmfsPath];
@@ -1372,17 +1450,24 @@ vector<string> ListCatalogs() {
  * files smaller than limit-cleanup_threshold.
  */
 uint64_t GetMaxFileSize() {
+  if (!initialized_) return 0;
   if (limit_ == 0) return INT64_MAX;
   return limit_ - cleanup_threshold_;
 }
 
 
 uint64_t GetCapacity() {
+  if (!initialized_) return 0;
   return limit_;
 }
 
 
 static void GetStatus(uint64_t *gauge, uint64_t *pinned) {
+  if (!initialized_) {
+    *gauge = 0;
+    *pinned = 0;
+    return;
+  }
   int pipe_status[2];
   MakeReturnPipe(pipe_status);
 
@@ -1415,6 +1500,11 @@ uint64_t GetSizePinned() {
 
 
 static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold) {
+  if (!initialized_) {
+    *limit = 0;
+    *cleanup_threshold = 0;
+    return;
+  }
   int pipe_limits[2];
   MakeReturnPipe(pipe_limits);
 
@@ -1428,7 +1518,7 @@ static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold) {
 }
 
 pid_t GetPid() {
-  if (!shared_ || !spawned_) {
+  if (!initialized_ || !shared_ || !spawned_) {
     return cvmfs::pid_;
   }
 

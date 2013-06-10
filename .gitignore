@@ -4,3 +4,4 @@ test/test.log
 *.DS_Store
 *._.DS_Store
 build/
+benchmark/

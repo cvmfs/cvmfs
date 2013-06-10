@@ -7,11 +7,14 @@ use lib "$RealBin";
 use IO::Handle;
 use Functions::Help qw(help);
 use Functions::Launcher qw(launch kill_process jobs killall);
-use Functions::Testd qw(stop_daemon);
+use Functions::Testd qw(stop_daemon print_all_listening_address);
 use Functions::ServerSocket qw(start_socket receive_msg end_msg send_ip send_msg);
 use Getopt::Long;
 
-my $shell_path = undef;
+# This variable is declared as variable as daemon will modify it whenever a new shell
+# connects to it.
+our $shell_path = undef;
+
 my $iface = 'eth0';
 
 my $ret = GetOptions ("shell-path=s" => \$shell_path,
@@ -26,6 +29,10 @@ my $socket_started = start_socket();
 unless ($socket_started) {
 	die "Failed to open the socket. Aborting.\n";
 }
+
+# Printing all listening address
+print_all_listening_address();
+
 
 while(1) {
 	my $line = receive_msg();

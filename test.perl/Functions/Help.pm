@@ -7,7 +7,7 @@ package Functions::Help;
 use strict;
 use warnings;
 use File::Find;
-use Functions::Shell qw(check_daemon);
+use Functions::Active qw(check_daemon);
 
 # The next line is here to help me find the directory of the script
 # if you have a better method, let me know.
@@ -109,7 +109,7 @@ sub print_command_help {
 	my $command = shift;
 	
 	# Checking if the command has a specific help file in shell_help
-	if ($command eq 'setup' or $command eq 'fixperm' or $command eq 'start' or $command eq 'restart') {
+	if ($command =~ m/setup|fixperm|start|restart|status|ping/) {
 		print_shell_help($command);
 		return;
 	}

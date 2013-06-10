@@ -46,7 +46,6 @@
 
 #include <openssl/crypto.h>
 #include <google/dense_hash_map>
-#include "MurmurHash2.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -62,6 +61,7 @@
 #include <functional>
 
 #include "platform.h"
+#include "murmur.h"
 #include "logging.h"
 #include "tracer.h"
 #include "download.h"
@@ -74,7 +74,7 @@
 #include "atomic.h"
 #include "lru.h"
 #include "peers.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
 #include "shortstring.h"
@@ -431,7 +431,7 @@ int cvmfs_int_init(
     if (platform_stat((relative_cachedir + "/running." + *cvmfs::repository_name_).c_str(),
                       &info) == 0)
     {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "looks like cvmfs has been "
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "looks like cvmfs has been "
                "crashed previously, rebuilding cache database");
       cvmfs_opts_rebuild_cachedb = 1;
     }
@@ -500,7 +500,7 @@ int cvmfs_int_init(
   atomic_init32(&cvmfs::open_dirs_);
 
   // Network initialization
-  download::Init(16);
+  download::Init(16, false);
   download::SetHostChain(string(cvmfs_opts_hostname));
   download::SetProxyChain(cvmfs_opts_proxies);
   download::SetTimeout(cvmfs_opts_timeout, cvmfs_opts_timeout_direct);
@@ -617,7 +617,7 @@ int cvmfs_open(const char *c_path)
     return -ENOENT;
   }
 
-  fd = cache::Fetch(dirent, string(path.GetChars(), path.GetLength()));  // TODO
+  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
@@ -628,11 +628,11 @@ int cvmfs_open(const char *c_path)
       return fd;
     } else {
       if (close(fd) == 0) atomic_dec32(&open_files_);
-      LogCvmfs(kLogCvmfs, kLogSyslog, "open file descriptor limit exceeded");
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       return -EMFILE;
     }
   } else {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to open path: %s, CAS key %s, error code %d",
              c_path, dirent.checksum().ToString().c_str(), errno);
     if (errno == EMFILE) {
@@ -780,10 +780,9 @@ int cvmfs_listdir(const char *c_path,char ***buf,size_t *buflen)
   if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
     return -EIO;
   }
-  for (catalog::StatEntryList::const_iterator i = listing_from_catalog.begin(),
-       iEnd = listing_from_catalog.end(); i != iEnd; ++i)
-  {
-    append_string_to_list(i->name.c_str(),buf,&listlen,buflen);
+  for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
+    append_string_to_list(listing_from_catalog.AtPtr(i)->name.c_str(),
+                          buf, &listlen, buflen);
   }
 
   return 0;

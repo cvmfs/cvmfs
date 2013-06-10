@@ -9,8 +9,9 @@
 
 #include "platform.h"
 #include "hash.h"
-#include "dirent.h"
+#include "directory_entry.h"
 #include "sync_union.h"
+#include "util.h"
 
 namespace publish {
 
@@ -57,7 +58,7 @@ class SyncItem {
 
   inline hash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const hash::Any &hash) { content_hash_ = hash; }
-  inline bool HasContentHash() { return !content_hash_.IsNull(); }
+  inline bool HasContentHash() const { return !content_hash_.IsNull(); }
 
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 

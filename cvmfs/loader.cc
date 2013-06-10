@@ -53,6 +53,7 @@ struct CvmfsOptions {
   int gid;
   int grab_mountpoint;
   int cvmfs_suid;
+  int disable_watchdog;
 };
 
 enum {
@@ -67,11 +68,12 @@ enum {
 #define CVMFS_OPT(t, p, v) { t, offsetof(struct CvmfsOptions, p), v }
 #define CVMFS_SWITCH(t, p) { t, offsetof(struct CvmfsOptions, p), 1 }
 static struct fuse_opt cvmfs_array_opts[] = {
-  CVMFS_OPT("config=%s",          config, 0),
-  CVMFS_OPT("uid=%d",             uid, 0),
-  CVMFS_OPT("gid=%d",             gid, 0),
-  CVMFS_SWITCH("grab_mountpoint", grab_mountpoint),
-  CVMFS_SWITCH("cvmfs_suid",      cvmfs_suid),
+  CVMFS_OPT("config=%s",           config, 0),
+  CVMFS_OPT("uid=%d",              uid, 0),
+  CVMFS_OPT("gid=%d",              gid, 0),
+  CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
+  CVMFS_SWITCH("cvmfs_suid",       cvmfs_suid),
+  CVMFS_SWITCH("disable_watchdog", disable_watchdog),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -91,6 +93,7 @@ string *repository_name_ = NULL;
 string *mount_point_ = NULL;
 string *config_files_ = NULL;
 string *socket_path_ = NULL;
+string *usyslog_path_ = NULL;
 uid_t uid_ = 0;
 gid_t gid_ = 0;
 bool single_threaded_ = false;
@@ -99,6 +102,7 @@ bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
+bool disable_watchdog_ = false;
 atomic_int32 blocking_;
 atomic_int64 num_operations_;
 void *library_handle_;
@@ -112,7 +116,14 @@ static void Usage(const std::string &exename) {
     "Version %s\n"
     "Copyright (c) 2009- CERN, all rights reserved\n\n"
     "Please visit http://cernvm.cern.ch for details.\n\n"
-    "Usage: %s [-s] [-d] [-k] [-o mount options] <repository name> <mount point>\n"
+    "Usage: %s [-h] [-V] [-s] [-f] [-d] [-k] [-o mount options] <repository name> <mount point>\n\n"
+    "CernVM-FS general options:\n"
+    "  --help|-h            Print Help output (this)\n"
+    "  --version|-V         Print CernVM-FS version\n"
+    "  -s                   Run singlethreaded\n"
+    "  -f                   Run in foreground\n"
+    "  -d                   Enable debugging\n"
+    "  -k                   Parse options\n"
     "CernVM-FS mount options:\n"
     "  -o config=FILES      colon-separated path list of config files\n"
     "  -o uid=UID           Drop credentials to another user\n"
@@ -121,6 +132,7 @@ static void Usage(const std::string &exename) {
                             "before mounting (required for autofs)\n"
     "  -o parse             Parse and print cvmfs parameters\n"
     "  -o cvmfs_suid        Enable suid mode\n\n"
+    "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -276,6 +288,14 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
 
 
+static void stub_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+  FileSystemFence();
+  atomic_inc64(&num_operations_);
+  cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
+  atomic_dec64(&num_operations_);
+}
+
+
 /**
  * The callback used when fuse is parsing all the options
  * We separate CVMFS options from FUSE options here.
@@ -365,6 +385,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   gid_ = cvmfs_options.gid;
   grab_mountpoint_ = cvmfs_options.grab_mountpoint;
   suid_mode_ = cvmfs_options.cvmfs_suid;
+  disable_watchdog_ = cvmfs_options.disable_watchdog;
 
   return mount_options;
 }
@@ -388,6 +409,7 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   loader_operations->statfs      = stub_statfs;
   loader_operations->getxattr    = stub_getxattr;
   loader_operations->listxattr   = stub_listxattr;
+  loader_operations->forget      = stub_forget;
 }
 
 
@@ -425,6 +447,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 
 Failures Reload(const int fd_progress, const bool stop_and_go) {
   int retval;
+
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
     return kFailMaintenanceMode;
@@ -432,15 +455,15 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   SendMsg2Socket(fd_progress, "Blocking new file system calls\n");
   atomic_cas32(&blocking_, 0, 1);
 
-  retval = cvmfs_exports_->fnSaveState(fd_progress,
-                                       &loader_exports_->saved_states);
-  if (!retval)
-    return kFailSaveState;
-
   SendMsg2Socket(fd_progress, "Waiting for active file system calls\n");
   while (atomic_read64(&num_operations_)) {
     sched_yield();
   }
+
+  retval = cvmfs_exports_->fnSaveState(fd_progress,
+                                       &loader_exports_->saved_states);
+  if (!retval)
+    return kFailSaveState;
 
   SendMsg2Socket(fd_progress, "Unloading Fuse module\n");
   cvmfs_exports_->fnFini();
@@ -462,6 +485,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
   if (retval != kFailOk) {
     string msg_progress = cvmfs_exports_->fnGetErrorMsg() + " (" +
                           StringifyInt(retval) + ")\n";
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", msg_progress.c_str());
     SendMsg2Socket(fd_progress, msg_progress);
     return (Failures)retval;
   }
@@ -572,16 +596,8 @@ int main(int argc, char *argv[]) {
     Usage(argv[0]);
     return kFailOptions;
   }
-  fuse_opt_add_arg(mount_options, "-oro");
-  fuse_opt_add_arg(mount_options, "-onodev");
-  if (suid_mode_) {
-    if (getuid() != 0) {
-      PrintError("must be root to mount with suid option");
-      abort();
-    }
-    fuse_opt_add_arg(mount_options, "-osuid");
-    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
-  }
+
+  string parameter;
   options::Init();
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
@@ -591,6 +607,23 @@ int main(int argc, char *argv[]) {
   } else {
     options::ParseDefault(*repository_name_);
   }
+
+  if (options::GetValue("CVMFS_MOUNT_RW", &parameter) &&
+      options::IsOn(parameter))
+  {
+    fuse_opt_add_arg(mount_options, "-orw");
+  } else {
+    fuse_opt_add_arg(mount_options, "-oro");
+  }
+  fuse_opt_add_arg(mount_options, "-onodev");
+  if (suid_mode_) {
+    if (getuid() != 0) {
+      PrintError("must be root to mount with suid option");
+      abort();
+    }
+    fuse_opt_add_arg(mount_options, "-osuid");
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
+  }
   loader_exports_ = new LoaderExports();
   loader_exports_->loader_version = PACKAGE_VERSION;
   loader_exports_->boot_time = time(NULL);
@@ -598,6 +631,7 @@ int main(int argc, char *argv[]) {
   loader_exports_->foreground = foreground_;
   loader_exports_->repository_name = *repository_name_;
   loader_exports_->mount_point = *mount_point_;
+  loader_exports_->disable_watchdog = disable_watchdog_;
   if (config_files_)
     loader_exports_->config_files = *config_files_;
   else
@@ -609,8 +643,6 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  string parameter;
-
   // Logging
   if (options::GetValue("CVMFS_SYSLOG_LEVEL", &parameter))
     SetLogSyslogLevel(String2Uint64(parameter));
@@ -619,6 +651,7 @@ int main(int argc, char *argv[]) {
   if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
     SetLogSyslogFacility(String2Int64(parameter));
   SetLogSyslogPrefix(*repository_name_);
+  // Deferr setting usyslog until credentials are dropped
 
   // Permissions check
   if (options::GetValue("CVMFS_CHECK_PERMISSIONS", &parameter)) {
@@ -633,14 +666,17 @@ int main(int argc, char *argv[]) {
     struct rlimit rpl;
     memset(&rpl, 0, sizeof(rpl));
     getrlimit(RLIMIT_NOFILE, &rpl);
-    if (rpl.rlim_max < nfiles)
-      rpl.rlim_max = nfiles;
-    rpl.rlim_cur = nfiles;
-    retval = setrlimit(RLIMIT_NOFILE, &rpl);
-    if (retval != 0) {
-      PrintError("Failed to set maximum number of open files, "
-                 "insufficient permissions");
-      return kFailPermission;
+    if (rpl.rlim_cur < nfiles) {
+      if (rpl.rlim_max < nfiles)
+        rpl.rlim_max = nfiles;
+      rpl.rlim_cur = nfiles;
+      retval = setrlimit(RLIMIT_NOFILE, &rpl);
+      if (retval != 0) {
+        PrintError("Failed to set maximum number of open files, "
+                   "insufficient permissions");
+        // TODO detect valgrind and don't fail
+        return kFailPermission;
+      }
     }
   }
 
@@ -658,11 +694,18 @@ int main(int argc, char *argv[]) {
   if ((uid_ != 0) || (gid_ != 0)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
              uid_, gid_);
-    if (!SwitchCredentials(uid_, gid_, suid_mode_)) {
+    const bool retrievable = (suid_mode_ || ! disable_watchdog_);
+    if (!SwitchCredentials(uid_, gid_, retrievable)) {
       PrintError("Failed to drop credentials");
       return kFailPermission;
     }
   }
+
+  // Only set usyslog now, otherwise file permissions are wrong
+  usyslog_path_ = new string();
+  if (options::GetValue("CVMFS_USYSLOG", &parameter))
+    *usyslog_path_ = parameter;
+  SetLogMicroSyslog(*usyslog_path_);
 
   if (single_threaded_) {
     LogCvmfs(kLogCvmfs, kLogStdout,
@@ -698,7 +741,14 @@ int main(int argc, char *argv[]) {
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
   if (retval != kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "%s (%d)",
+    if (retval == kFailDoubleMount) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "\nCernVM-FS: repository %s already mounted on %s",
+               loader_exports_->repository_name.c_str(),
+               loader_exports_->mount_point.c_str());
+      return 0;
+    }
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s (%d)",
              cvmfs_exports_->fnGetErrorMsg().c_str(), retval);
     return retval;
   }
@@ -712,7 +762,8 @@ int main(int argc, char *argv[]) {
   atomic_init32(&blocking_);
 
   if (suid_mode_) {
-    if (!SwitchCredentials(0, getgid(), true)) {
+    const bool retrievable = true;
+    if (!SwitchCredentials(0, getgid(), retrievable)) {
       PrintError("failed to re-gain root permissions for mounting");
       return kFailPermission;
     }
@@ -727,9 +778,10 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
            mount_point_->c_str());
 
-  // Ultimately drop credentials
+  // drop credentials
   if (suid_mode_) {
-    if (!SwitchCredentials(uid_, gid_, false)) {
+    const bool retrievable = ! disable_watchdog_;
+    if (!SwitchCredentials(uid_, gid_, retrievable)) {
       PrintError("failed to drop permissions after mounting");
       return kFailPermission;
     }
@@ -752,6 +804,7 @@ int main(int argc, char *argv[]) {
   cvmfs_exports_->fnSpawn();
   loader_talk::Spawn();
 
+  SetLogMicroSyslog("");
   retval = fuse_set_signal_handlers(session);
   assert(retval == 0);
   fuse_session_add_chan(session, channel);
@@ -759,6 +812,7 @@ int main(int argc, char *argv[]) {
     retval = fuse_session_loop(session);
   else
     retval = fuse_session_loop_mt(session);
+  SetLogMicroSyslog(*usyslog_path_);
 
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
@@ -776,7 +830,7 @@ int main(int argc, char *argv[]) {
   dlclose(library_handle_);
   library_handle_ = NULL;
 
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
 
   CleanupLibcryptoMt();

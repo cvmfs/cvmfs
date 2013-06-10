@@ -15,11 +15,13 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "dirent.h"
+#include "directory_entry.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "shortstring.h"
-#include "duplex_sqlite3.h"
+#include "sql.h"
 #include "util.h"
+
 
 namespace catalog {
 
@@ -90,6 +92,22 @@ struct Counters {
   uint64_t subtree_nested;
 };
 
+/**
+ * Allows to define a class that transforms the inode in order to ensure
+ * that inodes are not reused after reloads (catalog or fuse module).
+ * Currently, annotation is used to set an offset starting at the highest
+ * so far issued inode.  The implementation is in the catalog manager.
+ */
+class InodeAnnotation {
+ public:
+  virtual ~InodeAnnotation() { };
+  virtual inode_t Annotate(const inode_t raw_inode) = 0;
+  virtual void IncGeneration(const uint64_t by) = 0;
+  virtual inode_t GetGeneration() = 0;
+  virtual bool ValidInode(const uint64_t inode) = 0;
+  virtual inode_t Strip(const inode_t annotated_inode) = 0;
+};
+
 
 /**
  * This class wraps a catalog database and provides methods
@@ -99,7 +117,7 @@ struct Counters {
  *
  * Read-only catalog. A sub-class provides read-write access.
  */
-  class Catalog : public SingleCopy {
+class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
   friend class SqlLookup;  // for mangled inode
  public:
@@ -138,6 +156,13 @@ struct Counters {
   bool AllChunksNext(hash::Any *hash, ChunkTypes *type);
   bool AllChunksEnd();
 
+  inline bool ListFileChunks(const PathString &path, FileChunkList *chunks) const
+  {
+    return ListMd5PathChunks(hash::Md5(path.GetChars(), path.GetLength()),
+                             chunks);
+  }
+  bool ListMd5PathChunks(const hash::Md5 &md5path, FileChunkList *chunks) const;
+
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetNumEntries() const;
@@ -168,6 +193,8 @@ struct Counters {
   NestedCatalogList *ListNestedCatalogs() const;
   bool FindNested(const PathString &mountpoint, hash::Any *hash) const;
 
+  void SetInodeAnnotation(InodeAnnotation *new_annotation);
+
  protected:
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
   HardlinkGroupMap hardlink_groups_;
@@ -175,8 +202,8 @@ struct Counters {
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
    */
-  virtual Database::OpenMode DatabaseOpenMode() const {
-    return Database::kOpenReadOnly;
+  virtual sqlite::DbOpenMode DatabaseOpenMode() const {
+    return sqlite::kDbOpenReadOnly;
   }
 
   virtual void InitPreparedStatements();
@@ -196,9 +223,7 @@ struct Counters {
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
-  inline uint64_t GetRowIdFromInode(const inode_t inode) const {
-    return inode - inode_range_.offset;
-  }
+  uint64_t GetRowIdFromInode(const inode_t inode) const;
   inode_t GetMangledInode(const uint64_t row_id,
                           const uint64_t hardlink_group);
 
@@ -217,13 +242,15 @@ struct Counters {
 
   InodeRange inode_range_;
   uint64_t max_row_id_;
+  InodeAnnotation *inode_annotation_;
 
-  SqlListing *sql_listing_;
-  SqlLookupPathHash *sql_lookup_md5path_;
-  SqlLookupInode *sql_lookup_inode_;
-  SqlNestedCatalogLookup *sql_lookup_nested_;
-  SqlNestedCatalogListing *sql_list_nested_;
-  SqlAllChunks *sql_all_chunks_;
+  SqlListing               *sql_listing_;
+  SqlLookupPathHash        *sql_lookup_md5path_;
+  SqlLookupInode           *sql_lookup_inode_;
+  SqlNestedCatalogLookup   *sql_lookup_nested_;
+  SqlNestedCatalogListing  *sql_list_nested_;
+  SqlAllChunks             *sql_all_chunks_;
+  SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
 
 Catalog *AttachFreely(const std::string &root_path, const std::string &file);

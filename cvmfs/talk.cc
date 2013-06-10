@@ -43,6 +43,8 @@
 #include "nfs_maps.h"
 #include "loader.h"
 #include "options.h"
+#include "cache.h"
+#include "monitor.h"
 
 using namespace std;  // NOLINT
 
@@ -56,6 +58,7 @@ string *socket_path_ = NULL;  /**< $cache_dir/cvmfs_io */
 int socket_fd_;
 pthread_t thread_talk_;
 bool spawned_;
+bool initialized_ = false;
 
 
 static void Answer(const int con_fd, const string &msg) {
@@ -88,15 +91,19 @@ static void *MainTalk(void *data __attribute__((unused))) {
     if ((con_fd = accept(socket_fd_, (struct sockaddr *)&remote, &socket_size))
          < 0)
     {
-      LogCvmfs(kLogTalk, kLogDebug, "terminating talk thead (fd %d, errno %d)",
+      LogCvmfs(kLogTalk, kLogDebug, "terminating talk thread (fd %d, errno %d)",
                con_fd, errno);
       break;
     }
 
     char buf[kMaxCommandSize];
-    if (recv(con_fd, buf, sizeof(buf), 0) > 0) {
-      const string line = string(buf);
-      LogCvmfs(kLogTalk, kLogDebug, "received %s", line.c_str());
+    int bytes_read;
+    if ((bytes_read = recv(con_fd, buf, sizeof(buf), 0)) > 0) {
+      if (buf[bytes_read-1] == '\0')
+        bytes_read--;
+      const string line = string(buf, bytes_read);
+      LogCvmfs(kLogTalk, kLogDebug, "received %s (length %u)",
+               line.c_str(), line.length());
 
       if (line == "tracebuffer flush") {
         tracer::Flush();
@@ -151,6 +158,17 @@ static void *MainTalk(void *data __attribute__((unused))) {
             }
           }
         }
+      } else if (line.substr(0, 5) == "evict") {
+        if (line.length() < 7) {
+          Answer(con_fd, "Usage: evict <path>\n");
+        } else {
+          const string path = line.substr(6);
+          const bool found_regular = cvmfs::Evict(path);
+          if (found_regular)
+            Answer(con_fd, "OK\n");
+          else
+            Answer(con_fd, "No such regular file\n");
+        }
       } else if (line == "mountpoint") {
         Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {
@@ -187,6 +205,14 @@ static void *MainTalk(void *data __attribute__((unused))) {
         } else {
           const unsigned max_ttl = String2Uint64(line.substr(12));
           cvmfs::SetMaxTTL(max_ttl);
+          Answer(con_fd, "OK\n");
+        }
+      } else if (line.substr(0, 14) == "nameserver set") {
+        if (line.length() < 16) {
+          Answer(con_fd, "Usage: nameserver set <host>\n");
+        } else {
+          const string host = line.substr(15);
+          download::SetDnsServer(host);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "host info") {
@@ -292,6 +318,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         catalog::Statistics catalog_stats;
         string result;
 
+        result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
         result += "File System Call Statistics:\n  " + cvmfs::GetFsStats();
 
         cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
@@ -299,6 +326,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
                   string("  inode cache:   ") + inode_stats.Print() +
                   string("  path cache:    ") + path_stats.Print() +
                   string("  md5path cache: ") + md5path_stats.Print();
+        result += string("  inode tracker: ") +
+                  cvmfs::PrintInodeTrackerStatistics();
 
         result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
         result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
@@ -313,19 +342,41 @@ static void *MainTalk(void *data __attribute__((unused))) {
           StringifyInt(LinkString::num_instances()) + "  overflows: " +
           StringifyInt(LinkString::num_overflows()) + "\n";
 
+        result += "\nCache Mode: ";
+        switch (cache::GetCacheMode()) {
+          case cache::kCacheReadWrite:
+            result += "read-write";
+            break;
+          case cache::kCacheReadOnly:
+            result += "read-only";
+            break;
+          default:
+            result += "unknown";
+        }
+        bool drainout_mode;
+        bool maintenance_mode;
+        cvmfs::GetReloadStatus(&drainout_mode, &maintenance_mode);
+        result += "\nDrainout Mode: " + StringifyBool(drainout_mode) + "\n";
+        result += "Maintenance Mode: " + StringifyBool(maintenance_mode) + "\n";
+
         if (cvmfs::nfs_maps_) {
-          result += "\nLEVELDB Statistics:\n";
+          result += "\nNFS Map Statistics:\n";
           result += nfs_maps::GetStatistics();
         }
 
         result += "\nNetwork Statistics:\n";
         result += download::GetStatistics().Print();
-        unsigned proxy_reset_delay;
-        time_t proxy_timestamp_failover;
+        unsigned proxy_reset_delay, host_reset_delay;
+        time_t proxy_timestamp_failover, host_timestamp_failover;
         download::GetProxyBackupInfo(&proxy_reset_delay,
                                      &proxy_timestamp_failover);
+        download::GetHostBackupInfo(&host_reset_delay,
+                                    &host_timestamp_failover);
         result += "Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
           ("Backup since " + StringifyTime(proxy_timestamp_failover, true)) :
+          "Primary") + "\n";
+        result += "Backup host: " + ((host_timestamp_failover > 0) ?
+          ("Backup since " + StringifyTime(host_timestamp_failover, true)) :
           "Primary");
         result += "\n\n";
 
@@ -375,6 +426,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "pid cachemgr") {
         const string pid_str = StringifyInt(quota::GetPid()) + "\n";
         Answer(con_fd, pid_str);
+      } else if (line == "pid watchdog") {
+        const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
+        Answer(con_fd, pid_str);
       } else if (line == "parameters") {
         Answer(con_fd, options::Dump());
       } else if (line == "hotpatch history") {
@@ -397,6 +451,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         Answer(con_fd, version_str);
       } else if (line == "version patchlevel") {
         Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
+      } else if (line == "tear down to read-only") {
+        cache::TearDown2ReadOnly();
+        Answer(con_fd, "In read-only mode\n");
       } else {
         Answer(con_fd, "unknown command\n");
       }
@@ -411,6 +468,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
  * Init the socket.
  */
 bool Init(const string &cachedir) {
+  if (initialized_) return true;
   spawned_ = false;
   cachedir_ = new string(cachedir);
   socket_path_ = new string(cachedir + "/cvmfs_io." + *cvmfs::repository_name_);
@@ -425,6 +483,7 @@ bool Init(const string &cachedir) {
   LogCvmfs(kLogTalk, kLogDebug, "socket created at %s (fd %d)",
            socket_path_->c_str(), socket_fd_);
 
+  initialized_ = true;
   return true;
 }
 
@@ -444,10 +503,11 @@ void Spawn() {
  * Terminates command-listener thread.  Removes socket.
  */
 void Fini() {
+  if (!initialized_) return;
   int result;
   result = unlink(socket_path_->c_str());
   if (result != 0) {
-    LogCvmfs(kLogTalk, kLogSyslog,
+    LogCvmfs(kLogTalk, kLogSyslogWarn,
              "Could not remove cvmfs_io socket from cache directory.");
   }
 
@@ -460,6 +520,7 @@ void Fini() {
   close(socket_fd_);
   if (spawned_) pthread_join(thread_talk_, NULL);
   LogCvmfs(kLogTalk, kLogDebug, "talk thread stopped");
+  initialized_ = false;
 }
 
 }  // namespace talk

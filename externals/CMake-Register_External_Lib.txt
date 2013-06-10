@@ -52,11 +52,14 @@ if (NOT REG_EXT_LIB)
 		endif (${ARGC} EQUAL 3)
 
 		# configure the library before generating the final build files
-		message (STATUS "configuring external library: ${NAME} ...")
-		execute_process (
-			COMMAND				sh ${LOCATION}/configureHook.sh
-			WORKING_DIRECTORY	${LOCATION}
-		)
+		if (NOT EXISTS ${LOCATION}/.external_is_configured)
+			message (STATUS "configuring external library: ${NAME} ...")
+			execute_process (
+				COMMAND				sh ${LOCATION}/configureHook.sh
+				WORKING_DIRECTORY	${LOCATION}
+			)
+			file (WRITE ${LOCATION}/.external_is_configured "no coffee break needed...")
+		endif (NOT EXISTS ${LOCATION}/.external_is_configured)
 
 	endmacro (register_external_lib)
 	

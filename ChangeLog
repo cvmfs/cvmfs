@@ -1,3 +1,139 @@
+2.1.12:
+  * Fix reading from socket in talk thread
+  * Add "nameserver set" command to cvmfs_talk
+  * Fix various issues with reading of chunked files
+  * Decrease memory consumption of the inode tracker
+  * Remove trailing empty attribute in listattr callback
+  * Make repositories replicatable by default
+  * Safe guard against concurrent snapshot processes
+  * Drop config.sh dependency from cvmfs_server
+  * Experimental support for repository tags (named snapshots).
+    Allows to mount a specific repository version and to rollback
+    and re-publish previous repository states.
+
+2.1.11:
+  * Improve logging for whitelist expiry and fqrn errors
+  * Add network path reset within the same proxy group
+    (re-balance proxies)
+  * Add network path reset for failover hosts
+  * Add missing execmod SELinux exception for 32bit SL6
+  * Fix occasional hangs of gdb when generating stack traces
+  * Improve host/proxy failover logging
+  * Fix host failover
+  * Perform a host failover instead of a proxy failover 
+    on HTTP 502, 504 errors
+  * Add experimental support for "micro-syslog" implementation that
+    writes syslog messages to a file.  Add CVMFS_USYSLOG parameter
+    to specify the destination file.
+  * Distinguish information, warning, and error records when
+    writing to syslog
+  * Add -march=i686 to CFLAGS and CXXFLAGS for 32bit builds 
+  * Add CVMFS_MOUNT_RW switch parameter.  A read/write mount point
+    can workaround problematic open flags (O_RDWR, O_TRUNC, ...)
+  * Remove unused CVMFS_64BIT_INODES parameter
+  * Avoid __sync_fetch_and_add on 64bit integers with a negative
+    offset.  This breaks on 32bit systems.  It affects the counter
+    for active file system calls in the loader.
+  * SLES11 build system compatibility fixes
+
+2.1.10:
+  * Use continuous inodes on inode generation change instead of
+    fixed bit fields.  This increases the usable inode space.
+  * Ensure unique inode--path relationship during kernel-imposed
+    lifetime of inodes.  Avoiding multiple inodes for the same path
+    avoids large hangs of 100% system load.
+  * Fix remove command in cache manager
+  * Fix uid/euid of shared cache manager
+  * Add 'evict' command to cvmfs_talk in order to remove specific
+    files from cache
+  * Improve logging for fatal cachedb update errors
+  * Fix potential endless loop in signal handler
+  * Add drainout mode and maintenance mode to internal affairs
+  * Add number of forget() calls to file system statistics
+  * Advise the kernel not to cache pages for files verified
+    by cvmfs_fsck
+  * Fix deadlock in 'cvmfs_config reload' when cwd is on cvmfs
+  * Fix reloading with wiping out the cache directory in case
+    the cache base directory is not owned by the cvmfs user
+  * Fix restoring directory handle gauge
+  * Prevent the leveldb build system from picking up the system's
+    snappy library
+
+2.1.9:
+  * RHEL 6.4 SELinux rules for generating stack traces
+  * Include stacktrace files in bugreport tarball
+  * Check for attr utility in cvmfs_config
+  * Fixed potential endless loop in automatic cache cleanup
+  * Switched to SQlite 3.7.16.2
+  * Fixed touching of .cvmfscatalog in server toolkit
+  * Added "pause mode" to 'cvmfs_server publish' in order to allow
+    for manually fixing file catalogs
+  * Fix removal of temporary files in replication tools
+  * Experimental support for "shared NFS maps", which are handled
+    by sqlite and allow for NFS HA setups at the cost of performance
+  * Recognize CVMFS_IPV4_ONLY environment variable and, if set
+    to a non-empty value, don't use IPv6 addresses
+  * Recognize http_proxy in cvmfs server toolkit
+  * Fix handling of "last_snapshot" sentinel in replication
+    when not executed as root
+  * Asynchronous catalog updates in the server toolkit
+  * Fix: shared cache manager race during load-unload cycles
+  * Fix: file descriptor leaks during Fuse module reload
+  * Fix: handling of log level parameter in snapshot
+  * Fix: save and restore open dir and open file counters
+    when the fuse module is reloaded
+  * Fixed several memory leaks when reloading the Fuse module
+  * Improved logging for whitelist verification errors
+  * Added "remount fence" in order to ensure consistent
+    catalog operations
+  * Fix: Rewind file descriptor on download retries
+  * Log inode generation overflows to syslog
+  * Pretty printing for 'cvmfs_config reload'
+  * Fixed selinux context for SL5 in cvmfs_server
+  * Omit autofs warnings in NFS mode
+  * Added "inode tracker" to smoothly connect catalog reloads 
+    and reloads of the Fuse module
+  * Fix: handling of "-n" option in mount helper
+  * Log application of new file system snapshots to syslog
+
+2.1.8:
+  * Added SElinux exception to allow unloading of cvmfs module
+  * Run default signal handlers after custom crash handling
+  * Fix for crash handler / ptrace Linux security handling
+  * Support for ignoring x-directory hardlinks in the
+    server toolkit
+  * Fix: evaluation of symlinks could lead to wrong
+    empty or 1-byte symlinks
+  * Use 32bit inodes by default
+  * Fixed wrong location for cache manager debug log
+  * Fixed chksetup error about missing library on Mac
+
+2.1.7:
+  * Added support for CVMFS_KEYS_DIR, which has precedence over
+    CVMFS_PUBLIC_KEY 
+  * Changed default install prefix to /usr
+  * Experimental support for file chunking
+  * Experimental support for cache read-only mode
+  * Multi-threaded, extensible storage backend
+  * Improved error reporting on mount failures
+  * Fix: cvmfs-internal 1G default for cache size
+  * Fix: file permissions for local storage backend
+  * Fix: prevent double mount block with private mount points
+  * Fix: store compressed certificate in replication
+  * Fix: Build system for parallel builds 
+  * Fix: create stack traces by gdb, thereby handle hidden 
+    symbols
+  * Packaging: Do not try to reload when upgrading from
+    the 2.0 branch
+  * Fix: Save fuse module state only after drainout of
+         file system calls
+  * Fix: stale page caches across file catalog reloads
+  * Fix: hardlink count for entries of 2.0 file catalogs
+  * Fix: don't retry downloads on HTTP errors 
+  * Fix: comply with system mount return values in the helper
+  * Renamed cvmfs-lib RPM to cvmfs-devel 
+  * Fixed cvmfs_config reload on clean nodes
+
 2.1.6:
   * Fixed hanging reload when reload socket can not be
     opened

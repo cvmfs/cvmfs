@@ -23,11 +23,29 @@ WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   sql_unlink_(NULL),
   sql_touch_(NULL),
   sql_update_(NULL),
+  sql_chunk_insert_(NULL),
+  sql_chunks_remove_(NULL),
   sql_max_link_id_(NULL),
-  sql_inc_linkcount_(NULL)
+  sql_inc_linkcount_(NULL),
+  dirty_(false)
 {
-  read_only_ = false;
-  dirty_ = false;
+  read_only_ =false;
+}
+
+
+WritableCatalog *AttachFreelyRw(const string &root_path, const string &file) {
+  WritableCatalog *catalog =
+    new WritableCatalog(root_path, NULL);
+  bool retval = catalog->OpenDatabase(file);
+  if (!retval) {
+    delete catalog;
+    return NULL;
+  }
+  InodeRange inode_range;
+  inode_range.offset = 256;
+  inode_range.size = 256 + catalog->max_row_id();
+  catalog->set_inode_range(inode_range);
+  return catalog;
 }
 
 
@@ -62,6 +80,8 @@ void WritableCatalog::InitPreparedStatements() {
   sql_unlink_        = new SqlDirentUnlink     (database());
   sql_touch_         = new SqlDirentTouch      (database());
   sql_update_        = new SqlDirentUpdate     (database());
+  sql_chunk_insert_  = new SqlChunkInsert      (database());
+  sql_chunks_remove_ = new SqlChunksRemove     (database());
   sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
   sql_inc_linkcount_ = new SqlIncLinkcount     (database());
 }
@@ -74,6 +94,8 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_unlink_;
   delete sql_touch_;
   delete sql_update_;
+  delete sql_chunk_insert_;
+  delete sql_chunks_remove_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
 }
@@ -140,6 +162,16 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
 
   SetDirty();
 
+  // if the entry used to be a chunked file... remove the chunks
+  if (entry.IsChunkedFile()) {
+    retval =
+      sql_chunks_remove_->BindPathHash(path_hash) &&
+      sql_chunks_remove_->Execute();
+    assert(retval);
+    sql_chunks_remove_->Reset();
+  }
+
+  // remove the entry itself
   retval =
     sql_unlink_->BindPathHash(path_hash) &&
     sql_unlink_->Execute();
@@ -191,6 +223,26 @@ void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
   sql_update_->Reset();
 }
 
+void WritableCatalog::AddFileChunk(const std::string &entry_path,
+                                   const FileChunk &chunk) {
+  SetDirty();
+
+  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
+
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding chunk for %s from offset %d "
+                                        "and chunk size: %d bytes",
+           entry_path.c_str(),
+           chunk.offset(),
+           chunk.offset() + chunk.size());
+
+  bool retval =
+    sql_chunk_insert_->BindPathHash(path_hash) &&
+    sql_chunk_insert_->BindFileChunk(chunk) &&
+    sql_chunk_insert_->Execute();
+  assert(retval);
+  sql_chunk_insert_->Reset();
+}
+
 
 /**
  * Sets the last modified time stamp of this catalog to current time.
@@ -212,6 +264,15 @@ void WritableCatalog::UpdateLastModified() {
 void WritableCatalog::IncrementRevision() {
   const string sql =
     "UPDATE properties SET value=value+1 WHERE key='revision';";
+  bool retval = Sql(database(), sql).Execute();
+  assert(retval);
+}
+
+
+void WritableCatalog::SetRevision(const uint64_t new_revision) {
+  const string sql =
+    "UPDATE properties SET value=" + StringifyInt(new_revision) +
+    " WHERE key='revision';";
   bool retval = Sql(database(), sql).Execute();
   assert(retval);
 }
@@ -284,7 +345,7 @@ void WritableCatalog::MoveToNestedRecursively(
        WritableCatalog *new_nested_catalog,
        vector<string> *grand_child_mountpoints)
 {
-  // After creating a new nested catalog we have move all elements
+  // After creating a new nested catalog we have to move all elements
   // now contained by the new one.  List and move them recursively.
   DirectoryEntryList listing;
   bool retval = ListingPath(PathString(directory.data(), directory.length()),
@@ -292,12 +353,10 @@ void WritableCatalog::MoveToNestedRecursively(
   assert(retval);
 
   // Go through the listing
-  string full_path;
   for (DirectoryEntryList::const_iterator i = listing.begin(),
        iEnd = listing.end(); i != iEnd; ++i)
   {
-    full_path = directory + "/";
-    full_path.append(i->name().GetChars(), i->name().GetLength());
+    const string full_path = i->GetFullPath(directory);
 
     // The entries are first inserted into the new catalog
     new_nested_catalog->AddEntry(*i, full_path);
@@ -309,6 +368,8 @@ void WritableCatalog::MoveToNestedRecursively(
       // Recurse deeper into the directory tree
       MoveToNestedRecursively(full_path, new_nested_catalog,
                               grand_child_mountpoints);
+    } else if (i->IsChunkedFile()) {
+      MoveFileChunksToNested(full_path, new_nested_catalog);
     }
 
     // Remove the entry from the current catalog
@@ -334,6 +395,20 @@ void WritableCatalog::MoveCatalogsToNested(
 
     new_nested_catalog->InsertNestedCatalog(*i, attached_reference,
                                             hash_nested);
+  }
+}
+
+
+void WritableCatalog::MoveFileChunksToNested(
+  const std::string  &full_path,
+  WritableCatalog    *new_nested_catalog)
+{
+  FileChunkList chunks;
+  ListFileChunks(PathString(full_path), &chunks);
+  assert (chunks.size() > 0);
+
+  for (unsigned i = 0; i < chunks.size(); ++i) {
+    new_nested_catalog->AddFileChunk(full_path, *chunks.AtPtr(i));
   }
 }
 
@@ -517,6 +592,9 @@ void WritableCatalog::CopyToParent() {
   assert(retval);
   retval = Sql(database(), "INSERT INTO other.catalog "
                            "SELECT * FROM main.catalog;").Execute();
+  assert(retval);
+  retval = Sql(database(), "INSERT INTO other.chunks "
+                           "SELECT * FROM main.chunks;").Execute();
   assert(retval);
   retval = Sql(database(), "DETACH other;").Execute();
   assert(retval);
