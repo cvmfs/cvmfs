@@ -1,4 +1,5 @@
 2.1.12:
+  * Add pin command to cvmfs_talk
   * Fix reading from socket in talk thread
   * Add "nameserver set" command to cvmfs_talk
   * Fix various issues with reading of chunked files
