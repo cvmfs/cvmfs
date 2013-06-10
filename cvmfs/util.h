@@ -34,6 +34,15 @@ const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 
+/**
+ * Type Trait:
+ * "Static" assertion that a template parameter is a pointer
+ */
+template<typename T>
+struct is_pointer { static const bool value = false; };
+template<typename T>
+struct is_pointer<T*> { static const bool value = true; };
+
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
@@ -48,6 +57,47 @@ void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);
 void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void ClosePipe(int pipe_fd[2]);
+struct Pipe {
+  Pipe() {
+    int pipe_fd[2];
+    MakePipe(pipe_fd);
+    read_end = pipe_fd[0];
+    write_end = pipe_fd[1];
+  }
+
+  void Close() {
+    close (read_end);
+    close (write_end);
+  }
+
+  template<typename T>
+  bool Write(const T &data) {
+    assert (! is_pointer<T>::value); // TODO: C++11 (replace by static_assert)
+    const int num_bytes = write(write_end, &data, sizeof(T));
+    return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
+  }
+
+  template<typename T>
+  bool Read(T *data) {
+    assert (! is_pointer<T>::value); // TODO: C++11 (replace by static_assert)
+    int num_bytes = read(read_end, data, sizeof(T));
+    return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
+  }
+
+  bool Write(const void *buf, size_t nbyte) {
+    WritePipe(write_end, buf, nbyte);
+    return true;
+  }
+
+  bool Read(void *buf, size_t nbyte) {
+    ReadPipe(read_end, buf, nbyte);
+    return true;
+  }
+
+  int read_end;
+  int write_end;
+};
+
 void Nonblock2Block(int filedes);
 void SendMsg2Socket(const int fd, const std::string &msg);
 
