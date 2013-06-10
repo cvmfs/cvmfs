@@ -1526,6 +1526,12 @@ bool Pin(const string &path) {
 
   if (!found || !dirent.IsRegular())
     return false;
+  if (dirent.IsChunkedFile())
+    return false;  // TODO
+  int fd = cache::FetchDirent(dirent, path);
+  if (fd < 0)
+    return false;
+  close(fd);
   bool retval = quota::Pin(dirent.checksum(), dirent.size(), path, false);
   return retval;
 }
