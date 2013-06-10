@@ -203,6 +203,14 @@ static void *MainTalk(void *data __attribute__((unused))) {
           cvmfs::SetMaxTTL(max_ttl);
           Answer(con_fd, "OK\n");
         }
+      } else if (line.substr(0, 14) == "nameserver set") {
+        if (line.length() < 16) {
+          Answer(con_fd, "Usage: nameserver set <host>\n");
+        } else {
+          const string host = line.substr(15);
+          download::SetDnsServer(host);
+          Answer(con_fd, "OK\n");
+        }
       } else if (line == "host info") {
         vector<string> host_chain;
         vector<int> rtt;

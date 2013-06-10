@@ -1,4 +1,5 @@
 2.1.12:
+  * Add "nameserver set" command to cvmfs_talk
   * Fix various issues with reading of chunked files
   * Decrease memory consumption of the inode tracker
   * Remove trailing empty attribute in listattr callback
