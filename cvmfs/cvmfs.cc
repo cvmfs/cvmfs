@@ -120,7 +120,6 @@ const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
 const int kMaxIoDelay = 2000; /**< Maximum 2 seconds */
 const int kForgetDos = 10000; /**< Clear DoS memory after 10 seconds */
 
-const uint64_t kChunkedFileHandle = static_cast<uint64_t>(-2);
 /**
  * Prevent DoS attacks on the Squid server
  */
@@ -165,44 +164,6 @@ struct DirectoryListing {
   DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
 };
 
-/**
- * For opening and reading chunked files
- */
-class LiveFileChunk : public FileChunk {
- public:
-  explicit LiveFileChunk(const FileChunk &chunk) :
-    FileChunk(chunk),
-    open_(false),
-    file_descriptor_(0) { }
-
-  bool Fetch() {
-    file_descriptor_ = cache::FetchChunk(*this, "file chunk TODO: of what");
-    if (file_descriptor_ >= 0)
-      open_ = true;
-    return IsOpen();
-  }
-  bool Close() {
-    if (!IsOpen()) return true;
-    open_ = close(file_descriptor_) != 0;
-    return !open_;
-  }
-  inline int file_descriptor() const { return file_descriptor_; }
-
-  inline bool IsOpen() const { return open_; }
-
-  /**
-   * exclusively used to find file chunks using std::lower_bound
-   */
-  inline bool operator<(const off_t offset) const {
-    return (off_t)(this->offset() + this->size()) <= offset;
-  }
-
- private:
-  bool open_;
-  int  file_descriptor_;
-};
-typedef std::vector<LiveFileChunk> LiveFileChunks;
-
 const loader::LoaderExports *loader_exports_ = NULL;
 bool foreground_ = false;
 bool nfs_maps_ = false;
@@ -244,11 +205,8 @@ DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
-typedef google::dense_hash_map<fuse_ino_t, LiveFileChunks,
-                               hash_murmur<fuse_ino_t> >
-        LiveFileChunksMap;
-LiveFileChunksMap *live_file_chunks_ = NULL;
-pthread_rwlock_t live_file_chunks_mutex_ = PTHREAD_RWLOCK_INITIALIZER;
+// contains inode to chunklist and handle to fd maps
+ChunkTables *chunk_tables_;
 
 atomic_int64 num_fs_open_;
 atomic_int64 num_fs_dir_open_;
@@ -1034,37 +992,50 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   atomic_inc64(&num_fs_open_);  // Count actual open / fetch operations
 
   if (dirent.IsChunkedFile()) {
-    // TODO: file descriptor pool and accounting
-    LogCvmfs(kLogCvmfs, kLogDebug, "chunked file %s opened (download delayed "
-                                   "to read() call)",
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "chunked file %s opened (download delayed to read() call)",
              path.c_str());
 
-    // Retrieve File chunks from the catalog
-    FileChunks chunks;
-    if (!dirent.catalog()->ListFileChunks(path, &chunks) || chunks.IsEmpty()) {
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
-               "but no chunks found in the catalog %s.", path.c_str(),
-               dirent.catalog()->path().c_str());
-      fuse_reply_err(req, EIO);
+    if (atomic_xadd32(&open_files_, 1) >=
+        (static_cast<int>(max_open_files_))-kNumReservedFd)
+    {
+      atomic_dec32(&open_files_);
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
+      fuse_reply_err(req, EMFILE);
       return;
     }
 
-    // Add process data to the retrieved chunks
-    LiveFileChunks live_chunks;
-    for (unsigned i = 0; i < chunks.size(); ++i) {
-      live_chunks.push_back(LiveFileChunk(*chunks.AtPtr(i)));
-    }
-
-    // Save the newly opened file chunks into the respective list
-    {
-      WriteLockGuard guard(live_file_chunks_mutex_);
-      if (live_file_chunks_->count(ino) == 0) {
-        (*live_file_chunks_)[ino] = live_chunks;
+    chunk_tables_->Lock();
+    if (!chunk_tables_->inode2chunks.Contains(ino)) {
+      chunk_tables_->Unlock();
+      // Retrieve File chunks from the catalog
+      FileChunkList *chunks = new FileChunkList();
+      if (!dirent.catalog()->ListFileChunks(path, chunks) || chunks->IsEmpty()) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
+                 "but no chunks found in the catalog %s.", path.c_str(),
+                 dirent.catalog()->path().c_str());
+        fuse_reply_err(req, EIO);
+        return;
       }
+      chunk_tables_->Lock();
+      chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path));
+      chunk_tables_->inode2references.Insert(ino, 1);
+    } else {
+      uint32_t refctr;
+      bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+      assert(retval);
+      chunk_tables_->inode2references.Insert(ino, refctr+1);
     }
 
-    // Actual file chunks will be loaded on demand...
-    fi->fh = kChunkedFileHandle;
+    // Update the chunk handle list
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "linking chunk handle %d to inode: %"PRIu64,
+             chunk_tables_->next_handle, ino);
+    chunk_tables_->handle2fd.Insert(chunk_tables_->next_handle, ChunkFd());
+    fi->fh = static_cast<uint64_t>(-chunk_tables_->next_handle);
+    ++chunk_tables_->next_handle;
+    chunk_tables_->Unlock();
+
     fuse_reply_open(req, fi);
     return;
   }
@@ -1135,87 +1106,99 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
            catalog_manager_->MangleInode(ino), size, off, fi->fh);
   atomic_inc64(&num_fs_read_);
 
-  // Get data chunk (<=4k guaranteed by Fuse)
+  // Get data chunk (<=128k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
-
   unsigned int overall_bytes_fetched = 0;
 
   // Do we have a a chunked file?
-  if (fi->fh == kChunkedFileHandle) {
-    // TODO: file descriptor pool and accounting
-    // TODO: read-ahead thread for chunks
-    WriteLockGuard guard(live_file_chunks_mutex_);
+  if (static_cast<int64_t>(fi->fh) < 0) {
+    const uint64_t chunk_handle =
+      static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
+    ChunkFd chunk_fd;
+    FileChunkReflist chunks;
+    bool retval;
 
-    // find the file chunk descriptions for the requested inode
-    LiveFileChunksMap::iterator chunks_itr = live_file_chunks_->find(ino);
-    if (chunks_itr == live_file_chunks_->end()) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-               "failed to find file chunk data for ino: %d", ino);
-      fuse_reply_err(req, EINVAL);
-      return;
+    // Fetch chunk list and file descriptor
+    chunk_tables_->Lock();
+    retval = chunk_tables_->inode2chunks.Lookup(ino, &chunks);
+    assert(retval);
+    retval = chunk_tables_->handle2fd.Lookup(chunk_handle, &chunk_fd);
+    assert(retval);
+    chunk_tables_->Unlock();
+
+    // Find the chunk that holds the beginning of the requested data
+    // TODO: binary search
+    unsigned chunk_idx = 0;
+    for (; chunk_idx < chunks.list->size(); ++chunk_idx) {
+      if (chunks.list->AtPtr(chunk_idx)->offset() > off)
+        break;
     }
-    LiveFileChunks &chunks = chunks_itr->second;
+    chunk_idx--;
 
-    // TODO: unlock here?
-    // find the chunk that holds the beginning of the requested data
-    LiveFileChunks::iterator chunk_itr = chunks.begin();
-    chunk_itr = std::lower_bound(chunk_itr,
-                                 chunks.end(),
-                                 off);
-    if (chunk_itr == chunks.end()) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-               "failed to find specific file chunk for ino: %d "
-               "starting at offset: %d", ino, off);
-      fuse_reply_err(req, EIO);
-      return;
-    }
 
-    // fetch all needed chunks and read the requested data
-    off_t offset_in_chunk = off - chunk_itr->offset();
+    // Lock chunk handle
+    pthread_mutex_t *handle_lock = chunk_tables_->Handle2Lock(chunk_handle);
+    LockMutex(handle_lock);
+
+    // Fetch all needed chunks and read the requested data
+    off_t offset_in_chunk = off - chunks.list->AtPtr(chunk_idx)->offset();
     do {
-      assert (chunk_itr != chunks.end());
-      LiveFileChunk &chunk = *chunk_itr;
-
-      // download and open chunk on demand
-      if (!chunk.IsOpen() && !chunk.Fetch()) {
-        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "failed to load chunk "
-                 "for inode: %"PRIu64", CAS key: %s, error code: %d",
-                 ino, chunk.content_hash().ToString().c_str(), errno);
-
-        if (errno == EMFILE) {
-          fuse_reply_err(req, EMFILE);
+      // Open file descriptor to chunk
+      if ((chunk_fd.fd == -1) || (chunk_fd.chunk_idx != chunk_idx)) {
+        // TODO: read-ahead
+        if (chunk_fd.fd != -1) close(chunk_fd.fd);
+        string verbose_path = "Part of " + chunks.path.ToString();
+        chunk_fd.fd = cache::FetchChunk(*chunks.list->AtPtr(chunk_idx),
+                                        verbose_path);
+        if (chunk_fd.fd < 0) {
+          chunk_fd.fd = -1;
+          chunk_tables_->Lock();
+          chunk_tables_->handle2fd.Insert(chunk_handle, chunk_fd);
+          chunk_tables_->Unlock();
+          UnlockMutex(handle_lock);
+          fuse_reply_err(req, EIO);
           return;
         }
-
-        fuse_reply_err(req, EIO);
-        return;
+        chunk_fd.chunk_idx = chunk_idx;
       }
 
-      // read data from the chunk
-      assert (chunk.IsOpen());
-      const size_t bytes_to_read            = size - overall_bytes_fetched;
-      const size_t remaining_bytes_in_chunk = chunk.size() - offset_in_chunk;
+      LogCvmfs(kLogCvmfs, kLogDebug, "reading from chunk fd %d",
+               chunk_fd.fd);
+      // Read data from chunk
+      const size_t bytes_to_read = size - overall_bytes_fetched;
+      const size_t remaining_bytes_in_chunk =
+        chunks.list->AtPtr(chunk_idx)->size() - offset_in_chunk;
       size_t bytes_to_read_in_chunk =
         std::min(bytes_to_read, remaining_bytes_in_chunk);
-      const size_t bytes_fetched = pread(chunk.file_descriptor(),
-                                         data + overall_bytes_fetched,
-                                         bytes_to_read_in_chunk,
-                                         offset_in_chunk);
+      const size_t bytes_fetched =
+        pread(chunk_fd.fd, data + overall_bytes_fetched,
+              bytes_to_read_in_chunk, offset_in_chunk);
 
       if (bytes_fetched == (size_t)-1) {
-        LogCvmfs(kLogCvmfs, kLogDebug, "read err no %d result %d",
-                 errno, bytes_fetched);
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d result %d (%s)",
+                 errno, bytes_fetched, chunks.path.ToString().c_str());
+        chunk_tables_->Lock();
+        chunk_tables_->handle2fd.Insert(chunk_handle, chunk_fd);
+        chunk_tables_->Unlock();
+        UnlockMutex(handle_lock);
         fuse_reply_err(req, errno);
         return;
       }
       overall_bytes_fetched += bytes_fetched;
 
-      // advance to the next chunk to keep on reading data
-      chunk.Close();
-      ++chunk_itr;
+      // Proceed to the next chunk to keep on reading data
+      ++chunk_idx;
       offset_in_chunk = 0;
-    } while (overall_bytes_fetched < size && chunk_itr != chunks.end());
+    } while ((overall_bytes_fetched < size) &&
+             (chunk_idx < chunks.list->size()));
 
+    // Update chunk file descriptor
+    chunk_tables_->Lock();
+    chunk_tables_->handle2fd.Insert(chunk_handle, chunk_fd);
+    chunk_tables_->Unlock();
+    UnlockMutex(handle_lock);
+    LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
+             chunk_fd.fd);
   } else {
     const int64_t fd = fi->fh;
     overall_bytes_fetched = pread(fd, data, size, off);
@@ -1239,11 +1222,41 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   const int64_t fd = fi->fh;
 
   // do we have a chunked file?
-  if (static_cast<uint64_t>(fd) == kChunkedFileHandle) {
-    WriteLockGuard guard(live_file_chunks_mutex_);
-    if (live_file_chunks_->erase(ino) > 0) {
-      atomic_dec32(&open_files_);
+  if (static_cast<int64_t>(fi->fh) < 0) {
+    const uint64_t chunk_handle =
+      static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
+    LogCvmfs(kLogCvmfs, kLogDebug, "releasing chunk handle %"PRIu64,
+             chunk_handle);
+    ChunkFd chunk_fd;
+    FileChunkReflist chunks;
+    uint32_t refctr;
+    bool retval;
+
+    chunk_tables_->Lock();
+    retval = chunk_tables_->handle2fd.Lookup(chunk_handle, &chunk_fd);
+    assert(retval);
+    chunk_tables_->handle2fd.Erase(chunk_handle);
+
+    retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+    assert(retval);
+    refctr--;
+    if (refctr == 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "releasing chunk list for inode %"PRIu64,
+               ino);
+      FileChunkReflist to_delete;
+      retval = chunk_tables_->inode2chunks.Lookup(ino, &to_delete);
+      assert(retval);
+      chunk_tables_->inode2references.Erase(ino);
+      chunk_tables_->inode2chunks.Erase(ino);
+      delete to_delete.list;
+    } else {
+      chunk_tables_->inode2references.Insert(ino, refctr);
     }
+    chunk_tables_->Unlock();
+
+    if (chunk_fd.fd != -1)
+      close(chunk_fd.fd);
+    atomic_dec32(&open_files_);
   } else {
     if (close(fd) == 0) {
       atomic_dec32(&open_files_);
@@ -1756,9 +1769,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
-  cvmfs::live_file_chunks_  = new cvmfs::LiveFileChunksMap();
-  cvmfs::live_file_chunks_->set_empty_key((fuse_ino_t)(-1));
-  cvmfs::live_file_chunks_->set_deleted_key((fuse_ino_t)(-2));
+  cvmfs::chunk_tables_ = new ChunkTables();
 
   // Runtime counters
   atomic_init64(&cvmfs::num_fs_open_);
@@ -2114,7 +2125,7 @@ static void Fini() {
   delete cvmfs::catalog_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
-  delete cvmfs::live_file_chunks_;
+  delete cvmfs::chunk_tables_;
   delete cvmfs::inode_tracker_;
   delete cvmfs::path_cache_;
   delete cvmfs::inode_cache_;
@@ -2129,7 +2140,7 @@ static void Fini() {
   cvmfs::catalog_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
-  cvmfs::live_file_chunks_ = NULL;
+  cvmfs::chunk_tables_ = NULL;
   cvmfs::inode_tracker_ = NULL;
   cvmfs::path_cache_ = NULL;
   cvmfs::inode_cache_ = NULL;

@@ -352,7 +352,7 @@ void WritableCatalogManager::AddFile(const DirectoryEntry  &entry,
 
 void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase  &entry,
                                             const std::string         &parent_directory,
-                                            const FileChunks          &file_chunks) {
+                                            const FileChunkList       &file_chunks) {
   assert (file_chunks.size() > 0);
 
   DirectoryEntry full_entry(entry);

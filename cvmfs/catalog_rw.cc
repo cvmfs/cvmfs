@@ -403,7 +403,7 @@ void WritableCatalog::MoveFileChunksToNested(
   const std::string  &full_path,
   WritableCatalog    *new_nested_catalog)
 {
-  FileChunks chunks;
+  FileChunkList chunks;
   ListFileChunks(PathString(full_path), &chunks);
   assert (chunks.size() > 0);
 

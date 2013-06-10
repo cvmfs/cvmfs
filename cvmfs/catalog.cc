@@ -351,7 +351,7 @@ bool Catalog::AllChunksEnd() {
 
 
 bool Catalog::ListMd5PathChunks(const hash::Md5  &md5path,
-                                FileChunks       *chunks) const
+                                FileChunkList    *chunks) const
 {
   assert(IsInitialized() && chunks->IsEmpty());
 
