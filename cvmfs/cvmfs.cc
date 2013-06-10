@@ -1526,13 +1526,41 @@ bool Pin(const string &path) {
 
   if (!found || !dirent.IsRegular())
     return false;
-  if (dirent.IsChunkedFile())
-    return false;  // TODO
-  int fd = cache::FetchDirent(dirent, path);
-  if (fd < 0)
-    return false;
-  close(fd);
+  if (dirent.IsChunkedFile()) {
+    FileChunkList chunks;
+    dirent.catalog()->ListFileChunks(PathString(path), &chunks);
+    for (unsigned i = 0; i < chunks.size(); ++i) {
+      bool retval =
+        quota::Pin(chunks.AtPtr(i)->content_hash(), chunks.AtPtr(i)->size(),
+                   "Part of " + path, false);
+      if (!retval)
+        return false;
+      int fd = cache::FetchChunk(*chunks.AtPtr(i), "Part of " + path);
+      if (fd < 0) {
+        quota::Unpin(chunks.AtPtr(i)->content_hash());
+        return false;
+      }
+      retval =
+        quota::Pin(chunks.AtPtr(i)->content_hash(), chunks.AtPtr(i)->size(),
+                   "Part of " + path, false);
+      close(fd);
+      if (!retval)
+        return false;
+    }
+    return true;
+  }
+
   bool retval = quota::Pin(dirent.checksum(), dirent.size(), path, false);
+  if (!retval)
+    return false;
+  int fd = cache::FetchDirent(dirent, path);
+  if (fd < 0) {
+    quota::Unpin(dirent.checksum());
+    return false;
+  }
+  // Again because it was overwritten by FetchDirent
+  retval = quota::Pin(dirent.checksum(), dirent.size(), path, false);
+  close(fd);
   return retval;
 }
 
