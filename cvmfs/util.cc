@@ -955,8 +955,7 @@ bool ManagedExec(const vector<string>  &command_line,
                        pid_t           *child_pid) {
   assert(command_line.size() >= 1);
 
-  int pipe_fork[2];
-  MakePipe(pipe_fork);
+  Pipe pipe_fork;
   pid_t pid = fork();
   assert(pid >= 0);
   if (pid == 0) {
@@ -988,7 +987,7 @@ bool ManagedExec(const vector<string>  &command_line,
       goto fork_failure;
     }
     for (int fd = 0; fd < max_fd; fd++) {
-      if (fd != pipe_fork[1]             &&
+      if (fd != pipe_fork.write_end &&
           preserve_fildes.count(fd) == 0) {
         close(fd);
       }
@@ -999,13 +998,13 @@ bool ManagedExec(const vector<string>  &command_line,
     assert(pid_grand_child >= 0);
     if (pid_grand_child != 0) _exit(0);
 
-    fd_flags = fcntl(pipe_fork[1], F_GETFD);
+    fd_flags = fcntl(pipe_fork.write_end, F_GETFD);
     if (fd_flags < 0) {
       failed = 'G';
       goto fork_failure;
     }
     fd_flags |= FD_CLOEXEC;
-    if (fcntl(pipe_fork[1], F_SETFD, fd_flags) < 0) {
+    if (fcntl(pipe_fork.write_end, F_SETFD, fd_flags) < 0) {
       failed = 'S';
       goto fork_failure;
     }
@@ -1021,28 +1020,28 @@ bool ManagedExec(const vector<string>  &command_line,
     // retrieve the PID of the new grand child process and send it to the
     // grand father
     pid_grand_child = getpid();
-    (void)write(pipe_fork[1], &send_pid, 1);
-    (void)write(pipe_fork[1], &pid_grand_child, sizeof(pid_t));
+    pipe_fork.Write(send_pid);
+    pipe_fork.Write(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = 'E';
 
    fork_failure:
-    (void)write(pipe_fork[1], &failed, 1);
+    pipe_fork.Write(failed);
     _exit(1);
   }
   int statloc;
   waitpid(pid, &statloc, 0);
 
-  close(pipe_fork[1]);
+  close(pipe_fork.write_end);
 
   // The character is either P, in which case the pid is sent, or
   // a failure code
   char buf;
-  ReadPipe(pipe_fork[0], &buf, 1);
+  pipe_fork.Read(&buf);
   if (buf != 'P') {
-    close(pipe_fork[0]);
+    close(pipe_fork.read_end);
     LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%c)", buf);
     return false;
   }
@@ -1050,11 +1049,11 @@ bool ManagedExec(const vector<string>  &command_line,
   // read the PID of the spawned process if requested
   // (the actual read needs to be done in any case!)
   pid_t buf_child_pid = 0;
-  ReadPipe(pipe_fork[0], &buf_child_pid, sizeof(pid_t));
+  pipe_fork.Read(&buf_child_pid);
   if (child_pid != NULL) {
     *child_pid = buf_child_pid;
   }
-  close(pipe_fork[0]);
+  close(pipe_fork.read_end);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
            command_line[0].c_str(),
            (int)buf_child_pid);
