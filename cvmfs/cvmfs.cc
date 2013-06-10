@@ -2226,6 +2226,14 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     saved_states->push_back(state_glue_buffer);
   }
 
+  msg_progress = "Saving chunk tables\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  ChunkTables *saved_chunk_tables = new ChunkTables(*cvmfs::chunk_tables_);
+  loader::SavedState *state_chunk_tables = new loader::SavedState();
+  state_chunk_tables->state_id = loader::kStateOpenFiles;
+  state_chunk_tables->state = saved_chunk_tables;
+  saved_states->push_back(state_chunk_tables);
+
   msg_progress = "Saving inode generation\n";
   SendMsg2Socket(fd_progress, msg_progress);
   cvmfs::inode_generation_info_.inode_generation +=
@@ -2297,6 +2305,14 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, " done\n");
     }
 
+    if (saved_states[i]->state_id == loader::kStateOpenFiles) {
+      SendMsg2Socket(fd_progress, "Restoring chunk tables... ");
+      delete cvmfs::chunk_tables_;
+      ChunkTables *saved_chunk_tables = (ChunkTables *)saved_states[i]->state;
+      cvmfs::chunk_tables_ = new ChunkTables(*saved_chunk_tables);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
     if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
       SendMsg2Socket(fd_progress, "Restoring inode generation... ");
       cvmfs::InodeGenerationInfo *old_info =
@@ -2352,6 +2368,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateGlueBufferV3:
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
+        break;
+      case loader::kStateOpenFiles:
+        SendMsg2Socket(fd_progress, "Releasing chunk tables\n");
+        delete static_cast<ChunkTables *>(saved_states[i]->state);
         break;
       case loader::kStateInodeGeneration:
         SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");
