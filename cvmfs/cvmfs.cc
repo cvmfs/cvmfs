@@ -1127,14 +1127,23 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     chunk_tables_->Unlock();
 
     // Find the chunk that holds the beginning of the requested data
-    // TODO: binary search
-    unsigned chunk_idx = 0;
-    for (; chunk_idx < chunks.list->size(); ++chunk_idx) {
-      if (chunks.list->AtPtr(chunk_idx)->offset() > off)
-        break;
+    assert(chunks.list->size() > 0);
+    unsigned idx_low = 0, idx_high = chunks.list->size()-1;
+    unsigned chunk_idx = idx_high/2;
+    while (idx_low < idx_high) {
+      if (chunks.list->AtPtr(chunk_idx)->offset() > off) {
+        assert(idx_high > 0);
+        idx_high = chunk_idx-1;
+      } else {
+        if ((chunk_idx == chunks.list->size()-1) ||
+            chunks.list->AtPtr(chunk_idx+1)->offset() > off)
+        {
+          break;
+        }
+        idx_low = chunk_idx + 1;
+      }
+      chunk_idx = idx_low + (idx_high-idx_low)/2;
     }
-    chunk_idx--;
-
 
     // Lock chunk handle
     pthread_mutex_t *handle_lock = chunk_tables_->Handle2Lock(chunk_handle);
