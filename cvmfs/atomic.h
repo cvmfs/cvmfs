@@ -49,16 +49,18 @@ static void inline __attribute__((used)) atomic_inc64(atomic_int64 *a) {
 
 
 static void inline __attribute__((used)) atomic_dec32(atomic_int32 *a) {
-  (void) __sync_fetch_and_add(a, -1);
+  (void) __sync_fetch_and_sub(a, 1);
 }
 
 static void inline __attribute__((used)) atomic_dec64(atomic_int64 *a) {
-  (void) __sync_fetch_and_add(a, -1);
+  (void) __sync_fetch_and_sub(a, 1);
 }
 
 static int32_t inline __attribute__((used)) atomic_xadd32(atomic_int32 *a,
                                                           int32_t offset)
 {
+  if (offset < 0)
+    return __sync_fetch_and_sub(a, -offset);
   return __sync_fetch_and_add(a, offset);
 }
 
@@ -66,6 +68,8 @@ static int32_t inline __attribute__((used)) atomic_xadd32(atomic_int32 *a,
 static int64_t inline __attribute__((used)) atomic_xadd64(atomic_int64 *a,
                                                           int64_t offset)
 {
+  if (offset < 0)
+    return __sync_fetch_and_sub(a, -offset);
   return __sync_fetch_and_add(a, offset);
 }
 

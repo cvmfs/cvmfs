@@ -243,7 +243,7 @@ if (defined($pid) and $pid != 0) {
 	# Be careful because the shell will wait for this output and if you don't
 	# print any output to it and if you forget about the ending message,
 	# the shell will hang forever after receiving this signal.
-	print "READ_RETURN_CODE";
+	print "READ_RETURN_CODE\n";
 }
 
 exit 0;

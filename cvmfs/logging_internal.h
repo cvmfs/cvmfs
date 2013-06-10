@@ -19,23 +19,24 @@ enum LogFacilities {
   kLogStdout = 2,
   kLogStderr = 4,
   kLogSyslog = 8,
+  kLogSyslogWarn = 16,
+  kLogSyslogErr = 32,
 };
 
 enum LogFlags {
-  kLogNoLinebreak = 16,
-  kLogShowSource = 32,
+  kLogNoLinebreak = 128,
+  kLogShowSource = 256,
 };
 
 enum LogLevels {
-  kLogLevel0 = 128,
-  kLogVerbose = 256,
-  kLogNormal = 512,
-  kLogDiscrete = 1024,
-  kLogNone = 2048,
+  kLogLevel0 = 1024,
+  kLogVerbose = 2048,
+  kLogNormal = 4096,
+  kLogDiscrete = 8192,
+  kLogNone = 16384,
 };
 
 /**
- * CAUTION!
  * Changes in this enum must be done in logging.cc as well!
  * (see const char *module_names[] = {....})
  */
@@ -59,14 +60,21 @@ enum LogSource {
   kLogNfsMaps,
   kLogPublish,
   kLogSpooler,
+  kLogConcurrency,
+  kLogUtility,
+  kLogGlueBuffer,
+  kLogHistory,
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
+const int kLogWarning    = kLogStdout | kLogShowSource | kLogNormal;
 
 void SetLogSyslogLevel(const int level);
 int GetLogSyslogLevel();
 void SetLogSyslogFacility(const int facility);
 int GetLogSyslogFacility();
+void SetLogMicroSyslog(const std::string &filename);
+std::string GetLogMicroSyslog();
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogVerbosity(const LogLevels min_level);
 

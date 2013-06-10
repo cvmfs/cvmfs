@@ -219,7 +219,7 @@ class Peers {
     if (Find(peer, elem_addr)) {
       const int position = std::distance(addresses_.begin(), elem_addr);
       if (position == index_me_) {
-        LogCvmfs(kLogPeers, kLogDebug | kLogSyslog,
+        LogCvmfs(kLogPeers, kLogDebug | kLogSyslogWarn,
                  "won't delete myself from peer list!");
         pthread_mutex_unlock(lock_);
         return;

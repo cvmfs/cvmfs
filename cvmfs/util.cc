@@ -18,6 +18,7 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <inttypes.h>
 #include <dirent.h>
@@ -48,7 +49,6 @@ using namespace std;  // NOLINT
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
-
 
 /**
  * Removes a trailing "/" from a path.
@@ -105,6 +105,25 @@ string GetFileName(const string &path) {
 }
 
 
+NameString GetFileName(const PathString &path) {
+  NameString name;
+  int length = path.GetLength();
+  const char *chars  = path.GetChars();
+
+  int i;
+  for (i = length-1; i >= 0; --i) {
+    if (chars[i] == '/')
+      break;
+  }
+  i++;
+  if (i < length) {
+    name.Append(chars+i, length-i);
+  }
+
+  return name;
+}
+
+
 /**
  * Abort() on failure
  */
@@ -142,9 +161,11 @@ int MakeSocket(const string &path, const int mode) {
       if (bind(socket_fd, (struct sockaddr *)&sock_addr,
                sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
       {
+        LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
         goto make_socket_failure;
       }
     } else {
+      LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
       goto make_socket_failure;
     }
   }
@@ -257,9 +278,15 @@ void SendMsg2Socket(const int fd, const string &msg) {
 bool SwitchCredentials(const uid_t uid, const gid_t gid,
                        const bool temporarily)
 {
-  int retval;
+  LogCvmfs(kLogCvmfs, kLogDebug, "current credentials uid %d gid %d "
+           "euid %d egid %d, switching to %d %d (temp: %d)",
+           getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
+  int retval = 0;
   if (temporarily) {
-    retval = setegid(gid) || seteuid(uid);
+    if (gid != getegid())
+      retval = setegid(gid);
+    if ((retval == 0) && (uid != geteuid()))
+      retval = seteuid(uid);
   } else {
     // If effective uid is not root, we must first gain root access back
     if ((getuid() == 0) && (getuid() != geteuid())) {
@@ -269,6 +296,8 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
     }
     retval = setgid(gid) || setuid(uid);
   }
+  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)",
+           retval, errno);
   return retval == 0;
 }
 
@@ -355,6 +384,29 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
   return true;
 }
 
+
+/**
+ * Tries to locks file path, return an error if file is already locked.
+ * Creates path if required.
+ *
+ * \return file descriptor, -1 on error, -2 if it would block
+ */
+int TryLockFile(const std::string &path) {
+  const int fd_lockfile = open(path.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (fd_lockfile < 0)
+    return -1;
+
+  if (flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) {
+    close(fd_lockfile);
+    if (errno != EWOULDBLOCK)
+      return -1;
+    return -2;
+  }
+
+  return fd_lockfile;
+}
+
+
 /**
  * Locks file path, blocks if file is already locked.  Creates path if required.
  *
@@ -400,8 +452,9 @@ FILE *CreateTempFile(const string &path_prefix, const int mode,
   *final_path = path_prefix + ".XXXXXX";
   char *tmp_file = strdupa(final_path->c_str());
   int tmp_fd = mkstemp(tmp_file);
-  if (tmp_fd < 0)
+  if (tmp_fd < 0) {
     return NULL;
+  }
   if (fchmod(tmp_fd, mode) != 0) {
     close(tmp_fd);
     return NULL;
@@ -479,9 +532,51 @@ bool RemoveTree(const string &path) {
 }
 
 
+/**
+ * Returns ls $dir/GLOB$suffix
+ */
+vector<string> FindFiles(const string &dir, const string &suffix) {
+  vector<string> result;
+  DIR *dirp = opendir(dir.c_str());
+  if (!dirp)
+    return result;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const string name(dirent->d_name);
+    if ((name.length() >= suffix.length()) &&
+        (name.substr(name.length()-suffix.length()) == suffix))
+    {
+      result.push_back(dir + "/" + name);
+    }
+  }
+  closedir(dirp);
+  return result;
+}
+
+
+string StringifyBool(const bool value) {
+  return value ? "yes" : "no";
+}
+
+
 string StringifyInt(const int64_t value) {
   char buffer[48];
   snprintf(buffer, sizeof(buffer), "%"PRId64, value);
+  return string(buffer);
+}
+
+
+string StringifyByteAsHex(const unsigned char value) {
+  char buffer[3];
+  snprintf(buffer, sizeof(buffer), "%02x", value);
+  return string(buffer);
+}
+
+
+string StringifyDouble(const double value) {
+  char buffer[64];
+  snprintf(buffer, sizeof(buffer), "%.03f", value);
   return string(buffer);
 }
 
@@ -539,6 +634,14 @@ uint64_t String2Uint64(const string &value) {
 }
 
 
+int HexDigit2Int(const char digit) {
+  if ((digit >= '0') && (digit <= '9')) return digit - '0';
+  if ((digit >= 'A') && (digit <= 'F')) return 10 + digit - 'A';
+  if ((digit >= 'a') && (digit <= 'f')) return 10 + digit - 'a';
+  return -1;
+}
+
+
 void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
   sscanf(value.c_str(), "%"PRIu64" %"PRIu64, a, b);
 }
@@ -563,20 +666,44 @@ bool HasPrefix(const string &str, const string &prefix,
 }
 
 
-vector<string> SplitString(const string &str, const char delim) {
+bool IsNumeric(const std::string &str) {
+  for (unsigned i = 0; i < str.length(); ++i) {
+    if ((str[i] < '0') || (str[i] > '9'))
+      return false;
+  }
+  return true;
+}
+
+
+vector<string> SplitString(const string &str,
+                           const char delim,
+                           const unsigned max_chunks) {
   vector<string> result;
 
+  // edge case... one chunk is always the whole string
+  if (1 == max_chunks) {
+    result.push_back(str);
+    return result;
+  }
+
+  // split the string
   const unsigned size = str.size();
   unsigned marker = 0;
+  unsigned chunks = 1;
   unsigned i;
   for (i = 0; i < size; ++i) {
     if (str[i] == delim) {
       result.push_back(str.substr(marker, i-marker));
       marker = i+1;
+
+      // we got what we want... good bye
+      if (++chunks == max_chunks)
+        break;
     }
   }
-  result.push_back(str.substr(marker, i-marker));
 
+  // push the remainings of the string and return
+  result.push_back(str.substr(marker));
   return result;
 }
 
@@ -713,7 +840,10 @@ void BlockSignal(int signum) {
  * Threads inherit their parent's signal mask.
  */
 void WaitForSignal(int signum) {
-  int retval = platform_sigwait(signum);
+  int retval;
+  do {
+    retval = platform_sigwait(signum);
+  } while ((retval != signum) && (errno == EINTR));
   assert(retval == signum);
 }
 
@@ -752,11 +882,12 @@ void Daemonize() {
 }
 
 
-/**
- * Opens /bin/sh and provides file descriptors to write into stdin and
- * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
- */
-bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
+bool ExecuteBinary(      int                       *fd_stdin,
+                         int                       *fd_stdout,
+                         int                       *fd_stderr,
+                   const std::string               &binary_path,
+                   const std::vector<std::string>  &argv,
+                         pid_t                     *child_pid) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -773,9 +904,10 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
   map_fildes[pipe_stderr[1]] = 2;  // Writing end of pipe_stderr
   vector<string> cmd_line;
-  cmd_line.push_back("/bin/sh");
+  cmd_line.push_back(binary_path);
+  cmd_line.insert(cmd_line.end(), argv.begin(), argv.end());
 
-  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes)) {
+  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes, true, child_pid)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);
@@ -793,6 +925,16 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
 
 
 /**
+ * Opens /bin/sh and provides file descriptors to write into stdin and
+ * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
+ */
+bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
+  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
+                       vector<string>());
+}
+
+
+/**
  * Execve to the given command line, preserving the given file descriptors.
  * If stdin, stdout, stderr should be preserved, add 0, 1, 2.
  * File descriptors from the parent process can also be mapped to the new
@@ -802,11 +944,14 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
  * Does a double fork to detach child.
  * The command_line parameter contains the binary at index 0 and the arguments
  * in the rest of the vector.
+ * Using the optional parameter *pid it is possible to retrieve the process ID
+ * of the spawned process.
  */
-bool ManagedExec(const vector<string> &command_line,
-                 const vector<int> &preserve_fildes,
-                 const map<int, int> &map_fildes)
-{
+bool ManagedExec(const vector<string>  &command_line,
+                 const vector<int>     &preserve_fildes,
+                 const map<int, int>   &map_fildes,
+                 const bool             drop_credentials,
+                       pid_t           *child_pid) {
   assert(command_line.size() >= 1);
 
   int pipe_fork[2];
@@ -818,6 +963,7 @@ bool ManagedExec(const vector<string> &command_line,
     int max_fd;
     int fd_flags;
     char failed = 'U';
+    char send_pid = 'P';
     const char *argv[command_line.size() + 1];
     for (unsigned i = 0; i < command_line.size(); ++i)
       argv[i] = command_line[i].c_str();
@@ -871,10 +1017,17 @@ bool ManagedExec(const vector<string> &command_line,
 #ifdef DEBUGMSG
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
-    if (!SwitchCredentials(geteuid(), getegid(), false)) {
+    if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false)) {
       failed = 'X';
       goto fork_failure;
     }
+
+    // retrieve the PID of the new grand child process and send it to the
+    // grand father
+    pid_grand_child = getpid();
+    (void)write(pipe_fork[1], &send_pid, 1);
+    (void)write(pipe_fork[1], &pid_grand_child, sizeof(pid_t));
+
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = 'E';
@@ -887,14 +1040,60 @@ bool ManagedExec(const vector<string> &command_line,
   waitpid(pid, &statloc, 0);
 
   close(pipe_fork[1]);
+
+  // The character is either P, in which case the pid is sent, or
+  // a failure code
   char buf;
-  if (read(pipe_fork[0], &buf, 1) == 1) {
+  ReadPipe(pipe_fork[0], &buf, 1);
+  if (buf != 'P') {
+    close(pipe_fork[0]);
     LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%c)", buf);
     return false;
   }
+
+  // read the PID of the spawned process if requested
+  // (the actual read needs to be done in any case!)
+  pid_t buf_child_pid = 0;
+  ReadPipe(pipe_fork[0], &buf_child_pid, sizeof(pid_t));
+  if (child_pid != NULL) {
+    *child_pid = buf_child_pid;
+  }
   close(pipe_fork[0]);
-  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s", command_line[0].c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
+           command_line[0].c_str(),
+           (int)buf_child_pid);
   return true;
+}
+
+// -----------------------------------------------------------------------------
+
+void StopWatch::Start() {
+  assert (!running_);
+
+  gettimeofday(&start_, NULL);
+  running_ = true;
+}
+
+
+void StopWatch::Stop() {
+  assert (running_);
+
+  gettimeofday(&end_, NULL);
+  running_ = false;
+}
+
+
+void StopWatch::Reset() {
+  start_ = timeval();
+  end_   = timeval();
+  running_ = false;
+}
+
+
+double StopWatch::GetTime() const {
+  assert (!running_);
+
+  return DiffTimeSeconds(start_, end_);
 }
 
 
@@ -908,6 +1107,91 @@ void SafeSleepMs(const unsigned ms) {
   wait_for.tv_usec = (ms % 1000) * 1000;
   select(0, NULL, NULL, NULL, &wait_for);
 }
+
+
+MemoryMappedFile::MemoryMappedFile(const std::string &file_path) :
+  file_path_(file_path),
+  file_descriptor_(-1),
+  mapped_file_(NULL),
+  mapped_size_(0),
+  mapped_(false) {}
+
+MemoryMappedFile::~MemoryMappedFile() {
+  if (IsMapped()) {
+    Unmap();
+  }
+}
+
+bool MemoryMappedFile::Map() {
+  assert (!mapped_);
+
+  // open the file
+  int fd;
+  if ((fd = open(file_path_.c_str(), O_RDONLY, 0)) == -1) {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to open %s (%d)",
+             file_path_.c_str(), errno);
+    return false;
+  }
+
+  // get file size
+  platform_stat64 filesize;
+  if (platform_fstat(fd, &filesize) != 0) {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to fstat %s (%d)",
+             file_path_.c_str(), errno);
+    close(fd);
+    return false;
+  }
+
+  // check if the file is empty and 'pretend' that the file is mapped
+  // --> buffer will then look like a buffer without any size...
+  void *mapping = NULL;
+  if (filesize.st_size > 0) {
+    // map the given file into memory
+    mapping = mmap(NULL, filesize.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (mapping == MAP_FAILED) {
+      LogCvmfs(kLogUtility, kLogStderr, "failed to mmap %s (file size: %d) "
+                                        "(errno: %d)",
+                file_path_.c_str(),
+                filesize.st_size,
+                errno);
+      close(fd);
+      return false;
+    }
+  }
+
+  // save results
+  mapped_file_     = static_cast<unsigned char*>(mapping);
+  file_descriptor_ = fd;
+  mapped_size_     = filesize.st_size;
+  mapped_          = true;
+  LogCvmfs(kLogUtility, kLogVerboseMsg, "mmap'ed %s", file_path_.c_str());
+  return true;
+}
+
+void MemoryMappedFile::Unmap() {
+  assert (mapped_);
+
+  if (mapped_file_ == NULL) {
+    return;
+  }
+
+  // unmap the previously mapped file
+  if ((munmap(static_cast<void*>(mapped_file_), mapped_size_) != 0) ||
+      (close(file_descriptor_) != 0))
+  {
+    LogCvmfs(kLogUtility, kLogStderr, "failed to unmap %s", file_path_.c_str());
+    const bool munmap_failed = false;
+    assert (munmap_failed);
+  }
+
+  // reset (resettable) data
+  mapped_file_     = NULL;
+  file_descriptor_ = -1;
+  mapped_size_     = 0;
+  mapped_          = false;
+  LogCvmfs(kLogUtility, kLogVerboseMsg, "munmap'ed %s", file_path_.c_str());
+}
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }

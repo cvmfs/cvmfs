@@ -118,6 +118,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   path_ = path;
   parent_ = parent;
   max_row_id_ = 0;
+  inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
@@ -130,6 +131,7 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
   sql_lookup_nested_ = NULL;
   sql_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
+  sql_chunks_listing_ = NULL;
 }
 
 
@@ -141,6 +143,7 @@ Catalog::~Catalog() {
   delete nested_catalog_cache_;
 }
 
+
 /**
  * InitPreparedStatement uses polymorphism in case of a r/w catalog.
  * FinalizePreparedStatements is called in the destructor where
@@ -148,16 +151,18 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_ = new SqlListing(database());
-  sql_lookup_md5path_ = new SqlLookupPathHash(database());
-  sql_lookup_inode_ = new SqlLookupInode(database());
-  sql_lookup_nested_ = new SqlNestedCatalogLookup(database());
-  sql_list_nested_ = new SqlNestedCatalogListing(database());
-  sql_all_chunks_ = new SqlAllChunks(database());
+  sql_listing_         = new SqlListing(database());
+  sql_lookup_md5path_  = new SqlLookupPathHash(database());
+  sql_lookup_inode_    = new SqlLookupInode(database());
+  sql_lookup_nested_   = new SqlNestedCatalogLookup(database());
+  sql_list_nested_     = new SqlNestedCatalogListing(database());
+  sql_all_chunks_      = new SqlAllChunks(database());
+  sql_chunks_listing_  = new SqlChunksListing(database());
 }
 
 
 void Catalog::FinalizePreparedStatements() {
+  delete sql_chunks_listing_;
   delete sql_all_chunks_;
   delete sql_listing_;
   delete sql_lookup_md5path_;
@@ -345,6 +350,23 @@ bool Catalog::AllChunksEnd() {
 }
 
 
+bool Catalog::ListMd5PathChunks(const hash::Md5  &md5path,
+                                FileChunks       *chunks) const
+{
+  assert(IsInitialized() && chunks->empty());
+
+  pthread_mutex_lock(lock_);
+  sql_chunks_listing_->BindPathHash(md5path);
+  while (sql_chunks_listing_->FetchRow()) {
+    chunks->push_back(sql_chunks_listing_->GetFileChunk());
+  }
+  sql_chunks_listing_->Reset();
+  pthread_mutex_unlock(lock_);
+
+  return true;
+}
+
+
 uint64_t Catalog::GetTTL() const {
   const string sql = "SELECT value FROM properties WHERE key='TTL';";
 
@@ -401,6 +423,9 @@ hash::Any Catalog::GetPreviousRevision() const {
  * Receive catalog statistics
  */
 bool Catalog::GetCounters(Counters *counters) const {
+  if (!database_)
+    return false;
+
   SqlGetCounter sql_counter(database());
   bool retval;
 
@@ -477,8 +502,25 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
     }
   }
 
+  if (inode_annotation_) {
+    inode = inode_annotation_->Annotate(inode);
+  }
+
   return inode;
 }
+
+
+/**
+ * Revert the inode mangling.  Required to lookup using inodes.
+ */
+uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
+  inode_t row_id = inode;
+  if (inode_annotation_)
+    row_id = inode_annotation_->Strip(row_id);
+
+  return row_id - inode_range_.offset;
+}
+
 
 /**
  * Get a list of all registered nested catalogs in this catalog.
@@ -529,6 +571,20 @@ bool Catalog::FindNested(const PathString &mountpoint, hash::Any *hash) const {
   pthread_mutex_unlock(lock_);
 
   return found;
+}
+
+
+/**
+ * Sets a new object to do inode annotations (or set to NULL)
+ * The annotation object is not owned by the catalog.
+ */
+void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
+  pthread_mutex_lock(lock_);
+  // Since annotated inodes could come back to the catalog in order to
+  // get stripped, exchanging the annotation is not allowed
+  assert((inode_annotation_ == NULL) || (inode_annotation_ == new_annotation));
+  inode_annotation_ = new_annotation;
+  pthread_mutex_unlock(lock_);
 }
 
 
