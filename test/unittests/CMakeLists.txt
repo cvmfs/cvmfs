@@ -20,6 +20,10 @@ set (CVMFS_UNITTEST_SOURCES
   t_fs_traversal.cc
   t_pipe.cc
   t_managed_exec.cc
+  t_test_utils.cc
+
+  # test utility functions
+  testutil.cc testutil.h
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
