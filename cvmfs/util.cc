@@ -918,6 +918,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
                    const std::vector<std::string>  &argv,
+                   const bool                       double_fork,
                          pid_t                     *child_pid) {
   int pipe_stdin[2];
   int pipe_stdout[2];
@@ -938,7 +939,12 @@ bool ExecuteBinary(      int                       *fd_stdin,
   cmd_line.push_back(binary_path);
   cmd_line.insert(cmd_line.end(), argv.begin(), argv.end());
 
-  if (!ManagedExec(cmd_line, preserve_fildes, map_fildes, true, child_pid)) {
+  if (!ManagedExec(cmd_line,
+                   preserve_fildes,
+                   map_fildes,
+                   true,
+                   double_fork,
+                   child_pid)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);
@@ -1017,6 +1023,7 @@ bool ManagedExec(const vector<string>  &command_line,
                  const set<int>        &preserve_fildes,
                  const map<int, int>   &map_fildes,
                  const bool             drop_credentials,
+                 const bool             double_fork,
                        pid_t           *child_pid) {
   assert(command_line.size() >= 1);
 
@@ -1059,9 +1066,11 @@ bool ManagedExec(const vector<string>  &command_line,
     }
 
     // Double fork to disconnect from parent
-    pid_grand_child = fork();
-    assert(pid_grand_child >= 0);
-    if (pid_grand_child != 0) _exit(0);
+    if (double_fork) {
+      pid_grand_child = fork();
+      assert(pid_grand_child >= 0);
+      if (pid_grand_child != 0) _exit(0);
+    }
 
     fd_flags = fcntl(pipe_fork.write_end, F_GETFD);
     if (fd_flags < 0) {
@@ -1096,8 +1105,10 @@ bool ManagedExec(const vector<string>  &command_line,
     pipe_fork.Write(failed);
     _exit(1);
   }
-  int statloc;
-  waitpid(pid, &statloc, 0);
+  if (double_fork) {
+    int statloc;
+    waitpid(pid, &statloc, 0);
+  }
 
   close(pipe_fork.write_end);
 
