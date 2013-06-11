@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
-#include <proc/readproc.h>
+
+#include "testutil.h"
 
 #include "../../cvmfs/util.h"
 
@@ -43,9 +44,8 @@ TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
   EXPECT_EQ (0, kill(child_pid, 0));
 
   // check that the PPID of the process is 1 (belongs to init)
-  proc_t process_info;
-  get_proc_stats(child_pid, &process_info);
-  EXPECT_EQ (1, process_info.ppid);
+  pid_t child_parent_pid = GetParentPid(child_pid);
+  EXPECT_EQ (1, child_parent_pid);
 
   // tell the process to terminate
   Pipe shell_pipe(fd_stdout, fd_stdin);
@@ -86,9 +86,8 @@ TEST(T_ManagedExec, ExecuteBinaryAsChild) {
   EXPECT_EQ (0, kill(child_pid, 0));
 
   // check that we are the parent of the spawned process
-  proc_t process_info;
-  get_proc_stats(child_pid, &process_info);
-  EXPECT_EQ (my_pid, process_info.ppid);
+  pid_t child_parent_pid = GetParentPid(child_pid);
+  EXPECT_EQ (my_pid, child_parent_pid);
 
   // tell the process to terminate
   Pipe shell_pipe(fd_stdout, fd_stdin);

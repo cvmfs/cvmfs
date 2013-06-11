@@ -59,9 +59,6 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/i
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
-find_package (ProcPS REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PROCPS_INCLUDE_DIR})
-
 #
 # Compiler and Linker Flags for unit tests
 #
@@ -77,7 +74,7 @@ add_dependencies (${PROJECT_TEST_NAME} googletest)
 set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
-target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} ${PROCPS_LIBRARY} pthread)
+target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} pthread)
 
 #
 # Integrate the test running into CMake
