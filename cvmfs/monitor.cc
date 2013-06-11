@@ -258,20 +258,20 @@ static string GenerateStackTrace(const string &exe_path,
   // skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
 
-  // generate a stack trace and kill gdb
-  const string gdb_cmd = "thread apply all bt\n"
-                         "quit\n";
+  // send stacktrace command to gdb
+  const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
+                         "quit\n";               // stop gdb
   WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
 
   // read the stack trace from the stdout of our gdb process
-  result += ReadUntilGdbPrompt(fd_stdout);
+  result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
 
   // close the connection to the terminated gdb process
   close(fd_stderr);
   close(fd_stdout);
   close(fd_stdin);
 
-  // wait for the gdb process
+  // make sure gdb has quitted (wait for it for a short while)
   unsigned int timeout = 15;
   int statloc;
   while (timeout > 0 && waitpid(gdb_pid, &statloc, WNOHANG) != gdb_pid) {
