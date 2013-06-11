@@ -128,6 +128,7 @@ static void SendTrace(int sig,
   // SIGQUIT (watchdog process will raise SIGQUIT)
   (void) sigaction(SIGQUIT, &old_signal_handlers_[sig], NULL);
 
+  // inform the watchdog that CernVM-FS crashed
   if (! pipe_watchdog_.Write(ControlFlow::kProduceStacktrace)) {
     _exit(1);
   }
