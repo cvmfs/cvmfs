@@ -302,6 +302,18 @@ void SendMsg2Socket(const int fd, const string &msg) {
 }
 
 
+void LockMutex(pthread_mutex_t *mutex) {
+  int retval = pthread_mutex_lock(mutex);
+  assert(retval == 0);
+}
+
+
+void UnlockMutex(pthread_mutex_t *mutex) {
+  int retval = pthread_mutex_unlock(mutex);
+  assert(retval == 0);
+}
+
+
 /**
  * set(e){g/u}id wrapper.
  */

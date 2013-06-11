@@ -1298,6 +1298,7 @@ void SetDnsServer(const string &address) {
     assert(opt_dns_server_);
   }
   pthread_mutex_unlock(&lock_options_);
+  LogCvmfs(kLogDownload, kLogSyslog, "set nameserver to %s", address.c_str());
 }
 
 
