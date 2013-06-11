@@ -69,6 +69,14 @@ struct CrashData {
   pid_t pid;
 };
 
+struct ControlFlow {
+  enum Flags { // TODO: C++11 (type safe enum)
+    kProduceStacktrace,
+    kQuit,
+    kUnknown
+  };
+};
+
 
 pid_t GetPid() {
   if (!spawned_) {
@@ -120,8 +128,7 @@ static void SendTrace(int sig,
   // SIGQUIT (watchdog process will raise SIGQUIT)
   (void) sigaction(SIGQUIT, &old_signal_handlers_[sig], NULL);
 
-  char cflow = 'S';
-  if (! pipe_watchdog_.Write(cflow)) {
+  if (! pipe_watchdog_.Write(ControlFlow::kProduceStacktrace)) {
     _exit(1);
   }
 
@@ -326,23 +333,23 @@ static string ReportStacktrace() {
  * Listens on the pipe and logs the stacktrace or quits silently.
  */
 static void Watchdog() {
-  char cflow;
-  bool pipe_read_success = true;
+  ControlFlow::Flags control_flow;
 
-  while ((pipe_read_success = pipe_watchdog_.Read(&cflow))) {
-    if (cflow == 'S') {
-      const string debug = ReportStacktrace();
-      LogEmergency(debug);
-      break;
-    } else if (cflow == 'Q') {
-      break;
-    } else {
-      LogEmergency("unexpected error");
-      break;
-    }
-  }
-  if (! pipe_read_success) {
+  if (! pipe_watchdog_.Read(&control_flow)) {
     LogEmergency("unexpected termination");
+  } else {
+    switch (control_flow) {
+      case ControlFlow::kProduceStacktrace:
+        LogEmergency(ReportStacktrace());
+        break;
+
+      case ControlFlow::kQuit:
+        break;
+
+      default:
+        LogEmergency("unexpected error");
+        break;
+    }
   }
 
   close(pipe_watchdog_.read_end);
@@ -377,8 +384,7 @@ void Fini() {
   }
 
   if (spawned_) {
-    char quit = 'Q';
-    pipe_watchdog_.Write(quit);
+    pipe_watchdog_.Write(ControlFlow::kQuit);
     close(pipe_watchdog_.write_end);
   }
   delete process_name_;
