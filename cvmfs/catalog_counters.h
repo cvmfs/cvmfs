@@ -13,7 +13,7 @@ class DirectoryEntry;
 
 template<typename FieldT>
 class TreeCountersBase {
- protected:
+ public:
   template<typename T>
   struct Fields {
     Fields() : regular_files(0), symlinks(0), directories(0),
