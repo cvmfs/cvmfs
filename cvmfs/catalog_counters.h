@@ -8,15 +8,25 @@
 #include <stdint.h>
 #include <map>
 #include <string>
+#include <gtest/gtest_prod.h>
+
+namespace swissknife {
+  class CommandCheck;
+}
 
 namespace catalog {
 
 class DirectoryEntry;
+class Database;
 
 template<typename FieldT>
 class TreeCountersBase {
- public:
-  typedef std::map<std::string, FieldT> FieldsMap;
+  friend class swissknife::CommandCheck;
+  FRIEND_TEST(T_CatalogCounters, FieldsCombinations);
+  FRIEND_TEST(T_CatalogCounters, FieldsMap);
+
+ protected:
+  typedef std::map<std::string, const FieldT*> FieldsMap;
   template<typename T>
   struct Fields {
     Fields() : regular_files(0), symlinks(0), directories(0),
@@ -43,12 +53,12 @@ class TreeCountersBase {
     }
 
     void FillFieldsMap(FieldsMap &map, const std::string &prefix) const {
-      map[prefix + "regular"] = regular_files;
-      map[prefix + "symlink"] = symlinks;
-      map[prefix + "dir"]     = directories;
-      map[prefix + "nested"]  = nested_catalogs;
-      map[prefix + "chunked"] = chunked_files;
-      map[prefix + "chunks"]  = number_of_file_chunks;
+      map[prefix + "regular"] = &regular_files;
+      map[prefix + "symlink"] = &symlinks;
+      map[prefix + "dir"]     = &directories;
+      map[prefix + "nested"]  = &nested_catalogs;
+      map[prefix + "chunked"] = &chunked_files;
+      map[prefix + "chunks"]  = &number_of_file_chunks;
     }
 
     T regular_files;
@@ -60,12 +70,13 @@ class TreeCountersBase {
   };
 
  public:
-  FieldsMap GetFieldsMap() const {
-    FieldsMap fields;
-    self.FillFieldsMap(fields, "self_");
-    subtree.FillFieldsMap(fields, "subtree_");
-    return fields;
-  }
+  bool ReadFromDatabase(const Database &database);
+  bool WriteToDatabase(const Database &database) const;
+
+  void SetZero();
+
+ protected:
+  FieldsMap GetFieldsMap() const;
 
  public:
   Fields<FieldT> self;
@@ -99,5 +110,7 @@ class Counters : public TreeCountersBase<Counters_t> {
 };
 
 }
+
+#include "catalog_counters_impl.h"
 
 #endif /* CVMFS_CATALOG_COUNTERS_H_ */

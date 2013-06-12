@@ -4,7 +4,7 @@
 
 #include "../../cvmfs/catalog_counters.h"
 
-using namespace catalog;
+namespace catalog {
 
 
 class T_CatalogCounters : public ::testing::Test {
@@ -308,52 +308,54 @@ TEST_F(T_CatalogCounters, FieldsMap) {
   d_counters.Increment(regular_file);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (3, map["self_regular"]);
-  EXPECT_EQ (0, map["subtree_regular"]);
+  EXPECT_EQ (3, *map["self_regular"]);
+  EXPECT_EQ (0, *map["subtree_regular"]);
 
   d_counters.Increment(directory);
   d_counters.Increment(directory);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (3, map["self_regular"]);
-  EXPECT_EQ (0, map["subtree_regular"]);
-  EXPECT_EQ (2, map["self_dir"]);
-  EXPECT_EQ (0, map["subtree_dir"]);
+  EXPECT_EQ (3, *map["self_regular"]);
+  EXPECT_EQ (0, *map["subtree_regular"]);
+  EXPECT_EQ (2, *map["self_dir"]);
+  EXPECT_EQ (0, *map["subtree_dir"]);
 
   d_counters.Increment(symlink);
   d_counters.Increment(symlink);
   d_counters.Increment(symlink);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (3, map["self_regular"]);
-  EXPECT_EQ (0, map["subtree_regular"]);
-  EXPECT_EQ (2, map["self_dir"]);
-  EXPECT_EQ (0, map["subtree_dir"]);
-  EXPECT_EQ (3, map["self_symlink"]);
-  EXPECT_EQ (0, map["subtree_symlink"]);
+  EXPECT_EQ (3, *map["self_regular"]);
+  EXPECT_EQ (0, *map["subtree_regular"]);
+  EXPECT_EQ (2, *map["self_dir"]);
+  EXPECT_EQ (0, *map["subtree_dir"]);
+  EXPECT_EQ (3, *map["self_symlink"]);
+  EXPECT_EQ (0, *map["subtree_symlink"]);
 
   d_counters.Increment(chunked_file);
   d_counters.Increment(chunked_file);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (5, map["self_regular"]);
-  EXPECT_EQ (0, map["subtree_regular"]);
-  EXPECT_EQ (2, map["self_dir"]);
-  EXPECT_EQ (0, map["subtree_dir"]);
-  EXPECT_EQ (3, map["self_symlink"]);
-  EXPECT_EQ (0, map["subtree_symlink"]);
-  EXPECT_EQ (2, map["self_chunked"]);
-  EXPECT_EQ (0, map["subtree_chunked"]);
+  EXPECT_EQ (5, *map["self_regular"]);
+  EXPECT_EQ (0, *map["subtree_regular"]);
+  EXPECT_EQ (2, *map["self_dir"]);
+  EXPECT_EQ (0, *map["subtree_dir"]);
+  EXPECT_EQ (3, *map["self_symlink"]);
+  EXPECT_EQ (0, *map["subtree_symlink"]);
+  EXPECT_EQ (2, *map["self_chunked"]);
+  EXPECT_EQ (0, *map["subtree_chunked"]);
 
   d_counters.PopulateToParent(d_parent);
 
   map = d_parent.GetFieldsMap();
-  EXPECT_EQ (0, map["self_regular"]);
-  EXPECT_EQ (5, map["subtree_regular"]);
-  EXPECT_EQ (0, map["self_dir"]);
-  EXPECT_EQ (2, map["subtree_dir"]);
-  EXPECT_EQ (0, map["self_symlink"]);
-  EXPECT_EQ (3, map["subtree_symlink"]);
-  EXPECT_EQ (0, map["self_chunked"]);
-  EXPECT_EQ (2, map["subtree_chunked"]);
+  EXPECT_EQ (0, *map["self_regular"]);
+  EXPECT_EQ (5, *map["subtree_regular"]);
+  EXPECT_EQ (0, *map["self_dir"]);
+  EXPECT_EQ (2, *map["subtree_dir"]);
+  EXPECT_EQ (0, *map["self_symlink"]);
+  EXPECT_EQ (3, *map["subtree_symlink"]);
+  EXPECT_EQ (0, *map["self_chunked"]);
+  EXPECT_EQ (2, *map["subtree_chunked"]);
+}
+
 }
