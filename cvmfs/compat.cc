@@ -46,4 +46,34 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 
 }  // namespace inode_tracker
 
+namespace inode_tracker_v2 {
+
+static uint32_t hasher_md5(const hash::Md5 &key) {
+  return (uint32_t) *((uint32_t *)key.digest + 1);
+}
+
+static uint32_t hasher_inode(const uint64_t &inode) {
+  return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
+}
+
+void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
+  old_tracker->inode_map_.map_.hasher_ = hasher_inode;
+  old_tracker->path_map_.map_.hasher_ = hasher_md5;
+
+  SmallHashDynamic<uint64_t, uint32_t> *old_inodes =
+    &old_tracker->inode_references_.map_;
+  for (unsigned i = 0; i < old_inodes->capacity_; ++i) {
+    const uint64_t inode = old_inodes->keys_[i];
+    if (inode == 0) continue;
+
+    const uint32_t references = old_inodes->values_[i];
+    PathString path;
+    bool retval = old_tracker->FindPath(inode, &path);
+    assert(retval);
+    new_tracker->VfsGetBy(inode, references, path);
+  }
+}
+
+}
+
 }  // namespace compat

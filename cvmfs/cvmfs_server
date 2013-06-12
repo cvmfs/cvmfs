@@ -243,8 +243,19 @@ check_repository_compatibility() {
   fi
 
   # repository format changed from 2.1.6 to 2.1.7
+  # config files changed as of 2.1.12 for stratum 0
   # Currently all other version updates do not need a migration
-  if [ "$creator" != "2.1.6" ] && version_greater_or_equal "2.1.7"; then
+  if [ "$CVMFS_REPOSITORY_TYPE" != "stratum0" ] && [ "$creator" != "2.1.6" ] && \
+     version_greater_or_equal "2.1.7";
+  then
+    return 0
+  fi
+
+  if [ "$creator" != "2.1.6" ] && [ "$creator" != "2.1.7" ] && \
+     [ "$creator" != "2.1.8" ] && [ "$creator" != "2.1.9" ] && \
+     [ "$creator" != "2.1.10" ] && [ "$creator" != "2.1.11" ] && \
+     version_greater_or_equal "2.1.12";
+  then
     return 0
   fi
 
@@ -680,7 +691,7 @@ get_cvmfs_owner() {
 set_ro_root_hash() {
   local name=$1
   local root_hash=$2
-  local client_config=/etc/cvmfs/repositories.d/${name}/client.conf
+  local client_config=/var/spool/cvmfs/${name}/client.local
 
   if grep -q ^CVMFS_ROOT_HASH= ${client_config}; then
     sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${root_hash}/" $client_config
@@ -770,7 +781,7 @@ mkfs() {
   local stratum0
   local upstream
   local owner
-  local replicable=0
+  local replicable=1
 
   # parameter handling
   OPTIND=1
@@ -972,14 +983,16 @@ EOF
     selinux_context="context=\"system_u:object_r:default_t:s0\""
   fi
   test -e /etc/cvmfs/server.overlayfs && (cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
+  sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
 )
   test -e /etc/cvmfs/server.overlayfs || (cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
+  sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
 )
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
@@ -1977,6 +1990,29 @@ EOF
 }
 
 
+migrate_2_1_7() {
+  local name=$name
+
+  # get repository information
+  . /etc/cvmfs/repositories.d/$name/server.conf
+
+  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string '2.1.12')"
+
+  echo "--> creating client.local"
+  sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
+
+  echo "--> adjusting /etc/fstab"
+  sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
+  if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
+    echo "Failed!"
+    false
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=2.1.12/" /etc/cvmfs/repositories.d/$name/server.conf
+}
+
+
 migrate() {
   local name
 
@@ -2000,6 +2036,16 @@ migrate() {
   # do the migrations...
   if [ $(repository_creator_version) = "2.1.6" ]; then
     migrate_2_1_6 $name
+    repository_creator_version="2.1.7"
+  fi
+
+  if [ $(repository_creator_version) = "2.1.7" -o \
+       $(repository_creator_version) = "2.1.8" -o \
+       $(repository_creator_version) = "2.1.9" -o \
+       $(repository_creator_version) = "2.1.10" -o \
+       $(repository_creator_version) = "2.1.11" ];
+  then
+    migrate_2_1_7 $name
   fi
 }
 

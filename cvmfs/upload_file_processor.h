@@ -110,7 +110,7 @@ class FileProcessor : public Observable<SpoolerResult> {
      */
     void FinalizeProcessing();
 
-    FileChunks GetFinalizedFileChunks() const;
+    FileChunkList GetFinalizedFileChunks() const;
     FileChunk  GetFinalizedBulkFile() const;
 
     inline bool IsCompleted()             const {
@@ -210,11 +210,11 @@ class FileProcessor : public Observable<SpoolerResult> {
 
       int                return_code; //!< 0 if job was successful
       FileChunk          bulk_file;   //!< results of the bulk file processing
-      FileChunks         file_chunks; //!< list of the generated file chunks
+      FileChunkList      file_chunks; //!< list of the generated file chunks
       const std::string  local_path;  //!< path to the local file that was
                                       //!< processed (same as in Parameters)
 
-      inline bool IsChunked() const { return !file_chunks.empty(); }
+      inline bool IsChunked() const { return !file_chunks.IsEmpty(); }
     };
 
     // these typedefs are needed for the ConcurrentWorkers template

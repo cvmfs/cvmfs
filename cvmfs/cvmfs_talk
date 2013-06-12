@@ -17,10 +17,10 @@ use Getopt::Long;
 sub usage {
   print "Usage: $0 [-i instance | -p pipe] <command>                       \n";
   print "   By default, iteratate through all instances.                   \n";
-  print "\n";  
+  print "\n";
   print "Example:                                                          \n";
   print "  $0 -i atlas.cern.ch pid                                         \n";
-  print "\n";  
+  print "\n";
   print "Commands:                                                         \n";
   print "  tracebuffer flush      flushes the trace buffer to disk         \n";
   print "  cache size             gets current size of file cache          \n";
@@ -29,11 +29,13 @@ sub usage {
   print "  cache list catalogs    gets all file catalogs in cache          \n";
   print "  cleanup <MB>           cleans file cache until size <= <MB>     \n";
   print "  evict <path>           removes <path> from the cache            \n";
+  print "  pin <path>             pins <path> in the cache                 \n";
   print "  mountpoint             returns the mount point                  \n";
   print "  remount                look for new catalogs                    \n";
   print "  revision               gets the repository revision             \n";
   print "  max ttl info           gets the maximum ttl                     \n";
   print "  max ttl set <minutes>  sets the maximum ttl                     \n";
+  print "  nameserver set <host>  sets a DNS server                        \n";
   print "  host info              get host chain and their rtt,            \n";
   print "                         if already probed                        \n";
   print "  host probe             orders the host chain according to rtt   \n";

@@ -300,7 +300,7 @@ bool Catalog::ListingMd5PathStat(const hash::Md5 &md5path,
     FixTransitionPoint(md5path, &dirent);
     entry.name = dirent.name();
     entry.info = dirent.GetStatStructure();
-    listing->push_back(entry);
+    listing->PushBack(entry);
   }
   sql_listing_->Reset();
   pthread_mutex_unlock(lock_);
@@ -351,14 +351,14 @@ bool Catalog::AllChunksEnd() {
 
 
 bool Catalog::ListMd5PathChunks(const hash::Md5  &md5path,
-                                FileChunks       *chunks) const
+                                FileChunkList    *chunks) const
 {
-  assert(IsInitialized() && chunks->empty());
+  assert(IsInitialized() && chunks->IsEmpty());
 
   pthread_mutex_lock(lock_);
   sql_chunks_listing_->BindPathHash(md5path);
   while (sql_chunks_listing_->FetchRow()) {
-    chunks->push_back(sql_chunks_listing_->GetFileChunk());
+    chunks->PushBack(sql_chunks_listing_->GetFileChunk());
   }
   sql_chunks_listing_->Reset();
   pthread_mutex_unlock(lock_);

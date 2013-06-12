@@ -329,7 +329,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     // checking file chunk integrity
     if (entries[i].IsChunkedFile()) {
-      FileChunks chunks;
+      FileChunkList chunks;
       catalog->ListFileChunks(full_path, &chunks);
 
       // do we find file chunks for the chunked file in this catalog?
@@ -342,31 +342,30 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       size_t aggregated_file_size = 0;
       off_t  next_offset          = 0;
 
-      FileChunks::const_iterator c    = chunks.begin();
-      FileChunks::const_iterator cend = chunks.end();
-      for (; c != cend; ++c) {
+      for (unsigned j = 0; j < chunks.size(); ++j) {
+        FileChunk this_chunk = chunks.At(j);
         // check if the chunk boundaries fit together...
-        if (next_offset != c->offset()) {
+        if (next_offset != this_chunk.offset()) {
           LogCvmfs(kLogCvmfs, kLogStderr, "misaligned chunk offsets for %s",
                    full_path.c_str());
           retval = false;
         }
-        next_offset = c->offset() + c->size();
-        aggregated_file_size += c->size();
+        next_offset = this_chunk.offset() + this_chunk.size();
+        aggregated_file_size += this_chunk.size();
 
         // are all data chunks in the data store?
         const string chunk_path = "data"                           +
-                                  c->content_hash().MakePath(1, 2) +
+                                  this_chunk.content_hash().MakePath(1, 2) +
                                   FileChunk::kCasSuffix;
         if (!Exists(chunk_path)) {
-          const std::string chunk_name = c->content_hash().ToString() +
+          const std::string chunk_name = this_chunk.content_hash().ToString() +
                                          FileChunk::kCasSuffix;
           LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
                                           "offset: %d | size: %d) missing",
                    chunk_name.c_str(),
                    full_path.c_str(),
-                   c->offset(),
-                   c->size());
+                   this_chunk.offset(),
+                   this_chunk.size());
           retval = false;
         }
       }
