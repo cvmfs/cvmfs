@@ -70,9 +70,9 @@ struct CrashData {
 
 struct ControlFlow {
   enum Flags { // TODO: C++11 (type safe enum)
-    kProduceStacktrace,
+    kProduceStacktrace = 0,
     kQuit,
-    kUnknown
+    kUnknown,
   };
 };
 
@@ -244,11 +244,13 @@ static string GenerateStackTrace(const string &exe_path,
   argv.push_back(exe_path);
   argv.push_back(StringifyInt(pid));
   pid_t gdb_pid = 0;
+  const bool double_fork = false;
   retval = ExecuteBinary(&fd_stdin,
                          &fd_stdout,
                          &fd_stderr,
                           "gdb",
                           argv,
+                          double_fork,
                          &gdb_pid);
   assert(retval);
 
@@ -334,7 +336,7 @@ static void Watchdog() {
   ControlFlow::Flags control_flow;
 
   if (!pipe_watchdog_->Read(&control_flow)) {
-    LogEmergency("unexpected termination");
+    LogEmergency("unexpected termination (" + StringifyInt(control_flow) + ")");
   } else {
     switch (control_flow) {
       case ControlFlow::kProduceStacktrace:

@@ -26,8 +26,7 @@ TEST(T_ManagedExec, RunShell) {
 }
 
 
-// TODO: use managed fork
-/*TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
+TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
   int fd_stdin, fd_stdout, fd_stderr;
   pid_t child_pid;
 
@@ -64,7 +63,7 @@ TEST(T_ManagedExec, RunShell) {
     ++counter;
   }
   EXPECT_LT (counter, timeout) << "detached process did not terminate in time";
-}*/
+}
 
 
 TEST(T_ManagedExec, ExecuteBinaryAsChild) {

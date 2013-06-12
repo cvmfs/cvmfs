@@ -928,6 +928,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
                    const std::vector<std::string>  &argv,
+                   const bool                       double_fork,
                          pid_t                     *child_pid) {
   int pipe_stdin[2];
   int pipe_stdout[2];
@@ -952,7 +953,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
                    preserve_fildes,
                    map_fildes,
                    true,
-                   false,
+                   double_fork,
                    child_pid)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
@@ -975,8 +976,9 @@ bool ExecuteBinary(      int                       *fd_stdin,
  * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
  */
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
+  const bool double_fork = false;
   return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
-                       vector<string>());
+                       vector<string>(), double_fork);
 }
 
 struct ForkFailures { // TODO: C++11 (type safe enum)

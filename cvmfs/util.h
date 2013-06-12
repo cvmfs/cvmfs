@@ -180,6 +180,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
                    const std::vector<std::string>  &argv,
+                   const bool                       double_fork = true,
                          pid_t                     *child_pid = NULL);
 bool ManagedExec(const std::vector<std::string>  &command_line,
                  const std::set<int>             &preserve_fildes,
