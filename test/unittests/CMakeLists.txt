@@ -78,10 +78,15 @@ set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
 add_dependencies (${PROJECT_TEST_NAME} googletest)
 
+if (SQLITE3_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} sqlite3)
+endif (SQLITE3_BUILTIN)
+
 set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
-target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} pthread)
+target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} 
+                       ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} pthread)
 
 #
 # Integrate the test running into CMake
