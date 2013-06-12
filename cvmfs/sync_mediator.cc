@@ -283,9 +283,8 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
            entry.GetUnionPath().c_str());
 
   // Look for legacy hardlinks
-  const set<string> ignore;
   FileSystemTraversal<SyncMediator> traversal(this, union_engine_->union_path(),
-                                              false, ignore);
+                                              false);
   traversal.fn_new_file =
     &SyncMediator::LegacyRegularHardlinkCallback;
   traversal.fn_new_symlink = &SyncMediator::LegacySymlinkHardlinkCallback;
@@ -315,13 +314,13 @@ void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
 	// Create a recursion engine, which recursively adds all entries in a newly
   // created directory
 	FileSystemTraversal<SyncMediator> traversal(
-    this, union_engine_->scratch_path(), true,
-    union_engine_->GetIgnoreFilenames());
+    this, union_engine_->scratch_path(), true);
 	traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
 	traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
 	traversal.fn_new_file = &SyncMediator::AddFileCallback;
 	traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
 	traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
+	traversal.fn_ignore_file = &SyncMediator::IgnoreFileCallback;
 	traversal.Recurse(entry.GetScratchPath());
 }
 
@@ -372,9 +371,8 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
 	// because it would start up another recursion
 
 	const bool recurse = false;
-  const set<string> ignore;
   FileSystemTraversal<SyncMediator> traversal(
-    this, union_engine_->rdonly_path(), recurse, ignore);
+    this, union_engine_->rdonly_path(), recurse);
   traversal.fn_new_file = &SyncMediator::RemoveFileCallback;
   traversal.fn_new_dir_postfix =
     &SyncMediator::RemoveDirectoryCallback;
@@ -407,6 +405,13 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 {
   SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   RemoveDirectoryRecursively(entry);
+}
+
+
+bool SyncMediator::IgnoreFileCallback(const std::string &parent_dir,
+                                      const std::string &file_name)
+{
+  return union_engine_->IgnoreFilePredicate(parent_dir, file_name);
 }
 
 

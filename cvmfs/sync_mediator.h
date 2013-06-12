@@ -136,6 +136,9 @@ class SyncMediator {
   void RemoveDirectoryCallback(const std::string &parent_dir,
                                const std::string &dir_name);
 
+  bool IgnoreFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
+
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);

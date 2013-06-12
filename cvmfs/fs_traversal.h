@@ -42,18 +42,28 @@ class FileSystemTraversal {
   VoidCallback fn_leave_dir;
   VoidCallback fn_new_file;
   VoidCallback fn_new_symlink;
+ 
+	/**
+	 * Optional callback for all files during recursion to decide
+	 * whether to completely ignore the file. If this callback returns
+	 * true then the file will not be processed (this is a replacement
+	 * for the ignored_files set, and it allows to ignore based on names
+	 * or something else). If the function is not specified, no files 
+	 * will be ignored (except for "." and "..").
+	 */
+	BoolCallback fn_ignore_file;
 
-  /**
-   * Callback if a directory was found.  Depending on the response of
-   * the callback, the recursion will continue in the found directory/
-   * If this callback is not specified, it will recurse by default.
-   */
-  BoolCallback fn_new_dir_prefix;
+	/**
+	 * Callback if a directory was found.  Depending on the response of
+	 * the callback, the recursion will continue in the found directory/
+	 * If this callback is not specified, it will recurse by default.
+	 */
+	BoolCallback fn_new_dir_prefix;
 
 	/**
 	 * Callback for a found directory after it was already recursed
 	 * e.g. for deletion of directories: first delete content,
-   * then the directory itself
+	 * then the directory itself
 	 */
 	VoidCallback fn_new_dir_postfix;
 
@@ -62,25 +72,22 @@ class FileSystemTraversal {
 	 * Create a new recursion engine
 	 * @param delegate The object that will receive the callbacks
 	 * @param relative_to_directory The DirEntries will be created relative
-   *        to this directory
-	 * @param ignored_files A list of files which the delegate does not care about
-   *                     (no callback calls or recursion for them)
+	 *        to this directory
 	 * @param recurse Should the traversal engine recurse? (if not,
-   *        it just traverses the given directory)
+	 *        it just traverses the given directory)
 	 */
 	FileSystemTraversal(T *delegate,
 	                const std::string &relative_to_directory,
-	                const bool recurse,
-	                const std::set<std::string> &ignored_files)
+	                const bool recurse)
   {
     delegate_ = delegate;
     relative_to_directory_ = relative_to_directory;
     recurse_ = recurse;
-    ignored_files_ = ignored_files;
     fn_enter_dir = NULL;
     fn_leave_dir = NULL;
     fn_new_file = NULL;
     fn_new_symlink = NULL;
+    fn_ignore_file = NULL;
     fn_new_dir_prefix = NULL;
     fn_new_dir_postfix = NULL;
     Init();
@@ -112,13 +119,8 @@ class FileSystemTraversal {
 	std::string relative_to_directory_;
 	bool recurse_;
 
-	// If one of these files are found somewhere they are completely ignored
-	std::set<std::string> ignored_files_;
-
 
   void Init() {
-    ignored_files_.insert(".");
-    ignored_files_.insert("..");
   }
 
   void DoRecursion(const std::string &parent_path, const std::string &dir_name)
@@ -138,8 +140,8 @@ class FileSystemTraversal {
 
     // Walk through the open directory notifying the about contents
     while ((dit = platform_readdir(dip)) != NULL) {
-      // Check if filename is included in the ignored files list
-      if (ignored_files_.find(dit->d_name) != ignored_files_.end())
+      // Check if filename should be ignored
+      if (std::string(dit->d_name) == "." || std::string(dit->d_name) == ".." || (fn_ignore_file != NULL && Notify(fn_ignore_file, path, dit->d_name))) 
         continue;
 
       // Notify user about found directory entry
