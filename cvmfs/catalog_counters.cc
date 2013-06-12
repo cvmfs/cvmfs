@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "catalog_counters.h"
 
 #include "directory_entry.h"
