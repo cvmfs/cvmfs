@@ -38,7 +38,7 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(const Database &database) {
 
 template<typename FieldT>
 bool TreeCountersBase<FieldT>::WriteToDatabase(const Database &database) const {
-  bool retval;
+  bool retval = true;
 
   const FieldsMap map = GetFieldsMap();
   SqlUpdateCounter sql_counter(database);
