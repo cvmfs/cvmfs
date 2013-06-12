@@ -290,3 +290,70 @@ TEST_F(T_CatalogCounters, AddAsSubtree) {
   EXPECT_EQ (118,  d_parent.subtree.chunked_files);
   EXPECT_EQ (1380, d_parent.subtree.number_of_file_chunks);
 }
+
+
+TEST_F(T_CatalogCounters, FieldsMap) {
+  DeltaCounters d_counters;
+  DeltaCounters d_parent;
+
+  DirectoryEntry regular_file = DirectoryEntryTestFactory::RegularFile();
+  DirectoryEntry directory    = DirectoryEntryTestFactory::Directory();
+  DirectoryEntry symlink      = DirectoryEntryTestFactory::Symlink();
+  DirectoryEntry chunked_file = DirectoryEntryTestFactory::ChunkedFile();
+
+  DeltaCounters::FieldsMap map;
+
+  d_counters.Increment(regular_file);
+  d_counters.Increment(regular_file);
+  d_counters.Increment(regular_file);
+
+  map = d_counters.GetFieldsMap();
+  EXPECT_EQ (3, map["self_regular"]);
+  EXPECT_EQ (0, map["subtree_regular"]);
+
+  d_counters.Increment(directory);
+  d_counters.Increment(directory);
+
+  map = d_counters.GetFieldsMap();
+  EXPECT_EQ (3, map["self_regular"]);
+  EXPECT_EQ (0, map["subtree_regular"]);
+  EXPECT_EQ (2, map["self_dir"]);
+  EXPECT_EQ (0, map["subtree_dir"]);
+
+  d_counters.Increment(symlink);
+  d_counters.Increment(symlink);
+  d_counters.Increment(symlink);
+
+  map = d_counters.GetFieldsMap();
+  EXPECT_EQ (3, map["self_regular"]);
+  EXPECT_EQ (0, map["subtree_regular"]);
+  EXPECT_EQ (2, map["self_dir"]);
+  EXPECT_EQ (0, map["subtree_dir"]);
+  EXPECT_EQ (3, map["self_symlink"]);
+  EXPECT_EQ (0, map["subtree_symlink"]);
+
+  d_counters.Increment(chunked_file);
+  d_counters.Increment(chunked_file);
+
+  map = d_counters.GetFieldsMap();
+  EXPECT_EQ (5, map["self_regular"]);
+  EXPECT_EQ (0, map["subtree_regular"]);
+  EXPECT_EQ (2, map["self_dir"]);
+  EXPECT_EQ (0, map["subtree_dir"]);
+  EXPECT_EQ (3, map["self_symlink"]);
+  EXPECT_EQ (0, map["subtree_symlink"]);
+  EXPECT_EQ (2, map["self_chunked"]);
+  EXPECT_EQ (0, map["subtree_chunked"]);
+
+  d_counters.PopulateToParent(d_parent);
+
+  map = d_parent.GetFieldsMap();
+  EXPECT_EQ (0, map["self_regular"]);
+  EXPECT_EQ (5, map["subtree_regular"]);
+  EXPECT_EQ (0, map["self_dir"]);
+  EXPECT_EQ (2, map["subtree_dir"]);
+  EXPECT_EQ (0, map["self_symlink"]);
+  EXPECT_EQ (3, map["subtree_symlink"]);
+  EXPECT_EQ (0, map["self_chunked"]);
+  EXPECT_EQ (2, map["subtree_chunked"]);
+}

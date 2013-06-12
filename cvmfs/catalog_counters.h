@@ -6,6 +6,8 @@
 #define CVMFS_CATALOG_COUNTERS_H_
 
 #include <stdint.h>
+#include <map>
+#include <string>
 
 namespace catalog {
 
@@ -14,6 +16,7 @@ class DirectoryEntry;
 template<typename FieldT>
 class TreeCountersBase {
  public:
+  typedef std::map<std::string, FieldT> FieldsMap;
   template<typename T>
   struct Fields {
     Fields() : regular_files(0), symlinks(0), directories(0),
@@ -39,6 +42,15 @@ class TreeCountersBase {
       number_of_file_chunks += factor * other.number_of_file_chunks;
     }
 
+    void FillFieldsMap(FieldsMap &map, const std::string &prefix) const {
+      map[prefix + "regular"] = regular_files;
+      map[prefix + "symlink"] = symlinks;
+      map[prefix + "dir"]     = directories;
+      map[prefix + "nested"]  = nested_catalogs;
+      map[prefix + "chunked"] = chunked_files;
+      map[prefix + "chunks"]  = number_of_file_chunks;
+    }
+
     T regular_files;
     T symlinks;
     T directories;
@@ -47,10 +59,12 @@ class TreeCountersBase {
     T number_of_file_chunks;
   };
 
- protected:
-  void SetZero() {
-    self    = Fields<FieldT>();
-    subtree = Fields<FieldT>();
+ public:
+  FieldsMap GetFieldsMap() const {
+    FieldsMap fields;
+    self.FillFieldsMap(fields, "self_");
+    subtree.FillFieldsMap(fields, "subtree_");
+    return fields;
   }
 
  public:
