@@ -489,6 +489,7 @@ create_whitelist() {
 
   local whitelist
   whitelist=${temp_dir}/whitelist.$name
+  echo "Using whitelist ${whitelist}"
 
   echo -n "Signing 30 day whitelist with master key... "
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
@@ -836,7 +837,8 @@ mkfs() {
 
   # more sanity checks
   check_user $cvmfs_user || die "No user $cvmfs_user"
-  /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
+  test -e /etc/cvmfs/server.overlayfs && (/sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || die "overlayfs kernel module missing")
+  test -e /etc/cvmfs/server.overlayfs || (/sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing")
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
   [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
@@ -980,11 +982,18 @@ EOF
   if has_selinux && try_mount_remount_cycle; then
     selinux_context="context=\"system_u:object_r:default_t:s0\""
   fi
-  cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
+  test -e /etc/cvmfs/server.overlayfs && (cat >> /etc/fstab << EOF
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
+overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro,$selinux_context 0 0 # added by CernVM-FS for $name
+EOF
+  sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
+)
+  test -e /etc/cvmfs/server.overlayfs || (cat >> /etc/fstab << EOF
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
+)
   mount $rdonly_dir > /dev/null
   mount /cvmfs/$name
   echo "done"
