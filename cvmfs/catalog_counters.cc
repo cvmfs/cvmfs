@@ -48,16 +48,16 @@ void Counters::MergeIntoParent(DeltaCounters &parent_delta) const {
 }
 
 
-uint64_t Counters::GetSelfEntries() const {
+Counters_t Counters::GetSelfEntries() const {
   return self.regular_files + self.symlinks + self.directories;
 }
 
 
-uint64_t Counters::GetSubtreeEntries() const {
+Counters_t Counters::GetSubtreeEntries() const {
   return subtree.regular_files + subtree.symlinks + subtree.directories;
 }
 
 
-uint64_t Counters::GetAllEntries() const {
+Counters_t Counters::GetAllEntries() const {
   return GetSelfEntries() + GetSubtreeEntries();
 }
