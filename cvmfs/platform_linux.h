@@ -68,7 +68,7 @@ inline int platform_sigwait(const int signum) {
 
 
 /**
- * Grants a PID with some necessary capabilites for ptrace() usage
+ * Grants a PID capabilites for ptrace() usage
  *
  * @param PID  the PID of the process to be granted ptrace()-access
  *             (may be ignored)
@@ -78,8 +78,8 @@ inline bool platform_allow_ptrace(const pid_t pid) {
 #ifdef PR_SET_PTRACER
   // On Ubuntu, yama prevents all processes from ptracing other processes, even
   // when they are owned by the same user. Therefore the watchdog would not be
-  // able to create a stacktrace, without this formal permission:
-  const int retval = prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
+  // able to create a stacktrace, without this extra permission:
+  const int retval = prctl(PR_SET_PTRACER, pid, 0, 0, 0);
   return (retval == 0);
 #else
   // On other platforms this is currently a no-op

@@ -40,9 +40,24 @@ const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
  * "Static" assertion that a template parameter is a pointer
  */
 template<typename T>
-struct is_pointer { static const bool value = false; };
+struct IsPointer { static const bool value = false; };
 template<typename T>
-struct is_pointer<T*> { static const bool value = true; };
+struct IsPointer<T*> { static const bool value = true; };
+
+/**
+ * Generic base class to mark an inheriting class as 'non-copyable'
+ */
+class SingleCopy {
+protected:
+  // Prevent SingleCopy from being instantiated on its own
+  SingleCopy() {}
+
+private:
+  // Provoke a linker error by not implementing copy constructor and
+  // assignment operator.
+  SingleCopy(const SingleCopy &other);
+  SingleCopy& operator=(const SingleCopy &rhs);
+};
 
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
@@ -58,7 +73,7 @@ void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);
 void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void ClosePipe(int pipe_fd[2]);
-struct Pipe {
+struct Pipe : public SingleCopy {
   Pipe() {
     int pipe_fd[2];
     MakePipe(pipe_fd);
@@ -76,14 +91,14 @@ struct Pipe {
 
   template<typename T>
   bool Write(const T &data) {
-    assert (! is_pointer<T>::value); // TODO: C++11 (replace by static_assert)
+    assert (!IsPointer<T>::value); // TODO: C++11 (replace by static_assert)
     const int num_bytes = write(write_end, &data, sizeof(T));
     return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
   }
 
   template<typename T>
   bool Read(T *data) {
-    assert (! is_pointer<T>::value); // TODO: C++11 (replace by static_assert)
+    assert (!IsPointer<T>::value); // TODO: C++11 (replace by static_assert)
     int num_bytes = read(read_end, data, sizeof(T));
     return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
   }
@@ -165,7 +180,6 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
                    const std::vector<std::string>  &argv,
-                   const bool                       double_fork = true,
                          pid_t                     *child_pid = NULL);
 bool ManagedExec(const std::vector<std::string>  &command_line,
                  const std::set<int>             &preserve_fildes,
@@ -186,22 +200,6 @@ struct hash_murmur {
     return MurmurHash2(&key, sizeof(key), 0x07387a4f);
 #endif
   }
-};
-
-
-/**
- * Generic base class to mark an inheriting class as 'non-copyable'
- */
-class SingleCopy {
- protected:
-  // Prevent SingleCopy from being instantiated on its own
-  SingleCopy() {}
-
- private:
-  // Provoke a linker error by not implementing copy constructor and
-  // assignment operator.
-  SingleCopy(const SingleCopy &other);
-  SingleCopy& operator=(const SingleCopy &rhs);
 };
 
 

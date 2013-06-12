@@ -216,8 +216,7 @@ void MakePipe(int pipe_fd[2]) {
 template<>
 bool Pipe::Write<std::string>(const std::string &data) {
   const size_t string_length = data.size();
-  return Write(string_length) &&
-         Write(data.c_str(), string_length);
+  return Write(string_length) && Write(data.c_str(), string_length);
 }
 
 
@@ -225,16 +224,15 @@ template<>
 bool Pipe::Read<std::string>(std::string *data) {
   size_t string_length;
   bool retval = Read(&string_length);
-  if (! retval) {
+  if (!retval)
     return false;
-  }
 
-  void *buffer = malloc(string_length + 1);
+  void *buffer = smalloc(string_length + 1);
   retval = Read(buffer, string_length);
-  if (! retval) {
+  if (!retval)
     return false;
-  }
-  char *c_buffer = static_cast<char*>(buffer);
+
+  char *c_buffer = static_cast<char *>(buffer);
   c_buffer[string_length] = '\0';
   data->assign(c_buffer);
   free(buffer);
@@ -930,7 +928,6 @@ bool ExecuteBinary(      int                       *fd_stdin,
                          int                       *fd_stderr,
                    const std::string               &binary_path,
                    const std::vector<std::string>  &argv,
-                   const bool                       double_fork,
                          pid_t                     *child_pid) {
   int pipe_stdin[2];
   int pipe_stdout[2];
@@ -955,7 +952,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
                    preserve_fildes,
                    map_fildes,
                    true,
-                   double_fork,
+                   false,
                    child_pid)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
@@ -982,37 +979,37 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
                        vector<string>());
 }
 
-struct StatusCodes { // TODO: C++11 (type safe enum)
+struct ForkFailures { // TODO: C++11 (type safe enum)
   enum Names {
-    kSendingPID,
+    kSendPid,
     kUnknown,
-    kErrorDupFileDescriptors,
-    kErrorReadMaxFileDesciptor,
-    kErrorReadFileDescriptorFlags,
-    kErrorSetFileDescriptorFlags,
-    kErrorLowerCredentials,
-    kErrorInvokeExec
+    kFailDupFd,
+    kFailGetMaxFd,
+    kFailGetFdFlags,
+    kFailSetFdFlags,
+    kFailDropCredentials,
+    kFailExec,
   };
 
   static std::string ToString(const Names name) {
     switch (name) {
-      case kSendingPID:
+      case kSendPid:
         return "Sending PID";
 
       default:
       case kUnknown:
         return "Unknown Status";
-      case kErrorDupFileDescriptors:
+      case kFailDupFd:
         return "Duplicate File Descriptor";
-      case kErrorReadMaxFileDesciptor:
+      case kFailGetMaxFd:
         return "Read maximal File Descriptor";
-      case kErrorReadFileDescriptorFlags:
+      case kFailGetFdFlags:
         return "Read File Descriptor Flags";
-      case kErrorSetFileDescriptorFlags:
+      case kFailSetFdFlags:
         return "Set File Descriptor Flags";
-      case kErrorLowerCredentials:
+      case kFailDropCredentials:
         return "Lower User Permissions";
-      case kErrorInvokeExec:
+      case kFailExec:
         return "Invoking execvp()";
     }
   }
@@ -1046,7 +1043,7 @@ bool ManagedExec(const vector<string>  &command_line,
     pid_t pid_grand_child;
     int max_fd;
     int fd_flags;
-    StatusCodes::Names failed = StatusCodes::kUnknown;
+    ForkFailures::Names failed = ForkFailures::kUnknown;
 
     const char *argv[command_line.size() + 1];
     for (unsigned i = 0; i < command_line.size(); ++i)
@@ -1059,7 +1056,7 @@ bool ManagedExec(const vector<string>  &command_line,
     {
       int retval = dup2(i->first, i->second);
       if (retval == -1) {
-        failed = StatusCodes::kErrorDupFileDescriptors;
+        failed = ForkFailures::kFailDupFd;
         goto fork_failure;
       }
     }
@@ -1067,12 +1064,11 @@ bool ManagedExec(const vector<string>  &command_line,
     // Child, close file descriptors
     max_fd = sysconf(_SC_OPEN_MAX);
     if (max_fd < 0) {
-      failed = StatusCodes::kErrorReadMaxFileDesciptor;
+      failed = ForkFailures::kFailGetMaxFd;
       goto fork_failure;
     }
     for (int fd = 0; fd < max_fd; fd++) {
-      if (fd != pipe_fork.write_end &&
-          preserve_fildes.count(fd) == 0) {
+      if ((fd != pipe_fork.write_end) && (preserve_fildes.count(fd) == 0)) {
         close(fd);
       }
     }
@@ -1086,12 +1082,12 @@ bool ManagedExec(const vector<string>  &command_line,
 
     fd_flags = fcntl(pipe_fork.write_end, F_GETFD);
     if (fd_flags < 0) {
-      failed = StatusCodes::kErrorReadFileDescriptorFlags;
+      failed = ForkFailures::kFailGetFdFlags;
       goto fork_failure;
     }
     fd_flags |= FD_CLOEXEC;
     if (fcntl(pipe_fork.write_end, F_SETFD, fd_flags) < 0) {
-      failed = StatusCodes::kErrorSetFileDescriptorFlags;
+      failed = ForkFailures::kFailSetFdFlags;
       goto fork_failure;
     }
 
@@ -1099,19 +1095,19 @@ bool ManagedExec(const vector<string>  &command_line,
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
     if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false)) {
-      failed = StatusCodes::kErrorLowerCredentials;
+      failed = ForkFailures::kFailDropCredentials;
       goto fork_failure;
     }
 
-    // retrieve the PID of the new grand child process and send it to the
+    // retrieve the PID of the new (grand) child process and send it to the
     // grand father
     pid_grand_child = getpid();
-    pipe_fork.Write(StatusCodes::kSendingPID);
+    pipe_fork.Write(ForkFailures::kSendPid);
     pipe_fork.Write(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
-    failed = StatusCodes::kErrorInvokeExec;
+    failed = ForkFailures::kFailExec;
 
    fork_failure:
     pipe_fork.Write(failed);
@@ -1124,15 +1120,14 @@ bool ManagedExec(const vector<string>  &command_line,
 
   close(pipe_fork.write_end);
 
-  // The character is either P, in which case the pid is sent, or
-  // a failure code
-  StatusCodes::Names status_code;
+  // Either the PID or a return value is sent
+  ForkFailures::Names status_code;
   bool retcode = pipe_fork.Read(&status_code);
-  assert (retcode);
-  if (status_code != StatusCodes::kSendingPID) {
+  assert(retcode);
+  if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);
     LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%s)",
-             StatusCodes::ToString(status_code).c_str());
+             ForkFailures::ToString(status_code).c_str());
     return false;
   }
 
@@ -1140,10 +1135,9 @@ bool ManagedExec(const vector<string>  &command_line,
   // (the actual read needs to be done in any case!)
   pid_t buf_child_pid = 0;
   retcode = pipe_fork.Read(&buf_child_pid);
-  assert (retcode);
-  if (child_pid != NULL) {
+  assert(retcode);
+  if (child_pid != NULL)
     *child_pid = buf_child_pid;
-  }
   close(pipe_fork.read_end);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
            command_line[0].c_str(),

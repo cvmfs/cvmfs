@@ -81,11 +81,7 @@ inline int platform_sigwait(const int signum) {
 }
 
 /**
- * Grants a PID with some necessary capabilites for ptrace() usage
- *
- * @param PID  the PID of the process to be granted ptrace()-access
- *             (may be ignored)
- * @return     true when successful
+ * See platform_linux.h
  */
 inline bool platform_allow_ptrace(const pid_t pid) {
   // No-op on Mac OS X
