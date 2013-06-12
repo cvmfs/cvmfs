@@ -64,8 +64,9 @@ class TreeCountersBase {
   };
 
  public:
-  bool ReadFromDatabase(const Database &database);
-  bool WriteToDatabase(const Database &database) const;
+  bool ReadFromDatabase(const Database   &database);
+  bool WriteToDatabase(const Database    &database) const;
+  bool InsertIntoDatabase(const Database &database) const;
 
   void SetZero();
 

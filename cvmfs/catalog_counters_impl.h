@@ -60,6 +60,29 @@ bool TreeCountersBase<FieldT>::WriteToDatabase(const Database &database) const {
 
 
 template<typename FieldT>
+bool TreeCountersBase<FieldT>::InsertIntoDatabase(const Database &database) const {
+  bool retval = true;
+
+  const FieldsMap map = GetFieldsMap();
+  SqlCreateCounter sql_counter(database);
+
+  typename FieldsMap::const_iterator i    = map.begin();
+  typename FieldsMap::const_iterator iend = map.end();
+  for (; i != iend; ++i) {
+    const bool current_retval =
+      sql_counter.BindCounter(i->first)   &&
+      sql_counter.BindInitialValue(*(i->second)) &&
+      sql_counter.Execute();
+    sql_counter.Reset();
+
+    retval = (retval) ? current_retval : false;
+  }
+
+  return retval;
+}
+
+
+template<typename FieldT>
 void TreeCountersBase<FieldT>::SetZero() {
   self.Subtract(self);
   subtree.Subtract(subtree);
