@@ -447,7 +447,7 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 bool SyncMediator::IgnoreFileCallback(const std::string &parent_dir,
                                       const std::string &file_name)
 {
-  return union_engine_->IgnoreFileP(parent_dir, file_name);
+  return union_engine_->IgnoreFilePredicate(parent_dir, file_name);
 }
 
 

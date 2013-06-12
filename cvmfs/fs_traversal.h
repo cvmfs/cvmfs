@@ -43,27 +43,27 @@ class FileSystemTraversal {
   VoidCallback fn_new_file;
   VoidCallback fn_new_symlink;
  
-  /**
-   * Optional callback for all files during recursion to decide
-   * whether to completely ignore the file. If this callback returns
-   * true then the file will not be processed (this is a replacement
-   * for the ignored_files set, and it allows to ignore based on names
-   * or something else). If the function is not specified, no files 
-   * will be ignored (except for "." and "..").
-   */
-  BoolCallback fn_ignore_file;
+	/**
+	 * Optional callback for all files during recursion to decide
+	 * whether to completely ignore the file. If this callback returns
+	 * true then the file will not be processed (this is a replacement
+	 * for the ignored_files set, and it allows to ignore based on names
+	 * or something else). If the function is not specified, no files 
+	 * will be ignored (except for "." and "..").
+	 */
+	BoolCallback fn_ignore_file;
 
-  /**
-   * Callback if a directory was found.  Depending on the response of
-   * the callback, the recursion will continue in the found directory/
-   * If this callback is not specified, it will recurse by default.
-   */
-  BoolCallback fn_new_dir_prefix;
+	/**
+	 * Callback if a directory was found.  Depending on the response of
+	 * the callback, the recursion will continue in the found directory/
+	 * If this callback is not specified, it will recurse by default.
+	 */
+	BoolCallback fn_new_dir_prefix;
 
 	/**
 	 * Callback for a found directory after it was already recursed
 	 * e.g. for deletion of directories: first delete content,
-   * then the directory itself
+	 * then the directory itself
 	 */
 	VoidCallback fn_new_dir_postfix;
 
