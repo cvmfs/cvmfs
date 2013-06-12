@@ -59,7 +59,8 @@ class TreeCountersBase {
 };
 
 
-class DeltaCounters : public TreeCountersBase<int64_t> {
+typedef int64_t DeltaCounters_t;
+class DeltaCounters : public TreeCountersBase<DeltaCounters_t> {
   friend class Counters;
 
  public:
@@ -72,14 +73,15 @@ class DeltaCounters : public TreeCountersBase<int64_t> {
 };
 
 
-class Counters : public TreeCountersBase<uint64_t> {
+typedef uint64_t Counters_t;
+class Counters : public TreeCountersBase<Counters_t> {
  public:
   void ApplyDelta(const DeltaCounters &delta);
   void AddAsSubtree(DeltaCounters &delta) const;
   void MergeIntoParent(DeltaCounters &parent_delta) const;
-  uint64_t GetSelfEntries() const;
-  uint64_t GetSubtreeEntries() const;
-  uint64_t GetAllEntries() const;
+  Counters_t GetSelfEntries() const;
+  Counters_t GetSubtreeEntries() const;
+  Counters_t GetAllEntries() const;
 };
 
 }
