@@ -44,31 +44,30 @@ struct ChunkJob {
 };
 
 
-class AbortSpoolerOnError : public upload::SpoolerCallback {
- public:
-  void Callback(const string &path, int retval, const string &digest) {
-    if (retval != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
-               retval, path.c_str(), digest.c_str());
-      abort();
-    }
+static void SpoolerOnUpload(const upload::SpoolerResult &result) {
+  unlink(result.local_path.c_str());
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
+             result.return_code,
+             result.local_path.c_str(),
+             result.content_hash.ToString().c_str());
+    abort();
   }
-};
+}
 
 
-string *stratum0_url = NULL;
-string *temp_dir = NULL;
-unsigned num_parallel = 1;
-bool pull_history = false;
-upload::Spooler *spooler = NULL;
-int pipe_chunks[2];
+string              *stratum0_url = NULL;
+string              *temp_dir = NULL;
+unsigned             num_parallel = 1;
+bool                 pull_history = false;
+upload::Spooler     *spooler = NULL;
+int                  pipe_chunks[2];
 // required for concurrent reading
-pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-upload::BackendStat *backend_stat = NULL;
-unsigned retries = 3;
-atomic_int64 overall_chunks;
-atomic_int64 overall_new;
-atomic_int64 chunk_queue;
+pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
+unsigned             retries = 3;
+atomic_int64         overall_chunks;
+atomic_int64         overall_new;
+atomic_int64         chunk_queue;
 
 }
 
@@ -90,7 +89,7 @@ static void *MainWorker(void *data) {
     if (next_chunk.type != 0)
       chunk_path.push_back(next_chunk.type);
 
-    if (!backend_stat->Stat(chunk_path)) {
+    if (!spooler->Peek(chunk_path)) {
       string tmp_file;
       FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                     &tmp_file);
@@ -111,7 +110,7 @@ static void *MainWorker(void *data) {
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
-      spooler->SpoolCopy(tmp_file, chunk_path);
+      spooler->Upload(tmp_file, chunk_path);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -128,7 +127,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   int retval;
 
   // Check if the catalog already exists
-  if (backend_stat->Stat("data" + catalog_hash.MakePath(1, 2) + "C")) {
+  if (spooler->Peek("data" + catalog_hash.MakePath(1, 2) + "C")) {
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
     return true;
   }
@@ -153,7 +152,6 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
                                           &file_catalog_vanilla);
   if (!fcatalog_vanilla) {
     LogCvmfs(kLogCvmfs, kLogStderr, "I/O error");
-    fclose(fcatalog_vanilla);
     unlink(file_catalog.c_str());
     return false;
   }
@@ -197,7 +195,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
         next_chunk.type = 'L';
         break;
       case catalog::kChunkPiece:
-        next_chunk.type = 'C';
+        next_chunk.type = FileChunk::kCasSuffix.c_str()[0];
         break;
       default:
         next_chunk.type = '\0';
@@ -249,9 +247,9 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
   delete catalog;
   unlink(file_catalog.c_str());
-  spooler->WaitFor();
-  spooler->SpoolCopy(file_catalog_vanilla,
-                     "data" + catalog_hash.MakePath(1, 2) + "C");
+  spooler->WaitForUpload();
+  spooler->Upload(file_catalog_vanilla,
+                  "data" + catalog_hash.MakePath(1, 2) + "C");
   return true;
 
  pull_cleanup:
@@ -263,21 +261,28 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
 
 static void UploadBuffer(const unsigned char *buffer, const unsigned size,
-                         const std::string dest_path)
+                         const std::string dest_path, const bool compress)
 {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
-  int retval = CopyMem2File(buffer, size, ftmp);
+  int retval;
+  if (compress) {
+    hash::Any dummy(hash::kSha1);
+    retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
+  } else {
+    retval = CopyMem2File(buffer, size, ftmp);
+  }
   assert(retval);
   fclose(ftmp);
-  spooler->SpoolCopy(tmp_file, dest_path);
+  spooler->Upload(tmp_file, dest_path);
 }
 
 
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   unsigned timeout = 10;
+  int fd_lockfile = -1;
   manifest::ManifestEnsemble ensemble;
 
   // Option parsing
@@ -292,12 +297,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   stratum0_url = args.find('u')->second;
   temp_dir = args.find('x')->second;
-  spooler = upload::MakeSpoolerEnsemble(*args.find('r')->second);
+  const upload::SpoolerDefinition spooler_definition(*args.find('r')->second);
+  spooler = upload::Spooler::Construct(spooler_definition);
   assert(spooler);
-  backend_stat = upload::GetBackendStat(*args.find('r')->second);
-  assert(backend_stat);
-  spooler->set_move_mode(true);
-  spooler->SetCallback(new AbortSpoolerOnError());
+  spooler->RegisterListener(&SpoolerOnUpload);
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
   if (args.find('n') != args.end())
@@ -310,9 +313,22 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
+  map<string, hash::Any> historic_tags;
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
+
+  // Wait for another instance to finish
+  fd_lockfile = TryLockFile(*temp_dir + "/lock_snapshot");
+  if (fd_lockfile < 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "waiting for another snapshot to finish...");
+    fd_lockfile = LockFile(*temp_dir + "/lock_snapshot");
+    if (fd_lockfile < 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to lock on %s",
+               (*temp_dir + "/lock_snapshot").c_str());
+      return 1;
+    }
+  }
 
   int result = 1;
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
@@ -322,7 +338,22 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
-  download::Init(num_parallel+1);
+  download::Init(num_parallel+1, true);
+  //download::ActivatePipelining();
+  unsigned current_group;
+  vector< vector<string> > proxies;
+  download::GetProxyInfo(&proxies, &current_group);
+  if (proxies.size() > 0) {
+    string proxy_str = "\nWarning, replicating through proxies\n";
+    proxy_str += "  Load-balance groups:\n";
+    for (unsigned i = 0; i < proxies.size(); ++i) {
+      proxy_str += "  [" + StringifyInt(i) + "] " +
+      JoinStrings(proxies[i], ", ") + "\n";
+    }
+    proxy_str += "  Active proxy: [" + StringifyInt(current_group) + "] " +
+    proxies[current_group][0];
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s\n", proxy_str.c_str());
+  }
   download::SetTimeout(timeout, timeout);
   download::SetRetryParameters(retries, timeout, 3*timeout);
   download::Spawn();
@@ -343,6 +374,42 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     goto fini;
   }
 
+  // Fetch tag list
+  if (!ensemble.manifest->history().IsNull()) {
+    hash::Any history_hash = ensemble.manifest->history();
+    const string history_url = *stratum0_url + "/data" +
+      history_hash.MakePath(1, 2) + "H";
+    const string history_path = *temp_dir + "/" + history_hash.ToString();
+    download::JobInfo download_history(&history_url, false, false,
+                                       &history_path,
+                                       &history_hash);
+    retval = download::Fetch(&download_history);
+    if (retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d)",
+               retval);
+      goto fini;
+    }
+    retval = zlib::DecompressPath2Path(history_path,
+                                       history_path + ".uncompressed");
+    assert(retval);
+    history::Database history_db;
+    history::TagList tag_list;
+    retval = history_db.Open(history_path + ".uncompressed",
+                             sqlite::kDbOpenReadWrite);
+    assert(retval);
+    retval = tag_list.Load(&history_db);
+    assert(retval);
+    unlink((history_path + ".uncompressed").c_str());
+    historic_tags = tag_list.GetAllHashes();
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
+             historic_tags.size());
+    LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
+    spooler->Upload(history_path, "data" + history_hash.MakePath(1, 2) + "H");
+    spooler->WaitForUpload();
+    unlink(history_path.c_str());
+  }
+
   // Check if we have a replica-ready server
   retval = download::Fetch(&download_sentinel);
   if (retval != download::kFailOk) {
@@ -359,8 +426,16 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     assert(retval == 0);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at /");
+  LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "", true);
+  for (map<string, hash::Any>::const_iterator i = historic_tags.begin(),
+       iEnd = historic_tags.end(); i != iEnd; ++i)
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
+             i->first.c_str());
+    bool retval2 = Pull(i->second, "", true);
+    retval = retval && retval2;
+  }
 
   // Stopping threads
   LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
@@ -386,29 +461,31 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Upload manifest ensemble
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
-    spooler->WaitFor();
+    spooler->WaitForUpload();
     const string certificate_path =
       "data" + ensemble.manifest->certificate().MakePath(1, 2) + "X";
-    if (!backend_stat->Stat(certificate_path)) {
-      UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path);
+    if (!spooler->Peek(certificate_path)) {
+      UploadBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path,
+                   true);
     }
     UploadBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                 ".cvmfswhitelist");
+                 ".cvmfswhitelist", false);
     UploadBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                 ".cvmfspublished");
+                 ".cvmfspublished", false);
   }
 
-  spooler->WaitFor();
+  spooler->WaitForUpload();
   LogCvmfs(kLogCvmfs, kLogStdout, "Fetched %"PRId64" new chunks out of %"
            PRId64" processed chunks",
            atomic_read64(&overall_new), atomic_read64(&overall_chunks));
   result = 0;
 
  fini:
+  if (fd_lockfile >= 0)
+    UnlockFile(fd_lockfile);
   free(workers);
   signature::Fini();
   download::Fini();
-  delete backend_stat;
   delete spooler;
   return result;
 }

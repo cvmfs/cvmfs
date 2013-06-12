@@ -57,7 +57,7 @@ EOF
     fi
 
     # check if timeout took approx. the expected number of seconds
-    if [ "$seconds" -le 18 ] || [ "$seconds" -ge 22 ]; then
+    if [ "$seconds" -le 26 ] || [ "$seconds" -ge 34 ]; then
       echo "------> NOTE: cvmfs failed but the timeout was unsual: took $seconds seconds to fail..." >> $logfile
       retcode=103
     fi

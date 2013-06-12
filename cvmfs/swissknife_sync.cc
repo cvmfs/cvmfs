@@ -27,6 +27,7 @@
 #include <cstdio>
 
 #include <string>
+#include <vector>
 
 #include "platform.h"
 #include "sync_union.h"
@@ -40,34 +41,40 @@
 using namespace std;  // NOLINT
 
 
-bool CheckParams(SyncParameters *p) {
-  if (!DirectoryExists(p->dir_scratch)) {
+bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
+  if (!DirectoryExists(p.dir_scratch)) {
     PrintError("overlay (copy on write) directory does not exist");
     return false;
   }
-  if (!DirectoryExists(p->dir_union)) {
+  if (!DirectoryExists(p.dir_union)) {
     PrintError("union volume does not exist");
     return false;
   }
-  if (!DirectoryExists(p->dir_rdonly)) {
+  if (!DirectoryExists(p.dir_rdonly)) {
     PrintError("cvmfs read/only repository does not exist");
     return false;
   }
-  if (p->stratum0 == "") {
+  if (p.stratum0 == "") {
     PrintError("Stratum0 url missing");
     return false;
   }
 
-  if (p->manifest_path == "") {
+  if (p.manifest_path == "") {
     PrintError("manifest output required");
     return false;
   }
-  if (!DirectoryExists(p->dir_temp)) {
+  if (!DirectoryExists(p.dir_temp)) {
     PrintError("data store directory does not exist");
     return false;
   }
 
-	return true;
+  if (p.min_file_chunk_size >= p.avg_file_chunk_size ||
+      p.avg_file_chunk_size >= p.max_file_chunk_size) {
+    PrintError("file chunk size values are not sane");
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -85,7 +92,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-  upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
   // TODO: consider using the unique pointer to come in Github Pull Request 46
@@ -113,12 +121,13 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   const string dest = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
-  upload::Spooler *spooler = upload::MakeSpoolerEnsemble(spooler_definition);
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
-  spooler->SpoolCopy(source, dest);
-  spooler->EndOfTransaction();
-  spooler->WaitFor();
-  if (spooler->num_errors() > 0) {
+  spooler->Upload(source, dest);
+  spooler->WaitForUpload();
+  spooler->WaitForTermination();
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
     return 1;
   }
@@ -127,8 +136,85 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
 }
 
 
+int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
+  const string file_to_peek = *args.find('d')->second;
+  const string spooler_definition = *args.find('r')->second;
+  
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
+  assert(spooler);
+  const bool success = spooler->Peek(file_to_peek);
+  spooler->WaitForTermination();
+  if (spooler->GetNumberOfErrors() > 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to peek for %s",
+             file_to_peek.c_str());
+    return 2;
+  }
+  if (!success) {
+    LogCvmfs(kLogCatalog, kLogStdout, "%s not found", file_to_peek.c_str());
+    return 1;
+  }
+  LogCvmfs(kLogCatalog, kLogStdout, "%s available", file_to_peek.c_str());
+  return 0;
+}
+
+
+int swissknife::CommandRemove::Main(const ArgumentList &args) {
+  const string file_to_delete     = *args.find('o')->second;
+  const string spooler_definition = *args.find('r')->second;
+
+  const upload::SpoolerDefinition sd(spooler_definition);
+  upload::Spooler *spooler = upload::Spooler::Construct(sd);
+  assert(spooler);
+  const bool success = spooler->Remove(file_to_delete);
+  spooler->WaitForTermination();
+  if (spooler->GetNumberOfErrors() > 0 || ! success) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
+             file_to_delete.c_str());
+    return 1;
+  }
+
+  return 0;
+}
+
+
+struct chunk_arg {
+  chunk_arg(char param, size_t *save_to) : param(param), save_to(save_to) {}
+  char    param;
+  size_t *save_to;
+};
+
+bool swissknife::CommandSync::ReadFileChunkingArgs(
+                                          const swissknife::ArgumentList &args,
+                                          SyncParameters &params) {
+  typedef std::vector<chunk_arg> ChunkArgs;
+
+  // define where to store the value of which file chunk argument
+  ChunkArgs chunk_args;
+  chunk_args.push_back(chunk_arg('a', &params.avg_file_chunk_size));
+  chunk_args.push_back(chunk_arg('l', &params.min_file_chunk_size));
+  chunk_args.push_back(chunk_arg('h', &params.max_file_chunk_size));
+
+  // read the arguments
+  ChunkArgs::const_iterator i    = chunk_args.begin();
+  ChunkArgs::const_iterator iend = chunk_args.end();
+  for (; i != iend; ++i) {
+    swissknife::ArgumentList::const_iterator arg = args.find(i->param);
+
+    if (arg != args.end()) {
+      size_t arg_value = static_cast<size_t>(String2Uint64(*arg->second));
+      if (arg_value > 0) *i->save_to = arg_value;
+      else return false;
+    }
+  }
+
+  // check if argument values are sane
+  return true;
+}
+
+
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
-	SyncParameters params;
+  SyncParameters params;
 
   // Initialization
   params.dir_union = MakeCanonicalPath(*args.find('u')->second);
@@ -143,6 +229,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;
+  if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
+  if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -153,11 +241,28 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
 
-	if (!CheckParams(&params)) return 2;
+  if (args.find('p') != args.end()) {
+    params.use_file_chunking = true;
+    if (!ReadFileChunkingArgs(args, params)) {
+      PrintError("Failed to read file chunk size values");
+      return 2;
+    }
+  }
+
+  if (!CheckParams(params)) return 2;
 
   // Start spooler
-  params.spooler = upload::MakeSpoolerEnsemble(params.spooler_definition);
-  download::Init(1);
+  const upload::SpoolerDefinition spooler_definition(
+    params.spooler_definition,
+    params.use_file_chunking,
+    params.min_file_chunk_size,
+    params.avg_file_chunk_size,
+    params.max_file_chunk_size);
+  params.spooler = upload::Spooler::Construct(spooler_definition);
+  if (NULL == params.spooler)
+    return 3;
+
+  download::Init(1, true);
 
   catalog::WritableCatalogManager
     catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
@@ -178,6 +283,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 4;
   }
 
+  // finalize the spooler
+  params.spooler->WaitForUpload();
+  params.spooler->WaitForTermination();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

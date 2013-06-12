@@ -27,7 +27,16 @@ static void ParseKeyvalMem(const unsigned char *buffer,
 
       if (line != "") {
         const string tail = (line.length() == 1) ? "" : line.substr(1);
-        (*content)[line[0]] = tail;
+        // Special handling of 'Z' key because it can exist multiple times
+        if (line[0] != 'Z') {
+          (*content)[line[0]] = tail;
+        } else {
+          if (content->find(line[0]) == content->end()) {
+            (*content)[line[0]] = tail;
+          } else {
+            (*content)[line[0]] = (*content)[line[0]] + "|" + tail;
+          }
+        }
       }
       line = "";
     } else {
@@ -103,6 +112,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   hash::Any micro_catalog_hash;
   string repository_name;
   hash::Any certificate;
+  hash::Any history;
   uint64_t publish_timestamp = 0;
 
   if ((iter = content.find('L')) != content.end())
@@ -111,12 +121,29 @@ Manifest *Manifest::Load(const map<char, string> &content) {
     repository_name = iter->second;
   if ((iter = content.find('X')) != content.end())
     certificate = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+  if ((iter = content.find('H')) != content.end())
+    history = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
 
+  // Z expands to a pipe-separated string of channel-hash pairs
+  vector<history::TagList::ChannelTag> channel_tops;
+  if ((iter = content.find('Z')) != content.end()) {
+    vector<string> elements = SplitString(iter->second, '|');
+    for (unsigned i = 0; i < elements.size(); ++i) {
+      assert(elements[i].length() > 2);
+      int channel_int = 16 * HexDigit2Int(elements[i][0]) +
+                        HexDigit2Int(elements[i][1]);
+      history::UpdateChannel channel =
+        static_cast<history::UpdateChannel>(channel_int);
+      channel_tops.push_back(history::TagList::ChannelTag(
+        channel, hash::Any(hash::kSha1, hash::HexPtr(elements[i].substr(2)))));
+    }
+  }
+
   return new Manifest(catalog_hash, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      publish_timestamp);
+                      history, publish_timestamp, channel_tops);
 }
 
 
@@ -145,8 +172,15 @@ string Manifest::ExportString() const {
     manifest += "N" + repository_name_ + "\n";
   if (!certificate_.IsNull())
     manifest += "X" + certificate_.ToString() + "\n";
+  if (!history_.IsNull())
+    manifest += "H" + history_.ToString() + "\n";
   if (publish_timestamp_ > 0)
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
+
+  for (unsigned i = 0; i < channel_tops_.size(); ++i) {
+    manifest += "Z" + StringifyByteAsHex(channel_tops_[i].channel) +
+                channel_tops_[i].root_hash.ToString() + "\n";
+  }
 
   return manifest;
 }

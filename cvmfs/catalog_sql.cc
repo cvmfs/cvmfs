@@ -25,7 +25,9 @@ const float Database::kLatestSupportedSchema = 2.4;  // + 1.X catalogs (r/o)
 const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
 
 
-Database::Database(const std::string filename, const OpenMode open_mode) {
+Database::Database(const std::string filename,
+                   const sqlite::DbOpenMode open_mode)
+{
   int retval;
 
   filename_ = filename;
@@ -35,11 +37,11 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
 
   int flags = SQLITE_OPEN_NOMUTEX;
   switch (open_mode) {
-    case kOpenReadOnly:
+    case sqlite::kDbOpenReadOnly:
       flags |= SQLITE_OPEN_READONLY;
       read_write_ = false;
       break;
-    case kOpenReadWrite:
+    case sqlite::kDbOpenReadWrite:
       flags |= SQLITE_OPEN_READWRITE;
       read_write_ = true;
       break;
@@ -59,6 +61,7 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
   sqlite3_extended_result_codes(sqlite_db_, 1);
 
   // Read-ahead into file system buffers
+  // TODO: mmap, re-readahead
   int fd_readahead = open(filename_.c_str(), O_RDONLY);
   if (fd_readahead < 0) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to open %s for read-ahead (%d)",
@@ -68,10 +71,10 @@ Database::Database(const std::string filename, const OpenMode open_mode) {
   }
   retval = platform_readahead(fd_readahead);
   if (retval != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to read-ahead %s (%d)",
-             filename_.c_str(), errno);
-    close(fd_readahead);
-    goto database_failure;
+    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn,
+             "failed to read-ahead %s (%d)", filename_.c_str(), errno);
+    //close(fd_readahead);
+    //goto database_failure;
   }
   close(fd_readahead);
 
@@ -241,7 +244,7 @@ bool Database::Create(const string &filename,
   sqlite3_close(sqlite_db);
   return true;
 
-create_schema_fail:
+ create_schema_fail:
   LogCvmfs(kLogSql, kLogVerboseMsg, "sql failure %s",
            sqlite3_errmsg(sqlite_db));
   sqlite3_close(sqlite_db);
@@ -250,85 +253,6 @@ create_schema_fail:
 
 std::string Database::GetLastErrorMsg() const {
   std::string msg = sqlite3_errmsg(sqlite_db_);
-  return msg;
-}
-
-
-//------------------------------------------------------------------------------
-
-
-Sql::Sql(const Database &database, const std::string &statement) {
-  Init(database.sqlite_db(), statement);
-}
-
-
-Sql::~Sql() {
-  last_error_code_ = sqlite3_finalize(statement_);
-
-  if (!Successful()) {
-    LogCvmfs(kLogSql, kLogDebug,
-             "failed to finalize statement - error code: %d", last_error_code_);
-  }
-  LogCvmfs(kLogSql, kLogDebug, "successfully finalized statement");
-}
-
-
-/**
- * Executes the prepared statement.
- * (this method should be used for modifying statements like DELETE or INSERT)
- * @return true on success otherwise false
- */
-bool Sql::Execute() {
-  last_error_code_ = sqlite3_step(statement_);
-  return Successful();
-}
-
-
-/**
- * Execute the prepared statement or fetch its next row.
- * This method is intended to step through the result set.
- * If it returns false this does not neccessarily mean, that the actual
- * statement execution failed, but that no row was fetched.
- * @return true if a new row was fetched otherwise false
- */
-bool Sql::FetchRow() {
-  last_error_code_ = sqlite3_step(statement_);
-  return SQLITE_ROW == last_error_code_;
-}
-
-
-/**
- * Reset a prepared statement to make it reusable.
- * @return true on success otherwise false
- */
-bool Sql::Reset() {
-  last_error_code_ = sqlite3_reset(statement_);
-  return Successful();
-}
-
-
-bool Sql::Init(const sqlite3 *database, const std::string &statement) {
-  last_error_code_ = sqlite3_prepare_v2((sqlite3*)database,
-                                        statement.c_str(),
-                                        -1, // parse until null termination
-                                        &statement_,
-                                        NULL);
-
-  if (!Successful()) {
-    LogCvmfs(kLogSql, kLogDebug, "failed to prepare statement '%s' (%d: %s)",
-             statement.c_str(), GetLastError(),
-             sqlite3_errmsg((sqlite3*)database));
-    return false;
-  }
-
-  LogCvmfs(kLogSql, kLogDebug, "successfully prepared statement '%s'",
-           statement.c_str());
-  return true;
-}
-
-std::string Sql::GetLastErrorMsg() const {
-  sqlite3* db     = sqlite3_db_handle(statement_);
-  std::string msg = sqlite3_errmsg(db);
   return msg;
 }
 
@@ -350,6 +274,9 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
     database_flags |= kFlagFile | kFlagLink;
   else
     database_flags |= kFlagFile;
+
+  if (entry.IsChunkedFile())
+    database_flags |= kFlagFileChunk;
 
   return database_flags;
 }
@@ -375,7 +302,7 @@ uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
 void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
   const char *c = raw_symlink->GetChars();
   const char *cEnd = c+raw_symlink->GetLength();
-  for (; c <= cEnd; ++c) {
+  for (; c < cEnd; ++c) {
     if (*c == '$')
       goto expand_symlink;
   }
@@ -383,17 +310,18 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
 
  expand_symlink:
   LinkString result;
-  for (; c <= cEnd; ++c) {
+  for (c = raw_symlink->GetChars(); c < cEnd; ++c) {
     if ((*c == '$') && (c < cEnd-2) && (*(c+1) == '(')) {
       c += 2;
       const char *rpar = c;
-      while (rpar <= cEnd) {
+      while (rpar < cEnd) {
         if (*rpar == ')')
           goto expand_symlink_getenv;
         rpar++;
       }
       // right parenthesis missing
       result.Append("$(", 2);
+      result.Append(c, 1);
       continue;
 
      expand_symlink_getenv:
@@ -404,7 +332,7 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
       const char *environ_value = getenv(environ_var);  // Don't free!
       if (environ_value)
         result.Append(environ_value, strlen(environ_value));
-      c = rpar+1;
+      c = rpar;
       continue;
     }
     result.Append(c, 1);
@@ -484,6 +412,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
   const unsigned database_flags = RetrieveInt(5);
   result.catalog_ = (Catalog*)catalog;
+  //result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
@@ -494,19 +423,22 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
 
   // retrieve the hardlink information from the hardlinks database field
-  const uint64_t hardlinks = RetrieveInt64(1);
-  result.linkcount_ = Hardlinks2Linkcount(hardlinks);
-  result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
-
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
+    result.linkcount_ = 1;
+    result.hardlink_group_ = 0;
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
     result.uid_ = g_uid;
     result.gid_ = g_gid;
+    result.is_chunked_file_ = false;
   } else {
+    const uint64_t hardlinks = RetrieveInt64(1);
+    result.linkcount_ = Hardlinks2Linkcount(hardlinks);
+    result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
     result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
                                                          result.hardlink_group_);
     result.uid_ = RetrieveInt64(13);
     result.gid_ = RetrieveInt64(14);
+    result.is_chunked_file_ = (database_flags & kFlagFileChunk);
   }
   result.mode_ = RetrieveInt(3);
   result.size_ = RetrieveInt64(2);
@@ -748,9 +680,77 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
+SqlChunkInsert::SqlChunkInsert(const Database &database) {
+  const string statememt =
+    "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
+    //                       1          2        3      4     5
+    "VALUES (:md5_1, :md5_2, :offset, :size, :hash);";
+  Init(database.sqlite_db(), statememt);
+}
+
+
+bool SqlChunkInsert::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
+  return
+    BindInt64(3,    chunk.offset())       &&
+    BindInt64(4,    chunk.size())         &&
+    BindSha1Blob(5, chunk.content_hash());
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlChunksRemove::SqlChunksRemove(const Database &database) {
+  const string statement =
+    "DELETE FROM chunks "
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlChunksRemove::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlChunksListing::SqlChunksListing(const Database &database) {
+  const string statement =
+    "SELECT offset, size, hash FROM chunks "
+    //         0      1     2
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2) "
+    //                    1                          2
+    "ORDER BY offset ASC;";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlChunksListing::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+FileChunk SqlChunksListing::GetFileChunk() const {
+  return FileChunk(RetrieveSha1Blob(2),
+                   RetrieveInt64(0),
+                   RetrieveInt64(1));
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
+
 
 uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
   return RetrieveInt64(0) >> 32;

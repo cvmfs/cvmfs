@@ -25,7 +25,9 @@ case "$1" in
         mkdir -p /cvmfs
         getent group cvmfs >/dev/null || getent passwd cvmfs > /dev/null || \
         adduser --system --group --no-create-home --home /cvmfs cvmfs
-        /usr/bin/cvmfs_config reload
+        if [ -d /var/run/cvmfs ]; then
+          /usr/bin/cvmfs_config reload
+        fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
