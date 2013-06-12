@@ -11,9 +11,6 @@ using namespace catalog;
 void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
   if (dirent.IsRegular()) {
     self.regular_files += delta;
-    if (dirent.IsChunkedFile()) {
-      self.chunked_files += delta;
-    }
   }
   else if (dirent.IsLink())
     self.symlinks += delta;
