@@ -40,6 +40,7 @@ set (CVMFS_CLIENT_SOURCES
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
+  catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   directory_entry.h directory_entry.cc
   shortstring.h
   file_chunk.h file_chunk.cc
@@ -122,6 +123,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_rw.h catalog_rw.cc
   catalog_mgr.h catalog_mgr.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
+  catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   history.h history.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
