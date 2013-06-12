@@ -698,7 +698,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
     if (cache_mode_ == kCacheReadWrite) {
       size = GetFileSize(catalog_path->c_str());
       assert(size > 0);
-      pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path);
+      pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
       if (!pin_retval) {
         quota::Remove(hash);
         unlink(catalog_path->c_str());
@@ -749,7 +749,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
   }
 
   // Instead of commit, manually rename and pin, otherwise there is a race
-  pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path);
+  pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
   if (!pin_retval) {
     AbortTransaction(temp_path);
     return catalog::kLoadNoSpace;
@@ -832,7 +832,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
           int64_t size = GetFileSize(*catalog_path);
           assert(size >= 0);
           retval = quota::Pin(cache_hash, uint64_t(size),
-                              cvmfs_path);
+                              cvmfs_path, true);
           if (!retval) {
             LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                      "failed to pin cached root catalog");
@@ -861,7 +861,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
         int64_t size = GetFileSize(*catalog_path);
         assert(size >= 0);
         retval = quota::Pin(cache_hash, uint64_t(size),
-                            cvmfs_path);
+                            cvmfs_path, true);
         if (!retval) {
           LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                    "failed to pin cached root catalog");

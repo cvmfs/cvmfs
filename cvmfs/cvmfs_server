@@ -1993,7 +1993,7 @@ migrate_2_1_7() {
   sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
 
   echo "--> adjusting /etc/fstab"
-  sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
+  sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
   if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
     echo "Failed!"
     false

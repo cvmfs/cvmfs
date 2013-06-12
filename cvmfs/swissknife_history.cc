@@ -58,7 +58,7 @@ static bool GetHistoryDbHash(const string &repository_url,
   // right history file
   if (expected_root_hash != manifest->catalog_hash()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "wrong manifest, expected catalg %s, found catalog %s",
+             "wrong manifest, expected catalog %s, found catalog %s",
              expected_root_hash.ToString().c_str(),
              manifest->catalog_hash().ToString().c_str());
     return false;
