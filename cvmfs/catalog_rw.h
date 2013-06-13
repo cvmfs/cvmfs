@@ -147,7 +147,8 @@ class WritableCatalog : public Catalog {
 typedef std::vector<WritableCatalog *> WritableCatalogList;
 
 WritableCatalog *AttachFreelyRw(const std::string &root_path,
-                                const std::string &file);
+                                const std::string &file,
+                                const hash::Any   &catalog_hash);
 
 }  // namespace catalog
 

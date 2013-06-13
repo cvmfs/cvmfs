@@ -37,9 +37,11 @@ WritableCatalog::WritableCatalog(const string     &path,
 }
 
 
-WritableCatalog *AttachFreelyRw(const string &root_path, const string &file) {
+WritableCatalog *AttachFreelyRw(const string     &root_path,
+                                const string     &file,
+                                const hash::Any  &catalog_hash) {
   WritableCatalog *catalog =
-    new WritableCatalog(root_path, NULL);
+    new WritableCatalog(root_path, catalog_hash, NULL);
   bool retval = catalog->OpenDatabase(file);
   if (!retval) {
     delete catalog;
