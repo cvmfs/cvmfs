@@ -25,6 +25,7 @@ cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
 cvmfs_setup_log="${cvmfs_workspace}/setup.log"
 cvmfs_run_log="${cvmfs_workspace}/run.log"
 cvmfs_test_log="${cvmfs_workspace}/test.log"
+cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
 
 # global variables for external script parameters
 platform_run_script=""
@@ -34,6 +35,7 @@ client_package=""
 old_client_package="notprovided"
 keys_package=""
 source_tarball=""
+unittest_package=""
 ami_name=""
 log_destination="."
 
@@ -63,6 +65,7 @@ usage() {
   echo " -s <cvmfs server package>  CernVM-FS server package to be tested"
   echo " -c <cvmfs client package>  CernVM-FS client package to be tested"
   echo " -t <cvmfs source tarball>  CernVM-FS sources containing associated tests"
+  echo " -g <cvmfs tests package>   CernVM-FS unit tests package"
   echo " -k <cvmfs keys package>    CernVM-FS public keys package"
   echo " -b <setup script>          platform specific setup script (inside the tarball)"
   echo " -r <run script>            platform specific test script (inside the tarball)"
@@ -199,6 +202,7 @@ setup_virtual_machine() {
       -c $client_package                                 \
       -o $old_client_package                             \
       -t $source_tarball                                 \
+      -g $unittest_package                               \
       -k $keys_package                                   \
       -r $platform_setup_script
   check_retcode $?
@@ -247,6 +251,7 @@ get_test_results() {
   local retval_run_log
   local retval_test_log
   local retval_setup_log
+  local retval_unittest_log
 
   echo -n "retrieving test results... "
   retrieve_file_from_virtual_machine                  \
@@ -264,10 +269,16 @@ get_test_results() {
       $cvmfs_setup_log                                \
       ${log_destination}/$(basename $cvmfs_setup_log)
   retval_setup_log=$?
+  retrieve_file_from_virtual_machine                  \
+      $ip                                             \
+      $cvmfs_unittest_log                             \
+      ${log_destination}/$(basename $cvmfs_unittest_log)
+  retval_unittest_log=$?
 
-  [ $retval_test_log  -eq 0 ] && \
-  [ $retval_run_log   -eq 0 ] && \
-  [ $retval_setup_log -eq 0 ]
+  [ $retval_test_log     -eq 0 ] && \
+  [ $retval_run_log      -eq 0 ] && \
+  [ $retval_setup_log    -eq 0 ] && \
+  [ $retval_unittest_log -eq 0 ]
   check_retcode $?
 }
 
@@ -277,7 +288,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:s:c:o:t:k:a:d:" option; do
+while getopts "r:b:s:c:o:t:g:k:a:d:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -296,6 +307,9 @@ while getopts "r:b:s:c:o:t:k:a:d:" option; do
       ;;
     t)
       source_tarball=$OPTARG
+      ;;
+    g)
+      unittest_package=$OPTARG
       ;;
     k)
       keys_package=$OPTARG
@@ -320,6 +334,7 @@ if [ x$platform_run_script   = "x" ] ||
    [ x$client_package        = "x" ] ||
    [ x$keys_package          = "x" ] ||
    [ x$source_tarball        = "x" ] ||
+   [ x$unittest_package      = "x" ] ||
    [ x$ami_name              = "x" ]; then
   usage "Missing parameter(s)"
 fi
