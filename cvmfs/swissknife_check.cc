@@ -294,6 +294,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       FileChunkList chunks;
       catalog->ListFileChunks(full_path, &chunks);
 
+      computed_counters->self.chunked_files++;
+      computed_counters->self.number_of_file_chunks += chunks.size();
+
       // do we find file chunks for the chunked file in this catalog?
       if (chunks.size() == 0) {
         LogCvmfs(kLogCvmfs, kLogStderr, "no file chunks found for big file %s",
