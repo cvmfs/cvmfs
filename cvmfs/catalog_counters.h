@@ -30,7 +30,7 @@ class TreeCountersBase {
   template<typename T>
   struct Fields {
     Fields() : regular_files(0), symlinks(0), directories(0),
-               nested_catalogs(0), chunked_files(0), number_of_file_chunks(0) {}
+               nested_catalogs(0), chunked_files(0), file_chunks(0) {}
 
     template<typename U>
     void Add(const U &other) {
@@ -44,12 +44,12 @@ class TreeCountersBase {
 
     template<typename U, int factor>
     void Combine(const U &other) {
-      regular_files         += factor * other.regular_files;
-      symlinks              += factor * other.symlinks;
-      directories           += factor * other.directories;
-      nested_catalogs       += factor * other.nested_catalogs;
-      chunked_files         += factor * other.chunked_files;
-      number_of_file_chunks += factor * other.number_of_file_chunks;
+      regular_files     += factor * other.regular_files;
+      symlinks          += factor * other.symlinks;
+      directories       += factor * other.directories;
+      nested_catalogs   += factor * other.nested_catalogs;
+      chunked_files     += factor * other.chunked_files;
+      file_chunks += factor * other.file_chunks;
     }
 
     void FillFieldsMap(FieldsMap &map, const std::string &prefix) const {
@@ -58,7 +58,7 @@ class TreeCountersBase {
       map[prefix + "dir"]     = &directories;
       map[prefix + "nested"]  = &nested_catalogs;
       map[prefix + "chunked"] = &chunked_files;
-      map[prefix + "chunks"]  = &number_of_file_chunks;
+      map[prefix + "chunks"]  = &file_chunks;
     }
 
     T regular_files;
@@ -66,7 +66,7 @@ class TreeCountersBase {
     T directories;
     T nested_catalogs;
     T chunked_files;
-    T number_of_file_chunks;
+    T file_chunks;
   };
 
  public:

@@ -231,7 +231,7 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
            chunk.offset(),
            chunk.offset() + chunk.size());
 
-  delta_counters_.self.number_of_file_chunks++;
+  delta_counters_.self.file_chunks++;
 
   bool retval =
     sql_chunk_insert_->BindPathHash(path_hash) &&
@@ -256,7 +256,7 @@ void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
     sql_chunks_count_->Execute();
   assert(retval);
   const int chunks_count = sql_chunks_count_->GetChunkCount();
-  delta_counters_.self.number_of_file_chunks -= chunks_count;
+  delta_counters_.self.file_chunks -= chunks_count;
   sql_chunks_count_->Reset();
 
   // remove the chunks associated to `entry_path`
