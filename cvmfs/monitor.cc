@@ -292,6 +292,9 @@ static string GenerateStackTrace(const string &exe_path,
  * Generates useful information from the backtrace log in the pipe.
  */
 static string ReportStacktrace() {
+  // Re-activate µSyslog, if necessary
+  SetLogMicroSyslog(GetLogMicroSyslog());
+
   CrashData crash_data;
   if (!pipe_watchdog_->Read(&crash_data)) {
     return "failed to read crash data (" + StringifyInt(errno) + ")";

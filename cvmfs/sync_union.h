@@ -45,139 +45,143 @@ class SyncMediator;
  */
 class SyncUnion {
  public:
- 	/**
- 	 * @param rdonly_path the absolute path to the mounted cvmfs repository
- 	 * @param union_path the absolute path to the mounted union file system volume
- 	 * @param scratch_path the absolute path to the read write branch attached to
+  /**
+   * @param rdonly_path the absolute path to the mounted cvmfs repository
+   * @param union_path the absolute path to the mounted union file system volume
+   * @param scratch_path the absolute path to the read write branch attached to
    *        the union file system
- 	 * @param mediator a reference to a SyncMediator object used as bridge to
+   * @param mediator a reference to a SyncMediator object used as bridge to
    *        the actual sync process
- 	 */
- 	SyncUnion(SyncMediator *mediator,
- 	          const std::string &rdonly_path,
+   */
+  SyncUnion(SyncMediator *mediator,
+            const std::string &rdonly_path,
             const std::string &union_path,
             const std::string &scratch_path);
- 	virtual ~SyncUnion() {}
+  virtual ~SyncUnion() {}
 
-	/**
-	 * Main routine, process scratch space
-	 */
-	virtual void Traverse() = 0;
+  /**
+   * Main routine, process scratch space
+   */
+  virtual void Traverse() = 0;
 
-	inline std::string rdonly_path() const { return rdonly_path_; }
-	inline std::string union_path() const { return union_path_; }
-	inline std::string scratch_path() const { return scratch_path_; }
+  inline std::string rdonly_path() const { return rdonly_path_; }
+  inline std::string union_path() const { return union_path_; }
+  inline std::string scratch_path() const { return scratch_path_; }
 
-	/**
-	 * Whiteout files may have special naming conventions.
-	 * This method "unmangles" them and retrieves the original file name
-	 * @param filename the filename as in the scratch directory
-	 * @return the original filename of the scratched out file in CVMFS repository
-	 */
-	virtual std::string UnwindWhiteoutFilename(const std::string &filename)
-    const = 0;
+  /**
+   * Whiteout files may have special naming conventions.
+   * This method "unmangles" them and retrieves the original file name
+   * @param filename the filename as in the scratch directory
+   * @return the original filename of the scratched out file in CVMFS repository
+   */
+  virtual std::string UnwindWhiteoutFilename(const std::string &filename)
+          const = 0;
 
-	/**
-	 * Union file systems use opaque directories to fully support rmdir
-	 * e.g:   $ rm -rf directory
-	 *        $ mkdir directory
-	 * This would produce an opaque directory whose contents are NOT merged with
+  /**
+   * Union file systems use opaque directories to fully support rmdir
+   * e.g:   $ rm -rf directory
+   *        $ mkdir directory
+   * This would produce an opaque directory whose contents are NOT merged with
    * the underlying directory in the read-only branch
-	 * @param directory the directory to check for opacity
-	 * @return true if directory is opaque, otherwise false
-	 */
-	virtual bool IsOpaqueDirectory(const SyncItem &directory) const = 0;
+   * @param directory the directory to check for opacity
+   * @return true if directory is opaque, otherwise false
+   */
+  virtual bool IsOpaqueDirectory(const SyncItem &directory) const = 0;
 
-	/**
-	 * Checks if given file is supposed to be whiteout.
-	 * These files indicate that a specific file has been deleted.
-	 * @param filename the filename to check
-	 * @return true if filename seems to be whiteout otherwise false
-	 */
-	virtual bool IsWhiteoutEntry(const SyncItem &entry) const = 0;
+  /**
+   * Checks if given file is supposed to be whiteout.
+   * These files indicate that a specific file has been deleted.
+   * @param filename the filename to check
+   * @return true if filename seems to be whiteout otherwise false
+   */
+  virtual bool IsWhiteoutEntry(const SyncItem &entry) const = 0;
 
-	/**
-	 * Union file systems may use some special files for bookkeeping.
-	 * They must not show up in to repository and are ignored by the recursion.
-	 * @return a set of filenames to be ignored
-	 */
-	virtual std::set<std::string> GetIgnoreFilenames() const = 0;
+  /**
+   * Union file systems may use some special files for bookkeeping.
+   * They must not show up in to repository and are ignored by the recursion.
+   * @param parent directory in which file resides
+   * @param filename to decide whether to ignore or not
+   * @return true if file should be ignored, othewise false
+   */
+  virtual bool IgnoreFilePredicate(const std::string &parent_dir,
+                                   const std::string &filename) = 0;
 
  protected:
   std::string rdonly_path_;
   std::string scratch_path_;
-	std::string union_path_;
+  std::string union_path_;
 
-	SyncMediator *mediator_;
+  SyncMediator *mediator_;
 
-	/**
-	 * Callback when a regular file is found.
-	 * @param parent_dir the relative directory path
-	 * @param filename the filename
-	 */
-	virtual void ProcessRegularFile(const std::string &parent_dir,
+  /**
+   * Callback when a regular file is found.
+   * @param parent_dir the relative directory path
+   * @param filename the filename
+   */
+  virtual void ProcessRegularFile(const std::string &parent_dir,
 	                                const std::string &filename);
 
-	/**
-	 * Callback when a directory is found.
-	 * @param parent_dir the relative directory path
-	 * @param dir_name the filename
-	 * @return true if file system traversal should branch into
+  /**
+   * Callback when a directory is found.
+   * @param parent_dir the relative directory path
+   * @param dir_name the filename
+   * @return true if file system traversal should branch into
    *         the given directory, false otherwise
-	 */
-	virtual bool ProcessDirectory(const std::string &parent_dir,
- 	                              const std::string &dir_name);
+   */
+  virtual bool ProcessDirectory(const std::string &parent_dir,
+                                const std::string &dir_name);
 
-	/**
-	 * Callback when a symlink is found.
-	 * @param parent_dir the relative directory path
-	 * @param link_name the filename
-	 */
-	virtual void ProcessSymlink(const std::string &parent_dir,
- 	                            const std::string &link_name);
+  /**
+   * Callback when a symlink is found.
+   * @param parent_dir the relative directory path
+   * @param link_name the filename
+   */
+  virtual void ProcessSymlink(const std::string &parent_dir,
+                              const std::string &link_name);
 
-	/**
-	 * Called if the file system traversal enters a directory for processing.
+  /**
+   * Called if the file system traversal enters a directory for processing.
    * @param parent_dir the relative directory path.
-	 */
-	virtual void EnterDirectory(const std::string &parent_dir,
- 	                            const std::string &dir_name);
+   */
+  virtual void EnterDirectory(const std::string &parent_dir,
+                              const std::string &dir_name);
 
 
   /**
-	 * Called before the file system traversal leaves a processed directory.
-	 * @param parent_dir the relative directory path.
-	 */
-	virtual void LeaveDirectory(const std::string &parent_dir,
- 	                            const std::string &dir_name);
+   * Called before the file system traversal leaves a processed directory.
+   * @param parent_dir the relative directory path.
+   */
+  virtual void LeaveDirectory(const std::string &parent_dir,
+                              const std::string &dir_name);
 
  private:
-   void ProcessFile(SyncItem &entry);
+  void ProcessFile(SyncItem &entry);
 };  // class SyncUnion
 
 
 /**
- * Syncing a CVMFS repository by the help of an overlayed AUFS 1.x
+ * Syncing a CVMFS repository by the help of an overlayed AUFS
  * read-write volume.
  */
 class SyncUnionAufs : public SyncUnion {
  public:
-	SyncUnionAufs(SyncMediator *mediator,
-  	            const std::string &rdonly_path,
-  	            const std::string &union_path,
+  SyncUnionAufs(SyncMediator *mediator,
+                const std::string &rdonly_path,
+                const std::string &union_path,
                 const std::string &scratch_path);
 
-	void Traverse();
+  void Traverse();
 
  protected:
-	bool IsWhiteoutEntry(const SyncItem &entry) const;
-	bool IsOpaqueDirectory(const SyncItem &directory) const;
-	std::string UnwindWhiteoutFilename(const std::string &filename) const;
-	std::set<std::string> GetIgnoreFilenames() const;
+  bool IsWhiteoutEntry(const SyncItem &entry) const;
+  bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IgnoreFilePredicate(const std::string &parent_dir,
+                           const std::string &filename);
+  std::string UnwindWhiteoutFilename(const std::string &filename) const;
 
  private:
-	std::set<std::string> ignore_filenames_;
-	std::string whiteout_prefix_;
+  std::set<std::string> ignore_filenames_;
+  std::string whiteout_prefix_;
 };  // class SyncUnionAufs
 
 }  // namespace publish
