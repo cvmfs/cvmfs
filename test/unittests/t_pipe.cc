@@ -118,16 +118,3 @@ TEST_F(T_Pipe, ReadRaw) {
 
   EXPECT_EQ (0, strncmp(data, res_data, data_length)) << "Data did not match";
 }
-
-
-TEST_F(T_Pipe, StdString) {
-  const std::string foo = "Just a usual string...";
-
-  bool retval;
-  retval = pipe.Write(foo); EXPECT_TRUE (retval);
-
-  std::string ret_string;
-  retval = pipe.Read(&ret_string); EXPECT_TRUE (retval);
-
-  EXPECT_EQ (foo, ret_string);
-}
