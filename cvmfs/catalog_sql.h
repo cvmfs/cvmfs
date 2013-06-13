@@ -467,6 +467,17 @@ class SqlUpdateCounter : public Sql {
 //------------------------------------------------------------------------------
 
 
+class SqlCreateCounter : public Sql {
+ public:
+  SqlCreateCounter(const Database &database);
+  bool BindCounter(const std::string &counter);
+  bool BindInitialValue(const int64_t value);
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlAllChunks : public Sql {
  public:
   SqlAllChunks(const Database &database);

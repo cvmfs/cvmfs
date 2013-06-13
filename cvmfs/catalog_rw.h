@@ -131,7 +131,7 @@ class WritableCatalog : public Catalog {
   void CopyToParent();
   void CopyCatalogsToParent();
 
-  void UpdateCounters();
+  void UpdateCounters() const;
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
