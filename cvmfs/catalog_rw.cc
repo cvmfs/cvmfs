@@ -82,6 +82,7 @@ void WritableCatalog::InitPreparedStatements() {
   sql_update_        = new SqlDirentUpdate     (database());
   sql_chunk_insert_  = new SqlChunkInsert      (database());
   sql_chunks_remove_ = new SqlChunksRemove     (database());
+  sql_chunks_count_  = new SqlChunksCount      (database());
   sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
   sql_inc_linkcount_ = new SqlIncLinkcount     (database());
 }
@@ -96,6 +97,7 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_update_;
   delete sql_chunk_insert_;
   delete sql_chunks_remove_;
+  delete sql_chunks_count_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
 }
@@ -164,11 +166,7 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
 
   // if the entry used to be a chunked file... remove the chunks
   if (entry.IsChunkedFile()) {
-    retval =
-      sql_chunks_remove_->BindPathHash(path_hash) &&
-      sql_chunks_remove_->Execute();
-    assert(retval);
-    sql_chunks_remove_->Reset();
+    RemoveFileChunks(file_path);
   }
 
   // remove the entry itself
@@ -235,12 +233,40 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
            chunk.offset(),
            chunk.offset() + chunk.size());
 
+  delta_counters_.self.number_of_file_chunks++;
+
   bool retval =
     sql_chunk_insert_->BindPathHash(path_hash) &&
     sql_chunk_insert_->BindFileChunk(chunk) &&
     sql_chunk_insert_->Execute();
   assert(retval);
   sql_chunk_insert_->Reset();
+}
+
+
+/**
+ * Removes the file chunks for a given file path
+ * @param entry_path   the file path to clear from it's file chunks
+ */
+void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
+  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
+  bool retval;
+
+  // subtract the number of chunks from the statistics counters
+  retval =
+    sql_chunks_count_->BindPathHash(path_hash)  &&
+    sql_chunks_count_->Execute();
+  assert(retval);
+  const int chunks_count = sql_chunks_count_->GetChunkCount();
+  delta_counters_.self.number_of_file_chunks -= chunks_count;
+  sql_chunks_count_->Reset();
+
+  // remove the chunks associated to `entry_path`
+  retval =
+    sql_chunks_remove_->BindPathHash(path_hash) &&
+    sql_chunks_remove_->Execute();
+  assert(retval);
+  sql_chunks_remove_->Reset();
 }
 
 
