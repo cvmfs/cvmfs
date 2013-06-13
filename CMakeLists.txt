@@ -20,6 +20,16 @@ set (CernVM-FS_VERSION_MINOR 1)
 set (CernVM-FS_VERSION_PATCH 12)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
+set (CVMFS_CONF_DIR etc)
+# Special exception if prefix is /usr so we don't make a /usr/etc.
+string(COMPARE EQUAL ${CMAKE_INSTALL_PREFIX} "/usr" isusr)
+if(isusr)
+  set(SYSCONFDIR          "/${GR_CONF_DIR}" CACHE PATH "System configuration directory")
+else(isusr)
+  set(SYSCONFDIR          "${CMAKE_INSTALL_PREFIX}/${CVMFS_CONF_DIR}" CACHE PATH "System configuration directory")
+endif(isusr)
+set(SYSCONFDIR          "${CMAKE_INSTALL_PREFIX}/${CVMFS_CONF_DIR}" CACHE PATH "System configuration directory")
+
 #
 # set the path where cmake looks for additional modules
 #

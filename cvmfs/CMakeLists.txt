@@ -453,7 +453,7 @@ if (BUILD_SERVER)
 
         install(
                 FILES           cvmfs_server_hooks.sh.demo
-                DESTINATION     "/etc/cvmfs"
+                DESTINATION     "${SYSCONFDIR}/cvmfs"
                 PERMISSIONS     OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
         )
 
