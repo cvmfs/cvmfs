@@ -164,6 +164,14 @@ namespace upload
                  const bool         allow_chunking = true);
 
     /**
+     * Convenience wrapper to process a catalog file. Please always use this
+     * for catalog processing. It will add special flags and hash suffixes
+     *
+     * @param local_path  the location of the catalog file to be processed
+     */
+    void ProcessCatalog(const std::string &local_path);
+
+    /**
      * Deletes the given file from the repository backend storage. This is done
      * synchronous, in any case.
      *

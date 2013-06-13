@@ -17,8 +17,12 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
-  Catalog(PathString(path.data(), path.length()), parent),
+WritableCatalog::WritableCatalog(const string     &path,
+                                 const hash::Any  &catalog_hash,
+                                 Catalog          *parent) :
+  Catalog(PathString(path.data(), path.length()),
+          catalog_hash, // Caution: this might be 0 for a newly created catalog!
+          parent),
   sql_insert_(NULL),
   sql_unlink_(NULL),
   sql_touch_(NULL),
@@ -29,7 +33,7 @@ WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   sql_inc_linkcount_(NULL),
   dirty_(false)
 {
-  read_only_ =false;
+  read_only_ = false;
 }
 
 
@@ -566,7 +570,6 @@ void WritableCatalog::CopyToParent() {
   // Update hardlink group IDs in this nested catalog.
   // To avoid collisions we add the maximal present hardlink group ID in parent
   // to all hardlink group IDs in the nested catalog.
-  // (CAUTION: hardlink group ID is saved in the inode field --> legacy :-) )
   const uint64_t offset = static_cast<uint64_t>(parent->GetMaxLinkId()) << 32;
   const string update_link_ids =
     "UPDATE catalog SET hardlinks = hardlinks + " + StringifyInt(offset) +
@@ -619,81 +622,37 @@ void WritableCatalog::CopyToParent() {
 /**
  * Writes delta_counters_ to the database.
  */
-void WritableCatalog::UpdateCounters() {
+void WritableCatalog::UpdateCounters() const {
+  const DeltaCounters &d = delta_counters_;
   SqlUpdateCounter sql_counter(database());
-  bool retval;
+  const bool retval =
+    UpdateCounter(sql_counter, "self_regular",    d.d_self_regular)    &&
+    UpdateCounter(sql_counter, "self_symlink",    d.d_self_symlink)    &&
+    UpdateCounter(sql_counter, "self_dir",        d.d_self_dir)        &&
+    UpdateCounter(sql_counter, "self_nested",     d.d_self_nested)     &&
+    UpdateCounter(sql_counter, "subtree_regular", d.d_subtree_regular) &&
+    UpdateCounter(sql_counter, "subtree_symlink", d.d_subtree_symlink) &&
+    UpdateCounter(sql_counter, "subtree_dir",     d.d_subtree_dir)     &&
+    UpdateCounter(sql_counter, "subtree_nested",  d.d_subtree_nested);
 
-  if (delta_counters_.d_self_regular != 0) {
-    retval =
-      sql_counter.BindCounter("self_regular") &&
-      sql_counter.BindDelta(delta_counters_.d_self_regular) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
+  assert(retval);
+}
 
-  if (delta_counters_.d_self_symlink != 0) {
-    retval =
-      sql_counter.BindCounter("self_symlink") &&
-      sql_counter.BindDelta(delta_counters_.d_self_symlink) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
 
-  if (delta_counters_.d_self_dir != 0) {
-    retval =
-      sql_counter.BindCounter("self_dir") &&
-      sql_counter.BindDelta(delta_counters_.d_self_dir) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
+bool WritableCatalog::UpdateCounter(      SqlUpdateCounter &sql,
+                                    const std::string      &counter_name,
+                                    const int64_t           delta) const {
+  if (delta == 0)
+    return true;
 
-  if (delta_counters_.d_self_nested != 0) {
-    retval =
-      sql_counter.BindCounter("self_nested") &&
-      sql_counter.BindDelta(delta_counters_.d_self_nested) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
+  const bool retval =
+    sql.BindCounter(counter_name) &&
+    sql.BindDelta(delta)          &&
+    sql.Execute();
+  if (!retval) return false;
+  sql.Reset();
 
-  if (delta_counters_.d_subtree_regular != 0) {
-    retval =
-      sql_counter.BindCounter("subtree_regular") &&
-      sql_counter.BindDelta(delta_counters_.d_subtree_regular) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
-
-  if (delta_counters_.d_subtree_symlink != 0) {
-    retval =
-      sql_counter.BindCounter("subtree_symlink") &&
-      sql_counter.BindDelta(delta_counters_.d_subtree_symlink) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
-
-  if (delta_counters_.d_subtree_dir != 0) {
-    retval =
-      sql_counter.BindCounter("subtree_dir") &&
-      sql_counter.BindDelta(delta_counters_.d_subtree_dir) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
-
-  if (delta_counters_.d_subtree_nested != 0) {
-    retval =
-      sql_counter.BindCounter("subtree_nested") &&
-      sql_counter.BindDelta(delta_counters_.d_subtree_nested) &&
-      sql_counter.Execute();
-    assert(retval);
-    sql_counter.Reset();
-  }
+  return true;
 }
 
 }  // namespace catalog

@@ -39,7 +39,19 @@ void DeltaCounters::DeltaDirent(const DirectoryEntry &dirent, const int delta) {
 }
 
 
-void DeltaCounters::PopulateToParent(DeltaCounters *parent) {
+void DeltaCounters::InitWithCounters(const Counters &counters) {
+  d_self_regular    = counters.self_regular;
+  d_self_symlink    = counters.self_symlink;
+  d_self_dir        = counters.self_dir;
+  d_self_nested     = counters.self_nested;
+  d_subtree_regular = counters.subtree_regular;
+  d_subtree_symlink = counters.subtree_symlink;
+  d_subtree_dir     = counters.subtree_dir;
+  d_subtree_nested  = counters.subtree_nested;
+}
+
+
+void DeltaCounters::PopulateToParent(DeltaCounters *parent) const {
   parent->d_subtree_regular += d_self_regular + d_subtree_regular;
   parent->d_subtree_symlink += d_self_symlink + d_subtree_symlink;
   parent->d_subtree_dir += d_self_dir + d_subtree_dir;
@@ -94,12 +106,45 @@ uint64_t Counters::GetAllEntries() const {
 }
 
 
+bool Counters::ReadCounters(const Database &database) {
+  SqlGetCounter sql_counter(database);
+  bool retval =
+    GetCounter(sql_counter, "self_regular",    &self_regular)    &&
+    GetCounter(sql_counter, "self_symlink",    &self_symlink)    &&
+    GetCounter(sql_counter, "self_dir",        &self_dir)        &&
+    GetCounter(sql_counter, "self_nested",     &self_nested)     &&
+    GetCounter(sql_counter, "subtree_regular", &subtree_regular) &&
+    GetCounter(sql_counter, "subtree_symlink", &subtree_symlink) &&
+    GetCounter(sql_counter, "subtree_dir",     &subtree_dir)     &&
+    GetCounter(sql_counter, "subtree_nested",  &subtree_nested);
+
+  return retval;
+}
+
+
+bool Counters::GetCounter(      SqlGetCounter  &sql,
+                          const std::string    &counter_name,
+                          uint64_t *counter) const {
+  const bool retval = sql.BindCounter(counter_name) &&
+                      sql.FetchRow();
+  if (!retval) return false;
+  *counter = sql.GetCounter();
+  sql.Reset();
+  return true;
+}
+
+
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string &root_path, const string &file) {
+Catalog *AttachFreely(const string     &root_path,
+                      const string     &file,
+                      const hash::Any  &catalog_hash,
+                            Catalog    *parent) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()), NULL);
+    new Catalog(PathString(root_path.data(), root_path.length()),
+                catalog_hash,
+                parent);
   bool retval = catalog->OpenDatabase(file);
   if (!retval) {
     delete catalog;
@@ -113,10 +158,14 @@ Catalog *AttachFreely(const string &root_path, const string &file) {
 }
 
 
-Catalog::Catalog(const PathString &path, Catalog *parent) {
-  read_only_ = true;
-  path_ = path;
-  parent_ = parent;
+Catalog::Catalog(const PathString &path,
+                 const hash::Any &catalog_hash,
+                 Catalog *parent) :
+  read_only_(true),
+  catalog_hash_(catalog_hash),
+  path_(path),
+  parent_(parent)
+{
   max_row_id_ = 0;
   inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -425,51 +474,7 @@ hash::Any Catalog::GetPreviousRevision() const {
 bool Catalog::GetCounters(Counters *counters) const {
   if (!database_)
     return false;
-
-  SqlGetCounter sql_counter(database());
-  bool retval;
-
-  retval = sql_counter.BindCounter("self_regular") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_regular = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("self_symlink") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_symlink = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("self_dir") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_dir = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("self_nested") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_nested = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_regular") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_regular = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_symlink") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_symlink = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_dir") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_dir = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_nested") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_nested = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  return true;
+  return counters->ReadCounters(database());
 }
 
 

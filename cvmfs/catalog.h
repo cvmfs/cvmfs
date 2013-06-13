@@ -22,6 +22,9 @@
 #include "sql.h"
 #include "util.h"
 
+namespace swissknife {
+  class CommandMigrate;
+}
 
 namespace catalog {
 
@@ -50,13 +53,17 @@ struct InodeRange {
 };
 
 
+class Counters;
+
 struct DeltaCounters {
   DeltaCounters() {
     SetZero();
   }
   void SetZero();
-  void PopulateToParent(DeltaCounters *parent);
+  void PopulateToParent(DeltaCounters *parent) const;
   void DeltaDirent(const DirectoryEntry &dirent, const int delta);
+
+  void InitWithCounters(const Counters &counters);
 
   int64_t d_self_regular;
   int64_t d_self_symlink;
@@ -69,7 +76,19 @@ struct DeltaCounters {
 };
 
 
-struct Counters {
+/**
+ * Catalog files keep track of summary counters of their catalog entries
+ *
+ * self_*     - number of specific entries in the _current_ catalog
+ * subtree_*  - aggregated number of specific entries in all nested catalogs of
+ *              the current catalog (_excluding_ self_* entries)
+ *
+ * Note: every nested-catalog-transition-point is defined by a mountpoint and a
+ *       catalog-root, resulting in an extra entry per nested catalog. Keep that
+ *       in mind when using these numbers in POSIX file system semantics.
+ */
+class Counters {
+ public:
   Counters() {
     self_regular = self_symlink = self_dir = self_nested =
       subtree_regular = subtree_symlink = subtree_dir = subtree_nested = 0;
@@ -82,6 +101,14 @@ struct Counters {
   uint64_t GetSubtreeEntries() const;
   uint64_t GetAllEntries() const;
 
+  bool ReadCounters(const Database &database);
+
+ protected:
+  bool GetCounter(      SqlGetCounter  &sql,
+                  const std::string    &counter_name,
+                  uint64_t *counter) const;
+
+ public:
   uint64_t self_regular;
   uint64_t self_symlink;
   uint64_t self_dir;
@@ -119,11 +146,14 @@ class InodeAnnotation {
  */
 class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
-  friend class SqlLookup;  // for mangled inode
+  friend class SqlLookup;                  // for mangled inode
+  friend class swissknife::CommandMigrate; // for catalog version migration
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
 
-  Catalog(const PathString &path, Catalog *parent);
+  Catalog(const PathString  &path,
+          const hash::Any   &catalog_hash,
+                Catalog     *parent);
   virtual ~Catalog();
 
   bool OpenDatabase(const std::string &db_path);
@@ -178,6 +208,7 @@ class Catalog : public SingleCopy {
   inline void set_inode_range(const InodeRange value) { inode_range_ = value; }
   inline std::string database_path() const { return database_->filename(); }
   inline PathString root_prefix() const { return root_prefix_; }
+  inline hash::Any hash() const { return catalog_hash_; }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && (max_row_id_ > 0);
@@ -233,6 +264,7 @@ class Catalog : public SingleCopy {
   Database *database_;
   pthread_mutex_t *lock_;
 
+  const hash::Any catalog_hash_;
   PathString root_prefix_;
   PathString path_;
 
@@ -253,7 +285,10 @@ class Catalog : public SingleCopy {
   SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
 
-Catalog *AttachFreely(const std::string &root_path, const std::string &file);
+Catalog *AttachFreely(const std::string  &root_path,
+                      const std::string  &file,
+                      const hash::Any    &catalog_hash,
+                            Catalog      *parent = NULL);
 
 }  // namespace catalog
 

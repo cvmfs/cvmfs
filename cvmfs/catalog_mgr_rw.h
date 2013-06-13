@@ -96,9 +96,13 @@ class WritableCatalogManager : public AbstractCatalogManager {
  protected:
   void EnforceSqliteMemLimit() { }
 
-  LoadError LoadCatalog(const PathString &mountpoint, const hash::Any &hash,
-                        std::string *catalog_path);
-  Catalog* CreateCatalog(const PathString &mountpoint, Catalog *parent_catalog);
+  LoadError LoadCatalog(const PathString &mountpoint,
+                        const hash::Any  &hash,
+                        std::string      *catalog_path,
+                        hash::Any        *catalog_hash);
+  Catalog* CreateCatalog(const PathString &mountpoint,
+                         const hash::Any  &catalog_hash,
+                         Catalog *parent_catalog);
 
   void AddFile(const DirectoryEntry  &entry,
                const std::string     &parent_directory);
