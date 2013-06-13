@@ -72,11 +72,13 @@ TEST(T_ManagedExec, ExecuteBinaryAsChild) {
   pid_t my_pid = getpid();
 
   // spawn a child process (not double forked)
+  const bool double_fork = false;
   bool retval = ExecuteBinary(&fd_stdin,
                               &fd_stdout,
                               &fd_stderr,
                                "gdb",
                                std::vector<std::string>(),
+                               double_fork,
                               &child_pid);
 
   // check that the process is running
