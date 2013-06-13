@@ -744,6 +744,29 @@ FileChunk SqlChunksListing::GetFileChunk() const {
 //------------------------------------------------------------------------------
 
 
+SqlChunksCount::SqlChunksCount(const Database &database) {
+  const string statement =
+    "SELECT count(*) FROM chunks "
+    //         0
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2)";
+    //                    1                          2
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlChunksCount::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+int SqlChunksCount::GetChunkCount() const {
+  return RetrieveInt64(0);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }

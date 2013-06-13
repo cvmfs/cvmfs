@@ -433,6 +433,17 @@ class SqlChunksListing : public Sql {
 //------------------------------------------------------------------------------
 
 
+class SqlChunksCount : public Sql {
+ public:
+  SqlChunksCount(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  int GetChunkCount() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlMaxHardlinkGroup : public Sql {
  public:
   SqlMaxHardlinkGroup(const Database &database);
