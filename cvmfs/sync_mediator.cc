@@ -87,7 +87,7 @@ void SyncMediator::Touch(SyncItem &entry) {
     AddFile(entry);
     return;
   }
-  
+
   if (entry.IsRegularFile() || entry.IsSymlink()) {
     Replace(entry);  // This way, hardlink processing is correct
     return;
@@ -309,19 +309,19 @@ void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
 
 
 void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
-	AddDirectory(entry);
+  AddDirectory(entry);
 
-	// Create a recursion engine, which recursively adds all entries in a newly
+  // Create a recursion engine, which recursively adds all entries in a newly
   // created directory
-	FileSystemTraversal<SyncMediator> traversal(
+  FileSystemTraversal<SyncMediator> traversal(
     this, union_engine_->scratch_path(), true);
-	traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
-	traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
-	traversal.fn_new_file = &SyncMediator::AddFileCallback;
-	traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
-	traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
-	traversal.fn_ignore_file = &SyncMediator::IgnoreFileCallback;
-	traversal.Recurse(entry.GetScratchPath());
+  traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
+  traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
+  traversal.fn_new_file = &SyncMediator::AddFileCallback;
+  traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
+  traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
+  traversal.fn_ignore_file = &SyncMediator::IgnoreFileCallback;
+  traversal.Recurse(entry.GetScratchPath());
 }
 
 
@@ -367,10 +367,10 @@ void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
 
 
 void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
-	// Delete a directory AFTER it was emptied here,
-	// because it would start up another recursion
+  // Delete a directory AFTER it was emptied here,
+  // because it would start up another recursion
 
-	const bool recurse = false;
+  const bool recurse = false;
   FileSystemTraversal<SyncMediator> traversal(
     this, union_engine_->rdonly_path(), recurse);
   traversal.fn_new_file = &SyncMediator::RemoveFileCallback;
@@ -379,7 +379,7 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
   traversal.fn_new_symlink = &SyncMediator::RemoveSymlinkCallback;
   traversal.Recurse(entry.GetRdOnlyPath());
 
-	// The given directory was emptied recursively and can now itself be deleted
+  // The given directory was emptied recursively and can now itself be deleted
   RemoveDirectory(entry);
 }
 
