@@ -123,7 +123,6 @@ uint32_t WritableCatalog::GetMaxLinkId() const {
  * @param entry the DirectoryEntry to add to the catalog
  * @param entry_path the full path of the DirectoryEntry to add
  * @param parent_path the full path of the containing directory
- * @return true if DirectoryEntry was added, false otherwise
  */
 void WritableCatalog::AddEntry(const DirectoryEntry &entry,
                                const string &entry_path,
@@ -153,7 +152,6 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
  * Note: removing a directory which is non-empty results in dangling entries.
  *       (this should be treated in upper layers)
  * @param entry_path the full path of the DirectoryEntry to delete
- * @return true if entry was removed, false otherwise
  */
 void WritableCatalog::RemoveEntry(const string &file_path) {
   hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(file_path));
@@ -272,7 +270,6 @@ void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
 
 /**
  * Sets the last modified time stamp of this catalog to current time.
- * @return true on success, false otherwise
  */
 void WritableCatalog::UpdateLastModified() {
   const time_t now = time(NULL);
@@ -285,7 +282,6 @@ void WritableCatalog::UpdateLastModified() {
 
 /**
  * Increments the revision of the catalog in the database.
- * @return true on success, false otherwise
  */
 void WritableCatalog::IncrementRevision() {
   const string sql =
@@ -306,7 +302,6 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
 
 /**
  * Sets the content hash of the previous catalog revision.
- * @return true on success, false otherwise
  */
 void WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
   const string sql = "INSERT OR REPLACE INTO properties "
@@ -448,7 +443,6 @@ void WritableCatalog::MoveFileChunksToNested(
  *        object of mountpoint
  * @param content_hash can be set to safe a content hash together with the
  *        reference
- * @return true on success, false otherwise
  */
 void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
                                           Catalog *attached_reference,
@@ -482,7 +476,6 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
               the database
  * @param[out] attached_reference is set to the object of the attached child or
  *             to NULL
- * @return true on success, false otherwise
  */
 void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                                           Catalog **attached_reference)
@@ -517,7 +510,6 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
  * Updates the link to a nested catalog in the database.
  * @param path the path of the nested catalog to update
  * @param hash the hash to set the given nested catalog link to
- * @return true on success, false otherwise
  */
 void WritableCatalog::UpdateNestedCatalog(const string &path,
                                           const hash::Any &hash)
