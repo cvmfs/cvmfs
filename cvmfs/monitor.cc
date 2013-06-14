@@ -18,6 +18,7 @@
 #else
   #include <ucontext.h>
 #endif
+#include <execinfo.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -42,6 +43,9 @@
 #include "cvmfs.h"
 
 using namespace std;  // NOLINT
+
+// Used for address offset calculation
+extern loader::CvmfsExports *g_cvmfs_exports;
 
 namespace monitor {
 
@@ -149,6 +153,19 @@ static void SendTrace(int sig,
     // quit anyway after 30 seconds
     if (++counter == 300) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
+      // Last attempt to log something useful
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
+               sig, send_errno);
+      void *addr[64];
+      int num_addr = backtrace(addr, 64);
+      char **symbols = backtrace_symbols(addr, num_addr);
+      string backtrace = "Backtrace:\n";
+      for (int i = 0; i < num_addr; ++i)
+        backtrace += string(symbols[i]) + "\n";
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
+               &g_cvmfs_exports);
+
       _exit(1);
     }
   }
@@ -252,7 +269,8 @@ static string GenerateStackTrace(const string &exe_path,
                           argv,
                           double_fork,
                          &gdb_pid);
-  assert(retval);
+  assert(false);
+  //assert(retval);
 
   // Skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
