@@ -1057,6 +1057,7 @@ void CommandMigrate::CreateNestedCatalogMarkerDirent(
 bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
                                                    PendingCatalog *data) const {
   bool retval = false;
+  const Database &writable = data->new_catalog->database();
 
   // Aggregated the statistics counters of all nested catalogs
   // Note: we might need to wait until nested catalogs are sucessfully processed
@@ -1066,58 +1067,63 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
   for (; i != iend; ++i) {
     const PendingCatalog *nested_catalog = *i;
     const catalog::DeltaCounters &s = nested_catalog->nested_statistics.Get();
-    s.PopulateToParent(&aggregated_counters);
+    s.PopulateToParent(aggregated_counters);
   }
 
-  // generate statistics for the current catalog and store the aggregated stats
-  // for the child catalog tree
-  const Database &writable = data->new_catalog->database();
-  Sql generate_stats(writable,
-    "INSERT OR REPLACE INTO statistics "
-    "SELECT 'self_regular', count(*) FROM catalog "
-    "                                WHERE     flags & :flag_file  "
-    "                                  AND NOT flags & :flag_link_1 "
-    "  UNION "
-    "SELECT 'self_symlink', count(*) FROM catalog "
-    "                                WHERE flags & :flag_link_2 "
-    "  UNION "
-    "SELECT 'self_dir',     count(*) FROM catalog "
-    "                                WHERE flags & :flag_dir "
-    "  UNION "
-    "SELECT 'self_nested',  count(*) FROM nested_catalogs "
-    "  UNION "
-    "SELECT 'subtree_regular', :subtree_regular "
-    "  UNION "
-    "SELECT 'subtree_symlink', :subtree_symlink "
-    "  UNION "
-    "SELECT 'subtree_dir',     :subtree_dir "
-    "  UNION "
-    "SELECT 'subtree_nested',  :subtree_nested;");
+  // count various directory entry types in the catalog to fill up the catalog
+  // statistics counters introduced in the current catalog schema
+  Sql count_regular_files(writable,
+    "SELECT count(*) FROM catalog "
+    "                WHERE  flags & :flag_file "
+    "                       AND NOT flags & :flag_link;");
+  Sql count_symlinks(writable,
+    "SELECT count(*) FROM catalog WHERE flags & :flag_link;");
+  Sql count_directories(writable,
+    "SELECT count(*) FROM catalog WHERE flags & :flag_dir;");
+  Sql count_nested_clgs(writable,
+    "SELECT count(*) FROM nested_catalogs;");
+
+  // run the actual counting queries
   retval =
-    generate_stats.BindInt64(1, SqlDirent::kFlagFile)                  &&
-    generate_stats.BindInt64(2, SqlDirent::kFlagLink)                  &&
-    generate_stats.BindInt64(3, SqlDirent::kFlagLink)                  &&
-    generate_stats.BindInt64(4, SqlDirent::kFlagDir)                   &&
-    generate_stats.BindInt64(5, aggregated_counters.d_subtree_regular) &&
-    generate_stats.BindInt64(6, aggregated_counters.d_subtree_symlink) &&
-    generate_stats.BindInt64(7, aggregated_counters.d_subtree_dir)     &&
-    generate_stats.BindInt64(8, aggregated_counters.d_subtree_nested)  &&
-    generate_stats.Execute();
+    count_regular_files.BindInt64(1, SqlDirent::kFlagFile) &&
+    count_regular_files.BindInt64(2, SqlDirent::kFlagLink) &&
+    count_regular_files.Execute();
   if (! retval) {
-    Error("Failed to generate catalog statistics.", generate_stats, data);
+    Error("Failed to count regular files.", count_regular_files, data);
+    return false;
+  }
+  retval =
+    count_symlinks.BindInt64(1, SqlDirent::kFlagLink) &&
+    count_symlinks.Execute();
+  if (! retval) {
+    Error("Failed to count symlinks.", count_symlinks, data);
+    return false;
+  }
+  retval =
+    count_directories.BindInt64(1, SqlDirent::kFlagDir) &&
+    count_directories.Execute();
+  if (! retval) {
+    Error("Failed to count directories.", count_directories, data);
+    return false;
+  }
+  retval = count_nested_clgs.Execute();
+  if (! retval) {
+    Error("Failed to count nested catalog references.",
+          count_nested_clgs, data);
     return false;
   }
 
-  // read out the generated information in order to pass it to parent catalog
-  catalog::Counters catalog_statistics;
-  retval = catalog_statistics.ReadCounters(writable);
-  if (! retval) {
-    Error("Failed to read out generated statistics counters", data);
-    return false;
-  }
-  catalog::DeltaCounters statistics;
-  statistics.InitWithCounters(catalog_statistics);
-  data->nested_statistics.Set(statistics);
+  // insert the counted statistics into the DeltaCounters data structure
+  aggregated_counters.self.regular_files = count_regular_files.RetrieveInt64(0);
+  aggregated_counters.self.symlinks      = count_symlinks.RetrieveInt64(0);
+  aggregated_counters.self.directories   = count_directories.RetrieveInt64(0);
+  aggregated_counters.self.nested_catalogs = count_nested_clgs.RetrieveInt64(0);
+
+  // write back the generated statistics counters into the catalog database
+  aggregated_counters.WriteToDatabase(writable);
+
+  // push the generated statistics counters up to the parent catalog
+  data->nested_statistics.Set(aggregated_counters);
 
   return true;
 }
