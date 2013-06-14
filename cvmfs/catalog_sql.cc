@@ -215,13 +215,8 @@ bool Database::Create(const string &filename,
     return false;
   }
 
-  // insert initial statistics counters
+  // create initial statistics counters
   catalog::Counters counters;
-  counters.self.directories = 1;
-  if (!counters.InsertIntoDatabase(database)) {
-    SqlError("failed to insert initial catalog statistics counters.", database);
-    return false;
-  }
 
   // insert root entry (when given)
   if (! root_entry.IsNegative()) {
@@ -235,6 +230,15 @@ bool Database::Create(const string &filename,
                database);
       return false;
     }
+
+    // account for the created root entry
+    counters.self.directories = 1;
+  }
+
+  // save initial statistics counters
+  if (!counters.InsertIntoDatabase(database)) {
+    SqlError("failed to insert initial catalog statistics counters.", database);
+    return false;
   }
 
   // insert root path (when given)
