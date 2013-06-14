@@ -670,8 +670,7 @@ catalog::Catalog *CatalogManager::CreateCatalog(const PathString &mountpoint,
  * Triggered when the catalog is attached (db file opened)
  */
 void CatalogManager::ActivateCatalog(const catalog::Catalog *catalog) {
-  catalog::Counters counters;
-  catalog->GetCounters(&counters);
+  const catalog::Counters &counters = catalog->GetCounters();
   if (catalog->IsRoot()) {
     all_inodes_ = counters.GetAllEntries();
   }
@@ -943,8 +942,7 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
     quota::Unpin(iter->second);
 
   mounted_catalogs_.erase(iter);
-  catalog::Counters counters;
-  catalog->GetCounters(&counters);
+  const catalog::Counters &counters = catalog->GetCounters();
   loaded_inodes_ -= counters.GetSelfEntries();
 }
 

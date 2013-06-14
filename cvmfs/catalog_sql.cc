@@ -202,25 +202,24 @@ bool Database::Create(const string &filename,
     return false;
   }
 
-  // insert initial values to properties and statistics
+  // insert initial values to properties
   Sql insert_initial_properties(database,
     "INSERT INTO properties (key, value) "
     "VALUES ('revision', 0), "
     "       ('schema',   :schema);");
   insert_initial_properties.BindDouble(1, kLatestSchema);
-  Sql insert_initial_statistics(database,
-    "INSERT INTO statistics (counter, value) "
-    "VALUES ('self_regular',    0), ('self_symlink',    0), "
-    "       ('self_dir',        1), ('self_nested',     0), "
-    "       ('subtree_regular', 0), ('subtree_symlink', 0), "
-    "       ('subtree_dir',     0), ('subtree_nested',  0);");
 
-  retval =
-    insert_initial_properties.Execute() &&
-    insert_initial_statistics.Execute();
-  if (! retval) {
+  if (! insert_initial_properties.Execute()) {
     SqlError("failed to insert default initial values into the newly created "
              "catalog tables.", database);
+    return false;
+  }
+
+  // insert initial statistics counters
+  catalog::Counters counters;
+  counters.self.directories = 1;
+  if (!counters.InsertIntoDatabase(database)) {
+    SqlError("failed to insert initial catalog statistics counters.", database);
     return false;
   }
 
@@ -756,6 +755,29 @@ FileChunk SqlChunksListing::GetFileChunk() const {
 //------------------------------------------------------------------------------
 
 
+SqlChunksCount::SqlChunksCount(const Database &database) {
+  const string statement =
+    "SELECT count(*) FROM chunks "
+    //         0
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2)";
+    //                    1                          2
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlChunksCount::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+int SqlChunksCount::GetChunkCount() const {
+  return RetrieveInt64(0);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
@@ -809,6 +831,25 @@ bool SqlUpdateCounter::BindCounter(const std::string &counter) {
 
 bool SqlUpdateCounter::BindDelta(const int64_t delta) {
   return BindInt64(1, delta);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlCreateCounter::SqlCreateCounter(const Database &database) {
+  Init(database.sqlite_db(),
+       "INSERT INTO statistics (counter, value) VALUES (:counter, :value);");
+}
+
+
+bool SqlCreateCounter::BindCounter(const std::string &counter) {
+  return BindText(1, counter);
+}
+
+
+bool SqlCreateCounter::BindInitialValue(const int64_t value) {
+  return BindInt64(2, value);
 }
 
 

@@ -21,6 +21,7 @@
 #include "shortstring.h"
 #include "sql.h"
 #include "util.h"
+#include "catalog_counters.h"
 
 namespace swissknife {
   class CommandMigrate;
@@ -30,6 +31,8 @@ namespace catalog {
 
 class AbstractCatalogManager;
 class Catalog;
+
+class Counters;
 
 typedef std::vector<Catalog *> CatalogList;
 
@@ -52,72 +55,6 @@ struct InodeRange {
   inline bool IsInitialized() const { return (offset > 0) && (size > 0); }
 };
 
-
-class Counters;
-
-struct DeltaCounters {
-  DeltaCounters() {
-    SetZero();
-  }
-  void SetZero();
-  void PopulateToParent(DeltaCounters *parent) const;
-  void DeltaDirent(const DirectoryEntry &dirent, const int delta);
-
-  void InitWithCounters(const Counters &counters);
-
-  int64_t d_self_regular;
-  int64_t d_self_symlink;
-  int64_t d_self_dir;
-  int64_t d_self_nested;
-  int64_t d_subtree_regular;
-  int64_t d_subtree_symlink;
-  int64_t d_subtree_dir;
-  int64_t d_subtree_nested;
-};
-
-
-/**
- * Catalog files keep track of summary counters of their catalog entries
- *
- * self_*     - number of specific entries in the _current_ catalog
- * subtree_*  - aggregated number of specific entries in all nested catalogs of
- *              the current catalog (_excluding_ self_* entries)
- *
- * Note: every nested-catalog-transition-point is defined by a mountpoint and a
- *       catalog-root, resulting in an extra entry per nested catalog. Keep that
- *       in mind when using these numbers in POSIX file system semantics.
- */
-class Counters {
- public:
-  Counters() {
-    self_regular = self_symlink = self_dir = self_nested =
-      subtree_regular = subtree_symlink = subtree_dir = subtree_nested = 0;
-  }
-
-  void ApplyDelta(const DeltaCounters &delta);
-  void AddAsSubtree(DeltaCounters *delta);
-  void MergeIntoParent(DeltaCounters *parent_delta);
-  uint64_t GetSelfEntries() const;
-  uint64_t GetSubtreeEntries() const;
-  uint64_t GetAllEntries() const;
-
-  bool ReadCounters(const Database &database);
-
- protected:
-  bool GetCounter(      SqlGetCounter  &sql,
-                  const std::string    &counter_name,
-                  uint64_t *counter) const;
-
- public:
-  uint64_t self_regular;
-  uint64_t self_symlink;
-  uint64_t self_dir;
-  uint64_t self_nested;
-  uint64_t subtree_regular;
-  uint64_t subtree_symlink;
-  uint64_t subtree_dir;
-  uint64_t subtree_nested;
-};
 
 /**
  * Allows to define a class that transforms the inode in order to ensure
@@ -197,7 +134,7 @@ class Catalog : public SingleCopy {
   uint64_t GetRevision() const;
   uint64_t GetNumEntries() const;
   hash::Any GetPreviousRevision() const;
-  bool GetCounters(Counters *counters) const;
+  const Counters& GetCounters() const { return counters_; };
 
   inline bool read_only() const { return read_only_; }
   inline float schema() const { return database().schema_version(); }
@@ -246,6 +183,8 @@ class Catalog : public SingleCopy {
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
 
+  Counters& GetCounters() { return counters_; };
+
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
@@ -275,6 +214,7 @@ class Catalog : public SingleCopy {
   InodeRange inode_range_;
   uint64_t max_row_id_;
   InodeAnnotation *inode_annotation_;
+  Counters counters_;
 
   SqlListing               *sql_listing_;
   SqlLookupPathHash        *sql_lookup_md5path_;

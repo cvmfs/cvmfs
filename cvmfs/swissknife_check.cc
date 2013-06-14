@@ -106,60 +106,22 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
 bool CommandCheck::CompareCounters(const catalog::Counters &a,
                                    const catalog::Counters &b)
 {
+  const catalog::Counters::FieldsMap map_a = a.GetFieldsMap();
+  const catalog::Counters::FieldsMap map_b = b.GetFieldsMap();
+
   bool retval = true;
-  if (a.self_regular != b.self_regular) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of regular files differs (%"PRIu64" / %"PRIu64")",
-             a.self_regular, b.self_regular);
-    retval = false;
-  }
-  if (a.self_symlink != b.self_symlink) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of symlinks differs (%"PRIu64" / %"PRIu64")",
-             a.self_symlink, b.self_symlink);
-    retval = false;
-  }
-  if (a.self_dir != b.self_dir) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of directories differs (%"PRIu64" / %"PRIu64")",
-             a.self_dir, b.self_dir);
-    retval = false;
-  }
-  if (a.self_nested != b.self_nested) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of nested_catalogs differs (%"PRIu64" / %"PRIu64")",
-             a.self_nested, b.self_nested);
-    retval = false;
-  }
-  if (a.subtree_regular != b.subtree_regular) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of subtree regular files differs (%"PRIu64" / %"PRIu64")",
-             a.subtree_regular, b.subtree_regular);
-    retval = false;
-  }
-  if (a.subtree_symlink != b.subtree_symlink) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of subtree symlinks differs (%"PRIu64" / %"PRIu64")",
-             a.subtree_symlink, b.subtree_symlink);
-    retval = false;
-  }
-  if (a.subtree_symlink != b.subtree_symlink) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of subtree symlinks differs (%"PRIu64" / %"PRIu64")",
-             a.subtree_symlink, b.subtree_symlink);
-    retval = false;
-  }
-  if (a.subtree_dir != b.subtree_dir) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of subtree directories differs (%"PRIu64" / %"PRIu64")",
-             a.subtree_dir, b.subtree_dir);
-    retval = false;
-  }
-  if (a.subtree_nested != b.subtree_nested) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "number of subtree nested catalogs differs (%"PRIu64" / %"PRIu64")",
-             a.subtree_nested, b.subtree_nested);
-    retval = false;
+  catalog::Counters::FieldsMap::const_iterator i    = map_a.begin();
+  catalog::Counters::FieldsMap::const_iterator iend = map_a.end();
+  for (; i != iend; ++i) {
+    catalog::Counters::FieldsMap::const_iterator comp = map_b.find(i->first);
+    assert (comp != map_b.end());
+
+    if (*(i->second) != *(comp->second)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "catalog statistics mismatch: %s (%"PRIu64" / %"PRIu64")",
+               comp->first.c_str(), *(i->second), *(comp->second));
+      retval = false;
+    }
   }
 
   return retval;
@@ -276,7 +238,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     // Checks depending of entry type
     if (entries[i].IsDirectory()) {
-      computed_counters->d_self_dir++;
+      computed_counters->self.directories++;
       num_subdirs++;
       // Directory size
       // if (entries[i].size() < 4096) {
@@ -292,7 +254,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
       if (entries[i].IsNestedCatalogMountpoint()) {
         // Find transition point
-        computed_counters->d_self_nested++;
+        computed_counters->self.nested_catalogs++;
         hash::Any tmp;
         if (!catalog->FindNested(full_path, &tmp)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
@@ -305,7 +267,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
           retval = false;
       }
     } else if (entries[i].IsLink()) {
-      computed_counters->d_self_symlink++;
+      computed_counters->self.symlinks++;
       // No hash for symbolics links
       if (!entries[i].checksum().IsNull()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "symbolic links with hash at %s",
@@ -320,7 +282,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         retval = false;
       }
     } else if (entries[i].IsRegular()) {
-      computed_counters->d_self_regular++;
+      computed_counters->self.regular_files++;
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "unknown file type %s",
                full_path.c_str());
@@ -331,6 +293,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     if (entries[i].IsChunkedFile()) {
       FileChunkList chunks;
       catalog->ListFileChunks(full_path, &chunks);
+
+      computed_counters->self.chunked_files++;
+      computed_counters->self.file_chunks += chunks.size();
 
       // do we find file chunks for the chunked file in this catalog?
       if (chunks.size() == 0) {
@@ -468,9 +433,9 @@ bool CommandCheck::InspectTree(const string &path,
     return false;
   }
 
-  catalog::Catalog *catalog = catalog::AttachFreely(path,
-                                                    tmp_file,
-                                                    catalog_hash);
+  const catalog::Catalog *catalog = catalog::AttachFreely(path,
+                                                          tmp_file,
+                                                          catalog_hash);
   unlink(tmp_file.c_str());
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",
@@ -523,8 +488,8 @@ bool CommandCheck::InspectTree(const string &path,
     retval = false;
 
   // Check number of entries
-  const uint64_t num_found_entries = 1 + computed_counters->d_self_regular +
-    computed_counters->d_self_symlink + computed_counters->d_self_dir;
+  const uint64_t num_found_entries = 1 + computed_counters->self.regular_files +
+    computed_counters->self.symlinks + computed_counters->self.directories;
   if (num_found_entries != catalog->GetNumEntries()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "dangling entries in catalog, "
              "expected %"PRIu64", got %"PRIu64,
@@ -536,10 +501,10 @@ bool CommandCheck::InspectTree(const string &path,
   catalog::Catalog::NestedCatalogList *nested_catalogs =
     catalog->ListNestedCatalogs();
   if (nested_catalogs->size() !=
-      static_cast<uint64_t>(computed_counters->d_self_nested))
+      static_cast<uint64_t>(computed_counters->self.nested_catalogs))
   {
     LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
-             " expected %lu, got %lu", computed_counters->d_self_nested,
+             " expected %lu, got %lu", computed_counters->self.nested_catalogs,
              nested_catalogs->size());
     retval = false;
   }
@@ -556,25 +521,19 @@ bool CommandCheck::InspectTree(const string &path,
       if (!InspectTree(i->path.ToString(), i->hash, &nested_transition_point,
                        &nested_counters))
         retval = false;
-      nested_counters.PopulateToParent(computed_counters);
+      nested_counters.PopulateToParent(*computed_counters);
     }
   }
 
   // Check statistics counters
-  computed_counters->d_self_dir++;  // Additionally account for root directory
+  computed_counters->self.directories++;  // Additionally account for root directory
   catalog::Counters compare_counters;
   compare_counters.ApplyDelta(*computed_counters);
-  catalog::Counters stored_counters;
-  if (!catalog->GetCounters(&stored_counters)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to get counters (%s) [%s]",
-             path.c_str(), catalog_hash.ToString().c_str());
+  const catalog::Counters stored_counters = catalog->GetCounters();
+  if (!CompareCounters(compare_counters, stored_counters)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
+             catalog_hash.ToString().c_str());
     retval = false;
-  } else {
-    if (!CompareCounters(compare_counters, stored_counters)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
-               catalog_hash.ToString().c_str());
-      retval = false;
-    }
   }
 
   delete catalog;

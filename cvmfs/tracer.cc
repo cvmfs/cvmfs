@@ -19,7 +19,7 @@
  *       down on assertion.  This might be not desired behavior.
  */
 
-#include "config.h"
+#include "cvmfs_config.h"
 #include "tracer.h"
 
 #include <pthread.h>

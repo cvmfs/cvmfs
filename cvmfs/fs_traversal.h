@@ -44,43 +44,50 @@ class FileSystemTraversal {
   VoidCallback fn_new_symlink;
 
   /**
+   * Optional callback for all files during recursion to decide
+   * whether to completely ignore the file.  If this callback returns
+   * true then the file will not be processed (this is a replacement
+   * for the ignored_files set, and it allows to ignore based on names
+   * or something else). If the function is not specified, no files
+   * will be ignored (except for "." and "..").
+   */
+  BoolCallback fn_ignore_file;
+
+  /**
    * Callback if a directory was found.  Depending on the response of
    * the callback, the recursion will continue in the found directory/
    * If this callback is not specified, it will recurse by default.
    */
   BoolCallback fn_new_dir_prefix;
 
-	/**
-	 * Callback for a found directory after it was already recursed
-	 * e.g. for deletion of directories: first delete content,
+  /**
+   * Callback for a found directory after it was already recursed
+   * e.g. for deletion of directories: first delete content,
    * then the directory itself
-	 */
-	VoidCallback fn_new_dir_postfix;
+   */
+  VoidCallback fn_new_dir_postfix;
 
 
-	/**
-	 * Create a new recursion engine
-	 * @param delegate The object that will receive the callbacks
-	 * @param relative_to_directory The DirEntries will be created relative
+  /**
+   * Create a new recursion engine
+   * @param delegate The object that will receive the callbacks
+   * @param relative_to_directory The DirEntries will be created relative
    *        to this directory
-	 * @param ignored_files A list of files which the delegate does not care about
-   *                     (no callback calls or recursion for them)
-	 * @param recurse Should the traversal engine recurse? (if not,
+   * @param recurse Should the traversal engine recurse? (if not,
    *        it just traverses the given directory)
-	 */
-	FileSystemTraversal(T *delegate,
-	                const std::string &relative_to_directory,
-	                const bool recurse,
-	                const std::set<std::string> &ignored_files)
+   */
+  FileSystemTraversal(T *delegate,
+                      const std::string &relative_to_directory,
+                      const bool recurse)
   {
     delegate_ = delegate;
     relative_to_directory_ = relative_to_directory;
     recurse_ = recurse;
-    ignored_files_ = ignored_files;
     fn_enter_dir = NULL;
     fn_leave_dir = NULL;
     fn_new_file = NULL;
     fn_new_symlink = NULL;
+    fn_ignore_file = NULL;
     fn_new_dir_prefix = NULL;
     fn_new_dir_postfix = NULL;
     Init();
@@ -105,20 +112,15 @@ class FileSystemTraversal {
   }
 
  private:
-	// The delegate all hooks are called on
-	T *delegate_;
+  // The delegate all hooks are called on
+  T *delegate_;
 
-	/** dir_path in callbacks will be relative to this directory */
-	std::string relative_to_directory_;
-	bool recurse_;
-
-	// If one of these files are found somewhere they are completely ignored
-	std::set<std::string> ignored_files_;
+  /** dir_path in callbacks will be relative to this directory */
+  std::string relative_to_directory_;
+  bool recurse_;
 
 
   void Init() {
-    ignored_files_.insert(".");
-    ignored_files_.insert("..");
   }
 
   void DoRecursion(const std::string &parent_path, const std::string &dir_name)
@@ -138,9 +140,12 @@ class FileSystemTraversal {
 
     // Walk through the open directory notifying the about contents
     while ((dit = platform_readdir(dip)) != NULL) {
-      // Check if filename is included in the ignored files list
-      if (ignored_files_.find(dit->d_name) != ignored_files_.end())
+      // Check if filename should be ignored
+      if (std::string(dit->d_name) == "." || std::string(dit->d_name) == ".." ||
+          (fn_ignore_file != NULL && Notify(fn_ignore_file, path, dit->d_name)))
+      {
         continue;
+      }
 
       // Notify user about found directory entry
       platform_stat64 info;
@@ -192,7 +197,7 @@ class FileSystemTraversal {
     }
   }
 
-	std::string GetRelativePath(const std::string &absolute_path) const  {
+  std::string GetRelativePath(const std::string &absolute_path) const {
     const unsigned int rel_dir_len = relative_to_directory_.length();
     if (rel_dir_len >= absolute_path.length()) { return ""; }
 	  else if (rel_dir_len > 1) { return absolute_path.substr(rel_dir_len + 1); }

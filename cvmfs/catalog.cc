@@ -20,120 +20,6 @@ namespace catalog {
 const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 
 
-void DeltaCounters::SetZero() {
-  d_self_regular = d_self_symlink = d_self_dir = d_self_nested =
-  d_subtree_regular = d_subtree_symlink = d_subtree_dir =
-  d_subtree_nested = 0;
-}
-
-
-void DeltaCounters::DeltaDirent(const DirectoryEntry &dirent, const int delta) {
-  if (dirent.IsRegular())
-    d_self_regular += delta;
-  else if (dirent.IsLink())
-    d_self_symlink += delta;
-  else if (dirent.IsDirectory())
-    d_self_dir += delta;
-  else
-    assert(false);
-}
-
-
-void DeltaCounters::InitWithCounters(const Counters &counters) {
-  d_self_regular    = counters.self_regular;
-  d_self_symlink    = counters.self_symlink;
-  d_self_dir        = counters.self_dir;
-  d_self_nested     = counters.self_nested;
-  d_subtree_regular = counters.subtree_regular;
-  d_subtree_symlink = counters.subtree_symlink;
-  d_subtree_dir     = counters.subtree_dir;
-  d_subtree_nested  = counters.subtree_nested;
-}
-
-
-void DeltaCounters::PopulateToParent(DeltaCounters *parent) const {
-  parent->d_subtree_regular += d_self_regular + d_subtree_regular;
-  parent->d_subtree_symlink += d_self_symlink + d_subtree_symlink;
-  parent->d_subtree_dir += d_self_dir + d_subtree_dir;
-  parent->d_subtree_nested += d_self_nested + d_subtree_nested;
-}
-
-
-void Counters::ApplyDelta(const DeltaCounters &delta) {
-  self_regular += delta.d_self_regular;
-  self_symlink += delta.d_self_symlink;
-  self_dir += delta.d_self_dir;
-  self_nested += delta.d_self_nested;
-  subtree_regular += delta.d_subtree_regular;
-  subtree_symlink += delta.d_subtree_symlink;
-  subtree_dir += delta.d_subtree_dir;
-  subtree_nested += delta.d_subtree_nested;
-}
-
-
-void Counters::AddAsSubtree(DeltaCounters *delta) {
-  delta->d_subtree_regular += self_regular + subtree_regular;
-  delta->d_subtree_symlink += self_symlink + subtree_symlink;
-  delta->d_subtree_dir += self_dir + subtree_dir;
-  delta->d_subtree_nested += self_nested + subtree_nested;
-}
-
-
-void Counters::MergeIntoParent(DeltaCounters *parent_delta) {
-  parent_delta->d_self_regular += self_regular;
-  parent_delta->d_subtree_regular -= self_regular;
-  parent_delta->d_self_symlink += self_symlink;
-  parent_delta->d_subtree_symlink -= self_symlink;
-  parent_delta->d_self_dir += self_dir;
-  parent_delta->d_subtree_dir -= self_dir;
-  parent_delta->d_self_nested += self_nested;
-  parent_delta->d_subtree_nested -= self_nested;
-}
-
-
-uint64_t Counters::GetSelfEntries() const {
-  return self_regular + self_symlink + self_dir;
-}
-
-
-uint64_t Counters::GetSubtreeEntries() const {
-  return subtree_regular + subtree_symlink + subtree_dir;
-}
-
-
-uint64_t Counters::GetAllEntries() const {
-  return GetSelfEntries() + GetSubtreeEntries();
-}
-
-
-bool Counters::ReadCounters(const Database &database) {
-  SqlGetCounter sql_counter(database);
-  bool retval =
-    GetCounter(sql_counter, "self_regular",    &self_regular)    &&
-    GetCounter(sql_counter, "self_symlink",    &self_symlink)    &&
-    GetCounter(sql_counter, "self_dir",        &self_dir)        &&
-    GetCounter(sql_counter, "self_nested",     &self_nested)     &&
-    GetCounter(sql_counter, "subtree_regular", &subtree_regular) &&
-    GetCounter(sql_counter, "subtree_symlink", &subtree_symlink) &&
-    GetCounter(sql_counter, "subtree_dir",     &subtree_dir)     &&
-    GetCounter(sql_counter, "subtree_nested",  &subtree_nested);
-
-  return retval;
-}
-
-
-bool Counters::GetCounter(      SqlGetCounter  &sql,
-                          const std::string    &counter_name,
-                          uint64_t *counter) const {
-  const bool retval = sql.BindCounter(counter_name) &&
-                      sql.FetchRow();
-  if (!retval) return false;
-  *counter = sql.GetCounter();
-  sql.Reset();
-  return true;
-}
-
-
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
@@ -263,6 +149,9 @@ bool Catalog::OpenDatabase(const string &db_path) {
                "no root prefix for root catalog file %s", db_path.c_str());
     }
   }
+
+  // Read Catalog Counter Statistics
+  counters_.ReadFromDatabase(database());
 
   if (!IsRoot()) {
     parent_->AddChild(this);
@@ -465,16 +354,6 @@ hash::Any Catalog::GetPreviousRevision() const {
   pthread_mutex_unlock(lock_);
 
   return result;
-}
-
-
-/**
- * Receive catalog statistics
- */
-bool Catalog::GetCounters(Counters *counters) const {
-  if (!database_)
-    return false;
-  return counters->ReadCounters(database());
 }
 
 

@@ -213,34 +213,6 @@ void MakePipe(int pipe_fd[2]) {
 }
 
 
-template<>
-bool Pipe::Write<std::string>(const std::string &data) {
-  const size_t string_length = data.size();
-  return Write(string_length) && Write(data.c_str(), string_length);
-}
-
-
-template<>
-bool Pipe::Read<std::string>(std::string *data) {
-  size_t string_length;
-  bool retval = Read(&string_length);
-  if (!retval)
-    return false;
-
-  void *buffer = smalloc(string_length + 1);
-  retval = Read(buffer, string_length);
-  if (!retval)
-    return false;
-
-  char *c_buffer = static_cast<char *>(buffer);
-  c_buffer[string_length] = '\0';
-  data->assign(c_buffer);
-  free(buffer);
-
-  return true;
-}
-
-
 /**
  * Writes to a pipe should always succeed.
  */
@@ -559,9 +531,8 @@ bool RemoveTree(const string &path) {
     return false;
 
   RemoveTreeHelper *remove_tree_helper = new RemoveTreeHelper();
-  set<string> ignore_files;
   FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "",
-                                                  true, ignore_files);
+                                                  true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;

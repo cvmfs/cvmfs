@@ -616,10 +616,8 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
     WritableCatalog *grand_catalog;
     retval = FindCatalog(i->path.ToString(), &grand_catalog);
     assert(retval);
-    Counters grand_counters;
-    retval = grand_catalog->GetCounters(&grand_counters);
-    assert(retval);
-    grand_counters.AddAsSubtree(&fix_subtree_counters);
+    const Counters &grand_counters = grand_catalog->GetCounters();
+    grand_counters.AddAsSubtree(fix_subtree_counters);
   }
   DeltaCounters save_counters = wr_new_catalog->delta_counters_;
   wr_new_catalog->delta_counters_ = fix_subtree_counters;
@@ -759,7 +757,7 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   catalog->UpdateCounters();
   if (catalog->parent()) {
     catalog->delta_counters_.PopulateToParent(
-      &catalog->GetWritableParent()->delta_counters_);
+      catalog->GetWritableParent()->delta_counters_);
   }
   catalog->delta_counters_.SetZero();
 

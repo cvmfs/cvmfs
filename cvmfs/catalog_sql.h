@@ -434,6 +434,17 @@ class SqlChunksListing : public Sql {
 //------------------------------------------------------------------------------
 
 
+class SqlChunksCount : public Sql {
+ public:
+  SqlChunksCount(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  int GetChunkCount() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlMaxHardlinkGroup : public Sql {
  public:
   SqlMaxHardlinkGroup(const Database &database);
@@ -462,6 +473,17 @@ class SqlUpdateCounter : public Sql {
   SqlUpdateCounter(const Database &database);
   bool BindCounter(const std::string &counter);
   bool BindDelta(const int64_t delta);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlCreateCounter : public Sql {
+ public:
+  SqlCreateCounter(const Database &database);
+  bool BindCounter(const std::string &counter);
+  bool BindInitialValue(const int64_t value);
 };
 
 

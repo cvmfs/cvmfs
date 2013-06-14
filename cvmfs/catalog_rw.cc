@@ -88,6 +88,7 @@ void WritableCatalog::InitPreparedStatements() {
   sql_update_        = new SqlDirentUpdate     (database());
   sql_chunk_insert_  = new SqlChunkInsert      (database());
   sql_chunks_remove_ = new SqlChunksRemove     (database());
+  sql_chunks_count_  = new SqlChunksCount      (database());
   sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
   sql_inc_linkcount_ = new SqlIncLinkcount     (database());
 }
@@ -102,6 +103,7 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_update_;
   delete sql_chunk_insert_;
   delete sql_chunks_remove_;
+  delete sql_chunks_count_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
 }
@@ -127,7 +129,6 @@ uint32_t WritableCatalog::GetMaxLinkId() const {
  * @param entry the DirectoryEntry to add to the catalog
  * @param entry_path the full path of the DirectoryEntry to add
  * @param parent_path the full path of the containing directory
- * @return true if DirectoryEntry was added, false otherwise
  */
 void WritableCatalog::AddEntry(const DirectoryEntry &entry,
                                const string &entry_path,
@@ -148,7 +149,7 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
   assert(retval);
   sql_insert_->Reset();
 
-  delta_counters_.DeltaDirent(entry, 1);
+  delta_counters_.Increment(entry);
 }
 
 
@@ -157,7 +158,6 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
  * Note: removing a directory which is non-empty results in dangling entries.
  *       (this should be treated in upper layers)
  * @param entry_path the full path of the DirectoryEntry to delete
- * @return true if entry was removed, false otherwise
  */
 void WritableCatalog::RemoveEntry(const string &file_path) {
   hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(file_path));
@@ -170,11 +170,7 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
 
   // if the entry used to be a chunked file... remove the chunks
   if (entry.IsChunkedFile()) {
-    retval =
-      sql_chunks_remove_->BindPathHash(path_hash) &&
-      sql_chunks_remove_->Execute();
-    assert(retval);
-    sql_chunks_remove_->Reset();
+    RemoveFileChunks(file_path);
   }
 
   // remove the entry itself
@@ -184,7 +180,7 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
   assert(retval);
   sql_unlink_->Reset();
 
-  delta_counters_.DeltaDirent(entry, -1);
+  delta_counters_.Decrement(entry);
 }
 
 
@@ -241,6 +237,8 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
            chunk.offset(),
            chunk.offset() + chunk.size());
 
+  delta_counters_.self.file_chunks++;
+
   bool retval =
     sql_chunk_insert_->BindPathHash(path_hash) &&
     sql_chunk_insert_->BindFileChunk(chunk) &&
@@ -251,8 +249,33 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
 
 
 /**
+ * Removes the file chunks for a given file path
+ * @param entry_path   the file path to clear from it's file chunks
+ */
+void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
+  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
+  bool retval;
+
+  // subtract the number of chunks from the statistics counters
+  retval =
+    sql_chunks_count_->BindPathHash(path_hash)  &&
+    sql_chunks_count_->Execute();
+  assert(retval);
+  const int chunks_count = sql_chunks_count_->GetChunkCount();
+  delta_counters_.self.file_chunks -= chunks_count;
+  sql_chunks_count_->Reset();
+
+  // remove the chunks associated to `entry_path`
+  retval =
+    sql_chunks_remove_->BindPathHash(path_hash) &&
+    sql_chunks_remove_->Execute();
+  assert(retval);
+  sql_chunks_remove_->Reset();
+}
+
+
+/**
  * Sets the last modified time stamp of this catalog to current time.
- * @return true on success, false otherwise
  */
 void WritableCatalog::UpdateLastModified() {
   const time_t now = time(NULL);
@@ -265,7 +288,6 @@ void WritableCatalog::UpdateLastModified() {
 
 /**
  * Increments the revision of the catalog in the database.
- * @return true on success, false otherwise
  */
 void WritableCatalog::IncrementRevision() {
   const string sql =
@@ -286,7 +308,6 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
 
 /**
  * Sets the content hash of the previous catalog revision.
- * @return true on success, false otherwise
  */
 void WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
   const string sql = "INSERT OR REPLACE INTO properties "
@@ -303,7 +324,7 @@ void WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
   // Create connection between parent and child catalogs
   MakeTransitionPoint(new_nested_catalog->path().ToString());
   new_nested_catalog->MakeNestedRoot();
-  delta_counters_.d_subtree_dir++;  // Root directory in nested catalog
+  delta_counters_.subtree.directories++;  // Root directory in nested catalog
 
   // Move the present directory tree into the newly created nested catalog
   // if we hit nested catalog mountpoints on the way, we return them through
@@ -428,7 +449,6 @@ void WritableCatalog::MoveFileChunksToNested(
  *        object of mountpoint
  * @param content_hash can be set to safe a content hash together with the
  *        reference
- * @return true on success, false otherwise
  */
 void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
                                           Catalog *attached_reference,
@@ -450,7 +470,7 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     AddChild(attached_reference);
 
-  delta_counters_.d_self_nested++;
+  delta_counters_.self.nested_catalogs++;
 }
 
 
@@ -462,7 +482,6 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
               the database
  * @param[out] attached_reference is set to the object of the attached child or
  *             to NULL
- * @return true on success, false otherwise
  */
 void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                                           Catalog **attached_reference)
@@ -489,7 +508,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     *attached_reference = child;
 
-  delta_counters_.d_self_nested--;
+  delta_counters_.self.nested_catalogs--;
 }
 
 
@@ -497,7 +516,6 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
  * Updates the link to a nested catalog in the database.
  * @param path the path of the nested catalog to update
  * @param hash the hash to set the given nested catalog link to
- * @return true on success, false otherwise
  */
 void WritableCatalog::UpdateNestedCatalog(const string &path,
                                           const hash::Any &hash)
@@ -526,12 +544,10 @@ void WritableCatalog::MergeIntoParent() {
   CopyCatalogsToParent();
 
   // Fix counters in parent
-  delta_counters_.PopulateToParent(&parent->delta_counters_);
-  Counters counters;
-  bool retval = GetCounters(&counters);
-  assert(retval);
+  delta_counters_.PopulateToParent(parent->delta_counters_);
+  Counters &counters = GetCounters();
   counters.ApplyDelta(delta_counters_);
-  counters.MergeIntoParent(&parent->delta_counters_);
+  counters.MergeIntoParent(parent->delta_counters_);
 
   // Remove the nested catalog reference for this nested catalog.
   // From now on this catalog will be dangling!
@@ -553,7 +569,7 @@ void WritableCatalog::CopyCatalogsToParent() {
   {
     Catalog *child = FindChild(i->path);
     parent->InsertNestedCatalog(i->path.ToString(), child, i->hash);
-    parent->delta_counters_.d_self_nested--;  // Will be fixed later
+    parent->delta_counters_.self.nested_catalogs--;  // Will be fixed later
   }
 }
 
@@ -625,36 +641,8 @@ void WritableCatalog::CopyToParent() {
  * Writes delta_counters_ to the database.
  */
 void WritableCatalog::UpdateCounters() const {
-  const DeltaCounters &d = delta_counters_;
-  SqlUpdateCounter sql_counter(database());
-  const bool retval =
-    UpdateCounter(sql_counter, "self_regular",    d.d_self_regular)    &&
-    UpdateCounter(sql_counter, "self_symlink",    d.d_self_symlink)    &&
-    UpdateCounter(sql_counter, "self_dir",        d.d_self_dir)        &&
-    UpdateCounter(sql_counter, "self_nested",     d.d_self_nested)     &&
-    UpdateCounter(sql_counter, "subtree_regular", d.d_subtree_regular) &&
-    UpdateCounter(sql_counter, "subtree_symlink", d.d_subtree_symlink) &&
-    UpdateCounter(sql_counter, "subtree_dir",     d.d_subtree_dir)     &&
-    UpdateCounter(sql_counter, "subtree_nested",  d.d_subtree_nested);
-
-  assert(retval);
-}
-
-
-bool WritableCatalog::UpdateCounter(      SqlUpdateCounter &sql,
-                                    const std::string      &counter_name,
-                                    const int64_t           delta) const {
-  if (delta == 0)
-    return true;
-
-  const bool retval =
-    sql.BindCounter(counter_name) &&
-    sql.BindDelta(delta)          &&
-    sql.Execute();
-  if (!retval) return false;
-  sql.Reset();
-
-  return true;
+  const bool retval = delta_counters_.WriteToDatabase(database());
+  assert (retval);
 }
 
 }  // namespace catalog
