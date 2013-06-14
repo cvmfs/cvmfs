@@ -19,6 +19,7 @@ namespace catalog {
 class DirectoryEntry;
 class Database;
 
+// FieldT is either int64_t (DeltaCounters) or uint64_t (Counters)
 template<typename FieldT>
 class TreeCountersBase {
   friend class swissknife::CommandCheck;
@@ -27,10 +28,11 @@ class TreeCountersBase {
 
  protected:
   typedef std::map<std::string, const FieldT*> FieldsMap;
-  template<typename T>
   struct Fields {
     Fields() : regular_files(0), symlinks(0), directories(0),
                nested_catalogs(0), chunked_files(0), file_chunks(0) {}
+
+    // typname U is another TreeCountersBase (eg: add DeltaCounters to Counters)
 
     template<typename U>
     void Add(const U &other) {
@@ -61,12 +63,12 @@ class TreeCountersBase {
       map[prefix + "chunks"]  = &file_chunks;
     }
 
-    T regular_files;
-    T symlinks;
-    T directories;
-    T nested_catalogs;
-    T chunked_files;
-    T file_chunks;
+    FieldT regular_files;
+    FieldT symlinks;
+    FieldT directories;
+    FieldT nested_catalogs;
+    FieldT chunked_files;
+    FieldT file_chunks;
   };
 
  public:
@@ -80,8 +82,8 @@ class TreeCountersBase {
   FieldsMap GetFieldsMap() const;
 
  public:
-  Fields<FieldT> self;
-  Fields<FieldT> subtree;
+  Fields self;
+  Fields subtree;
 };
 
 
@@ -110,8 +112,8 @@ class Counters : public TreeCountersBase<Counters_t> {
   Counters_t GetAllEntries() const;
 };
 
-}
+}  // namespace catalog
 
 #include "catalog_counters_impl.h"
 
-#endif /* CVMFS_CATALOG_COUNTERS_H_ */
+#endif  // CVMFS_CATALOG_COUNTERS_H_

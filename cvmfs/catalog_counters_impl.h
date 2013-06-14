@@ -1,3 +1,6 @@
+/**
+ * This file is part of the CernVM File System.
+ */
 
 #include "catalog_sql.h"
 
@@ -5,7 +8,8 @@ namespace catalog {
 
 template<typename FieldT>
 typename TreeCountersBase<FieldT>::FieldsMap
-    TreeCountersBase<FieldT>::GetFieldsMap() const {
+    TreeCountersBase<FieldT>::GetFieldsMap() const
+{
   FieldsMap map;
   self.FillFieldsMap(map, "self_");
   subtree.FillFieldsMap(map, "subtree_");
@@ -26,7 +30,7 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(const Database &database) {
     const bool current_retval = sql_counter.BindCounter(i->first) &&
                                 sql_counter.Execute();
     *(const_cast<FieldT*>(i->second)) =
-                                  static_cast<FieldT>(sql_counter.GetCounter());
+      static_cast<FieldT>(sql_counter.GetCounter());
     sql_counter.Reset();
 
     retval = (retval) ? current_retval : false;
@@ -60,7 +64,8 @@ bool TreeCountersBase<FieldT>::WriteToDatabase(const Database &database) const {
 
 
 template<typename FieldT>
-bool TreeCountersBase<FieldT>::InsertIntoDatabase(const Database &database) const {
+bool TreeCountersBase<FieldT>::InsertIntoDatabase(const Database &database) const
+{
   bool retval = true;
 
   const FieldsMap map = GetFieldsMap();
@@ -89,4 +94,4 @@ void TreeCountersBase<FieldT>::SetZero() {
 }
 
 
-} /* namespace catalog */
+}  // namespace catalog

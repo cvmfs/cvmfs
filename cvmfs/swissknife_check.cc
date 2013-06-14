@@ -528,7 +528,7 @@ bool CommandCheck::InspectTree(const string &path,
   catalog::Counters compare_counters;
   compare_counters.ApplyDelta(*computed_counters);
   const catalog::Counters stored_counters = catalog->GetCounters();
-  if (! CompareCounters(compare_counters, stored_counters)) {
+  if (!CompareCounters(compare_counters, stored_counters)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
              catalog_hash.ToString().c_str());
     retval = false;

@@ -218,7 +218,7 @@ bool Database::Create(const string &filename,
   if (!retval)
     goto create_schema_fail;
 
-  if (! counters.InsertIntoDatabase(database))
+  if (!counters.InsertIntoDatabase(database))
     goto create_schema_fail;
 
   // Insert root entry

@@ -133,7 +133,7 @@ TEST_F(T_CatalogCounters, DeltaBasicDecrement) {
 
 
 TEST_F(T_CatalogCounters, FieldsCombinations) {
-  typedef TreeCountersBase<int>::Fields<int> IntFields;
+  typedef TreeCountersBase<int>::Fields IntFields;
   IntFields a;
   IntFields b;
 
