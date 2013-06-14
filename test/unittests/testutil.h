@@ -7,6 +7,8 @@
 
 pid_t GetParentPid(const pid_t pid);
 
+namespace catalog {
+
 class DirectoryEntryTestFactory {
  public:
   static catalog::DirectoryEntry RegularFile();
@@ -14,5 +16,7 @@ class DirectoryEntryTestFactory {
   static catalog::DirectoryEntry Symlink();
   static catalog::DirectoryEntry ChunkedFile();
 };
+
+} /* namespace catalog */
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */

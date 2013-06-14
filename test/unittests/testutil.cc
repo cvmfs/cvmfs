@@ -41,31 +41,34 @@ pid_t GetParentPid(const pid_t pid) {
   return parent_pid;
 }
 
+namespace catalog {
 
-catalog::DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
-  catalog::DirectoryEntry dirent;
+DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
+  DirectoryEntry dirent;
   dirent.mode_ = 33188;
   return dirent;
 }
 
 
-catalog::DirectoryEntry DirectoryEntryTestFactory::Directory() {
-  catalog::DirectoryEntry dirent;
+DirectoryEntry DirectoryEntryTestFactory::Directory() {
+  DirectoryEntry dirent;
   dirent.mode_ = 16893;
   return dirent;
 }
 
 
-catalog::DirectoryEntry DirectoryEntryTestFactory::Symlink() {
-  catalog::DirectoryEntry dirent;
+DirectoryEntry DirectoryEntryTestFactory::Symlink() {
+  DirectoryEntry dirent;
   dirent.mode_ = 41471;
   return dirent;
 }
 
 
-catalog::DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
-  catalog::DirectoryEntry dirent;
+DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
+  DirectoryEntry dirent;
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
   return dirent;
 }
+
+} /* namespace catalog */
