@@ -339,6 +339,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
   download::Init(num_parallel+1, true);
+  //download::ActivatePipelining();
   unsigned current_group;
   vector< vector<string> > proxies;
   download::GetProxyInfo(&proxies, &current_group);

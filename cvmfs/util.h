@@ -50,6 +50,8 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void ClosePipe(int pipe_fd[2]);
 void Nonblock2Block(int filedes);
 void SendMsg2Socket(const int fd, const std::string &msg);
+void LockMutex(pthread_mutex_t *mutex);
+void UnlockMutex(pthread_mutex_t *mutex);
 
 bool SwitchCredentials(const uid_t uid, const gid_t gid,
                        const bool temporarily);

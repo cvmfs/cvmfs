@@ -15,6 +15,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <new>
 #include <algorithm>
 
 #include "smalloc.h"
@@ -43,8 +44,7 @@ class SmallHashBase {
   }
 
   ~SmallHashBase() {
-    delete[] keys_;
-    delete[] values_;
+    DeallocMemory(keys_, values_, capacity_);
   }
 
   void Init(uint32_t expected_size, Key empty,
@@ -56,7 +56,7 @@ class SmallHashBase {
       static_cast<uint32_t>(static_cast<double>(expected_size)/kLoadFactor);
     initial_capacity_ = capacity_;
     static_cast<Derived *>(this)->SetThresholds();  // No-op for fixed size
-    InitMemory();
+    AllocMemory();
     this->DoClear(false);
   }
 
@@ -124,10 +124,29 @@ class SmallHashBase {
     return (uint32_t)bucket % capacity_;
   }
 
-  void InitMemory() {
-    keys_ = new Key[capacity_];
-    values_ = new Value[capacity_];
+  void AllocMemory() {
+    keys_ = static_cast<Key *>(smmap(capacity_ * sizeof(Key)));
+    values_ = static_cast<Value *>(smmap(capacity_ * sizeof(Value)));
+    for (uint32_t i = 0; i < capacity_; ++i) {
+      /*keys_[i] =*/ new (keys_ + i) Key();
+    }
+    for (uint32_t i = 0; i < capacity_; ++i) {
+      /*values_[i] =*/ new (values_ + i) Value();
+    }
     bytes_allocated_ = (sizeof(Key) + sizeof(Value)) * capacity_;
+  }
+
+  void DeallocMemory(Key *k, Value *v, uint32_t c) {
+    for (uint32_t i = 0; i < c; ++i) {
+      k[i].~Key();
+    }
+    for (uint32_t i = 0; i < c; ++i) {
+      v[i].~Value();
+    }
+    smunmap(k);
+    smunmap(v);
+    k = NULL;
+    v = NULL;
   }
 
   // Returns true iff the key is overwritten
@@ -256,10 +275,9 @@ class SmallHashDynamic :
   }
 
   void ResetCapacity() {
-    delete[] Base::keys_;
-    delete[] Base::values_;
+    Base::DeallocMemory(Base::keys_, Base::values_, Base::capacity_);
     Base::capacity_ = Base::initial_capacity_;
-    Base::InitMemory();
+    Base::AllocMemory();
     SetThresholds();
   }
 
@@ -272,7 +290,7 @@ class SmallHashDynamic :
 
     Base::capacity_ = new_capacity;
     SetThresholds();
-    Base::InitMemory();
+    Base::AllocMemory();
     Base::DoClear(false);
     for (uint32_t i = 0; i < old_capacity; ++i) {
       if (old_keys[i] != Base::empty_key_)
@@ -280,8 +298,7 @@ class SmallHashDynamic :
     }
     assert(size() == old_size);
 
-    delete[] old_keys;
-    delete[] old_values;
+    Base::DeallocMemory(old_keys, old_values, old_capacity);
     num_migrates_++;
   }
 
@@ -410,12 +427,12 @@ class MultiHash {
 
 // initialize the static fields
 template<class Key, class Value, class Derived>
-const double SmallHashBase<Key, Value, Derived>::kLoadFactor = 0.7;
+const double SmallHashBase<Key, Value, Derived>::kLoadFactor = 0.75;
 
 template<class Key, class Value>
-const double SmallHashDynamic<Key, Value>::kThresholdGrow = 0.7;
+const double SmallHashDynamic<Key, Value>::kThresholdGrow = 0.75;
 
 template<class Key, class Value>
-const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.15;
+const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.25;
 
 #endif  // CVMFS_SMALLHASH_H_

@@ -97,9 +97,13 @@ static void *MainTalk(void *data __attribute__((unused))) {
     }
 
     char buf[kMaxCommandSize];
-    if (recv(con_fd, buf, sizeof(buf), 0) > 0) {
-      const string line = string(buf);
-      LogCvmfs(kLogTalk, kLogDebug, "received %s", line.c_str());
+    int bytes_read;
+    if ((bytes_read = recv(con_fd, buf, sizeof(buf), 0)) > 0) {
+      if (buf[bytes_read-1] == '\0')
+        bytes_read--;
+      const string line = string(buf, bytes_read);
+      LogCvmfs(kLogTalk, kLogDebug, "received %s (length %u)",
+               line.c_str(), line.length());
 
       if (line == "tracebuffer flush") {
         tracer::Flush();
@@ -165,6 +169,17 @@ static void *MainTalk(void *data __attribute__((unused))) {
           else
             Answer(con_fd, "No such regular file\n");
         }
+      } else if (line.substr(0, 3) == "pin") {
+        if (line.length() < 5) {
+          Answer(con_fd, "Usage: pin <path>\n");
+        } else {
+          const string path = line.substr(4);
+          const bool found_regular = cvmfs::Pin(path);
+          if (found_regular)
+            Answer(con_fd, "OK\n");
+          else
+            Answer(con_fd, "No such regular file or pinning failed\n");
+        }
       } else if (line == "mountpoint") {
         Answer(con_fd, *cvmfs::mountpoint_ + "\n");
       } else if (line == "remount") {
@@ -201,6 +216,14 @@ static void *MainTalk(void *data __attribute__((unused))) {
         } else {
           const unsigned max_ttl = String2Uint64(line.substr(12));
           cvmfs::SetMaxTTL(max_ttl);
+          Answer(con_fd, "OK\n");
+        }
+      } else if (line.substr(0, 14) == "nameserver set") {
+        if (line.length() < 16) {
+          Answer(con_fd, "Usage: nameserver set <host>\n");
+        } else {
+          const string host = line.substr(15);
+          download::SetDnsServer(host);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "host info") {

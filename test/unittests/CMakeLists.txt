@@ -15,6 +15,7 @@ set (CVMFS_UNITTEST_SOURCES
   # unit test files
   t_atomic.cc
   t_smallhash.cc
+  t_bigvector.cc
   t_util_concurrency.cc 
   t_fs_traversal.cc
 
@@ -24,6 +25,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/murmur.h
   ${CVMFS_SOURCE_DIR}/smallhash.h
+  ${CVMFS_SOURCE_DIR}/bigvector.h
   ${CVMFS_SOURCE_DIR}/smalloc.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
