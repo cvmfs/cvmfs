@@ -140,9 +140,19 @@ class FileSystemTraversal {
 
     // Walk through the open directory notifying the about contents
     while ((dit = platform_readdir(dip)) != NULL) {
-      // Check if filename should be ignored
-      if (std::string(dit->d_name) == "." || std::string(dit->d_name) == ".." || (fn_ignore_file != NULL && Notify(fn_ignore_file, path, dit->d_name))) 
-        continue;
+      // Check if file should be ignored
+      if (std::string(dit->d_name) == "." || std::string(dit->d_name) == "..") {
+	continue;
+      } else if (fn_ignore_file != NULL) {
+	if (Notify(fn_ignore_file, path, dit->d_name)) {
+	  LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "ignoring %s/%s",
+		   path.c_str(), dit->d_name);
+	  continue;
+	}
+      } else {
+	LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "not ignoring %s/%s (fn_ignore_file not set)",
+		 path.c_str(), dit->d_name);
+      }
 
       // Notify user about found directory entry
       platform_stat64 info;

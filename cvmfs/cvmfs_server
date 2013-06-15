@@ -363,14 +363,25 @@ try_mount_remount_cycle() {
   local tmpdir
   tmpdir=$(mktemp -d)
   mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
-  mount -t aufs \
-    -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
-    try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
-  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
-  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
-  rm -fR ${tmpdir}
-  return 0
+  if [ -e /etc/cvmfs/server.overlayfs ]; then
+      mount -t overlayfs \
+	  -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
+	  try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+      mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
+      mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
+      umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
+      rm -fR ${tmpdir}
+      return 0
+  else
+      mount -t aufs \
+	  -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
+	  try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+      mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
+      mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
+      umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
+      rm -fR ${tmpdir}
+      return 0
+  fi
 }
 
 
@@ -983,13 +994,13 @@ EOF
     selinux_context="context=\"system_u:object_r:default_t:s0\""
   fi
   test -e /etc/cvmfs/server.overlayfs && (cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
 )
   test -e /etc/cvmfs/server.overlayfs || (cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf,${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
