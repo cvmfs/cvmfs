@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 CARES_VERSION=1.9.1
 CURL_VERSION=7.27.0
 ZLIB_VERSION=1.2.7
@@ -12,7 +14,7 @@ if [ $# -ne 1 ]; then
   exit 1
 fi
 
-externals_build_dir=$1
+externals_build_dir=$(readlink --canonicalize $1)
 repo_root=$(pwd)
 externals_dir="$repo_root/externals"
 
