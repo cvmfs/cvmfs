@@ -1,7 +1,7 @@
 #!/bin/sh
 
 cdir=$(pwd)
-cares_location="../c-ares"
+cares_location="../build_c-ares"
 cd $cares_location
 sh makeHook.sh
 cd $cdir
