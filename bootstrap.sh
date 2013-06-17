@@ -33,22 +33,10 @@ do_extract() {
   local library_dir="$externals_dir/$library_name"
   local dest_dir=$(get_destination_dir $library_name)
   local cdir=$(pwd)
-  local library_archive_extension
-  local library_decompressed_dir
-
-  library_archive_extension=$(echo $library_archive | sed "s/^.*\.\([a-z]*\)$/\1/")
+  local library_decompressed_dir=$(basename $library_archive .tar.gz)
 
   cd $externals_build_dir
-  if [ "$library_archive_extension" = "gz" ]; then
-    library_decompressed_dir=$(basename $library_archive .tar.gz)
-    tar xvfz "$library_dir/$library_archive"
-  elif [ "$library_archive_extension" = "zip" ]; then
-    library_decompressed_dir=$(basename $library_archive .zip)
-    unzip "$library_dir/$library_archive"
-  else
-    echo "unknown archive file extension $library_archive_extension"
-    exit 2
-  fi
+  tar xvfz "$library_dir/$library_archive"
   mv $library_decompressed_dir $dest_dir
   cd $cdir
   cp $library_dir/src/* $dest_dir
@@ -80,7 +68,7 @@ do_extract  "libcurl"     "curl-${CURL_VERSION}.tar.gz"
 do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
 do_extract  "sparsehash"  "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
 do_extract  "leveldb"     "leveldb-${LEVELDB_VERSION}.tar.gz"
-do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.zip"
+do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.tar.gz"
 
 do_copy     "sqlite3"
 do_copy     "vjson"
