@@ -21,12 +21,17 @@ if [ -f "$externals_build_dir/.decompressionDone" ]; then
   exit 0
 fi
 
+get_destination_dir() {
+  local library_name=$1
+  echo "$externals_build_dir/src_$library_name"
+}
+
 do_extract() {
   local library_name="$1"
   local library_archive="$2"
 
   local library_dir="$externals_dir/$library_name"
-  local dest_dir="$externals_build_dir/$library_name"
+  local dest_dir=$(get_destination_dir $library_name)
   local cdir=$(pwd)
   local library_archive_extension
   local library_decompressed_dir
@@ -44,7 +49,7 @@ do_extract() {
     echo "unknown archive file extension $library_archive_extension"
     exit 2
   fi
-  mv $library_decompressed_dir $library_name
+  mv $library_decompressed_dir $dest_dir
   cd $cdir
   cp $library_dir/src/* $dest_dir
 }
@@ -53,7 +58,7 @@ do_copy() {
   local library_name="$1"
 
   local library_dir="$externals_dir/$library_name"
-  local dest_dir="$externals_build_dir/$library_name"
+  local dest_dir=$(get_destination_dir $library_name)
 
   mkdir -p $dest_dir
   cp $library_dir/src/* $dest_dir
@@ -61,7 +66,7 @@ do_copy() {
 
 patch_leveldb() {
   local cdir=$(pwd)
-  cd "$externals_build_dir/leveldb/"
+  cd $(get_destination_dir "leveldb")
   patch < dont_search_snappy.patch
   cd $cdir
 }
