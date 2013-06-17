@@ -7,82 +7,80 @@ SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.5.0
 GOOGLETEST_VERSION=1.6.0
 
-# put the extracted stuff out of source for compilation (location given by cmake)
-outOfSource=$1
-
-# check if bootstrapping already happened
-if [ -f "$outOfSource/.decompressionDone" ]; then
-	exit 0
+if [ $# -ne 1 ]; then
+  echo "Usage: $0 <decompress location>"
+  exit 1
 fi
 
+externals_build_dir=$1
 repo_root=$(pwd)
+externals_dir="$repo_root/externals"
 
-# C-ARES
-cd externals/c-ares
-tar xvfz c-ares-${CARES_VERSION}.tar.gz
-mkdir -p "$outOfSource/c-ares/src"
-mv c-ares-${CARES_VERSION}/* "$outOfSource/c-ares/src"
-cp src/* "$outOfSource/c-ares/src"
-rm -rf c-ares-${CARES_VERSION}
-cd $repo_root
+# check if bootstrapping already happened
+if [ -f "$externals_build_dir/.decompressionDone" ]; then
+  exit 0
+fi
 
-# CURL
-cd externals/libcurl
-tar xfz curl-${CURL_VERSION}.tar.gz
-mkdir -p "$outOfSource/libcurl/src"
-mv curl-${CURL_VERSION}/* "$outOfSource/libcurl/src"
-cp src/* "$outOfSource/libcurl/src"
-rm -rf curl-${CURL_VERSION}
-cd $repo_root
+do_extract() {
+  local library_name="$1"
+  local library_archive="$2"
 
-# Zlib
-cd externals/zlib
-tar xfz zlib-${ZLIB_VERSION}.tar.gz
-mkdir -p "$outOfSource/zlib/src"
-mv zlib-${ZLIB_VERSION}/* "$outOfSource/zlib/src"
-cp src/* "$outOfSource/zlib/src"
-rm -rf zlib-${ZLIB_VERSION}
-cd $repo_root
+  local library_dir="$externals_dir/$library_name"
+  local dest_dir="$externals_build_dir/$library_name"
+  local cdir=$(pwd)
+  local library_archive_extension
+  local library_decompressed_dir
 
-# sqlite3
-cd externals/sqlite3
-mkdir -p "$outOfSource/sqlite3/src"
-cp src/* "$outOfSource/sqlite3/src"
-cd $repo_root
+  library_archive_extension=$(echo $library_archive | sed "s/^.*\.\([a-z]*\)$/\1/")
 
-# vjson
-cd externals/vjson
-mkdir -p "$outOfSource/vjson/src"
-cp src/* "$outOfSource/vjson/src"
-cd $repo_root
+  cd $externals_build_dir
+  if [ "$library_archive_extension" = "gz" ]; then
+    library_decompressed_dir=$(basename $library_archive .tar.gz)
+    tar xvfz "$library_dir/$library_archive"
+  elif [ "$library_archive_extension" = "zip" ]; then
+    library_decompressed_dir=$(basename $library_archive .zip)
+    unzip "$library_dir/$library_archive"
+  else
+    echo "unknown archive file extension $library_archive_extension"
+    exit 2
+  fi
+  mv $library_decompressed_dir $library_name
+  cd $cdir
+  cp $library_dir/src/* $dest_dir
+}
 
-# google sparse hash
-cd externals/sparsehash
-tar xfz sparsehash-${SPARSEHASH_VERSION}.tar.gz
-mkdir -p "$outOfSource/sparsehash/src"
-mv sparsehash-${SPARSEHASH_VERSION}/* "$outOfSource/sparsehash/src"
-cp src/* "$outOfSource/sparsehash/src"
-rm -rf sparsehash-${SPARSEHASH_VERSION}
-cd $repo_root
+do_copy() {
+  local library_name="$1"
 
-# leveldb
-cd externals/leveldb
-tar xvfz leveldb-${LEVELDB_VERSION}.tar.gz
-mkdir -p "$outOfSource/leveldb/src"
-mv leveldb-${LEVELDB_VERSION}/* "$outOfSource/leveldb/src"
-cp src/* "$outOfSource/leveldb/src"
-cd "$outOfSource/leveldb/src" && patch < dont_search_snappy.patch
-rm -rf leveldb-${LEVELDB_VERSION}
-cd $repo_root
+  local library_dir="$externals_dir/$library_name"
+  local dest_dir="$externals_build_dir/$library_name"
 
-# googletest
-cd externals/googletest
-unzip gtest-${GOOGLETEST_VERSION}.zip
-mkdir -p "$outOfSource/googletest/src"
-mv gtest-${GOOGLETEST_VERSION}/* "$outOfSource/googletest/src"
-cp src/* "$outOfSource/googletest/src"
-rm -rf gtest-${GOOGLETEST_VERSION}
-cd $repo_root
+  mkdir -p $dest_dir
+  cp $library_dir/src/* $dest_dir
+}
+
+patch_leveldb() {
+  local cdir=$(pwd)
+  cd "$externals_build_dir/leveldb/"
+  patch < dont_search_snappy.patch
+  cd $cdir
+}
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+mkdir -p $externals_build_dir
+
+do_extract  "c-ares"      "c-ares-${CARES_VERSION}.tar.gz"
+do_extract  "libcurl"     "curl-${CURL_VERSION}.tar.gz"
+do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
+do_extract  "sparsehash"  "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
+do_extract  "leveldb"     "leveldb-${LEVELDB_VERSION}.tar.gz"
+do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.zip"
+
+do_copy     "sqlite3"
+do_copy     "vjson"
+
+patch_leveldb
 
 # create a hint that bootstrapping is already done
-touch "$outOfSource/.decompressionDone"
+touch "$externals_build_dir/.decompressionDone"
