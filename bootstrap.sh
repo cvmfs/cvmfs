@@ -23,7 +23,7 @@ fi
 
 get_destination_dir() {
   local library_name=$1
-  echo "$externals_build_dir/src_$library_name"
+  echo "$externals_build_dir/build_$library_name"
 }
 
 do_extract() {
