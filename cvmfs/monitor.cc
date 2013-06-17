@@ -269,8 +269,7 @@ static string GenerateStackTrace(const string &exe_path,
                           argv,
                           double_fork,
                          &gdb_pid);
-  assert(false);
-  //assert(retval);
+  assert(retval);
 
   // Skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
