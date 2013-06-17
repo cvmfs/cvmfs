@@ -82,3 +82,36 @@ mortem analysis by hand.
   Detailed unit test results end up in this log file.
 
 
+ + ----------------------------------
+ | Flow
+
+   +-----------+
+   | run.sh    |
+   +-----------+
+         |                                +-------------------+
+         +------------- Spawn ----------> | Virtual Machine   |
+         |      (instance_handler.py)     +-------------------+
+         |                                          /
+         |                                          \
+         +---+--- run remote_setup.sh ------------> /
+         |   |                                      \
+         |   +--- run platforms/*_setup.sh -------> /
+         |                                          \
+         |                                          /
+         +---+--- run remote_run.sh --------------> \
+         |   |                                      /
+         |   +-+- run platforms/*_run.sh ---------> \
+         |     |                                    /
+         |     +----- execute unit tests ---------> \
+         |     |                                    /
+         |     +----- execute integration tests---> \
+         |                                          /
+         |                                          \
+         +------- retrieve test log files --------> /
+         |<---------------------------------------- \
+         |                                          /
+         |                                          \
+         +-------------- Terminate ---------------> /
+         |                                         o
+         o
+
