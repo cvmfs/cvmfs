@@ -101,9 +101,13 @@ file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
 if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 	message (STATUS "running bootstrap.sh ...")
 	execute_process (
-		COMMAND			sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
-		WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}
+    COMMAND           sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    RESULT_VARIABLE   BOOTSTRAPPING_RESULT
 	)
+  if (BOOTSTRAPPING_RESULT GREATER 0)
+    message (FATAL_ERROR "bootstrapping failed")
+  endif (BOOTSTRAPPING_RESULT GREATER 0)
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
 #
