@@ -279,6 +279,18 @@ bool TagList::FindRevision(const unsigned revision, Tag *tag) {
 }
 
 
+bool TagList::FindHash(const hash::Any &hash, Tag *tag) {
+  assert(tag);
+  for (unsigned i = 0; i < list_.size(); ++i) {
+    if (list_[i].root_hash == hash) {
+      *tag = list_[i];
+      return true;
+    }
+  }
+  return false;
+}
+
+
 void TagList::Remove(const string &name) {
   for (vector<Tag>::iterator i = list_.begin(); i < list_.end(); ++i) {
     if (i->name == name) {
