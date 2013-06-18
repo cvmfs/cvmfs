@@ -150,7 +150,8 @@ CernVM-FS Server Tool $(cvmfs_version_string)
 Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
-  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
+  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] 
+                [-m replicable] [-f union filesystem type]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner]
@@ -357,31 +358,36 @@ has_selinux() {
 # for some reason `mount -o remount,(ro|rw) /cvmfs/$name` does not work on older
 # platforms if we set the SELinux context=... parameter in /etc/fstab
 # this dry-runs the whole mount, remount, unmount cycle to find out if it works
-# correctly
+# correctly (aufs version)
 # @returns  0 if the whole cycle worked as expected
-try_mount_remount_cycle() {
+try_mount_remount_cycle_aufs() {
   local tmpdir
   tmpdir=$(mktemp -d)
   mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
-  if [ -e /etc/cvmfs/server.overlayfs ]; then
-      mount -t overlayfs \
-	  -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
-	  try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-      mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
-      mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
-      umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
-      rm -fR ${tmpdir}
-      return 0
-  else
-      mount -t aufs \
-	  -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
-	  try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-      mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
-      mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
-      umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
-      rm -fR ${tmpdir}
-      return 0
-  fi
+  mount -t aufs \
+      -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
+      try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
+  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
+  rm -fR ${tmpdir}
+  return 0
+}
+
+# test the mount, remount, unmount cycle (overlayfs version)
+# @returns  0 if the whole cycle worked as expected
+try_mount_remount_cycle_overlayfs() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
+  mount -t overlayfs \
+      -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
+      try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
+  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
+  rm -fR ${tmpdir}
+  return 0
 }
 
 
@@ -793,10 +799,11 @@ mkfs() {
   local upstream
   local owner
   local replicable=1
+  local unionfs
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:m" option; do
+  while getopts "w:u:o:mf:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -809,6 +816,9 @@ mkfs() {
       ;;
       m)
         replicable=1
+      ;;
+      f)
+        unionfs=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -825,6 +835,7 @@ mkfs() {
   # default values
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
+  [ x"$unionfs" = x ] && unionfs=aufs
 
   # sanity checks
   check_repository_existence $name && die "The repository $name already exists"
@@ -848,8 +859,11 @@ mkfs() {
 
   # more sanity checks
   check_user $cvmfs_user || die "No user $cvmfs_user"
-  test -e /etc/cvmfs/server.overlayfs && (/sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || die "overlayfs kernel module missing")
-  test -e /etc/cvmfs/server.overlayfs || (/sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing")
+  if [ $unionfs = "overlayfs" ]; then
+      /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || die "overlayfs kernel module missing"
+  else
+      /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
+  fi
   [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
   [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
@@ -872,6 +886,7 @@ CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
 CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
 CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+CVMFS_UNION_FS_TYPE=$unionfs
 EOF
   cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
@@ -988,27 +1003,36 @@ EOF
   fi
   echo "done"
 
-  echo -n "Mounting CernVM-FS Storage... "
-  local selinux_context=""
-  if has_selinux && try_mount_remount_cycle; then
-    selinux_context="context=\"system_u:object_r:default_t:s0\""
-  fi
-  test -e /etc/cvmfs/server.overlayfs && (cat >> /etc/fstab << EOF
+  if [ $unionfs = "overlayfs" ]; then
+      echo -n "Mounting CernVM-FS Storage... (overlayfs) "
+      local selinux_context=""
+      if has_selinux && try_mount_remount_cycle_overlayfs; then
+	  selinux_context="context=\"system_u:object_r:default_t:s0\""
+      fi
+      cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
-  sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
-)
-  test -e /etc/cvmfs/server.overlayfs || (cat >> /etc/fstab << EOF
+      sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
+      mount $rdonly_dir > /dev/null
+      mount /cvmfs/$name
+      echo "done"
+  else
+      echo -n "Mounting CernVM-FS Storage... (aufs) "
+      local selinux_context=""
+      if has_selinux && try_mount_remount_cycle_aufs; then
+	  selinux_context="context=\"system_u:object_r:default_t:s0\""
+      fi
+      cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
-  sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
-)
-  mount $rdonly_dir > /dev/null
-  mount /cvmfs/$name
-  echo "done"
-
+      sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
+      mount $rdonly_dir > /dev/null
+      mount /cvmfs/$name
+      echo "done"
+  fi
+  
   if [ $replicable -eq 1 ]; then
     alterfs -m on $name
   fi
@@ -1716,6 +1740,9 @@ publish() {
     -w $stratum0 \
     -o ${spool_dir}/tmp/manifest \
     $log_level $tweaks_option"
+  if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
+    sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
+  fi
   if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
     sync_command="$sync_command -p \
      -l $CVMFS_MIN_CHUNK_SIZE \
@@ -1977,6 +2004,7 @@ CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
 CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
 CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+CVMFS_UNION_FS_TYPE=aufs
 EOF
   fi
 
