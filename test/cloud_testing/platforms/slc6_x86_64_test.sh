@@ -9,7 +9,8 @@ sudo service httpd start
 
 # run tests
 echo "running CernVM-FS unit tests..."
-cvmfs_unittests --gtest_shuffle >> $UNITTEST_LOGFILE 2>&1 || die "fail"
+cvmfs_unittests --gtest_shuffle \
+                --gtest_death_test_use_fork >> $UNITTEST_LOGFILE 2>&1 || die "fail"
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
