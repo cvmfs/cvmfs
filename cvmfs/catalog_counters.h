@@ -30,7 +30,8 @@ class TreeCountersBase {
   typedef std::map<std::string, const FieldT*> FieldsMap;
   struct Fields {
     Fields() : regular_files(0), symlinks(0), directories(0),
-               nested_catalogs(0), chunked_files(0), file_chunks(0) {}
+               nested_catalogs(0), chunked_files(0), file_chunks(0),
+               file_size(0), chunked_file_size(0) {}
 
     // typname U is another TreeCountersBase (eg: add DeltaCounters to Counters)
 
@@ -51,16 +52,20 @@ class TreeCountersBase {
       directories       += factor * other.directories;
       nested_catalogs   += factor * other.nested_catalogs;
       chunked_files     += factor * other.chunked_files;
-      file_chunks += factor * other.file_chunks;
+      file_chunks       += factor * other.file_chunks;
+      file_size         += factor * other.file_size;
+      chunked_file_size += factor * other.chunked_file_size;
     }
 
     void FillFieldsMap(FieldsMap &map, const std::string &prefix) const {
-      map[prefix + "regular"] = &regular_files;
-      map[prefix + "symlink"] = &symlinks;
-      map[prefix + "dir"]     = &directories;
-      map[prefix + "nested"]  = &nested_catalogs;
-      map[prefix + "chunked"] = &chunked_files;
-      map[prefix + "chunks"]  = &file_chunks;
+      map[prefix + "regular"]      = &regular_files;
+      map[prefix + "symlink"]      = &symlinks;
+      map[prefix + "dir"]          = &directories;
+      map[prefix + "nested"]       = &nested_catalogs;
+      map[prefix + "chunked"]      = &chunked_files;
+      map[prefix + "chunks"]       = &file_chunks;
+      map[prefix + "file_size"]    = &file_size;
+      map[prefix + "chunked_size"] = &chunked_file_size;
     }
 
     FieldT regular_files;
@@ -69,6 +74,8 @@ class TreeCountersBase {
     FieldT nested_catalogs;
     FieldT chunked_files;
     FieldT file_chunks;
+    FieldT file_size;
+    FieldT chunked_file_size;
   };
 
  public:
