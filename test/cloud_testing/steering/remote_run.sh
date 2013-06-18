@@ -27,6 +27,7 @@ cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
 cvmfs_setup_log="${cvmfs_workspace}/setup.log"
 cvmfs_run_log="${cvmfs_workspace}/run.log"
 cvmfs_test_log="${cvmfs_workspace}/test.log"
+cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
 
 # parameterized variables
 platform_script=""
@@ -78,5 +79,6 @@ fi
 
 # run the platform specific script to perform CernVM-FS tests
 echo "running platform specific script $platform_script ..."
-sudo -H -u $test_username sh $platform_script_abs -t $cvmfs_source_directory \
-                                                  -l $cvmfs_test_log
+sudo -H -u $test_username sh $platform_script_abs -t $cvmfs_source_directory   \
+                                                  -l $cvmfs_test_log           \
+                                                  -u $cvmfs_unittest_log

@@ -107,7 +107,6 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
                              const std::string &union_path,
                              const std::string &scratch_path) :
 SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
-
 	// Ignored filenames
 	ignore_filenames_.insert(".wh..wh..tmp");
 	ignore_filenames_.insert(".wh..wh.plnk");

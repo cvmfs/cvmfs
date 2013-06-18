@@ -1,10 +1,12 @@
 #!/bin/sh
 
-cd ../../c-ares/src
-make clean && make
-cd ../../libcurl/src
+cdir=$(pwd)
+cares_location="../build_c-ares"
+cd $cares_location
+sh makeHook.sh
+cd $cdir
 
-sh configure LDFLAGS="$LDFLAGS -L${PWD}/../../c-ares/src/.libs -rdynamic" CFLAGS="$CFLAGS -I${PWD}/../../c-ares/src -D_FILE_OFFSET_BITS=64 -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden" \
+sh configure LDFLAGS="$LDFLAGS -L${PWD}/${cares_location}/.libs -rdynamic" CFLAGS="$CFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=64 -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fno-optimize-sibling-calls -fvisibility=hidden" \
   $CVMFS_ZLIB --enable-warnings \
   --enable-ares \
   --disable-shared \

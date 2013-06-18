@@ -120,6 +120,7 @@ class TagList {
 
   bool FindTag(const std::string &name, Tag *tag);
   bool FindRevision(const unsigned revision, Tag *tag);
+  bool FindHash(const hash::Any &hash, Tag *tag);
   Failures Insert(const Tag &tag);
   void Remove(const std::string &name);
   void Rollback(const unsigned until_revision);

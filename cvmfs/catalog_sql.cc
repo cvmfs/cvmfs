@@ -158,6 +158,9 @@ bool Database::Create(const string &filename,
   sqlite3_extended_result_codes(sqlite_db, 1);
   Database database(sqlite_db, kLatestSchema, true);
 
+  catalog::Counters counters;
+  counters.self.directories = 1;
+
   bool retval;
   string sql;
   retval = Sql(database,
@@ -215,13 +218,7 @@ bool Database::Create(const string &filename,
   if (!retval)
     goto create_schema_fail;
 
-  retval = Sql(database,
-    "INSERT INTO statistics (counter, value) "
-    "SELECT 'self_regular', 0 UNION ALL SELECT 'self_symlink', 0 UNION ALL "
-    "SELECT 'self_dir', 1 UNION ALL SELECT 'self_nested', 0 UNION ALL "
-    "SELECT 'subtree_regular', 0 UNION ALL SELECT 'subtree_symlink', 0 UNION ALL "
-    "SELECT 'subtree_dir', 0 UNION ALL SELECT 'subtree_nested', 0;").Execute();
-  if (!retval)
+  if (!counters.InsertIntoDatabase(database))
     goto create_schema_fail;
 
   // Insert root entry
@@ -747,6 +744,29 @@ FileChunk SqlChunksListing::GetFileChunk() const {
 //------------------------------------------------------------------------------
 
 
+SqlChunksCount::SqlChunksCount(const Database &database) {
+  const string statement =
+    "SELECT count(*) FROM chunks "
+    //         0
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2)";
+    //                    1                          2
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlChunksCount::BindPathHash(const hash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+int SqlChunksCount::GetChunkCount() const {
+  return RetrieveInt64(0);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
@@ -800,6 +820,25 @@ bool SqlUpdateCounter::BindCounter(const std::string &counter) {
 
 bool SqlUpdateCounter::BindDelta(const int64_t delta) {
   return BindInt64(1, delta);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlCreateCounter::SqlCreateCounter(const Database &database) {
+  Init(database.sqlite_db(),
+       "INSERT INTO statistics (counter, value) VALUES (:counter, :value);");
+}
+
+
+bool SqlCreateCounter::BindCounter(const std::string &counter) {
+  return BindText(1, counter);
+}
+
+
+bool SqlCreateCounter::BindInitialValue(const int64_t value) {
+  return BindInt64(2, value);
 }
 
 

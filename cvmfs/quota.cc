@@ -972,12 +972,12 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
 
-  vector<int> preserve_filedes;
-  preserve_filedes.push_back(0);
-  preserve_filedes.push_back(1);
-  preserve_filedes.push_back(2);
-  preserve_filedes.push_back(pipe_boot[1]);
-  preserve_filedes.push_back(pipe_handshake[0]);
+  set<int> preserve_filedes;
+  preserve_filedes.insert(0);
+  preserve_filedes.insert(1);
+  preserve_filedes.insert(2);
+  preserve_filedes.insert(pipe_boot[1]);
+  preserve_filedes.insert(pipe_handshake[0]);
 
   retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
   if (!retval) {

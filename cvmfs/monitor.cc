@@ -18,6 +18,7 @@
 #else
   #include <ucontext.h>
 #endif
+#include <execinfo.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -43,6 +44,9 @@
 
 using namespace std;  // NOLINT
 
+// Used for address offset calculation
+extern loader::CvmfsExports *g_cvmfs_exports;
+
 namespace monitor {
 
 const unsigned kMinOpenFiles = 8192;  /**< minmum threshold for the maximum
@@ -54,13 +58,28 @@ string *cache_dir_ = NULL;
 string *process_name_ = NULL;
 string *exe_path_ = NULL;
 bool spawned_ = false;
-int pipe_wd_[2];
+Pipe *pipe_watchdog_ = NULL;
 platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
 pid_t watchdog_pid_ = 0;
 
 typedef std::map<int, struct sigaction> SigactionMap;
 SigactionMap old_signal_handlers_;
+
+struct CrashData {
+  int   signal;
+  int   sys_errno;
+  pid_t pid;
+};
+
+struct ControlFlow {
+  enum Flags { // TODO: C++11 (type safe enum)
+    kProduceStacktrace = 0,
+    kQuit,
+    kUnknown,
+  };
+};
+
 
 pid_t GetPid() {
   if (!spawned_) {
@@ -98,7 +117,7 @@ static SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers) {
  * Signal handler for signals that indicate a cvmfs crash.
  * Sends debug information to watchdog.
  */
-static void SendTrace(int signal,
+static void SendTrace(int sig,
                       siginfo_t *siginfo __attribute__((unused)),
                       void *context)
 {
@@ -110,26 +129,23 @@ static void SendTrace(int signal,
 
   // Set the original signal handler for the raised signal in
   // SIGQUIT (watchdog process will raise SIGQUIT)
-  (void) sigaction(SIGQUIT, &old_signal_handlers_[signal], NULL);
+  (void) sigaction(SIGQUIT, &old_signal_handlers_[sig], NULL);
 
-  char cflow = 'S';
-  if (write(pipe_wd_[1], &cflow, 1) != 1)
+  // Inform the watchdog that CernVM-FS crashed
+  if (!pipe_watchdog_->Write(ControlFlow::kProduceStacktrace)) {
     _exit(1);
+  }
 
-  // write the occured signal
-  if (write(pipe_wd_[1], &signal, sizeof(signal)) != sizeof(signal))
+  // Send crash information to the watchdog
+  CrashData crash_data;
+  crash_data.signal     = sig;
+  crash_data.sys_errno  = send_errno;
+  crash_data.pid        = getpid();
+  if (!pipe_watchdog_->Write(crash_data)) {
     _exit(1);
+  }
 
-  // write the last error number
-  if (write(pipe_wd_[1], &send_errno, sizeof(send_errno)) != sizeof(send_errno))
-    _exit(1);
-
-  // write the PID
-  pid_t pid = getpid();
-  if (write(pipe_wd_[1], &pid, sizeof(pid_t)) != sizeof(pid_t))
-    _exit(1);
-
-  // do not die before the stack trace was generated
+  // Do not die before the stack trace was generated
   // kill -SIGQUIT <pid> will finish this
   int counter = 0;
   while(true) {
@@ -137,6 +153,19 @@ static void SendTrace(int signal,
     // quit anyway after 30 seconds
     if (++counter == 300) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
+      // Last attempt to log something useful
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
+               sig, send_errno);
+      void *addr[64];
+      int num_addr = backtrace(addr, 64);
+      char **symbols = backtrace_symbols(addr, num_addr);
+      string backtrace = "Backtrace:\n";
+      for (int i = 0; i < num_addr; ++i)
+        backtrace += string(symbols[i]) + "\n";
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
+               &g_cvmfs_exports);
+
       _exit(1);
     }
   }
@@ -231,32 +260,37 @@ static string GenerateStackTrace(const string &exe_path,
   argv.push_back("-n");
   argv.push_back(exe_path);
   argv.push_back(StringifyInt(pid));
-  pid_t gdb_pid;
+  pid_t gdb_pid = 0;
+  const bool double_fork = false;
   retval = ExecuteBinary(&fd_stdin,
                          &fd_stdout,
                          &fd_stderr,
                           "gdb",
                           argv,
+                          double_fork,
                          &gdb_pid);
   assert(retval);
 
-  // skip the gdb startup output
+  // Skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
 
-  // send stacktrace command to gdb
+  // Send stacktrace command to gdb
   const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
                          "quit\n";               // stop gdb
   WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
 
-  // read the stack trace from the stdout of our gdb process
+  // Read the stack trace from the stdout of our gdb process
   result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
+
+  // Close the connection to the terminated gdb process
   close(fd_stderr);
   close(fd_stdout);
   close(fd_stdin);
 
-  // make sure gdb has quitted (wait for it for a short while)
+  // Make sure gdb has terminated (wait for it for a short while)
   unsigned int timeout = 15;
-  while (timeout > 0 && kill(gdb_pid, 0) == 0) {
+  int statloc;
+  while (timeout > 0 && waitpid(gdb_pid, &statloc, WNOHANG) != gdb_pid) {
     --timeout;
     SafeSleepMs(1000);
   }
@@ -275,38 +309,25 @@ static string GenerateStackTrace(const string &exe_path,
  * Generates useful information from the backtrace log in the pipe.
  */
 static string ReportStacktrace() {
+  // Re-activate µSyslog, if necessary
+  SetLogMicroSyslog(GetLogMicroSyslog());
+
+  CrashData crash_data;
+  if (!pipe_watchdog_->Read(&crash_data)) {
+    return "failed to read crash data (" + StringifyInt(errno) + ")";
+  }
+
   string debug = "--\n";
-
-  int recv_signal;
-  if (read(pipe_wd_[0], &recv_signal, sizeof(recv_signal)) <
-      int(sizeof(recv_signal)))
-  {
-    return "failure while reading signal number";
-  }
-  debug += "Signal: " + StringifyInt(recv_signal);
-
-  int recv_errno;
-  if (read(pipe_wd_[0], &recv_errno, sizeof(recv_errno)) <
-      int(sizeof(recv_errno)))
-  {
-    return "failure while reading errno";
-  }
-  debug += ", errno: " + StringifyInt(errno);
-
+  debug += "Signal: "    + StringifyInt(crash_data.signal);
+  debug += ", errno: "   + StringifyInt(crash_data.sys_errno);
   debug += ", version: " + string(VERSION);
-
-  pid_t pid;
-  if (read(pipe_wd_[0], &pid, sizeof(pid_t)) < int(sizeof(pid_t))) {
-    return "failure while reading PID";
-  }
-  debug += ", PID: " + StringifyInt(pid) + "\n";
-
+  debug += ", PID: "     + StringifyInt(crash_data.pid) + "\n";
   debug += "Executable path: " + *exe_path_ + "\n";
 
-  debug += GenerateStackTrace(*exe_path_, pid);
+  debug += GenerateStackTrace(*exe_path_, crash_data.pid);
 
-  // give the dying cvmfs client the finishing stroke
-  if (kill(pid, SIGKILL) != 0) {
+  // Give the dying cvmfs client the finishing stroke
+  if (kill(crash_data.pid, SIGKILL) != 0) {
     debug += "Failed to kill cvmfs client! (";
     switch (errno) {
       case EINVAL:
@@ -332,24 +353,26 @@ static string ReportStacktrace() {
  * Listens on the pipe and logs the stacktrace or quits silently.
  */
 static void Watchdog() {
-  char cflow;
-  int num_read;
+  ControlFlow::Flags control_flow;
 
-  while ((num_read = read(pipe_wd_[0], &cflow, 1)) > 0) {
-    if (cflow == 'S') {
-      const string debug = ReportStacktrace();
-      LogEmergency(debug);
-      break;
-    } else if (cflow == 'Q') {
-      break;
-    } else {
-      LogEmergency("unexpected error");
-      break;
+  if (!pipe_watchdog_->Read(&control_flow)) {
+    LogEmergency("unexpected termination (" + StringifyInt(control_flow) + ")");
+  } else {
+    switch (control_flow) {
+      case ControlFlow::kProduceStacktrace:
+        LogEmergency(ReportStacktrace());
+        break;
+
+      case ControlFlow::kQuit:
+        break;
+
+      default:
+        LogEmergency("unexpected error");
+        break;
     }
   }
-  if (num_read <= 0) LogEmergency("unexpected termination");
 
-  close(pipe_wd_[0]);
+  close(pipe_watchdog_->read_end);
 }
 
 
@@ -381,13 +404,14 @@ void Fini() {
   }
 
   if (spawned_) {
-    char quit = 'Q';
-    (void)write(pipe_wd_[1], &quit, 1);
-    close(pipe_wd_[1]);
+    pipe_watchdog_->Write(ControlFlow::kQuit);
+    close(pipe_watchdog_->write_end);
   }
+  delete pipe_watchdog_;
   delete process_name_;
   delete cache_dir_;
   delete exe_path_;
+  pipe_watchdog_ = NULL;
   process_name_ = NULL;
   cache_dir_ = NULL;
   exe_path_ = NULL;
@@ -398,9 +422,8 @@ void Fini() {
  * Fork watchdog.
  */
 void Spawn() {
-  int pipe_pid[2];
-  MakePipe(pipe_wd_);
-  MakePipe(pipe_pid);
+  Pipe pipe_pid;
+  pipe_watchdog_ = new Pipe();
 
   pid_t pid;
   int statloc;
@@ -413,15 +436,15 @@ void Spawn() {
       switch (fork()) {
         case -1: exit(1);
         case 0: {
-          close(pipe_wd_[1]);
+          close(pipe_watchdog_->write_end);
           Daemonize();
           // send the watchdog PID to cvmfs
           pid_t watchdog_pid = getpid();
-          WritePipe(pipe_pid[1], (const void*)&watchdog_pid, sizeof(pid_t));
-          close(pipe_pid[1]);
+          pipe_pid.Write(watchdog_pid);
+          close(pipe_pid.write_end);
           // Close all unused file descriptors
           for (int fd = 0; fd < max_fd; fd++) {
-            if (fd != pipe_wd_[0])
+            if (fd != pipe_watchdog_->read_end)
               close(fd);
           }
           Watchdog();
@@ -431,15 +454,23 @@ void Spawn() {
           exit(0);
       }
     default:
-      close(pipe_wd_[0]);
+      close(pipe_watchdog_->read_end);
       if (waitpid(pid, &statloc, 0) != pid) abort();
       if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
   }
 
   // retrieve the watchdog PID from the pipe
-  close(pipe_pid[1]);
-  ReadPipe(pipe_pid[0], (void*)&watchdog_pid_, sizeof(pid_t));
-  close(pipe_pid[0]);
+  close(pipe_pid.write_end);
+  pipe_pid.Read(&watchdog_pid_);
+  close(pipe_pid.read_end);
+
+  // lower restrictions for ptrace
+  if (!platform_allow_ptrace(watchdog_pid_)) {
+    LogCvmfs(kLogMonitor, kLogSyslogWarn,
+             "failed to allow ptrace() for watchdog (PID: %d). "
+             "Post crash stacktrace of the CernVM-FS client might not work",
+             watchdog_pid_);
+  }
 
   // Extra stack for signal handlers
   int stack_size = kSignalHandlerStacksize;  // 2 MB

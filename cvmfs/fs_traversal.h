@@ -42,43 +42,43 @@ class FileSystemTraversal {
   VoidCallback fn_leave_dir;
   VoidCallback fn_new_file;
   VoidCallback fn_new_symlink;
- 
-	/**
-	 * Optional callback for all files during recursion to decide
-	 * whether to completely ignore the file. If this callback returns
-	 * true then the file will not be processed (this is a replacement
-	 * for the ignored_files set, and it allows to ignore based on names
-	 * or something else). If the function is not specified, no files 
-	 * will be ignored (except for "." and "..").
-	 */
-	BoolCallback fn_ignore_file;
 
-	/**
-	 * Callback if a directory was found.  Depending on the response of
-	 * the callback, the recursion will continue in the found directory/
-	 * If this callback is not specified, it will recurse by default.
-	 */
-	BoolCallback fn_new_dir_prefix;
+  /**
+   * Optional callback for all files during recursion to decide
+   * whether to completely ignore the file.  If this callback returns
+   * true then the file will not be processed (this is a replacement
+   * for the ignored_files set, and it allows to ignore based on names
+   * or something else). If the function is not specified, no files
+   * will be ignored (except for "." and "..").
+   */
+  BoolCallback fn_ignore_file;
 
-	/**
-	 * Callback for a found directory after it was already recursed
-	 * e.g. for deletion of directories: first delete content,
-	 * then the directory itself
-	 */
-	VoidCallback fn_new_dir_postfix;
+  /**
+   * Callback if a directory was found.  Depending on the response of
+   * the callback, the recursion will continue in the found directory/
+   * If this callback is not specified, it will recurse by default.
+   */
+  BoolCallback fn_new_dir_prefix;
+
+  /**
+   * Callback for a found directory after it was already recursed
+   * e.g. for deletion of directories: first delete content,
+   * then the directory itself
+   */
+  VoidCallback fn_new_dir_postfix;
 
 
-	/**
-	 * Create a new recursion engine
-	 * @param delegate The object that will receive the callbacks
-	 * @param relative_to_directory The DirEntries will be created relative
-	 *        to this directory
-	 * @param recurse Should the traversal engine recurse? (if not,
-	 *        it just traverses the given directory)
-	 */
-	FileSystemTraversal(T *delegate,
-	                const std::string &relative_to_directory,
-	                const bool recurse)
+  /**
+   * Create a new recursion engine
+   * @param delegate The object that will receive the callbacks
+   * @param relative_to_directory The DirEntries will be created relative
+   *        to this directory
+   * @param recurse Should the traversal engine recurse? (if not,
+   *        it just traverses the given directory)
+   */
+  FileSystemTraversal(T *delegate,
+                      const std::string &relative_to_directory,
+                      const bool recurse)
   {
     delegate_ = delegate;
     relative_to_directory_ = relative_to_directory;
@@ -112,12 +112,12 @@ class FileSystemTraversal {
   }
 
  private:
-	// The delegate all hooks are called on
-	T *delegate_;
+  // The delegate all hooks are called on
+  T *delegate_;
 
-	/** dir_path in callbacks will be relative to this directory */
-	std::string relative_to_directory_;
-	bool recurse_;
+  /** dir_path in callbacks will be relative to this directory */
+  std::string relative_to_directory_;
+  bool recurse_;
 
 
   void Init() {
@@ -204,7 +204,7 @@ class FileSystemTraversal {
     }
   }
 
-	std::string GetRelativePath(const std::string &absolute_path) const  {
+  std::string GetRelativePath(const std::string &absolute_path) const {
     const unsigned int rel_dir_len = relative_to_directory_.length();
     if (rel_dir_len >= absolute_path.length()) { return ""; }
 	  else if (rel_dir_len > 1) { return absolute_path.substr(rel_dir_len + 1); }
