@@ -67,8 +67,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
   void AddChunkedFile(const DirectoryEntryBase &entry,
                       const std::string &parent_directory,
                       const FileChunkList &file_chunks);
-  void TouchFile(const DirectoryEntryBase &entry,
-                 const std::string &file_path);
   void RemoveFile(const std::string &file_path);
 
   void AddDirectory(const DirectoryEntryBase &entry,

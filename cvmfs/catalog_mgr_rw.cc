@@ -456,33 +456,6 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
 
 /**
  * Update entry meta data (mode, owner, ...).
- * CVMFS specific meta data are NOT changed by this method.
- * @param entry      the directory entry to be touched
- * @param path       the path of the directory entry to be touched
- */
-void WritableCatalogManager::TouchFile(const DirectoryEntryBase &entry,
-                                       const std::string &file_path) {
-  assert (!entry.IsDirectory());
-
-  const string entry_path = MakeRelativePath(file_path);
-  const string parent_path = GetParentPath(entry_path);
-
-  SyncLock();
-  // find the catalog to be updated
-  WritableCatalog *catalog;
-  if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
-             entry_path.c_str());
-    assert(false);
-  }
-
-  catalog->TouchEntry(entry, entry_path);
-  SyncUnlock();
-}
-
-
-/**
- * Update entry meta data (mode, owner, ...).
  * CVMFS specific meta data (i.e. nested catalog transition points) are NOT
  * changed by this method, although transition points intrinsics are taken into
  * account, to keep nested catalogs consistent.

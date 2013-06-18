@@ -82,6 +82,7 @@ void SyncMediator::Touch(SyncItem &entry) {
     return;
   }
 
+  // Avoid removing and recreating nested catalog
   if (entry.IsCatalogMarker()) {
     RemoveFile(entry);
     AddFile(entry);
@@ -532,16 +533,6 @@ void SyncMediator::RemoveFile(SyncItem &entry) {
       catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
     }
     catalog_manager_->RemoveFile(entry.GetRelativePath());
-  }
-}
-
-
-void SyncMediator::TouchFile(SyncItem &entry) {
-  if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
-  if (!params_->dry_run) {
-    catalog_manager_->TouchFile(entry.CreateBasicCatalogDirent(),
-                                entry.GetRelativePath());
   }
 }
 
