@@ -24,7 +24,7 @@
  * for internal bookkeeping which should be ignored.
  *
  * Classes that derive from UnionSync implement the specifics of a concrete
- * union file system (e.g. AUFS1).
+ * union file system (e.g. AUFS1, overlayfs).
  */
 
 #ifndef CVMFS_SYNC_UNION_H_
@@ -32,6 +32,9 @@
 
 #include <string>
 #include <set>
+
+#include "platform.h"
+#include "logging.h"
 
 namespace publish {
 
@@ -99,9 +102,12 @@ class SyncUnion {
 	/**
 	 * Union file systems may use some special files for bookkeeping.
 	 * They must not show up in to repository and are ignored by the recursion.
-	 * @return a set of filenames to be ignored
+	 * @param parent directory in which file resides
+	 * @param filename to decide whether to ignore or not
+	 * @return true if file should be ignored, othewise false
 	 */
-	virtual std::set<std::string> GetIgnoreFilenames() const = 0;
+	virtual bool IgnoreFilePredicate(const std::string &parent_dir,
+	                                 const std::string &filename) = 0;
 
  protected:
   std::string rdonly_path_;
@@ -172,13 +178,40 @@ class SyncUnionAufs : public SyncUnion {
  protected:
 	bool IsWhiteoutEntry(const SyncItem &entry) const;
 	bool IsOpaqueDirectory(const SyncItem &directory) const;
+	bool IgnoreFilePredicate(const std::string &parent_dir,
+	                         const std::string &filename);
 	std::string UnwindWhiteoutFilename(const std::string &filename) const;
-	std::set<std::string> GetIgnoreFilenames() const;
 
  private:
 	std::set<std::string> ignore_filenames_;
 	std::string whiteout_prefix_;
 };  // class SyncUnionAufs
+
+/**
+ * Syncing a CVMFS repository by the help of an overlayed overlayfs
+ * read-write volume.
+ */
+class SyncUnionOverlayfs : public SyncUnion {
+ public:
+	SyncUnionOverlayfs(SyncMediator *mediator,
+  	            const std::string &rdonly_path,
+  	            const std::string &union_path,
+                const std::string &scratch_path);
+
+	void Traverse();
+
+ protected:
+	bool IsWhiteoutEntry(const SyncItem &entry) const;
+	bool IsOpaqueDirectory(const SyncItem &directory) const;
+	bool IgnoreFilePredicate(const std::string &parent_dir,
+	                         const std::string &filename);
+	std::string UnwindWhiteoutFilename(const std::string &filename) const;
+	std::set<std::string> GetIgnoreFilenames() const;
+
+ private:
+	bool IsWhiteoutSymlinkPath(const std::string &path) const;
+	bool IsOpaqueDirPath(const std::string &path) const;
+};  // class SyncUnionOverlayfs
 
 }  // namespace publish
 

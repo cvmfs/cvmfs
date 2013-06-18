@@ -1,4 +1,11 @@
 2.1.12:
+  * Add pin command to cvmfs_talk
+  * Fix reading from socket in talk thread
+  * Add "nameserver set" command to cvmfs_talk
+  * Fix various issues with reading of chunked files
+  * Decrease memory consumption of the inode tracker
+  * Remove trailing empty attribute in listattr callback
+  * Make repositories replicatable by default
   * Safe guard against concurrent snapshot processes
   * Drop config.sh dependency from cvmfs_server
   * Experimental support for repository tags (named snapshots).

@@ -352,7 +352,7 @@ void WritableCatalogManager::AddFile(const DirectoryEntry  &entry,
 
 void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase  &entry,
                                             const std::string         &parent_directory,
-                                            const FileChunks          &file_chunks) {
+                                            const FileChunkList       &file_chunks) {
   assert (file_chunks.size() > 0);
 
   DirectoryEntry full_entry(entry);
@@ -371,10 +371,8 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase  &entry,
     assert(false);
   }
 
-  FileChunks::const_iterator i    = file_chunks.begin();
-  FileChunks::const_iterator iend = file_chunks.end();
-  for (; i != iend; ++i) {
-    catalog->AddFileChunk(file_path, *i);
+  for (unsigned i = 0; i < file_chunks.size(); ++i) {
+    catalog->AddFileChunk(file_path, *file_chunks.AtPtr(i));
   }
   SyncUnlock();
 }

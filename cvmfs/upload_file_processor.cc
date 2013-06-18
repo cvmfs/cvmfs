@@ -368,12 +368,12 @@ void FileProcessor::PendingFile::CheckForCompletionAndNotify() {
 }
 
 
-FileChunks FileProcessor::PendingFile::GetFinalizedFileChunks() const {
-  FileChunks final_chunks;
+FileChunkList FileProcessor::PendingFile::GetFinalizedFileChunks() const {
+  FileChunkList final_chunks;
   TemporaryFileChunkMap::const_iterator i    = file_chunks_.begin();
   TemporaryFileChunkMap::const_iterator iend = file_chunks_.end();
   for (; i != iend; ++i) {
-    final_chunks.push_back(static_cast<FileChunk>(i->second));
+    final_chunks.PushBack(static_cast<FileChunk>(i->second));
   }
   return final_chunks;
 }

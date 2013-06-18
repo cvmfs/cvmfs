@@ -17,6 +17,10 @@
 #include <limits.h>
 #include <unistd.h>
 
+#include <attr/xattr.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <cassert>
 
 #include <cstring>
@@ -24,6 +28,14 @@
 #include <cstdlib>
 
 #include "smalloc.h"
+
+
+#ifdef DEBUGMSG
+#include <stdio.h>
+void perror(const char *s);
+#include <errno.h>
+int errno;
+#endif
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -118,6 +130,35 @@ inline int platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
 }
 
+inline std::string platform_readlink32(std::string const& path) {
+  char buf[32];
+  ssize_t len = ::readlink(path.c_str(), buf, sizeof(buf)-1);
+  if (len != -1) {
+    buf[len] = '\0';
+    return std::string(buf);
+  } else {
+    // error
+#ifdef DEBUGMSG
+    printf("platform_readlink32 error reading link [%s]: %s\n", path.c_str(), strerror(errno));
+#endif
+    return std::string();
+  }
+}
+
+inline std::string platform_lgetxattr32(std::string const& path, std::string const& name) {
+  char buf[32];
+  ssize_t len = ::lgetxattr(path.c_str(), name.c_str(), buf, sizeof(buf)-1);
+  if (len != -1) {
+    buf[len] = '\0';
+    return std::string(buf);
+  } else {
+    // error
+#ifdef DEBUGMSG
+    printf("platform_lgetxattr32 error reading xattr [%s] from [%s]: %s\n", name.c_str(), path.c_str(), strerror(errno));
+#endif
+    return std::string();
+  }
+}
 
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".so";

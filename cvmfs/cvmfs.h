@@ -29,6 +29,7 @@ extern bool foreground_;
 extern bool nfs_maps_;
 
 bool Evict(const std::string &path);
+bool Pin(const std::string &path);
 catalog::LoadError RemountStart();
 void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode);
 unsigned GetRevision();

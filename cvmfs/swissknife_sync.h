@@ -12,6 +12,7 @@
 struct SyncParameters {
   SyncParameters() :
     spooler(NULL),
+    union_fs_type("aufs"),
     print_changeset(false),
     dry_run(false),
     mucatalogs(false),
@@ -31,6 +32,7 @@ struct SyncParameters {
   std::string      stratum0;
   std::string      manifest_path;
   std::string      spooler_definition;
+  std::string      union_fs_type;
   bool             print_changeset;
   bool             dry_run;
   bool             mucatalogs;
@@ -155,6 +157,7 @@ class CommandSync : public Command {
                                false));
     result.push_back(Parameter('h', "maximal file chunk size in bytes", true,
                                false));
+    result.push_back(Parameter('f', "union filesystem type", true, false));
     return result;
   }
   int Main(const ArgumentList &args);

@@ -21,6 +21,7 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "globals.h"
+#include "bigvector.h"
 
 namespace publish {
 class SyncItem;
@@ -287,7 +288,7 @@ struct StatEntry {
 
 typedef std::vector<DirectoryEntry> DirectoryEntryList;         // TODO: rename!
 typedef std::vector<DirectoryEntryBase> DirectoryEntryBaseList; //       these are NOT lists.
-typedef std::vector<StatEntry> StatEntryList;  // TODO: use mmap for large listings
+typedef BigVector<StatEntry> StatEntryList;  // TODO: use mmap for large listings
 
 } // namespace catalog
 
