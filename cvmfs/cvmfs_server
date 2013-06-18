@@ -48,8 +48,10 @@ fi
 # Find the service binary
 if [ -x /sbin/service ]; then
   SERVICE_BIN="/sbin/service"
-else
+elif [ -x /usr/sbin/service ]; then
   SERVICE_BIN="/usr/sbin/service" # Ubuntu
+elif [ -x /sbin/rc-service ]; then
+  SERVICE_BIN="/sbin/rc-service" # OpenRC
 fi
 [ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
 
@@ -57,7 +59,7 @@ fi
 if [ -x /sbin/fuser ]; then
   fuser="/sbin/fuser" # RHEL
 else
-  fuser="/bin/fuser"  # Ubuntu, SuSe
+  fuser="/bin/fuser"  # Ubuntu, SuSe, Gentoo
 fi
 
 # standard values
