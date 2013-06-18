@@ -14,7 +14,7 @@ if [ $# -ne 1 ]; then
   exit 1
 fi
 
-externals_build_dir=$(readlink --canonicalize $1)
+externals_build_dir="$1"
 repo_root=$(pwd)
 externals_dir="$repo_root/externals"
 
