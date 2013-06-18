@@ -139,6 +139,10 @@ class SyncMediator {
   bool IgnoreFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
 
+  // Called by Upload Spooler
+  void PublishFilesCallback(const upload::SpoolerResult &result);
+  void PublishHardlinksCallback(const upload::SpoolerResult &result);
+
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }

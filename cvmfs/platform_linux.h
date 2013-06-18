@@ -29,6 +29,14 @@
 
 #include "smalloc.h"
 
+
+#ifdef DEBUGMSG
+#include <stdio.h>
+void perror(const char *s);
+#include <errno.h>
+int errno;
+#endif
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
@@ -130,18 +138,24 @@ inline std::string platform_readlink32(std::string const& path) {
     return std::string(buf);
   } else {
     // error
+#ifdef DEBUGMSG
+    printf("platform_readlink32 error reading link [%s]: %s\n", path.c_str(), strerror(errno));
+#endif
     return std::string();
   }
 }
 
 inline std::string platform_lgetxattr32(std::string const& path, std::string const& name) {
   char buf[32];
-  ssize_t len = ::getxattr(path.c_str(), name.c_str(), buf, sizeof(buf)-1);
+  ssize_t len = ::lgetxattr(path.c_str(), name.c_str(), buf, sizeof(buf)-1);
   if (len != -1) {
     buf[len] = '\0';
     return std::string(buf);
   } else {
     // error
+#ifdef DEBUGMSG
+    printf("platform_lgetxattr32 error reading xattr [%s] from [%s]: %s\n", name.c_str(), path.c_str(), strerror(errno));
+#endif
     return std::string();
   }
 }

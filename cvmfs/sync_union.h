@@ -34,6 +34,7 @@
 #include <set>
 
 #include "platform.h"
+#include "logging.h"
 
 namespace publish {
 
@@ -105,8 +106,8 @@ class SyncUnion {
 	 * @param filename to decide whether to ignore or not
 	 * @return true if file should be ignored, othewise false
 	 */
-        virtual bool IgnoreFileP(const std::string &parent_dir,
-                                 const std::string &filename) = 0;
+	virtual bool IgnoreFilePredicate(const std::string &parent_dir,
+	                                 const std::string &filename) = 0;
 
  protected:
   std::string rdonly_path_;
@@ -177,8 +178,8 @@ class SyncUnionAufs : public SyncUnion {
  protected:
 	bool IsWhiteoutEntry(const SyncItem &entry) const;
 	bool IsOpaqueDirectory(const SyncItem &directory) const;
-        bool IgnoreFileP(const std::string &parent_dir,
-                         const std::string &filename);
+	bool IgnoreFilePredicate(const std::string &parent_dir,
+	                         const std::string &filename);
 	std::string UnwindWhiteoutFilename(const std::string &filename) const;
 
  private:
@@ -202,9 +203,14 @@ class SyncUnionOverlayfs : public SyncUnion {
  protected:
 	bool IsWhiteoutEntry(const SyncItem &entry) const;
 	bool IsOpaqueDirectory(const SyncItem &directory) const;
+	bool IgnoreFilePredicate(const std::string &parent_dir,
+	                         const std::string &filename);
 	std::string UnwindWhiteoutFilename(const std::string &filename) const;
 	std::set<std::string> GetIgnoreFilenames() const;
 
+ private:
+	bool IsWhiteoutSymlinkPath(const std::string &path) const;
+	bool IsOpaqueDirPath(const std::string &path) const;
 };  // class SyncUnionOverlayfs
 
 }  // namespace publish

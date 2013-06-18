@@ -411,7 +411,75 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 bool SyncMediator::IgnoreFileCallback(const std::string &parent_dir,
                                       const std::string &file_name)
 {
-  return union_engine_->IgnoreFileP(parent_dir, file_name);
+  return union_engine_->IgnoreFilePredicate(parent_dir, file_name);
+}
+
+
+void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for %s, digest %s, produced %d chunks, retval %d",
+           result.local_path.c_str(),
+           result.content_hash.ToString().c_str(),
+           result.file_chunks.size(),
+           result.return_code);
+  if (result.return_code != 0) {
+    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
+             result.local_path.c_str(), result.return_code);
+    abort();
+  }
+
+  SyncItemList::iterator itr;
+  {
+    MutexLockGuard guard(lock_file_queue_);
+    itr = file_queue_.find(result.local_path);
+  }
+
+  assert(itr != file_queue_.end());
+
+  SyncItem &item = itr->second;
+  item.SetContentHash(result.content_hash);
+
+  if (result.IsChunked()) {
+    catalog_manager_->AddChunkedFile(item.CreateBasicCatalogDirent(),
+                                     item.relative_parent_path(),
+                                     result.file_chunks);
+  } else {
+    catalog_manager_->AddFile(item.CreateBasicCatalogDirent(),
+                              item.relative_parent_path());
+  }
+}
+
+
+void SyncMediator::PublishHardlinksCallback(const upload::SpoolerResult &result) {
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for hardlink %s, digest %s, retval %d",
+           result.local_path.c_str(),
+           result.content_hash.ToString().c_str(),
+           result.return_code);
+  if (result.return_code != 0) {
+    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
+             result.local_path.c_str(), result.return_code);
+    abort();
+  }
+
+  bool found = false;
+  for (unsigned i = 0; i < hardlink_queue_.size(); ++i) {
+    if (hardlink_queue_[i].master.GetUnionPath() == result.local_path) {
+      found = true;
+      hardlink_queue_[i].master.SetContentHash(result.content_hash);
+      SyncItemList::iterator j,jend;
+      for (j = hardlink_queue_[i].hardlinks.begin(),
+           jend = hardlink_queue_[i].hardlinks.end();
+           j != jend; ++j)
+      {
+        j->second.SetContentHash(result.content_hash);
+      }
+
+      break;
+    }
+  }
+
+  assert(found);
 }
 
 

@@ -226,6 +226,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
 
+  if (args.find('f') != args.end()) 
+    params.union_fs_type = *args.find('f')->second;
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;
@@ -268,12 +270,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
                     params.stratum0, params.dir_temp, params.spooler);
   publish::SyncMediator mediator(&catalog_manager, &params);
-  publish::SyncUnionOverlayfs sync(&mediator, params.dir_rdonly, params.dir_union,
-                              params.dir_scratch);
-  //  publish::SyncUnionAufs sync(&mediator, params.dir_rdonly, params.dir_union,
-  //                            params.dir_scratch);
-
-  sync.Traverse();
+  publish::SyncUnion *sync;
+  if (params.union_fs_type == "overlayfs")
+    sync = new publish::SyncUnionOverlayfs(&mediator, params.dir_rdonly, params.dir_union,
+					   params.dir_scratch);
+  else
+    sync = new publish::SyncUnionAufs(&mediator, params.dir_rdonly, params.dir_union,
+				      params.dir_scratch);
+  
+  sync->Traverse();
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest = mediator.Commit();
 

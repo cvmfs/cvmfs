@@ -67,13 +67,19 @@ void SyncUnion::ProcessFile(SyncItem &entry) {
   // Process whiteout prefix
   if (IsWhiteoutEntry(entry)) {
     string actual_filename = UnwindWhiteoutFilename(entry.filename());
+    LogCvmfs(kLogUnion, kLogVerboseMsg, "processing file [%s] as whiteout of [%s] (remove)",
+	     entry.filename().c_str(), actual_filename.c_str());
     entry.MarkAsWhiteout(actual_filename);
     mediator_->Remove(entry);
   } else {
     // Process normal file
     if (entry.IsNew()) {
+      LogCvmfs(kLogUnion, kLogVerboseMsg, "processing file [%s] as new (add)",
+	       entry.filename().c_str());
       mediator_->Add(entry);
     } else {
+      LogCvmfs(kLogUnion, kLogVerboseMsg, "processing file [%s] as existing (touch)",
+	       entry.filename().c_str());
       mediator_->Touch(entry);
     }
   }
@@ -106,7 +112,7 @@ SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
 	ignore_filenames_.insert(".wh..wh..tmp");
 	ignore_filenames_.insert(".wh..wh.plnk");
 	ignore_filenames_.insert(".wh..wh.aufs");
-  ignore_filenames_.insert(".wh..wh.orph");
+	ignore_filenames_.insert(".wh..wh.orph");
 	ignore_filenames_.insert(".wh..wh..opq");
 
 	// set the whiteout prefix AUFS preceeds for every whiteout file
@@ -116,12 +122,12 @@ SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
 
 void SyncUnionAufs::Traverse() {
 	FileSystemTraversal<SyncUnionAufs>
-    traversal(this, scratch_path(), true);
+	  traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
+	traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
 	traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
 	traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
-	traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFileP;
+	traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFilePredicate;
 	traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
 	traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
 
@@ -130,66 +136,118 @@ void SyncUnionAufs::Traverse() {
 
 
 bool SyncUnionAufs::IsWhiteoutEntry(const SyncItem &entry) const {
-  return entry.filename().substr(0, whiteout_prefix_.length()) ==
-         whiteout_prefix_;
+	return entry.filename().substr(0, whiteout_prefix_.length()) ==
+	  whiteout_prefix_;
 }
 
 bool SyncUnionAufs::IsOpaqueDirectory(const SyncItem &directory) const {
-  return FileExists(directory.GetScratchPath() + "/.wh..wh..opq");
+	return FileExists(directory.GetScratchPath() + "/.wh..wh..opq");
 }
 
 string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
-  return filename.substr(whiteout_prefix_.length());
+	return filename.substr(whiteout_prefix_.length());
 }
 
-bool SyncUnionAufs::IgnoreFileP(const string &parent_dir,
-                                const string &filename)
-{
-  return (ignore_filenames_.find(filename) != ignore_filenames_.end());
+bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
+                                        const string &filename) {
+	return (ignore_filenames_.find(filename) != ignore_filenames_.end());
 }
 
 
 SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
-                             const std::string &rdonly_path,
-                             const std::string &union_path,
-                             const std::string &scratch_path) :
-SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
-
-}
-
-
-void SyncUnionOverlayfs::Traverse() {
-  FileSystemTraversal<SyncUnionOverlayfs>
-    traversal(this, scratch_path(), true, this->GetIgnoreFilenames());
-
-  traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
-  traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
+				       const std::string &rdonly_path,
+				       const std::string &union_path,
+				       const std::string &scratch_path) :
+  SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
   
-  traversal.Recurse(scratch_path());
 }
-
-
-bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
-  return (entry.IsSymlink() && 
-	  (platform_readlink32(entry.GetScratchPath()) == "(overlay-whiteout)") && 
-	  (platform_lgetxattr32(entry.GetScratchPath(), "trusted.overlay.whiteout") == "y"));
-}
-
-bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
-  return (platform_lgetxattr32(directory.GetScratchPath(), "trusted.overlay.opaque") == "y");
-}
-
-string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const {
-  return filename;
-}
-
-set<string> SyncUnionOverlayfs::GetIgnoreFilenames() const {
-  std::set<string> empty;
-  return empty;
-}
-
-
+  
+  void SyncUnionOverlayfs::Traverse() {
+    FileSystemTraversal<SyncUnionOverlayfs>
+      traversal(this, scratch_path(), true);
+    
+    traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
+    traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
+    traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
+    traversal.fn_ignore_file = &SyncUnionOverlayfs::IgnoreFilePredicate;
+    traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
+    traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
+    
+    LogCvmfs(kLogUnion, kLogVerboseMsg, "overlayfs starting traversal "
+	     "recursion for scratch_path=[%s]",
+	     scratch_path().c_str());
+    traversal.Recurse(scratch_path());
+  }
+  
+  bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
+    return (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
+  }
+  
+  bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const std::string &path) const {
+    std::string link_name = platform_readlink32(path.c_str());
+    std::string whiteout_xattr = platform_lgetxattr32(path.c_str(), "trusted.overlay.whiteout");
+    bool is_whiteout = (link_name == "(overlay-whiteout)" && 
+			whiteout_xattr == "y");
+    if (is_whiteout) {
+      LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] is whiteout symlink",
+	       path.c_str());
+    } else {
+      LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] is not a whiteout symlink link_name=[%s] whiteout_xattr=[%s]",
+	       path.c_str(), link_name.c_str(), whiteout_xattr.c_str());
+    }
+    return is_whiteout;
+  }
+  
+  bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
+    return (IsOpaqueDirPath(directory.GetScratchPath()));
+  }
+  
+  bool SyncUnionOverlayfs::IsOpaqueDirPath(const std::string &path) const {
+    bool is_opaque = (platform_lgetxattr32(path.c_str(), "trusted.overlay.opaque") == "y");
+    if (is_opaque) {
+      LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] has opaque xattr", 
+	       path.c_str());
+    }
+    return is_opaque;
+  }
+  
+  std::string SyncUnionOverlayfs::UnwindWhiteoutFilename(const std::string &filename) const {
+    return filename;
+  }
+  
+  bool SyncUnionOverlayfs::IgnoreFilePredicate(const std::string &parent_dir,
+                                               const std::string &filename) {
+    std::string path = scratch_path() + "/" + (parent_dir.empty() ? 
+					  filename : 
+					  (parent_dir + (filename.empty() ? 
+							 "" : 
+							 ("/" + filename))));
+    LogCvmfs(kLogUnion, kLogDebug, "overlayfs checking whether "
+	     "to ignore [%s]",
+	     path.c_str());
+    
+    if (IsOpaqueDirPath(path)) {
+      platform_stat64 info;
+      int retval = platform_lstat(path.c_str(), &info);
+      assert(retval == 0);
+      if (S_ISDIR(info.st_mode)) {
+	LogCvmfs(kLogUnion, kLogVerboseMsg, "overlayfs ignoring [%s] "
+		 "because it is an opaque dir",
+		 path.c_str());
+	return true;
+      } else {
+	LogCvmfs(kLogUnion, kLogVerboseMsg, "overlayfs not ignoring [%s] "
+		 "because although it has an "
+		 "opaque dir xattr, it is not "
+		 "a dir",
+		 path.c_str());
+	return false;
+      }
+    }
+    LogCvmfs(kLogUnion, kLogDebug, "overlayfs not ignoring [%s]",
+	     path.c_str());
+    return false;
+  }
+  
+  
 }  // namespace sync
