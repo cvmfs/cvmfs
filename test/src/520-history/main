@@ -1,0 +1,387 @@
+
+cvmfs_test_name="History"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+	local working_dir=$1
+
+	pushdir $working_dir
+
+  touch gedicht
+  echo "Ein Vater an seinen Sohn"                         >> gedicht
+  echo ""                                                 >> gedicht
+  echo "Wie die Himmelslüfte mit den Rosen"               >> gedicht
+  echo "An den Frühlingsmorgen zärtlich kosen,"           >> gedicht
+  echo "Kind, so schmeichelt dir"                         >> gedicht
+  echo "Itzt das äußre Glück in deinen Jugendtagen."      >> gedicht
+  echo "Tränen sahst du nur, noch rangen keine Klagen"    >> gedicht
+  echo "Sich aus deiner Brust herfür."                    >> gedicht
+  echo ""                                                 >> gedicht
+  echo "Aber sieh! der Hain, der kaum entzücket,"         >> gedicht
+  echo "Neigt sich, plötzlich rast der Sturm, zerknicket" >> gedicht
+  echo "Liegt die Rosenblum!"                             >> gedicht
+  echo "O so ist es, Sohn, mit unsern Sinnesfreuden,"     >> gedicht
+  echo "Unserm Golde, unsern lichten Herrlichkeiten,"     >> gedicht
+  echo "So mit unserm Flitterruhm."                       >> gedicht
+  echo ""                                                 >> gedicht
+  echo "Nur des Höchsten Abglanz, der Gerechte,"          >> gedicht
+  echo "Welcher in dem schröcklichen Gefechte"            >> gedicht
+  echo "Zwischen Lust und Pflicht"                        >> gedicht
+  echo "Jener sich entringt, der höhern Weisheit Stimme"  >> gedicht
+  echo "Folget, trotz der Selbstsucht heißem Grimme,"     >> gedicht
+  echo "Die sein Herz mit Schwertern sticht –"            >> gedicht
+  echo ""                                                 >> gedicht
+  echo "Dessen Wollust trägt von hier die Bahre"          >> gedicht
+  echo "Nicht, es löscht sie nicht der Strom der Jahre,"  >> gedicht
+  echo "Nicht die Ewigkeit:"                              >> gedicht
+  echo "Angeleuchtet könnt er in den letzten Blitzen"     >> gedicht
+  echo "Und vom Weltenumsturz angeschwungen sitzen"       >> gedicht
+  echo "Ohne Menschenbangigkeit."                         >> gedicht
+  echo ""                                                 >> gedicht
+  echo "       Friedrich Schiller"                        >> gedicht
+
+  mkdir -p dir1/dir1/dir1
+  mkdir -p dir1/dir2/dir1
+  mkdir -p dir1/dir3/dir1
+  mkdir -p dir2/dir1
+
+  ln gedicht schiller
+  ln -s gedicht symbolic_schiller
+
+  touch dir1/dir1/heine
+  echo "An die Jungen"                                >> dir1/dir1/heine
+  echo ""                                             >> dir1/dir1/heine
+  echo "Laß dich nicht kirren, laß dich nicht wirren" >> dir1/dir1/heine
+  echo "Durch goldne Äpfel in deinem Lauf!"           >> dir1/dir1/heine
+  echo "Die Schwerter klirren, die Pfeile schwirren," >> dir1/dir1/heine
+  echo "Doch halten sie nicht den Helden auf."        >> dir1/dir1/heine
+  echo ""                                             >> dir1/dir1/heine
+  echo "Ein kühnes Beginnen ist halbes Gewinnen,"     >> dir1/dir1/heine
+  echo "Ein Alexander erbeutet die Welt!"             >> dir1/dir1/heine
+  echo "Kein langes Besinnen! Die Königinnen"         >> dir1/dir1/heine
+  echo "Erwarten schon knieend den Sieger im Zelt."   >> dir1/dir1/heine
+  echo ""                                             >> dir1/dir1/heine
+  echo "Wir wagen, wir werben! besteigen als Erben"   >> dir1/dir1/heine
+  echo "Des alten Darius Bett und Thron."             >> dir1/dir1/heine
+  echo "O süßes Verderben! o blühendes Sterben!"      >> dir1/dir1/heine
+  echo "Berauschter Triumphtod zu Babylon!"           >> dir1/dir1/heine
+  echo ""                                             >> dir1/dir1/heine
+  echo "       Heinrich Heine"                        >> dir1/dir1/heine
+  touch dir1/.cvmfscatalog
+
+	popdir
+}
+
+change_files_1_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  touch dir2/morgenstern
+  echo "Die Irrlichter"                            >> dir2/morgenstern
+  echo ""                                          >> dir2/morgenstern
+  echo "Ein Irrlicht, schwebt' ich heut im Traume" >> dir2/morgenstern
+  echo "auf einem weiten, düstren Sumpfe,"         >> dir2/morgenstern
+  echo "und um mich der Gespielen Reigen"          >> dir2/morgenstern
+  echo "in wunderlich geschlungnen Kränzen."       >> dir2/morgenstern
+  echo "Wir sangen traurig-süße Lieder"            >> dir2/morgenstern
+  echo "mit leisen, feinen Geisterstimmen,"        >> dir2/morgenstern
+  echo "viel feiner als die lauten Grillen,"       >> dir2/morgenstern
+  echo "die fern im Korn eintönig sangen."         >> dir2/morgenstern
+  echo "Wir sangen, wie das harte Schicksal"       >> dir2/morgenstern
+  echo "uns wehre, daß wir Menschen würden:"       >> dir2/morgenstern
+  echo "So oft schon waren wir erschienen,"        >> dir2/morgenstern
+  echo "wo sich zwei Liebende vereinten,"          >> dir2/morgenstern
+  echo "doch immer, ach, war schon ein andres"     >> dir2/morgenstern
+  echo "Irr-Seelchen uns zuvorgekommen,"           >> dir2/morgenstern
+  echo "und seufzend hatten wir von Neuem"         >> dir2/morgenstern
+  echo "zurück gemußt zum dunklen Sumpfe."         >> dir2/morgenstern
+  echo "So sangen wir von unsern Leiden -"         >> dir2/morgenstern
+  echo "als uns mit einem Mal Entsetzen"           >> dir2/morgenstern
+  echo "in wirren Läufen huschen machte."          >> dir2/morgenstern
+  echo "Ein Mensch entsprang dem nahen Walde"      >> dir2/morgenstern
+  echo "und lief verzweifelten Gebahrens"          >> dir2/morgenstern
+  echo "gerade auf uns zu -: Der Boden"            >> dir2/morgenstern
+  echo "schlug schwankend, eine schwere Woge,"     >> dir2/morgenstern
+  echo "dem Armen überm Haupt zusammen."           >> dir2/morgenstern
+  echo "Verstummt zu zitterndem Geflüster"         >> dir2/morgenstern
+  echo "umschwirrten wir die grause Stelle ..."    >> dir2/morgenstern
+  echo "Bald aber sangen wir von neuem"            >> dir2/morgenstern
+  echo "die alten traurig-süßen Lieder."           >> dir2/morgenstern
+  echo ""                                          >> dir2/morgenstern
+  echo "      Christian Morgenstern"               >> dir2/morgenstern
+
+  rm dir1/dir1/heine
+  ln -s dir2/morgenstern christian
+
+  popdir
+}
+
+change_files_2_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR dir1
+
+  popdir
+}
+
+change_files_3_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -f dir2/morgenstern
+  rm christian
+  echo "not here anymore" > christian
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir1
+  mkdir reference_dir2
+  mkdir reference_dir3
+  mkdir reference_dir4
+  local reference_dir1=$scratch_dir/reference_dir1
+  local reference_dir2=$scratch_dir/reference_dir2
+  local reference_dir3=$scratch_dir/reference_dir3
+  local reference_dir4=$scratch_dir/reference_dir4
+
+  local first_tag="initial"
+  local first_tag_desc="initial tag"
+  local second_tag="intermediate"
+  local second_tag_desc="intermediate revision"
+  local third_tag="third_tag"
+  local third_tag_desc="last tag revision"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "putting some stuff in the new repository" >> $logfile
+  produce_files_in $repo_dir >> $logfile 2>&1 || return 3
+
+  echo "putting exactly the same stuff in the scratch spaces for comparison" >> $logfile
+  produce_files_in $reference_dir1 >> $logfile 2>&1 || return 4
+  produce_files_in $reference_dir2 >> $logfile 2>&1 || return 4
+  produce_files_in $reference_dir3 >> $logfile 2>&1 || return 4
+  produce_files_in $reference_dir4 >> $logfile 2>&1 || return 4
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO -a $first_tag -t "$first_tag_desc" >> $logfile 2>&1 || return $?
+
+  echo "compare the results of cvmfs to our reference copy" >> $logfile
+  compare_directories $repo_dir $reference_dir1 >> $logfile || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "change stuff in the repository" >> $logfile
+  change_files_1_in $repo_dir >> $logfile 2>&1 || return 7
+
+  echo "change exactly the same stuff in the scratch spaces" >> $logfile 2>&1
+  change_files_1_in $reference_dir2 >> $logfile 2>&1 || return 8
+  change_files_1_in $reference_dir3 >> $logfile 2>&1 || return 8
+  change_files_1_in $reference_dir4 >> $logfile 2>&1 || return 8
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO -a $second_tag -t "$second_tag_desc" >> $logfile 2>&1 || return $?
+
+  echo "compare the changed directories" >> $logfile
+  compare_directories $repo_dir $reference_dir2 >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "change stuff in the repository" >> $logfile
+  change_files_2_in $repo_dir >> $logfile 2>&1 || return 7
+
+  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
+  change_files_2_in $reference_dir3 >> $logfile 2>&1 || return 8
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO -a $third_tag -t "$third_tag_desc" >> $logfile 2>&1 || return $?
+
+  echo "compare the changed directories" >> $logfile
+  compare_directories $repo_dir $reference_dir3 >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "current tag statistics:" >> $logfile
+  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+
+  echo "check tag descriptions" >> $logfile
+  if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag"       && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"; then
+    echo "all tags and their descriptions found" >> $logfile
+  else
+    return 9
+  fi
+
+  # ============================================================================
+
+  echo "start transaction to rollback" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "rollback to second tagged revision: $second_tag" >> $logfile
+  cvmfs_server rollback -f -t $second_tag $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "compare to reference directory" >> $logfile
+  compare_directories $repo_dir $reference_dir2 >> $logfile 2>&1 || return 10
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "current tag statistics:" >> $logfile
+  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+
+  echo "check tag descriptions" >> $logfile
+  if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc"; then
+    echo "all tags and their descriptions found" >> $logfile
+  else
+    return 11
+  fi
+  if [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag_desc" | wc -l) -ne 0 ]; then
+    return 12
+  fi
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "change stuff in the repository" >> $logfile
+  change_files_3_in $repo_dir >> $logfile 2>&1 || return 13
+
+  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
+  change_files_3_in $reference_dir4 >> $logfile 2>&1 || return 14
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "compare the changed directories" >> $logfile
+  compare_directories $repo_dir $reference_dir4 >> $logfile 2>&1 || return $?
+
+  echo "current tag statistics:" >> $logfile
+  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+
+  echo "check tag descriptions" >> $logfile
+  if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc"; then
+    echo "all tags and their descriptions found" >> $logfile
+  else
+    return 15
+  fi
+  if [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag_desc" | wc -l) -ne 0 ]; then
+    return 16
+  fi
+
+  # ============================================================================
+
+  echo "start transaction to rollback" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "rollback to first tagged revision: $first_tag" >> $logfile
+  cvmfs_server rollback -f -t $first_tag $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "compare to reference directory" >> $logfile
+  compare_directories $repo_dir $reference_dir1 >> $logfile 2>&1 || return 17
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "current tag statistics:" >> $logfile
+  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+
+  echo "check tag descriptions" >> $logfile
+  if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"; then
+    echo "all tags and their descriptions found" >> $logfile
+  else
+    return 18
+  fi
+  if [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  | wc -l) -ne 0 ]; then
+    return 19
+  fi
+
+  # ============================================================================
+
+  echo "create a couple of revisions..." >> $logfile
+  iterations=5
+  while [ $iterations -gt 0 ]; do
+    echo "init a new transaction in $CVMFS_TEST_REPO" >> $logfile
+    start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+    echo "creating CVMFS snapshot" >> $logfile
+    publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+    iterations=$(( $iterations - 1))
+  done
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to move a tag" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  local newest_hash=$(sudo cvmfs_server lstags | tail -n1 | awk '{print $3}')
+
+  echo "moving tag '$first_tag' to hash '$newest_hash'" >> $logfile
+  publish_repo $CVMFS_TEST_REPO -a $first_tag -h $newest_hash -t "$first_tag_desc+1" >> $logfile 2>&1 || return $?
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "current tag statistics:" >> $logfile
+  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+
+  echo "check tag descriptions" >> $logfile
+  if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
+     cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc+1"; then
+    echo "all tags and their descriptions found" >> $logfile
+  else
+    return 20
+  fi
+  if [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  | wc -l) -ne 0 ]; then
+    return 21
+  fi
+
+  return 0
+}
+
