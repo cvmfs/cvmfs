@@ -179,7 +179,7 @@ Supported Commands:
   info          <fully qualified name>
                 Print summary about the repository
   lstags        <fully qualified name>
-                Print named tags (snapshots) of the reoppsitory
+                Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
                 [-t tag (check given tag instead of trunk)]
                 <fully qualified name>
