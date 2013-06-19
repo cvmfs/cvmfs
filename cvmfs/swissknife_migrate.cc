@@ -1058,13 +1058,13 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
 
   // Aggregated the statistics counters of all nested catalogs
   // Note: we might need to wait until nested catalogs are sucessfully processed
-  DeltaCounters aggregated_counters;
+  DeltaCounters stats_counters;
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
     const PendingCatalog *nested_catalog = *i;
     const catalog::DeltaCounters &s = nested_catalog->nested_statistics.Get();
-    s.PopulateToParent(aggregated_counters);
+    s.PopulateToParent(stats_counters);
   }
 
   // count various directory entry types in the catalog to fill up the catalog
@@ -1111,16 +1111,16 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
   }
 
   // insert the counted statistics into the DeltaCounters data structure
-  aggregated_counters.self.regular_files = count_regular_files.RetrieveInt64(0);
-  aggregated_counters.self.symlinks      = count_symlinks.RetrieveInt64(0);
-  aggregated_counters.self.directories   = count_directories.RetrieveInt64(0);
-  aggregated_counters.self.nested_catalogs = count_nested_clgs.RetrieveInt64(0);
+  stats_counters.self.regular_files    = count_regular_files.RetrieveInt64(0);
+  stats_counters.self.symlinks         = count_symlinks.RetrieveInt64(0);
+  stats_counters.self.directories      = count_directories.RetrieveInt64(0);
+  stats_counters.self.nested_catalogs  = count_nested_clgs.RetrieveInt64(0);
 
   // write back the generated statistics counters into the catalog database
-  aggregated_counters.WriteToDatabase(writable);
+  stats_counters.WriteToDatabase(writable);
 
   // push the generated statistics counters up to the parent catalog
-  data->nested_statistics.Set(aggregated_counters);
+  data->nested_statistics.Set(stats_counters);
 
   return true;
 }
