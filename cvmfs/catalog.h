@@ -52,7 +52,10 @@ struct InodeRange {
     return ((inode > offset) && (inode <= size + offset));
   }
 
-  inline bool IsInitialized() const { return (offset > 0) && (size > 0); }
+  inline void MakeDummy() { offset = 1; }
+
+  inline bool IsInitialized() const { return offset > 0; }
+  inline bool IsDummy() const { return IsInitialized() && size == 0; }
 };
 
 

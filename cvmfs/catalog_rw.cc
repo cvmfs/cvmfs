@@ -48,8 +48,7 @@ WritableCatalog *AttachFreelyRw(const string     &root_path,
     return NULL;
   }
   InodeRange inode_range;
-  inode_range.offset = 256;
-  inode_range.size = 256 + catalog->max_row_id();
+  inode_range.MakeDummy();
   catalog->set_inode_range(inode_range);
   return catalog;
 }

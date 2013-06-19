@@ -37,8 +37,7 @@ Catalog *AttachFreely(const string     &root_path,
     return NULL;
   }
   InodeRange inode_range;
-  inode_range.offset = 256;
-  inode_range.size = 256 + catalog->max_row_id();
+  inode_range.MakeDummy();
   catalog->set_inode_range(inode_range);
   return catalog;
 }
@@ -369,6 +368,10 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
                                  const uint64_t hardlink_group)
 {
   assert(IsInitialized());
+
+  if (inode_range_.IsDummy()) {
+    return DirectoryEntry::kInvalidInode;
+  }
 
   inode_t inode = row_id + inode_range_.offset;
 
