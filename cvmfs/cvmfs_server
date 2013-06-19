@@ -1659,8 +1659,9 @@ publish() {
       echo "Tag name missing"
       return 1
     fi
-    if lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$"; then
-      echo "Tag name '$tag_name' is already in use."
+    if lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+       [ x"$tag_hash" = "x" ]; then
+      echo "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
       return 1
     fi
     add_tag="-a ${tag_name}@${tag_channel}@${tag_description}"
