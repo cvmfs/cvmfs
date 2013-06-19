@@ -1664,7 +1664,7 @@ publish() {
       echo "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
       return 1
     fi
-    add_tag="-a ${tag_name}@${tag_channel}@${tag_description}"
+    add_tag="-a \"${tag_name}@${tag_channel}@${tag_description}\""
   fi
 
   # do it!
