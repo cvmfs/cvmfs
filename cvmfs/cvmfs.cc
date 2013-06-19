@@ -1008,6 +1008,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     chunk_tables_->Lock();
     if (!chunk_tables_->inode2chunks.Contains(ino)) {
       chunk_tables_->Unlock();
+
       // Retrieve File chunks from the catalog
       FileChunkList *chunks = new FileChunkList();
       if (!dirent.catalog()->ListFileChunks(path, chunks) || chunks->IsEmpty()) {
@@ -1017,9 +1018,18 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         fuse_reply_err(req, EIO);
         return;
       }
+
       chunk_tables_->Lock();
-      chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path));
-      chunk_tables_->inode2references.Insert(ino, 1);
+      // Check again to avoid race
+      if (!chunk_tables_->inode2chunks.Contains(ino)) {
+        chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path));
+        chunk_tables_->inode2references.Insert(ino, 1);
+      } else {
+        uint32_t refctr;
+        bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+        assert(retval);
+        chunk_tables_->inode2references.Insert(ino, refctr+1);
+      }
     } else {
       uint32_t refctr;
       bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);

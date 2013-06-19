@@ -171,9 +171,9 @@ include_directories (${INCLUDE_DIRECTORIES})
 if (BUILD_CVMFS)
 
   add_executable (cvmfs2 ${CVMFS_LOADER_SOURCES})
-  add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-  add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-  add_executable (cvmfs_fsck    ${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
+  add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES})
+  add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
+  add_executable (cvmfs_fsck ${CVMFS_FSCK_SOURCES})
 
   if (LIBFUSE_BUILTIN)
     add_dependencies (cvmfs_fuse_debug libfuse) # here it does not matter if libfuse or libfuse4x

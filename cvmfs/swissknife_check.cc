@@ -283,6 +283,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
     } else if (entries[i].IsRegular()) {
       computed_counters->self.regular_files++;
+      computed_counters->self.file_size += entries[i].size();
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "unknown file type %s",
                full_path.c_str());
@@ -295,7 +296,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       catalog->ListFileChunks(full_path, &chunks);
 
       computed_counters->self.chunked_files++;
-      computed_counters->self.file_chunks += chunks.size();
+      computed_counters->self.chunked_file_size += entries[i].size();
+      computed_counters->self.file_chunks       += chunks.size();
 
       // do we find file chunks for the chunked file in this catalog?
       if (chunks.size() == 0) {

@@ -26,9 +26,6 @@ set (CVMFS_UNITTEST_SOURCES
   # test utility functions
   testutil.cc testutil.h
 
-  # test utility functions
-  testutil.cc testutil.h
-
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
   ${CVMFS_SOURCE_DIR}/logging.h

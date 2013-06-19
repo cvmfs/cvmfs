@@ -48,8 +48,10 @@ fi
 # Find the service binary
 if [ -x /sbin/service ]; then
   SERVICE_BIN="/sbin/service"
-else
+elif [ -x /usr/sbin/service ]; then
   SERVICE_BIN="/usr/sbin/service" # Ubuntu
+elif [ -x /sbin/rc-service ]; then
+  SERVICE_BIN="/sbin/rc-service" # OpenRC
 fi
 [ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
 
@@ -57,7 +59,7 @@ fi
 if [ -x /sbin/fuser ]; then
   fuser="/sbin/fuser" # RHEL
 else
-  fuser="/bin/fuser"  # Ubuntu, SuSe
+  fuser="/bin/fuser"  # Ubuntu, SuSe, Gentoo
 fi
 
 # standard values
@@ -162,7 +164,7 @@ Supported Commands:
                 < -k path to keys> <fully qualified repository name>
                 Imports a CernVM-FS 2.0.x repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
-                [-a tag name] [-c tag channel] [ -t tag description ]
+                [-a tag name] [-c tag channel] [ -t tag description ] [ -h hash ]
                 [-r tag name]
                 <fully qualified name>
                 Make a new repository snapshot
@@ -1850,12 +1852,13 @@ publish() {
   local tag_name=
   local tag_channel=00
   local tag_description=
+  local tag_hash=
   local add_tag=
   local remove_tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:c:t:r:" option
+  while getopts "dDpa:h:c:t:r:" option
   do
     case $option in
       d)
@@ -1870,6 +1873,10 @@ publish() {
       a)
         add_tag="-a"
         tag_name="$OPTARG"
+      ;;
+      h)
+        add_tag="-a"
+        tag_hash="-h $OPTARG"
       ;;
       c)
         add_tag="-a"
@@ -1988,7 +1995,7 @@ publish() {
   $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-  tag_command="$tag_command -t $trunk_hash -i $trunk_revision"
+  tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"
   echo "Tagging $name"
   $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"

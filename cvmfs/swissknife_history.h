@@ -31,6 +31,8 @@ class CommandTag : public Command {
     result.push_back(Parameter('d', "delete a tag", true, false));
     result.push_back(Parameter('a', "add a tag (format: \"name@channel@desc\")",
                                true, false));
+    result.push_back(Parameter('h', "tag hash (if different from trunk)",
+                               true, false));
     result.push_back(Parameter('l', "list tags", true, true));
 
     return result;
