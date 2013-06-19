@@ -1079,6 +1079,9 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
     "SELECT count(*) FROM catalog WHERE flags & :flag_dir;");
   Sql count_nested_clgs(writable,
     "SELECT count(*) FROM nested_catalogs;");
+  Sql aggregate_file_size(writable,
+    "SELECT sum(size) FROM catalog WHERE  flags & :flag_file "
+    "                                     AND NOT flags & :flag_link");
 
   // run the actual counting queries
   retval =
@@ -1109,12 +1112,21 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
           count_nested_clgs, data);
     return false;
   }
+  retval =
+    aggregate_file_size.BindInt64(1, SqlDirent::kFlagFile) &&
+    aggregate_file_size.BindInt64(2, SqlDirent::kFlagLink) &&
+    aggregate_file_size.Execute();
+  if (! retval) {
+    Error("Failed to aggregate the file sizes.", aggregate_file_size, data);
+    return false;
+  }
 
   // insert the counted statistics into the DeltaCounters data structure
   stats_counters.self.regular_files    = count_regular_files.RetrieveInt64(0);
   stats_counters.self.symlinks         = count_symlinks.RetrieveInt64(0);
   stats_counters.self.directories      = count_directories.RetrieveInt64(0);
   stats_counters.self.nested_catalogs  = count_nested_clgs.RetrieveInt64(0);
+  stats_counters.self.file_size        = aggregate_file_size.RetrieveInt64(0);
 
   // write back the generated statistics counters into the catalog database
   stats_counters.WriteToDatabase(writable);
