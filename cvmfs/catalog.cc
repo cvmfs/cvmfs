@@ -367,8 +367,7 @@ hash::Any Catalog::GetPreviousRevision() const {
  * @return the assigned inode number
  */
 inode_t Catalog::GetMangledInode(const uint64_t row_id,
-                                 const uint64_t hardlink_group)
-{
+                                 const uint64_t hardlink_group) const {
   assert(IsInitialized());
 
   if (inode_range_.IsDummy()) {

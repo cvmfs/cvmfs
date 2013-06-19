@@ -168,7 +168,7 @@ class Catalog : public SingleCopy {
 
  protected:
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
-  HardlinkGroupMap hardlink_groups_;
+  mutable HardlinkGroupMap hardlink_groups_;
 
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
@@ -198,7 +198,7 @@ class Catalog : public SingleCopy {
 
   uint64_t GetRowIdFromInode(const inode_t inode) const;
   inode_t GetMangledInode(const uint64_t row_id,
-                          const uint64_t hardlink_group);
+                          const uint64_t hardlink_group) const;
 
   void FixTransitionPoint(const hash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
