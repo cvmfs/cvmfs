@@ -434,9 +434,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
     result.linkcount_ = 1;
     result.hardlink_group_ = 0;
-    result.inode_ = catalog->IsInitialized()
-             ? ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0)
-             : DirectoryEntry::kInvalidInode;
+    result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
     result.uid_ = g_uid;
     result.gid_ = g_gid;
     result.is_chunked_file_ = false;
@@ -444,10 +442,8 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
     const uint64_t hardlinks = RetrieveInt64(1);
     result.linkcount_ = Hardlinks2Linkcount(hardlinks);
     result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
-    result.inode_ = catalog->IsInitialized()
-             ? ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                                                    result.hardlink_group_)
-             : DirectoryEntry::kInvalidInode;
+    result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
+                                                    result.hardlink_group_);
     result.uid_ = RetrieveInt64(13);
     result.gid_ = RetrieveInt64(14);
     result.is_chunked_file_ = (database_flags & kFlagFileChunk);
