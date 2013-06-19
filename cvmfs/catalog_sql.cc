@@ -25,7 +25,7 @@ const float Database::kLatestSupportedSchema = 2.4;  // + 1.X catalogs (r/o)
 const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
 
 
-void SqlError(const std::string &error_msg, const Database &database) {
+static void SqlError(const std::string &error_msg, const Database &database) {
   LogCvmfs(kLogCatalog, kLogStderr, "%s\nSQLite said: '%s'",
            error_msg.c_str(), database.GetLastErrorMsg().c_str());
 }

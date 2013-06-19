@@ -58,13 +58,13 @@ ParameterList CommandMigrate::GetParams() {
 }
 
 
-void Error(const std::string &message) {
+static void Error(const std::string &message) {
   LogCvmfs(kLogCatalog, kLogStderr, message.c_str());
 }
 
 
-void Error(const std::string                     &message,
-           const CommandMigrate::PendingCatalog  *catalog) {
+static void Error(const std::string                     &message,
+                  const CommandMigrate::PendingCatalog  *catalog) {
   std::stringstream ss;
   ss << message << std::endl
      << "Catalog: " << catalog->root_path();
@@ -72,9 +72,9 @@ void Error(const std::string                     &message,
 }
 
 
-void Error(const std::string                     &message,
-           const catalog::Sql                    &statement,
-           const CommandMigrate::PendingCatalog  *catalog) {
+static void Error(const std::string                     &message,
+                  const catalog::Sql                    &statement,
+                  const CommandMigrate::PendingCatalog  *catalog) {
   std::stringstream ss;
   ss << message << std::endl
      << "SQLite:  " << statement.GetLastError() << " - "
