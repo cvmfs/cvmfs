@@ -2116,8 +2116,19 @@ fi
 subcommand=$1
 shift
 if is_subcommand $subcommand; then
+  # parse the command line arguments (keep quotation marks)
+  args=""
+  while [ $# -gt 0 ]; do
+    if echo $1 | grep -q "\s"; then
+      args="$args \"$1\""
+    else
+      args="$args $1"
+    fi
+    shift 1
+  done
+
   # replace a dash (-) by an underscore (_) and call the requested sub-command
-  eval "$(echo $subcommand | sed 's/-/_/g') $@"
+  eval "$(echo $subcommand | sed 's/-/_/g') $args"
 else
   usage "Unrecognized command: $subcommand"
 fi
