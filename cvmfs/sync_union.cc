@@ -9,6 +9,9 @@
 #include "sync_item.h"
 #include "sync_mediator.h"
 
+#include <alloca.h>
+#include <unistd.h>
+
 using namespace std;  // NOLINT
 
 namespace publish {
@@ -178,21 +181,66 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
     traversal.Recurse(scratch_path());
   }
   
+  /**
+   * Wrapper around readlink to read the value of the symbolic link 
+   * and return true if it is equal to the supplied value, or false 
+   * otherwise (including if any errors occur)
+   *
+   * @param[in] path to the symbolic link
+   * @param[in] value to compare to link value
+   */
+  bool SyncUnionOverlayfs::ReadlinkEquals(std::string const &path, 
+                                          std::string const &compare_value) {
+    char *buf;
+    size_t compare_len;
+    
+    // compare to one more than compare_value length in case the link value 
+    // begins with compare_value but ends with something else
+    compare_len = compare_value.length() + 1;
+    
+    // allocate enough space for compare_len and terminating null
+    buf = static_cast<char *>(alloca(compare_len+1));
+    
+    ssize_t len = ::readlink(path.c_str(), buf, compare_len);
+    if (len != -1) {
+      buf[len] = '\0';
+      // have link, return true if it is equal to compare_value
+      return (std::string(buf) == compare_value);
+    } else {
+      // error, return false
+#ifdef DEBUGMSG
+      printf("SyncUnionOverlayfs::ReadlinkEquals error reading link [%s]: %s\n", 
+	     path.c_str(), strerror(errno));
+#endif
+      return false;
+    }
+  }
+  
+  /**
+   * Wrapper around lgetxattr to read the value of the specified 
+   * xattr and return true if it is equal to the supplied value, 
+   * or false otherwise (including if any errors occur)
+   *
+   * @param[in] path to the symbolic link
+   * @param[in] name of the attribute for which to compare the value
+   * @param[in] value to compare to xattr value
+   */
+  bool SyncUnionOverlayfs::XattrEquals(std::string const &path, std::string const &attr_name, std::string const &compare_value) {
+    return platform_lgetxattr_buflen(path, attr_name, compare_value.length()+1) == compare_value;
+  }
+  
   bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
     return (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
   }
   
   bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const std::string &path) const {
-    std::string link_name = platform_readlink32(path.c_str());
-    std::string whiteout_xattr = platform_lgetxattr32(path.c_str(), "trusted.overlay.whiteout");
-    bool is_whiteout = (link_name == "(overlay-whiteout)" && 
-			whiteout_xattr == "y");
+    bool is_whiteout = ReadlinkEquals(path, "(overlay-whiteout)") && XattrEquals(path.c_str(), "trusted.overlay.whiteout", "y");
     if (is_whiteout) {
       LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] is whiteout symlink",
 	       path.c_str());
     } else {
-      LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] is not a whiteout symlink link_name=[%s] whiteout_xattr=[%s]",
-	       path.c_str(), link_name.c_str(), whiteout_xattr.c_str());
+      LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] is not a whiteout symlink",
+	       path.c_str());
     }
     return is_whiteout;
   }
@@ -200,12 +248,12 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
   bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
     return (IsOpaqueDirPath(directory.GetScratchPath()));
   }
-  
+
   bool SyncUnionOverlayfs::IsOpaqueDirPath(const std::string &path) const {
-    bool is_opaque = (platform_lgetxattr32(path.c_str(), "trusted.overlay.opaque") == "y");
+    bool is_opaque = XattrEquals(path.c_str(), "trusted.overlay.opaque", "y");
     if (is_opaque) {
       LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] has opaque xattr", 
-	       path.c_str());
+               path.c_str());
     }
     return is_opaque;
   }
@@ -247,6 +295,5 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
 	     path.c_str());
     return false;
   }
-  
   
 }  // namespace sync

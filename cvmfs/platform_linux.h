@@ -144,42 +144,32 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
   return true;
 }
 
+inline std::string platform_lgetxattr_buflen(std::string const& path, 
+					     std::string const& name, 
+					     size_t buf_len) 
+{
+  char *buf;
+  buf = static_cast<char *>(alloca(buf_len+1));
+  
+  ssize_t len = ::lgetxattr(path.c_str(), name.c_str(), buf, buf_len-1);
+  if (len != -1) {
+    buf[len] = '\0';
+    return std::string(buf);
+  } else {
+    // error
+#ifdef DEBUGMSG
+    printf("platform_lgetxattr_buflen error reading xattr [%s] from [%s]: %s\n", name.c_str(), path.c_str(), strerror(errno));
+#endif
+    return std::string();
+  }
+}
+
 inline void platform_disable_kcache(int filedes) {
   posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
 
 inline int platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
-}
-
-inline std::string platform_readlink32(std::string const& path) {
-  char buf[32];
-  ssize_t len = ::readlink(path.c_str(), buf, sizeof(buf)-1);
-  if (len != -1) {
-    buf[len] = '\0';
-    return std::string(buf);
-  } else {
-    // error
-#ifdef DEBUGMSG
-    printf("platform_readlink32 error reading link [%s]: %s\n", path.c_str(), strerror(errno));
-#endif
-    return std::string();
-  }
-}
-
-inline std::string platform_lgetxattr32(std::string const& path, std::string const& name) {
-  char buf[32];
-  ssize_t len = ::lgetxattr(path.c_str(), name.c_str(), buf, sizeof(buf)-1);
-  if (len != -1) {
-    buf[len] = '\0';
-    return std::string(buf);
-  } else {
-    // error
-#ifdef DEBUGMSG
-    printf("platform_lgetxattr32 error reading xattr [%s] from [%s]: %s\n", name.c_str(), path.c_str(), strerror(errno));
-#endif
-    return std::string();
-  }
 }
 
 inline std::string platform_libname(const std::string &base_name) {

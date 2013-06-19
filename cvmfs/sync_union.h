@@ -199,6 +199,8 @@ class SyncUnionOverlayfs : public SyncUnion {
                 const std::string &scratch_path);
 
 	void Traverse();
+	static bool ReadlinkEquals(std::string const &path, std::string const &compare_value);
+	static bool XattrEquals(std::string const &path, std::string const &attr_name, std::string const &compare_value);
 
  protected:
 	bool IsWhiteoutEntry(const SyncItem &entry) const;
@@ -211,6 +213,7 @@ class SyncUnionOverlayfs : public SyncUnion {
  private:
 	bool IsWhiteoutSymlinkPath(const std::string &path) const;
 	bool IsOpaqueDirPath(const std::string &path) const;
+
 };  // class SyncUnionOverlayfs
 
 }  // namespace publish
