@@ -362,6 +362,9 @@ cvmfs_run_test() {
   echo "moving tag '$first_tag' to hash '$newest_hash'" >> $logfile
   publish_repo $CVMFS_TEST_REPO -a $first_tag -h $newest_hash -t "$first_tag_desc+1" >> $logfile 2>&1 || return $?
 
+  echo "compare to reference directory" >> $logfile
+  compare_directories $repo_dir $reference_dir1 >> $logfile 2>&1 || return 20
+
   echo "check catalog integrity" >> $logfile
   check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
 
@@ -373,13 +376,13 @@ cvmfs_run_test() {
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc+1"; then
     echo "all tags and their descriptions found" >> $logfile
   else
-    return 20
+    return 21
   fi
   if [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      | wc -l) -ne 0 ] || \
      [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag"       | wc -l) -ne 0 ] || \
      [ $(cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  | wc -l) -ne 0 ]; then
-    return 21
+    return 22
   fi
 
   return 0
