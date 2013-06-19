@@ -118,7 +118,8 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 
     if (*(i->second) != *(comp->second)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "catalog statistics mismatch: %s (%"PRIu64" / %"PRIu64")",
+               "catalog statistics mismatch: %s (expected: %"PRIu64" / "
+               "in catalog: %"PRIu64")",
                comp->first.c_str(), *(i->second), *(comp->second));
       retval = false;
     }
