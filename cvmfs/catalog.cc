@@ -49,7 +49,8 @@ Catalog::Catalog(const PathString &path,
   read_only_(true),
   catalog_hash_(catalog_hash),
   path_(path),
-  parent_(parent)
+  parent_(parent),
+  initialized_(false)
 {
   max_row_id_ = 0;
   inode_annotation_ = NULL;
@@ -156,6 +157,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
     parent_->AddChild(this);
   }
 
+  initialized_ = true;
   return true;
 }
 

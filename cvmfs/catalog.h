@@ -151,7 +151,7 @@ class Catalog : public SingleCopy {
   inline hash::Any hash() const { return catalog_hash_; }
 
   inline bool IsInitialized() const {
-    return inode_range_.IsInitialized() && (max_row_id_ > 0);
+    return inode_range_.IsInitialized() && initialized_;
   }
   inline bool IsRoot() const { return NULL == parent_; }
   inline virtual bool IsWritable() const { return false; }
@@ -203,6 +203,7 @@ class Catalog : public SingleCopy {
   void FixTransitionPoint(const hash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
+ private:
   Database *database_;
   pthread_mutex_t *lock_;
 
@@ -214,6 +215,7 @@ class Catalog : public SingleCopy {
   NestedCatalogMap children_;
   mutable NestedCatalogList *nested_catalog_cache_;
 
+  bool initialized_;
   InodeRange inode_range_;
   uint64_t max_row_id_;
   InodeAnnotation *inode_annotation_;
