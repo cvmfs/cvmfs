@@ -1633,14 +1633,6 @@ publish() {
     esac
   done
 
-  if [ "x$add_tag" != "x" ]; then
-    if [ "x$tag_name" = "x" ]; then
-      echo "Tag name missing"
-      return 1
-    fi
-    add_tag="-a ${tag_name}@${tag_channel}@${tag_description}"
-  fi
-
   # get repository name
   shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
@@ -1662,6 +1654,17 @@ publish() {
   check_expiry $stratum0 || die "Repository whitelist is expired!"
   [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  if [ "x$add_tag" != "x" ]; then
+    if [ "x$tag_name" = "x" ]; then
+      echo "Tag name missing"
+      return 1
+    fi
+    if lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$"; then
+      echo "Tag name '$tag_name' is already in use."
+      return 1
+    fi
+    add_tag="-a ${tag_name}@${tag_channel}@${tag_description}"
+  fi
 
   # do it!
   local swissknife="cvmfs_swissknife"
