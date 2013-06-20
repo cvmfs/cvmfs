@@ -18,6 +18,8 @@
 #include <new>
 #include <algorithm>
 
+#include <gtest/gtest_prod.h>
+
 #include "smalloc.h"
 #include "atomic.h"
 #include "murmur.h"
@@ -29,6 +31,8 @@
  */
 template<class Key, class Value, class Derived>
 class SmallHashBase {
+ FRIEND_TEST(T_Smallhash, InsertAndCopyMd5);
+
  public:
   static const double kLoadFactor;  // mainly useless for the dynamic version
   static const double kThresholdGrow;  // only used for resizable version
