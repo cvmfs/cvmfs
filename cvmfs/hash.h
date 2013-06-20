@@ -16,6 +16,7 @@
 
 #include <cstring>
 #include <cassert>
+#include <cstdlib>
 
 #include <string>
 #include "logging.h"
@@ -96,6 +97,17 @@ struct Digest {
     algorithm = a;
     assert(buffer_size <= digest_size_);
     memcpy(digest, digest_buffer, buffer_size);
+  }
+
+  /**
+   * Generates a purely random hash
+   * Only used for testing purposes
+   */
+  void Randomize() {
+    const unsigned bytes = GetDigestSize();
+    for (unsigned i = 0; i < bytes; ++i) {
+      digest[i] = rand() % 256;
+    }
   }
 
   void ToCStr(char cstr[digest_size_+1]) const {
@@ -207,8 +219,6 @@ struct Sha1 : public Digest<20, kSha1> { };
  * setting the algorithm field accordingly.
  */
 struct Any : public Digest<20, kAny> {
-  static Any RandomHash(const Algorithms a);
-
   Any() : Digest<20, kAny>() { }
   explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
   Any(const Algorithms a,
