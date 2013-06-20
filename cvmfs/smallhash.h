@@ -295,7 +295,7 @@ class SmallHashDynamic :
       const uint32_t swap_idx = i + random() % (N - i);
       uint32_t tmp = shuffled[i];
       shuffled[i] = shuffled[swap_idx];
-      shuffled[swap_idx] = tmp;
+      shuffled[swap_idx]  = tmp;
     }
     return shuffled;
   }
@@ -310,14 +310,21 @@ class SmallHashDynamic :
     SetThresholds();
     Base::AllocMemory();
     Base::DoClear(false);
-    uint32_t *shuffled_indices = ShuffleIndices(old_capacity);
-    for (uint32_t i = 0; i < old_capacity; ++i) {
-      if (old_keys[shuffled_indices[i]] != Base::empty_key_)
-        Base::Insert(old_keys[shuffled_indices[i]],
-                     old_values[shuffled_indices[i]]);
+    if (new_capacity < old_capacity) {
+      uint32_t *shuffled_indices = ShuffleIndices(old_capacity);
+      for (uint32_t i = 0; i < old_capacity; ++i) {
+        if (old_keys[shuffled_indices[i]] != Base::empty_key_)
+          Base::Insert(old_keys[shuffled_indices[i]],
+                       old_values[shuffled_indices[i]]);
+      }
+      smunmap(shuffled_indices);
+    } else {
+      for (uint32_t i = 0; i < old_capacity; ++i) {
+        if (old_keys[i] != Base::empty_key_)
+          Base::Insert(old_keys[i], old_values[i]);
+      }
     }
     assert(size() == old_size);
-    smunmap(shuffled_indices);
 
     Base::DeallocMemory(old_keys, old_values, old_capacity);
     num_migrates_++;
