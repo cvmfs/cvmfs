@@ -2,6 +2,8 @@
 
 #include <pthread.h>
 
+#include <limits>
+
 #include "../../cvmfs/smallhash.h"
 #include "../../cvmfs/murmur.h"
 
@@ -100,7 +102,8 @@ TEST_F(T_Smallhash, InsertAndCopyMd5) {
     smallhash_md5_.Insert(random_hash, i);
   }
 
-  EXPECT_GT(1000u, smallhash_md5_.max_collisions_);
+  const uint32_t max_collisions = std::numeric_limits<uint32_t>::max() / N;
+  EXPECT_GT(max_collisions, smallhash_md5_.max_collisions_);
 
   SmallHashDynamic<hash::Md5, int> new_smallhash_md5;
   new_smallhash_md5.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
@@ -108,6 +111,7 @@ TEST_F(T_Smallhash, InsertAndCopyMd5) {
 
   EXPECT_EQ(N, smallhash_md5_.size());
   EXPECT_EQ(N, new_smallhash_md5.size());
+  EXPECT_GT(max_collisions, new_smallhash_md5.max_collisions_);
 }
 
 
