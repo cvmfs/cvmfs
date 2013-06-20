@@ -3,13 +3,7 @@
 # This script spawns a virtual machine of a specific platform type on ibex and
 # runs the associated test cases on this machine
 
-# internal script configuration
-script_location=$(dirname $(readlink --canonicalize $0))
-reachability_timeout=60  # * 10 seconds
-accessibility_timeout=60 # * 10 seconds
-
-# Load configuration
-#
+# Configuration for cloud access
 # Example:
 # EC2_ACCESS_KEY="..."
 # EC2_SECRET_KEY="..."
@@ -17,7 +11,11 @@ accessibility_timeout=60 # * 10 seconds
 # EC2_KEY="..."
 # EC2_INSTANCE_TYPE="..."
 # EC2_KEY_LOCATION="/home/.../ibex_key.pem"
-. ${script_location}/ec2_config.sh
+
+# internal script configuration
+script_location=$(dirname $(readlink --canonicalize $0))
+reachability_timeout=60  # * 10 seconds
+accessibility_timeout=60 # * 10 seconds
 
 # static information (check also remote_setup.sh and remote_run.sh)
 cvmfs_workspace="/tmp/cvmfs-test-workspace"
@@ -36,6 +34,7 @@ old_client_package="notprovided"
 keys_package=""
 source_tarball=""
 unittest_package=""
+ec2_config="ec2_config.sh"
 ami_name=""
 log_destination="."
 
@@ -72,6 +71,7 @@ usage() {
   echo " -a <AMI name>              the virtual machine image to spawn"
   echo
   echo "Optional parameters:"
+  echo " -e <EC2 config file>       lcal location of the ec2_config.sh file"
   echo " -o <old client package>    CernVM-FS client package to be hotpatched on"
   echo " -d <results destination>   Directory to store final test session logs"
   echo
@@ -288,7 +288,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:s:c:o:t:g:k:a:d:" option; do
+while getopts "r:b:s:c:o:t:g:k:e:a:d:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -314,6 +314,9 @@ while getopts "r:b:s:c:o:t:g:k:a:d:" option; do
     k)
       keys_package=$OPTARG
       ;;
+    e)
+      ec2_config=$OPTARG
+      ;;
     a)
       ami_name=$OPTARG
       ;;
@@ -338,6 +341,9 @@ if [ x$platform_run_script   = "x" ] ||
    [ x$ami_name              = "x" ]; then
   usage "Missing parameter(s)"
 fi
+
+# load EC2 configuration
+. $ec2_config
 
 # spawn the virtual machine image, run the platform specific setup script
 # on it, wait for the spawning and setup to be complete and run the actual
