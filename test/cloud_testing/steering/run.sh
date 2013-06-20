@@ -71,7 +71,7 @@ usage() {
   echo " -a <AMI name>              the virtual machine image to spawn"
   echo
   echo "Optional parameters:"
-  echo " -e <EC2 config file>       lcal location of the ec2_config.sh file"
+  echo " -e <EC2 config file>       local location of the ec2_config.sh file"
   echo " -o <old client package>    CernVM-FS client package to be hotpatched on"
   echo " -d <results destination>   Directory to store final test session logs"
   echo
