@@ -48,6 +48,10 @@ class ShortString {
       Assign(other);
     return *this;
   }
+  ShortString & operator= (const std::string & other) {
+    Assign(other.data(), other.size());
+    return *this;
+  }
 
   ~ShortString() { delete long_string_; }
 
@@ -91,7 +95,7 @@ class ShortString {
       memcpy(&stack_[this->length_], chars, length);
     this->length_ = new_length;
   }
-  
+
   void Clear() {
     delete long_string_;
     long_string_ = NULL;
@@ -139,8 +143,16 @@ class ShortString {
     return memcmp(this->GetChars(), other.GetChars(), this_length) == 0;
   }
 
+  bool operator ==(const std::string &other) const {
+    return (*this == ShortString(other));
+  }
+
   bool operator !=(const ShortString &other) const {
     return !(*this == other);
+  }
+
+  bool operator !=(const std::string &other) const {
+    return (*this != ShortString(other));
   }
 
   bool operator <(const ShortString &other) const {

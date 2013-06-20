@@ -95,8 +95,9 @@ cvmfs_mkfqrn() {
 # @return   0 if the command was recognized
 is_subcommand() {
   subcommand=$1
-  supported_commands="mkfs add-replica publish rollback rmfs alterfs resign list \
-    info lstags check transaction abort snapshot skeleton migrate"
+  supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
+    resign list info lstags check transaction abort snapshot skeleton migrate"
+
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
@@ -158,6 +159,10 @@ Supported Commands:
   add-replica   [-u stratum1 upstream storage] [-o owner]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
+  import        [-w stratum0 url] [-o owner] [-u upstream storage]
+                [-s show migration statistics] [-c file ownership (UID:GID)]
+                < -k path to keys> <fully qualified repository name>
+                Imports a CernVM-FS 2.0.x repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
                 [-a tag name] [-c tag channel] [ -t tag description ] [ -h hash ]
                 [-r tag name]
@@ -204,6 +209,11 @@ NOTE: $errormsg
   else
     exit 2
   fi
+}
+
+load_repo_config() {
+  local name=$1
+  . /etc/cvmfs/repositories.d/${name}/server.conf
 }
 
 # retrieves (or guesses) the version of CernVM-FS that was used to create the
@@ -295,6 +305,38 @@ check_repository_existence() {
 }
 
 
+# checks if the aufs kernel module is present
+#
+# @return   0 if the aufs kernel module is loaded
+check_aufs() {
+  /sbin/modprobe -q aufs || test -d /sys/fs/aufs
+}
+
+
+# checks if autofs is disabled on /cvmfs
+#
+# @return  0 if autofs is not used for /cvmfs
+check_autofs_on_cvmfs() {
+  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+}
+
+
+# checks if apache is installed and running
+#
+# @return  0 if apache is installed and running
+check_apache() {
+  [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null
+}
+
+
+# checks if cvmfs2 client is installed
+#
+# @return  0 if cvmfs2 client is installed
+check_cvmfs2_client() {
+  [ -x /usr/bin/cvmfs2 ]
+}
+
+
 # checks if the running user is root
 #
 # @return   0 if the current user is root
@@ -334,7 +376,7 @@ is_master_replica() {
     is_master_replica=$(cvmfs_swissknife info -r $name -m 2>/dev/null)
   else
     is_stratum0 $name || return 1
-    . /etc/cvmfs/repositories.d/${name}/server.conf
+    load_repo_config $name
     is_master_replica=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -m 2>/dev/null)
   fi
 
@@ -580,9 +622,8 @@ is_riak_upstream() {
   return $?
 }
 
-get_upstream_path() {
+get_upstream_config() {
   local upstream=$1
-
   echo "$upstream" | cut -d, -f3-
 }
 
@@ -659,10 +700,10 @@ create_repository_skeleton() {
   local i=0
   while [ $i -lt 256 ]
   do
-    mkdir ${directory}/data/$(printf "%02x" $i)
+    mkdir -p ${directory}/data/$(printf "%02x" $i)
     i=$(($i+1))
   done
-  mkdir ${directory}/data/txn
+  mkdir -p ${directory}/data/txn
   if [ x$(id -un) != x$user ]; then
     chown -R $user $directory
   fi
@@ -699,6 +740,191 @@ set_ro_root_hash() {
   else
     echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
   fi
+}
+
+
+# puts all configuration files in place that are need for a stratum0 repository
+#
+# @param name        the name of the repository
+# @param upstream    the upstream definition of the future repository
+# @param stratum0    the URL of the stratum0 http entry point
+# @param cvmfs_user  the owning user of the repository
+create_config_files_for_new_repository() {
+  local name=$1
+  local upstream=$2
+  local stratum0=$3
+  local cvmfs_user=$4
+
+  # other configurations
+  local spool_dir="/var/spool/cvmfs/${name}"
+  local scratch_dir="${spool_dir}/scratch"
+  local rdonly_dir="${spool_dir}/rdonly"
+  local temp_dir="${spool_dir}/tmp"
+  local cache_dir="${spool_dir}/cache"
+
+  mkdir -p /etc/cvmfs/repositories.d/${name}
+  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+# Created by cvmfs_server.
+CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_REPOSITORY_NAME=$name
+CVMFS_REPOSITORY_TYPE=stratum0
+CVMFS_USER=$cvmfs_user
+CVMFS_UNION_DIR=/cvmfs/$name
+CVMFS_SPOOL_DIR=$spool_dir
+CVMFS_STRATUM0=$stratum0
+CVMFS_UPSTREAM_STORAGE=$upstream
+CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
+CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
+CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
+CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+EOF
+  cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
+# Created by cvmfs_server.  Don't touch.
+# For pushing files to the worker nodes
+Alias /fanout/cvmfs/$name /cvmfs/$name
+<Directory "/cvmfs/$name">
+    Options -MultiViews
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+    EnableMMAP Off
+    EnableSendFile Off
+</Directory>
+# For pushing catalogs to upstream storage
+Alias /fanout/$temp_dir $temp_dir
+<Directory "$temp_dir">
+    Options -MultiViews
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+    EnableMMAP Off
+    EnableSendFile Off
+</Directory>
+EOF
+
+  # ONLY FOR LOCAL UPSTREAM
+  if is_local_upstream $upstream; then
+    local repository_dir=$(get_upstream_config $upstream)
+    cat >> /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
+# Translation URL to real pathname
+Alias /cvmfs/$name ${repository_dir}
+<Directory "${repository_dir}">
+    Options -MultiViews
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+
+    EnableMMAP Off
+    EnableSendFile Off
+
+    AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
+
+    Header unset Last-Modified
+    FileETag None
+
+    ExpiresActive On
+    ExpiresDefault "access plus 3 days"
+    ExpiresByType text/html "access plus 5 minutes"
+    ExpiresByType application/x-cvmfs "access plus 1 minutes"
+</Directory>
+EOF
+
+  # ONLY FOR RIAK UPSTREAM
+  elif is_riak_upstream $upstream; then
+    local riak_urls=$(get_upstream_config $upstream)
+    cat > /etc/cvmfs/repositories.d/${name}/riak.conf << EOF
+# Created by cvmfs_server.
+CVMFS_RIAK_URLS=$riak_urls
+EOF
+  fi
+
+  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
+# Created by cvmfs_server.  Don't touch.
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_QUOTA_LIMIT=4000
+CVMFS_SERVER_URL=$stratum0
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
+CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_IGNORE_SIGNATURE=no
+CVMFS_AUTO_UPDATE=no
+CVMFS_NFS_SOURCE=no
+EOF
+  cat >> /etc/sudoers << EOF
+$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,rw /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/umount $rdonly_dir # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/mount $rdonly_dir # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/mount /cvmfs/$name # added by CernVM-FS for $name
+$cvmfs_user localhost = NOPASSWD: /bin/rm -rf $scratch_dir # added by CernVM-FS for $name
+EOF
+}
+
+
+create_spool_area_for_new_repository() {
+  local name=$1
+  local create_skeleton=0
+
+  if [ $# -gt 1 ]; then
+    create_skeleton=1
+  fi
+
+  # gather repository information from configuration file
+  load_repo_config $name
+  local spool_dir=$CVMFS_SPOOL_DIR
+  local scratch_dir="${spool_dir}/scratch"
+  local rdonly_dir="${spool_dir}/rdonly"
+  local temp_dir="${spool_dir}/tmp"
+  local cache_dir="${spool_dir}/cache"
+
+  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
+  chown -R $CVMFS_USER /cvmfs/$name $spool_dir
+  if [ $create_skeleton -eq 1 ] && is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    local repository_dir
+    repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
+  fi
+}
+
+
+setup_and_mount_new_repository() {
+  local name=$1
+
+  # get repository information
+  load_repo_config $name
+  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+
+  local selinux_context=""
+  if has_selinux && try_mount_remount_cycle; then
+    selinux_context="context=\"system_u:object_r:default_t:s0\""
+  fi
+  cat >> /etc/fstab << EOF
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
+EOF
+  sudo -H -u $cvmfs_user sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
+  mount $rdonly_dir > /dev/null
+  mount /cvmfs/$name
+}
+
+
+print_new_repository_notice() {
+  local name=$1
+  local cvmfs_user=$2
+
+  echo "\
+
+Before you can install anything, call \`cvmfs_server transaction\`
+to enable write access on your repository. Then install your
+software in /cvmfs/$name as user $cvmfs_user.
+Once you're happy, publish using \`cvmfs_server publish\`
+
+For client configuration, have a look at 'cvmfs_server info'
+
+If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
@@ -744,7 +970,7 @@ alterfs() {
   is_root || die "Only root can alter a repository"
 
   # gather repository information
-  . /etc/cvmfs/repositories.d/${name}/server.conf
+  load_repo_config $name
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
 
   # do what you've been asked for
@@ -817,178 +1043,60 @@ mkfs() {
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
 
   # sanity checks
-  check_repository_existence $name && die "The repository $name already exists"
-  is_root || die "Only root can create a new repository"
+  check_repository_existence $name  && die "The repository $name already exists"
+  is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
-
-  # other configurations
-  local cvmfs_user=`get_cvmfs_owner $name $owner`
-  local spool_dir="/var/spool/cvmfs/${name}"
-  local scratch_dir="${spool_dir}/scratch"
-  local rdonly_dir="${spool_dir}/rdonly"
-  local temp_dir="${spool_dir}/tmp"
-  local cache_dir="${spool_dir}/cache"
-  local repository_dir;
-  local riak_urls;
-  if is_local_upstream $upstream; then
-    repository_dir=$(get_upstream_path $upstream)
-  elif is_riak_upstream $upstream; then
-    riak_urls=$(get_upstream_path $upstream)
-  fi
-
-  # more sanity checks
-  check_user $cvmfs_user || die "No user $cvmfs_user"
-  /sbin/modprobe -q aufs || test -d /sys/fs/aufs || die "aufs kernel module missing"
-  [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
-  [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
+  is_local_upstream $upstream       || die "Import is only supported for local storage"
+  check_aufs                        || die "aufs kernel module missing"
+  check_cvmfs2_client               || die "cvmfs client missing"
+  check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
+  check_apache                      || die "Apache must be installed and running"
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
 
+  # repository owner dialog
+  local cvmfs_user=$(get_cvmfs_owner $name $owner)
+  check_user $cvmfs_user || die "No user $cvmfs_user"
+
+  # create system-wide configuration
   echo -n "Creating configuration files... "
-  mkdir -p /etc/cvmfs/repositories.d/${name}
-  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
-# Created by cvmfs_server.
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
-CVMFS_REPOSITORY_NAME=$name
-CVMFS_REPOSITORY_TYPE=stratum0
-CVMFS_USER=$cvmfs_user
-CVMFS_UNION_DIR=/cvmfs/$name
-CVMFS_SPOOL_DIR=$spool_dir
-CVMFS_STRATUM0=$stratum0
-CVMFS_UPSTREAM_STORAGE=$upstream
-CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
-CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
-CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
-CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
-EOF
-  cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
-# Created by cvmfs_server.  Don't touch.
-# For pushing files to the worker nodes
-Alias /fanout/cvmfs/$name /cvmfs/$name
-<Directory "/cvmfs/$name">
-    Options -MultiViews
-    AllowOverride All
-    Order allow,deny
-    Allow from all
-    EnableMMAP Off
-    EnableSendFile Off
-</Directory>
-# For pushing catalogs to upstream storage
-Alias /fanout/$temp_dir $temp_dir
-<Directory "$temp_dir">
-    Options -MultiViews
-    AllowOverride All
-    Order allow,deny
-    Allow from all
-    EnableMMAP Off
-    EnableSendFile Off
-</Directory>
-EOF
-  if is_local_upstream $upstream; then
-    cat >> /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
-# Translation URL to real pathname
-Alias /cvmfs/$name ${repository_dir}
-<Directory "${repository_dir}">
-    Options -MultiViews
-    AllowOverride All
-    Order allow,deny
-    Allow from all
-
-    EnableMMAP Off
-    EnableSendFile Off
-
-    AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
-
-    Header unset Last-Modified
-    FileETag None
-
-    ExpiresActive On
-    ExpiresDefault "access plus 3 days"
-    ExpiresByType text/html "access plus 5 minutes"
-    ExpiresByType application/x-cvmfs "access plus 1 minutes"
-</Directory>
-EOF
-  elif is_riak_upstream $upstream; then
-    cat > /etc/cvmfs/repositories.d/${name}/riak.conf << EOF
-# Created by cvmfs_server.
-CVMFS_RIAK_URLS=$riak_urls
-EOF
-  fi
-
-  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
-# Created by cvmfs_server.  Don't touch.
-CVMFS_CACHE_BASE=$cache_dir
-CVMFS_RELOAD_SOCKETS=$cache_dir
-CVMFS_QUOTA_LIMIT=4000
-CVMFS_SERVER_URL=$stratum0
-CVMFS_HTTP_PROXY=DIRECT
-CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_CHECK_PERMISSIONS=yes
-CVMFS_IGNORE_SIGNATURE=no
-CVMFS_AUTO_UPDATE=no
-CVMFS_NFS_SOURCE=no
-EOF
-  cat >> /etc/sudoers << EOF
-$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,rw /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/umount $rdonly_dir # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/mount $rdonly_dir # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/mount /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/rm -rf $scratch_dir # added by CernVM-FS for $name
-EOF
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user
   echo "done"
 
+  # create security keys and certificates
   mkdir -p /etc/cvmfs/keys
   create_master_key $name $cvmfs_user
   create_cert $name $cvmfs_user
 
+  # create storage and mountpoints
   echo -n "Create CernVM-FS Storage... "
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
-  chown -R $cvmfs_user /cvmfs/$name $spool_dir
-  if is_local_upstream $upstream; then
-    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
-  fi
+  create_spool_area_for_new_repository $name "with storage skeleton"
   reload_apache > /dev/null
   echo "done"
 
-  local spooler_definition="${upstream}"
+  # get information about new repository
+  load_repo_config $name
+  local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+
   echo -n "Create Initial Repository... "
-  create_whitelist $name $cvmfs_user $spooler_definition $temp_dir > /dev/null
+  create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
     -t $temp_dir \
-    -r $spooler_definition \
-    -o ${temp_dir}/new_manifest"
-  if [ $? -ne 0 ]; then
-    echo "fail!"
-    return
-  fi
+    -r $upstream \
+    -o ${temp_dir}/new_manifest" > /dev/null || die "fail! (cannot init repo)"
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
     -m ${temp_dir}/new_manifest \
     -t $temp_dir \
-    -r $spooler_definition" > /dev/null
-  if [ $? -ne 0 ]; then
-    echo "fail!"
-    return
-  fi
+    -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  local selinux_context=""
-  if has_selinux && try_mount_remount_cycle; then
-    selinux_context="context=\"system_u:object_r:default_t:s0\""
-  fi
-  cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${spool_dir}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
-EOF
-  sudo -H -u $cvmfs_user sh -c "touch ${spool_dir}/client.local"
-  mount $rdonly_dir > /dev/null
-  mount /cvmfs/$name
+  setup_and_mount_new_repository $name || die "fail!"
   echo "done"
 
   if [ $replicable -eq 1 ]; then
@@ -1002,16 +1110,7 @@ EOF
   publish $name > /dev/null
   cat $rdonly_dir/new_repository
 
-  echo "\
-
-Before you can install anything, call \`cvmfs_server transaction\`
-to enable write access on your repository. Then install your
-software in /cvmfs/$name as user $cvmfs_user.
-Once you're happy, publish using \`cvmfs_server publish\`
-
-For client configuration, have a look at 'cvmfs_server info'
-
-If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
+  print_new_repository_notice $name $cvmfs_user
 }
 
 
@@ -1071,14 +1170,14 @@ add_replica() {
   local temp_dir="${spool_dir}/tmp"
   local repository_dir;
   if is_local_upstream $upstream; then
-    repository_dir=$(get_upstream_path $upstream)
+    repository_dir=$(get_upstream_config $upstream)
   fi
 
   # additional sanity checks
   is_root || die "Only root can create a new repository"
   check_user $cvmfs_user || die "No user $cvmfs_user"
   if is_local_upstream $upstream; then
-    [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
+    check_apache || die "Apache must be installed and running"
   fi
   check_upstream_validity $upstream
 
@@ -1151,6 +1250,173 @@ You might have to add the key in /etc/cvmfs/repositories.d/${name}/replica.conf"
 ################################################################################
 
 
+import() {
+  local name
+  local stratum0
+  local keys_location
+  local upstream
+  local owner
+  local file_ownership
+  local show_statistics=0
+  local replicable=0
+
+  # parameter handling
+  OPTIND=1
+  while getopts "w:o:c:u:k:sm" option; do
+    case $option in
+      w)
+        stratum0=$OPTARG
+      ;;
+      o)
+        owner=$OPTARG
+      ;;
+      c)
+        file_ownership=$OPTARG
+      ;;
+      u)
+        upstream=$OPTARG
+      ;;
+      k)
+        keys_location=$OPTARG
+      ;;
+      s)
+        show_statistics=1
+      ;;
+      m)
+        replicable=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command import: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count 1 $#
+  name=$(get_repository_name $1)
+
+  # default values
+  [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
+  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
+
+  # security key pathes
+  local masterkey="${name}.masterkey"
+  local private_key="${name}.key"
+  local certificate="${name}.crt"
+  local public_key="${name}.pub"
+  local pki_keys="$masterkey $private_key $certificate $public_key"
+
+  # sanity checks
+  check_repository_existence $name  && die "The repository $name already exists"
+  is_root                           || die "Only root can create a new repository"
+  check_upstream_validity $upstream
+  check_aufs                        || die "aufs kernel module missing"
+  check_cvmfs2_client               || die "cvmfs client missing"
+  check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
+  check_apache                      || die "Apache must be installed and running"
+  is_local_upstream $upstream       || die "Import only works locally for the moment"
+  lower_hardlink_restrictions
+  ensure_enabled_apache_modules
+  for pki_file in $pki_keys; do
+    [ -f "${keys_location}/$pki_file" ] || die "Cannot find $pki_file in $keys_location"
+  done
+  [ x$keys_location == x ] && die "Please provide the location of the 2.0.x repository security keys (-k)"
+
+  # investigate the given repository storage for sanity
+  local storage_location=$(get_upstream_config $upstream)
+  [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
+  [ -f "${storage_location}/.cvmfspublished" ] && \
+  [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
+
+  # repository owner dialog
+  local cvmfs_user=$(get_cvmfs_owner $name $owner)
+  check_user $cvmfs_user || die "No user $cvmfs_user"
+  [ x"$file_ownership" = x ] && file_ownership="$(id -u $cvmfs_user):$(id -g $cvmfs_user)"
+  echo $file_ownership | grep -q "^[0-9][0-9]*:[0-9][0-9]*$" || die "Unrecognized file ownership: $file_ownership | expected: <uid>:<gid>"
+  local cvmfs_uid=$(echo $file_ownership | cut -d: -f1)
+  local cvmfs_gid=$(echo $file_ownership | cut -d: -f2)
+
+  # create the configuration for the new repository
+  echo -n "Creating configuration files... "
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user
+  echo "done"
+
+  # import the old repository security keys
+  echo -n "Importing the given key files... "
+  local global_key_dir="/etc/cvmfs/keys"
+  mkdir -p $global_key_dir
+  for pki_file in $pki_keys; do
+    cp "${keys_location}/$pki_file" $global_key_dir    || die "fail! (cannot copy $pki_file)"
+    chmod 444 "${global_key_dir}/${pki_file}"          || die "fail! (cannot chmod $pki_file)"
+    chown $cvmfs_user "${global_key_dir}/${pki_file}"  || die "fail! (cannot chown $pki_file)"
+  done
+  echo "done"
+
+  # create storage
+  echo -n "Create CernVM-FS Storage... "
+  create_spool_area_for_new_repository $name
+  reload_apache > /dev/null
+  echo "done"
+
+  # load repository configuration file
+  load_repo_config $name
+  local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
+
+  # migrate old catalogs
+  echo "Importing and Migrating old catalogs (may take a while)... "
+  chown -R $cvmfs_user $storage_location
+  if has_selinux; then
+    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null
+  fi
+  local new_manifest="${temp_dir}/new_manifest"
+  local statistics_flag
+  if [ $show_statistics -ne 0 ]; then
+    statistics_flag="-s"
+  fi
+  cvmfs_swissknife migrate \
+    -r $storage_location \
+    -n $name \
+    -u $upstream \
+    -t $temp_dir \
+    -k "${global_key_dir}/$public_key" \
+    -o $new_manifest \
+    -p $cvmfs_uid \
+    -g $cvmfs_gid \
+    -f \
+    $statistics_flag || die "fail!"
+  chown $cvmfs_user $new_manifest
+
+  # sign new (migrated) repository revision
+  echo -n "Signing newly imported Repository... "
+  create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+    -c ${global_key_dir}/${certificate} \
+    -k ${global_key_dir}/${private_key} \
+    -n $name \
+    -m $new_manifest \
+    -t $temp_dir \
+    -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
+  echo "done"
+
+  # do final setup
+  echo -n "Mounting CernVM-FS Storage... "
+  setup_and_mount_new_repository $name || die "fail!"
+  echo "done"
+
+  # make stratum0 repository replicable if requested
+  if [ $replicable -eq 1 ]; then
+    alterfs -m on $name
+  fi
+
+  print_new_repository_notice $name $cvmfs_user
+}
+
+
+################################################################################
+
+
 rmfs() {
   local name
   local spool_dir
@@ -1192,7 +1458,7 @@ rmfs() {
   fi
 
   # get information about repository
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   spool_dir=$CVMFS_SPOOL_DIR
   upstream=$CVMFS_UPSTREAM_STORAGE
   type=$CVMFS_REPOSITORY_TYPE
@@ -1223,7 +1489,7 @@ rmfs() {
   echo done
 
   if is_local_upstream $upstream; then
-    local repository_dir=$(get_upstream_path $upstream)
+    local repository_dir=$(get_upstream_config $upstream)
     if [ "x"$repository_dir != x ]; then
       echo -n "Removing repository storage... "
       rm -rf $repository_dir
@@ -1268,7 +1534,7 @@ resign() {
   is_stratum0 $name || die "This is not a stratum 0 repository ($name)"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
@@ -1296,7 +1562,7 @@ info() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   stratum0=$CVMFS_STRATUM0
 
   # do it!
@@ -1385,7 +1651,7 @@ check() {
   check_repository_existence $name || die "The repository $name does not exist"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
@@ -1397,7 +1663,7 @@ check() {
   fi
 
   upstream=$CVMFS_UPSTREAM_STORAGE
-  repository_dir=$(get_upstream_path $upstream)
+  repository_dir=$(get_upstream_config $upstream)
 
   # do it!
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
@@ -1476,7 +1742,7 @@ transaction() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
   base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
@@ -1539,7 +1805,7 @@ abort() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
 
@@ -1651,7 +1917,7 @@ publish() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
@@ -1874,7 +2140,7 @@ snapshot() {
   is_stratum1 $name || die "This is not a stratum 1 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   . /etc/cvmfs/repositories.d/$name/replica.conf
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
@@ -1923,7 +2189,7 @@ migrate_2_1_6() {
   local name=$name
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
 
   echo "Migrating repository '$name' from CernVM-FS $(mangle_version_string '2.1.6') to $(mangle_version_string '2.1.7')"
 
@@ -1984,7 +2250,7 @@ EOF
   fi
 
   # reload repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
 }
 
 
@@ -2023,7 +2289,7 @@ migrate() {
   is_root || die "Only root can migrate repositories"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
 
   # more sanity checks
   if check_repository_compatibility "nokill"; then

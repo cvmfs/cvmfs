@@ -311,6 +311,12 @@ check_memory() {
 }
 
 
+destroy_repo() {
+  local repo=$1
+  sudo cvmfs_server rmfs -f $repo || return 100
+}
+
+
 create_repo() {
   local repo=$1
   local uid=$2
@@ -321,7 +327,7 @@ create_repo() {
 
   if cvmfs_server list | grep -q $repo; then
     echo "Repository $repo is already present... removing it"
-    sudo cvmfs_server rmfs -f $repo || return 101
+    destroy_repo $repo || return 101
   fi
 
   echo "Creating new repository $repo..."
@@ -464,9 +470,11 @@ compare_directories() {
   listing2=$(create_listing $dir2)
 
   echo "check if directory structure and file meta data fits"
-  echo -e "$listing1" > listingFile1
-  echo -e "$listing2" > listingFile2
-  diff -uN listingFile1 listingFile2 2>&1 || return 101
+  local listingFile1="listing_$(basename $dir1)"
+  local listingFile2="listing_$(basename $dir2)"
+  echo -e "$listing1" > $listingFile1
+  echo -e "$listing2" > $listingFile2
+  diff -uN $listingFile1 $listingFile2 2>&1 || return 101
 
   echo "check if the file contents in both directories are the same"
   diff -ruN $dir1 $dir2 2>&1 || return 102
@@ -657,8 +665,9 @@ get_catalog_count() {
 # @param repo    the repository to be checked
 check_catalogs() {
   local repo=$1
+  shift 1
 
-  cvmfs_server check $repo || return 100
+  cvmfs_server check $@ $repo || return 100
   return 0
 }
 

@@ -23,26 +23,35 @@ const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string &root_path, const string &file) {
+Catalog *AttachFreely(const string     &root_path,
+                      const string     &file,
+                      const hash::Any  &catalog_hash,
+                            Catalog    *parent) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()), NULL);
+    new Catalog(PathString(root_path.data(), root_path.length()),
+                catalog_hash,
+                parent);
   bool retval = catalog->OpenDatabase(file);
   if (!retval) {
     delete catalog;
     return NULL;
   }
   InodeRange inode_range;
-  inode_range.offset = 256;
-  inode_range.size = 256 + catalog->max_row_id();
+  inode_range.MakeDummy();
   catalog->set_inode_range(inode_range);
   return catalog;
 }
 
 
-Catalog::Catalog(const PathString &path, Catalog *parent) {
-  read_only_ = true;
-  path_ = path;
-  parent_ = parent;
+Catalog::Catalog(const PathString &path,
+                 const hash::Any &catalog_hash,
+                 Catalog *parent) :
+  read_only_(true),
+  catalog_hash_(catalog_hash),
+  path_(path),
+  parent_(parent),
+  initialized_(false)
+{
   max_row_id_ = 0;
   inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -148,6 +157,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
     parent_->AddChild(this);
   }
 
+  initialized_ = true;
   return true;
 }
 
@@ -357,9 +367,12 @@ hash::Any Catalog::GetPreviousRevision() const {
  * @return the assigned inode number
  */
 inode_t Catalog::GetMangledInode(const uint64_t row_id,
-                                 const uint64_t hardlink_group)
-{
+                                 const uint64_t hardlink_group) const {
   assert(IsInitialized());
+
+  if (inode_range_.IsDummy()) {
+    return DirectoryEntry::kInvalidInode;
+  }
 
   inode_t inode = row_id + inode_range_.offset;
 

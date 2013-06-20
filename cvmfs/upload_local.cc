@@ -41,6 +41,9 @@ void LocalUploader::Upload(const std::string &local_path,
   // create destination in backend storage temporary directory
   std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
   if (tmp_path.empty()) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to create temp path for "
+                                          "upload of file '%s'",
+             local_path.c_str());
     atomic_inc32(&copy_errors_);
     Respond(callback, 1, local_path);
     return;
@@ -50,14 +53,21 @@ void LocalUploader::Upload(const std::string &local_path,
   int retval  = CopyPath2Path(local_path, tmp_path);
   int retcode = retval ? 0 : 100;
   if (retcode != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to copy file '%s' to staging "
+                                          "area: '%s'",
+             local_path.c_str(), tmp_path.c_str());
     atomic_inc32(&copy_errors_);
     Respond(callback, retcode, local_path);
     return;
   }
 
-  // move the file in place
+  // move the file in place (atomic operation)
   retcode = Move(tmp_path, remote_path);
   if (retcode != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move file '%s' from the "
+                                          "staging area to the final location: "
+                                          "'%s'",
+             tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
   }
   Respond(callback, retcode, local_path);
@@ -71,6 +81,9 @@ void LocalUploader::Upload(const std::string  &local_path,
   const int retcode = Move(local_path,
                            "data" + content_hash.MakePath(1,2) + hash_suffix);
   if (retcode != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move file '%s' to the "
+                                          "final location: '%s'",
+             local_path.c_str(), content_hash.ToString().c_str());
     atomic_inc32(&copy_errors_);
   }
   Respond(callback, retcode, local_path);
@@ -100,12 +113,20 @@ int LocalUploader::Move(const std::string &local_path,
   int retval  = chmod(local_path.c_str(), 0666);
   int retcode = (retval == 0) ? 0 : 101;
   if (retcode != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to set file permission '%s' "
+                                          "errno: %d",
+             local_path.c_str(), errno);
     return retcode;
   }
 
   // move the file in place
   retval  = rename(local_path.c_str(), destination_path.c_str());
   retcode = (retval == 0) ? 0 : errno;
+  if (retcode != 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move file '%s' to '%s' "
+                                          "errno: %d",
+             local_path.c_str(), remote_path.c_str(), errno);
+  }
 
   return retcode;
 }
