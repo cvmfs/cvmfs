@@ -95,7 +95,7 @@ def decompressCatalog(filename, destination):
 	f.close()
 
 
-def findNestedCatalogs(catalogName, catalogDirectory, getHistory):
+def findNestedCatalogs(catalogName, catalogDirectory):
 	catalogFile = getCatalogFilePath(catalogName, catalogDirectory)
 	tempFile    = tempfile.NamedTemporaryFile('wb')
 	decompressCatalog(catalogFile, tempFile.name)
@@ -110,19 +110,12 @@ def findNestedCatalogs(catalogName, catalogDirectory, getHistory):
 	for catalog in result:
 		catalogs.append(catalog[0])
 
-	# history references
-	if getHistory:
-		cursor.execute("SELECT value FROM properties WHERE key = 'previous_revision' LIMIT 1")
-		result = cursor.fetchall()
-		if result:
-			catalogs.append(result[0][0])
-
 	dbHandle.close()
 	tempFile.close()
 	return catalogs
 
 
-def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, beVerbose, getHistory):
+def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, beVerbose):
 	catalogs = [catalogName]
 	downloads = 0
 	while catalogs:
@@ -133,7 +126,7 @@ def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, be
 			continue
 
 		downloadCatalog(repositoryUrl, catalog, catalogDirectory, beVerbose)
-		nestedCatalogs = findNestedCatalogs(catalog, catalogDirectory, getHistory)
+		nestedCatalogs = findNestedCatalogs(catalog, catalogDirectory)
 		downloads += 1
 
 		if beVerbose:
@@ -147,9 +140,7 @@ def main():
 	usage = "usage: %prog [options] <repository url>\nThis script walks through all nested catalogs of a repository and\ndownloads these catalogs to the given destination directory\nTake care: the catalogs are saved uncompressed, so do not use cvmfs_zpipe"
 	parser = OptionParser(usage)
 	parser.add_option("-d", "--directory", dest="catalogDirectory", default="catalogs", help="the directory to download catalogs to")
-	parser.add_option("-m", "--merge", metavar="FILE", dest="mergeToFile", help="merge all catalogs into one given file")
 	parser.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="don't print status messages to stdout")
-	parser.add_option("-l", "--history", action="store_true", dest="history", default=False, help="download the catalog history")
 	(options, args) = parser.parse_args()
 
 	if len(args) != 1:
@@ -158,25 +149,18 @@ def main():
 	# read command line arguments
 	repositoryUrl = args[0]
 	catalogDirectory = options.catalogDirectory
-	merge = options.mergeToFile
 	verbose = options.verbose
-	history = options.history
 
 	# check option consistency
 	if os.path.exists(catalogDirectory) and os.listdir(catalogDirectory) != []:
 		printError("Directory '" + catalogDirectory + "' exists and is not empty")
 
-	if merge and foundSqlite and not foundSqlite3:
-		printError("unfortunately merging is not possible with your version of the python sqlite module")
-
 	# do the job
 	rootCatalog = getRootCatalogName(repositoryUrl)
-	numCatalogs = retrieveCatalogsRecursively(repositoryUrl, rootCatalog, catalogDirectory, verbose, history)
+	numCatalogs = retrieveCatalogsRecursively(repositoryUrl, rootCatalog, catalogDirectory, verbose)
 
 	print "downloaded" , numCatalogs , "catalogs"
 
-	if merge:
-		mergeCatalogs(rootCatalog, catalogs, catalogDirectory, merge, verbose)
 
 def printError(errorMessage):
 	print "[ERROR] " + errorMessage

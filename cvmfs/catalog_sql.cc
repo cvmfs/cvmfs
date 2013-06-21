@@ -25,6 +25,12 @@ const float Database::kLatestSupportedSchema = 2.4;  // + 1.X catalogs (r/o)
 const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
 
 
+static void SqlError(const std::string &error_msg, const Database &database) {
+  LogCvmfs(kLogCatalog, kLogStderr, "%s\nSQLite said: '%s'",
+           error_msg.c_str(), database.GetLastErrorMsg().c_str());
+}
+
+
 Database::Database(const std::string filename,
                    const sqlite::DbOpenMode open_mode)
 {
@@ -108,18 +114,31 @@ Database::Database(const std::string filename,
 /**
  * Private constructor.  Used to create a new sqlite database.
  */
-Database::Database(sqlite3 *sqlite_db, const float schema, const bool rw) {
-  sqlite_db_ = sqlite_db;
-  filename_ = "TMP";
-  schema_version_ = schema;
-  read_write_ = rw;
-  ready_ = false;  // Don't close on delete
+Database::Database(const std::string &filename, const float schema) :
+  sqlite_db_(NULL),
+  filename_(filename),
+  schema_version_(schema),
+  read_write_(true),
+  ready_(false)
+{
+  const int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
+                         SQLITE_OPEN_CREATE;
+
+  // create and open new database file
+  if (sqlite3_open_v2(filename_.c_str(), &sqlite_db_, open_flags, NULL)
+      != SQLITE_OK) {
+    return;
+  }
+
+  sqlite3_extended_result_codes(sqlite_db_, 1);
+  ready_ = true;
 }
 
 
 Database::~Database() {
-  if (ready_)
+  if (ready_) {
     sqlite3_close(sqlite_db_);
+  }
 }
 
 
@@ -127,14 +146,9 @@ Database::~Database() {
  * This method creates a new database file and initializes the database schema.
  */
 bool Database::Create(const string &filename,
-                      const DirectoryEntry &root_entry,
-                      const string &root_path)
-{
-  sqlite3 *sqlite_db;
-  SqlDirentInsert *sql_insert;
-  Sql *sql_schema;
-  int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
-                   SQLITE_OPEN_CREATE;
+                      const string &root_path,
+                      const DirectoryEntry &root_entry) {
+  bool retval = false;
 
   // Path hashes
   hash::Md5 root_path_hash = hash::Md5(hash::AsciiPtr(root_path));
@@ -147,105 +161,102 @@ bool Database::Create(const string &filename,
   // Create the new catalog file and open it
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new catalog at '%s'",
            filename.c_str());
-  if (sqlite3_open_v2(filename.c_str(), &sqlite_db, open_flags, NULL) !=
-      SQLITE_OK)
-  {
+  Database database(filename, kLatestSchema);
+  if (! database.ready()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "Cannot create and open catalog database file '%s'",
              filename.c_str());
     return false;
   }
-  sqlite3_extended_result_codes(sqlite_db, 1);
-  Database database(sqlite_db, kLatestSchema, true);
 
-  catalog::Counters counters;
-  counters.self.directories = 1;
-
-  bool retval;
-  string sql;
-  retval = Sql(database,
+  // generate the catalog table and index structure
+  retval =
+  Sql(database,
     "CREATE TABLE catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
-    " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database,
-               "CREATE INDEX idx_catalog_parent "
-               "ON catalog (parent_1, parent_2);").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database,
+    " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
+  Sql(database,
+    "CREATE INDEX idx_catalog_parent "
+    "ON catalog (parent_1, parent_2);")                           .Execute()  &&
+  Sql(database,
     "CREATE TABLE chunks "
     "(md5path_1 INTEGER, md5path_2 INTEGER, offset INTEGER, size INTEGER, "
     " hash BLOB, "
     " CONSTRAINT pk_chunks PRIMARY KEY (md5path_1, md5path_2, offset, size), "
     " FOREIGN KEY (md5path_1, md5path_2) REFERENCES "
-    "   catalog(md5path_1, md5path_2));").Execute();
-  if (!retval)
-    goto create_schema_fail;
+    "   catalog(md5path_1, md5path_2));")                         .Execute()  &&
+  Sql(database,
+    "CREATE TABLE properties (key TEXT, value TEXT, "
+    "CONSTRAINT pk_properties PRIMARY KEY (key));")               .Execute()  &&
+  Sql(database,
+    "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, "
+    "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
+  Sql(database,
+    "CREATE TABLE statistics (counter TEXT, value INTEGER, "
+    "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
 
-  retval = Sql(database,
-               "CREATE TABLE properties (key TEXT, value TEXT, "
-               "CONSTRAINT pk_properties PRIMARY KEY (key));").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database,
-               "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, "
-               "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database, "INSERT INTO properties "
-               "(key, value) VALUES ('revision', 0);").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  sql_schema = new Sql(database, "INSERT INTO properties "
-                                 "(key, value) VALUES ('schema', :schema);");
-  retval = sql_schema->BindDouble(1, kLatestSchema) && sql_schema->Execute();
-  delete sql_schema;
-  if (!retval)
-    goto create_schema_fail;
-
-  retval = Sql(database,
-               "CREATE TABLE statistics (counter TEXT, value INTEGER, "
-               "CONSTRAINT pk_statistics PRIMARY KEY (counter));").Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  if (!counters.InsertIntoDatabase(database))
-    goto create_schema_fail;
-
-  // Insert root entry
-  sql_insert = new SqlDirentInsert(database);
-  retval = sql_insert->BindPathHash(root_path_hash) &&
-           sql_insert->BindParentPathHash(root_parent_hash) &&
-           sql_insert->BindDirent(root_entry) &&
-           sql_insert->Execute();
-  delete sql_insert;
-  if (!retval)
-    goto create_schema_fail;
-
-  if (root_path != "") {
-    retval = Sql(database, "INSERT INTO properties "
-      "(key, value) VALUES ('root_prefix', '" + root_path + "');").Execute();
-    if (!retval)
-      goto create_schema_fail;
+  if (! retval) {
+    SqlError("failed to create catalog database tables.", database);
+    return false;
   }
 
-  sqlite3_close(sqlite_db);
-  return true;
+  // insert initial values to properties
+  Sql insert_initial_properties(database,
+    "INSERT INTO properties (key, value) "
+    "VALUES ('revision', 0), "
+    "       ('schema',   :schema);");
+  insert_initial_properties.BindDouble(1, kLatestSchema);
 
- create_schema_fail:
-  LogCvmfs(kLogSql, kLogVerboseMsg, "sql failure %s",
-           sqlite3_errmsg(sqlite_db));
-  sqlite3_close(sqlite_db);
-  return false;
+  if (! insert_initial_properties.Execute()) {
+    SqlError("failed to insert default initial values into the newly created "
+             "catalog tables.", database);
+    return false;
+  }
+
+  // create initial statistics counters
+  catalog::Counters counters;
+
+  // insert root entry (when given)
+  if (! root_entry.IsNegative()) {
+    SqlDirentInsert sql_insert(database);
+    retval = sql_insert.BindPathHash(root_path_hash)         &&
+             sql_insert.BindParentPathHash(root_parent_hash) &&
+             sql_insert.BindDirent(root_entry)               &&
+             sql_insert.Execute();
+    if (! retval) {
+      SqlError("failed to insert root entry into newly created catalog.",
+               database);
+      return false;
+    }
+
+    // account for the created root entry
+    counters.self.directories = 1;
+  }
+
+  // save initial statistics counters
+  if (!counters.InsertIntoDatabase(database)) {
+    SqlError("failed to insert initial catalog statistics counters.", database);
+    return false;
+  }
+
+  // insert root path (when given)
+  if (! root_path.empty()) {
+    Sql insert_root_path(database,
+      "INSERT INTO properties "
+      "(key, value) VALUES ('root_prefix', :root_path);");
+    retval = insert_root_path.BindText(1, root_path) &&
+             insert_root_path.Execute();
+
+    if (!retval) {
+      SqlError("failed to store root prefix in the newly created catalog.",
+               database);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 std::string Database::GetLastErrorMsg() const {
@@ -408,7 +419,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   DirectoryEntry result;
 
   const unsigned database_flags = RetrieveInt(5);
-  result.catalog_ = (Catalog*)catalog;
+  result.catalog_ = const_cast<Catalog*>(catalog);
   //result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
@@ -421,28 +432,29 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
 
   // retrieve the hardlink information from the hardlinks database field
   if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
-    result.linkcount_ = 1;
-    result.hardlink_group_ = 0;
-    result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12), 0);
-    result.uid_ = g_uid;
-    result.gid_ = g_gid;
+    result.linkcount_       = 1;
+    result.hardlink_group_  = 0;
+    result.inode_           = catalog->GetMangledInode(RetrieveInt64(12), 0);
+    result.uid_             = g_uid;
+    result.gid_             = g_gid;
     result.is_chunked_file_ = false;
   } else {
     const uint64_t hardlinks = RetrieveInt64(1);
-    result.linkcount_ = Hardlinks2Linkcount(hardlinks);
-    result.hardlink_group_ = Hardlinks2HardlinkGroup(hardlinks);
-    result.inode_ = ((Catalog*)catalog)->GetMangledInode(RetrieveInt64(12),
-                                                         result.hardlink_group_);
-    result.uid_ = RetrieveInt64(13);
-    result.gid_ = RetrieveInt64(14);
-    result.is_chunked_file_ = (database_flags & kFlagFileChunk);
+    result.linkcount_        = Hardlinks2Linkcount(hardlinks);
+    result.hardlink_group_   = Hardlinks2HardlinkGroup(hardlinks);
+    result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
+                                                        result.hardlink_group_);
+    result.uid_              = RetrieveInt64(13);
+    result.gid_              = RetrieveInt64(14);
+    result.is_chunked_file_  = (database_flags & kFlagFileChunk);
   }
-  result.mode_ = RetrieveInt(3);
-  result.size_ = RetrieveInt64(2);
-  result.mtime_ = RetrieveInt64(4);
+
+  result.mode_     = RetrieveInt(3);
+  result.size_     = RetrieveInt64(2);
+  result.mtime_    = RetrieveInt64(4);
   result.checksum_ = RetrieveSha1Blob(0);
-  result.name_.Assign(name, strlen(name));
-  result.symlink_.Assign(symlink, strlen(symlink));
+  result.name_     = name;
+  result.symlink_  = symlink;
   ExpandSymlink(&result.symlink_);
 
   return result;

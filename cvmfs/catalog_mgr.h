@@ -98,6 +98,7 @@ class InodeGenerationAnnotation : public InodeAnnotation {
              inode_offset_);
   }
   inode_t GetGeneration() { return inode_offset_; };
+
  private:
   uint64_t inode_offset_;
 };
@@ -195,12 +196,14 @@ class AbstractCatalogManager {
 
  protected:
   /**
-   * Load the catalog and return a file name.  Derived class can decide if it
-   * wants to use the hash or the path.  The hash can be 0.
+   * Load the catalog and return a file name and the catalog hash. Derived
+   * class can decide if it wants to use the hash or the path.
+   * Both the input as well as the output hash can be 0.
    */
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const hash::Any &hash,
-                                std::string *catalog_path) = 0;
+                                std::string *catalog_path,
+                                hash::Any   *catalog_hash) = 0;
   virtual void UnloadCatalog(const Catalog *catalog) { };
   virtual void ActivateCatalog(const Catalog *catalog) { };
 
@@ -208,11 +211,13 @@ class AbstractCatalogManager {
    * Create a new Catalog object.
    * Every derived class has to implement this and return a newly
    * created (derived) Catalog structure of it's desired type.
-   * @param mountpoint the future mountpoint of the catalog to create
-   * @param parent_catalog the parent of the catalog to create
+   * @param mountpoint      the future mountpoint of the catalog to create
+   * @param catalog_hash    the content hash of the catalog database
+   * @param parent_catalog  the parent of the catalog to create
    * @return a newly created (derived) Catalog
    */
   virtual Catalog* CreateCatalog(const PathString &mountpoint,
+                                 const hash::Any  &catalog_hash,
                                  Catalog *parent_catalog) = 0;
 
   Catalog *MountCatalog(const PathString &mountpoint, const hash::Any &hash,

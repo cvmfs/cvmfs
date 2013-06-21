@@ -23,6 +23,9 @@
 #include "util.h"
 #include "catalog_counters.h"
 
+namespace swissknife {
+  class CommandMigrate;
+}
 
 namespace catalog {
 
@@ -49,7 +52,10 @@ struct InodeRange {
     return ((inode > offset) && (inode <= size + offset));
   }
 
-  inline bool IsInitialized() const { return (offset > 0) && (size > 0); }
+  inline void MakeDummy() { offset = 1; }
+
+  inline bool IsInitialized() const { return offset > 0; }
+  inline bool IsDummy() const { return IsInitialized() && size == 0; }
 };
 
 
@@ -80,11 +86,14 @@ class InodeAnnotation {
  */
 class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
-  friend class SqlLookup;  // for mangled inode
+  friend class SqlLookup;                  // for mangled inode
+  friend class swissknife::CommandMigrate; // for catalog version migration
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
 
-  Catalog(const PathString &path, Catalog *parent);
+  Catalog(const PathString  &path,
+          const hash::Any   &catalog_hash,
+                Catalog     *parent);
   virtual ~Catalog();
 
   bool OpenDatabase(const std::string &db_path);
@@ -139,9 +148,10 @@ class Catalog : public SingleCopy {
   inline void set_inode_range(const InodeRange value) { inode_range_ = value; }
   inline std::string database_path() const { return database_->filename(); }
   inline PathString root_prefix() const { return root_prefix_; }
+  inline hash::Any hash() const { return catalog_hash_; }
 
   inline bool IsInitialized() const {
-    return inode_range_.IsInitialized() && (max_row_id_ > 0);
+    return inode_range_.IsInitialized() && initialized_;
   }
   inline bool IsRoot() const { return NULL == parent_; }
   inline virtual bool IsWritable() const { return false; }
@@ -158,7 +168,7 @@ class Catalog : public SingleCopy {
 
  protected:
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
-  HardlinkGroupMap hardlink_groups_;
+  mutable HardlinkGroupMap hardlink_groups_;
 
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
@@ -188,14 +198,16 @@ class Catalog : public SingleCopy {
 
   uint64_t GetRowIdFromInode(const inode_t inode) const;
   inode_t GetMangledInode(const uint64_t row_id,
-                          const uint64_t hardlink_group);
+                          const uint64_t hardlink_group) const;
 
   void FixTransitionPoint(const hash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
+ private:
   Database *database_;
   pthread_mutex_t *lock_;
 
+  const hash::Any catalog_hash_;
   PathString root_prefix_;
   PathString path_;
 
@@ -203,6 +215,7 @@ class Catalog : public SingleCopy {
   NestedCatalogMap children_;
   mutable NestedCatalogList *nested_catalog_cache_;
 
+  bool initialized_;
   InodeRange inode_range_;
   uint64_t max_row_id_;
   InodeAnnotation *inode_annotation_;
@@ -217,7 +230,10 @@ class Catalog : public SingleCopy {
   SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
 
-Catalog *AttachFreely(const std::string &root_path, const std::string &file);
+Catalog *AttachFreely(const std::string  &root_path,
+                      const std::string  &file,
+                      const hash::Any    &catalog_hash,
+                            Catalog      *parent = NULL);
 
 }  // namespace catalog
 
