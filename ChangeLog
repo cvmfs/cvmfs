@@ -1,4 +1,6 @@
 2.1.12:
+  * Drastically improved performance of copying the inode
+    tracker
   * Add pin command to cvmfs_talk
   * Fix reading from socket in talk thread
   * Add "nameserver set" command to cvmfs_talk

@@ -23,8 +23,6 @@
 #include "globals.h"
 #include "bigvector.h"
 
-class DirectoryEntryTestFactory;
-
 namespace publish {
 class SyncItem;
 }
@@ -34,6 +32,8 @@ class CommandMigrate;
 }
 
 namespace catalog {
+
+class DirectoryEntryTestFactory;
 
 class Catalog;
 typedef uint64_t inode_t;
