@@ -124,9 +124,10 @@ Database::Database(const std::string &filename, const float schema) :
   const int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
                          SQLITE_OPEN_CREATE;
 
-  // create and open new database file
+  // Create and open new database file
   if (sqlite3_open_v2(filename_.c_str(), &sqlite_db_, open_flags, NULL)
-      != SQLITE_OK) {
+      != SQLITE_OK)
+  {
     return;
   }
 
@@ -147,7 +148,8 @@ Database::~Database() {
  */
 bool Database::Create(const string &filename,
                       const string &root_path,
-                      const DirectoryEntry &root_entry) {
+                      const DirectoryEntry &root_entry)
+{
   bool retval = false;
 
   // Path hashes
@@ -162,7 +164,7 @@ bool Database::Create(const string &filename,
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new catalog at '%s'",
            filename.c_str());
   Database database(filename, kLatestSchema);
-  if (! database.ready()) {
+  if (!database.ready()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "Cannot create and open catalog database file '%s'",
              filename.c_str());
@@ -197,7 +199,7 @@ bool Database::Create(const string &filename,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
 
-  if (! retval) {
+  if (!retval) {
     SqlError("failed to create catalog database tables.", database);
     return false;
   }
@@ -209,7 +211,7 @@ bool Database::Create(const string &filename,
     "       ('schema',   :schema);");
   insert_initial_properties.BindDouble(1, kLatestSchema);
 
-  if (! insert_initial_properties.Execute()) {
+  if (!insert_initial_properties.Execute()) {
     SqlError("failed to insert default initial values into the newly created "
              "catalog tables.", database);
     return false;
@@ -219,13 +221,13 @@ bool Database::Create(const string &filename,
   catalog::Counters counters;
 
   // insert root entry (when given)
-  if (! root_entry.IsNegative()) {
+  if (!root_entry.IsNegative()) {
     SqlDirentInsert sql_insert(database);
     retval = sql_insert.BindPathHash(root_path_hash)         &&
              sql_insert.BindParentPathHash(root_parent_hash) &&
              sql_insert.BindDirent(root_entry)               &&
              sql_insert.Execute();
-    if (! retval) {
+    if (!retval) {
       SqlError("failed to insert root entry into newly created catalog.",
                database);
       return false;
@@ -242,7 +244,7 @@ bool Database::Create(const string &filename,
   }
 
   // insert root path (when given)
-  if (! root_path.empty()) {
+  if (!root_path.empty()) {
     Sql insert_root_path(database,
       "INSERT INTO properties "
       "(key, value) VALUES ('root_prefix', :root_path);");
@@ -419,7 +421,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   DirectoryEntry result;
 
   const unsigned database_flags = RetrieveInt(5);
-  result.catalog_ = const_cast<Catalog*>(catalog);
+  result.catalog_ = const_cast<Catalog *>(catalog);
   //result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
@@ -453,8 +455,8 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.size_     = RetrieveInt64(2);
   result.mtime_    = RetrieveInt64(4);
   result.checksum_ = RetrieveSha1Blob(0);
-  result.name_     = name;
-  result.symlink_  = symlink;
+  result.name_.Assign(name, strlen(name));
+  result.symlink_.Assign(symlink, strlen(symlink));
   ExpandSymlink(&result.symlink_);
 
   return result;

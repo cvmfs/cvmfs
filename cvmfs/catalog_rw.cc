@@ -21,7 +21,7 @@ WritableCatalog::WritableCatalog(const string     &path,
                                  const hash::Any  &catalog_hash,
                                  Catalog          *parent) :
   Catalog(PathString(path.data(), path.length()),
-          catalog_hash, // Caution: this might be 0 for a newly created catalog!
+          catalog_hash,  // This is 0 for a newly created catalog!
           parent),
   sql_insert_(NULL),
   sql_unlink_(NULL),

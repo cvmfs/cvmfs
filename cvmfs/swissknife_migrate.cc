@@ -4,17 +4,16 @@
 
 #include "swissknife_migrate.h"
 
+#include <sys/resource.h>
+
 #include "catalog_traversal.h"
 #include "catalog_sql.h"
 #include "catalog_rw.h"
-
 #include "logging.h"
-
-#include <sys/resource.h>
-#include <sstream>
 
 using namespace swissknife;
 using namespace catalog;
+using namespace std;  // NOLINT
 
 catalog::DirectoryEntry  CommandMigrate::nested_catalog_marker_;
 
@@ -84,7 +83,6 @@ static void Error(const std::string                     &message,
 
 
 int CommandMigrate::Main(const ArgumentList &args) {
-  // parameter parsing
   const std::string &repo_url           = *args.find('r')->second;
   const std::string &spooler            = *args.find('u')->second;
   const std::string &manifest_path      = *args.find('o')->second;
@@ -113,19 +111,19 @@ int CommandMigrate::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // we might need a lot of file descriptors
-  if (! RaiseFileDescriptorLimit()) {
+  // We might need a lot of file descriptors
+  if (!RaiseFileDescriptorLimit()) {
     Error("Failed to raise file descriptor limits");
     return 2;
   }
 
-  // put SQLite into multithreaded mode
-  if (! ConfigureSQLite()) {
+  // Put SQLite into multithreaded mode
+  if (!ConfigureSQLite()) {
     Error("Failed to preconfigure SQLite library");
     return 3;
   }
 
-  // load the full catalog hierarchy
+  // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
   CatalogTraversal<CommandMigrate> traversal(
@@ -146,9 +144,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
 
   LogCvmfs(kLogCatalog, kLogStdout, "Loaded %d catalogs", catalog_count_);
-  assert (root_catalog_ != NULL);
+  assert(root_catalog_ != NULL);
 
-  // create an upstream spooler
+  // Create an upstream spooler
   const upload::SpoolerDefinition spooler_definition(spooler);
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
@@ -157,14 +155,14 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
   spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
 
-  // generate and upload a nested catalog marker
+  // Generate and upload a nested catalog marker
   if (! GenerateNestedCatalogMarkerChunk()) {
     Error("Failed to create a nested catalog marker.");
     return 6;
   }
   spooler_->WaitForUpload();
 
-  // create a concurrent catalog migration facility
+  // Create a concurrent catalog migration facility
   const unsigned int cpus = GetNumberOfCpuCores();
   MigrationWorker::worker_context context(spooler_definition.temporary_path,
                                           fix_transition_points,
@@ -176,14 +174,14 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                 cpus,
                                 cpus * 10,
                                 &context);
-  if (! concurrent_migration_->Initialize()) {
+  if (!concurrent_migration_->Initialize()) {
     Error("Failed to initialize worker migration system.");
     return 7;
   }
   concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
                                           this);
 
-  // migrate catalogs recursively (starting with the deepest nested catalogs)
+  // Migrate catalogs recursively (starting with the deepest nested catalogs)
   LogCvmfs(kLogCatalog, kLogStdout, "\nMigrating catalogs...");
   PendingCatalog *root_catalog = new PendingCatalog(root_catalog_);
   migration_stopwatch_.Start();
@@ -195,18 +193,17 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const unsigned int errors = concurrent_migration_->GetNumberOfFailedJobs() +
                               spooler_->GetNumberOfErrors();
 
-  LogCvmfs(kLogCatalog, kLogStdout, "Catalog Migration finished with %d "
-                                    "errors.",
-           errors);
+  LogCvmfs(kLogCatalog, kLogStdout,
+           "Catalog Migration finished with %d errors.", errors);
   if (errors > 0) {
-    LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration produced errors\n"
-                                      "Aborting...");
+    LogCvmfs(kLogCatalog, kLogStdout,
+             "\nCatalog Migration produced errors\nAborting...");
     return 8;
   }
 
-  // commit the new (migrated) repository revision...
-  LogCvmfs(kLogCatalog, kLogStdout, "\nCommitting migrated repository "
-                                    "revision...");
+  // Commit the new (migrated) repository revision...
+  LogCvmfs(kLogCatalog, kLogStdout,
+           "\nCommitting migrated repository revision...");
   const hash::Any   &root_catalog_hash = root_catalog->new_catalog_hash.Get();
   const std::string &root_catalog_path = root_catalog->root_path();
   manifest::Manifest manifest(root_catalog_hash,
@@ -218,16 +215,15 @@ int CommandMigrate::Main(const ArgumentList &args) {
     return 9;
   }
 
-  // get rid of the open root catalog
+  // Get rid of the open root catalog
   delete root_catalog;
 
-  // analyze collected statistics
+  // Analyze collected statistics
   if (collect_catalog_statistics) {
     LogCvmfs(kLogCatalog, kLogStdout, "\nCollected statistics results:");
     AnalyzeCatalogStatistics();
   }
 
-  // all done...
   LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration succeeded");
   return 0;
 }
@@ -235,7 +231,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
 void CommandMigrate::CatalogCallback(const Catalog*    catalog,
                                      const hash::Any&  catalog_hash,
-                                     const unsigned    tree_level) {
+                                     const unsigned    tree_level)
+{
   std::string tree_indent;
   std::string hash_string;
   std::string path;
@@ -266,16 +263,16 @@ void CommandMigrate::CatalogCallback(const Catalog*    catalog,
 
 
 void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
-  // check if the migration of the catalog was successful
+  // Check if the migration of the catalog was successful
   if (!data->success) {
     Error("Catalog migration failed! Aborting...");
     exit(1);
     return;
   }
 
-  const std::string &path = data->new_catalog->database_path();
+  const string &path = data->new_catalog->database_path();
 
-  // save the processed catalog in the pending map
+  // Save the processed catalog in the pending map
   {
     LockGuard<PendingCatalogMap> guard(pending_catalogs_);
     assert (pending_catalogs_.find(path) == pending_catalogs_.end());
@@ -283,36 +280,31 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
   }
   catalog_statistics_list_.Insert(data->statistics);
 
-  // schedule the compression and upload of the catalog
+  // Schedule the compression and upload of the catalog
   spooler_->ProcessCatalog(path);
 }
 
 
 void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
-  const std::string &path = result.local_path;
+  const string &path = result.local_path;
 
-  // check if the upload was successful
+  // Check if the upload was successful
   if (result.return_code != 0) {
-    std::stringstream ss;
-    ss << "Failed to upload file " << path << std::endl
-       << "Aborting...";
-    Error(ss.str());
+    Error("Failed to upload file " + path + "\nAborting...");
     exit(2);
     return;
   }
   assert (result.file_chunks.size() == 0);
 
-  // remove the just uploaded file
+  // Remove the just uploaded file
   unlink(path.c_str());
 
-  // uploaded nested catalog marker... generate and cache DirectoryEntry for it
+  // Uploaded nested catalog marker... generate and cache DirectoryEntry for it
   if (path == nested_catalog_marker_tmp_path_) {
     CreateNestedCatalogMarkerDirent(result.content_hash);
     return;
-
   } else {
-
-    // find the catalog path in the pending catalogs and remove it from the list
+    // Find the catalog path in the pending catalogs and remove it from the list
     PendingCatalog *catalog;
     {
       LockGuard<PendingCatalogMap> guard(pending_catalogs_);
@@ -322,7 +314,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
       pending_catalogs_.erase(i);
     }
 
-    // the catalog is completely processed... fill the hash-future to allow the
+    // The catalog is completely processed... fill the hash-future to allow the
     // processing of parent catalogs
     catalog->new_catalog_hash.Set(result.content_hash);
 
@@ -338,7 +330,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 
 
 void CommandMigrate::ConvertCatalogsRecursively(PendingCatalog *catalog) {
-  // first migrate all nested catalogs (depth first traversal)
+  // First migrate all nested catalogs (depth first traversal)
   const CatalogList nested_catalogs = catalog->old_catalog->GetChildren();
   CatalogList::const_iterator i    = nested_catalogs.begin();
   CatalogList::const_iterator iend = nested_catalogs.end();
@@ -349,7 +341,7 @@ void CommandMigrate::ConvertCatalogsRecursively(PendingCatalog *catalog) {
     ConvertCatalogsRecursively(new_nested);
   }
 
-  // migrate this catalog referencing all it's (already migrated) children
+  // Migrate this catalog referencing all its (already migrated) children
   concurrent_migration_->Schedule(catalog);
 }
 
@@ -447,10 +439,10 @@ CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) 
   collect_catalog_statistics_     (context->collect_catalog_statistics),
   uid_                            (context->uid),
   gid_                            (context->gid)
-{}
+{ }
 
 
-CommandMigrate::MigrationWorker::~MigrationWorker() {}
+CommandMigrate::MigrationWorker::~MigrationWorker() { }
 
 
 void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
@@ -485,19 +477,20 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
 
 
 bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
-                                                   PendingCatalog *data) const {
-  const std::string root_path = data->root_path();
+  PendingCatalog *data) const
+{
+  const string root_path = data->root_path();
 
   // create a new catalog database schema
   bool retval;
-  const std::string catalog_db = CreateTempPath(temporary_directory_ + "/catalog",
-                                                0666);
+  const string catalog_db =
+    CreateTempPath(temporary_directory_ + "/catalog", 0666);
   if (catalog_db.empty()) {
     Error("Failed to create temporary file for the new catalog database.");
     return false;
   }
   retval = Database::Create(catalog_db, root_path);
-  if (! retval) {
+  if (!retval) {
     Error("Failed to create database for new catalog");
     unlink(catalog_db.c_str());
     return false;
@@ -518,16 +511,18 @@ bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
 
 
 bool CommandMigrate::MigrationWorker::CheckDatabaseSchemaCompatibility(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   const catalog::Database &old_catalog = data->old_catalog->database();
   const catalog::Database &new_catalog = data->new_catalog->database();
 
-  if (! new_catalog.ready()                                                  ||
+  if (!new_catalog.ready()                                                  ||
       (new_catalog.schema_version() < Database::kLatestSupportedSchema -
                                       Database::kSchemaEpsilon         ||
        new_catalog.schema_version() > Database::kLatestSupportedSchema +
-                                      Database::kSchemaEpsilon)              ||
-      (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon)) {
+                                      Database::kSchemaEpsilon)             ||
+      (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon))
+  {
     Error("Failed to meet database requirements for migration.", data);
     return false;
   }
@@ -536,7 +531,8 @@ bool CommandMigrate::MigrationWorker::CheckDatabaseSchemaCompatibility(
 
 
 bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   const catalog::Database &old_catalog = data->old_catalog->database();
   const catalog::Database &new_catalog = data->new_catalog->database();
 
@@ -549,7 +545,7 @@ bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
   // be needed anymore... data will get deleted when the database is closed
   unlink(data->old_catalog->database().filename().c_str());
 
-  if (! retval) {
+  if (!retval) {
     Error("Failed to attach database of old catalog", sql_attach_new, data);
     return false;
   }
@@ -558,17 +554,18 @@ bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
 
 
 bool CommandMigrate::MigrationWorker::StartDatabaseTransaction(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   data->new_catalog->Transaction();
   return true;
 }
 
 
 bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
-                                                   PendingCatalog *data) const {
-  assert (! data->new_catalog->IsDirty());
+  PendingCatalog *data) const
+{
+  assert (!data->new_catalog->IsDirty());
   bool retval;
-
   const Database &writable = data->new_catalog->database();
 
   // Hardlinks scratch space.
@@ -588,7 +585,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     "     linkcount          INTEGER, "
     "     CONSTRAINT unique_inode UNIQUE (inode)  );");
   retval = sql_create_hardlinks_table.Execute();
-  if (! retval) {
+  if (!retval) {
     Error("Failed to create temporary hardlink analysis table",
           sql_create_hardlinks_table, data);
     return false;
@@ -609,17 +606,17 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
           sql_create_linkcounts_table, data);
   }
 
-  // it is possible to skip this step
-  // in that case all hardlink inodes with a (potential) linkcount > 1 will get
+  // It is possible to skip this step.
+  // In that case all hardlink inodes with a (potential) linkcount > 1 will get
   // degraded to files containing the same content
   if (analyze_file_linkcounts_) {
     retval = AnalyzeFileLinkcounts(data);
-    if (! retval) {
+    if (!retval) {
       return false;
     }
   }
 
-  // analyze the linkcounts of directories
+  // Analyze the linkcounts of directories
   //   - each directory has a linkcount of at least 2 (empty directory)
   //     (link in parent directory and self reference (cd .) )
   //   - for each child directory, the parent's link count is incremented by 1
@@ -644,7 +641,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     sql_dir_linkcounts.BindInt64(2, SqlDirent::kFlagDir)                 &&
     sql_dir_linkcounts.BindInt64(3, SqlDirent::kFlagDirNestedMountpoint) &&
     sql_dir_linkcounts.Execute();
-  if (! retval) {
+  if (!retval) {
     Error("Failed to analyze directory specific linkcounts",
           sql_dir_linkcounts, data);
     if (sql_dir_linkcounts.GetLastError() == SQLITE_CONSTRAINT) {
@@ -654,7 +651,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
-  // copy the old file meta information into the new catalog schema
+  // Copy the old file meta information into the new catalog schema
   //   here we also add the previously analyzed hardlink/linkcount information
   //   from both temporary tables "hardlinks" and "dir_linkcounts".
   //
@@ -686,7 +683,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
-  // if we deal with a nested catalog, we need to add a .cvmfscatalog entry
+  // If we deal with a nested catalog, we need to add a .cvmfscatalog entry
   // since it was not present in the old repository specification but is needed
   // now!
   if (! data->IsRoot()) {
@@ -711,7 +708,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     }
   }
 
-  // copy (and update) the properties fields
+  // Copy (and update) the properties fields
   //
   // Note: The 'schema' is explicitly not copied to the new catalog.
   //       Each catalog contains a revision, which is also copied here and that
@@ -728,7 +725,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
     return false;
   }
 
-  // set the previous revision hash in the new catalog to the old catalog
+  // Set the previous revision hash in the new catalog to the old catalog
   //   we are doing the whole migration as a new snapshot that does not change
   //   any files, but just bumpes the catalog schema to the latest version
   data->new_catalog->SetPreviousRevision(data->old_catalog->hash());
@@ -744,7 +741,7 @@ bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
   const Database &writable = data->new_catalog->database();
   bool retval;
 
-  // analyze the hardlink relationships in the old catalog
+  // Analyze the hardlink relationships in the old catalog
   //   inodes used to be assigned at publishing time, implicitly constituating
   //   those relationships. We now need them explicitly in the file catalogs
   // This looks for directory entries with matching inodes but differing path-
@@ -828,7 +825,7 @@ bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
     return false;
   }
 
-  // do some statistics if asked for...
+  // Do some statistics if asked for...
   if (collect_catalog_statistics_) {
     Sql count_hardlinks(writable,
       "SELECT count(*), sum(linkcount) FROM hardlinks;");
@@ -848,7 +845,8 @@ bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
 
 
 bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   const Database &writable = data->new_catalog->database();
   bool retval;
 
@@ -880,7 +878,7 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
       update_mntpnt_linkcount.BindInt64(1, root_entry.linkcount());
       update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
       update_mntpnt_linkcount.Execute();
-    if (! retval) {
+    if (!retval) {
       Error("Failed to update linkcount of nested catalog mountpoint",
             update_mntpnt_linkcount, data);
       return false;
@@ -904,9 +902,10 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
 
 
 bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
-                                                   PendingCatalog *data) const {
-  if (! fix_nested_catalog_transitions_) {
-    // fixing transition point mismatches is not enabled...
+  PendingCatalog *data) const
+{
+  if (!fix_nested_catalog_transitions_) {
+    // Fixing transition point mismatches is not enabled...
     return true;
   }
 
@@ -918,57 +917,55 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
   SqlLookupPathHash lookup_mountpoint(writable);
   SqlDirentUpdate   update_directory_entry(writable);
 
-  // unbox the nested catalogs (possibly waiting for migration of them first)
+  // Unbox the nested catalogs (possibly waiting for migration of them first)
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
-    // collect information about the nested catalog
+    // Collect information about the nested catalog
     PendingCatalog *nested_catalog = *i;
     const DirectoryEntry nested_root_entry = nested_catalog->root_entry.Get();
     const std::string &nested_root_path    = nested_catalog->root_path();
     const hash::Md5 mountpoint_path_hash = hash::Md5(nested_root_path.data(),
                                                      nested_root_path.size());
 
-    // retrieve the nested catalog mountpoint from the current catalog
+    // Retrieve the nested catalog mountpoint from the current catalog
     retval = lookup_mountpoint.BindPathHash(mountpoint_path_hash) &&
              lookup_mountpoint.FetchRow();
-    if (! retval) {
+    if (!retval) {
       Error("Failed to fetch nested catalog mountpoint to check for compatible"
             "transition points", lookup_mountpoint, data);
       return false;
     }
 
     DirectoryEntry mountpoint_entry =
-                                 lookup_mountpoint.GetDirent(data->new_catalog);
+      lookup_mountpoint.GetDirent(data->new_catalog);
     lookup_mountpoint.Reset();
 
-    // compare nested catalog mountpoint and nested catalog root entries
+    // Compare nested catalog mountpoint and nested catalog root entries
     DirectoryEntry::Differences diffs =
-                                  mountpoint_entry.CompareTo(nested_root_entry);
+      mountpoint_entry.CompareTo(nested_root_entry);
 
-    // we MUST deal with two directory entries that are a pair of nested cata-
+    // We MUST deal with two directory entries that are a pair of nested cata-
     // log mountpoint and root entry! Thus we expect their transition flags to
     // differ and their name to be the same.
-    assert (diffs & Difference::kNestedCatalogTransitionFlags);
-    assert ((diffs & Difference::kName) == 0);
+    assert(diffs & Difference::kNestedCatalogTransitionFlags);
+    assert((diffs & Difference::kName) == 0);
 
-    // check if there are other differences except the nested catalog transition
+    // Check if there are other differences except the nested catalog transition
     // flags and fix them...
     if ((diffs ^ Difference::kNestedCatalogTransitionFlags) != 0) {
-      // if we found differences, we still assume a couple of directory entry
+      // If we found differences, we still assume a couple of directory entry
       // fields to be the same, otherwise some severe stuff would be wrong...
       if ((diffs & Difference::kChecksum)        ||
           (diffs & Difference::kLinkcount)       ||
           (diffs & Difference::kSymlink)         ||
-          (diffs & Difference::kChunkedFileFlag)    ) {
-        std::stringstream ss;
-        ss << "Found an irreparable mismatch in a nested catalog transition "
-              "point at '" << nested_root_path << "'" << std::endl
-           << "Aborting..." << std::endl;
-        Error(ss.str());
+          (diffs & Difference::kChunkedFileFlag)    )
+      {
+        Error("Found an irreparable mismatch in a nested catalog transition "
+              "point at '" + nested_root_path + "'\nAborting...\n");
       }
 
-      // copy the properties from the nested catalog root entry into the mount-
+      // Copy the properties from the nested catalog root entry into the mount-
       // point entry to bring them in sync again
       CommandMigrate::FixNestedCatalogTransitionPoint(mountpoint_entry,
                                                       nested_root_entry);
@@ -977,14 +974,14 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
       retval = update_directory_entry.BindPathHash(mountpoint_path_hash) &&
                update_directory_entry.BindDirent(mountpoint_entry)       &&
                update_directory_entry.Execute();
-      if (! retval) {
+      if (!retval) {
         Error("Failed to save resynchronized nested catalog mountpoint into "
               "catalog database", update_directory_entry, data);
         return false;
       }
       update_directory_entry.Reset();
 
-      // fixing of this mountpoint went well... inform the user that this minor
+      // Fixing of this mountpoint went well... inform the user that this minor
       // issue occured
       LogCvmfs(kLogCatalog, kLogStdout, "NOTE: fixed incompatible nested "
                                         "catalog transition point at: '%s' ",
@@ -998,8 +995,9 @@ bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
 
 void CommandMigrate::FixNestedCatalogTransitionPoint(
                         catalog::DirectoryEntry &mountpoint,
-                  const catalog::DirectoryEntry &nested_root) {
-  // replace some file system parameters in the mountpoint to resync it with
+                  const catalog::DirectoryEntry &nested_root)
+{
+  // Replace some file system parameters in the mountpoint to resync it with
   // the nested root of the corresponding nested catalog
   //
   // Note: this method relies on CommandMigrate being a friend of DirectoryEntry
@@ -1012,35 +1010,35 @@ void CommandMigrate::FixNestedCatalogTransitionPoint(
 
 
 const catalog::DirectoryEntry& CommandMigrate::GetNestedCatalogMarkerDirent() {
-  // this is pre-initialized singleton... it MUST be already there...
-  assert (nested_catalog_marker_.name_ == ".cvmfscatalog");
+  // This is pre-initialized singleton... it MUST be already there...
+  assert (nested_catalog_marker_.name_.ToString() == ".cvmfscatalog");
   return nested_catalog_marker_;
 }
 
 
 bool CommandMigrate::GenerateNestedCatalogMarkerChunk() {
-  // create an empty nested catalog marker file
+  // Create an empty nested catalog marker file
   nested_catalog_marker_tmp_path_ =
-                         CreateTempPath(temporary_directory_ + "/.cvmfscatalog",
-                                        0644);
+    CreateTempPath(temporary_directory_ + "/.cvmfscatalog", 0644);
   if (nested_catalog_marker_tmp_path_.empty()) {
     Error("Failed to create temp file for nested catalog marker dummy.");
     return false;
   }
 
-  // process and upload it to the backend storage
+  // Process and upload it to the backend storage
   spooler_->Process(nested_catalog_marker_tmp_path_);
   return true;
 }
 
 
 void CommandMigrate::CreateNestedCatalogMarkerDirent(
-                                                const hash::Any &content_hash) {
-  // generate it only once
-  assert (nested_catalog_marker_.name_ != ".cvmfscatalog");
+  const hash::Any &content_hash)
+{
+  // Generate it only once
+  assert (nested_catalog_marker_.name_.ToString() != ".cvmfscatalog");
 
-  // fill the DirectoryEntry structure will all needed information
-  nested_catalog_marker_.name_      = ".cvmfscatalog";
+  // Fill the DirectoryEntry structure will all needed information
+  nested_catalog_marker_.name_.Assign(".cvmfscatalog", strlen(".cvmfscatalog"));
   nested_catalog_marker_.mode_      = 33188;
   nested_catalog_marker_.uid_       = uid_;
   nested_catalog_marker_.gid_       = gid_;
@@ -1052,7 +1050,8 @@ void CommandMigrate::CreateNestedCatalogMarkerDirent(
 
 
 bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   bool retval = false;
   const Database &writable = data->new_catalog->database();
 
@@ -1067,7 +1066,7 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
     s.PopulateToParent(stats_counters);
   }
 
-  // count various directory entry types in the catalog to fill up the catalog
+  // Count various directory entry types in the catalog to fill up the catalog
   // statistics counters introduced in the current catalog schema
   Sql count_regular_files(writable,
     "SELECT count(*) FROM catalog "
@@ -1083,31 +1082,31 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
     "SELECT sum(size) FROM catalog WHERE  flags & :flag_file "
     "                                     AND NOT flags & :flag_link");
 
-  // run the actual counting queries
+  // Run the actual counting queries
   retval =
     count_regular_files.BindInt64(1, SqlDirent::kFlagFile) &&
     count_regular_files.BindInt64(2, SqlDirent::kFlagLink) &&
     count_regular_files.Execute();
-  if (! retval) {
+  if (!retval) {
     Error("Failed to count regular files.", count_regular_files, data);
     return false;
   }
   retval =
     count_symlinks.BindInt64(1, SqlDirent::kFlagLink) &&
     count_symlinks.Execute();
-  if (! retval) {
+  if (!retval) {
     Error("Failed to count symlinks.", count_symlinks, data);
     return false;
   }
   retval =
     count_directories.BindInt64(1, SqlDirent::kFlagDir) &&
     count_directories.Execute();
-  if (! retval) {
+  if (!retval) {
     Error("Failed to count directories.", count_directories, data);
     return false;
   }
   retval = count_nested_clgs.Execute();
-  if (! retval) {
+  if (!retval) {
     Error("Failed to count nested catalog references.",
           count_nested_clgs, data);
     return false;
@@ -1116,22 +1115,22 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
     aggregate_file_size.BindInt64(1, SqlDirent::kFlagFile) &&
     aggregate_file_size.BindInt64(2, SqlDirent::kFlagLink) &&
     aggregate_file_size.Execute();
-  if (! retval) {
+  if (!retval) {
     Error("Failed to aggregate the file sizes.", aggregate_file_size, data);
     return false;
   }
 
-  // insert the counted statistics into the DeltaCounters data structure
+  // Insert the counted statistics into the DeltaCounters data structure
   stats_counters.self.regular_files    = count_regular_files.RetrieveInt64(0);
   stats_counters.self.symlinks         = count_symlinks.RetrieveInt64(0);
   stats_counters.self.directories      = count_directories.RetrieveInt64(0);
   stats_counters.self.nested_catalogs  = count_nested_clgs.RetrieveInt64(0);
   stats_counters.self.file_size        = aggregate_file_size.RetrieveInt64(0);
 
-  // write back the generated statistics counters into the catalog database
+  // Write back the generated statistics counters into the catalog database
   stats_counters.WriteToDatabase(writable);
 
-  // push the generated statistics counters up to the parent catalog
+  // Push the generated statistics counters up to the parent catalog
   data->nested_statistics.Set(stats_counters);
 
   return true;
@@ -1139,7 +1138,8 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
 
 
 bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   const Database &writable = data->new_catalog->database();
   bool retval;
 
@@ -1156,7 +1156,7 @@ bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
   }
 
   DirectoryEntry entry = lookup_root_entry.GetDirent(data->new_catalog);
-  if (entry.linkcount() < 2 || entry.linkcount() >= (1l << 32)) {
+  if (entry.linkcount() < 2 || entry.hardlink_group() > 0) {
     Error("Retrieved linkcount of catalog root entry is not sane.", data);
     return false;
   }
@@ -1167,22 +1167,24 @@ bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
 
 
 bool CommandMigrate::MigrationWorker::CommitDatabaseTransaction(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   data->new_catalog->Commit();
   return true;
 }
 
 
 bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
-                                                   PendingCatalog *data) const {
-  if (! collect_catalog_statistics_) {
+  PendingCatalog *data) const
+{
+  if (!collect_catalog_statistics_) {
     return true;
   }
 
   const Database &writable = data->new_catalog->database();
   bool retval;
 
-  // find out the discrepancy between MAX(rowid) and COUNT(*)
+  // Find out the discrepancy between MAX(rowid) and COUNT(*)
   Sql wasted_inodes(writable,
     "SELECT COUNT(*), MAX(rowid) FROM old.catalog;");
   retval = wasted_inodes.FetchRow();
@@ -1193,7 +1195,7 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
   const unsigned int entry_count = wasted_inodes.RetrieveInt64(0);
   const unsigned int max_row_id  = wasted_inodes.RetrieveInt64(1);
 
-  // save collected information into the central statistics aggregator
+  // Save collected information into the central statistics aggregator
   data->statistics.root_path   = data->root_path();
   data->statistics.max_row_id  = max_row_id;
   data->statistics.entry_count = entry_count;
@@ -1203,7 +1205,8 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
 
 
 bool CommandMigrate::MigrationWorker::DetachOldCatalogDatabase(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   const Database &writable = data->new_catalog->database();
   Sql detach_old_catalog(writable, "DETACH old;");
   const bool retval = detach_old_catalog.Execute();
@@ -1216,7 +1219,8 @@ bool CommandMigrate::MigrationWorker::DetachOldCatalogDatabase(
 
 
 bool CommandMigrate::MigrationWorker::CleanupNestedCatalogs(
-                                                   PendingCatalog *data) const {
+  PendingCatalog *data) const
+{
   // All nested catalogs of PendingCatalog 'data' are fully processed and
   // accounted. It is safe to get rid of their data structures here!
   DeltaCounters aggregated_counters;
@@ -1229,4 +1233,3 @@ bool CommandMigrate::MigrationWorker::CleanupNestedCatalogs(
   data->nested_catalogs.clear();
   return true;
 }
-

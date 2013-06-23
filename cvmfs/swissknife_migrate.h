@@ -7,13 +7,16 @@
 
 #include "swissknife.h"
 
+#include <map>
+#include <vector>
+#include <string>
+
 #include "hash.h"
+#include "util.h"
 #include "util_concurrency.h"
 #include "catalog.h"
 #include "upload.h"
 #include "atomic.h"
-
-#include <map>
 
 namespace catalog {
   class WritableCatalog;
@@ -48,7 +51,7 @@ class CommandMigrate : public Command {
 
  public:
   struct PendingCatalog;
-  typedef std::vector<PendingCatalog*> PendingCatalogList;
+  typedef std::vector<PendingCatalog *> PendingCatalogList;
   struct PendingCatalog {
     PendingCatalog(const catalog::Catalog *old_catalog = NULL) :
       success(false),
@@ -116,7 +119,7 @@ class CommandMigrate : public Command {
     bool AttachOldCatalogDatabase         (PendingCatalog *data) const;
     bool StartDatabaseTransaction         (PendingCatalog *data) const;
     bool MigrateFileMetadata              (PendingCatalog *data) const;
-    bool   AnalyzeFileLinkcounts          (PendingCatalog *data) const;
+    bool AnalyzeFileLinkcounts            (PendingCatalog *data) const;
     bool MigrateNestedCatalogReferences   (PendingCatalog *data) const;
     bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
@@ -191,6 +194,6 @@ class CommandMigrate : public Command {
   StopWatch  migration_stopwatch_;
 };
 
-}
+}  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_MIGRATE_H_
