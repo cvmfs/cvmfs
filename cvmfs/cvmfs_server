@@ -184,7 +184,7 @@ Supported Commands:
   info          <fully qualified name>
                 Print summary about the repository
   lstags        <fully qualified name>
-                Print named tags (snapshots) of the reoppsitory
+                Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
                 [-t tag (check given tag instead of trunk)]
                 <fully qualified name>
@@ -1899,14 +1899,6 @@ publish() {
     esac
   done
 
-  if [ "x$add_tag" != "x" ]; then
-    if [ "x$tag_name" = "x" ]; then
-      echo "Tag name missing"
-      return 1
-    fi
-    add_tag="-a ${tag_name}@${tag_channel}@${tag_description}"
-  fi
-
   # get repository name
   shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
@@ -1925,9 +1917,18 @@ publish() {
 
   # more sanity checks
   check_repository_compatibility
-  check_expiry $stratum0 || die "Repository whitelist is expired!"
-  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
+  check_expiry $stratum0                  || die "Repository whitelist is expired!"
+  [ -f ${spool_dir}/in_transaction ]      || die "Not in a transaction"
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  if [ "x$add_tag" != "x" ]; then
+    [ "x$tag_name" != "x" ]               || die "Tag name missing"
+    echo $tag_name | grep -q -v "\s"      || die "Spaces are not allowed in tag names"
+    if lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+       [ x"$tag_hash" = "x" ]; then
+      die "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
+    fi
+    add_tag="-a \"${tag_name}@${tag_channel}@${tag_description}\""
+  fi
 
   # do it!
   local swissknife="cvmfs_swissknife"
@@ -2379,8 +2380,19 @@ fi
 subcommand=$1
 shift
 if is_subcommand $subcommand; then
+  # parse the command line arguments (keep quotation marks)
+  args=""
+  while [ $# -gt 0 ]; do
+    if echo $1 | grep -q "\s"; then
+      args="$args \"$1\""
+    else
+      args="$args $1"
+    fi
+    shift 1
+  done
+
   # replace a dash (-) by an underscore (_) and call the requested sub-command
-  eval "$(echo $subcommand | sed 's/-/_/g') $@"
+  eval "$(echo $subcommand | sed 's/-/_/g') $args"
 else
   usage "Unrecognized command: $subcommand"
 fi
