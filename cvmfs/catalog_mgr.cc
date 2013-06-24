@@ -48,6 +48,14 @@ void AbstractCatalogManager::SetInodeAnnotation(InodeAnnotation *new_annotation)
 }
 
 
+void AbstractCatalogManager::SetOwnerMaps(const OwnerMap &uid_map,
+                                          const OwnerMap &gid_map)
+{
+  uid_map_ = uid_map;
+  gid_map_ = gid_map;
+}
+
+
 /**
  * Initializes the CatalogManager and loads and attaches the root entry.
  * @return true on successful init, otherwise false
@@ -598,6 +606,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   InodeRange range = AcquireInodes(inode_chunk_size);
   new_catalog->set_inode_range(range);
   new_catalog->SetInodeAnnotation(inode_annotation_);
+  new_catalog->SetOwnerMaps(&uid_map_, &gid_map_);
 
   // Add catalog to the manager
   if (!new_catalog->IsInitialized()) {

@@ -14,6 +14,7 @@
 #include <cassert>
 
 #include <vector>
+#include <map>
 #include <string>
 
 #include "catalog.h"
@@ -165,6 +166,7 @@ class AbstractCatalogManager {
     remount_listener_ = listener;
     Unlock();
   }
+  void SetOwnerMaps(const OwnerMap &uid_map, const OwnerMap &gid_map);
 
   Statistics statistics() const { return statistics_; }
   uint64_t inode_gauge() {
@@ -263,6 +265,8 @@ class AbstractCatalogManager {
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
   RemountListener *remount_listener_;
+  OwnerMap uid_map_;
+  OwnerMap gid_map_;
 
   Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const Catalog *catalog,

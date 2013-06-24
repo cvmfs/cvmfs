@@ -449,6 +449,16 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
     result.uid_              = RetrieveInt64(13);
     result.gid_              = RetrieveInt64(14);
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
+    if (result.catalog_->uid_map_) {
+      OwnerMap::const_iterator i = result.catalog_->uid_map_->find(result.uid_);
+      if (i != result.catalog_->uid_map_->end())
+        result.uid_ = i->second;
+    }
+    if (result.catalog_->gid_map_) {
+      OwnerMap::const_iterator i = result.catalog_->gid_map_->find(result.gid_);
+      if (i != result.catalog_->gid_map_->end())
+        result.gid_ = i->second;
+    }
   }
 
   result.mode_     = RetrieveInt(3);

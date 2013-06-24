@@ -60,6 +60,8 @@ Catalog::Catalog(const PathString &path,
 
   database_ = NULL;
   nested_catalog_cache_ = NULL;
+  uid_map_ = NULL;
+  gid_map_ = NULL;
   sql_listing_ = NULL;
   sql_lookup_md5path_ = NULL;
   sql_lookup_inode_ = NULL;
@@ -473,6 +475,12 @@ void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
   assert((inode_annotation_ == NULL) || (inode_annotation_ == new_annotation));
   inode_annotation_ = new_annotation;
   pthread_mutex_unlock(lock_);
+}
+
+
+void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
+  uid_map_ = (uid_map && !uid_map->empty()) ? uid_map : NULL;
+  gid_map_ = (gid_map && !gid_map->empty()) ? gid_map : NULL;
 }
 
 

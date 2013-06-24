@@ -1672,6 +1672,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool ignore_signature = false;
   string root_hash = "";
   string repository_tag = "";
+  map<uint64_t, uint64_t> uid_map;
+  map<uint64_t, uint64_t> gid_map;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
 
@@ -1786,6 +1788,21 @@ static int Init(const loader::LoaderExports *loader_exports) {
       cachedir = cachedir + "/" + loader_exports->repository_name;
     }
   }
+  if (options::GetValue("CVMFS_UID_MAP", &parameter)) {
+    retval = options::ParseUIntMap(parameter, &uid_map);
+    if (!retval) {
+      *g_boot_error = "failed to parse uid map " + parameter;
+      return loader::kFailOptions;
+    }
+  }
+  if (options::GetValue("CVMFS_GID_MAP", &parameter)) {
+    retval = options::ParseUIntMap(parameter, &gid_map);
+    if (!retval) {
+      *g_boot_error = "failed to parse gid map " + parameter;
+      return loader::kFailOptions;
+    }
+  }
+
 
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
@@ -2058,6 +2075,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
+  cvmfs::catalog_manager_->SetOwnerMaps(uid_map, gid_map);
 
   // Load specific tag (root hash has precedence)
   if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {

@@ -35,6 +35,7 @@ class Catalog;
 class Counters;
 
 typedef std::vector<Catalog *> CatalogList;
+typedef std::map<uint64_t, uint64_t> OwnerMap;  // used to map uid/gid
 
 
 /**
@@ -86,7 +87,7 @@ class InodeAnnotation {
  */
 class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
-  friend class SqlLookup;                  // for mangled inode
+  friend class SqlLookup;                  // for mangled inode and uid/gid maps
   friend class swissknife::CommandMigrate; // for catalog version migration
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
@@ -165,6 +166,7 @@ class Catalog : public SingleCopy {
   bool FindNested(const PathString &mountpoint, hash::Any *hash) const;
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
+  void SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map);
 
  protected:
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
@@ -220,6 +222,9 @@ class Catalog : public SingleCopy {
   uint64_t max_row_id_;
   InodeAnnotation *inode_annotation_;
   Counters counters_;
+  // Point to the maps in the catalog manager
+  const OwnerMap *uid_map_;
+  const OwnerMap *gid_map_;
 
   SqlListing               *sql_listing_;
   SqlLookupPathHash        *sql_lookup_md5path_;
