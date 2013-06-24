@@ -30,6 +30,8 @@ CommandMigrate::CommandMigrate() :
 
 ParameterList CommandMigrate::GetParams() {
   ParameterList result;
+  result.push_back(Parameter('v', "migration base version ( 2.0.x | 2.1.7 )",
+                             false, false));
   result.push_back(Parameter('r', "repository URL (absolute local path "
                                   "or remote URL)",
                              false, false));
@@ -40,9 +42,9 @@ ParameterList CommandMigrate::GetParams() {
   result.push_back(Parameter('t', "temporary directory for catalog decompress",
                              false, false));
   result.push_back(Parameter('p', "user id to be used for this repository",
-                             false, false));
+                             true, false));
   result.push_back(Parameter('g', "group id to be used for this repository",
-                             false, false));
+                             true, false));
   result.push_back(Parameter('n', "fully qualified repository name",
                              true, false));
   result.push_back(Parameter('k', "repository master key(s)",
@@ -83,12 +85,17 @@ static void Error(const std::string                     &message,
 
 
 int CommandMigrate::Main(const ArgumentList &args) {
+  const std::string &migration_base     = *args.find('v')->second;
   const std::string &repo_url           = *args.find('r')->second;
   const std::string &spooler            = *args.find('u')->second;
   const std::string &manifest_path      = *args.find('o')->second;
   const std::string &decompress_tmp_dir = *args.find('t')->second;
-  const std::string &uid                = *args.find('p')->second;
-  const std::string &gid                = *args.find('g')->second;
+  const std::string &uid                = (args.count('p') > 0)      ?
+                                             *args.find('p')->second :
+                                             "";
+  const std::string &gid                = (args.count('g') > 0)      ?
+                                             *args.find('g')->second :
+                                             "";
   const std::string &repo_name          = (args.count('n') > 0)      ?
                                              *args.find('n')->second :
                                              "";
@@ -98,18 +105,6 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const bool fix_transition_points      = (args.count('f') > 0);
   const bool analyze_file_linkcounts    = (args.count('l') == 0);
   const bool collect_catalog_statistics = (args.count('s') > 0);
-
-  temporary_directory_ = decompress_tmp_dir;
-  std::istringstream uid_ss(uid); uid_ss >> uid_;
-  if (uid_ss.fail()) {
-    Error("Failed to parse user ID");
-    return 1;
-  }
-  std::istringstream gid_ss(gid); gid_ss >> gid_;
-  if (gid_ss.fail()) {
-    Error("Failed to parse group ID");
-    return 1;
-  }
 
   // We might need a lot of file descriptors
   if (!RaiseFileDescriptorLimit()) {
@@ -122,6 +117,16 @@ int CommandMigrate::Main(const ArgumentList &args) {
     Error("Failed to preconfigure SQLite library");
     return 3;
   }
+
+  // Create an upstream spooler
+  temporary_directory_ = decompress_tmp_dir;
+  const upload::SpoolerDefinition spooler_definition(spooler);
+  spooler_ = upload::Spooler::Construct(spooler_definition);
+  if (!spooler_) {
+    Error("Failed to create upstream Spooler.");
+    return 5;
+  }
+  spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
 
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
@@ -146,59 +151,106 @@ int CommandMigrate::Main(const ArgumentList &args) {
   LogCvmfs(kLogCatalog, kLogStdout, "Loaded %d catalogs", catalog_count_);
   assert(root_catalog_ != NULL);
 
-  // Create an upstream spooler
-  const upload::SpoolerDefinition spooler_definition(spooler);
-  spooler_ = upload::Spooler::Construct(spooler_definition);
-  if (!spooler_) {
-    Error("Failed to create upstream Spooler.");
+  // Do the actual migration step
+  bool migration_succeeded = false;
+  if (migration_base == "2.0.x") {
+    if (uid.empty()) {
+      Error("Please provide a user ID");
+      return 1;
+    }
+    if (gid.empty()) {
+      Error("Please provide a group ID");
+      return 1;
+    }
+    std::istringstream uid_ss(uid); uid_ss >> uid_;
+    if (uid_ss.fail()) {
+      Error("Failed to parse user ID");
+      return 1;
+    }
+    std::istringstream gid_ss(gid); gid_ss >> gid_;
+    if (gid_ss.fail()) {
+      Error("Failed to parse group ID");
+      return 1;
+    }
+
+    // Generate and upload a nested catalog marker
+    if (! GenerateNestedCatalogMarkerChunk()) {
+      Error("Failed to create a nested catalog marker.");
+      return 6;
+    }
+    spooler_->WaitForUpload();
+
+    // Configure the concurrent catalog migration facility
+    MigrationWorker_20x::worker_context context(spooler_definition.temporary_path,
+                                                collect_catalog_statistics,
+                                                fix_transition_points,
+                                                analyze_file_linkcounts,
+                                                uid_,
+                                                gid_);
+    migration_succeeded =
+      DoMigrationAndCommit<MigrationWorker_20x>(context, manifest_path);
+  } else if (migration_base == "2.1.7") {
+    MigrationWorker_217::worker_context context(spooler_definition.temporary_path,
+                                                collect_catalog_statistics);
+    migration_succeeded =
+      DoMigrationAndCommit<MigrationWorker_217>(context, manifest_path);
+  } else {
+    std::stringstream ss;
+    ss << "Unknown migration base: " << migration_base;
+    Error(ss.str());
+    return 1;
+  }
+
+  // Check if everything went well
+  if (!migration_succeeded) {
+    Error("Migration failed!");
     return 5;
   }
-  spooler_->RegisterListener(&CommandMigrate::UploadCallback, this);
 
-  // Generate and upload a nested catalog marker
-  if (! GenerateNestedCatalogMarkerChunk()) {
-    Error("Failed to create a nested catalog marker.");
-    return 6;
+  // Analyze collected statistics
+  if (collect_catalog_statistics) {
+    LogCvmfs(kLogCatalog, kLogStdout, "\nCollected statistics results:");
+    AnalyzeCatalogStatistics();
   }
-  spooler_->WaitForUpload();
 
-  // Create a concurrent catalog migration facility
+  LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration succeeded");
+  return 0;
+}
+
+
+template <class MigratorT>
+bool CommandMigrate::DoMigrationAndCommit(
+                           typename MigratorT::worker_context  &context,
+                           const std::string                   &manifest_path) {
+  // Create a concurrent migration context for catalog migration
   const unsigned int cpus = GetNumberOfCpuCores();
-  MigrationWorker::worker_context context(spooler_definition.temporary_path,
-                                          fix_transition_points,
-                                          analyze_file_linkcounts,
-                                          collect_catalog_statistics,
-                                          uid_,
-                                          gid_);
-  concurrent_migration_ = new ConcurrentWorkers<MigrationWorker>(
-                                cpus,
-                                cpus * 10,
-                                &context);
-  if (!concurrent_migration_->Initialize()) {
+  ConcurrentWorkers<MigratorT> concurrent_migration(cpus, cpus * 10, &context);
+
+  if (!concurrent_migration.Initialize()) {
     Error("Failed to initialize worker migration system.");
-    return 7;
+    return false;
   }
-  concurrent_migration_->RegisterListener(&CommandMigrate::MigrationCallback,
-                                          this);
+  concurrent_migration.RegisterListener(&CommandMigrate::MigrationCallback,
+                                         this);
 
   // Migrate catalogs recursively (starting with the deepest nested catalogs)
   LogCvmfs(kLogCatalog, kLogStdout, "\nMigrating catalogs...");
   PendingCatalog *root_catalog = new PendingCatalog(root_catalog_);
   migration_stopwatch_.Start();
-  ConvertCatalogsRecursively(root_catalog);
-  concurrent_migration_->WaitForEmptyQueue();
+  ConvertCatalogsRecursively(root_catalog, concurrent_migration);
+  concurrent_migration.WaitForEmptyQueue();
   spooler_->WaitForUpload();
   migration_stopwatch_.Stop();
 
-  const unsigned int errors = concurrent_migration_->GetNumberOfFailedJobs() +
+  // check for possible errors during the migration process
+  const unsigned int errors = concurrent_migration.GetNumberOfFailedJobs() +
                               spooler_->GetNumberOfErrors();
-
   LogCvmfs(kLogCatalog, kLogStdout,
            "Catalog Migration finished with %d errors.", errors);
   if (errors > 0) {
     LogCvmfs(kLogCatalog, kLogStdout,
              "\nCatalog Migration produced errors\nAborting...");
-    return 8;
+    return false;
   }
 
   // Commit the new (migrated) repository revision...
@@ -212,20 +264,13 @@ int CommandMigrate::Main(const ArgumentList &args) {
   manifest.set_revision(root_catalog->new_catalog->GetRevision());
   if (! manifest.Export(manifest_path)) {
     Error("Manifest export failed.\nAborting...");
-    return 9;
+    return false;
   }
 
   // Get rid of the open root catalog
   delete root_catalog;
 
-  // Analyze collected statistics
-  if (collect_catalog_statistics) {
-    LogCvmfs(kLogCatalog, kLogStdout, "\nCollected statistics results:");
-    AnalyzeCatalogStatistics();
-  }
-
-  LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration succeeded");
-  return 0;
+  return true;
 }
 
 
@@ -329,7 +374,9 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 }
 
 
-void CommandMigrate::ConvertCatalogsRecursively(PendingCatalog *catalog) {
+template <class MigratorT>
+void CommandMigrate::ConvertCatalogsRecursively(PendingCatalog *catalog,
+                                                MigratorT       &migrator) {
   // First migrate all nested catalogs (depth first traversal)
   const CatalogList nested_catalogs = catalog->old_catalog->GetChildren();
   CatalogList::const_iterator i    = nested_catalogs.begin();
@@ -338,11 +385,11 @@ void CommandMigrate::ConvertCatalogsRecursively(PendingCatalog *catalog) {
   for (; i != iend; ++i) {
     PendingCatalog *new_nested = new PendingCatalog(*i);
     catalog->nested_catalogs.push_back(new_nested);
-    ConvertCatalogsRecursively(new_nested);
+    ConvertCatalogsRecursively(new_nested, migrator);
   }
 
   // Migrate this catalog referencing all its (already migrated) children
-  concurrent_migration_->Schedule(catalog);
+  migrator.Schedule(catalog);
 }
 
 
@@ -432,20 +479,27 @@ CommandMigrate::PendingCatalog::~PendingCatalog() {
 }
 
 
-CommandMigrate::MigrationWorker::MigrationWorker(const worker_context *context) :
-  temporary_directory_            (context->temporary_directory),
-  fix_nested_catalog_transitions_ (context->fix_nested_catalog_transitions),
-  analyze_file_linkcounts_        (context->analyze_file_linkcounts),
-  collect_catalog_statistics_     (context->collect_catalog_statistics),
-  uid_                            (context->uid),
-  gid_                            (context->gid)
-{ }
+template<class DerivedT>
+CommandMigrate::AbstractMigrationWorker<DerivedT>::AbstractMigrationWorker(
+                                                const worker_context *context) :
+  temporary_directory_       (context->temporary_directory),
+  collect_catalog_statistics_(context->collect_catalog_statistics) { }
 
 
-CommandMigrate::MigrationWorker::~MigrationWorker() { }
+template<class DerivedT>
+CommandMigrate::AbstractMigrationWorker<DerivedT>::~AbstractMigrationWorker() {}
 
 
-void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
+CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
+                                                const worker_context *context) :
+  AbstractMigrationWorker        (context),
+  fix_nested_catalog_transitions_(context->fix_nested_catalog_transitions),
+  analyze_file_linkcounts_       (context->analyze_file_linkcounts),
+  uid_                           (context->uid),
+  gid_                           (context->gid) { }
+
+
+void CommandMigrate::MigrationWorker_20x::operator()(const expected_data &data) {
   migration_stopwatch_.Start();
   const bool success =
     CreateNewEmptyCatalog            (data) &&
@@ -476,7 +530,7 @@ void CommandMigrate::MigrationWorker::operator()(const expected_data &data) {
 }
 
 
-bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
+bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
   PendingCatalog *data) const
 {
   const string root_path = data->root_path();
@@ -510,7 +564,7 @@ bool CommandMigrate::MigrationWorker::CreateNewEmptyCatalog(
 }
 
 
-bool CommandMigrate::MigrationWorker::CheckDatabaseSchemaCompatibility(
+bool CommandMigrate::MigrationWorker_20x::CheckDatabaseSchemaCompatibility(
   PendingCatalog *data) const
 {
   const catalog::Database &old_catalog = data->old_catalog->database();
@@ -530,7 +584,7 @@ bool CommandMigrate::MigrationWorker::CheckDatabaseSchemaCompatibility(
 }
 
 
-bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
+bool CommandMigrate::MigrationWorker_20x::AttachOldCatalogDatabase(
   PendingCatalog *data) const
 {
   const catalog::Database &old_catalog = data->old_catalog->database();
@@ -553,7 +607,7 @@ bool CommandMigrate::MigrationWorker::AttachOldCatalogDatabase(
 }
 
 
-bool CommandMigrate::MigrationWorker::StartDatabaseTransaction(
+bool CommandMigrate::MigrationWorker_20x::StartDatabaseTransaction(
   PendingCatalog *data) const
 {
   data->new_catalog->Transaction();
@@ -561,7 +615,7 @@ bool CommandMigrate::MigrationWorker::StartDatabaseTransaction(
 }
 
 
-bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
+bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
   PendingCatalog *data) const
 {
   assert (!data->new_catalog->IsDirty());
@@ -736,7 +790,7 @@ bool CommandMigrate::MigrationWorker::MigrateFileMetadata(
 }
 
 
-bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
+bool CommandMigrate::MigrationWorker_20x::AnalyzeFileLinkcounts(
                                                    PendingCatalog *data) const {
   const Database &writable = data->new_catalog->database();
   bool retval;
@@ -844,7 +898,7 @@ bool CommandMigrate::MigrationWorker::AnalyzeFileLinkcounts(
 }
 
 
-bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
+bool CommandMigrate::MigrationWorker_20x::MigrateNestedCatalogReferences(
   PendingCatalog *data) const
 {
   const Database &writable = data->new_catalog->database();
@@ -901,7 +955,7 @@ bool CommandMigrate::MigrationWorker::MigrateNestedCatalogReferences(
 }
 
 
-bool CommandMigrate::MigrationWorker::FixNestedCatalogTransitionPoints(
+bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
   PendingCatalog *data) const
 {
   if (!fix_nested_catalog_transitions_) {
@@ -1049,7 +1103,7 @@ void CommandMigrate::CreateNestedCatalogMarkerDirent(
 }
 
 
-bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
+bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   PendingCatalog *data) const
 {
   bool retval = false;
@@ -1137,7 +1191,7 @@ bool CommandMigrate::MigrationWorker::GenerateCatalogStatistics(
 }
 
 
-bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
+bool CommandMigrate::MigrationWorker_20x::FindRootEntryInformation(
   PendingCatalog *data) const
 {
   const Database &writable = data->new_catalog->database();
@@ -1166,7 +1220,7 @@ bool CommandMigrate::MigrationWorker::FindRootEntryInformation(
 }
 
 
-bool CommandMigrate::MigrationWorker::CommitDatabaseTransaction(
+bool CommandMigrate::MigrationWorker_20x::CommitDatabaseTransaction(
   PendingCatalog *data) const
 {
   data->new_catalog->Commit();
@@ -1174,7 +1228,7 @@ bool CommandMigrate::MigrationWorker::CommitDatabaseTransaction(
 }
 
 
-bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
+bool CommandMigrate::MigrationWorker_20x::CollectAndAggregateStatistics(
   PendingCatalog *data) const
 {
   if (!collect_catalog_statistics_) {
@@ -1204,7 +1258,7 @@ bool CommandMigrate::MigrationWorker::CollectAndAggregateStatistics(
 }
 
 
-bool CommandMigrate::MigrationWorker::DetachOldCatalogDatabase(
+bool CommandMigrate::MigrationWorker_20x::DetachOldCatalogDatabase(
   PendingCatalog *data) const
 {
   const Database &writable = data->new_catalog->database();
@@ -1218,12 +1272,11 @@ bool CommandMigrate::MigrationWorker::DetachOldCatalogDatabase(
 }
 
 
-bool CommandMigrate::MigrationWorker::CleanupNestedCatalogs(
+bool CommandMigrate::MigrationWorker_20x::CleanupNestedCatalogs(
   PendingCatalog *data) const
 {
   // All nested catalogs of PendingCatalog 'data' are fully processed and
   // accounted. It is safe to get rid of their data structures here!
-  DeltaCounters aggregated_counters;
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
@@ -1232,4 +1285,21 @@ bool CommandMigrate::MigrationWorker::CleanupNestedCatalogs(
 
   data->nested_catalogs.clear();
   return true;
+}
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+CommandMigrate::MigrationWorker_217::MigrationWorker_217(
+                                                const worker_context *context) :
+  AbstractMigrationWorker(context) {
+
+}
+
+
+void CommandMigrate::MigrationWorker_217::operator()(const expected_data &data) {
+
 }

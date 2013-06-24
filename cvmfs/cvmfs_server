@@ -1376,6 +1376,7 @@ import() {
     statistics_flag="-s"
   fi
   cvmfs_swissknife migrate \
+    -v "2.0.x" \
     -r $storage_location \
     -n $name \
     -u $upstream \
