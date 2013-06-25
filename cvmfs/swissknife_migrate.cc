@@ -131,7 +131,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
-  CatalogTraversal<CommandMigrate> traversal(
+  CatalogTraversal<CommandMigrate, WritableCatalog> traversal(
     this,
     &CommandMigrate::CatalogCallback,
     repo_url,
