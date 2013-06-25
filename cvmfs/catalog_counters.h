@@ -19,6 +19,13 @@ namespace catalog {
 class DirectoryEntry;
 class Database;
 
+struct LegacyMode {
+  enum Type { // TODO: C++11 typed enum
+    kNoLegacy,
+    kLegacy
+  };
+};
+
 // FieldT is either int64_t (DeltaCounters) or uint64_t (Counters)
 template<typename FieldT>
 class TreeCountersBase {
@@ -79,9 +86,10 @@ class TreeCountersBase {
   };
 
  public:
-  bool ReadFromDatabase(const Database   &database);
-  bool WriteToDatabase(const Database    &database) const;
-  bool InsertIntoDatabase(const Database &database) const;
+  bool ReadFromDatabase(const Database         &database,
+                        const LegacyMode::Type  legacy = LegacyMode::kNoLegacy);
+  bool WriteToDatabase(const Database     &database) const;
+  bool InsertIntoDatabase(const Database  &database) const;
 
   void SetZero();
 
