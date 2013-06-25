@@ -102,6 +102,11 @@ class CommandMigrate : public Command {
     AbstractMigrationWorker(const worker_context *context);
     virtual ~AbstractMigrationWorker();
 
+    void operator()(const expected_data &data);
+
+   protected:
+    bool RunMigration(PendingCatalog *data) const { return false; }
+
    protected:
     const std::string  temporary_directory_;
     const bool         collect_catalog_statistics_;
@@ -110,6 +115,8 @@ class CommandMigrate : public Command {
   };
 
   class MigrationWorker_20x : public AbstractMigrationWorker<MigrationWorker_20x> {
+    friend class AbstractMigrationWorker<MigrationWorker_20x>;
+
    public:
     struct worker_context : AbstractMigrationWorker<MigrationWorker_20x>::worker_context {
       worker_context(const std::string  &temporary_directory,
@@ -133,9 +140,9 @@ class CommandMigrate : public Command {
    public:
     MigrationWorker_20x(const worker_context *context);
 
-    void operator()(const expected_data &data);
-
    protected:
+    bool RunMigration(PendingCatalog *data) const;
+
     bool CreateNewEmptyCatalog            (PendingCatalog *data) const;
     bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
     bool AttachOldCatalogDatabase         (PendingCatalog *data) const;
@@ -159,12 +166,18 @@ class CommandMigrate : public Command {
   };
 
   class MigrationWorker_217 : public AbstractMigrationWorker<MigrationWorker_217> {
+    friend class AbstractMigrationWorker<MigrationWorker_217>;
+
    public:
     MigrationWorker_217(const worker_context *context);
-    void operator()(const expected_data &data);
 
    protected:
+    bool RunMigration(PendingCatalog *data) const;
+
     bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
+    bool StartDatabaseTransaction         (PendingCatalog *data) const;
+    bool GenerateNewStatisticsCounters    (PendingCatalog *data) const;
+    bool CommitDatabaseTransaction        (PendingCatalog *data) const;
   };
 
  public:

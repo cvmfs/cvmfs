@@ -490,6 +490,26 @@ template<class DerivedT>
 CommandMigrate::AbstractMigrationWorker<DerivedT>::~AbstractMigrationWorker() {}
 
 
+template<class DerivedT>
+void CommandMigrate::AbstractMigrationWorker<DerivedT>::operator()(
+                                                    const expected_data &data) {
+  migration_stopwatch_.Start();
+  const bool success = static_cast<DerivedT*>(this)->RunMigration(data);
+  data->success = success;
+  migration_stopwatch_.Stop();
+
+  data->statistics.migration_time = migration_stopwatch_.GetTime();
+  migration_stopwatch_.Reset();
+
+  // Note: MigrationCallback() will take care of the result...
+  if (success) {
+    ConcurrentWorker<DerivedT>::master()->JobSuccessful(data);
+  } else {
+    ConcurrentWorker<DerivedT>::master()->JobFailed(data);
+  }
+}
+
+
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
                                                 const worker_context *context) :
   AbstractMigrationWorker        (context),
@@ -499,36 +519,21 @@ CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
   gid_                           (context->gid) { }
 
 
-void CommandMigrate::MigrationWorker_20x::operator()(const expected_data &data) {
-  migration_stopwatch_.Start();
-  const bool success =
-    CreateNewEmptyCatalog            (data) &&
-    CheckDatabaseSchemaCompatibility (data) &&
-    AttachOldCatalogDatabase         (data) &&
-    StartDatabaseTransaction         (data) &&
-    MigrateFileMetadata              (data) &&
-    MigrateNestedCatalogReferences   (data) &&
-    FixNestedCatalogTransitionPoints (data) &&
-    GenerateCatalogStatistics        (data) &&
-    FindRootEntryInformation         (data) &&
-    CommitDatabaseTransaction        (data) &&
-    CollectAndAggregateStatistics    (data) &&
-    DetachOldCatalogDatabase         (data) &&
-    CleanupNestedCatalogs            (data);
-  data->success = success;
-  migration_stopwatch_.Stop();
-
-  data->statistics.migration_time = migration_stopwatch_.GetTime();
-  migration_stopwatch_.Reset();
-
-  // Note: MigrationCallback() will take care of the result...
-  if (success) {
-    master()->JobSuccessful(data);
-  } else {
-    master()->JobFailed(data);
-  }
+bool CommandMigrate::MigrationWorker_20x::RunMigration(PendingCatalog *data) const {
+  return CreateNewEmptyCatalog            (data) &&
+         CheckDatabaseSchemaCompatibility (data) &&
+         AttachOldCatalogDatabase         (data) &&
+         StartDatabaseTransaction         (data) &&
+         MigrateFileMetadata              (data) &&
+         MigrateNestedCatalogReferences   (data) &&
+         FixNestedCatalogTransitionPoints (data) &&
+         GenerateCatalogStatistics        (data) &&
+         FindRootEntryInformation         (data) &&
+         CommitDatabaseTransaction        (data) &&
+         CollectAndAggregateStatistics    (data) &&
+         DetachOldCatalogDatabase         (data) &&
+         CleanupNestedCatalogs            (data);
 }
-
 
 bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
   PendingCatalog *data) const
