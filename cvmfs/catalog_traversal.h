@@ -27,9 +27,9 @@ namespace swissknife {
  *       file size, each catalog is loaded, processed and removed immediately
  *       afterwards.
  *
- * CAUTION: currently the Catalog* pointer passed into the callback becomes in-
- *          valid directly after the callback method returns. Therefore you
- *          MUST NOT store it for later use.
+ * CAUTION: the Catalog* pointer passed into the callback becomes invalid
+ *          directly after the callback method returns, unless you create the
+ *          CatalogTraversal object with no_close = true.
  *
  * TODO: Use the Observable template buried in Pull Request 46 instead of imple-
  *       menting your own callback infrastructure here.
