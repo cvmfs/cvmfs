@@ -842,7 +842,8 @@ bool SqlUpdateCounter::BindDelta(const int64_t delta) {
 
 SqlCreateCounter::SqlCreateCounter(const Database &database) {
   Init(database.sqlite_db(),
-       "INSERT INTO statistics (counter, value) VALUES (:counter, :value);");
+       "INSERT OR REPLACE INTO statistics (counter, value) "
+       "VALUES (:counter, :value);");
 }
 
 
