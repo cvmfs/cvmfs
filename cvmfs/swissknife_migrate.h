@@ -65,6 +65,7 @@ class CommandMigrate : public Command {
       return old_catalog->path().ToString();
     }
     inline const bool IsRoot() const { return old_catalog->IsRoot(); }
+    inline const bool HasNew() const { return new_catalog != NULL;   }
 
     bool                              success;
 

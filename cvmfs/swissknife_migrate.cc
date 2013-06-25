@@ -260,8 +260,11 @@ bool CommandMigrate::DoMigrationAndCommit(
   const std::string &root_catalog_path = root_catalog->root_path();
   manifest::Manifest manifest(root_catalog_hash,
                               root_catalog_path);
-  manifest.set_ttl(root_catalog->new_catalog->GetTTL());
-  manifest.set_revision(root_catalog->new_catalog->GetRevision());
+  const Catalog* new_catalog = (root_catalog->HasNew())
+                                 ? root_catalog->new_catalog
+                                 : root_catalog->old_catalog;
+  manifest.set_ttl(new_catalog->GetTTL());
+  manifest.set_revision(new_catalog->GetRevision());
   if (! manifest.Export(manifest_path)) {
     Error("Manifest export failed.\nAborting...");
     return false;
@@ -315,7 +318,8 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     return;
   }
 
-  const string &path = data->new_catalog->database_path();
+  const string &path = (data->HasNew()) ? data->new_catalog->database_path()
+                                        : data->old_catalog->database_path();
 
   // Save the processed catalog in the pending map
   {
@@ -615,6 +619,7 @@ bool CommandMigrate::MigrationWorker_20x::AttachOldCatalogDatabase(
 bool CommandMigrate::MigrationWorker_20x::StartDatabaseTransaction(
   PendingCatalog *data) const
 {
+  assert(data->HasNew());
   data->new_catalog->Transaction();
   return true;
 }
@@ -624,6 +629,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
   PendingCatalog *data) const
 {
   assert (!data->new_catalog->IsDirty());
+  assert(data->HasNew());
   bool retval;
   const Database &writable = data->new_catalog->database();
 
@@ -797,6 +803,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
 
 bool CommandMigrate::MigrationWorker_20x::AnalyzeFileLinkcounts(
                                                    PendingCatalog *data) const {
+  assert(data->HasNew());
   const Database &writable = data->new_catalog->database();
   bool retval;
 
@@ -906,6 +913,7 @@ bool CommandMigrate::MigrationWorker_20x::AnalyzeFileLinkcounts(
 bool CommandMigrate::MigrationWorker_20x::MigrateNestedCatalogReferences(
   PendingCatalog *data) const
 {
+  assert(data->HasNew());
   const Database &writable = data->new_catalog->database();
   bool retval;
 
@@ -963,6 +971,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateNestedCatalogReferences(
 bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
   PendingCatalog *data) const
 {
+  assert(data->HasNew());
   if (!fix_nested_catalog_transitions_) {
     // Fixing transition point mismatches is not enabled...
     return true;
@@ -1111,6 +1120,7 @@ void CommandMigrate::CreateNestedCatalogMarkerDirent(
 bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   PendingCatalog *data) const
 {
+  assert(data->HasNew());
   bool retval = false;
   const Database &writable = data->new_catalog->database();
 
@@ -1228,6 +1238,7 @@ bool CommandMigrate::MigrationWorker_20x::FindRootEntryInformation(
 bool CommandMigrate::MigrationWorker_20x::CommitDatabaseTransaction(
   PendingCatalog *data) const
 {
+  assert(data->HasNew());
   data->new_catalog->Commit();
   return true;
 }
@@ -1236,6 +1247,7 @@ bool CommandMigrate::MigrationWorker_20x::CommitDatabaseTransaction(
 bool CommandMigrate::MigrationWorker_20x::CollectAndAggregateStatistics(
   PendingCatalog *data) const
 {
+  assert(data->HasNew());
   if (!collect_catalog_statistics_) {
     return true;
   }
@@ -1266,6 +1278,7 @@ bool CommandMigrate::MigrationWorker_20x::CollectAndAggregateStatistics(
 bool CommandMigrate::MigrationWorker_20x::DetachOldCatalogDatabase(
   PendingCatalog *data) const
 {
+  assert(data->HasNew());
   const Database &writable = data->new_catalog->database();
   Sql detach_old_catalog(writable, "DETACH old;");
   const bool retval = detach_old_catalog.Execute();
