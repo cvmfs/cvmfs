@@ -1396,7 +1396,7 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
     "SELECT count(*), sum(size) FROM catalog "
     "                WHERE flags & :flag_chunked_file;");
   Sql count_file_chunks(writable,
-    "SELECT count(*) FROM catalog WHERE flags & :flag_chunked_file;");
+    "SELECT count(*) FROM chunks;");
   Sql aggregate_file_size(writable,
     "SELECT sum(size) FROM catalog WHERE  flags & :flag_file "
     "                                     AND NOT flags & :flag_link;");
@@ -1409,9 +1409,7 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
     Error("Failed to count chunked files.", count_chunked_files, data);
     return false;
   }
-  retval =
-    count_file_chunks.BindInt64(1, SqlDirent::kFlagFileChunk) &&
-    count_file_chunks.FetchRow();
+  retval = count_file_chunks.FetchRow();
   if (!retval) {
     Error("Failed to count file chunks", count_file_chunks, data);
     return false;
