@@ -1225,21 +1225,21 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   retval =
     count_regular_files.BindInt64(1, SqlDirent::kFlagFile) &&
     count_regular_files.BindInt64(2, SqlDirent::kFlagLink) &&
-    count_regular_files.Execute();
+    count_regular_files.FetchRow();
   if (!retval) {
     Error("Failed to count regular files.", count_regular_files, data);
     return false;
   }
   retval =
     count_symlinks.BindInt64(1, SqlDirent::kFlagLink) &&
-    count_symlinks.Execute();
+    count_symlinks.FetchRow();
   if (!retval) {
     Error("Failed to count symlinks.", count_symlinks, data);
     return false;
   }
   retval =
     count_directories.BindInt64(1, SqlDirent::kFlagDir) &&
-    count_directories.Execute();
+    count_directories.FetchRow();
   if (!retval) {
     Error("Failed to count directories.", count_directories, data);
     return false;
@@ -1247,7 +1247,7 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   retval =
     aggregate_file_size.BindInt64(1, SqlDirent::kFlagFile) &&
     aggregate_file_size.BindInt64(2, SqlDirent::kFlagLink) &&
-    aggregate_file_size.Execute();
+    aggregate_file_size.FetchRow();
   if (!retval) {
     Error("Failed to aggregate the file sizes.", aggregate_file_size, data);
     return false;
