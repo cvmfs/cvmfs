@@ -108,7 +108,8 @@ class CommandMigrate : public Command {
    protected:
     bool RunMigration(PendingCatalog *data) const { return false; }
 
-    bool CleanupNestedCatalogs(PendingCatalog *data) const;
+    bool CleanupNestedCatalogs         (PendingCatalog *data) const;
+    bool CollectAndAggregateStatistics (PendingCatalog *data) const;
 
    protected:
     const std::string  temporary_directory_;
@@ -157,7 +158,6 @@ class CommandMigrate : public Command {
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
     bool FindRootEntryInformation         (PendingCatalog *data) const;
     bool CommitDatabaseTransaction        (PendingCatalog *data) const;
-    bool CollectAndAggregateStatistics    (PendingCatalog *data) const;
     bool DetachOldCatalogDatabase         (PendingCatalog *data) const;
 
    private:

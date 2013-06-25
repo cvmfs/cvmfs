@@ -498,8 +498,9 @@ template<class DerivedT>
 void CommandMigrate::AbstractMigrationWorker<DerivedT>::operator()(
                                                     const expected_data &data) {
   migration_stopwatch_.Start();
-  const bool success = static_cast<DerivedT*>(this)->RunMigration(data) &&
-                       CleanupNestedCatalogs(data);
+  const bool success = static_cast<DerivedT*>(this)->RunMigration (data) &&
+                       CollectAndAggregateStatistics              (data) &&
+                       CleanupNestedCatalogs                      (data);
   data->success = success;
   migration_stopwatch_.Stop();
 
@@ -512,6 +513,39 @@ void CommandMigrate::AbstractMigrationWorker<DerivedT>::operator()(
   } else {
     ConcurrentWorker<DerivedT>::master()->JobFailed(data);
   }
+}
+
+
+template<class DerivedT>
+bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CollectAndAggregateStatistics(
+  PendingCatalog *data) const
+{
+  if (!collect_catalog_statistics_) {
+    return true;
+  }
+
+  const Catalog *new_catalog = (data->HasNew()) ? data->new_catalog
+                                                : data->old_catalog;
+  const Database &writable = new_catalog->database();
+  bool retval;
+
+  // Find out the discrepancy between MAX(rowid) and COUNT(*)
+  Sql wasted_inodes(writable,
+    "SELECT COUNT(*), MAX(rowid) FROM catalog;");
+  retval = wasted_inodes.FetchRow();
+  if (! retval) {
+    Error("Failed to count entries in catalog", wasted_inodes, data);
+    return false;
+  }
+  const unsigned int entry_count = wasted_inodes.RetrieveInt64(0);
+  const unsigned int max_row_id  = wasted_inodes.RetrieveInt64(1);
+
+  // Save collected information into the central statistics aggregator
+  data->statistics.root_path   = data->root_path();
+  data->statistics.max_row_id  = max_row_id;
+  data->statistics.entry_count = entry_count;
+
+  return true;
 }
 
 
@@ -1258,37 +1292,6 @@ bool CommandMigrate::MigrationWorker_20x::CommitDatabaseTransaction(
 {
   assert(data->HasNew());
   data->new_catalog->Commit();
-  return true;
-}
-
-
-bool CommandMigrate::MigrationWorker_20x::CollectAndAggregateStatistics(
-  PendingCatalog *data) const
-{
-  assert(data->HasNew());
-  if (!collect_catalog_statistics_) {
-    return true;
-  }
-
-  const Database &writable = data->new_catalog->database();
-  bool retval;
-
-  // Find out the discrepancy between MAX(rowid) and COUNT(*)
-  Sql wasted_inodes(writable,
-    "SELECT COUNT(*), MAX(rowid) FROM old.catalog;");
-  retval = wasted_inodes.FetchRow();
-  if (! retval) {
-    Error("Failed to count entries in catalog", wasted_inodes, data);
-    return false;
-  }
-  const unsigned int entry_count = wasted_inodes.RetrieveInt64(0);
-  const unsigned int max_row_id  = wasted_inodes.RetrieveInt64(1);
-
-  // Save collected information into the central statistics aggregator
-  data->statistics.root_path   = data->root_path();
-  data->statistics.max_row_id  = max_row_id;
-  data->statistics.entry_count = entry_count;
-
   return true;
 }
 
