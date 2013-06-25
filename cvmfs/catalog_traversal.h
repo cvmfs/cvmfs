@@ -34,7 +34,7 @@ namespace swissknife {
  * TODO: Use the Observable template buried in Pull Request 46 instead of imple-
  *       menting your own callback infrastructure here.
  */
-template<class T>
+template<class T, class CatalogT = catalog::Catalog>
 class CatalogTraversal {
  public:
   /**
@@ -180,10 +180,10 @@ class CatalogTraversal {
     }
 
     // Open the catalog
-    catalog::Catalog *catalog = catalog::Catalog::AttachFreely(job.path,
-                                                               tmp_file,
-                                                               job.hash,
-                                                               job.parent);
+    catalog::Catalog *catalog = CatalogT::AttachFreely(job.path,
+                                                       tmp_file,
+                                                       job.hash,
+                                                       job.parent);
     if (!no_close_) {
       unlink(tmp_file.c_str());
     }
