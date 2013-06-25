@@ -498,7 +498,8 @@ template<class DerivedT>
 void CommandMigrate::AbstractMigrationWorker<DerivedT>::operator()(
                                                     const expected_data &data) {
   migration_stopwatch_.Start();
-  const bool success = static_cast<DerivedT*>(this)->RunMigration(data);
+  const bool success = static_cast<DerivedT*>(this)->RunMigration(data) &&
+                       CleanupNestedCatalogs(data);
   data->success = success;
   migration_stopwatch_.Stop();
 
@@ -511,6 +512,23 @@ void CommandMigrate::AbstractMigrationWorker<DerivedT>::operator()(
   } else {
     ConcurrentWorker<DerivedT>::master()->JobFailed(data);
   }
+}
+
+
+template<class DerivedT>
+bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
+  PendingCatalog *data) const
+{
+  // All nested catalogs of PendingCatalog 'data' are fully processed and
+  // accounted. It is safe to get rid of their data structures here!
+  PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
+  PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
+  for (; i != iend; ++i) {
+    delete *i;
+  }
+
+  data->nested_catalogs.clear();
+  return true;
 }
 
 
@@ -1286,22 +1304,6 @@ bool CommandMigrate::MigrationWorker_20x::DetachOldCatalogDatabase(
     Error("Failed to detach old catalog database.", detach_old_catalog, data);
     return false;
   }
-  return true;
-}
-
-
-bool CommandMigrate::MigrationWorker_20x::CleanupNestedCatalogs(
-  PendingCatalog *data) const
-{
-  // All nested catalogs of PendingCatalog 'data' are fully processed and
-  // accounted. It is safe to get rid of their data structures here!
-  PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
-  PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
-  for (; i != iend; ++i) {
-    delete *i;
-  }
-
-  data->nested_catalogs.clear();
   return true;
 }
 
