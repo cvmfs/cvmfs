@@ -23,22 +23,19 @@ const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string     &root_path,
-                      const string     &file,
-                      const hash::Any  &catalog_hash,
-                            Catalog    *parent) {
+Catalog* Catalog::AttachFreely(const string     &root_path,
+                               const string     &file,
+                               const hash::Any  &catalog_hash,
+                                     Catalog    *parent) {
   Catalog *catalog =
     new Catalog(PathString(root_path.data(), root_path.length()),
                 catalog_hash,
                 parent);
-  bool retval = catalog->OpenDatabase(file);
-  if (!retval) {
+  const bool successful_init = catalog->InitStandalone(file);
+  if (!successful_init) {
     delete catalog;
     return NULL;
   }
-  InodeRange inode_range;
-  inode_range.MakeDummy();
-  catalog->set_inode_range(inode_range);
   return catalog;
 }
 
@@ -104,6 +101,19 @@ void Catalog::FinalizePreparedStatements() {
   delete sql_lookup_inode_;
   delete sql_lookup_nested_;
   delete sql_list_nested_;
+}
+
+
+bool Catalog::InitStandalone(const std::string &database_file) {
+  bool retval = OpenDatabase(database_file);
+  if (!retval) {
+    return false;
+  }
+
+  InodeRange inode_range;
+  inode_range.MakeDummy();
+  set_inode_range(inode_range);
+  return true;
 }
 
 

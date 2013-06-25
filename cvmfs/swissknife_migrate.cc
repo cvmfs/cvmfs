@@ -552,7 +552,7 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
 
   // Attach the just created nested catalog database
   WritableCatalog *writable_catalog =
-    AttachFreelyRw(root_path, catalog_db, hash::Any(hash::kSha1));
+    WritableCatalog::AttachFreely(root_path, catalog_db, hash::Any(hash::kSha1));
   if (writable_catalog == NULL) {
     Error("Failed to open database for new catalog");
     unlink(catalog_db.c_str());

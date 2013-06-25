@@ -96,6 +96,11 @@ class Catalog : public SingleCopy {
                 Catalog     *parent);
   virtual ~Catalog();
 
+  static Catalog *AttachFreely(const std::string  &root_path,
+                               const std::string  &file,
+                               const hash::Any    &catalog_hash,
+                                     Catalog      *parent = NULL);
+
   bool OpenDatabase(const std::string &db_path);
 
   bool LookupInode(const inode_t inode,
@@ -170,6 +175,8 @@ class Catalog : public SingleCopy {
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
   mutable HardlinkGroupMap hardlink_groups_;
 
+  bool InitStandalone(const std::string &database_file);
+
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
    */
@@ -229,11 +236,6 @@ class Catalog : public SingleCopy {
   SqlAllChunks             *sql_all_chunks_;
   SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
-
-Catalog *AttachFreely(const std::string  &root_path,
-                      const std::string  &file,
-                      const hash::Any    &catalog_hash,
-                            Catalog      *parent = NULL);
 
 }  // namespace catalog
 
