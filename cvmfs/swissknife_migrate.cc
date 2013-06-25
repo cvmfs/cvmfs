@@ -1345,6 +1345,7 @@ bool CommandMigrate::MigrationWorker_217::RunMigration(PendingCatalog *data) con
 
 bool CommandMigrate::MigrationWorker_217::CheckDatabaseSchemaCompatibility
                                                   (PendingCatalog *data) const {
+  assert(!data->HasNew());
   const catalog::Database &old_catalog = data->old_catalog->database();
 
   if ((old_catalog.schema_version() < 2.4 - Database::kSchemaEpsilon) ||
@@ -1360,6 +1361,7 @@ bool CommandMigrate::MigrationWorker_217::CheckDatabaseSchemaCompatibility
 
 bool CommandMigrate::MigrationWorker_217::StartDatabaseTransaction
                                                   (PendingCatalog *data) const {
+  assert(!data->HasNew());
   GetWritable(data->old_catalog)->Transaction();
   return true;
 }
@@ -1367,6 +1369,7 @@ bool CommandMigrate::MigrationWorker_217::StartDatabaseTransaction
 
 bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
                                                   (PendingCatalog *data) const {
+  assert(!data->HasNew());
   bool retval = false;
   const Database &writable = GetWritable(data->old_catalog)->database();
 
@@ -1444,6 +1447,7 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
 
 bool CommandMigrate::MigrationWorker_217::CommitDatabaseTransaction
                                                   (PendingCatalog *data) const {
+  assert(!data->HasNew());
   GetWritable(data->old_catalog)->Commit();
   return true;
 }
