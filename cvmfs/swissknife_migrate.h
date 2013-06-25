@@ -168,6 +168,23 @@ class CommandMigrate : public Command {
     const gid_t gid_;
   };
 
+  class MigrationWorker_217 : public AbstractMigrationWorker<MigrationWorker_217> {
+    friend class AbstractMigrationWorker<MigrationWorker_217>;
+
+   public:
+    MigrationWorker_217(const worker_context *context);
+
+   protected:
+    bool RunMigration(PendingCatalog *data) const;
+
+    bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
+    bool StartDatabaseTransaction         (PendingCatalog *data) const;
+    bool GenerateNewStatisticsCounters    (PendingCatalog *data) const;
+    bool CommitDatabaseTransaction        (PendingCatalog *data) const;
+
+    catalog::WritableCatalog* GetWritable(const catalog::Catalog *catalog) const;
+  };
+
  public:
   CommandMigrate();
   ~CommandMigrate() { };
