@@ -1336,10 +1336,6 @@ CommandMigrate::MigrationWorker_217::MigrationWorker_217(
 
 
 bool CommandMigrate::MigrationWorker_217::RunMigration(PendingCatalog *data) const {
-  data->new_catalog = static_cast<WritableCatalog*>(
-                        const_cast<Catalog*>(data->old_catalog)
-                      );
-
   return CheckDatabaseSchemaCompatibility (data) &&
          StartDatabaseTransaction         (data) &&
          GenerateNewStatisticsCounters    (data) &&
@@ -1364,7 +1360,7 @@ bool CommandMigrate::MigrationWorker_217::CheckDatabaseSchemaCompatibility
 
 bool CommandMigrate::MigrationWorker_217::StartDatabaseTransaction
                                                   (PendingCatalog *data) const {
-  data->new_catalog->Transaction();
+  GetWritable(data->old_catalog)->Transaction();
   return true;
 }
 
@@ -1372,7 +1368,7 @@ bool CommandMigrate::MigrationWorker_217::StartDatabaseTransaction
 bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
                                                   (PendingCatalog *data) const {
   bool retval = false;
-  const Database &writable = data->new_catalog->database();
+  const Database &writable = GetWritable(data->old_catalog)->database();
 
   // Aggregated the statistics counters of all nested catalogs
   // Note: we might need to wait until nested catalogs are sucessfully processed
@@ -1448,6 +1444,13 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
 
 bool CommandMigrate::MigrationWorker_217::CommitDatabaseTransaction
                                                   (PendingCatalog *data) const {
-  data->new_catalog->Commit();
+  GetWritable(data->old_catalog)->Commit();
   return true;
 }
+
+
+WritableCatalog* CommandMigrate::MigrationWorker_217::GetWritable(
+                                                 const Catalog *catalog) const {
+  return dynamic_cast<WritableCatalog*>(const_cast<Catalog*>(catalog));
+}
+
