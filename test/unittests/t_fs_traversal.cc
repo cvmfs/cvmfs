@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <ftw.h>
+#include <errno.h>
 
 #include <string>
 #include <sstream>
