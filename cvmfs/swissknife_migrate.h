@@ -108,6 +108,7 @@ class CommandMigrate : public Command {
    protected:
     bool RunMigration(PendingCatalog *data) const { return false; }
 
+    bool UpdateNestedCatalogReferences (PendingCatalog *data) const;
     bool CleanupNestedCatalogs         (PendingCatalog *data) const;
     bool CollectAndAggregateStatistics (PendingCatalog *data) const;
 
@@ -153,7 +154,7 @@ class CommandMigrate : public Command {
     bool StartDatabaseTransaction         (PendingCatalog *data) const;
     bool MigrateFileMetadata              (PendingCatalog *data) const;
     bool AnalyzeFileLinkcounts            (PendingCatalog *data) const;
-    bool MigrateNestedCatalogReferences   (PendingCatalog *data) const;
+    bool MigrateNestedCatalogMountPoints  (PendingCatalog *data) const;
     bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;
     bool FindRootEntryInformation         (PendingCatalog *data) const;
