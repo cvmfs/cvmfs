@@ -174,7 +174,7 @@ class CatalogTraversal {
     // Load a catalog
     std::string tmp_file;
     if (!FetchCatalog(job.hash, &tmp_file)) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to load catalog %s",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
@@ -188,7 +188,7 @@ class CatalogTraversal {
       unlink(tmp_file.c_str());
     }
     if (catalog == NULL) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to open catalog %s",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to open catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
@@ -294,7 +294,7 @@ class CatalogTraversal {
     download::Failures retval = download::Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to download catalog %s (%d)",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);
       return false;
     }
