@@ -1217,8 +1217,6 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
     "SELECT count(*) FROM catalog WHERE flags & :flag_link;");
   Sql count_directories(writable,
     "SELECT count(*) FROM catalog WHERE flags & :flag_dir;");
-  Sql count_nested_clgs(writable,
-    "SELECT count(*) FROM nested_catalogs;");
   Sql aggregate_file_size(writable,
     "SELECT sum(size) FROM catalog WHERE  flags & :flag_file "
     "                                     AND NOT flags & :flag_link");
@@ -1246,12 +1244,6 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
     Error("Failed to count directories.", count_directories, data);
     return false;
   }
-  retval = count_nested_clgs.Execute();
-  if (!retval) {
-    Error("Failed to count nested catalog references.",
-          count_nested_clgs, data);
-    return false;
-  }
   retval =
     aggregate_file_size.BindInt64(1, SqlDirent::kFlagFile) &&
     aggregate_file_size.BindInt64(2, SqlDirent::kFlagLink) &&
@@ -1265,7 +1257,7 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   stats_counters.self.regular_files    = count_regular_files.RetrieveInt64(0);
   stats_counters.self.symlinks         = count_symlinks.RetrieveInt64(0);
   stats_counters.self.directories      = count_directories.RetrieveInt64(0);
-  stats_counters.self.nested_catalogs  = count_nested_clgs.RetrieveInt64(0);
+  stats_counters.self.nested_catalogs  = data->nested_catalogs.size();
   stats_counters.self.file_size        = aggregate_file_size.RetrieveInt64(0);
 
   // Write back the generated statistics counters into the catalog database
