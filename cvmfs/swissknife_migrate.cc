@@ -66,21 +66,19 @@ static void Error(const std::string &message) {
 
 static void Error(const std::string                     &message,
                   const CommandMigrate::PendingCatalog  *catalog) {
-  std::stringstream ss;
-  ss << message << std::endl
-     << "Catalog: " << catalog->root_path();
-  Error(ss.str());
+  const std::string err_msg = message + "\n"
+                              "Catalog: " + catalog->root_path();
+  Error(err_msg);
 }
 
 
 static void Error(const std::string                     &message,
                   const catalog::Sql                    &statement,
                   const CommandMigrate::PendingCatalog  *catalog) {
-  std::stringstream ss;
-  ss << message << std::endl
-     << "SQLite:  " << statement.GetLastError() << " - "
-                    << statement.GetLastErrorMsg();
-  Error(ss.str(), catalog);
+  const std::string err_msg = message + "\n"
+                              "SQLite: " + StringifyInt(statement.GetLastError()) +
+                              " - "      + statement.GetLastErrorMsg();
+  Error(err_msg, catalog);
 }
 
 
@@ -162,16 +160,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
       Error("Please provide a group ID");
       return 1;
     }
-    std::istringstream uid_ss(uid); uid_ss >> uid_;
-    if (uid_ss.fail()) {
-      Error("Failed to parse user ID");
-      return 1;
-    }
-    std::istringstream gid_ss(gid); gid_ss >> gid_;
-    if (gid_ss.fail()) {
-      Error("Failed to parse group ID");
-      return 1;
-    }
+
+    uid_ = String2Int64(uid);
+    gid_ = String2Int64(gid);
 
     // Generate and upload a nested catalog marker
     if (! GenerateNestedCatalogMarkerChunk()) {
@@ -190,9 +181,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_20x>(context, manifest_path);
   } else {
-    std::stringstream ss;
-    ss << "Unknown migration base: " << migration_base;
-    Error(ss.str());
+    const std::string err_msg = "Unknown migration base: " + migration_base;
+    Error(err_msg);
     return 1;
   }
 
