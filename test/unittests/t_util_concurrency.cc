@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <errno.h>
 
 #include "../../cvmfs/util_concurrency.h"
 
