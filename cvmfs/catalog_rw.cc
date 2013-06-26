@@ -37,19 +37,17 @@ WritableCatalog::WritableCatalog(const string     &path,
 }
 
 
-WritableCatalog *AttachFreelyRw(const string     &root_path,
-                                const string     &file,
-                                const hash::Any  &catalog_hash) {
+WritableCatalog *WritableCatalog::AttachFreely(const string     &root_path,
+                                               const string     &file,
+                                               const hash::Any  &catalog_hash,
+                                                     Catalog    *parent) {
   WritableCatalog *catalog =
-    new WritableCatalog(root_path, catalog_hash, NULL);
-  bool retval = catalog->OpenDatabase(file);
-  if (!retval) {
+    new WritableCatalog(root_path, catalog_hash, parent);
+  const bool successful_init = catalog->InitStandalone(file);
+  if (!successful_init) {
     delete catalog;
     return NULL;
   }
-  InodeRange inode_range;
-  inode_range.MakeDummy();
-  catalog->set_inode_range(inode_range);
   return catalog;
 }
 

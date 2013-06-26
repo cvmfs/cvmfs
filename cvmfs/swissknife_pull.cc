@@ -173,7 +173,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     goto pull_cleanup;
   }
 
-  catalog = catalog::AttachFreely(path, file_catalog, catalog_hash);
+  catalog = catalog::Catalog::AttachFreely(path, file_catalog, catalog_hash);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to attach catalog %s",
              catalog_hash.ToString().c_str());

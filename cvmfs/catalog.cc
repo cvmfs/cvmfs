@@ -23,22 +23,19 @@ const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string     &root_path,
-                      const string     &file,
-                      const hash::Any  &catalog_hash,
-                            Catalog    *parent) {
+Catalog* Catalog::AttachFreely(const string     &root_path,
+                               const string     &file,
+                               const hash::Any  &catalog_hash,
+                                     Catalog    *parent) {
   Catalog *catalog =
     new Catalog(PathString(root_path.data(), root_path.length()),
                 catalog_hash,
                 parent);
-  bool retval = catalog->OpenDatabase(file);
-  if (!retval) {
+  const bool successful_init = catalog->InitStandalone(file);
+  if (!successful_init) {
     delete catalog;
     return NULL;
   }
-  InodeRange inode_range;
-  inode_range.MakeDummy();
-  catalog->set_inode_range(inode_range);
   return catalog;
 }
 
@@ -109,6 +106,19 @@ void Catalog::FinalizePreparedStatements() {
 }
 
 
+bool Catalog::InitStandalone(const std::string &database_file) {
+  bool retval = OpenDatabase(database_file);
+  if (!retval) {
+    return false;
+  }
+
+  InodeRange inode_range;
+  inode_range.MakeDummy();
+  set_inode_range(inode_range);
+  return true;
+}
+
+
 /**
  * Establishes the database structures and opens the sqlite database file.
  * @param db_path the absolute path to the database file on local file system
@@ -153,7 +163,17 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   // Read Catalog Counter Statistics
-  counters_.ReadFromDatabase(database());
+  const bool statistics_loaded =
+    (database().schema_version() < Database::kLatestSupportedSchema -
+                                   Database::kSchemaEpsilon)
+      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
+      : counters_.ReadFromDatabase(database());
+  if (! statistics_loaded) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to load statistics counters for catalog %s (file %s)",
+             root_prefix_.c_str(), db_path.c_str());
+    return false;
+  }
 
   if (!IsRoot()) {
     parent_->AddChild(this);
