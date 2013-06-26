@@ -189,11 +189,6 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                                 gid_);
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_20x>(context, manifest_path);
-  } else if (migration_base == "2.1.7") {
-    MigrationWorker_217::worker_context context(spooler_definition.temporary_path,
-                                                collect_catalog_statistics);
-    migration_succeeded =
-      DoMigrationAndCommit<MigrationWorker_217>(context, manifest_path);
   } else {
     std::stringstream ss;
     ss << "Unknown migration base: " << migration_base;
@@ -1340,14 +1335,3 @@ bool CommandMigrate::MigrationWorker_20x::DetachOldCatalogDatabase(
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 //
 
-
-CommandMigrate::MigrationWorker_217::MigrationWorker_217(
-                                                const worker_context *context) :
-  AbstractMigrationWorker(context) {
-
-}
-
-
-void CommandMigrate::MigrationWorker_217::operator()(const expected_data &data) {
-
-}
