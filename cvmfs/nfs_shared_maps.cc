@@ -225,6 +225,9 @@ string GetStatistics() {
 
 static int BusyHandler(void *data, int attempt) {
   BusyHandlerInfo *handler_info = static_cast<BusyHandlerInfo *>(data);
+  // Reset the accumulated time if this is the start of a new request
+  if (attempt == 0)
+    handler_info->accumulated_ms = 0;
   LogCvmfs(kLogNfsMaps, kLogDebug,
            "busy handler, attempt %d, accumulated waiting time %u",
            attempt, handler_info->accumulated_ms);
