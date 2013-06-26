@@ -20,8 +20,8 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-const float Database::kLatestSchema = 2.4;
-const float Database::kLatestSupportedSchema = 2.4;  // + 1.X catalogs (r/o)
+const float Database::kLatestSchema = 2.5;
+const float Database::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
 const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
 
 
@@ -94,8 +94,10 @@ Database::Database(const std::string filename,
   }
   LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f",
            schema_version_);
-  if ((schema_version_ >= 2.0-kSchemaEpsilon) &&
-      (schema_version_ < kLatestSupportedSchema-kSchemaEpsilon))
+  if ( (schema_version_ >= 2.0-kSchemaEpsilon)                   &&
+       (!CompareSchema(schema_version_, kLatestSupportedSchema)) &&
+       (!CompareSchema(schema_version_, 2.4)           ||
+        !CompareSchema(kLatestSupportedSchema, 2.5)) )
   {
     LogCvmfs(kLogCatalog, kLogDebug, "schema version %f not supported (%s)",
              schema_version_, filename.c_str());
