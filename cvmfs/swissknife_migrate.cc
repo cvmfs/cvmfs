@@ -358,7 +358,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 
     // The catalog is completely processed... fill the hash-future to allow the
     // processing of parent catalogs
-    // NOTE: From now on, this PendingCatalog structure cound be deleted and
+    // NOTE: From now on, this PendingCatalog structure could be deleted and
     //       should not be used anymore!
     catalog->new_catalog_hash.Set(result.content_hash);
   }
