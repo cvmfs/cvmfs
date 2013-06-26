@@ -1376,12 +1376,6 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
   // Aggregated the statistics counters of all nested catalogs
   // Note: we might need to wait until nested catalogs are sucessfully processed
   DeltaCounters stats_counters;
-  retval = stats_counters.ReadFromDatabase(writable, LegacyMode::kLegacy);
-  if (!retval) {
-    Error("Failed to read legacy catalog statistics counters", data);
-    return false;
-  }
-
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
@@ -1430,7 +1424,14 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
   stats_counters.self.file_size         = aggregate_file_size.RetrieveInt64(0);
 
   // Write back the generated statistics counters into the catalog database
-  retval = stats_counters.InsertIntoDatabase(writable);
+  Counters counters;
+  retval = counters.ReadFromDatabase(writable, LegacyMode::kLegacy);
+  if (!retval) {
+    Error("Failed to read old catalog statistics counters", data);
+    return false;
+  }
+  counters.ApplyDelta(stats_counters);
+  retval = counters.InsertIntoDatabase(writable);
   if (!retval) {
     Error("Failed to write new statistics counters to database", data);
     return false;
