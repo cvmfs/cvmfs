@@ -358,7 +358,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 
     // The catalog is completely processed... fill the hash-future to allow the
     // processing of parent catalogs
-    // NOTE: From now on, this PendingCatalog structure cound be deleted and
+    // NOTE: From now on, this PendingCatalog structure could be deleted and
     //       should not be used anymore!
     catalog->new_catalog_hash.Set(result.content_hash);
   }
@@ -1215,21 +1215,21 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   retval =
     count_regular_files.BindInt64(1, SqlDirent::kFlagFile) &&
     count_regular_files.BindInt64(2, SqlDirent::kFlagLink) &&
-    count_regular_files.Execute();
+    count_regular_files.FetchRow();
   if (!retval) {
     Error("Failed to count regular files.", count_regular_files, data);
     return false;
   }
   retval =
     count_symlinks.BindInt64(1, SqlDirent::kFlagLink) &&
-    count_symlinks.Execute();
+    count_symlinks.FetchRow();
   if (!retval) {
     Error("Failed to count symlinks.", count_symlinks, data);
     return false;
   }
   retval =
     count_directories.BindInt64(1, SqlDirent::kFlagDir) &&
-    count_directories.Execute();
+    count_directories.FetchRow();
   if (!retval) {
     Error("Failed to count directories.", count_directories, data);
     return false;
@@ -1237,7 +1237,7 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   retval =
     aggregate_file_size.BindInt64(1, SqlDirent::kFlagFile) &&
     aggregate_file_size.BindInt64(2, SqlDirent::kFlagLink) &&
-    aggregate_file_size.Execute();
+    aggregate_file_size.FetchRow();
   if (!retval) {
     Error("Failed to aggregate the file sizes.", aggregate_file_size, data);
     return false;
@@ -1316,4 +1316,134 @@ bool CommandMigrate::MigrationWorker_20x::DetachOldCatalogDatabase(
 //
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 //
+
+
+CommandMigrate::MigrationWorker_217::MigrationWorker_217(
+                                                const worker_context *context) :
+  AbstractMigrationWorker(context) {
+
+}
+
+
+bool CommandMigrate::MigrationWorker_217::RunMigration(PendingCatalog *data) const {
+  return CheckDatabaseSchemaCompatibility (data) &&
+         StartDatabaseTransaction         (data) &&
+         GenerateNewStatisticsCounters    (data) &&
+         CommitDatabaseTransaction        (data);
+}
+
+
+bool CommandMigrate::MigrationWorker_217::CheckDatabaseSchemaCompatibility
+                                                  (PendingCatalog *data) const {
+  assert(!data->HasNew());
+  const catalog::Database &old_catalog = data->old_catalog->database();
+
+  if ((old_catalog.schema_version() < 2.4 - Database::kSchemaEpsilon) ||
+      (old_catalog.schema_version() > 2.4 + Database::kSchemaEpsilon))
+  {
+    Error("Given Catalog is not Schema 2.4.", data);
+    return false;
+  }
+
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker_217::StartDatabaseTransaction
+                                                  (PendingCatalog *data) const {
+  assert(!data->HasNew());
+  GetWritable(data->old_catalog)->Transaction();
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
+                                                  (PendingCatalog *data) const {
+  assert(!data->HasNew());
+  bool retval = false;
+  const Database &writable = GetWritable(data->old_catalog)->database();
+
+  // Aggregated the statistics counters of all nested catalogs
+  // Note: we might need to wait until nested catalogs are sucessfully processed
+  DeltaCounters stats_counters;
+  PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
+  PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
+  for (; i != iend; ++i) {
+    const PendingCatalog *nested_catalog = *i;
+    const catalog::DeltaCounters &s = nested_catalog->nested_statistics.Get();
+    s.PopulateToParent(stats_counters);
+  }
+
+  // Count various directory entry types in the catalog to fill up the catalog
+  // statistics counters introduced in the current catalog schema
+  Sql count_chunked_files(writable,
+    "SELECT count(*), sum(size) FROM catalog "
+    "                WHERE flags & :flag_chunked_file;");
+  Sql count_file_chunks(writable,
+    "SELECT count(*) FROM chunks;");
+  Sql aggregate_file_size(writable,
+    "SELECT sum(size) FROM catalog WHERE  flags & :flag_file "
+    "                                     AND NOT flags & :flag_link;");
+
+  // Run the actual counting queries
+  retval =
+    count_chunked_files.BindInt64(1, SqlDirent::kFlagFileChunk) &&
+    count_chunked_files.FetchRow();
+  if (!retval) {
+    Error("Failed to count chunked files.", count_chunked_files, data);
+    return false;
+  }
+  retval = count_file_chunks.FetchRow();
+  if (!retval) {
+    Error("Failed to count file chunks", count_file_chunks, data);
+    return false;
+  }
+  retval =
+    aggregate_file_size.BindInt64(1, SqlDirent::kFlagFile) &&
+    aggregate_file_size.BindInt64(2, SqlDirent::kFlagLink) &&
+    aggregate_file_size.FetchRow();
+  if (!retval) {
+    Error("Failed to aggregate the file sizes.", aggregate_file_size, data);
+    return false;
+  }
+
+  // Insert the counted statistics into the DeltaCounters data structure
+  stats_counters.self.chunked_files     = count_chunked_files.RetrieveInt64(0);
+  stats_counters.self.chunked_file_size = count_chunked_files.RetrieveInt64(1);
+  stats_counters.self.file_chunks       = count_file_chunks.RetrieveInt64(0);
+  stats_counters.self.file_size         = aggregate_file_size.RetrieveInt64(0);
+
+  // Write back the generated statistics counters into the catalog database
+  Counters counters;
+  retval = counters.ReadFromDatabase(writable, LegacyMode::kLegacy);
+  if (!retval) {
+    Error("Failed to read old catalog statistics counters", data);
+    return false;
+  }
+  counters.ApplyDelta(stats_counters);
+  retval = counters.InsertIntoDatabase(writable);
+  if (!retval) {
+    Error("Failed to write new statistics counters to database", data);
+    return false;
+  }
+
+  // Push the generated statistics counters up to the parent catalog
+  data->nested_statistics.Set(stats_counters);
+
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker_217::CommitDatabaseTransaction
+                                                  (PendingCatalog *data) const {
+  assert(!data->HasNew());
+  GetWritable(data->old_catalog)->Commit();
+  return true;
+}
+
+
+WritableCatalog* CommandMigrate::MigrationWorker_217::GetWritable(
+                                                 const Catalog *catalog) const {
+  return dynamic_cast<WritableCatalog*>(const_cast<Catalog*>(catalog));
+}
 
