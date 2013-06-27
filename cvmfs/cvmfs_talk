@@ -55,6 +55,7 @@ sub usage {
   print "  pid cachemgr           gets the pid of the shared cache manager \n";
   print "  pid watchdog           gets the pid of the crash handler process\n";
   print "  parameters             dumps the effective parameters           \n";
+  print "  reset error counters   resets the counter for I/O errors        \n";
   print "  hotpatch history       shows timestamps and version info of     \n";
   print "                         loaded (hotpatched) Fuse modules         \n";
   print "  version                gets cvmfs version                       \n";
