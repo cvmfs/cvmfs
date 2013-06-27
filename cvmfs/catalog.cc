@@ -163,7 +163,17 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   // Read Catalog Counter Statistics
-  counters_.ReadFromDatabase(database());
+  const bool statistics_loaded =
+    (database().schema_version() < Database::kLatestSupportedSchema -
+                                   Database::kSchemaEpsilon)
+      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
+      : counters_.ReadFromDatabase(database());
+  if (! statistics_loaded) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to load statistics counters for catalog %s (file %s)",
+             root_prefix_.c_str(), db_path.c_str());
+    return false;
+  }
 
   if (!IsRoot()) {
     parent_->AddChild(this);

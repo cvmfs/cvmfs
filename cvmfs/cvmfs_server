@@ -2260,7 +2260,7 @@ migrate_2_1_7() {
   local name=$name
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
 
   echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string '2.1.12')"
 
@@ -2273,6 +2273,33 @@ migrate_2_1_7() {
     echo "Failed!"
     false
   fi
+
+  echo "--> analyzing file catalogs for addtional statistics counters"
+  local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  local new_manifest="${temp_dir}/new_manifest"
+
+  cvmfs_swissknife migrate \
+    -v "2.1.7" \
+    -r ${CVMFS_STRATUM0} \
+    -n $name \
+    -u ${CVMFS_UPSTREAM_STORAGE} \
+    -t $temp_dir \
+    -o $new_manifest \
+    -k /etc/cvmfs/keys/$name.pub \
+    -s || die "fail!"
+  chown ${CVMFS_USER} $new_manifest
+
+  # sign new (migrated) repository revision
+  echo -n "Signing newly imported Repository... "
+  create_whitelist $name ${CVMFS_USER} ${CVMFS_UPSTREAM_STORAGE} $temp_dir > /dev/null
+  sudo -H -u ${CVMFS_USER} sh -c "cvmfs_swissknife sign \
+    -c /etc/cvmfs/keys/$name.crt \
+    -k /etc/cvmfs/keys/$name.key \
+    -n $name \
+    -m $new_manifest \
+    -t $temp_dir \
+    -r ${CVMFS_UPSTREAM_STORAGE}" > /dev/null || die "fail! (cannot sign repo)"
+  echo "done"
 
   echo "--> updating server.conf"
   sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=2.1.12/" /etc/cvmfs/repositories.d/$name/server.conf

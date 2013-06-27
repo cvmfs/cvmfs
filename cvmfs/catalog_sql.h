@@ -55,6 +55,11 @@ class Database {
   static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
   static const float kSchemaEpsilon;  // floats get imprecise in SQlite
 
+  static bool CompareSchema(const float value, const float compare) {
+    return (value > compare - kSchemaEpsilon &&
+            value < compare + kSchemaEpsilon);
+  }
+
   Database(const std::string filename, const sqlite::DbOpenMode open_mode);
   ~Database();
   static bool Create(const std::string &filename,
