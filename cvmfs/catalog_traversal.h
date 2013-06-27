@@ -27,14 +27,14 @@ namespace swissknife {
  *       file size, each catalog is loaded, processed and removed immediately
  *       afterwards.
  *
- * CAUTION: currently the Catalog* pointer passed into the callback becomes in-
- *          valid directly after the callback method returns. Therefore you
- *          MUST NOT store it for later use.
+ * CAUTION: the Catalog* pointer passed into the callback becomes invalid
+ *          directly after the callback method returns, unless you create the
+ *          CatalogTraversal object with no_close = true.
  *
  * TODO: Use the Observable template buried in Pull Request 46 instead of imple-
  *       menting your own callback infrastructure here.
  */
-template<class T>
+template<class T, class CatalogT = catalog::Catalog>
 class CatalogTraversal {
  public:
   /**
@@ -174,21 +174,21 @@ class CatalogTraversal {
     // Load a catalog
     std::string tmp_file;
     if (!FetchCatalog(job.hash, &tmp_file)) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to load catalog %s",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
 
     // Open the catalog
-    catalog::Catalog *catalog = catalog::AttachFreely(job.path,
-                                                      tmp_file,
-                                                      job.hash,
-                                                      job.parent);
+    catalog::Catalog *catalog = CatalogT::AttachFreely(job.path,
+                                                       tmp_file,
+                                                       job.hash,
+                                                       job.parent);
     if (!no_close_) {
       unlink(tmp_file.c_str());
     }
     if (catalog == NULL) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to open catalog %s",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to open catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
@@ -294,7 +294,7 @@ class CatalogTraversal {
     download::Failures retval = download::Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to download catalog %s (%d)",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);
       return false;
     }

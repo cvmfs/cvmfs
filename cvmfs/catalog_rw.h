@@ -40,6 +40,11 @@ class WritableCatalog : public Catalog {
                   Catalog           *parent);
   virtual ~WritableCatalog();
 
+  static WritableCatalog *AttachFreely(const std::string &root_path,
+                                       const std::string &file,
+                                       const hash::Any   &catalog_hash,
+                                             Catalog     *parent = NULL);
+
   void Transaction();
   void Commit();
 
@@ -144,10 +149,6 @@ class WritableCatalog : public Catalog {
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
-
-WritableCatalog *AttachFreelyRw(const std::string &root_path,
-                                const std::string &file,
-                                const hash::Any   &catalog_hash);
 
 }  // namespace catalog
 
