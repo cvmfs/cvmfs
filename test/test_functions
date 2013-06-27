@@ -684,19 +684,31 @@ start_transaction() {
 # @param repo    the repository name to start the transaction in
 publish_repo() {
   local repo=$1
+  shift 1
+
+  # parse the command line arguments (keep quotation marks)
+  args=""
+  while [ $# -gt 0 ]; do
+    if echo $1 | grep -q "\s"; then
+      args="$args \"$1\""
+    else
+      args="$args $1"
+    fi
+    shift 1
+  done
 
   # enable the debug mode?
   # in debug mode we redirect output directly to the interactive shell,
   # overriding any redirections to logfiles or whatever... We want to hack!
   case $CVMFS_TEST_SRVDEBUG in
     fail)
-      cvmfs_server publish -d $repo > /dev/tty 2>&1 || return 100
+      cvmfs_server publish -d $args $repo > /dev/tty 2>&1 || return 100
     ;;
     startup)
-      cvmfs_server publish -D $repo > /dev/tty 2>&1 || return 100
+      cvmfs_server publish -D $args $repo > /dev/tty 2>&1 || return 100
     ;;
     *)
-      cvmfs_server publish $repo || return 100
+      cvmfs_server publish $args $repo || return 100
     ;;
   esac
 
