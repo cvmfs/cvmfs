@@ -1,4 +1,5 @@
 2.1.12:
+  * Fix timeouts in NFS shared maps
   * Add "import" command to cvmfs_server that transforms a 2.0
     repository into a 2.1 repository (Stratum 0)
   * Drastically improved performance of copying the inode
