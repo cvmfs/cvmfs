@@ -594,11 +594,11 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
 
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
                                                 const worker_context *context) :
-  AbstractMigrationWorker        (context),
-  fix_nested_catalog_transitions_(context->fix_nested_catalog_transitions),
-  analyze_file_linkcounts_       (context->analyze_file_linkcounts),
-  uid_                           (context->uid),
-  gid_                           (context->gid) { }
+  AbstractMigrationWorker<MigrationWorker_20x> (context),
+  fix_nested_catalog_transitions_              (context->fix_nested_catalog_transitions),
+  analyze_file_linkcounts_                     (context->analyze_file_linkcounts),
+  uid_                                         (context->uid),
+  gid_                                         (context->gid) { }
 
 
 bool CommandMigrate::MigrationWorker_20x::RunMigration(PendingCatalog *data) const {
@@ -1320,7 +1320,7 @@ bool CommandMigrate::MigrationWorker_20x::DetachOldCatalogDatabase(
 
 CommandMigrate::MigrationWorker_217::MigrationWorker_217(
                                                 const worker_context *context) :
-  AbstractMigrationWorker(context) {
+  AbstractMigrationWorker<MigrationWorker_217>(context) {
 
 }
 

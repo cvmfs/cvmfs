@@ -130,8 +130,8 @@ class CommandMigrate : public Command {
                      const bool          analyze_file_linkcounts,
                      const uid_t         uid,
                      const gid_t         gid) :
-        AbstractMigrationWorker::worker_context(temporary_directory,
-                                                collect_catalog_statistics),
+        AbstractMigrationWorker<MigrationWorker_20x>::worker_context(temporary_directory,
+                                                                     collect_catalog_statistics),
         fix_nested_catalog_transitions(fix_nested_catalog_transitions),
         analyze_file_linkcounts(analyze_file_linkcounts),
         uid(uid),
