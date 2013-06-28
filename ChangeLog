@@ -1,4 +1,5 @@
 2.1.12:
+  * Fix help text of cvmfs_talk
   * Fix timeouts in NFS shared maps
   * Add "import" command to cvmfs_server that transforms a 2.0
     repository into a 2.1 repository (Stratum 0)
