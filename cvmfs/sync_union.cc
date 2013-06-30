@@ -264,35 +264,7 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
   
   bool SyncUnionOverlayfs::IgnoreFilePredicate(const std::string &parent_dir,
                                                const std::string &filename) {
-    std::string path = scratch_path() + "/" + (parent_dir.empty() ? 
-					  filename : 
-					  (parent_dir + (filename.empty() ? 
-							 "" : 
-							 ("/" + filename))));
-    LogCvmfs(kLogUnion, kLogDebug, "overlayfs checking whether "
-	     "to ignore [%s]",
-	     path.c_str());
-    
-    if (IsOpaqueDirPath(path)) {
-      platform_stat64 info;
-      int retval = platform_lstat(path.c_str(), &info);
-      assert(retval == 0);
-      if (S_ISDIR(info.st_mode)) {
-	LogCvmfs(kLogUnion, kLogVerboseMsg, "overlayfs ignoring [%s] "
-		 "because it is an opaque dir",
-		 path.c_str());
-	return true;
-      } else {
-	LogCvmfs(kLogUnion, kLogVerboseMsg, "overlayfs not ignoring [%s] "
-		 "because although it has an "
-		 "opaque dir xattr, it is not "
-		 "a dir",
-		 path.c_str());
-	return false;
-      }
-    }
-    LogCvmfs(kLogUnion, kLogDebug, "overlayfs not ignoring [%s]",
-	     path.c_str());
+    // no files need to be ignored for overlayfs 
     return false;
   }
   
