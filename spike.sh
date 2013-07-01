@@ -2,7 +2,7 @@
 
 ramdisk_name="ramdisk"
 
-clang++ -o spike -O3 -std=c++11 -stdlib=libc++ -ltbb -ltbbmalloc -lz -lcrypto spike.cc cvmfs/logging.cc
+clang++ -o spike -O0 -g -std=c++11 -stdlib=libc++ -ltbb -ltbbmalloc -lz -lcrypto spike.cc cvmfs/logging.cc
 if [ $? -ne 0 ]; then
   exit 1
 fi

@@ -9,6 +9,9 @@
 #include <tbb/blocked_range.h>
 #include <tbb/tick_count.h>
 #include <tbb/scalable_allocator.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/compat/thread>
+#include <tbb/task.h>
 
 #include <zlib.h>
 
@@ -19,6 +22,13 @@
 using namespace tbb;
 
 static const std::string output_path = "/Volumes/ramdisk";
+
+void Print(const std::string &msg) {
+  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  pthread_mutex_lock(&mutex);
+  std::cout << msg << std::endl;
+  pthread_mutex_unlock(&mutex);
+}
 
 template<typename T, class A = std::allocator<T> >
 class Buffer {
@@ -90,15 +100,9 @@ typedef Buffer<unsigned char, scalable_allocator<unsigned char> > CharBuffer;
 
 class File {
  public:
-  explicit File(const std::string &path) : path_(path) {}
-  File(File &&other) noexcept :
-    uncompressed_buffer_(std::move(other.uncompressed_buffer())),
-    compressed_buffer_(std::move(other.compressed_buffer()))
-  {
-    path_                = std::move(other.path());
-    sha1_context_        = other.sha1_context();
-    sha1_                = std::move(other.sha1());
-  }
+  File() : path_(""), uncompressed_buffer_(NULL), compressed_buffer_(NULL) {}
+  explicit File(const std::string &path) :
+    path_(path) {}
 
   const std::string& path() const { return path_; }
 
@@ -106,6 +110,8 @@ class File {
   CharBuffer&  compressed_buffer()   { return compressed_buffer_;   }
   SHA_CTX&     sha1_context()        { return sha1_context_;        }
   std::string& sha1()                { return sha1_;                }
+
+  bool         IsDummy() const       { return path_.empty();        }
 
  public:
   bool Read() {
@@ -127,7 +133,7 @@ class File {
 
     // read the file chunk wise
     do {
-      const size_t read_bytes = fread(uncompressed_buffer_, 1, size, f);
+      const size_t read_bytes = fread(uncompressed_buffer_.ptr(), 1, size, f);
     } while(!feof(f) && !ferror(f));
 
     // close the file
@@ -151,7 +157,7 @@ class File {
     }
 
     // write buffer
-    const size_t written = fwrite(compressed_buffer_, 1,
+    const size_t written = fwrite(compressed_buffer_.ptr(), 1,
                                   compressed_buffer_.size(), f);
     if (written != compressed_buffer_.size()) {
       std::cout << "failed to write " << compressed_buffer_.size() << " bytes "
@@ -200,7 +206,7 @@ class File {
 
     SHA1_Init(&sha1_context_);
     SHA1_Update(&sha1_context_,
-                uncompressed_buffer_,
+                uncompressed_buffer_.ptr(),
                 uncompressed_buffer_.size());
     unsigned char sha[20];
     char sha_string[41];
@@ -219,11 +225,6 @@ class File {
     sha1_ = static_cast<char*>(sha_string);
   }
 
-  void Destroy() {
-    uncompressed_buffer_ = CharBuffer();
-    compressed_buffer_   = CharBuffer();
-  }
-
 
  private:
   std::string  path_;
@@ -235,34 +236,137 @@ class File {
 typedef std::vector<File> FileVector;
 
 
+class IoRequest {
+ public:
+  enum RequestType {
+    Read,
+    Write,
+    Terminate,
+    Unknown
+  };
+
+ public:
+  IoRequest(const RequestType type = Unknown, File *file = nullptr) :
+    type_(type), file_(file)
+  {
+    if (file != nullptr) {
+      assert (type == Read || type == Write);
+    } else {
+      assert (type == Terminate || type == Unknown);
+    }
+  }
+
+  IoRequest(const IoRequest &other) :
+    type_(other.type_), file_(other.file_) {}
+
+  bool        IsValid()      const { return type_ != Unknown;   }
+  bool        IsTerminator() const { return type_ == Terminate; }
+  File*       file()               { return file_;              }
+  RequestType type()         const { return type_;              }
+
+ private:
+  RequestType  type_;
+  File        *file_;
+};
+
+
 class TraversalDelegate {
  public:
-  TraversalDelegate() {}
+  TraversalDelegate(concurrent_bounded_queue<IoRequest> &io_queue) :
+    io_queue_(io_queue) {}
   ~TraversalDelegate() {}
 
   void FileCb(const std::string &relative_path,
               const std::string &file_name) {
     const std::string path = relative_path + "/" + file_name;
-    File file(path);
-    files_.push_back(std::move(file));
+    File *file = new File(path);
+    io_queue_.push(IoRequest(IoRequest::Read, file));
   }
 
-  FileVector& files() { return files_; }
-
  private:
-  FileVector files_;
+  concurrent_bounded_queue<IoRequest> &io_queue_;
 };
 
 
+class CruncherTask : public task {
+ public:
+  CruncherTask(File *file, concurrent_bounded_queue<IoRequest> &io_queue) :
+    file_(file), io_queue_(io_queue) {}
+
+  task* execute() {
+    //Print("crunching " + file_->path());
+    file_->Compress();
+    file_->Hash();
+    io_queue_.push(IoRequest(IoRequest::Write, file_));
+    return NULL;
+  }
+
+ private:
+  File                                 *file_;
+  concurrent_bounded_queue<IoRequest>  &io_queue_;
+};
+
+
+static void IO(concurrent_bounded_queue<IoRequest>  *io_queue,
+               task                                 *dummy_task) {
+
+  Print("hello from IO");
+
+  bool run = true;
+  task *crunch_task;
+
+  unsigned int files = 0;
+
+  while (run) {
+    IoRequest request;
+    io_queue->pop(request);
+
+    switch (request.type()) {
+      case IoRequest::Terminate:
+        run = false;
+        break;
+      case IoRequest::Read:
+        //Print("reading " + request.file()->path());
+        request.file()->Read();
+        crunch_task =
+          new(dummy_task->allocate_child()) CruncherTask(request.file(),
+                                                         *io_queue);
+        dummy_task->increment_ref_count();
+        dummy_task->spawn(*crunch_task);
+        ++files;
+        break;
+      case IoRequest::Write:
+        //Print("writing " + request.file()->path() + " (" + request.file()->sha1() + ")");
+        request.file()->Write();
+        delete request.file();
+        --files;
+        if (files == 0) {
+          dummy_task->decrement_ref_count();
+        }
+        break;
+      default:
+        assert (false);
+    }
+  }
+
+  Print("ciao from IO");
+}
+
+
 int main() {
-  TraversalDelegate delegate;
   tick_count start, end;
   tick_count all_start, all_end;
 
 
+  concurrent_bounded_queue<IoRequest> io_queue;
+  TraversalDelegate delegate(io_queue);
 
   all_start = tick_count::now();
 
+
+  task* dummy_task = new(task::allocate_root()) empty_task;
+  dummy_task->set_ref_count(2);
+  tbb_thread io_thread(IO, &io_queue, dummy_task);
 
 
   start = tick_count::now();
@@ -273,42 +377,51 @@ int main() {
   std::cout << "recursion took:   " << (end - start).seconds() << " seconds" << std::endl;
 
 
-
-  FileVector &files = delegate.files();
-
-
-  start = tick_count::now();
-  for (auto &file : files) {
-    file.Read();
-  }
-  end = tick_count::now();
-  std::cout << "reading took:     " << (end - start).seconds() << " seconds" << std::endl;
+  // FileVector &files = delegate.files();
 
 
-
-  start = tick_count::now();
-  parallel_for(blocked_range<size_t>(0, files.size()),
-               [&](blocked_range<size_t> block) {
-                 for (size_t i = block.begin(); i != block.end(); ++i) {
-                    File &file = files[i];
-
-                    // file.Read();
-                    file.Compress();
-                    file.Hash();
-                 }
-               });
-  end = tick_count::now();
-  std::cout << "crunching took:   " << (end - start).seconds() << " seconds" << std::endl;
+  // start = tick_count::now();
+  // for (auto &file : files) {
+  //   file.Read();
+  // }
+  // end = tick_count::now();
+  // std::cout << "reading took:     " << (end - start).seconds() << " seconds" << std::endl;
 
 
 
-  start = tick_count::now();
-  for (auto &file : files) {
-    file.Write();
-  }
-  end = tick_count::now();
-  std::cout << "writing took:     " << (end - start).seconds() << " seconds" << std::endl;
+  // start = tick_count::now();
+  // parallel_for(blocked_range<size_t>(0, files.size()),
+  //              [&](blocked_range<size_t> block) {
+  //                for (size_t i = block.begin(); i != block.end(); ++i) {
+  //                   File &file = files[i];
 
+  //                   // file.Read();
+  //                   file.Compress();
+  //                   file.Hash();
+  //                }
+  //              });
+  // end = tick_count::now();
+  // std::cout << "crunching took:   " << (end - start).seconds() << " seconds" << std::endl;
+
+
+
+  // start = tick_count::now();
+  // for (auto &file : files) {
+  //   file.Write();
+  // }
+  // end = tick_count::now();
+  // std::cout << "writing took:     " << (end - start).seconds() << " seconds" << std::endl;
+
+
+  Print("going to wait now...");
+
+  dummy_task->wait_for_all();
+  dummy_task->destroy(*dummy_task);
+
+  Print("waited...");
+
+  io_queue.push(IoRequest(IoRequest::Terminate));
+  io_thread.join();
 
   all_end = tick_count::now();
   std::cout << "overall time:     " << (all_end - all_start).seconds() << " seconds" << std::endl;
