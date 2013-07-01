@@ -58,7 +58,7 @@ static string EscapeShell(const std::string &raw) {
   }
   return raw;
 
-escape_shell_quote:
+ escape_shell_quote:
   string result = "'";
   for (unsigned i = 0, l = raw.length(); i < l; ++i) {
     if (raw[i] == '\'')
@@ -76,7 +76,7 @@ void ParsePath(const string &config_file) {
     return;
 
   int retval;
-  
+
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
@@ -91,7 +91,7 @@ void ParsePath(const string &config_file) {
     WritePipe(fd_stdin, newline.data(), newline.length());
   }
   rewind(fconfig);
-  
+
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
     line = Trim(line);
@@ -119,7 +119,7 @@ void ParsePath(const string &config_file) {
       parameter = parameter.substr(4);
       parameter = Trim(parameter);
     }
-    
+
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
     GetLineFd(fd_stdout, &value.value);
@@ -218,6 +218,30 @@ string Dump() {
               "    # from " + source + "\n";
   }
   return result;
+}
+
+
+bool ParseUIntMap(const string &path, map<uint64_t, uint64_t> *map) {
+  assert(map);
+
+  FILE *fmap = fopen(path.c_str(), "r");
+  if (!fmap)
+    return false;
+
+  string line;
+  while (GetLineFile(fmap, &line)) {
+    line = Trim(line);
+    if (line.empty() || line[0] == '#') {
+      continue;
+    }
+    vector<string> components = SplitString(line, ' ');
+    if (components.size() != 2)
+      return false;
+    uint64_t from = String2Uint64(components[0]);
+    uint64_t to = String2Uint64(components[1]);
+    map->insert(pair<uint64_t, uint64_t>(from, to));
+  }
+  return true;
 }
 
 }  // namespace options

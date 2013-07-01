@@ -3,13 +3,7 @@
 # This script spawns a virtual machine of a specific platform type on ibex and
 # runs the associated test cases on this machine
 
-# internal script configuration
-script_location=$(dirname $(readlink --canonicalize $0))
-reachability_timeout=60  # * 10 seconds
-accessibility_timeout=60 # * 10 seconds
-
-# Load configuration
-#
+# Configuration for cloud access
 # Example:
 # EC2_ACCESS_KEY="..."
 # EC2_SECRET_KEY="..."
@@ -17,7 +11,11 @@ accessibility_timeout=60 # * 10 seconds
 # EC2_KEY="..."
 # EC2_INSTANCE_TYPE="..."
 # EC2_KEY_LOCATION="/home/.../ibex_key.pem"
-. ${script_location}/ec2_config.sh
+
+# internal script configuration
+script_location=$(dirname $(readlink --canonicalize $0))
+reachability_timeout=60  # * 10 seconds
+accessibility_timeout=60 # * 10 seconds
 
 # static information (check also remote_setup.sh and remote_run.sh)
 cvmfs_workspace="/tmp/cvmfs-test-workspace"
@@ -25,14 +23,18 @@ cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
 cvmfs_setup_log="${cvmfs_workspace}/setup.log"
 cvmfs_run_log="${cvmfs_workspace}/run.log"
 cvmfs_test_log="${cvmfs_workspace}/test.log"
+cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
 
 # global variables for external script parameters
 platform_run_script=""
 platform_setup_script=""
 server_package=""
 client_package=""
+old_client_package="notprovided"
 keys_package=""
 source_tarball=""
+unittest_package=""
+ec2_config="ec2_config.sh"
 ami_name=""
 log_destination="."
 
@@ -62,12 +64,15 @@ usage() {
   echo " -s <cvmfs server package>  CernVM-FS server package to be tested"
   echo " -c <cvmfs client package>  CernVM-FS client package to be tested"
   echo " -t <cvmfs source tarball>  CernVM-FS sources containing associated tests"
+  echo " -g <cvmfs tests package>   CernVM-FS unit tests package"
   echo " -k <cvmfs keys package>    CernVM-FS public keys package"
   echo " -b <setup script>          platform specific setup script (inside the tarball)"
   echo " -r <run script>            platform specific test script (inside the tarball)"
   echo " -a <AMI name>              the virtual machine image to spawn"
   echo
   echo "Optional parameters:"
+  echo " -e <EC2 config file>       local location of the ec2_config.sh file"
+  echo " -o <old client package>    CernVM-FS client package to be hotpatched on"
   echo " -d <results destination>   Directory to store final test session logs"
   echo
   echo "You must provide http addresses for all packages and tar balls. They will"
@@ -135,8 +140,12 @@ wait_for_virtual_machine() {
   # wait for the virtual machine to become accessible via ssh
   echo -n "waiting for VM ($ip) to become accessible... "
   timeout=$accessibility_timeout
-  while [ $timeout -gt 0 ] && \
-        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'echo hallo' > /dev/null 2>&1; do
+  while [ $timeout -gt 0 ] &&                                      \
+        ! ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
+                                   -o UserKnownHostsFile=/dev/null \
+                                   -o LogLevel=ERROR               \
+                                   -o BatchMode=yes                \
+              root@$ip 'echo hallo' > /dev/null 2>&1; do
     sleep 10
     timeout=$(( $timeout - 1 ))
   done
@@ -163,7 +172,11 @@ run_script_on_virtual_machine() {
   local script_path=$2
   shift 2
 
-  ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no root@$ip 'cat | bash /dev/stdin' $@ < $script_path
+  ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
+                           -o UserKnownHostsFile=/dev/null \
+                           -o LogLevel=ERROR               \
+                           -o BatchMode=yes                \
+      root@$ip 'cat | bash /dev/stdin' $@ < $script_path
 }
 
 
@@ -187,11 +200,14 @@ setup_virtual_machine() {
   run_script_on_virtual_machine $ip $remote_setup_script \
       -s $server_package                                 \
       -c $client_package                                 \
+      -o $old_client_package                             \
       -t $source_tarball                                 \
+      -g $unittest_package                               \
       -k $keys_package                                   \
       -r $platform_setup_script
   check_retcode $?
   if [ $? -ne 0 ]; then
+    handle_test_failure $ip
     return 1
   fi
 
@@ -235,6 +251,7 @@ get_test_results() {
   local retval_run_log
   local retval_test_log
   local retval_setup_log
+  local retval_unittest_log
 
   echo -n "retrieving test results... "
   retrieve_file_from_virtual_machine                  \
@@ -252,10 +269,16 @@ get_test_results() {
       $cvmfs_setup_log                                \
       ${log_destination}/$(basename $cvmfs_setup_log)
   retval_setup_log=$?
+  retrieve_file_from_virtual_machine                  \
+      $ip                                             \
+      $cvmfs_unittest_log                             \
+      ${log_destination}/$(basename $cvmfs_unittest_log)
+  retval_unittest_log=$?
 
-  [ $retval_test_log  -eq 0 ] && \
-  [ $retval_run_log   -eq 0 ] && \
-  [ $retval_setup_log -eq 0 ]
+  [ $retval_test_log     -eq 0 ] && \
+  [ $retval_run_log      -eq 0 ] && \
+  [ $retval_setup_log    -eq 0 ] && \
+  [ $retval_unittest_log -eq 0 ]
   check_retcode $?
 }
 
@@ -265,7 +288,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:s:c:t:k:a:d:" option; do
+while getopts "r:b:s:c:o:t:g:k:e:a:d:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -279,11 +302,20 @@ while getopts "r:b:s:c:t:k:a:d:" option; do
     c)
       client_package=$OPTARG
       ;;
+    o)
+      old_client_package=$OPTARG
+      ;;
     t)
       source_tarball=$OPTARG
       ;;
+    g)
+      unittest_package=$OPTARG
+      ;;
     k)
       keys_package=$OPTARG
+      ;;
+    e)
+      ec2_config=$OPTARG
       ;;
     a)
       ami_name=$OPTARG
@@ -305,9 +337,13 @@ if [ x$platform_run_script   = "x" ] ||
    [ x$client_package        = "x" ] ||
    [ x$keys_package          = "x" ] ||
    [ x$source_tarball        = "x" ] ||
+   [ x$unittest_package      = "x" ] ||
    [ x$ami_name              = "x" ]; then
   usage "Missing parameter(s)"
 fi
+
+# load EC2 configuration
+. $ec2_config
 
 # spawn the virtual machine image, run the platform specific setup script
 # on it, wait for the spawning and setup to be complete and run the actual

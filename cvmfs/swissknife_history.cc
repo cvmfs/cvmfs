@@ -58,7 +58,7 @@ static bool GetHistoryDbHash(const string &repository_url,
   // right history file
   if (expected_root_hash != manifest->catalog_hash()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "wrong manifest, expected catalg %s, found catalog %s",
+             "wrong manifest, expected catalog %s, found catalog %s",
              expected_root_hash.ToString().c_str(),
              manifest->catalog_hash().ToString().c_str());
     return false;
@@ -104,16 +104,20 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   const hash::Any base_hash(hash::kSha1, hash::HexPtr(*args.find('b')->second));
   const hash::Any trunk_hash(hash::kSha1, hash::HexPtr(*args.find('t')->second));
   const unsigned trunk_revision = String2Uint64(*args.find('i')->second);
+  hash::Any tag_hash = trunk_hash;
   string delete_tag;
   if (args.find('d') != args.end()) {
     delete_tag = *args.find('d')->second;
+  }
+  if (args.find('h') != args.end()) {
+    tag_hash = hash::Any(hash::kSha1, hash::HexPtr(*args.find('h')->second));
   }
   history::Tag new_tag;
   if (args.find('a') != args.end()) {
     vector<string> fields = SplitString(*args.find('a')->second, '@');
     new_tag.name = fields[0];
-    new_tag.root_hash = trunk_hash;
-    new_tag.revision = trunk_revision;
+    new_tag.root_hash = trunk_hash;  // might be changed later
+    new_tag.revision = trunk_revision;  // might be changed later
     new_tag.timestamp = time(NULL);
     if (fields.size() > 1) {
       new_tag.channel =
@@ -177,6 +181,18 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
     tag_list.Remove(delete_tag);
   }
   if (new_tag.name != "") {
+    if (tag_hash != trunk_hash) {
+      history::Tag existing_tag;
+      bool exists = tag_list.FindHash(tag_hash, &existing_tag);
+      if (!exists) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to find hash %s in tag list",
+                 tag_hash.ToString().c_str());
+        goto tag_fini;
+      }
+      tag_list.Remove(new_tag.name);
+      new_tag.root_hash = tag_hash;
+      new_tag.revision = existing_tag.revision;
+    }
     retval = tag_list.Insert(new_tag);
     assert(retval == history::TagList::kFailOk);
   }
@@ -296,7 +312,9 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   }
 
   // Update timestamp and revision
-  catalog = catalog::AttachFreelyRw("", catalog_path);
+  catalog = catalog::WritableCatalog::AttachFreely("",
+                                                   catalog_path,
+                                                   target_tag.root_hash);
   assert(catalog);
   catalog->UpdateLastModified();
   catalog->SetRevision(trunk_tag.revision + 1);

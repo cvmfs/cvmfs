@@ -2,7 +2,11 @@
 cvmfs_test_name="Path Traversal while Catalog Reloading"
 
 reload_catalogs() {
-  while true; do
+  local loop_flag
+  loop_flag=1
+  trap "{ loop_flag=0; }" HUP
+
+  while [ $loop_flag -eq 1 ]; do
     sudo cvmfs_config reload sft.cern.ch
     sleep 15
   done
@@ -23,28 +27,31 @@ cvmfs_run_test() {
   sudo cvmfs_config umount >> $logfile 2>&1 || return 4
   sudo cvmfs_config probe  >> $logfile 2>&1 || return 5
 
-  # do some concurrent find calls
-  find /cvmfs/sft.cern.ch > /tmp/find1 2>>$logfile -ignore_readdir_race &
+  # do a detached find call
+  # (sudo because sometimes the permissions in the repo are scrambled)
+  sudo find /cvmfs/sft.cern.ch > /tmp/find1 2>>$logfile -ignore_readdir_race &
   find_cmd=$!
 
-  # reload the catalog every now and than
+  # reload the catalog every now and then
   reload_catalogs >> $logfile 2>&1 &
   reload_cmd=$!
 
   # always kill the detached processes
-  trap "kill -9 $find_cmd $reload_cmd > /dev/null 2>&1; exit" SIGHUP SIGINT SIGTERM
+  trap "{ sudo kill -9 $find_cmd; kill -s HUP $reload_cmd; }" HUP INT TERM
 
-  # wait for the find calls to succeed
+  # wait for the find call to succeed
   wait $find_cmd
   local retval=$?
+
+  # gracefully get rid of the catalog reload worker
+  kill -s HUP $reload_cmd >> $logfile 2>&1
+  wait $reload_cmd
+
+  # check if all went well
   if [ $retval -ne 0 ]; then
     echo "Find failed with return code: $retval" >> $logfile
-    kill -9 $reload_cmd
     return 6
   fi
-
-  # stop the reload cycle, it seemed to work fine...
-  kill -9 $reload_cmd
 
   return 0
 }

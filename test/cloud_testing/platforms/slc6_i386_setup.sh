@@ -8,6 +8,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 echo "installing RPM packages... "
 install_rpm $KEYS_PACKAGE
 install_rpm $CLIENT_PACKAGE
+install_rpm $UNITTEST_PACKAGE
 
 # setup environment
 echo -n "setting up CernVM-FS environment... "
@@ -18,6 +19,6 @@ attach_user_group fuse                           || die "fail (add fuse group to
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
 
-# install additional stuff (needed for perl testing tools)
+# install test dependencies
 echo "installing additional RPM packages..."
 install_from_repo gcc

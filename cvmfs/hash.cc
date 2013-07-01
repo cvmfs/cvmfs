@@ -9,7 +9,6 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
-#include <cstdlib>
 #include <cstdio>
 
 using namespace std;  // NOLINT
@@ -19,7 +18,6 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 namespace hash {
-
 
 /**
  * Allows the caller to create the context on the stack.

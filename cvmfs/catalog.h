@@ -21,14 +21,21 @@
 #include "shortstring.h"
 #include "sql.h"
 #include "util.h"
+#include "catalog_counters.h"
 
+namespace swissknife {
+  class CommandMigrate;
+}
 
 namespace catalog {
 
 class AbstractCatalogManager;
 class Catalog;
 
+class Counters;
+
 typedef std::vector<Catalog *> CatalogList;
+typedef std::map<uint64_t, uint64_t> OwnerMap;  // used to map uid/gid
 
 
 /**
@@ -46,51 +53,12 @@ struct InodeRange {
     return ((inode > offset) && (inode <= size + offset));
   }
 
-  inline bool IsInitialized() const { return (offset > 0) && (size > 0); }
+  inline void MakeDummy() { offset = 1; }
+
+  inline bool IsInitialized() const { return offset > 0; }
+  inline bool IsDummy() const { return IsInitialized() && size == 0; }
 };
 
-
-struct DeltaCounters {
-  DeltaCounters() {
-    SetZero();
-  }
-  void SetZero();
-  void PopulateToParent(DeltaCounters *parent);
-  void DeltaDirent(const DirectoryEntry &dirent, const int delta);
-
-  int64_t d_self_regular;
-  int64_t d_self_symlink;
-  int64_t d_self_dir;
-  int64_t d_self_nested;
-  int64_t d_subtree_regular;
-  int64_t d_subtree_symlink;
-  int64_t d_subtree_dir;
-  int64_t d_subtree_nested;
-};
-
-
-struct Counters {
-  Counters() {
-    self_regular = self_symlink = self_dir = self_nested =
-      subtree_regular = subtree_symlink = subtree_dir = subtree_nested = 0;
-  }
-
-  void ApplyDelta(const DeltaCounters &delta);
-  void AddAsSubtree(DeltaCounters *delta);
-  void MergeIntoParent(DeltaCounters *parent_delta);
-  uint64_t GetSelfEntries() const;
-  uint64_t GetSubtreeEntries() const;
-  uint64_t GetAllEntries() const;
-
-  uint64_t self_regular;
-  uint64_t self_symlink;
-  uint64_t self_dir;
-  uint64_t self_nested;
-  uint64_t subtree_regular;
-  uint64_t subtree_symlink;
-  uint64_t subtree_dir;
-  uint64_t subtree_nested;
-};
 
 /**
  * Allows to define a class that transforms the inode in order to ensure
@@ -119,12 +87,20 @@ class InodeAnnotation {
  */
 class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
-  friend class SqlLookup;  // for mangled inode
+  friend class SqlLookup;                  // for mangled inode and uid/gid maps
+  friend class swissknife::CommandMigrate; // for catalog version migration
  public:
   static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
 
-  Catalog(const PathString &path, Catalog *parent);
+  Catalog(const PathString  &path,
+          const hash::Any   &catalog_hash,
+                Catalog     *parent);
   virtual ~Catalog();
+
+  static Catalog *AttachFreely(const std::string  &root_path,
+                               const std::string  &file,
+                               const hash::Any    &catalog_hash,
+                                     Catalog      *parent = NULL);
 
   bool OpenDatabase(const std::string &db_path);
 
@@ -156,17 +132,18 @@ class Catalog : public SingleCopy {
   bool AllChunksNext(hash::Any *hash, ChunkTypes *type);
   bool AllChunksEnd();
 
-  inline bool ListFileChunks(const PathString &path, FileChunks *chunks) const {
+  inline bool ListFileChunks(const PathString &path, FileChunkList *chunks) const
+  {
     return ListMd5PathChunks(hash::Md5(path.GetChars(), path.GetLength()),
                              chunks);
   }
-  bool ListMd5PathChunks(const hash::Md5 &md5path, FileChunks *chunks) const;
+  bool ListMd5PathChunks(const hash::Md5 &md5path, FileChunkList *chunks) const;
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetNumEntries() const;
   hash::Any GetPreviousRevision() const;
-  bool GetCounters(Counters *counters) const;
+  const Counters& GetCounters() const { return counters_; };
 
   inline bool read_only() const { return read_only_; }
   inline float schema() const { return database().schema_version(); }
@@ -177,9 +154,10 @@ class Catalog : public SingleCopy {
   inline void set_inode_range(const InodeRange value) { inode_range_ = value; }
   inline std::string database_path() const { return database_->filename(); }
   inline PathString root_prefix() const { return root_prefix_; }
+  inline hash::Any hash() const { return catalog_hash_; }
 
   inline bool IsInitialized() const {
-    return inode_range_.IsInitialized() && (max_row_id_ > 0);
+    return inode_range_.IsInitialized() && initialized_;
   }
   inline bool IsRoot() const { return NULL == parent_; }
   inline virtual bool IsWritable() const { return false; }
@@ -193,10 +171,13 @@ class Catalog : public SingleCopy {
   bool FindNested(const PathString &mountpoint, hash::Any *hash) const;
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
+  void SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map);
 
  protected:
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
-  HardlinkGroupMap hardlink_groups_;
+  mutable HardlinkGroupMap hardlink_groups_;
+
+  bool InitStandalone(const std::string &database_file);
 
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
@@ -214,6 +195,8 @@ class Catalog : public SingleCopy {
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
 
+  Counters& GetCounters() { return counters_; };
+
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
@@ -224,14 +207,16 @@ class Catalog : public SingleCopy {
 
   uint64_t GetRowIdFromInode(const inode_t inode) const;
   inode_t GetMangledInode(const uint64_t row_id,
-                          const uint64_t hardlink_group);
+                          const uint64_t hardlink_group) const;
 
   void FixTransitionPoint(const hash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
+ private:
   Database *database_;
   pthread_mutex_t *lock_;
 
+  const hash::Any catalog_hash_;
   PathString root_prefix_;
   PathString path_;
 
@@ -239,9 +224,14 @@ class Catalog : public SingleCopy {
   NestedCatalogMap children_;
   mutable NestedCatalogList *nested_catalog_cache_;
 
+  bool initialized_;
   InodeRange inode_range_;
   uint64_t max_row_id_;
   InodeAnnotation *inode_annotation_;
+  Counters counters_;
+  // Point to the maps in the catalog manager
+  const OwnerMap *uid_map_;
+  const OwnerMap *gid_map_;
 
   SqlListing               *sql_listing_;
   SqlLookupPathHash        *sql_lookup_md5path_;
@@ -251,8 +241,6 @@ class Catalog : public SingleCopy {
   SqlAllChunks             *sql_all_chunks_;
   SqlChunksListing         *sql_chunks_listing_;
 };  // class Catalog
-
-Catalog *AttachFreely(const std::string &root_path, const std::string &file);
 
 }  // namespace catalog
 

@@ -32,6 +32,7 @@ set (CVMFS_CLIENT_SOURCES
   manifest.h manifest.cc
   manifest_fetch.h manifest_fetch.cc
   murmur.h smallhash.h
+  bigvector.h
   lru.h
   globals.h globals.cc
   peers.h peers.cc
@@ -39,6 +40,7 @@ set (CVMFS_CLIENT_SOURCES
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
+  catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   directory_entry.h directory_entry.cc
   shortstring.h
   file_chunk.h file_chunk.cc
@@ -121,6 +123,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_rw.h catalog_rw.cc
   catalog_mgr.h catalog_mgr.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
+  catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   history.h history.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
@@ -131,6 +134,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_sync.h swissknife_sync.cc
   swissknife_info.h swissknife_info.cc
   swissknife_history.h swissknife_history.cc
+  swissknife_migrate.h swissknife_migrate.cc
   swissknife.h swissknife.cc)
 
 
@@ -152,80 +156,6 @@ set (CVMFS_SWISSKNIFE_DEBUG_CFLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS} -DDEBUGMSG 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
 #
-# set properties for configurable libraries
-#
-# some libraries are statically linked and has to be compiled from source
-# therefore we have to include the specific CVMFS-CMakeLists.txt from the
-# different 3rd-party locations.
-# If dynamic linking is desired we have to look for the presence of the libs
-# in the system and set the LIBRARY and INCLUDE variables properly
-#
-# either ***_LIBRARIES or ***_ARCHIVE has to be defined for all externals
-# in order to successfully link the targets.
-#
-
-if (MACOSX)
-  find_package (Fuse4x REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
-  set (FUSE_LIBRARIES ${FUSE4X_LIBRARIES}) # just abstract the difference here... they are compatible
-else (MACOSX)
-  find_package (FUSE REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
-endif (MACOSX)
-
-if (LIBCURL_BUILTIN)
-  include (${CARES_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  include (${LIBCURL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  set (CURL_LIBRARIES "")
-else (LIBCURL_BUILTIN)
-  find_package (CURL REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CURL_INCLUDE_DIRS})
-endif (LIBCURL_BUILTIN)
-
-if (SQLITE3_BUILTIN)
-  include (${SQLITE3_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  set (SQLITE3_LIBRARY "")
-else (SQLITE3_BUILTIN)
-  find_package (SQLite3 REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
-endif (SQLITE3_BUILTIN)
-
-if (ZLIB_BUILTIN)
-  include (${ZLIB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  set (ZLIB_LIBRARIES "")
-else (ZLIB_BUILTIN)
-  find_package (ZLIB REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
-endif (ZLIB_BUILTIN)
-
-if (SPARSEHASH_BUILTIN)
-  include (${SPARSEHASH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_BUILTIN_LOCATION}/src)
-else (SPARSEHASH_BUILTIN)
-  find_package(Sparsehash)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
-endif (SPARSEHASH_BUILTIN)
-
-if (LEVELDB_BUILTIN)
-  include (${LEVELDB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_BUILTIN_LOCATION}/src)
-else (LEVELDB_BUILTIN)
-  find_package(leveldb)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
-endif (LEVELDB_BUILTIN)
-
-if (NOT MACOSX)
-  set (HAVE_LIB_RT TRUE)
-  set (RT_LIBRARY "rt")
-else (NOT MACOSX)
-  set (HAVE_LIB_RT FALSE)
-  set (RT_LIBRARY "")
-endif (NOT MACOSX)
-
-find_package (OpenSSL REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
-
-#
 # set some include and linking stuff
 #
 set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
@@ -241,9 +171,9 @@ include_directories (${INCLUDE_DIRECTORIES})
 if (BUILD_CVMFS)
 
   add_executable (cvmfs2 ${CVMFS_LOADER_SOURCES})
-  add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-  add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE})
-  add_executable (cvmfs_fsck    ${CVMFS_FSCK_SOURCES} ${ZLIB_ARCHIVE})
+  add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES})
+  add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
+  add_executable (cvmfs_fsck ${CVMFS_FSCK_SOURCES})
 
   if (LIBFUSE_BUILTIN)
     add_dependencies (cvmfs_fuse_debug libfuse) # here it does not matter if libfuse or libfuse4x

@@ -177,7 +177,7 @@ string Manifest::ExportString() const {
   if (publish_timestamp_ > 0)
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
 
-  for (unsigned i; i < channel_tops_.size(); ++i) {
+  for (unsigned i = 0; i < channel_tops_.size(); ++i) {
     manifest += "Z" + StringifyByteAsHex(channel_tops_[i].channel) +
                 channel_tops_[i].root_hash.ToString() + "\n";
   }

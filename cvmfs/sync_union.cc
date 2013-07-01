@@ -100,31 +100,31 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
                              const std::string &rdonly_path,
                              const std::string &union_path,
                              const std::string &scratch_path) :
-SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
-
-	// Ignored filenames
-	ignore_filenames_.insert(".wh..wh..tmp");
-	ignore_filenames_.insert(".wh..wh.plnk");
-	ignore_filenames_.insert(".wh..wh.aufs");
+  SyncUnion(mediator, rdonly_path, union_path, scratch_path)
+{
+  // Ignored filenames
+  ignore_filenames_.insert(".wh..wh..tmp");
+  ignore_filenames_.insert(".wh..wh.plnk");
+  ignore_filenames_.insert(".wh..wh.aufs");
   ignore_filenames_.insert(".wh..wh.orph");
-	ignore_filenames_.insert(".wh..wh..opq");
+  ignore_filenames_.insert(".wh..wh..opq");
 
-	// set the whiteout prefix AUFS preceeds for every whiteout file
-	whiteout_prefix_ = ".wh.";
+  // set the whiteout prefix AUFS preceeds for every whiteout file
+  whiteout_prefix_ = ".wh.";
 }
 
 
 void SyncUnionAufs::Traverse() {
-	FileSystemTraversal<SyncUnionAufs>
-    traversal(this, scratch_path(), true, ignore_filenames_);
+  FileSystemTraversal<SyncUnionAufs> traversal(this, scratch_path(), true);
 
   traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
-	traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
-	traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
-	traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
-	traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
+  traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
+  traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
+  traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFilePredicate;
+  traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
+  traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
 
-	traversal.Recurse(scratch_path());
+  traversal.Recurse(scratch_path());
 }
 
 
@@ -141,9 +141,11 @@ string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
   return filename.substr(whiteout_prefix_.length());
 }
 
-set<string> SyncUnionAufs::GetIgnoreFilenames() const {
-  return ignore_filenames_;
-};
+bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
+                                        const string &filename)
+{
+  return (ignore_filenames_.find(filename) != ignore_filenames_.end());
+}
 
 
 }  // namespace sync

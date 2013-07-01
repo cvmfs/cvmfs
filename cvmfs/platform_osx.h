@@ -80,6 +80,14 @@ inline int platform_sigwait(const int signum) {
   return result;
 }
 
+/**
+ * See platform_linux.h
+ */
+inline bool platform_allow_ptrace(const pid_t pid) {
+  // No-op on Mac OS X
+  return true;
+}
+
 
 /**
  * File system functions, Mac OS X has 64bit functions by default.

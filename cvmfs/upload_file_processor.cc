@@ -47,16 +47,12 @@ void FileProcessor::ProcessingCallback(const FileProcessorWorker::Results  &data
 
 
 void FileProcessor::WaitForProcessing() const {
-  uploader_->DisablePrecaching();
   workers_->WaitForEmptyQueue();
-  uploader_->EnablePrecaching();
 }
 
 
 void FileProcessor::WaitForTermination() const {
-  uploader_->DisablePrecaching();
   workers_->WaitForTermination();
-  uploader_->EnablePrecaching();
 }
 
 
@@ -163,7 +159,7 @@ bool FileProcessor::FileProcessorWorker::ProcessFile(
   }
 
   // in any case we need to upload the bulk version of the file
-  UploadChunk(file->bulk_chunk(), file);
+  UploadChunk(file->bulk_chunk(), file, parameters.hash_suffix);
   return true;
 }
 
@@ -219,10 +215,12 @@ bool FileProcessor::FileProcessorWorker::ProcessFileChunk(
   fclose(fcas);
 
   // all done... thanks
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "compressed chunk: %d %d | hash: %s",
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "compressed chunk: %d %d | hash: %s "
+                                        "into temporary file: %s",
            chunk.offset(),
            chunk.size(),
-           chunk.content_hash().ToString().c_str());
+           chunk.content_hash().ToString().c_str(),
+           temporary_path.c_str());
 
   return true;
 }
@@ -238,6 +236,8 @@ void FileProcessor::FileProcessorWorker::ProcessingCompleted(
   }
 
   if (!pending_file->IsCompletedSuccessfully()) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to process file: '%s'",
+             pending_file->local_path().c_str());
     master()->JobFailed(Results(local_path, 4));
     return;
   }
@@ -250,6 +250,9 @@ void FileProcessor::FileProcessorWorker::ProcessingCompleted(
     completed_files_.push_back(pending_file);
   }
 
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "successfully processed file: '%s', "
+                                        "generated %d file chunks",
+           pending_file->local_path().c_str(), final_result.file_chunks.size());
   master()->JobSuccessful(final_result);
 }
 
@@ -368,12 +371,12 @@ void FileProcessor::PendingFile::CheckForCompletionAndNotify() {
 }
 
 
-FileChunks FileProcessor::PendingFile::GetFinalizedFileChunks() const {
-  FileChunks final_chunks;
+FileChunkList FileProcessor::PendingFile::GetFinalizedFileChunks() const {
+  FileChunkList final_chunks;
   TemporaryFileChunkMap::const_iterator i    = file_chunks_.begin();
   TemporaryFileChunkMap::const_iterator iend = file_chunks_.end();
   for (; i != iend; ++i) {
-    final_chunks.push_back(static_cast<FileChunk>(i->second));
+    final_chunks.PushBack(static_cast<FileChunk>(i->second));
   }
   return final_chunks;
 }

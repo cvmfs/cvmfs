@@ -21,12 +21,19 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "globals.h"
+#include "bigvector.h"
 
 namespace publish {
 class SyncItem;
 }
 
+namespace swissknife {
+class CommandMigrate;
+}
+
 namespace catalog {
+
+class DirectoryEntryTestFactory;
 
 class Catalog;
 typedef uint64_t inode_t;
@@ -187,9 +194,11 @@ class DirectoryEntryBase {
  *  - Hardlink group used to emulate hardlinks in cvmfs
  */
 class DirectoryEntry : public DirectoryEntryBase {
-  friend class SqlLookup;               // simplify creation of DirectoryEntry objects
-  friend class SqlDirentWrite;          // simplify write of DirectoryEntry objects in database
-  friend class WritableCatalogManager;  // TODO: remove this dependency
+  friend class SqlLookup;                  // simplify creation of DirectoryEntry objects
+  friend class SqlDirentWrite;             // simplify write of DirectoryEntry objects in database
+  friend class swissknife::CommandMigrate; // fixing DirectoryEntry glitches
+  friend class WritableCatalogManager;     // TODO: remove this dependency
+  friend class DirectoryEntryTestFactory;  // create DirectoryEntries for unit-test purposes
 
  public:
   /**
@@ -287,7 +296,7 @@ struct StatEntry {
 
 typedef std::vector<DirectoryEntry> DirectoryEntryList;         // TODO: rename!
 typedef std::vector<DirectoryEntryBase> DirectoryEntryBaseList; //       these are NOT lists.
-typedef std::vector<StatEntry> StatEntryList;  // TODO: use mmap for large listings
+typedef BigVector<StatEntry> StatEntryList;  // TODO: use mmap for large listings
 
 } // namespace catalog
 

@@ -76,10 +76,12 @@ class CatalogManager : public catalog::AbstractCatalogManager {
 
  protected:
   catalog::LoadError LoadCatalog(const PathString &mountpoint,
-                                 const hash::Any &hash,
-                                 std::string *catalog_path);
+                                 const hash::Any  &hash,
+                                 std::string      *catalog_path,
+                                 hash::Any        *catalog_hash);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
+                                  const hash::Any  &catalog_hash,
                                   catalog::Catalog *parent_catalog);
   void ActivateCatalog(const catalog::Catalog *catalog);
 

@@ -55,11 +55,17 @@ class Database {
   static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
   static const float kSchemaEpsilon;  // floats get imprecise in SQlite
 
+  static bool IsEqualSchema(const float value, const float compare) {
+    return (value > compare - kSchemaEpsilon &&
+            value < compare + kSchemaEpsilon);
+  }
+
   Database(const std::string filename, const sqlite::DbOpenMode open_mode);
   ~Database();
   static bool Create(const std::string &filename,
-                     const DirectoryEntry &root_entry,
-                     const std::string &root_path);
+                     const std::string &root_path,
+                     const DirectoryEntry &root_entry
+                                             = DirectoryEntry(kDirentNegative));
 
   sqlite3 *sqlite_db() const { return sqlite_db_; }
   std::string filename() const { return filename_; }
@@ -75,7 +81,7 @@ class Database {
    */
   std::string GetLastErrorMsg() const;
  private:
-  Database(sqlite3 *sqlite_db, const float schema, const bool rw);
+  Database(const std::string &filename, const float schema);
 
   sqlite3 *sqlite_db_;
   std::string filename_;
@@ -136,9 +142,6 @@ class Sql : public sqlite::Sql {
     return hash::Any(hash::kSha1, hash::HexPtr(hash_string));
   }
 
- protected:
-  Sql() : sqlite::Sql() { }
-
   /**
    * Wrapper for binding a MD5 hash.
    * @param idx_high offset of most significant bits in database query
@@ -166,6 +169,9 @@ class Sql : public sqlite::Sql {
       return BindBlob(idx_column, hash.digest, hash.GetDigestSize());
     }
   }
+
+ protected:
+  Sql() : sqlite::Sql() { }
 };
 
 
@@ -433,6 +439,17 @@ class SqlChunksListing : public Sql {
 //------------------------------------------------------------------------------
 
 
+class SqlChunksCount : public Sql {
+ public:
+  SqlChunksCount(const Database &database);
+  bool BindPathHash(const hash::Md5 &hash);
+  int GetChunkCount() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlMaxHardlinkGroup : public Sql {
  public:
   SqlMaxHardlinkGroup(const Database &database);
@@ -461,6 +478,17 @@ class SqlUpdateCounter : public Sql {
   SqlUpdateCounter(const Database &database);
   bool BindCounter(const std::string &counter);
   bool BindDelta(const int64_t delta);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlCreateCounter : public Sql {
+ public:
+  SqlCreateCounter(const Database &database);
+  bool BindCounter(const std::string &counter);
+  bool BindInitialValue(const int64_t value);
 };
 
 

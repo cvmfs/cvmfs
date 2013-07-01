@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <ftw.h>
+#include <errno.h>
 
 #include <string>
 #include <sstream>
@@ -390,8 +391,7 @@ TEST_F(T_FsTraversal, FullTraversal) {
   BaseTraversalDelegate delegate(reference_);
   FileSystemTraversal<BaseTraversalDelegate> traverse(&delegate,
                                                        testbed_path_,
-                                                       true,
-                                                       std::set<std::string>());
+                                                       true);
   RegisterDelegate(traverse, delegate);
 
   traverse.Recurse(testbed_path_);
@@ -430,8 +430,7 @@ TEST_F(T_FsTraversal, RootTraversal) {
   RootTraversalDelegate delegate(reference_);
   FileSystemTraversal<RootTraversalDelegate> traverse(&delegate,
                                                        testbed_path_,
-                                                       false,
-                                                       std::set<std::string>());
+                                                       false);
   RegisterDelegate(traverse, delegate);
 
   traverse.Recurse(testbed_path_);
@@ -471,6 +470,19 @@ class IgnoringTraversalDelegate : public BaseTraversalDelegate {
     CheckAllExcept(ignored_pathes);
     CheckPathes(ignored_pathes, Checklist::Untouched);
   }
+
+  void SetIgnoreNames(const std::set<std::string> &ignore_names) {
+    ignore_names_ = ignore_names;
+  }
+
+  bool IgnoreFilePredicate(const std::string &parent_dir,
+                           const std::string &filename)
+  {
+    return (ignore_names_.find(filename) != ignore_names_.end());
+  }
+
+ private:
+  std::set<std::string> ignore_names_;
 };
 
 TEST_F(T_FsTraversal, IgnoringTraversal) {
@@ -480,11 +492,12 @@ TEST_F(T_FsTraversal, IgnoringTraversal) {
   ignored_filenames.insert("d");
 
   IgnoringTraversalDelegate delegate(reference_);
+  delegate.SetIgnoreNames(ignored_filenames);
   FileSystemTraversal<IgnoringTraversalDelegate> traverse(&delegate,
                                                            testbed_path_,
-                                                           true,
-                                                           ignored_filenames);
+                                                           true);
   RegisterDelegate(traverse, delegate);
+  traverse.fn_ignore_file = &IgnoringTraversalDelegate::IgnoreFilePredicate;
 
   traverse.Recurse(testbed_path_);
   delegate.Check();
@@ -552,8 +565,7 @@ TEST_F(T_FsTraversal, SteeredTraversal) {
   FileSystemTraversal<SteeringTraversalDelegate> traverse(
                                                       &delegate,
                                                        testbed_path_,
-                                                       true,
-                                                       std::set<std::string>());
+                                                       true);
   RegisterDelegate(traverse, delegate);
 
   traverse.Recurse(testbed_path_);

@@ -66,7 +66,8 @@ bool WritableCatalogManager::Init() {
  */
 LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
                                               const hash::Any &hash,
-                                              std::string *catalog_path)
+                                              std::string *catalog_path,
+                                              hash::Any   *catalog_hash)
 {
   hash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
   const string url = stratum0_ + "/data" + effective_hash.MakePath(1, 2) + "C";
@@ -90,6 +91,7 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
     assert(false);
   }
 
+  *catalog_hash = effective_hash;
   return kLoadNew;
 }
 
@@ -98,14 +100,18 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
  * This method is virtual in AbstractCatalogManager.  It returns a new catalog
  * structure in the form the different CatalogManagers need it.
  * In this case it returns a stub for a WritableCatalog.
- * @param mountpoint the mount point of the catalog stub to create
+ * @param mountpoint     the mount point of the catalog stub to create
+ * @param catalog_hash   the content hash of the catalog to create
  * @param parent_catalog the parent of the catalog stub to create
  * @return a pointer to the catalog stub structure created
  */
 Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
-                                               Catalog *parent_catalog)
+                                               const hash::Any  &catalog_hash,
+                                               Catalog          *parent_catalog)
 {
-  return new WritableCatalog(mountpoint.ToString(), parent_catalog);
+  return new WritableCatalog(mountpoint.ToString(),
+                             catalog_hash,
+                             parent_catalog);
 }
 
 
@@ -137,7 +143,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   string root_path = "";
 
   // Create the database schema and the inital root entry
-  if (!Database::Create(file_path, root_entry, root_path)) {
+  if (!Database::Create(file_path, root_path, root_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
              file_path.c_str());
     return NULL;
@@ -352,7 +358,7 @@ void WritableCatalogManager::AddFile(const DirectoryEntry  &entry,
 
 void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase  &entry,
                                             const std::string         &parent_directory,
-                                            const FileChunks          &file_chunks) {
+                                            const FileChunkList       &file_chunks) {
   assert (file_chunks.size() > 0);
 
   DirectoryEntry full_entry(entry);
@@ -371,10 +377,8 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase  &entry,
     assert(false);
   }
 
-  FileChunks::const_iterator i    = file_chunks.begin();
-  FileChunks::const_iterator iend = file_chunks.end();
-  for (; i != iend; ++i) {
-    catalog->AddFileChunk(file_path, *i);
+  for (unsigned i = 0; i < file_chunks.size(); ++i) {
+    catalog->AddFileChunk(file_path, *file_chunks.AtPtr(i));
   }
   SyncUnlock();
 }
@@ -452,33 +456,6 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
   }
 
   catalog->IncLinkcount(relative_path, -1);
-  SyncUnlock();
-}
-
-
-/**
- * Update entry meta data (mode, owner, ...).
- * CVMFS specific meta data are NOT changed by this method.
- * @param entry      the directory entry to be touched
- * @param path       the path of the directory entry to be touched
- */
-void WritableCatalogManager::TouchFile(const DirectoryEntryBase &entry,
-                                       const std::string &file_path) {
-  assert (!entry.IsDirectory());
-
-  const string entry_path = MakeRelativePath(file_path);
-  const string parent_path = GetParentPath(entry_path);
-
-  SyncLock();
-  // find the catalog to be updated
-  WritableCatalog *catalog;
-  if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
-             entry_path.c_str());
-    assert(false);
-  }
-
-  catalog->TouchEntry(entry, entry_path);
   SyncUnlock();
 }
 
@@ -577,12 +554,13 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   const string database_file_path = CreateTempPath(dir_temp_ + "/catalog",
                                                    0666);
   retval =
-    Database::Create(database_file_path, new_root_entry, nested_root_path);
+    Database::Create(database_file_path, nested_root_path, new_root_entry);
   assert(retval);
 
   // Attach the just created nested catalog
   Catalog *new_catalog =
     CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()),
+                  hash::Any(),
                   old_catalog);
   retval = AttachCatalog(database_file_path, new_catalog);
   assert(retval);
@@ -611,10 +589,8 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
     WritableCatalog *grand_catalog;
     retval = FindCatalog(i->path.ToString(), &grand_catalog);
     assert(retval);
-    Counters grand_counters;
-    retval = grand_catalog->GetCounters(&grand_counters);
-    assert(retval);
-    grand_counters.AddAsSubtree(&fix_subtree_counters);
+    const Counters &grand_counters = grand_catalog->GetCounters();
+    grand_counters.AddAsSubtree(fix_subtree_counters);
   }
   DeltaCounters save_counters = wr_new_catalog->delta_counters_;
   wr_new_catalog->delta_counters_ = fix_subtree_counters;
@@ -754,7 +730,7 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   catalog->UpdateCounters();
   if (catalog->parent()) {
     catalog->delta_counters_.PopulateToParent(
-      &catalog->GetWritableParent()->delta_counters_);
+      catalog->GetWritableParent()->delta_counters_);
   }
   catalog->delta_counters_.SetZero();
 

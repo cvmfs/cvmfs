@@ -156,6 +156,55 @@ typedef LockGuard<LockGuardAdapter<pthread_rwlock_t,
 //
 
 
+/**
+ * This is a simple implementation of a Future wrapper template.
+ * It is used as a proxy for results that are computed asynchronously and might
+ * not be available on the first access.
+ * Since this is a very simple implementation one needs to use the Future's
+ * Get() and Set() methods to obtain the containing data resp. to write it.
+ * Note: More than a single call to Set() is prohibited!
+ *       If Get() is called before Set() the calling thread will block until
+ *       the value has been set by a different thread.
+ *
+ * @param T  the value type wrapped by this Future template
+ */
+template <typename T>
+class Future : SingleCopy {
+ public:
+  Future();
+  virtual ~Future();
+
+  /**
+   * Save an asynchronously computed value into the Future. This potentially
+   * unblocks threads that already wait for the value.
+   * @param object  the value object to be set
+   */
+  void     Set(const T &object);
+
+  /**
+   * Retrieves the wrapped value object. If the value is not yet available it
+   * will automatically block until a different thread calls Set().
+   * @return  the containing value object
+   */
+  T&       Get();
+  const T& Get() const;
+
+ protected:
+  void Wait() const;
+
+ private:
+  T                       object_;
+  mutable pthread_mutex_t mutex_;
+  mutable pthread_cond_t  object_set_;
+  bool                    object_was_set_;
+};
+
+
+//
+// -----------------------------------------------------------------------------
+//
+
+
 template <typename ParamT>
 class Observable;
 
@@ -376,8 +425,7 @@ class FifoChannel : protected std::queue<T> {
    *                            considered to be "not full"
    */
   FifoChannel(const size_t maximal_length,
-              const size_t drainout_threshold,
-              const size_t prefill_threshold = 0);
+              const size_t drainout_threshold);
   virtual ~FifoChannel();
 
   /**
@@ -404,16 +452,6 @@ class FifoChannel : protected std::queue<T> {
    */
   unsigned int Drop();
 
-  /**
-   * Sets the prefill threshold of the channel to 0 in order to drain it out
-   */
-  void EnableDrainoutMode() const;
-
-  /**
-   * Resets the prefill threshold to it's initial value
-   */
-  void DisableDrainoutMode() const;
-
   inline size_t GetItemCount() const;
   inline bool   IsEmpty() const;
   inline size_t GetMaximalItemCount() const;
@@ -422,8 +460,6 @@ class FifoChannel : protected std::queue<T> {
   // general configuration
   const   size_t             maximal_queue_length_;
   const   size_t             queue_drainout_threshold_;
-  const   size_t             queue_prefill_threshold_;
-  mutable bool               drainout_mode_;
 
   // thread synchronisation structures
   mutable pthread_mutex_t    mutex_;
@@ -472,6 +508,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
       data(data),
       is_death_sentence(false) {}
     Job() :
+      data(),
       is_death_sentence(true) {}
     const DataT  data;              //!< job payload
     const bool   is_death_sentence; //!< death sentence flag
@@ -560,9 +597,6 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *       schedule jobs in the mean time.
    */
   void WaitForTermination();
-
-  void EnableDrainoutMode() const;
-  void DisableDrainoutMode() const;
 
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
   inline unsigned int GetNumberOfFailedJobs() const {

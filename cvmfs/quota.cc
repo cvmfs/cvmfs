@@ -75,6 +75,7 @@ enum CommandType {
   kStatus,
   kLimits,
   kPid,
+  kPinRegular,
 };
 
 struct LruCommand {
@@ -312,6 +313,7 @@ static void ProcessCommandBunch(const unsigned num,
         sqlite3_reset(stmt_unpin_);
         break;
       case kPin:
+      case kPinRegular:
       case kInsert:
         // It could already be in, check
         exists = Contains(hash_str);
@@ -333,8 +335,9 @@ static void ProcessCommandBunch(const unsigned num,
                           commands[i].path_length, SQLITE_STATIC);
         sqlite3_bind_int64(stmt_new_, 5, (commands[i].command_type == kPin) ?
                            kFileCatalog : kFileRegular);
-        sqlite3_bind_int64(stmt_new_, 6, (commands[i].command_type == kPin) ?
-                           1 : 0);
+        sqlite3_bind_int64(stmt_new_, 6,
+          ((commands[i].command_type == kPin) ||
+           (commands[i].command_type == kPinRegular)) ? 1 : 0);
         retval = sqlite3_step(stmt_new_);
         LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, pin %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
@@ -378,7 +381,9 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     const uint64_t size = command_buffer[num_commands].size;
 
     // Inserts and pins come with a cvmfs path
-    if ((command_type == kInsert) || (command_type == kPin)) {
+    if ((command_type == kInsert) || (command_type == kPin) ||
+        (command_type == kPinRegular))
+    {
       const int path_length = command_buffer[num_commands].path_length;
       ReadPipe(pipe_lru_[0], &path_buffer[kMaxCvmfsPath*num_commands],
                path_length);
@@ -967,12 +972,12 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
 
-  vector<int> preserve_filedes;
-  preserve_filedes.push_back(0);
-  preserve_filedes.push_back(1);
-  preserve_filedes.push_back(2);
-  preserve_filedes.push_back(pipe_boot[1]);
-  preserve_filedes.push_back(pipe_handshake[0]);
+  set<int> preserve_filedes;
+  preserve_filedes.insert(0);
+  preserve_filedes.insert(1);
+  preserve_filedes.insert(2);
+  preserve_filedes.insert(pipe_boot[1]);
+  preserve_filedes.insert(pipe_handshake[0]);
 
   retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
   if (!retval) {
@@ -1236,7 +1241,7 @@ bool Cleanup(const uint64_t leave_size) {
 
 
 static void DoInsert(const hash::Any &hash, const uint64_t size,
-                     const string &cvmfs_path, const bool pin)
+                     const string &cvmfs_path, const CommandType command_type)
 {
   const string hash_str = hash.ToString();
   LogCvmfs(kLogQuota, kLogDebug, "insert into lru %s, path %s",
@@ -1246,7 +1251,7 @@ static void DoInsert(const hash::Any &hash, const uint64_t size,
 
   LruCommand *cmd = reinterpret_cast<LruCommand *>(
                       alloca(sizeof(LruCommand) + path_length));
-  cmd->command_type = pin ? kPin : kInsert;
+  cmd->command_type = command_type;
   cmd->size = size;
   memcpy(cmd->digest, hash.digest, hash.GetDigestSize());
   cmd->path_length = path_length;
@@ -1265,7 +1270,7 @@ void Insert(const hash::Any &any_hash, const uint64_t size,
 {
   assert(initialized_);
   if (limit_ == 0) return;
-  DoInsert(any_hash, size, cvmfs_path, false);
+  DoInsert(any_hash, size, cvmfs_path, kInsert);
 }
 
 
@@ -1276,7 +1281,7 @@ void Insert(const hash::Any &any_hash, const uint64_t size,
  * \return True on success, false otherwise
  */
 bool Pin(const hash::Any &hash, const uint64_t size,
-         const string &cvmfs_path)
+         const string &cvmfs_path, const bool is_catalog)
 {
   assert(initialized_);
   if (limit_ == 0) return true;
@@ -1334,7 +1339,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
   CloseReturnPipe(pipe_reserve);
 
   if (!result) return false;
-  DoInsert(hash, size, cvmfs_path, true);
+  DoInsert(hash, size, cvmfs_path, is_catalog ? kPin : kPinRegular);
 
   return true;
 }

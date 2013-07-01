@@ -82,14 +82,14 @@ option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" 
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 set (EXTERNALS_BUILD_LOCATION     "${CMAKE_BINARY_DIR}/externals")
-set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/sqlite3/src")
-set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/c-ares/src")
-set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/libcurl/src")
-set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/zlib/src")
-set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/sparsehash/src")
-set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/leveldb/src")
-set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/vjson/src")
-set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/googletest/src")
+set (SQLITE3_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_sqlite3")
+set (CARES_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_c-ares")
+set (LIBCURL_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_libcurl")
+set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_zlib")
+set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_sparsehash")
+set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_leveldb")
+set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
+set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -101,9 +101,13 @@ file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
 if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 	message (STATUS "running bootstrap.sh ...")
 	execute_process (
-		COMMAND			sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
-		WORKING_DIRECTORY	${CMAKE_SOURCE_DIR}
+    COMMAND           sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    RESULT_VARIABLE   BOOTSTRAPPING_RESULT
 	)
+  if (BOOTSTRAPPING_RESULT GREATER 0)
+    message (FATAL_ERROR "bootstrapping failed")
+  endif (BOOTSTRAPPING_RESULT GREATER 0)
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
 #
@@ -170,6 +174,84 @@ configure_file (
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 
 include_directories (${INCLUDE_DIRECTORIES})
+
+
+
+#
+# set properties for configurable libraries
+#
+# some libraries are statically linked and has to be compiled from source
+# therefore we have to include the specific CVMFS-CMakeLists.txt from the
+# different 3rd-party locations.
+# If dynamic linking is desired we have to look for the presence of the libs
+# in the system and set the LIBRARY and INCLUDE variables properly
+#
+# either ***_LIBRARIES or ***_ARCHIVE has to be defined for all externals
+# in order to successfully link the targets.
+#
+
+if (MACOSX)
+  find_package (Fuse4x REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
+  set (FUSE_LIBRARIES ${FUSE4X_LIBRARIES}) # just abstract the difference here... they are compatible
+else (MACOSX)
+  find_package (FUSE REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
+endif (MACOSX)
+
+if (LIBCURL_BUILTIN)
+  include (${CARES_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  include (${LIBCURL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (CURL_LIBRARIES "")
+else (LIBCURL_BUILTIN)
+  find_package (CURL REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CURL_INCLUDE_DIRS})
+endif (LIBCURL_BUILTIN)
+
+if (SQLITE3_BUILTIN)
+  include (${SQLITE3_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (SQLITE3_LIBRARY "")
+else (SQLITE3_BUILTIN)
+  find_package (SQLite3 REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
+endif (SQLITE3_BUILTIN)
+
+if (ZLIB_BUILTIN)
+  include (${ZLIB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (ZLIB_LIBRARIES "")
+else (ZLIB_BUILTIN)
+  find_package (ZLIB REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
+endif (ZLIB_BUILTIN)
+
+if (SPARSEHASH_BUILTIN)
+  include (${SPARSEHASH_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_BUILTIN_LOCATION}/src)
+else (SPARSEHASH_BUILTIN)
+  find_package(Sparsehash)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
+endif (SPARSEHASH_BUILTIN)
+
+if (LEVELDB_BUILTIN)
+  include (${LEVELDB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_BUILTIN_LOCATION}/src)
+else (LEVELDB_BUILTIN)
+  find_package(leveldb)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
+endif (LEVELDB_BUILTIN)
+
+if (NOT MACOSX)
+  set (HAVE_LIB_RT TRUE)
+  set (RT_LIBRARY "rt")
+else (NOT MACOSX)
+  set (HAVE_LIB_RT FALSE)
+  set (RT_LIBRARY "")
+endif (NOT MACOSX)
+
+find_package (OpenSSL REQUIRED)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
+
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/include)
 
 #
 # go for the actual compilation

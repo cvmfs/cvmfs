@@ -1298,6 +1298,7 @@ void SetDnsServer(const string &address) {
     assert(opt_dns_server_);
   }
   pthread_mutex_unlock(&lock_options_);
+  LogCvmfs(kLogDownload, kLogSyslog, "set nameserver to %s", address.c_str());
 }
 
 
@@ -1549,6 +1550,11 @@ void SetRetryParameters(const unsigned max_retries,
   opt_backoff_init_ms_ = backoff_init_ms;
   opt_backoff_max_ms_ = backoff_max_ms;
   pthread_mutex_unlock(&lock_options_);
+}
+
+
+void ActivatePipelining() {
+  curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 }
 
 

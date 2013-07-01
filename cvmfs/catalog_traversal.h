@@ -21,22 +21,21 @@ namespace swissknife {
  * This class traverses the complete catalog hierarchy of a CVMFS repository
  * recursively. The user can specify a callback which is called for each catalog
  * on the way.
- * We are doing a depth first, pre-order traversal here. (I.e. if you simply print
+ * We are doing a BFS, pre-order traversal here. (I.e. if you simply print
  * the catalogs in the provided order you obtain a nice catalog tree.)
  * Note: Since all CVMFS catalog files together can grow to several gigabytes in
  *       file size, each catalog is loaded, processed and removed immediately
  *       afterwards.
  *
- * CAUTION: currently the Catalog* pointer passed into the callback becomes in-
- *          valid directly after the callback method returns. Therefore you
- *          MUST NOT store it for later use.
+ * CAUTION: the Catalog* pointer passed into the callback becomes invalid
+ *          directly after the callback method returns, unless you create the
+ *          CatalogTraversal object with no_close = true.
  *
  * TODO: Use the Observable template buried in Pull Request 46 instead of imple-
  *       menting your own callback infrastructure here.
  */
-template<class T>
-class CatalogTraversal
-{
+template<class T, class CatalogT = catalog::Catalog>
+class CatalogTraversal {
  public:
   /**
    * Callback signature which has to be implemented by the delegate object
@@ -51,28 +50,31 @@ class CatalogTraversal
 
 
  protected:
-  typedef struct CatalogJob_ {
-    CatalogJob_(const std::string& path,
-                const hash::Any&   hash,
-                const unsigned     tree_level) :
+  struct CatalogJob {
+    CatalogJob(const std::string      &path,
+               const hash::Any        &hash,
+               const unsigned          tree_level,
+                     catalog::Catalog *parent = NULL) :
       path(path),
       hash(hash),
-      tree_level(tree_level) {}
-    CatalogJob_(const catalog::Catalog::NestedCatalog& nested_catalog,
-                const unsigned                         tree_level) :
+      tree_level(tree_level),
+      parent(parent) {}
+    CatalogJob(const catalog::Catalog::NestedCatalog &nested_catalog,
+               const unsigned                         tree_level,
+                     catalog::Catalog                *parent = NULL) :
       path(nested_catalog.path.ToString()),
       hash(nested_catalog.hash),
-      tree_level(tree_level) {}
+      tree_level(tree_level),
+      parent(parent) {}
 
-    const std::string path;
-    const hash::Any   hash;
-    const unsigned    tree_level;
-  } CatalogJob;
+    const std::string       path;
+    const hash::Any         hash;
+    const unsigned          tree_level;
+          catalog::Catalog *parent;
+  };
   typedef std::stack<CatalogJob> CatalogJobStack;
 
-
  public:
-
   /**
    * Constructs a new catalog traversal engine.
    * @param delegate           the object to be notified when a catalog needs
@@ -86,18 +88,24 @@ class CatalogTraversal
    *                           repository signature check) (optional)
    * @param repo_keys          a comma separated list of public key file
    *                           locations to verify the repository manifest file
+   * @param no_close           do not close catalogs after they were attached
+   *                           (catalogs retain their parent/child pointers)
    */
 	CatalogTraversal(T*                 delegate,
                    Callback           catalog_callback,
                    const std::string& repo_url,
                    const std::string& repo_name = "",
-                   const std::string& repo_keys = "") :
+                   const std::string& repo_keys = "",
+                   const bool         no_close = false,
+                   const std::string& tmp_dir  = "/tmp") :
     delegate_(delegate),
     catalog_callback_(catalog_callback),
     repo_url_(MakeCanonicalPath(repo_url)),
     repo_name_(repo_name),
     repo_keys_(repo_keys),
-    is_remote_(repo_url.substr(0, 7) == "http://")
+    is_remote_(repo_url.substr(0, 7) == "http://"),
+    no_close_(no_close),
+    temporary_directory_(tmp_dir)
   {
     if (is_remote_)
       download::Init(1, true);
@@ -137,87 +145,87 @@ class CatalogTraversal
 
     delete manifest;
 
-    // start the magic
-    return TraverseRecursively();
+    return DoTraverse();
   }
 
 
  protected:
-  bool TraverseRecursively() {
-
-    // the CatalogTraversal works with a stack, where new nested catalogs are
-    // pushed onto while processing their parent (depth first traversal).
+  bool DoTraverse() {
+    // The CatalogTraversal works with a stack, where new nested catalogs are
+    // pushed onto while processing their parent (breadth first traversal).
     // When all catalogs are processed, this stack will naturally be empty and
     // the traversal can terminate
     while(!catalog_stack_.empty())
     {
-      // get the top most catalog for the next processing step
+      // Get the top most catalog for the next processing step
       CatalogJob job = catalog_stack_.top();
       catalog_stack_.pop();
 
-      // process it (potentially generating new catalog jobs on the stack)
+      // Process it (potentially generating new catalog jobs on the stack)
       const bool success = ProcessCatalogJob(job);
       if (!success)
         return false;
     }
-
-    // well done
     return true;
   }
 
 
   bool ProcessCatalogJob(const CatalogJob &job) {
-    // load a catalog
+    // Load a catalog
     std::string tmp_file;
     if (!FetchCatalog(job.hash, &tmp_file)) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to load catalog %s",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
 
-    // open the catalog
-    catalog::Catalog *catalog = catalog::AttachFreely(job.path, tmp_file);
-    unlink(tmp_file.c_str());
+    // Open the catalog
+    catalog::Catalog *catalog = CatalogT::AttachFreely(job.path,
+                                                       tmp_file,
+                                                       job.hash,
+                                                       job.parent);
+    if (!no_close_) {
+      unlink(tmp_file.c_str());
+    }
     if (catalog == NULL) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to open catalog %s",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to open catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
 
-    // provide the user with the catalog
+    // Provide the user with the catalog
     (delegate_->*catalog_callback_)(catalog, job.hash, job.tree_level);
 
-    // Inception! Go to the next recursion level
+    // Inception! Go to the next catalog level
     catalog::Catalog::NestedCatalogList *nested_catalogs =
       catalog->ListNestedCatalogs();
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
          nested_catalogs->begin(), iEnd = nested_catalogs->end();
          i != iEnd; ++i)
     {
-      catalog_stack_.push(CatalogJob(*i, job.tree_level + 1));
+      catalog::Catalog* parent = (no_close_) ? catalog : NULL;
+      catalog_stack_.push(CatalogJob(*i, job.tree_level + 1, parent));
     }
 
-    // we are done with this catalog
-    delete catalog;
-
-    // sucessfully traversed
+    // We are done with this catalog
+    if (!no_close_) {
+      delete catalog;
+    }
     return true;
   }
 
 
   manifest::Manifest* LoadManifest() {
     manifest::Manifest *manifest = NULL;
-
-    // grab manifest file
+    // Grab manifest file
     if (!is_remote_) {
-      // locally
+      // Locally
       manifest = manifest::Manifest::LoadFile(repo_url_ + "/.cvmfspublished");
-
     } else {
-      // remote
+      // Remote
       const std::string url = repo_url_ + "/.cvmfspublished";
 
-      // initialize signature module
+      // Initialize signature module
       signature::Init();
       const bool success = signature::LoadPublicRsaKeys(repo_keys_);
       if (!success) {
@@ -227,7 +235,7 @@ class CatalogTraversal
         return NULL;
       }
 
-      // download manifest file
+      // Download manifest file
       struct manifest::ManifestEnsemble manifest_ensemble;
       manifest::Failures retval = manifest::Fetch(
                                     repo_url_,
@@ -236,18 +244,21 @@ class CatalogTraversal
                                     NULL,
                                     &manifest_ensemble);
 
-      // we don't need the signature module from now on
+      // We don't need the signature module from now on
       signature::Fini();
 
-      // check if manifest was loaded correctly
-      if (retval == manifest::kFailNameMismatch)
+      // Check if manifest was loaded correctly
+      if (retval == manifest::kFailNameMismatch) {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
-          "repository name mismatch. No name provided?");
+                 "repository name mismatch. No name provided?");
+      }
       if (retval == manifest::kFailBadSignature   ||
           retval == manifest::kFailBadCertificate ||
           retval == manifest::kFailBadWhitelist)
+      {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
-          "repository signature mismatch. No key(s) provided?");
+                 "repository signature mismatch. No key(s) provided?");
+      }
 
       if (retval == manifest::kFailOk)
         manifest = new manifest::Manifest(*manifest_ensemble.manifest);
@@ -258,7 +269,8 @@ class CatalogTraversal
 
 
   inline bool FetchCatalog(const hash::Any& catalog_hash,
-                                  std::string *catalog_file) {
+                                  std::string *catalog_file)
+  {
     return (is_remote_) ? DownloadCatalog  (catalog_hash, catalog_file)
                         : DecompressCatalog(catalog_hash, catalog_file);
   }
@@ -275,14 +287,14 @@ class CatalogTraversal
     catalog_file->clear();
 
     const std::string source = "data" + catalog_hash.MakePath(1,2) + "C";
-    const std::string dest = "/tmp/" + catalog_hash.ToString();
+    const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
     const std::string url = repo_url_ + "/" + source;
 
     download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
     download::Failures retval = download::Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStdout, "failed to download catalog %s (%d)",
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);
       return false;
     }
@@ -303,7 +315,7 @@ class CatalogTraversal
 
     const std::string source =
       repo_url_ + "/data" + catalog_hash.MakePath(1,2) + "C";
-    const std::string dest = "/tmp/" + catalog_hash.ToString();
+    const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
 
     if (!zlib::DecompressPath2Path(source, dest))
       return false;
@@ -335,6 +347,8 @@ class CatalogTraversal
   const std::string repo_name_;
   const std::string repo_keys_;
   const bool        is_remote_;
+  const bool        no_close_;
+  const std::string temporary_directory_;
   CatalogJobStack   catalog_stack_;
 };
 

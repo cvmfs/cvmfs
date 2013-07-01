@@ -105,7 +105,6 @@ class SyncMediator {
   // Called after figuring out the type of a path (file, symlink, dir)
   void AddFile(SyncItem &entry);
   void RemoveFile(SyncItem &entry);
-  void TouchFile(SyncItem &entry);
 
   void AddDirectory(SyncItem &entry);
   void RemoveDirectory(SyncItem &entry);
@@ -135,6 +134,9 @@ class SyncMediator {
                              const std::string &link_name);
   void RemoveDirectoryCallback(const std::string &parent_dir,
                                const std::string &dir_name);
+
+  bool IgnoreFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
 
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);

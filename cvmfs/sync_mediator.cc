@@ -82,12 +82,13 @@ void SyncMediator::Touch(SyncItem &entry) {
     return;
   }
 
+  // Avoid removing and recreating nested catalog
   if (entry.IsCatalogMarker()) {
     RemoveFile(entry);
     AddFile(entry);
     return;
   }
-  
+
   if (entry.IsRegularFile() || entry.IsSymlink()) {
     Replace(entry);  // This way, hardlink processing is correct
     return;
@@ -283,9 +284,8 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
            entry.GetUnionPath().c_str());
 
   // Look for legacy hardlinks
-  const set<string> ignore;
   FileSystemTraversal<SyncMediator> traversal(this, union_engine_->union_path(),
-                                              false, ignore);
+                                              false);
   traversal.fn_new_file =
     &SyncMediator::LegacyRegularHardlinkCallback;
   traversal.fn_new_symlink = &SyncMediator::LegacySymlinkHardlinkCallback;
@@ -310,19 +310,19 @@ void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
 
 
 void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
-	AddDirectory(entry);
+  AddDirectory(entry);
 
-	// Create a recursion engine, which recursively adds all entries in a newly
+  // Create a recursion engine, which recursively adds all entries in a newly
   // created directory
-	FileSystemTraversal<SyncMediator> traversal(
-    this, union_engine_->scratch_path(), true,
-    union_engine_->GetIgnoreFilenames());
-	traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
-	traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
-	traversal.fn_new_file = &SyncMediator::AddFileCallback;
-	traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
-	traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
-	traversal.Recurse(entry.GetScratchPath());
+  FileSystemTraversal<SyncMediator> traversal(
+    this, union_engine_->scratch_path(), true);
+  traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
+  traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
+  traversal.fn_new_file = &SyncMediator::AddFileCallback;
+  traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
+  traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
+  traversal.fn_ignore_file = &SyncMediator::IgnoreFileCallback;
+  traversal.Recurse(entry.GetScratchPath());
 }
 
 
@@ -368,20 +368,19 @@ void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
 
 
 void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
-	// Delete a directory AFTER it was emptied here,
-	// because it would start up another recursion
+  // Delete a directory AFTER it was emptied here,
+  // because it would start up another recursion
 
-	const bool recurse = false;
-  const set<string> ignore;
+  const bool recurse = false;
   FileSystemTraversal<SyncMediator> traversal(
-    this, union_engine_->rdonly_path(), recurse, ignore);
+    this, union_engine_->rdonly_path(), recurse);
   traversal.fn_new_file = &SyncMediator::RemoveFileCallback;
   traversal.fn_new_dir_postfix =
     &SyncMediator::RemoveDirectoryCallback;
   traversal.fn_new_symlink = &SyncMediator::RemoveSymlinkCallback;
   traversal.Recurse(entry.GetRdOnlyPath());
 
-	// The given directory was emptied recursively and can now itself be deleted
+  // The given directory was emptied recursively and can now itself be deleted
   RemoveDirectory(entry);
 }
 
@@ -407,6 +406,13 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 {
   SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   RemoveDirectoryRecursively(entry);
+}
+
+
+bool SyncMediator::IgnoreFileCallback(const std::string &parent_dir,
+                                      const std::string &file_name)
+{
+  return union_engine_->IgnoreFilePredicate(parent_dir, file_name);
 }
 
 
@@ -527,16 +533,6 @@ void SyncMediator::RemoveFile(SyncItem &entry) {
       catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
     }
     catalog_manager_->RemoveFile(entry.GetRelativePath());
-  }
-}
-
-
-void SyncMediator::TouchFile(SyncItem &entry) {
-  if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
-  if (!params_->dry_run) {
-    catalog_manager_->TouchFile(entry.CreateBasicCatalogDirent(),
-                                entry.GetRelativePath());
   }
 }
 

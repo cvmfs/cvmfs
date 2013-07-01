@@ -112,12 +112,12 @@ bool Init(const string &cachedir, const string &exe_path,
   command_line.push_back(StringifyInt(cvmfs::foreground_));
   command_line.push_back(GetLogDebugFile());
 
-  vector<int> preserve_filedes;
-  preserve_filedes.push_back(0);
-  preserve_filedes.push_back(1);
-  preserve_filedes.push_back(2);
-  preserve_filedes.push_back(pipe_boot[1]);
-  preserve_filedes.push_back(socket_pair[1]);
+  set<int> preserve_filedes;
+  preserve_filedes.insert(0);
+  preserve_filedes.insert(1);
+  preserve_filedes.insert(2);
+  preserve_filedes.insert(pipe_boot[1]);
+  preserve_filedes.insert(socket_pair[1]);
 
   retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
   close(socket_pair[1]);

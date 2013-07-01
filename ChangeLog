@@ -1,4 +1,19 @@
 2.1.12:
+  * Fix help text of cvmfs_talk
+  * Fix timeouts in NFS shared maps
+  * Add "import" command to cvmfs_server that transforms a 2.0
+    repository into a 2.1 repository (Stratum 0)
+  * Drastically improved performance of copying the inode
+    tracker
+  * Add pin command to cvmfs_talk
+  * Fix reading from socket in talk thread
+  * Add "nameserver set" command to cvmfs_talk
+  * Fix various issues with reading of chunked files
+  * Decrease memory consumption of the inode tracker
+  * Remove trailing empty attribute in listattr callback
+  * Make repositories replicatable by default
+  * Safe guard against concurrent snapshot processes
+  * Drop config.sh dependency from cvmfs_server
   * Experimental support for repository tags (named snapshots).
     Allows to mount a specific repository version and to rollback
     and re-publish previous repository states.

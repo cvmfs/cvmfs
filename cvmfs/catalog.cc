@@ -20,103 +20,35 @@ namespace catalog {
 const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 
 
-void DeltaCounters::SetZero() {
-  d_self_regular = d_self_symlink = d_self_dir = d_self_nested =
-  d_subtree_regular = d_subtree_symlink = d_subtree_dir =
-  d_subtree_nested = 0;
-}
-
-
-void DeltaCounters::DeltaDirent(const DirectoryEntry &dirent, const int delta) {
-  if (dirent.IsRegular())
-    d_self_regular += delta;
-  else if (dirent.IsLink())
-    d_self_symlink += delta;
-  else if (dirent.IsDirectory())
-    d_self_dir += delta;
-  else
-    assert(false);
-}
-
-
-void DeltaCounters::PopulateToParent(DeltaCounters *parent) {
-  parent->d_subtree_regular += d_self_regular + d_subtree_regular;
-  parent->d_subtree_symlink += d_self_symlink + d_subtree_symlink;
-  parent->d_subtree_dir += d_self_dir + d_subtree_dir;
-  parent->d_subtree_nested += d_self_nested + d_subtree_nested;
-}
-
-
-void Counters::ApplyDelta(const DeltaCounters &delta) {
-  self_regular += delta.d_self_regular;
-  self_symlink += delta.d_self_symlink;
-  self_dir += delta.d_self_dir;
-  self_nested += delta.d_self_nested;
-  subtree_regular += delta.d_subtree_regular;
-  subtree_symlink += delta.d_subtree_symlink;
-  subtree_dir += delta.d_subtree_dir;
-  subtree_nested += delta.d_subtree_nested;
-}
-
-
-void Counters::AddAsSubtree(DeltaCounters *delta) {
-  delta->d_subtree_regular += self_regular + subtree_regular;
-  delta->d_subtree_symlink += self_symlink + subtree_symlink;
-  delta->d_subtree_dir += self_dir + subtree_dir;
-  delta->d_subtree_nested += self_nested + subtree_nested;
-}
-
-
-void Counters::MergeIntoParent(DeltaCounters *parent_delta) {
-  parent_delta->d_self_regular += self_regular;
-  parent_delta->d_subtree_regular -= self_regular;
-  parent_delta->d_self_symlink += self_symlink;
-  parent_delta->d_subtree_symlink -= self_symlink;
-  parent_delta->d_self_dir += self_dir;
-  parent_delta->d_subtree_dir -= self_dir;
-  parent_delta->d_self_nested += self_nested;
-  parent_delta->d_subtree_nested -= self_nested;
-}
-
-
-uint64_t Counters::GetSelfEntries() const {
-  return self_regular + self_symlink + self_dir;
-}
-
-
-uint64_t Counters::GetSubtreeEntries() const {
-  return subtree_regular + subtree_symlink + subtree_dir;
-}
-
-
-uint64_t Counters::GetAllEntries() const {
-  return GetSelfEntries() + GetSubtreeEntries();
-}
-
-
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string &root_path, const string &file) {
+Catalog* Catalog::AttachFreely(const string     &root_path,
+                               const string     &file,
+                               const hash::Any  &catalog_hash,
+                                     Catalog    *parent) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()), NULL);
-  bool retval = catalog->OpenDatabase(file);
-  if (!retval) {
+    new Catalog(PathString(root_path.data(), root_path.length()),
+                catalog_hash,
+                parent);
+  const bool successful_init = catalog->InitStandalone(file);
+  if (!successful_init) {
     delete catalog;
     return NULL;
   }
-  InodeRange inode_range;
-  inode_range.offset = 256;
-  inode_range.size = 256 + catalog->max_row_id();
-  catalog->set_inode_range(inode_range);
   return catalog;
 }
 
 
-Catalog::Catalog(const PathString &path, Catalog *parent) {
-  read_only_ = true;
-  path_ = path;
-  parent_ = parent;
+Catalog::Catalog(const PathString &path,
+                 const hash::Any &catalog_hash,
+                 Catalog *parent) :
+  read_only_(true),
+  catalog_hash_(catalog_hash),
+  path_(path),
+  parent_(parent),
+  initialized_(false)
+{
   max_row_id_ = 0;
   inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -125,6 +57,8 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
 
   database_ = NULL;
   nested_catalog_cache_ = NULL;
+  uid_map_ = NULL;
+  gid_map_ = NULL;
   sql_listing_ = NULL;
   sql_lookup_md5path_ = NULL;
   sql_lookup_inode_ = NULL;
@@ -172,6 +106,19 @@ void Catalog::FinalizePreparedStatements() {
 }
 
 
+bool Catalog::InitStandalone(const std::string &database_file) {
+  bool retval = OpenDatabase(database_file);
+  if (!retval) {
+    return false;
+  }
+
+  InodeRange inode_range;
+  inode_range.MakeDummy();
+  set_inode_range(inode_range);
+  return true;
+}
+
+
 /**
  * Establishes the database structures and opens the sqlite database file.
  * @param db_path the absolute path to the database file on local file system
@@ -215,10 +162,24 @@ bool Catalog::OpenDatabase(const string &db_path) {
     }
   }
 
+  // Read Catalog Counter Statistics
+  const bool statistics_loaded =
+    (database().schema_version() < Database::kLatestSupportedSchema -
+                                   Database::kSchemaEpsilon)
+      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
+      : counters_.ReadFromDatabase(database());
+  if (! statistics_loaded) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to load statistics counters for catalog %s (file %s)",
+             root_prefix_.c_str(), db_path.c_str());
+    return false;
+  }
+
   if (!IsRoot()) {
     parent_->AddChild(this);
   }
 
+  initialized_ = true;
   return true;
 }
 
@@ -300,7 +261,7 @@ bool Catalog::ListingMd5PathStat(const hash::Md5 &md5path,
     FixTransitionPoint(md5path, &dirent);
     entry.name = dirent.name();
     entry.info = dirent.GetStatStructure();
-    listing->push_back(entry);
+    listing->PushBack(entry);
   }
   sql_listing_->Reset();
   pthread_mutex_unlock(lock_);
@@ -351,14 +312,14 @@ bool Catalog::AllChunksEnd() {
 
 
 bool Catalog::ListMd5PathChunks(const hash::Md5  &md5path,
-                                FileChunks       *chunks) const
+                                FileChunkList    *chunks) const
 {
-  assert(IsInitialized() && chunks->empty());
+  assert(IsInitialized() && chunks->IsEmpty());
 
   pthread_mutex_lock(lock_);
   sql_chunks_listing_->BindPathHash(md5path);
   while (sql_chunks_listing_->FetchRow()) {
-    chunks->push_back(sql_chunks_listing_->GetFileChunk());
+    chunks->PushBack(sql_chunks_listing_->GetFileChunk());
   }
   sql_chunks_listing_->Reset();
   pthread_mutex_unlock(lock_);
@@ -420,60 +381,6 @@ hash::Any Catalog::GetPreviousRevision() const {
 
 
 /**
- * Receive catalog statistics
- */
-bool Catalog::GetCounters(Counters *counters) const {
-  if (!database_)
-    return false;
-
-  SqlGetCounter sql_counter(database());
-  bool retval;
-
-  retval = sql_counter.BindCounter("self_regular") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_regular = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("self_symlink") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_symlink = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("self_dir") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_dir = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("self_nested") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->self_nested = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_regular") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_regular = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_symlink") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_symlink = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_dir") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_dir = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  retval = sql_counter.BindCounter("subtree_nested") && sql_counter.Execute();
-  if (!retval) return false;
-  counters->subtree_nested = sql_counter.GetCounter();
-  sql_counter.Reset();
-
-  return true;
-}
-
-
-/**
  * Determine the actual inode of a DirectoryEntry.
  * The first used entry from a hardlink group deterimines the inode of the
  * others.
@@ -482,9 +389,12 @@ bool Catalog::GetCounters(Counters *counters) const {
  * @return the assigned inode number
  */
 inode_t Catalog::GetMangledInode(const uint64_t row_id,
-                                 const uint64_t hardlink_group)
-{
+                                 const uint64_t hardlink_group) const {
   assert(IsInitialized());
+
+  if (inode_range_.IsDummy()) {
+    return DirectoryEntry::kInvalidInode;
+  }
 
   inode_t inode = row_id + inode_range_.offset;
 
@@ -585,6 +495,12 @@ void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
   assert((inode_annotation_ == NULL) || (inode_annotation_ == new_annotation));
   inode_annotation_ = new_annotation;
   pthread_mutex_unlock(lock_);
+}
+
+
+void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
+  uid_map_ = (uid_map && !uid_map->empty()) ? uid_map : NULL;
+  gid_map_ = (gid_map && !gid_map->empty()) ? gid_map : NULL;
 }
 
 

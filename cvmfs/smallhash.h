@@ -15,7 +15,10 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <new>
 #include <algorithm>
+
+#include <gtest/gtest_prod.h>
 
 #include "smalloc.h"
 #include "atomic.h"
@@ -28,6 +31,8 @@
  */
 template<class Key, class Value, class Derived>
 class SmallHashBase {
+ FRIEND_TEST(T_Smallhash, InsertAndCopyMd5);
+
  public:
   static const double kLoadFactor;  // mainly useless for the dynamic version
   static const double kThresholdGrow;  // only used for resizable version
@@ -43,8 +48,7 @@ class SmallHashBase {
   }
 
   ~SmallHashBase() {
-    delete[] keys_;
-    delete[] values_;
+    DeallocMemory(keys_, values_, capacity_);
   }
 
   void Init(uint32_t expected_size, Key empty,
@@ -56,7 +60,7 @@ class SmallHashBase {
       static_cast<uint32_t>(static_cast<double>(expected_size)/kLoadFactor);
     initial_capacity_ = capacity_;
     static_cast<Derived *>(this)->SetThresholds();  // No-op for fixed size
-    InitMemory();
+    AllocMemory();
     this->DoClear(false);
   }
 
@@ -124,10 +128,29 @@ class SmallHashBase {
     return (uint32_t)bucket % capacity_;
   }
 
-  void InitMemory() {
-    keys_ = new Key[capacity_];
-    values_ = new Value[capacity_];
+  void AllocMemory() {
+    keys_ = static_cast<Key *>(smmap(capacity_ * sizeof(Key)));
+    values_ = static_cast<Value *>(smmap(capacity_ * sizeof(Value)));
+    for (uint32_t i = 0; i < capacity_; ++i) {
+      /*keys_[i] =*/ new (keys_ + i) Key();
+    }
+    for (uint32_t i = 0; i < capacity_; ++i) {
+      /*values_[i] =*/ new (values_ + i) Value();
+    }
     bytes_allocated_ = (sizeof(Key) + sizeof(Value)) * capacity_;
+  }
+
+  void DeallocMemory(Key *k, Value *v, uint32_t c) {
+    for (uint32_t i = 0; i < c; ++i) {
+      k[i].~Key();
+    }
+    for (uint32_t i = 0; i < c; ++i) {
+      v[i].~Value();
+    }
+    smunmap(k);
+    smunmap(v);
+    k = NULL;
+    v = NULL;
   }
 
   // Returns true iff the key is overwritten
@@ -256,14 +279,31 @@ class SmallHashDynamic :
   }
 
   void ResetCapacity() {
-    delete[] Base::keys_;
-    delete[] Base::values_;
+    Base::DeallocMemory(Base::keys_, Base::values_, Base::capacity_);
     Base::capacity_ = Base::initial_capacity_;
-    Base::InitMemory();
+    Base::AllocMemory();
     SetThresholds();
   }
 
  private:
+  // Returns a random permutation of indices [0..N-1] that is allocated
+  // by smmap (Knuth's shuffle algorithm)
+  uint32_t *ShuffleIndices(const uint32_t N) {
+    uint32_t *shuffled =
+      static_cast<uint32_t *>(smmap(N * sizeof(uint32_t)));
+    // Init with identity
+    for (unsigned i = 0; i < N; ++i)
+      shuffled[i] = i;
+    // Shuffle (no shuffling for the last element)
+    for (unsigned i = 0; i < N-1; ++i) {
+      const uint32_t swap_idx = i + random() % (N - i);
+      uint32_t tmp = shuffled[i];
+      shuffled[i] = shuffled[swap_idx];
+      shuffled[swap_idx]  = tmp;
+    }
+    return shuffled;
+  }
+
   void Migrate(const uint32_t new_capacity) {
     Key *old_keys = Base::keys_;
     Value *old_values = Base::values_;
@@ -272,24 +312,36 @@ class SmallHashDynamic :
 
     Base::capacity_ = new_capacity;
     SetThresholds();
-    Base::InitMemory();
+    Base::AllocMemory();
     Base::DoClear(false);
-    for (uint32_t i = 0; i < old_capacity; ++i) {
-      if (old_keys[i] != Base::empty_key_)
-        Base::Insert(old_keys[i], old_values[i]);
+    if (new_capacity < old_capacity) {
+      uint32_t *shuffled_indices = ShuffleIndices(old_capacity);
+      for (uint32_t i = 0; i < old_capacity; ++i) {
+        if (old_keys[shuffled_indices[i]] != Base::empty_key_)
+          Base::Insert(old_keys[shuffled_indices[i]],
+                       old_values[shuffled_indices[i]]);
+      }
+      smunmap(shuffled_indices);
+    } else {
+      for (uint32_t i = 0; i < old_capacity; ++i) {
+        if (old_keys[i] != Base::empty_key_)
+          Base::Insert(old_keys[i], old_values[i]);
+      }
     }
     assert(size() == old_size);
 
-    delete[] old_keys;
-    delete[] old_values;
+    Base::DeallocMemory(old_keys, old_values, old_capacity);
     num_migrates_++;
   }
 
   void CopyFrom(const SmallHashDynamic<Key, Value> &other) {
+    uint32_t *shuffled_indices = ShuffleIndices(other.capacity_);
     for (uint32_t i = 0; i < other.capacity_; ++i) {
-      if (other.keys_[i] != other.empty_key_)
-        this->Insert(other.keys_[i], other.values_[i]);
+      if (other.keys_[shuffled_indices[i]] != other.empty_key_)
+        this->Insert(other.keys_[shuffled_indices[i]],
+                     other.values_[shuffled_indices[i]]);
     }
+    smunmap(shuffled_indices);
   }
 
   uint32_t num_migrates_;
@@ -410,12 +462,12 @@ class MultiHash {
 
 // initialize the static fields
 template<class Key, class Value, class Derived>
-const double SmallHashBase<Key, Value, Derived>::kLoadFactor = 0.7;
+const double SmallHashBase<Key, Value, Derived>::kLoadFactor = 0.75;
 
 template<class Key, class Value>
-const double SmallHashDynamic<Key, Value>::kThresholdGrow = 0.7;
+const double SmallHashDynamic<Key, Value>::kThresholdGrow = 0.75;
 
 template<class Key, class Value>
-const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.15;
+const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.25;
 
 #endif  // CVMFS_SMALLHASH_H_

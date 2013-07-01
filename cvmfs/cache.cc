@@ -657,11 +657,12 @@ bool CatalogManager::InitFixed(const hash::Any &root_hash) {
 
 
 catalog::Catalog *CatalogManager::CreateCatalog(const PathString &mountpoint,
-  catalog::Catalog *parent_catalog)
+                                                const hash::Any  &catalog_hash,
+                                                catalog::Catalog *parent_catalog)
 {
   mounted_catalogs_[mountpoint] = loaded_catalogs_[mountpoint];
   loaded_catalogs_.erase(mountpoint);
-  return new catalog::Catalog(mountpoint, parent_catalog);
+  return new catalog::Catalog(mountpoint, catalog_hash, parent_catalog);
 }
 
 
@@ -669,8 +670,7 @@ catalog::Catalog *CatalogManager::CreateCatalog(const PathString &mountpoint,
  * Triggered when the catalog is attached (db file opened)
  */
 void CatalogManager::ActivateCatalog(const catalog::Catalog *catalog) {
-  catalog::Counters counters;
-  catalog->GetCounters(&counters);
+  const catalog::Counters &counters = catalog->GetCounters();
   if (catalog->IsRoot()) {
     all_inodes_ = counters.GetAllEntries();
   }
@@ -698,7 +698,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
     if (cache_mode_ == kCacheReadWrite) {
       size = GetFileSize(catalog_path->c_str());
       assert(size > 0);
-      pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path);
+      pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
       if (!pin_retval) {
         quota::Remove(hash);
         unlink(catalog_path->c_str());
@@ -749,7 +749,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
   }
 
   // Instead of commit, manually rename and pin, otherwise there is a race
-  pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path);
+  pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
   if (!pin_retval) {
     AbortTransaction(temp_path);
     return catalog::kLoadNoSpace;
@@ -765,14 +765,21 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
 
 
 catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
-                                               const hash::Any &hash,
-                                               std::string *catalog_path)
+                                               const hash::Any  &hash,
+                                               std::string      *catalog_path,
+                                               hash::Any        *catalog_hash)
 {
   CallGuard call_guard;
   string cvmfs_path = "file catalog at " + repo_name_ + ":" +
     (mountpoint.IsEmpty() ?
       "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
   bool retval;
+
+  // send the catalog hash to a blind memory position if it zero (save some ifs)
+  hash::Any blind_hash;
+  if (catalog_hash == NULL) {
+    catalog_hash = &blind_hash;
+  }
 
   // Load a particular catalog
   if (!hash.IsNull()) {
@@ -781,6 +788,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
                                                    catalog_path);
     if (load_error == catalog::kLoadNew)
       loaded_catalogs_[mountpoint] = hash;
+    *catalog_hash = hash;
     return load_error;
   }
 
@@ -832,7 +840,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
           int64_t size = GetFileSize(*catalog_path);
           assert(size >= 0);
           retval = quota::Pin(cache_hash, uint64_t(size),
-                              cvmfs_path);
+                              cvmfs_path, true);
           if (!retval) {
             LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                      "failed to pin cached root catalog");
@@ -840,7 +848,9 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
           }
         }
         loaded_catalogs_[mountpoint] = cache_hash;
+        *catalog_hash = cache_hash;
         offline_mode_ = true;
+
         return catalog::kLoadUp2Date;
       }
     }
@@ -861,7 +871,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
         int64_t size = GetFileSize(*catalog_path);
         assert(size >= 0);
         retval = quota::Pin(cache_hash, uint64_t(size),
-                            cvmfs_path);
+                            cvmfs_path, true);
         if (!retval) {
           LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                    "failed to pin cached root catalog");
@@ -869,9 +879,11 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
         }
       }
       loaded_catalogs_[mountpoint] = cache_hash;
+      *catalog_hash = cache_hash;
       return catalog::kLoadUp2Date;
     } else {
       loaded_catalogs_[mountpoint] = cache_hash;
+      *catalog_hash = cache_hash;
       return catalog::kLoadUp2Date;
     }
   }
@@ -887,6 +899,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   if (load_retval != catalog::kLoadNew)
     return load_retval;
   loaded_catalogs_[mountpoint] = ensemble.manifest->catalog_hash();
+  *catalog_hash = ensemble.manifest->catalog_hash();
 
   // Store new manifest and certificate
   CommitFromMem(ensemble.manifest->certificate(),
@@ -929,8 +942,7 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
     quota::Unpin(iter->second);
 
   mounted_catalogs_.erase(iter);
-  catalog::Counters counters;
-  catalog->GetCounters(&counters);
+  const catalog::Counters &counters = catalog->GetCounters();
   loaded_inodes_ -= counters.GetSelfEntries();
 }
 

@@ -22,16 +22,28 @@
 
 #include "catalog.h"
 
+namespace swissknife {
+  class CommandMigrate;
+}
+
 namespace catalog {
 
 class WritableCatalogManager;
 
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
+  friend class swissknife::CommandMigrate; // needed for catalog migrations
 
  public:
-  WritableCatalog(const std::string &path, Catalog *parent);
+  WritableCatalog(const std::string &path,
+                  const hash::Any   &catalog_hash,
+                  Catalog           *parent);
   virtual ~WritableCatalog();
+
+  static WritableCatalog *AttachFreely(const std::string &root_path,
+                                       const std::string &file,
+                                       const hash::Any   &catalog_hash,
+                                             Catalog     *parent = NULL);
 
   void Transaction();
   void Commit();
@@ -49,6 +61,7 @@ class WritableCatalog : public Catalog {
   void RemoveEntry(const std::string &entry_path);
   void IncLinkcount(const std::string &path_within_group, const int delta);
   void AddFileChunk(const std::string &entry_path, const FileChunk &chunk);
+  void RemoveFileChunks(const std::string &entry_path);
 
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
@@ -97,6 +110,7 @@ class WritableCatalog : public Catalog {
   SqlDirentUpdate     *sql_update_;
   SqlChunkInsert      *sql_chunk_insert_;
   SqlChunksRemove     *sql_chunks_remove_;
+  SqlChunksCount      *sql_chunks_count_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
 
@@ -131,13 +145,10 @@ class WritableCatalog : public Catalog {
   void CopyToParent();
   void CopyCatalogsToParent();
 
-  void UpdateCounters();
+  void UpdateCounters() const;
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
-
-WritableCatalog *AttachFreelyRw(const std::string &root_path,
-                                const std::string &file);
 
 }  // namespace catalog
 
