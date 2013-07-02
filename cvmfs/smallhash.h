@@ -264,11 +264,11 @@ class SmallHashDynamic :
   }
 
  private:
-  // Returns a random permutation of indices [0..N-1] that is allocated
-  // by smmap (Knuth's shuffle algorithm)
+  // Returns a random permutation of indices [0..N-1]
+  // (Knuth's shuffle algorithm)
   uint32_t *ShuffleIndices(const uint32_t N) {
     uint32_t *shuffled =
-      static_cast<uint32_t *>(smmap(N * sizeof(uint32_t)));
+      static_cast<uint32_t *>(smalloc(N * sizeof(uint32_t)));
     // Init with identity
     for (unsigned i = 0; i < N; ++i)
       shuffled[i] = i;
@@ -299,7 +299,7 @@ class SmallHashDynamic :
           Base::Insert(old_keys[shuffled_indices[i]],
                        old_values[shuffled_indices[i]]);
       }
-      smunmap(shuffled_indices);
+      free(shuffled_indices);
     } else {
       for (uint32_t i = 0; i < old_capacity; ++i) {
         if (old_keys[i] != Base::empty_key_)
@@ -320,7 +320,7 @@ class SmallHashDynamic :
         this->Insert(other.keys_[shuffled_indices[i]],
                      other.values_[shuffled_indices[i]]);
     }
-    smunmap(shuffled_indices);
+    free(shuffled_indices);
   }
 
   uint32_t num_migrates_;
