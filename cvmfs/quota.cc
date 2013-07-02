@@ -709,8 +709,12 @@ static bool InitDatabase(const bool rebuild_database) {
   }
 
   bool retry = false;
-init_recover:
   const string db_file = (*cache_dir_) + "/cachedb";
+  if (rebuild_database) {
+    unlink(db_file.c_str());
+    unlink((db_file + "-journal").c_str());
+  }
+init_recover:
   int err = sqlite3_open(db_file.c_str(), &db_);
   if (err != SQLITE_OK) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open cache database (%d)", err);
