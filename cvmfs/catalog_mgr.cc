@@ -115,7 +115,7 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
 }
 
 
-Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
+/*Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
   Catalog *result = NULL;
   const inode_t raw_inode =
     inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
@@ -132,7 +132,7 @@ Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
              "(raw inode: %"PRIu64")", inode, raw_inode);
   }
   return result;
-}
+}*/
 
 
 /**

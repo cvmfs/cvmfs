@@ -268,7 +268,7 @@ class AbstractCatalogManager {
   OwnerMap uid_map_;
   OwnerMap gid_map_;
 
-  Catalog *Inode2Catalog(const inode_t inode);
+  //Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;
 
