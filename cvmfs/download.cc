@@ -564,15 +564,19 @@ static void SetUrlOptions(JobInfo *info) {
         static_cast<int64_t>(opt_timestamp_backup_proxies_ +
                              opt_proxy_groups_reset_after_))
     {
-      if (opt_proxy_groups_) {
-        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                 "switching proxy from %s to %s (reset proxy group)",
-                 (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str(),
-                 (*opt_proxy_groups_)[0][0].c_str());
-      }
+      string old_proxy;
+      if (opt_proxy_groups_)
+        old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
+
       opt_proxy_groups_current_ = 0;
       RebalanceProxiesUnlocked();
       opt_timestamp_backup_proxies_ = 0;
+
+      if (opt_proxy_groups_) {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "switching proxy from %s to %s (reset proxy group)",
+                 old_proxy.c_str(), (*opt_proxy_groups_)[0][0].c_str());
+      }
     }
   }
   // Check if load-balanced proxies within the group need to be reset
@@ -754,6 +758,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_COULDNT_CONNECT:
     case CURLE_OPERATION_TIMEDOUT:
       if (info->proxy != "")
+        // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
       else
         info->error_code = kFailHostConnection;
@@ -789,12 +794,39 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if ( same_url_retry || (
          ( (info->error_code == kFailProxyResolve) ||
            (info->error_code == kFailProxyConnection) ||
-           (info->error_code == kFailProxyHttp)) &&
-         (info->num_failed_proxies < opt_num_proxies_))
+           (info->error_code == kFailProxyHttp)) )
        )
     {
       try_again = true;
-    }
+      // If all proxies failed, do a next round with the next host
+      if (!same_url_retry && (info->num_failed_proxies >= opt_num_proxies_)) {
+        // Check if this can be made a host fail-over
+        if (info->probe_hosts &&
+            opt_host_chain_ &&
+            (info->num_failed_hosts < opt_host_chain_->size()))
+        {
+          // reset proxy group
+          string old_proxy;
+          if (opt_proxy_groups_)
+            old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
+          opt_proxy_groups_current_ = 0;
+          RebalanceProxiesUnlocked();
+          opt_timestamp_backup_proxies_ = 0;
+          if (opt_proxy_groups_) {
+            LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                     "switching proxy from %s to %s "
+                     "(reset proxies for host failover)",
+                     old_proxy.c_str(), (*opt_proxy_groups_)[0][0].c_str());
+          }
+
+          // Make it a host failure
+          info->num_failed_proxies = 0;
+          info->error_code = kFailHostAfterProxy;
+        } else {
+          try_again = false;
+        }
+      }  // Make a proxy failure a host failure
+    }  // Proxy failure assumed
     pthread_mutex_unlock(&lock_options_);
   }
 
@@ -840,6 +872,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
         break;
       case kFailHostResolve:
       case kFailHostHttp:
+      case kFailHostAfterProxy:
         switch_host = true;
         break;
       case kFailProxyConnection:

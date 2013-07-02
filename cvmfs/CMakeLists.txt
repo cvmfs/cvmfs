@@ -71,6 +71,11 @@ set (LIBCVMFS_SOURCES
   libcvmfs.h libcvmfs.cc
 )
 
+set (TEST_LIBCVMFS_SOURCES
+  libcvmfs.h
+  test_libcvmfs.cc
+)
+
 set (CVMFS_FSCK_SOURCES
   platform.h platform_linux.h platform_osx.h
   logging_internal.h logging.h logging.cc
@@ -154,6 +159,8 @@ set (CVMFS2_DEBUG_CFLAGS "${CVMFS2_DEBUG_CFLAGS} ${CVMFS2_CFLAGS} -D_FILE_OFFSET
 set (CVMFS_SWISSKNIFE_DEBUG_CFLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS} -DDEBUGMSG -g")
 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
+
+set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS")
 
 #
 # set some include and linking stuff
@@ -250,7 +257,7 @@ if (BUILD_LIBCVMFS)
     add_dependencies (cvmfs_only sparsehash)
   endif (SPARSEHASH_BUILTIN)
 
-  set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}")
+  set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
   if (NOT MACOSX)
     # We do not (yet) have a recipe for localizing private symbols
@@ -268,6 +275,9 @@ if (BUILD_LIBCVMFS)
   # dummy target to cause merged libcvmfs to be produced
   add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
   add_dependencies (libcvmfs cvmfs_only)
+
+  add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
+  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE} pthread dl )
 
 endif (BUILD_LIBCVMFS)
 
