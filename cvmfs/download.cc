@@ -564,15 +564,19 @@ static void SetUrlOptions(JobInfo *info) {
         static_cast<int64_t>(opt_timestamp_backup_proxies_ +
                              opt_proxy_groups_reset_after_))
     {
-      if (opt_proxy_groups_) {
-        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                 "switching proxy from %s to %s (reset proxy group)",
-                 (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str(),
-                 (*opt_proxy_groups_)[0][0].c_str());
-      }
+      string old_proxy;
+      if (opt_proxy_groups_)
+        old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
+
       opt_proxy_groups_current_ = 0;
       RebalanceProxiesUnlocked();
       opt_timestamp_backup_proxies_ = 0;
+
+      if (opt_proxy_groups_) {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "switching proxy from %s to %s (reset proxy group)",
+                 old_proxy.c_str(), (*opt_proxy_groups_)[0][0].c_str());
+      }
     }
   }
   // Check if load-balanced proxies within the group need to be reset
