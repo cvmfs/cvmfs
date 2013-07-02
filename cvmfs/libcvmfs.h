@@ -10,7 +10,13 @@
  * the list in libcvmfs_public_syms.txt.
  */
 
+// needed for size_t
+#include <unistd.h>
+#include <sys/stat.h>
+
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 /**
  * Initialize the CVMFS library and attach the specified remote
@@ -98,6 +104,8 @@ int cvmfs_lstat(const char *path,struct stat *st);
  */
 int cvmfs_listdir(const char *path,char ***buf,size_t *buflen);
 
+#ifdef __cplusplus
 }
+#endif
 
 #endif  // CVMFS_LIBCVMFS_H_
