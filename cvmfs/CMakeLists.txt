@@ -160,6 +160,8 @@ set (CVMFS_SWISSKNIFE_DEBUG_CFLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS} -DDEBUGMSG 
 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
+set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS")
+
 #
 # set some include and linking stuff
 #
@@ -255,7 +257,7 @@ if (BUILD_LIBCVMFS)
     add_dependencies (cvmfs_only sparsehash)
   endif (SPARSEHASH_BUILTIN)
 
-  set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}")
+  set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
   if (NOT MACOSX)
     # We do not (yet) have a recipe for localizing private symbols

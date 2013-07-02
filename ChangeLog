@@ -1,4 +1,6 @@
 2.1.13:
+  * Refurbish build system for external dependencies
+  * Fix C binding of libcvmfs
   * Add "import" command to cvmfs_server that transforms a 2.0
     repository into a 2.1 repository (Stratum 0)
   * Add pin command to cvmfs_talk

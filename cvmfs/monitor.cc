@@ -45,8 +45,9 @@
 using namespace std;  // NOLINT
 
 // Used for address offset calculation
-// Temporarily commented out to avoid undefined symbol in cvmfs.
-// extern loader::CvmfsExports *g_cvmfs_exports;
+#ifndef CVMFS_LIBCVMFS
+extern loader::CvmfsExports *g_cvmfs_exports;
+#endif
 
 namespace monitor {
 
@@ -155,6 +156,7 @@ static void SendTrace(int sig,
     if (++counter == 300) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
       // Last attempt to log something useful
+#ifndef CVMFS_LIBCVMFS
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
                sig, send_errno);
       void *addr[64];
@@ -164,8 +166,9 @@ static void SendTrace(int sig,
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
-// Temporarily commented out to avoid undefined symbol in cvmfs.
-//      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p", &g_cvmfs_exports);
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
+               &g_cvmfs_exports);
+#endif
 
       _exit(1);
     }
