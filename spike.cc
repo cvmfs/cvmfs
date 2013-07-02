@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cassert>
 #include <vector>
+#include <sstream>
 
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
@@ -98,11 +99,65 @@ class Buffer {
 typedef Buffer<unsigned char, scalable_allocator<unsigned char> > CharBuffer;
 
 
+
+class File;
+
+class IoRequest {
+ public:
+  enum RequestType {
+    Read,
+    Write,
+    Terminate,
+    Unknown
+  };
+
+ public:
+  IoRequest(const RequestType type = Unknown, File *file = nullptr) :
+    type_(type), file_(file)
+  {
+    if (file != nullptr) {
+      assert (type == Read || type == Write);
+    } else {
+      assert (type == Terminate || type == Unknown);
+    }
+  }
+
+  IoRequest(const IoRequest &other) :
+    type_(other.type_), file_(other.file_) {}
+
+  bool        IsValid()      const { return type_ != Unknown;   }
+  bool        IsTerminator() const { return type_ == Terminate; }
+  File*       file()               { return file_;              }
+  RequestType type()         const { return type_;              }
+
+ private:
+  RequestType  type_;
+  File        *file_;
+};
+
+
+class CruncherTask : public task {
+  public:
+  CruncherTask(File *file, concurrent_bounded_queue<IoRequest> &io_queue) :
+    file_(file), io_queue_(io_queue) {}
+
+  task* execute();
+
+ private:
+  File                                 *file_;
+  concurrent_bounded_queue<IoRequest>  &io_queue_;
+};
+
+
 class File {
  public:
-  File() : path_(""), uncompressed_buffer_(NULL), compressed_buffer_(NULL) {}
+  File() : path_(""),
+           uncompressed_buffer_(NULL),
+           compressed_buffer_(NULL),
+           cruncher_task_(nullptr) {}
   explicit File(const std::string &path) :
-    path_(path) {}
+    path_(path),
+    cruncher_task_(nullptr) {}
 
   const std::string& path() const { return path_; }
 
@@ -110,8 +165,23 @@ class File {
   CharBuffer&  compressed_buffer()   { return compressed_buffer_;   }
   SHA_CTX&     sha1_context()        { return sha1_context_;        }
   std::string& sha1()                { return sha1_;                }
+  task*        cruncher_task()       { return cruncher_task_;       }
 
   bool         IsDummy() const       { return path_.empty();        }
+
+  void CreateTbbTask(task *parent, concurrent_bounded_queue<IoRequest> &io_queue) {
+    CruncherTask *t = new(parent->allocate_child()) CruncherTask(this,
+                                                                 io_queue);
+    cruncher_task_ = t;
+  }
+
+  void SpawnTbbTask() {
+    assert (cruncher_task_ != nullptr);
+
+    task *parent = cruncher_task_->parent();
+    parent->increment_ref_count();
+    task::spawn(*cruncher_task_);
+  }
 
  public:
   bool Read() {
@@ -227,83 +297,45 @@ class File {
 
 
  private:
-  std::string  path_;
-  CharBuffer   uncompressed_buffer_;
-  CharBuffer   compressed_buffer_;
-  SHA_CTX      sha1_context_;
-  std::string  sha1_;
+  std::string   path_;
+  CruncherTask *cruncher_task_;
+  CharBuffer    uncompressed_buffer_;
+  CharBuffer    compressed_buffer_;
+  SHA_CTX       sha1_context_;
+  std::string   sha1_;
 };
 typedef std::vector<File> FileVector;
 
 
-class IoRequest {
- public:
-  enum RequestType {
-    Read,
-    Write,
-    Terminate,
-    Unknown
-  };
-
- public:
-  IoRequest(const RequestType type = Unknown, File *file = nullptr) :
-    type_(type), file_(file)
-  {
-    if (file != nullptr) {
-      assert (type == Read || type == Write);
-    } else {
-      assert (type == Terminate || type == Unknown);
-    }
-  }
-
-  IoRequest(const IoRequest &other) :
-    type_(other.type_), file_(other.file_) {}
-
-  bool        IsValid()      const { return type_ != Unknown;   }
-  bool        IsTerminator() const { return type_ == Terminate; }
-  File*       file()               { return file_;              }
-  RequestType type()         const { return type_;              }
-
- private:
-  RequestType  type_;
-  File        *file_;
-};
+task* CruncherTask::execute() {
+  std::stringstream ss;
+  ss << pthread_self();
+  Print(ss.str());
+  file_->Compress();
+  file_->Hash();
+  io_queue_.push(IoRequest(IoRequest::Write, file_));
+  return NULL;
+}
 
 
 class TraversalDelegate {
  public:
-  TraversalDelegate(concurrent_bounded_queue<IoRequest> &io_queue) :
-    io_queue_(io_queue) {}
+  TraversalDelegate(concurrent_bounded_queue<IoRequest> &io_queue,
+                    task *dummy_task) :
+    io_queue_(io_queue), dummy_task_(dummy_task) {}
   ~TraversalDelegate() {}
 
   void FileCb(const std::string &relative_path,
               const std::string &file_name) {
     const std::string path = relative_path + "/" + file_name;
     File *file = new File(path);
+    file->CreateTbbTask(dummy_task_, io_queue_);
     io_queue_.push(IoRequest(IoRequest::Read, file));
   }
 
  private:
-  concurrent_bounded_queue<IoRequest> &io_queue_;
-};
-
-
-class CruncherTask : public task {
- public:
-  CruncherTask(File *file, concurrent_bounded_queue<IoRequest> &io_queue) :
-    file_(file), io_queue_(io_queue) {}
-
-  task* execute() {
-    //Print("crunching " + file_->path());
-    file_->Compress();
-    file_->Hash();
-    io_queue_.push(IoRequest(IoRequest::Write, file_));
-    return NULL;
-  }
-
- private:
-  File                                 *file_;
   concurrent_bounded_queue<IoRequest>  &io_queue_;
+  task                                 *dummy_task_;
 };
 
 
@@ -321,18 +353,16 @@ static void IO(concurrent_bounded_queue<IoRequest>  *io_queue,
     IoRequest request;
     io_queue->pop(request);
 
+    //Print("processing request... " + ((request.type() != IoRequest::Terminate) ? request.file()->path() : ""));
+
     switch (request.type()) {
       case IoRequest::Terminate:
         run = false;
         break;
       case IoRequest::Read:
-        //Print("reading " + request.file()->path());
+        // Print("reading " + request.file()->path());
         request.file()->Read();
-        crunch_task =
-          new(dummy_task->allocate_child()) CruncherTask(request.file(),
-                                                         *io_queue);
-        dummy_task->increment_ref_count();
-        dummy_task->spawn(*crunch_task);
+        request.file()->SpawnTbbTask();
         ++files;
         break;
       case IoRequest::Write:
@@ -341,7 +371,7 @@ static void IO(concurrent_bounded_queue<IoRequest>  *io_queue,
         delete request.file();
         --files;
         if (files == 0) {
-          dummy_task->decrement_ref_count();
+          //dummy_task->decrement_ref_count();
         }
         break;
       default:
@@ -357,16 +387,15 @@ int main() {
   tick_count start, end;
   tick_count all_start, all_end;
 
-
   concurrent_bounded_queue<IoRequest> io_queue;
-  TraversalDelegate delegate(io_queue);
 
   all_start = tick_count::now();
 
-
   task* dummy_task = new(task::allocate_root()) empty_task;
-  dummy_task->set_ref_count(2);
+  dummy_task->increment_ref_count();
   tbb_thread io_thread(IO, &io_queue, dummy_task);
+
+  TraversalDelegate delegate(io_queue, dummy_task);
 
 
   start = tick_count::now();
@@ -376,46 +405,9 @@ int main() {
   end = tick_count::now();
   std::cout << "recursion took:   " << (end - start).seconds() << " seconds" << std::endl;
 
-
-  // FileVector &files = delegate.files();
-
-
-  // start = tick_count::now();
-  // for (auto &file : files) {
-  //   file.Read();
-  // }
-  // end = tick_count::now();
-  // std::cout << "reading took:     " << (end - start).seconds() << " seconds" << std::endl;
-
-
-
-  // start = tick_count::now();
-  // parallel_for(blocked_range<size_t>(0, files.size()),
-  //              [&](blocked_range<size_t> block) {
-  //                for (size_t i = block.begin(); i != block.end(); ++i) {
-  //                   File &file = files[i];
-
-  //                   // file.Read();
-  //                   file.Compress();
-  //                   file.Hash();
-  //                }
-  //              });
-  // end = tick_count::now();
-  // std::cout << "crunching took:   " << (end - start).seconds() << " seconds" << std::endl;
-
-
-
-  // start = tick_count::now();
-  // for (auto &file : files) {
-  //   file.Write();
-  // }
-  // end = tick_count::now();
-  // std::cout << "writing took:     " << (end - start).seconds() << " seconds" << std::endl;
-
-
   Print("going to wait now...");
 
-  dummy_task->wait_for_all();
+  dummy_task->spawn_and_wait_for_all(*dummy_task);
   dummy_task->destroy(*dummy_task);
 
   Print("waited...");
