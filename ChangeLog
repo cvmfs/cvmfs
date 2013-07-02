@@ -1,4 +1,6 @@
 2.1.12:
+  * Improve recovery reliabliliy after node crash 
+    (force removal of cache database)
   * Fix help text of cvmfs_talk
   * Fix timeout for NFS shared maps
   * Drastically improved performance of copying the inode
