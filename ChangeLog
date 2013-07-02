@@ -1,4 +1,6 @@
 2.1.12:
+  * Perform host failover after unsuccessful proxy
+    failover (test all paths)
   * Improve recovery reliabliliy after node crash 
     (force removal of cache database)
   * Fix help text of cvmfs_talk
