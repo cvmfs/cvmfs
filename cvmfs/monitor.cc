@@ -45,7 +45,8 @@
 using namespace std;  // NOLINT
 
 // Used for address offset calculation
-extern loader::CvmfsExports *g_cvmfs_exports;
+// Temporarily commented out to avoid undefined symbol in cvmfs.
+// extern loader::CvmfsExports *g_cvmfs_exports;
 
 namespace monitor {
 
@@ -163,8 +164,8 @@ static void SendTrace(int sig,
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
-               &g_cvmfs_exports);
+// Temporarily commented out to avoid undefined symbol in cvmfs.
+//      LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p", &g_cvmfs_exports);
 
       _exit(1);
     }
