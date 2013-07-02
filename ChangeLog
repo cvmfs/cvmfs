@@ -1,4 +1,8 @@
 2.1.12:
+  * Fix help text of cvmfs_talk
+  * Fix timeout for NFS shared maps
+  * Drastically improved performance of copying the inode
+    tracker
   * Safe guard against concurrent snapshot processes
   * Drop config.sh dependency from cvmfs_server
 
