@@ -5,8 +5,14 @@ cvmfs_run_test() {
   logfile=$1
   local scratch_dir=$(pwd)
 
+  local uuid1
+  local uuid2
+
+  uuid1=$(head -c10 /dev/urandom | sha1sum | awk '{print $1}')
+  uuid2=$(head -c10 /dev/urandom | sha1sum | awk '{print $1}')
+
   echo "configure cvmfs with an unreachable proxy for the test case" >> $logfile
-  cvmfs_mount "atlas.cern.ch"  "http://crap.cern.ch/cvmfsproxy:3128|http://garbage.cern.ch/proxy:3128|${CVMFS_TEST_PROXY}" || return 1
+  cvmfs_mount "atlas.cern.ch"  "http://$uuid1.cern.ch/cvmfsproxy:3128|http://$uuid2.cern.ch/proxy:3128|${CVMFS_TEST_PROXY}" || return 1
 
   ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 2
 }
