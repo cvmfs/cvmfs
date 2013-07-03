@@ -184,18 +184,22 @@ cvmfs_clean() {
 
 cvmfs_mount() {
   repositories=$1
-  proxies=$2
-
-  if [ x"$proxies" = x"" ]; then
-    proxies=${CVMFS_TEST_PROXY}
-  fi
+  shift 1
 
   sudo sh -c "echo \"CVMFS_REPOSITORIES=$repositories\" > /etc/cvmfs/default.local" || return 100
-  sudo sh -c "echo \"CVMFS_HTTP_PROXY=\\\"$proxies\\\"\" >> /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo \"CVMFS_HTTP_PROXY=\\\"${CVMFS_TEST_PROXY}\\\"\" >> /etc/cvmfs/default.local" || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
+
+  # add additional parameters
+  while [ $# -gt 0 ]; do
+    local param="$1"
+    sudo sh -c "echo \"$1\" >> /etc/cvmfs/default.local" || return 100
+    shift 1
+  done
+
   if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
