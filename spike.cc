@@ -26,8 +26,8 @@
 
 using namespace tbb;
 
-static const std::string input_path  = "../benchmark_repo";
-static const std::string output_path = "/Volumes/ramdisk/output";
+static const std::string input_path  = "/Volumes/ramdisk/input";
+static const std::string output_path = "output";
 
 void Print(const std::string &msg) {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -39,24 +39,24 @@ void Print(const std::string &msg) {
 template<typename T, class A = std::allocator<T> >
 class Buffer {
  public:
-  Buffer() : size_(0), used_bytes_(0), buffer_(nullptr) {}
+  Buffer() : size_(0), used_bytes_(0), buffer_(NULL) {}
 
   Buffer(const size_t size) : size_(0) {
     Allocate(size);
   }
 
-  Buffer(Buffer &&other) {
-    *this = std::move(other);
-  }
+  // Buffer(Buffer &&other) {
+  //   *this = std::move(other);
+  // }
 
-  Buffer& operator=(Buffer &&other) {
-    size_         = other.size();
-    buffer_       = (size_ > 0) ? other.buffer_
-                                : nullptr;
-    other.size_   = 0;
-    other.buffer_ = nullptr;
-    return *this;
-  }
+  // Buffer& operator=(Buffer &&other) {
+  //   size_         = other.size();
+  //   buffer_       = (size_ > 0) ? other.buffer_
+  //                               : nullptr;
+  //   other.size_   = 0;
+  //   other.buffer_ = nullptr;
+  //   return *this;
+  // }
 
   ~Buffer() {
     Deallocate();
@@ -130,9 +130,7 @@ class CruncherTask : public task {
 
 class File {
  public:
-  File() : path_(""),
-           uncompressed_buffer_(NULL),
-           compressed_buffer_(NULL) {}
+  File() : path_("") {}
   explicit File(const std::string &path) :
     path_(path) {}
 
@@ -386,12 +384,13 @@ typedef std::vector<File> FileVector;
 class IoDispatcher {
  public:
   IoDispatcher() :
-    files_in_flight_(0),
     file_count_(0),
-    all_enqueued_(false),
     read_thread_(IoDispatcher::ReadThread, this),
     write_thread_(IoDispatcher::WriteThread, this)
-  {}
+  {
+    files_in_flight_ = 0;
+    all_enqueued_ = false;
+  }
 
   ~IoDispatcher() {
     Wait();
@@ -405,7 +404,7 @@ class IoDispatcher {
   void Wait() {
     all_enqueued_ = true;
 
-    read_queue_.push(nullptr);
+    read_queue_.push(NULL);
 
     if (read_thread_.joinable()) {
       read_thread_.join();
@@ -431,7 +430,7 @@ class IoDispatcher {
     while (true) {
       File *file;
       dispatcher->read_queue_.pop(file);
-      if (file == nullptr) {
+      if (file == NULL) {
         break;
       }
 
@@ -454,7 +453,7 @@ class IoDispatcher {
     while (true) {
       File *file;
       dispatcher->write_queue_.pop(file);
-      if (file == nullptr) {
+      if (file == NULL) {
         break;
       }
 
@@ -515,23 +514,9 @@ class TraversalDelegate {
   IoDispatcher *io_dispatcher_;
 };
 
-
-class Observer : public task_scheduler_observer {
-  void on_scheduler_entry(bool is_worker) {
-    Print("ENTER");
-  }
-
-  void on_scheduler_exit(bool is_worker) {
-    Print("EXIT");
-  }
-};
-
 int main() {
   tick_count start, end;
   tick_count all_start, all_end;
-
-  Observer observer;
-  observer.observe();
 
   all_start = tick_count::now();
 

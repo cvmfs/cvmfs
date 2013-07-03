@@ -1,19 +1,21 @@
 #!/bin/sh
 
-ramdisk_name="ramdisk"
-
-clang++ -o spike -O3 -g -std=c++11 -stdlib=libc++ -ltbb -ltbbmalloc -lz -lcrypto spike.cc cvmfs/logging.cc
+echo "compiling..."
+clang++ -o spike -O3 -g spike.cc cvmfs/logging.cc -lrt -ltbb -ltbbmalloc -lz -lcrypto
 if [ $? -ne 0 ]; then
   exit 1
 fi
 
-rm -fR /Volumes/$ramdisk_name/output
-mkdir /Volumes/$ramdisk_name/output
+echo "cleanup..."
+rm -fR /Volumes/ramdisk/output
+mkdir /Volumes/ramdisk/output
+rm -fR output
+mkdir output
 
-# umount /Volumes/$ramdisk_name
-# diskutil erasevolume HFS+ "$ramdisk_name" `hdiutil attach -nomount ram://4388608`
-
-purge
+if [ x"$1" != x"" ]; then
+  echo "clear all caches..."
+  echo 3 > /proc/sys/vm/drop_caches
+fi
 
 echo "- - - - - -"
 
