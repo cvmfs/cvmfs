@@ -1104,7 +1104,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
         DiffTimeSeconds(timeval_start, timeval_stop);
     }
     int retval = poll(watch_fds_, watch_fds_inuse_, timeout);
-    if (errno == -1) {
+    if (retval<0) {
       continue;
     }
 
