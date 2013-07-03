@@ -7,12 +7,16 @@
 #include <sstream>
 
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_invoke.h>
 #include <tbb/blocked_range.h>
 #include <tbb/tick_count.h>
 #include <tbb/scalable_allocator.h>
 #include <tbb/concurrent_queue.h>
 #include <tbb/compat/thread>
 #include <tbb/task.h>
+#include <tbb/task_scheduler_init.h>
+#include <tbb/task_scheduler_observer.h>
+#include <tbb/atomic.h>
 
 #include <zlib.h>
 
@@ -22,7 +26,8 @@
 
 using namespace tbb;
 
-static const std::string output_path = "/Volumes/ramdisk";
+static const std::string input_path  = "../benchmark_repo";
+static const std::string output_path = "/Volumes/ramdisk/output";
 
 void Print(const std::string &msg) {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -34,7 +39,7 @@ void Print(const std::string &msg) {
 template<typename T, class A = std::allocator<T> >
 class Buffer {
  public:
-  Buffer() : size_(0), buffer_(nullptr) {}
+  Buffer() : size_(0), used_bytes_(0), buffer_(nullptr) {}
 
   Buffer(const size_t size) : size_(0) {
     Allocate(size);
@@ -79,7 +84,10 @@ class Buffer {
     return ptr();
   }
 
-  const size_t size() const { return size_; }
+  void SetUsedBytes(const size_t bytes) { used_bytes_ = bytes; }
+
+  const size_t size()       const { return size_;       }
+  const size_t used_bytes() const { return used_bytes_; }
 
  private:
   Buffer(const Buffer &other) { assert (false); } // no copy!
@@ -90,9 +98,13 @@ class Buffer {
       return;
     }
     A().deallocate(buffer_, size_);
+    std::stringstream ss;
+    ss << "freeing: " << size_ << " bytes";
+    Print(ss.str());
   }
 
  private:
+  size_t               used_bytes_;
   size_t               size_;
   typename A::pointer  buffer_;
 };
@@ -101,51 +113,18 @@ typedef Buffer<unsigned char, scalable_allocator<unsigned char> > CharBuffer;
 
 
 class File;
-
-class IoRequest {
- public:
-  enum RequestType {
-    Read,
-    Write,
-    Terminate,
-    Unknown
-  };
-
- public:
-  IoRequest(const RequestType type = Unknown, File *file = nullptr) :
-    type_(type), file_(file)
-  {
-    if (file != nullptr) {
-      assert (type == Read || type == Write);
-    } else {
-      assert (type == Terminate || type == Unknown);
-    }
-  }
-
-  IoRequest(const IoRequest &other) :
-    type_(other.type_), file_(other.file_) {}
-
-  bool        IsValid()      const { return type_ != Unknown;   }
-  bool        IsTerminator() const { return type_ == Terminate; }
-  File*       file()               { return file_;              }
-  RequestType type()         const { return type_;              }
-
- private:
-  RequestType  type_;
-  File        *file_;
-};
-
+class IoDispatcher;
 
 class CruncherTask : public task {
   public:
-  CruncherTask(File *file, concurrent_bounded_queue<IoRequest> &io_queue) :
-    file_(file), io_queue_(io_queue) {}
+  CruncherTask(File *file, IoDispatcher *io_dispatcher) :
+    file_(file), io_dispatcher_(io_dispatcher) {}
 
   task* execute();
 
  private:
-  File                                 *file_;
-  concurrent_bounded_queue<IoRequest>  &io_queue_;
+  File          *file_;
+  IoDispatcher  *io_dispatcher_;
 };
 
 
@@ -153,11 +132,9 @@ class File {
  public:
   File() : path_(""),
            uncompressed_buffer_(NULL),
-           compressed_buffer_(NULL),
-           cruncher_task_(nullptr) {}
+           compressed_buffer_(NULL) {}
   explicit File(const std::string &path) :
-    path_(path),
-    cruncher_task_(nullptr) {}
+    path_(path) {}
 
   const std::string& path() const { return path_; }
 
@@ -165,80 +142,27 @@ class File {
   CharBuffer&  compressed_buffer()   { return compressed_buffer_;   }
   SHA_CTX&     sha1_context()        { return sha1_context_;        }
   std::string& sha1()                { return sha1_;                }
-  task*        cruncher_task()       { return cruncher_task_;       }
 
   bool         IsDummy() const       { return path_.empty();        }
 
-  void CreateTbbTask(task *parent, concurrent_bounded_queue<IoRequest> &io_queue) {
-    CruncherTask *t = new(parent->allocate_child()) CruncherTask(this,
-                                                                 io_queue);
-    cruncher_task_ = t;
-  }
-
-  void SpawnTbbTask() {
-    assert (cruncher_task_ != nullptr);
-
-    task *parent = cruncher_task_->parent();
-    parent->increment_ref_count();
-    task::spawn(*cruncher_task_);
+  void SpawnTbbTask(IoDispatcher *io_dispatcher) {
+    CruncherTask *t = new(task::allocate_root()) CruncherTask(this, io_dispatcher);
+    task::enqueue(*t);
   }
 
  public:
   bool Read() {
-    // open file
-    FILE *f = fopen(path_.c_str(), "r");
-    if (f == NULL) {
-      std::cout << "cannot open file: " << path_
-                << " errno: " << errno << std::endl;
-      return false;
-    }
-
-    // get file size
-    fseek(f, 0, SEEK_END);
-    const size_t size = ftell(f);
-    rewind(f);
-
-    // allocate buffer
-    uncompressed_buffer_.Allocate(size);
-
-    // read the file chunk wise
-    do {
-      const size_t read_bytes = fread(uncompressed_buffer_.ptr(), 1, size, f);
-    } while(!feof(f) && !ferror(f));
-
-    // close the file
-    fclose(f);
-
-    return true;
+    //return ReadOldfashion();
+    //return ReadMmap();
+    return ReadFd();
   }
 
   bool Write() {
     assert (sha1_.size() > 0);
     assert (compressed_buffer_.Initialized());
 
-    const std::string path = output_path + "/" + sha1_;
-
-    // open file
-    FILE *f = fopen(path.c_str(), "w+");
-    if (f == NULL) {
-      std::cout << "cannot open file: " << path
-                << " errno: " << errno << std::endl;
-      return false;
-    }
-
-    // write buffer
-    const size_t written = fwrite(compressed_buffer_.ptr(), 1,
-                                  compressed_buffer_.size(), f);
-    if (written != compressed_buffer_.size()) {
-      std::cout << "failed to write " << compressed_buffer_.size() << " bytes "
-                << "to file: " << path << std::endl;
-      return false;
-    }
-
-    // close the file
-    fclose(f);
-
-    return true;
+    return WriteOldfashion();
+    //return WriteFd();
   }
 
   size_t Compress() {
@@ -268,6 +192,7 @@ class File {
       return 0;
     }
 
+    compressed_buffer_.SetUsedBytes(stream.total_out);
     return stream.total_out;
   }
 
@@ -296,6 +221,154 @@ class File {
   }
 
 
+ protected:
+  bool ReadOldfashion() {
+    // open file
+    FILE *f = fopen(path_.c_str(), "r");
+    if (f == NULL) {
+      std::cout << "cannot open file: " << path_
+                << " errno: " << errno << std::endl;
+      return false;
+    }
+
+    // get file size
+    fseek(f, 0, SEEK_END);
+    const size_t size = ftell(f);
+    rewind(f);
+
+    // allocate buffer
+    uncompressed_buffer_.Allocate(size);
+
+    // read the file chunk wise
+    do {
+      const size_t read_bytes = fread(uncompressed_buffer_.ptr(), 1, size, f);
+    } while(!feof(f) && !ferror(f));
+
+    // close the file
+    fclose(f);
+
+    return true;
+  }
+
+  bool ReadMmap() {
+    // open the file
+    int fd;
+    if ((fd = open(path_.c_str(), O_RDONLY, 0)) == -1) {
+      std::cout << "cannot open file: " << path_ << std::endl;
+      return false;
+    }
+
+    // get file size
+    struct stat64 filesize;
+    if (fstat64(fd, &filesize) != 0) {
+      std::cout << "failed to fstat file: " << path_ << std::endl;
+      close(fd);
+      return false;
+    }
+
+    void *mapping = NULL;
+    if (filesize.st_size > 0) {
+      // map the given file into memory
+      mapping = mmap(NULL, filesize.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+      if (mapping == MAP_FAILED) {
+        std::cout << "failed to mmap file: " << path_ << std::endl;
+        close(fd);
+        return false;
+      }
+    }
+
+    // save results
+    uncompressed_buffer_.Allocate(filesize.st_size);
+    memcpy(uncompressed_buffer_.ptr(), mapping, filesize.st_size);
+
+    // do unmap
+    if ((munmap(static_cast<void*>(mapping), filesize.st_size) != 0) ||
+        (close(fd) != 0))
+    {
+      std::cout << "failed to unmap file: " << path_ << std::endl;
+    }
+    return true;
+  }
+
+  bool ReadFd() {
+    // open the file
+    int fd;
+    if ((fd = open(path_.c_str(), O_RDONLY, 0)) == -1) {
+      std::cout << "cannot open file: " << path_ << std::endl;
+      return false;
+    }
+
+    // get file size
+    struct stat64 filesize;
+    if (fstat64(fd, &filesize) != 0) {
+      std::cout << "failed to fstat file: " << path_ << std::endl;
+      close(fd);
+      return false;
+    }
+
+    // allocate space
+    uncompressed_buffer_.Allocate(filesize.st_size);
+
+    if (read(fd, uncompressed_buffer_.ptr(), filesize.st_size) != filesize.st_size) {
+      std::cout << "failed to read file: " << path_ << std::endl;
+      close(fd);
+      return false;
+    }
+
+    // close the file
+    close(fd);
+
+    return true;
+  }
+
+  bool WriteOldfashion() {
+    const std::string path = output_path + "/" + sha1_;
+
+    // open file
+    FILE *f = fopen(path.c_str(), "w+");
+    if (f == NULL) {
+      std::cout << "cannot open file: " << path
+                << " errno: " << errno << std::endl;
+      return false;
+    }
+
+    // write buffer
+    const size_t to_write = compressed_buffer_.used_bytes();
+    const size_t written = fwrite(compressed_buffer_.ptr(), 1, to_write, f);
+    if (written != to_write) {
+      std::cout << "failed to write " << to_write << " bytes "
+                << "to file: " << path << std::endl;
+      return false;
+    }
+
+    // close the file
+    fclose(f);
+
+    return true;
+  }
+
+  bool WriteFd() {
+    // open the file
+    int fd;
+    if ((fd = open(path_.c_str(), O_WRONLY | O_CREAT, 0)) == -1) {
+      std::cout << "cannot open file: " << path_ << std::endl;
+      return false;
+    }
+
+    // write to file
+    const size_t bytes = compressed_buffer_.used_bytes();
+    if (write(fd, compressed_buffer_.ptr(), bytes) != bytes) {
+      std::cout << "failed to read file: " << path_ << std::endl;
+      close(fd);
+      return false;
+    }
+
+    // close the file
+    close(fd);
+    return true;
+  }
+
+
  private:
   std::string   path_;
   CruncherTask *cruncher_task_;
@@ -307,113 +380,175 @@ class File {
 typedef std::vector<File> FileVector;
 
 
+#define MEASURE_IO_TIME
+
+
+class IoDispatcher {
+ public:
+  IoDispatcher() :
+    files_in_flight_(0),
+    file_count_(0),
+    all_enqueued_(false),
+    read_thread_(IoDispatcher::ReadThread, this),
+    write_thread_(IoDispatcher::WriteThread, this)
+  {}
+
+  ~IoDispatcher() {
+    Wait();
+
+    std::cout << "Reads took:  " << read_time_ << std::endl
+              << "  average:   " << (read_time_ / file_count_) << std::endl
+              << "Writes took: " << write_time_ << std::endl
+              << "  average:   " << (write_time_ / file_count_) << std::endl;
+  }
+
+  void Wait() {
+    all_enqueued_ = true;
+
+    read_queue_.push(nullptr);
+
+    if (read_thread_.joinable()) {
+      read_thread_.join();
+    }
+
+    if (write_thread_.joinable()) {
+      write_thread_.join();
+    }
+  }
+
+  void Read(File *file) {
+    read_queue_.push(file);
+    ++file_count_;
+  }
+  void Write(File *file) {
+    write_queue_.push(file);
+  }
+
+ protected:
+  static void ReadThread(IoDispatcher *dispatcher) {
+    task_scheduler_init sched(3);
+
+    while (true) {
+      File *file;
+      dispatcher->read_queue_.pop(file);
+      if (file == nullptr) {
+        break;
+      }
+
+      dispatcher->files_in_flight_++;
+
+#ifdef MEASURE_IO_TIME
+      tick_count start = tick_count::now();
+      file->Read();
+      tick_count end = tick_count::now();
+      dispatcher->read_time_ += (end - start).seconds();
+#else
+      file->Read();
+#endif
+
+      file->SpawnTbbTask(dispatcher);
+    }
+  }
+
+  static void WriteThread(IoDispatcher *dispatcher) {
+    while (true) {
+      File *file;
+      dispatcher->write_queue_.pop(file);
+      if (file == nullptr) {
+        break;
+      }
+
+#ifdef MEASURE_IO_TIME
+      tick_count start = tick_count::now();
+      file->Write();
+      tick_count end = tick_count::now();
+      dispatcher->write_time_ += (end - start).seconds();
+#else
+      file->Write();
+#endif
+
+      dispatcher->files_in_flight_--;
+      if (dispatcher->files_in_flight_ == 0 && dispatcher->all_enqueued_) {
+        break;
+      }
+    }
+  }
+
+ private:
+  atomic<unsigned int> files_in_flight_;
+  atomic<bool>         all_enqueued_;
+  unsigned int         file_count_;
+
+  double read_time_;
+  double write_time_;
+
+  concurrent_bounded_queue<File*> read_queue_;
+  concurrent_bounded_queue<File*> write_queue_;
+
+  tbb_thread read_thread_;
+  tbb_thread write_thread_;
+};
+
+
+
 task* CruncherTask::execute() {
-  std::stringstream ss;
-  ss << pthread_self();
-  Print(ss.str());
   file_->Compress();
   file_->Hash();
-  io_queue_.push(IoRequest(IoRequest::Write, file_));
+  io_dispatcher_->Write(file_);
   return NULL;
 }
 
 
 class TraversalDelegate {
  public:
-  TraversalDelegate(concurrent_bounded_queue<IoRequest> &io_queue,
-                    task *dummy_task) :
-    io_queue_(io_queue), dummy_task_(dummy_task) {}
-  ~TraversalDelegate() {}
+  TraversalDelegate(IoDispatcher *io_dispatcher) :
+    io_dispatcher_(io_dispatcher) {}
 
   void FileCb(const std::string &relative_path,
               const std::string &file_name) {
     const std::string path = relative_path + "/" + file_name;
     File *file = new File(path);
-    file->CreateTbbTask(dummy_task_, io_queue_);
-    io_queue_.push(IoRequest(IoRequest::Read, file));
+    io_dispatcher_->Read(file);
   }
 
  private:
-  concurrent_bounded_queue<IoRequest>  &io_queue_;
-  task                                 *dummy_task_;
+  IoDispatcher *io_dispatcher_;
 };
 
 
-static void IO(concurrent_bounded_queue<IoRequest>  *io_queue,
-               task                                 *dummy_task) {
-
-  Print("hello from IO");
-
-  bool run = true;
-  task *crunch_task;
-
-  unsigned int files = 0;
-
-  while (run) {
-    IoRequest request;
-    io_queue->pop(request);
-
-    //Print("processing request... " + ((request.type() != IoRequest::Terminate) ? request.file()->path() : ""));
-
-    switch (request.type()) {
-      case IoRequest::Terminate:
-        run = false;
-        break;
-      case IoRequest::Read:
-        // Print("reading " + request.file()->path());
-        request.file()->Read();
-        request.file()->SpawnTbbTask();
-        ++files;
-        break;
-      case IoRequest::Write:
-        //Print("writing " + request.file()->path() + " (" + request.file()->sha1() + ")");
-        request.file()->Write();
-        delete request.file();
-        --files;
-        if (files == 0) {
-          //dummy_task->decrement_ref_count();
-        }
-        break;
-      default:
-        assert (false);
-    }
+class Observer : public task_scheduler_observer {
+  void on_scheduler_entry(bool is_worker) {
+    Print("ENTER");
   }
 
-  Print("ciao from IO");
-}
-
+  void on_scheduler_exit(bool is_worker) {
+    Print("EXIT");
+  }
+};
 
 int main() {
   tick_count start, end;
   tick_count all_start, all_end;
 
-  concurrent_bounded_queue<IoRequest> io_queue;
+  Observer observer;
+  observer.observe();
 
   all_start = tick_count::now();
 
-  task* dummy_task = new(task::allocate_root()) empty_task;
-  dummy_task->increment_ref_count();
-  tbb_thread io_thread(IO, &io_queue, dummy_task);
+  IoDispatcher io_dispatcher;
 
-  TraversalDelegate delegate(io_queue, dummy_task);
-
+  TraversalDelegate delegate(&io_dispatcher);
 
   start = tick_count::now();
   FileSystemTraversal<TraversalDelegate> t(&delegate, "", true);
   t.fn_new_file = &TraversalDelegate::FileCb;
-  t.Recurse("../benchmark_repo");
+  t.Recurse(input_path);
   end = tick_count::now();
   std::cout << "recursion took:   " << (end - start).seconds() << " seconds" << std::endl;
 
   Print("going to wait now...");
-
-  dummy_task->spawn_and_wait_for_all(*dummy_task);
-  dummy_task->destroy(*dummy_task);
-
+  io_dispatcher.Wait();
   Print("waited...");
-
-  io_queue.push(IoRequest(IoRequest::Terminate));
-  io_thread.join();
 
   all_end = tick_count::now();
   std::cout << "overall time:     " << (all_end - all_start).seconds() << " seconds" << std::endl;

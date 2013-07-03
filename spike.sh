@@ -7,8 +7,11 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-umount /Volumes/$ramdisk_name
-diskutil erasevolume HFS+ "$ramdisk_name" `hdiutil attach -nomount ram://4388608`
+rm -fR /Volumes/$ramdisk_name/output
+mkdir /Volumes/$ramdisk_name/output
+
+# umount /Volumes/$ramdisk_name
+# diskutil erasevolume HFS+ "$ramdisk_name" `hdiutil attach -nomount ram://4388608`
 
 purge
 
