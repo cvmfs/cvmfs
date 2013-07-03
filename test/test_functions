@@ -728,7 +728,7 @@ publish_repo() {
 stop_watch() {
   begin=$(date +%s)
   cmd="$@"
-  sh -c "$cmd"
+  $cmd
   res=$?
   end=$(date +%s)
   echo $((end - begin))
