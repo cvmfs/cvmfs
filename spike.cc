@@ -426,7 +426,7 @@ class IoDispatcher {
 
  protected:
   static void ReadThread(IoDispatcher *dispatcher) {
-    task_scheduler_init sched(3);
+    task_scheduler_init sched(task_scheduler_init::default_num_threads() + 1);
 
     while (true) {
       File *file;
