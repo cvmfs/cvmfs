@@ -1,4 +1,5 @@
 2.1.13:
+  * Fix potential endless loop in download thread
   * Refurbish build system for external dependencies
   * Fix C binding of libcvmfs
   * Add "import" command to cvmfs_server that transforms a 2.0
