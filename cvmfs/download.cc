@@ -757,6 +757,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
     case CURLE_COULDNT_CONNECT:
     case CURLE_OPERATION_TIMEDOUT:
+    case CURLE_PARTIAL_FILE:
       if (info->proxy != "")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
