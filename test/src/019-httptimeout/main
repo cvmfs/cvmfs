@@ -1,0 +1,38 @@
+
+cvmfs_test_name="HTTP Timeout"
+
+do_faulty_mount() {
+  cvmfs_mount "atlas.cern.ch"          \
+              "CVMFS_TIMEOUT=3"        \
+              "CVMFS_TIMEOUT_DIRECT=3" \
+              "CVMFS_HTTP_PROXY=DIRECT"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local retcode=0
+  local seconds=100
+  local http_pid=0
+
+  echo "configure cvmfs with an unreachable and an unresponsive host" >> $logfile
+  sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.1.2:8080;http://127.0.0.1/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
+
+  echo "run a silent HTTP server" >> $logfile
+  http_pid=$(open_silent_port TCP 80 $logfile)
+  echo "mocked HTTP server started with PID $http_pid" >> $logfile
+
+  echo "try to mount cvmfs" >> $logfile
+  seconds=$(stop_watch do_faulty_mount)
+
+  rm -f /etc/cvmfs/domain.d/cern.ch.local
+  sudo kill -9 $http_pid >> $logfile 2>&1
+
+  echo "try to list the repository" >> $logfile
+  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 3
+
+  if [ $seconds -gt 6 ]; then
+    echo "mounting took too long with $seconds seconds (expected 6)" >> $logfile
+    return 4
+  fi
+}
