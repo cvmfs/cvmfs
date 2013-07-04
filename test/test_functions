@@ -492,42 +492,6 @@ compare_directories() {
 }
 
 
-# handles some iptables related stuff
-#
-# @param command   what should be done?
-#                   - backup
-#                   - restore
-#                   - forward
-# @param ____      what to forward
-# @param ____      which port to forward to
-iptables_rules() {
-  local cmd=$1
-
-  case "$cmd" in
-    "backup")
-      if [ -f $IPTABLES_STARTUP ] ; then
-        sudo $IPTABLES_STARTUP save
-      else
-        sudo $IPTABLES_SAVE > saved_iptables_rules
-      fi
-      ;;
-    "restore")
-      if [ -f $IPTABLES_STARTUP ] ; then
-        sudo $IPTABLES_STARTUP restart
-      else
-        sudo $IPTABLES_RESTORE < saved_iptables_rules
-      fi
-      ;;
-    "forward")
-      sudo $IPTABLES -t nat -A OUTPUT -p tcp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
-      sudo $IPTABLES -t nat -A OUTPUT -p udp --dport $2 -j DNAT --to-destination 127.0.0.1:$3
-      ;;
-    *)
-      echo "No action set for this argument."
-  esac
-}
-
-
 # starts a perl helper service
 #
 # @param service_name   the identifier of the service to be started:
