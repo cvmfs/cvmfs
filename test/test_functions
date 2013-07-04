@@ -492,6 +492,38 @@ compare_directories() {
 }
 
 
+# open a port for incoming connections. It will accept the connection but stay
+# silent on it
+#
+# Note: The user is responsible for killing the created server process after
+#       usage
+#
+# @param protocol  either UDP or TCP
+# @param port      the desired port number to be opened
+# @param logfile   a path to the logfile where connection logs should be written
+# @return          the process ID of the created server script
+open_silent_port() {
+  local protocol=$1
+  local port=$2
+  local logfile=$3
+
+  local server_pid_tmp=""
+  server_pid_tmp=$(mktemp -q)
+
+  nohup sudo ${TEST_ROOT}/mock_services/silent_socket.py $protocol $port >> $server_pid_tmp 2>>$logfile &
+  sleep 1
+  server_pid=$(head -n1 $server_pid_tmp)
+  rm -f $server_pid_tmp
+
+  if ! sudo kill -0 $server_pid > /dev/null 2>&1; then
+    return 4
+  fi
+
+  echo $server_pid
+  return 0
+}
+
+
 # starts a perl helper service
 #
 # @param service_name   the identifier of the service to be started:
