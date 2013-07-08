@@ -68,11 +68,13 @@ struct FileChunkReflist {
  * Stores the chunk index of a file descriptor.  Needed for the Fuse module
  */
 struct ChunkFd {
-  ChunkFd() {
-    fd = -1;
-    chunk_idx = 0;
-  }
+  ChunkFd() :
+    fd(-1),
+    cfd(-1),
+    chunk_idx(0)
+  {}
   int fd;  // -1 or pointing to chunk_idx
+  int cfd; // FD of the checksum file.
   unsigned chunk_idx;
 };
 

@@ -17,6 +17,7 @@
 
 #include "cvmfs_config.h"
 #include "quota.h"
+#include "checksum.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -76,6 +77,7 @@ enum CommandType {
   kLimits,
   kPid,
   kPinRegular,
+  kQuery
 };
 
 struct LruCommand {
@@ -118,6 +120,7 @@ sqlite3_stmt *stmt_unpin_ = NULL;
 sqlite3_stmt *stmt_new_ = NULL;
 sqlite3_stmt *stmt_lru_ = NULL;
 sqlite3_stmt *stmt_size_ = NULL;
+sqlite3_stmt *stmt_query_ = NULL;
 sqlite3_stmt *stmt_rm_ = NULL;
 sqlite3_stmt *stmt_list_ = NULL;
 sqlite3_stmt *stmt_list_pinned_ = NULL;  /**< Loaded catalogs are pinned. */
@@ -266,6 +269,27 @@ static bool Contains(const string &hash_str) {
   return result;
 }
 
+
+static bool QuotaQuery(const string &hash_str, uint64_t &size, string &path) {
+  bool result = false;
+
+  sqlite3_bind_text(stmt_query_, 1, hash_str.c_str(), hash_str.length(),
+                    SQLITE_STATIC);
+  if (sqlite3_step(stmt_query_) == SQLITE_ROW) {
+    const unsigned char * tmp_path = sqlite3_column_text(stmt_query_, 0);
+    path = string(reinterpret_cast<const char *>(tmp_path));
+    size = sqlite3_column_int64(stmt_query_, 1);
+    result = true;
+  }
+  sqlite3_reset(stmt_query_);
+  if (result) {
+    LogCvmfs(kLogQuota, kLogDebug, "Hash %s maps to path %s, size %d",
+             hash_str.c_str(), path.c_str(), size);
+  } else {
+    LogCvmfs(kLogQuota, kLogDebug, "Hash %s does not map to path in catalog.", hash_str.c_str());
+  }
+  return result;
+}
 
 static void ProcessCommandBunch(const unsigned num,
                                 const LruCommand *commands, const char *paths)
@@ -436,7 +460,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       (command_type == kList) || (command_type == kListPinned) ||
       (command_type == kListCatalogs) || (command_type == kRemove) ||
       (command_type == kStatus) || (command_type == kLimits) ||
-      (command_type == kPid);
+      (command_type == kPid) || (command_type == kQuery);
     if (!immediate_command) num_commands++;
 
     if ((num_commands == kCommandBufferSize) || immediate_command)
@@ -518,6 +542,24 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
           length = -1;
           WritePipe(return_pipe, &length, sizeof(length));
           sqlite3_reset(this_stmt_list);
+          break;
+        case kQuery: {
+            string cvmfs_path;
+            uint64_t size;
+            const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
+                                 hash::kDigestSizes[hash::kSha1]);
+            const string hash_str = hash.ToString();
+            LogCvmfs(kLogQuota, kLogDebug, "Querying for hash %s", hash_str.c_str());
+            bool retval = QuotaQuery(hash_str, size, cvmfs_path);
+            size_t path_size = retval ? cvmfs_path.size() : 0;
+            if (retval) {
+              WritePipe(return_pipe, &path_size, sizeof(path_size));
+              WritePipe(return_pipe, &cvmfs_path[0], cvmfs_path.length());
+              WritePipe(return_pipe, &size, sizeof(size));
+            } else {
+              WritePipe(return_pipe, &path_size, sizeof(path_size));
+            }
+          }
           break;
         case kStatus:
           WritePipe(return_pipe, &gauge_, sizeof(gauge_));
@@ -863,6 +905,9 @@ init_recover:
   sqlite3_prepare_v2(db_,
                      ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) +
                       ";").c_str(), -1, &stmt_list_catalogs_, NULL);
+  sqlite3_prepare_v2(db_,
+                     "SELECT path, size FROM cache_catalog WHERE sha1=:sha1;",
+                     -1, &stmt_query_, NULL);
   return true;
 
  init_database_fail:
@@ -882,6 +927,7 @@ static void CloseDatabase() {
   if (stmt_touch_) sqlite3_finalize(stmt_touch_);
   if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
   if (stmt_new_) sqlite3_finalize(stmt_new_);
+  if (stmt_query_) sqlite3_finalize(stmt_query_);
   if (db_) sqlite3_close(db_);
   UnlockFile(fd_lock_cachedb_);
 
@@ -892,6 +938,7 @@ static void CloseDatabase() {
   stmt_size_ = NULL;
   stmt_touch_ = NULL;
   stmt_new_ = NULL;
+  stmt_query_ = NULL;
   db_ = NULL;
 
   delete pinned_chunks_;
@@ -1397,6 +1444,7 @@ void Remove(const hash::Any &hash) {
   }
 
   unlink(((*cache_dir_) + hash.MakePath(1, 2)).c_str());
+  unlink(((*cache_dir_) + hash.MakePath(1, 2) + CHECKSUM_SUFFIX).c_str());
 }
 
 
@@ -1429,6 +1477,37 @@ static vector<string> DoList(const CommandType list_command) {
   return result;
 }
 
+
+/**
+ * Returns information about a given hash.
+ */
+bool Query(const hash::Any &hash, uint64_t &size, string &cvmfs_path) {
+  if (!initialized_) {
+    return false;
+  }
+  int pipe_list[2];
+  MakeReturnPipe(pipe_list);
+  char path_buffer[kMaxCvmfsPath];
+
+  LruCommand cmd;
+  cmd.command_type = kQuery;
+  cmd.return_pipe = pipe_list[1];
+  memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  bool result = false;
+
+  size_t length;
+  ReadHalfPipe(pipe_list[0], &length, sizeof(length));
+  if (length > 0) {
+    ReadPipe(pipe_list[0], path_buffer, length);
+    cvmfs_path = string(path_buffer, length);
+    ReadHalfPipe(pipe_list[0], &size, sizeof(uint64_t));
+    result = true;
+  }
+
+  CloseReturnPipe(pipe_list);
+  return result;
+}
 
 /**
  * Lists all path names from the cache db.

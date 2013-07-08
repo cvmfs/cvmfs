@@ -24,6 +24,9 @@ set (CVMFS_CLIENT_SOURCES
   quota.h quota.cc
   hash.h hash.cc
   cache.h cache.cc
+  checksum.h checksum.cc
+  bulk_crc32.c bulk_crc32.h
+  crc32c_tables.h crc32_zlib_polynomial_tables.h
   platform.h platform_osx.h platform_linux.h
   monitor.h monitor.cc
   util.cc util.h
@@ -82,6 +85,9 @@ set (CVMFS_FSCK_SOURCES
   smalloc.h
   atomic.h
   duplex_zlib.h compression.cc compression.h
+  checksum.cc checksum.h
+  bulk_crc32.c bulk_crc32.h
+  crc32c_tables.h crc32_zlib_polynomial_tables.h
   hash.cc hash.h
   util.cc util.h
   cvmfs_fsck.cc)
@@ -96,6 +102,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   manifest_fetch.h manifest_fetch.cc
   hash.h hash.cc
   compression.h compression.cc
+  checksum.cc checksum.h
+  bulk_crc32.c bulk_crc32.h
+  crc32c_tables.h crc32_zlib_polynomial_tables.h
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
 

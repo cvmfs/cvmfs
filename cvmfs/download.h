@@ -16,6 +16,7 @@
 #include "duplex_curl.h"
 #include "compression.h"
 #include "hash.h"
+#include "checksum.h"
 
 namespace download {
 
@@ -87,6 +88,7 @@ struct JobInfo {
   } destination_mem;
   FILE *destination_file;
   const std::string *destination_path;
+  ChecksumFileWriter *checksum_file;
   const hash::Any *expected_hash;
 
   // One constructor per destination + head request
@@ -94,20 +96,23 @@ struct JobInfo {
   JobInfo(const std::string *u, const bool c, const bool ph,
           const std::string *p, const hash::Any *h) : url(u), compressed(c),
           probe_hosts(ph), head_request(false),
-          destination(kDestinationPath), destination_path(p), expected_hash(h)
+          destination(kDestinationPath), destination_path(p), checksum_file(NULL),
+          expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
           const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
           head_request(false),
-          destination(kDestinationFile), destination_file(f), expected_hash(h)
+          destination(kDestinationFile), destination_file(f), checksum_file(NULL),
+          expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph,
           const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
-          head_request(false), destination(kDestinationMem), expected_hash(h)
+          head_request(false), destination(kDestinationMem), checksum_file(NULL),
+          expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool ph) :
           url(u), compressed(false), probe_hosts(ph), head_request(true),
-          destination(kDestinationNone), expected_hash(NULL)
+          destination(kDestinationNone), checksum_file(NULL), expected_hash(NULL)
           { wait_at[0] = wait_at[1] = -1; }
   ~JobInfo() {
     if (wait_at[0] >= 0) {

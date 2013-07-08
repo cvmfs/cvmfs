@@ -12,6 +12,8 @@
 
 #include "duplex_zlib.h"
 
+class ChecksumFileWriter;
+
 namespace hash {
   struct Any;
 }
@@ -37,7 +39,7 @@ void DecompressInit(z_stream *strm);
 void CompressFini(z_stream *strm);
 void DecompressFini(z_stream *strm);
 
-StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
+StreamStates DecompressZStream2File(z_stream *strm, FILE *f, ChecksumFileWriter *cf, const void *buf,
                                     const int64_t size);
 
 bool CompressPath2Path(const std::string &src, const std::string &dest);

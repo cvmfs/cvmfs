@@ -36,10 +36,12 @@ enum CacheModes {
 bool Init(const std::string &cache_path);
 void Fini();
 
+std::string GetPathInCache(const hash::Any &id);
 int Open(const hash::Any &id);
 int FetchDirent(const catalog::DirectoryEntry &d,
                 const std::string &cvmfs_path);
 int FetchChunk(const FileChunk &chunk, const std::string &cvmfs_path);
+int Fetch(const hash::Any &hash, const std::string &, uint64_t size, const std::string &cvmfs_path);
 int64_t GetNumDownloads();
 
 CacheModes GetCacheMode();
