@@ -30,7 +30,6 @@
 
 #include "smalloc.h"
 
-
 #ifdef DEBUGMSG
 #include <stdio.h>
 void perror(const char *s);

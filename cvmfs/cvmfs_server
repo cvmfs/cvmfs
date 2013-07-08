@@ -1444,7 +1444,7 @@ import() {
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
   # import from 2.0 -> 2.1 only supports aufs, not overlayfs
-  check_aufs                    || die "aufs kernel module missing"
+  check_aufs                        || die "aufs kernel module missing"
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
   check_apache                      || die "Apache must be installed and running"

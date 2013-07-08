@@ -139,7 +139,7 @@ void SyncUnionAufs::Traverse() {
 
 bool SyncUnionAufs::IsWhiteoutEntry(const SyncItem &entry) const {
   return entry.filename().substr(0, whiteout_prefix_.length()) ==
-    whiteout_prefix_;
+         whiteout_prefix_;
 }
 
 bool SyncUnionAufs::IsOpaqueDirectory(const SyncItem &directory) const {
