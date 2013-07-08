@@ -1225,7 +1225,7 @@ EOF
     -t $temp_dir \
     -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
   echo "done"
-  
+
   echo -n "Mounting CernVM-FS Storage... "
   setup_and_mount_new_repository $name || die "fail!"
   echo "done"

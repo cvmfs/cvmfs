@@ -172,6 +172,7 @@ inline int platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
 }
 
+
 inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".so";
 }

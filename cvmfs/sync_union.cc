@@ -71,18 +71,18 @@ void SyncUnion::ProcessFile(SyncItem &entry) {
   if (IsWhiteoutEntry(entry)) {
     string actual_filename = UnwindWhiteoutFilename(entry.filename());
     LogCvmfs(kLogUnion, kLogVerboseMsg, "processing file [%s] as whiteout of [%s] (remove)",
-	     entry.filename().c_str(), actual_filename.c_str());
+             entry.filename().c_str(), actual_filename.c_str());
     entry.MarkAsWhiteout(actual_filename);
     mediator_->Remove(entry);
   } else {
     // Process normal file
     if (entry.IsNew()) {
       LogCvmfs(kLogUnion, kLogVerboseMsg, "processing file [%s] as new (add)",
-	       entry.filename().c_str());
+               entry.filename().c_str());
       mediator_->Add(entry);
     } else {
       LogCvmfs(kLogUnion, kLogVerboseMsg, "processing file [%s] as existing (touch)",
-	       entry.filename().c_str());
+               entry.filename().c_str());
       mediator_->Touch(entry);
     }
   }
@@ -101,7 +101,7 @@ void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name)
 {
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
-	mediator_->LeaveDirectory(entry);
+  mediator_->LeaveDirectory(entry);
 }
 
 
@@ -109,57 +109,58 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
                              const std::string &rdonly_path,
                              const std::string &union_path,
                              const std::string &scratch_path) :
-SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
-	// Ignored filenames
-	ignore_filenames_.insert(".wh..wh..tmp");
-	ignore_filenames_.insert(".wh..wh.plnk");
-	ignore_filenames_.insert(".wh..wh.aufs");
-	ignore_filenames_.insert(".wh..wh.orph");
-	ignore_filenames_.insert(".wh..wh..opq");
+  SyncUnion(mediator, rdonly_path, union_path, scratch_path)
+{
+  // Ignored filenames
+  ignore_filenames_.insert(".wh..wh..tmp");
+  ignore_filenames_.insert(".wh..wh.plnk");
+  ignore_filenames_.insert(".wh..wh.aufs");
+  ignore_filenames_.insert(".wh..wh.orph");
+  ignore_filenames_.insert(".wh..wh..opq");
 
-	// set the whiteout prefix AUFS preceeds for every whiteout file
-	whiteout_prefix_ = ".wh.";
+  // set the whiteout prefix AUFS preceeds for every whiteout file
+  whiteout_prefix_ = ".wh.";
 }
 
 
 void SyncUnionAufs::Traverse() {
-	FileSystemTraversal<SyncUnionAufs>
-	  traversal(this, scratch_path(), true);
+  FileSystemTraversal<SyncUnionAufs> traversal(this, scratch_path(), true);
 
-	traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
-	traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
-	traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
-	traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFilePredicate;
-	traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
-	traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
+  traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
+  traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
+  traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
+  traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFilePredicate;
+  traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
+  traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
 
-	traversal.Recurse(scratch_path());
+  traversal.Recurse(scratch_path());
 }
 
 
 bool SyncUnionAufs::IsWhiteoutEntry(const SyncItem &entry) const {
-	return entry.filename().substr(0, whiteout_prefix_.length()) ==
-	  whiteout_prefix_;
+  return entry.filename().substr(0, whiteout_prefix_.length()) ==
+    whiteout_prefix_;
 }
 
 bool SyncUnionAufs::IsOpaqueDirectory(const SyncItem &directory) const {
-	return FileExists(directory.GetScratchPath() + "/.wh..wh..opq");
+  return FileExists(directory.GetScratchPath() + "/.wh..wh..opq");
 }
 
 string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
-	return filename.substr(whiteout_prefix_.length());
+  return filename.substr(whiteout_prefix_.length());
 }
 
 bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
-                                        const string &filename) {
-	return (ignore_filenames_.find(filename) != ignore_filenames_.end());
+                                        const string &filename)
+{
+  return (ignore_filenames_.find(filename) != ignore_filenames_.end());
 }
 
 
 SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
-				       const std::string &rdonly_path,
-				       const std::string &union_path,
-				       const std::string &scratch_path) :
+                                       const std::string &rdonly_path,
+                                       const std::string &union_path,
+                                       const std::string &scratch_path) :
   SyncUnion(mediator, rdonly_path, union_path, scratch_path) {
   
 }
@@ -176,8 +177,8 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
     traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
     
     LogCvmfs(kLogUnion, kLogVerboseMsg, "overlayfs starting traversal "
-	     "recursion for scratch_path=[%s]",
-	     scratch_path().c_str());
+             "recursion for scratch_path=[%s]",
+             scratch_path().c_str());
     traversal.Recurse(scratch_path());
   }
   
@@ -210,7 +211,7 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
       // error, return false
 #ifdef DEBUGMSG
       printf("SyncUnionOverlayfs::ReadlinkEquals error reading link [%s]: %s\n", 
-	     path.c_str(), strerror(errno));
+             path.c_str(), strerror(errno));
 #endif
       return false;
     }
@@ -237,10 +238,10 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
     bool is_whiteout = ReadlinkEquals(path, "(overlay-whiteout)") && XattrEquals(path.c_str(), "trusted.overlay.whiteout", "y");
     if (is_whiteout) {
       LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] is whiteout symlink",
-	       path.c_str());
+               path.c_str());
     } else {
       LogCvmfs(kLogUnion, kLogDebug, "overlayfs [%s] is not a whiteout symlink",
-	       path.c_str());
+               path.c_str());
     }
     return is_whiteout;
   }
