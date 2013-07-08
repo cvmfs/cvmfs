@@ -64,6 +64,7 @@ enum LogSource {
   kLogUtility,
   kLogGlueBuffer,
   kLogHistory,
+  kLogChecksum
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
