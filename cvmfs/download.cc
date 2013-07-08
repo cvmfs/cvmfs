@@ -446,6 +446,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       zlib::StreamStates retval =
         zlib::DecompressZStream2File(&info->zstream,
                                      info->destination_file,
+                                     info->checksum_file,
                                      ptr, num_bytes);
       if (retval == zlib::kStreamError) {
         LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
@@ -454,10 +455,17 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         return 0;
       }
     } else {
+      if (info->checksum_file) {info->checksum_file->stream(static_cast<const unsigned char *>(ptr), num_bytes);}
       if (fwrite(ptr, 1, num_bytes, info->destination_file) != num_bytes) {
         info->error_code = kFailLocalIO;
         return 0;
       }
+    }
+    if (info->checksum_file && !info->checksum_file->isGood()) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to write checksum file for %s",
+               info->url->c_str());
+      info->error_code = kFailLocalIO;
+      return 0;
     }
   }
 

@@ -37,6 +37,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
 void Unpin(const hash::Any &hash);
 void Touch(const hash::Any &hash);
 void Remove(const hash::Any &file);
+bool Query(const hash::Any &hash, uint64_t &size, std::string &cvmfs_path);
 std::vector<std::string> List();
 std::vector<std::string> ListPinned();
 std::vector<std::string> ListCatalogs();

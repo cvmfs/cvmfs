@@ -207,7 +207,7 @@ void TearDown2ReadOnly() {
  * @param[in] id content hash of the catalog entry.
  * \return Absolute path in local cache.
  */
-static inline string GetPathInCache(const hash::Any &id) {
+string GetPathInCache(const hash::Any &id) {
   return *cache_path_ + id.MakePath(1, 2);
 }
 
@@ -418,10 +418,10 @@ static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-static int Fetch(const hash::Any &checksum,
-                 const string    &hash_suffix,
-                 const uint64_t   size,
-                 const string    &cvmfs_path)
+int Fetch(const hash::Any &checksum,
+          const string    &hash_suffix,
+          const uint64_t   size,
+          const string    &cvmfs_path)
 {
   CallGuard call_guard;
   int fd_return;  // Read-only file descriptor that is returned
@@ -495,16 +495,27 @@ static int Fetch(const hash::Any &checksum,
 
   const string url = "/data" + checksum.MakePath(1, 2) + hash_suffix;
   string final_path;
+  string checksum_path;
   string temp_path;
   int fd;  // Used to write the downloaded file
   FILE *f = NULL;
   int result = -EIO;
 
   fd = StartTransaction(checksum, &final_path, &temp_path);
+  ChecksumFileWriter cwriter(checksum);
+
   if (fd < 0) {
     LogCvmfs(kLogCache, kLogDebug, "could not start transaction on %s",
              final_path.c_str());
     result = fd;
+    goto fetch_finalize;
+  }
+
+  checksum_path = final_path + CHECKSUM_SUFFIX;
+  if (!cwriter.isGood()) {
+    LogCvmfs(kLogCache, kLogDebug, "Could not open checksum file %s",
+             checksum_path.c_str());
+    result = -EIO;
     goto fetch_finalize;
   }
 
@@ -517,6 +528,7 @@ static int Fetch(const hash::Any &checksum,
 
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
+  tls->download_job.checksum_file = &cwriter;
   tls->download_job.expected_hash = &checksum;
   download::Fetch(&tls->download_job);
 

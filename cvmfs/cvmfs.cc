@@ -128,6 +128,20 @@ static struct {
   int delay;
 } previous_io_error_;
 
+/**
+ * Encode two file descriptors in a single int64_t
+ */
+int64_t mangle_fds(int32_t fd, int32_t fd2) {
+  return (static_cast<int64_t>(fd) << 32) + static_cast<int64_t>(fd2);
+}
+
+/**
+ * Decode two file descriptors from a int64_t
+ */
+void unmangle_fds(int64_t input_fd, int32_t &fd, int32_t &fd2) {
+  fd = input_fd >> 32;
+  fd2 = input_fd & 0xFFFFFFFF;
+}
 
 /**
  * Stores the initial catalog revision (in order to detect overflows) and
@@ -279,6 +293,39 @@ static unsigned GetEffectiveTTL() {
   const unsigned catalog_ttl = catalog_manager_->GetTTL();
 
   return max_ttl ? std::min(max_ttl, catalog_ttl) : catalog_ttl;
+}
+
+
+/**
+ * Given an open file descriptor, try to determine the
+ * corresponding hash of the file in the CVMFS cache.
+ */
+static bool GetHashFromFD(int fd, hash::Any &hash) {
+#ifdef __APPLE__
+  return false;
+#else
+  stringstream ss;
+  ss << "/proc/self/fd/" << fd;
+  string proc_filename = ss.str();
+  vector<char> buffer; buffer.reserve(PATH_MAX);
+
+  ssize_t result = readlink(proc_filename.c_str(), &buffer[0], PATH_MAX);
+  if (result < 0 ) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Failed to determine filename for FD %d (proc file %s, errno=%d, %s)", fd, proc_filename.c_str(), errno, strerror(errno));
+    return false;
+  }
+  string cvmfs_path(&buffer[0], result);
+  size_t last_slash = cvmfs_path.rfind("/");
+  if (last_slash == string::npos) {return false;}
+  size_t second_last_slash = cvmfs_path.rfind("/", last_slash-1);
+  if (second_last_slash == string::npos) {return false;}
+  string ending_digest = cvmfs_path.substr(last_slash+1);
+  string beginning_digest = cvmfs_path.substr(second_last_slash+1, 2);
+  string digest = beginning_digest + ending_digest;
+  hash = hash::Any(hash::kSha1, hash::HexPtr(digest));
+
+  return true;
+#endif
 }
 
 
@@ -996,9 +1043,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              "chunked file %s opened (download delayed to read() call)",
              path.c_str());
 
-    if (atomic_xadd32(&open_files_, 1) >=
+    if (atomic_xadd32(&open_files_, 2) >=
         (static_cast<int>(max_open_files_))-kNumReservedFd)
     {
+      atomic_dec32(&open_files_);
       atomic_dec32(&open_files_);
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
@@ -1051,9 +1099,17 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
+  int fd2 = ChecksumFileReader::open(dirent.checksum());
+  // Retry opening the checksum once.
+  if (fd >= 0 && fd2 < 0) {
+    close(fd);
+    quota::Remove(dirent.checksum());
+    fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
+    fd2 = ChecksumFileReader::open(dirent.checksum());
+  }
 
-  if (fd >= 0) {
-    if (atomic_xadd32(&open_files_, 1) <
+  if (fd >= 0 && fd2 >= 0) {
+    if (atomic_xadd32(&open_files_, 2) <
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
@@ -1067,11 +1123,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         inode_cache_->Insert(ino, dirent);
       }*/
       fi->keep_cache = 0;
-      fi->fh = fd;
+      fi->fh = mangle_fds(fd, fd2);
       fuse_reply_open(req, fi);
       return;
     } else {
-      if (close(fd) == 0) atomic_dec32(&open_files_);
+      if (fd >= 0 && close(fd) == 0) atomic_dec32(&open_files_);
+      if (fd2 >= 0 && close(fd2) == 0) atomic_dec32(&open_files_);
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
       return;
@@ -1169,10 +1226,21 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         // TODO: read-ahead
         if (chunk_fd.fd != -1) close(chunk_fd.fd);
         string verbose_path = "Part of " + chunks.path.ToString();
-        chunk_fd.fd = cache::FetchChunk(*chunks.list->AtPtr(chunk_idx),
-                                        verbose_path);
-        if (chunk_fd.fd < 0) {
+        const FileChunk &chunk = *chunks.list->AtPtr(chunk_idx);
+        chunk_fd.fd = cache::FetchChunk(chunk, verbose_path);
+        int fd2 = ChecksumFileReader::open(chunk.content_hash());
+        // Retry opening the checksum once.
+        if (chunk_fd.fd >= 0 && fd2 < 0) {
+          close(chunk_fd.fd);
+          quota::Remove(chunk.content_hash());
+          chunk_fd.fd = cache::FetchChunk(chunk, verbose_path);
+          fd2 = ChecksumFileReader::open(chunk.content_hash());
+        }
+
+        if (chunk_fd.fd < 0 || fd2 < 0) {
+          if (chunk_fd.fd < 0) {close(chunk_fd.fd);}
           chunk_fd.fd = -1;
+          if (fd2 >= 0) {close(fd2);}
           chunk_tables_->Lock();
           chunk_tables_->handle2fd.Insert(chunk_handle, chunk_fd);
           chunk_tables_->Unlock();
@@ -1181,6 +1249,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
           return;
         }
         chunk_fd.chunk_idx = chunk_idx;
+        chunk_fd.cfd = fd2;
       }
 
       LogCvmfs(kLogCvmfs, kLogDebug, "reading from chunk fd %d",
@@ -1205,6 +1274,20 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         fuse_reply_err(req, errno);
         return;
       }
+      int result;
+      if ((result = ChecksumFileReader::verify(chunk_fd.fd, chunk_fd.cfd, 
+          reinterpret_cast<const unsigned char *>(data + overall_bytes_fetched), 
+          bytes_fetched, offset_in_chunk)) < 0) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "checksum failed (%d) for %s", 
+                 result, chunks.path.ToString().c_str());
+        chunk_tables_->Lock();
+        chunk_tables_->handle2fd.Insert(chunk_handle, chunk_fd);
+        chunk_tables_->Unlock();
+        UnlockMutex(handle_lock);
+        fuse_reply_err(req, -result);
+        return;
+      }
+
       overall_bytes_fetched += bytes_fetched;
 
       // Proceed to the next chunk to keep on reading data
@@ -1221,8 +1304,57 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
              chunk_fd.fd);
   } else {
-    const int64_t fd = fi->fh;
+    int32_t fd;
+    int32_t fd2;
+    int result;
+    unmangle_fds(fi->fh, fd, fd2);
     overall_bytes_fetched = pread(fd, data, size, off);
+    LogCvmfs(kLogCvmfs, kLogDebug, "Read %d bytes; will now verify.", overall_bytes_fetched);
+    if ((result = ChecksumFileReader::verify(fd, fd2, reinterpret_cast<const unsigned char *>(data), overall_bytes_fetched, off)) < 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "checksum failed for fd %d", fd);
+
+      // Re-open file
+      hash::Any hash;
+      string cvmfs_path;
+      uint64_t file_size = 0;
+      bool got_hash = false;
+      if ((got_hash = GetHashFromFD(fd, hash)) && quota::Query(hash, file_size, cvmfs_path)) {
+        quota::Remove(hash);
+        int32_t new_fd = cache::Fetch(hash, "", file_size, cvmfs_path);
+        if (new_fd < 0) {LogCvmfs(kLogCvmfs, kLogDebug, "Failed to fetch new copy of %s", cvmfs_path.c_str());}
+        int32_t new_fd2 = ChecksumFileReader::open(hash);
+        if (new_fd2 < 0) {LogCvmfs(kLogCvmfs, kLogDebug, "Failed to open checksum file of %s", cvmfs_path.c_str());}
+        // Note we do not retry the open here, unlike cvmfs_open -- this was already the fallback!
+
+        //  Swap out the new file descriptors
+        bool retry_ok = false;
+        if (new_fd >= 0 && new_fd2 >= 0 && dup2(new_fd, fd) >= 0 && dup2(new_fd2, fd2) >= 0) {
+          // Retry read
+          overall_bytes_fetched = pread(fd, data, size, off);
+          LogCvmfs(kLogCvmfs, kLogDebug, "Read %d bytes; will now retry verify.", overall_bytes_fetched);
+          if ((result = ChecksumFileReader::verify(fd, fd2, reinterpret_cast<const unsigned char *>(data), overall_bytes_fetched, off)) < 0) {
+            LogCvmfs(kLogCvmfs, kLogDebug, "checksum failed again for fd %d", fd);
+          }
+          else {
+            retry_ok = true;
+          }
+        } else {
+          LogCvmfs(kLogCvmfs, kLogDebug, "failed to duplicate file descriptors (errno=%d, %s)", errno, strerror(errno));
+        }
+        // Successful or no, we overwrote the new FD's with dup2.
+        if (new_fd >= 0) {close(new_fd);}
+        if (new_fd2 >= 0) {close(new_fd2);}
+        if (!retry_ok) {
+          fuse_reply_err(req, -result);
+          return;
+        }
+      } else {
+        if (got_hash) {quota::Remove(hash);}
+        fuse_reply_err(req, EIO);
+        LogCvmfs(kLogCvmfs, kLogDebug, "Failed to determine path information to re-download corrupt file");
+        return;
+      }
+    }
   }
 
   // Push it to user
@@ -1240,7 +1372,6 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 {
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %"PRIu64, ino);
-  const int64_t fd = fi->fh;
 
   // do we have a chunked file?
   if (static_cast<int64_t>(fi->fh) < 0) {
@@ -1275,11 +1406,21 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
     }
     chunk_tables_->Unlock();
 
-    if (chunk_fd.fd != -1)
+    if (chunk_fd.fd != -1) {
       close(chunk_fd.fd);
-    atomic_dec32(&open_files_);
+      atomic_dec32(&open_files_);
+    }
+    if (chunk_fd.cfd != -1) {
+      close(chunk_fd.cfd);
+      atomic_dec32(&open_files_);
+    }
   } else {
+    int32_t fd, fd2;
+    unmangle_fds(fi->fh, fd, fd2);
     if (close(fd) == 0) {
+      atomic_dec32(&open_files_);
+    }
+    if (close(fd2) == 0) {
       atomic_dec32(&open_files_);
     }
   }

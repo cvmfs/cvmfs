@@ -10,6 +10,7 @@
 
 #include "cvmfs_config.h"
 #include "compression.h"
+#include "checksum.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -158,7 +159,7 @@ void DecompressFini(z_stream *strm) {
 }
 
 
-StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
+StreamStates DecompressZStream2File(z_stream *strm, FILE *f, ChecksumFileWriter *cf, const void *buf,
                                     const int64_t size)
 {
   unsigned char out[kZChunk];
@@ -183,6 +184,7 @@ StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
           return kStreamError;
       }
       size_t have = kZChunk - strm->avail_out;
+      if (cf) {cf->stream(out, have);}
       if (fwrite(out, 1, have, f) != have || ferror(f))
         return kStreamError;
     } while (strm->avail_out == 0);
@@ -503,7 +505,7 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
   DecompressInit(&strm);
 
   while ((have = fread(buf, 1, kBufferSize, fsrc)) > 0) {
-    stream_state = DecompressZStream2File(&strm, fdest, buf, have);
+    stream_state = DecompressZStream2File(&strm, fdest, NULL, buf, have);
     if (stream_state == kStreamError)
       goto decompress_file2file_final;
   }
