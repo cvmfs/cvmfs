@@ -98,6 +98,14 @@ set (TEST_LIBCVMFS_SOURCES
   test_libcvmfs.cc
 )
 
+set (TEST_CHECKSUM_SOURCES
+  test_checksum.cc
+  checksum.h checksum.cc
+  bulk_crc32.c bulk_crc32.h
+  crc32c_tables.h crc32_zlib_polynomial_tables.h
+  hash.h
+)
+
 set (CVMFS_FSCK_SOURCES
   platform.h platform_linux.h platform_osx.h
   logging_internal.h logging.h logging.cc
@@ -361,6 +369,8 @@ if (BUILD_LIBCVMFS)
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
+
+  add_executable( test_checksum ${TEST_CHECKSUM_SOURCES} )
 
 endif (BUILD_LIBCVMFS)
 
