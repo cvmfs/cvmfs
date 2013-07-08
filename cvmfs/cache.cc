@@ -511,7 +511,7 @@ int Fetch(const hash::Any &checksum,
     goto fetch_finalize;
   }
 
-  checksum_path = final_path + ".checksums"; 
+  checksum_path = final_path + CHECKSUM_SUFFIX;
   if (!cwriter.isGood()) {
     LogCvmfs(kLogCache, kLogDebug, "Could not open checksum file %s",
              checksum_path.c_str());

@@ -2,6 +2,8 @@
 #ifndef __CHECKSUM_H_
 #define __CHECKSUM_H_
 
+#include <sys/types.h>
+
 #include <string>
 
 #define CHECKSUM_SUFFIX ".checksums"
