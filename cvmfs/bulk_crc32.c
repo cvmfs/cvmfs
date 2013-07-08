@@ -42,8 +42,6 @@
 
 #define USE_PIPELINED
 
-#define CRC_INITIAL_VAL 0xffffffff
-
 typedef uint32_t (*crc_update_func_t)(uint32_t, const uint8_t *, size_t);
 static inline uint32_t crc_val(uint32_t crc);
 static uint32_t crc32_zlib_sb8(uint32_t crc, const uint8_t *buf, size_t length);
@@ -55,12 +53,9 @@ static void pipelined_crc32c(uint32_t *crc1, uint32_t *crc2, uint32_t *crc3, con
 static int cached_cpu_supports_crc32; // initialized by constructor below
 static uint32_t crc32c_hardware(uint32_t crc, const uint8_t* data, size_t length);
 
-int bulk_calculate_crc(const uint8_t *data, size_t data_len,
-                    uint32_t *sums, int checksum_type,
-                    int bytes_per_checksum) {
-  uint32_t crc;
-  crc_update_func_t crc_update_func;
+static crc_update_func_t get_crc_update_func(int checksum_type) {
 
+  crc_update_func_t crc_update_func = NULL;
   switch (checksum_type) {
     case CRC32_ZLIB_POLYNOMIAL:
       crc_update_func = crc32_zlib_sb8;
@@ -69,9 +64,18 @@ int bulk_calculate_crc(const uint8_t *data, size_t data_len,
       crc_update_func = crc32c_sb8;
       break;
     default:
-      return -EINVAL;
       break;
   }
+  return crc_update_func;
+}
+
+int bulk_calculate_crc(const uint8_t *data, size_t data_len,
+                    uint32_t *sums, int checksum_type,
+                    int bytes_per_checksum) {
+  uint32_t crc;
+  crc_update_func_t crc_update_func = get_crc_update_func(checksum_type);
+  if (!crc_update_func) {return -EINVAL;}
+
   while (likely(data_len > 0)) {
     int len = likely(data_len >= bytes_per_checksum) ? bytes_per_checksum : data_len;
     crc = CRC_INITIAL_VAL;
@@ -81,6 +85,17 @@ int bulk_calculate_crc(const uint8_t *data, size_t data_len,
     data_len -= len;
     sums++;
   }
+  return 0;
+}
+
+int calculate_crc(const uint8_t *data, size_t data_len,
+                    uint32_t *crc, int checksum_type) {
+
+  crc_update_func_t crc_update_func = get_crc_update_func(checksum_type);
+  if (!crc_update_func) {return -EINVAL;}
+
+  uint32_t crc_start = *crc;
+  *crc = crc_update_func(crc_start, data, data_len);
   return 0;
 }
 

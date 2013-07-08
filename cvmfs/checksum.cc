@@ -16,10 +16,17 @@
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 
 namespace cache {
+
+// In the case of cvmfs_swissknife, we end up creating a reference
+// to ChecksumFileWriter - but never use it to write a file.
+//
+// To prevent having to link in the cache module (and most of the rest of
+// CVMFS), we define a weak symbol here.
 std::string
 __attribute__((weak))
 GetPathInCache(const hash::Any &) {return "";}
 }
+
 
 static int
 pread_full(int fd, void *in_buf, size_t len, off_t off) {
@@ -42,6 +49,7 @@ pread_full(int fd, void *in_buf, size_t len, off_t off) {
   return counter;
 }
 
+
 static int
 write_full(int fd, void *in_buf, size_t len) {
   if (len == 0) return 0;
@@ -62,10 +70,23 @@ write_full(int fd, void *in_buf, size_t len) {
   return counter;
 }
 
-ChecksumFileWriter::ChecksumFileWriter(const hash::Any &hash)
-  : filename(cache::GetPathInCache(hash) + CHECKSUM_SUFFIX), buffer_offset(0), fd(-1), error(true)
+
+ChecksumFileWriter::ChecksumFileWriter(const hash::Any &hash, bool sumonly)
+  : filename(cache::GetPathInCache(hash) + CHECKSUM_SUFFIX),
+    running_sum(CRC_INITIAL_VAL), buffer_offset(0), fd(-1), error(true),
+    done(false)
 {
   memset(partial_buffer, '\0', CHECKSUM_BLOCKSIZE);
+  char header[CHECKSUM_HEADERSIZE];
+  memset(header, '\0', CHECKSUM_HEADERSIZE);
+  header[0] = '\1';
+  if (sumonly) {
+    if (!calculate_crc(reinterpret_cast<unsigned char *>(header),
+        CHECKSUM_HEADERSIZE, &running_sum, CRC32C_POLYNOMIAL)) {
+      error = false;
+    }
+    return;
+  }
   fd = open(filename.c_str(), O_RDWR|O_TRUNC|O_CREAT);
   if (fd < 0) {
     LogCvmfs(kLogChecksum, kLogDebug, "could not open checksum file %s (errno=%d, %s)",
@@ -84,14 +105,27 @@ ChecksumFileWriter::ChecksumFileWriter(const hash::Any &hash)
   }
 }
 
-ChecksumFileWriter::~ChecksumFileWriter() {
+
+int
+ChecksumFileWriter::finalize(uint32_t &hash) {
+  if (unlikely(error)) {return -1;}
+
   if (buffer_offset) {
-    //LogCvmfs(kLogChecksum, kLogDebug, "checksumming %d bytes on close", buffer_offset);
     memset(partial_buffer+buffer_offset, '\0', CHECKSUM_BLOCKSIZE - buffer_offset);
     checksum(partial_buffer, CHECKSUM_BLOCKSIZE);
   }
-  close(fd);
+  if (fd >= 0) {close(fd);}
+  if (error) {return -1;}
+  hash = running_sum;
+  return 0;
 }
+
+
+ChecksumFileWriter::~ChecksumFileWriter() {
+  uint32_t hash;
+  finalize(hash);
+}
+
 
 // Note -- len here is assumed to be aligned to CHECKSUM_BLOCKSIZE by stream below.
 void
@@ -107,11 +141,16 @@ ChecksumFileWriter::checksum(const uint8_t * buf, size_t len) {
     LogCvmfs(kLogChecksum, kLogDebug, "could not calculate checksum for %s", filename.c_str());
     error = true;
   }
-  if (write_full(fd, &sums[0], c_count*CHECKSUM_SIZE) != c_count*CHECKSUM_SIZE) {
+  if (calculate_crc(reinterpret_cast<const unsigned char *>(&sums[0]),
+      c_count, &running_sum, CRC32C_POLYNOMIAL)) {
+    error = true;
+  }
+  if (fd >= 0 && write_full(fd, &sums[0], c_count*CHECKSUM_SIZE) != c_count*CHECKSUM_SIZE) {
     LogCvmfs(kLogChecksum, kLogDebug, "could not write to checksum file %s (errno=%d, %s)", filename.c_str(), errno, strerror(errno));
     error = true;
   }
 }
+
 
 int
 ChecksumFileWriter::stream(const unsigned char *buf, size_t len) {
@@ -147,6 +186,7 @@ ChecksumFileWriter::stream(const unsigned char *buf, size_t len) {
   return !error ? 0 : -1;
 }
 
+
 int
 ChecksumFileReader::open(const hash::Any &hash)
 {
@@ -171,6 +211,7 @@ ChecksumFileReader::open(const hash::Any &hash)
   }
   return -EIO;
 }
+
 
 int
 ChecksumFileReader::verify(int fd, int cfd, const unsigned char *buf, size_t len, off_t off) {
@@ -258,3 +299,4 @@ ChecksumFileReader::verify(int fd, int cfd, const unsigned char *buf, size_t len
 
   return 0;
 }
+
