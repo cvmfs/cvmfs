@@ -1443,11 +1443,8 @@ import() {
   check_repository_existence $name  && die "The repository $name already exists"
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
-  if [ $unionfs = "overlayfs" ]; then
-      check_overlayfs               || die "overlayfs kernel module missing"
-  else
-      check_aufs                    || die "aufs kernel module missing"
-  fi
+  # import from 2.0 -> 2.1 only supports aufs, not overlayfs
+  check_aufs                    || die "aufs kernel module missing"
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
   check_apache                      || die "Apache must be installed and running"
