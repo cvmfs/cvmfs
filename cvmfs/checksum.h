@@ -3,6 +3,7 @@
 #define __CHECKSUM_H_
 
 #include <sys/types.h>
+#include <stdint.h>
 
 #include <string>
 
@@ -37,7 +38,7 @@ namespace hash {
 class ChecksumFileWriter {
 
 public:
-  ChecksumFileWriter(const hash::Any &hash);
+  ChecksumFileWriter(const hash::Any &hash, bool sumonly=false);
   ~ChecksumFileWriter();
 
     /*
@@ -49,6 +50,18 @@ public:
      */
   int stream(const unsigned char * buff, size_t len);
 
+    /*
+     * Finalize the checksum calculation.
+     *
+     * After this is called, one cannot call stream() again.
+     *
+     * The return value is a checksum-of-checksums which can
+     * be used to identify the entirity of the file contents.
+     * 
+     * Returns 0 on success; negative on failure.
+     */
+  int finalize(uint32_t &checksum);
+
   const bool isGood() {return !error;}
 
 private:
@@ -56,9 +69,11 @@ private:
 
   std::string filename;
   unsigned char partial_buffer[CHECKSUM_BLOCKSIZE];
+  uint32_t running_sum;
   int buffer_offset;
   int fd;
   bool error;
+  bool done;
 
 };
 

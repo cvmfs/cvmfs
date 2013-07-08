@@ -37,6 +37,9 @@
 #define INVALID_CHECKSUM_DETECTED -1
 #define INVALID_CHECKSUM_TYPE -2
 
+// Default initial value for the CRC32
+#define CRC_INITIAL_VAL 0xffffffff
+
 // Return type for bulk verification when verification fails
 typedef struct crc32_error {
   uint32_t got_crc;
@@ -93,6 +96,26 @@ int bulk_verify_crc(const uint8_t *data, size_t data_len,
 int bulk_calculate_crc(const uint8_t *data, size_t data_len,
                     uint32_t *sums, int checksum_type,
                     int bytes_per_checksum);
+
+/**
+ * Calculate a checksum for a single data buffer.
+ *
+ * This is a non-bulk variant of the checksum algorithm.
+ *
+ * @param data                  The data to checksum
+ * @param dataLen               Length of the data buffer
+ * @param crc                   The initial CRC32 value; this is useful if one
+ *                              intends to keep a running checksum.
+ *                              This is also an output parameter.
+ * @param checksum_type         One of the CRC32 algorithm constants.
+ * @return                      0 for success, non-zero for an error.
+ *                              On success, this updates the crc parameter with
+ *                              the latest checksum.  On failure, the value of crc
+ *                              is undefined.
+ */
+int calculate_crc(const uint8_t *data, size_t data_len,
+                  uint32_t *crc, int checksum_type);
+
 #ifdef __cplusplus
 }
 #endif
