@@ -417,8 +417,8 @@ try_mount_remount_cycle_aufs() {
   tmpdir=$(mktemp -d)
   mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
   mount -t aufs \
-      -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
-      try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+    -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
+    try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
   mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
   mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
   umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
@@ -433,8 +433,8 @@ try_mount_remount_cycle_overlayfs() {
   tmpdir=$(mktemp -d)
   mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
   mount -t overlayfs \
-      -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
-      try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
+    -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
+    try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
   mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
   mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
   umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
