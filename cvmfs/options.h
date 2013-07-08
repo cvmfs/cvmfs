@@ -5,8 +5,11 @@
 #ifndef CVMFS_OPTIONS_H_
 #define CVMFS_OPTIONS_H_
 
+#include <stdint.h>
+
 #include <string>
 #include <vector>
+#include <map>
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -25,6 +28,8 @@ bool GetSource(const std::string &key, std::string *value);
 bool IsOn(const std::string &param_value);
 std::vector<std::string> GetAllKeys();
 std::string Dump();
+
+bool ParseUIntMap(const std::string &path, std::map<uint64_t, uint64_t> *map);
 
 }  // namespace options
 

@@ -23,13 +23,17 @@
 #include "globals.h"
 #include "bigvector.h"
 
-class DirectoryEntryTestFactory;
-
 namespace publish {
 class SyncItem;
 }
 
+namespace swissknife {
+class CommandMigrate;
+}
+
 namespace catalog {
+
+class DirectoryEntryTestFactory;
 
 class Catalog;
 typedef uint64_t inode_t;
@@ -192,6 +196,7 @@ class DirectoryEntryBase {
 class DirectoryEntry : public DirectoryEntryBase {
   friend class SqlLookup;                  // simplify creation of DirectoryEntry objects
   friend class SqlDirentWrite;             // simplify write of DirectoryEntry objects in database
+  friend class swissknife::CommandMigrate; // fixing DirectoryEntry glitches
   friend class WritableCatalogManager;     // TODO: remove this dependency
   friend class DirectoryEntryTestFactory;  // create DirectoryEntries for unit-test purposes
 

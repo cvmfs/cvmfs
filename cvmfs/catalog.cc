@@ -23,26 +23,32 @@ const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog *AttachFreely(const string &root_path, const string &file) {
+Catalog* Catalog::AttachFreely(const string     &root_path,
+                               const string     &file,
+                               const hash::Any  &catalog_hash,
+                                     Catalog    *parent) {
   Catalog *catalog =
-    new Catalog(PathString(root_path.data(), root_path.length()), NULL);
-  bool retval = catalog->OpenDatabase(file);
-  if (!retval) {
+    new Catalog(PathString(root_path.data(), root_path.length()),
+                catalog_hash,
+                parent);
+  const bool successful_init = catalog->InitStandalone(file);
+  if (!successful_init) {
     delete catalog;
     return NULL;
   }
-  InodeRange inode_range;
-  inode_range.offset = 256;
-  inode_range.size = 256 + catalog->max_row_id();
-  catalog->set_inode_range(inode_range);
   return catalog;
 }
 
 
-Catalog::Catalog(const PathString &path, Catalog *parent) {
-  read_only_ = true;
-  path_ = path;
-  parent_ = parent;
+Catalog::Catalog(const PathString &path,
+                 const hash::Any &catalog_hash,
+                 Catalog *parent) :
+  read_only_(true),
+  catalog_hash_(catalog_hash),
+  path_(path),
+  parent_(parent),
+  initialized_(false)
+{
   max_row_id_ = 0;
   inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -51,6 +57,8 @@ Catalog::Catalog(const PathString &path, Catalog *parent) {
 
   database_ = NULL;
   nested_catalog_cache_ = NULL;
+  uid_map_ = NULL;
+  gid_map_ = NULL;
   sql_listing_ = NULL;
   sql_lookup_md5path_ = NULL;
   sql_lookup_inode_ = NULL;
@@ -98,6 +106,19 @@ void Catalog::FinalizePreparedStatements() {
 }
 
 
+bool Catalog::InitStandalone(const std::string &database_file) {
+  bool retval = OpenDatabase(database_file);
+  if (!retval) {
+    return false;
+  }
+
+  InodeRange inode_range;
+  inode_range.MakeDummy();
+  set_inode_range(inode_range);
+  return true;
+}
+
+
 /**
  * Establishes the database structures and opens the sqlite database file.
  * @param db_path the absolute path to the database file on local file system
@@ -142,12 +163,23 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   // Read Catalog Counter Statistics
-  counters_.ReadFromDatabase(database());
+  const bool statistics_loaded =
+    (database().schema_version() < Database::kLatestSupportedSchema -
+                                   Database::kSchemaEpsilon)
+      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
+      : counters_.ReadFromDatabase(database());
+  if (! statistics_loaded) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to load statistics counters for catalog %s (file %s)",
+             root_prefix_.c_str(), db_path.c_str());
+    return false;
+  }
 
   if (!IsRoot()) {
     parent_->AddChild(this);
   }
 
+  initialized_ = true;
   return true;
 }
 
@@ -357,9 +389,12 @@ hash::Any Catalog::GetPreviousRevision() const {
  * @return the assigned inode number
  */
 inode_t Catalog::GetMangledInode(const uint64_t row_id,
-                                 const uint64_t hardlink_group)
-{
+                                 const uint64_t hardlink_group) const {
   assert(IsInitialized());
+
+  if (inode_range_.IsDummy()) {
+    return DirectoryEntry::kInvalidInode;
+  }
 
   inode_t inode = row_id + inode_range_.offset;
 
@@ -460,6 +495,12 @@ void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
   assert((inode_annotation_ == NULL) || (inode_annotation_ == new_annotation));
   inode_annotation_ = new_annotation;
   pthread_mutex_unlock(lock_);
+}
+
+
+void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
+  uid_map_ = (uid_map && !uid_map->empty()) ? uid_map : NULL;
+  gid_map_ = (gid_map && !gid_map->empty()) ? gid_map : NULL;
 }
 
 

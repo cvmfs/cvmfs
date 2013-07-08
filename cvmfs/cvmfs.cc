@@ -1668,10 +1668,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
   string proxies = "";
+  string dns_server = "";
   string public_keys = "";
   bool ignore_signature = false;
   string root_hash = "";
   string repository_tag = "";
+  map<uint64_t, uint64_t> uid_map;
+  map<uint64_t, uint64_t> gid_map;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
 
@@ -1730,6 +1733,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     quota_limit = String2Int64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
+  if (options::GetValue("CVMFS_DNS_SERVER", &parameter))
+    dns_server = parameter;
   if (options::GetValue("CVMFS_KEYS_DIR", &parameter)) {
     // Collect .pub files from CVMFS_KEYS_DIR
     public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
@@ -1786,6 +1791,21 @@ static int Init(const loader::LoaderExports *loader_exports) {
       cachedir = cachedir + "/" + loader_exports->repository_name;
     }
   }
+  if (options::GetValue("CVMFS_UID_MAP", &parameter)) {
+    retval = options::ParseUIntMap(parameter, &uid_map);
+    if (!retval) {
+      *g_boot_error = "failed to parse uid map " + parameter;
+      return loader::kFailOptions;
+    }
+  }
+  if (options::GetValue("CVMFS_GID_MAP", &parameter)) {
+    retval = options::ParseUIntMap(parameter, &gid_map);
+    if (!retval) {
+      *g_boot_error = "failed to parse gid map " + parameter;
+      return loader::kFailOptions;
+    }
+  }
+
 
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
@@ -2027,6 +2047,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   download::Init(cvmfs::kDefaultNumConnections, false);
   download::SetHostChain(hostname);
   download::SetProxyChain(proxies);
+  if (! dns_server.empty()) {
+    download::SetDnsServer(dns_server);
+  }
   download::SetTimeout(timeout, timeout_direct);
   download::SetProxyGroupResetDelay(proxy_reset_after);
   download::SetHostResetDelay(host_reset_after);
@@ -2058,6 +2081,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
+  cvmfs::catalog_manager_->SetOwnerMaps(uid_map, gid_map);
 
   // Load specific tag (root hash has precedence)
   if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {

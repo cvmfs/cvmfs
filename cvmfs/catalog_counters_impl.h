@@ -18,7 +18,10 @@ typename TreeCountersBase<FieldT>::FieldsMap
 
 
 template<typename FieldT>
-bool TreeCountersBase<FieldT>::ReadFromDatabase(const Database &database) {
+bool TreeCountersBase<FieldT>::ReadFromDatabase(
+                                              const Database          &database,
+                                              const LegacyMode::Type   legacy)
+{
   bool retval = true;
 
   FieldsMap map = GetFieldsMap();
@@ -27,12 +30,18 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(const Database &database) {
   typename FieldsMap::const_iterator i    = map.begin();
   typename FieldsMap::const_iterator iend = map.end();
   for (; i != iend; ++i) {
-    const bool current_retval = sql_counter.BindCounter(i->first) &&
-                                sql_counter.Execute();
-    *(const_cast<FieldT*>(i->second)) =
-      static_cast<FieldT>(sql_counter.GetCounter());
-    sql_counter.Reset();
+    bool current_retval = sql_counter.BindCounter(i->first) &&
+                          sql_counter.FetchRow();
 
+    if (current_retval) {
+      *(const_cast<FieldT*>(i->second)) =
+        static_cast<FieldT>(sql_counter.GetCounter());
+    } else if (legacy == LegacyMode::kLegacy) {
+      *(const_cast<FieldT*>(i->second)) = FieldT(0);
+      current_retval = true;
+    }
+
+    sql_counter.Reset();
     retval = (retval) ? current_retval : false;
   }
 

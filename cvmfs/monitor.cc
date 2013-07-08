@@ -45,7 +45,9 @@
 using namespace std;  // NOLINT
 
 // Used for address offset calculation
+#ifndef CVMFS_LIBCVMFS
 extern loader::CvmfsExports *g_cvmfs_exports;
+#endif
 
 namespace monitor {
 
@@ -154,6 +156,7 @@ static void SendTrace(int sig,
     if (++counter == 300) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
       // Last attempt to log something useful
+#ifndef CVMFS_LIBCVMFS
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
                sig, send_errno);
       void *addr[64];
@@ -165,6 +168,7 @@ static void SendTrace(int sig,
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
                &g_cvmfs_exports);
+#endif
 
       _exit(1);
     }

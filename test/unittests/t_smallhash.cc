@@ -2,22 +2,34 @@
 
 #include <pthread.h>
 
+#include <limits>
+
 #include "../../cvmfs/smallhash.h"
 #include "../../cvmfs/murmur.h"
 
+#include "../../cvmfs/hash.h"
+
 static uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
+}
+
+static uint32_t hasher_md5(const hash::Md5 &key) {
+  // Don't start with the first bytes, because == is using them as well
+  return (uint32_t) *((uint32_t *)key.digest + 1);
 }
 
 class T_Smallhash : public ::testing::Test {
  protected:
   virtual void SetUp() {
     smallhash_.Init(16, -1, hasher_int);
+    smallhash_md5_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
     multihash_.Init(kNumHashmaps, -1, hasher_int);
     active_multihash = &multihash_;
 
     unsigned num_hashmaps = kNumHashmaps;
     EXPECT_EQ(num_hashmaps, multihash_.num_hashmaps());
+
+    srand (time(NULL));
   }
 
   uint32_t GetMultiSize() {
@@ -53,6 +65,7 @@ class T_Smallhash : public ::testing::Test {
   static const unsigned kNumHashmaps = 42;
   static const unsigned kNumThreads = 8;
   SmallHashDynamic<int, int> smallhash_;
+  SmallHashDynamic<hash::Md5, int> smallhash_md5_;
   MultiHash<int, int> multihash_;
   static MultiHash<int, int> *active_multihash;
 };
@@ -66,6 +79,39 @@ TEST_F(T_Smallhash, Insert) {
   }
 
   EXPECT_EQ(N, smallhash_.size());
+}
+
+
+TEST_F(T_Smallhash, InsertMd5) {
+  unsigned N = kNumElements;
+  for (unsigned i = 0; i < N; ++i) {
+    hash::Md5 random_hash;
+    random_hash.Randomize();
+    smallhash_md5_.Insert(random_hash, i);
+  }
+
+  EXPECT_EQ(N, smallhash_md5_.size());
+}
+
+
+TEST_F(T_Smallhash, InsertAndCopyMd5) {
+  unsigned N = kNumElements;
+  for (unsigned i = 0; i < N; ++i) {
+    hash::Md5 random_hash;
+    random_hash.Randomize();
+    smallhash_md5_.Insert(random_hash, i);
+  }
+
+  const uint32_t max_collisions = std::numeric_limits<uint32_t>::max() / N;
+  EXPECT_GT(max_collisions, smallhash_md5_.max_collisions_);
+
+  SmallHashDynamic<hash::Md5, int> new_smallhash_md5;
+  new_smallhash_md5.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+  new_smallhash_md5 = smallhash_md5_;
+
+  EXPECT_EQ(N, smallhash_md5_.size());
+  EXPECT_EQ(N, new_smallhash_md5.size());
+  EXPECT_GT(max_collisions, new_smallhash_md5.max_collisions_);
 }
 
 

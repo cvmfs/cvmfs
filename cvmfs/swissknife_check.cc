@@ -118,7 +118,8 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 
     if (*(i->second) != *(comp->second)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "catalog statistics mismatch: %s (%"PRIu64" / %"PRIu64")",
+               "catalog statistics mismatch: %s (expected: %"PRIu64" / "
+               "in catalog: %"PRIu64")",
                comp->first.c_str(), *(i->second), *(comp->second));
       retval = false;
     }
@@ -435,7 +436,8 @@ bool CommandCheck::InspectTree(const string &path,
     return false;
   }
 
-  const catalog::Catalog *catalog = catalog::AttachFreely(path, tmp_file);
+  const catalog::Catalog *catalog =
+    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
   unlink(tmp_file.c_str());
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",

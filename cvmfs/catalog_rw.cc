@@ -17,8 +17,12 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
-  Catalog(PathString(path.data(), path.length()), parent),
+WritableCatalog::WritableCatalog(const string     &path,
+                                 const hash::Any  &catalog_hash,
+                                 Catalog          *parent) :
+  Catalog(PathString(path.data(), path.length()),
+          catalog_hash,  // This is 0 for a newly created catalog!
+          parent),
   sql_insert_(NULL),
   sql_unlink_(NULL),
   sql_touch_(NULL),
@@ -29,22 +33,21 @@ WritableCatalog::WritableCatalog(const string &path, Catalog *parent) :
   sql_inc_linkcount_(NULL),
   dirty_(false)
 {
-  read_only_ =false;
+  read_only_ = false;
 }
 
 
-WritableCatalog *AttachFreelyRw(const string &root_path, const string &file) {
+WritableCatalog *WritableCatalog::AttachFreely(const string     &root_path,
+                                               const string     &file,
+                                               const hash::Any  &catalog_hash,
+                                                     Catalog    *parent) {
   WritableCatalog *catalog =
-    new WritableCatalog(root_path, NULL);
-  bool retval = catalog->OpenDatabase(file);
-  if (!retval) {
+    new WritableCatalog(root_path, catalog_hash, parent);
+  const bool successful_init = catalog->InitStandalone(file);
+  if (!successful_init) {
     delete catalog;
     return NULL;
   }
-  InodeRange inode_range;
-  inode_range.offset = 256;
-  inode_range.size = 256 + catalog->max_row_id();
-  catalog->set_inode_range(inode_range);
   return catalog;
 }
 
@@ -582,7 +585,6 @@ void WritableCatalog::CopyToParent() {
   // Update hardlink group IDs in this nested catalog.
   // To avoid collisions we add the maximal present hardlink group ID in parent
   // to all hardlink group IDs in the nested catalog.
-  // (CAUTION: hardlink group ID is saved in the inode field --> legacy :-) )
   const uint64_t offset = static_cast<uint64_t>(parent->GetMaxLinkId()) << 32;
   const string update_link_ids =
     "UPDATE catalog SET hardlinks = hardlinks + " + StringifyInt(offset) +

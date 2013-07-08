@@ -22,16 +22,28 @@
 
 #include "catalog.h"
 
+namespace swissknife {
+  class CommandMigrate;
+}
+
 namespace catalog {
 
 class WritableCatalogManager;
 
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
+  friend class swissknife::CommandMigrate; // needed for catalog migrations
 
  public:
-  WritableCatalog(const std::string &path, Catalog *parent);
+  WritableCatalog(const std::string &path,
+                  const hash::Any   &catalog_hash,
+                  Catalog           *parent);
   virtual ~WritableCatalog();
+
+  static WritableCatalog *AttachFreely(const std::string &root_path,
+                                       const std::string &file,
+                                       const hash::Any   &catalog_hash,
+                                             Catalog     *parent = NULL);
 
   void Transaction();
   void Commit();
@@ -137,9 +149,6 @@ class WritableCatalog : public Catalog {
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;
-
-WritableCatalog *AttachFreelyRw(const std::string &root_path,
-                                const std::string &file);
 
 }  // namespace catalog
 

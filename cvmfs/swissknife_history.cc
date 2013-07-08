@@ -312,7 +312,9 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   }
 
   // Update timestamp and revision
-  catalog = catalog::AttachFreelyRw("", catalog_path);
+  catalog = catalog::WritableCatalog::AttachFreely("",
+                                                   catalog_path,
+                                                   target_tag.root_hash);
   assert(catalog);
   catalog->UpdateLastModified();
   catalog->SetRevision(trunk_tag.revision + 1);

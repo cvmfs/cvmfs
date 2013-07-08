@@ -105,7 +105,6 @@ class SyncMediator {
   // Called after figuring out the type of a path (file, symlink, dir)
   void AddFile(SyncItem &entry);
   void RemoveFile(SyncItem &entry);
-  void TouchFile(SyncItem &entry);
 
   void AddDirectory(SyncItem &entry);
   void RemoveDirectory(SyncItem &entry);

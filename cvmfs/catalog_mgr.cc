@@ -17,6 +17,7 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+
 AbstractCatalogManager::AbstractCatalogManager() {
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
   revision_cache_ = 0;
@@ -47,6 +48,14 @@ void AbstractCatalogManager::SetInodeAnnotation(InodeAnnotation *new_annotation)
 }
 
 
+void AbstractCatalogManager::SetOwnerMaps(const OwnerMap &uid_map,
+                                          const OwnerMap &gid_map)
+{
+  uid_map_ = uid_map;
+  gid_map_ = gid_map;
+}
+
+
 /**
  * Initializes the CatalogManager and loads and attaches the root entry.
  * @return true on successful init, otherwise false
@@ -74,21 +83,24 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remounting repositories (dry run %d)", dry_run);
   if (dry_run)
-    return LoadCatalog(PathString("", 0), hash::Any(), NULL);
+    return LoadCatalog(PathString("", 0), hash::Any(), NULL, NULL);
 
   WriteLock();
   if (remount_listener_)
     remount_listener_->BeforeRemount(this);
 
-  string catalog_path;
-  const LoadError load_error = LoadCatalog(PathString("", 0), hash::Any(),
-                                           &catalog_path);
+  string    catalog_path;
+  hash::Any catalog_hash;
+  const LoadError load_error = LoadCatalog(PathString("", 0),
+                                           hash::Any(),
+                                           &catalog_path,
+                                           &catalog_hash);
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager::kInodeOffset;
 
-    Catalog *new_root = CreateCatalog(PathString("", 0), NULL);
+    Catalog *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
     assert(new_root);
     bool retval = AttachCatalog(catalog_path, new_root);
     assert(retval);
@@ -103,7 +115,7 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
 }
 
 
-Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
+/*Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
   Catalog *result = NULL;
   const inode_t raw_inode =
     inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
@@ -120,7 +132,7 @@ Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
              "(raw inode: %"PRIu64")", inode, raw_inode);
   }
   return result;
-}
+}*/
 
 
 /**
@@ -544,15 +556,19 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
   if (IsAttached(mountpoint, &attached_catalog))
     return attached_catalog;
 
-  string catalog_path;
-  const LoadError retval = LoadCatalog(mountpoint, hash, &catalog_path);
+  string    catalog_path;
+  hash::Any catalog_hash;
+  const LoadError retval = LoadCatalog( mountpoint,
+                                        hash,
+                                       &catalog_path,
+                                       &catalog_hash);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d)",
              mountpoint.c_str(), retval);
     return NULL;
   }
 
-  attached_catalog = CreateCatalog(mountpoint, parent_catalog);
+  attached_catalog = CreateCatalog(mountpoint, catalog_hash, parent_catalog);
 
   // Attach loaded catalog
   if (!AttachCatalog(catalog_path, attached_catalog)) {
@@ -590,6 +606,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
   InodeRange range = AcquireInodes(inode_chunk_size);
   new_catalog->set_inode_range(range);
   new_catalog->SetInodeAnnotation(inode_annotation_);
+  new_catalog->SetOwnerMaps(&uid_map_, &gid_map_);
 
   // Add catalog to the manager
   if (!new_catalog->IsInitialized()) {

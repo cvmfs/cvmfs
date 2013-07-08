@@ -38,6 +38,9 @@ enum Failures {
   kFailBadUrl,
   kFailProxyResolve,
   kFailHostResolve,
+  // artificial failure code.  Try other host even though
+  // failure seems to be at the proxy
+  kFailHostAfterProxy,
   kFailProxyConnection,
   kFailHostConnection,
   kFailProxyHttp,

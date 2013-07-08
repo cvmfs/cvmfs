@@ -67,8 +67,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
   void AddChunkedFile(const DirectoryEntryBase &entry,
                       const std::string &parent_directory,
                       const FileChunkList &file_chunks);
-  void TouchFile(const DirectoryEntryBase &entry,
-                 const std::string &file_path);
   void RemoveFile(const std::string &file_path);
 
   void AddDirectory(const DirectoryEntryBase &entry,
@@ -96,9 +94,13 @@ class WritableCatalogManager : public AbstractCatalogManager {
  protected:
   void EnforceSqliteMemLimit() { }
 
-  LoadError LoadCatalog(const PathString &mountpoint, const hash::Any &hash,
-                        std::string *catalog_path);
-  Catalog* CreateCatalog(const PathString &mountpoint, Catalog *parent_catalog);
+  LoadError LoadCatalog(const PathString &mountpoint,
+                        const hash::Any  &hash,
+                        std::string      *catalog_path,
+                        hash::Any        *catalog_hash);
+  Catalog* CreateCatalog(const PathString &mountpoint,
+                         const hash::Any  &catalog_hash,
+                         Catalog *parent_catalog);
 
   void AddFile(const DirectoryEntry  &entry,
                const std::string     &parent_directory);

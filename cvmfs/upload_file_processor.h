@@ -183,17 +183,21 @@ class FileProcessor : public Observable<SpoolerResult> {
      */
     struct Parameters {
       Parameters(const std::string &local_path,
-                 const bool         allow_chunking) :
+                 const bool         allow_chunking,
+                 const std::string &hash_suffix) :
         local_path(local_path),
-        allow_chunking(allow_chunking) {}
+        allow_chunking(allow_chunking),
+        hash_suffix(hash_suffix) {}
 
       // default constructor to create an 'empty' struct
       // (needed by the ConcurrentWorkers implementation)
       Parameters() :
-        local_path(), allow_chunking(false) {}
+        local_path(), allow_chunking(false), hash_suffix("") {}
 
       const std::string local_path;     //!< path to the local file to process
       const bool        allow_chunking; //!< enables file chunking for this job
+      const std::string hash_suffix;    //!< appended to the content hash of the
+                                        //!< bulk file in CA-Storage
     };
 
     /**
@@ -277,14 +281,19 @@ class FileProcessor : public Observable<SpoolerResult> {
    * @param allow_chunking  true, if file chunks should be generated if appropriate
    */
   inline void Process(const std::string  &local_path,
-                      const bool          allow_chunking) {
-    const FileProcessorWorker::Parameters params(local_path, allow_chunking);
+                      const bool          allow_chunking,
+                      const std::string  &hash_suffix = "") {
+    const FileProcessorWorker::Parameters params(local_path,
+                                                 allow_chunking,
+                                                 hash_suffix);
     workers_->Schedule(params);
   }
 
   inline unsigned int GetNumberOfErrors() const {
     return workers_->GetNumberOfFailedJobs();
   }
+
+  void DisablePrecaching();
 
   void WaitForProcessing() const;
   void WaitForTermination() const;

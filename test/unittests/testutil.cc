@@ -3,6 +3,10 @@
 #include <fstream>
 #include <sstream>
 
+#ifdef __APPLE__
+  #include <sys/sysctl.h>
+#endif
+
 
 void SkipWhitespace(std::istringstream &iss) {
   while (iss.good()) {
@@ -16,8 +20,23 @@ void SkipWhitespace(std::istringstream &iss) {
 
 
 pid_t GetParentPid(const pid_t pid) {
-  static const std::string ppid_label = "PPid:";
   pid_t parent_pid = 0;
+
+#ifdef __APPLE__
+  int mib[4];
+  size_t len;
+  struct kinfo_proc kp;
+
+  len = 4;
+  sysctlnametomib("kern.proc.pid", mib, &len);
+
+  mib[3] = pid;
+  len = sizeof(kp);
+  if (sysctl(mib, 4, &kp, &len, NULL, 0) == 0) {
+    parent_pid = kp.kp_eproc.e_ppid;
+  }
+#else
+  static const std::string ppid_label = "PPid:";
 
   std::stringstream proc_status_path;
   proc_status_path << "/proc/" << pid << "/status";
@@ -37,6 +56,7 @@ pid_t GetParentPid(const pid_t pid) {
       break;
     }
   }
+#endif
 
   return parent_pid;
 }
