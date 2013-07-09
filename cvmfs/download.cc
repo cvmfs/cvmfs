@@ -76,6 +76,7 @@ uint32_t watch_fds_inuse_ = 0;
 uint32_t watch_fds_max_;
 
 pthread_mutex_t lock_options_ = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t lock_synchronous_mode_ = PTHREAD_MUTEX_INITIALIZER;
 char *opt_dns_server_ = NULL;
 unsigned opt_timeout_proxy_ ;
 unsigned opt_timeout_direct_;
@@ -974,6 +975,7 @@ Failures Fetch(JobInfo *info) {
     ReadPipe(info->wait_at[0], &result, sizeof(result));
     //LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
+    pthread_mutex_lock(&lock_synchronous_mode_);
     CURL *handle = AcquireCurlHandle();
     InitializeRequest(info, handle);
     SetUrlOptions(info);
@@ -988,6 +990,7 @@ Failures Fetch(JobInfo *info) {
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code;
     ReleaseCurlHandle(info->curl_handle);
+    pthread_mutex_unlock(&lock_synchronous_mode_);
   }
 
   if (result != kFailOk) {
