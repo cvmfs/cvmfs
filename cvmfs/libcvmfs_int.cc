@@ -565,7 +565,12 @@ void cvmfs_int_spawn() {
   if (monitor_ready) {
     monitor::Spawn();
   }
-  download::Spawn();
+
+  // Do not spawn multiple download threads, this results in (unexplained)
+  // errors when libcvmfs is libnked with parrot.
+
+  // download::Spawn();
+
   quota::Spawn();
 
   if (*tracefile_ != "")
