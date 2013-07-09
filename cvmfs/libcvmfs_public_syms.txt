@@ -1,3 +1,5 @@
+__i686.get_pc_thunk.bx
+__i686.get_pc_thunk.cx
 cvmfs_init
 cvmfs_fini
 cvmfs_remount
