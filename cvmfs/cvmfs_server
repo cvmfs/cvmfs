@@ -779,6 +779,7 @@ create_config_files_for_new_repository() {
   local upstream=$2
   local stratum0=$3
   local cvmfs_user=$4
+  local unionfs=$5
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -802,6 +803,7 @@ CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
 CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
 CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+CVMFS_UNION_FS_TYPE=$unionfs
 EOF
   cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
@@ -1088,110 +1090,25 @@ mkfs() {
   check_repository_existence $name  && die "The repository $name already exists"
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
-
-  # other configurations
-  local cvmfs_user=`get_cvmfs_owner $name $owner`
-  local spool_dir="/var/spool/cvmfs/${name}"
-  local scratch_dir="${spool_dir}/scratch"
-  local rdonly_dir="${spool_dir}/rdonly"
-  local temp_dir="${spool_dir}/tmp"
-  local cache_dir="${spool_dir}/cache"
-  local repository_dir;
-  local riak_urls;
-  if is_local_upstream $upstream; then
-    repository_dir=$(get_upstream_path $upstream)
-  elif is_riak_upstream $upstream; then
-    riak_urls=$(get_upstream_path $upstream)
-  fi
-
-  # more sanity checks
-  check_user $cvmfs_user || die "No user $cvmfs_user"
+  is_local_upstream $upstream       || die "Import is only supported for local storage"
   if [ $unionfs = "overlayfs" ]; then
-      check_overlayfs || die "overlayfs kernel module missing"
+    check_overlayfs                 || die "overlayfs kernel module missing"
+    echo "WARNING: CVMFS filesystems using overlayfs will not enforce hard link semantics during publishing."
   else
-      check_aufs      || die "aufs kernel module missing"
+    check_aufs                      || die "aufs kernel module missing"
   fi
-  [ -x /usr/bin/cvmfs2 ] || die "cvmfs client missing"
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs " && die "Autofs on /cvmfs has to be disabled"
-  [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null || die "Apache must be installed and running"
+  check_cvmfs2_client               || die "cvmfs client missing"
+  check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
+  check_apache                      || die "Apache must be installed and running"
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
 
-  echo -n "Creating configuration files... "
-  mkdir -p /etc/cvmfs/repositories.d/${name}
-  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
-# Created by cvmfs_server.
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
-CVMFS_REPOSITORY_NAME=$name
-CVMFS_REPOSITORY_TYPE=stratum0
-CVMFS_USER=$cvmfs_user
-CVMFS_UNION_DIR=/cvmfs/$name
-CVMFS_SPOOL_DIR=$spool_dir
-CVMFS_STRATUM0=$stratum0
-CVMFS_UPSTREAM_STORAGE=$upstream
-CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
-CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
-CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
-CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
-CVMFS_UNION_FS_TYPE=$unionfs
-EOF
-  cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
-# Created by cvmfs_server.  Don't touch.
-# For pushing files to the worker nodes
-Alias /fanout/cvmfs/$name /cvmfs/$name
-<Directory "/cvmfs/$name">
-    Options -MultiViews
-    AllowOverride All
-    Order allow,deny
-    Allow from all
-    EnableMMAP Off
-    EnableSendFile Off
-</Directory>
-# For pushing catalogs to upstream storage
-Alias /fanout/$temp_dir $temp_dir
-<Directory "$temp_dir">
-    Options -MultiViews
-    AllowOverride All
-    Order allow,deny
-    Allow from all
-    EnableMMAP Off
-    EnableSendFile Off
-</Directory>
-EOF
-  if is_local_upstream $upstream; then
-    cat >> /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
-# Translation URL to real pathname
-Alias /cvmfs/$name ${repository_dir}
-<Directory "${repository_dir}">
-    Options -MultiViews
-    AllowOverride All
-    Order allow,deny
-    Allow from all
-
-    EnableMMAP Off
-    EnableSendFile Off
-
-    AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
-
-    Header unset Last-Modified
-    FileETag None
-
-    ExpiresActive On
-    ExpiresDefault "access plus 3 days"
-    ExpiresByType text/html "access plus 5 minutes"
-    ExpiresByType application/x-cvmfs "access plus 1 minutes"
-</Directory>
-EOF
-  elif is_riak_upstream $upstream; then
-    cat > /etc/cvmfs/repositories.d/${name}/riak.conf << EOF
-# Created by cvmfs_server.
-CVMFS_RIAK_URLS=$riak_urls
-EOF
-  fi
+  # repository owner dialog                                                                           local cvmfs_user=$(get_cvmfs_owner $name $owner)
+  check_user $cvmfs_user || die "No user $cvmfs_user"
 
   # create system-wide configuration
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs
   echo "done"
 
   # create security keys and certificates
@@ -1472,7 +1389,7 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs
   echo "done"
 
   # import the old repository security keys
