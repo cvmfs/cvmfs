@@ -1188,6 +1188,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
        iEnd = pool_handles_inuse_->end(); i != iEnd; ++i)
   {
     curl_multi_remove_handle(curl_multi_, *i);
+    curl_easy_cleanup(*i);
   }
   pool_handles_inuse_->clear();
   free(watch_fds_);
