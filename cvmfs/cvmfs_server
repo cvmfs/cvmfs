@@ -1093,7 +1093,7 @@ mkfs() {
   is_local_upstream $upstream       || die "Import is only supported for local storage"
   if [ $unionfs = "overlayfs" ]; then
     check_overlayfs                 || die "overlayfs kernel module missing"
-    echo "WARNING: CVMFS filesystems using overlayfs will not enforce hard link semantics during publishing."
+    echo "Warning: CVMFS filesystems using overlayfs may not enforce hard link semantics during publishing."
   else
     check_aufs                      || die "aufs kernel module missing"
   fi
