@@ -1103,7 +1103,8 @@ mkfs() {
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
 
-  # repository owner dialog                                                                           local cvmfs_user=$(get_cvmfs_owner $name $owner)
+  # repository owner dialog
+  local cvmfs_user=$(get_cvmfs_owner $name $owner)
   check_user $cvmfs_user || die "No user $cvmfs_user"
 
   # create system-wide configuration
