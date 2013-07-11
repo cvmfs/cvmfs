@@ -8,9 +8,9 @@ script_location=$(dirname $(readlink --canonicalize $0))
 sudo service httpd start
 
 # run tests
-echo "running CernVM-FS unit tests..."
-cvmfs_unittests --gtest_shuffle \
-                --gtest_death_test_use_fork >> $UNITTEST_LOGFILE 2>&1 || die "fail"
+retval=0
+run_unittests --gtest_shuffle \
+              --gtest_death_test_use_fork || retval=$?
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
@@ -18,4 +18,6 @@ cd ${SOURCE_DIRECTORY}/test
                           src/005-asetup               \
                           src/007-testjobs             \
                           src/024-reload-during-asetup \
-                          src/518-hardlinkstresstest
+                          src/518-hardlinkstresstest || retval=$?
+
+exit $retval
