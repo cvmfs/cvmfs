@@ -30,7 +30,7 @@ cvmfs_run_test() {
 
   if [ $seconds -gt 8 ]; then
     echo "mounting took too long with $seconds seconds (expected 8)" >> $logfile
-    return 1
+    CVMFS_TIME_WARNING_FLAG=1
   fi
 
   echo "checking host chain" >> $logfile

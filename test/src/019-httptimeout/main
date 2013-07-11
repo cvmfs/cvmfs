@@ -50,7 +50,7 @@ cvmfs_run_test() {
 
   if [ $seconds -gt 6 ]; then
     echo "mounting took too long with $seconds seconds (expected 6)" >> $logfile
-    retval=7
+    CVMFS_TIME_WARNING_FLAG=1
   fi
 
   return $retval

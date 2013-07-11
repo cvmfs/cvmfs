@@ -29,9 +29,8 @@ cvmfs_run_test() {
 
   if [ $seconds -gt 2 ]; then
     echo "timeout was too long: $seconds (expected at most 2)" >> $logfile
-    return 3
+    CVMFS_TIME_WARNING_FLAG=1
   fi
 
   return 0
 }
-
