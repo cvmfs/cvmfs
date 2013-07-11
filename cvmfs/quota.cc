@@ -481,7 +481,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       map<hash::Md5, int>::const_iterator iter = back_channels_->find(hash);
       if (iter != back_channels_->end()) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
-                 "closing left-over backchannel %s", hash.ToString().c_str());
+                 "closing left-over back channel %s", hash.ToString().c_str());
         close(iter->second);
       }
       (*back_channels_)[hash] = return_pipe;
@@ -500,7 +500,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       map<hash::Md5, int>::iterator iter = back_channels_->find(hash);
       if (iter != back_channels_->end()) {
         LogCvmfs(kLogQuota, kLogDebug,
-                 "closing backchannel %s", hash.ToString().c_str());
+                 "closing back channel %s", hash.ToString().c_str());
         close(iter->second);
         back_channels_->erase(iter);
       } else {
