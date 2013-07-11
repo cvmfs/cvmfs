@@ -318,11 +318,11 @@ static bool Contains(const string &hash_str) {
 
 
 static void CheckHighPinWatermark() {
-  if ((cleanup_threshold_ > 0) &&
-      (pinned_ > kHighPinWatermark*cleanup_threshold_/100))
-  {
+  const uint64_t watermark = kHighPinWatermark*cleanup_threshold_/100;
+  if ((cleanup_threshold_ > 0) && (pinned_ > watermark)) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
-             "high watermark of pinned files ("PRIu64")", pinned_);
+             "high watermark of pinned files (%"PRIu64"M > %"PRIu64"M)",
+             pinned_/(1024*1024), watermark/(1024*1024));
     BroadcastBackchannels("R");  // release pinned catalogs
   }
 }
