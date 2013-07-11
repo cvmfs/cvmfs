@@ -1,0 +1,36 @@
+
+cvmfs_test_name="DNS Unreachable"
+
+do_faulty_mount() {
+  cvmfs_mount $repo \
+              "CVMFS_DNS_SERVER=127.0.0.2" \
+              "CVMFS_TIMEOUT=1" \
+              "CVMFS_TIMEOUT_DIRECT=1"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo="atlas.cern.ch"
+
+  echo "restarting autofs" >> $logfile
+  autofs_switch off >> $logfile 2>&1 || return 10
+  autofs_switch on  >> $logfile 2>&1 || return 11
+
+  echo "trying to mount $repo first" >> $logfile
+  cvmfs_mount $repo || return 1
+
+  echo "unmounting and cleaning" >> $logfile
+  cvmfs_clean || return 2
+
+  echo "trying to mount again with unreachable DNS" >> $logfile
+  local seconds
+  seconds=$(stop_watch do_faulty_mount)
+
+  if [ $seconds -gt 2 ]; then
+    echo "timeout was too long: $seconds (expected at most 2)" >> $logfile
+    CVMFS_TIME_WARNING_FLAG=1
+  fi
+
+  return 0
+}

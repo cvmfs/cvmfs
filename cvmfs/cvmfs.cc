@@ -1668,6 +1668,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
   string proxies = "";
+  string dns_server = "";
   string public_keys = "";
   bool ignore_signature = false;
   string root_hash = "";
@@ -1732,6 +1733,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     quota_limit = String2Int64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
+  if (options::GetValue("CVMFS_DNS_SERVER", &parameter))
+    dns_server = parameter;
   if (options::GetValue("CVMFS_KEYS_DIR", &parameter)) {
     // Collect .pub files from CVMFS_KEYS_DIR
     public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
@@ -2044,6 +2047,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   download::Init(cvmfs::kDefaultNumConnections, false);
   download::SetHostChain(hostname);
   download::SetProxyChain(proxies);
+  if (! dns_server.empty()) {
+    download::SetDnsServer(dns_server);
+  }
   download::SetTimeout(timeout, timeout_direct);
   download::SetProxyGroupResetDelay(proxy_reset_after);
   download::SetHostResetDelay(host_reset_after);

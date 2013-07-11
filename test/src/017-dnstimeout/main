@@ -1,0 +1,46 @@
+
+cvmfs_test_name="DNS Timeout"
+
+do_faulty_mount() {
+  cvmfs_mount $repo \
+              "CVMFS_DNS_SERVER=127.0.0.1" \
+              "CVMFS_TIMEOUT=3" \
+              "CVMFS_TIMEOUT_DIRECT=3"
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  local repo="atlas.cern.ch"
+  local retcode=0
+  local server_pid=0
+
+  echo "restarting autofs" >> $logfile
+  autofs_switch off >> $logfile 2>&1 || return 10
+  autofs_switch on  >> $logfile 2>&1 || return 11
+
+  echo "trying to mount $repo first" >> $logfile
+  cvmfs_mount $repo || return 1
+
+  echo "unmounting and cleaning" >> $logfile
+  cvmfs_clean || return 2
+
+  echo "starting mocked and silent DNS server" >> $logfile
+  server_pid=$(open_silent_port UDP 53 $logfile)
+
+  echo "silent DNS server running as PID $server_pid" >> $logfile
+
+  echo "trying to mount again with unresponsive DNS" >> $logfile
+  local seconds
+  seconds=$(stop_watch do_faulty_mount)
+
+  if [ $seconds -gt 8 ]; then
+    echo "timeout was too long: $seconds (expected at most 8)" >> $logfile
+    CVMFS_TIME_WARNING_FLAG=1
+  fi
+
+  echo "killing the mocked DNS server" >> $logfile
+  sudo kill -9 $server_pid >> $logfile 2>&1 || retcode=6
+
+  return $retcode
+}

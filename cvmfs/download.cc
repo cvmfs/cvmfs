@@ -76,6 +76,7 @@ uint32_t watch_fds_inuse_ = 0;
 uint32_t watch_fds_max_;
 
 pthread_mutex_t lock_options_ = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t lock_synchronous_mode_ = PTHREAD_MUTEX_INITIALIZER;
 char *opt_dns_server_ = NULL;
 unsigned opt_timeout_proxy_ ;
 unsigned opt_timeout_direct_;
@@ -757,6 +758,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
     case CURLE_COULDNT_CONNECT:
     case CURLE_OPERATION_TIMEDOUT:
+    case CURLE_PARTIAL_FILE:
       if (info->proxy != "")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
@@ -973,6 +975,7 @@ Failures Fetch(JobInfo *info) {
     ReadPipe(info->wait_at[0], &result, sizeof(result));
     //LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
+    pthread_mutex_lock(&lock_synchronous_mode_);
     CURL *handle = AcquireCurlHandle();
     InitializeRequest(info, handle);
     SetUrlOptions(info);
@@ -987,6 +990,7 @@ Failures Fetch(JobInfo *info) {
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code;
     ReleaseCurlHandle(info->curl_handle);
+    pthread_mutex_unlock(&lock_synchronous_mode_);
   }
 
   if (result != kFailOk) {
@@ -1104,7 +1108,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
         DiffTimeSeconds(timeval_start, timeval_stop);
     }
     int retval = poll(watch_fds_, watch_fds_inuse_, timeout);
-    if (errno == -1) {
+    if (retval < 0) {
       continue;
     }
 
@@ -1187,7 +1191,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
        iEnd = pool_handles_inuse_->end(); i != iEnd; ++i)
   {
     curl_multi_remove_handle(curl_multi_, *i);
-    curl_multi_cleanup(*i);
+    curl_easy_cleanup(*i);
   }
   pool_handles_inuse_->clear();
   free(watch_fds_);
