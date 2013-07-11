@@ -13,6 +13,10 @@ cvmfs_run_test() {
 
   local repo="atlas.cern.ch"
 
+  echo "restarting autofs" >> $logfile
+  autofs_switch off >> $logfile 2>&1 || return 10
+  autofs_switch on  >> $logfile 2>&1 || return 11
+
   echo "trying to mount $repo first" >> $logfile
   cvmfs_mount $repo || return 1
 

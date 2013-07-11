@@ -14,6 +14,10 @@ cvmfs_run_test() {
   local retcode=0
   local seconds=100
 
+  echo "restarting autofs" >> $logfile
+  autofs_switch off >> $logfile 2>&1 || return 10
+  autofs_switch on  >> $logfile 2>&1 || return 11
+
   echo "configure cvmfs with a number of unreachable hosts" >> $logfile
   sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.0.1:80;http://127.0.0.2:8080;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
 
