@@ -14,25 +14,44 @@ cvmfs_run_test() {
   local retcode=0
   local seconds=100
   local http_pid=0
+  local retval=0
+
+  echo "restarting autofs" >> $logfile
+  autofs_switch off >> $logfile 2>&1 || return 10
+  autofs_switch on  >> $logfile 2>&1 || return 11
 
   echo "configure cvmfs with an unreachable and an unresponsive host" >> $logfile
-  sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.1.2:8080;http://127.0.0.1/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
+  sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.1.2:8080;http://127.0.0.1:8000/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
 
   echo "run a silent HTTP server" >> $logfile
-  http_pid=$(open_silent_port TCP 80 $logfile)
+  http_pid=$(open_silent_port TCP 8000 $logfile)
+  if [ $? -ne 0 ]; then return 2; fi
   echo "mocked HTTP server started with PID $http_pid" >> $logfile
 
   echo "try to mount cvmfs" >> $logfile
   seconds=$(stop_watch do_faulty_mount)
 
-  rm -f /etc/cvmfs/domain.d/cern.ch.local
+  echo "try to list the repository" >> $logfile
+  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || retval=3
+
+  echo "checking host chain" >> $logfile
+  sudo cvmfs_talk -i atlas.cern.ch host probe >> $logfile 2>&1 || retval=4
+  sudo cvmfs_talk -i atlas.cern.ch host info | grep 127.0.1.2 | grep -q "host down"
+  local h1=$?
+  sudo cvmfs_talk -i atlas.cern.ch host info | grep 127.0.0.1 | grep -q "host down"
+  local h2=$?
+  sudo cvmfs_talk -i atlas.cern.ch host info >> $logfile 2>&1
+
   sudo kill -9 $http_pid >> $logfile 2>&1
 
-  echo "try to list the repository" >> $logfile
-  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 3
+  [ $h1 -eq 0 ] && [ $h2 -eq 0 ] || retval=5
+
+  sudo rm -f /etc/cvmfs/domain.d/cern.ch.local >> $logfile 2>&1 || retval=6
 
   if [ $seconds -gt 6 ]; then
     echo "mounting took too long with $seconds seconds (expected 6)" >> $logfile
-    return 4
+    CVMFS_TIME_WARNING_FLAG=1
   fi
+
+  return $retval
 }
