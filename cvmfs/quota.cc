@@ -28,10 +28,12 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include <cassert>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 
 #include <string>
 #include <vector>
@@ -76,6 +78,8 @@ enum CommandType {
   kLimits,
   kPid,
   kPinRegular,
+  kRegisterBackChannel,
+  kUnregisterBackChannel,
 };
 
 struct LruCommand {
@@ -111,6 +115,8 @@ uint64_t gauge_;  /**< Current size of cache. */
 uint64_t seq_;  /**< Current access sequence number.  Gets increased on every
                      access/insert operation. */
 string *cache_dir_ = NULL;
+/// Maps Md5 over channel id to writeable file descriptor.
+map<hash::Md5, int> *back_channels_ = NULL;
 
 sqlite3 *db_ = NULL;
 sqlite3_stmt *stmt_touch_ = NULL;
@@ -148,7 +154,6 @@ static void MakeReturnPipe(int pipe[2]) {
 }
 
 
-// TODO: make sure that a broken return pipe does not kill the cache manager
 static int BindReturnPipe(int pipe_wronly) {
   if (!shared_)
     return pipe_wronly;
@@ -156,8 +161,12 @@ static int BindReturnPipe(int pipe_wronly) {
   // Connect writer's end
   int result = open((*cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(),
                     O_WRONLY | O_NONBLOCK);
-  assert(result >= 0);
-  Nonblock2Block(result);
+  if (result >= 0) {
+    Nonblock2Block(result);
+  } else {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+             "failed to bind return pipe (%d)", errno);
+  }
   return result;
 }
 
@@ -168,12 +177,49 @@ static void UnbindReturnPipe(int pipe_wronly) {
 }
 
 
+static void UnlinkReturnPipe(int pipe_wronly) {
+  if (shared_)
+    unlink((*cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str());
+}
+
+
 static void CloseReturnPipe(int pipe[2]) {
   if (shared_) {
     close(pipe[0]);
-    unlink((*cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str());
+    UnlinkReturnPipe(pipe[1]);
   } else {
     ClosePipe(pipe);
+  }
+}
+
+
+static void BroadcastBackchannels(const string &message) {
+  assert(message.length() > 0);
+
+  for (map<hash::Md5, int>::iterator i = back_channels_->begin(),
+       iend = back_channels_->end(); i != iend; )
+  {
+    LogCvmfs(kLogQuota, kLogDebug, "broadcasting %s to %s",
+             message.c_str(), i->first.ToString().c_str());
+    int written = write(i->second, message.data(), message.length());
+    if (written < 0) written = 0;
+    if (static_cast<unsigned>(written) != message.length()) {
+      bool remove_backchannel = errno != EAGAIN;
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "failed to broadcast '%s' to %s (written %d, error %d)",
+               message.c_str(), i->first.ToString().c_str(), written, errno);
+      if (remove_backchannel) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "removing back channel %s", i->first.ToString().c_str());
+        map<hash::Md5, int>::iterator remove_me = i;
+        ++i;
+        back_channels_->erase(remove_me);
+      } else {
+        ++i;
+      }
+    } else {
+      ++i;
+    }
   }
 }
 
@@ -369,6 +415,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
   LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
   sqlite3_soft_heap_limit(kSqliteMemPerThread);
 
+  back_channels_ = new map<hash::Md5, int>;
   LruCommand command_buffer[kCommandBufferSize];
   char path_buffer[kCommandBufferSize*kMaxCvmfsPath];
   unsigned num_commands = 0;
@@ -394,6 +441,9 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       bool success = true;
       int return_pipe =
         BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
       const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
                            sizeof(command_buffer[num_commands].digest));
       const string hash_str(hash.ToString());
@@ -413,6 +463,50 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
       WritePipe(return_pipe, &success, sizeof(success));
       UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
+    // Back channels are also handled out of band
+    if (command_type == kRegisterBackChannel) {
+      int return_pipe =
+        BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
+      UnlinkReturnPipe(command_buffer[num_commands].return_pipe);
+      Block2Nonblock(return_pipe);  // back channels are opportunistic
+      hash::Md5 hash;
+      memcpy(hash.digest, command_buffer[num_commands].digest,
+             hash::kDigestSizes[hash::kMd5]);
+      map<hash::Md5, int>::const_iterator iter = back_channels_->find(hash);
+      if (iter != back_channels_->end()) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "closing left-over backchannel %s", hash.ToString().c_str());
+        close(iter->second);
+      }
+      (*back_channels_)[hash] = return_pipe;
+      char success = 'S';
+      WritePipe(return_pipe, &success, sizeof(success));
+      LogCvmfs(kLogQuota, kLogDebug, "register back channel %s on fd %d",
+               hash.ToString().c_str(), return_pipe);
+
+      continue;
+    }
+
+    if (command_type == kUnregisterBackChannel) {
+      hash::Md5 hash;
+      memcpy(hash.digest, command_buffer[num_commands].digest,
+             hash::kDigestSizes[hash::kMd5]);
+      map<hash::Md5, int>::iterator iter = back_channels_->find(hash);
+      if (iter != back_channels_->end()) {
+        LogCvmfs(kLogQuota, kLogDebug,
+                 "closing backchannel %s", hash.ToString().c_str());
+        close(iter->second);
+        back_channels_->erase(iter);
+      } else {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "did not find back channel %s", hash.ToString().c_str());
+      }
       continue;
     }
 
@@ -449,6 +543,11 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       // Process cleanup, listings
       int return_pipe =
         BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0) {
+        num_commands = 0;
+        continue;
+      }
+
       int retval;
       sqlite3_stmt *this_stmt_list = NULL;
       switch (command_type) {
@@ -553,8 +652,59 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     memcpy(command_buffer[0].digest, i->first.digest, i->first.GetDigestSize());
     ProcessCommandBunch(1, command_buffer, path_buffer);
   }
+  delete back_channels_;
+  back_channels_ = NULL;
 
   return NULL;
+}
+
+
+/**
+ * Register a channel that allows the cache manager to trigger action to its
+ * clients.  Currently used for releasing pinned catalogs.
+ */
+void RegisterBackChannel(int back_channel[2], const string &channel_id) {
+  assert(initialized_);
+
+  if (limit_ != 0) {
+    hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
+    MakeReturnPipe(back_channel);
+
+    LruCommand cmd;
+    cmd.command_type = kRegisterBackChannel;
+    cmd.return_pipe = back_channel[1];
+    memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+    WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+    char success;
+    ReadHalfPipe(back_channel[0], &success, sizeof(success));
+    // At this point, the named FIFO is unlinked, so don't use CloseReturnPipe
+    if (success != 'S') {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+               "failed to register quota back channel (%c)", success);
+      abort();
+    }
+  }
+}
+
+
+/**
+ * Gracefully closes a back channel.
+ */
+void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
+  assert(initialized_);
+
+  if (limit_ != 0) {
+    hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
+
+    LruCommand cmd;
+    cmd.command_type = kUnregisterBackChannel;
+    memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+    WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+    // Writer's end will be closed by cache manager, FIFO is already unlinked
+    close(back_channel[0]);
+  }
 }
 
 
@@ -716,6 +866,8 @@ static bool InitDatabase(const bool rebuild_database) {
   bool retry = false;
   const string db_file = (*cache_dir_) + "/cachedb";
   if (rebuild_database) {
+    LogCvmfs(kLogQuota, kLogDebug, "rebuild database, unlinking existing (%s)",
+             db_file.c_str());
     unlink(db_file.c_str());
     unlink((db_file + "-journal").c_str());
   }
@@ -1116,6 +1268,9 @@ int MainCacheManager(int argc, char **argv) {
   ReadPipe(pipe_handshake, &buf, 1);
   close(pipe_handshake);
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
+
+  // Ensure that broken pipes from clients do not kill the cache manager
+  signal(SIGPIPE, SIG_IGN);
 
   MainCommandServer(NULL);
   unlink(fifo_path.c_str());
