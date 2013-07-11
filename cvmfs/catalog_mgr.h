@@ -140,7 +140,7 @@ class AbstractCatalogManager {
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadError Remount(const bool dry_run);
-  void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
+  void DetachNested();
 
   //bool LookupInode(const inode_t inode, const LookupOptions options,
   //                 DirectoryEntry *entry);
@@ -230,6 +230,7 @@ class AbstractCatalogManager {
   bool AttachCatalog(const std::string &db_path, Catalog *new_catalog);
   void DetachCatalog(Catalog *catalog);
   void DetachSubtree(Catalog *catalog);
+  void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
   bool IsAttached(const PathString &root_path,
                   Catalog **attached_catalog) const;
 

@@ -54,7 +54,8 @@ static void *MainUnpinListener(void *data) {
       watch_fds[1].revents = 0;
       char cmd;
       ReadPipe(handle->pipe_backchannel[0], &cmd, sizeof(cmd));
-      if (cmd == 'C') {
+      if (cmd == 'R') {
+        handle->catalog_manager->DetachNested();
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "released nested catalogs");
       }
     }

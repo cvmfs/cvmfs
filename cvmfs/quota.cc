@@ -323,7 +323,7 @@ static void CheckHighPinWatermark() {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "high watermark of pinned files (%"PRIu64"M > %"PRIu64"M)",
              pinned_/(1024*1024), watermark/(1024*1024));
-    BroadcastBackchannels("R");  // release pinned catalogs
+    BroadcastBackchannels("R");  // clients: please release pinned catalogs
   }
 }
 

@@ -115,6 +115,29 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
 }
 
 
+/**
+ * Detaches everything except the root catalog
+ */
+void AbstractCatalogManager::DetachNested() {
+  WriteLock();
+  if (catalogs_.empty()) {
+    Unlock();
+    return;
+  }
+
+  CatalogList::const_iterator i;
+  CatalogList::const_iterator iend;
+  CatalogList catalogs_to_detach = GetRootCatalog()->GetChildren();
+  for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end();
+       i != iend; ++i)
+  {
+    DetachSubtree(*i);
+  }
+
+  Unlock();
+}
+
+
 /*Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
   Catalog *result = NULL;
   const inode_t raw_inode =
