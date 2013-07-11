@@ -5,8 +5,8 @@ script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_test.sh
 
 # run tests
-echo "running CernVM-FS unit tests..."
-cvmfs_unittests --gtest_shuffle >> $UNITTEST_LOGFILE 2>&1 || die "fail"
+retval=0
+run_unittests --gtest_shuffle || retval=$?
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
@@ -19,4 +19,6 @@ cd ${SOURCE_DIRECTORY}/test
                           src/019-faulty_proxy         \
                           src/020-server_timeout       \
                           src/024-reload-during-asetup \
-                          src/5*
+                          src/5* || retval=$?
+
+exit $retval
