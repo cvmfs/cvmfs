@@ -5,7 +5,9 @@ script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_test.sh
 
 # start apache
-sudo service httpd start
+echo -n "starting apache... "
+sudo service httpd start > /dev/null 2>&1 || die "fail"
+echo "OK"
 
 # run tests
 retval=0
