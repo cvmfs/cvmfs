@@ -98,6 +98,10 @@ const unsigned kSqliteMemPerThread = 2*1024*1024;
 const unsigned kCommandBufferSize = 32;
 const unsigned kMaxCvmfsPath = 512-sizeof(LruCommand);
 
+// Alarm when more than 75% of the cache fraction allowed for pinned files (50%)
+// is filled with pinned files
+const unsigned kHighPinWatermark = 75;
+
 pthread_t thread_lru_;
 int pipe_lru_[2];
 bool shared_;
@@ -313,6 +317,17 @@ static bool Contains(const string &hash_str) {
 }
 
 
+static void CheckHighPinWatermark() {
+  if ((cleanup_threshold_ > 0) &&
+      (pinned_ > kHighPinWatermark*cleanup_threshold_/100))
+  {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "high watermark of pinned files ("PRIu64")", pinned_);
+    BroadcastBackchannels("R");  // release pinned catalogs
+  }
+}
+
+
 static void ProcessCommandBunch(const unsigned num,
                                 const LruCommand *commands, const char *paths)
 {
@@ -458,6 +473,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
         } else {
           (*pinned_chunks_)[hash] = size;
           pinned_ += size;
+          CheckHighPinWatermark();
         }
       }
 
@@ -1460,6 +1476,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
       } else {
         (*pinned_chunks_)[hash] = size;
         pinned_ += size;
+        CheckHighPinWatermark();
       }
     }
     bool exists = Contains(hash_str);
