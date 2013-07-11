@@ -19,7 +19,7 @@ cvmfs_run_test() {
 
   echo "try to mount cvmfs" >> $logfile
   seconds=$(stop_watch do_faulty_mount)
-  rm -f /etc/cvmfs/domain.d/cern.ch.local
+  sudo rm -f /etc/cvmfs/domain.d/cern.ch.local >> $logfile 2>&1
 
   echo "try to list the repository" >> $logfile
   ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 2

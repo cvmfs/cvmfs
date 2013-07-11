@@ -14,25 +14,32 @@ cvmfs_run_test() {
   local retcode=0
   local seconds=100
   local http_pid=0
+  local retval=0
 
   echo "configure cvmfs with an unreachable and an unresponsive host" >> $logfile
-  sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.1.2:8080;http://127.0.0.1/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
+  sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.1.2:8080;http://127.0.0.1:8000/@org@;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
 
   echo "run a silent HTTP server" >> $logfile
-  http_pid=$(open_silent_port TCP 80 $logfile)
+  http_pid=$(open_silent_port TCP 8000 $logfile)
+  if [ $? -ne 0 ]; then return 2; fi
   echo "mocked HTTP server started with PID $http_pid" >> $logfile
 
   echo "try to mount cvmfs" >> $logfile
   seconds=$(stop_watch do_faulty_mount)
 
-  rm -f /etc/cvmfs/domain.d/cern.ch.local
+  echo "try to list the repository" >> $logfile
+  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || retval=3
+   
   sudo kill -9 $http_pid >> $logfile 2>&1
 
-  echo "try to list the repository" >> $logfile
-  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 3
+  [ $h1 -eq 0 ] && [ $h2 -eq 0 ] || retval=5
+
+  sudo rm -f /etc/cvmfs/domain.d/cern.ch.local >> $logfile 2>&1 || retval=6
 
   if [ $seconds -gt 6 ]; then
     echo "mounting took too long with $seconds seconds (expected 6)" >> $logfile
-    return 4
+    retval=7
   fi
+
+  return $retval
 }
