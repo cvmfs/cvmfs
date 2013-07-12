@@ -62,6 +62,9 @@ else
   fuser="/bin/fuser"  # Ubuntu, SuSe, Gentoo
 fi
 
+# set default repositories directory
+repositories_d=/etc/cvmfs/repositories.d
+
 # standard values
 CVMFS_DEFAULT_USE_FILE_CHUNKING=true
 CVMFS_DEFAULT_MIN_CHUNK_SIZE=4194304
@@ -191,7 +194,7 @@ Supported Commands:
                 Checks if the repository is sane
   transaction   <fully qualified name>
                 Start to edit a repository
-  snapshot      <fully qualified name>
+  snapshot      [-r repositories_dir ] <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
   migrate       <fully qualified name>
                 Migrates a repository to the current version of CernVM-FS
@@ -213,7 +216,7 @@ NOTE: $errormsg
 
 load_repo_config() {
   local name=$1
-  . /etc/cvmfs/repositories.d/${name}/server.conf
+  . $repositories_d/${name}/server.conf
 }
 
 # retrieves (or guesses) the version of CernVM-FS that was used to create the
@@ -301,7 +304,7 @@ check_repository_existence() {
 
   # Check if exists
   fqrn=$(cvmfs_mkfqrn $given_name)
-  [ -d /etc/cvmfs/repositories.d/$fqrn ]
+  [ -d $repositories_d/$fqrn ]
 }
 
 
@@ -351,7 +354,7 @@ is_root() {
 # @return       0 if it is a stratum 0 repository
 is_stratum0() {
   local name=$1
-  ! [ -f /etc/cvmfs/repositories.d/$name/replica.conf ]
+  ! [ -f $repositories_d/$name/replica.conf ]
 }
 
 
@@ -461,7 +464,7 @@ check_parameter_count_with_guessing() {
 
   if [ $provided_parameter_count -lt 1 ]; then
     # check if we have not _exactly_ one repository present
-    if [ $(ls /etc/cvmfs/repositories.d/ | wc -l) -ne 1 ]; then
+    if [ $(ls $repositories_d/ | wc -l) -ne 1 ]; then
       usage "Please provide a repository name"
     fi
   fi
@@ -482,7 +485,7 @@ get_or_guess_repository_name() {
   local repository_name=$1
 
   if [ "x$repository_name" = "x" ]; then
-    echo $(get_repository_name $(ls /etc/cvmfs/repositories.d))
+    echo $(get_repository_name $(ls $repositories_d))
   else
     echo $(get_repository_name $repository_name)
   fi
@@ -762,8 +765,8 @@ create_config_files_for_new_repository() {
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
 
-  mkdir -p /etc/cvmfs/repositories.d/${name}
-  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+  mkdir -p $repositories_d/${name}
+  cat > $repositories_d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
 CVMFS_REPOSITORY_NAME=$name
@@ -832,13 +835,13 @@ EOF
   # ONLY FOR RIAK UPSTREAM
   elif is_riak_upstream $upstream; then
     local riak_urls=$(get_upstream_config $upstream)
-    cat > /etc/cvmfs/repositories.d/${name}/riak.conf << EOF
+    cat > $repositories_d/${name}/riak.conf << EOF
 # Created by cvmfs_server.
 CVMFS_RIAK_URLS=$riak_urls
 EOF
   fi
 
-  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
+  cat > $repositories_d/${name}/client.conf << EOF
 # Created by cvmfs_server.  Don't touch.
 CVMFS_CACHE_BASE=$cache_dir
 CVMFS_RELOAD_SOCKETS=$cache_dir
@@ -902,7 +905,7 @@ setup_and_mount_new_repository() {
     selinux_context="context=\"system_u:object_r:default_t:s0\""
   fi
   cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=$repositories_d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   sudo -H -u $cvmfs_user sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
@@ -1182,8 +1185,8 @@ add_replica() {
   check_upstream_validity $upstream
 
   echo -n "Creating configuration files... "
-  mkdir -p /etc/cvmfs/repositories.d/${name}
-  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+  mkdir -p $repositories_d/${name}
+  cat > $repositories_d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
 CVMFS_REPOSITORY_NAME=$name
@@ -1193,7 +1196,7 @@ CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_UPSTREAM_STORAGE=$upstream
 EOF
-  cat > /etc/cvmfs/repositories.d/${name}/replica.conf << EOF
+  cat > $repositories_d/${name}/replica.conf << EOF
 # Created by cvmfs_server.
 CVMFS_NUM_WORKERS=16
 CVMFS_PUBLIC_KEY=$public_key
@@ -1243,7 +1246,7 @@ EOF
 
 Use 'cvmfs_server snapshot' to replicate $name.
 Make sure to install the repository public key in /etc/cvmfs/keys/
-You might have to add the key in /etc/cvmfs/repositories.d/${name}/replica.conf"
+You might have to add the key in $repositories_d/${name}/replica.conf"
 }
 
 
@@ -1512,7 +1515,7 @@ rmfs() {
     reload_apache > /dev/null
   fi
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
-  rm -rf /etc/cvmfs/repositories.d/$name
+  rm -rf $repositories_d/$name
   echo "done"
 
   echo "CernVM-FS repository $name wiped out!"
@@ -1606,7 +1609,7 @@ lstags() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  . $repositories_d/$name/server.conf
   local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
   cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
     -i 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
@@ -1679,12 +1682,12 @@ check() {
 
 
 list() {
-  for repository in /etc/cvmfs/repositories.d/*; do
-    if [ "x$repository" = "x/etc/cvmfs/repositories.d/*" ]; then
+  for repository in $repositories_d/*; do
+    if [ "x$repository" = "x$repositories_d/*" ]; then
       return 0
     fi
     if [ -f $repository ]; then
-      echo "Warning: unexpected file '$repository' in directory /etc/cvmfs/repositories.d/"
+      echo "Warning: unexpected file '$repository' in directory $repositories_d/"
       continue
     fi
     . ${repository}/server.conf
@@ -2055,7 +2058,7 @@ rollback() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  . $repositories_d/$name/server.conf
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
@@ -2133,6 +2136,22 @@ snapshot() {
   local timeout
   local retries
 
+  # optional parameter handling
+  OPTIND=1
+  while getopts "r:" option
+  do
+    case $option in
+      r)
+        repositories_d=$OPTARG
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command snapshot: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
   # get repository name
   check_parameter_count_with_guessing $#
   name=$(get_or_guess_repository_name $1)
@@ -2143,7 +2162,7 @@ snapshot() {
 
   # get repository information
   load_repo_config $name
-  . /etc/cvmfs/repositories.d/$name/replica.conf
+  . $repositories_d/$name/replica.conf
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
@@ -2216,8 +2235,8 @@ migrate_2_1_6() {
     fi
 
     echo "--> updating server.conf"
-    mv /etc/cvmfs/repositories.d/${name}/server.conf /etc/cvmfs/repositories.d/${name}/server.conf.old
-    cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+    mv $repositories_d/${name}/server.conf $repositories_d/${name}/server.conf.old
+    cat > $repositories_d/${name}/server.conf << EOF
 # created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
 CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
@@ -2237,8 +2256,8 @@ EOF
 
   if is_stratum1 $name; then
     echo "--> updating server.conf"
-    mv /etc/cvmfs/repositories.d/${name}/server.conf /etc/cvmfs/repositories.d/${name}/server.conf.old
-    cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+    mv $repositories_d/${name}/server.conf $repositories_d/${name}/server.conf.old
+    cat > $repositories_d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
 CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
@@ -2268,7 +2287,7 @@ migrate_2_1_7() {
   sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
 
   echo "--> adjusting /etc/fstab"
-  sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
+  sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=$repositories_d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=$repositories_d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
   if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
     echo "Failed!"
     false
@@ -2302,7 +2321,7 @@ migrate_2_1_7() {
   echo "done"
 
   echo "--> updating server.conf"
-  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=2.1.12/" /etc/cvmfs/repositories.d/$name/server.conf
+  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=2.1.12/" $repositories_d/$name/server.conf
 }
 
 
