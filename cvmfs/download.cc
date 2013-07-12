@@ -383,11 +383,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
                header_line.c_str());
-      if ((header_line.length() >= i+2) &&
-          (header_line[i] == '5') && (header_line[i+1] == '0') &&
-          ((header_line[i+2] == '2') || (header_line[i+2] == '4')))
-      {
-        // 502 Bad Gateway, 504 Fateway Time-out
+      if (header_line[i] == '5') {
+        // 5XX returned by host
         info->error_code = kFailHostHttp;
       } else {
         info->error_code = (info->proxy == "") ? kFailHostHttp :
