@@ -60,6 +60,6 @@ try:
 	sys.stdout.flush()
 	print_msg("starting a " + server_protocol + " server on port " + str(server_port))
 	server.serve_forever()
-except socket.error as msg:
+except socket.error, msg:
 	print_msg("Failed to open port")
 	print msg
