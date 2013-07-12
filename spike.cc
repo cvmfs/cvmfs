@@ -36,6 +36,10 @@ void Print(const std::string &msg) {
   pthread_mutex_unlock(&mutex);
 }
 
+
+#define MEASURE_ALLOCATION_TIME
+static const uint64_t kTimeResolution = 1000000000;
+
 template<typename T, class A = std::allocator<T> >
 class Buffer {
  public:
@@ -64,8 +68,15 @@ class Buffer {
 
   void Allocate(const size_t size) {
     assert (!Initialized());
+#ifdef MEASURE_ALLOCATION_TIME
+    tick_count start = tick_count::now();
+#endif
     size_ = size;
     buffer_ = A().allocate(size_);
+#ifdef MEASURE_ALLOCATION_TIME
+    tick_count end = tick_count::now();
+    allocation_time_ += (uint64_t)((end - start).seconds() * kTimeResolution);
+#endif
   }
 
   bool Initialized() const { return size_ > 0; }
@@ -94,23 +105,35 @@ class Buffer {
   Buffer& operator=(const Buffer& other) { assert (false); }
 
   void Deallocate() {
+#ifdef MEASURE_ALLOCATION_TIME
+    tick_count start = tick_count::now();
+#endif
     if (size_ == 0) {
       return;
     }
     A().deallocate(buffer_, size_);
-    std::stringstream ss;
-    ss << "freeing: " << size_ << " bytes";
-    Print(ss.str());
+#ifdef MEASURE_ALLOCATION_TIME
+    tick_count end = tick_count::now();
+    deallocation_time_ += (uint64_t)((end - start).seconds() * kTimeResolution);
+#endif
   }
 
  private:
   size_t               used_bytes_;
   size_t               size_;
   typename A::pointer  buffer_;
+
+ public:
+  static atomic<uint64_t> allocation_time_;
+  static atomic<uint64_t> deallocation_time_;
 };
 typedef Buffer<unsigned char, scalable_allocator<unsigned char> > CharBuffer;
 
+template<typename T, class A>
+atomic<uint64_t> Buffer<T, A>::allocation_time_;
 
+template<typename T, class A>
+atomic<uint64_t> Buffer<T, A>::deallocation_time_;
 
 class File;
 class IoDispatcher;
@@ -159,8 +182,9 @@ class File {
     assert (sha1_.size() > 0);
     assert (compressed_buffer_.Initialized());
 
-    return WriteOldfashion();
+    //return WriteOldfashion();
     //return WriteFd();
+    return true;
   }
 
   size_t Compress() {
@@ -466,6 +490,8 @@ class IoDispatcher {
       file->Write();
 #endif
 
+      delete file;
+
       dispatcher->files_in_flight_--;
       if (dispatcher->files_in_flight_ == 0 && dispatcher->all_enqueued_) {
         break;
@@ -534,6 +560,11 @@ int main() {
   Print("going to wait now...");
   io_dispatcher.Wait();
   Print("waited...");
+
+#ifdef MEASURE_ALLOCATION_TIME
+  std::cout << "allocations took: " << ((double)CharBuffer::allocation_time_   / (double)kTimeResolution) << " seconds" << std::endl;
+  std::cout << "deallocs took:    " << ((double)CharBuffer::deallocation_time_ / (double)kTimeResolution) << " seconds" << std::endl;
+#endif
 
   all_end = tick_count::now();
   std::cout << "overall time:     " << (all_end - all_start).seconds() << " seconds" << std::endl;
