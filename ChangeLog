@@ -1,4 +1,5 @@
 2.1.13:
+  * Release pinned catalogs at high watermark of pinned files
   * Unset executable bit of /etc/cvmfs/{default.conf,config.sh}
   * Fix potential endless loop in download thread
   * Refurbish build system for external dependencies
