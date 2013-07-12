@@ -53,6 +53,8 @@ using namespace std;  // NOLINT
 
 namespace quota {
 
+const uint32_t kProtocolRevision = 1;  // Start of keeping revisions
+
 static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
 /**
@@ -80,6 +82,7 @@ enum CommandType {
   kPinRegular,
   kRegisterBackChannel,
   kUnregisterBackChannel,
+  kGetProtocolRevision,
 };
 
 struct LruCommand {
@@ -451,6 +454,17 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                path_length);
     }
 
+    // The protocol revision is returned immediately
+    if (command_type == kGetProtocolRevision) {
+      int return_pipe =
+      BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+      WritePipe(return_pipe, &kProtocolRevision, sizeof(kProtocolRevision));
+      UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
     // Reservations are handled immediately and "out of band"
     if (command_type == kReserve) {
       bool success = true;
@@ -720,6 +734,26 @@ void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
 
     // Writer's end will be closed by cache manager, FIFO is already unlinked
     close(back_channel[0]);
+  }
+}
+
+
+static uint32_t GetProtocolRevision() {
+  assert(initialized_);
+  if (limit_ != 0) {
+    int pipe_revision[2];
+    MakeReturnPipe(pipe_revision);
+
+    LruCommand cmd;
+    cmd.command_type = kGetProtocolRevision;
+    cmd.return_pipe = pipe_revision[1];
+    WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+    uint32_t revision;
+    ReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
+    return revision;
+  } else {
+    return 0;
   }
 }
 
