@@ -28,10 +28,12 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include <cassert>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 
 #include <string>
 #include <vector>
@@ -50,6 +52,8 @@
 using namespace std;  // NOLINT
 
 namespace quota {
+
+const uint32_t kProtocolRevision = 1;  // Start of keeping revisions
 
 static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
@@ -76,6 +80,9 @@ enum CommandType {
   kLimits,
   kPid,
   kPinRegular,
+  kRegisterBackChannel,
+  kUnregisterBackChannel,
+  kGetProtocolRevision,
 };
 
 struct LruCommand {
@@ -94,6 +101,10 @@ const unsigned kSqliteMemPerThread = 2*1024*1024;
 const unsigned kCommandBufferSize = 32;
 const unsigned kMaxCvmfsPath = 512-sizeof(LruCommand);
 
+// Alarm when more than 75% of the cache fraction allowed for pinned files (50%)
+// is filled with pinned files
+const unsigned kHighPinWatermark = 75;
+
 pthread_t thread_lru_;
 int pipe_lru_[2];
 bool shared_;
@@ -101,6 +112,7 @@ bool spawned_;
 bool initialized_ = false;
 map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
 int fd_lock_cachedb_;
+uint32_t protocol_revision_ = 0;
 
 uint64_t limit_;  /**< If the cache grows above this size,
                       we clean up until cleanup_threshold. */
@@ -111,6 +123,8 @@ uint64_t gauge_;  /**< Current size of cache. */
 uint64_t seq_;  /**< Current access sequence number.  Gets increased on every
                      access/insert operation. */
 string *cache_dir_ = NULL;
+/// Maps Md5 over channel id to writeable file descriptor.
+map<hash::Md5, int> *back_channels_ = NULL;
 
 sqlite3 *db_ = NULL;
 sqlite3_stmt *stmt_touch_ = NULL;
@@ -148,7 +162,6 @@ static void MakeReturnPipe(int pipe[2]) {
 }
 
 
-// TODO: make sure that a broken return pipe does not kill the cache manager
 static int BindReturnPipe(int pipe_wronly) {
   if (!shared_)
     return pipe_wronly;
@@ -156,8 +169,12 @@ static int BindReturnPipe(int pipe_wronly) {
   // Connect writer's end
   int result = open((*cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(),
                     O_WRONLY | O_NONBLOCK);
-  assert(result >= 0);
-  Nonblock2Block(result);
+  if (result >= 0) {
+    Nonblock2Block(result);
+  } else {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+             "failed to bind return pipe (%d)", errno);
+  }
   return result;
 }
 
@@ -168,12 +185,49 @@ static void UnbindReturnPipe(int pipe_wronly) {
 }
 
 
+static void UnlinkReturnPipe(int pipe_wronly) {
+  if (shared_)
+    unlink((*cache_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str());
+}
+
+
 static void CloseReturnPipe(int pipe[2]) {
   if (shared_) {
     close(pipe[0]);
-    unlink((*cache_dir_ + "/pipe" + StringifyInt(pipe[1])).c_str());
+    UnlinkReturnPipe(pipe[1]);
   } else {
     ClosePipe(pipe);
+  }
+}
+
+
+static void BroadcastBackchannels(const string &message) {
+  assert(message.length() > 0);
+
+  for (map<hash::Md5, int>::iterator i = back_channels_->begin(),
+       iend = back_channels_->end(); i != iend; )
+  {
+    LogCvmfs(kLogQuota, kLogDebug, "broadcasting %s to %s",
+             message.c_str(), i->first.ToString().c_str());
+    int written = write(i->second, message.data(), message.length());
+    if (written < 0) written = 0;
+    if (static_cast<unsigned>(written) != message.length()) {
+      bool remove_backchannel = errno != EAGAIN;
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "failed to broadcast '%s' to %s (written %d, error %d)",
+               message.c_str(), i->first.ToString().c_str(), written, errno);
+      if (remove_backchannel) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "removing back channel %s", i->first.ToString().c_str());
+        map<hash::Md5, int>::iterator remove_me = i;
+        ++i;
+        back_channels_->erase(remove_me);
+      } else {
+        ++i;
+      }
+    } else {
+      ++i;
+    }
   }
 }
 
@@ -264,6 +318,17 @@ static bool Contains(const string &hash_str) {
            hash_str.c_str(), result);
 
   return result;
+}
+
+
+static void CheckHighPinWatermark() {
+  const uint64_t watermark = kHighPinWatermark*cleanup_threshold_/100;
+  if ((cleanup_threshold_ > 0) && (pinned_ > watermark)) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "high watermark of pinned files (%"PRIu64"M > %"PRIu64"M)",
+             pinned_/(1024*1024), watermark/(1024*1024));
+    BroadcastBackchannels("R");  // clients: please release pinned catalogs
+  }
 }
 
 
@@ -369,6 +434,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
   LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
   sqlite3_soft_heap_limit(kSqliteMemPerThread);
 
+  back_channels_ = new map<hash::Md5, int>;
   LruCommand command_buffer[kCommandBufferSize];
   char path_buffer[kCommandBufferSize*kMaxCvmfsPath];
   unsigned num_commands = 0;
@@ -389,11 +455,25 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                path_length);
     }
 
+    // The protocol revision is returned immediately
+    if (command_type == kGetProtocolRevision) {
+      int return_pipe =
+      BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+      WritePipe(return_pipe, &kProtocolRevision, sizeof(kProtocolRevision));
+      UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
     // Reservations are handled immediately and "out of band"
     if (command_type == kReserve) {
       bool success = true;
       int return_pipe =
         BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
       const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
                            sizeof(command_buffer[num_commands].digest));
       const string hash_str(hash.ToString());
@@ -408,11 +488,56 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
         } else {
           (*pinned_chunks_)[hash] = size;
           pinned_ += size;
+          CheckHighPinWatermark();
         }
       }
 
       WritePipe(return_pipe, &success, sizeof(success));
       UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
+    // Back channels are also handled out of band
+    if (command_type == kRegisterBackChannel) {
+      int return_pipe =
+        BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
+      UnlinkReturnPipe(command_buffer[num_commands].return_pipe);
+      Block2Nonblock(return_pipe);  // back channels are opportunistic
+      hash::Md5 hash;
+      memcpy(hash.digest, command_buffer[num_commands].digest,
+             hash::kDigestSizes[hash::kMd5]);
+      map<hash::Md5, int>::const_iterator iter = back_channels_->find(hash);
+      if (iter != back_channels_->end()) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "closing left-over back channel %s", hash.ToString().c_str());
+        close(iter->second);
+      }
+      (*back_channels_)[hash] = return_pipe;
+      char success = 'S';
+      WritePipe(return_pipe, &success, sizeof(success));
+      LogCvmfs(kLogQuota, kLogDebug, "register back channel %s on fd %d",
+               hash.ToString().c_str(), return_pipe);
+
+      continue;
+    }
+
+    if (command_type == kUnregisterBackChannel) {
+      hash::Md5 hash;
+      memcpy(hash.digest, command_buffer[num_commands].digest,
+             hash::kDigestSizes[hash::kMd5]);
+      map<hash::Md5, int>::iterator iter = back_channels_->find(hash);
+      if (iter != back_channels_->end()) {
+        LogCvmfs(kLogQuota, kLogDebug,
+                 "closing back channel %s", hash.ToString().c_str());
+        close(iter->second);
+        back_channels_->erase(iter);
+      } else {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "did not find back channel %s", hash.ToString().c_str());
+      }
       continue;
     }
 
@@ -449,6 +574,11 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       // Process cleanup, listings
       int return_pipe =
         BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0) {
+        num_commands = 0;
+        continue;
+      }
+
       int retval;
       sqlite3_stmt *this_stmt_list = NULL;
       switch (command_type) {
@@ -553,8 +683,84 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     memcpy(command_buffer[0].digest, i->first.digest, i->first.GetDigestSize());
     ProcessCommandBunch(1, command_buffer, path_buffer);
   }
+  delete back_channels_;
+  back_channels_ = NULL;
 
   return NULL;
+}
+
+
+/**
+ * Register a channel that allows the cache manager to trigger action to its
+ * clients.  Currently used for releasing pinned catalogs.
+ */
+void RegisterBackChannel(int back_channel[2], const string &channel_id) {
+  assert(initialized_);
+
+  if ((limit_ != 0) && (protocol_revision_ >= 1)) {
+    hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
+    MakeReturnPipe(back_channel);
+
+    LruCommand cmd;
+    cmd.command_type = kRegisterBackChannel;
+    cmd.return_pipe = back_channel[1];
+    memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+    WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+    char success;
+    ReadHalfPipe(back_channel[0], &success, sizeof(success));
+    // At this point, the named FIFO is unlinked, so don't use CloseReturnPipe
+    if (success != 'S') {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+               "failed to register quota back channel (%c)", success);
+      abort();
+    }
+  } else {
+    // Dummy pipe to return valid file descriptors
+    MakePipe(back_channel);
+  }
+}
+
+
+/**
+ * Gracefully closes a back channel.
+ */
+void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
+  assert(initialized_);
+
+  if ((limit_ != 0) && (protocol_revision_ >= 1)) {
+    hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
+
+    LruCommand cmd;
+    cmd.command_type = kUnregisterBackChannel;
+    memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+    WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+    // Writer's end will be closed by cache manager, FIFO is already unlinked
+    close(back_channel[0]);
+  } else {
+    ClosePipe(back_channel);
+  }
+}
+
+
+static uint32_t GetProtocolRevision() {
+  assert(initialized_);
+  if (limit_ != 0) {
+    int pipe_revision[2];
+    MakeReturnPipe(pipe_revision);
+
+    LruCommand cmd;
+    cmd.command_type = kGetProtocolRevision;
+    cmd.return_pipe = pipe_revision[1];
+    WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+    uint32_t revision;
+    ReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
+    return revision;
+  } else {
+    return 0;
+  }
 }
 
 
@@ -716,6 +922,8 @@ static bool InitDatabase(const bool rebuild_database) {
   bool retry = false;
   const string db_file = (*cache_dir_) + "/cachedb";
   if (rebuild_database) {
+    LogCvmfs(kLogQuota, kLogDebug, "rebuild database, unlinking existing (%s)",
+             db_file.c_str());
     unlink(db_file.c_str());
     unlink((db_file + "-journal").c_str());
   }
@@ -929,6 +1137,13 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     GetLimits(&limit_, &cleanup_threshold_);
     LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
              limit_, cleanup_threshold_);
+    if (FileExists(*cache_dir_ + "/cachemgr.protocol")) {
+      protocol_revision_ = GetProtocolRevision();
+      LogCvmfs(kLogQuota, kLogDebug, "connected protocol revision %u",
+               protocol_revision_);
+    } else {
+      LogCvmfs(kLogQuota, kLogDebug, "connected to ancient cache manager");
+    }
     return true;
   }
   const int connect_error = errno;
@@ -1028,6 +1243,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
 
   Nonblock2Block(pipe_lru_[1]);
   LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
+  protocol_revision_ = kProtocolRevision;
 
   UnlockFile(fd_lockfile);
 
@@ -1098,6 +1314,27 @@ int MainCacheManager(int argc, char **argv) {
     return 1;
   }
 
+  // Save protocol revision to file.  If the file is not found, it indicates
+  // to the client that the cache manager is from times before the protocol
+  // was versioned.
+  const string protocol_revision_path = *cache_dir_ + "/cachemgr.protocol";
+  retval = open(protocol_revision_path.c_str(), O_WRONLY | O_CREAT, 0600);
+  if (retval < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to open protocol revision file (%d)", errno);
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+  const string revision = StringifyInt(kProtocolRevision);
+  int written = write(retval, revision.data(), revision.length());
+  close(retval);
+  if ((written < 0) || static_cast<unsigned>(written) != revision.length()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to write protocol revision (%d)", errno);
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
@@ -1117,8 +1354,12 @@ int MainCacheManager(int argc, char **argv) {
   close(pipe_handshake);
   LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
 
+  // Ensure that broken pipes from clients do not kill the cache manager
+  signal(SIGPIPE, SIG_IGN);
+
   MainCommandServer(NULL);
   unlink(fifo_path.c_str());
+  unlink(protocol_revision_path.c_str());
   CloseDatabase();
   unlink(crash_guard.c_str());
   UnlockFile(fd_lockfile_fifo);
@@ -1211,6 +1452,7 @@ void Fini() {
 
   CloseDatabase();
   initialized_ = false;
+  protocol_revision_ = 0;
 }
 
 
@@ -1305,6 +1547,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
       } else {
         (*pinned_chunks_)[hash] = size;
         pinned_ += size;
+        CheckHighPinWatermark();
       }
     }
     bool exists = Contains(hash_str);

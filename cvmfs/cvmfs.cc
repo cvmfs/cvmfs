@@ -75,6 +75,7 @@
 #include "monitor.h"
 #include "signature.h"
 #include "quota.h"
+#include "quota_listener.h"
 #include "util.h"
 #include "util_concurrency.h"
 #include "atomic.h"
@@ -180,6 +181,7 @@ unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 catalog::InodeGenerationAnnotation *inode_annotation_ = NULL;
 cache::CatalogManager *catalog_manager_ = NULL;
+quota::ListenerHandle *unpin_listener_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
@@ -2179,6 +2181,9 @@ static void Spawn() {
   }
   download::Spawn();
   quota::Spawn();
+  cvmfs::unpin_listener_ =
+    quota::RegisterUnpinListener(cvmfs::catalog_manager_,
+                                 *cvmfs::repository_name_);
   talk::Spawn();
   if (cvmfs::nfs_maps_)
     nfs_maps::Spawn();
@@ -2204,7 +2209,13 @@ static void Fini() {
   if (g_download_ready) download::Fini();
   if (g_talk_ready) talk::Fini();
   if (g_monitor_ready) monitor::Fini();
-  if (g_quota_ready) quota::Fini();
+  if (g_quota_ready) {
+    if (cvmfs::unpin_listener_) {
+      quota::UnregisterUnpinListener(cvmfs::unpin_listener_);
+      cvmfs::unpin_listener_ = NULL;
+    }
+    quota::Fini();
+  }
   if (g_nfs_maps_ready) nfs_maps::Fini();
   if (g_cache_ready) cache::Fini();
   if (g_running_created)

@@ -118,6 +118,7 @@ struct Pipe : public SingleCopy {
 };
 
 void Nonblock2Block(int filedes);
+void Block2Nonblock(int filedes);
 void SendMsg2Socket(const int fd, const std::string &msg);
 void LockMutex(pthread_mutex_t *mutex);
 void UnlockMutex(pthread_mutex_t *mutex);
