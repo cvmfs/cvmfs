@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <sstream>
+#include <sys/resource.h>
 
 #include <zlib.h>
 #include <openssl/sha.h>
@@ -60,6 +61,22 @@ std::string ShaToString(const unsigned char *sha_digest) {
 }
 
 
+
+bool RaiseFileDescriptorLimit(unsigned int limit) {
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  getrlimit(RLIMIT_NOFILE, &rpl);
+  if (rpl.rlim_cur < limit) {
+    if (rpl.rlim_max < limit)
+      rpl.rlim_max = limit;
+    rpl.rlim_cur = limit;
+    const bool retval = setrlimit(RLIMIT_NOFILE, &rpl);
+    if (retval != 0) {
+      return false;
+    }
+  }
+  return true;
+}
 
 
 
@@ -182,15 +199,22 @@ typedef std::vector<CharBuffer*> CharBufferVector;
 class Chunk {
  public:
   Chunk(const off_t offset, const size_t size, const std::string &path) :
-    path_(path),
-    file_offset_(offset), chunk_size_(size),
-    zlib_output_marker_(0), zlib_initialized_(false),
-    sha1_digest_(""), sha1_initialized_(false)
+    path_(path), file_offset_(offset), chunk_size_(size),
+    zlib_initialized_(false),
+    sha1_digest_(""), sha1_initialized_(false),
+    file_descriptor_(0), bytes_written_(0)
   {
     Initialize();
   }
 
-  bool IsInitialized() const { return zlib_initialized_ && sha1_initialized_; }
+  bool IsInitialized()     const { return zlib_initialized_ && sha1_initialized_; }
+  bool HasFileDescriptor() const { return file_descriptor_ > 0;                   }
+  bool IsFullyProcessed()  const { return done_;                                  }
+
+  void Done() {
+    assert (! IsFullyProcessed());
+    done_ = true;
+  }
 
   off_t          offset()                 const { return file_offset_;        }
   size_t         size()                   const { return chunk_size_;         }
@@ -199,13 +223,27 @@ class Chunk {
   unsigned char* sha1_digest()                  { return sha1_digest_;        }
 
   z_stream&      zlib_context()                 { return zlib_context_;       }
-  off_t          zlib_output_marker()     const { return zlib_output_marker_; }
-  void       set_zlib_output_marker(const off_t new_marker) {
-    zlib_output_marker_ = new_marker;
+
+  int            file_descriptor()        const { return file_descriptor_;    }
+  void       set_file_descriptor(const int fd) {
+    assert (! HasFileDescriptor());
+    file_descriptor_ = fd;
+  }
+
+  size_t         bytes_written()          const { return bytes_written_;      }
+  size_t         compressed_size()        const { return compressed_size_;    }
+  void       add_bytes_written(const size_t new_bytes) {
+    bytes_written_ += new_bytes;
+  }
+  void       add_compressed_size(const size_t new_bytes) {
+    compressed_size_ += new_bytes;
   }
 
  protected:
   void Initialize() {
+    done_            = false;
+    compressed_size_ = 0;
+
     const int sha1_retval = SHA1_Init(&sha1_context_);
     assert (sha1_retval == 1);
 
@@ -221,20 +259,22 @@ class Chunk {
     sha1_initialized_ = true;
   }
 
- public:
-  const std::string path_;
-
  private:
-  off_t         file_offset_;
-  size_t        chunk_size_;
+  const std::string   path_;
+  off_t               file_offset_;
+  size_t              chunk_size_;
+  tbb::atomic<bool>   done_;
 
-  off_t         zlib_output_marker_;
-  z_stream      zlib_context_;
-  bool          zlib_initialized_;
+  z_stream            zlib_context_;
+  bool                zlib_initialized_;
 
-  SHA_CTX       sha1_context_;
-  unsigned char sha1_digest_[SHA_DIGEST_LENGTH];
-  bool          sha1_initialized_;
+  SHA_CTX             sha1_context_;
+  unsigned char       sha1_digest_[SHA_DIGEST_LENGTH];
+  bool                sha1_initialized_;
+
+  int                 file_descriptor_;
+  size_t              bytes_written_;
+  tbb::atomic<size_t> compressed_size_;
 };
 
 
@@ -279,19 +319,18 @@ class File {
 
 
 
-
-
-
 #define MEASURE_IO_TIME
 
 class IoDispatcher {
  protected:
   static const size_t kMaxBufferSize;
 
+  typedef void (IoDispatcher:: *MethodPtr)();
+
  public:
   IoDispatcher() :
-    read_thread_(IoDispatcher::ReadThread, this),
-    write_thread_(IoDispatcher::WriteThread, this)
+    read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
+    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread)
   {
     file_count_      = 0;
     files_in_flight_ = 0;
@@ -307,6 +346,11 @@ class IoDispatcher {
               << "Writes took: " << write_time_ << std::endl
               << "  average:   " << (write_time_ / file_count_) << std::endl;
 #endif
+  }
+
+  static void ThreadEntry(IoDispatcher *delegate,
+                          MethodPtr     method) {
+    (*delegate.*method)();
   }
 
   void Wait() {
@@ -333,62 +377,65 @@ class IoDispatcher {
     write_queue_.push(std::make_pair(chunk, buffer));
   }
 
+  void ScheduleCommit(Chunk *chunk) {
+    write_queue_.push(std::make_pair(chunk, static_cast<CharBuffer*>(NULL)));
+  }
+
  protected:
-  static void ReadThread(IoDispatcher *dispatcher) {
+  void ReadThread() {
     tbb::task_scheduler_init sched(
       tbb::task_scheduler_init::default_num_threads() + 1);
 
     while (true) {
       File *file;
-      dispatcher->read_queue_.pop(file);
+      read_queue_.pop(file);
       if (file == NULL) {
         break;
       }
 
-      dispatcher->files_in_flight_++;
+      ++files_in_flight_;
 
 #ifdef MEASURE_IO_TIME
       tbb::tick_count start = tbb::tick_count::now();
 #endif
-      ReadFileAndSpawnTasks(file, dispatcher);
+      ReadFileAndSpawnTasks(file);
 #ifdef MEASURE_IO_TIME
       tbb::tick_count end = tbb::tick_count::now();
-      dispatcher->read_time_ += (end - start).seconds();
+      read_time_ += (end - start).seconds();
 #endif
     }
   }
 
-  static void WriteThread(IoDispatcher *dispatcher) {
+  void WriteThread() {
     while (true) {
       std::pair<Chunk*, CharBuffer*> writable_item;
-      dispatcher->write_queue_.pop(writable_item);
-      Chunk *chunk       = writable_item.first;
-      CharBuffer *buffer = writable_item.second;
-      if (chunk == NULL || buffer == NULL) {
-        break;
-      }
+      write_queue_.pop(writable_item);
+      Chunk       *chunk  = writable_item.first;
+      CharBuffer  *buffer = writable_item.second;
+      assert (chunk != NULL);
 
+      if (buffer == NULL) {
+        CommitChunk(chunk);
+      } else {
 #ifdef MEASURE_IO_TIME
       tbb::tick_count start = tbb::tick_count::now();
 #endif
-      WriteBufferToChunk(chunk, buffer);
+        WriteBufferToChunk(chunk, buffer);
 #ifdef MEASURE_IO_TIME
       tbb::tick_count end = tbb::tick_count::now();
-      dispatcher->write_time_ += (end - start).seconds();
+      write_time_ += (end - start).seconds();
 #endif
+      }
 
-      dispatcher->files_in_flight_--;
-      if (dispatcher->files_in_flight_ == 0 && dispatcher->all_enqueued_) {
+      if (files_in_flight_ == 0 && all_enqueued_) {
         break;
       }
     }
   }
 
-  static bool ReadFileAndSpawnTasks(File *file, IoDispatcher *dispatcher);
-  static bool WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer) {
-    buffer->Release();
-    return true;
-  }
+  bool ReadFileAndSpawnTasks(File *file);
+  bool WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer);
+  bool CommitChunk(Chunk* chunk);
 
  private:
   tbb::atomic<unsigned int> files_in_flight_;
@@ -423,11 +470,21 @@ const size_t IoDispatcher::kMaxBufferSize = 1048576;
 template <class CruncherT>
 class ChunkCruncher {
  public:
-  ChunkCruncher(Chunk         *chunk,
-                CharBuffer    *buffer,
-                IoDispatcher  *io_dispatcher) :
-    chunk_(chunk), buffer_(buffer), cruncher_(io_dispatcher)
+  ChunkCruncher(Chunk                *chunk,
+                CharBuffer           *buffer,
+                const off_t           internal_offset,
+                const size_t          byte_count,
+                const bool            finalize,
+                IoDispatcher         *io_dispatcher) :
+    chunk_(chunk),
+    buffer_(buffer),
+    internal_offset_(internal_offset),
+    byte_count_(byte_count),
+    finalize_(finalize),
+    cruncher_(io_dispatcher)
   {
+    assert (internal_offset_ < buffer->used_bytes());
+    assert (internal_offset_ + byte_count_ <= buffer->used_bytes());
     buffer_->Retain();
   }
 
@@ -438,32 +495,14 @@ class ChunkCruncher {
   void operator()() const {
     // Hack: parallel_invoke expects a const callable operator... wtf
     ChunkCruncher  *self     = const_cast<ChunkCruncher*>(this);
-    CruncherT      &cruncher = self->cruncher();
     Chunk          *chunk    = self->chunk();
     CharBuffer     *buffer   = self->buffer();
+    CruncherT      &cruncher = self->cruncher();
 
-    assert (chunk->IsInitialized());
-    assert (buffer->IsInitialized());
-
-    const off_t internal_offset =
-      std::max(off_t(0), chunk->offset() - buffer->base_offset());
-    assert (internal_offset < buffer->used_bytes());
-    const unsigned char *data = buffer->ptr() + internal_offset;
-
-    const size_t byte_count = (chunk->size() == 0)
-      ? buffer->used_bytes()
-      :   std::min(buffer->base_offset() + buffer->used_bytes(),
-                   chunk->offset()       + chunk->size())
-        - std::max(buffer->base_offset(), chunk->offset());
-    assert (byte_count <= buffer->used_bytes() - internal_offset);
-
-    const bool finalize = (
-      (chunk->size() > 0) &&
-      (buffer->base_offset() + internal_offset + byte_count
-        == chunk->offset() + chunk->size())
-    );
-
-    cruncher.Crunch(chunk, data, byte_count, finalize);
+    cruncher.Crunch(chunk,
+                    buffer_->ptr() + internal_offset_,
+                    byte_count_,
+                    finalize_);
   }
 
  protected:
@@ -476,9 +515,12 @@ class ChunkCruncher {
   ChunkCruncher& operator=(const ChunkCruncher& other) { assert (false); }
 
  private:
-  Chunk       *chunk_;
-  CharBuffer  *buffer_;
-  CruncherT    cruncher_;
+  Chunk        *chunk_;
+  CharBuffer   *buffer_;
+  const off_t   internal_offset_;
+  const size_t  byte_count_;
+  const bool    finalize_;
+  CruncherT     cruncher_;
 };
 
 
@@ -511,7 +553,6 @@ class ChunkCompressor {
               const unsigned char  *data,
               const size_t          bytes,
               const bool            finalize) {
-    off_t marker     = chunk->zlib_output_marker();
     z_stream &stream = chunk->zlib_context();
 
     const size_t max_output_size = deflateBound(&stream, bytes);
@@ -530,11 +571,11 @@ class ChunkCompressor {
       retcode = deflate(&stream, flush);
       assert (retcode == Z_OK || retcode == Z_STREAM_END);
 
-      const size_t bytes_written = compress_buffer->size() - stream.avail_out;
-      compress_buffer->SetUsedBytes(bytes_written);
-      compress_buffer->SetBaseOffset(marker);
+      const size_t bytes_produced = compress_buffer->size() - stream.avail_out;
+      compress_buffer->SetUsedBytes(bytes_produced);
+      compress_buffer->SetBaseOffset(chunk->compressed_size());
+      chunk->add_compressed_size(bytes_produced);
       io_dispatcher_->ScheduleWrite(chunk, compress_buffer);
-      marker += bytes_written;
       compress_buffer->Release();
 
       if ((flush == Z_NO_FLUSH && retcode == Z_OK) ||
@@ -594,15 +635,50 @@ class FileScrubbingTask : public tbb::task {
     //   }
     // }
 
-    ChunkCruncher<ChunkHasher>     hasher    (file_->bulk_chunk(),
+    Chunk *chunk  = file_->bulk_chunk();
+
+    assert (chunk->IsInitialized());
+    assert (buffer_->IsInitialized());
+
+    const off_t internal_offset =
+      std::max(off_t(0), chunk->offset() - buffer_->base_offset());
+    assert (internal_offset < buffer_->used_bytes());
+    const unsigned char *data = buffer_->ptr() + internal_offset;
+
+    const size_t byte_count = (chunk->size() == 0)
+      ? buffer_->used_bytes()
+      :   std::min(buffer_->base_offset() + buffer_->used_bytes(),
+                   chunk->offset()       + chunk->size())
+        - std::max(buffer_->base_offset(), chunk->offset());
+    assert (byte_count <= buffer_->used_bytes() - internal_offset);
+
+    const bool finalize = (
+      (chunk->size() > 0) &&
+      (buffer_->base_offset() + internal_offset + byte_count
+        == chunk->offset() + chunk->size())
+    );
+
+    ChunkCruncher<ChunkHasher>     hasher    (chunk,
                                               buffer_,
+                                              internal_offset,
+                                              byte_count,
+                                              finalize,
                                               io_dispatcher_);
-    ChunkCruncher<ChunkCompressor> compressor(file_->bulk_chunk(),
+    ChunkCruncher<ChunkCompressor> compressor(chunk,
                                               buffer_,
+                                              internal_offset,
+                                              byte_count,
+                                              finalize,
                                               io_dispatcher_);
 
     tbb::parallel_invoke(hasher, compressor);
     buffer_->Release();
+
+    if (finalize) {
+      chunk->Done();
+      io_dispatcher_->ScheduleCommit(chunk);
+    }
+
     return Next();
   }
 
@@ -646,7 +722,7 @@ const size_t FileScrubbingTask::kMaxChunkSize = 16 * 1024 * 1024;
 
 
 
-bool IoDispatcher::ReadFileAndSpawnTasks(File *file, IoDispatcher *dispatcher) {
+bool IoDispatcher::ReadFileAndSpawnTasks(File *file) {
   const std::string &path = file->path();
   const size_t       size = file->size();
 
@@ -689,7 +765,7 @@ bool IoDispatcher::ReadFileAndSpawnTasks(File *file, IoDispatcher *dispatcher) {
     FileScrubbingTask  *new_task =
       new(tbb::task::allocate_root()) FileScrubbingTask(file,
                                                         buffer,
-                                                        dispatcher);
+                                                        this);
     new_task->increment_ref_count();
     tbb::task *sync_task = new(new_task->allocate_child()) tbb::empty_task();
 
@@ -710,6 +786,7 @@ bool IoDispatcher::ReadFileAndSpawnTasks(File *file, IoDispatcher *dispatcher) {
     file_marker       += bytes_read;
   }
 
+  // make sure that the last chunk is processed
   tbb::task::enqueue(*previous_sync_task);
 
   // close the file
@@ -719,6 +796,55 @@ bool IoDispatcher::ReadFileAndSpawnTasks(File *file, IoDispatcher *dispatcher) {
   return true;
 }
 
+
+bool IoDispatcher::WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer) {
+  if (! chunk->HasFileDescriptor()) {
+    const std::string file_path = output_path + "/" + "chunk.XXXXXXX";
+    char *tmp_file = strdupa(file_path.c_str());
+    const int tmp_fd = mkstemp(tmp_file);
+    if (tmp_fd < 0) {
+      std::stringstream ss;
+      ss << "Failed to create temporary output file (Errno: " << errno << ")";
+      PrintErr(ss.str());
+      return false;
+    }
+    chunk->set_file_descriptor(tmp_fd);
+  }
+
+  const int fd = chunk->file_descriptor();
+
+  // write to file
+  const size_t bytes_to_write = buffer->used_bytes();
+  assert (bytes_to_write > 0);
+  assert (chunk->bytes_written() == buffer->base_offset());
+  const size_t bytes_written = write(fd, buffer->ptr(), bytes_to_write);
+  if (bytes_written != bytes_to_write) {
+    std::stringstream ss;
+    ss << "Failed to write to file (Errno: " << errno << ")";
+    PrintErr(ss.str());
+    return false;
+  }
+  chunk->add_bytes_written(bytes_written);
+
+  buffer->Release();
+
+  return true;
+}
+
+
+bool IoDispatcher::CommitChunk(Chunk* chunk) {
+  assert (chunk->IsFullyProcessed());
+  assert (chunk->HasFileDescriptor());
+  assert (chunk->bytes_written() == chunk->compressed_size());
+
+  const int fd = chunk->file_descriptor();
+  const int retval = close(fd);
+  assert (retval == 0);
+
+  --files_in_flight_;
+
+  return true;
+}
 
 
 
@@ -759,6 +885,8 @@ class TraversalDelegate {
 int main() {
   tbb::tick_count start, end;
   tbb::tick_count all_start, all_end;
+
+  //RaiseFileDescriptorLimit(100000);
 
   all_start = tbb::tick_count::now();
 
