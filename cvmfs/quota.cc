@@ -112,6 +112,7 @@ bool spawned_;
 bool initialized_ = false;
 map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
 int fd_lock_cachedb_;
+uint32_t protocol_revision_ = 0;
 
 uint64_t limit_;  /**< If the cache grows above this size,
                       we clean up until cleanup_threshold. */
@@ -696,7 +697,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 void RegisterBackChannel(int back_channel[2], const string &channel_id) {
   assert(initialized_);
 
-  if (limit_ != 0) {
+  if ((limit_ != 0) && (protocol_revision_ >= 1)) {
     hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
     MakeReturnPipe(back_channel);
 
@@ -714,6 +715,9 @@ void RegisterBackChannel(int back_channel[2], const string &channel_id) {
                "failed to register quota back channel (%c)", success);
       abort();
     }
+  } else {
+    // Dummy pipe to return valid file descriptors
+    MakePipe(back_channel);
   }
 }
 
@@ -724,7 +728,7 @@ void RegisterBackChannel(int back_channel[2], const string &channel_id) {
 void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
   assert(initialized_);
 
-  if (limit_ != 0) {
+  if ((limit_ != 0) && (protocol_revision_ >= 1)) {
     hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
 
     LruCommand cmd;
@@ -734,6 +738,8 @@ void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
 
     // Writer's end will be closed by cache manager, FIFO is already unlinked
     close(back_channel[0]);
+  } else {
+    ClosePipe(back_channel);
   }
 }
 
@@ -1131,6 +1137,13 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     GetLimits(&limit_, &cleanup_threshold_);
     LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
              limit_, cleanup_threshold_);
+    if (FileExists(*cache_dir_ + "/cachemgr.protocol")) {
+      protocol_revision_ = GetProtocolRevision();
+      LogCvmfs(kLogQuota, kLogDebug, "connected protocol revision %u",
+               protocol_revision_);
+    } else {
+      LogCvmfs(kLogQuota, kLogDebug, "connected to ancient cache manager");
+    }
     return true;
   }
   const int connect_error = errno;
@@ -1230,6 +1243,7 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
 
   Nonblock2Block(pipe_lru_[1]);
   LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
+  protocol_revision_ = kProtocolRevision;
 
   UnlockFile(fd_lockfile);
 
@@ -1300,6 +1314,27 @@ int MainCacheManager(int argc, char **argv) {
     return 1;
   }
 
+  // Save protocol revision to file.  If the file is not found, it indicates
+  // to the client that the cache manager is from times before the protocol
+  // was versioned.
+  const string protocol_revision_path = *cache_dir_ + "/cachemgr.protocol";
+  retval = open(protocol_revision_path.c_str(), O_WRONLY | O_CREAT, 0600);
+  if (retval < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to open protocol revision file (%d)", errno);
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+  const string revision = StringifyInt(kProtocolRevision);
+  int written = write(retval, revision.data(), revision.length());
+  close(retval);
+  if ((written < 0) || static_cast<unsigned>(written) != revision.length()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to write protocol revision (%d)", errno);
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+
   const string fifo_path = *cache_dir_ + "/cachemgr";
   pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
   if (pipe_lru_[0] < 0) {
@@ -1324,6 +1359,7 @@ int MainCacheManager(int argc, char **argv) {
 
   MainCommandServer(NULL);
   unlink(fifo_path.c_str());
+  unlink(protocol_revision_path.c_str());
   CloseDatabase();
   unlink(crash_guard.c_str());
   UnlockFile(fd_lockfile_fifo);
@@ -1416,6 +1452,7 @@ void Fini() {
 
   CloseDatabase();
   initialized_ = false;
+  protocol_revision_ = 0;
 }
 
 
