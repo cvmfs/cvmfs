@@ -513,8 +513,8 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
   info->curl_handle = handle;
   info->error_code = kFailOk;
   info->nocache = false;
-  info->num_failed_proxies = 0;
-  info->num_failed_hosts = 0;
+  info->num_used_proxies = 1;
+  info->num_used_hosts = 1;
   info->num_retries = 0;
   info->backoff_ms = 0;
   if (info->compressed) {
@@ -785,7 +785,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
            (info->error_code == kFailHostConnection) ||
            (info->error_code == kFailHostHttp)) &&
          info->probe_hosts &&
-         opt_host_chain_ && (info->num_failed_hosts < opt_host_chain_->size()))
+         opt_host_chain_ && (info->num_used_hosts < opt_host_chain_->size()))
        )
     {
       try_again = true;
@@ -798,11 +798,11 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     {
       try_again = true;
       // If all proxies failed, do a next round with the next host
-      if (!same_url_retry && (info->num_failed_proxies >= opt_num_proxies_)) {
+      if (!same_url_retry && (info->num_used_proxies >= opt_num_proxies_)) {
         // Check if this can be made a host fail-over
         if (info->probe_hosts &&
             opt_host_chain_ &&
-            (info->num_failed_hosts < opt_host_chain_->size()))
+            (info->num_used_hosts < opt_host_chain_->size()))
         {
           // reset proxy group
           string old_proxy;
@@ -819,7 +819,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
           }
 
           // Make it a host failure
-          info->num_failed_proxies = 0;
+          info->num_used_proxies = 1;
           info->error_code = kFailHostAfterProxy;
         } else {
           try_again = false;
@@ -892,12 +892,12 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if (switch_proxy) {
       SwitchProxy(info);
-      info->num_failed_proxies++;
+      info->num_used_proxies++;
       SetUrlOptions(info);
     }
     if (switch_host) {
       SwitchHost(info);
-      info->num_failed_hosts++;
+      info->num_used_hosts++;
       SetUrlOptions(info);
     }
 
