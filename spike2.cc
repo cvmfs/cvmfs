@@ -88,28 +88,17 @@ static const uint64_t kTimeResolution = 1000000000;
 template<typename T, class A = std::allocator<T> >
 class Buffer {
  public:
-  Buffer() : base_offset_(0), size_(0), used_bytes_(0), buffer_(NULL) {
-    Retain();
-  }
+  Buffer() : base_offset_(0), size_(0), used_bytes_(0), buffer_(NULL) {}
 
   Buffer(const size_t size) : base_offset_(0),
                               size_(0),
                               used_bytes_(0),
                               buffer_(NULL) {
-    Retain();
     Allocate(size);
   }
 
   ~Buffer() {
-    assert (refcount_ == 0);
     Deallocate();
-  }
-
-  void Retain() { ++refcount_; }
-  void Release() {
-    if (--refcount_ == 0) {
-      Deallocate();
-    }
   }
 
   void Allocate(const size_t size) {
@@ -122,6 +111,7 @@ class Buffer {
 #ifdef MEASURE_ALLOCATION_TIME
     tbb::tick_count end = tbb::tick_count::now();
     allocation_time_ += (uint64_t)((end - start).seconds() * kTimeResolution);
+    ++active_instances_;
 #endif
   }
 
@@ -161,11 +151,11 @@ class Buffer {
 #ifdef MEASURE_ALLOCATION_TIME
     tbb::tick_count end = tbb::tick_count::now();
     deallocation_time_ += (uint64_t)((end - start).seconds() * kTimeResolution);
+    --active_instances_;
 #endif
   }
 
  private:
-  tbb::atomic<unsigned int>    refcount_;
   off_t                        base_offset_;
   size_t                       used_bytes_;
   size_t                       size_;
@@ -174,6 +164,7 @@ class Buffer {
  public:
   static tbb::atomic<uint64_t> allocation_time_;
   static tbb::atomic<uint64_t> deallocation_time_;
+  static tbb::atomic<uint64_t> active_instances_;
 };
 typedef Buffer<unsigned char, tbb::scalable_allocator<unsigned char> > CharBuffer;
 
@@ -182,6 +173,9 @@ tbb::atomic<uint64_t> Buffer<T, A>::allocation_time_;
 
 template<typename T, class A>
 tbb::atomic<uint64_t> Buffer<T, A>::deallocation_time_;
+
+template<typename T, class A>
+tbb::atomic<uint64_t> Buffer<T, A>::active_instances_;
 
 typedef std::vector<CharBuffer*> CharBufferVector;
 
@@ -373,7 +367,6 @@ class IoDispatcher {
   }
 
   void ScheduleWrite(Chunk *chunk, CharBuffer *buffer) {
-    buffer->Retain();
     write_queue_.push(std::make_pair(chunk, buffer));
   }
 
@@ -485,11 +478,6 @@ class ChunkCruncher {
   {
     assert (internal_offset_ < buffer->used_bytes());
     assert (internal_offset_ + byte_count_ <= buffer->used_bytes());
-    buffer_->Retain();
-  }
-
-  ~ChunkCruncher() {
-    buffer_->Release();
   }
 
   void operator()() const {
@@ -576,7 +564,6 @@ class ChunkCompressor {
       compress_buffer->SetBaseOffset(chunk->compressed_size());
       chunk->add_compressed_size(bytes_produced);
       io_dispatcher_->ScheduleWrite(chunk, compress_buffer);
-      compress_buffer->Release();
 
       if ((flush == Z_NO_FLUSH && retcode == Z_OK) ||
           (flush == Z_FINISH   && retcode == Z_STREAM_END)) {
@@ -611,10 +598,7 @@ class FileScrubbingTask : public tbb::task {
 
  public:
   FileScrubbingTask(File *file, CharBuffer *buffer, IoDispatcher *io_dispatcher) :
-    file_(file), buffer_(buffer), io_dispatcher_(io_dispatcher), next_(NULL)
-  {
-    buffer_->Retain();
-  }
+    file_(file), buffer_(buffer), io_dispatcher_(io_dispatcher), next_(NULL) {}
 
   void SetNext(FileScrubbingTask *next) {
     next->increment_ref_count();
@@ -658,21 +642,23 @@ class FileScrubbingTask : public tbb::task {
         == chunk->offset() + chunk->size())
     );
 
-    ChunkCruncher<ChunkHasher>     hasher    (chunk,
-                                              buffer_,
-                                              internal_offset,
-                                              byte_count,
-                                              finalize,
-                                              io_dispatcher_);
-    ChunkCruncher<ChunkCompressor> compressor(chunk,
-                                              buffer_,
-                                              internal_offset,
-                                              byte_count,
-                                              finalize,
-                                              io_dispatcher_);
+    {
+      ChunkCruncher<ChunkHasher>     hasher    (chunk,
+                                                buffer_,
+                                                internal_offset,
+                                                byte_count,
+                                                finalize,
+                                                io_dispatcher_);
+      ChunkCruncher<ChunkCompressor> compressor(chunk,
+                                                buffer_,
+                                                internal_offset,
+                                                byte_count,
+                                                finalize,
+                                                io_dispatcher_);
 
-    tbb::parallel_invoke(hasher, compressor);
-    buffer_->Release();
+      tbb::parallel_invoke(hasher, compressor);
+    }
+    delete buffer_;
 
     if (finalize) {
       chunk->Done();
@@ -825,8 +811,7 @@ bool IoDispatcher::WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer) {
     return false;
   }
   chunk->add_bytes_written(bytes_written);
-
-  buffer->Release();
+  delete buffer;
 
   return true;
 }
@@ -908,6 +893,7 @@ int main() {
 #ifdef MEASURE_ALLOCATION_TIME
   std::cout << "allocations took: " << ((double)CharBuffer::allocation_time_   / (double)kTimeResolution) << " seconds" << std::endl;
   std::cout << "deallocs took:    " << ((double)CharBuffer::deallocation_time_ / (double)kTimeResolution) << " seconds" << std::endl;
+  std::cout << "leaked buffers:   " << CharBuffer::active_instances_ << std::endl;
 #endif
 
   all_end = tbb::tick_count::now();
