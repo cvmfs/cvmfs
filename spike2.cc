@@ -26,7 +26,7 @@
 
 
 
-static const std::string input_path  = "/Volumes/ramdisk/input";
+static const std::string input_path  = "/Volumes/ramdisk/input/mkfsfk6g/";
 static const std::string output_path = "/Volumes/ramdisk/output";
 
 
@@ -192,8 +192,8 @@ typedef std::vector<CharBuffer*> CharBufferVector;
 
 class Chunk {
  public:
-  Chunk(const off_t offset, const size_t size, const std::string &path) :
-    path_(path), file_offset_(offset), chunk_size_(size),
+  Chunk(const off_t offset, const size_t size = 0) :
+    file_offset_(offset), chunk_size_(size), is_bulk_chunk_(false),
     zlib_initialized_(false),
     sha1_digest_(""), sha1_initialized_(false),
     file_descriptor_(0), bytes_written_(0)
@@ -204,14 +204,23 @@ class Chunk {
   bool IsInitialized()     const { return zlib_initialized_ && sha1_initialized_; }
   bool HasFileDescriptor() const { return file_descriptor_ > 0;                   }
   bool IsFullyProcessed()  const { return done_;                                  }
+  bool IsBulkChunk()       const { return is_bulk_chunk_;                         }
 
   void Done() {
     assert (! IsFullyProcessed());
     done_ = true;
   }
 
+  Chunk* CopyAsBulkChunk(const size_t file_size) const {
+    Chunk *bulk_chunk = new Chunk(*this);
+    bulk_chunk->set_size(file_size);
+    bulk_chunk->is_bulk_chunk_ = true;
+    return bulk_chunk;
+  }
+
   off_t          offset()                 const { return file_offset_;        }
   size_t         size()                   const { return chunk_size_;         }
+  void       set_size(const size_t size)        { chunk_size_ = size;         }
   std::string    sha1_string()            const {
     assert (IsFullyProcessed());
     return ShaToString(sha1_digest_);
@@ -263,9 +272,9 @@ class Chunk {
   }
 
  private:
-  const std::string   path_;
   off_t               file_offset_;
   size_t              chunk_size_;
+  bool                is_bulk_chunk_;
   tbb::atomic<bool>   done_;
 
   z_stream            zlib_context_;
@@ -284,13 +293,30 @@ class Chunk {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 class File {
  public:
   File(const std::string &path, const platform_stat64 &info) :
     path_(path), size_(info.st_size),
-    bulk_chunk_(0, info.st_size, path) {}
+    bulk_chunk_(NULL), current_chunk_(new Chunk(0)) {}
 
   ~File() {
+    if (bulk_chunk_ != NULL) {
+      delete bulk_chunk_;
+    }
+
     tbb::concurrent_vector<Chunk*>::const_iterator i    = chunks_.begin();
     tbb::concurrent_vector<Chunk*>::const_iterator iend = chunks_.end();
     for (; i != iend; ++i) {
@@ -299,18 +325,27 @@ class File {
     chunks_.clear();
   }
 
-  size_t size()             const { return size_; }
-  const std::string& path() const { return path_; }
+  bool HasBulkChunk()                const { return bulk_chunk_ != NULL; }
 
-  const Chunk* bulk_chunk() const { return &bulk_chunk_; }
-        Chunk* bulk_chunk()       { return &bulk_chunk_; }
+  size_t size()                      const { return size_;               }
+  const std::string& path()          const { return path_;               }
+
+        Chunk* bulk_chunk()                { return bulk_chunk_;         }
+  const Chunk* bulk_chunk()          const { return bulk_chunk_;         }
+  void     set_bulk_chunk(Chunk *chunk)    { bulk_chunk_ = chunk;        }
+
+  const Chunk* current_chunk()       const { return current_chunk_;      }
+        Chunk* current_chunk()             { return current_chunk_;      }
+  void     set_current_chunk(Chunk *chunk) { current_chunk_ = chunk;     }
 
  private:
-  const std::string              path_;
-  const size_t                   size_;
+  const std::string               path_;
+  const size_t                    size_;
 
-  tbb::concurrent_vector<Chunk*> chunks_;
-  Chunk                          bulk_chunk_;
+  tbb::concurrent_vector<Chunk*>  chunks_;
+  Chunk                          *bulk_chunk_;
+
+  Chunk                          *current_chunk_;
 };
 
 
@@ -600,6 +635,20 @@ class ChunkCompressor {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class FileScrubbingTask : public tbb::task {
  public:
   static const size_t kMinChunkSize;
@@ -622,15 +671,81 @@ class FileScrubbingTask : public tbb::task {
   }
 
   tbb::task* execute() {
-    // if (file_->size() > kAvgChunkSize) {
-    //   const off_t cut_mark = TryToFindFileCutMark();
-    //   if (cut_mark > 0) {
+    do {
+      Chunk *current_chunk = file_->current_chunk();
+      const off_t cut_mark = TryToFindNextCutMark(current_chunk);
 
-    //   }
-    // }
+      // TODO:
+      // In einem Buffer können 0 bis n chunks liegen. Alle Cut-marks müssen
+      // vor der Verarbeitung feststehen, erst dann können die produzierten
+      // Chunks verarbeitet werden
 
-    Chunk *chunk  = file_->bulk_chunk();
+      // <crap>
 
+      if (cut_mark > 0) {
+        Chunk *previous_chunk = current_chunk;
+        current_chunk = new Chunk(cut_mark);
+        file_->set_current_chunk(current_chunk);
+
+        if (! file_->HasBulkChunk()) {
+          Chunk *bulk_chunk = previous_chunk->CopyAsBulkChunk(file_->size());
+          file_->set_bulk_chunk(bulk_chunk);
+        }
+
+        previous_chunk->set_size(cut_mark - previous_chunk->offset());
+        Process(previous_chunk);
+      }
+
+
+
+    } while (cut_mark > 0);
+
+    if (file_->HasBulkChunk()) {
+      Process(file_->bulk_chunk());
+    }
+
+
+    const off_t cut_mark = TryToFindNextCutMark(current_chunk);
+    if (cut_mark > 0) {
+      if (! file_->HasBulkChunk()) {
+        Chunk *bulk_chunk = new Chunk(*current_chunk);
+        bulk_chunk->set_size(file_->size());
+        file_->set_bulk_chunk(bulk_chunk);
+      }
+
+      current_chunk->set_size(cut_mark - current_chunk->offset());
+      Chunk *next_chunk = new Chunk(cut_mark);
+      chunks_to_process.push_back(next_chunk);
+    }
+
+    if (file_->HasBulkChunk()) {
+      chunks_to_process.push_back(file_->bulk_chunk());
+    }
+
+    chunks_to_process.push_back(current_chunk);
+
+    Process(chunks_to_process);
+
+    // </crap>
+
+    delete buffer_;
+    return Next();
+  }
+
+ protected:
+  bool IsLastBufferOfFile() const {
+    return file_->size() == buffer_->base_offset() + buffer_->used_bytes();
+  }
+
+  off_t TryToFindNextCutMark(Chunk *chunk) {
+    if (buffer_->base_offset() - chunk->offset() > FileScrubbingTask::kMinChunkSize) {
+      return (buffer_->size() / 2) + buffer_->base_offset();
+    }
+
+    return 0;
+  }
+
+  void Process(Chunk *chunk) {
     assert (chunk->IsInitialized());
     assert (buffer_->IsInitialized());
 
@@ -641,8 +756,8 @@ class FileScrubbingTask : public tbb::task {
 
     const size_t byte_count = (chunk->size() == 0)
       ? buffer_->used_bytes()
-      :   std::min(buffer_->base_offset() + buffer_->used_bytes(),
-                   chunk->offset()       + chunk->size())
+      :   std::min(buffer_->base_offset()  + buffer_->used_bytes(),
+                   chunk->offset()         + chunk->size())
         - std::max(buffer_->base_offset(), chunk->offset());
     assert (byte_count <= buffer_->used_bytes() - internal_offset);
 
@@ -668,26 +783,11 @@ class FileScrubbingTask : public tbb::task {
 
       tbb::parallel_invoke(hasher, compressor);
     }
-    delete buffer_;
 
     if (finalize) {
       chunk->Done();
       io_dispatcher_->ScheduleCommit(chunk);
     }
-
-    return Next();
-  }
-
-  std::string GetIdString() {
-    std::stringstream ss;
-    ss << file_->path() << " " << buffer_->base_offset() << " "
-       << buffer_->used_bytes() << " refcnt: " << ref_count();
-    return ss.str();
-  }
-
- protected:
-  off_t TryToFindFileCutMark() {
-    return 0;
   }
 
  public:
@@ -697,9 +797,9 @@ class FileScrubbingTask : public tbb::task {
   FileScrubbingTask  *next_;
 };
 
-const size_t FileScrubbingTask::kMinChunkSize =  4 * 1024 * 1024;
-const size_t FileScrubbingTask::kAvgChunkSize =  8 * 1024 * 1024;
-const size_t FileScrubbingTask::kMaxChunkSize = 16 * 1024 * 1024;
+const size_t FileScrubbingTask::kMinChunkSize = 2 * 1024 * 1024;
+const size_t FileScrubbingTask::kAvgChunkSize = 4 * 1024 * 1024;
+const size_t FileScrubbingTask::kMaxChunkSize = 6 * 1024 * 1024;
 
 
 
