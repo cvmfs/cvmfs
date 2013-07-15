@@ -27,7 +27,7 @@
 
 
 static const std::string input_path  = "/Volumes/ramdisk/input";
-static const std::string output_path = "output";
+static const std::string output_path = "/Volumes/ramdisk/output";
 
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -212,6 +212,10 @@ class Chunk {
 
   off_t          offset()                 const { return file_offset_;        }
   size_t         size()                   const { return chunk_size_;         }
+  std::string    sha1_string()            const {
+    assert (IsFullyProcessed());
+    return ShaToString(sha1_digest_);
+  }
 
   SHA_CTX&       sha1_context()                 { return sha1_context_;       }
   unsigned char* sha1_digest()                  { return sha1_digest_;        }
@@ -222,6 +226,11 @@ class Chunk {
   void       set_file_descriptor(const int fd) {
     assert (! HasFileDescriptor());
     file_descriptor_ = fd;
+  }
+
+  const std::string& temporary_path()     const { return tmp_file_path_; }
+  void           set_temporary_path(const std::string path) {
+    tmp_file_path_ = path;
   }
 
   size_t         bytes_written()          const { return bytes_written_;      }
@@ -267,6 +276,7 @@ class Chunk {
   bool                sha1_initialized_;
 
   int                 file_descriptor_;
+  std::string         tmp_file_path_;
   size_t              bytes_written_;
   tbb::atomic<size_t> compressed_size_;
 };
@@ -795,6 +805,7 @@ bool IoDispatcher::WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer) {
       return false;
     }
     chunk->set_file_descriptor(tmp_fd);
+    chunk->set_temporary_path(tmp_file);
   }
 
   const int fd = chunk->file_descriptor();
@@ -822,8 +833,12 @@ bool IoDispatcher::CommitChunk(Chunk* chunk) {
   assert (chunk->HasFileDescriptor());
   assert (chunk->bytes_written() == chunk->compressed_size());
 
-  const int fd = chunk->file_descriptor();
-  const int retval = close(fd);
+  const int          fd   = chunk->file_descriptor();
+  const std::string &path = chunk->temporary_path();
+  int retval = close(fd);
+  assert (retval == 0);
+
+  retval = rename(path.c_str(), (output_path + "/" + chunk->sha1_string()).c_str());
   assert (retval == 0);
 
   --files_in_flight_;
