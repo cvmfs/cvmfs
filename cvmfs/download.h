@@ -124,8 +124,8 @@ struct JobInfo {
   std::string proxy;
   bool nocache;
   Failures error_code;
-  unsigned char num_failed_proxies;
-  unsigned char num_failed_hosts;
+  unsigned char num_used_proxies;
+  unsigned char num_used_hosts;
   unsigned char num_retries;
   unsigned backoff_ms;
 };

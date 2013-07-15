@@ -294,6 +294,8 @@ static bool quota_ready;
 static bool catalog_ready;
 static bool running_created;
 
+static bool enable_async_downloads;
+
 
 /**
  * Off we go
@@ -320,7 +322,8 @@ int cvmfs_int_init(
   const std::string &cvmfs_opts_deep_mount,
   const std::string &cvmfs_opts_blacklist,
   int cvmfs_opts_nofiles,
-  bool cvmfs_opts_enable_monitor
+  bool cvmfs_opts_enable_monitor,
+  bool cvmfs_opts_enable_async_downloads
 ) {
 
   int retval;
@@ -337,6 +340,7 @@ int cvmfs_int_init(
   quota_ready = false;
   catalog_ready = false;
   running_created = false;
+  enable_async_downloads = cvmfs_opts_enable_async_downloads;
 
   cvmfs::boot_time_ = time(NULL);
   SetupLibcryptoMt();
@@ -565,7 +569,8 @@ void cvmfs_int_spawn() {
   if (monitor_ready) {
     monitor::Spawn();
   }
-  download::Spawn();
+  if (enable_async_downloads)
+    download::Spawn();
   quota::Spawn();
 
   if (*tracefile_ != "")

@@ -13,6 +13,10 @@ cvmfs_run_test() {
 
   local repo="atlas.cern.ch"
 
+  echo "restarting autofs" >> $logfile
+  autofs_switch off >> $logfile 2>&1 || return 10
+  autofs_switch on  >> $logfile 2>&1 || return 11
+
   echo "trying to mount $repo first" >> $logfile
   cvmfs_mount $repo || return 1
 
@@ -25,9 +29,8 @@ cvmfs_run_test() {
 
   if [ $seconds -gt 2 ]; then
     echo "timeout was too long: $seconds (expected at most 2)" >> $logfile
-    return 3
+    CVMFS_TIME_WARNING_FLAG=1
   fi
 
   return 0
 }
-

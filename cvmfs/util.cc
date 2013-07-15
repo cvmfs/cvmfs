@@ -264,6 +264,17 @@ void Nonblock2Block(int filedes) {
 
 
 /**
+ * Changes a blocking file descriptor to a non-blocking one.
+ */
+void Block2Nonblock(int filedes) {
+  int flags = fcntl(filedes, F_GETFL);
+  assert(flags != -1);
+  int retval = fcntl(filedes, F_SETFL, flags | O_NONBLOCK);
+  assert(retval != -1);
+}
+
+
+/**
  * Drops the characters of string to a socket.  It doesn't matter
  * if the other side has hung up.
  */
@@ -947,7 +958,7 @@ bool ExecuteBinary(      int                       *fd_stdin,
  * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
  */
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
-  const bool double_fork = false;
+  const bool double_fork = true;
   return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
                        vector<string>(), double_fork);
 }

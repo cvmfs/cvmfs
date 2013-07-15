@@ -235,12 +235,15 @@ bool ParseUIntMap(const string &path, map<uint64_t, uint64_t> *map) {
       continue;
     }
     vector<string> components = SplitString(line, ' ');
-    if (components.size() != 2)
+    if (components.size() != 2) {
+      fclose(fmap);
       return false;
+    }
     uint64_t from = String2Uint64(components[0]);
     uint64_t to = String2Uint64(components[1]);
     map->insert(pair<uint64_t, uint64_t>(from, to));
   }
+  fclose(fmap);
   return true;
 }
 

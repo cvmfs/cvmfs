@@ -1,4 +1,8 @@
 2.1.13:
+  * Fix "one too often" fail-over
+  * Consider all HTTP 5XX errors as host errors
+  * Release pinned catalogs at high watermark of pinned files
+  * Unset executable bit of /etc/cvmfs/{default.conf,config.sh}
   * Fix potential endless loop in download thread
   * Refurbish build system for external dependencies
   * Fix C binding of libcvmfs
@@ -18,7 +22,7 @@
 2.1.12:
   * Perform host failover after unsuccessful proxy
     failover (test all paths)
-  * Improve recovery reliabliliy after node crash 
+  * Improve recovery reliabiliy after node crash 
     (force removal of cache database)
   * Fix help text of cvmfs_talk
   * Fix timeout for NFS shared maps

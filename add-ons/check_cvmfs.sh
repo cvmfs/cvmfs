@@ -1,13 +1,23 @@
 #!/bin/bash
 # CernVM-FS check for Nagios
-# Version 1.4, last modified: 01.11.2011
+# Version 1.7, last modified: 10.07.2013
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
+#
+# ChangeLog
+# 1.7:
+#    - optionally turn on memory verification
+# 1.6:
+#    - added -H "Pragma:" as curl option (avoid no-cache pragma)
+# 1.5:
+#    - return STATUS_UNKNOWN if extended attribute cannot be read
+#    - return immediately if transport endpoint is not connected
+#    - start of ChangeLog
 
-VERSION=1.4
+VERSION=1.7
 
-STATUS_OK=0          
-STATUS_WARNING=1     # CernVM-FS resource consumption high or 
-                     # previous error STATUS detected
+STATUS_OK=0
+STATUS_WARNING=1     # CernVM-FS resource consumption high or
+                     # previous error status detected
 STATUS_CRITICAL=2    # CernVM-FS not working
 STATUS_UNKNOWN=3     # Internal or usage error
 
@@ -16,10 +26,12 @@ RETURN_STATUS=$STATUS_OK
 
 
 usage() {
-   /bin/echo "Usage:   $0 [-n] <repository name> [expected cvmfs version]"
-   /bin/echo "Example: $0 -n atlas.cern.ch 2.0.4"
+   /bin/echo "Usage:   $0 [-m] [-n] <repository name> [expected cvmfs version]"
+   /bin/echo "Example: $0 -m -n atlas.cern.ch 2.0.4"
    /bin/echo "Options:"
    /bin/echo "  -n  run extended network checks"
+   /bin/echo "  -m  check memory consumption of the cvmfs2 process"
+   /bin/echo "      (less than 50M or 1% of available memory)"
 }
 
 version() {
@@ -34,20 +46,20 @@ help() {
 # Make a version in the format RELEASE.MAJOR.MINOR.PATCH
 sanitize_version() {
    local version; version=$1
-   
+
    ndots=`/bin/echo $version | /usr/bin/tr -Cd . | /usr/bin/wc -c`
    while [ $ndots -lt 3 ]; do
       version="${version}.0"
       ndots=`/bin/echo $version | /usr/bin/tr -Cd . | /usr/bin/wc -c`
    done
-   
+
    echo $version
 }
 
 # Appends information to the brief output string
 append_info() {
    local info; info=$1
-   
+
    if [ "x$BRIEF_INFO" == "xOK" ]; then
       BRIEF_INFO=$info
    else
@@ -58,11 +70,11 @@ append_info() {
 # Read xattr value from current directory into XATTR_VALUE variable
 get_xattr() {
    XATTR_NAME=$1
-   
+
    XATTR_VALUE=`/usr/bin/attr -q -g $XATTR_NAME .`
    if [ $? -ne 0 ]; then
       /bin/echo "SERVICE STATUS: failed to read $XATTR_NAME attribute"
-      exit $SERVICE_UNKNOWN
+      exit $STATUS_UNKNOWN
    fi
 }
 
@@ -71,7 +83,8 @@ get_xattr() {
 
 # Option handling
 OPT_NETWORK_CHECK=0
-while getopts "hVvn" opt; do
+OPT_MEMORY_CHECK=0
+while getopts "hVvnm" opt; do
   case $opt in
     h)
       help
@@ -80,16 +93,19 @@ while getopts "hVvn" opt; do
     V)
       version
       exit $STATUS_OK
-    ;;  
+    ;;
     v)
       /bin/echo "verbose mode"
-    ;;  
+    ;;
     n)
       OPT_NETWORK_CHECK=1
     ;;
+    m)
+      OPT_MEMORY_CHECK=1
+    ;;
     *)
       /bin/echo "SERVICE STATUS: Invalid option: $1"
-      exit $STATUS_UNKNOWN 
+      exit $STATUS_UNKNOWN
       ;;
   esac
 done
@@ -100,7 +116,7 @@ VERSION_EXPECTED=$2
 
 if [ -z "$REPOSITORY" ]; then
    usage
-   exit $STATUS_UNKNOWN    
+   exit $STATUS_UNKNOWN
 fi
 
 
@@ -128,7 +144,7 @@ fi
 
 
 # Grab mountpoint / basic availability
-cd "${CVMFS_MOUNT_DIR}/$FQRN"
+cd "${CVMFS_MOUNT_DIR}/$FQRN" && ls . > /dev/null
 if [ $? -ne 0 ]; then
   /bin/echo "SERVICE STATUS: failed to access $FQRN"
   exit $STATUS_CRITICAL
@@ -145,10 +161,13 @@ get_xattr maxfd; NFDMAX=$XATTR_VALUE
 get_xattr nclg; NCATALOGS=$XATTR_VALUE
 get_xattr revision; REVISION=$XATTR_VALUE
 get_xattr pid; PID=$XATTR_VALUE
-MEMKB=`/bin/ps -p $PID -o rss= | /bin/sed 's/ //g'`
-if [ $PIPESTATUS -ne 0 ]; then
-   /bin/echo "SERVICE STATUS: failed to read memory consumption"
-   exit $STATUS_UNKNOWN
+MEMKB=0
+if [ $OPT_MEMORY_CHECK -eq 1 ]; then
+   MEMKB=`/bin/ps -p $PID -o rss= | /bin/sed 's/ //g'`
+   if [ $PIPESTATUS -ne 0 ]; then
+      /bin/echo "SERVICE STATUS: failed to read memory consumption"
+      exit $STATUS_UNKNOWN
+   fi
 fi
 
 
@@ -162,7 +181,7 @@ if [ $OPT_NETWORK_CHECK -eq 1 ]; then
       /bin/echo "SERVICE STATUS: CernVM-FS configuration error"
       exit $STATUS_UNKNOWN
    fi
-                   
+
    get_xattr timeout; CVMFS_TIMEOUT_PROXY=$XATTR_VALUE
    get_xattr timeout_direct; CVMFS_TIMEOUT_DIRECT=$XATTR_VALUE
 fi
@@ -196,13 +215,15 @@ if [ $FDRATIO -gt 80 ]; then
 fi
 
 # Check for memory footprint (< 50M or < 1% of available memory?)
-MEM=$[$MEMKB/1024]
-if [ $MEM -gt 50 ]; then
-   MEMTOTAL=`/bin/grep MemTotal /proc/meminfo | /bin/awk '{print $2}'`
-   # More than 1% of total memory?
-   if [ $[$MEMKB*100] -gt $MEMTOTAL ]; then
-      append_info "high memory consumption (${MEM}m)"
-      RETURN_STATUS=$STATUS_WARNING
+if [ $OPT_MEMORY_CHECK -eq 1 ]; then
+   MEM=$[$MEMKB/1024]
+   if [ $MEM -gt 50 ]; then
+      MEMTOTAL=`/bin/grep MemTotal /proc/meminfo | /bin/awk '{print $2}'`
+      # More than 1% of total memory?
+      if [ $[$MEMKB*100] -gt $MEMTOTAL ]; then
+         append_info "high memory consumption (${MEM}m)"
+         RETURN_STATUS=$STATUS_WARNING
+      fi
    fi
 fi
 
@@ -240,7 +261,7 @@ if [ $OPT_NETWORK_CHECK -eq 1 ]; then
             TIMEOUT=$CVMFS_TIMEOUT_DIRECT
          fi
          URL="${HOST}/.cvmfspublished"
-         $PROXY_ENV /usr/bin/curl -f --connect-timeout $TIMEOUT $URL > \
+         $PROXY_ENV /usr/bin/curl -H "Pragma:" -f --connect-timeout $TIMEOUT $URL > \
            /dev/null 2>&1
          if [ $? -ne 0 ]; then
             append_info "offline ($HOST via $PROXY)"

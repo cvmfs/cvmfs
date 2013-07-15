@@ -56,3 +56,18 @@ die() {
   echo $msg
   exit 103
 }
+
+
+run_unittests() {
+  echo -n "running CernVM-FS unit tests... "
+  cvmfs_unittests $@ >> $UNITTEST_LOGFILE 2>&1
+
+  local ut_retval=$?
+  if [ $ut_retval -ne 0 ]; then
+    echo "Failed!"
+  else
+    echo "OK"
+  fi
+
+  return $ut_retval
+}

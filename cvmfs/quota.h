@@ -41,6 +41,9 @@ std::vector<std::string> List();
 std::vector<std::string> ListPinned();
 std::vector<std::string> ListCatalogs();
 
+void RegisterBackChannel(int back_channel[2], const std::string &channel_id);
+void UnregisterBackChannel(int back_channel[2], const std::string &channel_id);
+
 uint64_t GetMaxFileSize();
 uint64_t GetCapacity();
 uint64_t GetSize();

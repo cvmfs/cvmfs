@@ -76,6 +76,7 @@ uint32_t watch_fds_inuse_ = 0;
 uint32_t watch_fds_max_;
 
 pthread_mutex_t lock_options_ = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t lock_synchronous_mode_ = PTHREAD_MUTEX_INITIALIZER;
 char *opt_dns_server_ = NULL;
 unsigned opt_timeout_proxy_ ;
 unsigned opt_timeout_direct_;
@@ -382,11 +383,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
                header_line.c_str());
-      if ((header_line.length() >= i+2) &&
-          (header_line[i] == '5') && (header_line[i+1] == '0') &&
-          ((header_line[i+2] == '2') || (header_line[i+2] == '4')))
-      {
-        // 502 Bad Gateway, 504 Fateway Time-out
+      if (header_line[i] == '5') {
+        // 5XX returned by host
         info->error_code = kFailHostHttp;
       } else {
         info->error_code = (info->proxy == "") ? kFailHostHttp :
@@ -515,8 +513,8 @@ static void InitializeRequest(JobInfo *info, CURL *handle) {
   info->curl_handle = handle;
   info->error_code = kFailOk;
   info->nocache = false;
-  info->num_failed_proxies = 0;
-  info->num_failed_hosts = 0;
+  info->num_used_proxies = 1;
+  info->num_used_hosts = 1;
   info->num_retries = 0;
   info->backoff_ms = 0;
   if (info->compressed) {
@@ -787,7 +785,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
            (info->error_code == kFailHostConnection) ||
            (info->error_code == kFailHostHttp)) &&
          info->probe_hosts &&
-         opt_host_chain_ && (info->num_failed_hosts < opt_host_chain_->size()))
+         opt_host_chain_ && (info->num_used_hosts < opt_host_chain_->size()))
        )
     {
       try_again = true;
@@ -800,11 +798,11 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     {
       try_again = true;
       // If all proxies failed, do a next round with the next host
-      if (!same_url_retry && (info->num_failed_proxies >= opt_num_proxies_)) {
+      if (!same_url_retry && (info->num_used_proxies >= opt_num_proxies_)) {
         // Check if this can be made a host fail-over
         if (info->probe_hosts &&
             opt_host_chain_ &&
-            (info->num_failed_hosts < opt_host_chain_->size()))
+            (info->num_used_hosts < opt_host_chain_->size()))
         {
           // reset proxy group
           string old_proxy;
@@ -821,7 +819,7 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
           }
 
           // Make it a host failure
-          info->num_failed_proxies = 0;
+          info->num_used_proxies = 1;
           info->error_code = kFailHostAfterProxy;
         } else {
           try_again = false;
@@ -894,12 +892,12 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if (switch_proxy) {
       SwitchProxy(info);
-      info->num_failed_proxies++;
+      info->num_used_proxies++;
       SetUrlOptions(info);
     }
     if (switch_host) {
       SwitchHost(info);
-      info->num_failed_hosts++;
+      info->num_used_hosts++;
       SetUrlOptions(info);
     }
 
@@ -974,6 +972,7 @@ Failures Fetch(JobInfo *info) {
     ReadPipe(info->wait_at[0], &result, sizeof(result));
     //LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
+    pthread_mutex_lock(&lock_synchronous_mode_);
     CURL *handle = AcquireCurlHandle();
     InitializeRequest(info, handle);
     SetUrlOptions(info);
@@ -988,6 +987,7 @@ Failures Fetch(JobInfo *info) {
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code;
     ReleaseCurlHandle(info->curl_handle);
+    pthread_mutex_unlock(&lock_synchronous_mode_);
   }
 
   if (result != kFailOk) {
@@ -1188,7 +1188,7 @@ static void *MainDownload(void *data __attribute__((unused))) {
        iEnd = pool_handles_inuse_->end(); i != iEnd; ++i)
   {
     curl_multi_remove_handle(curl_multi_, *i);
-    curl_multi_cleanup(*i);
+    curl_easy_cleanup(*i);
   }
   pool_handles_inuse_->clear();
   free(watch_fds_);

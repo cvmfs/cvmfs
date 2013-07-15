@@ -702,8 +702,8 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
       if (!pin_retval) {
         quota::Remove(hash);
         unlink(catalog_path->c_str());
-        LogCvmfs(kLogCache, kLogDebug,
-                 "failed to pin cached copy of catalog %s",
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+                 "failed to pin cached copy of catalog %s (no space)",
                  hash.ToString().c_str());
         return catalog::kLoadNoSpace;
       }
@@ -751,6 +751,8 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
   // Instead of commit, manually rename and pin, otherwise there is a race
   pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
   if (!pin_retval) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "failed to pin catalog %s (no space)", hash.ToString().c_str());
     AbortTransaction(temp_path);
     return catalog::kLoadNoSpace;
   }
@@ -843,7 +845,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
                               cvmfs_path, true);
           if (!retval) {
             LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-                     "failed to pin cached root catalog");
+                     "failed to pin cached root catalog (no space)");
             return catalog::kLoadFail;
           }
         }
@@ -874,7 +876,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
                             cvmfs_path, true);
         if (!retval) {
           LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-                   "failed to pin cached root catalog");
+                   "failed to pin cached root catalog (no space)");
           return catalog::kLoadFail;
         }
       }
