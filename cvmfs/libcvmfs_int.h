@@ -65,7 +65,8 @@ int cvmfs_int_init(
   const std::string &cvmfs_opts_deep_mount,
   const std::string &cvmfs_opts_blacklist,
   int cvmfs_opts_nofiles,
-  bool cvmfs_opts_enable_monitor
+  bool cvmfs_opts_enable_monitor,
+  bool cvmfs_opts_enable_async_downloads
 );
 
 void cvmfs_int_spawn();

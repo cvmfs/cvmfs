@@ -58,6 +58,7 @@ set (CVMFS2_DEBUG_SOURCES
   glue_buffer.h glue_buffer.cc
   loader.h compat.cc compat.h
   history.h history.cc
+  quota_listener.h quota_listener.cc
   cvmfs.h cvmfs.cc
 )
 
@@ -277,7 +278,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE} pthread dl )
+  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
 
 endif (BUILD_LIBCVMFS)
