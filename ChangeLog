@@ -1,4 +1,5 @@
 2.1.13:
+  * Switch to zlib 1.2.8
   * Switch to c-ares 1.10.0
   * Fix "one too often" fail-over
   * Consider all HTTP 5XX errors as host errors
