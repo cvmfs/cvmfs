@@ -804,18 +804,23 @@ static bool VerifyAndFinalize(const int curl_error, JobInfo *info) {
             opt_host_chain_ &&
             (info->num_used_hosts < opt_host_chain_->size()))
         {
-          // reset proxy group
-          string old_proxy;
-          if (opt_proxy_groups_)
-            old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
-          opt_proxy_groups_current_ = 0;
-          RebalanceProxiesUnlocked();
-          opt_timestamp_backup_proxies_ = 0;
+          // reset proxy group if not already performed by other handle
           if (opt_proxy_groups_) {
-            LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                     "switching proxy from %s to %s "
-                     "(reset proxies for host failover)",
-                     old_proxy.c_str(), (*opt_proxy_groups_)[0][0].c_str());
+            if ((opt_proxy_groups_current_ > 0) ||
+                (opt_proxy_groups_current_burned_ > 1))
+            {
+              string old_proxy;
+              old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
+              opt_proxy_groups_current_ = 0;
+              RebalanceProxiesUnlocked();
+              opt_timestamp_backup_proxies_ = 0;
+              if (opt_proxy_groups_) {
+                LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                         "switching proxy from %s to %s "
+                         "(reset proxies for host failover)",
+                         old_proxy.c_str(), (*opt_proxy_groups_)[0][0].c_str());
+              }
+            }
           }
 
           // Make it a host failure
@@ -1238,6 +1243,8 @@ void Init(const unsigned max_pool_handles, const bool use_system_proxy) {
   assert(curl_multi_ != NULL);
   curl_multi_setopt(curl_multi_, CURLMOPT_SOCKETFUNCTION, CallbackCurlSocket);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
+  curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
+                    pool_max_handles_);
   //curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 
   // Initialize random number engine with system time
