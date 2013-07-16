@@ -26,9 +26,13 @@
 
 
 
-static const std::string input_path  = "/Volumes/ramdisk/input/mkfsfk6g/";
+static const std::string input_path  = "/Volumes/ramdisk/input";
 static const std::string output_path = "/Volumes/ramdisk/output";
 
+
+const size_t kMinChunkSize = 2 * 1024 * 1024;
+const size_t kAvgChunkSize = 4 * 1024 * 1024;
+const size_t kMaxChunkSize = 6 * 1024 * 1024;
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -210,13 +214,6 @@ class Chunk {
     done_ = true;
   }
 
-  Chunk* CopyAsBulkChunk(const size_t file_size) const {
-    assert (file_offset_ == 0);
-    Chunk *bulk_chunk = new Chunk(*this);
-    bulk_chunk->set_size(file_size);
-    return bulk_chunk;
-  }
-
   off_t          offset()                 const { return file_offset_;        }
   size_t         size()                   const { return chunk_size_;         }
   void       set_size(const size_t size)        { chunk_size_ = size;         }
@@ -271,6 +268,10 @@ class Chunk {
   }
 
  private:
+  Chunk(const Chunk &other)            { assert (false); } // don't copy
+  Chunk& operator=(const Chunk &other) { assert (false); }
+
+ private:
   off_t               file_offset_;
   size_t              chunk_size_;
   tbb::atomic<bool>   done_;
@@ -310,6 +311,7 @@ class File {
  public:
   File(const std::string &path, const platform_stat64 &info) :
     path_(path), size_(info.st_size),
+    might_become_chunked_(size_ > kMinChunkSize),
     bulk_chunk_(NULL), current_chunk_(NULL)
   {
     CreateNextChunk(0);
@@ -420,12 +422,13 @@ class File {
     assert (current_chunk_           != NULL);
     assert (bulk_chunk_              == NULL);
     assert (current_chunk_->offset() == 0 && current_chunk_->size() == 0);
-    bulk_chunk_ = current_chunk_->CopyAsBulkChunk(size_);
+    assert (false);
   }
 
  private:
   const std::string  path_;
   const size_t       size_;
+  const bool         might_become_chunked_;
 
   ChunkVector        chunks_;
 
@@ -593,12 +596,12 @@ const size_t IoDispatcher::kMaxBufferSize = 1048576;
 template <class CruncherT>
 class ChunkCruncher {
  public:
-  ChunkCruncher(Chunk                *chunk,
-                CharBuffer           *buffer,
-                const off_t           internal_offset,
-                const size_t          byte_count,
-                const bool            finalize,
-                IoDispatcher         *io_dispatcher) :
+  ChunkCruncher(Chunk        *chunk,
+                CharBuffer   *buffer,
+                const off_t   internal_offset,
+                const size_t  byte_count,
+                const bool    finalize,
+                IoDispatcher *io_dispatcher) :
     chunk_(chunk),
     buffer_(buffer),
     internal_offset_(internal_offset),
@@ -728,6 +731,70 @@ class ChunkCompressor {
 
 
 
+class ChunkProcessingTask : public tbb::task {
+ public:
+  ChunkProcessingTask(Chunk        *chunk,
+                      CharBuffer   *buffer,
+                      IoDispatcher *io_dispatcher) :
+    chunk_(chunk), buffer_(buffer), io_dispatcher_(io_dispatcher) {}
+
+  tbb::task* execute() {
+    assert (chunk_->IsInitialized());
+    assert (buffer_->IsInitialized());
+
+    const off_t internal_offset =
+      std::max(off_t(0), chunk_->offset() - buffer_->base_offset());
+    assert (internal_offset < buffer_->used_bytes());
+    const unsigned char *data = buffer_->ptr() + internal_offset;
+
+    const size_t byte_count = (chunk_->size() == 0)
+      ? buffer_->used_bytes()
+      :   std::min(buffer_->base_offset()  + buffer_->used_bytes(),
+                   chunk_->offset()         + chunk_->size())
+        - std::max(buffer_->base_offset(), chunk_->offset());
+    assert (byte_count <= buffer_->used_bytes() - internal_offset);
+
+    const bool finalize = (
+      (chunk_->size() > 0) &&
+      (buffer_->base_offset() + internal_offset + byte_count
+        == chunk_->offset() + chunk_->size())
+    );
+
+    ChunkCruncher<ChunkHasher>     hasher    (chunk_,
+                                              buffer_,
+                                              internal_offset,
+                                              byte_count,
+                                              finalize,
+                                              io_dispatcher_);
+    ChunkCruncher<ChunkCompressor> compressor(chunk_,
+                                              buffer_,
+                                              internal_offset,
+                                              byte_count,
+                                              finalize,
+                                              io_dispatcher_);
+
+    tbb::parallel_invoke(hasher, compressor);
+
+    if (finalize) {
+      chunk_->Done();
+      io_dispatcher_->ScheduleCommit(chunk_);
+    }
+
+    return NULL;
+  }
+
+ private:
+  Chunk        *chunk_;
+  CharBuffer   *buffer_;
+  IoDispatcher *io_dispatcher_;
+};
+
+
+
+
+
+
+
 
 
 
@@ -735,11 +802,6 @@ class ChunkCompressor {
 
 
 class FileScrubbingTask : public tbb::task {
- public:
-  static const size_t kMinChunkSize;
-  static const size_t kAvgChunkSize;
-  static const size_t kMaxChunkSize;
-
  protected:
   typedef std::vector<off_t> CutMarks;
 
@@ -750,12 +812,6 @@ class FileScrubbingTask : public tbb::task {
   void SetNext(FileScrubbingTask *next) {
     next->increment_ref_count();
     next_ = next;
-  }
-
-  tbb::task* Next() {
-    return (next_ != NULL && next_->decrement_ref_count() == 0)
-      ? next_
-      : NULL;
   }
 
   tbb::task* execute() {
@@ -807,57 +863,26 @@ class FileScrubbingTask : public tbb::task {
     return file_->size() == buffer_->base_offset() + buffer_->used_bytes();
   }
 
-  void WaitForProcessing() const {
-
+  void WaitForProcessing() {
+    increment_ref_count(); // for the wait itself
+    wait_for_all();
   }
 
   CutMarks FindNextChunkCutMarks() {
     return CutMarks();
   }
 
+  tbb::task* Next() {
+    return (next_ != NULL && next_->decrement_ref_count() == 0)
+      ? next_
+      : NULL;
+  }
+
   void Process(Chunk *chunk) {
-    assert (chunk->IsInitialized());
-    assert (buffer_->IsInitialized());
-
-    const off_t internal_offset =
-      std::max(off_t(0), chunk->offset() - buffer_->base_offset());
-    assert (internal_offset < buffer_->used_bytes());
-    const unsigned char *data = buffer_->ptr() + internal_offset;
-
-    const size_t byte_count = (chunk->size() == 0)
-      ? buffer_->used_bytes()
-      :   std::min(buffer_->base_offset()  + buffer_->used_bytes(),
-                   chunk->offset()         + chunk->size())
-        - std::max(buffer_->base_offset(), chunk->offset());
-    assert (byte_count <= buffer_->used_bytes() - internal_offset);
-
-    const bool finalize = (
-      (chunk->size() > 0) &&
-      (buffer_->base_offset() + internal_offset + byte_count
-        == chunk->offset() + chunk->size())
-    );
-
-    {
-      ChunkCruncher<ChunkHasher>     hasher    (chunk,
-                                                buffer_,
-                                                internal_offset,
-                                                byte_count,
-                                                finalize,
-                                                io_dispatcher_);
-      ChunkCruncher<ChunkCompressor> compressor(chunk,
-                                                buffer_,
-                                                internal_offset,
-                                                byte_count,
-                                                finalize,
-                                                io_dispatcher_);
-
-      tbb::parallel_invoke(hasher, compressor);
-    }
-
-    if (finalize) {
-      chunk->Done();
-      io_dispatcher_->ScheduleCommit(chunk);
-    }
+    tbb::task *chunk_processing_task =
+      new(allocate_child()) ChunkProcessingTask(chunk, buffer_, io_dispatcher_);
+    increment_ref_count();
+    spawn(*chunk_processing_task);
   }
 
  public:
@@ -866,10 +891,6 @@ class FileScrubbingTask : public tbb::task {
   IoDispatcher       *io_dispatcher_;
   FileScrubbingTask  *next_;
 };
-
-const size_t FileScrubbingTask::kMinChunkSize = 2 * 1024 * 1024;
-const size_t FileScrubbingTask::kAvgChunkSize = 4 * 1024 * 1024;
-const size_t FileScrubbingTask::kMaxChunkSize = 6 * 1024 * 1024;
 
 
 
