@@ -193,7 +193,7 @@ typedef std::vector<CharBuffer*> CharBufferVector;
 class Chunk {
  public:
   Chunk(const off_t offset, const size_t size = 0) :
-    file_offset_(offset), chunk_size_(size), is_bulk_chunk_(false),
+    file_offset_(offset), chunk_size_(size),
     zlib_initialized_(false),
     sha1_digest_(""), sha1_initialized_(false),
     file_descriptor_(0), bytes_written_(0)
@@ -204,7 +204,6 @@ class Chunk {
   bool IsInitialized()     const { return zlib_initialized_ && sha1_initialized_; }
   bool HasFileDescriptor() const { return file_descriptor_ > 0;                   }
   bool IsFullyProcessed()  const { return done_;                                  }
-  bool IsBulkChunk()       const { return is_bulk_chunk_;                         }
 
   void Done() {
     assert (! IsFullyProcessed());
@@ -212,9 +211,9 @@ class Chunk {
   }
 
   Chunk* CopyAsBulkChunk(const size_t file_size) const {
+    assert (file_offset_ == 0);
     Chunk *bulk_chunk = new Chunk(*this);
     bulk_chunk->set_size(file_size);
-    bulk_chunk->is_bulk_chunk_ = true;
     return bulk_chunk;
   }
 
@@ -274,7 +273,6 @@ class Chunk {
  private:
   off_t               file_offset_;
   size_t              chunk_size_;
-  bool                is_bulk_chunk_;
   tbb::atomic<bool>   done_;
 
   z_stream            zlib_context_;
@@ -289,6 +287,8 @@ class Chunk {
   size_t              bytes_written_;
   tbb::atomic<size_t> compressed_size_;
 };
+
+typedef std::vector<Chunk*> ChunkVector;
 
 
 
@@ -310,42 +310,127 @@ class File {
  public:
   File(const std::string &path, const platform_stat64 &info) :
     path_(path), size_(info.st_size),
-    bulk_chunk_(NULL), current_chunk_(new Chunk(0)) {}
+    bulk_chunk_(NULL), current_chunk_(NULL)
+  {
+    CreateNextChunk(0);
+  }
 
   ~File() {
     if (bulk_chunk_ != NULL) {
       delete bulk_chunk_;
     }
 
-    tbb::concurrent_vector<Chunk*>::const_iterator i    = chunks_.begin();
-    tbb::concurrent_vector<Chunk*>::const_iterator iend = chunks_.end();
+    ChunkVector::const_iterator i    = chunks_.begin();
+    ChunkVector::const_iterator iend = chunks_.end();
     for (; i != iend; ++i) {
       delete *i;
     }
     chunks_.clear();
   }
 
-  bool HasBulkChunk()                const { return bulk_chunk_ != NULL; }
+  /**
+   * This creates a next chunk which will be the successor of the current chunk
+   *
+   * @param   offset  the offset at which the new chunk should be created
+   *                  Note: this implictly defines the size of the current chunk
+   * @return  the successor (!) of the just created chunk
+   */
+  Chunk* CreateNextChunk(const off_t offset) {
+    assert (offset < size_);
+    assert (current_chunk_ == NULL || current_chunk_->size() == 0);
 
-  size_t size()                      const { return size_;               }
-  const std::string& path()          const { return path_;               }
+    // copy the first current_chunk_ as the bulk_chunk_ as soon as we create
+    // a second chunk, thus defining the file to be chunked in general
+    if (current_chunk_ != NULL && ! HasBulkChunk()) {
+      CreateBulkChunk();
+    }
 
-        Chunk* bulk_chunk()                { return bulk_chunk_;         }
-  const Chunk* bulk_chunk()          const { return bulk_chunk_;         }
-  void     set_bulk_chunk(Chunk *chunk)    { bulk_chunk_ = chunk;        }
+    // fix the size of the current_chunk_ since we now create it's successor at
+    // the given offset
+    if (current_chunk_ != NULL) {
+      current_chunk_->set_size(offset - current_chunk_->offset());
+    }
+    Chunk *successor = current_chunk_;
 
-  const Chunk* current_chunk()       const { return current_chunk_;      }
-        Chunk* current_chunk()             { return current_chunk_;      }
-  void     set_current_chunk(Chunk *chunk) { current_chunk_ = chunk;     }
+    // create and register a new chunk
+    current_chunk_ = new Chunk(offset);
+    chunks_.push_back(current_chunk_);
+    return successor;
+  }
+
+  /**
+   * This will fix the current_chunk_ as being the last chunk of the file.
+   *
+   * @return  the finalized chunk
+   */
+  Chunk* FinalizeLastChunk() {
+    assert (current_chunk_         != NULL);
+    assert (current_chunk_->size() == 0);
+    current_chunk_->set_size(size_ - current_chunk_->offset());
+    return current_chunk_;
+  }
+
+  void Finalize() {
+    // doing some sanity checks (might be removed later on)
+    assert (bulk_chunk_ == NULL || chunks_.size() > 1);
+
+    size_t aggregated_size    = 0;
+    off_t  previous_chunk_end = 0;
+    ChunkVector::const_iterator i    = chunks_.begin();
+    ChunkVector::const_iterator iend = chunks_.end();
+    for (; i != iend; ++i) {
+      Chunk *current_chunk = *i;
+      assert (current_chunk->size() > 0);
+      assert (previous_chunk_end == current_chunk->offset());
+      assert (current_chunk->IsFullyProcessed());
+      previous_chunk_end = current_chunk->offset() + current_chunk->size();
+      aggregated_size += current_chunk->size();
+    }
+    assert (aggregated_size == size_);
+
+    // a file with only one generated chunk is _not_ a chunked file and it's
+    // bulk_chunk_ is equal to the single generated chunk
+    if (chunks_.size() == 1) {
+      assert (bulk_chunk_ == NULL);
+      bulk_chunk_ = chunks_.front();
+      chunks_.clear();
+    }
+
+    // more sanity checks
+    assert (bulk_chunk_           != NULL);
+    assert (bulk_chunk_->offset() == 0);
+    assert (bulk_chunk_->size()   == size_);
+    assert (bulk_chunk_->IsFullyProcessed());
+  }
+
+  bool HasBulkChunk()          const { return bulk_chunk_ != NULL; }
+
+  size_t size()                const { return size_;               }
+  const std::string& path()    const { return path_;               }
+
+        Chunk* current_chunk()       { return current_chunk_;      }
+  const Chunk* current_chunk() const { return current_chunk_;      }
+
+        Chunk* bulk_chunk()          { return bulk_chunk_;         }
+  const Chunk* bulk_chunk()    const { return bulk_chunk_;         }
+  const ChunkVector& chunks()  const { return chunks_;             }
+
+ protected:
+  void CreateBulkChunk() {
+    assert (current_chunk_           != NULL);
+    assert (bulk_chunk_              == NULL);
+    assert (current_chunk_->offset() == 0 && current_chunk_->size() == 0);
+    bulk_chunk_ = current_chunk_->CopyAsBulkChunk(size_);
+  }
 
  private:
-  const std::string               path_;
-  const size_t                    size_;
+  const std::string  path_;
+  const size_t       size_;
 
-  tbb::concurrent_vector<Chunk*>  chunks_;
-  Chunk                          *bulk_chunk_;
+  ChunkVector        chunks_;
 
-  Chunk                          *current_chunk_;
+  Chunk              *bulk_chunk_;
+  Chunk              *current_chunk_;
 };
 
 
@@ -655,6 +740,9 @@ class FileScrubbingTask : public tbb::task {
   static const size_t kAvgChunkSize;
   static const size_t kMaxChunkSize;
 
+ protected:
+  typedef std::vector<off_t> CutMarks;
+
  public:
   FileScrubbingTask(File *file, CharBuffer *buffer, IoDispatcher *io_dispatcher) :
     file_(file), buffer_(buffer), io_dispatcher_(io_dispatcher), next_(NULL) {}
@@ -671,78 +759,60 @@ class FileScrubbingTask : public tbb::task {
   }
 
   tbb::task* execute() {
-    do {
-      Chunk *current_chunk = file_->current_chunk();
-      const off_t cut_mark = TryToFindNextCutMark(current_chunk);
+    // find chunk cut marks in the current buffer and process all chunks that
+    // are fully specified (i.e. not reaching beyond the current buffer)
+    const CutMarks cut_marks = FindNextChunkCutMarks();
+    CutMarks::const_iterator i    = cut_marks.begin();
+    CutMarks::const_iterator iend = cut_marks.end();
+    for (; i != iend; ++i) {
+      Chunk *fully_defined_chunk = file_->CreateNextChunk(*i);
+      assert (fully_defined_chunk->size() > 0);
+      Process(fully_defined_chunk);
+    }
 
-      // TODO:
-      // In einem Buffer können 0 bis n chunks liegen. Alle Cut-marks müssen
-      // vor der Verarbeitung feststehen, erst dann können die produzierten
-      // Chunks verarbeitet werden
-
-      // <crap>
-
-      if (cut_mark > 0) {
-        Chunk *previous_chunk = current_chunk;
-        current_chunk = new Chunk(cut_mark);
-        file_->set_current_chunk(current_chunk);
-
-        if (! file_->HasBulkChunk()) {
-          Chunk *bulk_chunk = previous_chunk->CopyAsBulkChunk(file_->size());
-          file_->set_bulk_chunk(bulk_chunk);
-        }
-
-        previous_chunk->set_size(cut_mark - previous_chunk->offset());
-        Process(previous_chunk);
-      }
-
-
-
-    } while (cut_mark > 0);
-
+    // check if the file has a bulk chunk and continue processing it using the
+    // current buffer
     if (file_->HasBulkChunk()) {
       Process(file_->bulk_chunk());
     }
 
-
-    const off_t cut_mark = TryToFindNextCutMark(current_chunk);
-    if (cut_mark > 0) {
-      if (! file_->HasBulkChunk()) {
-        Chunk *bulk_chunk = new Chunk(*current_chunk);
-        bulk_chunk->set_size(file_->size());
-        file_->set_bulk_chunk(bulk_chunk);
-      }
-
-      current_chunk->set_size(cut_mark - current_chunk->offset());
-      Chunk *next_chunk = new Chunk(cut_mark);
-      chunks_to_process.push_back(next_chunk);
+    // if we reached the last buffer this input file will produce all but the
+    // last created chunk will be fully defined at this point
+    if (IsLastBuffer()) {
+      file_->FinalizeLastChunk();
     }
 
-    if (file_->HasBulkChunk()) {
-      chunks_to_process.push_back(file_->bulk_chunk());
-    }
+    // process the current chunk, i.e. the last created chunk that potentially
+    // reaches beyond the current buffer or to the end of the file
+    Process(file_->current_chunk());
 
-    chunks_to_process.push_back(current_chunk);
-
-    Process(chunks_to_process);
-
-    // </crap>
-
+    // wait for all scheduled chunk processing on the current buffer to be
+    // finished and get rid of the buffer
+    WaitForProcessing();
     delete buffer_;
+
+    // if the last buffer was processed, we finalize the whole file
+    // (Note: this does not mean, that the IoDispatcher already uploaded all
+    //        chunk data)
+    if (IsLastBuffer()) {
+      file_->Finalize();
+    }
+
+    // go on with the next file buffer
     return Next();
   }
 
  protected:
-  bool IsLastBufferOfFile() const {
+  bool IsLastBuffer() const {
     return file_->size() == buffer_->base_offset() + buffer_->used_bytes();
   }
 
-  off_t TryToFindNextCutMark(Chunk *chunk) {
-    if (buffer_->base_offset() - chunk->offset() > FileScrubbingTask::kMinChunkSize) {
-      return (buffer_->size() / 2) + buffer_->base_offset();
-    }
+  void WaitForProcessing() const {
 
-    return 0;
+  }
+
+  CutMarks FindNextChunkCutMarks() {
+    return CutMarks();
   }
 
   void Process(Chunk *chunk) {
