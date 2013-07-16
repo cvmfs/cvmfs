@@ -2047,7 +2047,7 @@ publish() {
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
-  $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
+  $user_shell "$sync_command" || (sudo /bin/mount -o remount,rw /cvmfs/$name && die "Synchronization failed\n\nExecuted Command:\n$sync_command")
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
   tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"

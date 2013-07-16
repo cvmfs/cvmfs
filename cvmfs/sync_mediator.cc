@@ -143,8 +143,8 @@ void SyncMediator::EnterDirectory(SyncItem &entry) {
 void SyncMediator::LeaveDirectory(SyncItem &entry)
 {
   CompleteHardlinks(entry);
-	AddLocalHardlinkGroups(GetHardlinkMap());
-	hardlink_stack_.pop();
+  AddLocalHardlinkGroups(GetHardlinkMap());
+  hardlink_stack_.pop();
 }
 
 

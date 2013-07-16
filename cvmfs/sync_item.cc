@@ -65,22 +65,22 @@ uint64_t SyncItem::GetRdOnlyInode() const {
 
 
 unsigned int SyncItem::GetUnionLinkcount() const {
-	StatUnion();
-	return union_stat_.stat.st_nlink;
+  StatUnion();
+  return union_stat_.stat.st_nlink;
 }
 
 
 uint64_t SyncItem::GetUnionInode() const {
-	StatUnion();
-	return union_stat_.stat.st_ino;
+  StatUnion();
+  return union_stat_.stat.st_ino;
 }
 
 
 void SyncItem::StatGeneric(const string &path, EntryStat *info) {
-	int retval = platform_lstat(path.c_str(), &info->stat);
+  int retval = platform_lstat(path.c_str(), &info->stat);
   if (retval != 0)
     info->error_code = errno;
-	info->obtained = true;
+  info->obtained = true;
 }
 
 
