@@ -11,6 +11,7 @@
 
 
 const size_t IoDispatcher::kMaxBufferSize = 1048576;
+IoDispatcher* IoDispatcher::instance_ = NULL;
 
 void IoDispatcher::ReadThread() {
   tbb::task_scheduler_init sched(

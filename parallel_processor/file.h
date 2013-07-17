@@ -21,12 +21,10 @@ static const size_t kMaxChunkSize = 6 * 1024 * 1024;;
 class File {
  public:
   File(const std::string      &path,
-       const platform_stat64  &info,
-       IoDispatcher           *io_dispatcher) :
+       const platform_stat64  &info) :
     path_(path), size_(info.st_size),
     might_become_chunked_(size_ > kMinChunkSize),
-    bulk_chunk_(NULL), current_chunk_(NULL),
-    io_dispatcher_(io_dispatcher)
+    bulk_chunk_(NULL), current_chunk_(NULL)
   {
     CreateNextChunk(0);
   }
@@ -74,8 +72,6 @@ class File {
 
   Chunk              *bulk_chunk_;
   Chunk              *current_chunk_;
-
-  IoDispatcher       *io_dispatcher_;
 };
 
 #endif /* FILE_H */

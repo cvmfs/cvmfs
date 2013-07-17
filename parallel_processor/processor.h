@@ -75,6 +75,15 @@ class ChunkCompressor {
 
 
 
+
+
+
+
+
+
+
+
+
 class ChunkProcessingTask : public tbb::task {
  public:
   ChunkProcessingTask(Chunk        *chunk,

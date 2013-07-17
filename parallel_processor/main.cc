@@ -8,19 +8,15 @@
 
 class TraversalDelegate {
  public:
-  TraversalDelegate(IoDispatcher *io_dispatcher) :
-    io_dispatcher_(io_dispatcher) {}
+  TraversalDelegate() {}
 
   void FileCb(const std::string      &relative_path,
               const std::string      &file_name,
               const platform_stat64  &info) {
     const std::string path = relative_path + "/" + file_name;
-    File *file = new File(path, info, io_dispatcher_);
-    io_dispatcher_->ScheduleRead(file);
+    File *file = new File(path, info);
+    IoDispatcher::Instance()->ScheduleRead(file);
   }
-
- private:
-  IoDispatcher *io_dispatcher_;
 };
 
 
@@ -36,9 +32,7 @@ int main() {
 
   all_start = tbb::tick_count::now();
 
-  IoDispatcher io_dispatcher;
-
-  TraversalDelegate delegate(&io_dispatcher);
+  TraversalDelegate delegate;
 
   start = tbb::tick_count::now();
   FileSystemTraversal<TraversalDelegate> t(&delegate, "", true);
@@ -48,7 +42,7 @@ int main() {
   std::cout << "recursion took:   " << (end - start).seconds() << " seconds" << std::endl;
 
   Print("going to wait now...");
-  io_dispatcher.Wait();
+  IoDispatcher::Instance()->Wait();
   Print("waited...");
 
 #ifdef MEASURE_ALLOCATION_TIME
@@ -59,6 +53,8 @@ int main() {
 
   all_end = tbb::tick_count::now();
   std::cout << "overall time:     " << (all_end - all_start).seconds() << " seconds" << std::endl;
+
+  IoDispatcher::Destroy();
 
   return 0;
 }

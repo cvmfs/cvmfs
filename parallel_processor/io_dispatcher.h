@@ -22,17 +22,27 @@ class Chunk;
 class IoDispatcher {
  protected:
   static const size_t kMaxBufferSize;
-
   typedef void (IoDispatcher:: *MethodPtr)();
 
+ private:
+  static IoDispatcher* instance_;
+
  public:
-  IoDispatcher() :
-    read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
-    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread)
-  {
-    file_count_      = 0;
-    files_in_flight_ = 0;
-    all_enqueued_    = false;
+  /**
+   * Singleton
+   */
+  static IoDispatcher* Instance() {
+    if (instance_ == NULL) {
+      instance_ = new IoDispatcher();
+    }
+    return instance_;
+  }
+
+  static void Destroy() {
+    if (instance_ != NULL) {
+      delete instance_;
+      instance_ = NULL;
+    }
   }
 
   ~IoDispatcher() {
@@ -79,6 +89,15 @@ class IoDispatcher {
   }
 
  protected:
+  IoDispatcher() :
+    read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
+    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread)
+  {
+    file_count_      = 0;
+    files_in_flight_ = 0;
+    all_enqueued_    = false;
+  }
+
   void ReadThread();
   void WriteThread();
 

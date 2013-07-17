@@ -10,5 +10,5 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
   //   return;
   // }
 
-  io_dispatcher_->ScheduleWrite(this, buffer);
+  IoDispatcher::Instance()->ScheduleWrite(this, buffer);
 }

@@ -20,13 +20,12 @@ class IoDispatcher;
 
 class Chunk {
  public:
-  Chunk(const off_t offset, IoDispatcher *io_dispatcher) :
+  Chunk(const off_t offset) :
     file_offset_(offset), chunk_size_(0),
     deferred_write_(false),
     zlib_initialized_(false),
     sha1_digest_(""), sha1_initialized_(false),
-    file_descriptor_(0), bytes_written_(0),
-    io_dispatcher_(io_dispatcher)
+    file_descriptor_(0), bytes_written_(0)
   {
     Initialize();
   }
@@ -123,8 +122,6 @@ class Chunk {
   std::string              tmp_file_path_;
   size_t                   bytes_written_;
   tbb::atomic<size_t>      compressed_size_;
-
-  IoDispatcher            *io_dispatcher_;
 };
 
 typedef std::vector<Chunk*> ChunkVector;
