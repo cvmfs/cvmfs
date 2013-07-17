@@ -44,7 +44,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   Chunk *predecessor = current_chunk_;
 
   // create and register a new chunk
-  current_chunk_ = new Chunk(offset, io_dispatcher_);
+  current_chunk_ = new Chunk(offset);
   if (is_first_chunk && might_become_chunked_) {
     assert (offset == 0);
     current_chunk_->EnableDeferredWrite();
