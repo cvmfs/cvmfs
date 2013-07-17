@@ -121,6 +121,12 @@ class SmallHashBase {
     *max_collisions = max_collisions_;
   }
 
+  // Careful with the direct access
+  uint32_t size() const { return size_; }
+  Key empty_key() const { return empty_key_; }
+  Key *keys() const { return keys_; }
+  Value *values() const { return values_; }
+
  protected:
   uint32_t ScaleHash(const Key &key) const {
     double bucket = (double(hasher_(key)) * double(capacity_) /
