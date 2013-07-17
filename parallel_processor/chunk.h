@@ -34,15 +34,12 @@ class Chunk {
   bool HasFileDescriptor() const { return file_descriptor_ > 0;                   }
   bool IsFullyProcessed()  const { return done_;                                  }
 
-  void Done() {
-    assert (! IsFullyProcessed());
-    done_ = true;
-  }
+  void Done();
 
   void ScheduleWrite(CharBuffer *buffer);
 
   void EnableDeferredWrite() {
-    assert (!HasFileDescriptor());
+    assert (! HasFileDescriptor());
     deferred_write_ = true;
   }
 

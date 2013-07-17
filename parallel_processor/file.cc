@@ -27,29 +27,32 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   assert (current_chunk_ == NULL || current_chunk_->size() == 0);
 
   // check if we are currently initializing the first current_chunk_
-  const bool is_first_chunk = (current_chunk_ == NULL);
+  const bool creates_initial_chunk = (current_chunk_ == NULL);
+  assert (creates_initial_chunk || might_become_chunked_);
+  assert (offset != 0 || creates_initial_chunk);
 
-  // copy the first current_chunk_ as the bulk_chunk_ as soon as we create
-  // a second chunk, thus defining the file to be chunked in general
-  if (current_chunk_ != NULL && ! HasBulkChunk()) {
-    assert (might_become_chunked_);
-    CreateBulkChunk();
-  }
+  if (! creates_initial_chunk) {
+    // copy the first current_chunk_ as the bulk_chunk_ as soon as we create
+    // a second chunk, thus defining the file to be chunked in general
+    if (! HasBulkChunk()) {
+      assert (might_become_chunked_);
+      CreateBulkChunk();
+    }
 
-  // fix the size of the current_chunk_ since we now create it's successor at
-  // the given offset
-  if (!is_first_chunk) {
+    // fix the size of the current_chunk_ since we now create it's successor at
+    // the given offset
     current_chunk_->set_size(offset - current_chunk_->offset());
   }
-  Chunk *predecessor = current_chunk_;
 
   // create and register a new chunk
+  Chunk *predecessor = current_chunk_;
   current_chunk_ = new Chunk(offset);
-  if (is_first_chunk && might_become_chunked_) {
+  if (creates_initial_chunk && might_become_chunked_) {
     assert (offset == 0);
     current_chunk_->EnableDeferredWrite();
   }
   chunks_.push_back(current_chunk_);
+
   return predecessor;
 }
 
