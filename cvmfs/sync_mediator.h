@@ -89,7 +89,7 @@ class SyncMediator {
   void Remove(SyncItem &entry);
   void Replace(SyncItem &entry);
 
-	void EnterDirectory(SyncItem &entry);
+  void EnterDirectory(SyncItem &entry);
   void LeaveDirectory(SyncItem &entry);
 
   manifest::Manifest *Commit();
@@ -145,7 +145,7 @@ class SyncMediator {
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
-	void LegacyRegularHardlinkCallback(const std::string &parent_dir,
+  void LegacyRegularHardlinkCallback(const std::string &parent_dir,
                                      const std::string &file_name);
   void LegacySymlinkHardlinkCallback(const std::string &parent_dir,
                                       const std::string &file_name);
@@ -168,10 +168,10 @@ class SyncMediator {
    */
   HardlinkGroupMapStack hardlink_stack_;
 
-	/**
-	 * New and modified files are sent to an external spooler for hashing and
+  /**
+   * New and modified files are sent to an external spooler for hashing and
    * compression.  A spooler callback adds them to the catalogs, once processed.
-	 */
+   */
   pthread_mutex_t lock_file_queue_;
   SyncItemList file_queue_;
 
