@@ -1,4 +1,6 @@
 2.1.13:
+  * Add experimental support for overlayfs as an alternative to
+    aufs
   * Enforce hard limit on number of concurrent HTTP connections
   * Switch to libcurl 7.31.0
   * Switch to zlib 1.2.8
