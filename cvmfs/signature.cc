@@ -14,14 +14,6 @@
 #include "cvmfs_config.h"
 #include "signature.h"
 
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/x509.h>
-#include <openssl/err.h>
-#include <openssl/bio.h>
-#include <openssl/rsa.h>
-#include <openssl/engine.h>
-
 #include <string>
 #include <vector>
 
@@ -42,20 +34,22 @@ namespace signature {
 
 const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch.pub";
 
-EVP_PKEY *private_key_ = NULL;
-X509 *certificate_ = NULL;
-vector<RSA *> *public_keys_;  /**< Contains cvmfs public master keys */
-vector<string> *blacklisted_certificates_ = NULL;
+SignatureManager::SignatureManager() {
+  private_key_ = NULL;
+  certificate_ = NULL;
+  public_keys_ = NULL;
+  blacklisted_certificates_ = NULL;
+}
 
 
-void Init() {
+void SignatureManager::Init() {
   OpenSSL_add_all_algorithms();
   public_keys_ = new vector<RSA *>();
   blacklisted_certificates_ = new vector<string>();
 }
 
 
-void Fini() {
+void SignatureManager::Fini() {
   if (certificate_) X509_free(certificate_);
   certificate_ = NULL;
   if (private_key_) EVP_PKEY_free(private_key_);
@@ -78,7 +72,7 @@ void Fini() {
 /**
  * OpenSSL error strings.
  */
-string GetCryptoError() {
+string SignatureManager::GetCryptoError() {
   char buf[121];
   string err;
   while (ERR_peek_error() != 0) {
@@ -95,7 +89,9 @@ string GetCryptoError() {
  *     Password is not saved internally, but the private key is.
  * \return True on success, false otherwise
  */
-bool LoadPrivateKeyPath(const string &file_pem, const string &password) {
+bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
+                                          const string &password)
+{
   bool result;
   FILE *fp = NULL;
   char *tmp = strdupa(password.c_str());
@@ -111,7 +107,7 @@ bool LoadPrivateKeyPath(const string &file_pem, const string &password) {
 /**
  * Clears the memory storing the private key.
  */
-void UnloadPrivateKey() {
+void SignatureManager::UnloadPrivateKey() {
   if (private_key_) EVP_PKEY_free(private_key_);
   private_key_ = NULL;
 }
@@ -123,7 +119,7 @@ void UnloadPrivateKey() {
  *
  * \return True on success, false otherwise
  */
-bool LoadCertificatePath(const string &file_pem) {
+bool SignatureManager::LoadCertificatePath(const string &file_pem) {
   if (certificate_) {
     X509_free(certificate_);
     certificate_ = NULL;
@@ -150,8 +146,8 @@ bool LoadCertificatePath(const string &file_pem) {
 /**
  * See the function that loads the certificate from file.
  */
-bool LoadCertificateMem(const unsigned char *buffer,
-                        const unsigned buffer_size)
+bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
+                                          const unsigned buffer_size)
 {
   if (certificate_) {
     X509_free(certificate_);
@@ -183,7 +179,7 @@ bool LoadCertificateMem(const unsigned char *buffer,
 /**
  * Loads a list of public RSA keys separated by ":".
  */
-bool LoadPublicRsaKeys(const string &path_list) {
+bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
   if (!public_keys_->empty()) {
     for (unsigned i = 0; i < public_keys_->size(); ++i)
       RSA_free((*public_keys_)[i]);
@@ -219,7 +215,7 @@ bool LoadPublicRsaKeys(const string &path_list) {
 /**
  * Loads a list of blacklisted certificates (fingerprints) from a file.
  */
-bool LoadBlacklist(const std::string &path_blacklist) {
+bool SignatureManager::LoadBlacklist(const std::string &path_blacklist) {
   blacklisted_certificates_->clear();
 
   char *buffer;
@@ -243,7 +239,7 @@ bool LoadBlacklist(const std::string &path_blacklist) {
 }
 
 
-vector<string> GetBlacklistedCertificates() {
+vector<string> SignatureManager::GetBlacklistedCertificates() {
   if (blacklisted_certificates_)
     return *blacklisted_certificates_;
   return vector<string>();
@@ -255,7 +251,7 @@ vector<string> GetBlacklistedCertificates() {
  * OpenSSL does (01:AB:...).
  * Empty string on failure.
  */
-string FingerprintCertificate() {
+string SignatureManager::FingerprintCertificate() {
   if (!certificate_) return "";
 
   int buffer_size;
@@ -281,7 +277,7 @@ string FingerprintCertificate() {
 /**
  * \return Some human-readable information about the loaded certificate.
  */
-string Whois() {
+string SignatureManager::Whois() {
   if (!certificate_) return "No certificate loaded";
 
   string result;
@@ -302,7 +298,9 @@ string Whois() {
 }
 
 
-bool WriteCertificateMem(unsigned char **buffer, unsigned *buffer_size) {
+bool SignatureManager::WriteCertificateMem(unsigned char **buffer,
+                                           unsigned *buffer_size)
+{
   BIO *mem = BIO_new(BIO_s_mem());
   if (!mem) return false;
   if (!PEM_write_bio_X509(mem, certificate_)) {
@@ -324,7 +322,7 @@ bool WriteCertificateMem(unsigned char **buffer, unsigned *buffer_size) {
  *
  * \return True, if private key and certificate match, false otherwise.
  */
-bool KeysMatch() {
+bool SignatureManager::KeysMatch() {
   if (!certificate_ || !private_key_)
     return false;
 
@@ -348,8 +346,10 @@ bool KeysMatch() {
  *
  * \return True on sucess, false otherwise
  */
-bool Sign(const unsigned char *buffer, const unsigned buffer_size,
-          unsigned char **signature, unsigned *signature_size)
+bool SignatureManager::Sign(const unsigned char *buffer,
+                            const unsigned buffer_size,
+                            unsigned char **signature,
+                            unsigned *signature_size)
 {
   if (!private_key_) {
     *signature_size = 0;
@@ -385,8 +385,10 @@ bool Sign(const unsigned char *buffer, const unsigned buffer_size,
  *
  * \return True if signature is valid, false on error or otherwise
  */
-bool Verify(const unsigned char *buffer, const unsigned buffer_size,
-            const unsigned char *signature, const unsigned signature_size)
+ bool SignatureManager::Verify(const unsigned char *buffer,
+                               const unsigned buffer_size,
+                               const unsigned char *signature,
+                               const unsigned signature_size)
 {
   if (!certificate_) return false;
 
@@ -412,8 +414,10 @@ bool Verify(const unsigned char *buffer, const unsigned buffer_size,
  *
  * \return True if signature is valid with any public key, false on error or otherwise
  */
-bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
-               const unsigned char *signature, const unsigned signature_size)
+bool SignatureManager::VerifyRsa(const unsigned char *buffer,
+                                 const unsigned buffer_size,
+                                 const unsigned char *signature,
+                                 const unsigned signature_size)
 {
   for (unsigned i = 0, s = public_keys_->size(); i < s; ++i) {
     if (buffer_size > (unsigned)RSA_size((*public_keys_)[i]))
@@ -448,8 +452,9 @@ bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
  *  <hash>
  *  <signature>
  */
-bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
-                  const bool by_rsa)
+bool SignatureManager::VerifyLetter(const unsigned char *buffer,
+                                    const unsigned buffer_size,
+                                    const bool by_rsa)
 {
   unsigned pos = 0;
   unsigned letter_length = 0;

@@ -226,12 +226,13 @@ class CatalogTraversal {
       const std::string url = repo_url_ + "/.cvmfspublished";
 
       // Initialize signature module
-      signature::Init();
-      const bool success = signature::LoadPublicRsaKeys(repo_keys_);
+      signature::SignatureManager signature_manager;
+      signature_manager.Init();
+      const bool success = signature_manager.LoadPublicRsaKeys(repo_keys_);
       if (!success) {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
           "cvmfs public key(s) could not be loaded.");
-        signature::Fini();
+        signature_manager.Fini();
         return NULL;
       }
 
@@ -242,10 +243,11 @@ class CatalogTraversal {
                                     repo_name_,
                                     0,
                                     NULL,
+                                    &signature_manager,
                                     &manifest_ensemble);
 
       // We don't need the signature module from now on
-      signature::Fini();
+      signature_manager.Fini();
 
       // Check if manifest was loaded correctly
       if (retval == manifest::kFailNameMismatch) {

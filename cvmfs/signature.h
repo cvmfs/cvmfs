@@ -8,38 +8,55 @@
 #include <string>
 #include <vector>
 #include <cstdio>
-#include "hash.h"
+
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/x509.h>
+#include <openssl/err.h>
+#include <openssl/bio.h>
+#include <openssl/rsa.h>
+#include <openssl/engine.h>
 
 namespace signature {
 
-void Init();
-void Fini();
-std::string GetCryptoError();
+class SignatureManager {
+ public:
+  SignatureManager();
 
-bool LoadPrivateKeyPath(const std::string &file_pem,
-                        const std::string &password);
-void UnloadPrivateKey();
+  void Init();
+  void Fini();
+  std::string GetCryptoError();
 
-bool LoadCertificatePath(const std::string &file_pem);
-bool LoadCertificateMem(const unsigned char *buffer,
-                        const unsigned buffer_size);
-bool WriteCertificateMem(unsigned char **buffer, unsigned *buffer_size);
-bool KeysMatch();
-std::string Whois();
-std::string FingerprintCertificate();
+  bool LoadPrivateKeyPath(const std::string &file_pem,
+                          const std::string &password);
+  void UnloadPrivateKey();
 
-bool LoadPublicRsaKeys(const std::string &path_list);
-bool LoadBlacklist(const std::string &path_blacklist);
-std::vector<std::string> GetBlacklistedCertificates();
+  bool LoadCertificatePath(const std::string &file_pem);
+  bool LoadCertificateMem(const unsigned char *buffer,
+                          const unsigned buffer_size);
+  bool WriteCertificateMem(unsigned char **buffer, unsigned *buffer_size);
+  bool KeysMatch();
+  std::string Whois();
+  std::string FingerprintCertificate();
 
-bool Sign(const unsigned char *buffer, const unsigned buffer_size,
-          unsigned char **signature, unsigned *signature_size);
-bool Verify(const unsigned char *buffer, const unsigned buffer_size,
-            const unsigned char *signature, unsigned signature_size);
-bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
-               const unsigned char *signature, unsigned signature_size);
-bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
-                  const bool by_rsa);
+  bool LoadPublicRsaKeys(const std::string &path_list);
+  bool LoadBlacklist(const std::string &path_blacklist);
+  std::vector<std::string> GetBlacklistedCertificates();
+
+  bool Sign(const unsigned char *buffer, const unsigned buffer_size,
+            unsigned char **signature, unsigned *signature_size);
+  bool Verify(const unsigned char *buffer, const unsigned buffer_size,
+              const unsigned char *signature, unsigned signature_size);
+  bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
+                 const unsigned char *signature, unsigned signature_size);
+  bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
+                    const bool by_rsa);
+ private:
+  EVP_PKEY *private_key_;
+  X509 *certificate_;
+  std::vector<RSA *> *public_keys_;  /**< Contains cvmfs public master keys */
+  std::vector<std::string> *blacklisted_certificates_;
+};  // class SignatureManager
 
 }  // namespace signature
 

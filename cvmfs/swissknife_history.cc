@@ -33,6 +33,7 @@ static bool IsRemote(const string &repository)
 static bool GetHistoryDbHash(const string &repository_url,
                              const string &repository_name,
                              const hash::Any &expected_root_hash,
+                             signature::SignatureManager *signature_manager,
                              hash::Any *historydb_hash)
 {
   manifest::ManifestEnsemble manifest_ensemble;
@@ -40,7 +41,7 @@ static bool GetHistoryDbHash(const string &repository_url,
   if (IsRemote(repository_url)) {
     manifest::Failures retval;
     retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
-                             &manifest_ensemble);
+                             signature_manager, &manifest_ensemble);
     if (retval != manifest::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest (%d)",
                retval);
@@ -135,8 +136,9 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   int retval;
 
   // Download & verify manifest
-  signature::Init();
-  retval = signature::LoadPublicRsaKeys(repository_key_path);
+  signature::SignatureManager signature_manager;
+  signature_manager.Init();
+  retval = signature_manager.LoadPublicRsaKeys(repository_key_path);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key %s",
              repository_key_path.c_str());
@@ -146,7 +148,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   int result = 1;
 
   retval = GetHistoryDbHash(repository_url, repository_name, base_hash,
-                            &history_hash);
+                            &signature_manager, &history_hash);
   if (!retval)
     goto tag_fini;
 
@@ -223,7 +225,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   result = 0;
 
  tag_fini:
-  signature::Fini();
+  signature_manager.Fini();
   download::Fini();
   return result;
 }
@@ -255,8 +257,9 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   int retval;
 
   // Download & verify manifest & history database
-  signature::Init();
-  retval = signature::LoadPublicRsaKeys(repository_key_path);
+  signature::SignatureManager signature_manager;
+  signature_manager.Init();
+  retval = signature_manager.LoadPublicRsaKeys(repository_key_path);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key %s",
              repository_key_path.c_str());
@@ -266,7 +269,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   int result = 1;
 
   retval = GetHistoryDbHash(repository_url, repository_name, base_hash,
-                            &history_hash);
+                            &signature_manager, &history_hash);
   if (!retval)
     goto rollback_fini;
 
@@ -366,7 +369,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
 
  rollback_fini:
   delete spooler;
-  signature::Fini();
+  signature_manager.Fini();
   download::Fini();
   return result;
 }

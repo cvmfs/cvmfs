@@ -626,11 +626,12 @@ int64_t GetNumDownloads() {
 
 
 CatalogManager::CatalogManager(const string &repo_name,
-                               const bool ignore_signature)
+                               signature::SignatureManager *signature_manager)
 {
   LogCvmfs(kLogCache, kLogDebug, "constructing cache catalog manager");
   repo_name_ = repo_name;
-  ignore_signature_ = ignore_signature;
+  //ignore_signature_ = ignore_signature;
+  signature_manager_ = signature_manager;
   offline_mode_ = false;
   loaded_inodes_ = all_inodes_ = 0;
   atomic_init32(&certificate_hits_);
@@ -830,7 +831,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   manifest::Failures manifest_failure;
   cache::ManifestEnsemble ensemble(this);
   manifest_failure = manifest::Fetch("", repo_name_, cache_last_modified,
-                                     &cache_hash, &ensemble);
+                                     &cache_hash, signature_manager_,
+                                     &ensemble);
   if (manifest_failure != manifest::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d)",
              manifest_failure);

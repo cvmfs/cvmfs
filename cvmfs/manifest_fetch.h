@@ -10,6 +10,7 @@
 
 #include "manifest.h"
 #include "hash.h"
+#include "signature.h"
 
 namespace manifest {
 
@@ -58,6 +59,7 @@ struct ManifestEnsemble {
 
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
                const uint64_t minimum_timestamp, const hash::Any *base_catalog,
+               signature::SignatureManager *signature_manager,
                ManifestEnsemble *ensemble);
 
 }  // namespace manifest

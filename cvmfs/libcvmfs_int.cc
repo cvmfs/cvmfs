@@ -116,6 +116,7 @@ pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 cache::CatalogManager *catalog_manager_;
+signature::SignatureManager *signature_manager_;
 lru::Md5PathCache *md5path_cache_ = NULL;
 
 atomic_int64 num_fs_open_;
@@ -510,8 +511,9 @@ int cvmfs_int_init(
   download::SetTimeout(cvmfs_opts_timeout, cvmfs_opts_timeout_direct);
   download_ready = true;
 
-  signature::Init();
-  if (!signature::LoadPublicRsaKeys(cvmfs_opts_pubkey))
+  cvmfs::signature_manager_ = new signature::SignatureManager();
+  cvmfs::signature_manager_->Init();
+  if (!cvmfs::signature_manager_->LoadPublicRsaKeys(cvmfs_opts_pubkey))
   {
     PrintError("failed to load public key(s)");
     goto cvmfs_cleanup;
@@ -522,7 +524,7 @@ int cvmfs_int_init(
   }
   signature_ready = true;
   if (!cvmfs_opts_blacklist.empty()) {
-    if (!signature::LoadBlacklist(cvmfs_opts_blacklist)) {
+    if (!cvmfs::signature_manager_->LoadBlacklist(cvmfs_opts_blacklist)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "failed to load blacklist");
       goto cvmfs_cleanup;
     }
@@ -531,7 +533,7 @@ int cvmfs_int_init(
   // Load initial file catalog
   cvmfs::catalog_manager_ = new
     cache::CatalogManager(*cvmfs::repository_name_,
-                          cvmfs_opts_ignore_signature);
+                          cvmfs::signature_manager_);
   if (!cvmfs_opts_root_hash.empty()) {
     retval = cvmfs::catalog_manager_->InitFixed(
       hash::Any(hash::kSha1, hash::HexPtr(string(cvmfs_opts_root_hash))));
@@ -588,7 +590,7 @@ void cvmfs_int_fini() {
   cvmfs::catalog_manager_ = NULL;
   cvmfs::md5path_cache_ = NULL;
 
-  if (signature_ready) signature::Fini();
+  if (signature_ready) cvmfs::signature_manager_->Fini();
   if (download_ready) download::Fini();
   if (monitor_ready) monitor::Fini();
   if (quota_ready) quota::Fini();
@@ -597,6 +599,9 @@ void cvmfs_int_fini() {
   if (fd_lockfile >= 0) UnlockFile(fd_lockfile);
   if (peers_ready) peers::Fini();
   tracer::Fini();
+
+  delete cvmfs::signature_manager_;
+  cvmfs::signature_manager_ = NULL;
 
   sqlite3_shutdown();
   free(sqlite_page_cache);

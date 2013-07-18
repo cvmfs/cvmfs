@@ -182,6 +182,7 @@ pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 catalog::InodeGenerationAnnotation *inode_annotation_ = NULL;
 cache::CatalogManager *catalog_manager_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
+signature::SignatureManager *signature_manager_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
@@ -2085,8 +2086,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   download::SetRetryParameters(max_retries, backoff_init, backoff_max);
   g_download_ready = true;
 
-  signature::Init();
-  if (!signature::LoadPublicRsaKeys(public_keys)) {
+  cvmfs::signature_manager_ = new signature::SignatureManager();
+  cvmfs::signature_manager_->Init();
+  if (!cvmfs::signature_manager_->LoadPublicRsaKeys(public_keys)) {
     *g_boot_error = "failed to load public key(s)";
     return loader::kFailSignature;
   } else {
@@ -2095,7 +2097,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   g_signature_ready = true;
   if (FileExists("/etc/cvmfs/blacklist")) {
-    if (!signature::LoadBlacklist("/etc/cvmfs/blacklist")) {
+    if (!cvmfs::signature_manager_->LoadBlacklist("/etc/cvmfs/blacklist")) {
       *g_boot_error = "failed to load blacklist";
       return loader::kFailSignature;
     }
@@ -2106,7 +2108,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
            sizeof(fuse_ino_t) * 8);
   cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
   cvmfs::catalog_manager_ =
-      new cache::CatalogManager(*cvmfs::repository_name_, ignore_signature);
+    new cache::CatalogManager(*cvmfs::repository_name_,
+                              cvmfs::signature_manager_);
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
@@ -2115,7 +2118,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Load specific tag (root hash has precedence)
   if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
     manifest::ManifestEnsemble ensemble;
-    retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL, &ensemble);
+    retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
+                             cvmfs::signature_manager_, &ensemble);
     if (retval != manifest::kFailOk) {
       *g_boot_error = "Failed to fetch manifest";
       return loader::kFailHistory;
@@ -2232,7 +2236,7 @@ static string GetErrorMsg() {
 static void Fini() {
   signal(SIGALRM, SIG_DFL);
   tracer::Fini();
-  if (g_signature_ready) signature::Fini();
+  if (g_signature_ready) cvmfs::signature_manager_->Fini();
   if (g_download_ready) download::Fini();
   if (g_talk_ready) talk::Fini();
   if (g_monitor_ready) monitor::Fini();
@@ -2253,6 +2257,7 @@ static void Fini() {
 
   delete cvmfs::remount_fence_;
   delete cvmfs::catalog_manager_;
+  delete cvmfs::signature_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::chunk_tables_;
@@ -2268,6 +2273,7 @@ static void Fini() {
   delete cvmfs::mountpoint_;
   cvmfs::remount_fence_ = NULL;
   cvmfs::catalog_manager_ = NULL;
+  cvmfs::signature_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::chunk_tables_ = NULL;

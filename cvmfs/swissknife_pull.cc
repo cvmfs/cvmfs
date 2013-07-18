@@ -284,6 +284,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   unsigned timeout = 10;
   int fd_lockfile = -1;
   manifest::ManifestEnsemble ensemble;
+  signature::SignatureManager signature_manager;
 
   // Option parsing
   if (args.find('l') != args.end()) {
@@ -357,8 +358,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download::SetTimeout(timeout, timeout);
   download::SetRetryParameters(retries, timeout, 3*timeout);
   download::Spawn();
-  signature::Init();
-  if (!signature::LoadPublicRsaKeys(master_keys)) {
+  signature_manager.Init();
+  if (!signature_manager.LoadPublicRsaKeys(master_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "cvmfs public master key could not be loaded.");
     goto fini;
@@ -368,7 +369,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
   }
 
-  retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL, &ensemble);
+  retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
+                           &signature_manager, &ensemble);
   if (retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
     goto fini;
@@ -484,7 +486,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (fd_lockfile >= 0)
     UnlockFile(fd_lockfile);
   free(workers);
-  signature::Fini();
+  signature_manager.Fini();
   download::Fini();
   delete spooler;
   return result;

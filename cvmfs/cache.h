@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "catalog_mgr.h"
+#include "signature.h"
 #include "file_chunk.h"
 #include "shortstring.h"
 #include "atomic.h"
@@ -55,7 +56,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
 
  public:
   CatalogManager(const std::string &repo_name,
-                 const bool ignore_signature);
+                 signature::SignatureManager *signature_manager);
   virtual ~CatalogManager() { };
 
   bool InitFixed(const hash::Any &root_hash);
@@ -97,7 +98,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   std::map<PathString, hash::Any> mounted_catalogs_;
 
   std::string repo_name_;
-  bool ignore_signature_;
+  signature::SignatureManager *signature_manager_;
   bool offline_mode_;  /**< cached copy used because there is no network */
   atomic_int32 certificate_hits_;
   atomic_int32 certificate_misses_;
