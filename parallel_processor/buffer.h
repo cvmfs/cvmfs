@@ -9,6 +9,8 @@
 #include <vector>
 #include <sys/types.h>
 
+#include <sstream> // TODO: remove
+#include "util.h"  // TODO: remove
 
 #define MEASURE_ALLOCATION_TIME
 static const uint64_t kTimeResolution = 1000000000;

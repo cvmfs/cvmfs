@@ -1,8 +1,10 @@
 #include "chunk.h"
 
 #include <sstream>
+#include <cstdio>
 
 #include "io_dispatcher.h"
+#include "file.h"
 
 void Chunk::ScheduleWrite(CharBuffer *buffer) {
   assert (buffer->used_bytes() > 0);
@@ -43,6 +45,7 @@ void Chunk::Done() {
 
 
 Chunk::Chunk(const Chunk &other) :
+  owning_file_(other.owning_file_),
   file_offset_(other.file_offset_),
   chunk_size_(other.chunk_size_),
   done_(other.done_),

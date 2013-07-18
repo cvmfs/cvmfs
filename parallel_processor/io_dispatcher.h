@@ -34,25 +34,23 @@ class IoDispatcher {
     };
 
     WriteJob() :
-      chunk(NULL), buffer(NULL), delete_buffer(true), job_type(TearDown) {}
+      chunk(NULL), buffer(NULL), delete_buffer(true),
+      type(TearDown) {}
 
     WriteJob(Chunk      *chunk,
              CharBuffer *buffer,
              const bool  delete_buffer) :
       chunk(chunk), buffer(buffer), delete_buffer(delete_buffer),
-      job_type(UploadChunk) {}
+      type(UploadChunk) {}
 
     WriteJob(Chunk *chunk) :
-      chunk(chunk), buffer(NULL), delete_buffer(false), job_type(CommitChunk) {}
-
-    bool IsUploadJob() const { return job_type == UploadChunk; }
-    bool IsCommitJob() const { return job_type == CommitChunk; }
-    bool IsTearDownJob() const { return job_type == TearDown; }
+      chunk(chunk), buffer(NULL), delete_buffer(false),
+      type(CommitChunk) {}
 
     Chunk       *chunk;
     CharBuffer  *buffer;
     bool         delete_buffer;
-    JobType      job_type;
+    JobType      type;
   };
 
  private:
@@ -81,7 +79,9 @@ class IoDispatcher {
     TearDown();
 
     pthread_mutex_destroy(&processing_done_mutex_);
+    pthread_mutex_destroy(&files_in_flight_mutex_);
     pthread_cond_destroy(&processing_done_condition_);
+    pthread_cond_destroy(&free_slot_condition_);
 
 #ifdef MEASURE_IO_TIME
     std::cout << "Reads took:  " << read_time_ << std::endl
@@ -109,7 +109,12 @@ class IoDispatcher {
   }
 
   void ScheduleRead(File *file) {
+    pthread_mutex_lock(&files_in_flight_mutex_);
+    while (files_in_flight_ > max_files_in_flight_) {
+      pthread_cond_wait(&free_slot_condition_, &files_in_flight_mutex_);
+    }
     ++files_in_flight_;
+    pthread_mutex_unlock(&files_in_flight_mutex_);
     ++file_count_;
     read_queue_.push(file);
   }
@@ -127,20 +132,21 @@ class IoDispatcher {
     write_queue_.push(WriteJob(chunk));
   }
 
-  void CommitFile(File *file) {
-    --files_in_flight_;
-  }
+  void CommitFile(File *file);
 
  protected:
   IoDispatcher() :
     read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
-    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread)
+    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
+    max_files_in_flight_(80) // TODO: make this configurable
   {
     files_in_flight_  = 0;
     chunks_in_flight_ = 0;
     file_count_       = 0;
     pthread_mutex_init(&processing_done_mutex_, NULL);
+    pthread_mutex_init(&files_in_flight_mutex_, NULL);
     pthread_cond_init(&processing_done_condition_, NULL);
+    pthread_cond_init(&free_slot_condition_, NULL);
   }
 
   void TearDown() {
@@ -161,7 +167,7 @@ class IoDispatcher {
   bool WriteBufferToChunk(Chunk       *chunk,
                           CharBuffer  *buffer,
                           const bool   delete_buffer);
-  bool CommitChunk(Chunk* chunk);
+  void CommitChunk(Chunk* chunk);
 
  private:
   tbb::atomic<unsigned int> files_in_flight_;
@@ -176,6 +182,10 @@ class IoDispatcher {
 
   tbb::tbb_thread read_thread_;
   tbb::tbb_thread write_thread_;
+
+  pthread_mutex_t files_in_flight_mutex_;
+  pthread_cond_t  free_slot_condition_;
+  unsigned int    max_files_in_flight_;
 
   pthread_mutex_t processing_done_mutex_;
   pthread_cond_t  processing_done_condition_;

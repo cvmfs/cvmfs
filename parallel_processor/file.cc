@@ -34,7 +34,7 @@ void File::CreateInitialChunk() {
   // if we are dealing with a file that will definitely _not_ be chunked, we
   // directly mark the initial chunk as being a bulk chunk
   const off_t offset        = 0;
-  Chunk *new_chunk = new Chunk(offset);
+  Chunk *new_chunk = new Chunk(this, offset);
 
   // for a potentially chunked file, the initial chunk needs to defer the write
   // back of data until a final decision has been made
@@ -68,7 +68,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   // will start at 'offset'
   latest_chunk->set_size(offset - latest_chunk->offset());
   Chunk *predecessor = latest_chunk;
-  AddChunk(new Chunk(offset));
+  AddChunk(new Chunk(this, offset));
 
   return predecessor;
 }
@@ -112,6 +112,9 @@ void File::Finalize() {
   assert (bulk_chunk_->offset() == 0);
   assert (bulk_chunk_->size()   == size_);
   assert (bulk_chunk_->IsFullyProcessed());
+
+  // notify about the finished file processing
+  IoDispatcher::Instance()->CommitFile(this);
 }
 
 
@@ -123,4 +126,11 @@ void File::ForkOffBulkChunk() {
 
   Chunk* bulk_chunk = latest_chunk->CopyAsBulkChunk(size_);
   AddChunk(bulk_chunk);
+}
+
+
+void File::ChunkCommitted(Chunk *chunk) {
+  if (++committed_chunks_ == chunks_.size() + 1) {
+    Finalize();
+  }
 }

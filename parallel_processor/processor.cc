@@ -155,14 +155,6 @@ tbb::task* FileScrubbingTask::execute() {
   WaitForProcessing();
   delete buffer_;
 
-  // if the last buffer was processed, we finalize the whole file
-  // (Note: this does not mean, that the IoDispatcher already uploaded all
-  //        chunk data)
-  if (is_last_buffer) {
-    file_->Finalize();
-    IoDispatcher::Instance()->CommitFile(file_);
-  }
-
   // go on with the next file buffer
   return Next();
 }

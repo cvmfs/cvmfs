@@ -24,7 +24,7 @@ class File {
        const platform_stat64  &info) :
     path_(path), size_(info.st_size),
     might_become_chunked_(size_ > kMinChunkSize),
-    bulk_chunk_(NULL)
+    bulk_chunk_(NULL), committed_chunks_(0)
   {
     CreateInitialChunk();
   }
@@ -43,9 +43,10 @@ class File {
   Chunk* CreateNextChunk(const off_t offset);
 
   void FinalizeLastChunk();
-  void Finalize();
 
   bool HasBulkChunk()          const { return bulk_chunk_ != NULL; }
+
+  void ChunkCommitted(Chunk *chunk);
 
   size_t size()                const { return size_;               }
   const std::string& path()    const { return path_;               }
@@ -65,6 +66,7 @@ class File {
   void AddChunk(Chunk *chunk);
   void CreateInitialChunk();
   void ForkOffBulkChunk();
+  void Finalize();
 
  private:
   const std::string  path_;
@@ -73,6 +75,7 @@ class File {
 
   ChunkVector        chunks_;
   Chunk             *bulk_chunk_;
+  unsigned int       committed_chunks_;
 };
 
 #endif /* FILE_H */
