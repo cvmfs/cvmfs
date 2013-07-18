@@ -136,9 +136,10 @@ class IoDispatcher {
 
  protected:
   IoDispatcher() :
+    tbb_workers_(8),
     read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
     write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
-    max_files_in_flight_(80) // TODO: make this configurable
+    max_files_in_flight_(tbb_workers_ * 10)
   {
     files_in_flight_  = 0;
     chunks_in_flight_ = 0;
@@ -170,6 +171,8 @@ class IoDispatcher {
   void CommitChunk(Chunk* chunk);
 
  private:
+  const unsigned int        tbb_workers_;
+
   tbb::atomic<unsigned int> files_in_flight_;
   tbb::atomic<unsigned int> chunks_in_flight_;
   tbb::atomic<unsigned int> file_count_;
