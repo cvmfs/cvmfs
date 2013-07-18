@@ -54,8 +54,8 @@ class SignatureManager {
  private:
   EVP_PKEY *private_key_;
   X509 *certificate_;
-  std::vector<RSA *> *public_keys_;  /**< Contains cvmfs public master keys */
-  std::vector<std::string> *blacklisted_certificates_;
+  std::vector<RSA *> public_keys_;  /**< Contains cvmfs public master keys */
+  std::vector<std::string> blacklisted_certificates_;
 };  // class SignatureManager
 
 }  // namespace signature

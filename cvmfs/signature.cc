@@ -37,15 +37,11 @@ const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch.pub";
 SignatureManager::SignatureManager() {
   private_key_ = NULL;
   certificate_ = NULL;
-  public_keys_ = NULL;
-  blacklisted_certificates_ = NULL;
 }
 
 
 void SignatureManager::Init() {
   OpenSSL_add_all_algorithms();
-  public_keys_ = new vector<RSA *>();
-  blacklisted_certificates_ = new vector<string>();
 }
 
 
@@ -54,18 +50,14 @@ void SignatureManager::Fini() {
   certificate_ = NULL;
   if (private_key_) EVP_PKEY_free(private_key_);
   private_key_ = NULL;
-  if (!public_keys_->empty()) {
-    for (unsigned i = 0; i < public_keys_->size(); ++i)
-      RSA_free((*public_keys_)[i]);
-    public_keys_->clear();
+  if (!public_keys_.empty()) {
+    for (unsigned i = 0; i < public_keys_.size(); ++i)
+      RSA_free(public_keys_[i]);
+    public_keys_.clear();
   }
   EVP_cleanup();
-  delete public_keys_;
-  delete blacklisted_certificates_;
   private_key_ = NULL;
   certificate_ = NULL;
-  public_keys_ = NULL;
-  blacklisted_certificates_ = NULL;
 }
 
 
@@ -180,10 +172,10 @@ bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
  * Loads a list of public RSA keys separated by ":".
  */
 bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
-  if (!public_keys_->empty()) {
-    for (unsigned i = 0; i < public_keys_->size(); ++i)
-      RSA_free((*public_keys_)[i]);
-    public_keys_->clear();
+  if (!public_keys_.empty()) {
+    for (unsigned i = 0; i < public_keys_.size(); ++i)
+      RSA_free(public_keys_[i]);
+    public_keys_.clear();
   }
 
   if (path_list == "")
@@ -202,9 +194,9 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
       return false;
     }
     fclose(fp);
-    public_keys_->push_back(EVP_PKEY_get1_RSA(this_key));
+    public_keys_.push_back(EVP_PKEY_get1_RSA(this_key));
     EVP_PKEY_free(this_key);
-    if ((*public_keys_)[i] == NULL)
+    if (public_keys_[i] == NULL)
       return false;
   }
 
@@ -216,7 +208,7 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
  * Loads a list of blacklisted certificates (fingerprints) from a file.
  */
 bool SignatureManager::LoadBlacklist(const std::string &path_blacklist) {
-  blacklisted_certificates_->clear();
+  blacklisted_certificates_.clear();
 
   char *buffer;
   unsigned buffer_size;
@@ -230,7 +222,7 @@ bool SignatureManager::LoadBlacklist(const std::string &path_blacklist) {
   while (num_bytes < buffer_size) {
     const string fingerprint = GetLineMem(buffer + num_bytes,
                                           buffer_size - num_bytes);
-    blacklisted_certificates_->push_back(fingerprint);
+    blacklisted_certificates_.push_back(fingerprint);
     num_bytes += fingerprint.length() + 1;
   }
   free(buffer);
@@ -240,9 +232,7 @@ bool SignatureManager::LoadBlacklist(const std::string &path_blacklist) {
 
 
 vector<string> SignatureManager::GetBlacklistedCertificates() {
-  if (blacklisted_certificates_)
-    return *blacklisted_certificates_;
-  return vector<string>();
+  return blacklisted_certificates_;
 }
 
 
@@ -419,16 +409,16 @@ bool SignatureManager::VerifyRsa(const unsigned char *buffer,
                                  const unsigned char *signature,
                                  const unsigned signature_size)
 {
-  for (unsigned i = 0, s = public_keys_->size(); i < s; ++i) {
-    if (buffer_size > (unsigned)RSA_size((*public_keys_)[i]))
+  for (unsigned i = 0, s = public_keys_.size(); i < s; ++i) {
+    if (buffer_size > (unsigned)RSA_size(public_keys_[i]))
       continue;
 
-    unsigned char *to = (unsigned char *)smalloc(RSA_size((*public_keys_)[i]));
+    unsigned char *to = (unsigned char *)smalloc(RSA_size(public_keys_[i]));
     unsigned char *from = (unsigned char *)smalloc(signature_size);
     memcpy(from, signature, signature_size);
 
     int size = RSA_public_decrypt(signature_size, from, to,
-                                  (*public_keys_)[i], RSA_PKCS1_PADDING);
+                                  public_keys_[i], RSA_PKCS1_PADDING);
     free(from);
     if ((size >= 0) && (unsigned(size) == buffer_size) &&
         (memcmp(buffer, to, size) == 0))
