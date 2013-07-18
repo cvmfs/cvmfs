@@ -21,7 +21,7 @@ class IoDispatcher;
 class Chunk {
  public:
   Chunk(const off_t offset) :
-    file_offset_(offset), chunk_size_(0),
+    file_offset_(offset), chunk_size_(0), is_bulk_chunk_(false),
     deferred_write_(false),
     zlib_initialized_(false),
     sha1_digest_(""), sha1_initialized_(false),
@@ -33,6 +33,7 @@ class Chunk {
   bool IsInitialized()     const { return zlib_initialized_ && sha1_initialized_; }
   bool HasFileDescriptor() const { return file_descriptor_ > 0;                   }
   bool IsFullyProcessed()  const { return done_;                                  }
+  bool IsBulkChunk()       const { return is_bulk_chunk_;                         }
 
   void Done();
   Chunk* CopyAsBulkChunk(const size_t file_size);
@@ -107,6 +108,7 @@ class Chunk {
   off_t                    file_offset_;
   size_t                   chunk_size_;
   tbb::atomic<bool>        done_;
+  bool                     is_bulk_chunk_;
 
   bool                     deferred_write_;
   std::vector<CharBuffer*> deferred_buffers_;

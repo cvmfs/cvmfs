@@ -191,8 +191,18 @@ bool IoDispatcher::CommitChunk(Chunk* chunk) {
   int retval = close(fd);
   assert (retval == 0);
 
-  retval = rename(path.c_str(), (output_path + "/" + chunk->sha1_string()).c_str());
+  const std::string final_path = output_path + "/" + chunk->sha1_string() +
+                                 ((! chunk->IsBulkChunk()) ? "P" : "");
+
+  retval = rename(path.c_str(), final_path.c_str());
   assert (retval == 0);
+
+  pthread_mutex_lock(&processing_done_mutex_);
+  if (--chunks_in_flight_ == 0 && files_in_flight_ == 0) {
+      pthread_cond_signal(&processing_done_condition_);
+
+  }
+  pthread_mutex_unlock(&processing_done_mutex_);
 
   return true;
 }
