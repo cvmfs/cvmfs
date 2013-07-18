@@ -46,10 +46,12 @@ void ChunkCompressor::Crunch(Chunk                *chunk,
     assert (retcode == Z_OK || retcode == Z_STREAM_END);
 
     const size_t bytes_produced = compress_buffer->size() - stream.avail_out;
-    compress_buffer->SetUsedBytes(bytes_produced);
-    compress_buffer->SetBaseOffset(chunk->compressed_size());
-    chunk->add_compressed_size(bytes_produced);
-    chunk->ScheduleWrite(compress_buffer);
+    if (bytes_produced > 0) {
+      compress_buffer->SetUsedBytes(bytes_produced);
+      compress_buffer->SetBaseOffset(chunk->compressed_size());
+      chunk->add_compressed_size(bytes_produced);
+      chunk->ScheduleWrite(compress_buffer);
+    }
 
     if ((flush == Z_NO_FLUSH && retcode == Z_OK) ||
         (flush == Z_FINISH   && retcode == Z_STREAM_END)) {
@@ -82,9 +84,9 @@ tbb::task* ChunkProcessingTask::execute() {
   const unsigned char *data = buffer_->ptr() + internal_offset;
 
   const size_t byte_count = (chunk_->size() == 0)
-    ? buffer_->used_bytes()
+    ? buffer_->used_bytes() - internal_offset
     :   std::min(buffer_->base_offset()  + buffer_->used_bytes(),
-                 chunk_->offset()         + chunk_->size())
+                 chunk_->offset()        + chunk_->size())
       - std::max(buffer_->base_offset(), chunk_->offset());
   assert (byte_count <= buffer_->used_bytes() - internal_offset);
 

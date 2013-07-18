@@ -10,7 +10,7 @@
 #include "util.h"
 
 
-const size_t IoDispatcher::kMaxBufferSize = 1048576;
+const size_t IoDispatcher::kMaxBufferSize = 512 * 1024;
 IoDispatcher* IoDispatcher::instance_ = NULL;
 
 void IoDispatcher::ReadThread() {
