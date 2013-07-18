@@ -14,8 +14,7 @@ const size_t IoDispatcher::kMaxBufferSize = 512 * 1024;
 IoDispatcher* IoDispatcher::instance_ = NULL;
 
 void IoDispatcher::ReadThread() {
-  tbb::task_scheduler_init sched(
-    tbb::task_scheduler_init::default_num_threads() + 1);
+  tbb::task_scheduler_init sched(tbb_workers_ + 1);
 
   while (true) {
     File *file;
