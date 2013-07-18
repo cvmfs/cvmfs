@@ -1644,6 +1644,31 @@ __attribute__ ((visibility ("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 
+static void LogSqliteError(void *user_data __attribute__((unused)),
+                           int sqlite_error, const char *message)
+{
+  int log_dest = kLogDebug;
+  if (((sqlite_error & SQLITE_INTERNAL) == SQLITE_INTERNAL) ||
+      ((sqlite_error & SQLITE_PERM) == SQLITE_PERM) ||
+      ((sqlite_error & SQLITE_NOMEM) == SQLITE_NOMEM) ||
+      ((sqlite_error & SQLITE_IOERR) == SQLITE_IOERR) ||
+      ((sqlite_error & SQLITE_CORRUPT) == SQLITE_CORRUPT) ||
+      ((sqlite_error & SQLITE_FULL) == SQLITE_FULL) ||
+      ((sqlite_error & SQLITE_CANTOPEN) == SQLITE_CANTOPEN) ||
+      ((sqlite_error & SQLITE_MISUSE) == SQLITE_MISUSE) ||
+      ((sqlite_error & SQLITE_FORMAT) == SQLITE_FORMAT) ||
+      ((sqlite_error & SQLITE_NOTADB) == SQLITE_NOTADB))
+  {
+    log_dest |= kLogSyslogErr;
+  } else if ((sqlite_error & SQLITE_WARNING) == SQLITE_WARNING) {
+    log_dest |= kLogSyslogWarn;
+  } else if ((sqlite_error & SQLITE_NOTICE) == SQLITE_NOTICE) {
+    log_dest |= kLogSyslog;
+  }
+  LogCvmfs(kLogCvmfs, log_dest, "SQlite3: %s (%d)", message, sqlite_error);
+}
+
+
 static int Init(const loader::LoaderExports *loader_exports) {
   int retval;
   g_boot_error = new string("unknown error");
@@ -1829,6 +1854,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Tune SQlite3
   sqlite3_shutdown();  // Make sure SQlite starts clean after initialization
+  retval = sqlite3_config(SQLITE_CONFIG_LOG, LogSqliteError, NULL);
+  assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
   g_sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)

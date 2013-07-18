@@ -1,4 +1,5 @@
 2.1.13:
+  * Connect SQlite logger to cvmfs logger
   * Switch to sqlite 3.7.17
   * Add check for accessibiliy of /etc/nsswitch.conf to
     cvmfs_config chksetup
