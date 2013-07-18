@@ -12,9 +12,9 @@ typedef std::vector<Chunk*> ChunkVector;
 
 
 
-static const size_t kMinChunkSize = 2 * 1024 * 1024;;
-static const size_t kAvgChunkSize = 4 * 1024 * 1024;;
-static const size_t kMaxChunkSize = 6 * 1024 * 1024;;
+static const size_t kMinChunkSize = 2 * 1024 * 1024;
+static const size_t kAvgChunkSize = 4 * 1024 * 1024;
+static const size_t kMaxChunkSize = 8 * 1024 * 1024;
 
 
 

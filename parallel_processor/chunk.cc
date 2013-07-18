@@ -5,6 +5,8 @@
 #include "io_dispatcher.h"
 
 void Chunk::ScheduleWrite(CharBuffer *buffer) {
+  assert (buffer->used_bytes() > 0);
+
   if (deferred_write_) {
     assert (! HasFileDescriptor());
     deferred_buffers_.push_back(buffer);
@@ -17,7 +19,6 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
 
 void Chunk::FlushDeferredWrites(const bool delete_buffers) {
   assert (deferred_write_);
-  assert (deferred_buffers_.size() > 0);
 
   std::vector<CharBuffer*>::const_iterator i    = deferred_buffers_.begin();
   std::vector<CharBuffer*>::const_iterator iend = deferred_buffers_.end();
@@ -73,7 +74,6 @@ Chunk::Chunk(const Chunk &other) :
 Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
   assert (! done_);
   assert (deferred_write_);
-  assert (deferred_buffers_.size() > 0);
   assert (! HasFileDescriptor());
   assert (file_offset_ == 0);
 
