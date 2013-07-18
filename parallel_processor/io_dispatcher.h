@@ -80,6 +80,9 @@ class IoDispatcher {
     Wait();
     TearDown();
 
+    pthread_mutex_destroy(&processing_done_mutex_);
+    pthread_cond_destroy(&processing_done_condition_);
+
 #ifdef MEASURE_IO_TIME
     std::cout << "Reads took:  " << read_time_ << std::endl
               << "  average:   " << (read_time_ / file_count_) << std::endl
@@ -94,7 +97,15 @@ class IoDispatcher {
   }
 
   void Wait() {
-    // Here we go tomorrow!
+    pthread_mutex_lock(&processing_done_mutex_);
+    while (files_in_flight_ > 0 || chunks_in_flight_ > 0) {
+      pthread_cond_wait(&processing_done_condition_, &processing_done_mutex_);
+    }
+    pthread_mutex_unlock(&processing_done_mutex_);
+  }
+
+  void RegisterChunk(Chunk *chunk) {
+    ++chunks_in_flight_;
   }
 
   void ScheduleRead(File *file) {
@@ -125,9 +136,11 @@ class IoDispatcher {
     read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
     write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread)
   {
-    file_count_      = 0;
-    files_in_flight_ = 0;
-    all_enqueued_    = false;
+    files_in_flight_  = 0;
+    chunks_in_flight_ = 0;
+    file_count_       = 0;
+    pthread_mutex_init(&processing_done_mutex_, NULL);
+    pthread_cond_init(&processing_done_condition_, NULL);
   }
 
   void TearDown() {
@@ -152,7 +165,7 @@ class IoDispatcher {
 
  private:
   tbb::atomic<unsigned int> files_in_flight_;
-  tbb::atomic<bool>         all_enqueued_;
+  tbb::atomic<unsigned int> chunks_in_flight_;
   tbb::atomic<unsigned int> file_count_;
 
   double read_time_;
@@ -163,6 +176,9 @@ class IoDispatcher {
 
   tbb::tbb_thread read_thread_;
   tbb::tbb_thread write_thread_;
+
+  pthread_mutex_t processing_done_mutex_;
+  pthread_cond_t  processing_done_condition_;
 };
 
 

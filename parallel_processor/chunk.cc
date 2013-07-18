@@ -45,6 +45,7 @@ Chunk::Chunk(const Chunk &other) :
   file_offset_(other.file_offset_),
   chunk_size_(other.chunk_size_),
   done_(other.done_),
+  is_bulk_chunk_(other.is_bulk_chunk_),
   deferred_write_(other.deferred_write_),
   deferred_buffers_(other.deferred_buffers_),
   zlib_initialized_(false),
@@ -80,6 +81,7 @@ Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
   new_bulk_chunk->set_size(file_size);
   const bool should_delete_buffers = false;
   new_bulk_chunk->FlushDeferredWrites(should_delete_buffers);
+  new_bulk_chunk->is_bulk_chunk_ = true;
 
   // upload all previously generated buffers _without_ deleting them, they will
   // be needed for the copied bulk chunk as well

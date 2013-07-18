@@ -137,7 +137,8 @@ tbb::task* FileScrubbingTask::execute() {
 
   // if we reached the last buffer this input file will produce all but the
   // last created chunk will be fully defined at this point
-  if (IsLastBuffer()) {
+  const bool is_last_buffer = IsLastBuffer();
+  if (is_last_buffer) {
     file_->FinalizeLastChunk();
   }
 
@@ -147,16 +148,15 @@ tbb::task* FileScrubbingTask::execute() {
 
   // wait for all scheduled chunk processing tasks on the current buffer
   WaitForProcessing();
+  delete buffer_;
 
   // if the last buffer was processed, we finalize the whole file
   // (Note: this does not mean, that the IoDispatcher already uploaded all
   //        chunk data)
-  if (IsLastBuffer()) {
+  if (is_last_buffer) {
     file_->Finalize();
     IoDispatcher::Instance()->CommitFile(file_);
   }
-
-  delete buffer_;
 
   // go on with the next file buffer
   return Next();

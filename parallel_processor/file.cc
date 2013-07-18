@@ -1,7 +1,7 @@
 #include "file.h"
 
 #include "chunk.h"
-
+#include "io_dispatcher.h"
 
 File::~File() {
   if (bulk_chunk_ != NULL) {
@@ -42,6 +42,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   // create and register a new chunk
   Chunk *predecessor = current_chunk_;
   current_chunk_ = new Chunk(offset);
+  IoDispatcher::Instance()->RegisterChunk(current_chunk_);
   if (creates_initial_chunk && might_become_chunked_) {
     assert (offset == 0);
     current_chunk_->EnableDeferredWrite();
@@ -99,4 +100,5 @@ void File::CreateBulkChunk() {
   assert (bulk_chunk_              == NULL);
   assert (current_chunk_->offset() == 0 && current_chunk_->size() == 0);
   bulk_chunk_ = current_chunk_->CopyAsBulkChunk(size_);
+  IoDispatcher::Instance()->RegisterChunk(bulk_chunk_);
 }

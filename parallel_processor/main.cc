@@ -51,10 +51,10 @@ int main() {
   std::cout << "leaked buffers:   " << CharBuffer::active_instances_ << std::endl;
 #endif
 
+  IoDispatcher::Destroy();
+
   all_end = tbb::tick_count::now();
   std::cout << "overall time:     " << (all_end - all_start).seconds() << " seconds" << std::endl;
-
-  IoDispatcher::Destroy();
 
   return 0;
 }
