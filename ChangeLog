@@ -1,4 +1,6 @@
 2.1.13:
+  * Add check for accessibiliy of /etc/nsswitch.conf to
+    cvmfs_config chksetup
   * Add experimental support for overlayfs as an alternative to
     aufs
   * Enforce hard limit on number of concurrent HTTP connections
