@@ -35,6 +35,7 @@ class Chunk {
   bool IsFullyProcessed()  const { return done_;                                  }
 
   void Done();
+  Chunk* CopyAsBulkChunk(const size_t file_size);
 
   void ScheduleWrite(CharBuffer *buffer);
 
@@ -96,9 +97,11 @@ class Chunk {
     sha1_initialized_ = true;
   }
 
+  void FlushDeferredWrites(const bool delete_buffers = true);
+
  private:
-  Chunk(const Chunk &other)            { assert (false); } // don't copy
-  Chunk& operator=(const Chunk &other) { assert (false); }
+  Chunk(const Chunk &other);
+  Chunk& operator=(const Chunk &other) { assert (false); }  // don't copy assign
 
  private:
   off_t                    file_offset_;

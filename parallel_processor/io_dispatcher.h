@@ -8,6 +8,8 @@
 #include <tbb/task_scheduler_init.h>
 #include <tbb/tbb_thread.h>
 
+#include <pthread.h>
+
 #include <iostream> // TODO: remove
 
 #include "buffer.h"
@@ -23,6 +25,35 @@ class IoDispatcher {
  protected:
   static const size_t kMaxBufferSize;
   typedef void (IoDispatcher:: *MethodPtr)();
+
+  struct WriteJob {
+    enum JobType {
+      UploadChunk,
+      CommitChunk,
+      TearDown
+    };
+
+    WriteJob() :
+      chunk(NULL), buffer(NULL), delete_buffer(true), job_type(TearDown) {}
+
+    WriteJob(Chunk      *chunk,
+             CharBuffer *buffer,
+             const bool  delete_buffer) :
+      chunk(chunk), buffer(buffer), delete_buffer(delete_buffer),
+      job_type(UploadChunk) {}
+
+    WriteJob(Chunk *chunk) :
+      chunk(chunk), buffer(NULL), delete_buffer(false), job_type(CommitChunk) {}
+
+    bool IsUploadJob() const { return job_type == UploadChunk; }
+    bool IsCommitJob() const { return job_type == CommitChunk; }
+    bool IsTearDownJob() const { return job_type == TearDown; }
+
+    Chunk       *chunk;
+    CharBuffer  *buffer;
+    bool         delete_buffer;
+    JobType      job_type;
+  };
 
  private:
   static IoDispatcher* instance_;
@@ -47,6 +78,7 @@ class IoDispatcher {
 
   ~IoDispatcher() {
     Wait();
+    TearDown();
 
 #ifdef MEASURE_IO_TIME
     std::cout << "Reads took:  " << read_time_ << std::endl
@@ -62,30 +94,30 @@ class IoDispatcher {
   }
 
   void Wait() {
-    all_enqueued_ = true;
-
-    read_queue_.push(NULL);
-
-    if (read_thread_.joinable()) {
-      read_thread_.join();
-    }
-
-    if (write_thread_.joinable()) {
-      write_thread_.join();
-    }
+    // Here we go tomorrow!
   }
 
   void ScheduleRead(File *file) {
-    read_queue_.push(file);
+    ++files_in_flight_;
     ++file_count_;
+    read_queue_.push(file);
   }
 
-  void ScheduleWrite(Chunk *chunk, CharBuffer *buffer) {
-    write_queue_.push(std::make_pair(chunk, buffer));
+  void ScheduleWrite(Chunk       *chunk,
+                     CharBuffer  *buffer,
+                     const bool   delete_buffer = true) {
+    assert (buffer != NULL && chunk != NULL);
+    assert (buffer->used_bytes() > 0);
+    write_queue_.push(WriteJob(chunk, buffer, delete_buffer));
   }
 
   void ScheduleCommit(Chunk *chunk) {
-    write_queue_.push(std::make_pair(chunk, static_cast<CharBuffer*>(NULL)));
+    assert (chunk != NULL);
+    write_queue_.push(WriteJob(chunk));
+  }
+
+  void CommitFile(File *file) {
+    --files_in_flight_;
   }
 
  protected:
@@ -98,11 +130,24 @@ class IoDispatcher {
     all_enqueued_    = false;
   }
 
+  void TearDown() {
+    assert(read_thread_.joinable());
+    assert(write_thread_.joinable());
+
+    read_queue_.push(NULL);
+    write_queue_.push(WriteJob());
+
+    read_thread_.join();
+    write_thread_.join();
+  }
+
   void ReadThread();
   void WriteThread();
 
   bool ReadFileAndSpawnTasks(File *file);
-  bool WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer);
+  bool WriteBufferToChunk(Chunk       *chunk,
+                          CharBuffer  *buffer,
+                          const bool   delete_buffer);
   bool CommitChunk(Chunk* chunk);
 
  private:
@@ -113,8 +158,8 @@ class IoDispatcher {
   double read_time_;
   double write_time_;
 
-  tbb::concurrent_bounded_queue<File*> read_queue_;
-  tbb::concurrent_bounded_queue<std::pair<Chunk*, CharBuffer*> > write_queue_;
+  tbb::concurrent_bounded_queue<File*>     read_queue_;
+  tbb::concurrent_bounded_queue<WriteJob>  write_queue_;
 
   tbb::tbb_thread read_thread_;
   tbb::tbb_thread write_thread_;

@@ -3,11 +3,6 @@
 #include "chunk.h"
 
 
-
-
-
-
-
 File::~File() {
   if (bulk_chunk_ != NULL) {
     delete bulk_chunk_;
@@ -103,5 +98,5 @@ void File::CreateBulkChunk() {
   assert (current_chunk_           != NULL);
   assert (bulk_chunk_              == NULL);
   assert (current_chunk_->offset() == 0 && current_chunk_->size() == 0);
-  assert (false);
+  bulk_chunk_ = current_chunk_->CopyAsBulkChunk(size_);
 }
