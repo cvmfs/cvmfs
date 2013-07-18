@@ -4,7 +4,7 @@
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
 else
-  echo "/etc/cvmfs/config.sh mising"
+  echo "/etc/cvmfs/config.sh missing"
   exit 1
 fi
 

@@ -143,8 +143,8 @@ void SyncMediator::EnterDirectory(SyncItem &entry) {
 void SyncMediator::LeaveDirectory(SyncItem &entry)
 {
   CompleteHardlinks(entry);
-	AddLocalHardlinkGroups(GetHardlinkMap());
-	hardlink_stack_.pop();
+  AddLocalHardlinkGroups(GetHardlinkMap());
+  hardlink_stack_.pop();
 }
 
 
@@ -160,7 +160,8 @@ manifest::Manifest *SyncMediator::Commit() {
   if (!hardlink_queue_.empty()) {
     LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
     params_->spooler->UnregisterListeners();
-    params_->spooler->RegisterListener(&SyncMediator::PublishHardlinksCallback, this);
+    params_->spooler->RegisterListener(&SyncMediator::PublishHardlinksCallback,
+                                       this);
 
     // TODO: Revise that for Thread Safety!
     //       This loop will spool hardlinks into the spooler, which will then
