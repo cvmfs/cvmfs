@@ -8,7 +8,7 @@
 
 #include <iostream> // TODO: remove
 
-static const std::string input_path =  "/Volumes/ramdisk/input/onefile";
+static const std::string input_path =  "../../big_benchmark";
 static const std::string output_path = "/Volumes/ramdisk/output";
 
 static pthread_mutex_t mutex;

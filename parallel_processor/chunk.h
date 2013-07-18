@@ -17,15 +17,15 @@
 #include "buffer.h"
 
 class IoDispatcher;
+class File;
 
 class Chunk {
  public:
-  Chunk(const off_t offset) :
-    file_offset_(offset), chunk_size_(0), is_bulk_chunk_(false),
-    deferred_write_(false),
-    zlib_initialized_(false),
-    sha1_digest_(""), sha1_initialized_(false),
-    file_descriptor_(0), bytes_written_(0)
+  Chunk(File* owning_file, const off_t offset) :
+    owning_file_(owning_file), file_offset_(offset), chunk_size_(0),
+    is_bulk_chunk_(false), deferred_write_(false), zlib_initialized_(false),
+    sha1_digest_(""), sha1_initialized_(false), file_descriptor_(0),
+    bytes_written_(0)
   {
     Initialize();
   }
@@ -37,6 +37,7 @@ class Chunk {
   bool IsFullyDefined()    const { return chunk_size_ > 0;                        }
 
   void Done();
+  void Commit();
   Chunk* CopyAsBulkChunk(const size_t file_size);
   void SetAsBulkChunk() { is_bulk_chunk_ = true; }
 
@@ -47,16 +48,14 @@ class Chunk {
     deferred_write_ = true;
   }
 
+  File*          owning_file()            const { return owning_file_;        }
   off_t          offset()                 const { return file_offset_;        }
   size_t         size()                   const { return chunk_size_;         }
   void       set_size(const size_t size)        { chunk_size_ = size;         }
-  std::string    sha1_string()            const {
-    assert (IsFullyProcessed());
-    return ShaToString(sha1_digest_);
-  }
 
   SHA_CTX&       sha1_context()                 { return sha1_context_;       }
   unsigned char* sha1_digest()                  { return sha1_digest_;        }
+  std::string    sha1_string() const      { return ShaToString(sha1_digest_); }
 
   z_stream&      zlib_context()                 { return zlib_context_;       }
 
@@ -107,6 +106,7 @@ class Chunk {
   Chunk& operator=(const Chunk &other) { assert (false); }  // don't copy assign
 
  private:
+  File                    *owning_file_;
   off_t                    file_offset_;
   size_t                   chunk_size_;
   tbb::atomic<bool>        done_;

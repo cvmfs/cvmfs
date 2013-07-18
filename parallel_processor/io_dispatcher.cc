@@ -37,25 +37,35 @@ void IoDispatcher::ReadThread() {
 
 
 void IoDispatcher::WriteThread() {
-  while (true) {
+  bool running = true;
+
+  while (running) {
     WriteJob write_job;
     write_queue_.pop(write_job);
 
-    if (write_job.IsTearDownJob()) {
-      break;
-    } else if (write_job.IsCommitJob()) {
-      CommitChunk(write_job.chunk);
-    } else {
-#ifdef MEASURE_IO_TIME
-    tbb::tick_count start = tbb::tick_count::now();
-#endif
-      WriteBufferToChunk(write_job.chunk,
-                         write_job.buffer,
-                         write_job.delete_buffer);
-#ifdef MEASURE_IO_TIME
-    tbb::tick_count end = tbb::tick_count::now();
-    write_time_ += (end - start).seconds();
-#endif
+    switch (write_job.type) {
+      case WriteJob::TearDown:
+        running = false;
+        break;
+      case WriteJob::CommitChunk:
+        CommitChunk(write_job.chunk);
+        break;
+      case WriteJob::UploadChunk:
+      {
+    #ifdef MEASURE_IO_TIME
+        tbb::tick_count start = tbb::tick_count::now();
+    #endif
+          WriteBufferToChunk(write_job.chunk,
+                             write_job.buffer,
+                             write_job.delete_buffer);
+    #ifdef MEASURE_IO_TIME
+        tbb::tick_count end = tbb::tick_count::now();
+        write_time_ += (end - start).seconds();
+    #endif
+      }
+        break;
+      default:
+        assert (false);
     }
   }
 }
@@ -179,28 +189,35 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
 }
 
 
-bool IoDispatcher::CommitChunk(Chunk* chunk) {
+void IoDispatcher::CommitChunk(Chunk* chunk) {
   assert (chunk->IsFullyProcessed());
   assert (chunk->HasFileDescriptor());
   assert (chunk->bytes_written() == chunk->compressed_size());
 
-  const int          fd   = chunk->file_descriptor();
-  const std::string &path = chunk->temporary_path();
-  int retval = close(fd);
+  int retval = close(chunk->file_descriptor());
   assert (retval == 0);
 
   const std::string final_path = output_path + "/" + chunk->sha1_string() +
                                  ((! chunk->IsBulkChunk()) ? "P" : "");
 
-  retval = rename(path.c_str(), final_path.c_str());
+  retval = rename(chunk->temporary_path().c_str(), final_path.c_str());
   assert (retval == 0);
+
+  chunk->owning_file()->ChunkCommitted(chunk);
 
   pthread_mutex_lock(&processing_done_mutex_);
   if (--chunks_in_flight_ == 0 && files_in_flight_ == 0) {
       pthread_cond_signal(&processing_done_condition_);
-
   }
   pthread_mutex_unlock(&processing_done_mutex_);
+}
 
-  return true;
+
+void IoDispatcher::CommitFile(File *file) {
+  pthread_mutex_lock(&files_in_flight_mutex_);
+  if (--files_in_flight_ < max_files_in_flight_ / 2) {
+    pthread_cond_signal(&free_slot_condition_);
+  }
+  pthread_mutex_unlock(&files_in_flight_mutex_);
+  delete file;
 }
