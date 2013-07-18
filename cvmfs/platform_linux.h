@@ -18,10 +18,6 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include <attr/xattr.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #include <cassert>
 
 #include <cstring>
@@ -29,13 +25,6 @@
 #include <cstdlib>
 
 #include "smalloc.h"
-
-#ifdef DEBUGMSG
-#include <stdio.h>
-void perror(const char *s);
-#include <errno.h>
-int errno;
-#endif
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -141,26 +130,6 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
   value->assign(static_cast<const char *>(buffer), size);
   free(buffer);
   return true;
-}
-
-inline std::string platform_lgetxattr_buflen(std::string const& path, 
-					     std::string const& name, 
-					     size_t buf_len) 
-{
-  char *buf;
-  buf = static_cast<char *>(alloca(buf_len+1));
-  
-  ssize_t len = ::lgetxattr(path.c_str(), name.c_str(), buf, buf_len-1);
-  if (len != -1) {
-    buf[len] = '\0';
-    return std::string(buf);
-  } else {
-    // error
-#ifdef DEBUGMSG
-    printf("platform_lgetxattr_buflen error reading xattr [%s] from [%s]: %s\n", name.c_str(), path.c_str(), strerror(errno));
-#endif
-    return std::string();
-  }
 }
 
 inline void platform_disable_kcache(int filedes) {

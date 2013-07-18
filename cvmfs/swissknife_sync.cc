@@ -139,7 +139,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
 int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   const string file_to_peek = *args.find('d')->second;
   const string spooler_definition = *args.find('r')->second;
-  
+
   const upload::SpoolerDefinition sd(spooler_definition);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
@@ -226,7 +226,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
 
-  if (args.find('f') != args.end()) 
+  if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
@@ -271,13 +271,18 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                     params.stratum0, params.dir_temp, params.spooler);
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
-  if (params.union_fs_type == "overlayfs")
+  if (params.union_fs_type == "overlayfs") {
     sync = new publish::SyncUnionOverlayfs(&mediator, params.dir_rdonly, params.dir_union,
-					   params.dir_scratch);
-  else
+                                           params.dir_scratch);
+  } else if (params.union_fs_type == "aufs") {
     sync = new publish::SyncUnionAufs(&mediator, params.dir_rdonly, params.dir_union,
-				      params.dir_scratch);
-  
+                                      params.dir_scratch);
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
+             params.union_fs_type.c_str());
+    return 3;
+  }
+
   sync->Traverse();
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest = mediator.Commit();

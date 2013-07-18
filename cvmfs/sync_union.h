@@ -24,7 +24,7 @@
  * for internal bookkeeping which should be ignored.
  *
  * Classes that derive from UnionSync implement the specifics of a concrete
- * union file system (e.g. AUFS1, overlayfs).
+ * union file system (e.g. AUFS, overlayfs).
  */
 
 #ifndef CVMFS_SYNC_UNION_H_
@@ -32,9 +32,6 @@
 
 #include <string>
 #include <set>
-
-#include "platform.h"
-#include "logging.h"
 
 namespace publish {
 
@@ -169,7 +166,7 @@ class SyncUnion {
 
 
 /**
- * Syncing a CVMFS repository by the help of an overlayed AUFS
+ * Syncing a cvmfs repository by the help of an overlayed AUFS
  * read-write volume.
  */
 class SyncUnionAufs : public SyncUnion {
@@ -193,8 +190,9 @@ class SyncUnionAufs : public SyncUnion {
   std::string whiteout_prefix_;
 };  // class SyncUnionAufs
 
+
 /**
- * Syncing a CVMFS repository by the help of an overlayed overlayfs
+ * Syncing a cvmfs repository by the help of an overlayed overlayfs
  * read-write volume.
  */
 class SyncUnionOverlayfs : public SyncUnion {
@@ -207,8 +205,9 @@ class SyncUnionOverlayfs : public SyncUnion {
   void Traverse();
   void ProcessFileHardlinkCallback(const std::string &parent_dir,
                                    const std::string &filename);
-  static bool ReadlinkEquals(std::string const &path, std::string const &compare_value);
-  static bool XattrEquals(std::string const &path, std::string const &attr_name, 
+  static bool ReadlinkEquals(std::string const &path,
+                             std::string const &compare_value);
+  static bool XattrEquals(std::string const &path, std::string const &attr_name,
                           std::string const &compare_value);
 
  protected:
@@ -225,7 +224,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   bool IsOpaqueDirPath(const std::string &path) const;
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
-
 };  // class SyncUnionOverlayfs
 
 }  // namespace publish

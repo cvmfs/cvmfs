@@ -131,12 +131,6 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
   return true;
 }
 
-inline std::string platform_lgetxattr_buflen(std::string const& path, std::string const& name, size_t buf_len) {
-  // this is only needed by overlayfs which is not supported on OSX
-  // it could however be implemeted using getxattr with options XATTR_NOFOLLOW
-  assert(false);
-}
-
 inline void platform_disable_kcache(int filedes) {
   fcntl(filedes, F_RDAHEAD, 0);
   fcntl(filedes, F_NOCACHE, 1);
