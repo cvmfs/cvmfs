@@ -121,8 +121,8 @@ class SmallHashBase {
     *max_collisions = max_collisions_;
   }
 
-  // Careful with the direct access
-  uint32_t size() const { return size_; }
+  // Careful with the direct access TODO: iterator
+  uint32_t capacity() const { return capacity_; }
   Key empty_key() const { return empty_key_; }
   Key *keys() const { return keys_; }
   Value *values() const { return values_; }
