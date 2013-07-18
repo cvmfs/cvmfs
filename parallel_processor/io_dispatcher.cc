@@ -24,8 +24,6 @@ void IoDispatcher::ReadThread() {
       break;
     }
 
-    ++files_in_flight_;
-
 #ifdef MEASURE_IO_TIME
     tbb::tick_count start = tbb::tick_count::now();
 #endif
@@ -40,27 +38,24 @@ void IoDispatcher::ReadThread() {
 
 void IoDispatcher::WriteThread() {
   while (true) {
-    std::pair<Chunk*, CharBuffer*> writable_item;
-    write_queue_.pop(writable_item);
-    Chunk       *chunk  = writable_item.first;
-    CharBuffer  *buffer = writable_item.second;
-    assert (chunk != NULL);
+    WriteJob write_job;
+    write_queue_.pop(write_job);
 
-    if (buffer == NULL) {
-      CommitChunk(chunk);
+    if (write_job.IsTearDownJob()) {
+      break;
+    } else if (write_job.IsCommitJob()) {
+      CommitChunk(write_job.chunk);
     } else {
 #ifdef MEASURE_IO_TIME
     tbb::tick_count start = tbb::tick_count::now();
 #endif
-      WriteBufferToChunk(chunk, buffer);
+      WriteBufferToChunk(write_job.chunk,
+                         write_job.buffer,
+                         write_job.delete_buffer);
 #ifdef MEASURE_IO_TIME
     tbb::tick_count end = tbb::tick_count::now();
     write_time_ += (end - start).seconds();
 #endif
-    }
-
-    if (files_in_flight_ == 0 && all_enqueued_) {
-      break;
     }
   }
 }
@@ -141,7 +136,14 @@ bool IoDispatcher::ReadFileAndSpawnTasks(File *file) {
 }
 
 
-bool IoDispatcher::WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer) {
+bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
+                                      CharBuffer  *buffer,
+                                      const bool   delete_buffer) {
+  assert (chunk != NULL);
+  assert (buffer != NULL);
+  assert (chunk->IsInitialized());
+  assert (buffer->IsInitialized());
+
   if (! chunk->HasFileDescriptor()) {
     const std::string file_path = output_path + "/" + "chunk.XXXXXXX";
     char *tmp_file = strdupa(file_path.c_str());
@@ -170,7 +172,10 @@ bool IoDispatcher::WriteBufferToChunk(Chunk* chunk, CharBuffer *buffer) {
     return false;
   }
   chunk->add_bytes_written(bytes_written);
-  delete buffer;
+
+  if (delete_buffer) {
+    delete buffer;
+  }
 
   return true;
 }
@@ -188,8 +193,6 @@ bool IoDispatcher::CommitChunk(Chunk* chunk) {
 
   retval = rename(path.c_str(), (output_path + "/" + chunk->sha1_string()).c_str());
   assert (retval == 0);
-
-  --files_in_flight_;
 
   return true;
 }

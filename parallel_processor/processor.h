@@ -134,9 +134,7 @@ class FileScrubbingTask : public tbb::task {
     wait_for_all();
   }
 
-  CutMarks FindNextChunkCutMarks() {
-    return CutMarks();
-  }
+  CutMarks FindNextChunkCutMarks();
 
   tbb::task* Next() {
     return (next_ != NULL && next_->decrement_ref_count() == 0)

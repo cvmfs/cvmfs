@@ -145,20 +145,38 @@ tbb::task* FileScrubbingTask::execute() {
   // reaches beyond the current buffer or to the end of the file
   Process(file_->current_chunk());
 
-  // wait for all scheduled chunk processing on the current buffer to be
-  // finished and get rid of the buffer
+  // wait for all scheduled chunk processing tasks on the current buffer
   WaitForProcessing();
-  delete buffer_;
 
   // if the last buffer was processed, we finalize the whole file
   // (Note: this does not mean, that the IoDispatcher already uploaded all
   //        chunk data)
   if (IsLastBuffer()) {
     file_->Finalize();
+    IoDispatcher::Instance()->CommitFile(file_);
   }
+
+  delete buffer_;
 
   // go on with the next file buffer
   return Next();
+}
+
+FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
+  const Chunk *current_chunk = file_->current_chunk();
+  assert (current_chunk->size() == 0);
+  assert (current_chunk->offset() <= buffer_->base_offset());
+  assert (current_chunk->offset() <  buffer_->base_offset() + buffer_->used_bytes());
+
+  CutMarks result;
+  off_t next_cutmark = current_chunk->offset() + kMinChunkSize;
+  while (next_cutmark < buffer_->base_offset() + buffer_->used_bytes()) {
+    assert (next_cutmark >= buffer_->base_offset());
+    result.push_back(next_cutmark);
+    next_cutmark += kMinChunkSize;
+  }
+
+  return result;
 }
 
 
