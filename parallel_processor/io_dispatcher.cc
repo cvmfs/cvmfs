@@ -102,9 +102,7 @@ bool IoDispatcher::ReadFileAndSpawnTasks(File *file) {
     // Note: the last task for any given file does not need to wait for a
     //       synchronisation task since it has no successor.
     FileScrubbingTask  *new_task =
-      new(tbb::task::allocate_root()) FileScrubbingTask(file,
-                                                        buffer,
-                                                        this);
+      new(tbb::task::allocate_root()) FileScrubbingTask(file, buffer);
     new_task->increment_ref_count();
     tbb::task *sync_task = new(new_task->allocate_child()) tbb::empty_task();
 

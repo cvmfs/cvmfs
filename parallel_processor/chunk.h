@@ -34,9 +34,11 @@ class Chunk {
   bool HasFileDescriptor() const { return file_descriptor_ > 0;                   }
   bool IsFullyProcessed()  const { return done_;                                  }
   bool IsBulkChunk()       const { return is_bulk_chunk_;                         }
+  bool IsFullyDefined()    const { return chunk_size_ > 0;                        }
 
   void Done();
   Chunk* CopyAsBulkChunk(const size_t file_size);
+  void SetAsBulkChunk() { is_bulk_chunk_ = true; }
 
   void ScheduleWrite(CharBuffer *buffer);
 

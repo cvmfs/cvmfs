@@ -87,16 +87,14 @@ class ChunkCompressor {
 class ChunkProcessingTask : public tbb::task {
  public:
   ChunkProcessingTask(Chunk        *chunk,
-                      CharBuffer   *buffer,
-                      IoDispatcher *io_dispatcher) :
-    chunk_(chunk), buffer_(buffer), io_dispatcher_(io_dispatcher) {}
+                      CharBuffer   *buffer) :
+    chunk_(chunk), buffer_(buffer) {}
 
   tbb::task* execute();
 
  private:
   Chunk        *chunk_;
   CharBuffer   *buffer_;
-  IoDispatcher *io_dispatcher_;
 };
 
 
@@ -116,8 +114,8 @@ class FileScrubbingTask : public tbb::task {
   typedef std::vector<off_t> CutMarks;
 
  public:
-  FileScrubbingTask(File *file, CharBuffer *buffer, IoDispatcher *io_dispatcher) :
-    file_(file), buffer_(buffer), io_dispatcher_(io_dispatcher), next_(NULL) {}
+  FileScrubbingTask(File *file, CharBuffer *buffer) :
+    file_(file), buffer_(buffer), next_(NULL) {}
 
   void SetNext(FileScrubbingTask *next) {
     next->increment_ref_count();
@@ -142,17 +140,11 @@ class FileScrubbingTask : public tbb::task {
       : NULL;
   }
 
-  void Process(Chunk *chunk) {
-    tbb::task *chunk_processing_task =
-      new(allocate_child()) ChunkProcessingTask(chunk, buffer_, io_dispatcher_);
-    increment_ref_count();
-    spawn(*chunk_processing_task);
-  }
+  void Process(Chunk *chunk);
 
  public:
   File               *file_;
   CharBuffer         *buffer_;
-  IoDispatcher       *io_dispatcher_;
   FileScrubbingTask  *next_;
 };
 

@@ -109,7 +109,7 @@ tbb::task* ChunkProcessingTask::execute() {
 
   if (finalize) {
     chunk_->Done();
-    io_dispatcher_->ScheduleCommit(chunk_);
+    IoDispatcher::Instance()->ScheduleCommit(chunk_);
   }
 
   return NULL;
@@ -118,15 +118,29 @@ tbb::task* ChunkProcessingTask::execute() {
 
 
 tbb::task* FileScrubbingTask::execute() {
-  // find chunk cut marks in the current buffer and process all chunks that
-  // are fully specified (i.e. not reaching beyond the current buffer)
-  const CutMarks cut_marks = FindNextChunkCutMarks();
-  CutMarks::const_iterator i    = cut_marks.begin();
-  CutMarks::const_iterator iend = cut_marks.end();
-  for (; i != iend; ++i) {
-    Chunk *fully_defined_chunk = file_->CreateNextChunk(*i);
-    assert (fully_defined_chunk->size() > 0);
-    Process(fully_defined_chunk);
+  const bool is_last_buffer = IsLastBuffer();
+
+  if (file_->MightBecomeChunked()) {
+    // find chunk cut marks in the current buffer and process all chunks that
+    // are fully specified (i.e. not reaching beyond the current buffer)
+    const CutMarks cut_marks = FindNextChunkCutMarks();
+    CutMarks::const_iterator i    = cut_marks.begin();
+    CutMarks::const_iterator iend = cut_marks.end();
+    for (; i != iend; ++i) {
+      Chunk *fully_defined_chunk = file_->CreateNextChunk(*i);
+      assert (fully_defined_chunk->size() > 0);
+      Process(fully_defined_chunk);
+    }
+
+    // if we reached the last buffer this input file will produce, all but the
+    // last created chunk will be fully defined at this point
+    if (is_last_buffer) {
+      file_->FinalizeLastChunk();
+    }
+
+    // process the current chunk, i.e. the last created chunk that potentially
+    // reaches beyond the current buffer or to the end of the file
+    Process(file_->current_chunk());
   }
 
   // check if the file has a bulk chunk and continue processing it using the
@@ -134,17 +148,6 @@ tbb::task* FileScrubbingTask::execute() {
   if (file_->HasBulkChunk()) {
     Process(file_->bulk_chunk());
   }
-
-  // if we reached the last buffer this input file will produce all but the
-  // last created chunk will be fully defined at this point
-  const bool is_last_buffer = IsLastBuffer();
-  if (is_last_buffer) {
-    file_->FinalizeLastChunk();
-  }
-
-  // process the current chunk, i.e. the last created chunk that potentially
-  // reaches beyond the current buffer or to the end of the file
-  Process(file_->current_chunk());
 
   // wait for all scheduled chunk processing tasks on the current buffer
   WaitForProcessing();
@@ -162,8 +165,20 @@ tbb::task* FileScrubbingTask::execute() {
   return Next();
 }
 
+
+void FileScrubbingTask::Process(Chunk *chunk) {
+  assert (chunk != NULL);
+
+  tbb::task *chunk_processing_task =
+    new(allocate_child()) ChunkProcessingTask(chunk, buffer_);
+  increment_ref_count();
+  spawn(*chunk_processing_task);
+}
+
+
 FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
   const Chunk *current_chunk = file_->current_chunk();
+  assert (current_chunk != NULL);
   assert (current_chunk->size() == 0);
   assert (current_chunk->offset() <= buffer_->base_offset());
   assert (current_chunk->offset() <  buffer_->base_offset() + buffer_->used_bytes());
