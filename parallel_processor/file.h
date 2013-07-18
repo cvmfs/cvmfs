@@ -24,12 +24,14 @@ class File {
        const platform_stat64  &info) :
     path_(path), size_(info.st_size),
     might_become_chunked_(size_ > kMinChunkSize),
-    bulk_chunk_(NULL), current_chunk_(NULL)
+    bulk_chunk_(NULL)
   {
-    CreateNextChunk(0);
+    CreateInitialChunk();
   }
 
   ~File();
+
+  bool MightBecomeChunked() const { return might_become_chunked_; }
 
   /**
    * This creates a next chunk which will be the successor of the current chunk
@@ -40,12 +42,7 @@ class File {
    */
   Chunk* CreateNextChunk(const off_t offset);
 
-  /**
-   * This will fix the current_chunk_ as being the last chunk of the file.
-   *
-   * @return  the finalized chunk
-   */
-  Chunk* FinalizeLastChunk();
+  void FinalizeLastChunk();
   void Finalize();
 
   bool HasBulkChunk()          const { return bulk_chunk_ != NULL; }
@@ -53,15 +50,21 @@ class File {
   size_t size()                const { return size_;               }
   const std::string& path()    const { return path_;               }
 
-        Chunk* current_chunk()       { return current_chunk_;      }
-  const Chunk* current_chunk() const { return current_chunk_;      }
-
         Chunk* bulk_chunk()          { return bulk_chunk_;         }
   const Chunk* bulk_chunk()    const { return bulk_chunk_;         }
   const ChunkVector& chunks()  const { return chunks_;             }
 
+  Chunk* current_chunk() {
+    return (chunks_.size() > 0) ? chunks_.back() : NULL;
+  }
+  const Chunk* current_chunk() const {
+    return (chunks_.size() > 0) ? chunks_.back() : NULL;
+  }
+
  protected:
-  void CreateBulkChunk();
+  void AddChunk(Chunk *chunk);
+  void CreateInitialChunk();
+  void ForkOffBulkChunk();
 
  private:
   const std::string  path_;
@@ -69,9 +72,7 @@ class File {
   const bool         might_become_chunked_;
 
   ChunkVector        chunks_;
-
-  Chunk              *bulk_chunk_;
-  Chunk              *current_chunk_;
+  Chunk             *bulk_chunk_;
 };
 
 #endif /* FILE_H */

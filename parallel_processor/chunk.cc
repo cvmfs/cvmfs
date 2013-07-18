@@ -81,7 +81,7 @@ Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
   new_bulk_chunk->set_size(file_size);
   const bool should_delete_buffers = false;
   new_bulk_chunk->FlushDeferredWrites(should_delete_buffers);
-  new_bulk_chunk->is_bulk_chunk_ = true;
+  new_bulk_chunk->SetAsBulkChunk();
 
   // upload all previously generated buffers _without_ deleting them, they will
   // be needed for the copied bulk chunk as well
