@@ -102,7 +102,7 @@ class Chunk {
 
  private:
   Chunk(const Chunk &other);
-  Chunk& operator=(const Chunk &other) { assert (false); }  // don't copy assign
+  Chunk& operator=(const Chunk &other);  // don't copy assign
 
  private:
   File                    *file_;
