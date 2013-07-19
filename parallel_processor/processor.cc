@@ -52,7 +52,7 @@ void ChunkCompressor::Crunch(Chunk                *chunk,
     }
 
     if (stream.avail_out == 0) {
-      compress_buffer = new CharBuffer(32768);
+      compress_buffer = new CharBuffer(4096);
     }
   }
 
