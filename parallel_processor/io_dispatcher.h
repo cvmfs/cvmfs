@@ -16,8 +16,6 @@
 
 #define MEASURE_IO_TIME
 
-
-
 class File;
 class Chunk;
 
@@ -53,25 +51,20 @@ class IoDispatcher {
     JobType      type;
   };
 
- private:
-  static IoDispatcher* instance_;
-
  public:
-  /**
-   * Singleton
-   */
-  static IoDispatcher* Instance() {
-    if (instance_ == NULL) {
-      instance_ = new IoDispatcher();
-    }
-    return instance_;
-  }
-
-  static void Destroy() {
-    if (instance_ != NULL) {
-      delete instance_;
-      instance_ = NULL;
-    }
+  IoDispatcher() :
+    tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
+    read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
+    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
+    max_files_in_flight_(tbb_workers_ * 10)
+  {
+    files_in_flight_  = 0;
+    chunks_in_flight_ = 0;
+    file_count_       = 0;
+    pthread_mutex_init(&processing_done_mutex_,    NULL);
+    pthread_mutex_init(&files_in_flight_mutex_,    NULL);
+    pthread_cond_init(&processing_done_condition_, NULL);
+    pthread_cond_init(&free_slot_condition_,       NULL);
   }
 
   ~IoDispatcher() {
@@ -135,21 +128,6 @@ class IoDispatcher {
   void CommitFile(File *file);
 
  protected:
-  IoDispatcher() :
-    tbb_workers_(8),
-    read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
-    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
-    max_files_in_flight_(tbb_workers_ * 10)
-  {
-    files_in_flight_  = 0;
-    chunks_in_flight_ = 0;
-    file_count_       = 0;
-    pthread_mutex_init(&processing_done_mutex_, NULL);
-    pthread_mutex_init(&files_in_flight_mutex_, NULL);
-    pthread_cond_init(&processing_done_condition_, NULL);
-    pthread_cond_init(&free_slot_condition_, NULL);
-  }
-
   void TearDown() {
     assert(read_thread_.joinable());
     assert(write_thread_.joinable());

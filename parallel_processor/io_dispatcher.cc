@@ -11,7 +11,6 @@
 
 
 const size_t IoDispatcher::kMaxBufferSize = 512 * 1024;
-IoDispatcher* IoDispatcher::instance_ = NULL;
 
 void IoDispatcher::ReadThread() {
   tbb::task_scheduler_init sched(tbb_workers_ + 1);
@@ -202,7 +201,7 @@ void IoDispatcher::CommitChunk(Chunk* chunk) {
   retval = rename(chunk->temporary_path().c_str(), final_path.c_str());
   assert (retval == 0);
 
-  chunk->owning_file()->ChunkCommitted(chunk);
+  chunk->file()->ChunkCommitted(chunk);
 
   pthread_mutex_lock(&processing_done_mutex_);
   if (--chunks_in_flight_ == 0 && files_in_flight_ == 0) {

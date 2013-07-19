@@ -15,7 +15,8 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
     return;
   }
 
-  IoDispatcher::Instance()->ScheduleWrite(this, buffer);
+
+  file_->io_dispatcher()->ScheduleWrite(this, buffer);
 }
 
 
@@ -25,7 +26,7 @@ void Chunk::FlushDeferredWrites(const bool delete_buffers) {
   std::vector<CharBuffer*>::const_iterator i    = deferred_buffers_.begin();
   std::vector<CharBuffer*>::const_iterator iend = deferred_buffers_.end();
   for (; i != iend; ++i) {
-    IoDispatcher::Instance()->ScheduleWrite(this, *i, delete_buffers);
+    file_->io_dispatcher()->ScheduleWrite(this, *i, delete_buffers);
   }
   deferred_buffers_.clear();
   deferred_write_ = false;
@@ -41,11 +42,13 @@ void Chunk::Done() {
 
   assert (! deferred_write_);
   done_ = true;
+
+  file_->io_dispatcher()->ScheduleCommit(this);
 }
 
 
 Chunk::Chunk(const Chunk &other) :
-  owning_file_(other.owning_file_),
+  file_(other.file_),
   file_offset_(other.file_offset_),
   chunk_size_(other.chunk_size_),
   done_(other.done_),
