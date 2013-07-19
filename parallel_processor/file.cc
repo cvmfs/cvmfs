@@ -33,8 +33,8 @@ void File::CreateInitialChunk() {
 
   // if we are dealing with a file that will definitely _not_ be chunked, we
   // directly mark the initial chunk as being a bulk chunk
-  const off_t offset        = 0;
-  Chunk *new_chunk = new Chunk(this, offset);
+  const off_t offset = 0;
+  Chunk *new_chunk   = new Chunk(this, offset);
 
   // for a potentially chunked file, the initial chunk needs to defer the write
   // back of data until a final decision has been made
@@ -100,7 +100,8 @@ void File::FinalizeLastChunk() {
 
 void File::Finalize() {
   if (might_become_chunked_) {
-    // do some sanity checks for chunked files (might be removed later on)
+#ifndef NDEBUG
+    // check sanity of generated chunk list
     size_t aggregated_size    = 0;
     off_t  previous_chunk_end = 0;
     ChunkVector::const_iterator i    = chunks_.begin();
@@ -113,6 +114,7 @@ void File::Finalize() {
       previous_chunk_end = current_chunk->offset() + current_chunk->size();
       aggregated_size += current_chunk->size();
     }
+#endif
     assert (aggregated_size == size_);
   } else {
     assert (chunks_.size() == 0);
