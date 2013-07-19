@@ -76,6 +76,7 @@
 #include "signature.h"
 #include "quota.h"
 #include "quota_listener.h"
+#include "prng.h"
 #include "util.h"
 #include "util_concurrency.h"
 #include "atomic.h"
@@ -127,6 +128,7 @@ static struct {
   time_t timestamp;
   int delay;
 } previous_io_error_;
+Prng *prng_;
 
 
 /**
@@ -1097,7 +1099,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       previous_io_error_.delay *= 2;
   } else {
     // Initial delay
-    previous_io_error_.delay = (random() % (kMaxInitIoDelay-1)) + 2;
+    previous_io_error_.delay = (prng_->Next(kMaxInitIoDelay-1)) + 2;
   }
   previous_io_error_.timestamp = now;
 
@@ -1702,6 +1704,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   map<uint64_t, uint64_t> gid_map;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
+  cvmfs::prng_ = new Prng();
+  cvmfs::prng_->InitLocaltime();
 
   // Option parsing
   options::Init();
@@ -2279,6 +2283,9 @@ static void Fini() {
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
+
+  delete cvmfs::prng_;
+  cvmfs::prng_ = NULL;
 }
 
 
