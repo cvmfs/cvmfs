@@ -74,6 +74,17 @@ Chunk* File::CreateNextChunk(const off_t offset) {
 }
 
 
+void File::ForkOffBulkChunk() {
+  assert (! HasBulkChunk());
+  Chunk *latest_chunk = current_chunk();
+  assert (latest_chunk != NULL);
+  assert (latest_chunk->offset() == 0 && ! latest_chunk->IsFullyDefined());
+
+  Chunk* bulk_chunk = latest_chunk->CopyAsBulkChunk(size_);
+  AddChunk(bulk_chunk);
+}
+
+
 void File::FinalizeLastChunk() {
   assert (might_become_chunked_);
   assert (chunks_.size() > 0);
@@ -115,17 +126,6 @@ void File::Finalize() {
 
   // notify about the finished file processing
   io_dispatcher_->CommitFile(this);
-}
-
-
-void File::ForkOffBulkChunk() {
-  assert (! HasBulkChunk());
-  Chunk *latest_chunk = current_chunk();
-  assert (latest_chunk != NULL);
-  assert (latest_chunk->offset() == 0 && ! latest_chunk->IsFullyDefined());
-
-  Chunk* bulk_chunk = latest_chunk->CopyAsBulkChunk(size_);
-  AddChunk(bulk_chunk);
 }
 
 

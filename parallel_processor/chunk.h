@@ -36,7 +36,7 @@ class Chunk {
   bool IsBulkChunk()       const { return is_bulk_chunk_;                         }
   bool IsFullyDefined()    const { return chunk_size_ > 0;                        }
 
-  void Done();
+  void Finalize();
   Chunk* CopyAsBulkChunk(const size_t file_size);
   void SetAsBulkChunk() { is_bulk_chunk_ = true; }
 

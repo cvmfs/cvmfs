@@ -33,16 +33,22 @@ void Chunk::FlushDeferredWrites(const bool delete_buffers) {
 }
 
 
-void Chunk::Done() {
+void Chunk::Finalize() {
   assert (! done_);
+
+
+  const int fin_rc = SHA1_Final(sha1_digest_, &sha1_context_);
+  assert (fin_rc == 1);
+
+  assert (zlib_context_.avail_in == 0);
+  const int retcode = deflateEnd(&zlib_context_);
+  assert (retcode == Z_OK);
 
   if (deferred_write_) {
     FlushDeferredWrites();
   }
 
-  assert (! deferred_write_);
   done_ = true;
-
   file_->io_dispatcher()->ScheduleCommit(this);
 }
 

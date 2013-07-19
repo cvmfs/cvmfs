@@ -13,12 +13,6 @@ void ChunkHasher::Crunch(Chunk                *chunk,
                          const bool            finalize) {
   const int upd_rc = SHA1_Update(&chunk->sha1_context(), data, bytes);
   assert (upd_rc == 1);
-
-  if (finalize) {
-    const int fin_rc = SHA1_Final(chunk->sha1_digest(),
-                                  &chunk->sha1_context());
-    assert (fin_rc == 1);
-  }
 }
 
 
@@ -64,10 +58,6 @@ void ChunkCompressor::Crunch(Chunk                *chunk,
 
   if (finalize) {
     assert (flush == Z_FINISH);
-    assert (stream.avail_in == 0);
-
-    retcode = deflateEnd(&stream);
-    assert (retcode == Z_OK);
   }
 }
 
@@ -109,7 +99,7 @@ tbb::task* ChunkProcessingTask::execute() {
   tbb::parallel_invoke(hasher, compressor);
 
   if (finalize) {
-    chunk_->Done();
+    chunk_->Finalize();
   }
 
   return NULL;

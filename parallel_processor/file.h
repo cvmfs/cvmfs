@@ -43,12 +43,10 @@ class File {
    * @return  the predecessor (!) of the just created chunk
    */
   Chunk* CreateNextChunk(const off_t offset);
-
+  void ChunkCommitted(Chunk *chunk);
   void FinalizeLastChunk();
 
   bool HasBulkChunk()          const { return bulk_chunk_ != NULL; }
-
-  void ChunkCommitted(Chunk *chunk);
 
   size_t size()                const { return size_;               }
   const std::string& path()    const { return path_;               }
