@@ -14,7 +14,7 @@
 
 #include "buffer.h"
 
-#define MEASURE_IO_TIME
+//#define MEASURE_IO_TIME
 
 class File;
 class Chunk;

@@ -12,7 +12,7 @@
 #include <sstream> // TODO: remove
 #include "util.h"  // TODO: remove
 
-#define MEASURE_ALLOCATION_TIME
+//#define MEASURE_ALLOCATION_TIME
 static const uint64_t kTimeResolution = 1000000000;
 
 template<typename T, class A = std::allocator<T> >
