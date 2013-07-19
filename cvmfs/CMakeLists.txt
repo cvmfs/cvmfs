@@ -35,7 +35,6 @@ set (CVMFS_CLIENT_SOURCES
   bigvector.h
   lru.h
   globals.h globals.cc
-  peers.h peers.cc
   sql.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc

@@ -80,7 +80,6 @@
 #include "util_concurrency.h"
 #include "atomic.h"
 #include "lru.h"
-#include "peers.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "compression.h"
@@ -1628,7 +1627,6 @@ bool g_options_ready = false;
 bool g_download_ready = false;
 bool g_cache_ready = false;
 bool g_nfs_maps_ready = false;
-bool g_peers_ready = false;
 bool g_monitor_ready = false;
 bool g_signature_ready = false;
 bool g_quota_ready = false;
@@ -1906,17 +1904,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     *g_boot_error = "cannot create cache directory " + *cvmfs::cachedir_;
     return loader::kFailCacheDir;
   }
-
-  // Spawn / connect to peer server
-  if (diskless) {
-    if (!peers::Init(GetParentPath(*cvmfs::cachedir_),
-                     loader_exports->program_name, ""))
-    {
-      *g_boot_error = "failed to initialize peer socket";
-      return loader::kFailPeers;
-    }
-  }
-  g_peers_ready = true;
 
   // Try to jump to cache directory.  This tests, if it is accassible.
   // Also, it brings speed later on.
@@ -2248,7 +2235,6 @@ static void Fini() {
   if (g_running_created)
     unlink(("running." + *cvmfs::repository_name_).c_str());
   if (g_fd_lockfile >= 0) UnlockFile(g_fd_lockfile);
-  if (g_peers_ready) peers::Fini();
   if (g_options_ready) options::Fini();
 
   delete cvmfs::remount_fence_;
@@ -2297,9 +2283,6 @@ static void Fini() {
 
 
 static int AltProcessFlavor(int argc, char **argv) {
-  if (strcmp(argv[1], "__peersrv__") == 0) {
-    return peers::MainPeerServer(argc, argv);
-  }
   if (strcmp(argv[1], "__cachemgr__") == 0) {
     return quota::MainCacheManager(argc, argv);
   }

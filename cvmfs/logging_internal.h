@@ -54,7 +54,6 @@ enum LogSource {
   kLogLru,
   kLogFuse,
   kLogSignature,
-  kLogPeers,
   kLogFsTraversal,
   kLogCatalogTraversal,
   kLogNfsMaps,
