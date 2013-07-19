@@ -107,8 +107,6 @@ bool IoDispatcher::ReadFileAndSpawnTasks(File *file) {
     // create an asynchronous task to process the data chunk, together with
     // a synchronisation task that ensures the correct execution order of the
     // processing tasks
-    // Note: the last task for any given file does not need to wait for a
-    //       synchronisation task since it has no successor.
     FileScrubbingTask  *new_task =
       new(tbb::task::allocate_root()) FileScrubbingTask(file, buffer);
     new_task->increment_ref_count();
