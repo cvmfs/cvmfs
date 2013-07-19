@@ -26,7 +26,7 @@ set (CVMFS_CLIENT_SOURCES
   cache.h cache.cc
   platform.h platform_osx.h platform_linux.h
   monitor.h monitor.cc
-  util.cc util.h
+  prng.h util.cc util.h
   duplex_zlib.h compression.h compression.cc
   download.cc download.h
   manifest.h manifest.cc
