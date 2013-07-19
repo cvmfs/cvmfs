@@ -5,7 +5,6 @@
 #include <tbb/parallel_invoke.h>
 
 #include "chunk.h"
-#include "io_dispatcher.h"
 #include "file.h"
 
 void ChunkHasher::Crunch(Chunk                *chunk,
@@ -111,7 +110,6 @@ tbb::task* ChunkProcessingTask::execute() {
 
   if (finalize) {
     chunk_->Done();
-    IoDispatcher::Instance()->ScheduleCommit(chunk_);
   }
 
   return NULL;

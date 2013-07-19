@@ -21,10 +21,12 @@ static const size_t kMaxChunkSize = 8 * 1024 * 1024;
 class File {
  public:
   File(const std::string      &path,
-       const platform_stat64  &info) :
+       const platform_stat64  &info,
+       IoDispatcher           *io_dispatcher) :
     path_(path), size_(info.st_size),
     might_become_chunked_(size_ > kMinChunkSize),
-    bulk_chunk_(NULL), committed_chunks_(0)
+    bulk_chunk_(NULL), committed_chunks_(0),
+    io_dispatcher_(io_dispatcher)
   {
     CreateInitialChunk();
   }
@@ -62,6 +64,8 @@ class File {
     return (chunks_.size() > 0) ? chunks_.back() : NULL;
   }
 
+  IoDispatcher* io_dispatcher() { return io_dispatcher_; }
+
  protected:
   void AddChunk(Chunk *chunk);
   void CreateInitialChunk();
@@ -76,6 +80,8 @@ class File {
   ChunkVector        chunks_;
   Chunk             *bulk_chunk_;
   unsigned int       committed_chunks_;
+
+  IoDispatcher      *io_dispatcher_;
 };
 
 #endif /* FILE_H */

@@ -18,7 +18,7 @@ File::~File() {
 
 
 void File::AddChunk(Chunk *chunk) {
-  IoDispatcher::Instance()->RegisterChunk(chunk);
+  io_dispatcher_->RegisterChunk(chunk);
   if (chunk->IsBulkChunk()) {
     bulk_chunk_ = chunk;
   } else {
@@ -114,7 +114,7 @@ void File::Finalize() {
   assert (bulk_chunk_->IsFullyProcessed());
 
   // notify about the finished file processing
-  IoDispatcher::Instance()->CommitFile(this);
+  io_dispatcher_->CommitFile(this);
 }
 
 

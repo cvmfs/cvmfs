@@ -8,15 +8,19 @@
 
 class TraversalDelegate {
  public:
-  TraversalDelegate() {}
+  TraversalDelegate(IoDispatcher *io_dispatcher) :
+    io_dispatcher_(io_dispatcher) {}
 
   void FileCb(const std::string      &relative_path,
               const std::string      &file_name,
               const platform_stat64  &info) {
     const std::string path = relative_path + "/" + file_name;
-    File *file = new File(path, info);
-    IoDispatcher::Instance()->ScheduleRead(file);
+    File *file = new File(path, info, io_dispatcher_);
+    io_dispatcher_->ScheduleRead(file);
   }
+
+ private:
+  IoDispatcher *io_dispatcher_;
 };
 
 
@@ -32,7 +36,9 @@ int main() {
 
   all_start = tbb::tick_count::now();
 
-  TraversalDelegate delegate;
+  IoDispatcher io_dispatcher;
+
+  TraversalDelegate delegate(&io_dispatcher);
 
   start = tbb::tick_count::now();
   FileSystemTraversal<TraversalDelegate> t(&delegate, "", true);
@@ -42,7 +48,7 @@ int main() {
   std::cout << "recursion took:   " << (end - start).seconds() << " seconds" << std::endl;
 
   Print("going to wait now...");
-  IoDispatcher::Instance()->Wait();
+  io_dispatcher.Wait();
   Print("waited...");
 
 #ifdef MEASURE_ALLOCATION_TIME
@@ -50,8 +56,6 @@ int main() {
   std::cout << "deallocs took:    " << ((double)CharBuffer::deallocation_time_ / (double)kTimeResolution) << " seconds" << std::endl;
   std::cout << "leaked buffers:   " << CharBuffer::active_instances_ << std::endl;
 #endif
-
-  IoDispatcher::Destroy();
 
   all_end = tbb::tick_count::now();
   std::cout << "overall time:     " << (all_end - all_start).seconds() << " seconds" << std::endl;
