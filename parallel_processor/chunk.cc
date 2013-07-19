@@ -6,6 +6,7 @@
 #include "io_dispatcher.h"
 #include "file.h"
 
+
 void Chunk::ScheduleWrite(CharBuffer *buffer) {
   assert (buffer->used_bytes() > 0);
 
@@ -14,7 +15,6 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
     deferred_buffers_.push_back(buffer);
     return;
   }
-
 
   file_->io_dispatcher()->ScheduleWrite(this, buffer);
 }
@@ -35,7 +35,6 @@ void Chunk::FlushDeferredWrites(const bool delete_buffers) {
 
 void Chunk::Finalize() {
   assert (! done_);
-
 
   const int fin_rc = SHA1_Final(sha1_digest_, &sha1_context_);
   assert (fin_rc == 1);
@@ -70,7 +69,7 @@ Chunk::Chunk(const Chunk &other) :
   bytes_written_(other.bytes_written_),
   compressed_size_(other.compressed_size_)
 {
-  assert (other.done_ == false);
+  assert (! other.done_);
   assert (! other.HasFileDescriptor());
   assert (other.tmp_file_path_.empty());
   assert (other.bytes_written_ == 0);
