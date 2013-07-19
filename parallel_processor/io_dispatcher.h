@@ -21,7 +21,6 @@ class Chunk;
 
 class IoDispatcher {
  protected:
-  static const size_t kMaxBufferSize;
   typedef void (IoDispatcher:: *MethodPtr)();
 
   struct WriteJob {
@@ -52,11 +51,16 @@ class IoDispatcher {
   };
 
  public:
-  IoDispatcher() :
+  typedef tbb::concurrent_bounded_queue<File*>    FileQueue;
+  typedef tbb::concurrent_bounded_queue<WriteJob> WriteJobQueue;
+
+ public:
+  IoDispatcher(const size_t max_read_buffer_size = 512 * 1024) :
     tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
     read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
     write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
-    max_files_in_flight_(tbb_workers_ * 10)
+    max_files_in_flight_(tbb_workers_ * 10),
+    max_read_buffer_size_(max_read_buffer_size)
   {
     files_in_flight_  = 0;
     chunks_in_flight_ = 0;
@@ -150,6 +154,7 @@ class IoDispatcher {
 
  private:
   const unsigned int        tbb_workers_;
+  const size_t              max_read_buffer_size_;
 
   tbb::atomic<unsigned int> files_in_flight_;
   tbb::atomic<unsigned int> chunks_in_flight_;
@@ -158,15 +163,15 @@ class IoDispatcher {
   double read_time_;
   double write_time_;
 
-  tbb::concurrent_bounded_queue<File*>     read_queue_;
-  tbb::concurrent_bounded_queue<WriteJob>  write_queue_;
+  FileQueue     read_queue_;
+  WriteJobQueue write_queue_;
 
   tbb::tbb_thread read_thread_;
   tbb::tbb_thread write_thread_;
 
-  pthread_mutex_t files_in_flight_mutex_;
-  pthread_cond_t  free_slot_condition_;
-  unsigned int    max_files_in_flight_;
+  pthread_mutex_t    files_in_flight_mutex_;
+  pthread_cond_t     free_slot_condition_;
+  const unsigned int max_files_in_flight_;
 
   pthread_mutex_t processing_done_mutex_;
   pthread_cond_t  processing_done_condition_;
