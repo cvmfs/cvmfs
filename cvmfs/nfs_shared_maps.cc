@@ -27,6 +27,7 @@
 
 #include "duplex_sqlite3.h"
 #include "logging.h"
+#include "prng.h"
 #include "util.h"
 #include "atomic.h"
 
@@ -78,6 +79,7 @@ struct BusyHandlerInfo {
   unsigned accumulated_ms;
 };
 BusyHandlerInfo *busy_handler_info_ = NULL;
+Prng *prng_;
 
 /**
  * Finds an inode by path
@@ -235,7 +237,7 @@ static int BusyHandler(void *data, int attempt) {
     return 0;
 
   const unsigned backoff_range_ms = 1 << attempt;
-  unsigned backoff_ms = random() % backoff_range_ms;
+  unsigned backoff_ms = prng_->Next(backoff_range_ms);
   if (handler_info->accumulated_ms + backoff_ms > handler_info->max_wait_ms)
     backoff_ms = handler_info->max_wait_ms - handler_info->accumulated_ms;
   if (backoff_ms > handler_info->max_backoff_ms)
@@ -303,6 +305,9 @@ bool Init(const string &db_dir, const uint64_t root_inode,
   sqlite3_finalize(stmt);
   stmt = NULL;
 
+  prng_ = new Prng();
+  prng_->InitLocaltime();
+
   // Prepare lookup and add-inode statements
   retval = sqlite3_prepare_v2(db_, kSQL_GetPath, kMaxDBSqlLen, &stmt_get_path_,
                               NULL);
@@ -350,7 +355,9 @@ void Fini() {
   sqlite3_close_v2(db_);
   db_ = NULL;
 
+  delete prng_;
   delete busy_handler_info_;
+  prng_ = NULL;
   busy_handler_info_ = NULL;
 }
 

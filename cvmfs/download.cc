@@ -50,6 +50,7 @@
 #include "logging.h"
 #include "atomic.h"
 #include "hash.h"
+#include "prng.h"
 #include "util.h"
 #include "compression.h"
 #include "smalloc.h"
@@ -57,6 +58,8 @@
 using namespace std;  // NOLINT
 
 namespace download {
+
+Prng prng_;
 
 set<CURL *> *pool_handles_idle_ = NULL;
 set<CURL *> *pool_handles_inuse_ = NULL;
@@ -285,7 +288,7 @@ static void SwitchProxy(JobInfo *info) {
 
   // Select new one
   if ((group_size - opt_proxy_groups_current_burned_) > 0) {
-    int select = random() % (group_size - opt_proxy_groups_current_burned_ + 1);
+    int select = prng_.Next(group_size - opt_proxy_groups_current_burned_ + 1);
 
     // Move selected proxy to front
     const string swap = (*group)[select];
@@ -314,7 +317,7 @@ static void RebalanceProxiesUnlocked() {
   opt_timestamp_failover_proxies_ = 0;
   opt_proxy_groups_current_burned_ = 1;
   vector<string> *group = &((*opt_proxy_groups_)[opt_proxy_groups_current_]);
-  int select = random() % group->size();
+  int select = prng_.Next(group->size());
   const string swap = (*group)[select];
   (*group)[select] = (*group)[0];
   (*group)[0] = swap;
@@ -681,7 +684,7 @@ static void Backoff(JobInfo *info) {
   info->num_retries++;
   statistics_->num_retries++;
   if (info->backoff_ms == 0) {
-    info->backoff_ms = random() % backoff_init_ms + 1;  // Must be != 0
+    info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
   } else {
     info->backoff_ms *= 2;
   }
@@ -1247,10 +1250,7 @@ void Init(const unsigned max_pool_handles, const bool use_system_proxy) {
                     pool_max_handles_);
   //curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 
-  // Initialize random number engine with system time
-  struct timeval tv_now;
-  gettimeofday(&tv_now, NULL);
-  srandom(tv_now.tv_usec);
+  prng_.InitLocaltime();
 
   // Parsing environment variables
   if (use_system_proxy) {
@@ -1448,7 +1448,7 @@ void SetProxyChain(const std::string &proxy_list) {
 
   /* Select random start proxy from the first group */
   if ((*opt_proxy_groups_)[0].size() > 1) {
-    int random_index = random() % (*opt_proxy_groups_)[0].size();
+    int random_index = prng_.Next((*opt_proxy_groups_)[0].size());
     string tmp = (*opt_proxy_groups_)[0][0];
     (*opt_proxy_groups_)[0][0] = (*opt_proxy_groups_)[0][random_index];
     (*opt_proxy_groups_)[0][random_index] = tmp;
