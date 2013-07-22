@@ -272,6 +272,14 @@ cvmfs_chksetup() {
     num_errors=$(($num_errors+$exit_code))
   fi
 
+  # Check that /etc/nsswitch.conf is readable from CVMFS_USER
+  if [ -f /etc/nsswitch.conf ]; then
+    if ! runas $CVMFS_USER "test -r /etc/nsswitch.conf"; then
+      echo "Error: /etc/nsswitch not readable by user $CVMFS_USER"
+      num_errors=$(($num_errors+1))
+    fi
+  fi
+
   # Check that automount is running
   if ! check_auto_mounter; then
     if ! check_is_on CVMFS_NFS_SOURCE; then

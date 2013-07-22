@@ -153,7 +153,7 @@ CernVM-FS Server Tool $(cvmfs_version_string)
 Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
-  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] 
+  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
                 [-m replicable] [-f union filesystem type]
                 <fully qualified repository name>
                 Creates a new repository with a given name
@@ -318,7 +318,7 @@ check_aufs() {
 #
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs 
+  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs
 }
 
 
@@ -1093,7 +1093,7 @@ mkfs() {
   is_local_upstream $upstream       || die "Import is only supported for local storage"
   if [ $unionfs = "overlayfs" ]; then
     check_overlayfs                 || die "overlayfs kernel module missing"
-    echo "Warning: CVMFS filesystems using overlayfs may not enforce hard link semantics during publishing."
+    echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
   else
     check_aufs                      || die "aufs kernel module missing"
   fi
@@ -2047,7 +2047,7 @@ publish() {
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
-  $user_shell "$sync_command" || (sudo /bin/mount -o remount,rw /cvmfs/$name && die "Synchronization failed\n\nExecuted Command:\n$sync_command")
+  $user_shell "$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command"
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
   tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"

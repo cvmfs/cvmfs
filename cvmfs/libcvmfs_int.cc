@@ -73,7 +73,6 @@
 #include "util.h"
 #include "atomic.h"
 #include "lru.h"
-#include "peers.h"
 #include "directory_entry.h"
 #include "compression.h"
 #include "duplex_sqlite3.h"
@@ -287,7 +286,6 @@ static void *sqlite_page_cache;
 static bool options_ready;
 static bool download_ready;
 static bool cache_ready;
-static bool peers_ready;
 static bool monitor_ready;
 static bool signature_ready;
 static bool quota_ready;
@@ -334,7 +332,6 @@ int cvmfs_int_init(
   options_ready = false;
   download_ready = false;
   cache_ready = false;
-  peers_ready = false;
   monitor_ready = false;
   signature_ready = false;
   quota_ready = false;
@@ -414,8 +411,6 @@ int cvmfs_int_init(
     PrintError("cannot create cache directory " + *cvmfs::cachedir_);
     goto cvmfs_cleanup;
   }
-
-  peers_ready = true;
 
   // Try to jump to cache directory.  This tests, if it is accassible.
   // Also, it brings speed later on.
@@ -595,7 +590,6 @@ void cvmfs_int_fini() {
   if (cache_ready) cache::Fini();
   if (running_created) unlink((relative_cachedir + "/running." + *cvmfs::repository_name_).c_str());
   if (fd_lockfile >= 0) UnlockFile(fd_lockfile);
-  if (peers_ready) peers::Fini();
   tracer::Fini();
 
   sqlite3_shutdown();

@@ -27,28 +27,28 @@ SyncItem::SyncItem(const string &relative_parent_path,
 
 
 bool SyncItem::IsNew() const {
-	StatRdOnly();
-	return (rdonly_stat_.error_code == ENOENT);
+  StatRdOnly();
+  return (rdonly_stat_.error_code == ENOENT);
 }
 
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
-	// Mark the file as whiteout entry and strip the whiteout prefix
-	whiteout_ = true;
-	filename_ = actual_filename;
+  // Mark the file as whiteout entry and strip the whiteout prefix
+  whiteout_ = true;
+  filename_ = actual_filename;
 
-	// Find the entry in the repository
-	StatRdOnly();
-	if (rdonly_stat_.error_code != 0) {
-		PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not"
+  // Find the entry in the repository
+  StatRdOnly();
+  if (rdonly_stat_.error_code != 0) {
+    PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not"
                  "found in repository.");
-		return;
-	}
+    return;
+  }
 
-	// What is deleted?
-	if (S_ISDIR(rdonly_stat_.stat.st_mode)) type_ = kItemDir;
-	else if (S_ISREG(rdonly_stat_.stat.st_mode)) type_ = kItemFile;
-	else if (S_ISLNK(rdonly_stat_.stat.st_mode)) type_ = kItemSymlink;
+  // What is deleted?
+  if (S_ISDIR(rdonly_stat_.stat.st_mode)) type_ = kItemDir;
+  else if (S_ISREG(rdonly_stat_.stat.st_mode)) type_ = kItemFile;
+  else if (S_ISLNK(rdonly_stat_.stat.st_mode)) type_ = kItemSymlink;
 }
 
 
@@ -85,10 +85,10 @@ void SyncItem::StatGeneric(const string &path, EntryStat *info) {
 
 
 bool SyncItem::IsOpaqueDirectory() const {
-	if (!IsDirectory()) {
-		return false;
-	}
-	return union_engine_->IsOpaqueDirectory(*this);
+  if (!IsDirectory()) {
+    return false;
+  }
+  return union_engine_->IsOpaqueDirectory(*this);
 }
 
 

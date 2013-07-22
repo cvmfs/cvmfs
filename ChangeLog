@@ -1,4 +1,14 @@
 2.1.13:
+  * Connect SQlite logger to cvmfs logger
+  * Switch to sqlite 3.7.17
+  * Add check for accessibiliy of /etc/nsswitch.conf to
+    cvmfs_config chksetup
+  * Add experimental support for overlayfs as an alternative to
+    aufs
+  * Enforce hard limit on number of concurrent HTTP connections
+  * Switch to libcurl 7.31.0
+  * Switch to zlib 1.2.8
+  * Switch to c-ares 1.10.0
   * Fix "one too often" fail-over
   * Consider all HTTP 5XX errors as host errors
   * Release pinned catalogs at high watermark of pinned files

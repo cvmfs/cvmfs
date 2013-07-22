@@ -76,11 +76,11 @@
 #include "signature.h"
 #include "quota.h"
 #include "quota_listener.h"
+#include "prng.h"
 #include "util.h"
 #include "util_concurrency.h"
 #include "atomic.h"
 #include "lru.h"
-#include "peers.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "compression.h"
@@ -128,6 +128,7 @@ static struct {
   time_t timestamp;
   int delay;
 } previous_io_error_;
+Prng *prng_;
 
 
 /**
@@ -1098,7 +1099,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       previous_io_error_.delay *= 2;
   } else {
     // Initial delay
-    previous_io_error_.delay = (random() % (kMaxInitIoDelay-1)) + 2;
+    previous_io_error_.delay = (prng_->Next(kMaxInitIoDelay-1)) + 2;
   }
   previous_io_error_.timestamp = now;
 
@@ -1628,7 +1629,6 @@ bool g_options_ready = false;
 bool g_download_ready = false;
 bool g_cache_ready = false;
 bool g_nfs_maps_ready = false;
-bool g_peers_ready = false;
 bool g_monitor_ready = false;
 bool g_signature_ready = false;
 bool g_quota_ready = false;
@@ -1642,6 +1642,31 @@ string *g_boot_error = NULL;
 
 __attribute__ ((visibility ("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
+
+
+static void LogSqliteError(void *user_data __attribute__((unused)),
+                           int sqlite_error, const char *message)
+{
+  int log_dest = kLogDebug;
+  if (((sqlite_error & SQLITE_INTERNAL) == SQLITE_INTERNAL) ||
+      ((sqlite_error & SQLITE_PERM) == SQLITE_PERM) ||
+      ((sqlite_error & SQLITE_NOMEM) == SQLITE_NOMEM) ||
+      ((sqlite_error & SQLITE_IOERR) == SQLITE_IOERR) ||
+      ((sqlite_error & SQLITE_CORRUPT) == SQLITE_CORRUPT) ||
+      ((sqlite_error & SQLITE_FULL) == SQLITE_FULL) ||
+      ((sqlite_error & SQLITE_CANTOPEN) == SQLITE_CANTOPEN) ||
+      ((sqlite_error & SQLITE_MISUSE) == SQLITE_MISUSE) ||
+      ((sqlite_error & SQLITE_FORMAT) == SQLITE_FORMAT) ||
+      ((sqlite_error & SQLITE_NOTADB) == SQLITE_NOTADB))
+  {
+    log_dest |= kLogSyslogErr;
+  } else if ((sqlite_error & SQLITE_WARNING) == SQLITE_WARNING) {
+    log_dest |= kLogSyslogWarn;
+  } else if ((sqlite_error & SQLITE_NOTICE) == SQLITE_NOTICE) {
+    log_dest |= kLogSyslog;
+  }
+  LogCvmfs(kLogCvmfs, log_dest, "SQlite3: %s (%d)", message, sqlite_error);
+}
 
 
 static int Init(const loader::LoaderExports *loader_exports) {
@@ -1679,6 +1704,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   map<uint64_t, uint64_t> gid_map;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
+  cvmfs::prng_ = new Prng();
+  cvmfs::prng_->InitLocaltime();
 
   // Option parsing
   options::Init();
@@ -1829,6 +1856,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Tune SQlite3
   sqlite3_shutdown();  // Make sure SQlite starts clean after initialization
+  retval = sqlite3_config(SQLITE_CONFIG_LOG, LogSqliteError, NULL);
+  assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
   assert(retval == SQLITE_OK);
   g_sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
@@ -1879,17 +1908,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     *g_boot_error = "cannot create cache directory " + *cvmfs::cachedir_;
     return loader::kFailCacheDir;
   }
-
-  // Spawn / connect to peer server
-  if (diskless) {
-    if (!peers::Init(GetParentPath(*cvmfs::cachedir_),
-                     loader_exports->program_name, ""))
-    {
-      *g_boot_error = "failed to initialize peer socket";
-      return loader::kFailPeers;
-    }
-  }
-  g_peers_ready = true;
 
   // Try to jump to cache directory.  This tests, if it is accassible.
   // Also, it brings speed later on.
@@ -2221,7 +2239,6 @@ static void Fini() {
   if (g_running_created)
     unlink(("running." + *cvmfs::repository_name_).c_str());
   if (g_fd_lockfile >= 0) UnlockFile(g_fd_lockfile);
-  if (g_peers_ready) peers::Fini();
   if (g_options_ready) options::Fini();
 
   delete cvmfs::remount_fence_;
@@ -2266,13 +2283,13 @@ static void Fini() {
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
+
+  delete cvmfs::prng_;
+  cvmfs::prng_ = NULL;
 }
 
 
 static int AltProcessFlavor(int argc, char **argv) {
-  if (strcmp(argv[1], "__peersrv__") == 0) {
-    return peers::MainPeerServer(argc, argv);
-  }
   if (strcmp(argv[1], "__cachemgr__") == 0) {
     return quota::MainCacheManager(argc, argv);
   }

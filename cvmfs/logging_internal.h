@@ -54,7 +54,6 @@ enum LogSource {
   kLogLru,
   kLogFuse,
   kLogSignature,
-  kLogPeers,
   kLogFsTraversal,
   kLogCatalogTraversal,
   kLogNfsMaps,
@@ -64,7 +63,7 @@ enum LogSource {
   kLogUtility,
   kLogGlueBuffer,
   kLogHistory,
-  kLogUnion,
+  kLogUnionFs,
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
