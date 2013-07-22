@@ -6,7 +6,6 @@
 
 #include "sync_union.h"
 
-#include <inttypes.h>
 #include <alloca.h>
 #include <unistd.h>
 #include <errno.h>
