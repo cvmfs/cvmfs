@@ -1973,7 +1973,7 @@ publish() {
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
   if [ "x$add_tag" != "x" ]; then
     [ "x$tag_name" != "x" ]               || die "Tag name missing"
-    echo $tag_name | grep -q -v "\s"      || die "Spaces are not allowed in tag names"
+    echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
     if lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
       die "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
