@@ -9,6 +9,10 @@
 #include "hash.h"
 #include "catalog.h"
 
+namespace download {
+class DownloadManager;
+}
+
 namespace swissknife {
 
 class CommandCheck : public Command {
@@ -37,15 +41,19 @@ class CommandCheck : public Command {
   bool InspectTree(const std::string &path,
                    const hash::Any &catalog_hash,
                    const catalog::DirectoryEntry *transition_point,
-                   catalog::DeltaCounters *computed_counters);
+                   catalog::DeltaCounters *computed_counters,
+                   download::DownloadManager *download_manager);
   std::string DecompressPiece(const hash::Any catalog_hash,
                               const char suffix);
   std::string DownloadPiece(const hash::Any catalog_hash,
-                            const char suffix);
+                            const char suffix,
+                            download::DownloadManager *download_manager);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,
-            catalog::DeltaCounters *computed_counters);
-  bool Exists(const std::string &file);
+            catalog::DeltaCounters *computed_counters,
+            download::DownloadManager *download_manager);
+  bool Exists(const std::string &file,
+              download::DownloadManager *download_manager);
   bool CompareCounters(const catalog::Counters &a,
                        const catalog::Counters &b);
   bool CompareEntries(const catalog::DirectoryEntry &a,

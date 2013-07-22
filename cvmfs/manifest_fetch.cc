@@ -10,6 +10,7 @@
 #include <cassert>
 
 #include "manifest.h"
+#include "hash.h"
 #include "download.h"
 #include "signature.h"
 #include "util.h"
@@ -131,6 +132,7 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
                const uint64_t minimum_timestamp, const hash::Any *base_catalog,
                signature::SignatureManager *signature_manager,
+               download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble)
 {
   assert(ensemble);
@@ -147,7 +149,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
                                          &certificate_hash);
 
-  retval = download::Fetch(&download_manifest);
+  retval = download_manager->Fetch(&download_manifest);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "failed to download repository manifest (%d)", retval);
@@ -191,7 +193,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
     certificate_url += certificate_hash.MakePath(1, 2) + "X";
-    retval = download::Fetch(&download_certificate);
+    retval = download_manager->Fetch(&download_certificate);
     if (retval != download::kFailOk) {
       result = kFailLoad;
         goto cleanup;
@@ -218,7 +220,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   }
 
   // Load whitelist and verify
-  retval = download::Fetch(&download_whitelist);
+  retval = download_manager->Fetch(&download_whitelist);
   if (retval != download::kFailOk) {
     result = kFailLoad;
     goto cleanup;

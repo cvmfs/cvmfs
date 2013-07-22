@@ -34,6 +34,7 @@ static bool GetHistoryDbHash(const string &repository_url,
                              const string &repository_name,
                              const hash::Any &expected_root_hash,
                              signature::SignatureManager *signature_manager,
+                             download::DownloadManager *download_manager,
                              hash::Any *historydb_hash)
 {
   manifest::ManifestEnsemble manifest_ensemble;
@@ -41,7 +42,8 @@ static bool GetHistoryDbHash(const string &repository_url,
   if (IsRemote(repository_url)) {
     manifest::Failures retval;
     retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
-                             signature_manager, &manifest_ensemble);
+                             signature_manager, download_manager,
+                             &manifest_ensemble);
     if (retval != manifest::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest (%d)",
                retval);
@@ -73,6 +75,7 @@ static bool GetHistoryDbHash(const string &repository_url,
 static bool FetchTagList(const string &repository_url,
                          const hash::Any &history_hash,
                          const std::string tmp_path,
+                         download::DownloadManager *download_manager,
                          history::Database *history_db,
                          history::TagList *tag_list)
 {
@@ -82,7 +85,7 @@ static bool FetchTagList(const string &repository_url,
       history_hash.MakePath(1, 2) + "H";
     download::JobInfo download_history(&url, true, false, &tmp_path,
                                        &history_hash);
-    retval = download::Fetch(&download_history);
+    retval = download_manager->Fetch(&download_history);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d)",
                retval);
@@ -144,11 +147,13 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
              repository_key_path.c_str());
     return 1;
   }
-  download::Init(1, true);
+  download::DownloadManager download_manager;
+  download_manager.Init(1, true);
   int result = 1;
 
   retval = GetHistoryDbHash(repository_url, repository_name, base_hash,
-                            &signature_manager, &history_hash);
+                            &signature_manager, &download_manager,
+                            &history_hash);
   if (!retval)
     goto tag_fini;
 
@@ -166,7 +171,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
     }
   }
   retval = FetchTagList(repository_url, history_hash, history_path,
-                        &tag_db, &tag_list);
+                        &download_manager, &tag_db, &tag_list);
   if (!retval)
     goto tag_fini;
 
@@ -226,7 +231,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
 
  tag_fini:
   signature_manager.Fini();
-  download::Fini();
+  download_manager.Fini();
   return result;
 }
 
@@ -265,11 +270,13 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
              repository_key_path.c_str());
     return 1;
   }
-  download::Init(1, true);
+  download::DownloadManager download_manager;
+  download_manager.Init(1, true);
   int result = 1;
 
   retval = GetHistoryDbHash(repository_url, repository_name, base_hash,
-                            &signature_manager, &history_hash);
+                            &signature_manager, &download_manager,
+                            &history_hash);
   if (!retval)
     goto rollback_fini;
 
@@ -278,7 +285,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     goto rollback_fini;
   }
   retval = FetchTagList(repository_url, history_hash, history_path,
-                        &tag_db, &tag_list);
+                        &download_manager, &tag_db, &tag_list);
   if (!retval)
     goto rollback_fini;
 
@@ -306,7 +313,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
       target_tag.root_hash.MakePath(1, 2) + "C";
     download::JobInfo download_catalog(&catalog_url, true, false, &catalog_path,
                                        &target_tag.root_hash);
-    retval = download::Fetch(&download_catalog);
+    retval = download_manager.Fetch(&download_catalog);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog (%d)",
                retval);
@@ -370,6 +377,6 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
  rollback_fini:
   delete spooler;
   signature_manager.Fini();
-  download::Fini();
+  download_manager.Fini();
   return result;
 }

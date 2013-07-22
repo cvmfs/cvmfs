@@ -41,6 +41,9 @@
 namespace upload {
 class Spooler;
 }
+namespace download {
+class DownloadManager;
+}
 namespace manifest {
 class Manifest;
 }
@@ -52,7 +55,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
   WritableCatalogManager(const hash::Any   &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
-                         upload::Spooler   *spooler);
+                         upload::Spooler   *spooler,
+                         download::DownloadManager *download_manager);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               upload::Spooler   *spooler);
@@ -140,11 +144,13 @@ class WritableCatalogManager : public AbstractCatalogManager {
   // defined in catalog_mgr_rw.cc
   const static std::string kCatalogFilename;
 
-  pthread_mutex_t  *sync_lock_;  // private lock of WritableCatalogManager
-  hash::Any         base_hash_;
-  std::string       stratum0_;
-  std::string       dir_temp_;
-  upload::Spooler  *spooler_;
+  // private lock of WritableCatalogManager
+  pthread_mutex_t            *sync_lock_;
+  hash::Any                  base_hash_;
+  std::string                stratum0_;
+  std::string                dir_temp_;
+  upload::Spooler            *spooler_;
+  download::DownloadManager  *download_manager_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

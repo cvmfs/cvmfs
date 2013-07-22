@@ -9,8 +9,18 @@
 #include <cstdlib>
 
 #include "manifest.h"
-#include "hash.h"
-#include "signature.h"
+
+namespace hash {
+class Any;
+}
+
+namespace signature {
+class SignatureManager;
+}
+
+namespace download {
+class DownloadManager;
+}
 
 namespace manifest {
 
@@ -60,6 +70,7 @@ struct ManifestEnsemble {
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
                const uint64_t minimum_timestamp, const hash::Any *base_catalog,
                signature::SignatureManager *signature_manager,
+               download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble);
 
 }  // namespace manifest

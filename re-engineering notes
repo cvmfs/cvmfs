@@ -1,0 +1,4 @@
+cache module --> cache manager
+download: proper abstraction of "network path"
+central statistcs service
+swissknife: global manager objects (signature, download)

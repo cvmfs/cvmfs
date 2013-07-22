@@ -35,7 +35,6 @@ bool check_chunks;
 std::string *remote_repository;
 }
 
-
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
                                   const catalog::DirectoryEntry &b,
                                   const bool compare_names,
@@ -132,13 +131,15 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 /**
  * Checks for existance of a file either locally or via HTTP head
  */
-bool CommandCheck::Exists(const string &file) {
+bool CommandCheck::Exists(const string &file,
+                          download::DownloadManager *download_manager)
+{
   if (remote_repository == NULL)
     return FileExists(file);
   else {
     const string url = *remote_repository + "/" + file;
     download::JobInfo head(&url, false);
-    return download::Fetch(&head) == download::kFailOk;
+    return download_manager->Fetch(&head) == download::kFailOk;
   }
 }
 
@@ -148,7 +149,9 @@ bool CommandCheck::Exists(const string &file) {
  */
 bool CommandCheck::Find(const catalog::Catalog *catalog,
                         const PathString &path,
-                        catalog::DeltaCounters *computed_counters) {
+                        catalog::DeltaCounters *computed_counters,
+                        download::DownloadManager *download_manager)
+{
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
 
@@ -207,7 +210,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       string chunk_path = "data" + entries[i].checksum().MakePath(1, 2);
       if (entries[i].IsDirectory())
         chunk_path += "L";
-      if (!Exists(chunk_path)) {
+      if (!Exists(chunk_path, download_manager)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "data chunk %s (%s) missing",
                  entries[i].checksum().ToString().c_str(), full_path.c_str());
         retval = false;
@@ -264,7 +267,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         }
       } else {
         // Recurse
-        if (!Find(catalog, full_path, computed_counters))
+        if (!Find(catalog, full_path, computed_counters, download_manager))
           retval = false;
       }
     } else if (entries[i].IsLink()) {
@@ -325,7 +328,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         const string chunk_path = "data"                           +
                                   this_chunk.content_hash().MakePath(1, 2) +
                                   FileChunk::kCasSuffix;
-        if (!Exists(chunk_path)) {
+        if (!Exists(chunk_path, download_manager)) {
           const std::string chunk_name = this_chunk.content_hash().ToString() +
                                          FileChunk::kCasSuffix;
           LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
@@ -384,14 +387,15 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
 
 string CommandCheck::DownloadPiece(const hash::Any catalog_hash,
-                                   const char suffix)
+                                   const char suffix,
+                                   download::DownloadManager *download_manager)
 {
   string source = "data" + catalog_hash.MakePath(1,2);
   source.push_back(suffix);
   const string dest = "/tmp/" + catalog_hash.ToString();
   const string url = *remote_repository + "/" + source;
   download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
-  download::Failures retval = download::Fetch(&download_catalog);
+  download::Failures retval = download_manager->Fetch(&download_catalog);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);
@@ -421,7 +425,9 @@ string CommandCheck::DecompressPiece(const hash::Any catalog_hash,
 bool CommandCheck::InspectTree(const string &path,
                                const hash::Any &catalog_hash,
                                const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters *computed_counters) {
+                               catalog::DeltaCounters *computed_counters,
+                               download::DownloadManager *download_manager)
+{
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
@@ -429,7 +435,7 @@ bool CommandCheck::InspectTree(const string &path,
   if (remote_repository == NULL)
     tmp_file = DecompressPiece(catalog_hash, 'C');
   else
-    tmp_file = DownloadPiece(catalog_hash, 'C');
+    tmp_file = DownloadPiece(catalog_hash, 'C', download_manager);
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
              catalog_hash.ToString().c_str());
@@ -486,8 +492,11 @@ bool CommandCheck::InspectTree(const string &path,
   }
 
   // Traverse the catalog
-  if (!Find(catalog, PathString(path.data(), path.length()), computed_counters))
+  if (!Find(catalog, PathString(path.data(), path.length()), computed_counters,
+            download_manager))
+  {
     retval = false;
+  }
 
   // Check number of entries
   const uint64_t num_found_entries = 1 + computed_counters->self.regular_files +
@@ -521,7 +530,7 @@ bool CommandCheck::InspectTree(const string &path,
     } else {
       catalog::DeltaCounters nested_counters;
       if (!InspectTree(i->path.ToString(), i->hash, &nested_transition_point,
-                       &nested_counters))
+                       &nested_counters, download_manager))
         retval = false;
       nested_counters.PopulateToParent(*computed_counters);
     }
@@ -561,10 +570,11 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
   const string repository = MakeCanonicalPath(*args.find('r')->second);
 
+  download::DownloadManager download_manager;
   // Repository can be HTTP address or on local file system
   if (repository.substr(0, 7) == "http://") {
     remote_repository = new string(repository);
-    download::Init(1, true);
+    download_manager.Init(1, true);
   } else {
     remote_repository = NULL;
   }
@@ -582,7 +592,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   } else {
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);
-    download::Failures retval = download::Fetch(&download_manifest);
+    download::Failures retval = download_manager.Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d)",
                retval);
@@ -603,7 +613,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   // Validate Manifest
   const string certificate_path =
     "data" + manifest->certificate().MakePath(1, 2) + "X";
-  if (!Exists(certificate_path)) {
+  if (!Exists(certificate_path, &download_manager)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());
     delete manifest;
@@ -621,7 +631,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (remote_repository == NULL)
       tmp_file = DecompressPiece(manifest->history(), 'H');
     else
-      tmp_file = DownloadPiece(manifest->history(), 'H');
+      tmp_file = DownloadPiece(manifest->history(), 'H', &download_manager);
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStdout, "failed to load history database %s",
                manifest->history().ToString().c_str());
@@ -651,7 +661,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   catalog::DeltaCounters computed_counters;
-  bool retval = InspectTree("", root_hash, NULL, &computed_counters);
+  bool retval = InspectTree("", root_hash, NULL, &computed_counters,
+                            &download_manager);
 
   delete manifest;
   return retval ? 0 : 1;

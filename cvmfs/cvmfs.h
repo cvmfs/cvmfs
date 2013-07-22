@@ -18,12 +18,17 @@
 
 #include "util.h"
 
+namespace download {
+class DownloadManager;
+}
+
 namespace cvmfs {
 
 extern const loader::LoaderExports *loader_exports_;
 extern pid_t pid_;
 extern std::string *mountpoint_;
 extern std::string *repository_name_;
+extern download::DownloadManager *download_manager_;
 extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;

@@ -30,11 +30,13 @@ static bool IsRemote(const string &repository) {
 /**
  * Checks for existance of a file either locally or via HTTP head
  */
-static bool Exists(const string &repository, const string &file) {
+static bool Exists(const string &repository, const string &file,
+                   download::DownloadManager *download_manager)
+{
   if (IsRemote(repository)) {
     const string url = repository + "/" + file;
     download::JobInfo head(&url, false);
-    return download::Fetch(&head) == download::kFailOk;
+    return download_manager->Fetch(&head) == download::kFailOk;
   } else {
     return FileExists(file);
   }
@@ -66,6 +68,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
   const string repository = MakeCanonicalPath(*args.find('r')->second);
+  download::DownloadManager download_manager;
 
   // Load manifest file
   // Repository can be HTTP address or on local file system
@@ -75,11 +78,11 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
   manifest::Manifest *manifest = NULL;
   if (IsRemote(repository)) {
-    download::Init(1, true);
+    download_manager.Init(1, true);
 
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);
-    download::Failures retval = download::Fetch(&download_manifest);
+    download::Failures retval = download_manager.Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d)",
                retval);
@@ -107,7 +110,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   // Validate Manifest
   const string certificate_path =
     "data" + manifest->certificate().MakePath(1, 2) + "X";
-  if (!Exists(repository, certificate_path)) {
+  if (!Exists(repository, certificate_path, &download_manager)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());
     delete manifest;
@@ -139,7 +142,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (args.count('m') > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Replication Master Copy:         " : "",
-             (Exists(repository, ".cvmfs_master_replica")) ? "true" : "false");
+             (Exists(repository, ".cvmfs_master_replica", &download_manager)) ?
+               "true" : "false");
   }
 
   delete manifest;

@@ -116,6 +116,7 @@ time_t boot_time_;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 cache::CatalogManager *catalog_manager_;
 signature::SignatureManager *signature_manager_;
+download::DownloadManager *download_manager_;
 lru::Md5PathCache *md5path_cache_ = NULL;
 
 atomic_int64 num_fs_open_;
@@ -500,10 +501,12 @@ int cvmfs_int_init(
   atomic_init32(&cvmfs::open_dirs_);
 
   // Network initialization
-  download::Init(16, false);
-  download::SetHostChain(string(cvmfs_opts_hostname));
-  download::SetProxyChain(cvmfs_opts_proxies);
-  download::SetTimeout(cvmfs_opts_timeout, cvmfs_opts_timeout_direct);
+  cvmfs::download_manager_ = new download::DownloadManager();
+  cvmfs::download_manager_->Init(16, false);
+  cvmfs::download_manager_->SetHostChain(string(cvmfs_opts_hostname));
+  cvmfs::download_manager_->SetProxyChain(cvmfs_opts_proxies);
+  cvmfs::download_manager_->SetTimeout(cvmfs_opts_timeout,
+                                       cvmfs_opts_timeout_direct);
   download_ready = true;
 
   cvmfs::signature_manager_ = new signature::SignatureManager();
@@ -528,7 +531,8 @@ int cvmfs_int_init(
   // Load initial file catalog
   cvmfs::catalog_manager_ = new
     cache::CatalogManager(*cvmfs::repository_name_,
-                          cvmfs::signature_manager_);
+                          cvmfs::signature_manager_,
+                          cvmfs::download_manager_);
   if (!cvmfs_opts_root_hash.empty()) {
     retval = cvmfs::catalog_manager_->InitFixed(
       hash::Any(hash::kSha1, hash::HexPtr(string(cvmfs_opts_root_hash))));
@@ -567,7 +571,7 @@ void cvmfs_int_spawn() {
     monitor::Spawn();
   }
   if (enable_async_downloads)
-    download::Spawn();
+    cvmfs::download_manager_->Spawn();
   quota::Spawn();
 
   if (*tracefile_ != "")
@@ -586,7 +590,7 @@ void cvmfs_int_fini() {
   cvmfs::md5path_cache_ = NULL;
 
   if (signature_ready) cvmfs::signature_manager_->Fini();
-  if (download_ready) download::Fini();
+  if (download_ready) cvmfs::download_manager_->Fini();
   if (monitor_ready) monitor::Fini();
   if (quota_ready) quota::Fini();
   if (cache_ready) cache::Fini();
@@ -595,7 +599,9 @@ void cvmfs_int_fini() {
   tracer::Fini();
 
   delete cvmfs::signature_manager_;
+  delete cvmfs::download_manager_;
   cvmfs::signature_manager_ = NULL;
+  cvmfs::download_manager_ = NULL;
 
   sqlite3_shutdown();
   free(sqlite_page_cache);
@@ -621,7 +627,8 @@ int cvmfs_open(const char *c_path)
     return -ENOENT;
   }
 
-  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
+  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
+                          cvmfs::download_manager_);
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
