@@ -41,19 +41,15 @@ class CommandCheck : public Command {
   bool InspectTree(const std::string &path,
                    const hash::Any &catalog_hash,
                    const catalog::DirectoryEntry *transition_point,
-                   catalog::DeltaCounters *computed_counters,
-                   download::DownloadManager *download_manager);
+                   catalog::DeltaCounters *computed_counters);
   std::string DecompressPiece(const hash::Any catalog_hash,
                               const char suffix);
   std::string DownloadPiece(const hash::Any catalog_hash,
-                            const char suffix,
-                            download::DownloadManager *download_manager);
+                            const char suffix);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,
-            catalog::DeltaCounters *computed_counters,
-            download::DownloadManager *download_manager);
-  bool Exists(const std::string &file,
-              download::DownloadManager *download_manager);
+            catalog::DeltaCounters *computed_counters);
+  bool Exists(const std::string &file);
   bool CompareCounters(const catalog::Counters &a,
                        const catalog::Counters &b);
   bool CompareEntries(const catalog::DirectoryEntry &a,

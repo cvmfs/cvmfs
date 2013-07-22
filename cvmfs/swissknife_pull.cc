@@ -35,6 +35,7 @@
 #include "atomic.h"
 
 using namespace std;  // NOLINT
+using namespace swissknife;  // NOLINT
 
 namespace {
 
@@ -73,9 +74,6 @@ atomic_int64         chunk_queue;
 
 
 static void *MainWorker(void *data) {
-  download::DownloadManager *download_manager =
-    static_cast<download::DownloadManager *>(data);
-
   while (1) {
     ChunkJob next_chunk;
     pthread_mutex_lock(&lock_pipe);
@@ -104,7 +102,7 @@ static void *MainWorker(void *data) {
       unsigned attempts = 0;
       download::Failures retval;
       do {
-        retval = download_manager->Fetch(&download_chunk);
+        retval = g_download_manager->Fetch(&download_chunk);
         if (retval != download::kFailOk) {
           LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
                    url_chunk.c_str(), retval);
@@ -125,8 +123,7 @@ static void *MainWorker(void *data) {
 
 
 static bool Pull(const hash::Any &catalog_hash, const std::string &path,
-                 const bool with_nested,
-                 download::DownloadManager *download_manager)
+                 const bool with_nested)
 {
   int retval;
 
@@ -163,7 +160,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
                              catalog_hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url_catalog, false, false,
                                      fcatalog_vanilla, &catalog_hash);
-  retval = download_manager->Fetch(&download_catalog);
+  retval = g_download_manager->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
@@ -225,7 +222,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
                previous_catalog.ToString().c_str());
-      retval = Pull(previous_catalog, path, false, download_manager);
+      retval = Pull(previous_catalog, path, false);
       if (!retval)
         return false;
     }
@@ -243,7 +240,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
                i->path.c_str());
-      retval = Pull(i->hash, i->path.ToString(), true, download_manager);
+      retval = Pull(i->hash, i->path.ToString(), true);
       if (!retval)
         return false;
     }
@@ -288,8 +285,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   unsigned timeout = 10;
   int fd_lockfile = -1;
   manifest::ManifestEnsemble ensemble;
-  signature::SignatureManager signature_manager;
-  download::DownloadManager download_manager;
 
   // Option parsing
   if (args.find('l') != args.end()) {
@@ -344,11 +339,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
-  download_manager.Init(num_parallel+1, true);
+  g_download_manager->Init(num_parallel+1, true);
   //download::ActivatePipelining();
   unsigned current_group;
   vector< vector<string> > proxies;
-  download_manager.GetProxyInfo(&proxies, &current_group);
+  g_download_manager->GetProxyInfo(&proxies, &current_group);
   if (proxies.size() > 0) {
     string proxy_str = "\nWarning, replicating through proxies\n";
     proxy_str += "  Load-balance groups:\n";
@@ -360,11 +355,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     proxies[current_group][0];
     LogCvmfs(kLogCvmfs, kLogStdout, "%s\n", proxy_str.c_str());
   }
-  download_manager.SetTimeout(timeout, timeout);
-  download_manager.SetRetryParameters(retries, timeout, 3*timeout);
-  download_manager.Spawn();
-  signature_manager.Init();
-  if (!signature_manager.LoadPublicRsaKeys(master_keys)) {
+  g_download_manager->SetTimeout(timeout, timeout);
+  g_download_manager->SetRetryParameters(retries, timeout, 3*timeout);
+  g_download_manager->Spawn();
+  g_signature_manager->Init();
+  if (!g_signature_manager->LoadPublicRsaKeys(master_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "cvmfs public master key could not be loaded.");
     goto fini;
@@ -375,7 +370,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
-                           &signature_manager, &download_manager, &ensemble);
+                           g_signature_manager, g_download_manager, &ensemble);
   if (retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
     goto fini;
@@ -390,7 +385,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     download::JobInfo download_history(&history_url, false, false,
                                        &history_path,
                                        &history_hash);
-    retval = download_manager.Fetch(&download_history);
+    retval = g_download_manager->Fetch(&download_history);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d)",
                retval);
@@ -418,7 +413,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   // Check if we have a replica-ready server
-  retval = download_manager.Fetch(&download_sentinel);
+  retval = g_download_manager->Fetch(&download_sentinel);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "This is not a CernVM-FS server for replication");
@@ -429,19 +424,18 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   MakePipe(pipe_chunks);
   LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
   for (unsigned i = 0; i < num_parallel; ++i) {
-    int retval = pthread_create(&workers[i], NULL, MainWorker,
-                                static_cast<void *>(&download_manager));
+    int retval = pthread_create(&workers[i], NULL, MainWorker, NULL);
     assert(retval == 0);
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
-  retval = Pull(ensemble.manifest->catalog_hash(), "", true, &download_manager);
+  retval = Pull(ensemble.manifest->catalog_hash(), "", true);
   for (map<string, hash::Any>::const_iterator i = historic_tags.begin(),
        iEnd = historic_tags.end(); i != iEnd; ++i)
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->first.c_str());
-    bool retval2 = Pull(i->second, "", true, &download_manager);
+    bool retval2 = Pull(i->second, "", true);
     retval = retval && retval2;
   }
 
@@ -461,9 +455,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (!retval)
     goto fini;
 
-  if (download_manager.GetStatistics().num_retries > 0) {
+  if (g_download_manager->GetStatistics().num_retries > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Overall number of retries: %"PRId64,
-             download_manager.GetStatistics().num_retries);
+             g_download_manager->GetStatistics().num_retries);
   }
 
   // Upload manifest ensemble
@@ -492,8 +486,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (fd_lockfile >= 0)
     UnlockFile(fd_lockfile);
   free(workers);
-  signature_manager.Fini();
-  download_manager.Fini();
+  g_signature_manager->Fini();
+  g_download_manager->Fini();
   delete spooler;
   return result;
 }

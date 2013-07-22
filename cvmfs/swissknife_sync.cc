@@ -264,13 +264,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  download::DownloadManager download_manager;
-  download_manager.Init(1, true);
+  g_download_manager->Init(1, true);
 
   catalog::WritableCatalogManager
     catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
                     params.stratum0, params.dir_temp, params.spooler,
-                    &download_manager);
+                    g_download_manager);
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
   if (params.union_fs_type == "overlayfs") {
@@ -293,7 +292,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest = mediator.Commit();
 
-  download_manager.Fini();
+  g_download_manager->Fini();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   if (!manifest) {
