@@ -13,8 +13,7 @@
 #include <cassert>
 
 /**
- * See: TAoCP, volume 2
- * Returns a random number sequence of length 2^36-1
+ * Pseudo Random Number Generator.  See: TAoCP, volume 2
  */
 class Prng {
  public:
