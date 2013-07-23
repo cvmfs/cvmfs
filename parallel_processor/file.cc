@@ -6,6 +6,12 @@
 File::~File() {
   if (HasBulkChunk()) {
     delete bulk_chunk_;
+    bulk_chunk_ = NULL;
+  }
+
+  if (HasChunkDetector()) {
+    delete chunk_detector_;
+    chunk_detector_ = NULL;
   }
 
   ChunkVector::const_iterator i    = chunks_.begin();
