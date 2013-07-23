@@ -3,7 +3,6 @@
 #include <cassert>
 #include <sstream>
 #include <cstdio>
-#include <list>
 
 #include "file.h"
 #include "processor.h"
@@ -11,170 +10,127 @@
 #include "util.h"
 
 
-class Reader {
- protected:
-  struct OpenFile {
-    OpenFile() :
-      file(NULL), file_marker(0), previous_task(NULL),
-      previous_sync_task(NULL) {}
-
-    File               *file;
-    int                 file_descriptor;
-    off_t               file_marker;
-
-    FileScrubbingTask  *previous_task;
-    tbb::task          *previous_sync_task;
-  };
-
-  typedef std::list<OpenFile> OpenFileList;
-
- public:
-  Reader(IoDispatcher::FileQueue  &queue,
-         const unsigned int        max_files_in_flight,
-         const size_t              max_buffer_size) :
-    queue_(queue), max_files_in_flight_(max_files_in_flight),
-    max_buffer_size_(max_buffer_size), draining_(false) {}
-
-  void Read() {
-    while (HasData()) {
-      File *file = NULL;
-      const bool popped_new_job = TryToAcquireNewJob(file);
-      if (popped_new_job) {
-        if (file != NULL) {
-          OpenNewFile(file);
-        } else {
-          EnableDraining();
-        }
+void Reader::Read() {
+  while (HasData()) {
+    File *file = NULL;
+    const bool popped_new_job = TryToAcquireNewJob(file);
+    if (popped_new_job) {
+      if (file != NULL) {
+        OpenNewFile(file);
+      } else {
+        EnableDraining();
       }
+    }
 
-      OpenFileList::iterator       i    = open_files_.begin();
-      OpenFileList::const_iterator iend = open_files_.end();
-      for (; i != iend; ++i) {
-        const bool finished_reading = ReadAndScheduleNextBuffer(*i);
-        if (finished_reading) {
-          CloseFile(*i);
-          i = open_files_.erase(i);
-        }
+    OpenFileList::iterator       i    = open_files_.begin();
+    OpenFileList::const_iterator iend = open_files_.end();
+    for (; i != iend; ++i) {
+      const bool finished_reading = ReadAndScheduleNextBuffer(*i);
+      if (finished_reading) {
+        CloseFile(*i);
+        i = open_files_.erase(i);
       }
     }
   }
+}
 
- protected:
-  bool HasData() const { return ! draining_ || open_files_.size() > 0; }
 
-  bool TryToAcquireNewJob(File *&new_file_job) {
-    // in draining mode we only process files that are already open
-    if (draining_) {
-      return false;
-    }
-
-    const size_t open_file_count = open_files_.size();
-
-    // if we have enough open files, we don't fetch more work
-    if (open_file_count == max_files_in_flight_) {
-      return false;
-    }
-
-    File *file  = NULL;
-    bool popped = false;
-
-    // if we have no more work, we allow the thread to block otherwise we just
-    // acquire what we can get
-    if (open_file_count == 0) {
-      queue_.pop(file);
-      popped = true;
-    } else {
-      popped = queue_.try_pop(file);
-    }
-
-    new_file_job = file;
-    return popped;
+bool Reader::TryToAcquireNewJob(File *&new_file_job) {
+  // in draining mode we only process files that are already open
+  if (draining_) {
+    return false;
   }
 
-  void OpenNewFile(File *file) {
-    assert (open_files_.size() < max_files_in_flight_);
+  File *file  = NULL;
+  bool popped = false;
 
-    const int fd = open(file->path().c_str(), O_RDONLY, 0);
-    assert (fd > 0);
-
-    OpenFile open_file;
-    open_file.file            = file;
-    open_file.file_descriptor = fd;
-
-    open_files_.push_back(open_file);
+  // if we have no more work, we allow the thread to block otherwise we just
+  // acquire what we can get
+  if (open_files_.empty()) {
+    queue_.pop(file);
+    popped = true;
+  } else {
+    popped = queue_.try_pop(file);
   }
 
-  void CloseFile(OpenFile &file) {
-    const int retval = close(file.file_descriptor);
-    assert (retval == 0);
+  new_file_job = file;
+  return popped;
+}
+
+
+void Reader::OpenNewFile(File *file) {
+  const int fd = open(file->path().c_str(), O_RDONLY, 0);
+  assert (fd > 0);
+
+  OpenFile open_file;
+  open_file.file            = file;
+  open_file.file_descriptor = fd;
+
+  open_files_.push_back(open_file);
+}
+
+
+void Reader::CloseFile(OpenFile &file) {
+  const int retval = close(file.file_descriptor);
+  assert (retval == 0);
+}
+
+
+bool Reader::ReadAndScheduleNextBuffer(OpenFile &open_file) {
+  assert (open_file.file != NULL);
+  assert (open_file.file_descriptor > 0);
+
+  const size_t file_size     = open_file.file->size();
+  const size_t bytes_to_read = std::min(max_buffer_size_,
+                                        file_size - open_file.file_marker);
+  CharBuffer *buffer = CreateBuffer(bytes_to_read);
+  buffer->SetBaseOffset(open_file.file_marker);
+
+  const size_t bytes_read = read(open_file.file_descriptor,
+                                 buffer->ptr(),
+                                 bytes_to_read);
+  assert (bytes_to_read == bytes_read);
+  buffer->SetUsedBytes(bytes_read);
+  open_file.file_marker += bytes_read;
+
+  // create an asynchronous task to process the data chunk, together with
+  // a synchronisation task that ensures the correct execution order of the
+  // processing tasks
+  FileScrubbingTask  *new_task =
+    new(tbb::task::allocate_root()) FileScrubbingTask(open_file.file,
+                                                      buffer,
+                                                      this);
+  new_task->increment_ref_count();
+  tbb::task *sync_task = new(new_task->allocate_child()) tbb::empty_task();
+
+  // decorate the predecessor task (i-1) with it's successor (i) and allow
+  // it to be scheduled by TBB
+  // Note: all asynchronous tasks for a single file need to be processed in
+  //       the correct order, since they depend on each other
+  //       (This inherently kills parallelism in the first stage but every
+  //        asynchronous task spawned here may spawn additional independent
+  //        sub-tasks)
+  if (open_file.previous_task != NULL) {
+    open_file.previous_task->SetNext(new_task);
+    tbb::task::enqueue(*open_file.previous_sync_task);
   }
 
-  bool ReadAndScheduleNextBuffer(OpenFile &open_file) {
-    assert (open_file.file != NULL);
-    assert (open_file.file_descriptor > 0);
+  open_file.previous_task      = new_task;
+  open_file.previous_sync_task = sync_task;
 
-    const size_t file_size     = open_file.file->size();
-    const size_t bytes_to_read = std::min(max_buffer_size_,
-                                          file_size - open_file.file_marker);
-    CharBuffer *buffer = new CharBuffer(bytes_to_read);
-    buffer->SetBaseOffset(open_file.file_marker);
-
-    const size_t bytes_read = read(open_file.file_descriptor,
-                                   buffer->ptr(),
-                                   bytes_to_read);
-    assert (bytes_to_read == bytes_read);
-    buffer->SetUsedBytes(bytes_read);
-    open_file.file_marker += bytes_read;
-
-    // create an asynchronous task to process the data chunk, together with
-    // a synchronisation task that ensures the correct execution order of the
-    // processing tasks
-    FileScrubbingTask  *new_task =
-      new(tbb::task::allocate_root()) FileScrubbingTask(open_file.file, buffer);
-    new_task->increment_ref_count();
-    tbb::task *sync_task = new(new_task->allocate_child()) tbb::empty_task();
-
-    // decorate the predecessor task (i-1) with it's successor (i) and allow
-    // it to be scheduled by TBB
-    // Note: all asynchronous tasks for a single file need to be processed in
-    //       the correct order, since they depend on each other
-    //       (This inherently kills parallelism in the first stage but every
-    //        asynchronous task spawned here may spawn additional independent
-    //        sub-tasks)
-    if (open_file.previous_task != NULL) {
-      open_file.previous_task->SetNext(new_task);
-      tbb::task::enqueue(*open_file.previous_sync_task);
-    }
-
-    open_file.previous_task      = new_task;
-    open_file.previous_sync_task = sync_task;
-
-    const bool finished_reading = (open_file.file_marker == file_size);
-    if (finished_reading) {
-      // make sure that the last chunk is processed
-      tbb::task::enqueue(*open_file.previous_sync_task);
-    }
-
-    return finished_reading;
+  const bool finished_reading = (open_file.file_marker == file_size);
+  if (finished_reading) {
+    // make sure that the last chunk is processed
+    tbb::task::enqueue(*open_file.previous_sync_task);
   }
 
-  void EnableDraining() { draining_ = true; }
-
- private:
-  IoDispatcher::FileQueue  &queue_;
-  const unsigned int        max_files_in_flight_;
-  const size_t              max_buffer_size_;
-
-  bool                      draining_;
-  OpenFileList              open_files_;
-};
+  return finished_reading;
+}
 
 
 void IoDispatcher::ReadThread() {
   tbb::task_scheduler_init sched(tbb_workers_ + 1);
-
-  Reader reader(read_queue_, max_files_in_flight_, max_read_buffer_size_);
-  reader.Read();
+  reader_.Read();
 }
 
 

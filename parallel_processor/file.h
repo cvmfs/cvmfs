@@ -6,15 +6,13 @@
 
 #include "../cvmfs/platform.h"
 
+#include "buffer.h"
+#include "chunk_detector.h"
+
 class IoDispatcher;
+class ChunkDetector;
 class Chunk;
 typedef std::vector<Chunk*> ChunkVector;
-
-
-
-static const size_t kMinChunkSize = 2 * 1024 * 1024;
-static const size_t kAvgChunkSize = 4 * 1024 * 1024;
-static const size_t kMaxChunkSize = 8 * 1024 * 1024;
 
 
 
@@ -24,9 +22,10 @@ class File {
        const platform_stat64  &info,
        IoDispatcher           *io_dispatcher) :
     path_(path), size_(info.st_size),
-    might_become_chunked_(size_ > kMinChunkSize),
+    might_become_chunked_(ChunkDetector::MightBecomeChunked(size_)),
     bulk_chunk_(NULL), committed_chunks_(0),
-    io_dispatcher_(io_dispatcher)
+    io_dispatcher_(io_dispatcher),
+    chunk_detector_(NULL)
   {
     CreateInitialChunk();
   }
@@ -45,6 +44,19 @@ class File {
   Chunk* CreateNextChunk(const off_t offset);
   void ChunkCommitted(Chunk *chunk);
   void FullyDefineLastChunk();
+
+  bool HasChunkDetector() const { return chunk_detector_ != NULL; }
+  void AddChunkDetector(ChunkDetector *detector) {
+    assert (chunk_detector_ == NULL);
+    assert (might_become_chunked_);
+    chunk_detector_ = detector;
+  }
+
+  off_t FindNextCutMark(CharBuffer *buffer) {
+    assert (chunk_detector_ != NULL);
+    assert (might_become_chunked_);
+    return chunk_detector_->FindNextCutMark(buffer);
+  }
 
   bool HasBulkChunk()          const { return bulk_chunk_ != NULL; }
 
@@ -80,6 +92,7 @@ class File {
   unsigned int       committed_chunks_;
 
   IoDispatcher      *io_dispatcher_;
+  ChunkDetector     *chunk_detector_;
 };
 
 #endif /* FILE_H */

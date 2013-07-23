@@ -7,6 +7,7 @@
 
 class Chunk;
 class IoDispatcher;
+class Reader;
 class File;
 
 template <class CruncherT>
@@ -40,8 +41,8 @@ class ChunkCruncher {
   }
 
  protected:
-  Chunk*      chunk()    { return chunk_;    }
-  CharBuffer* buffer()   { return buffer_;   }
+  Chunk*      chunk()  { return chunk_;  }
+  CharBuffer* buffer() { return buffer_; }
 
  private:
   ChunkCruncher(const ChunkCruncher &other) { assert (false); } // no copy!
@@ -114,8 +115,8 @@ class FileScrubbingTask : public tbb::task {
   typedef std::vector<off_t> CutMarks;
 
  public:
-  FileScrubbingTask(File *file, CharBuffer *buffer) :
-    file_(file), buffer_(buffer), next_(NULL) {}
+  FileScrubbingTask(File *file, CharBuffer *buffer, Reader *reader) :
+    file_(file), buffer_(buffer), reader_(reader), next_(NULL) {}
 
   void SetNext(FileScrubbingTask *next) {
     next->increment_ref_count();
@@ -145,6 +146,7 @@ class FileScrubbingTask : public tbb::task {
  public:
   File               *file_;
   CharBuffer         *buffer_;
+  Reader             *reader_;
   FileScrubbingTask  *next_;
 };
 

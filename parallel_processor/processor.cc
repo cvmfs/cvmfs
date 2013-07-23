@@ -4,8 +4,9 @@
 
 #include <tbb/parallel_invoke.h>
 
-#include "chunk.h"
+#include "io_dispatcher.h"
 #include "file.h"
+#include "chunk.h"
 
 void ChunkHasher::Crunch(Chunk                *chunk,
                          const unsigned char  *data,
@@ -62,7 +63,6 @@ void ChunkCompressor::Crunch(Chunk                *chunk,
 }
 
 
-
 tbb::task* ChunkProcessingTask::execute() {
   assert (chunk_->IsInitialized());
   assert (buffer_->IsInitialized());
@@ -108,9 +108,11 @@ tbb::task* ChunkProcessingTask::execute() {
 
 
 tbb::task* FileScrubbingTask::execute() {
-  const bool is_last_buffer = IsLastBuffer();
-
   if (file_->MightBecomeChunked()) {
+    if (! file_->HasChunkDetector()) {
+      file_->AddChunkDetector(new Xor32Detector());
+    }
+
     // find chunk cut marks in the current buffer and process all chunks that
     // are fully specified (i.e. not reaching beyond the current buffer)
     const CutMarks cut_marks = FindNextChunkCutMarks();
@@ -118,19 +120,22 @@ tbb::task* FileScrubbingTask::execute() {
     CutMarks::const_iterator iend = cut_marks.end();
     for (; i != iend; ++i) {
       Chunk *fully_defined_chunk = file_->CreateNextChunk(*i);
-      assert (fully_defined_chunk->size() > 0);
+      assert (fully_defined_chunk->IsFullyDefined());
       Process(fully_defined_chunk);
     }
 
     // if we reached the last buffer this input file will produce, all but the
     // last created chunk will be fully defined at this point
-    if (is_last_buffer) {
-      file_->FinalizeLastChunk();
+    if (IsLastBuffer()) {
+      file_->FullyDefineLastChunk();
     }
 
     // process the current chunk, i.e. the last created chunk that potentially
     // reaches beyond the current buffer or to the end of the file
-    Process(file_->current_chunk());
+    Chunk *current_chunk = file_->current_chunk();
+    if (current_chunk != NULL) {
+      Process(current_chunk);
+    }
   }
 
   // check if the file has a bulk chunk and continue processing it using the
@@ -141,7 +146,7 @@ tbb::task* FileScrubbingTask::execute() {
 
   // wait for all scheduled chunk processing tasks on the current buffer
   WaitForProcessing();
-  delete buffer_;
+  reader_->ReleaseBuffer(buffer_);
 
   // go on with the next file buffer
   return Next();
@@ -160,17 +165,17 @@ void FileScrubbingTask::Process(Chunk *chunk) {
 
 FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
   const Chunk *current_chunk = file_->current_chunk();
+  assert (file_->MightBecomeChunked());
+  assert (file_->HasChunkDetector());
   assert (current_chunk != NULL);
   assert (current_chunk->size() == 0);
   assert (current_chunk->offset() <= buffer_->base_offset());
   assert (current_chunk->offset() <  buffer_->base_offset() + buffer_->used_bytes());
 
   CutMarks result;
-  off_t next_cutmark = current_chunk->offset() + kMinChunkSize;
-  while (next_cutmark < buffer_->base_offset() + buffer_->used_bytes()) {
-    assert (next_cutmark >= buffer_->base_offset());
-    result.push_back(next_cutmark);
-    next_cutmark += kMinChunkSize;
+  off_t next_cut;
+  while ((next_cut = file_->FindNextCutMark(buffer_)) != 0) {
+    result.push_back(next_cut);
   }
 
   return result;
