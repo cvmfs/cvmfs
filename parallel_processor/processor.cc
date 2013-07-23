@@ -1,6 +1,7 @@
 #include "processor.h"
 
-#include <cstdio>
+#include <sstream> // TODO: remove
+#include "util.h"  //          "
 
 #include <tbb/parallel_invoke.h>
 
@@ -64,6 +65,11 @@ void ChunkCompressor::Crunch(Chunk                *chunk,
 
 
 tbb::task* ChunkProcessingTask::execute() {
+  // Thread Safety:
+  //   * Only one ChunkProcessingTask for any given Chunk at any given time
+  //   * Parallel execution of more than one ChunkProcessingTask for chunks of
+  //     the same File is possible
+
   assert (chunk_->IsInitialized());
   assert (buffer_->IsInitialized());
 
@@ -108,6 +114,11 @@ tbb::task* ChunkProcessingTask::execute() {
 
 
 tbb::task* FileScrubbingTask::execute() {
+  // Thread Safety:
+  //   * Only one executing FileScrubbingTask per File at any time
+  //   * Execution is done in-order, thus the File is processed as a stream of
+  //     CharBuffers. Each CharBuffer will be processed in one FileScrubbingTask
+
   if (file_->MightBecomeChunked()) {
     if (! file_->HasChunkDetector()) {
       file_->AddChunkDetector(new Xor32Detector());
@@ -121,7 +132,7 @@ tbb::task* FileScrubbingTask::execute() {
     for (; i != iend; ++i) {
       Chunk *fully_defined_chunk = file_->CreateNextChunk(*i);
       assert (fully_defined_chunk->IsFullyDefined());
-      Process(fully_defined_chunk);
+      QueueForDeferredProcessing(fully_defined_chunk);
     }
 
     // if we reached the last buffer this input file will produce, all but the
@@ -134,32 +145,53 @@ tbb::task* FileScrubbingTask::execute() {
     // reaches beyond the current buffer or to the end of the file
     Chunk *current_chunk = file_->current_chunk();
     if (current_chunk != NULL) {
-      Process(current_chunk);
+      QueueForDeferredProcessing(current_chunk);
     }
   }
 
   // check if the file has a bulk chunk and continue processing it using the
   // current buffer
   if (file_->HasBulkChunk()) {
-    Process(file_->bulk_chunk());
+    QueueForDeferredProcessing(file_->bulk_chunk());
   }
 
   // wait for all scheduled chunk processing tasks on the current buffer
-  WaitForProcessing();
+  SpawnTasksAndWaitForProcessing();
   reader_->ReleaseBuffer(buffer_);
+
+  // commit the chunks that have been finished during this processing step
+  CommitFinishedChunks();
 
   // go on with the next file buffer
   return Next();
 }
 
 
-void FileScrubbingTask::Process(Chunk *chunk) {
-  assert (chunk != NULL);
+void FileScrubbingTask::SpawnTasksAndWaitForProcessing() {
+  tbb::task_list tasks;
+  std::vector<Chunk*>::const_iterator i    = chunks_to_process_.begin();
+  std::vector<Chunk*>::const_iterator iend = chunks_to_process_.end();
+  for (; i != iend; ++i) {
+    tbb::task *chunk_processing_task =
+      new(allocate_child()) ChunkProcessingTask(*i, buffer_);
+    tasks.push_back(*chunk_processing_task);
+  }
 
-  tbb::task *chunk_processing_task =
-    new(allocate_child()) ChunkProcessingTask(chunk, buffer_);
-  increment_ref_count();
-  spawn(*chunk_processing_task);
+  set_ref_count(chunks_to_process_.size() + 1); // +1 for the wait
+  spawn_and_wait_for_all(tasks);
+}
+
+
+void FileScrubbingTask::CommitFinishedChunks() const {
+  std::vector<Chunk*>::const_iterator i    = chunks_to_process_.begin();
+  std::vector<Chunk*>::const_iterator iend = chunks_to_process_.end();
+  for (; i != iend; ++i) {
+    Chunk *current_chunk = *i;
+    if (current_chunk->IsFullyProcessed()) {
+      current_chunk->ScheduleCommit();
+    }
+  }
+
 }
 
 

@@ -3,6 +3,9 @@
 #include "chunk.h"
 #include "io_dispatcher.h"
 
+#include <sstream>  // TODO: remove
+#include "util.h"   //          "
+
 File::~File() {
   if (HasBulkChunk()) {
     delete bulk_chunk_;
@@ -23,8 +26,11 @@ File::~File() {
 }
 
 
-void File::AddChunk(Chunk *chunk) {
-  io_dispatcher_->RegisterChunk(chunk);
+void File::AddChunk(Chunk *chunk, const bool register_chunk) {
+  if (register_chunk) {
+    io_dispatcher_->RegisterChunk(chunk);
+    ++chunks_to_commit_;
+  }
   if (chunk->IsBulkChunk()) {
     bulk_chunk_ = chunk;
   } else {
@@ -91,6 +97,23 @@ void File::ForkOffBulkChunk() {
 }
 
 
+void File::PromoteSingleChunkAsBulkChunk() {
+  assert (might_become_chunked_);
+  assert (chunks_.size() == 1);
+  Chunk *only_chunk = current_chunk();
+  assert (only_chunk != NULL);
+  assert (only_chunk->offset() == 0);
+  assert (only_chunk->size() == size_);
+  assert (! only_chunk->IsBulkChunk());
+  assert (only_chunk->IsFullyDefined());
+
+  only_chunk->SetAsBulkChunk();
+  chunks_.clear();
+  AddChunk(only_chunk, false); // do not register in the IoDispatcher again
+                               // this chunk is only promoted, not created
+}
+
+
 void File::FullyDefineLastChunk() {
   assert (might_become_chunked_);
   assert (chunks_.size() > 0);
@@ -99,20 +122,15 @@ void File::FullyDefineLastChunk() {
   assert (latest_chunk != NULL);
   assert (! latest_chunk->IsFullyDefined());
 
+  latest_chunk->set_size(size_ - latest_chunk->offset());
+  assert (latest_chunk->offset() + latest_chunk->size() == size_);
+
   // only one Chunk was generated during the processing of this file, though it
   // was classified as possible chunked file --> re-define the file as not being
   // chunked and use the single generated Chunk as bulk Chunk
   if (might_become_chunked_ && ! HasBulkChunk()) {
-    assert (chunks_.size() == 1);
-    assert (latest_chunk->offset() == 0);
-
-    latest_chunk->SetAsBulkChunk();
-    chunks_.clear();
-    bulk_chunk_ = latest_chunk;
+    PromoteSingleChunkAsBulkChunk();
   }
-
-  latest_chunk->set_size(size_ - latest_chunk->offset());
-  assert (latest_chunk->offset() + latest_chunk->size() == size_);
 }
 
 
@@ -150,7 +168,7 @@ void File::Finalize() {
 
 
 void File::ChunkCommitted(Chunk *chunk) {
-  if (++committed_chunks_ == chunks_.size() + ((HasBulkChunk()) ? 1 : 0)) {
+  if (--chunks_to_commit_ == 0) {
     Finalize();
   }
 }

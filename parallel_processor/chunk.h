@@ -37,6 +37,7 @@ class Chunk {
   bool IsFullyDefined()    const { return chunk_size_ > 0;                        }
 
   void Finalize();
+  void ScheduleCommit();
   Chunk* CopyAsBulkChunk(const size_t file_size);
   void SetAsBulkChunk() { is_bulk_chunk_ = true; }
 

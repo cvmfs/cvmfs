@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <tbb/atomic.h>
+
 #include "../cvmfs/platform.h"
 
 #include "buffer.h"
@@ -23,10 +25,11 @@ class File {
        IoDispatcher           *io_dispatcher) :
     path_(path), size_(info.st_size),
     might_become_chunked_(ChunkDetector::MightBecomeChunked(size_)),
-    bulk_chunk_(NULL), committed_chunks_(0),
+    bulk_chunk_(NULL),
     io_dispatcher_(io_dispatcher),
     chunk_detector_(NULL)
   {
+    chunks_to_commit_ = 0;
     CreateInitialChunk();
   }
 
@@ -77,22 +80,23 @@ class File {
   IoDispatcher* io_dispatcher() { return io_dispatcher_; }
 
  protected:
-  void AddChunk(Chunk *chunk);
+  void AddChunk(Chunk *chunk, const bool register_chunk = true);
   void CreateInitialChunk();
   void ForkOffBulkChunk();
+  void PromoteSingleChunkAsBulkChunk();
   void Finalize();
 
  private:
-  const std::string  path_;
-  const size_t       size_;
-  const bool         might_become_chunked_;
+  const std::string           path_;
+  const size_t                size_;
+  const bool                  might_become_chunked_;
 
-  ChunkVector        chunks_;
-  Chunk             *bulk_chunk_;
-  unsigned int       committed_chunks_;
+  ChunkVector                 chunks_;
+  Chunk                      *bulk_chunk_;
+  tbb::atomic<unsigned int>   chunks_to_commit_;
 
-  IoDispatcher      *io_dispatcher_;
-  ChunkDetector     *chunk_detector_;
+  IoDispatcher               *io_dispatcher_;
+  ChunkDetector              *chunk_detector_;
 };
 
 #endif /* FILE_H */
