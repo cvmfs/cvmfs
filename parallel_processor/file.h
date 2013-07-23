@@ -44,7 +44,7 @@ class File {
    */
   Chunk* CreateNextChunk(const off_t offset);
   void ChunkCommitted(Chunk *chunk);
-  void FinalizeLastChunk();
+  void FullyDefineLastChunk();
 
   bool HasBulkChunk()          const { return bulk_chunk_ != NULL; }
 
