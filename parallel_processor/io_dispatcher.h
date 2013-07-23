@@ -51,7 +51,8 @@ class Reader {
          const size_t        max_buffer_size,
          const unsigned int  max_buffers_in_flight) :
     queue_(queue),
-    max_buffer_size_(max_buffer_size), draining_(false),
+    max_buffer_size_(max_buffer_size),
+    draining_(false),
     max_buffers_in_flight_(max_buffers_in_flight)
   {
     buffers_in_flight_ = 0;
@@ -151,9 +152,9 @@ class IoDispatcher {
     tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
     max_read_buffer_size_(max_read_buffer_size),
     max_files_in_flight_(tbb_workers_ * 10),
+    reader_(read_queue_, max_read_buffer_size_, max_files_in_flight_ * 5),
     read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
-    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
-    reader_(read_queue_, max_read_buffer_size_, max_files_in_flight_ * 5)
+    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread)
   {
     files_in_flight_   = 0;
     chunks_in_flight_  = 0;
@@ -266,9 +267,9 @@ class IoDispatcher {
   pthread_mutex_t processing_done_mutex_;
   pthread_cond_t  processing_done_condition_;
 
+  Reader          reader_;
   tbb::tbb_thread read_thread_;
   tbb::tbb_thread write_thread_;
-  Reader          reader_;
 };
 
 
