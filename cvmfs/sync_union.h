@@ -30,6 +30,8 @@
 #ifndef CVMFS_SYNC_UNION_H_
 #define CVMFS_SYNC_UNION_H_
 
+#include <inttypes.h>
+
 #include <string>
 #include <set>
 

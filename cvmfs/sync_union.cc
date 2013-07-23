@@ -6,7 +6,6 @@
 
 #include "sync_union.h"
 
-#include <inttypes.h>
 #include <alloca.h>
 #include <unistd.h>
 #include <errno.h>
@@ -256,22 +255,32 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
           if (errno == ENOENT) {
             // file is not present in scratch, warn, and/or abort
             LogCvmfs(kLogUnionFs, kLogWarning,
-  "[WARNING] a file in the OverlayFS lowerdir (%s) has multiple "
-  "hard links one of which (%s) has been modified in CernVM-FS.  "
-  "Due to a limitation in OverlayFS, after this sync the modified "
-  "the file would no longer be part of its previous hardlink group "
-  "(CernVM-FS inode %"PRIu64").  The sync operation will now be aborted so "
-  "that this issue can be corrected manually by explicitly "
-  "including all files in the entire hardlink group in the "
-  "CernVM-FS transaction. To restore this hardlink, try something like:\n"
+  "[WARNING] a file in the OverlayFS lowerdir (%s) has multiple\n"
+  "hard links, at least one of which (%s)\n"
+  "has been modified in CernVM-FS.  Due to a limitation in OverlayFS, after\n"
+  "this sync the modified file would no longer be part of its previous \n"
+  "hardlink group (CernVM-FS inode %"PRIu64").\n"
+  "The sync operation will now be aborted so that this issue can be corrected\n"
+  "manually -- you must explicitly include all files belonging to this\n"
+  "hardlink group in the CernVM-FS transaction (e.g. by touching them if you\n"
+  "wish to break the link or linking them if you wish to preserve it).\n"
+  "\n"
+  "To restore only this hardlink, you could run:\n"
   "rm %s && ln %s %s\n"
+  "\n"
+  "To find all files that are part of this hardlink group, use:\n"
+  "find %s -inum %"PRIu64"\n"
+  "\n"    
   "To restore all hardlinks in this group, try something like:\n"
-  "for file in $(find %s -inum %u); do rm ${file} && ln %s ${file}; done",
+  "for file in $(find %s -inum %"PRIu64"); do rm ${file} && ln %s ${file}; done\n"
+  "\n"
+  "Once you have corrected the issue, run `cvmfs_server publish` again\n",
                      filename.c_str(),
                      entry.GetUnionPath().c_str(),
                      entry.GetRdOnlyInode(),
                      union_path.c_str(),
                      entry.GetUnionPath().c_str(), union_path.c_str(),
+                     union_parent_dir.c_str(), entry.GetRdOnlyInode(),
                      union_parent_dir.c_str(), entry.GetRdOnlyInode(),
                      entry.GetUnionPath().c_str()
             );  // LogCvmfs
