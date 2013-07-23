@@ -13,10 +13,9 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
   if (deferred_write_) {
     assert (! HasFileDescriptor());
     deferred_buffers_.push_back(buffer);
-    return;
+  } else {
+    file_->io_dispatcher()->ScheduleWrite(this, buffer);
   }
-
-  file_->io_dispatcher()->ScheduleWrite(this, buffer);
 }
 
 
@@ -48,6 +47,10 @@ void Chunk::Finalize() {
   }
 
   done_ = true;
+}
+
+
+void Chunk::ScheduleCommit() {
   file_->io_dispatcher()->ScheduleCommit(this);
 }
 
@@ -88,14 +91,17 @@ Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
   assert (! HasFileDescriptor());
   assert (file_offset_ == 0);
 
+  // create a new bulk chunk and upload the (copied) data buffers that have been
+  // hold back (deferred write)
+  // Note: The buffer data is _not_ copied when copying the chunk
+  //       we therefore do not delete the uploaded data
   Chunk *new_bulk_chunk = new Chunk(*this);
   new_bulk_chunk->set_size(file_size);
   const bool should_delete_buffers = false;
   new_bulk_chunk->FlushDeferredWrites(should_delete_buffers);
   new_bulk_chunk->SetAsBulkChunk();
 
-  // upload all previously generated buffers _without_ deleting them, they will
-  // be needed for the copied bulk chunk as well
+  // upload the deferred buffers and delete them after the upload is complete
   FlushDeferredWrites();
   assert (! deferred_write_);
 

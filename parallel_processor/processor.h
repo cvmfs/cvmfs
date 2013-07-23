@@ -127,12 +127,6 @@ class FileScrubbingTask : public tbb::task {
 
  protected:
   bool IsLastBuffer() const;
-
-  void WaitForProcessing() {
-    increment_ref_count(); // for the wait itself
-    wait_for_all();
-  }
-
   CutMarks FindNextChunkCutMarks();
 
   tbb::task* Next() {
@@ -141,13 +135,20 @@ class FileScrubbingTask : public tbb::task {
       : NULL;
   }
 
-  void Process(Chunk *chunk);
+  void QueueForDeferredProcessing(Chunk *chunk) {
+    assert (chunk != NULL);
+    chunks_to_process_.push_back(chunk);
+  }
+  void SpawnTasksAndWaitForProcessing();
+  void CommitFinishedChunks() const;
 
- public:
-  File               *file_;
-  CharBuffer         *buffer_;
-  Reader             *reader_;
-  FileScrubbingTask  *next_;
+ private:
+  File                *file_;
+  CharBuffer          *buffer_;
+  Reader              *reader_;
+  FileScrubbingTask   *next_;
+
+  std::vector<Chunk*>  chunks_to_process_;
 };
 
 
