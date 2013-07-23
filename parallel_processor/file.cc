@@ -85,7 +85,7 @@ void File::ForkOffBulkChunk() {
 }
 
 
-void File::FinalizeLastChunk() {
+void File::FullyDefineLastChunk() {
   assert (might_become_chunked_);
   assert (chunks_.size() > 0);
 
@@ -93,14 +93,26 @@ void File::FinalizeLastChunk() {
   assert (latest_chunk != NULL);
   assert (! latest_chunk->IsFullyDefined());
 
+  // only one Chunk was generated during the processing of this file, though it
+  // was classified as possible chunked file --> re-define the file as not being
+  // chunked and use the single generated Chunk as bulk Chunk
+  if (might_become_chunked_ && ! HasBulkChunk()) {
+    assert (chunks_.size() == 1);
+    assert (latest_chunk->offset() == 0);
+
+    latest_chunk->SetAsBulkChunk();
+    chunks_.clear();
+    bulk_chunk_ = latest_chunk;
+  }
+
   latest_chunk->set_size(size_ - latest_chunk->offset());
   assert (latest_chunk->offset() + latest_chunk->size() == size_);
 }
 
 
 void File::Finalize() {
-  if (might_become_chunked_) {
 #ifndef NDEBUG
+  if (might_become_chunked_ && chunks_.size() > 0) {
     // check sanity of generated chunk list
     size_t aggregated_size    = 0;
     off_t  previous_chunk_end = 0;
@@ -114,14 +126,14 @@ void File::Finalize() {
       previous_chunk_end = current_chunk->offset() + current_chunk->size();
       aggregated_size += current_chunk->size();
     }
-#endif
     assert (aggregated_size == size_);
   } else {
     assert (chunks_.size() == 0);
   }
+#endif
 
   // more sanity checks
-  assert (bulk_chunk_           != NULL);
+  assert (HasBulkChunk());
   assert (bulk_chunk_->offset() == 0);
   assert (bulk_chunk_->size()   == size_);
   assert (bulk_chunk_->IsFullyProcessed());
@@ -132,7 +144,7 @@ void File::Finalize() {
 
 
 void File::ChunkCommitted(Chunk *chunk) {
-  if (++committed_chunks_ == chunks_.size() + 1) {
+  if (++committed_chunks_ == chunks_.size() + ((HasBulkChunk()) ? 1 : 0)) {
     Finalize();
   }
 }
