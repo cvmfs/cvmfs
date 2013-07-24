@@ -24,7 +24,7 @@ class Chunk {
   Chunk(File* file, const off_t offset) :
     file_(file), file_offset_(offset), chunk_size_(0),
     is_bulk_chunk_(false), deferred_write_(false), zlib_initialized_(false),
-    sha1_digest_(""), sha1_initialized_(false), file_descriptor_(0),
+    sha1_initialized_(false), file_descriptor_(0),
     bytes_written_(0)
   {
     Initialize();
@@ -80,25 +80,7 @@ class Chunk {
   }
 
  protected:
-  void Initialize() {
-    done_            = false;
-    compressed_size_ = 0;
-
-    const int sha1_retval = SHA1_Init(&sha1_context_);
-    assert (sha1_retval == 1);
-
-    zlib_context_.zalloc   = Z_NULL;
-    zlib_context_.zfree    = Z_NULL;
-    zlib_context_.opaque   = Z_NULL;
-    zlib_context_.next_in  = Z_NULL;
-    zlib_context_.avail_in = 0;
-    const int zlib_retval = deflateInit(&zlib_context_, Z_DEFAULT_COMPRESSION);
-    assert (zlib_retval == 0);
-
-    zlib_initialized_ = true;
-    sha1_initialized_ = true;
-  }
-
+  void Initialize();
   void FlushDeferredWrites(const bool delete_buffers = true);
 
  private:

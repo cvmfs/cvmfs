@@ -32,6 +32,26 @@ void Chunk::FlushDeferredWrites(const bool delete_buffers) {
 }
 
 
+void Chunk::Initialize() {
+  done_            = false;
+  compressed_size_ = 0;
+
+  const int sha1_retval = SHA1_Init(&sha1_context_);
+  assert (sha1_retval == 1);
+
+  zlib_context_.zalloc   = Z_NULL;
+  zlib_context_.zfree    = Z_NULL;
+  zlib_context_.opaque   = Z_NULL;
+  zlib_context_.next_in  = Z_NULL;
+  zlib_context_.avail_in = 0;
+  const int zlib_retval = deflateInit(&zlib_context_, Z_DEFAULT_COMPRESSION);
+  assert (zlib_retval == 0);
+
+  zlib_initialized_ = true;
+  sha1_initialized_ = true;
+}
+
+
 void Chunk::Finalize() {
   assert (! done_);
 
@@ -65,7 +85,6 @@ Chunk::Chunk(const Chunk &other) :
   deferred_buffers_(other.deferred_buffers_),
   zlib_initialized_(false),
   sha1_context_(other.sha1_context_),
-  sha1_digest_(""),
   sha1_initialized_(other.sha1_initialized_),
   file_descriptor_(0),
   tmp_file_path_(other.tmp_file_path_),
