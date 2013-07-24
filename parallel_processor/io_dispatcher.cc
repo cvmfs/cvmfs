@@ -3,6 +3,7 @@
 #include <cassert>
 #include <sstream>
 #include <cstdio>
+#include <cerrno>
 
 #include "file.h"
 #include "processor.h"
@@ -81,8 +82,9 @@ bool Reader::ReadAndScheduleNextBuffer(OpenFile &open_file) {
   assert (open_file.file_descriptor > 0);
 
   const size_t file_size     = open_file.file->size();
-  const size_t bytes_to_read = std::min(max_buffer_size_,
-                                        file_size - open_file.file_marker);
+  const size_t bytes_to_read =
+    std::min(file_size - static_cast<size_t>(open_file.file_marker),
+             max_buffer_size_);
   CharBuffer *buffer = CreateBuffer(bytes_to_read);
   buffer->SetBaseOffset(open_file.file_marker);
 

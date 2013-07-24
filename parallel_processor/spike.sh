@@ -1,7 +1,11 @@
 #!/bin/sh
 
 echo "compiling..."
-clang++ -o spike -O3 -g -DNDEBUG main.cc chunk.cc util.cc file.cc processor.cc io_dispatcher.cc chunk_detector.cc ../cvmfs/logging.cc -lrt -ltbb -ltbbmalloc -lz -lcrypto
+LINKER_FLAGS="-ltbb -ltbbmalloc -lz -lcrypto"
+if [ $(uname) = "Linux" ]; then
+  LINKER_FLAGS="${LINKER_FLAGS} -lrt"
+fi
+clang++ -o spike -O3 -g -DNDEBUG main.cc chunk.cc util.cc file.cc processor.cc io_dispatcher.cc chunk_detector.cc ../cvmfs/logging.cc $LINKER_FLAGS
 if [ $? -ne 0 ]; then
   exit 1
 fi
