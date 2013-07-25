@@ -1,0 +1,14 @@
+We repackage the original tgz downloaded from threadingbuildingblocks.org
+into a fresh tar.gz archive using the following commands:
+
+TBB_VERSION=4.1-4 # <-- ADAPT THIS
+tar xzf <original tgz file>
+mv <resulting directory> tbb-${TBB_VERSION}
+tar czf tbb-${TBB_VERSION}.tar.gz tbb-${TBB_VERSION}
+
+
+
+Here you have a mapping to the original archive names:
+
+Original Name                   Repackaged Archive        TBB Version
+tbb41_20130613oss_src.tgz       tbb-4.1-4.tar.gz          4.1 Update 4

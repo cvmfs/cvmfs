@@ -1,0 +1,26 @@
+include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
+
+if (MACOSX)
+  set (DLLEXT "dylib")
+else (MACOSX)
+  set (DLLEXT "so")
+endif (MACOSX)
+
+set (TBB_LIBRARY_DIRS        "${TBB_BUILD_LOCATION}/build_release")
+set (TBB_DEBUG_LIBRARY_DIRS  "${TBB_BUILD_LOCATION}/build_debug")
+set (TBB_LIBRARIES           ${TBB_LIBRARY_DIRS}/libtbb_cvmfs.${DLLEXT} ${TBB_LIBRARY_DIRS}/libtbbmalloc_cvmfs.${DLLEXT})
+set (TBB_DEBUG_LIBRARIES     ${TBB_DEBUG_LIBRARY_DIRS}/libtbb_cvmfs_debug.${DLLEXT} ${TBB_DEBUG_LIBRARY_DIRS}/libtbbmalloc_cvmfs_debug.${DLLEXT})
+
+register_external_lib (libtbb ${TBB_BUILD_LOCATION} "${TBB_LIBRARIES} ${TBB_DEBUG_LIBRARIES}")
+
+if (IS_64_BIT)
+  set (TBB_INSTALL_LOCATION "lib64")
+else (IS_64_BIT)
+  set (TBB_INSTALL_LOCATION "lib")
+endif (IS_64_BIT)
+
+install (
+  FILES          ${TBB_LIBRARIES} ${TBB_DEBUG_LIBRARIES}
+  DESTINATION    ${TBB_INSTALL_LOCATION}
+  PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+)
