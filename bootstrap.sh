@@ -9,6 +9,7 @@ ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.5.0
 GOOGLETEST_VERSION=1.6.0
+TBB_VERSION=4.1-4
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <decompress location>"
@@ -90,11 +91,14 @@ do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
 do_extract  "sparsehash"  "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
 do_extract  "leveldb"     "leveldb-${LEVELDB_VERSION}.tar.gz"
 do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.tar.gz"
+do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 
 do_copy     "sqlite3"
 do_copy     "vjson"
 
 patch_external "leveldb"  "dont_search_snappy.patch"
+patch_external "tbb"      "custom_library_suffix.patch"        \
+                          "symlink_to_build_directories.patch"
 
 # create a hint that bootstrapping is already done
 touch "$externals_build_dir/.decompressionDone"
