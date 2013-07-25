@@ -11,6 +11,11 @@ set (TBB_DEBUG_LIBRARY_DIRS  "${TBB_BUILD_LOCATION}/build_debug")
 set (TBB_LIBRARIES           ${TBB_LIBRARY_DIRS}/libtbb_cvmfs.${DLLEXT} ${TBB_LIBRARY_DIRS}/libtbbmalloc_cvmfs.${DLLEXT})
 set (TBB_DEBUG_LIBRARIES     ${TBB_DEBUG_LIBRARY_DIRS}/libtbb_cvmfs_debug.${DLLEXT} ${TBB_DEBUG_LIBRARY_DIRS}/libtbbmalloc_cvmfs_debug.${DLLEXT})
 
+if (NOT MACOSX)
+  set (TBB_LIBRARIES ${TBB_LIBRARIES} ${TBB_LIBRARY_DIRS}/libtbb_cvmfs.${DLLEXT}.2 ${TBB_LIBRARY_DIRS}/libtbbmalloc_cvmfs.${DLLEXT}.2)
+  set (TBB_DEBUG_LIBRARIES ${TBB_DEBUG_LIBRARIES} ${TBB_DEBUG_LIBRARY_DIRS}/libtbb_cvmfs_debug.${DLLEXT}.2 ${TBB_DEBUG_LIBRARY_DIRS}/libtbbmalloc_cvmfs_debug.${DLLEXT}.2)
+endif (NOT MACOSX)
+
 register_external_lib (libtbb ${TBB_BUILD_LOCATION} "${TBB_LIBRARIES} ${TBB_DEBUG_LIBRARIES}")
 
 if (IS_64_BIT)
