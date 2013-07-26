@@ -94,6 +94,7 @@
 #include "compat.h"
 #include "history.h"
 #include "manifest_fetch.h"
+#include "auto_umount.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -2161,6 +2162,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
            cvmfs::catalog_manager_->GetRootInode());
 
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
+  auto_umount::SetMountpoint(*cvmfs::mountpoint_);
 
   return loader::kFailOk;
 }
@@ -2195,6 +2197,7 @@ static void Spawn() {
 
   cvmfs::pid_ = getpid();
   if (cvmfs::UseWatchdog() && g_monitor_ready) {
+    monitor::RegisterOnCrash(auto_umount::UmountOnCrash);
     monitor::Spawn();
   }
   download::Spawn();
@@ -2283,6 +2286,7 @@ static void Fini() {
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
+  auto_umount::SetMountpoint("");
 
   delete cvmfs::prng_;
   cvmfs::prng_ = NULL;

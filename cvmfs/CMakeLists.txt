@@ -58,6 +58,7 @@ set (CVMFS2_DEBUG_SOURCES
   loader.h compat.cc compat.h
   history.h history.cc
   quota_listener.h quota_listener.cc
+  auto_umount.h auto_umount.cc
   cvmfs.h cvmfs.cc
 )
 
