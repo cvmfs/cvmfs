@@ -89,7 +89,7 @@ void UmountOnCrash() {
     return;
   }
 
-  LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler: unmounted %s",
+  LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler unmounted stalled %s",
            mountpoint_->c_str());
 }
 
