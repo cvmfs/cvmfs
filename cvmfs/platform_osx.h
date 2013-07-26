@@ -22,6 +22,7 @@
 #include <cstdlib>
 
 #include <string>
+#include <vector>
 
 #include "smalloc.h"
 
@@ -41,6 +42,12 @@ namespace CVMFS_NAMESPACE_GUARD {
  * HOST_NAME_MAX does on exist on OS X
  */
 #define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
+
+
+inline std::vector<std::string> platform_mountlist() {
+  std::vector<std::string> result;
+  return result;
+}
 
 
 /**

@@ -17,18 +17,34 @@
 #include <signal.h>
 #include <limits.h>
 #include <unistd.h>
+#include <mntent.h>
 
 #include <cassert>
+#include <cstdio>
 
 #include <cstring>
-#include <string>
 #include <cstdlib>
+#include <string>
+#include <vector>
 
 #include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
+
+
+inline std::vector<std::string> platform_mountlist() {
+  std::vector<std::string> result;
+  FILE *fmnt = setmntent("/proc/mounts", "r");
+  struct mntent *mntbuf;  // Static buffer managed by libc!
+  while ((mntbuf = getmntent(fmnt)) != NULL) {
+    result.push_back(mntbuf->mnt_dir);
+  }
+  endmntent(fmnt);
+  return result;
+}
+
 
 /**
  * Spinlocks are not necessarily part of pthread on all platforms.
