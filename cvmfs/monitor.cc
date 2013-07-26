@@ -64,6 +64,7 @@ Pipe *pipe_watchdog_ = NULL;
 platform_spinlock lock_handler_;
 stack_t sighandler_stack_;
 pid_t watchdog_pid_ = 0;
+void (*on_crash_)(void) = NULL;
 
 typedef std::map<int, struct sigaction> SigactionMap;
 SigactionMap old_signal_handlers_;
@@ -361,10 +362,12 @@ static void Watchdog() {
 
   if (!pipe_watchdog_->Read(&control_flow)) {
     LogEmergency("unexpected termination (" + StringifyInt(control_flow) + ")");
+    if (on_crash_) on_crash_();
   } else {
     switch (control_flow) {
       case ControlFlow::kProduceStacktrace:
         LogEmergency(ReportStacktrace());
+        if (on_crash_) on_crash_();
         break;
 
       case ControlFlow::kQuit:
@@ -393,6 +396,8 @@ bool Init(const string &cache_dir, const std::string &process_name,
 
 
 void Fini() {
+  on_crash_ = NULL;
+
   // Reset signal handlers
   if (spawned_) {
     signal(SIGQUIT, SIG_DFL);
@@ -447,10 +452,13 @@ void Spawn() {
           pipe_pid.Write(watchdog_pid);
           close(pipe_pid.write_end);
           // Close all unused file descriptors
+          string usyslog_save = GetLogMicroSyslog();
+          SetLogMicroSyslog("");
           for (int fd = 0; fd < max_fd; fd++) {
             if (fd != pipe_watchdog_->read_end)
               close(fd);
           }
+          SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           Watchdog();
           exit(0);
         }
@@ -504,6 +512,12 @@ void Spawn() {
 
   spawned_ = true;
 }
+
+
+void RegisterOnCrash(void (*CleanupOnCrash)(void)) {
+  on_crash_ = CleanupOnCrash;
+}
+
 
 unsigned GetMaxOpenFiles() {
   static unsigned max_open_files;

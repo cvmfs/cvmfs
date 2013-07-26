@@ -13,6 +13,7 @@ bool Init(const std::string &cache_dir, const std::string &process_name,
           const bool check_max_open_files);
 void Fini();
 void Spawn();
+void RegisterOnCrash(void (*CleanupOnCrash)(void));
 
 pid_t GetPid();
 
