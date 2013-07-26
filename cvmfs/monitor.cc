@@ -453,12 +453,15 @@ void Spawn() {
           close(pipe_pid.write_end);
           // Close all unused file descriptors
           string usyslog_save = GetLogMicroSyslog();
+          string debuglog_save = GetLogDebugFile();
           SetLogMicroSyslog("");
+          SetLogDebugFile("");
           for (int fd = 0; fd < max_fd; fd++) {
             if (fd != pipe_watchdog_->read_end)
               close(fd);
           }
           SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
+          SetLogDebugFile(debuglog_save);  // no-op if debug log not used
           Watchdog();
           exit(0);
         }
