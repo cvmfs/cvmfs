@@ -67,8 +67,14 @@ void UmountOnCrash() {
   }
 
   // stat() might be served from caches.  Opendir ensures fuse module is called.
+  int expected_error;
+#ifdef __APPLE__
+  expected_error = ENXIO;
+#else
+  expected_error = ENOTCONN;
+#endif
   DIR *dirp = opendir(mountpoint_->c_str());
-  if (dirp || (errno != ENOTCONN)) {
+  if (dirp || (errno != expected_error)) {
     if (dirp) closedir(dirp);
     LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler: "
              "%s seems not to be stalled (%d)", mountpoint_->c_str(), errno);
