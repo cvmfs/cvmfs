@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/prctl.h>
 #include <attr/xattr.h>
+#include <sys/mount.h>
 #include <signal.h>
 #include <limits.h>
 #include <unistd.h>
@@ -43,6 +44,17 @@ inline std::vector<std::string> platform_mountlist() {
   }
   endmntent(fmnt);
   return result;
+}
+
+
+// glibc < 2.11
+#ifndef MNT_DETACH
+#define MNT_DETACH 0x00000002
+#endif
+inline bool platform_umount(const char* mountpoint, const bool lazy) {
+  int flags = lazy ? MNT_DETACH : 0;
+  int retval = umount2(mountpoint, flags);
+  return retval == 0;
 }
 
 

@@ -50,6 +50,11 @@ inline std::vector<std::string> platform_mountlist() {
 }
 
 
+inline bool platform_umount(const char* mountpoint, const bool lazy) {
+  return false;
+}
+
+
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.
  */
