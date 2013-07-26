@@ -1,4 +1,8 @@
 2.1.13:
+  * cvmfs_server: increase default expiration time for .cvmfspublished
+    to 2 minutes in order to avoid being dDoS'd by misconfigured
+    Squids
+  * Automatically unmount a crashed mountpoint from the watchdog
   * Connect SQlite logger to cvmfs logger
   * Switch to sqlite 3.7.17
   * Add check for accessibiliy of /etc/nsswitch.conf to
