@@ -53,10 +53,8 @@ static void *MainUnpinListener(void *data) {
     if (watch_fds[1].revents) {
       watch_fds[1].revents = 0;
       char cmd;
-      // The pipe may break if Ctrl+C is pressed in foreground cvmfs.
-      // This should be gracefully handled
-      int bytes_read = read(handle->pipe_backchannel[0], &cmd, sizeof(cmd));
-      if ((bytes_read == 1) && (cmd == 'R')) {
+      ReadPipe(handle->pipe_backchannel[0], &cmd, sizeof(cmd));
+      if (cmd == 'R') {
         handle->catalog_manager->DetachNested();
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "released nested catalogs");
       }

@@ -734,8 +734,7 @@ void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
     LruCommand cmd;
     cmd.command_type = kUnregisterBackChannel;
     memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
-    // Don't fail on errors (no WritePipe)
-    write(pipe_lru_[1], &cmd, sizeof(cmd));
+    WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
     // Writer's end will be closed by cache manager, FIFO is already unlinked
     close(back_channel[0]);
