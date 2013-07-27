@@ -1356,6 +1356,8 @@ int MainCacheManager(int argc, char **argv) {
 
   // Ensure that broken pipes from clients do not kill the cache manager
   signal(SIGPIPE, SIG_IGN);
+  // Don't let Ctrl-C ungracefully kill interactive session
+  signal(SIGINT, SIG_IGN);
 
   MainCommandServer(NULL);
   unlink(fifo_path.c_str());
