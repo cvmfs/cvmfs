@@ -12,7 +12,7 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --disable-shared \
   --enable-static \
   --disable-ftp \
-  --disable-file \
+  --enable-file \
   --disable-ldap \
   --disable-ldaps \
   --disable-rtsp \
