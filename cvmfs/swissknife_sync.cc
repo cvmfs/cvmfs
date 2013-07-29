@@ -264,18 +264,23 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  download::Init(1, true);
+  g_download_manager->Init(1, true);
 
   catalog::WritableCatalogManager
     catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
-                    params.stratum0, params.dir_temp, params.spooler);
+                    params.stratum0, params.dir_temp, params.spooler,
+                    g_download_manager);
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
   if (params.union_fs_type == "overlayfs") {
-    sync = new publish::SyncUnionOverlayfs(&mediator, params.dir_rdonly, params.dir_union,
+    sync = new publish::SyncUnionOverlayfs(&mediator,
+                                           params.dir_rdonly,
+                                           params.dir_union,
                                            params.dir_scratch);
   } else if (params.union_fs_type == "aufs") {
-    sync = new publish::SyncUnionAufs(&mediator, params.dir_rdonly, params.dir_union,
+    sync = new publish::SyncUnionAufs(&mediator,
+                                      params.dir_rdonly,
+                                      params.dir_union,
                                       params.dir_scratch);
   } else {
     LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
@@ -287,7 +292,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest = mediator.Commit();
 
-  download::Fini();
+  g_download_manager->Fini();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   if (!manifest) {

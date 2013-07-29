@@ -9,6 +9,10 @@
 #include "hash.h"
 #include "catalog.h"
 
+namespace download {
+class DownloadManager;
+}
+
 namespace swissknife {
 
 class CommandCheck : public Command {

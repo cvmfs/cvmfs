@@ -9,7 +9,17 @@
 #include <vector>
 #include <map>
 
+namespace download {
+class DownloadManager;
+}
+namespace signature {
+class SignatureManager;
+}
+
 namespace swissknife {
+
+extern download::DownloadManager *g_download_manager;
+extern signature::SignatureManager *g_signature_manager;
 
 void Usage();
 

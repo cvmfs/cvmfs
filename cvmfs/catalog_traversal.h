@@ -108,12 +108,12 @@ class CatalogTraversal {
     temporary_directory_(tmp_dir)
   {
     if (is_remote_)
-      download::Init(1, true);
+      download_manager_.Init(1, true);
   }
 
   virtual ~CatalogTraversal() {
     if (is_remote_)
-      download::Fini();
+      download_manager_.Fini();
   }
 
 
@@ -226,12 +226,13 @@ class CatalogTraversal {
       const std::string url = repo_url_ + "/.cvmfspublished";
 
       // Initialize signature module
-      signature::Init();
-      const bool success = signature::LoadPublicRsaKeys(repo_keys_);
+      signature::SignatureManager signature_manager;
+      signature_manager.Init();
+      const bool success = signature_manager.LoadPublicRsaKeys(repo_keys_);
       if (!success) {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
           "cvmfs public key(s) could not be loaded.");
-        signature::Fini();
+        signature_manager.Fini();
         return NULL;
       }
 
@@ -242,10 +243,12 @@ class CatalogTraversal {
                                     repo_name_,
                                     0,
                                     NULL,
+                                    &signature_manager,
+                                    &download_manager_,
                                     &manifest_ensemble);
 
       // We don't need the signature module from now on
-      signature::Fini();
+      signature_manager.Fini();
 
       // Check if manifest was loaded correctly
       if (retval == manifest::kFailNameMismatch) {
@@ -291,7 +294,7 @@ class CatalogTraversal {
     const std::string url = repo_url_ + "/" + source;
 
     download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
-    download::Failures retval = download::Fetch(&download_catalog);
+    download::Failures retval = download_manager_.Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s (%d)",
@@ -334,7 +337,7 @@ class CatalogTraversal {
   bool Exists(const std::string &file) {
     if (is_remote_) {
       download::JobInfo head(&file, false);
-      return download::Fetch(&head) == download::kFailOk;
+      return download_manager_.Fetch(&head) == download::kFailOk;
     } else {
       return FileExists(file);
     }
@@ -350,6 +353,7 @@ class CatalogTraversal {
   const bool        no_close_;
   const std::string temporary_directory_;
   CatalogJobStack   catalog_stack_;
+  download::DownloadManager download_manager_;
 };
 
 }

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "catalog_mgr.h"
+#include "signature.h"
 #include "file_chunk.h"
 #include "shortstring.h"
 #include "atomic.h"
@@ -26,6 +27,10 @@ namespace hash {
 struct Any;
 }
 
+namespace download {
+class DownloadManager;
+}
+
 namespace cache {
 
 enum CacheModes {
@@ -38,8 +43,11 @@ void Fini();
 
 int Open(const hash::Any &id);
 int FetchDirent(const catalog::DirectoryEntry &d,
-                const std::string &cvmfs_path);
-int FetchChunk(const FileChunk &chunk, const std::string &cvmfs_path);
+                const std::string &cvmfs_path,
+                download::DownloadManager *download_manager);
+int FetchChunk(const FileChunk &chunk,
+               const std::string &cvmfs_path,
+               download::DownloadManager *download_manager);
 int64_t GetNumDownloads();
 
 CacheModes GetCacheMode();
@@ -55,7 +63,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
 
  public:
   CatalogManager(const std::string &repo_name,
-                 const bool ignore_signature);
+                 signature::SignatureManager *signature_manager,
+                 download::DownloadManager *download_manager);
   virtual ~CatalogManager() { };
 
   bool InitFixed(const hash::Any &root_hash);
@@ -97,7 +106,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   std::map<PathString, hash::Any> mounted_catalogs_;
 
   std::string repo_name_;
-  bool ignore_signature_;
+  signature::SignatureManager *signature_manager_;
+  download::DownloadManager *download_manager_;
   bool offline_mode_;  /**< cached copy used because there is no network */
   atomic_int32 certificate_hits_;
   atomic_int32 certificate_misses_;

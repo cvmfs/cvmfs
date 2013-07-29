@@ -19,6 +19,7 @@
 #include "download.h"
 
 using namespace std;  // NOLINT
+using namespace swissknife;  // NOLINT
 
 /**
  * Checks if the given path looks like a remote path
@@ -30,11 +31,12 @@ static bool IsRemote(const string &repository) {
 /**
  * Checks for existance of a file either locally or via HTTP head
  */
-static bool Exists(const string &repository, const string &file) {
+static bool Exists(const string &repository, const string &file)
+{
   if (IsRemote(repository)) {
     const string url = repository + "/" + file;
     download::JobInfo head(&url, false);
-    return download::Fetch(&head) == download::kFailOk;
+    return g_download_manager->Fetch(&head) == download::kFailOk;
   } else {
     return FileExists(file);
   }
@@ -75,11 +77,11 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
   manifest::Manifest *manifest = NULL;
   if (IsRemote(repository)) {
-    download::Init(1, true);
+    g_download_manager->Init(1, true);
 
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);
-    download::Failures retval = download::Fetch(&download_manifest);
+    download::Failures retval = g_download_manager->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d)",
                retval);

@@ -184,6 +184,8 @@ pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 catalog::InodeGenerationAnnotation *inode_annotation_ = NULL;
 cache::CatalogManager *catalog_manager_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
+signature::SignatureManager *signature_manager_ = NULL;
+download::DownloadManager *download_manager_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
@@ -1054,7 +1056,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()));
+  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
+                          download_manager_);
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
@@ -1174,7 +1177,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         if (chunk_fd.fd != -1) close(chunk_fd.fd);
         string verbose_path = "Part of " + chunks.path.ToString();
         chunk_fd.fd = cache::FetchChunk(*chunks.list->AtPtr(chunk_idx),
-                                        verbose_path);
+                                        verbose_path,
+                                        download_manager_);
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
           chunk_tables_->Lock();
@@ -1421,7 +1425,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.proxy") {
     vector< vector<string> > proxy_chain;
     unsigned current_group;
-    download::GetProxyInfo(&proxy_chain, &current_group);
+    download_manager_->GetProxyInfo(&proxy_chain, &current_group);
     if (proxy_chain.size()) {
       attribute_value = proxy_chain[current_group][0];
     } else {
@@ -1431,7 +1435,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     vector<string> host_chain;
     vector<int> rtt;
     unsigned current_host;
-    download::GetHostInfo(&host_chain, &rtt, &current_host);
+    download_manager_->GetHostInfo(&host_chain, &rtt, &current_host);
     if (host_chain.size()) {
       attribute_value = string(host_chain[current_host]);
     } else {
@@ -1452,18 +1456,18 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(cache::GetNumDownloads());
   } else if (attr == "user.timeout") {
     unsigned seconds, seconds_direct;
-    download::GetTimeout(&seconds, &seconds_direct);
+    download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds);
   } else if (attr == "user.timeout_direct") {
     unsigned seconds, seconds_direct;
-    download::GetTimeout(&seconds, &seconds_direct);
+    download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
+    int64_t rx = uint64_t(download_manager_->GetStatistics().transferred_bytes);
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = uint64_t(download::GetStatistics().transferred_bytes);
-    int64_t time = uint64_t(download::GetStatistics().transfer_time);
+    int64_t rx = uint64_t(download_manager_->GetStatistics().transferred_bytes);
+    int64_t time = uint64_t(download_manager_->GetStatistics().transfer_time);
     if (time == 0)
       attribute_value = "n/a";
     else
@@ -1551,7 +1555,8 @@ bool Pin(const string &path) {
                    "Part of " + path, false);
       if (!retval)
         return false;
-      int fd = cache::FetchChunk(*chunks.AtPtr(i), "Part of " + path);
+      int fd = cache::FetchChunk(*chunks.AtPtr(i), "Part of " + path,
+                                 download_manager_);
       if (fd < 0) {
         quota::Unpin(chunks.AtPtr(i)->content_hash());
         return false;
@@ -1569,7 +1574,7 @@ bool Pin(const string &path) {
   bool retval = quota::Pin(dirent.checksum(), dirent.size(), path, false);
   if (!retval)
     return false;
-  int fd = cache::FetchDirent(dirent, path);
+  int fd = cache::FetchDirent(dirent, path, download_manager_);
   if (fd < 0) {
     quota::Unpin(dirent.checksum());
     return false;
@@ -2065,20 +2070,24 @@ static int Init(const loader::LoaderExports *loader_exports) {
   g_talk_ready = true;
 
   // Network initialization
-  download::Init(cvmfs::kDefaultNumConnections, false);
-  download::SetHostChain(hostname);
-  download::SetProxyChain(proxies);
-  if (! dns_server.empty()) {
-    download::SetDnsServer(dns_server);
+  cvmfs::download_manager_ = new download::DownloadManager();
+  cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false);
+  cvmfs::download_manager_->SetHostChain(hostname);
+  cvmfs::download_manager_->SetProxyChain(proxies);
+  if (!dns_server.empty()) {
+    cvmfs::download_manager_->SetDnsServer(dns_server);
   }
-  download::SetTimeout(timeout, timeout_direct);
-  download::SetProxyGroupResetDelay(proxy_reset_after);
-  download::SetHostResetDelay(host_reset_after);
-  download::SetRetryParameters(max_retries, backoff_init, backoff_max);
+  cvmfs::download_manager_->SetTimeout(timeout, timeout_direct);
+  cvmfs::download_manager_->SetProxyGroupResetDelay(proxy_reset_after);
+  cvmfs::download_manager_->SetHostResetDelay(host_reset_after);
+  cvmfs::download_manager_->SetRetryParameters(max_retries,
+                                               backoff_init,
+                                               backoff_max);
   g_download_ready = true;
 
-  signature::Init();
-  if (!signature::LoadPublicRsaKeys(public_keys)) {
+  cvmfs::signature_manager_ = new signature::SignatureManager();
+  cvmfs::signature_manager_->Init();
+  if (!cvmfs::signature_manager_->LoadPublicRsaKeys(public_keys)) {
     *g_boot_error = "failed to load public key(s)";
     return loader::kFailSignature;
   } else {
@@ -2087,7 +2096,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   g_signature_ready = true;
   if (FileExists("/etc/cvmfs/blacklist")) {
-    if (!signature::LoadBlacklist("/etc/cvmfs/blacklist")) {
+    if (!cvmfs::signature_manager_->LoadBlacklist("/etc/cvmfs/blacklist")) {
       *g_boot_error = "failed to load blacklist";
       return loader::kFailSignature;
     }
@@ -2098,7 +2107,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
            sizeof(fuse_ino_t) * 8);
   cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
   cvmfs::catalog_manager_ =
-      new cache::CatalogManager(*cvmfs::repository_name_, ignore_signature);
+    new cache::CatalogManager(*cvmfs::repository_name_,
+                              cvmfs::signature_manager_,
+                              cvmfs::download_manager_);
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
@@ -2107,7 +2118,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Load specific tag (root hash has precedence)
   if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
     manifest::ManifestEnsemble ensemble;
-    retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL, &ensemble);
+    retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
+                             cvmfs::signature_manager_,
+                             cvmfs::download_manager_,
+                             &ensemble);
     if (retval != manifest::kFailOk) {
       *g_boot_error = "Failed to fetch manifest";
       return loader::kFailHistory;
@@ -2122,7 +2136,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     string history_url = "/data" + history_hash.MakePath(1, 2) + "H";
     download::JobInfo download_history(&history_url, true, true, &history_path,
                                        &history_hash);
-    retval = download::Fetch(&download_history);
+    retval = cvmfs::download_manager_->Fetch(&download_history);
     if (retval != download::kFailOk) {
       *g_boot_error = "failed to download history: " + StringifyInt(retval);
       return loader::kFailHistory;
@@ -2200,7 +2214,7 @@ static void Spawn() {
     monitor::RegisterOnCrash(auto_umount::UmountOnCrash);
     monitor::Spawn();
   }
-  download::Spawn();
+  cvmfs::download_manager_->Spawn();
   quota::Spawn();
   cvmfs::unpin_listener_ =
     quota::RegisterUnpinListener(cvmfs::catalog_manager_,
@@ -2226,8 +2240,8 @@ static string GetErrorMsg() {
 static void Fini() {
   signal(SIGALRM, SIG_DFL);
   tracer::Fini();
-  if (g_signature_ready) signature::Fini();
-  if (g_download_ready) download::Fini();
+  if (g_signature_ready) cvmfs::signature_manager_->Fini();
+  if (g_download_ready) cvmfs::download_manager_->Fini();
   if (g_talk_ready) talk::Fini();
   if (g_monitor_ready) monitor::Fini();
   if (g_quota_ready) {
@@ -2245,6 +2259,8 @@ static void Fini() {
   if (g_options_ready) options::Fini();
 
   delete cvmfs::remount_fence_;
+  delete cvmfs::signature_manager_;
+  delete cvmfs::download_manager_;
   delete cvmfs::catalog_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
@@ -2260,6 +2276,8 @@ static void Fini() {
   delete cvmfs::repository_tag_;
   delete cvmfs::mountpoint_;
   cvmfs::remount_fence_ = NULL;
+  cvmfs::signature_manager_ = NULL;
+  cvmfs::download_manager_ = NULL;
   cvmfs::catalog_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;

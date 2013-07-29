@@ -61,7 +61,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   const upload::SpoolerDefinition sd(spooler_definition);
   spooler = upload::Spooler::Construct(sd);
 
-  signature::Init();
+  signature::SignatureManager signature_manager;
+  signature_manager.Init();
 
   // Load certificate
   unsigned char *cert_buf;
@@ -71,8 +72,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
              "Enter file name of X509 certificate []: ");
     getline(cin, certificate);
   }
-  if (!signature::LoadCertificatePath(certificate) ||
-      !signature::WriteCertificateMem(&cert_buf, &cert_buf_size))
+  if (!signature_manager.LoadCertificatePath(certificate) ||
+      !signature_manager.WriteCertificateMem(&cert_buf, &cert_buf_size))
   {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load certificate");
     return 2;
@@ -84,7 +85,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
              "Enter file name of private key file to your certificate []: ");
     getline(cin, priv_key);
   }
-  if (!signature::LoadPrivateKeyPath(priv_key, pwd)) {
+  if (!signature_manager.LoadPrivateKeyPath(priv_key, pwd)) {
     int retry = 0;
     bool success;
     do {
@@ -106,21 +107,21 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       tcsetattr(fileno(stdin), TCSANOW, &defrsett);
       LogCvmfs(kLogCvmfs, kLogStdout, "");
 
-      success = signature::LoadPrivateKeyPath(priv_key, pwd);
+      success = signature_manager.LoadPrivateKeyPath(priv_key, pwd);
       if (!success) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to load private key (%s)",
-                 signature::GetCryptoError().c_str());
+                 signature_manager.GetCryptoError().c_str());
       }
       retry++;
     } while (!success && (retry < 3));
     if (!success)
       return 2;
   }
-  if (!signature::KeysMatch()) {
+  if (!signature_manager.KeysMatch()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "the private key doesn't seem to match your certificate (%s)",
-             signature::GetCryptoError().c_str());
-    signature::UnloadPrivateKey();
+             signature_manager.GetCryptoError().c_str());
+    signature_manager.UnloadPrivateKey();
     return 2;
   }
 
@@ -205,9 +206,10 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     // Sign manifest
     unsigned char *sig;
     unsigned sig_size;
-    if (!signature::Sign(reinterpret_cast<const unsigned char *>(
-                         published_hash.ToString().data()),
-                         2*published_hash.GetDigestSize(), &sig, &sig_size))
+    if (!signature_manager.Sign(reinterpret_cast<const unsigned char *>(
+                                published_hash.ToString().data()),
+                                2*published_hash.GetDigestSize(),
+                                &sig, &sig_size))
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
       unlink(cert_path_tmp.c_str());
@@ -254,14 +256,14 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   }
 
   delete spooler;
-  signature::Fini();
+  signature_manager.Fini();
   return 0;
 
  sign_fail:
   if (hist_compressed_path != "")
     unlink(hist_compressed_path.c_str());
   delete spooler;
-  signature::Fini();
+  signature_manager.Fini();
   return 1;
 }
 

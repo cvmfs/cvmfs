@@ -223,7 +223,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "Usage: nameserver set <host>\n");
         } else {
           const string host = line.substr(15);
-          download::SetDnsServer(host);
+          cvmfs::download_manager_->SetDnsServer(host);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "host info") {
@@ -231,7 +231,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         vector<int> rtt;
         unsigned active_host;
 
-        download::GetHostInfo(&host_chain, &rtt, &active_host);
+        cvmfs::download_manager_->GetHostInfo(&host_chain, &rtt, &active_host);
         string host_str;
         for (unsigned i = 0; i < host_chain.size(); ++i) {
           host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
@@ -247,23 +247,23 @@ static void *MainTalk(void *data __attribute__((unused))) {
                     host_chain[active_host] + "\n";
         Answer(con_fd, host_str);
       } else if (line == "host probe") {
-        download::ProbeHosts();
+        cvmfs::download_manager_->ProbeHosts();
         Answer(con_fd, "OK\n");
       } else if (line == "host switch") {
-        download::SwitchHost();
+        cvmfs::download_manager_->SwitchHost();
         Answer(con_fd, "OK\n");
       } else if (line.substr(0, 8) == "host set") {
         if (line.length() < 10) {
           Answer(con_fd, "Usage: host set <host list>\n");
         } else {
           const string hosts = line.substr(9);
-          download::SetHostChain(hosts);
+          cvmfs::download_manager_->SetHostChain(hosts);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "proxy info") {
         vector< vector<string> > proxy_chain;
         unsigned active_group;
-        download::GetProxyInfo(&proxy_chain, &active_group);
+        cvmfs::download_manager_->GetProxyInfo(&proxy_chain, &active_group);
 
         string proxy_str;
         if (proxy_chain.size()) {
@@ -280,23 +280,23 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
         Answer(con_fd, proxy_str);
       } else if (line == "proxy rebalance") {
-        download::RebalanceProxies();
+        cvmfs::download_manager_->RebalanceProxies();
         Answer(con_fd, "OK\n");
       } else if (line == "proxy group switch") {
-        download::SwitchProxyGroup();
+        cvmfs::download_manager_->SwitchProxyGroup();
         Answer(con_fd, "OK\n");
       } else if (line.substr(0, 9) == "proxy set") {
         if (line.length() < 11) {
           Answer(con_fd, "Usage: proxy set <proxy list>\n");
         } else {
           const string proxies = line.substr(10);
-          download::SetProxyChain(proxies);
+          cvmfs::download_manager_->SetProxyChain(proxies);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "timeout info") {
         unsigned timeout;
         unsigned timeout_direct;
-        download::GetTimeout(&timeout, &timeout_direct);
+        cvmfs::download_manager_->GetTimeout(&timeout, &timeout_direct);
         string timeout_str =  "Timeout with proxy: ";
         if (timeout)
           timeout_str += StringifyInt(timeout) + "s\n";
@@ -315,7 +315,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           uint64_t timeout;
           uint64_t timeout_direct;
           String2Uint64Pair(line.substr(12), &timeout, &timeout_direct);
-          download::SetTimeout(timeout, timeout_direct);
+          cvmfs::download_manager_->SetTimeout(timeout, timeout_direct);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "open catalogs") {
@@ -376,13 +376,13 @@ static void *MainTalk(void *data __attribute__((unused))) {
         }
 
         result += "\nNetwork Statistics:\n";
-        result += download::GetStatistics().Print();
+        result += cvmfs::download_manager_->GetStatistics().Print();
         unsigned proxy_reset_delay, host_reset_delay;
         time_t proxy_timestamp_failover, host_timestamp_failover;
-        download::GetProxyBackupInfo(&proxy_reset_delay,
-                                     &proxy_timestamp_failover);
-        download::GetHostBackupInfo(&host_reset_delay,
-                                    &host_timestamp_failover);
+        cvmfs::download_manager_->GetProxyBackupInfo(&proxy_reset_delay,
+                                                     &proxy_timestamp_failover);
+        cvmfs::download_manager_->GetHostBackupInfo(&host_reset_delay,
+                                                    &host_timestamp_failover);
         result += "Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
           ("Backup since " + StringifyTime(proxy_timestamp_failover, true)) :
           "Primary") + "\n";

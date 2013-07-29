@@ -421,7 +421,8 @@ static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
 static int Fetch(const hash::Any &checksum,
                  const string    &hash_suffix,
                  const uint64_t   size,
-                 const string    &cvmfs_path)
+                 const string    &cvmfs_path,
+                 download::DownloadManager *download_manager)
 {
   CallGuard call_guard;
   int fd_return;  // Read-only file descriptor that is returned
@@ -518,7 +519,7 @@ static int Fetch(const hash::Any &checksum,
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
   tls->download_job.expected_hash = &checksum;
-  download::Fetch(&tls->download_job);
+  download_manager->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "finished downloading of %s", url.c_str());
@@ -598,8 +599,11 @@ static int Fetch(const hash::Any &checksum,
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int FetchDirent(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
-  return Fetch(d.checksum(), "", d.size(), cvmfs_path);
+int FetchDirent(const catalog::DirectoryEntry &d,
+                const string &cvmfs_path,
+                download::DownloadManager *download_manager)
+{
+  return Fetch(d.checksum(), "", d.size(), cvmfs_path, download_manager);
 }
 
 
@@ -612,11 +616,14 @@ int FetchDirent(const catalog::DirectoryEntry &d, const string &cvmfs_path) {
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int FetchChunk(const FileChunk &chunk, const string &cvmfs_path) {
+int FetchChunk(const FileChunk &chunk, const string &cvmfs_path,
+               download::DownloadManager *download_manager)
+{
   return Fetch(chunk.content_hash(),
                FileChunk::kCasSuffix,
                chunk.size(),
-               cvmfs_path);
+               cvmfs_path,
+               download_manager);
 }
 
 
@@ -626,11 +633,14 @@ int64_t GetNumDownloads() {
 
 
 CatalogManager::CatalogManager(const string &repo_name,
-                               const bool ignore_signature)
+                               signature::SignatureManager *signature_manager,
+                               download::DownloadManager *download_manager)
 {
   LogCvmfs(kLogCache, kLogDebug, "constructing cache catalog manager");
   repo_name_ = repo_name;
-  ignore_signature_ = ignore_signature;
+  //ignore_signature_ = ignore_signature;
+  signature_manager_ = signature_manager;
+  download_manager_ = download_manager;
   offline_mode_ = false;
   loaded_inodes_ = all_inodes_ = 0;
   atomic_init32(&certificate_hits_);
@@ -731,7 +741,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
 
   const string url = "/data" + hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url, true, true, catalog_file, &hash);
-  download::Fetch(&download_catalog);
+  download_manager_->Fetch(&download_catalog);
   fclose(catalog_file);
   if (download_catalog.error_code != download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
@@ -830,7 +840,9 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   manifest::Failures manifest_failure;
   cache::ManifestEnsemble ensemble(this);
   manifest_failure = manifest::Fetch("", repo_name_, cache_last_modified,
-                                     &cache_hash, &ensemble);
+                                     &cache_hash, signature_manager_,
+                                     download_manager_,
+                                     &ensemble);
   if (manifest_failure != manifest::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d)",
              manifest_failure);
