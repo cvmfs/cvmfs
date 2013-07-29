@@ -87,7 +87,10 @@ inline bool platform_umount(const char* mountpoint, const bool lazy) {
       return false;
     }
     FILE *fmntnew = setmntent(mntnew.c_str(), "w+");
-    if (!fmntnew) {
+    if (!fmntnew &&
+        (chmod(mntnew.c_str(), mtab_info.st_mode) != 0) &&
+        (chown(mntnew.c_str(), mtab_info.st_uid, mtab_info.st_gid) != 0))
+    {
       endmntent(fmntold);
       flock(fd_lockfile, LOCK_UN);
       close(fd_lockfile);
@@ -117,6 +120,8 @@ inline bool platform_umount(const char* mountpoint, const bool lazy) {
     unlink(lockfile.c_str());
     if (retval != 0)
       return false;
+    chmod(_PATH_MOUNTED, mtab_info.st_mode);
+    chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
   }
 
   int flags = lazy ? MNT_DETACH : 0;
