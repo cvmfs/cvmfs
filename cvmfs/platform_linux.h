@@ -15,6 +15,8 @@
 #include <sys/prctl.h>
 #include <attr/xattr.h>
 #include <sys/mount.h>
+#include <sys/file.h>
+#include <sys/select.h>
 #include <signal.h>
 #include <limits.h>
 #include <unistd.h>
@@ -52,8 +54,73 @@ inline std::vector<std::string> platform_mountlist() {
 #define MNT_DETACH 0x00000002
 #endif
 inline bool platform_umount(const char* mountpoint, const bool lazy) {
+  struct stat64 mtab_info;
+  int retval = lstat64(_PATH_MOUNTED, &mtab_info);
+  // If /etc/mtab exists and is not a symlink to /proc/mount
+  if ((retval == 0) && S_ISREG(mtab_info.st_mode)) {
+    // Lock the modification on /etc/mtab against concurrent
+    // crash unmount handlers
+    std::string lockfile = std::string(_PATH_MOUNTED) + ".cvmfslock";
+    const int fd_lockfile = open(lockfile.c_str(), O_RDONLY | O_CREAT, 0600);
+    if (fd_lockfile < 0)
+      return false;
+    int timeout = 10;
+    while ((flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) && (timeout > 0)) {
+      if (errno != EWOULDBLOCK) {
+        close(fd_lockfile);
+        unlink(lockfile.c_str());
+      }
+      struct timeval wait_for;
+      wait_for.tv_sec = 1;
+      wait_for.tv_usec = 0;
+      select(0, NULL, NULL, NULL, &wait_for);
+      timeout--;
+    }
+
+    // Remove entry from /etc/mtab (create new file without entry)
+    std::string mntnew = std::string(_PATH_MOUNTED) + ".cvmfstmp";
+    FILE *fmntold = setmntent(_PATH_MOUNTED, "r");
+    if (!fmntold) {
+      flock(fd_lockfile, LOCK_UN);
+      close(fd_lockfile);
+      unlink(lockfile.c_str());
+      return false;
+    }
+    FILE *fmntnew = setmntent(mntnew.c_str(), "w+");
+    if (!fmntnew) {
+      endmntent(fmntold);
+      flock(fd_lockfile, LOCK_UN);
+      close(fd_lockfile);
+      unlink(lockfile.c_str());
+      return false;
+    }
+    struct mntent *mntbuf;  // Static buffer managed by libc!
+    while ((mntbuf = getmntent(fmntold)) != NULL) {
+      if (strcmp(mntbuf->mnt_dir, mountpoint) != 0) {
+        retval = addmntent(fmntnew, mntbuf);
+        if (retval != 0) {
+          endmntent(fmntold);
+          endmntent(fmntnew);
+          unlink(mntnew.c_str());
+          flock(fd_lockfile, LOCK_UN);
+          close(fd_lockfile);
+          unlink(lockfile.c_str());
+          return false;
+        }
+      }
+    }
+    endmntent(fmntold);
+    endmntent(fmntnew);
+    retval = rename(mntnew.c_str(), _PATH_MOUNTED);
+    flock(fd_lockfile, LOCK_UN);
+    close(fd_lockfile);
+    unlink(lockfile.c_str());
+    if (retval != 0)
+      return false;
+  }
+
   int flags = lazy ? MNT_DETACH : 0;
-  int retval = umount2(mountpoint, flags);
+  retval = umount2(mountpoint, flags);
   return retval == 0;
 }
 
