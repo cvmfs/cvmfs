@@ -68,6 +68,7 @@
 #include "logging.h"
 #include "tracer.h"
 #include "download.h"
+#include "wpad.h"
 #include "cache.h"
 #include "nfs_maps.h"
 #include "hash.h"
@@ -2073,7 +2074,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_ = new download::DownloadManager();
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false);
   cvmfs::download_manager_->SetHostChain(hostname);
-  cvmfs::download_manager_->SetProxyChain(proxies);
   if (!dns_server.empty()) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
   }
@@ -2083,6 +2083,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetRetryParameters(max_retries,
                                                backoff_init,
                                                backoff_max);
+  if (proxies != "auto") {
+    cvmfs::download_manager_->SetProxyChain(proxies);
+  } else {
+    proxies = download::AutoProxy(cvmfs::download_manager_);
+    if (proxies == "") {
+      *g_boot_error = "failed to discover HTTP proxy servers";
+      return loader::kFailWpad;
+    }
+    cvmfs::download_manager_->SetProxyChain(proxies);
+  }
   g_download_ready = true;
 
   cvmfs::signature_manager_ = new signature::SignatureManager();

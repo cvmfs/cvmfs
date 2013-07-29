@@ -44,6 +44,7 @@ enum Failures {
   kFailOtherMount,
   kFailDoubleMount,
   kFailHistory,
+  kFailWpad,
 };
 
 
