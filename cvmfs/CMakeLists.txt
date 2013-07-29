@@ -29,6 +29,7 @@ set (CVMFS_CLIENT_SOURCES
   prng.h util.cc util.h
   duplex_zlib.h compression.h compression.cc
   download.cc download.h
+  wpad.cc wpad.h
   manifest.h manifest.cc
   manifest_fetch.h manifest_fetch.cc
   murmur.h smallhash.h
