@@ -194,6 +194,9 @@ if (BUILD_CVMFS)
     add_dependencies (cvmfs_fuse libcares libcurl)
   endif (LIBCURL_BUILTIN)
 
+  add_dependencies (cvmfs_fuse_debug libpacparser)
+  add_dependencies (cvmfs_fuse libpacparser)
+
   if (SQLITE3_BUILTIN)
     add_dependencies (cvmfs_fuse_debug sqlite3)
     add_dependencies (cvmfs_fuse sqlite3)
@@ -227,8 +230,8 @@ if (BUILD_CVMFS)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} fuse ${RT_LIBRARY} pthread dl)
-  target_link_libraries (cvmfs_fuse_debug    ${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
-  target_link_libraries (cvmfs_fuse      ${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+  target_link_libraries (cvmfs_fuse_debug    ${CVMFS2_DEBUG_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+  target_link_libraries (cvmfs_fuse      ${CVMFS2_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
   target_link_libraries (cvmfs_fsck    ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
 
 endif (BUILD_CVMFS)
@@ -244,6 +247,9 @@ if (BUILD_LIBCVMFS)
     set (LIBCVMFS_LIBS ${CARES_ARCHIVE} ${LIBCVMFS_LIBS} )
     set (LIBCVMFS_LIBS ${LIBCURL_ARCHIVE} ${LIBCVMFS_LIBS} )
   endif (LIBCURL_BUILTIN)
+
+  add_dependencies (cvmfs_only libpacparser)
+  set (LIBCVMFS_LIBS ${PACPARSER_ARCHIVE} ${LIBCVMFS_LIBS} )
 
   if (SQLITE3_BUILTIN)
     add_dependencies (cvmfs_only sqlite3)

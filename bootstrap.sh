@@ -4,6 +4,7 @@ set -e
 
 CARES_VERSION=1.10.0
 CURL_VERSION=7.31.0
+PACPARSER_VERSION=1.3.1
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.5.0
@@ -67,6 +68,7 @@ mkdir -p $externals_build_dir
 
 do_extract  "c-ares"      "c-ares-${CARES_VERSION}.tar.gz"
 do_extract  "libcurl"     "curl-${CURL_VERSION}.tar.gz"
+do_extract  "pacparser"   "pacparser-${PACPARSER_VERSION}.tar.gz"
 do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
 do_extract  "sparsehash"  "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
 do_extract  "leveldb"     "leveldb-${LEVELDB_VERSION}.tar.gz"
