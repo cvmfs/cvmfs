@@ -192,4 +192,19 @@ string AutoProxy(DownloadManager *download_manager) {
   return "";
 }
 
+
+string ResolveProxyDescription(const string &cvmfs_proxies,
+                               DownloadManager *download_manager)
+{
+  if ((cvmfs_proxies == "") || (cvmfs_proxies.find("auto") == string::npos))
+    return cvmfs_proxies;
+
+  vector<string> lb_groups = SplitString(cvmfs_proxies, ';');
+  for (unsigned i = 0; i < lb_groups.size(); ++i) {
+    if (lb_groups[i] == "auto")
+      lb_groups[i] = AutoProxy(download_manager);
+  }
+  return JoinStrings(lb_groups, ";");
+}
+
 }  // namespace download

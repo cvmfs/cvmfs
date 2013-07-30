@@ -17,6 +17,12 @@ class DownloadManager;
  */
 std::string AutoProxy(DownloadManager *download_manager);
 
+/**
+ * Uses AutoProxy to replace any "auto" proxy by the proxies from the PAC file
+ */
+std::string ResolveProxyDescription(const std::string &cvmfs_proxies,
+                                    DownloadManager *download_manager);
+
 }  // namespace download
 
 #endif  // CVMFS_WPAD_H_
