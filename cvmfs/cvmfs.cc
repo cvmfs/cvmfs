@@ -2322,6 +2322,9 @@ static int AltProcessFlavor(int argc, char **argv) {
   if (strcmp(argv[1], "__cachemgr__") == 0) {
     return quota::MainCacheManager(argc, argv);
   }
+  if (strcmp(argv[1], "__wpad__") == 0) {
+    return download::MainResolveProxyDescription(argc, argv);
+  }
   return 1;
 }
 

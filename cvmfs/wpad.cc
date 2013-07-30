@@ -208,4 +208,38 @@ string ResolveProxyDescription(const string &cvmfs_proxies,
   return JoinStrings(lb_groups, ";");
 }
 
+
+static void AltCvmfsLogger(const LogSource source, const int mask,
+                           const char *msg)
+{
+  FILE *log_output = NULL;
+  if (mask & kLogStdout)
+    log_output = stdout;
+  else if (mask & kLogStderr || mask & kLogSyslogWarn || mask & kLogSyslogErr)
+    log_output = stderr;
+  if (log_output)
+    fprintf(log_output, "%s\n", msg);
+}
+
+
+int MainResolveProxyDescription(int argc, char **argv) {
+  SetAltLogFunc(AltCvmfsLogger);
+  if (argc < 4) {
+    LogCvmfs(kLogDownload, kLogStderr, "arguments missing");
+    return 1;
+  }
+  string proxy_configuration = argv[2];
+  string host_list = argv[3];
+
+  DownloadManager download_manager;
+  download_manager.Init(1, false);
+  download_manager.SetHostChain(host_list);
+  string resolved_proxies = ResolveProxyDescription(proxy_configuration,
+                                                    &download_manager);
+  download_manager.Fini();
+
+  LogCvmfs(kLogDownload, kLogStdout, "%s", resolved_proxies.c_str());
+  return resolved_proxies == "";
+}
+
 }  // namespace download
