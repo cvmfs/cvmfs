@@ -92,6 +92,7 @@ static bool ParsePac(const char *pac_data, const size_t size,
     return false;
 
   const string pac_string(pac_data, size);
+  LogCvmfs(kLogDownload, kLogDebug, "PAC script is:\n%s", pac_string.c_str());
   retval = pacparser_parse_pac_string(pac_string.c_str());
   if (!retval) {
     pacparser_cleanup();
@@ -168,7 +169,7 @@ string AutoProxy(DownloadManager *download_manager) {
     if (retval == download::kFailOk) {
       string proxies;
       retval = ParsePac(download_pac.destination_mem.data,
-                        download_pac.destination_mem.size,
+                        download_pac.destination_mem.pos,
                         download_manager,
                         &proxies);
       free(download_pac.destination_mem.data);
