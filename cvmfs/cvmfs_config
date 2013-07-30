@@ -481,16 +481,25 @@ cvmfs_chksetup() {
           proxy_list=`echo "$CVMFS_HTTP_PROXY" | sed -e 's/;/ /g' -e 's/|/ /g'`
           for proxy in $proxy_list
           do
-            if [ "$proxy" != "DIRECT" ]; then
+            org=`cvmfs_getorg $fqrn`
+            url=`echo $server | sed s/@org@/$org/g | sed s/@fqrn@/$fqrn/g`
+            url="${url}/.cvmfspublished"
+            if [ "x$proxy" == "xauto" ]; then
+              auto_proxy=$(cvmfs2 __wpad__ auto "$CVMFS_SERVER_URL" 2>/dev/null)
+              if [ "x$auto_proxy" == "x" ]; then
+                echo "Warning: failed to resolve auto proxy for $url"
+                num_warnings=$(($num_warnings+1))
+                continue
+              fi
+              proxy="$auto_proxy"
+            fi
+            if [ "x$proxy" != "xDIRECT" ]; then
               proxy_param="env http_proxy=$proxy"
               timeout=$CVMFS_TIMEOUT
             else
               proxy_param=
               timeout=$CVMFS_TIMEOUT_DIRECT
             fi
-            org=`cvmfs_getorg $fqrn`
-            url=`echo $server | sed s/@org@/$org/g | sed s/@fqrn@/$fqrn/g`
-            url="${url}/.cvmfspublished"
             $proxy_param curl -H "Pragma:" -f --connect-timeout $timeout $url > /dev/null 2>&1
             if [ $? -ne 0 ]; then
               echo "Warning: failed to access $url through proxy $proxy"
