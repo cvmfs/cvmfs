@@ -65,6 +65,7 @@
 #include "logging.h"
 #include "tracer.h"
 #include "download.h"
+#include "wpad.h"
 #include "cache.h"
 #include "hash.h"
 #include "monitor.h"
@@ -504,9 +505,11 @@ int cvmfs_int_init(
   cvmfs::download_manager_ = new download::DownloadManager();
   cvmfs::download_manager_->Init(16, false);
   cvmfs::download_manager_->SetHostChain(string(cvmfs_opts_hostname));
-  cvmfs::download_manager_->SetProxyChain(cvmfs_opts_proxies);
   cvmfs::download_manager_->SetTimeout(cvmfs_opts_timeout,
                                        cvmfs_opts_timeout_direct);
+  cvmfs::download_manager_->SetProxyChain(
+    download::ResolveProxyDescription(cvmfs_opts_proxies,
+                                      cvmfs::download_manager_));
   download_ready = true;
 
   cvmfs::signature_manager_ = new signature::SignatureManager();
