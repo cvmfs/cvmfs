@@ -37,6 +37,7 @@
 #include "util.h"
 #include "logging.h"
 #include "download.h"
+#include "wpad.h"
 #include "duplex_sqlite3.h"
 #include "shortstring.h"
 #include "lru.h"
@@ -289,9 +290,15 @@ static void *MainTalk(void *data __attribute__((unused))) {
         if (line.length() < 11) {
           Answer(con_fd, "Usage: proxy set <proxy list>\n");
         } else {
-          const string proxies = line.substr(10);
-          cvmfs::download_manager_->SetProxyChain(proxies);
-          Answer(con_fd, "OK\n");
+          string proxies = line.substr(10);
+          proxies = download::ResolveProxyDescription(proxies,
+                                                      cvmfs::download_manager_);
+          if (proxies == "") {
+              Answer(con_fd, "Failed, no valid proxies\n");
+          } else {
+            cvmfs::download_manager_->SetProxyChain(proxies);
+            Answer(con_fd, "OK\n");
+          }
         }
       } else if (line == "timeout info") {
         unsigned timeout;
