@@ -13,6 +13,7 @@
 #include <sched.h>
 
 #include <cassert>
+#include <cstring>
 #include <string>
 #include <map>
 #include <vector>
@@ -44,11 +45,139 @@ static inline uint32_t hasher_inode(const uint64_t &inode) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
+/**
+ * Pointer to a 2 byte length information followed by the characters
+ */
+class StringRef {
+ public:
+  StringRef() {
+    length_ = NULL;
+  }
+
+  uint16_t length() const { return *length_; }
+  uint16_t size() const { return sizeof(uint16_t) + *length_; }
+  static uint16_t size(const uint16_t length) {
+    return sizeof(uint16_t) + length;
+  }
+  char *data() const { return reinterpret_cast<char *>(length_ + 1); }
+  static StringRef Place(const uint16_t length, const char *str,
+                         void *addr)
+  {
+    StringRef result;
+    result.length_ = reinterpret_cast<uint16_t *>(addr);
+    *result.length_ = length;
+    if (length > 0)
+      memcpy(result.length_ + 1, str, length);
+    return result;
+  }
+ private:
+  uint16_t *length_;
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Manages memory bins with immutable strings (deleting is a no-op).
+ * When the fraction of garbage is too large, the user of the StringHeap
+ * can copy the entire contents to a new heap.
+ */
+class StringHeap : public SingleCopy {
+ public:
+  StringHeap() {
+    Init(128*1024);  // 128kB (should be >= 64kB+2B which is largest string)
+  }
+
+  StringHeap(const uint32_t minimum_size) {
+    Init(minimum_size);
+  }
+
+  void Init(const uint32_t minimum_size) {
+    size_ = 0;
+    used_ = 0;
+
+    // Initial bin: 128kB or smallest power of 2 >= minimum size
+    uint32_t pow2_size = minimum_size < 128*1024 ? 128*1024 : minimum_size;
+    pow2_size--;
+    pow2_size |= pow2_size >> 1;
+    pow2_size |= pow2_size >> 2;
+    pow2_size |= pow2_size >> 4;
+    pow2_size |= pow2_size >> 8;
+    pow2_size |= pow2_size >> 16;
+    pow2_size++;
+    AddBin(pow2_size);
+  }
+
+  ~StringHeap() {
+    for (unsigned i = 0; i < bins_.size(); ++i) {
+      smunmap(bins_.At(i));
+    }
+  }
+
+  StringRef AddString(const uint16_t length, const char *str) {
+    const uint16_t str_size = StringRef::size(length);
+    const uint64_t remaining_bin_size = bin_size_ - bin_used_;
+    // May require opening of new bin
+    if (remaining_bin_size < str_size) {
+      size_ += remaining_bin_size;
+      AddBin(2*bin_size_);
+    }
+    StringRef result =
+      StringRef::Place(length, str,
+                       static_cast<char *>(bins_.At(bins_.size()-1))+bin_used_);
+    size_ += str_size;
+    used_ += str_size;
+    bin_used_ += str_size;
+    return result;
+  }
+
+  void RemoveString(const StringRef str_ref) {
+    used_ -= str_ref.size();
+  }
+
+  double GetUsage() const {
+    if (size_ == 0) return 1.0;
+    return (double)(used_) / (double)(size_);
+  }
+
+  uint64_t used() const { return used_; }
+
+ private:
+  void AddBin(const uint64_t size) {
+    void *bin = smmap(size);
+    bins_.PushBack(bin);
+    bin_size_ = size;
+    bin_used_ = 0;
+  }
+
+  uint64_t size_;
+  uint64_t used_;
+  uint64_t bin_size_;
+  uint64_t bin_used_;
+  BigVector<void *> bins_;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class PathStore {
  public:
   PathStore() {
     map_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+    string_heap_ = new StringHeap();
   }
+
+  ~PathStore() {
+    delete string_heap_;
+  }
+
+  explicit PathStore(const PathStore &other);
+  PathStore &operator= (const PathStore &other);
 
   void Insert(const hash::Md5 &md5path, const PathString &path) {
     PathInfo info;
@@ -61,6 +190,7 @@ class PathStore {
 
     PathInfo new_entry;
     if (path.IsEmpty()) {
+      new_entry.name = string_heap_->AddString(0, "");
       map_.Insert(md5path, new_entry);
       return;
     }
@@ -69,7 +199,10 @@ class PathStore {
     new_entry.parent = hash::Md5(parent_path.GetChars(),
                                  parent_path.GetLength());
     Insert(new_entry.parent, parent_path);
-    new_entry.name = GetFileName(path);
+
+    const uint16_t name_length = path.GetLength() - parent_path.GetLength() - 1;
+    const char *name_str = path.GetChars() + parent_path.GetLength() + 1;
+    new_entry.name = string_heap_->AddString(name_length, name_str);
     map_.Insert(md5path, new_entry);
   }
 
@@ -85,7 +218,7 @@ class PathStore {
     retval = Lookup(info.parent, path);
     assert(retval);
     path->Append("/", 1);
-    path->Append(info.name.GetChars(), info.name.GetLength());
+    path->Append(info.name.data(), info.name.length());
     return true;
   }
 
@@ -98,6 +231,20 @@ class PathStore {
     info.refcnt--;
     if (info.refcnt == 0) {
       map_.Erase(md5path);
+      string_heap_->RemoveString(info.name);
+      if (string_heap_->GetUsage() < 0.75) {
+        StringHeap *new_string_heap = new StringHeap(string_heap_->used());
+        hash::Md5 empty_path = map_.empty_key();
+        for (unsigned i = 0; i < map_.capacity(); ++i) {
+          if (map_.keys()[i] != empty_path) {
+            (map_.values() + i)->name =
+              new_string_heap->AddString(map_.values()[i].name.length(),
+                                         map_.values()[i].name.data());
+          }
+        }
+        delete string_heap_;
+        string_heap_ = new_string_heap;
+      }
       Erase(info.parent);
     } else {
       map_.Insert(md5path, info);
@@ -106,6 +253,8 @@ class PathStore {
 
   void Clear() {
     map_.Clear();
+    delete string_heap_;
+    string_heap_ = new StringHeap();
   }
 
  private:
@@ -115,11 +264,17 @@ class PathStore {
     }
     hash::Md5 parent;
     uint32_t refcnt;
-    NameString name;
+    StringRef name;
   };
 
+  void CopyFrom(const PathStore &other);
+
   SmallHashDynamic<hash::Md5, PathInfo> map_;
+  StringHeap *string_heap_;
 };
+
+
+//------------------------------------------------------------------------------
 
 
 class PathMap {
@@ -168,6 +323,9 @@ class PathMap {
 };
 
 
+//------------------------------------------------------------------------------
+
+
 class InodeMap {
  public:
   InodeMap() {
@@ -191,6 +349,9 @@ class InodeMap {
  private:
   SmallHashDynamic<uint64_t, hash::Md5> map_;
 };
+
+
+//------------------------------------------------------------------------------
 
 
 class InodeReferences {
@@ -230,11 +391,14 @@ class InodeReferences {
 };
 
 
+//------------------------------------------------------------------------------
+
+
 /**
  * Tracks inode reference counters as given by Fuse.
  */
 class InodeTracker {
-public:
+ public:
   struct Statistics {
     Statistics() {
       atomic_init64(&num_inserts);
@@ -323,7 +487,7 @@ public:
   }
 
 
-private:
+ private:
   static const unsigned kVersion = 3;
 
   void InitLock();
