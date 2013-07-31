@@ -255,6 +255,48 @@ void ClosePipe(int pipe_fd[2]) {
 
 
 /**
+ * Sets the sticky bit of path and sets mtime to value.  Vulnerable to races,
+ * so only use with immutable data.  Note that this modifies the inode.
+ */
+bool StoreInMtime(const std::string &path, const uint32_t value) {
+  platform_stat64 info;
+  int retval = platform_stat(path.c_str(), &info);
+  if (retval != 0) return false;
+
+  struct timeval times[2];
+  times[0].tv_usec = times[1].tv_usec = 0;
+  times[0].tv_sec = info.st_atime;
+
+  assert(sizeof(times[1].tv_sec) >= sizeof(value));
+  times[1].tv_sec = value;
+  retval = utimes(path.c_str(), times);
+  if (retval != 0) return false;
+
+  if (!(info.st_mode & S_ISVTX)) {
+    retval = chmod(path.c_str(), info.st_mode | S_ISVTX);
+    if (retval != 0) return false;
+  }
+  return true;
+}
+
+
+/**
+ * Checks for the sticky bit and returns mtime in value
+ */
+bool RetrieveFromMtime(const std::string &path, uint32_t *value) {
+  platform_stat64 info;
+  int retval = platform_stat(path.c_str(), &info);
+  if (retval != 0) return false;
+
+  if (info.st_mode & S_ISVTX) {
+    *value = info.st_mtime;
+    return true;
+  }
+  return false;
+}
+
+
+/**
  * Changes a non-blocking file descriptor to a blocking one.
  */
 void Nonblock2Block(int filedes) {

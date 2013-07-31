@@ -117,6 +117,8 @@ struct Pipe : public SingleCopy {
   int read_end;
   int write_end;
 };
+bool StoreInMtime(const std::string &path, const uint32_t value);
+bool RetrieveFromMtime(const std::string &path, uint32_t *value);
 
 void Nonblock2Block(int filedes);
 void Block2Nonblock(int filedes);
