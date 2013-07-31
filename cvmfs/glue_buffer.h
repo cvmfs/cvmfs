@@ -45,6 +45,12 @@ static inline uint32_t hasher_inode(const uint64_t &inode) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
+/**
+ * Pointer to a 2 byte length information followed by the characters
+ */
 class StringRef {
  public:
   StringRef() {
@@ -72,10 +78,18 @@ class StringRef {
 };
 
 
+//------------------------------------------------------------------------------
+
+
+/**
+ * Manages memory bins with immutable strings (deleting is a no-op).
+ * When the fraction of garbage is too large, the user of the StringHeap
+ * can copy the entire contents to a new heap.
+ */
 class StringHeap : public SingleCopy {
  public:
   StringHeap() {
-    Init(128*1024);  // 128kB (should be >= 64K)
+    Init(128*1024);  // 128kB (should be >= 64kB+2B which is largest string)
   }
 
   StringHeap(const uint32_t minimum_size) {
@@ -86,6 +100,7 @@ class StringHeap : public SingleCopy {
     size_ = 0;
     used_ = 0;
 
+    // Initial bin: 128kB or smallest power of 2 >= minimum size
     uint32_t pow2_size = minimum_size < 128*1024 ? 128*1024 : minimum_size;
     pow2_size--;
     pow2_size |= pow2_size >> 1;
@@ -147,6 +162,9 @@ class StringHeap : public SingleCopy {
 };
 
 
+//------------------------------------------------------------------------------
+
+
 class PathStore {
  public:
   PathStore() {
@@ -157,6 +175,9 @@ class PathStore {
   ~PathStore() {
     delete string_heap_;
   }
+
+  explicit PathStore(const PathStore &other);
+  PathStore &operator= (const PathStore &other);
 
   void Insert(const hash::Md5 &md5path, const PathString &path) {
     PathInfo info;
@@ -246,9 +267,14 @@ class PathStore {
     StringRef name;
   };
 
+  void CopyFrom(const PathStore &other);
+
   SmallHashDynamic<hash::Md5, PathInfo> map_;
   StringHeap *string_heap_;
 };
+
+
+//------------------------------------------------------------------------------
 
 
 class PathMap {
@@ -297,6 +323,9 @@ class PathMap {
 };
 
 
+//------------------------------------------------------------------------------
+
+
 class InodeMap {
  public:
   InodeMap() {
@@ -320,6 +349,9 @@ class InodeMap {
  private:
   SmallHashDynamic<uint64_t, hash::Md5> map_;
 };
+
+
+//------------------------------------------------------------------------------
 
 
 class InodeReferences {
@@ -359,11 +391,14 @@ class InodeReferences {
 };
 
 
+//------------------------------------------------------------------------------
+
+
 /**
  * Tracks inode reference counters as given by Fuse.
  */
 class InodeTracker {
-public:
+ public:
   struct Statistics {
     Statistics() {
       atomic_init64(&num_inserts);
@@ -452,7 +487,7 @@ public:
   }
 
 
-private:
+ private:
   static const unsigned kVersion = 3;
 
   void InitLock();
