@@ -1,4 +1,5 @@
 2.1.13:
+  * Strip debug symbols from 3rd party externals
   * Resolve "auto" proxy according to WLCG auto proxy discovery
     (see http://cern.ch/go/HV9f)
   * cvmfs_server: increase default expiration time for .cvmfspublished
