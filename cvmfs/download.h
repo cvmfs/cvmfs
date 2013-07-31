@@ -125,6 +125,7 @@ struct JobInfo {
   CURL *curl_handle;
   z_stream zstream;
   shash::ContextPtr hash_context;
+  uint32_t crc32;
   int wait_at[2];  /**< Pipe used for the return value */
   std::string proxy;
   bool nocache;
