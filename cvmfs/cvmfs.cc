@@ -1693,7 +1693,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
   int kcache_timeout = 0;
-  bool diskless = false;
   bool rebuild_cachedb = false;
   bool nfs_source = false;
   bool nfs_shared = false;
@@ -1704,7 +1703,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string proxies = "";
   string dns_server = "";
   string public_keys = "";
-  bool ignore_signature = false;
   string root_hash = "";
   string repository_tag = "";
   map<uint64_t, uint64_t> uid_map;
@@ -1783,11 +1781,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     root_hash = parameter;
   if (options::GetValue("CVMFS_REPOSITORY_TAG", &parameter))
     repository_tag = parameter;
-  if (options::GetValue("CVMFS_DISKLESS", &parameter) &&
-      options::IsOn(parameter))
-  {
-    diskless = true;
-  }
   if (options::GetValue("CVMFS_NFS_SOURCE", &parameter) &&
       options::IsOn(parameter))
   {
@@ -1797,11 +1790,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
       nfs_shared = true;
       nfs_shared_dir = MakeCanonicalPath(parameter);
     }
-  }
-  if (options::GetValue("CVMFS_IGNORE_SIGNATURE", &parameter) &&
-      options::IsOn(parameter))
-  {
-    ignore_signature = true;
   }
   if (options::GetValue("CVMFS_AUTO_UPDATE", &parameter) &&
       !options::IsOn(parameter))

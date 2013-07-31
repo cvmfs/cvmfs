@@ -11,7 +11,7 @@
 #include "manifest.h"
 
 namespace hash {
-class Any;
+struct Any;
 }
 
 namespace signature {

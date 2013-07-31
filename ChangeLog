@@ -1,4 +1,6 @@
 2.1.13:
+  * Resolve "auto" proxy according to WLCG auto proxy discovery
+    (see http://cern.ch/go/HV9f)
   * cvmfs_server: increase default expiration time for .cvmfspublished
     to 2 minutes in order to avoid being dDoS'd by misconfigured
     Squids
