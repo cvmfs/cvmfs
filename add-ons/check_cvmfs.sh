@@ -1,9 +1,11 @@
 #!/bin/bash
 # CernVM-FS check for Nagios
-# Version 1.7, last modified: 10.07.2013
+# Version 1.8, last modified: 30.07.2013
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
+# 1.8:
+#    - resolve auto proxy
 # 1.7:
 #    - optionally turn on memory verification
 # 1.6:
@@ -13,7 +15,7 @@
 #    - return immediately if transport endpoint is not connected
 #    - start of ChangeLog
 
-VERSION=1.7
+VERSION=1.8
 
 STATUS_OK=0
 STATUS_WARNING=1     # CernVM-FS resource consumption high or
@@ -177,6 +179,15 @@ if [ $OPT_NETWORK_CHECK -eq 1 ]; then
       CVMFS_HOSTS=`/bin/echo "$CVMFS_SERVER_URL" | /bin/sed 's/,\|;/ /g' \
          | sed s/@org@/$ORG/g | sed s/@fqrn@/$FQRN/g`
       CVMFS_PROXIES=`/bin/echo "$CVMFS_HTTP_PROXY" | /bin/sed 's/;\||/ /g'`
+      CVMFS_REAL_PROXIES=
+      for proxy in $CVMFS_PROXIES; do
+        if [ "x$proxy" = "xauto" ]; then
+          proxy=$(/usr/bin/cvmfs2 __wpad__ auto "$CVMFS_SERVER_URL" 2>/dev/null)
+          proxy=$(echo "$proxy" | /bin/sed 's/;/ /g')
+        fi
+        CVMFS_REAL_PROXIES="$CVMFS_REAL_PROXIES $proxy"
+      done
+      CVMFS_PROXIES="$CVMFS_REAL_PROXIES"
    else
       /bin/echo "SERVICE STATUS: CernVM-FS configuration error"
       exit $STATUS_UNKNOWN
