@@ -75,6 +75,15 @@ option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
+# set name of fuse library (-losxfuse for osxfuse)
+#
+if (MACOSX)
+	set(LIBFUSE osxfuse)
+else (MACOSX)
+	set(LIBFUSE fuse)
+endif(MACOSX)
+
+#
 # define where to find the external dependencies
 #
 # for the external libraries there should be a CVMFS-CMakeLists.txt file provided
@@ -192,9 +201,9 @@ include_directories (${INCLUDE_DIRECTORIES})
 #
 
 if (MACOSX)
-  find_package (Fuse4x REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE4X_INCLUDE_DIR})
-  set (FUSE_LIBRARIES ${FUSE4X_LIBRARIES}) # just abstract the difference here... they are compatible
+  find_package (OSXFuse REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OSXFUSE_INCLUDE_DIR})
+  set (FUSE_LIBRARIES ${OSXFUSE_LIBRARIES}) # just abstract the difference here... they are compatible
 else (MACOSX)
   find_package (FUSE REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})

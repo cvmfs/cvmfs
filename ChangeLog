@@ -1,4 +1,5 @@
 2.1.13:
+  * Move OS X client from fuse4x to OSXFuse
   * Properly handle (ignore) mount options
     auto, noauto, user, nouser, users, _netdev
   * Strip debug symbols from 3rd party externals
