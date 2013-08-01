@@ -1,4 +1,6 @@
 2.1.13:
+  * Properly handle (ignore) mount options
+    auto, noauto, user, nouser, users, _netdev
   * Strip debug symbols from 3rd party externals
   * Resolve "auto" proxy according to WLCG auto proxy discovery
     (see http://cern.ch/go/HV9f)

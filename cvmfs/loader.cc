@@ -54,6 +54,14 @@ struct CvmfsOptions {
   int grab_mountpoint;
   int cvmfs_suid;
   int disable_watchdog;
+
+  // Ignored options
+  int ign_netdev;
+  int ign_user;
+  int ign_nouser;
+  int ign_users;
+  int ign_auto;
+  int ign_noauto;
 };
 
 enum {
@@ -74,6 +82,14 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
   CVMFS_SWITCH("cvmfs_suid",       cvmfs_suid),
   CVMFS_SWITCH("disable_watchdog", disable_watchdog),
+
+  // Ignore these options
+  CVMFS_SWITCH("_netdev",          ign_netdev),
+  CVMFS_SWITCH("user",             ign_user),
+  CVMFS_SWITCH("nouser",           ign_nouser),
+  CVMFS_SWITCH("users",            ign_users),
+  CVMFS_SWITCH("auto",             ign_auto),
+  CVMFS_SWITCH("noauto",           ign_noauto),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
