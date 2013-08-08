@@ -1309,6 +1309,14 @@ int MainCacheManager(int argc, char **argv) {
     return 1;
   }
   close(retval);
+
+  // Redirect SQlite temp directory to cache (global variable)
+  const string tmp_dir = *cache_dir_ + "/txn";
+  sqlite3_temp_directory =
+    static_cast<char *>(sqlite3_malloc(tmp_dir.length() + 1));
+  strcpy(sqlite3_temp_directory, tmp_dir.c_str());
+
+
   if (!InitDatabase(rebuild)) {
     UnlockFile(fd_lockfile_fifo);
     return 1;
@@ -1365,6 +1373,11 @@ int MainCacheManager(int argc, char **argv) {
   CloseDatabase();
   unlink(crash_guard.c_str());
   UnlockFile(fd_lockfile_fifo);
+
+  if (sqlite3_temp_directory) {
+    sqlite3_free(sqlite3_temp_directory);
+    sqlite3_temp_directory = NULL;
+  }
 
   monitor::Fini();
 

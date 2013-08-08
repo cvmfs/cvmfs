@@ -1968,6 +1968,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   CreateFile("./.cvmfscache", 0600);
   g_cache_ready = true;
 
+  // Redirect SQlite temp directory to cache (global variable)
+  sqlite3_temp_directory =
+    static_cast<char *>(sqlite3_malloc(strlen("./txn") + 1));
+  strcpy(sqlite3_temp_directory, "./txn");
+
   // Start NFS maps module, if necessary
 #ifdef CVMFS_NFS_SUPPORT
   if (nfs_source) {
@@ -2288,6 +2293,10 @@ static void Fini() {
   cvmfs::repository_tag_ = NULL;
   cvmfs::mountpoint_= NULL;
 
+  if (sqlite3_temp_directory) {
+    sqlite3_free(sqlite3_temp_directory);
+    sqlite3_temp_directory = NULL;
+  }
   sqlite3_shutdown();
   if (g_sqlite_page_cache) free(g_sqlite_page_cache);
   if (g_sqlite_scratch) free(g_sqlite_scratch);
