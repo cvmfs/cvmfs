@@ -229,7 +229,9 @@ static bool GetDirentForPath(const PathString &path,
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForPath, no entry");
-  md5path_cache_->InsertNegative(md5path);
+  // Only cache real ENOENT errors, not catalog load errors
+  if (dirent->GetSpecial() == catalog::kDirentNegative)
+    md5path_cache_->InsertNegative(md5path);
   return false;
 }
 
