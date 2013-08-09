@@ -725,6 +725,20 @@ static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup)
 
 
 /**
+ * Looks into dirent to decide if this is an EIO negative reply or an
+ * ENOENT negative reply
+ */
+static void ReplyNegative(const catalog::DirectoryEntry &dirent,
+                          fuse_req_t req)
+{
+  if (dirent.GetSpecial() == catalog::kDirentNegative)
+    fuse_reply_err(req, ENOENT);
+  else
+    fuse_reply_err(req, EIO);
+}
+
+
+/**
  * Transform a cvmfs dirent into a struct stat.
  */
 static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
@@ -742,7 +756,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   remount_fence_->Leave();
 
   if (!found) {
-    fuse_reply_err(req, ENOENT);
+    ReplyNegative(dirent, req);
     return;
   }
 
@@ -767,7 +781,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   remount_fence_->Leave();
 
   if (!found) {
-    fuse_reply_err(req, ENOENT);
+    ReplyNegative(dirent, req);
     return;
   }
 
@@ -818,11 +832,17 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   PathString path;
   catalog::DirectoryEntry d;
-  const bool found = GetPathForInode(ino, &path) &&  GetDirentForInode(ino, &d);
-
+  bool found = GetPathForInode(ino, &path);
   if (!found) {
     remount_fence_->Leave();
     fuse_reply_err(req, ENOENT);
+    return;
+  }
+  found = GetDirentForInode(ino, &d);
+
+  if (!found) {
+    remount_fence_->Leave();
+    ReplyNegative(d, req);
     return;
   }
   if (!d.IsDirectory()) {
@@ -999,12 +1019,16 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   catalog::DirectoryEntry dirent;
   PathString path;
 
-  const bool found = GetDirentForInode(ino, &dirent) &&
-                     GetPathForInode(ino, &path);
-
+  bool found = GetPathForInode(ino, &path);
   if (!found) {
     remount_fence_->Leave();
     fuse_reply_err(req, ENOENT);
+    return;
+  }
+  found = GetDirentForInode(ino, &dirent);
+  if (!found) {
+    remount_fence_->Leave();
+    ReplyNegative(dirent, req);
     return;
   }
   remount_fence_->Leave();
@@ -1391,7 +1415,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   remount_fence_->Leave();
 
   if (!found) {
-    fuse_reply_err(req, ENOENT);
+    ReplyNegative(d, req);
     return;
   }
 
@@ -1531,7 +1555,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   remount_fence_->Leave();
 
   if (!found) {
-    fuse_reply_err(req, ENOENT);
+    ReplyNegative(d, req);
     return;
   }
 
