@@ -491,39 +491,56 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (inode_cache_->Lookup(ino, dirent))
     return true;
 
-  // Lookup inode in catalog
+  // Look in the catalogs in 2 steps: lookup inode->path, lookup path
+  catalog::DirectoryEntry dirent_negative =
+    catalog::DirectoryEntry(catalog::kDirentNegative);
+  // Reset directory entry.  If the function returns false and dirent is no
+  // the kDirentNegative, it was an I/O error
+  *dirent = catalog::DirectoryEntry();
+
   if (nfs_maps_) {
     // NFS mode
     PathString path;
-    if (nfs_maps::GetPath(ino, &path) &&
-        catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent))
-    {
+    bool retval = nfs_maps::GetPath(ino, &path);
+    if (!retval) {
+      *dirent = dirent_negative;
+      return false;
+    }
+    if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
       // Fix inodes
       dirent->set_inode(ino);
       inode_cache_->Insert(ino, *dirent);
       return true;
     }
-  } else {
-    // Normal mode
-    PathString path;
-    if (ino == catalog_manager_->GetRootInode()) {
-      catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
-      dirent->set_inode(ino);
-      inode_cache_->Insert(ino, *dirent);
-      return true;
-    }
-    if (inode_tracker_->FindPath(ino, &path) &&
-        catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent))
-    {
-      // Fix inodes
-      dirent->set_inode(ino);
-      inode_cache_->Insert(ino, *dirent);
-      return true;
-    }
+    return false;  // Not found in catalog or catalog load error
   }
 
-  // Can happen after reload of catalogs
-  LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode lookup failure");
+  // Non-NFS mode
+  PathString path;
+  if (ino == catalog_manager_->GetRootInode()) {
+    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
+    dirent->set_inode(ino);
+    inode_cache_->Insert(ino, *dirent);
+    return true;
+  }
+
+  bool retval = inode_tracker_->FindPath(ino, &path);
+  if (!retval) {
+    // Can this ever happen?
+    LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode inode lookup failure");
+    *dirent = dirent_negative;
+    return false;
+  }
+  // TODO: should this become GetDirentForPath?
+  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+    // Fix inodes
+    dirent->set_inode(ino);
+    inode_cache_->Insert(ino, *dirent);
+    return true;
+  }
+
+  // Can happen after reload of catalogs or on catalog load failure
+  LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode path lookup failure");
   return false;
 }
 
@@ -620,32 +637,34 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   result.attr_timeout = timeout;
   result.entry_timeout = timeout;
 
-  // Special NFS lookups
+  // Special NFS lookups: . and ..
   if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
     if (GetDirentForInode(parent, &dirent)) {
       if (strcmp(name, ".") == 0) {
-        goto reply_positive;
+        goto lookup_reply_positive;
       } else {
+        // Lookup for ".."
         if (dirent.inode() == catalog_manager_->GetRootInode()) {
           dirent.set_inode(1);
-          goto reply_positive;
+          goto lookup_reply_positive;
         }
-        if (GetPathForInode(parent, &parent_path) &&
-            GetDirentForPath(GetParentPath(parent_path), &dirent))
-        {
-          goto reply_positive;
-        } else {
-          goto reply_negative;
-        }
+        if (!GetPathForInode(parent, &parent_path))
+          goto lookup_reply_negative;
+        if (GetDirentForPath(GetParentPath(parent_path), &dirent))
+          goto lookup_reply_positive;
       }
-    } else {
-      goto reply_negative;
     }
+    // No entry for "." or no entry for ".."
+    if (dirent.GetSpecial() == catalog::kDirentNegative)
+      goto lookup_reply_negative;
+    else
+      goto lookup_reply_error;
+    assert(false);
   }
 
   if (!GetPathForInode(parent, &parent_path)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "no path for parent inode found");
-    goto reply_negative;
+    goto lookup_reply_negative;
   }
 
   path.Assign(parent_path);
@@ -653,10 +672,13 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   path.Append(name, strlen(name));
   tracer::Trace(tracer::kFuseLookup, path, "lookup()");
   if (!GetDirentForPath(path, &dirent)) {
-    goto reply_negative;
+    if (dirent.GetSpecial() == catalog::kDirentNegative)
+      goto lookup_reply_negative;
+    else
+      goto lookup_reply_error;
   }
 
- reply_positive:
+ lookup_reply_positive:
   if (!nfs_maps_)
     inode_tracker_->VfsGet(dirent.inode(), path);
   remount_fence_->Leave();
@@ -665,11 +687,16 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   fuse_reply_entry(req, &result);
   return;
 
- reply_negative:
+ lookup_reply_negative:
   remount_fence_->Leave();
   atomic_inc64(&num_fs_lookup_negative_);
   result.ino = 0;
   fuse_reply_entry(req, &result);
+  return;
+
+ lookup_reply_error:
+  remount_fence_->Leave();
+  fuse_reply_err(req, EIO);
 }
 
 
