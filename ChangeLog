@@ -1,4 +1,6 @@
 2.1.13:
+  * Fix false negative caching of I/O errors that occur during
+    path lookup
   * Place SQlite temporary files into cache directory
   * Move OS X client from fuse4x to OSXFuse
   * Properly handle (ignore) mount options
