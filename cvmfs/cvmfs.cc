@@ -562,7 +562,10 @@ static bool GetDirentForPath(const PathString &path,
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForPath, no entry");
-  md5path_cache_->InsertNegative(md5path);
+  // Only insert ENOENT results into negative cache.  Otherwise it was an
+  // error loading nested catalogs
+  if (dirent->GetSpecial() == catalog::kDirentNegative)
+    md5path_cache_->InsertNegative(md5path);
   return false;
 }
 
