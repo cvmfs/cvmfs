@@ -1,0 +1,19 @@
+
+cvmfs_test_name="Negative cache and I/O errors"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount sft.cern.ch || return 1
+  
+  sudo cvmfs_talk -i sft.cern.ch proxy set "invalid" >> $logfile
+  stat /cvmfs/sft.cern.ch/lcg/external/ROOT >> $logfile 2>&1
+  [ $? -eq 0 ] && return 2
+
+  sudo cvmfs_talk -i sft.cern.ch proxy set "DIRECT" >> $logfile
+  stat /cvmfs/sft.cern.ch/lcg/external/ROOT >> $logfile 2>&1
+  [ $? -ne 0 ] && return 3
+
+  return 0
+}
+
