@@ -77,7 +77,7 @@
 #include "signature.h"
 #include "quota.h"
 #include "quota_listener.h"
-#include "prng.h"
+#include "backoff.h"
 #include "util.h"
 #include "util_concurrency.h"
 #include "atomic.h"
@@ -118,20 +118,7 @@ const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
 
-const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
-                                     backoff */
-const int kMaxIoDelay = 2000; /**< Maximum 2 seconds */
-const int kForgetDos = 10000; /**< Clear DoS memory after 10 seconds */
-
-/**
- * Prevent DoS attacks on the Squid server
- */
-static struct {
-  time_t timestamp;
-  int delay;
-} previous_io_error_;
-Prng *prng_;
-
+BackoffThrottle *backoff_throttle_;
 
 /**
  * Stores the initial catalog revision (in order to detect overflows) and
@@ -1150,17 +1137,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  // Prevent Squid DoS
-  time_t now = time(NULL);
-  if (now - previous_io_error_.timestamp < kForgetDos) {
-    SafeSleepMs(previous_io_error_.delay);
-    if (previous_io_error_.delay < kMaxIoDelay)
-      previous_io_error_.delay *= 2;
-  } else {
-    // Initial delay
-    previous_io_error_.delay = (prng_->Next(kMaxInitIoDelay-1)) + 2;
-  }
-  previous_io_error_.timestamp = now;
+  backoff_throttle_->Throttle();
 
   atomic_inc32(&num_io_error_);
   fuse_reply_err(req, -fd);
@@ -1763,8 +1740,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   map<uint64_t, uint64_t> gid_map;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
-  cvmfs::prng_ = new Prng();
-  cvmfs::prng_->InitLocaltime();
+  cvmfs::backoff_throttle_ = new BackoffThrottle();
 
   // Option parsing
   options::Init();
@@ -1949,8 +1925,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   atomic_init64(&cvmfs::num_fs_readlink_);
   atomic_init64(&cvmfs::num_fs_forget_);
   atomic_init32(&cvmfs::num_io_error_);
-  cvmfs::previous_io_error_.timestamp = 0;
-  cvmfs::previous_io_error_.delay = 0;
 
   // Create cache directory, if necessary
   if (!MkdirDeep(*cvmfs::cachedir_, 0700)) {
@@ -2364,8 +2338,8 @@ static void Fini() {
   SetLogDebugFile("");
   auto_umount::SetMountpoint("");
 
-  delete cvmfs::prng_;
-  cvmfs::prng_ = NULL;
+  delete cvmfs::backoff_throttle_;
+  cvmfs::backoff_throttle_ = NULL;
 }
 
 

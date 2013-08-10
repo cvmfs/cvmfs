@@ -17,6 +17,7 @@
 #include "shortstring.h"
 #include "atomic.h"
 #include "manifest_fetch.h"
+#include "backoff.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -113,6 +114,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   atomic_int32 certificate_misses_;
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
+  BackoffThrottle backoff_throttle_;
 };
 
 

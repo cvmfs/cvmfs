@@ -27,6 +27,7 @@ set (CVMFS_CLIENT_SOURCES
   platform.h platform_osx.h platform_linux.h
   monitor.h monitor.cc
   prng.h util.cc util.h
+  backoff.h backoff.cc
   duplex_zlib.h compression.h compression.cc
   download.cc download.h
   wpad.cc wpad.h

@@ -80,6 +80,7 @@
 #include "shortstring.h"
 #include "smalloc.h"
 #include "globals.h"
+#include "backoff.h"
 #include "libcvmfs_int.h"
 
 using namespace std;  // NOLINT
@@ -92,18 +93,6 @@ const unsigned int kMd5pathCacheSize = 32000;
 const unsigned int kShortTermTTL = 180;  /**< If catalog reload fails, try again
                                               in 3 minutes */
 const time_t kIndefiniteDeadline = time_t(-1);
-
-const int kMaxInitIoDelay = 32; /**< Maximum start value for exponential
-                                     backoff */
-const int kMaxIoDelay = 2000; /**< Maximum 2 seconds */
-const int kForgetDos = 10000; /**< Clear DoS memory after 10 seconds */
-/**
- * Prevent DoS attacks on the Squid server
- */
-static struct {
-  time_t timestamp;
-  int delay;
-} previous_io_error_;
 
 bool foreground_ = false;
 string *mountpoint_ = NULL;
@@ -133,6 +122,8 @@ atomic_int32 open_dirs_; /**< number of currently open directories */
 unsigned max_open_files_; /**< maximum allowed number of open files */
 const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
+
+BackoffThrottle *backoff_throttle_;
 
 
 unsigned GetMaxTTL() {
@@ -362,6 +353,8 @@ int cvmfs_int_init(
   g_gid = getgid();
   options_ready = true;
 
+  cvmfs::backoff_throttle_ = new BackoffThrottle();
+
   // Tune SQlite3 memory
   sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   sqlite_page_cache = smalloc(1280*3275);  // 4MB
@@ -383,8 +376,6 @@ int cvmfs_int_init(
   atomic_init64(&cvmfs::num_fs_read_);
   atomic_init64(&cvmfs::num_fs_readlink_);
   atomic_init32(&cvmfs::num_io_error_);
-  cvmfs::previous_io_error_.timestamp = 0;
-  cvmfs::previous_io_error_.delay = 0;
 
   // Logging
   SetLogSyslogLevel(cvmfs_opts_syslog_level);
@@ -614,6 +605,9 @@ void cvmfs_int_fini() {
   sqlite_page_cache = NULL;
   sqlite_scratch = NULL;
 
+  delete cvmfs::backoff_throttle_;
+  cvmfs::backoff_throttle_ = NULL;
+
   CleanupLibcryptoMt();
 }
 
@@ -657,17 +651,7 @@ int cvmfs_open(const char *c_path)
   }
 
   // Prevent Squid DoS
-  // TODO: move to download
-  time_t now = time(NULL);
-  if (now - previous_io_error_.timestamp < kForgetDos) {
-    usleep(previous_io_error_.delay*1000);
-    if (previous_io_error_.delay < kMaxIoDelay)
-      previous_io_error_.delay *= 2;
-  } else {
-    // Initial delay
-    previous_io_error_.delay = (random() % (kMaxInitIoDelay-1)) + 2;
-  }
-  previous_io_error_.timestamp = now;
+  backoff_throttle_->Throttle();
 
   atomic_inc32(&num_io_error_);
   return fd;
