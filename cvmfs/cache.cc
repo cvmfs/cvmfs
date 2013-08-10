@@ -748,6 +748,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
              "unable to load catalog with key %s (%d)",
              hash.ToString().c_str(), download_catalog.error_code);
     AbortTransaction(temp_path);
+    // TODO: DoS protection
     return catalog::kLoadFail;
   }
 
@@ -755,6 +756,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
   assert(size > 0);
   if (uint64_t(size) > quota::GetMaxFileSize()) {
     AbortTransaction(temp_path);
+    // TODO: DoS protection
     return catalog::kLoadNoSpace;
   }
 
@@ -764,12 +766,14 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "failed to pin catalog %s (no space)", hash.ToString().c_str());
     AbortTransaction(temp_path);
+    // TODO: DoS protection
     return catalog::kLoadNoSpace;
   }
 
   retval = rename(temp_path.c_str(), catalog_path->c_str());
   if (retval != 0) {
     quota::Remove(hash);
+    // TODO: DoS protection
     return catalog::kLoadFail;
   }
   return catalog::kLoadNew;
