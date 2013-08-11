@@ -1,4 +1,7 @@
 2.1.13:
+  * Fix parsing of config file without trailing newline
+  * Expand backoff on download errors to the loading of 
+    file catalogs 
   * Fix false negative caching of I/O errors that occur during
     path lookup
   * Place SQlite temporary files into cache directory

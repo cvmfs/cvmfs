@@ -783,7 +783,7 @@ bool GetLineFile(FILE *f, std::string *line) {
       break;
     line->push_back(c);
   }
-  return retval != EOF;
+  return (retval != EOF) || !line->empty();
 }
 
 
@@ -796,7 +796,7 @@ bool GetLineFd(const int fd, std::string *line) {
       break;
     line->push_back(c);
   }
-  return retval == 1;
+  return (retval == 1) || !line->empty();
 }
 
 
