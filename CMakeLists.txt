@@ -132,11 +132,18 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwi
 
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT FALSE)
+  set (INSTALL_LIBDIR "lib")
 	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
 	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
 else (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT TRUE)
+  set (INSTALL_LIBDIR "lib64")
 endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+
+if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
+  set (CMAKE_INSTALL_LIBDIR ${INSTALL_LIBDIR})
+endif (NOT DEFINED CMAKE_INSTALL_LIBDIR)
+unset (INSTALL_LIBDIR)
 
 if (NOT USING_CLANG)
 	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
