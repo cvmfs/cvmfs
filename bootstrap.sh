@@ -26,12 +26,12 @@ if [ -f "$externals_build_dir/.decompressionDone" ]; then
 fi
 
 print_hint() {
-  local msg=$1
+  local msg="$1"
   echo "--> $msg"
 }
 
 get_destination_dir() {
-  local library_name=$1
+  local library_name="$1"
   echo "$externals_build_dir/build_$library_name"
 }
 
@@ -66,16 +66,16 @@ do_copy() {
 }
 
 patch_external() {
-  local library_name=$1
+  local library_name="$1"
   shift 1
-  local patches=$@
   local cdir=$(pwd)
 
   print_hint "Patching $library_name"
 
   cd $(get_destination_dir $library_name)
-  for patchfile in $patches; do
-    patch -p0 < $patchfile
+  while [ $# -gt 0 ]; do
+    patch -p0 < $1
+    shift 1
   done
   cd $cdir
 }
