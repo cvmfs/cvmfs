@@ -297,6 +297,14 @@ fi
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_server
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
+%{_libdir}/libtbb_cvmfs.so
+%{_libdir}/libtbb_cvmfs.so.2
+%{_libdir}/libtbbmalloc_cvmfs.so
+%{_libdir}/libtbbmalloc_cvmfs.so.2
+%{_libdir}/libtbb_cvmfs_debug.so
+%{_libdir}/libtbb_cvmfs_debug.so.2
+%{_libdir}/libtbbmalloc_cvmfs_debug.so
+%{_libdir}/libtbbmalloc_cvmfs_debug.so.2
 %dir %{_sysconfdir}/cvmfs/repositories.d
 %doc COPYING AUTHORS README ChangeLog
 
