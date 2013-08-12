@@ -16,7 +16,8 @@ if (NOT MACOSX)
   set (TBB_DEBUG_LIBRARIES ${TBB_DEBUG_LIBRARIES} ${TBB_DEBUG_LIBRARY_DIRS}/libtbb_cvmfs_debug.${DLLEXT}.2 ${TBB_DEBUG_LIBRARY_DIRS}/libtbbmalloc_cvmfs_debug.${DLLEXT}.2)
 endif (NOT MACOSX)
 
-register_external_lib (libtbb ${TBB_BUILD_LOCATION} "${TBB_LIBRARIES} ${TBB_DEBUG_LIBRARIES}")
+list (GET TBB_LIBRARIES 0 TBB_MAIN_LIB)
+register_external_lib (libtbb ${TBB_BUILD_LOCATION} ${TBB_MAIN_LIB})
 
 if (IS_64_BIT)
   set (TBB_INSTALL_LOCATION "lib64")
