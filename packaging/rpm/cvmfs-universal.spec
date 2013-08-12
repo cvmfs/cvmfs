@@ -295,7 +295,7 @@ fi
 %defattr(-,root,root)
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
-%{_bindir}/cvmfs_server
+%{_bindir}/cvmfs_server 
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
 %{_libdir}/libtbb_cvmfs.so.2
