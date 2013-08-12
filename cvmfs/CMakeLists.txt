@@ -355,10 +355,6 @@ endif (BUILD_SERVER)
 # installation
 #
 
-if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-  set(CMAKE_INSTALL_LIBDIR "lib")
-endif()
-
 if (BUILD_CVMFS)
   install (
     TARGETS      cvmfs2 cvmfs_fsck
