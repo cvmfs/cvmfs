@@ -66,12 +66,13 @@ else ()
 endif()
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
-option (BUILD_UNITTESTS "Build the CernVM-FS unit test set" OFF)
-option (SQLITE3_BUILTIN "Don't use system SQLite3" ON)
-option (LIBCURL_BUILTIN "Don't use system libcurl" ON)
-option (ZLIB_BUILTIN "Don't use system zlib" ON)
+option (BUILD_UNITTESTS    "Build the CernVM-FS unit test set"                   OFF)
+option (SQLITE3_BUILTIN    "Don't use system SQLite3"                            ON)
+option (LIBCURL_BUILTIN    "Don't use system libcurl"                            ON)
+option (ZLIB_BUILTIN       "Don't use system zlib"                               ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
-option (LEVELDB_BUILTIN "Don't use system leveldb" ON)
+option (LEVELDB_BUILTIN    "Don't use system leveldb"                            ON)
+option (TBB_PRIVATE_LIB    "Compile our own TBB shared libraries"                ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
@@ -100,6 +101,7 @@ set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_sparsehash"
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_leveldb")
 set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
 set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
+set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -129,8 +131,11 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT FALSE)
 	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
 	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+else (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT TRUE)
 endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
 
 if (NOT USING_CLANG)
@@ -252,6 +257,14 @@ else (LEVELDB_BUILTIN)
   find_package(leveldb)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
 endif (LEVELDB_BUILTIN)
+
+if (TBB_PRIVATE_LIB)
+  include (${TBB_BUILD_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_BUILD_LOCATION}/include)
+else (TBB_PRIVATE_LIB)
+  find_package(TBB REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_INCLUDE_DIRS})
+endif (TBB_PRIVATE_LIB)
 
 if (NOT MACOSX)
   set (HAVE_LIB_RT TRUE)
