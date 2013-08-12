@@ -72,7 +72,7 @@ option (LIBCURL_BUILTIN    "Don't use system libcurl"                           
 option (ZLIB_BUILTIN       "Don't use system zlib"                               ON)
 option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
 option (LEVELDB_BUILTIN    "Don't use system leveldb"                            ON)
-option (TBB_HOMEBREW       "Compile our own TBB shared libraries"                ON)
+option (TBB_PRIVATE_LIB    "Compile our own TBB shared libraries"                ON)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
 
 #
@@ -258,13 +258,13 @@ else (LEVELDB_BUILTIN)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
 endif (LEVELDB_BUILTIN)
 
-if (TBB_HOMEBREW)
+if (TBB_PRIVATE_LIB)
   include (${TBB_BUILD_LOCATION}/CVMFS-CMakeLists.txt)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_BUILD_LOCATION}/include)
-else (TBB_HOMEBREW)
+else (TBB_PRIVATE_LIB)
   find_package(TBB REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_INCLUDE_DIRS})
-endif (TBB_HOMEBREW)
+endif (TBB_PRIVATE_LIB)
 
 if (NOT MACOSX)
   set (HAVE_LIB_RT TRUE)

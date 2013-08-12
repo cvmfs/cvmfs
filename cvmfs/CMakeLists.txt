@@ -312,9 +312,9 @@ if (BUILD_SERVER)
     add_dependencies (cvmfs_swissknife zlib)
   endif (ZLIB_BUILTIN)
 
-  if (TBB_HOMEBREW)
+  if (TBB_PRIVATE_LIB)
     add_dependencies (cvmfs_swissknife libtbb)
-  endif (TBB_HOMEBREW)
+  endif (TBB_PRIVATE_LIB)
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
@@ -336,9 +336,9 @@ if (BUILD_SERVER)
       add_dependencies (cvmfs_swissknife_debug zlib)
     endif (ZLIB_BUILTIN)
 
-    if (TBB_HOMEBREW)
+    if (TBB_PRIVATE_LIB)
       add_dependencies (cvmfs_swissknife_debug libtbb)
-    endif (TBB_HOMEBREW)
+    endif (TBB_PRIVATE_LIB)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
 
