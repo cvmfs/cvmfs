@@ -1,10 +1,10 @@
 We repackage the original tgz downloaded from threadingbuildingblocks.org
 into a fresh tar.gz archive using the following commands:
 
-TBB_VERSION=4.1-4 # <-- ADAPT THIS
-tar xzf <original tgz file>
-mv <resulting directory> tbb-${TBB_VERSION}
-tar czf tbb-${TBB_VERSION}.tar.gz tbb-${TBB_VERSION}
+$  TBB_VERSION=4.1-4 # <-- ADAPT THIS
+$  tar xzf <original tgz file>
+$  mv <resulting directory> tbb-${TBB_VERSION}
+$  tar czf tbb-${TBB_VERSION}.tar.gz tbb-${TBB_VERSION}
 
 Additionally we apply two patches to the build system of TBB before compilation
 Those allow both for easier handling of the build products as well as custom
