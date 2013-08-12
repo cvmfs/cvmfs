@@ -68,14 +68,14 @@ do_copy() {
 patch_external() {
   local library_name="$1"
   shift 1
-  local patches=$@
   local cdir=$(pwd)
 
   print_hint "Patching $library_name"
 
   cd $(get_destination_dir $library_name)
-  for patchfile in $patches; do
-    patch -p0 < $patchfile
+  while [ $# -gt 0 ]; do
+    patch -p0 < $1
+    shift 1
   done
   cd $cdir
 }
