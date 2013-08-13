@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# Sanitize input, anything that's not a hostname is rejected
+if echo "$1" | grep -q '[^a-zA-Z0-9\-\._]'; then
+  exit 1
+fi
+
 fqrn=$1
 AUTO_OPTIONS="-fstype=cvmfs"
 

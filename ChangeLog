@@ -1,3 +1,8 @@
+2.1.13:
+  * Fix security bug in /etc/auto.cvmfs: due to improper
+    option checking, normal users can get root privileges
+    through autofs.
+
 2.1.12:
   * Perform host failover after unsuccessful proxy
     failover (test all paths)
