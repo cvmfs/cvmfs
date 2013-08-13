@@ -228,17 +228,22 @@ void AbstractCatalogManager::DetachNested() {
 
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
- * @param path the path to find in the catalogs
- * @param options whether to perform another lookup to get the parent entry, too
- * @param dirent the resulting DirectoryEntry, or special Negative entry
+ * @param path      the path to find in the catalogs
+ * @param options   whether to perform another lookup to get the parent entry, too
+ * @param dirent    the resulting DirectoryEntry, or special Negative entry
+ *                  Note: can be set to zero if the result is not important
  * @return true if lookup succeeded otherwise false
  */
 bool AbstractCatalogManager::LookupPath(const PathString &path,
                                         const LookupOptions options,
                                         DirectoryEntry *dirent)
 {
-  *dirent = DirectoryEntry();  // initialize as non-negative
-  DirectoryEntry dirent_negative = DirectoryEntry(catalog::kDirentNegative);
+  // initialize as non-negative
+  if (dirent != NULL) *dirent = DirectoryEntry();
+
+  // create a dummy negative directory entry
+  const DirectoryEntry dirent_negative =
+    DirectoryEntry(catalog::kDirentNegative);
 
   EnforceSqliteMemLimit();
   ReadLock();
@@ -286,14 +291,14 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
           LogCvmfs(kLogCatalog, kLogDebug,
                    "nested catalogs loaded but entry '%s' was still not found",
                    path.c_str());
-          *dirent = dirent_negative;
+          if (dirent != NULL) *dirent = dirent_negative;
           goto lookup_path_notfound;
         } else {
           best_fit = nested_catalog;
         }
       } else {
         LogCvmfs(kLogCatalog, kLogDebug, "no nested catalog fits");
-        *dirent = dirent_negative;
+        if (dirent != NULL) *dirent = dirent_negative;
         goto lookup_path_notfound;
       }
     }
@@ -302,7 +307,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   // Not in a nested catalog (because no nested cataog fits), ENOENT
   if (!found) {
     LogCvmfs(kLogCatalog, kLogDebug, "ENOENT: %s", path.c_str());
-    *dirent = dirent_negative;
+    if (dirent != NULL) *dirent = dirent_negative;
     goto lookup_path_notfound;
   }
 
@@ -311,6 +316,8 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
 
   // Look for parent entry
   if (options == kLookupFull) {
+    assert (dirent != NULL);
+
     DirectoryEntry parent;
     PathString parent_path = GetParentPath(path);
     if (dirent->IsNestedCatalogRoot()) {
