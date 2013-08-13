@@ -17,8 +17,8 @@
 
 #include <tbb/atomic.h>
 
-#include "util.h"
 #include "buffer.h"
+#include "../hash.h"
 
 namespace upload {
 
@@ -60,8 +60,10 @@ class Chunk {
   void       set_size(const size_t size)        { chunk_size_ = size;         }
 
   SHA_CTX&       sha1_context()                 { return sha1_context_;       }
-  unsigned char* sha1_digest()                  { return sha1_digest_;        }
-  std::string    sha1_string() const      { return ShaToString(sha1_digest_); }
+  hash::Any      sha1() const                   { return hash::Any(
+                                                          hash::kSha1,
+                                                          sha1_digest_,
+                                                          SHA_DIGEST_LENGTH); }
 
   z_stream&      zlib_context()                 { return zlib_context_;       }
 

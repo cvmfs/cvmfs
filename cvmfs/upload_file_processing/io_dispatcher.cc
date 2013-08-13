@@ -12,7 +12,6 @@
 #include "file.h"
 #include "processor.h"
 #include "chunk.h"
-#include "util.h"
 
 using namespace upload;
 
@@ -185,33 +184,38 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
   assert (chunk->IsInitialized());
   assert (buffer->IsInitialized());
 
-  if (! chunk->HasFileDescriptor()) {
-    const std::string file_path = output_path + "/" + "chunk.XXXXXXX";
-    char *tmp_file = strdupa(file_path.c_str());
-    const int tmp_fd = mkstemp(tmp_file);
-    if (tmp_fd < 0) {
-      std::stringstream ss;
-      ss << "Failed to create temporary output file (Errno: " << errno << ")";
-      PrintErr(ss.str());
-      return false;
-    }
-    chunk->set_file_descriptor(tmp_fd);
-    chunk->set_temporary_path(tmp_file);
-  }
+  // if (! chunk->HasFileDescriptor()) {
+  //   const std::string file_path = output_path + "/" + "chunk.XXXXXXX";
+  //   char *tmp_file = strdupa(file_path.c_str());
+  //   const int tmp_fd = mkstemp(tmp_file);
+  //   if (tmp_fd < 0) {
+  //     std::stringstream ss;
+  //     ss << "Failed to create temporary output file (Errno: " << errno << ")";
+  //     PrintErr(ss.str());
+  //     return false;
+  //   }
+  //   chunk->set_file_descriptor(tmp_fd);
+  //   chunk->set_temporary_path(tmp_file);
+  // }
 
-  const int fd = chunk->file_descriptor();
+  // const int fd = chunk->file_descriptor();
 
   // write to file
   const size_t bytes_to_write = buffer->used_bytes();
   assert (bytes_to_write > 0u);
-  assert (chunk->bytes_written() == buffer->base_offset());
-  const size_t bytes_written = write(fd, buffer->ptr(), bytes_to_write);
-  if (bytes_written != bytes_to_write) {
-    std::stringstream ss;
-    ss << "Failed to write to file (Errno: " << errno << ")";
-    PrintErr(ss.str());
-    return false;
-  }
+  assert (chunk->bytes_written() == static_cast<size_t>(buffer->base_offset()));
+
+  // HACK:
+  const size_t bytes_written = bytes_to_write;
+
+
+  // const size_t bytes_written = write(fd, buffer->ptr(), bytes_to_write);
+  // if (bytes_written != bytes_to_write) {
+  //   std::stringstream ss;
+  //   ss << "Failed to write to file (Errno: " << errno << ")";
+  //   PrintErr(ss.str());
+  //   return false;
+  // }
   chunk->add_bytes_written(bytes_written);
 
   if (delete_buffer) {
@@ -224,17 +228,17 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
 
 void IoDispatcher::CommitChunk(Chunk* chunk) {
   assert (chunk->IsFullyProcessed());
-  assert (chunk->HasFileDescriptor());
+  // assert (chunk->HasFileDescriptor());
   assert (chunk->bytes_written() == chunk->compressed_size());
 
-  int retval = close(chunk->file_descriptor());
-  assert (retval == 0);
+  // int retval = close(chunk->file_descriptor());
+  // assert (retval == 0);
 
-  const std::string final_path = output_path + "/" + chunk->sha1_string() +
-                                 ((! chunk->IsBulkChunk()) ? "P" : "");
+  // const std::string final_path = output_path + "/" + chunk->sha1_string() +
+  //                                ((! chunk->IsBulkChunk()) ? "P" : "");
 
-  retval = rename(chunk->temporary_path().c_str(), final_path.c_str());
-  assert (retval == 0);
+  // retval = rename(chunk->temporary_path().c_str(), final_path.c_str());
+  // assert (retval == 0);
 
   chunk->file()->ChunkCommitted(chunk);
 
