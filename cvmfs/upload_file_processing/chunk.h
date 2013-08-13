@@ -1,5 +1,9 @@
-#ifndef CHUNK_H
-#define CHUNK_H
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef UPLOAD_FILE_PROCESSING_CHUNK_H
+#define UPLOAD_FILE_PROCESSING_CHUNK_H
 
 #include <sys/types.h>
 #include <string>
@@ -15,6 +19,8 @@
 
 #include "util.h"
 #include "buffer.h"
+
+namespace upload {
 
 class IoDispatcher;
 class File;
@@ -112,4 +118,6 @@ class Chunk {
 
 typedef std::vector<Chunk*> ChunkVector;
 
-#endif /* CHUNK_H */
+}
+
+#endif /* UPLOAD_FILE_PROCESSING_CHUNK_H */

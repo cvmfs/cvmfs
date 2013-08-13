@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "chunk.h"
 
 #include <sstream>
@@ -6,6 +10,7 @@
 #include "io_dispatcher.h"
 #include "file.h"
 
+using namespace upload;
 
 void Chunk::ScheduleWrite(CharBuffer *buffer) {
   assert (buffer->used_bytes() > 0);

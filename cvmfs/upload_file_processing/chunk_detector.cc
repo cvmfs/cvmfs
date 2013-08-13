@@ -1,7 +1,13 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "chunk_detector.h"
 
 #include <algorithm>
 #include <limits>
+
+using namespace upload;
 
 off_t StaticOffsetDetector::FindNextCutMark(CharBuffer *buffer) {
   const off_t next_cut = last_cut() + offset_;

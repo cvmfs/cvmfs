@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "processor.h"
 
 #include <sstream> // TODO: remove
@@ -9,6 +13,7 @@
 #include "file.h"
 #include "chunk.h"
 
+using namespace upload;
 
 tbb::task* ChunkProcessingTask::execute() {
   // Thread Safety:

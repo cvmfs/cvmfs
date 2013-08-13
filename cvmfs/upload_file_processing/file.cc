@@ -1,10 +1,13 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "file.h"
 
 #include "chunk.h"
 #include "io_dispatcher.h"
 
-#include <sstream>  // TODO: remove
-#include "util.h"   //          "
+using namespace upload;
 
 File::~File() {
   if (HasBulkChunk()) {
