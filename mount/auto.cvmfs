@@ -1,11 +1,18 @@
 #!/bin/sh
 
 # Sanitize input, anything that's not a hostname is rejected
-if echo "$1" | grep '[^a-zA-Z0-9\._-]'; then
+if echo "$1" | grep -q '[^a-zA-Z0-9._-]'; then
+  exit 1
+fi
+if [ $(echo "x$1" | wc -l | awk '{print $1}') -gt 1 ]; then
+  exit 1
+fi
+if [ $(echo "x$1" | head -c2) = "x-" ]; then
   exit 1
 fi
 
 fqrn=$1
+
 AUTO_OPTIONS="-fstype=cvmfs"
 
 echo $fqrn | grep -q \\.
@@ -14,3 +21,4 @@ if [ $? -ne 0 ]; then
 fi
 
 echo ${AUTO_OPTIONS} :$fqrn
+
