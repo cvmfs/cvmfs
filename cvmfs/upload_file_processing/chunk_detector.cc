@@ -11,7 +11,7 @@ using namespace upload;
 
 off_t StaticOffsetDetector::FindNextCutMark(CharBuffer *buffer) {
   const off_t next_cut = last_cut() + offset_;
-  if (next_cut >= buffer->base_offset() + buffer->size()) {
+  if (next_cut >= buffer->base_offset() + static_cast<off_t>(buffer->size())) {
     return NoCut(next_cut);
   }
 

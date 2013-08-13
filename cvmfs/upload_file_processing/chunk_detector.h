@@ -48,8 +48,9 @@ class StaticOffsetDetector : public ChunkDetector {
   StaticOffsetDetector(const off_t static_offset = ChunkDetector::kAvgChunkSize) :
     offset_(static_offset)
   {
-    assert (static_offset >= kMinChunkSize);
-    assert (static_offset <  kMaxChunkSize);
+    assert (static_offset >= 0);
+    assert (static_cast<size_t>(static_offset) >= kMinChunkSize);
+    assert (static_cast<size_t>(static_offset) <  kMaxChunkSize);
   }
 
   off_t FindNextCutMark(CharBuffer *buffer);

@@ -24,8 +24,8 @@ class Buffer {
   Buffer() : base_offset_(0), size_(0), used_bytes_(0), buffer_(NULL) {}
 
   Buffer(const size_t size) : base_offset_(0),
-                              size_(0),
                               used_bytes_(0),
+                              size_(0),
                               buffer_(NULL) {
     Allocate(size);
   }
@@ -73,10 +73,10 @@ class Buffer {
   }
 
  private:
-  off_t                        base_offset_;
-  size_t                       used_bytes_;
-  size_t                       size_;
-  typename A::pointer          buffer_;
+  off_t                base_offset_;
+  size_t               used_bytes_;
+  size_t               size_;
+  typename A::pointer  buffer_;
 };
 typedef Buffer<unsigned char, tbb::scalable_allocator<unsigned char> > CharBuffer;
 

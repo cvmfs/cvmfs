@@ -27,7 +27,8 @@ tbb::task* ChunkProcessingTask::execute() {
   // get the position from where the current input buffer needs to be processed
   const off_t internal_offset =
     std::max(off_t(0), chunk_->offset() - buffer_->base_offset());
-  assert (internal_offset < buffer_->used_bytes());
+  assert (internal_offset >= 0);
+  assert (static_cast<size_t>(internal_offset) < buffer_->used_bytes());
   const unsigned char *data = buffer_->ptr() + internal_offset;
 
   // determine how many bytes need to be processed
@@ -72,7 +73,6 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
   const int flush = (finalize) ? Z_FINISH : Z_NO_FLUSH;
 
   int retcode = -1;
-  bool done = false;
   while (true) {
     stream.avail_out = compress_buffer->size();
     stream.next_out  = compress_buffer->ptr();
@@ -198,7 +198,8 @@ FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
   assert (current_chunk != NULL);
   assert (current_chunk->size() == 0);
   assert (current_chunk->offset() <= buffer_->base_offset());
-  assert (current_chunk->offset() <  buffer_->base_offset() + buffer_->used_bytes());
+  assert (current_chunk->offset() <  buffer_->base_offset() +
+                                     static_cast<off_t>(buffer_->used_bytes()));
 
   CutMarks result;
   off_t next_cut;
