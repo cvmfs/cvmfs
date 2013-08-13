@@ -10,80 +10,6 @@ class IoDispatcher;
 class Reader;
 class File;
 
-template <class CruncherT>
-class ChunkCruncher {
- public:
-  ChunkCruncher(Chunk        *chunk,
-                CharBuffer   *buffer,
-                const off_t   internal_offset,
-                const size_t  byte_count,
-                const bool    finalize) :
-    chunk_(chunk),
-    buffer_(buffer),
-    internal_offset_(internal_offset),
-    byte_count_(byte_count),
-    finalize_(finalize)
-  {
-    assert (internal_offset_ < buffer->used_bytes());
-    assert (internal_offset_ + byte_count_ <= buffer->used_bytes());
-  }
-
-  void operator()() const {
-    // Hack: parallel_invoke expects a const callable operator... wtf
-    ChunkCruncher  *self     = const_cast<ChunkCruncher*>(this);
-    Chunk          *chunk    = self->chunk();
-    CharBuffer     *buffer   = self->buffer();
-
-    CruncherT::Crunch(chunk,
-                      buffer_->ptr() + internal_offset_,
-                      byte_count_,
-                      finalize_);
-  }
-
- protected:
-  Chunk*      chunk()  { return chunk_;  }
-  CharBuffer* buffer() { return buffer_; }
-
- private:
-  ChunkCruncher(const ChunkCruncher &other) { assert (false); } // no copy!
-  ChunkCruncher& operator=(const ChunkCruncher& other) { assert (false); }
-
- private:
-  Chunk        *chunk_;
-  CharBuffer   *buffer_;
-  const off_t   internal_offset_;
-  const size_t  byte_count_;
-  const bool    finalize_;
-};
-
-
-class ChunkHasher {
- public:
-  static void Crunch(Chunk                *chunk,
-                     const unsigned char  *data,
-                     const size_t          bytes,
-                     const bool            finalize);
-};
-
-
-class ChunkCompressor {
- public:
-  static void Crunch(Chunk                *chunk,
-                     const unsigned char  *data,
-                     const size_t          bytes,
-                     const bool            finalize);
-};
-
-
-
-
-
-
-
-
-
-
-
 
 class ChunkProcessingTask : public tbb::task {
  public:
@@ -92,6 +18,11 @@ class ChunkProcessingTask : public tbb::task {
     chunk_(chunk), buffer_(buffer) {}
 
   tbb::task* execute();
+
+ protected:
+  void Crunch(const unsigned char  *data,
+              const size_t          bytes,
+              const bool            finalize) const;
 
  private:
   Chunk        *chunk_;
