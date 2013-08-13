@@ -12,6 +12,7 @@
 #include <tbb/concurrent_queue.h>
 #include <tbb/task_scheduler_init.h>
 #include <tbb/tbb_thread.h>
+#include <tbb/task.h>
 
 #include <pthread.h>
 
@@ -48,8 +49,8 @@ class Reader {
          const unsigned int  max_buffers_in_flight) :
     queue_(queue),
     max_buffer_size_(max_buffer_size),
-    draining_(false),
-    max_buffers_in_flight_(max_buffers_in_flight)
+    max_buffers_in_flight_(max_buffers_in_flight),
+    draining_(false)
   {
     buffers_in_flight_ = 0;
     pthread_mutex_init(&free_slot_mutex_,    NULL);

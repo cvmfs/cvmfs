@@ -125,7 +125,8 @@ bool Reader::ReadAndScheduleNextBuffer(OpenFile &open_file) {
   open_file.previous_task      = new_task;
   open_file.previous_sync_task = sync_task;
 
-  const bool finished_reading = (open_file.file_marker == file_size);
+  const bool finished_reading =
+    (static_cast<size_t>(open_file.file_marker) == file_size);
   if (finished_reading) {
     // make sure that the last chunk is processed
     tbb::task::enqueue(*open_file.previous_sync_task);
@@ -202,7 +203,7 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
 
   // write to file
   const size_t bytes_to_write = buffer->used_bytes();
-  assert (bytes_to_write > 0);
+  assert (bytes_to_write > 0u);
   assert (chunk->bytes_written() == buffer->base_offset());
   const size_t bytes_written = write(fd, buffer->ptr(), bytes_to_write);
   if (bytes_written != bytes_to_write) {
