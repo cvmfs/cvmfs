@@ -1,5 +1,9 @@
-#ifndef IO_DISPATCHER_H
-#define IO_DISPATCHER_H
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef UPLOAD_FILE_PROCESSING_IO_DISPATCHER_H
+#define UPLOAD_FILE_PROCESSING_IO_DISPATCHER_H
 
 #include <sys/types.h>
 #include <list>
@@ -11,23 +15,15 @@
 
 #include <pthread.h>
 
-#include <iostream> // TODO: remove
-#include <sstream>  // TODO:    "
-
 #include "buffer.h"
 
-//#define MEASURE_IO_TIME
+namespace upload {
 
 class File;
 class Chunk;
 class FileScrubbingTask;
 
-namespace tbb {
-  class task;
-}
-
 typedef tbb::concurrent_bounded_queue<File*> FileQueue;
-
 
 class Reader {
  protected:
@@ -272,5 +268,7 @@ class IoDispatcher {
   tbb::tbb_thread write_thread_;
 };
 
+} // namespace upload
 
-#endif /* IO_DISPATCHER_H */
+
+#endif /* UPLOAD_FILE_PROCESSING_IO_DISPATCHER_H */

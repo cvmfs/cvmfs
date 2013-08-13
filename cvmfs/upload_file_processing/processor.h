@@ -1,15 +1,16 @@
-#ifndef PROCESSOR_H
-#define PROCESSOR_H
+#ifndef UPLOAD_FILE_PROCESSING_PROCESSOR_H
+#define UPLOAD_FILE_PROCESSING_PROCESSOR_H
 
 #include <tbb/task.h>
 
 #include "buffer.h"
 
+namespace upload {
+
 class Chunk;
 class IoDispatcher;
 class Reader;
 class File;
-
 
 class ChunkProcessingTask : public tbb::task {
  public:
@@ -28,17 +29,6 @@ class ChunkProcessingTask : public tbb::task {
   Chunk        *chunk_;
   CharBuffer   *buffer_;
 };
-
-
-
-
-
-
-
-
-
-
-
 
 
 class FileScrubbingTask : public tbb::task {
@@ -82,6 +72,6 @@ class FileScrubbingTask : public tbb::task {
   std::vector<Chunk*>  chunks_to_process_;
 };
 
+} // namespace upload
 
-
-#endif /* PROCESSOR_H */
+#endif /* UPLOAD_FILE_PROCESSING_PROCESSOR_H */

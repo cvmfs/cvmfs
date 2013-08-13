@@ -1,11 +1,17 @@
-#ifndef CHUNK_DETECTOR_H
-#define CHUNK_DETECTOR_H
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef ULOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
+#define ULOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
 
 #include <algorithm>
 #include <vector>
 #include <sys/types.h>
 
 #include "buffer.h"
+
+namespace upload {
 
 class ChunkDetector {
  public:
@@ -111,4 +117,6 @@ class Xor32Detector : public ChunkDetector {
   static const int32_t threshold_;
 };
 
-#endif /* CHUNK_DETECTOR_H */
+} // namespace upload
+
+#endif /* ULOAD_FILE_PROCESSING_CHUNK_DETECTOR_H */

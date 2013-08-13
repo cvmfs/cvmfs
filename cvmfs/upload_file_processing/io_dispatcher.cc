@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "io_dispatcher.h"
 
 #include <cassert>
@@ -10,6 +14,7 @@
 #include "chunk.h"
 #include "util.h"
 
+using namespace upload;
 
 void Reader::Read() {
   while (HasData()) {

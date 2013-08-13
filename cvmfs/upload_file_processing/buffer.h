@@ -1,5 +1,9 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef ULOAD_FILE_PROCESSING_BUFFER_H
+#define ULOAD_FILE_PROCESSING_BUFFER_H
 
 #include <tbb/atomic.h>
 #include <tbb/scalable_allocator.h>
@@ -9,10 +13,9 @@
 #include <vector>
 #include <sys/types.h>
 
-#include <sstream> // TODO: remove
-#include "util.h"  // TODO: remove
 
-//#define MEASURE_ALLOCATION_TIME
+namespace upload {
+
 static const uint64_t kTimeResolution = 1000000000;
 
 template<typename T, class A = std::allocator<T> >
@@ -33,16 +36,8 @@ class Buffer {
 
   void Allocate(const size_t size) {
     assert (!IsInitialized());
-#ifdef MEASURE_ALLOCATION_TIME
-    tbb::tick_count start = tbb::tick_count::now();
-#endif
     size_ = size;
     buffer_ = A().allocate(size_);
-#ifdef MEASURE_ALLOCATION_TIME
-    tbb::tick_count end = tbb::tick_count::now();
-    allocation_time_ += (uint64_t)((end - start).seconds() * kTimeResolution);
-    ++active_instances_;
-#endif
   }
 
   bool IsInitialized() const { return size_ > 0; }
@@ -68,9 +63,6 @@ class Buffer {
   Buffer& operator=(const Buffer& other) { assert (false); }
 
   void Deallocate() {
-#ifdef MEASURE_ALLOCATION_TIME
-    tbb::tick_count start = tbb::tick_count::now();
-#endif
     if (size_ == 0) {
       return;
     }
@@ -78,11 +70,6 @@ class Buffer {
     buffer_     = NULL;
     size_       = 0;
     used_bytes_ = 0;
-#ifdef MEASURE_ALLOCATION_TIME
-    tbb::tick_count end = tbb::tick_count::now();
-    deallocation_time_ += (uint64_t)((end - start).seconds() * kTimeResolution);
-    --active_instances_;
-#endif
   }
 
  private:
@@ -90,23 +77,11 @@ class Buffer {
   size_t                       used_bytes_;
   size_t                       size_;
   typename A::pointer          buffer_;
-
- public:
-  static tbb::atomic<uint64_t> allocation_time_;
-  static tbb::atomic<uint64_t> deallocation_time_;
-  static tbb::atomic<uint64_t> active_instances_;
 };
 typedef Buffer<unsigned char, tbb::scalable_allocator<unsigned char> > CharBuffer;
 
-template<typename T, class A>
-tbb::atomic<uint64_t> Buffer<T, A>::allocation_time_;
-
-template<typename T, class A>
-tbb::atomic<uint64_t> Buffer<T, A>::deallocation_time_;
-
-template<typename T, class A>
-tbb::atomic<uint64_t> Buffer<T, A>::active_instances_;
-
 typedef std::vector<CharBuffer*> CharBufferVector;
 
-#endif /* BUFFER_H */
+} // namespace upload
+
+#endif /* ULOAD_FILE_PROCESSING_BUFFER_H */

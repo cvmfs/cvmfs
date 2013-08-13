@@ -1,22 +1,26 @@
-#ifndef FILE_H
-#define FILE_H
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef UPLOAD_FILE_PROCESSING_FILE_H
+#define UPLOAD_FILE_PROCESSING_FILE_H
 
 #include <string>
 #include <vector>
 
 #include <tbb/atomic.h>
 
-#include "../cvmfs/platform.h"
+#include "../platform.h"
 
 #include "buffer.h"
 #include "chunk_detector.h"
+
+namespace upload {
 
 class IoDispatcher;
 class ChunkDetector;
 class Chunk;
 typedef std::vector<Chunk*> ChunkVector;
-
-
 
 class File {
  public:
@@ -100,4 +104,6 @@ class File {
   ChunkDetector              *chunk_detector_;
 };
 
-#endif /* FILE_H */
+} // namespace upload
+
+#endif /* UPLOAD_FILE_PROCESSING_FILE_H */
