@@ -294,17 +294,19 @@ void SyncMediator::CompleteHardlinks(SyncItem &entry) {
 }
 
 
-void SyncMediator::LegacyRegularHardlinkCallback(const string &parent_dir,
-                                                 const string &file_name)
-{
+void SyncMediator::LegacyRegularHardlinkCallback(
+                                          const string           &parent_dir,
+                                          const string           &file_name,
+                                          const platform_stat64  &info) {
   SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
   InsertLegacyHardlink(entry);
 }
 
 
-void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
-                                                  const string &file_name)
-{
+void SyncMediator::LegacySymlinkHardlinkCallback(
+                                          const string &parent_dir,
+                                          const string &file_name,
+                                          const platform_stat64  &info) {
   SyncItem entry(parent_dir, file_name, kItemSymlink, union_engine_);
   InsertLegacyHardlink(entry);
 }
@@ -327,42 +329,44 @@ void SyncMediator::AddDirectoryRecursively(SyncItem &entry) {
 }
 
 
-bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
-                                        const std::string &dir_name)
-{
+bool SyncMediator::AddDirectoryCallback(const std::string      &parent_dir,
+                                        const std::string      &dir_name,
+                                        const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   AddDirectory(entry);
   return true;  // The recursion engine should recurse deeper here
 }
 
 
-void SyncMediator::AddFileCallback(const std::string &parent_dir,
-                                   const std::string &file_name)
-{
+void SyncMediator::AddFileCallback(const std::string      &parent_dir,
+                                   const std::string      &file_name,
+                                   const platform_stat64  &info) {
   SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
   Add(entry);
 }
 
 
-void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
-                                      const std::string &link_name)
-{
+void SyncMediator::AddSymlinkCallback(const std::string      &parent_dir,
+                                      const std::string      &link_name,
+                                      const platform_stat64  &info) {
   SyncItem entry(parent_dir, link_name, kItemSymlink, union_engine_);
   Add(entry);
 }
 
 
-void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
-                                               const std::string &dir_name)
-{
+void SyncMediator::EnterAddedDirectoryCallback(
+                                      const std::string      &parent_dir,
+                                      const std::string      &dir_name,
+                                      const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   EnterDirectory(entry);
 }
 
 
-void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
-                                               const std::string &dir_name)
-{
+void SyncMediator::LeaveAddedDirectoryCallback(
+                                      const std::string      &parent_dir,
+                                      const std::string      &dir_name,
+                                      const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   LeaveDirectory(entry);
 }
@@ -386,34 +390,34 @@ void SyncMediator::RemoveDirectoryRecursively(SyncItem &entry) {
 }
 
 
-void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
-                                      const std::string &file_name)
-{
+void SyncMediator::RemoveFileCallback(const std::string      &parent_dir,
+                                      const std::string      &file_name,
+                                      const platform_stat64  &info) {
   SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
   Remove(entry);
 }
 
 
-void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
-                                         const std::string &link_name)
-{
+void SyncMediator::RemoveSymlinkCallback(const std::string      &parent_dir,
+                                         const std::string      &link_name,
+                                         const platform_stat64  &info) {
   SyncItem entry(parent_dir, link_name, kItemSymlink, union_engine_);
   Remove(entry);
 }
 
 
-void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
-                                           const std::string &dir_name)
-{
+void SyncMediator::RemoveDirectoryCallback(const std::string      &parent_dir,
+                                           const std::string      &dir_name,
+                                           const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
   RemoveDirectoryRecursively(entry);
 }
 
 
-bool SyncMediator::IgnoreFileCallback(const std::string &parent_dir,
-                                      const std::string &file_name)
-{
-  return union_engine_->IgnoreFilePredicate(parent_dir, file_name);
+bool SyncMediator::IgnoreFileCallback(const std::string      &parent_dir,
+                                      const std::string      &file_name,
+                                      const platform_stat64  &info) {
+  return union_engine_->IgnoreFilePredicate(parent_dir, file_name, info);
 }
 
 

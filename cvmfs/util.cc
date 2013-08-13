@@ -517,12 +517,16 @@ class RemoveTreeHelper {
   RemoveTreeHelper() {
     success = true;
   }
-  void RemoveFile(const string &parent_path, const string &name) {
+  void RemoveFile(const string           &parent_path,
+                  const string           &name,
+                  const platform_stat64  &info) {
     int retval = unlink((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;
   }
-  void RemoveDir(const string &parent_path, const string &name) {
+  void RemoveDir(const string           &parent_path,
+                 const string           &name,
+                 const platform_stat64  &info) {
     int retval = rmdir((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;

@@ -17,7 +17,6 @@
 #include <attr/xattr.h>
 #endif
 
-#include "platform.h"
 #include "util.h"
 #include "fs_traversal.h"
 #include "sync_item.h"
@@ -41,9 +40,9 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
 }
 
 
-bool SyncUnion::ProcessDirectory(const string &parent_dir,
-                                 const string &dir_name)
-{
+bool SyncUnion::ProcessDirectory(const string           &parent_dir,
+                                 const string           &dir_name,
+                                 const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
@@ -65,9 +64,9 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 }
 
 
-void SyncUnion::ProcessRegularFile(const string &parent_dir,
-                                   const string &filename)
-{
+void SyncUnion::ProcessRegularFile(const string           &parent_dir,
+                                   const string           &filename,
+                                   const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
   SyncItem entry(parent_dir, filename, kItemFile, this);
@@ -75,9 +74,9 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
 }
 
 
-void SyncUnion::ProcessSymlink(const string &parent_dir,
-                               const string &link_name)
-{
+void SyncUnion::ProcessSymlink(const string           &parent_dir,
+                               const string           &link_name,
+                               const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
   SyncItem entry(parent_dir, link_name, kItemSymlink, this);
@@ -112,17 +111,17 @@ void SyncUnion::ProcessFile(SyncItem &entry) {
 }
 
 
-void SyncUnion::EnterDirectory(const string &parent_dir,
-                               const string &dir_name)
-{
+void SyncUnion::EnterDirectory(const string           &parent_dir,
+                               const string           &dir_name,
+                               const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
   mediator_->EnterDirectory(entry);
 }
 
 
-void SyncUnion::LeaveDirectory(const string &parent_dir,
-                               const string &dir_name)
-{
+void SyncUnion::LeaveDirectory(const string           &parent_dir,
+                               const string           &dir_name,
+                               const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
   mediator_->LeaveDirectory(entry);
 }
@@ -179,9 +178,9 @@ string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
 }
 
 
-bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
-                                        const string &filename)
-{
+bool SyncUnionAufs::IgnoreFilePredicate(const string           &parent_dir,
+                                        const string           &filename,
+                                        const platform_stat64  &info) {
   return (ignore_filenames_.find(filename) != ignore_filenames_.end());
 }
 
@@ -295,9 +294,10 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
 }
 
 
-void SyncUnionOverlayfs::ProcessFileHardlinkCallback(const string &parent_dir,
-                                                     const string &filename)
-{
+void SyncUnionOverlayfs::ProcessFileHardlinkCallback(
+                                        const string           &parent_dir,
+                                        const string           &filename,
+                                        const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessFileHardlinkCallback(%s, %s)",
            parent_dir.c_str(), filename.c_str());
@@ -432,15 +432,14 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 }
 
 
-string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const
-{
+string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const {
   return filename;
 }
 
 
-bool SyncUnionOverlayfs::IgnoreFilePredicate(const string &parent_dir,
-                                             const string &filename)
-{
+bool SyncUnionOverlayfs::IgnoreFilePredicate(const string           &parent_dir,
+                                             const string           &filename,
+                                             const platform_stat64  &info) {
   // no files need to be ignored for OverlayFS
   return false;
 }

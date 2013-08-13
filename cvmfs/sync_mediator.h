@@ -114,29 +114,37 @@ class SyncMediator {
   void RemoveNestedCatalog(SyncItem &requestFile);
 
 	// Called by file system traversal
-  void EnterAddedDirectoryCallback(const std::string &parent_dir,
-                                   const std::string &dir_name);
-  void LeaveAddedDirectoryCallback(const std::string &parent_dir,
-                                   const std::string &dir_name);
+  void EnterAddedDirectoryCallback(const std::string      &parent_dir,
+                                   const std::string      &dir_name,
+                                   const platform_stat64  &info);
+  void LeaveAddedDirectoryCallback(const std::string      &parent_dir,
+                                   const std::string      &dir_name,
+                                   const platform_stat64  &info);
 
   void AddDirectoryRecursively(SyncItem &entry);
-  bool AddDirectoryCallback(const std::string &parent_dir,
-                            const std::string &dir_name);
-  void AddFileCallback(const std::string &parent_dir,
-                       const std::string &file_name);
-  void AddSymlinkCallback(const std::string &parent_dir,
-                          const std::string &link_name);
+  bool AddDirectoryCallback( const std::string      &parent_dir,
+                             const std::string      &dir_name,
+                             const platform_stat64  &info);
+  void AddFileCallback(      const std::string      &parent_dir,
+                             const std::string      &file_name,
+                             const platform_stat64  &info);
+  void AddSymlinkCallback(   const std::string      &parent_dir,
+                             const std::string      &link_name,
+                             const platform_stat64  &info);
 
   void RemoveDirectoryRecursively(SyncItem &entry);
-  void RemoveFileCallback(const std::string &parent_dir,
-                          const std::string &file_name);
-  void RemoveSymlinkCallback(const std::string &parent_dir,
-                             const std::string &link_name);
-  void RemoveDirectoryCallback(const std::string &parent_dir,
-                               const std::string &dir_name);
-
-  bool IgnoreFileCallback(const std::string &parent_dir,
-                          const std::string &file_name);
+  void RemoveFileCallback(     const std::string      &parent_dir,
+                               const std::string      &file_name,
+                               const platform_stat64  &info);
+  void RemoveSymlinkCallback(  const std::string      &parent_dir,
+                               const std::string      &link_name,
+                               const platform_stat64  &info);
+  void RemoveDirectoryCallback(const std::string      &parent_dir,
+                               const std::string      &dir_name,
+                               const platform_stat64  &info);
+  bool IgnoreFileCallback(     const std::string      &parent_dir,
+                               const std::string      &file_name,
+                               const platform_stat64  &info);
 
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
@@ -145,10 +153,12 @@ class SyncMediator {
   // Hardlink handling
   void CompleteHardlinks(SyncItem &entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
-  void LegacyRegularHardlinkCallback(const std::string &parent_dir,
-                                     const std::string &file_name);
-  void LegacySymlinkHardlinkCallback(const std::string &parent_dir,
-                                      const std::string &file_name);
+  void LegacyRegularHardlinkCallback(const std::string      &parent_dir,
+                                     const std::string      &file_name,
+                                     const platform_stat64  &info);
+  void LegacySymlinkHardlinkCallback(const std::string      &parent_dir,
+                                     const std::string      &file_name,
+                                     const platform_stat64  &info);
   void InsertLegacyHardlink(SyncItem &entry);
   uint64_t GetTemporaryHardlinkGroupNumber(SyncItem &entry) const;
   void InsertHardlink(SyncItem &entry);
