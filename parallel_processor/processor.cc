@@ -9,20 +9,55 @@
 #include "file.h"
 #include "chunk.h"
 
-void ChunkHasher::Crunch(Chunk                *chunk,
-                         const unsigned char  *data,
-                         const size_t          bytes,
-                         const bool            finalize) {
-  const int upd_rc = SHA1_Update(&chunk->sha1_context(), data, bytes);
-  assert (upd_rc == 1);
+
+tbb::task* ChunkProcessingTask::execute() {
+  // Thread Safety:
+  //   * Only one ChunkProcessingTask for any given Chunk at any given time
+  //   * Parallel execution of more than one ChunkProcessingTask for chunks of
+  //     the same File is possible
+
+  assert (chunk_->IsInitialized());
+  assert (buffer_->IsInitialized());
+
+  // get the position from where the current input buffer needs to be processed
+  const off_t internal_offset =
+    std::max(off_t(0), chunk_->offset() - buffer_->base_offset());
+  assert (internal_offset < buffer_->used_bytes());
+  const unsigned char *data = buffer_->ptr() + internal_offset;
+
+  // determine how many bytes need to be processed
+  const size_t byte_count = (chunk_->size() == 0)
+    ? buffer_->used_bytes() - internal_offset
+    :   std::min(buffer_->base_offset()  + buffer_->used_bytes(),
+                 chunk_->offset()        + chunk_->size())
+      - std::max(buffer_->base_offset(), chunk_->offset());
+  assert (byte_count <= buffer_->used_bytes() - internal_offset);
+
+  // find out, if we are going to process the final block of the chunk
+  const bool finalize = (
+    (chunk_->size() > 0) &&
+    (buffer_->base_offset() + internal_offset + byte_count
+      == chunk_->offset() + chunk_->size())
+  );
+
+  // crunch the data
+  Crunch(data, byte_count, finalize);
+
+  // finalize the chunk if necessary
+  if (finalize) {
+    chunk_->Finalize();
+  }
+
+  // the TBB scheduler should figure out what to do next
+  return NULL;
 }
 
 
-void ChunkCompressor::Crunch(Chunk                *chunk,
-                             const unsigned char  *data,
-                             const size_t          bytes,
-                             const bool            finalize) {
-  z_stream &stream = chunk->zlib_context();
+void ChunkProcessingTask::Crunch(const unsigned char  *data,
+                                 const size_t          bytes,
+                                 const bool            finalize) const {
+  z_stream  &stream   = chunk_->zlib_context();
+  SHA_CTX   &sha1_ctx = chunk_->sha1_context();
 
   const size_t max_output_size = deflateBound(&stream, bytes);
   CharBuffer *compress_buffer  = new CharBuffer(max_output_size);
@@ -43,9 +78,13 @@ void ChunkCompressor::Crunch(Chunk                *chunk,
     const size_t bytes_produced = compress_buffer->size() - stream.avail_out;
     if (bytes_produced > 0) {
       compress_buffer->SetUsedBytes(bytes_produced);
-      compress_buffer->SetBaseOffset(chunk->compressed_size());
-      chunk->add_compressed_size(bytes_produced);
-      chunk->ScheduleWrite(compress_buffer);
+      compress_buffer->SetBaseOffset(chunk_->compressed_size());
+      chunk_->add_compressed_size(bytes_produced);
+      const int sha_retcode = SHA1_Update(&sha1_ctx,
+                                           compress_buffer->ptr(),
+                                           compress_buffer->used_bytes());
+      assert (sha_retcode == 1);
+      chunk_->ScheduleWrite(compress_buffer);
     }
 
     if ((flush == Z_NO_FLUSH && retcode == Z_OK) ||
@@ -61,54 +100,6 @@ void ChunkCompressor::Crunch(Chunk                *chunk,
   if (finalize) {
     assert (flush == Z_FINISH);
   }
-}
-
-
-tbb::task* ChunkProcessingTask::execute() {
-  // Thread Safety:
-  //   * Only one ChunkProcessingTask for any given Chunk at any given time
-  //   * Parallel execution of more than one ChunkProcessingTask for chunks of
-  //     the same File is possible
-
-  assert (chunk_->IsInitialized());
-  assert (buffer_->IsInitialized());
-
-  const off_t internal_offset =
-    std::max(off_t(0), chunk_->offset() - buffer_->base_offset());
-  assert (internal_offset < buffer_->used_bytes());
-  const unsigned char *data = buffer_->ptr() + internal_offset;
-
-  const size_t byte_count = (chunk_->size() == 0)
-    ? buffer_->used_bytes() - internal_offset
-    :   std::min(buffer_->base_offset()  + buffer_->used_bytes(),
-                 chunk_->offset()        + chunk_->size())
-      - std::max(buffer_->base_offset(), chunk_->offset());
-  assert (byte_count <= buffer_->used_bytes() - internal_offset);
-
-  const bool finalize = (
-    (chunk_->size() > 0) &&
-    (buffer_->base_offset() + internal_offset + byte_count
-      == chunk_->offset() + chunk_->size())
-  );
-
-  ChunkCruncher<ChunkHasher>     hasher    (chunk_,
-                                            buffer_,
-                                            internal_offset,
-                                            byte_count,
-                                            finalize);
-  ChunkCruncher<ChunkCompressor> compressor(chunk_,
-                                            buffer_,
-                                            internal_offset,
-                                            byte_count,
-                                            finalize);
-
-  tbb::parallel_invoke(hasher, compressor);
-
-  if (finalize) {
-    chunk_->Finalize();
-  }
-
-  return NULL;
 }
 
 
