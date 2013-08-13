@@ -102,6 +102,13 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
 
+  upload_file_processing/buffer.h
+  upload_file_processing/chunk.h upload_file_processing/chunk.cc
+  upload_file_processing/chunk_detector.h upload_file_processing/chunk_detector.cc
+  upload_file_processing/file.h upload_file_processing/file.cc
+  upload_file_processing/io_dispatcher.h upload_file_processing/io_dispatcher.cc
+  upload_file_processing/processor.h upload_file_processing/processor.cc
+
   upload_file_chunker.h upload_file_chunker.cc
   upload_file_chunker_xor32.h upload_file_chunker_xor32.cc
   upload_file_processor.h upload_file_processor.cc
