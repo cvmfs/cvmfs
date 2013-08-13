@@ -32,10 +32,12 @@ namespace CVMFS_NAMESPACE_GUARD {
 template <class T>
 class FileSystemTraversal {
  public:
-  typedef void (T::*VoidCallback)(const std::string &relative_path,
-                                  const std::string &dir_name);
-  typedef bool (T::*BoolCallback)(const std::string &relative_path,
-                                  const std::string &dir_name);
+  typedef void (T::*VoidCallback)(const std::string      &relative_path,
+                                  const std::string      &dir_name,
+                                  const platform_stat64  &info);
+  typedef bool (T::*BoolCallback)(const std::string      &relative_path,
+                                  const std::string      &dir_name,
+                                  const platform_stat64  &info);
 
 
   VoidCallback fn_enter_dir;
@@ -108,7 +110,11 @@ class FileSystemTraversal {
            dir_path.substr(0, relative_to_directory_.length()) ==
              relative_to_directory_);
 
-    DoRecursion(dir_path, "");
+    platform_stat64 info;
+    const int retval = platform_lstat(dir_path.c_str(), &info);
+    assert (retval == 0);
+
+    DoRecursion(dir_path, "", info);
   }
 
  private:
@@ -123,8 +129,9 @@ class FileSystemTraversal {
   void Init() {
   }
 
-  void DoRecursion(const std::string &parent_path, const std::string &dir_name)
-    const
+  void DoRecursion(const std::string      &parent_path,
+                   const std::string      &dir_name,
+                   const platform_stat64  &info) const
   {
     DIR *dip;
     platform_dirent64 *dit;
@@ -136,7 +143,7 @@ class FileSystemTraversal {
              path.c_str(), parent_path.c_str(), dir_name.c_str());
     dip = opendir(path.c_str());
     assert(dip);
-    Notify(fn_enter_dir, parent_path, dir_name);
+    Notify(fn_enter_dir, parent_path, dir_name, info);
 
     // Walk through the open directory notifying the user about contents
     while ((dit = platform_readdir(dip)) != NULL) {
@@ -144,7 +151,7 @@ class FileSystemTraversal {
       if (std::string(dit->d_name) == "." || std::string(dit->d_name) == "..") {
         continue;
       } else if (fn_ignore_file != NULL) {
-        if (Notify(fn_ignore_file, path, dit->d_name)) {
+        if (Notify(fn_ignore_file, path, dit->d_name, info)) {
           LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "ignoring %s/%s",
                    path.c_str(), dit->d_name);
           continue;
@@ -156,24 +163,24 @@ class FileSystemTraversal {
       }
 
       // Notify user about found directory entry
-      platform_stat64 info;
-      int retval = platform_lstat((path + "/" + dit->d_name).c_str(), &info);
+      platform_stat64 c_info;
+      int retval = platform_lstat((path + "/" + dit->d_name).c_str(), &c_info);
       assert(retval == 0);
-      if (S_ISDIR(info.st_mode)) {
+      if (S_ISDIR(c_info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing directory %s/%s",
                  path.c_str(), dit->d_name);
-        if (Notify(fn_new_dir_prefix, path, dit->d_name) && recurse_) {
-          DoRecursion(path, dit->d_name);
+        if (Notify(fn_new_dir_prefix, path, dit->d_name, c_info) && recurse_) {
+          DoRecursion(path, dit->d_name, c_info);
         }
-        Notify(fn_new_dir_postfix, path, dit->d_name);
-      } else if (S_ISREG(info.st_mode)) {
+        Notify(fn_new_dir_postfix, path, dit->d_name, c_info);
+      } else if (S_ISREG(c_info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing regular file %s/%s",
                  path.c_str(), dit->d_name);
-        Notify(fn_new_file, path, dit->d_name);
-      } else if (S_ISLNK(info.st_mode)) {
+        Notify(fn_new_file, path, dit->d_name, c_info);
+      } else if (S_ISLNK(c_info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing symlink %s/%s",
                  path.c_str(), dit->d_name);
-        Notify(fn_new_symlink, path, dit->d_name);
+        Notify(fn_new_symlink, path, dit->d_name, c_info);
       } else {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "unknown file type %s/%s",
                  path.c_str(), dit->d_name);
@@ -183,34 +190,38 @@ class FileSystemTraversal {
     // Close directory and notify user
     closedir(dip);
     LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "leaving %s", path.c_str());
-    Notify(fn_leave_dir, parent_path, dir_name);
+    Notify(fn_leave_dir, parent_path, dir_name, info);
   }
 
-  inline bool Notify(const BoolCallback callback,
-        	           const std::string &parent_path,
-        	           const std::string &entry_name) const
+  inline bool Notify(const BoolCallback      callback,
+                     const std::string      &parent_path,
+                     const std::string      &entry_name,
+                     const platform_stat64  &info) const
   {
     return (callback == NULL) ? true :
       (delegate_->*callback)(GetRelativePath(parent_path),
-                             entry_name);
+                             entry_name,
+                             info);
   }
 
-  inline void Notify(const VoidCallback callback,
-        	           const std::string &parent_path,
-        	           const std::string &entry_name) const
+  inline void Notify(const VoidCallback      callback,
+        	           const std::string      &parent_path,
+        	           const std::string      &entry_name,
+                     const platform_stat64  &info) const
   {
     if (callback != NULL) {
       (delegate_->*callback)(GetRelativePath(parent_path),
-                             entry_name);
+                             entry_name,
+                             info);
     }
   }
 
   std::string GetRelativePath(const std::string &absolute_path) const {
     const unsigned int rel_dir_len = relative_to_directory_.length();
     if (rel_dir_len >= absolute_path.length()) { return ""; }
-	  else if (rel_dir_len > 1) { return absolute_path.substr(rel_dir_len + 1); }
-	  else if (rel_dir_len == 0){ return absolute_path; }
-	  else if (relative_to_directory_ == "/") { return absolute_path.substr(1); }
+    else if (rel_dir_len > 1) { return absolute_path.substr(rel_dir_len + 1); }
+    else if (rel_dir_len == 0){ return absolute_path; }
+    else if (relative_to_directory_ == "/") { return absolute_path.substr(1); }
     else return "";
   }
 };  // FileSystemTraversal
