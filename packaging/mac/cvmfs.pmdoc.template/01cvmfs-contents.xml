@@ -2,10 +2,6 @@
 <pkg-contents spec="1.12">
   <f n="CVMFS_Package" o="root" g="wheel" p="16877" pt="@PackageInput@" m="false" t="file">
     <f n="etc" o="root" g="wheel" p="16877">
-      <f n="auto_cvmfs" o="root" g="wheel" p="33188">
-        <mod>group</mod>
-        <mod>owner</mod>
-      </f>
       <f n="cvmfs" o="root" g="wheel" p="16877">
         <f n="config.sh" o="root" g="wheel" p="33188">
           <mod>group</mod>

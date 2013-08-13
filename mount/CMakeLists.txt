@@ -1,8 +1,8 @@
 if (MACOSX)
-	install (
-		FILES			auto_cvmfs
-		DESTINATION		"/etc"
-	)
+#	install (
+#		FILES			auto_cvmfs
+#		DESTINATION		"/etc"
+#	)
 
 	install (
 		FILES			mount.cvmfs
