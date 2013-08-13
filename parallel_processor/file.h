@@ -22,9 +22,10 @@ class File {
  public:
   File(const std::string      &path,
        const platform_stat64  &info,
-       IoDispatcher           *io_dispatcher) :
+       IoDispatcher           *io_dispatcher,
+       const bool              allow_chunking = true) :
     path_(path), size_(info.st_size),
-    might_become_chunked_(ChunkDetector::MightBecomeChunked(size_)),
+    might_become_chunked_(allow_chunking && ChunkDetector::MightBecomeChunked(size_)),
     bulk_chunk_(NULL),
     io_dispatcher_(io_dispatcher),
     chunk_detector_(NULL)
