@@ -1,3 +1,7 @@
+2.1.14:
+  * Another fix for the whitelist expression used in the 
+    security hotfix 2.1.13
+
 2.1.13:
   * Fix security bug in /etc/auto.cvmfs: due to improper
     option checking, normal users can get root privileges
