@@ -517,12 +517,16 @@ class RemoveTreeHelper {
   RemoveTreeHelper() {
     success = true;
   }
-  void RemoveFile(const string &parent_path, const string &name) {
+  void RemoveFile(const string           &parent_path,
+                  const string           &name,
+                  const platform_stat64  &info) {
     int retval = unlink((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;
   }
-  void RemoveDir(const string &parent_path, const string &name) {
+  void RemoveDir(const string           &parent_path,
+                 const string           &name,
+                 const platform_stat64  &info) {
     int retval = rmdir((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;
@@ -544,9 +548,9 @@ bool RemoveTree(const string &path) {
   RemoveTreeHelper *remove_tree_helper = new RemoveTreeHelper();
   FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "",
                                                   true);
-  traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_file    = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
-  traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
+  traversal.fn_leave_dir   = &RemoveTreeHelper::RemoveDir;
   traversal.Recurse(path);
   bool result = remove_tree_helper->success;
   delete remove_tree_helper;

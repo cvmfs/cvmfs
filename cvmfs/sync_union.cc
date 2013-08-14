@@ -17,7 +17,6 @@
 #include <attr/xattr.h>
 #endif
 
-#include "platform.h"
 #include "util.h"
 #include "fs_traversal.h"
 #include "sync_item.h"
@@ -41,9 +40,9 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
 }
 
 
-bool SyncUnion::ProcessDirectory(const string &parent_dir,
-                                 const string &dir_name)
-{
+bool SyncUnion::ProcessDirectory(const string           &parent_dir,
+                                 const string           &dir_name,
+                                 const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
@@ -65,9 +64,9 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 }
 
 
-void SyncUnion::ProcessRegularFile(const string &parent_dir,
-                                   const string &filename)
-{
+void SyncUnion::ProcessRegularFile(const string           &parent_dir,
+                                   const string           &filename,
+                                   const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
   SyncItem entry(parent_dir, filename, kItemFile, this);
@@ -75,9 +74,9 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
 }
 
 
-void SyncUnion::ProcessSymlink(const string &parent_dir,
-                               const string &link_name)
-{
+void SyncUnion::ProcessSymlink(const string           &parent_dir,
+                               const string           &link_name,
+                               const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
   SyncItem entry(parent_dir, link_name, kItemSymlink, this);
@@ -112,17 +111,17 @@ void SyncUnion::ProcessFile(SyncItem &entry) {
 }
 
 
-void SyncUnion::EnterDirectory(const string &parent_dir,
-                               const string &dir_name)
-{
+void SyncUnion::EnterDirectory(const string           &parent_dir,
+                               const string           &dir_name,
+                               const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
   mediator_->EnterDirectory(entry);
 }
 
 
-void SyncUnion::LeaveDirectory(const string &parent_dir,
-                               const string &dir_name)
-{
+void SyncUnion::LeaveDirectory(const string           &parent_dir,
+                               const string           &dir_name,
+                               const platform_stat64  &info) {
   SyncItem entry(parent_dir, dir_name, kItemDir, this);
   mediator_->LeaveDirectory(entry);
 }
@@ -152,12 +151,12 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
 void SyncUnionAufs::Traverse() {
   FileSystemTraversal<SyncUnionAufs> traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
-  traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFilePredicate;
+  traversal.fn_enter_dir      = &SyncUnionAufs::EnterDirectory;
+  traversal.fn_leave_dir      = &SyncUnionAufs::LeaveDirectory;
+  traversal.fn_new_file       = &SyncUnionAufs::ProcessRegularFile;
+  traversal.fn_ignore_file    = &SyncUnionAufs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
+  traversal.fn_new_symlink    = &SyncUnionAufs::ProcessSymlink;
 
   traversal.Recurse(scratch_path());
 }
@@ -179,9 +178,9 @@ string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
 }
 
 
-bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
-                                        const string &filename)
-{
+bool SyncUnionAufs::IgnoreFilePredicate(const string           &parent_dir,
+                                        const string           &filename,
+                                        const platform_stat64  &info) {
   return (ignore_filenames_.find(filename) != ignore_filenames_.end());
 }
 
@@ -193,9 +192,7 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
                                        const string &rdonly_path,
                                        const string &union_path,
                                        const string &scratch_path) :
-  SyncUnion(mediator, rdonly_path, union_path, scratch_path)
-{
-}
+  SyncUnion(mediator, rdonly_path, union_path, scratch_path) {}
 
 
 void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
@@ -219,7 +216,7 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
     // (only check this dir since we don't allow cross-dir hardlinks in CVMFS)
     FileSystemTraversal<SyncUnionOverlayfs>
       traversal(this, rdonly_path(), false);
-    traversal.fn_new_file = &SyncUnionOverlayfs::ProcessFileHardlinkCallback;
+    traversal.fn_new_file    = &SyncUnionOverlayfs::ProcessFileHardlinkCallback;
     traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessFileHardlinkCallback;
     traversal.Recurse(rdonly_parent_dir);
 
@@ -270,7 +267,7 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
   "\n"
   "To find all files that are part of this hardlink group, use:\n"
   "find %s -inum %"PRIu64"\n"
-  "\n"    
+  "\n"
   "To restore all hardlinks in this group, try something like:\n"
   "for file in $(find %s -inum %"PRIu64"); do rm ${file} && ln %s ${file}; done\n"
   "\n"
@@ -295,9 +292,10 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
 }
 
 
-void SyncUnionOverlayfs::ProcessFileHardlinkCallback(const string &parent_dir,
-                                                     const string &filename)
-{
+void SyncUnionOverlayfs::ProcessFileHardlinkCallback(
+                                        const string           &parent_dir,
+                                        const string           &filename,
+                                        const platform_stat64  &info) {
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessFileHardlinkCallback(%s, %s)",
            parent_dir.c_str(), filename.c_str());
@@ -318,12 +316,12 @@ void SyncUnionOverlayfs::Traverse() {
   FileSystemTraversal<SyncUnionOverlayfs>
     traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
-  traversal.fn_ignore_file = &SyncUnionOverlayfs::IgnoreFilePredicate;
+  traversal.fn_enter_dir      = &SyncUnionOverlayfs::EnterDirectory;
+  traversal.fn_leave_dir      = &SyncUnionOverlayfs::LeaveDirectory;
+  traversal.fn_new_file       = &SyncUnionOverlayfs::ProcessRegularFile;
+  traversal.fn_ignore_file    = &SyncUnionOverlayfs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
+  traversal.fn_new_symlink    = &SyncUnionOverlayfs::ProcessSymlink;
 
   LogCvmfs(kLogUnionFs, kLogVerboseMsg, "OverlayFS starting traversal "
            "recursion for scratch_path=[%s]",
@@ -341,8 +339,7 @@ void SyncUnionOverlayfs::Traverse() {
  * @param[in] value to compare to link value
  */
 bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
-                                        string const &compare_value)
-{
+                                        string const &compare_value) {
   char *buf;
   size_t compare_len;
 
@@ -379,8 +376,7 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
  */
 bool SyncUnionOverlayfs::XattrEquals(string const &path,
                                      string const &attr_name,
-                                     string const &compare_value)
-{
+                                     string const &compare_value) {
   const size_t buf_len = compare_value.length()+1;
   char *buf = static_cast<char *>(alloca(buf_len+1));
 
@@ -432,15 +428,14 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 }
 
 
-string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const
-{
+string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const {
   return filename;
 }
 
 
-bool SyncUnionOverlayfs::IgnoreFilePredicate(const string &parent_dir,
-                                             const string &filename)
-{
+bool SyncUnionOverlayfs::IgnoreFilePredicate(const string           &parent_dir,
+                                             const string           &filename,
+                                             const platform_stat64  &info) {
   // no files need to be ignored for OverlayFS
   return false;
 }

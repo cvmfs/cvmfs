@@ -35,6 +35,8 @@
 #include <string>
 #include <set>
 
+#include "platform.h"
+
 namespace publish {
 
 class SyncItem;
@@ -105,8 +107,9 @@ class SyncUnion {
    * @param filename to decide whether to ignore or not
    * @return true if file should be ignored, othewise false
    */
-  virtual bool IgnoreFilePredicate(const std::string &parent_dir,
-                                   const std::string &filename) = 0;
+  virtual bool IgnoreFilePredicate(const std::string      &parent_dir,
+                                   const std::string      &filename,
+                                   const platform_stat64  &info) = 0;
 
  protected:
   std::string rdonly_path_;
@@ -120,8 +123,9 @@ class SyncUnion {
    * @param parent_dir the relative directory path
    * @param filename the filename
    */
-  virtual void ProcessRegularFile(const std::string &parent_dir,
-                                  const std::string &filename);
+  virtual void ProcessRegularFile(const std::string      &parent_dir,
+                                  const std::string      &filename,
+                                  const platform_stat64  &info);
 
   /**
    * Callback when a directory is found.
@@ -130,31 +134,35 @@ class SyncUnion {
    * @return true if file system traversal should branch into
    *         the given directory, false otherwise
    */
-  virtual bool ProcessDirectory(const std::string &parent_dir,
-                                const std::string &dir_name);
+  virtual bool ProcessDirectory(const std::string      &parent_dir,
+                                const std::string      &dir_name,
+                                const platform_stat64  &info);
 
   /**
    * Callback when a symlink is found.
    * @param parent_dir the relative directory path
    * @param link_name the filename
    */
-  virtual void ProcessSymlink(const std::string &parent_dir,
-                              const std::string &link_name);
+  virtual void ProcessSymlink(const std::string      &parent_dir,
+                              const std::string      &link_name,
+                              const platform_stat64  &info);
 
   /**
    * Called if the file system traversal enters a directory for processing.
    * @param parent_dir the relative directory path.
    */
-  virtual void EnterDirectory(const std::string &parent_dir,
-                              const std::string &dir_name);
+  virtual void EnterDirectory(const std::string      &parent_dir,
+                              const std::string      &dir_name,
+                              const platform_stat64  &info);
 
 
   /**
    * Called before the file system traversal leaves a processed directory.
    * @param parent_dir the relative directory path.
    */
-  virtual void LeaveDirectory(const std::string &parent_dir,
-                              const std::string &dir_name);
+  virtual void LeaveDirectory(const std::string      &parent_dir,
+                              const std::string      &dir_name,
+                              const platform_stat64  &info);
 
 
   /**
@@ -183,8 +191,9 @@ class SyncUnionAufs : public SyncUnion {
  protected:
   bool IsWhiteoutEntry(const SyncItem &entry) const;
   bool IsOpaqueDirectory(const SyncItem &directory) const;
-  bool IgnoreFilePredicate(const std::string &parent_dir,
-                           const std::string &filename);
+  bool IgnoreFilePredicate(const std::string      &parent_dir,
+                           const std::string      &filename,
+                           const platform_stat64  &info);
   std::string UnwindWhiteoutFilename(const std::string &filename) const;
 
  private:
@@ -205,8 +214,9 @@ class SyncUnionOverlayfs : public SyncUnion {
                      const std::string &scratch_path);
 
   void Traverse();
-  void ProcessFileHardlinkCallback(const std::string &parent_dir,
-                                   const std::string &filename);
+  void ProcessFileHardlinkCallback(const std::string      &parent_dir,
+                                   const std::string      &filename,
+                                   const platform_stat64  &info);
   static bool ReadlinkEquals(std::string const &path,
                              std::string const &compare_value);
   static bool XattrEquals(std::string const &path, std::string const &attr_name,
@@ -215,8 +225,9 @@ class SyncUnionOverlayfs : public SyncUnion {
  protected:
   bool IsWhiteoutEntry(const SyncItem &entry) const;
   bool IsOpaqueDirectory(const SyncItem &directory) const;
-  bool IgnoreFilePredicate(const std::string &parent_dir,
-                           const std::string &filename);
+  bool IgnoreFilePredicate(const std::string      &parent_dir,
+                           const std::string      &filename,
+                           const platform_stat64  &info);
   std::string UnwindWhiteoutFilename(const std::string &filename) const;
   std::set<std::string> GetIgnoreFilenames() const;
   virtual void ProcessFile(SyncItem &entry);
