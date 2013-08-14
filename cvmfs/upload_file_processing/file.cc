@@ -85,7 +85,7 @@ void File::CreateInitialChunk() {
 
 
 Chunk* File::CreateNextChunk(const off_t offset) {
-  assert (offset > 0 && offset < size_);
+  assert (offset > 0 && offset < static_cast<off_t>(size_));
   assert (chunks_.size() > 0);
   assert (might_become_chunked_);
 
