@@ -1,4 +1,4 @@
-2.1.14:
+2.1.15:
   * Fix parsing of config file without trailing newline
   * Expand backoff on download errors to the loading of 
     file catalogs 
@@ -44,6 +44,9 @@
   * Experimental support for repository tags (named snapshots).
     Allows to mount a specific repository version and to rollback
     and re-publish previous repository states.
+
+2.1.14:
+  * Fix initial problems introduced with the 2.1.13 security hotfix
 
 2.1.13:
   * Fix security bug in /etc/auto.cvmfs: due to improper
