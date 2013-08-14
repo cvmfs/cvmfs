@@ -110,14 +110,10 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_file_processing/processor.h upload_file_processing/processor.cc
   upload_file_processing/file_processor.h upload_file_processing/file_processor.cc
 
-  upload_file_chunker.h upload_file_chunker.cc
-  upload_file_chunker_xor32.h upload_file_chunker_xor32.cc
-  upload_file_processor.h upload_file_processor.cc
   upload.h upload.cc
   upload_spooler_definition.h upload_spooler_definition.cc
   upload_facility.h upload_facility.cc
   upload_local.h upload_local.cc
-  upload_riak.h upload_riak.cc
   upload_spooler_result.h
   json_document.h json_document.cc
 

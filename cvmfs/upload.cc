@@ -3,7 +3,6 @@
  */
 
 #include "upload.h"
-#include "upload_file_chunker.h"
 
 #include "util_concurrency.h"
 
