@@ -202,9 +202,9 @@ class IoDispatcher {
       pthread_cond_wait(&free_slot_condition_, &files_in_flight_mutex_);
     }
     ++files_in_flight_;
-    pthread_mutex_unlock(&files_in_flight_mutex_);
     ++file_count_;
     read_queue_.push(file);
+    pthread_mutex_unlock(&files_in_flight_mutex_);
   }
 
   void ScheduleWrite(Chunk       *chunk,
