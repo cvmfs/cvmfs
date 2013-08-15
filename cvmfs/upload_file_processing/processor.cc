@@ -25,7 +25,7 @@ tbb::task* ChunkProcessingTask::execute() {
   const off_t internal_offset =
     std::max(off_t(0), chunk_->offset() - buffer_->base_offset());
   assert (internal_offset >= 0);
-  assert (static_cast<size_t>(internal_offset) < buffer_->used_bytes());
+  assert (static_cast<size_t>(internal_offset) <= buffer_->used_bytes());
   const unsigned char *data = buffer_->ptr() + internal_offset;
 
   // determine how many bytes need to be processed
@@ -35,6 +35,9 @@ tbb::task* ChunkProcessingTask::execute() {
                  chunk_->offset()        + chunk_->size())
       - std::max(buffer_->base_offset(), chunk_->offset());
   assert (byte_count <= buffer_->used_bytes() - internal_offset);
+  if (byte_count == 0) {
+    return NULL;
+  }
 
   // find out, if we are going to process the final block of the chunk
   const bool finalize = (
