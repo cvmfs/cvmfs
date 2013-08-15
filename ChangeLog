@@ -1,4 +1,5 @@
 2.1.15:
+  * Replace leveldb usleep by SafeSleepMs
   * Switch to leveldb 1.12.0 (IA-64 compatibility)
   * Fix parsing of config file without trailing newline
   * Expand backoff on download errors to the loading of 

@@ -111,6 +111,11 @@ class ForkAwareEnv : public leveldb::EnvWrapper {
     fake_thread_running_ = false;
   }
 
+  // Leveldb's usleep might collide with the ALARM timer
+  void SleepForMicroseconds(int micros) {
+    SafeSleepMs(micros/1000);
+  }
+
  private:
   pthread_t fake_thread_;  // A real thread is required to prevent deadlocks.
   bool fake_thread_running_;
