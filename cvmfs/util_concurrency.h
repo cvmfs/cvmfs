@@ -280,6 +280,19 @@ class BoundCallback : public CallbackBase<ParamT> {
 };
 
 
+/**
+ * A BoundClosure works exactly the same as a BoundCallback (see above) but,
+ * allows for an opaque enclosure of an arbitrary chunk of user data on
+ * creation. When the closure is invoked the provided user data chunk is
+ * passed as a second argument to the specified callback method.
+ *
+ * Note: delegate must be still around when the closure is invoked!
+ *
+ * @param ParamT        the type of the parameter to be passed to the callback
+ * @param DelegateT     the <class name> of the object the member <member name>
+ *                      should be invoked in
+ * @param ClosureDataT  the type of the user data chunk to be passed on invoke
+ */
 template <typename ParamT, class DelegateT, typename ClosureDataT>
 class BoundClosure : public CallbackBase<ParamT> {
  public:
