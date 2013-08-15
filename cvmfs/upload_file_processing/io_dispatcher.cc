@@ -13,6 +13,7 @@
 #include "processor.h"
 #include "chunk.h"
 #include "../util_concurrency.h"
+#include "../file_chunk.h"
 
 using namespace upload;
 
@@ -202,9 +203,12 @@ void IoDispatcher::CommitChunk(Chunk* chunk) {
   assert (chunk->IsFullyProcessed());
   assert (chunk->HasUploadStreamHandle());
 
+  const std::string hash_suffix =
+    (chunk->IsBulkChunk()) ? "" : FileChunk::kCasSuffix;
+
   uploader_->FinalizeStreamedUpload(chunk->upload_stream_handle(),
                                     chunk->sha1(),
-                                    "");
+                                    hash_suffix);
 }
 
 
