@@ -280,6 +280,50 @@ class BoundCallback : public CallbackBase<ParamT> {
 };
 
 
+/**
+ * A BoundClosure works exactly the same as a BoundCallback (see above) but,
+ * allows for an opaque enclosure of an arbitrary chunk of user data on
+ * creation. When the closure is invoked the provided user data chunk is
+ * passed as a second argument to the specified callback method.
+ *
+ * Note: delegate must be still around when the closure is invoked!
+ *
+ * @param ParamT        the type of the parameter to be passed to the callback
+ * @param DelegateT     the <class name> of the object the member <member name>
+ *                      should be invoked in
+ * @param ClosureDataT  the type of the user data chunk to be passed on invoke
+ */
+template <typename ParamT, class DelegateT, typename ClosureDataT>
+class BoundClosure : public CallbackBase<ParamT> {
+ public:
+  typedef void (DelegateT::*CallbackMethod)(const ParamT        &value,
+                                            const ClosureDataT   closure_data);
+
+ public:
+  BoundClosure(CallbackMethod  method,
+               DelegateT      *delegate,
+               ClosureDataT    data) :
+    delegate_(delegate),
+    method_(method),
+    closure_data_(data) {}
+  BoundClosure(CallbackMethod  method,
+               DelegateT      &delegate,
+               ClosureDataT    data) :
+    delegate_(&delegate),
+    method_(method),
+    closure_data_(data) {}
+
+  void operator()(const ParamT &value) const {
+    (delegate_->*method_)(value, closure_data_);
+  }
+
+ private:
+  DelegateT*          delegate_;
+  CallbackMethod      method_;
+  const ClosureDataT  closure_data_;
+};
+
+
 template <class ParamT>
 class Callbackable {
  public:
@@ -287,6 +331,15 @@ class Callbackable {
 
  public:
   // replace this stuff by C++11 lambdas!
+  template <class DelegateT, typename ClosureDataT>
+  static callback_t* MakeClosure(
+      typename BoundClosure<ParamT, DelegateT, ClosureDataT>::CallbackMethod method,
+      DelegateT           *delegate,
+      const ClosureDataT  &closure_data) {
+    return new BoundClosure<ParamT, DelegateT, ClosureDataT>(method,
+                                                             delegate,
+                                                             closure_data);
+  }
   template <class DelegateT>
   static callback_t* MakeCallback(
         typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
