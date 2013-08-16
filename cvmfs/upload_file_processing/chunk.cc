@@ -93,13 +93,11 @@ Chunk::Chunk(const Chunk &other) :
   sha1_context_(other.sha1_context_),
   sha1_initialized_(other.sha1_initialized_),
   upload_stream_handle_(NULL),
-  tmp_file_path_(other.tmp_file_path_),
   bytes_written_(other.bytes_written_),
   compressed_size_(other.compressed_size_)
 {
   assert (! other.done_);
   assert (! other.HasUploadStreamHandle());
-  assert (other.tmp_file_path_.empty());
   assert (other.bytes_written_ == 0);
   assert (other.zlib_context_.avail_in == 0);
 
