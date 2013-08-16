@@ -79,11 +79,6 @@ class Chunk {
     upload_stream_handle_ = ush;
   }
 
-  const std::string& temporary_path()     const { return tmp_file_path_; }
-  void           set_temporary_path(const std::string path) {
-    tmp_file_path_ = path;
-  }
-
   size_t         bytes_written()          const { return bytes_written_;      }
   size_t         compressed_size()        const { return compressed_size_;    }
   void       add_bytes_written(const size_t new_bytes) {
@@ -120,7 +115,6 @@ class Chunk {
   bool                     sha1_initialized_;
 
   UploadStreamHandle      *upload_stream_handle_;
-  std::string              tmp_file_path_;
   size_t                   bytes_written_;
   tbb::atomic<size_t>      compressed_size_;
 };
