@@ -48,12 +48,7 @@ namespace upload
                 const std::string  &remote_path,
                 const callback_t   *callback = NULL);
 
-    void Upload(const std::string  &local_path,
-                const hash::Any    &content_hash,
-                const std::string  &hash_suffix,
-                const callback_t   *callback = NULL);
-
-    UploadStreamHandle* InitStreamedUpload(const callback_t   *callback = NULL);
+    UploadStreamHandle* InitStreamedUpload(const callback_t *callback = NULL);
     void Upload(UploadStreamHandle  *handle,
                 CharBuffer          *buffer,
                 const callback_t    *callback = NULL);

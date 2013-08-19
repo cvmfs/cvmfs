@@ -93,21 +93,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                       const callback_t   *callback = NULL) = 0;
 
   /**
-   * Uploads the file at the path local_path into the backend storage and saves
-   * it under the provided content hash. Additionally the content hash can be
-   * extended by a hash suffix.
-   *
-   * @param local_path    path to the file to be uploaded
-   * @param content_hash  content hash to be used as path in the backend storage
-   * @param hash_suffix   string to append behind the content hash
-   * @param callback      (optional) gets notified when the upload was finished
-   */
-  virtual void Upload(const std::string  &local_path,
-                      const hash::Any    &content_hash,
-                      const std::string  &hash_suffix,
-                      const callback_t   *callback = NULL) = 0;
-
-  /**
    *
    */
   virtual UploadStreamHandle* InitStreamedUpload(

@@ -76,22 +76,6 @@ void LocalUploader::Upload(const std::string &local_path,
 }
 
 
-void LocalUploader::Upload(const std::string  &local_path,
-                           const hash::Any    &content_hash,
-                           const std::string  &hash_suffix,
-                           const callback_t   *callback) {
-  const int retcode = Move(local_path,
-                           "data" + content_hash.MakePath(1,2) + hash_suffix);
-  if (retcode != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move file '%s' to the "
-                                          "final location: '%s'",
-             local_path.c_str(), content_hash.ToString().c_str());
-    atomic_inc32(&copy_errors_);
-  }
-  Respond(callback, UploaderResults(retcode, local_path));
-}
-
-
 UploadStreamHandle* LocalUploader::InitStreamedUpload(
                                                  const callback_t   *callback) {
   const std::string tmp_path = CreateTempPath(temporary_path_ + "/" + "chunk",
