@@ -23,7 +23,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_managed_exec.cc
   t_prng.cc
   t_buffer.cc
-  t_file_processing.cc
+  t_chunk_detectors.cc
   t_test_utils.cc
 
   # test utility functions
@@ -53,6 +53,8 @@ set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/chunk_detector.cc
 )
 
 #
