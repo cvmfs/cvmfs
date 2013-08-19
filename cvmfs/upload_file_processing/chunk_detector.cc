@@ -10,12 +10,18 @@
 using namespace upload;
 
 off_t StaticOffsetDetector::FindNextCutMark(CharBuffer *buffer) {
+  assert (buffer->IsInitialized());
+
+  const off_t beginning = buffer->base_offset();
+  const off_t end =
+    buffer->base_offset() + static_cast<off_t>(buffer->used_bytes());
+
   const off_t next_cut = last_cut() + chunk_size_;
-  if (next_cut >= buffer->base_offset() + static_cast<off_t>(buffer->size())) {
-    return NoCut(next_cut);
+  if (next_cut >= beginning && next_cut < end) {
+    return DoCut(next_cut);
   }
 
-  return DoCut(next_cut);
+  return NoCut(next_cut);
 }
 
 
