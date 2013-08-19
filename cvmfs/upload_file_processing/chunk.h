@@ -17,7 +17,7 @@
 
 #include <tbb/atomic.h>
 
-#include "buffer.h"
+#include "char_buffer.h"
 #include "../hash.h"
 
 namespace upload {

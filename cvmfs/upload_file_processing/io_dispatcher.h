@@ -16,7 +16,7 @@
 
 #include <pthread.h>
 
-#include "buffer.h"
+#include "char_buffer.h"
 
 namespace upload {
 
