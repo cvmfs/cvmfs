@@ -12,7 +12,7 @@
 
 #include "../platform.h"
 
-#include "buffer.h"
+#include "char_buffer.h"
 #include "chunk_detector.h"
 
 namespace upload {

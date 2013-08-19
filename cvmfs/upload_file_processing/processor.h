@@ -3,7 +3,7 @@
 
 #include <tbb/task.h>
 
-#include "buffer.h"
+#include "char_buffer.h"
 
 namespace upload {
 

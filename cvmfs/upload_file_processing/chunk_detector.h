@@ -9,7 +9,7 @@
 #include <vector>
 #include <sys/types.h>
 
-#include "buffer.h"
+#include "char_buffer.h"
 
 namespace upload {
 
