@@ -70,6 +70,8 @@ namespace upload
     int Move(const std::string &local_path,
              const std::string &remote_path) const;
 
+    int CreateAndOpenTemporaryChunkFile(std::string *path) const;
+
    private:
     // state information
     const std::string    upstream_path_;
