@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
 #include <vector>
 
-#include <iostream> // TODO: remove me
-
 #include "../../cvmfs/upload_file_processing/chunk_detector.h"
 #include "../../cvmfs/upload_file_processing/char_buffer.h"
 #include "../../cvmfs/prng.h"
@@ -98,7 +96,12 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetector) {
 
 TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
   const size_t base = 512000;
-  upload::Xor32Detector xor32_detector(base, base * 2, base * 4);
+  const size_t min_chk_size = base;
+  const size_t avg_chk_size = base * 2;
+  const size_t max_chk_size = base * 4;
+  upload::Xor32Detector xor32_detector(min_chk_size,
+                                       avg_chk_size,
+                                       max_chk_size);
 
   EXPECT_FALSE (xor32_detector.MightFindChunks(0));
   EXPECT_FALSE (xor32_detector.MightFindChunks(base));
@@ -142,19 +145,40 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
     // expected results
     upload::Xor32Detector detector(base, base * 2, base * 4);
     off_t next_cut = 0;
+    off_t last_cut = 0;
     int   cut      = 0;
-    bool fail      = false;
+    bool  fail     = false;
     Buffers::const_iterator j    = buffers_.begin();
     Buffers::const_iterator jend = buffers_.end();
+
     for (; ! fail && j != jend; ++j) {
       while ((next_cut = detector.FindNextCutMark(*j)) != 0) {
-        const int index = cut++;
-        if (expected[index] != next_cut) {
-          EXPECT_EQ(expected[index], next_cut) << "failed with buffer size "
-                                               << *i << " byte... ";
+        // check that the chunk size lies in the legal boundaries
+        size_t chunk_size = next_cut - last_cut;
+        if (max_chk_size < chunk_size) {
+          EXPECT_GE (max_chk_size, chunk_size)
+            << "too large chunk with buffer size " << *i << " bytes...";
           fail = true;
           break;
         }
+
+        if (min_chk_size > chunk_size) {
+          EXPECT_LE (min_chk_size, chunk_size)
+            << "too small chunk with buffer size " << *i << " bytes...";
+          fail = true;
+          break;
+        }
+
+        // check that chunk boundary is correct
+        const int index = cut++;
+        if (expected[index] != next_cut) {
+          EXPECT_EQ(expected[index], next_cut)
+            << "unexpected cut mark with buffer size " << *i << " bytes...";
+          fail = true;
+          break;
+        }
+
+        last_cut = next_cut;
       }
     }
   }
