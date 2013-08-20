@@ -24,6 +24,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_prng.cc
   t_buffer.cc
   t_chunk_detectors.cc
+  t_file_processing.cc
   t_test_utils.cc
 
   # test utility functions
@@ -55,6 +56,16 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 
   ${CVMFS_SOURCE_DIR}/upload_file_processing/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/file_processor.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/io_dispatcher.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/processor.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/file.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/chunk.cc
+  ${CVMFS_SOURCE_DIR}/upload_facility.cc
+  ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
 )
 
 #
@@ -93,7 +104,7 @@ set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UN
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
-                       ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES} pthread)
+                       ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
 
 #
 # Integrate the test running into CMake
