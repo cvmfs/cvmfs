@@ -9,6 +9,7 @@
 
 #include "io_dispatcher.h"
 #include "file.h"
+#include "../file_chunk.h"
 
 using namespace upload;
 
@@ -129,4 +130,9 @@ Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
   assert (! deferred_write_);
 
   return new_bulk_chunk;
+}
+
+
+std::string Chunk::hash_suffix() const {
+  return (IsBulkChunk()) ? file_->hash_suffix() : FileChunk::kCasSuffix;
 }
