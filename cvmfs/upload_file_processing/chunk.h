@@ -85,7 +85,7 @@ class Chunk {
                                                           hash::kSha1,
                                                           sha1_digest_,
                                                           SHA_DIGEST_LENGTH); }
-
+  std::string    hash_suffix() const;
   z_stream&      zlib_context()                 { return zlib_context_;       }
 
   UploadStreamHandle* upload_stream_handle() const { return upload_stream_handle_; }
