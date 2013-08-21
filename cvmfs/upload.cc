@@ -44,7 +44,7 @@ bool Spooler::Initialize() {
                                       spooler_definition_.min_file_chunk_size,
                                       spooler_definition_.avg_file_chunk_size,
                                       spooler_definition_.max_file_chunk_size);
-  //file_processor_->RegisterListener(&Spooler::ProcessingCallback, this);
+  file_processor_->RegisterListener(&Spooler::ProcessingCallback, this);
 
   // all done...
   return true;
