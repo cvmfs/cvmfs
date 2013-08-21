@@ -123,7 +123,9 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   /**
    *
    */
-   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle) = 0;
+   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                       const hash::Any     content_hash,
+                                       const std::string   hash_suffix) = 0;
 
   /**
    * Removes a file from the backend storage. This is done synchronously in any
