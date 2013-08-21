@@ -10,6 +10,8 @@
 #include "compression.h"
 #include "util.h"
 
+#include "upload_file_processing/char_buffer.h"
+
 using namespace upload;
 
 
@@ -92,20 +94,61 @@ void LocalUploader::Upload(const std::string  &local_path,
 
 UploadStreamHandle* LocalUploader::InitStreamedUpload(
                                                  const callback_t   *callback) {
+  const std::string tmp_path = CreateTempPath(temporary_path_ + "/" + "chunk",
+                                              0644);
+  assert (! tmp_path.empty());
 
-  return new LocalStreamHandle(callback, 0);
+  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
+  assert (tmp_fd >= 0);
+
+  return new LocalStreamHandle(callback, tmp_fd, tmp_path);
 }
 
 
 void LocalUploader::Upload(UploadStreamHandle  *handle,
                            CharBuffer          *buffer,
                            const callback_t    *callback) {
+  assert (buffer->IsInitialized());
+  LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
+
+  const size_t bytes_written = write(local_handle->file_descriptor,
+                                     buffer->ptr(),
+                                     buffer->used_bytes());
+  if (bytes_written != buffer->used_bytes()) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to write %d bytes to '%s' "
+                                          "(errno: %d)",
+             buffer->used_bytes(), local_handle->temporary_path.c_str(), errno);
+    Respond(callback, UploaderResults(errno, buffer));
+    return;
+  }
 
   Respond(callback, UploaderResults(0, buffer));
 }
 
 
-void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle) {
+void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                           const hash::Any     content_hash,
+                                           const std::string   hash_suffix) {
+  int retval = 0;
+  LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
+
+  retval = close(local_handle->file_descriptor);
+  if (retval != 0) {
+    Respond(handle->commit_callback, UploaderResults(errno));
+    return;
+  }
+
+  const std::string final_path = upstream_path_ + "/data" +
+                                 content_hash.MakePath(1, 2) +
+                                 hash_suffix;
+
+  retval = rename(local_handle->temporary_path.c_str(), final_path.c_str());
+  if (retval != 0) {
+    Respond(handle->commit_callback, UploaderResults(errno));
+    return;
+  }
+
+  delete local_handle;
 
   Respond(handle->commit_callback, UploaderResults(0));
 }
