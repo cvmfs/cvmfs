@@ -45,7 +45,7 @@ void LocalUploader::Upload(const std::string &local_path,
                                           "upload of file '%s'",
              local_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, 1, local_path);
+    Respond(callback, UploaderResults(1, local_path));
     return;
   }
 
@@ -57,7 +57,7 @@ void LocalUploader::Upload(const std::string &local_path,
                                           "area: '%s'",
              local_path.c_str(), tmp_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, retcode, local_path);
+    Respond(callback, UploaderResults(retcode, local_path));
     return;
   }
 
@@ -70,7 +70,7 @@ void LocalUploader::Upload(const std::string &local_path,
              tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
   }
-  Respond(callback, retcode, local_path);
+  Respond(callback, UploaderResults(retcode, local_path));
 }
 
 
@@ -86,7 +86,28 @@ void LocalUploader::Upload(const std::string  &local_path,
              local_path.c_str(), content_hash.ToString().c_str());
     atomic_inc32(&copy_errors_);
   }
-  Respond(callback, retcode, local_path);
+  Respond(callback, UploaderResults(retcode, local_path));
+}
+
+
+UploadStreamHandle* LocalUploader::InitStreamedUpload(
+                                                 const callback_t   *callback) {
+
+  return new LocalStreamHandle(callback, 0);
+}
+
+
+void LocalUploader::Upload(UploadStreamHandle  *handle,
+                           CharBuffer          *buffer,
+                           const callback_t    *callback) {
+
+  Respond(callback, UploaderResults(0, buffer));
+}
+
+
+void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle) {
+
+  Respond(handle->commit_callback, UploaderResults(0));
 }
 
 

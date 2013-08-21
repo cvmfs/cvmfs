@@ -35,14 +35,12 @@ void AbstractUploader::DisablePrecaching() {}
 void AbstractUploader::EnablePrecaching() {}
 
 
-void AbstractUploader::Respond(const callback_t  *callback,
-                               const int          return_code,
-                               const std::string  local_path) {
+void AbstractUploader::Respond(const callback_t       *callback,
+                               const UploaderResults  &result) const {
   if (callback == NULL) {
     return;
   }
 
-  const UploaderResults result(return_code, local_path);
   (*callback)(result);
   delete callback;
 }
