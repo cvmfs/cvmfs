@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef ULOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
-#define ULOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
+#ifndef UPLOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
+#define UPLOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
 
 #include <algorithm>
 #include <vector>
@@ -13,6 +13,10 @@
 
 namespace upload {
 
+/**
+ * Abstract base class for a cutmark detector.
+ * This decides on which file positions a File should be chunked.
+ */
 class ChunkDetector {
  public:
   ChunkDetector() : last_cut_(0) {}
@@ -22,11 +26,20 @@ class ChunkDetector {
   virtual bool MightFindChunks(const size_t size) const = 0;
 
  protected:
+  /**
+   * When returning from an implemented FindNextCutMark call you must call this
+   * function when a cut mark has been found.
+   * Like: return DoCut(found_offset)
+   */
   virtual off_t DoCut(const off_t offset) {
     last_cut_ = offset;
     return offset;
   }
 
+  /**
+   * Same as DoCut() but if no cut mark has been found in the given Buffer in
+   * FindNextCutMark()
+   */
   virtual off_t NoCut(const off_t offset) { return 0; }
 
   off_t last_cut() const { return last_cut_; }
@@ -35,7 +48,10 @@ class ChunkDetector {
   off_t last_cut_;
 };
 
-
+/**
+ * The StaticOffsetDetector cuts files on a hard threshold and generates
+ * uniform size Chunks.
+ */
 class StaticOffsetDetector : public ChunkDetector {
  public:
   StaticOffsetDetector(const size_t static_chunk_size) :
@@ -123,4 +139,4 @@ class Xor32Detector : public ChunkDetector {
 
 } // namespace upload
 
-#endif /* ULOAD_FILE_PROCESSING_CHUNK_DETECTOR_H */
+#endif /* UPLOAD_FILE_PROCESSING_CHUNK_DETECTOR_H */

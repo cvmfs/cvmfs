@@ -22,6 +22,11 @@ class ChunkDetector;
 class Chunk;
 typedef std::vector<Chunk*> ChunkVector;
 
+/**
+ * File to be processed by the processing pipe line. A File object is the only
+ * input object for the processing. It is in charge of the Chunk handling and
+ * holds file related meta data.
+ */
 class File {
  public:
   File(const std::string  &path,
@@ -41,7 +46,17 @@ class File {
    * @return  the predecessor (!) of the just created chunk
    */
   Chunk* CreateNextChunk(const off_t offset);
+
+  /**
+   * Notifies that a given Chunk has been fully processed and committed.
+   * @param chunk   The finalized chunk
+   */
   void ChunkCommitted(Chunk *chunk);
+
+  /**
+   * After all Chunks have been produced, this makes sure that the last generated
+   * Chunk will contain all remaining data of File.
+   */
   void FullyDefineLastChunk();
 
   off_t FindNextCutMark(CharBuffer *buffer) {
@@ -76,17 +91,17 @@ class File {
   void Finalize();
 
  private:
-  const std::string           path_;
-  const size_t                size_;
-  const bool                  might_become_chunked_;
-  const std::string           hash_suffix_;
+  const std::string           path_;                 ///< File path of the associated file
+  const size_t                size_;                 ///< The (uncompressed) file size
+  const bool                  might_become_chunked_; ///< Result of the chunkedness forecast
+  const std::string           hash_suffix_;          ///< Suffix to be appended to the bulk chunk content hash
 
-  ChunkVector                 chunks_;
-  Chunk                      *bulk_chunk_;
-  tbb::atomic<unsigned int>   chunks_to_commit_;
+  ChunkVector                 chunks_;               ///< List of generated Chunks
+  Chunk                      *bulk_chunk_;           ///< Associated bulk Chunk
+  tbb::atomic<unsigned int>   chunks_to_commit_;     ///< Counter of Chunks in flight (synchronization)
 
   IoDispatcher               *io_dispatcher_;
-  ChunkDetector              *chunk_detector_;
+  ChunkDetector              *chunk_detector_;       ///< The ChunkDetector to be used for this file
 };
 
 } // namespace upload

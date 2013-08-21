@@ -23,7 +23,7 @@ File::File(const std::string  &path,
   io_dispatcher_(io_dispatcher),
   chunk_detector_(chunk_detector)
 {
-  chunks_to_commit_ = 0;
+  chunks_to_commit_ = 0; // tbb::atomic has no init constructor
   CreateInitialChunk();
 }
 
@@ -63,16 +63,18 @@ void File::CreateInitialChunk() {
   assert (bulk_chunk_    == NULL);
   assert (chunks_.size() == 0);
 
-  // if we are dealing with a file that will definitely _not_ be chunked, we
-  // directly mark the initial chunk as being a bulk chunk
   const off_t offset = 0;
   Chunk *new_chunk   = new Chunk(this, offset);
 
-  // for a potentially chunked file, the initial chunk needs to defer the write
-  // back of data until a final decision has been made
   if (might_become_chunked_) {
+    // for a potentially chunked file, the initial chunk needs to defer the
+    // write back of data until a final decision has been made
+    // as soon as a second chunk has been generated, this chunk will be
+    // duplicated and serve as the beginning of the bulk chunk as well
     new_chunk->EnableDeferredWrite();
   } else {
+    // if we are dealing with a file that will definitely _not_ be chunked, we
+    // directly mark the initial chunk as being a bulk chunk
     new_chunk->SetAsBulkChunk();
     new_chunk->set_size(size_);
   }
@@ -92,6 +94,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
 
   // copy the initially created Chunk as the bulk_chunk_ as soon as we create
   // a second Chunk, thus defining the file to be chunked in general
+  // (see CreateInitialChunk())
   if (! HasBulkChunk()) {
     ForkOffBulkChunk();
   }
@@ -107,6 +110,9 @@ Chunk* File::CreateNextChunk(const off_t offset) {
 
 
 void File::ForkOffBulkChunk() {
+  // (see CreateInitialChunk())
+  // this takes care of copying the first generated Chunk to use it as bulk
+  // Chunk as well as first Chunk in the list
   assert (! HasBulkChunk());
   Chunk *latest_chunk = current_chunk();
   assert (latest_chunk != NULL);
@@ -118,6 +124,8 @@ void File::ForkOffBulkChunk() {
 
 
 void File::PromoteSingleChunkAsBulkChunk() {
+  // if the file was initally classified as possible chunked file but turns out
+  // to have no cuts, we need to use it's only Chunk as bulk Chunk.
   assert (might_become_chunked_);
   assert (chunks_.size() == 1);
   Chunk *only_chunk = current_chunk();
@@ -127,6 +135,8 @@ void File::PromoteSingleChunkAsBulkChunk() {
   assert (! only_chunk->IsBulkChunk());
   assert (only_chunk->IsFullyDefined());
 
+  // Use the single generated Chunk as bulk chunk and clear the chunked file
+  // Chunk list
   only_chunk->SetAsBulkChunk();
   chunks_.clear();
   AddChunk(only_chunk, false); // do not register in the IoDispatcher again
@@ -156,8 +166,9 @@ void File::FullyDefineLastChunk() {
 
 void File::Finalize() {
 #ifndef NDEBUG
+  // check sanity of generated chunk list (this code does not manipulate any-
+  // thing and can safely be disabled in release mode)
   if (might_become_chunked_ && chunks_.size() > 0) {
-    // check sanity of generated chunk list
     size_t aggregated_size    = 0;
     off_t  previous_chunk_end = 0;
     ChunkVector::const_iterator i    = chunks_.begin();

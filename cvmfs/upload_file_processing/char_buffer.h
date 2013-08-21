@@ -15,6 +15,13 @@
 
 namespace upload {
 
+/**
+ * Specialization of a Buffer object for an ordinary unsigned char buffer.
+ * We are using the scalable_allocator of TBB which brings measurable advantage
+ * compared to the std::allocator in our use case!
+ * Additionally this buffer allows to store a Base Offset, which describes the
+ * offset of a specific buffer in a partly read file.
+ */
 class CharBuffer : public Buffer<unsigned char,
                                  tbb::scalable_allocator<unsigned char> > {
  public:
@@ -27,7 +34,7 @@ class CharBuffer : public Buffer<unsigned char,
   off_t base_offset() const { return base_offset_; }
 
  private:
-  off_t                base_offset_;
+  off_t base_offset_;
 };
 
 typedef std::vector<CharBuffer*> CharBufferVector;

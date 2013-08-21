@@ -17,18 +17,30 @@ tbb::task* ChunkProcessingTask::execute() {
   //   * Only one ChunkProcessingTask for any given Chunk at any given time
   //   * Parallel execution of more than one ChunkProcessingTask for chunks of
   //     the same File is possible
+  //   * Multiple ChunkProcessingTasks might share the same CharBuffer
 
   assert (chunk_->IsInitialized());
   assert (buffer_->IsInitialized());
 
-  // get the position from where the current input buffer needs to be processed
+  // Get the position from where the current input buffer needs to be processed
+  // Two different cases:
+  //   -> The beginning of the CharBuffer, if the contained data lies in the
+  //      middle of the currently processed Chunk
+  //   -> At the position where the applicable data for the processed Chunk
+  //      starts (i.e. Chunk's starting offset is in the middle of the buffer)
   const off_t internal_offset =
     std::max(off_t(0), chunk_->offset() - buffer_->base_offset());
   assert (internal_offset >= 0);
   assert (static_cast<size_t>(internal_offset) <= buffer_->used_bytes());
   const unsigned char *data = buffer_->ptr() + internal_offset;
 
-  // determine how many bytes need to be processed
+  // Determine how many bytes need to be processed
+  // Two different cases:
+  //   -> The full CharBuffer, if the FileScrubbingTask did not find any Chunk
+  //      cut marks in the current buffer (thus not defining the size of the
+  //      associated Chunk)
+  //   -> The end of the applicable data for the associated Chunk inside the
+  //      CharBuffer (defined by the size of the Chunk)
   const size_t byte_count = (chunk_->size() == 0)
     ? buffer_->used_bytes() - internal_offset
     :   std::min(buffer_->base_offset()  + buffer_->used_bytes(),
@@ -62,21 +74,28 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
   z_stream  &stream   = chunk_->zlib_context();
   SHA_CTX   &sha1_ctx = chunk_->sha1_context();
 
+  // estimate the size needed for the data to compress
   const size_t max_output_size = deflateBound(&stream, bytes);
   CharBuffer *compress_buffer  = new CharBuffer(max_output_size);
 
+  // state the input data in the zlib stream for the next compression step
   stream.avail_in  = bytes;
   stream.next_in   = const_cast<unsigned char*>(data); // sry, but zlib forces me...
   const int flush = (finalize) ? Z_FINISH : Z_NO_FLUSH;
 
   int retcode = -1;
   while (true) {
+    // state the current output buffer in the zlib stream
     stream.avail_out = compress_buffer->size();
     stream.next_out  = compress_buffer->ptr();
 
+    // do the compression step
     retcode = deflate(&stream, flush);
     assert (retcode == Z_OK || retcode == Z_STREAM_END);
 
+    // check if zlib produced any bytes, define the byte offset and size of the
+    // produced output data Block, update the running content hash with the
+    // fresh compression data and schedule it for writing
     const size_t bytes_produced = compress_buffer->size() - stream.avail_out;
     if (bytes_produced > 0) {
       compress_buffer->SetUsedBytes(bytes_produced);
@@ -89,18 +108,18 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
       chunk_->ScheduleWrite(compress_buffer);
     }
 
+    // check if the compression for the given input data has finished and stop
+    // the compression loop
     if ((flush == Z_NO_FLUSH && retcode == Z_OK) ||
         (flush == Z_FINISH   && retcode == Z_STREAM_END)) {
       break;
     }
 
+    // when the estimated output buffer size was not sufficient we provide 4k
+    // fallback buffers until all input data has been consumed
     if (stream.avail_out == 0) {
       compress_buffer = new CharBuffer(4096);
     }
-  }
-
-  if (finalize) {
-    assert (flush == Z_FINISH);
   }
 }
 

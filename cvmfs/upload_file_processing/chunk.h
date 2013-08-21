@@ -27,6 +27,13 @@ struct UploadStreamHandle;
 class IoDispatcher;
 class File;
 
+/**
+ * The Chunk class describes a file chunk in processing. It holds state infor-
+ * mation for compression and hashing as well as other chunk specific meta data.
+ * Note that it deliberately _does not_ contain the actual chunk data which is
+ * managed dynamically by a stream of Buffers. Still the Chunk class is in
+ * charge of scheduling (or deferred scheduling) the write of processed Buffers.
+ */
 class Chunk {
  public:
   Chunk(File* file, const off_t offset) :
@@ -52,6 +59,14 @@ class Chunk {
 
   void ScheduleWrite(CharBuffer *buffer);
 
+  /**
+   * An enabled deferred write mode instructs the Chunk object to store Buffers
+   * instead of directly sending them to the IoDispatcher for write out.
+   * This is used for Files that might become chunked to produce a bulk chunk
+   * together with the actual file chunks.
+   * Deferred writes of Buffers are issued as soon as the final decision for
+   * file chunking is made. (See protected member FlushDeferredWrites())
+   */
   void EnableDeferredWrite() {
     assert (! HasUploadStreamHandle());
     deferred_write_ = true;
@@ -97,15 +112,18 @@ class Chunk {
   Chunk& operator=(const Chunk &other);  // don't copy assign
 
  private:
-  File                    *file_;
-  off_t                    file_offset_;
-  size_t                   chunk_size_;
+  File                    *file_;              ///< This is a chunk of File
+  off_t                    file_offset_;       ///< Offset in the associated File
+  size_t                   chunk_size_;        ///< Size of the chunk
+                                               ///< Note: might not be defined from
+                                               ///<       from the beginning
   tbb::atomic<bool>        done_;
   bool                     is_bulk_chunk_;
   bool                     is_fully_defined_;
 
   bool                     deferred_write_;
-  std::vector<CharBuffer*> deferred_buffers_;
+  std::vector<CharBuffer*> deferred_buffers_;  ///< Buffers stored for a deferred write
+                                               ///< (see EnableDeferredWrite())
 
   z_stream                 zlib_context_;
   bool                     zlib_initialized_;
@@ -114,9 +132,9 @@ class Chunk {
   unsigned char            sha1_digest_[SHA_DIGEST_LENGTH];
   bool                     sha1_initialized_;
 
-  UploadStreamHandle      *upload_stream_handle_;
-  size_t                   bytes_written_;
-  tbb::atomic<size_t>      compressed_size_;
+  UploadStreamHandle      *upload_stream_handle_; ///< opaque handle for streamed upload
+  size_t                   bytes_written_;        ///< bytes already uploaded (compressed)
+  tbb::atomic<size_t>      compressed_size_;      ///< size of the compressed data
 };
 
 typedef std::vector<Chunk*> ChunkVector;
