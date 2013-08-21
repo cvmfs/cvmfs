@@ -12,13 +12,47 @@
 
 namespace upload {
 
-struct UploaderResults {
-  UploaderResults(const int return_code, const std::string &local_path) :
-    return_code(return_code),
-    local_path(local_path) {}
+class CharBuffer;
 
-  const int         return_code;
-  const std::string local_path;
+struct UploaderResults {
+  enum Type {
+    kFileUpload,
+    kBufferUpload,
+    kChunkCommit
+  };
+
+  UploaderResults(const int return_code, const std::string &local_path) :
+    type(kFileUpload),
+    return_code(return_code),
+    local_path(local_path),
+    buffer(NULL) {}
+
+  UploaderResults(const int return_code, CharBuffer *buffer) :
+    type(kBufferUpload),
+    return_code(return_code),
+    local_path(""),
+    buffer(buffer) {}
+
+  UploaderResults(const int return_code) :
+    type(kChunkCommit),
+    return_code(return_code),
+    local_path(""),
+    buffer(NULL) {}
+
+  const Type         type;
+  const int          return_code;
+  const std::string  local_path;
+  CharBuffer        *buffer;
+};
+
+
+struct UploadStreamHandle {
+  typedef CallbackBase<UploaderResults> callback_t;
+
+  UploadStreamHandle(const callback_t *commit_callback) :
+    commit_callback(commit_callback) {}
+
+  const callback_t *commit_callback;
 };
 
 
@@ -72,6 +106,24 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                       const hash::Any    &content_hash,
                       const std::string  &hash_suffix,
                       const callback_t   *callback = NULL) = 0;
+
+  /**
+   *
+   */
+  virtual UploadStreamHandle* InitStreamedUpload(
+                                       const callback_t   *callback = NULL) = 0;
+
+  /**
+   *
+   */
+  virtual void Upload(UploadStreamHandle  *handle,
+                      CharBuffer          *buffer,
+                      const callback_t    *callback = NULL) = 0;
+
+  /**
+   *
+   */
+   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle) = 0;
 
   /**
    * Removes a file from the backend storage. This is done synchronously in any
@@ -132,9 +184,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *       Therefore you must not call Respond() twice or use the callback later
    *       by any means!
    */
-  void Respond(const callback_t *callback,
-               const int return_code,
-               const std::string local_path);
+  void Respond(const callback_t       *callback,
+               const UploaderResults  &result) const;
 
   const SpoolerDefinition& spooler_definition() const {
     return spooler_definition_;

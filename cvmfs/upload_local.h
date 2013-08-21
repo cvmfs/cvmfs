@@ -12,6 +12,15 @@
 
 namespace upload
 {
+  struct LocalStreamHandle : public UploadStreamHandle {
+    LocalStreamHandle(const callback_t *commit_callback,
+                      const int fd) :
+      UploadStreamHandle(commit_callback),
+      file_descriptor(fd) {}
+
+    const int file_descriptor;
+  };
+
   /**
    * The LocalSpooler implements the AbstractSpooler interface to push files
    * into a local CVMFS repository backend.
@@ -40,6 +49,12 @@ namespace upload
                 const hash::Any    &content_hash,
                 const std::string  &hash_suffix,
                 const callback_t   *callback = NULL);
+
+    UploadStreamHandle* InitStreamedUpload(const callback_t   *callback = NULL);
+    void Upload(UploadStreamHandle  *handle,
+                CharBuffer          *buffer,
+                const callback_t    *callback = NULL);
+    void FinalizeStreamedUpload(UploadStreamHandle *handle);
 
     bool Remove(const std::string &file_to_delete);
 
