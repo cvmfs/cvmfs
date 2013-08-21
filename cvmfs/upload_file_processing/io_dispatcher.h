@@ -244,7 +244,7 @@ class IoDispatcher {
   void WriteThread();
 
   bool ReadFileAndSpawnTasks(File *file);
-  bool WriteBufferToChunk(Chunk       *chunk,
+  void WriteBufferToChunk(Chunk       *chunk,
                           CharBuffer  *buffer,
                           const bool   delete_buffer);
   void CommitChunk(Chunk* chunk);
