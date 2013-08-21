@@ -86,6 +86,7 @@ Chunk::Chunk(const Chunk &other) :
   chunk_size_(other.chunk_size_),
   done_(other.done_),
   is_bulk_chunk_(other.is_bulk_chunk_),
+  is_fully_defined_(other.is_fully_defined_),
   deferred_write_(other.deferred_write_),
   deferred_buffers_(other.deferred_buffers_),
   zlib_initialized_(false),

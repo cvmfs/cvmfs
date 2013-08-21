@@ -35,13 +35,10 @@ tbb::task* ChunkProcessingTask::execute() {
                  chunk_->offset()        + chunk_->size())
       - std::max(buffer_->base_offset(), chunk_->offset());
   assert (byte_count <= buffer_->used_bytes() - internal_offset);
-  if (byte_count == 0) {
-    return NULL;
-  }
 
   // find out, if we are going to process the final block of the chunk
   const bool finalize = (
-    (chunk_->size() > 0) &&
+    (chunk_->IsFullyDefined()) &&
     (buffer_->base_offset() + internal_offset + byte_count
       == chunk_->offset() + chunk_->size())
   );
