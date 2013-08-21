@@ -22,6 +22,8 @@
 
 namespace upload {
 
+struct UploadStreamHandle;
+
 class IoDispatcher;
 class File;
 
@@ -30,17 +32,18 @@ class Chunk {
   Chunk(File* file, const off_t offset) :
     file_(file), file_offset_(offset), chunk_size_(0),
     is_bulk_chunk_(false), deferred_write_(false), zlib_initialized_(false),
-    sha1_initialized_(false), file_descriptor_(0),
+    sha1_initialized_(false), upload_stream_handle_(NULL),
     bytes_written_(0)
   {
     Initialize();
   }
 
-  bool IsInitialized()     const { return zlib_initialized_ && sha1_initialized_; }
-  bool HasFileDescriptor() const { return file_descriptor_ > 0;                   }
-  bool IsFullyProcessed()  const { return done_;                                  }
-  bool IsBulkChunk()       const { return is_bulk_chunk_;                         }
-  bool IsFullyDefined()    const { return chunk_size_ > 0;                        }
+  bool IsInitialized()         const { return zlib_initialized_ &&
+                                              sha1_initialized_;            }
+  bool IsFullyProcessed()      const { return done_;                        }
+  bool IsBulkChunk()           const { return is_bulk_chunk_;               }
+  bool IsFullyDefined()        const { return chunk_size_ > 0;              }
+  bool HasUploadStreamHandle() const { return upload_stream_handle_ != NULL; }
 
   void Finalize();
   void ScheduleCommit();
@@ -50,7 +53,7 @@ class Chunk {
   void ScheduleWrite(CharBuffer *buffer);
 
   void EnableDeferredWrite() {
-    assert (! HasFileDescriptor());
+    assert (! HasUploadStreamHandle());
     deferred_write_ = true;
   }
 
@@ -67,10 +70,10 @@ class Chunk {
 
   z_stream&      zlib_context()                 { return zlib_context_;       }
 
-  int            file_descriptor()        const { return file_descriptor_;    }
-  void       set_file_descriptor(const int fd) {
-    assert (! HasFileDescriptor());
-    file_descriptor_ = fd;
+  UploadStreamHandle* upload_stream_handle() const { return upload_stream_handle_; }
+  void set_upload_stream_handle(UploadStreamHandle* ush) {
+    assert (! HasUploadStreamHandle());
+    upload_stream_handle_ = ush;
   }
 
   const std::string& temporary_path()     const { return tmp_file_path_; }
@@ -112,7 +115,7 @@ class Chunk {
   unsigned char            sha1_digest_[SHA_DIGEST_LENGTH];
   bool                     sha1_initialized_;
 
-  int                      file_descriptor_;
+  UploadStreamHandle      *upload_stream_handle_;
   std::string              tmp_file_path_;
   size_t                   bytes_written_;
   tbb::atomic<size_t>      compressed_size_;

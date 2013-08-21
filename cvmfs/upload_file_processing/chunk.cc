@@ -16,7 +16,7 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
   assert (buffer->used_bytes() > 0);
 
   if (deferred_write_) {
-    assert (! HasFileDescriptor());
+    assert (! HasUploadStreamHandle());
     deferred_buffers_.push_back(buffer);
   } else {
     file_->io_dispatcher()->ScheduleWrite(this, buffer);
@@ -91,13 +91,13 @@ Chunk::Chunk(const Chunk &other) :
   zlib_initialized_(false),
   sha1_context_(other.sha1_context_),
   sha1_initialized_(other.sha1_initialized_),
-  file_descriptor_(0),
+  upload_stream_handle_(NULL),
   tmp_file_path_(other.tmp_file_path_),
   bytes_written_(other.bytes_written_),
   compressed_size_(other.compressed_size_)
 {
   assert (! other.done_);
-  assert (! other.HasFileDescriptor());
+  assert (! other.HasUploadStreamHandle());
   assert (other.tmp_file_path_.empty());
   assert (other.bytes_written_ == 0);
   assert (other.zlib_context_.avail_in == 0);
@@ -112,7 +112,7 @@ Chunk::Chunk(const Chunk &other) :
 Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
   assert (! done_);
   assert (deferred_write_);
-  assert (! HasFileDescriptor());
+  assert (! HasUploadStreamHandle());
   assert (file_offset_ == 0);
 
   // create a new bulk chunk and upload the (copied) data buffers that have been
