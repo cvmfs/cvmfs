@@ -24,20 +24,11 @@ typedef std::vector<Chunk*> ChunkVector;
 
 class File {
  public:
-  File(const std::string      &path,
-       const platform_stat64  &info,
-       IoDispatcher           *io_dispatcher,
-       const bool              allow_chunking = true) :
-    path_(path), size_(info.st_size),
-    might_become_chunked_(allow_chunking && ChunkDetector::MightBecomeChunked(size_)),
-    bulk_chunk_(NULL),
-    io_dispatcher_(io_dispatcher),
-    chunk_detector_(NULL)
-  {
-    chunks_to_commit_ = 0;
-    CreateInitialChunk();
-  }
-
+  File(const std::string  &path,
+       IoDispatcher       *io_dispatcher,
+       ChunkDetector      *chunk_detector,
+       const bool          allow_chunking = true,
+       const std::string  &hash_suffix    = "");
   ~File();
 
   bool MightBecomeChunked() const { return might_become_chunked_; }
@@ -52,13 +43,6 @@ class File {
   Chunk* CreateNextChunk(const off_t offset);
   void ChunkCommitted(Chunk *chunk);
   void FullyDefineLastChunk();
-
-  bool HasChunkDetector() const { return chunk_detector_ != NULL; }
-  void AddChunkDetector(ChunkDetector *detector) {
-    assert (chunk_detector_ == NULL);
-    assert (might_become_chunked_);
-    chunk_detector_ = detector;
-  }
 
   off_t FindNextCutMark(CharBuffer *buffer) {
     assert (chunk_detector_ != NULL);
@@ -95,6 +79,7 @@ class File {
   const std::string           path_;
   const size_t                size_;
   const bool                  might_become_chunked_;
+  const std::string           hash_suffix_;
 
   ChunkVector                 chunks_;
   Chunk                      *bulk_chunk_;

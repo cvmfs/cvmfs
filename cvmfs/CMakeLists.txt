@@ -108,6 +108,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_file_processing/file.h upload_file_processing/file.cc
   upload_file_processing/io_dispatcher.h upload_file_processing/io_dispatcher.cc
   upload_file_processing/processor.h upload_file_processing/processor.cc
+  upload_file_processing/file_processor.h upload_file_processing/file_processor.cc
 
   upload_file_chunker.h upload_file_chunker.cc
   upload_file_chunker_xor32.h upload_file_chunker_xor32.cc

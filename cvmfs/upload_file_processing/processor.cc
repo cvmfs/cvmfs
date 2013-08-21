@@ -113,10 +113,6 @@ tbb::task* FileScrubbingTask::execute() {
   //     CharBuffers. Each CharBuffer will be processed in one FileScrubbingTask
 
   if (file_->MightBecomeChunked()) {
-    if (! file_->HasChunkDetector()) {
-      file_->AddChunkDetector(new Xor32Detector());
-    }
-
     // find chunk cut marks in the current buffer and process all chunks that
     // are fully specified (i.e. not reaching beyond the current buffer)
     const CutMarks cut_marks = FindNextChunkCutMarks();
@@ -191,7 +187,6 @@ void FileScrubbingTask::CommitFinishedChunks() const {
 FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
   const Chunk *current_chunk = file_->current_chunk();
   assert (file_->MightBecomeChunked());
-  assert (file_->HasChunkDetector());
   assert (current_chunk != NULL);
   assert (current_chunk->size() == 0);
   assert (current_chunk->offset() <= buffer_->base_offset());

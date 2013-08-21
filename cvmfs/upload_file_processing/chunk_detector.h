@@ -15,18 +15,11 @@ namespace upload {
 
 class ChunkDetector {
  public:
-  static const size_t kMinChunkSize = 2 * 1024 * 1024;
-  static const size_t kAvgChunkSize = 4 * 1024 * 1024;
-  static const size_t kMaxChunkSize = 8 * 1024 * 1024;
-
- public:
   ChunkDetector() : last_cut_(0) {}
   virtual ~ChunkDetector() {};
   virtual off_t FindNextCutMark(CharBuffer *buffer) = 0;
 
-  static bool MightBecomeChunked(const size_t size) {
-    return size > kMinChunkSize;
-  }
+  virtual bool MightFindChunks(const size_t size) const = 0;
 
  protected:
   virtual off_t DoCut(const off_t offset) {
@@ -45,18 +38,18 @@ class ChunkDetector {
 
 class StaticOffsetDetector : public ChunkDetector {
  public:
-  StaticOffsetDetector(const off_t static_offset = ChunkDetector::kAvgChunkSize) :
-    offset_(static_offset)
+  StaticOffsetDetector(const size_t static_chunk_size) :
+    chunk_size_(static_chunk_size)
   {
-    assert (static_offset >= 0);
-    assert (static_cast<size_t>(static_offset) >= kMinChunkSize);
-    assert (static_cast<size_t>(static_offset) <  kMaxChunkSize);
+    assert (chunk_size_ >= 0u);
   }
+
+  bool MightFindChunks(const size_t size) const { return size > chunk_size_; }
 
   off_t FindNextCutMark(CharBuffer *buffer);
 
  private:
-  const off_t offset_;
+  const size_t chunk_size_;
 };
 
 
@@ -86,7 +79,13 @@ class Xor32Detector : public ChunkDetector {
   static const size_t xor32_influence = 32;
 
  public:
-  Xor32Detector() : xor32_ptr_(0), xor32_(0) {}
+  Xor32Detector(const size_t minimal_chunk_size,
+                const size_t average_chunk_size,
+                const size_t maximal_chunk_size);
+
+  bool MightFindChunks(const size_t size) const {
+    return size > minimal_chunk_size_;
+  }
 
   off_t FindNextCutMark(CharBuffer *buffer);
 
@@ -111,11 +110,15 @@ class Xor32Detector : public ChunkDetector {
   }
 
  private:
+  const size_t minimal_chunk_size_;
+  const size_t average_chunk_size_;
+  const size_t maximal_chunk_size_;
+
   off_t    xor32_ptr_;
   uint32_t xor32_;
 
   static const int32_t magic_number_;
-  static const int32_t threshold_;
+  const int32_t threshold_;
 };
 
 } // namespace upload
