@@ -12,6 +12,7 @@
 #include "file.h"
 #include "processor.h"
 #include "chunk.h"
+#include "../util_concurrency.h"
 
 using namespace upload;
 
@@ -156,18 +157,9 @@ void IoDispatcher::WriteThread() {
         CommitChunk(write_job.chunk);
         break;
       case WriteJob::UploadChunk:
-      {
-    #ifdef MEASURE_IO_TIME
-        tbb::tick_count start = tbb::tick_count::now();
-    #endif
-          WriteBufferToChunk(write_job.chunk,
-                             write_job.buffer,
-                             write_job.delete_buffer);
-    #ifdef MEASURE_IO_TIME
-        tbb::tick_count end = tbb::tick_count::now();
-        write_time_ += (end - start).seconds();
-    #endif
-      }
+        WriteBufferToChunk(write_job.chunk,
+                           write_job.buffer,
+                           write_job.delete_buffer);
         break;
       default:
         assert (false);
@@ -183,6 +175,31 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
   assert (buffer != NULL);
   assert (chunk->IsInitialized());
   assert (buffer->IsInitialized());
+
+  const size_t bytes_to_write = buffer->used_bytes();
+  assert (bytes_to_write > 0u);
+  assert (chunk->bytes_written() == static_cast<size_t>(buffer->base_offset()));
+
+  if (! chunk->HasUploadStreamHandle()) {
+    UploadStreamHandle *handle = uploader_->InitStreamedUpload(
+      AbstractUploader::MakeClosure(&IoDispatcher::ChunkUploadCompleteCallback,
+                                    this,
+                                    chunk));
+    assert (handle != NULL);
+    chunk->set_upload_stream_handle(handle);
+  }
+
+  uploader_->Upload(chunk->upload_stream_handle(), buffer,
+    AbstractUploader::MakeClosure(&IoDispatcher::BufferUploadCompleteCallback,
+                                  this,
+                                  BufferUploadCompleteParam(chunk,
+                                                            buffer,
+                                                            delete_buffer)));
+
+
+
+
+
 
   // if (! chunk->HasFileDescriptor()) {
   //   const std::string file_path = output_path + "/" + "chunk.XXXXXXX";
@@ -201,12 +218,6 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
   // const int fd = chunk->file_descriptor();
 
   // write to file
-  const size_t bytes_to_write = buffer->used_bytes();
-  assert (bytes_to_write > 0u);
-  assert (chunk->bytes_written() == static_cast<size_t>(buffer->base_offset()));
-
-  // HACK:
-  const size_t bytes_written = bytes_to_write;
 
 
   // const size_t bytes_written = write(fd, buffer->ptr(), bytes_to_write);
@@ -216,11 +227,6 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
   //   PrintErr(ss.str());
   //   return false;
   // }
-  chunk->add_bytes_written(bytes_written);
-
-  if (delete_buffer) {
-    delete buffer;
-  }
 
   return true;
 }
@@ -228,8 +234,11 @@ bool IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
 
 void IoDispatcher::CommitChunk(Chunk* chunk) {
   assert (chunk->IsFullyProcessed());
+  assert (chunk->HasUploadStreamHandle());
+
+  uploader_->FinalizeStreamedUpload(chunk->upload_stream_handle());
   // assert (chunk->HasFileDescriptor());
-  assert (chunk->bytes_written() == chunk->compressed_size());
+  // assert (chunk->bytes_written() == chunk->compressed_size());
 
   // int retval = close(chunk->file_descriptor());
   // assert (retval == 0);
@@ -239,6 +248,38 @@ void IoDispatcher::CommitChunk(Chunk* chunk) {
 
   // retval = rename(chunk->temporary_path().c_str(), final_path.c_str());
   // assert (retval == 0);
+
+  // chunk->file()->ChunkCommitted(chunk);
+
+  // pthread_mutex_lock(&processing_done_mutex_);
+  // if (--chunks_in_flight_ == 0 && files_in_flight_ == 0) {
+  //     pthread_cond_signal(&processing_done_condition_);
+  // }
+  // pthread_mutex_unlock(&processing_done_mutex_);
+}
+
+
+void IoDispatcher::BufferUploadCompleteCallback(
+                                    const UploaderResults        &results,
+                                    BufferUploadCompleteParam     buffer_info) {
+  Chunk      *chunk         = buffer_info.chunk;
+  CharBuffer *buffer        = buffer_info.buffer;
+  const bool  delete_buffer = buffer_info.delete_buffer;
+
+  assert (results.return_code == 0);
+
+  chunk->add_bytes_written(buffer->used_bytes());
+  if (delete_buffer) {
+    delete buffer;
+  }
+}
+
+
+void IoDispatcher::ChunkUploadCompleteCallback(const UploaderResults &results,
+                                               Chunk* chunk) {
+  assert (chunk->IsFullyProcessed());
+  assert (chunk->HasUploadStreamHandle());
+  assert (chunk->bytes_written() == chunk->compressed_size());
 
   chunk->file()->ChunkCommitted(chunk);
 

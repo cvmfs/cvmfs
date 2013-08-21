@@ -17,6 +17,7 @@
 #include <pthread.h>
 
 #include "char_buffer.h"
+#include "../upload_facility.h"
 
 namespace upload {
 
@@ -141,17 +142,29 @@ class IoDispatcher {
     JobType      type;
   };
 
+  struct BufferUploadCompleteParam {
+    BufferUploadCompleteParam(Chunk       *chunk,
+                              CharBuffer  *buffer,
+                              bool         delete_buffer) :
+      chunk(chunk), buffer(buffer), delete_buffer(delete_buffer) {}
+    Chunk       *chunk;
+    CharBuffer  *buffer;
+    bool         delete_buffer;
+  };
+
  public:
   typedef tbb::concurrent_bounded_queue<WriteJob> WriteJobQueue;
 
  public:
-  IoDispatcher(const size_t max_read_buffer_size = 512 * 1024) :
+  IoDispatcher(AbstractUploader  *uploader,
+               const size_t       max_read_buffer_size = 512 * 1024) :
     tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
     max_read_buffer_size_(max_read_buffer_size),
     max_files_in_flight_(tbb_workers_ * 10),
     reader_(read_queue_, max_read_buffer_size_, max_files_in_flight_ * 5),
     read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
-    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread)
+    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
+    uploader_(uploader)
   {
     files_in_flight_   = 0;
     chunks_in_flight_  = 0;
@@ -170,13 +183,6 @@ class IoDispatcher {
      pthread_mutex_destroy(&files_in_flight_mutex_);
      pthread_cond_destroy(&processing_done_condition_);
      pthread_cond_destroy(&free_slot_condition_);
-
-#ifdef MEASURE_IO_TIME
-    std::cout << "Reads took:  " << read_time_ << std::endl
-              << "  average:   " << (read_time_ / file_count_) << std::endl
-              << "Writes took: " << write_time_ << std::endl
-              << "  average:   " << (write_time_ / file_count_) << std::endl;
-#endif
   }
 
   static void ThreadEntry(IoDispatcher *delegate,
@@ -243,6 +249,10 @@ class IoDispatcher {
                           const bool   delete_buffer);
   void CommitChunk(Chunk* chunk);
 
+  void ChunkUploadCompleteCallback(const UploaderResults &results, Chunk* chunk);
+  void BufferUploadCompleteCallback(const UploaderResults      &results,
+                                    BufferUploadCompleteParam   buffer_info);
+
  private:
   const unsigned int        tbb_workers_;
   const size_t              max_read_buffer_size_;
@@ -251,22 +261,24 @@ class IoDispatcher {
   tbb::atomic<unsigned int> chunks_in_flight_;
   tbb::atomic<unsigned int> file_count_;
 
-  double read_time_;
-  double write_time_;
+  double                    read_time_;
+  double                    write_time_;
 
-  FileQueue     read_queue_;
-  WriteJobQueue write_queue_;
+  FileQueue                 read_queue_;
+  WriteJobQueue             write_queue_;
 
-  pthread_mutex_t    files_in_flight_mutex_;
-  pthread_cond_t     free_slot_condition_;
-  const unsigned int max_files_in_flight_;
+  pthread_mutex_t           files_in_flight_mutex_;
+  pthread_cond_t            free_slot_condition_;
+  const unsigned int        max_files_in_flight_;
 
-  pthread_mutex_t processing_done_mutex_;
-  pthread_cond_t  processing_done_condition_;
+  pthread_mutex_t           processing_done_mutex_;
+  pthread_cond_t            processing_done_condition_;
 
-  Reader          reader_;
-  tbb::tbb_thread read_thread_;
-  tbb::tbb_thread write_thread_;
+  Reader                    reader_;
+  tbb::tbb_thread           read_thread_;
+  tbb::tbb_thread           write_thread_;
+
+  AbstractUploader         *uploader_;
 };
 
 } // namespace upload
