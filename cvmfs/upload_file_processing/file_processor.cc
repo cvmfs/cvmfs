@@ -8,16 +8,18 @@
 
 #include "io_dispatcher.h"
 #include "file.h"
+#include "chunk.h"
 #include "chunk_detector.h"
 #include "../logging.h"
 
 using namespace upload;
 
-FileProcessor::FileProcessor(const bool   enable_file_chunking,
-                             const size_t minimal_chunk_size,
-                             const size_t average_chunk_size,
-                             const size_t maximal_chunk_size) :
-  io_dispatcher_(new IoDispatcher),
+FileProcessor::FileProcessor(AbstractUploader *uploader,
+                             const bool        enable_file_chunking,
+                             const size_t      minimal_chunk_size,
+                             const size_t      average_chunk_size,
+                             const size_t      maximal_chunk_size) :
+  io_dispatcher_(new IoDispatcher(uploader, this)),
   chunking_enabled_(enable_file_chunking),
   minimal_chunk_size_(minimal_chunk_size),
   average_chunk_size_(average_chunk_size),
@@ -51,6 +53,32 @@ void FileProcessor::Process(const std::string  &local_path,
            ((allow_chunking) ? "true" : "false"),
            hash_suffix.c_str());
   io_dispatcher_->ScheduleRead(file);
+}
+
+
+void FileProcessor::FileDone(File *file) {
+  assert (file != NULL);
+  assert (! file->path().empty());
+  assert (file->bulk_chunk() != NULL);
+  assert (! file->bulk_chunk()->sha1().IsNull());
+
+  FileChunkList resulting_chunks;
+  const ChunkVector &generated_chunks = file->chunks();
+  ChunkVector::const_iterator i    = generated_chunks.begin();
+  ChunkVector::const_iterator iend = generated_chunks.end();
+  for (; i != iend; ++i) {
+    Chunk *current_chunk = *i;
+    resulting_chunks.PushBack(FileChunk(current_chunk->sha1(),
+                                         current_chunk->offset(),
+                                         current_chunk->size()));
+  }
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "File '%s' processed completely",
+           file->path().c_str());
+  NotifyListeners(SpoolerResult(0,
+                                file->path(),
+                                file->bulk_chunk()->sha1(),
+                                resulting_chunks));
 }
 
 

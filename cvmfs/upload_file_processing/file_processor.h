@@ -6,12 +6,15 @@
 #define UPLOAD_FILE_PROCESSING_FILE_PROCESSOR_H_
 
 #include "../util.h"
+#include "../util_concurrency.h"
+#include "../upload_spooler_result.h"
 
 namespace upload {
 
 class IoDispatcher;
+class File;
 
-class FileProcessor {
+class FileProcessor : public Observable<SpoolerResult> {
  public:
   FileProcessor(const bool   enable_file_chunking,
                 const size_t minimal_chunk_size = 2 * 1024 * 1024,
@@ -24,6 +27,10 @@ class FileProcessor {
                const std::string  &hash_suffix = "");
 
   void WaitForProcessing();
+
+ protected:
+  friend class IoDispatcher;
+  void FileDone(File *file);
 
  private:
   IoDispatcher  *io_dispatcher_;

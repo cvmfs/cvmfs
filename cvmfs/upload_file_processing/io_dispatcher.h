@@ -24,6 +24,7 @@ namespace upload {
 class File;
 class Chunk;
 class FileScrubbingTask;
+class FileProcessor;
 
 typedef tbb::concurrent_bounded_queue<File*> FileQueue;
 
@@ -157,6 +158,7 @@ class IoDispatcher {
 
  public:
   IoDispatcher(AbstractUploader  *uploader,
+               FileProcessor     *file_processor,
                const size_t       max_read_buffer_size = 512 * 1024) :
     tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
     max_read_buffer_size_(max_read_buffer_size),
@@ -164,7 +166,8 @@ class IoDispatcher {
     reader_(read_queue_, max_read_buffer_size_, max_files_in_flight_ * 5),
     read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
     write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
-    uploader_(uploader)
+    uploader_(uploader),
+    file_processor_(file_processor)
   {
     files_in_flight_   = 0;
     chunks_in_flight_  = 0;
@@ -279,6 +282,7 @@ class IoDispatcher {
   tbb::tbb_thread           write_thread_;
 
   AbstractUploader         *uploader_;
+  FileProcessor            *file_processor_;
 };
 
 } // namespace upload

@@ -12,6 +12,7 @@
 #include "file.h"
 #include "processor.h"
 #include "chunk.h"
+#include "file_processor.h"
 #include "../util_concurrency.h"
 #include "../file_chunk.h"
 
@@ -252,5 +253,7 @@ void IoDispatcher::CommitFile(File *file) {
     pthread_cond_signal(&free_slot_condition_);
   }
   pthread_mutex_unlock(&files_in_flight_mutex_);
+
+  file_processor_->FileDone(file);
   delete file;
 }
