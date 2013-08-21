@@ -31,18 +31,18 @@ class Chunk {
  public:
   Chunk(File* file, const off_t offset) :
     file_(file), file_offset_(offset), chunk_size_(0),
-    is_bulk_chunk_(false), deferred_write_(false), zlib_initialized_(false),
-    sha1_initialized_(false), upload_stream_handle_(NULL),
-    bytes_written_(0)
+    is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
+    zlib_initialized_(false), sha1_initialized_(false),
+    upload_stream_handle_(NULL), bytes_written_(0)
   {
     Initialize();
   }
 
   bool IsInitialized()         const { return zlib_initialized_ &&
-                                              sha1_initialized_;            }
-  bool IsFullyProcessed()      const { return done_;                        }
-  bool IsBulkChunk()           const { return is_bulk_chunk_;               }
-  bool IsFullyDefined()        const { return chunk_size_ > 0;              }
+                                              sha1_initialized_;             }
+  bool IsFullyProcessed()      const { return done_;                         }
+  bool IsBulkChunk()           const { return is_bulk_chunk_;                }
+  bool IsFullyDefined()        const { return is_fully_defined_;             }
   bool HasUploadStreamHandle() const { return upload_stream_handle_ != NULL; }
 
   void Finalize();
@@ -60,7 +60,10 @@ class Chunk {
   File*          file()                   const { return file_;               }
   off_t          offset()                 const { return file_offset_;        }
   size_t         size()                   const { return chunk_size_;         }
-  void       set_size(const size_t size)        { chunk_size_ = size;         }
+  void       set_size(const size_t size) {
+    chunk_size_       = size;
+    is_fully_defined_ = true;
+  }
 
   SHA_CTX&       sha1_context()                 { return sha1_context_;       }
   hash::Any      sha1() const                   { return hash::Any(
@@ -104,6 +107,7 @@ class Chunk {
   size_t                   chunk_size_;
   tbb::atomic<bool>        done_;
   bool                     is_bulk_chunk_;
+  bool                     is_fully_defined_;
 
   bool                     deferred_write_;
   std::vector<CharBuffer*> deferred_buffers_;
