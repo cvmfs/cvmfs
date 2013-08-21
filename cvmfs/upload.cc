@@ -39,7 +39,8 @@ bool Spooler::Initialize() {
   }
 
   // configure the file processor context
-  file_processor_ = new FileProcessor(spooler_definition_.use_file_chunking,
+  file_processor_ = new FileProcessor(uploader_.weak_ref(),
+                                      spooler_definition_.use_file_chunking,
                                       spooler_definition_.min_file_chunk_size,
                                       spooler_definition_.avg_file_chunk_size,
                                       spooler_definition_.max_file_chunk_size);
