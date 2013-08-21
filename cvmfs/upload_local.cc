@@ -148,9 +148,10 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     return;
   }
 
+  const callback_t *callback = handle->commit_callback;
   delete local_handle;
 
-  Respond(handle->commit_callback, UploaderResults(0));
+  Respond(callback, UploaderResults(0));
 }
 
 
