@@ -62,6 +62,8 @@ void FileProcessor::FileDone(File *file) {
   assert (file->bulk_chunk() != NULL);
   assert (! file->bulk_chunk()->sha1().IsNull());
 
+  // extract crucial information from the Chunk structures and wrap them into
+  // the global FileChunk data structure
   FileChunkList resulting_chunks;
   const ChunkVector &generated_chunks = file->chunks();
   ChunkVector::const_iterator i    = generated_chunks.begin();
@@ -69,8 +71,8 @@ void FileProcessor::FileDone(File *file) {
   for (; i != iend; ++i) {
     Chunk *current_chunk = *i;
     resulting_chunks.PushBack(FileChunk(current_chunk->sha1(),
-                                         current_chunk->offset(),
-                                         current_chunk->size()));
+                                        current_chunk->offset(),
+                                        current_chunk->size()));
   }
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "File '%s' processed completely",

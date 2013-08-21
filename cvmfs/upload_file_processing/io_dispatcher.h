@@ -28,19 +28,35 @@ class FileProcessor;
 
 typedef tbb::concurrent_bounded_queue<File*> FileQueue;
 
+/**
+ * The Reader takes care of the efficient read-in of files. It (asynchronously)
+ * pops read jobs from a queue and handles them. Reading of multiple big Files
+ * is done concurrently in a sense that new data Blocks for a number of Files
+ * are read in a round robin fashion and scheduled for processing.
+ * This allows for better parallelism in the processing pipeline since each
+ * individual File needs to be processed sequentially. Though data Blocks of
+ * different Files are independent of each other and allow for higher throughput.
+ *
+ * Note: The Reader produces CharBuffers that are passed into the processing
+ *       pipeline. The Reader claims ownership of these specific CharBuffers,
+ *       thus they need to be released using the Reader::ReleaseBuffer() method!
+ */
 class Reader {
  protected:
+  /**
+   * Internal structure to keep information about each currently open File.
+   */
   struct OpenFile {
     OpenFile() :
       file(NULL), file_marker(0), previous_task(NULL),
       previous_sync_task(NULL) {}
 
-    File               *file;
-    int                 file_descriptor;
-    off_t               file_marker;
+    File               *file;               ///< reference to the associated File structure
+    int                 file_descriptor;    ///< open file descriptor of the file
+    off_t               file_marker;        ///< current position of file read-in
 
-    FileScrubbingTask  *previous_task;
-    tbb::task          *previous_sync_task;
+    FileScrubbingTask  *previous_task;      ///< previously scheduled TBB task (for synchronization)
+    tbb::task          *previous_sync_task; ///< previously scheduled TBB task (for synchronization)
   };
 
   typedef std::list<OpenFile> OpenFileList;
@@ -64,7 +80,15 @@ class Reader {
     pthread_cond_destroy(&free_slot_condition_);
   }
 
+  /**
+   * Starts the reading loop of the Reader.
+   */
   void Read();
+
+  /**
+   * Releases CharBuffers that were previously allocated by the Reader. This
+   * needs to be called by the processing pipeline for finished Buffers.
+   */
   void ReleaseBuffer(CharBuffer *buffer) {
     delete buffer;
     pthread_mutex_lock(&free_slot_mutex_);
@@ -75,6 +99,7 @@ class Reader {
   }
 
  protected:
+  /** Checks if there is still data to be worked on */
   bool HasData() const { return ! draining_ || open_files_.size() > 0; }
 
   bool TryToAcquireNewJob(File *&new_file_job);
@@ -82,6 +107,10 @@ class Reader {
   void CloseFile(OpenFile &file);
   bool ReadAndScheduleNextBuffer(OpenFile &open_file);
 
+  /**
+   * When all Files have been scheduled from the outside, we enable the draining
+   * mode to bring all reading to an end and terminate eventually.
+   */
   void EnableDraining() { draining_ = true; }
 
   CharBuffer *CreateBuffer(const size_t size) {
@@ -97,10 +126,10 @@ class Reader {
   }
 
  private:
-  FileQueue                 &queue_;
-  const size_t               max_buffer_size_;
-  tbb::atomic<unsigned int>  buffers_in_flight_;
-  const unsigned int         max_buffers_in_flight_;
+  FileQueue                 &queue_;                 ///< reference to the JobQueue (see IoDispatcher)
+  const size_t               max_buffer_size_;       ///< size of data Blocks to read-in
+  tbb::atomic<unsigned int>  buffers_in_flight_;     ///< number of data Blocks currently in memory
+  const unsigned int         max_buffers_in_flight_; ///< maximal number of Buffers in memory
 
   bool                       draining_;
   OpenFileList               open_files_;
@@ -111,11 +140,51 @@ class Reader {
 
 
 
-
+/**
+ * The IoDispatcher is responsible for reading Files from disk and schedule them
+ * for processing. Additionally it dispatches the write back of processed data
+ * Blocks. Both reading and writing are asynchronous operations and run in sep-
+ * arate threads.
+ * Note: For files of a certain size the IoDispatcher will not read the complete
+ *       File in memory. Instead small data Blocks get loaded and scheduled in
+ *       a TBB task for processing. This allows for processing of huge files w/o
+ *       fully storing them in memory at any point in time.
+ *
+ * Writing blocks of Chunk data into the backend storage need to happen in the
+ * right order! WriteJobs are scheduled in correct order and the IoDispatcher is
+ * not allowed to change this order during asynchronous dispatching.
+ *
+ * Note: The concrete implementations of AbstractUploader will receive upload
+ *       requests from the IoDispatcher in a special write thread managed by the
+ *       IoDispatcher itself. If this thread gets blocked by the Uploader for an
+ *       extended period of time it might affect the performance of the file
+ *       processing as well.
+ */
 class IoDispatcher {
  protected:
   typedef void (IoDispatcher:: *MethodPtr)();
 
+  /**
+   * This Job description wraps information for the writing compressed data
+   * Blocks back to disk. There are currently three different events to be pro-
+   * cessed by the writing part of the IoDispatcher:
+   *  -> UploadChunk
+   *        Job description containing a single CharBuffer that contains a block
+   *        of compressed data to be written for a specific (provided) Chunk
+   *        Note: The IoDispatcher must not change the order of these Jobs,
+   *              since this would lead to data corruption. Thus, WriteJobs for
+   *              each individual Chunk must be scheduled in the right order!
+   *
+   *  -> CommitChunk
+   *        After all data Blocks for a specific Chunk are successfully written
+   *        and the processing of the Chunk finished, a CommitChunk Job is sent.
+   *        This job contains a fully defined Chunk (finalized content hash).
+   *
+   *  -> TearDown
+   *        This job is sent at the end of the processing run, when no more work
+   *        has to be done and the write thread should terminate. Jobs scheduled
+   *        after a TearDown job will not be processed anymore.
+   */
   struct WriteJob {
     enum JobType {
       UploadChunk,
@@ -137,12 +206,18 @@ class IoDispatcher {
       chunk(chunk), buffer(NULL), delete_buffer(false),
       type(CommitChunk) {}
 
-    Chunk       *chunk;
-    CharBuffer  *buffer;
-    bool         delete_buffer;
-    JobType      type;
+    Chunk       *chunk;         ///< Chunk to be (partially) uploaded
+    CharBuffer  *buffer;        ///< Data to be uploaded (or appended)
+    bool         delete_buffer; ///< Delete the buffer after upload?
+    JobType      type;          ///< Type of the WriteJob (see general info)
   };
 
+  /**
+   * This is a wrapper struct for the upload callback closure.
+   * The implementation of AbstractUploader asynchronously informs the
+   * IoDispatcher about a finished upload. Thus we need to associate the initial
+   * management information with these asynchronous callbacks.
+   */
   struct BufferUploadCompleteParam {
     BufferUploadCompleteParam(Chunk       *chunk,
                               CharBuffer  *buffer,
@@ -188,11 +263,19 @@ class IoDispatcher {
      pthread_cond_destroy(&free_slot_condition_);
   }
 
+  /**
+   * Wrapper function to bind the IoDispatcher* to its worker thread spawning
+   */
   static void ThreadEntry(IoDispatcher *delegate,
                           MethodPtr     method) {
     (*delegate.*method)();
   }
 
+  /**
+   * Waits until all scheduled files are processed
+   * Note: scheduling new files for reading after calling Wait() might cause
+   *       undefined behaviour
+   */
   void Wait() {
     pthread_mutex_lock(&processing_done_mutex_);
     while (files_in_flight_ > 0 || chunks_in_flight_ > 0) {
@@ -201,10 +284,11 @@ class IoDispatcher {
     pthread_mutex_unlock(&processing_done_mutex_);
   }
 
-  void RegisterChunk(Chunk *chunk) {
-    ++chunks_in_flight_;
-  }
-
+  /**
+   * Schedule a File object for reading by the IoDispatcher
+   * Note: the IoDispatcher will read the file block-wise and schedule these
+   *       Blocks for processing asynchronously.
+   */
   void ScheduleRead(File *file) {
     pthread_mutex_lock(&files_in_flight_mutex_);
     while (files_in_flight_ > max_files_in_flight_) {
@@ -216,6 +300,17 @@ class IoDispatcher {
     pthread_mutex_unlock(&files_in_flight_mutex_);
   }
 
+  void CommitFile(File *file);
+
+ protected:
+  friend class Chunk;
+  friend class File;
+
+  /**
+   * Internally called by the processing pipeline to write back processed data
+   * blocks. Writing will be done by an implementation of AbstractUploader and
+   * happens asynchronously.
+   */
   void ScheduleWrite(Chunk       *chunk,
                      CharBuffer  *buffer,
                      const bool   delete_buffer = true) {
@@ -224,14 +319,24 @@ class IoDispatcher {
     write_queue_.push(WriteJob(chunk, buffer, delete_buffer));
   }
 
+  /**
+   * This is called by the processing pipeline to a schedule the commit of a
+   * specific Chunk. A Chunk must be committed only after all data blocks have
+   * been processed and uploaded.
+   */
   void ScheduleCommit(Chunk *chunk) {
     assert (chunk != NULL);
     write_queue_.push(WriteJob(chunk));
   }
 
-  void CommitFile(File *file);
+  /**
+   * Newly generated Chunks need to be registered to keep track of the number
+   * of Chunks currently being processed
+   */
+  void RegisterChunk(Chunk *chunk) {
+    ++chunks_in_flight_;
+  }
 
- protected:
   void TearDown() {
     assert(read_thread_.joinable());
     assert(write_thread_.joinable());
@@ -257,18 +362,15 @@ class IoDispatcher {
                                     BufferUploadCompleteParam   buffer_info);
 
  private:
-  const unsigned int        tbb_workers_;
-  const size_t              max_read_buffer_size_;
+  const unsigned int        tbb_workers_;               ///< number of TBB worker threads to be used
+  const size_t              max_read_buffer_size_;      ///< maximal data block size for file read-in
 
-  tbb::atomic<unsigned int> files_in_flight_;
-  tbb::atomic<unsigned int> chunks_in_flight_;
-  tbb::atomic<unsigned int> file_count_;
+  tbb::atomic<unsigned int> files_in_flight_;           ///< number of Files currently in processing
+  tbb::atomic<unsigned int> chunks_in_flight_;          ///< number of Chunks currently in processing
+  tbb::atomic<unsigned int> file_count_;                ///< overall number of processed files
 
-  double                    read_time_;
-  double                    write_time_;
-
-  FileQueue                 read_queue_;
-  WriteJobQueue             write_queue_;
+  FileQueue                 read_queue_;                ///< JobQueue for reading (see Reader)
+  WriteJobQueue             write_queue_;               ///< JobQueue for writing
 
   pthread_mutex_t           files_in_flight_mutex_;
   pthread_cond_t            free_slot_condition_;
@@ -277,12 +379,12 @@ class IoDispatcher {
   pthread_mutex_t           processing_done_mutex_;
   pthread_cond_t            processing_done_condition_;
 
-  Reader                    reader_;
+  Reader                    reader_;                    ///< dedicated File Reader object
   tbb::tbb_thread           read_thread_;
   tbb::tbb_thread           write_thread_;
 
-  AbstractUploader         *uploader_;
-  FileProcessor            *file_processor_;
+  AbstractUploader         *uploader_;                  ///< (weak) reference to the used AbstractUploaer
+  FileProcessor            *file_processor_;            ///< (weak) reference to the FileProcesser in command
 };
 
 } // namespace upload
