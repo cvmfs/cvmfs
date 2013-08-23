@@ -1214,7 +1214,7 @@ add_replica() {
   is_master_replica $stratum0 || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
   if check_repository_existence $alias_name; then
     if is_stratum0 $alias_name; then
-      die "Repository $alias_name already exists as a Stratum0 repository.\nYou cannot create a Stratum1 replica for $alias_name on this machine."
+      die "Repository $alias_name already exists as a Stratum0 repository.\nUse -n to create an aliased Stratum1 replica for $name on this machine."
     else
       die "There is already a Stratum1 repository $alias_name"
     fi
