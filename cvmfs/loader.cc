@@ -432,17 +432,27 @@ static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
 static CvmfsExports *LoadLibrary(const bool debug_mode,
                                  LoaderExports *loader_exports)
 {
-  string library_name = "cvmfs_fuse";
-  if (debug_mode)
-    library_name += "_debug";
+  string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
   library_name = platform_libname(library_name);
 
-  library_handle_ = dlopen(library_name.c_str(), RTLD_NOW | RTLD_LOCAL);
-  if (!library_handle_) {
-    library_handle_ = dlopen(("/usr/lib/" + library_name).c_str(),
-                             RTLD_NOW | RTLD_LOCAL);
-    if (!library_handle_)
-      return NULL;
+  static std::vector<std::string> library_pathes; // TODO: C++11 - replace that
+  if (library_pathes.empty()) {                   //       'crap' with an init-
+    library_pathes.push_back(library_name);       //       ializer list!
+    library_pathes.push_back("/usr/lib/"   + library_name);
+    library_pathes.push_back("/usr/lib64/" + library_name);
+  }
+
+  std::vector<std::string>::const_iterator i    = library_pathes.begin();
+  std::vector<std::string>::const_iterator iend = library_pathes.end();
+  for (; i != iend; ++i) { // TODO: C++11 - replace that with a range based for!
+    library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (library_handle_) {
+      break;
+    }
+  }
+
+  if (! library_handle_) {
+    return NULL;
   }
 
   CvmfsExports **exports_ptr =
