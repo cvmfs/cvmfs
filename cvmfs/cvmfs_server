@@ -1749,6 +1749,8 @@ list() {
     fi
     . ${repository}/server.conf
     local name=$(basename $repository)
+
+    # figure out the schema version of the repository
     local version_info=""
     local creator_version=$(repository_creator_version)
     if ! version_equal $creator_version; then
@@ -1761,7 +1763,16 @@ list() {
       version_info=""
     fi
 
-    echo "$name ($CVMFS_REPOSITORY_TYPE) $version_info"
+    # collect additional information about aliased stratum1 repos
+    local stratum1_info=""
+    if is_stratum1 $name; then
+      if [ "$CVMFS_REPOSITORY_NAME" != "$name" ]; then
+        stratum1_info="-> $CVMFS_REPOSITORY_NAME"
+      fi
+    fi
+
+    # print out repository information list
+    echo "$name ($CVMFS_REPOSITORY_TYPE) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
