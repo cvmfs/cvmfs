@@ -1592,7 +1592,7 @@ resign() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   is_root || die "Only root can resign repositories"
-  is_stratum0 $name || die "This is not a stratum 0 repository ($name)"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
   load_repo_config $name
