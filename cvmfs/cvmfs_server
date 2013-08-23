@@ -2197,6 +2197,7 @@ rollback() {
 
 
 snapshot() {
+  local alias_name
   local name
   local user
   local spool_dir
@@ -2209,15 +2210,16 @@ snapshot() {
 
   # get repository name
   check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  alias_name=$(get_or_guess_repository_name $1)
 
   # sanity checks
-  check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum1 $name || die "This is not a stratum 1 repository"
+  check_repository_existence $alias_name || die "The repository $alias_name does not exist"
+  is_stratum1 $alias_name || die "This is not a stratum 1 repository"
 
   # get repository information
-  load_repo_config $name
-  . /etc/cvmfs/repositories.d/$name/replica.conf
+  load_repo_config $alias_name
+  . /etc/cvmfs/repositories.d/$alias_name/replica.conf
+  name=$CVMFS_REPOSITORY_NAME
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
