@@ -98,8 +98,10 @@ EOF
 
 desaster_cleanup() {
   local mountpoint=$1
+  local replica_name=$2
+
   sudo umount $mountpoint > /dev/null 2>&1
-  kill_all_perl_services > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
 }
 
 cvmfs_run_test() {
