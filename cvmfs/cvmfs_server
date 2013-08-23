@@ -157,7 +157,7 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type]
                 <fully qualified repository name>
                 Creates a new repository with a given name
-  add-replica   [-u stratum1 upstream storage] [-o owner]
+  add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -1168,6 +1168,7 @@ mkfs() {
 
 add_replica() {
   local name
+  local alias_name
   local stratum0
   local public_key
   local upstream
@@ -1175,7 +1176,7 @@ add_replica() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:" option
+  while getopts "o:u:n:" option
   do
     case $option in
       u)
@@ -1183,6 +1184,9 @@ add_replica() {
       ;;
       o)
         owner=$OPTARG
+      ;;
+      n)
+        alias_name=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1199,6 +1203,9 @@ add_replica() {
   public_key=$2
 
   name=$(cvmfs_swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
+  if [ x$alias_name = x"" ]; then
+    alias_name=name
+  fi
 
   # sanity checks
   is_master_replica $stratum0 || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
