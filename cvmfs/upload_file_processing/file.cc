@@ -14,10 +14,10 @@ using namespace upload;
 File::File(const std::string  &path,
            IoDispatcher       *io_dispatcher,
            ChunkDetector      *chunk_detector,
-           const bool          allow_chunking,
            const std::string  &hash_suffix) :
   path_(path), size_(GetFileSize(path)),
-  might_become_chunked_(allow_chunking && chunk_detector->MightFindChunks(size_)),
+  might_become_chunked_(chunk_detector != NULL &&
+                        chunk_detector->MightFindChunks(size_)),
   hash_suffix_(hash_suffix),
   bulk_chunk_(NULL),
   io_dispatcher_(io_dispatcher),
@@ -34,8 +34,10 @@ File::~File() {
     bulk_chunk_ = NULL;
   }
 
-  delete chunk_detector_;
-  chunk_detector_ = NULL;
+  if (HasChunkDetector()) {
+    delete chunk_detector_;
+    chunk_detector_ = NULL;
+  }
 
   ChunkVector::const_iterator i    = chunks_.begin();
   ChunkVector::const_iterator iend = chunks_.end();
