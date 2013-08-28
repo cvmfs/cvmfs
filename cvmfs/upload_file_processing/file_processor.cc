@@ -26,6 +26,11 @@ FileProcessor::FileProcessor(AbstractUploader *uploader,
   maximal_chunk_size_(maximal_chunk_size)
 {
   assert (io_dispatcher_ != NULL);
+  assert (!chunking_enabled_ || minimal_chunk_size_ > 0);
+  assert (!chunking_enabled_ || average_chunk_size_ > 0);
+  assert (!chunking_enabled_ || maximal_chunk_size_ > 0);
+  assert (!chunking_enabled_ || minimal_chunk_size_ <= average_chunk_size_);
+  assert (!chunking_enabled_ || average_chunk_size_ <= maximal_chunk_size_);
 }
 
 
@@ -38,13 +43,14 @@ FileProcessor::~FileProcessor() {
 void FileProcessor::Process(const std::string  &local_path,
                             const bool          allow_chunking,
                             const std::string  &hash_suffix) {
-  ChunkDetector *chunk_detector = new Xor32Detector(minimal_chunk_size_,
-                                                    average_chunk_size_,
-                                                    maximal_chunk_size_);
+  ChunkDetector *chunk_detector = (chunking_enabled_ && allow_chunking)
+                                        ? new Xor32Detector(minimal_chunk_size_,
+                                                            average_chunk_size_,
+                                                            maximal_chunk_size_)
+                                        : NULL;
   File *file = new File(local_path,
                         io_dispatcher_,
                         chunk_detector,
-                        chunking_enabled_ && allow_chunking,
                         hash_suffix);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Scheduling '%s' for processing ("
