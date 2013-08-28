@@ -5,6 +5,17 @@
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
 
+# TODO:
+#  -> Support debian multiarch
+#       CMake's GNUInstallDirs supports multiarch beginning from CMake 2.8.8...
+#       Recipe to migrate:
+#         1. uncomment the two lines below this comment
+#         2. uncomment appropriate lines in the debian/control file
+#         3. replace 'usr/lib/<libname>' by 'usr/lib/*/<libname>'
+#            in debian/*.install and debian/*.dirs files
+#
+#DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+#DEB_CONFIGURE_EXTRA_FLAGS += --libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH)
 
 Makefile: 
 	dh_testdir
