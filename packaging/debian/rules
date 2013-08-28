@@ -19,7 +19,7 @@ export DH_VERBOSE=1
 
 Makefile: 
 	dh_testdir
-	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr
+	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr
 
 build: build-stamp
 build-stamp: Makefile
@@ -47,7 +47,7 @@ install: build debian/cvmfs.install debian/cvmfs-keys.install debian/cvmfs-serve
 	
 	# Add here commands to install the package into debian/gentoo.
 	dh_auto_install --destdir=${CURDIR}/debian/tmp
-	dh_install --sourcedir=${CURDIR}/debian/tmp
+	dh_install --fail-missing --sourcedir=${CURDIR}/debian/tmp
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -75,7 +75,7 @@ binary-arch: build install
 #	dh_strip
 	dh_compress
 	dh_fixperms
-#        dh_makeshlibs
+	dh_makeshlibs
 	dh_installdeb
 #        dh_perl
 	dh_shlibdeps
