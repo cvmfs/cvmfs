@@ -79,6 +79,7 @@ endif()
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS    "Build the CernVM-FS unit test set"                   OFF)
+option (INSTALL_UNITTESTS  "Install the unit test binary (mainly for packaging)" OFF)
 option (SQLITE3_BUILTIN    "Don't use system SQLite3"                            ON)
 option (LIBCURL_BUILTIN    "Don't use system libcurl"                            ON)
 option (ZLIB_BUILTIN       "Don't use system zlib"                               ON)
@@ -211,9 +212,6 @@ configure_file (
 )
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 
-include_directories (${INCLUDE_DIRECTORIES})
-
-
 
 #
 # set properties for configurable libraries
@@ -301,6 +299,8 @@ find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/include)
+
+include_directories (${INCLUDE_DIRECTORIES})
 
 #
 # go for the actual compilation
