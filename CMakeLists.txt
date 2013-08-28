@@ -9,6 +9,8 @@ cmake_minimum_required (VERSION 2.6.2)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
+message ("Running CMake version ${CMAKE_VERSION}")
+
 #
 # The version numbers
 #
@@ -40,13 +42,23 @@ endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
 
 #
-# check if we are on Mac OS X
+# detect the operating system and the distribution we are compiling on
 #
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-	set (MACOSX TRUE)
-else ()
-	set (MACOSX FALSE)
-endif ()
+  set (MACOSX TRUE)
+else (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set (MACOSX FALSE)
+endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  set (LINUX TRUE)
+  if (EXISTS /etc/debian_version)
+    set (DEBIAN TRUE)
+  endif (EXISTS /etc/debian_version)
+else (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  set (LINUX FALSE)
+  set (DEBIAN FALSE)
+endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 #
 # check if we use Clang
@@ -67,6 +79,7 @@ endif()
 option (BUILD_SERVER "Build writer's end programs" ON)
 option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS    "Build the CernVM-FS unit test set"                   OFF)
+option (INSTALL_UNITTESTS  "Install the unit test binary (mainly for packaging)" OFF)
 option (SQLITE3_BUILTIN    "Don't use system SQLite3"                            ON)
 option (LIBCURL_BUILTIN    "Don't use system libcurl"                            ON)
 option (ZLIB_BUILTIN       "Don't use system zlib"                               ON)
@@ -137,10 +150,15 @@ if (CMAKE_SIZEOF_VOID_P EQUAL 4)
 	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
 else (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT TRUE)
-  set (CVMFS_INSTALL_LIBDIR "lib64")
+  if (NOT DEBIAN)
+    set (CVMFS_INSTALL_LIBDIR "lib64")
+  else (NOT DEBIAN)
+    set (CVMFS_INSTALL_LIBDIR "lib")
+  endif (NOT DEBIAN)
 endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
 
 if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
+  message (WARNING "Did not find default library path for this system. Guessing '${CVMFS_INSTALL_LIBDIR}' ...")
   set (CMAKE_INSTALL_LIBDIR ${CVMFS_INSTALL_LIBDIR})
 endif (NOT DEFINED CMAKE_INSTALL_LIBDIR)
 
@@ -193,9 +211,6 @@ configure_file (
 	"${CMAKE_BINARY_DIR}/cvmfs_config.h"
 )
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
-
-include_directories (${INCLUDE_DIRECTORIES})
-
 
 
 #
@@ -284,6 +299,8 @@ find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/include)
+
+include_directories (${INCLUDE_DIRECTORIES})
 
 #
 # go for the actual compilation
