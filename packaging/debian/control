@@ -6,9 +6,22 @@ Build-Depends: debhelper (>= 7), autotools-dev, cmake, libssl-dev, make, gcc, g+
 Standards-Version: 3.9.3.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
+Package: cvmfs-keys
+Architecture: all
+Description: CernVM File System Public Keys
+ HTTP File System for Distributing Software to CernVM.
+ See http://cernvm.cern.ch
+
 Package: cvmfs
 Architecture: i386 amd64
 Depends: bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb
 Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
+ See http://cernvm.cern.ch
+
+Package: cvmfs-server
+Architecture: amd64
+Depends: cvmfs (= ${source:Version}), insserv, initscripts, bash, coreutils, grep, sed, sudo, psmisc, curl, attr, openssl, apache2, cvmfs-keys (>= 1.2)
+Description: CernVM File System Server
+ HTTP File System Repository Server for Distributing Software to CernVM.
  See http://cernvm.cern.ch
