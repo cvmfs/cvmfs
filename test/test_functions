@@ -463,6 +463,41 @@ compare_directories() {
 }
 
 
+# run a binary in the background and return it's PID through stdout
+#
+# @param logfile  a path to a logfile for outputs of the started program
+# @return         the process ID of the created background service
+run_background_service() {
+  local logfile=$1
+  shift 1
+
+  local srv_pid
+
+  # shell for the win!
+  # This spawns a shell executing the passed command string (sudo sh -c) which
+  # will print it's PID (echo $$) into a fifo and execute the user defined
+  # binary redirecting its outputs into the logfile (exec $@ >> $logfile 2>&1).
+  # Furthermore it disconnects the new process from the executing shell (nohup),
+  # satisfies the I/O requirements of nohup (2>&1 < /dev/null) and sends it to
+  # the background (&)
+  #   Credit: Dario Berzano helped with that monster!
+  local fifo="pid_fifo"
+  mkfifo $fifo || return 1
+  nohup sh -c "echo \$\$ > $fifo; exec $@ >> $logfile 2>&1" 2>&1 < /dev/null &
+  srv_pid=$(cat $fifo)
+  rm -f $fifo
+
+  # check if the background proces is running
+  if ! sudo kill -0 $srv_pid > /dev/null 2>&1; then
+    return 4
+  fi
+
+  # print the PID of the background process and return successfully
+  echo $srv_pid
+  return 0
+}
+
+
 # open a port for incoming connections. It will accept the connection but stay
 # silent on it
 #
@@ -477,21 +512,20 @@ open_silent_port() {
   local protocol=$1
   local port=$2
   local logfile=$3
+  local pid
+  local cmd
+  local retcode
 
-  local server_pid_tmp=""
-  server_pid_tmp=$(mktemp -q)
+  cmd="sudo python ${TEST_ROOT}/mock_services/silent_socket.py $protocol $port"
+  pid=$(run_background_service $logfile "$cmd")
+  retcode=$?
 
-  nohup sudo ${TEST_ROOT}/mock_services/silent_socket.py $protocol $port >> $server_pid_tmp 2>>$logfile &
-  sleep 1
-  server_pid=$(head -n1 $server_pid_tmp)
-  rm -f $server_pid_tmp
-
-  if ! sudo kill -0 $server_pid > /dev/null 2>&1; then
-    return 4
+  if [ $retcode -ne 0 ]; then
+    return $retcode
   fi
 
-  echo $server_pid
-  return 0
+  echo $pid
+  return $retcode
 }
 
 
