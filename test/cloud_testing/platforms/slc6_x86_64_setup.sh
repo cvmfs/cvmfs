@@ -50,30 +50,6 @@ echo "done"
 echo "installing additional RPM packages..."
 install_from_repo gcc
 install_from_repo gcc-c++
-install_from_repo libuuid-devel
-
-echo "installing perl dependencies for certain test cases... "
-mkdir perl
-cd perl
-
-zeromq_src="http://download.zeromq.org/zeromq-2.2.0.tar.gz"
-wget $zeromq_src > /dev/null 2>&1                         || die "fail (download zeromq)"
-tar -xzf $(basename $zeromq_src)                          || die "fail (extract zeromq)"
-cd $(basename $zeromq_src .tar.gz)
-./configure --prefix=/usr --libdir=/usr/lib64 > /dev/null || die "fail (configure zeromq)"
-make > /dev/null                                          || die "fail (compile zeromq)"
-sudo make install > /dev/null                             || die "fail (install zeromq)"
-cd ..
-
-sudo curl -o /usr/bin/cpanm -L http://cpanmin.us > /dev/null || die "fail (download cpan)"
-sudo chmod 555 /usr/bin/cpanm                                || die "fail (chmod cpan)"
-
-sudo cpanm --notest ZeroMQ          > /dev/null   || die "fail (install ZeroMQ-perl)"
-sudo cpanm --notest IO::Interface   > /dev/null   || die "fail (install IO::Interface)"
-sudo cpanm --notest Socket          > /dev/null   || die "fail (install Socket)"
-sudo cpanm --notest URI             > /dev/null   || die "fail (install URI)"
-cd ..
-echo "done"
 
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh
