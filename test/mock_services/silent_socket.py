@@ -56,8 +56,6 @@ try:
 	else:
 		usage()
 
-	print os.getpid()
-	sys.stdout.flush()
 	print_msg("starting a " + server_protocol + " server on port " + str(server_port))
 	server.serve_forever()
 except socket.error, msg:
