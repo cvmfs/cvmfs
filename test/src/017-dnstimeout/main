@@ -40,7 +40,7 @@ cvmfs_run_test() {
   fi
 
   echo "killing the mocked DNS server" >> $logfile
-  sudo kill -9 $server_pid >> $logfile 2>&1 || retcode=6
+  sudo kill $server_pid >> $logfile 2>&1 || retcode=6
 
   return $retcode
 }

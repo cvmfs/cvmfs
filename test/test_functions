@@ -28,36 +28,6 @@ die() {
   exit 1
 }
 
-# iptables handling
-IPTABLES_STARTUP="/etc/init.d/iptables"
-IPTABLES="/sbin/iptables"
-IPTABLES_SAVE="/sbin/iptables-save"
-IPTABLES_RESTORE="/sbin/iptables-restore"
-
-if [ ! -f $IPTABLES ] ; then
-  if [ -f "/usr/sbin/iptables" ] ; then
-    IPTABLES="/usr/sbin/iptables"
-  else
-    die "iptables binary not found"
-  fi
-fi
-
-if [ ! -f $IPTABLES_SAVE ] ; then
-  if [ -f "/usr/sbin/iptables-save" ] ; then
-    IPTABLES_SAVE="/usr/sbin/iptables-save"
-  else
-    die "iptables-save binary not found"
-  fi
-fi
-
-if [ ! -f $IPTABLES_RESTORE ] ; then
-  if [ -f "/usr/sbin/iptables-restore" ] ; then
-    IPTABLES_RESTORE="/usr/sbin/iptables-restore"
-  else
-    die "iptables-restore binary not found"
-  fi
-fi
-
 
 # find the service binary
 if [ -x /sbin/service ]; then
@@ -493,6 +463,41 @@ compare_directories() {
 }
 
 
+# run a binary in the background and return it's PID through stdout
+#
+# @param logfile  a path to a logfile for outputs of the started program
+# @return         the process ID of the created background service
+run_background_service() {
+  local logfile=$1
+  shift 1
+
+  local srv_pid
+
+  # shell for the win!
+  # This spawns a shell executing the passed command string (sudo sh -c) which
+  # will print it's PID (echo $$) into a fifo and execute the user defined
+  # binary redirecting its outputs into the logfile (exec $@ >> $logfile 2>&1).
+  # Furthermore it disconnects the new process from the executing shell (nohup),
+  # satisfies the I/O requirements of nohup (2>&1 < /dev/null) and sends it to
+  # the background (&)
+  #   Credit: Dario Berzano helped with that monster!
+  local fifo="pid_fifo"
+  mkfifo $fifo || return 1
+  nohup sh -c "echo \$\$ > $fifo; exec $@ >> $logfile 2>&1" 2>&1 < /dev/null &
+  srv_pid=$(cat $fifo)
+  rm -f $fifo
+
+  # check if the background proces is running
+  if ! sudo kill -0 $srv_pid > /dev/null 2>&1; then
+    return 4
+  fi
+
+  # print the PID of the background process and return successfully
+  echo $srv_pid
+  return 0
+}
+
+
 # open a port for incoming connections. It will accept the connection but stay
 # silent on it
 #
@@ -507,88 +512,20 @@ open_silent_port() {
   local protocol=$1
   local port=$2
   local logfile=$3
+  local pid
+  local cmd
+  local retcode
 
-  local server_pid_tmp=""
-  server_pid_tmp=$(mktemp -q)
+  cmd="sudo python ${TEST_ROOT}/mock_services/silent_socket.py $protocol $port"
+  pid=$(run_background_service $logfile "$cmd")
+  retcode=$?
 
-  nohup sudo ${TEST_ROOT}/mock_services/silent_socket.py $protocol $port >> $server_pid_tmp 2>>$logfile &
-  sleep 1
-  server_pid=$(head -n1 $server_pid_tmp)
-  rm -f $server_pid_tmp
-
-  if ! sudo kill -0 $server_pid > /dev/null 2>&1; then
-    return 4
+  if [ $retcode -ne 0 ]; then
+    return $retcode
   fi
-
-  echo $server_pid
-  return 0
-}
-
-
-# starts a perl helper service
-#
-# @param service_name   the identifier of the service to be started:
-#                       i.e.  named, httpd, webproxy
-# @param __             all addtional parameters will be passed to the starting
-#                       perl service
-# @return               the process ID of the started service
-start_perl_service() {
-  service_name=$1
-  shift
-
-  # check if the service exists
-  if [ ! -f $TEST_ROOT/mock_services/Services/$service_name/main.pl ]; then
-    echo "No such perl service '$service_name'"
-    return 1
-  fi
-
-  # start the service
-  pushdir $TEST_ROOT/mock_services > /dev/null
-  output=$(sudo perl Services/$service_name/main.pl $@)
-  popdir > /dev/null
-  pid=$(echo "$output" | grep SAVE_PID | cut -d : -f 2)
-
-  # log its process ID
-  mkdir -p service_pids
-  touch service_pids/$pid
 
   echo $pid
-  return 0
-}
-
-
-# kills a single perl process
-#
-# @param pid   the process ID of the perl service to be killed
-kill_perl_service() {
-  pid=$1
-
-  # check if the process ID was logged before
-  if [ ! -f service_pids/$pid ]; then
-    echo "No such perl service with process ID: $pid"
-    return 1
-  fi
-
-  # kill the service
-  sudo kill $pid
-  rm -f service_pids/$pid
-
-  return 0
-}
-
-
-# kills all perl services that might still run in the background
-kill_all_perl_services() {
-  # check if there are any services to kill
-  if [ ! -d service_pids ]; then
-    return 0
-  fi
-
-  # kill them all!!
-  services=$(ls service_pids)
-  for service in $services; do
-    kill_perl_service $service
-  done
+  return $retcode
 }
 
 
