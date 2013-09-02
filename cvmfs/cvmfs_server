@@ -2045,7 +2045,7 @@ abort() {
 
 
 publish() {
-  local name
+  local names
   local user
   local spool_dir
   local stratum0
@@ -2058,6 +2058,7 @@ publish() {
   local tag_hash=
   local add_tag=
   local remove_tag=
+  local retcode=0
 
   # optional parameter handling
   OPTIND=1
@@ -2102,27 +2103,13 @@ publish() {
     esac
   done
 
-  # get repository name
+  # get repository names
   shift $(($OPTIND-1))
-  check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  check_parameter_count_for_multiple_repositories $#
+  names=$(get_or_guess_multiple_repository_names $@)
+  check_multiple_repository_existence "$names"
 
   # sanity checks
-  check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum0 $name || die "This is not a stratum 0 repository"
-
-  # get repository information
-  load_repo_config $name
-  user=$CVMFS_USER
-  spool_dir=$CVMFS_SPOOL_DIR
-  stratum0=$CVMFS_STRATUM0
-  upstream=$CVMFS_UPSTREAM_STORAGE
-
-  # more sanity checks
-  check_repository_compatibility
-  check_expiry $stratum0                  || die "Repository whitelist is expired!"
-  [ -f ${spool_dir}/in_transaction ]      || die "Not in a transaction"
-  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
   if [ "x$add_tag" != "x" ]; then
     [ "x$tag_name" != "x" ]               || die "Tag name missing"
     echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
@@ -2133,90 +2120,119 @@ publish() {
     add_tag="-a \"${tag_name}@${tag_channel}@${tag_description}\""
   fi
 
-  # do it!
-  local swissknife="cvmfs_swissknife"
+  for name in $names; do
 
-  # enable the debug mode?
-  if [ $debug -ne 0 ]
-  then
-    if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
-      case $debug in
-        1)
-          # in case something breaks we are provided with a GDB prompt.
-          swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
-        ;;
-        2)
-          # attach gdb and provide a prompt WITHOUT actual running the program
-          swissknife="gdb --quiet --args cvmfs_swissknife_debug"
-        ;;
-      esac
-    else
-      echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+    # sanity checks
+    is_stratum0 $name || die "This is not a stratum 0 repository"
+
+    # get repository information
+    load_repo_config $name
+    user=$CVMFS_USER
+    spool_dir=$CVMFS_SPOOL_DIR
+    stratum0=$CVMFS_STRATUM0
+    upstream=$CVMFS_UPSTREAM_STORAGE
+
+    # more sanity checks
+    check_repository_compatibility
+    check_expiry $stratum0                  || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
+    [ -f ${spool_dir}/in_transaction ]      || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
+    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1; continue; }
+    if [ "x$add_tag" != "x" ] && \
+       lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+       [ x"$tag_hash" = "x" ]; then
+      echo "Tag name '$tag_name' is already in use for repository $name. Maybe you wanted to specify -h to move it?"
+      retcode=1
+      continue
     fi
-  fi
 
-  local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    # do it!
+    local swissknife="cvmfs_swissknife"
 
-  publish_before_hook $name
-  sudo /bin/mount -o remount,ro /cvmfs/$name
-  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
-  local log_level=
-  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+    # enable the debug mode?
+    if [ $debug -ne 0 ]
+    then
+      if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
+        case $debug in
+          1)
+            # in case something breaks we are provided with a GDB prompt.
+            swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+          ;;
+          2)
+            # attach gdb and provide a prompt WITHOUT actual running the program
+            swissknife="gdb --quiet --args cvmfs_swissknife_debug"
+          ;;
+        esac
+      else
+        echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+      fi
+    fi
 
-  local sync_command="$swissknife sync -x -u /cvmfs/$name \
-    -s ${spool_dir}/scratch \
-    -c ${spool_dir}/rdonly \
-    -t ${spool_dir}/tmp \
-    -b $base_hash \
-    -r ${upstream} \
-    -w $stratum0 \
-    -o ${spool_dir}/tmp/manifest \
-    $log_level $tweaks_option"
-  if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
-    sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
-  fi
-  if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
-    sync_command="$sync_command -p \
-     -l $CVMFS_MIN_CHUNK_SIZE \
-     -a $CVMFS_AVG_CHUNK_SIZE \
-     -h $CVMFS_MAX_CHUNK_SIZE"
-  fi
-  if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
-    sync_command="$sync_command -i"
-  fi
-  local tag_command="$swissknife tag -r $stratum0 \
-    -b $base_hash \
-    -n $name \
-    -o ${spool_dir}/tmp/history \
-    -k /etc/cvmfs/keys/${name}.pub \
-    $add_tag $remove_tag"
-  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
-    -k /etc/cvmfs/keys/${name}.key \
-    -n $name \
-    -m ${spool_dir}/tmp/manifest \
-    -h ${spool_dir}/tmp/history \
-    -t ${spool_dir}/tmp \
-    -r ${upstream}"
+    local user_shell="sh -c"
+    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
-  $user_shell "$sync_command" || (sudo /bin/mount -o remount,rw /cvmfs/$name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
-  local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-  local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-  tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"
-  echo "Tagging $name"
-  $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
-  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
-  echo "Remounting newly created repository revision"
-  sudo umount /cvmfs/$name
-  sudo umount ${spool_dir}/rdonly
-  set_ro_root_hash $name $trunk_hash
-  sudo rm -rf ${spool_dir}/scratch
-  rm -rf ${spool_dir}/tmp/*
-  $user_shell "mkdir ${spool_dir}/scratch"
-  sudo mount ${spool_dir}/rdonly > /dev/null
-  sudo mount /cvmfs/$name
-  rm -f ${spool_dir}/in_transaction
-  publish_after_hook $name
+    publish_before_hook $name
+    sudo /bin/mount -o remount,ro /cvmfs/$name
+    local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+    local log_level=
+    [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
+
+    local sync_command="$swissknife sync -x -u /cvmfs/$name \
+      -s ${spool_dir}/scratch \
+      -c ${spool_dir}/rdonly \
+      -t ${spool_dir}/tmp \
+      -b $base_hash \
+      -r ${upstream} \
+      -w $stratum0 \
+      -o ${spool_dir}/tmp/manifest \
+      $log_level $tweaks_option"
+    if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
+      sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
+    fi
+    if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
+      sync_command="$sync_command -p \
+       -l $CVMFS_MIN_CHUNK_SIZE \
+       -a $CVMFS_AVG_CHUNK_SIZE \
+       -h $CVMFS_MAX_CHUNK_SIZE"
+    fi
+    if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
+      sync_command="$sync_command -i"
+    fi
+    local tag_command="$swissknife tag -r $stratum0 \
+      -b $base_hash \
+      -n $name \
+      -o ${spool_dir}/tmp/history \
+      -k /etc/cvmfs/keys/${name}.pub \
+      $add_tag $remove_tag"
+    local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
+      -k /etc/cvmfs/keys/${name}.key \
+      -n $name \
+      -m ${spool_dir}/tmp/manifest \
+      -h ${spool_dir}/tmp/history \
+      -t ${spool_dir}/tmp \
+      -r ${upstream}"
+
+    $user_shell "$sync_command" || (sudo /bin/mount -o remount,rw /cvmfs/$name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
+    local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
+    local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
+    tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"
+    echo "Tagging $name"
+    $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
+    $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+    echo "Remounting newly created repository revision"
+    sudo umount /cvmfs/$name
+    sudo umount ${spool_dir}/rdonly
+    set_ro_root_hash $name $trunk_hash
+    sudo rm -rf ${spool_dir}/scratch
+    rm -rf ${spool_dir}/tmp/*
+    $user_shell "mkdir ${spool_dir}/scratch"
+    sudo mount ${spool_dir}/rdonly > /dev/null
+    sudo mount /cvmfs/$name
+    rm -f ${spool_dir}/in_transaction
+    publish_after_hook $name
+
+  done
+
+  return $retcode
 }
 
 
