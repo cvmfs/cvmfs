@@ -1865,8 +1865,14 @@ list() {
       fi
     fi
 
+    # find out if the repository is currently in a transaction
+    local transaction_info=""
+    if is_stratum0 && [ -f ${CVMFS_SPOOL_DIR}/in_transaction ]; then
+      transaction_info=" - in transaction"
+    fi
+
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE$transaction_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
