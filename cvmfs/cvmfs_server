@@ -1971,10 +1971,11 @@ transaction() {
 
 
 abort() {
-  local name
+  local names
   local user
   local spool_dir
   local force=0
+  local retcode=0
 
   # optional parameter handling
   OPTIND=1
@@ -1991,46 +1992,52 @@ abort() {
     esac
   done
 
-  # get repository name
+  # get repository names
   shift $(($OPTIND-1))
-  check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  check_parameter_count_for_multiple_repositories $#
+  names=$(get_or_guess_multiple_repository_names $@)
+  check_multiple_repository_existence "$names"
 
-  # sanity checks
-  check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum0 $name || die "This is not a stratum 0 repository"
+  for name in $names; do
 
-  # get repository information
-  load_repo_config $name
-  user=$CVMFS_USER
-  spool_dir=$CVMFS_SPOOL_DIR
+    # sanity checks
+    is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
 
-  # more sanity checks
-  check_repository_compatibility
-  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+    # get repository information
+    load_repo_config $name
+    user=$CVMFS_USER
+    spool_dir=$CVMFS_SPOOL_DIR
 
-  # better ask the user once again!
-  if [ $force -ne 1 ]; then
-    local reply
-    read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION for $name!  Are you sure (y/N)? " reply
-    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
-      return 1
+    # more sanity checks
+    check_repository_compatibility
+    [ -f ${spool_dir}/in_transaction ] || { echo "Repository $name is not in a transaction"; continue; }
+    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1 continue; }
+
+    # better ask the user once again!
+    if [ $force -ne 1 ]; then
+      local reply
+      read -p "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION for $name!  Are you sure (y/N)? " reply
+      if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+        continue
+      fi
     fi
-  fi
 
-  # do it!
-  local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    # do it!
+    local user_shell="sh -c"
+    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
-  abort_before_hook $name
-  sudo umount /cvmfs/$name
-  rm -rf ${spool_dir}/tmp/*
-  sudo rm -rf ${spool_dir}/scratch
-  $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
-  sudo mount /cvmfs/$name
-  rm -f ${spool_dir}/in_transaction
-  abort_after_hook $name
+    abort_before_hook $name
+    sudo umount /cvmfs/$name
+    rm -rf ${spool_dir}/tmp/*
+    sudo rm -rf ${spool_dir}/scratch
+    $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
+    sudo mount /cvmfs/$name
+    rm -f ${spool_dir}/in_transaction
+    abort_after_hook $name
+
+  done
+
+  return $retcode
 }
 
 
