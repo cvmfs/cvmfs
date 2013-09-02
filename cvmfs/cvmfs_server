@@ -2538,39 +2538,45 @@ migrate_2_1_7() {
 
 
 migrate() {
-  local name
+  local names
+  local retcode=0
 
-  # get repository name
-  check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  # get repository names
+  check_parameter_count_for_multiple_repositories $#
+  names=$(get_or_guess_multiple_repository_names $@)
+  check_multiple_repository_existence "$names"
 
   # sanity checks
-  check_repository_existence $name || die "The repository $name does not exist"
   is_root || die "Only root can migrate repositories"
 
-  # get repository information
-  load_repo_config $name
+  for name in $names; do
 
-  # more sanity checks
-  if check_repository_compatibility "nokill"; then
-    echo "Repository '$name' is already up-to-date."
-    exit 0
-  fi
+    check_repository_existence $name || { echo "The repository $name does not exist"; retcode=1; continue; }
 
-  # do the migrations...
-  if [ $(repository_creator_version) = "2.1.6" ]; then
-    migrate_2_1_6 $name
-    repository_creator_version="2.1.7"
-  fi
+    # get repository information
+    load_repo_config $name
 
-  if [ $(repository_creator_version) = "2.1.7" -o \
-       $(repository_creator_version) = "2.1.8" -o \
-       $(repository_creator_version) = "2.1.9" -o \
-       $(repository_creator_version) = "2.1.10" -o \
-       $(repository_creator_version) = "2.1.11" ];
-  then
-    migrate_2_1_7 $name
-  fi
+    # more sanity checks
+    check_repository_compatibility "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
+
+    # do the migrations...
+    if [ $(repository_creator_version) = "2.1.6" ]; then
+      migrate_2_1_6 $name
+      repository_creator_version="2.1.7"
+    fi
+
+    if [ $(repository_creator_version) = "2.1.7" -o \
+         $(repository_creator_version) = "2.1.8" -o \
+         $(repository_creator_version) = "2.1.9" -o \
+         $(repository_creator_version) = "2.1.10" -o \
+         $(repository_creator_version) = "2.1.11" ];
+    then
+      migrate_2_1_7 $name
+    fi
+
+  done
+
+  return $retcode
 }
 
 
