@@ -295,14 +295,38 @@ check_repository_existence() {
   local given_name="$1"
   local fqrn
 
-  # empty name is not allowed (and thus does not exist)
-  if [ x"$given_name" = x ]; then
+  # empty name or wildcards are not allowed (and thus does not exist)
+  if [ x"$given_name" = x ] || echo "$given_name" | grep -q "*"; then
     return 1
   fi
 
   # Check if exists
   fqrn=$(cvmfs_mkfqrn $given_name)
   [ -d /etc/cvmfs/repositories.d/$fqrn ]
+}
+
+
+# checks the existence of a list of repositories
+# Note: the function echo's an error message and stops the execution of the
+#       script by default.
+#
+# @param given_names   the list of repository names to be checked
+# @param no_kill       (optional) skip the termination on error
+# @return              0 if all listed repositories exist
+check_multiple_repository_existence() {
+  local given_names="$1"
+  local no_kill=$2
+
+  for name in $given_names; do
+    if ! check_repository_existence $name; then
+      if [ x"$no_kill" = x"" ]; then
+        die "The repository $name does not exist."
+      else
+        return 1
+      fi
+    fi
+  done
+  return 0
 }
 
 
@@ -407,6 +431,26 @@ has_selinux() {
   [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
 }
 
+
+# checks if a given list of strings contains a specific item
+#
+# @param haystack   the list to be searched
+# @param needle     the string item to be found in the haystack
+# @return           0 if the item was found
+contains() {
+  local haystack="$1"
+  local needle=$2
+
+  for elem in $haystack; do
+    if [ x"$elem" = x"$needle" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+
 # for some reason `mount -o remount,(ro|rw) /cvmfs/$name` does not work on older
 # platforms if we set the SELinux context=... parameter in /etc/fstab
 # this dry-runs the whole mount, remount, unmount cycle to find out if it works
@@ -481,8 +525,11 @@ get_repository_name() {
 #       error before actually doing something wrong
 #
 # @param provided_parameter_count  number of parameters provided by the user
+# @param allow_multiple_names      switches off the usage print for too many
+#                                  detected script parameters (see next fn)
 check_parameter_count_with_guessing() {
   local provided_parameter_count=$1
+  local allow_multiple_names=$2
 
   if [ $provided_parameter_count -lt 1 ]; then
     # check if we have not _exactly_ one repository present
@@ -491,9 +538,25 @@ check_parameter_count_with_guessing() {
     fi
   fi
 
-  if [ $provided_parameter_count -gt 1 ]; then
+  if [ $provided_parameter_count -gt 1 ] && \
+     [ x"$allow_multiple_names" = x"" ]; then
     usage "Too many arguments provided"
   fi
+
+  return 0
+}
+
+
+# checks the parameter count when we accept more than one repository for the
+# command.
+# Note: this method prints an error message if appropriate and exists the script
+#       execution
+#
+# @param provided_parameter_count  number of parameters provided by the user
+check_parameter_count_for_multiple_repositories() {
+  local provided_parameter_count=$1
+  check_parameter_count_with_guessing $provided_parameter_count allow_multiple
+  return $?
 }
 
 
@@ -511,6 +574,37 @@ get_or_guess_repository_name() {
   else
     echo $(get_repository_name $repository_name)
   fi
+}
+
+
+# guesses a list of repository names based on file system wildcards
+#
+# @param ...    all repository hints provided by the user of the script
+#               Like: test.local repo.* *.cern.ch
+get_or_guess_multiple_repository_names() {
+  local repo_dir="/etc/cvmfs/repositories.d"
+  local repo_names=""
+
+  if [ $# -eq 0 ]; then
+    repo_names=$(get_or_guess_repository_name)
+    echo $repo_names
+    return 0;
+  fi
+
+  for input_pattern in $@; do
+    local names="$(ls --directory $repo_dir/$input_pattern 2>/dev/null)"
+    if [ x"$names" = x"" ]; then
+      repo_names="$repo_names $input_pattern"
+    else
+      for name in $names; do
+        if ! contains "$repo_names" $(basename $name); then
+          repo_names="$repo_names $(basename $name)"
+        fi
+      done
+    fi
+  done
+
+  echo "$repo_names"
 }
 
 
