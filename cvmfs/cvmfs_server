@@ -1684,27 +1684,36 @@ rmfs() {
 
 
 resign() {
-  local name
+  local names
+  local retcode=0
 
-  # get repository name
-  check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  # get repository names
+  check_parameter_count_for_multiple_repositories $#
+  names=$(get_or_guess_multiple_repository_names $@)
+  check_multiple_repository_existence "$names"
 
   # sanity checks
-  check_repository_existence $name || die "The repository $name does not exist"
   is_root || die "Only root can resign repositories"
-  is_stratum0 $name || die "This is not a stratum 0 repository"
 
-  # get repository information
-  load_repo_config $name
+  for name in $names; do
 
-  # check if repository is compatible to the installed CernVM-FS version
-  check_repository_compatibility
+    # sanity checks
+    is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
 
-  # do it!
-  create_whitelist $name $CVMFS_USER \
-      ${CVMFS_UPSTREAM_STORAGE} \
-      ${CVMFS_SPOOL_DIR}/tmp
+    # get repository information
+    load_repo_config $name
+
+    # check if repository is compatible to the installed CernVM-FS version
+    check_repository_compatibility
+
+    # do it!
+    create_whitelist $name $CVMFS_USER \
+        ${CVMFS_UPSTREAM_STORAGE} \
+        ${CVMFS_SPOOL_DIR}/tmp
+
+  done
+
+  return $retcode
 }
 
 
