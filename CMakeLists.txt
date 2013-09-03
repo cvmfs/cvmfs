@@ -177,6 +177,16 @@ set (REQUIRED_HEADERS sys/xattr.h zlib.h netinet/in.h arpa/inet.h sys/socket.h
                       signal.h errno.h dirent.h unistd.h fcntl.h netdb.h
                       syslog.h sys/resource.h execinfo.h poll.h)
 if (NOT MACOSX)
+  # Unfortunately, attr/xattr.h fails to compile without including sys/types.h
+  # before including attr/xattr.h (it uses size_t and ssize_t).
+  # CMake searches for include files by compiling a minimal *.c file like:
+  #    #include <${SEARCHED_HEADER_FILE}>
+  #    int main(int argc, char **argv) { return 0; }
+  #
+  # We pre-define the include guard of attr/xattr.h and thus still check, if the
+  # file is found by the compiler but mitigating the compiler errors caused by
+  # a standalone inclusion of attr/xattr.h
+  set (CMAKE_REQUIRED_DEFINITIONS "-D__XATTR_H__")
   set (REQUIRED_HEADERS ${REQUIRED_HEADERS}
                         sys/statfs.h
                         attr/xattr.h)
