@@ -155,35 +155,34 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 # check existence of include files
 #
 include (CheckIncludeFile)
-check_include_file (sys/xattr.h HAVE_XATTR_H)
-check_include_file (zlib.h HAVE_ZLIB_H)
-check_include_file (netinet/in.h HAVE_NETINET_IN_H)
-check_include_file (arpa/inet.h HAVE_ARPA_INET_H)
-check_include_file (sys/socket.h HAVE_SYS_SOCKET_H)
-check_include_file (sys/un.h HAVE_SYS_UN_H)
-check_include_file (sys/time.h HAVE_SYS_TIME_H)
-check_include_file (sys/uio.h HAVE_SYS_UIO_H)
-check_include_file (sys/stat.h HAVE_SYS_STAT_H)
-check_include_file (sys/types.h HAVE_SYS_TYPES_H)
-check_include_file (sys/wait.h HAVE_SYS_WAIT_H)
-check_include_file (sys/select.h HAVE_SYS_SELECT_H)
-check_include_file (pthread.h HAVE_PTHREAD_H)
-check_include_file (termios.h HAVE_TERMIOS_H)
-check_include_file (utime.h HAVE_UTIME_H)
-check_include_file (signal.h HAVE_SIGNAL_H)
-check_include_file (errno.h HAVE_ERRNO_H)
-check_include_file (dirent.h HAVE_DIRENT_H)
-check_include_file (unistd.h HAVE_UNISTD_H)
-check_include_file (fcntl.h HAVE_FCNTL_H)
-check_include_file (netdb.h HAVE_NETDB_H)
-check_include_file (syslog.h HAVE_SYSLOG_H)
-check_include_file (sys/resource.h HAVE_SYS_RESOURCE_H)
-check_include_file (execinfo.h HAVE_EXECINFO_H)
-check_include_file (poll.h HAVE_POLL_H)
+
+macro (pedantic_include_check HEADERFILE VARIABLENAME)
+  check_include_file (${HEADERFILE} ${VARIABLENAME})
+  if (NOT ${VARIABLENAME})
+    message (FATAL_ERROR "${HEADERFILE} is missing on your system")
+  endif (NOT ${VARIABLENAME})
+endmacro (pedantic_include_check)
+
+macro (look_for_include_files)
+  foreach (HEADER IN ITEMS ${ARGV})
+    string (REGEX REPLACE "/|\\." "_" HEADER_VAR_LOWER ${HEADER})
+    string (TOUPPER "have_${HEADER_VAR_LOWER}" HEADER_VAR)
+    pedantic_include_check (${HEADER} ${HEADER_VAR})
+  endforeach (HEADER IN ITEMS ${ARGV})
+endmacro (look_for_include_files)
+
+set (REQUIRED_HEADERS sys/xattr.h zlib.h netinet/in.h arpa/inet.h sys/socket.h
+                      sys/un.h sys/time.h sys/uio.h sys/stat.h sys/types.h
+                      sys/wait.h sys/select.h pthread.h termios.h utime.h
+                      signal.h errno.h dirent.h unistd.h fcntl.h netdb.h
+                      syslog.h sys/resource.h execinfo.h poll.h)
 if (NOT MACOSX)
-	check_include_file (sys/statfs.h HAVE_SYS_STATFS_H)
-  check_include_file (attr/xattr.h HAVE_ATTR_XATTR_H)
-endif ()
+  set (REQUIRED_HEADERS ${REQUIRED_HEADERS}
+                        sys/statfs.h
+                        attr/xattr.h)
+endif (NOT MACOSX)
+
+look_for_include_files (${REQUIRED_HEADERS})
 
 #
 # configure the config.h.in file
