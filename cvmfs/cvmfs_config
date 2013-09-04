@@ -14,7 +14,7 @@ case $sys_arch in
   Linux )
     if [ -x /sbin/service ]; then
       service="/sbin/service"
-    elif [ -x /sbin/service ]; then
+    elif [ -x /usr/sbin/service ]; then
       # Ubuntu
       service="/usr/sbin/service"
     elif [ -x /sbin/rc-service ] ; then
