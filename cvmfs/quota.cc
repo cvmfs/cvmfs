@@ -806,7 +806,10 @@ bool RebuildDatabase() {
     if (d->d_type != DT_REG) continue;
 
     const string name = d->d_name;
-    if (name.substr(0, 14) == "cvmfs.checksum") {
+    if (name.substr(0, quota::checksum_file_prefix.size()) ==
+        quota::checksum_file_prefix) {
+      LogCvmfs(kLogQuota, kLogDebug, "found catalog checksum file %s in cache "
+                                     "directory", name.c_str());
       FILE *f = fopen(((*cache_dir_) + "/" + name).c_str(), "r");
       if (f != NULL) {
         char sha1[40];
