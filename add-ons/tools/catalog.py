@@ -272,14 +272,3 @@ def OpenRepository(repo_path):
 		return RemoteRepository(repo_path)
 	else:
 		return LocalRepository(repo_path)
-
-#repo         = LocalRepository("/srv/cvmfs/test.local")
-repo         = RemoteRepository("http://cvmfs-stratum-one.cern.ch/opt/geant4")
-root_catalog = repo.RetrieveRootCatalog()
-print root_catalog
-
-nested_catalog = root_catalog.FindNestedForPath("/share/data/G4ABLA3.0")
-nested_catalog = repo.RetrieveCatalog(nested_catalog.hash)
-print nested_catalog
-
-nested_catalog.OpenInteractive()
