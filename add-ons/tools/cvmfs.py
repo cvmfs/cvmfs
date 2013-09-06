@@ -118,10 +118,9 @@ class Catalog:
 
 
 	def ListNested(self):
-		cursor = self._GetCursor()
-		cursor.execute("SELECT path, sha1 FROM nested_catalogs;")
+		catalogs = self.RunSql("SELECT path, sha1 FROM nested_catalogs;")
 		nested_catalogs = []
-		for catalog in cursor.fetchall():
+		for catalog in catalogs:
 			nested_catalogs.append(CatalogReference(catalog[0], catalog[1]))
 		return nested_catalogs
 
@@ -136,6 +135,12 @@ class Catalog:
 					best_match_score = len(nested_catalog.root_path)
 					best_match       = nested_catalog
 		return best_match
+
+
+	def RunSql(self, sql):
+		cursor = self._GetCursor()
+		cursor.execute(sql)
+		return cursor.fetchall()
 
 
 	def _GetCursor(self):
@@ -153,9 +158,8 @@ class Catalog:
 
 
 	def _ReadProperties(self):
-		cursor = self._GetCursor()
-		cursor.execute("SELECT key, value FROM properties;")
-		for prop in cursor.fetchall():
+		props = self.RunSql("SELECT key, value FROM properties;")
+		for prop in props:
 			self._ReadProperty(prop)
 
 
