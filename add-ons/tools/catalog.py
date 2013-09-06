@@ -127,11 +127,15 @@ class Catalog:
 
 
 	def FindNestedForPath(self, needle_path):
-		nested_catalogs = self.ListNested()
+		nested_catalogs  = self.ListNested()
+		best_match       = None
+		best_match_score = 0
 		for nested_catalog in nested_catalogs:
-			if needle_path.startswith(nested_catalog.root_path):
-				return nested_catalog
-		return None
+			if needle_path.startswith(nested_catalog.root_path) and \
+				len(nested_catalog.root_path) > best_match_score:
+					best_match_score = len(nested_catalog.root_path)
+					best_match       = nested_catalog
+		return best_match
 
 
 	def _GetCursor(self):
@@ -212,8 +216,15 @@ class Repository:
 
 
 	def RetrieveCatalogForPath(self, needle_path):
-		root_catalog = self.RetrieveRootCatalog()
-		print root_catalog.FindNestedForPath(needle_path)
+		clg = self.RetrieveRootCatalog()
+		nested_reference = None
+		while True:
+			new_nested_reference = clg.FindNestedForPath(needle_path)
+			if new_nested_reference == None:
+				break
+			nested_reference = new_nested_reference
+			clg = self.RetrieveCatalog(nested_reference.hash)
+		return clg
 
 
 	def RetrieveCatalog(self, catalog_hash):
