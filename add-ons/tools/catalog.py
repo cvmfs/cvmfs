@@ -37,6 +37,14 @@ class Manifest:
 		self._CheckValidity()
 
 
+	def __str__(self):
+		return "<Manifest for " + self.name + ">"
+
+
+	def __repr__(self):
+		return self.__str__()
+
+
 	def _Readline(self, line):
 		key_char = line[0]
 		data     = line[1:-1]
@@ -76,10 +84,10 @@ class CatalogReference:
 		self.hash      = clg_hash
 
 	def __str__(self):
-		return "<catalog reference " + self.root_path + " - " + self.hash + ">"
+		return "<CatalogReference for " + self.root_path + " - " + self.hash + ">"
 
 	def __repr__(self):
-		return "<catalog reference " + self.root_path + ">"
+		return "<CatalogReference for " + self.root_path + ">"
 
 
 
@@ -99,6 +107,10 @@ class Catalog:
 
 	def __str__(self):
 		return "<Catalog " + self.root_prefix + ">"
+
+
+	def __repr__(self):
+		return self.__str__()
 
 
 	def OpenInteractive(self):
@@ -180,6 +192,14 @@ class Repository:
 		self.manifest_ = Manifest(manifest_file)
 
 
+	def __str__(self):
+		raise Exception("Not implemented!")
+
+
+	def __repr__(self):
+		return self.__str__()
+
+
 	def manifest(self):
 		return self.manifest_
 
@@ -212,6 +232,10 @@ class LocalRepository(Repository):
 		Repository.__init__(self)
 
 
+	def __str__(self):
+		return "<LocalRepository at " + self.base_directory_ + ">"
+
+
 	def RetrieveFile(self, file_name):
 		file_path = self.base_directory_ + "/" + file_name
 		if not os.path.exists(file_path):
@@ -224,6 +248,10 @@ class RemoteRepository(Repository):
 	def __init__(self, repository_url):
 		self.repository_url_ = urlparse.urlunparse(urlparse.urlparse(repository_url))
 		Repository.__init__(self)
+
+
+	def __str__(self):
+		return "<RemoteRepository at " + self.repository_url_ + ">"
 
 
 	def RetrieveFile(self, file_name):
