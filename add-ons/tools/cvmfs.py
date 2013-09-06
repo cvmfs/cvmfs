@@ -155,6 +155,7 @@ class Catalog:
 
 	def _OpenDatabase(self):
 		self.db_handle_ = sqlite.connect(self.catalog_file_.name)
+		self.db_handle_.text_factory = str
 
 
 	def _ReadProperties(self):
