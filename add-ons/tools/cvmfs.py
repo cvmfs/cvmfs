@@ -213,7 +213,7 @@ class Repository:
 	""" Abstract Wrapper around a Repository connection """
 	def __init__(self):
 		manifest_file = self.RetrieveFile(".cvmfspublished")
-		self.manifest_ = Manifest(manifest_file)
+		self.manifest = Manifest(manifest_file)
 
 
 	def __str__(self):
@@ -224,17 +224,13 @@ class Repository:
 		return self.__str__()
 
 
-	def manifest(self):
-		return self.manifest_
-
-
 	def RetrieveFile(self, file_name):
 		""" Abstract method to retrieve a file from the repository """
 		raise Exception("Not implemented!")
 
 
 	def RetrieveRootCatalog(self):
-		return self.RetrieveCatalog(self.manifest_.root_catalog)
+		return self.RetrieveCatalog(self.manifest.root_catalog)
 
 
 	def RetrieveCatalogForPath(self, needle_path):
