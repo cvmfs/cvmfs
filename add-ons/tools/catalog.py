@@ -267,6 +267,11 @@ class RemoteRepository(Repository):
 		f.flush()
 
 
+def OpenRepository(repo_path):
+	if repo_path[0:7] == "http://":
+		return RemoteRepository(repo_path)
+	else:
+		return LocalRepository(repo_path)
 
 #repo         = LocalRepository("/srv/cvmfs/test.local")
 repo         = RemoteRepository("http://cvmfs-stratum-one.cern.ch/opt/geant4")
