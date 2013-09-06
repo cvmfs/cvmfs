@@ -250,6 +250,11 @@ class LocalRepository(Repository):
 		file_path = self.base_directory_ + "/" + file_name
 		if not os.path.exists(file_path):
 			raise Exception("didn't find" + file_path)
+		return LocalRepository.Open(file_path)
+
+
+	@staticmethod
+	def Open(file_path):
 		return open(file_path, "rb")
 
 
@@ -266,12 +271,18 @@ class RemoteRepository(Repository):
 
 	def RetrieveFile(self, file_name):
 		file_url = self.repository_url_ + "/" + file_name
+		return RemoteRepository.Download(file_url)
+
+
+	@staticmethod
+	def Download(url):
 		tmp_file = tempfile.NamedTemporaryFile('w+b')
-		self._DownloadToFile(file_url, tmp_file)
+		RemoteRepository._DownloadToFile(url, tmp_file)
 		return tmp_file
 
 
-	def _DownloadToFile(self, url, f):
+	@staticmethod
+	def _DownloadToFile(url, f):
 		response = urlopen(url)
 		f.write(response.read())
 		f.seek(0)
