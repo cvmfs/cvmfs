@@ -151,7 +151,7 @@ class Catalog:
 
 	def RunSql(self, sql):
 		""" Run an arbitrary SQL query on the catalog database """
-		cursor = self.self.db_handle_.cursor()
+		cursor = self.db_handle_.cursor()
 		cursor.execute(sql)
 		return cursor.fetchall()
 
