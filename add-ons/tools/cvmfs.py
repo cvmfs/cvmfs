@@ -332,4 +332,4 @@ def OpenCatalog(catalog_file):
 	if IsRemote(catalog_file):
 		return Catalog(RemoteRepository.Download(catalog_file))
 	else:
-		return Catalog(open(catalog_file, "rb"))
+		return Catalog(LocalRepository.Open(catalog_file))
