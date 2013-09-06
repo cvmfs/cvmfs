@@ -98,6 +98,46 @@ class CatalogReference:
 
 
 
+class DirectoryEntry:
+	""" Thin wrapper around a DirectoryEntry as it is saved in the Catalogs """
+
+	def __init__(self):
+		self.md5path_1 = 0
+		self.md5path_2 = 0
+		self.parent_1  = 0
+		self.parent_2  = 0
+		self.size      = 0
+		self.mode      = 0
+		self.mtime     = 0
+		self.name      = ""
+		self.symlink   = ""
+
+	def __str__(self):
+		return "<DirectoryEntry for " + self.name + ">"
+
+	def __repr__(self):
+		return "<DirectoryEntry " + self.name + " - " + \
+		       md5path_1 + "|" + md5path_2 + ">"
+
+
+	def BacktracePath(self, containing_catalog, repo):
+		""" Tries to reconstruct the full path of a DirectoryEntry """
+		dirent  = self
+		path    = self.name
+		catalog = containing_catalog
+		while True:
+			p_dirent = catalog.FindDirectoryEntry(dirent.parent_1, dirent.parent_2)
+			if p_dirent != None:
+				path = p_dirent.name + "/" + path
+				dirent = p_dirent
+			elif not catalog.IsRoot():
+				catalog = repo.FindParentCatalogOf(catalog)
+			else:
+				break
+		return path
+
+
+
 class Catalog:
 	""" Wraps the basic functionality of CernVM-FS Catalogs """
 
@@ -149,11 +189,33 @@ class Catalog:
 		return best_match
 
 
+	def FindDirectoryEntry(self, md5path_1, md5path_2):
+		""" Finds the DirectoryEntry residing under the given MD5 hashed path """
+		res = self.RunSql("SELECT parent_1, parent_2, size, mode, mtime, name,  \
+			                        symlink                                       \
+			                 FROM catalog                                         \
+			                 WHERE md5path_1 = " + str(md5path_1) + " AND         \
+			                       md5path_2 = " + str(md5path_2) + "             \
+			                 LIMIT 1;")
+		if len(res) != 1:
+			return None
+		e = DirectoryEntry()
+		e.md5path_1 = md5path_1
+		e.md5path_2 = md5path_2
+		e.parent_1, e.parent_2, e.size, e.mode, e.mtime, e.name, e.symlink = res[0]
+		return e
+
+
 	def RunSql(self, sql):
 		""" Run an arbitrary SQL query on the catalog database """
 		cursor = self.db_handle_.cursor()
 		cursor.execute(sql)
 		return cursor.fetchall()
+
+
+	def IsRoot(self):
+		""" Checks if this is the root catalog (based on the root prefix) """
+		return self.root_prefix == "/"
 
 
 	def _Decompress(self, catalog_file):
@@ -251,6 +313,11 @@ class Repository:
 		catalog_path = "data/" + catalog_hash[:2] + "/" + catalog_hash[2:] + "C"
 		catalog_file = self.RetrieveFile(catalog_path)
 		return Catalog(catalog_file)
+
+
+	def FindParentCatalogOf(self, catalog):
+		""" Tries to find the parent catalog of a given catalog and returns it """
+		return self.RetrieveCatalogForPath(os.path.split(catalog.root_prefix)[0])
 
 
 
