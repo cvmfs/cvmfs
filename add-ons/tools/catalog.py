@@ -115,7 +115,6 @@ class Catalog:
 
 	def OpenInteractive(self):
 		subprocess.call(['sqlite3', self.catalog_file_.name])
-		sys.exit(0)
 
 
 	def ListNested(self):
