@@ -289,8 +289,20 @@ class RemoteRepository(Repository):
 		f.flush()
 
 
+
+def IsRemote(path):
+	return path[0:7] == "http://"
+
+
 def OpenRepository(repo_path):
-	if repo_path[0:7] == "http://":
+	if IsRemote(repo_path):
 		return RemoteRepository(repo_path)
 	else:
 		return LocalRepository(repo_path)
+
+
+def OpenCatalog(catalog_file):
+	if IsRemote(catalog_file):
+		return Catalog(RemoteRepository.Download(catalog_file))
+	else:
+		return Catalog(open(catalog_file, "rb"))
