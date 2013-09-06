@@ -27,7 +27,10 @@ if not foundSqlite3:
 
 
 class Manifest:
+	""" Wraps information from .cvmfspublished"""
+
 	def __init__(self, manifest_file):
+		""" Initializes a Manifest object from a file pointer to .cvmfspublished """
 		for line in manifest_file.readlines():
 			if len(line) == 0:
 				continue
@@ -46,6 +49,7 @@ class Manifest:
 
 
 	def _Readline(self, line):
+		""" Parse lines that appear in .cvmfspublished """
 		key_char = line[0]
 		data     = line[1:-1]
 		if key_char == "C":
@@ -67,6 +71,7 @@ class Manifest:
 
 
 	def _CheckValidity(self):
+		""" Checks that all mandatory fields are found in .cvmfspublished """
 		if not hasattr(self, 'root_catalog'):
 		  raise Exception("Manifest lacks a root catalog entry")
 		if not hasattr(self, 'root_hash'):
@@ -79,6 +84,8 @@ class Manifest:
 
 
 class CatalogReference:
+	""" Wraps a catalog reference to nested catalogs as found in Catalogs """
+
 	def __init__(self, root_path, clg_hash):
 		self.root_path = root_path
 		self.hash      = clg_hash
@@ -92,6 +99,8 @@ class CatalogReference:
 
 
 class Catalog:
+	""" Wraps the basic functionality of CernVM-FS Catalogs """
+
 	def __init__(self, catalog_file):
 		self._Decompress(catalog_file)
 		self._OpenDatabase()
@@ -114,10 +123,12 @@ class Catalog:
 
 
 	def OpenInteractive(self):
+		""" Spawns a sqlite shell for interactive catalog database inspection """
 		subprocess.call(['sqlite3', self.catalog_file_.name])
 
 
 	def ListNested(self):
+		""" List CatalogReferences to all contained nested catalogs """
 		catalogs = self.RunSql("SELECT path, sha1 FROM nested_catalogs;")
 		nested_catalogs = []
 		for catalog in catalogs:
@@ -126,6 +137,7 @@ class Catalog:
 
 
 	def FindNestedForPath(self, needle_path):
+		""" Find the best matching nested CatalogReference for a given path """
 		nested_catalogs  = self.ListNested()
 		best_match       = None
 		best_match_score = 0
@@ -138,29 +150,34 @@ class Catalog:
 
 
 	def RunSql(self, sql):
+		""" Run an arbitrary SQL query on the catalog database """
 		cursor = self.self.db_handle_.cursor()
 		cursor.execute(sql)
 		return cursor.fetchall()
 
 
 	def _Decompress(self, catalog_file):
+		""" Unzip a catalog file to a temporary referenced by self.catalog_file_ """
 		self.catalog_file_ = tempfile.NamedTemporaryFile('w+b')
 		self.catalog_file_.write(zlib.decompress(catalog_file.read()))
 		self.catalog_file_.flush()
 
 
 	def _OpenDatabase(self):
+		""" Create and configure a database handle to the Catalog """
 		self.db_handle_ = sqlite.connect(self.catalog_file_.name)
 		self.db_handle_.text_factory = str
 
 
 	def _ReadProperties(self):
+		""" Retrieve all properties stored in the catalog database """
 		props = self.RunSql("SELECT key, value FROM properties;")
 		for prop in props:
 			self._ReadProperty(prop)
 
 
 	def _ReadProperty(self, prop):
+		""" Detect catalog properties and store them as public class members """
 		prop_key   = prop[0]
 		prop_value = prop[1]
 		if prop_key == "revision":
@@ -176,11 +193,13 @@ class Catalog:
 
 
 	def _GuessRootPrefixIfNeeded(self):
+		""" Root catalogs don't have a root prefix property (fixed here) """
 		if not hasattr(self, 'root_prefix'):
 			self.root_prefix = "/"
 
 
 	def _CheckValidity(self):
+		""" Check that all crucial properties have been found in the database """
 		if not hasattr(self, 'schema'):
 		  raise Exception("Catalog lacks a schema entry")
 		if not hasattr(self, 'root_prefix'):
@@ -191,6 +210,7 @@ class Catalog:
 
 
 class Repository:
+	""" Abstract Wrapper around a Repository connection """
 	def __init__(self):
 		manifest_file = self.RetrieveFile(".cvmfspublished")
 		self.manifest_ = Manifest(manifest_file)
@@ -209,6 +229,7 @@ class Repository:
 
 
 	def RetrieveFile(self, file_name):
+		""" Abstract method to retrieve a file from the repository """
 		raise Exception("Not implemented!")
 
 
@@ -217,6 +238,7 @@ class Repository:
 
 
 	def RetrieveCatalogForPath(self, needle_path):
+		""" Recursively walk down the Catalogs and find the best fit for a path """
 		clg = self.RetrieveRootCatalog()
 		nested_reference = None
 		while True:
@@ -229,6 +251,7 @@ class Repository:
 
 
 	def RetrieveCatalog(self, catalog_hash):
+		""" Download and open a catalog from the repository """
 		catalog_path = "data/" + catalog_hash[:2] + "/" + catalog_hash[2:] + "C"
 		catalog_file = self.RetrieveFile(catalog_path)
 		return Catalog(catalog_file)
@@ -236,6 +259,7 @@ class Repository:
 
 
 class LocalRepository(Repository):
+	""" Concrete Repository implementation for a locally stored CernVM-FS repo """
 	def __init__(self, base_directory):
 		if not os.path.isdir(base_directory):
 			raise Exception("didn't find" + base_directory)
@@ -261,6 +285,7 @@ class LocalRepository(Repository):
 
 
 class RemoteRepository(Repository):
+	""" Concrete Repository implementation for a repository reachable by HTTP """
 	def __init__(self, repository_url):
 		self.repository_url_ = urlparse.urlunparse(urlparse.urlparse(repository_url))
 		Repository.__init__(self)
@@ -277,6 +302,7 @@ class RemoteRepository(Repository):
 
 	@staticmethod
 	def Download(url):
+		""" Download the given URL to a (returned) temporary file """
 		tmp_file = tempfile.NamedTemporaryFile('w+b')
 		RemoteRepository._DownloadToFile(url, tmp_file)
 		return tmp_file
@@ -284,6 +310,7 @@ class RemoteRepository(Repository):
 
 	@staticmethod
 	def _DownloadToFile(url, f):
+		""" Download the given URL to the provided temporary file """
 		response = urlopen(url)
 		f.write(response.read())
 		f.seek(0)
@@ -292,10 +319,12 @@ class RemoteRepository(Repository):
 
 
 def IsRemote(path):
+	""" Check if a given path points to remote (HTTP) or local storage """
 	return path[0:7] == "http://"
 
 
 def OpenRepository(repo_path):
+	""" Convenience function to open a connection to a local or remote repo """
 	if IsRemote(repo_path):
 		return RemoteRepository(repo_path)
 	else:
@@ -303,6 +332,7 @@ def OpenRepository(repo_path):
 
 
 def OpenCatalog(catalog_file):
+	""" Convenience function to open a specific catalog file (local or remote) """
 	if IsRemote(catalog_file):
 		return Catalog(RemoteRepository.Download(catalog_file))
 	else:
