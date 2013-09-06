@@ -138,13 +138,9 @@ class Catalog:
 
 
 	def RunSql(self, sql):
-		cursor = self._GetCursor()
+		cursor = self.self.db_handle_.cursor()
 		cursor.execute(sql)
 		return cursor.fetchall()
-
-
-	def _GetCursor(self):
-		return self.db_handle_.cursor()
 
 
 	def _Decompress(self, catalog_file):
