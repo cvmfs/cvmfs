@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from urllib2 import urlopen, URLError, HTTPError
 import sys
 import zlib
 import tempfile
@@ -21,11 +22,54 @@ if not foundSqlite3:
 	except ImportError, e:
 		pass
 
+
+def retrieveFile(repo, filename):
+	url = repo + "/" + filename
+
+	if repo[0:7] != "http://":
+		try:
+			f = open(url, "rb")
+			return f
+		except:
+			print "cannot open " , url
+
+	# download the catalog
+	myTmpFile = tempfile.NamedTemporaryFile('w+b')
+	try:
+		f = urlopen(url)
+		meta = f.info()
+		fileSize = int(meta.getheaders("Content-Length")[0])
+
+		myTmpFile.write(f.read())
+	except HTTPError, e:
+		print "HTTP: " + e.code + url
+		sys.exit(1)
+	except URLError, e:
+		print "URL:" + e.reason + url
+		sys.exit(1)
+
+	myTmpFile.flush()
+	myTmpFile.seek(0)
+	return myTmpFile
+
+
+def doHttpRequest(url):
+	response = urlopen(url)
+	return response.read()
+
+
+def downloadCatalog(repositoryUrl, catalogName, beVerbose):
+	# find out some pathes and init the zlib decompressor
+	subdir = catalogName[0:2]
+	filename = catalogName[2:] + "C"
+	url = repositoryUrl + "/data/" + subdir + "/" + filename
+
+
 def getRootCatalogName(cvmfspublished):
 	try:
-		cvmfspubdata = open(cvmfspublished, 'rb').read()
+		cvmfspubdata = cvmfspublished.read()
 	except:
-		print "cannot open .cvmfspublished"
+		print "cannot read .cvmfspublished"
 		sys.exit(1)
 
 	lines = cvmfspubdata.split('\n')
@@ -36,22 +80,20 @@ def getRootCatalogName(cvmfspublished):
 	return lines[0][1:]
 
 
-def getCalalogFilePath(repoDir, catalogName):
-	return repoDir + "data/" + catalogName[:2] + "/" + catalogName[2:] + "C"
+def getCalalogFilePath(catalogName):
+	return "data/" + catalogName[:2] + "/" + catalogName[2:] + "C"
 
 
-def decompressCatalog(filename, destination):
-	str_object1 = open(filename, 'rb').read()
-	str_object2 = zlib.decompress(str_object1)
-	f = open(destination, 'wb')
-	f.write(str_object2)
-	f.close()
-
-
-def fetchCatalog(repoDir, catalogName):
+def decompressCatalog(compressedFile):
 	myTmpFile = tempfile.NamedTemporaryFile('wb')
-	decompressCatalog(getCalalogFilePath(repoDir,catalogName), myTmpFile.name)
+	myTmpFile.write(zlib.decompress(compressedFile.read()))
+	myTmpFile.flush()
 	return myTmpFile
+
+
+def fetchCatalog(repo, catalogName):
+	catalogPath = getCalalogFilePath(catalogName)
+	return decompressCatalog(retrieveFile(repo, catalogPath))
 
 
 def retrieveNestedCatalogs(catalogFile):
@@ -69,18 +111,19 @@ def retrieveNestedCatalogs(catalogFile):
 	return catalogs
 
 
-def findNestedCatalogName(repoDir, catalog, nestedCatalogPath):
-	clgFile = fetchCatalog(repoDir, catalog)
+def findNestedCatalogName(repo, catalogName, nestedCatalogPath):
+	clgFile = fetchCatalog(repo, catalogName)
 	nestedClgs = retrieveNestedCatalogs(clgFile)
 	clgName = ""
 
 	for clg in nestedClgs:
 		if nestedCatalogPath.startswith(clg[0]):
+			print "Catalog Path:" , clg[0]
 			if nestedCatalogPath == clg[0]:
 				clgName = clg[1]
 				break
 			else:
-				clgName = findNestedCatalogName(repoDir, clg[1], nestedCatalogPath)
+				clgName = findNestedCatalogName(repo, clg[1], nestedCatalogPath)
 				break
 
 	clgFile.close()
@@ -92,7 +135,7 @@ def openCatalog(catalogFile):
 
 
 def usage():
-	print sys.argv[0] + " <repository name> <nested catalog path>"
+	print sys.argv[0] + " <repository name | repository url> <nested catalog path>"
 	print "This script walks through the catalog structure and opens the nested"
 	print "catalog specified."
 	print "WARNING: changes to this database will not persist, as it is only a temp"
@@ -103,17 +146,18 @@ def main():
 		usage()
 		sys.exit(1)
 
-	repoDir = "/storage/" + sys.argv[1] + "/";
-	rootCatalog = getRootCatalogName(repoDir + ".cvmfspublished")
-	nestedCatalog = findNestedCatalogName(repoDir, rootCatalog, sys.argv[2])
+	repo = sys.argv[1]
+	nestedCatalogPath = sys.argv[2]
+
+	rootCatalogName = getRootCatalogName(retrieveFile(repo, ".cvmfspublished"))
+	nestedCatalog = findNestedCatalogName(repo, rootCatalogName, nestedCatalogPath)
 
 	if nestedCatalog == "":
 		print "nested catalog not found"
 		sys.exit(1)
 
-	print "Opening: " + nestedCatalog
-	catalogFile = fetchCatalog(repoDir, nestedCatalog)
+	print "Opening Clg: " , nestedCatalog
+	catalogFile = fetchCatalog(repo, nestedCatalog)
 	openCatalog(catalogFile)
-	catalogFile.close()
 
 main()
