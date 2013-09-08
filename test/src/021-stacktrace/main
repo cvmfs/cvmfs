@@ -30,7 +30,7 @@ cvmfs_run_test() {
   sudo cat $stacktrace_path >> $logfile 2>&1
 
   # clean up the broken mount point
-  sudo umount /cvmfs/${repo} || return 7
+  sudo umount /cvmfs/${repo} >> $logfile 2>&1 || return 7
   
   return 0
 }
