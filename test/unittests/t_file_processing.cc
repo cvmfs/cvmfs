@@ -8,12 +8,13 @@
 #include <iostream>
 
 #include "../../cvmfs/util.h"
-#include "../../cvmfs/prng.h"
 #include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/upload_spooler_definition.h"
 #include "../../cvmfs/upload_spooler_result.h"
 #include "../../cvmfs/file_processing/file_processor.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
+
+#include "c_file_sandbox.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {
   MockStreamHandle(const callback_t   *commit_callback) :
@@ -183,43 +184,28 @@ const std::string MockUploader::sandbox_tmp_dir = MockUploader::sandbox_path + "
 //
 
 
-class T_FileProcessing : public ::testing::Test {
+class T_FileProcessing : public FileSandbox {
  public:
-  typedef std::pair<std::string, std::string> ExpectedHashString;
   typedef std::vector<ExpectedHashString>     ExpectedHashStrings;
+
+  T_FileProcessing() :
+    FileSandbox(MockUploader::sandbox_path) {}
 
  protected:
   void SetUp() {
-    CreateSandbox(MockUploader::sandbox_path,
-                  MockUploader::sandbox_tmp_dir);
+    CreateSandbox(MockUploader::sandbox_tmp_dir);
   }
 
   void TearDown() {
-    RemoveSandbox(MockUploader::sandbox_path,
-                  MockUploader::sandbox_tmp_dir);
-  }
-
-  const std::string& GetEmptyFile() {
-    LazilyCreateDummyFile(MockUploader::sandbox_path, 0, &empty_file_, 42);
-    return empty_file_;
+    RemoveSandbox(MockUploader::sandbox_tmp_dir);
   }
 
   ExpectedHashString GetEmptyFileBulkHash(const std::string suffix = "") const {
     return std::make_pair("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", suffix);
   }
 
-  const std::string GetSmallFile() {
-    LazilyCreateDummyFile(MockUploader::sandbox_path, 50, &small_file_, 314);
-    return small_file_;
-  }
-
   ExpectedHashString GetSmallFileBulkHash(const std::string suffix = "") const {
     return std::make_pair("7935fe23e1f9959b176999d63f6b8ccacc7c6eff", suffix);
-  }
-
-  const std::string GetBigFile() {
-    LazilyCreateDummyFile(MockUploader::sandbox_path, 4*1024, &big_file_, 1337);
-    return big_file_;
   }
 
   ExpectedHashString GetBigFileBulkHash(const std::string suffix = "") const {
@@ -231,11 +217,6 @@ class T_FileProcessing : public ::testing::Test {
     h.push_back(std::make_pair("eef05f8b57bfd1178e761e1ea4cf02d0409e5a63", "P"));
     h.push_back(std::make_pair("aa965b9d3c790713320a9358c09ab2d1819d35e3", "P"));
     return h;
-  }
-
-  const std::string GetHugeFile() {
-    LazilyCreateDummyFile(MockUploader::sandbox_path, 100*1024, &huge_file_, 1);
-    return huge_file_;
   }
 
   ExpectedHashString GetHugeFileBulkHash(const std::string suffix = "") const {
@@ -357,74 +338,8 @@ class T_FileProcessing : public ::testing::Test {
     }
   }
 
- private:
-  void CreateSandbox(const std::string &sandbox_path,
-                     const std::string &sandbox_tmp_dir) {
-    bool retval;
-
-    retval = MkdirDeep(sandbox_path, 0700);
-    ASSERT_TRUE (retval) << "failed to create sandbox";
-
-    retval = MkdirDeep(sandbox_tmp_dir, 0700);
-    ASSERT_TRUE (retval) << "failed to create sandbox tmp directory";
-  }
-
-  void RemoveSandbox(const std::string &sandbox_path,
-                     const std::string &sandbox_tmp_dir) {
-    bool retval;
-
-    retval = RemoveTree(sandbox_tmp_dir);
-    ASSERT_TRUE (retval) << "failed to remove sandbox tmp directory";
-
-    retval = RemoveTree(sandbox_path);
-    ASSERT_TRUE (retval) << "failed to remove sandbox";
-  }
-
-  void CreateRandomBuffer(char *buffer, const size_t nbytes, Prng &rng) {
-    for (size_t i = 0; i < nbytes; ++i) {
-      buffer[i] = rng.Next(256);
-    }
-  }
-
-  void LazilyCreateDummyFile(const std::string &sandbox_path,
-                             const size_t       file_size_kb,
-                                   std::string *file_name,
-                             const uint64_t     seed) {
-    static const size_t kb = 1024;
-
-    // if file was already created, we do not do it again!
-    if (! file_name->empty()) {
-      return;
-    }
-
-    // create a temporary file
-    FILE *file = CreateTempFile(sandbox_path + "/dummy", 0600, "r+", file_name);
-    ASSERT_NE (static_cast<FILE*>(0), file) << "failed to create tmp file";
-
-    // file the temporary file with the requested number of (pseudo) random data
-    Prng rng;
-    rng.InitSeed(seed);
-    for (size_t i = 0; i < file_size_kb; ++i) {
-      typedef char buffer_type;
-      buffer_type buffer[kb];
-      CreateRandomBuffer(buffer, kb, rng);
-      const size_t written = fwrite(buffer, sizeof(buffer_type), kb, file);
-      ASSERT_EQ (written, kb * sizeof(buffer_type))
-        << "failed to write to tmp (errno: " << errno << ")";
-    }
-
-    // close the generated dummy file
-    const int retval = fclose(file);
-    ASSERT_EQ (0, retval) << "failed to close tmp file";
-  }
-
  protected:
   MockUploader uploader_;
-
-  std::string  empty_file_;
-  std::string  small_file_;
-  std::string  big_file_;
-  std::string  huge_file_;
 };
 
 
