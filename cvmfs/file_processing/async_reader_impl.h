@@ -79,6 +79,14 @@ void Reader<FileScrubbingTaskT, FileT>::CloseFile(OpenFile &file) {
 
 
 template <class FileScrubbingTaskT, class FileT>
+void Reader<FileScrubbingTaskT, FileT>::FinalizedFile(AbstractFile *file) {
+  assert (file != NULL);
+  FileT *concrete_file = static_cast<FileT*>(file);
+  NotifyListeners(concrete_file);
+}
+
+
+template <class FileScrubbingTaskT, class FileT>
 bool Reader<FileScrubbingTaskT, FileT>::
                                 ReadAndScheduleNextBuffer(OpenFile &open_file) {
   assert (open_file.file != NULL);
@@ -145,13 +153,18 @@ bool Reader<FileScrubbingTaskT, FileT>::
   buffer->SetUsedBytes(bytes_read);
   open_file.file_marker += bytes_read;
 
+  // check if the file has been fully read
+  const bool finished_reading =
+    (static_cast<size_t>(open_file.file_marker) == file_size);
+
   // create an asynchronous task (FileScrubbingTaskT) to process the data chunk,
   // together with a synchronization task that ensures the correct execution
   // order of the FileScrubbingTasks
   FileScrubbingTaskT *new_task =
     new(tbb::task::allocate_root()) FileScrubbingTaskT(open_file.file,
                                                        buffer,
-                                                       this);
+                                                       finished_reading);
+  new_task->SetReader(this);
   new_task->increment_ref_count();
   tbb::task *sync_task = new(new_task->allocate_child()) tbb::empty_task();
 
@@ -166,8 +179,6 @@ bool Reader<FileScrubbingTaskT, FileT>::
   open_file.previous_sync_task = sync_task;
 
   // make sure that the last chunk is processed
-  const bool finished_reading =
-    (static_cast<size_t>(open_file.file_marker) == file_size);
   if (finished_reading) {
     tbb::task::enqueue(*open_file.previous_sync_task);
   }
