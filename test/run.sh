@@ -146,7 +146,6 @@ do
          cd $workdir                            && \
          cvmfs_run_test $logfile $(pwd)/${t}    && \
          retval=\$?                             && \
-         kill_all_perl_services                 && \
          retval=\$(mangle_test_retval \$retval) && \
          exit \$retval"
   RETVAL=$?
