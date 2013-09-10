@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <vector>
 
-#include "../../cvmfs/upload_file_processing/chunk_detector.h"
-#include "../../cvmfs/upload_file_processing/char_buffer.h"
+#include "../../cvmfs/file_processing/chunk_detector.h"
+#include "../../cvmfs/file_processing/char_buffer.h"
 #include "../../cvmfs/prng.h"
 
 class T_ChunkDetectors : public ::testing::Test {
