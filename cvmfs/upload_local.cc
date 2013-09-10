@@ -10,7 +10,7 @@
 #include "compression.h"
 #include "util.h"
 
-#include "upload_file_processing/char_buffer.h"
+#include "file_processing/char_buffer.h"
 
 using namespace upload;
 

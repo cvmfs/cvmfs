@@ -12,8 +12,8 @@
 #include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/upload_spooler_definition.h"
 #include "../../cvmfs/upload_spooler_result.h"
-#include "../../cvmfs/upload_file_processing/file_processor.h"
-#include "../../cvmfs/upload_file_processing/char_buffer.h"
+#include "../../cvmfs/file_processing/file_processor.h"
+#include "../../cvmfs/file_processing/char_buffer.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {
   MockStreamHandle(const callback_t   *commit_callback) :

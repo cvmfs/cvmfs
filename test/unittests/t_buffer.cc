@@ -2,7 +2,7 @@
 #include <tbb/scalable_allocator.h>
 
 #include "../../cvmfs/util.h"
-#include "../../cvmfs/upload_file_processing/char_buffer.h"
+#include "../../cvmfs/file_processing/char_buffer.h"
 
 TEST(T_Buffer, Initialize) {
   typedef unsigned char buffer_type;

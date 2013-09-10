@@ -102,14 +102,14 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
 
-  upload_file_processing/async_reader.h upload_file_processing/async_reader_impl.h upload_file_processing/async_reader.cc
-  upload_file_processing/char_buffer.h
-  upload_file_processing/chunk.h upload_file_processing/chunk.cc
-  upload_file_processing/chunk_detector.h upload_file_processing/chunk_detector.cc
-  upload_file_processing/file.h upload_file_processing/file.cc
-  upload_file_processing/io_dispatcher.h upload_file_processing/io_dispatcher.cc
-  upload_file_processing/processor.h upload_file_processing/processor.cc
-  upload_file_processing/file_processor.h upload_file_processing/file_processor.cc
+  file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
+  file_processing/char_buffer.h
+  file_processing/chunk.h file_processing/chunk.cc
+  file_processing/chunk_detector.h file_processing/chunk_detector.cc
+  file_processing/file.h file_processing/file.cc
+  file_processing/io_dispatcher.h file_processing/io_dispatcher.cc
+  file_processing/processor.h file_processing/processor.cc
+  file_processing/file_processor.h file_processing/file_processor.cc
 
   upload.h upload.cc
   upload_spooler_definition.h upload_spooler_definition.cc

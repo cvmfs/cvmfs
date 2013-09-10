@@ -95,7 +95,7 @@
 #include "upload_spooler_result.h"
 
 #include "upload_facility.h"
-#include "upload_file_processing/file_processor.h"
+#include "file_processing/file_processor.h"
 
 namespace upload
 {
