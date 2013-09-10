@@ -36,6 +36,9 @@ class AbstractFileScrubbingTask : public tbb::task {
 
   ~AbstractFileScrubbingTask() {
     reader_->ReleaseBuffer(buffer_);
+    if (IsLast()) {
+      reader_->FinalizedFile(file_);
+    }
   }
 
         FileT*      file()         { return file_;   }

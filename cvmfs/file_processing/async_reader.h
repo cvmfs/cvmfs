@@ -13,9 +13,14 @@
 
 #include <list>
 
+#include <string>
+
 #include "char_buffer.h"
+#include "../util_concurrency.h"
 
 namespace upload { // TODO: remove this... wrong namespace (for testing)
+
+class AbstractFile;
 
 /**
  * Wrapper function to bind an arbitrary this* to a method call in a C-style
@@ -29,7 +34,6 @@ void ThreadProxy(DelegateT        *delegate,
 
 
 class AbstractReader {
-
  public:
   AbstractReader(const unsigned int  max_buffers_in_flight) :
     max_buffers_in_flight_(max_buffers_in_flight)
@@ -49,6 +53,11 @@ class AbstractReader {
    * needs to be called for each Buffer that was created using CreateBuffer.
    */
   void ReleaseBuffer(CharBuffer *buffer);
+
+  /**
+   * Gets called by the AbstractFileScrubbingTask for each fully read file
+   */
+  virtual void FinalizedFile(AbstractFile *file) = 0;
 
  protected:
   /**
@@ -82,7 +91,8 @@ class AbstractReader {
  *       thus they need to be released using the Reader::ReleaseBuffer() method!
  */
 template <class FileScrubbingTaskT, class FileT>
-class Reader : public AbstractReader {
+class Reader : public AbstractReader,
+               public Observable<FileT*> {
  protected:
   /**
    * Internal structure to keep information about each currently open File.
@@ -120,20 +130,31 @@ class Reader : public AbstractReader {
     tbb_worker_count_(number_of_tbb_threads),
     read_thread_(&ThreadProxy<Reader>,
                  this,
-                 &Reader<FileScrubbingTaskT, FileT>::ReadThread)
-  {}
+                 &Reader<FileScrubbingTaskT, FileT>::ReadThread),
+    running_(true)
+  {
+    pthread_mutex_init(&terminatation_mutex_, NULL);
+  }
 
   ~Reader() {
-    if (read_thread_.joinable()) {
+    Terminate();
+    pthread_mutex_destroy(&terminatation_mutex_);
+  }
+
+  void ScheduleRead(FileT *file) {
+    assert (running_);
+    queue_.push(FileJob(file));
+  }
+
+  void Terminate() {
+    MutexLockGuard lock(terminatation_mutex_);
+
+    if (running_ && read_thread_.joinable()) {
       // send a termination signal through the queue and wait for the read
       // thread to terminate
       queue_.push(FileJob());
       read_thread_.join();
     }
-  }
-
-  void ScheduleRead(FileT *file) {
-    queue_.push(FileJob(file));
   }
 
  protected:
@@ -154,6 +175,8 @@ class Reader : public AbstractReader {
 
   bool ReadAndScheduleNextBuffer(OpenFile &open_file);
 
+  void FinalizedFile(AbstractFile *file);
+
  private:
   JobQueue            queue_;           ///< reference to the JobQueue (see IoDispatcher)
   const size_t        max_buffer_size_; ///< size of data Blocks to read-in
@@ -163,6 +186,8 @@ class Reader : public AbstractReader {
 
   const unsigned int  tbb_worker_count_;
   tbb::tbb_thread     read_thread_;
+  pthread_mutex_t     terminatation_mutex_;
+  bool                running_;
 };
 
 }
