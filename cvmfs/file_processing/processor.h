@@ -74,8 +74,8 @@ class FileScrubbingTask : public AbstractFileScrubbingTask<File> {
  public:
   FileScrubbingTask(File            *file,
                     CharBuffer      *buffer,
-                    AbstractReader  *reader) :
-    AbstractFileScrubbingTask<File>(file, buffer, reader) {}
+                    const bool       is_last_piece) :
+    AbstractFileScrubbingTask<File>(file, buffer, is_last_piece) {}
 
   tbb::task* execute();
 

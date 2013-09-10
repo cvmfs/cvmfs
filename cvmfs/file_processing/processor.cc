@@ -131,14 +131,16 @@ tbb::task* FileScrubbingTask::execute() {
   //   * Execution is done in-order, thus the File is processed as a stream of
   //     CharBuffers. Each CharBuffer will be processed in one FileScrubbingTask
 
-  if (file_->MightBecomeChunked()) {
+  File *file = FileScrubbingTask::file();
+
+  if (file->MightBecomeChunked()) {
     // find chunk cut marks in the current buffer and process all chunks that
     // are fully specified (i.e. not reaching beyond the current buffer)
     const CutMarks cut_marks = FindNextChunkCutMarks();
     CutMarks::const_iterator i    = cut_marks.begin();
     CutMarks::const_iterator iend = cut_marks.end();
     for (; i != iend; ++i) {
-      Chunk *fully_defined_chunk = file_->CreateNextChunk(*i);
+      Chunk *fully_defined_chunk = file->CreateNextChunk(*i);
       assert (fully_defined_chunk->IsFullyDefined());
       QueueForDeferredProcessing(fully_defined_chunk);
     }
@@ -146,12 +148,12 @@ tbb::task* FileScrubbingTask::execute() {
     // if we reached the last buffer this input file will produce, all but the
     // last created chunk will be fully defined at this point
     if (IsLastBuffer()) {
-      file_->FullyDefineLastChunk();
+      file->FullyDefineLastChunk();
     }
 
     // process the current chunk, i.e. the last created chunk that potentially
     // reaches beyond the current buffer or to the end of the file
-    Chunk *current_chunk = file_->current_chunk();
+    Chunk *current_chunk = file->current_chunk();
     if (current_chunk != NULL) {
       QueueForDeferredProcessing(current_chunk);
     }
@@ -159,8 +161,8 @@ tbb::task* FileScrubbingTask::execute() {
 
   // check if the file has a bulk chunk and continue processing it using the
   // current buffer
-  if (file_->HasBulkChunk()) {
-    QueueForDeferredProcessing(file_->bulk_chunk());
+  if (file->HasBulkChunk()) {
+    QueueForDeferredProcessing(file->bulk_chunk());
   }
 
   // wait for all scheduled chunk processing tasks on the current buffer
@@ -180,7 +182,7 @@ void FileScrubbingTask::SpawnTasksAndWaitForProcessing() {
   std::vector<Chunk*>::const_iterator iend = chunks_to_process_.end();
   for (; i != iend; ++i) {
     tbb::task *chunk_processing_task =
-      new(allocate_child()) ChunkProcessingTask(*i, buffer_);
+      new(allocate_child()) ChunkProcessingTask(*i, buffer());
     tasks.push_back(*chunk_processing_task);
   }
 
@@ -203,17 +205,20 @@ void FileScrubbingTask::CommitFinishedChunks() const {
 
 
 FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
-  const Chunk *current_chunk = file_->current_chunk();
-  assert (file_->MightBecomeChunked());
+  File       *file   = FileScrubbingTask::file();
+  CharBuffer *buffer = FileScrubbingTask::buffer();
+
+  const Chunk *current_chunk = file->current_chunk();
+  assert (file->MightBecomeChunked());
   assert (current_chunk != NULL);
   assert (current_chunk->size() == 0);
-  assert (current_chunk->offset() <= buffer_->base_offset());
-  assert (current_chunk->offset() <  buffer_->base_offset() +
-                                     static_cast<off_t>(buffer_->used_bytes()));
+  assert (current_chunk->offset() <= buffer->base_offset());
+  assert (current_chunk->offset() <  buffer->base_offset() +
+                                     static_cast<off_t>(buffer->used_bytes()));
 
   CutMarks result;
   off_t next_cut;
-  while ((next_cut = file_->FindNextCutMark(buffer_)) != 0) {
+  while ((next_cut = file->FindNextCutMark(buffer)) != 0) {
     result.push_back(next_cut);
   }
 
@@ -222,6 +227,7 @@ FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
 
 
 bool FileScrubbingTask::IsLastBuffer() const {
-  return file_->size() == buffer_->base_offset() + buffer_->used_bytes();
+  const CharBuffer *buffer = FileScrubbingTask::buffer();
+  return file()->size() == buffer->base_offset() + buffer->used_bytes();
 }
 
