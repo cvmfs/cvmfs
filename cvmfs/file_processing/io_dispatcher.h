@@ -125,19 +125,15 @@ class IoDispatcher {
                const size_t       max_read_buffer_size = 512 * 1024) :
     tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
     max_read_buffer_size_(max_read_buffer_size),
-    max_files_in_flight_(tbb_workers_ * 10),
-    reader_(max_read_buffer_size_, max_files_in_flight_ * 5),
+    reader_(max_read_buffer_size_, tbb_workers_ * 10),
     write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
     uploader_(uploader),
     file_processor_(file_processor)
   {
-    files_in_flight_   = 0;
     chunks_in_flight_  = 0;
     file_count_        = 0;
     pthread_mutex_init(&processing_done_mutex_,    NULL);
-    pthread_mutex_init(&files_in_flight_mutex_,    NULL);
     pthread_cond_init(&processing_done_condition_, NULL);
-    pthread_cond_init(&free_slot_condition_,       NULL);
   }
 
   ~IoDispatcher() {
@@ -145,9 +141,7 @@ class IoDispatcher {
     TearDown();
 
      pthread_mutex_destroy(&processing_done_mutex_);
-     pthread_mutex_destroy(&files_in_flight_mutex_);
      pthread_cond_destroy(&processing_done_condition_);
-     pthread_cond_destroy(&free_slot_condition_);
   }
 
   /**
@@ -164,8 +158,10 @@ class IoDispatcher {
    *       undefined behaviour
    */
   void Wait() {
+    reader_.Wait();
+
     pthread_mutex_lock(&processing_done_mutex_);
-    while (files_in_flight_ > 0 || chunks_in_flight_ > 0) {
+    while (chunks_in_flight_ > 0) {
       pthread_cond_wait(&processing_done_condition_, &processing_done_mutex_);
     }
     pthread_mutex_unlock(&processing_done_mutex_);
@@ -177,14 +173,8 @@ class IoDispatcher {
    *       Blocks for processing asynchronously.
    */
   void ScheduleRead(File *file) {
-    pthread_mutex_lock(&files_in_flight_mutex_);
-    while (files_in_flight_ > max_files_in_flight_) {
-      pthread_cond_wait(&free_slot_condition_, &files_in_flight_mutex_);
-    }
-    ++files_in_flight_;
     ++file_count_;
     reader_.ScheduleRead(file);
-    pthread_mutex_unlock(&files_in_flight_mutex_);
   }
 
   void CommitFile(File *file);
@@ -245,15 +235,10 @@ class IoDispatcher {
   const unsigned int               tbb_workers_;               ///< number of TBB worker threads to be used
   const size_t                     max_read_buffer_size_;      ///< maximal data block size for file read-in
 
-  tbb::atomic<unsigned int>        files_in_flight_;           ///< number of Files currently in processing
   tbb::atomic<unsigned int>        chunks_in_flight_;          ///< number of Chunks currently in processing
   tbb::atomic<unsigned int>        file_count_;                ///< overall number of processed files
 
   WriteJobQueue                    write_queue_;               ///< JobQueue for writing
-
-  pthread_mutex_t                  files_in_flight_mutex_;
-  pthread_cond_t                   free_slot_condition_;
-  const unsigned int               max_files_in_flight_;
 
   pthread_mutex_t                  processing_done_mutex_;
   pthread_cond_t                   processing_done_condition_;

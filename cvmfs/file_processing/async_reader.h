@@ -35,7 +35,7 @@ void ThreadProxy(DelegateT        *delegate,
 
 class AbstractReader {
  public:
-  AbstractReader(const unsigned int  max_buffers_in_flight) :
+  AbstractReader(const unsigned int max_buffers_in_flight) :
     max_buffers_in_flight_(max_buffers_in_flight)
   {
     buffers_in_flight_ = 0;
@@ -69,7 +69,7 @@ class AbstractReader {
 
  private:
   tbb::atomic<unsigned int>  buffers_in_flight_;     ///< number of data Blocks currently in memory
-  const unsigned int         max_buffers_in_flight_; ///< maximal number of Buffers in memory
+  const unsigned int         max_buffers_in_flight_;
 
   pthread_mutex_t            free_slot_mutex_;
   pthread_cond_t             free_slot_condition_;
@@ -122,38 +122,60 @@ class Reader : public AbstractReader,
 
  public:
   Reader(const size_t       max_buffer_size,
-         const unsigned int max_buffers_in_flight,
+         const unsigned int max_files_in_flight,
          const unsigned int number_of_tbb_threads =
                           tbb::task_scheduler_init::default_num_threads() + 1) :
+    AbstractReader(max_files_in_flight * 5),
     max_buffer_size_(max_buffer_size),
     draining_(false),
+    max_files_in_flight_(max_files_in_flight),
+    files_in_flight_(0),
     tbb_worker_count_(number_of_tbb_threads),
     read_thread_(&ThreadProxy<Reader>,
                  this,
                  &Reader<FileScrubbingTaskT, FileT>::ReadThread),
     running_(true)
   {
-    pthread_mutex_init(&terminatation_mutex_, NULL);
+    pthread_mutex_init(&termination_mutex_, NULL);
+    pthread_mutex_init(&files_in_flight_mutex_, NULL);
+    pthread_cond_init(&free_file_slots_, NULL);
+    pthread_cond_init(&reading_done_, NULL);
   }
 
   ~Reader() {
     Terminate();
-    pthread_mutex_destroy(&terminatation_mutex_);
+    pthread_cond_destroy(&reading_done_);
+    pthread_cond_destroy(&free_file_slots_);
+    pthread_mutex_destroy(&files_in_flight_mutex_);
+    pthread_mutex_destroy(&termination_mutex_);
   }
 
   void ScheduleRead(FileT *file) {
+    MutexLockGuard lock(files_in_flight_mutex_);
     assert (running_);
+    if (files_in_flight_ > max_files_in_flight_) {
+     pthread_cond_wait(&free_file_slots_, &files_in_flight_mutex_);
+    }
+    ++files_in_flight_;
     queue_.push(FileJob(file));
   }
 
+  void Wait() {
+    MutexLockGuard lock(files_in_flight_mutex_);
+    while (files_in_flight_ > 0) {
+      pthread_cond_wait(&reading_done_, &files_in_flight_mutex_);
+    }
+  }
+
   void Terminate() {
-    MutexLockGuard lock(terminatation_mutex_);
+    Wait();
 
     if (running_ && read_thread_.joinable()) {
       // send a termination signal through the queue and wait for the read
       // thread to terminate
       queue_.push(FileJob());
       read_thread_.join();
+      running_ = false;
     }
   }
 
@@ -184,9 +206,15 @@ class Reader : public AbstractReader,
   bool                draining_;
   OpenFileList        open_files_;
 
+  pthread_mutex_t     files_in_flight_mutex_;
+  pthread_cond_t      free_file_slots_;
+  pthread_cond_t      reading_done_;
+  unsigned int        max_files_in_flight_;
+  unsigned int        files_in_flight_;
+
   const unsigned int  tbb_worker_count_;
   tbb::tbb_thread     read_thread_;
-  pthread_mutex_t     terminatation_mutex_;
+  pthread_mutex_t     termination_mutex_;
   bool                running_;
 };
 

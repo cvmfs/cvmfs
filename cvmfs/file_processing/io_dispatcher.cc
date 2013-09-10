@@ -115,7 +115,7 @@ void IoDispatcher::ChunkUploadCompleteCallback(const UploaderResults &results,
   chunk->file()->ChunkCommitted(chunk);
 
   pthread_mutex_lock(&processing_done_mutex_);
-  if (--chunks_in_flight_ == 0 && files_in_flight_ == 0) {
+  if (--chunks_in_flight_ == 0) {
       pthread_cond_signal(&processing_done_condition_);
   }
   pthread_mutex_unlock(&processing_done_mutex_);
@@ -123,12 +123,6 @@ void IoDispatcher::ChunkUploadCompleteCallback(const UploaderResults &results,
 
 
 void IoDispatcher::CommitFile(File *file) {
-  pthread_mutex_lock(&files_in_flight_mutex_);
-  if (--files_in_flight_ < max_files_in_flight_ / 2) {
-    pthread_cond_signal(&free_slot_condition_);
-  }
-  pthread_mutex_unlock(&files_in_flight_mutex_);
-
   file_processor_->FileDone(file);
   delete file;
 }
