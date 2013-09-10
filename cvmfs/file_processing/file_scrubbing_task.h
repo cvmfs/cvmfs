@@ -14,17 +14,28 @@ class AbstractFileScrubbingTask : public tbb::task {
  public:
   AbstractFileScrubbingTask(FileT           *file,
                             CharBuffer      *buffer,
-                            AbstractReader  *reader) :
-    file_(file), buffer_(buffer), reader_(reader), next_(NULL)  {}
+                            const bool       is_last_piece) :
+    file_(file), buffer_(buffer), reader_(NULL), is_last_(is_last_piece),
+    next_(NULL) {}
 
   ~AbstractFileScrubbingTask() {
     reader_->ReleaseBuffer(buffer_);
   }
 
+        FileT*      file()         { return file_;   }
+        CharBuffer* buffer()       { return buffer_; }
+  const FileT*      file()   const { return file_;   }
+  const CharBuffer* buffer() const { return buffer_; }
+  bool        IsLast() const { return is_last_; }
+
   /** Associate the FileScrubbingTask with its successor */
   void SetNext(tbb::task *next) {
     next->increment_ref_count();
     next_ = next;
+  }
+
+  void SetReader(AbstractReader *reader) {
+    reader_ = reader;
   }
 
  protected:
@@ -38,12 +49,13 @@ class AbstractFileScrubbingTask : public tbb::task {
       : NULL;
   }
 
- protected:
-  FileT               *file_;   ///< the associated file that is to be processed
-  CharBuffer          *buffer_; ///< the CharBuffer containing the current data Block
-  AbstractReader      *reader_; ///< the Reader that is responsible for the given data Block
-  tbb::task           *next_;   ///< the next FileScrubbingTask
-                                ///< (if NULL, no more data will come after this FileScrubbingTask)
+ private:
+  FileT          *file_;    ///< the associated file that is to be processed
+  CharBuffer     *buffer_;  ///< the CharBuffer containing the current data Block
+  AbstractReader *reader_;  ///< the Reader that is responsible for the given data Block
+  const bool      is_last_; ///< defines if we have the last piece
+  tbb::task      *next_;    ///< the next FileScrubbingTask
+                            ///< (if NULL, no more data will come after this FileScrubbingTask)
 };
 
 }
