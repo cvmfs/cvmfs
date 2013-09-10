@@ -165,7 +165,6 @@ tbb::task* FileScrubbingTask::execute() {
 
   // wait for all scheduled chunk processing tasks on the current buffer
   SpawnTasksAndWaitForProcessing();
-  reader_->ReleaseBuffer(buffer_);
 
   // commit the chunks that have been finished during this processing step
   CommitFinishedChunks();

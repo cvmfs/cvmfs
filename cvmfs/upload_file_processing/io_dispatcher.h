@@ -17,127 +17,15 @@
 #include <pthread.h>
 
 #include "char_buffer.h"
+#include "async_reader.h"
+#include "file.h"
+#include "processor.h"
 #include "../upload_facility.h"
 
 namespace upload {
 
-class File;
 class Chunk;
-class FileScrubbingTask;
 class FileProcessor;
-
-typedef tbb::concurrent_bounded_queue<File*> FileQueue;
-
-/**
- * The Reader takes care of the efficient read-in of files. It (asynchronously)
- * pops read jobs from a queue and handles them. Reading of multiple big Files
- * is done concurrently in a sense that new data Blocks for a number of Files
- * are read in a round robin fashion and scheduled for processing.
- * This allows for better parallelism in the processing pipeline since each
- * individual File needs to be processed sequentially. Though data Blocks of
- * different Files are independent of each other and allow for higher throughput.
- *
- * Note: The Reader produces CharBuffers that are passed into the processing
- *       pipeline. The Reader claims ownership of these specific CharBuffers,
- *       thus they need to be released using the Reader::ReleaseBuffer() method!
- */
-class Reader {
- protected:
-  /**
-   * Internal structure to keep information about each currently open File.
-   */
-  struct OpenFile {
-    OpenFile() :
-      file(NULL), file_marker(0), previous_task(NULL),
-      previous_sync_task(NULL) {}
-
-    File               *file;               ///< reference to the associated File structure
-    int                 file_descriptor;    ///< open file descriptor of the file
-    off_t               file_marker;        ///< current position of file read-in
-
-    FileScrubbingTask  *previous_task;      ///< previously scheduled TBB task (for synchronization)
-    tbb::task          *previous_sync_task; ///< previously scheduled TBB task (for synchronization)
-  };
-
-  typedef std::list<OpenFile> OpenFileList;
-
- public:
-  Reader(FileQueue          &queue,
-         const size_t        max_buffer_size,
-         const unsigned int  max_buffers_in_flight) :
-    queue_(queue),
-    max_buffer_size_(max_buffer_size),
-    max_buffers_in_flight_(max_buffers_in_flight),
-    draining_(false)
-  {
-    buffers_in_flight_ = 0;
-    pthread_mutex_init(&free_slot_mutex_,    NULL);
-    pthread_cond_init(&free_slot_condition_, NULL);
-  }
-
-  ~Reader() {
-    pthread_mutex_destroy(&free_slot_mutex_);
-    pthread_cond_destroy(&free_slot_condition_);
-  }
-
-  /**
-   * Starts the reading loop of the Reader.
-   */
-  void Read();
-
-  /**
-   * Releases CharBuffers that were previously allocated by the Reader. This
-   * needs to be called by the processing pipeline for finished Buffers.
-   */
-  void ReleaseBuffer(CharBuffer *buffer) {
-    delete buffer;
-    pthread_mutex_lock(&free_slot_mutex_);
-    if (--buffers_in_flight_ < max_buffers_in_flight_ / 2) {
-      pthread_cond_signal(&free_slot_condition_);
-    }
-    pthread_mutex_unlock(&free_slot_mutex_);
-  }
-
- protected:
-  /** Checks if there is still data to be worked on */
-  bool HasData() const { return ! draining_ || open_files_.size() > 0; }
-
-  bool TryToAcquireNewJob(File *&new_file_job);
-  void OpenNewFile(File *file);
-  void CloseFile(OpenFile &file);
-  bool ReadAndScheduleNextBuffer(OpenFile &open_file);
-
-  /**
-   * When all Files have been scheduled from the outside, we enable the draining
-   * mode to bring all reading to an end and terminate eventually.
-   */
-  void EnableDraining() { draining_ = true; }
-
-  CharBuffer *CreateBuffer(const size_t size) {
-    pthread_mutex_lock(&free_slot_mutex_);
-    while (buffers_in_flight_ > max_buffers_in_flight_) {
-      pthread_cond_wait(&free_slot_condition_, &free_slot_mutex_);
-    }
-    ++buffers_in_flight_;
-    pthread_mutex_unlock(&free_slot_mutex_);
-
-    CharBuffer *buffer = new CharBuffer(size);
-    return buffer;
-  }
-
- private:
-  FileQueue                 &queue_;                 ///< reference to the JobQueue (see IoDispatcher)
-  const size_t               max_buffer_size_;       ///< size of data Blocks to read-in
-  tbb::atomic<unsigned int>  buffers_in_flight_;     ///< number of data Blocks currently in memory
-  const unsigned int         max_buffers_in_flight_; ///< maximal number of Buffers in memory
-
-  bool                       draining_;
-  OpenFileList               open_files_;
-
-  pthread_mutex_t            free_slot_mutex_;
-  pthread_cond_t             free_slot_condition_;
-};
-
 
 
 /**
@@ -238,8 +126,7 @@ class IoDispatcher {
     tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
     max_read_buffer_size_(max_read_buffer_size),
     max_files_in_flight_(tbb_workers_ * 10),
-    reader_(read_queue_, max_read_buffer_size_, max_files_in_flight_ * 5),
-    read_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::ReadThread),
+    reader_(max_read_buffer_size_, max_files_in_flight_ * 5),
     write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
     uploader_(uploader),
     file_processor_(file_processor)
@@ -296,7 +183,7 @@ class IoDispatcher {
     }
     ++files_in_flight_;
     ++file_count_;
-    read_queue_.push(file);
+    reader_.ScheduleRead(file);
     pthread_mutex_unlock(&files_in_flight_mutex_);
   }
 
@@ -338,20 +225,13 @@ class IoDispatcher {
   }
 
   void TearDown() {
-    assert(read_thread_.joinable());
     assert(write_thread_.joinable());
-
-    read_queue_.push(NULL);
     write_queue_.push(WriteJob());
-
-    read_thread_.join();
     write_thread_.join();
   }
 
-  void ReadThread();
   void WriteThread();
 
-  bool ReadFileAndSpawnTasks(File *file);
   void WriteBufferToChunk(Chunk       *chunk,
                           CharBuffer  *buffer,
                           const bool   delete_buffer);
@@ -362,29 +242,27 @@ class IoDispatcher {
                                     BufferUploadCompleteParam   buffer_info);
 
  private:
-  const unsigned int        tbb_workers_;               ///< number of TBB worker threads to be used
-  const size_t              max_read_buffer_size_;      ///< maximal data block size for file read-in
+  const unsigned int               tbb_workers_;               ///< number of TBB worker threads to be used
+  const size_t                     max_read_buffer_size_;      ///< maximal data block size for file read-in
 
-  tbb::atomic<unsigned int> files_in_flight_;           ///< number of Files currently in processing
-  tbb::atomic<unsigned int> chunks_in_flight_;          ///< number of Chunks currently in processing
-  tbb::atomic<unsigned int> file_count_;                ///< overall number of processed files
+  tbb::atomic<unsigned int>        files_in_flight_;           ///< number of Files currently in processing
+  tbb::atomic<unsigned int>        chunks_in_flight_;          ///< number of Chunks currently in processing
+  tbb::atomic<unsigned int>        file_count_;                ///< overall number of processed files
 
-  FileQueue                 read_queue_;                ///< JobQueue for reading (see Reader)
-  WriteJobQueue             write_queue_;               ///< JobQueue for writing
+  WriteJobQueue                    write_queue_;               ///< JobQueue for writing
 
-  pthread_mutex_t           files_in_flight_mutex_;
-  pthread_cond_t            free_slot_condition_;
-  const unsigned int        max_files_in_flight_;
+  pthread_mutex_t                  files_in_flight_mutex_;
+  pthread_cond_t                   free_slot_condition_;
+  const unsigned int               max_files_in_flight_;
 
-  pthread_mutex_t           processing_done_mutex_;
-  pthread_cond_t            processing_done_condition_;
+  pthread_mutex_t                  processing_done_mutex_;
+  pthread_cond_t                   processing_done_condition_;
 
-  Reader                    reader_;                    ///< dedicated File Reader object
-  tbb::tbb_thread           read_thread_;
-  tbb::tbb_thread           write_thread_;
+  Reader<FileScrubbingTask, File>  reader_;                    ///< dedicated File Reader object
+  tbb::tbb_thread                  write_thread_;
 
-  AbstractUploader         *uploader_;                  ///< (weak) reference to the used AbstractUploaer
-  FileProcessor            *file_processor_;            ///< (weak) reference to the FileProcesser in command
+  AbstractUploader                *uploader_;                  ///< (weak) reference to the used AbstractUploaer
+  FileProcessor                   *file_processor_;            ///< (weak) reference to the FileProcesser in command
 };
 
 } // namespace upload
