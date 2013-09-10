@@ -164,7 +164,7 @@ macro (pedantic_include_check HEADERFILE VARIABLENAME)
 endmacro (pedantic_include_check)
 
 macro (look_for_include_files)
-  foreach (HEADER IN ITEMS ${ARGV})
+  foreach (HEADER ${ARGV})
     string (REGEX REPLACE "/|\\." "_" HEADER_VAR_LOWER ${HEADER})
     string (TOUPPER "have_${HEADER_VAR_LOWER}" HEADER_VAR)
     pedantic_include_check (${HEADER} ${HEADER_VAR})
