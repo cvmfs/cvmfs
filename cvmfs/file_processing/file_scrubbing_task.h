@@ -9,6 +9,22 @@ namespace upload { // TODO: remove or replace
 
 class CharBuffer;
 
+
+class AbstractFile {
+ public:
+  AbstractFile(const std::string &path,
+               const size_t       size) :
+    path_(path), size_(size) {}
+
+  const std::string& path() const { return path_; }
+  const size_t       size() const { return size_; }
+
+ private:
+  const std::string  path_;
+  const size_t       size_;
+};
+
+
 template <class FileT>
 class AbstractFileScrubbingTask : public tbb::task {
  public:

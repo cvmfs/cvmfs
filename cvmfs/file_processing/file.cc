@@ -15,9 +15,9 @@ File::File(const std::string  &path,
            IoDispatcher       *io_dispatcher,
            ChunkDetector      *chunk_detector,
            const std::string  &hash_suffix) :
-  path_(path), size_(GetFileSize(path)),
+  AbstractFile(path, GetFileSize(path)),
   might_become_chunked_(chunk_detector != NULL &&
-                        chunk_detector->MightFindChunks(size_)),
+                        chunk_detector->MightFindChunks(size())),
   hash_suffix_(hash_suffix),
   bulk_chunk_(NULL),
   io_dispatcher_(io_dispatcher),
@@ -78,7 +78,7 @@ void File::CreateInitialChunk() {
     // if we are dealing with a file that will definitely _not_ be chunked, we
     // directly mark the initial chunk as being a bulk chunk
     new_chunk->SetAsBulkChunk();
-    new_chunk->set_size(size_);
+    new_chunk->set_size(size());
   }
 
   // register the new initial chunk
@@ -87,7 +87,7 @@ void File::CreateInitialChunk() {
 
 
 Chunk* File::CreateNextChunk(const off_t offset) {
-  assert (offset > 0 && offset < static_cast<off_t>(size_));
+  assert (offset > 0 && offset < static_cast<off_t>(size()));
   assert (chunks_.size() > 0);
   assert (might_become_chunked_);
 
@@ -120,7 +120,7 @@ void File::ForkOffBulkChunk() {
   assert (latest_chunk != NULL);
   assert (latest_chunk->offset() == 0 && ! latest_chunk->IsFullyDefined());
 
-  Chunk* bulk_chunk = latest_chunk->CopyAsBulkChunk(size_);
+  Chunk* bulk_chunk = latest_chunk->CopyAsBulkChunk(size());
   AddChunk(bulk_chunk);
 }
 
@@ -133,7 +133,7 @@ void File::PromoteSingleChunkAsBulkChunk() {
   Chunk *only_chunk = current_chunk();
   assert (only_chunk != NULL);
   assert (only_chunk->offset() == 0);
-  assert (only_chunk->size() == size_);
+  assert (only_chunk->size() == size());
   assert (! only_chunk->IsBulkChunk());
   assert (only_chunk->IsFullyDefined());
 
@@ -154,8 +154,8 @@ void File::FullyDefineLastChunk() {
   assert (latest_chunk != NULL);
   assert (! latest_chunk->IsFullyDefined());
 
-  latest_chunk->set_size(size_ - latest_chunk->offset());
-  assert (latest_chunk->offset() + latest_chunk->size() == size_);
+  latest_chunk->set_size(size() - latest_chunk->offset());
+  assert (latest_chunk->offset() + latest_chunk->size() == size());
 
   // only one Chunk was generated during the processing of this file, though it
   // was classified as possible chunked file --> re-define the file as not being
@@ -183,7 +183,7 @@ void File::Finalize() {
       previous_chunk_end = current_chunk->offset() + current_chunk->size();
       aggregated_size += current_chunk->size();
     }
-    assert (aggregated_size == size_);
+    assert (aggregated_size == size());
   } else {
     assert (chunks_.size() == 0);
   }
@@ -192,7 +192,7 @@ void File::Finalize() {
   // more sanity checks
   assert (HasBulkChunk());
   assert (bulk_chunk_->offset() == 0);
-  assert (bulk_chunk_->size()   == size_);
+  assert (bulk_chunk_->size()   == size());
   assert (bulk_chunk_->IsFullyProcessed());
 
   // notify about the finished file processing
