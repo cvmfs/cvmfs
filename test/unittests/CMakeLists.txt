@@ -25,6 +25,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_buffer.cc
   t_chunk_detectors.cc
   t_file_processing.cc
+  t_async_reader.cc
   t_test_utils.cc
 
   # test utility functions
