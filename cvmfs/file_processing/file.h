@@ -14,6 +14,7 @@
 
 #include "char_buffer.h"
 #include "chunk_detector.h"
+#include "file_scrubbing_task.h"
 
 namespace upload {
 
@@ -27,7 +28,7 @@ typedef std::vector<Chunk*> ChunkVector;
  * input object for the processing. It is in charge of the Chunk handling and
  * holds file related meta data.
  */
-class File {
+class File : public AbstractFile {
  public:
   File(const std::string  &path,
        IoDispatcher       *io_dispatcher,
@@ -67,9 +68,6 @@ class File {
   bool HasBulkChunk()              const { return bulk_chunk_ != NULL;     }
   bool HasChunkDetector()          const { return chunk_detector_ != NULL; }
 
-  size_t size()                    const { return size_;                   }
-  const std::string& path()        const { return path_;                   }
-
         Chunk* bulk_chunk()              { return bulk_chunk_;             }
   const Chunk* bulk_chunk()        const { return bulk_chunk_;             }
   const ChunkVector& chunks()      const { return chunks_;                 }
@@ -92,8 +90,6 @@ class File {
   void Finalize();
 
  private:
-  const std::string           path_;                 ///< File path of the associated file
-  const size_t                size_;                 ///< The (uncompressed) file size
   const bool                  might_become_chunked_; ///< Result of the chunkedness forecast
   const std::string           hash_suffix_;          ///< Suffix to be appended to the bulk chunk content hash
 
