@@ -28,8 +28,9 @@ void Reader<FileScrubbingTaskT, FileT>::ReadThread() {
     for (; i != iend; ++i) {
       const bool finished_reading = ReadAndScheduleNextBuffer(*i);
       if (finished_reading) {
-        CloseFile(*i);
+        OpenFile file = *i;
         i = open_files_.erase(i);
+        CloseFile(file);
       }
     }
   }
@@ -66,7 +67,6 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
   OpenFile open_file;
   open_file.file            = file;
   open_file.file_descriptor = fd;
-
   open_files_.push_back(open_file);
 }
 
@@ -81,8 +81,22 @@ void Reader<FileScrubbingTaskT, FileT>::CloseFile(OpenFile &file) {
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::FinalizedFile(AbstractFile *file) {
   assert (file != NULL);
+
+  // notify subscribed callbacks for a finalized file
   FileT *concrete_file = static_cast<FileT*>(file);
   NotifyListeners(concrete_file);
+
+  // check if all files have been processed
+  {
+    MutexLockGuard lock(files_in_flight_mutex_);
+    --files_in_flight_;
+    if (files_in_flight_ == 0) {
+      pthread_cond_broadcast(&reading_done_);
+    }
+    if (files_in_flight_ <= max_files_in_flight_ / 2) {
+      pthread_cond_broadcast(&free_file_slots_);
+    }
+  }
 }
 
 
