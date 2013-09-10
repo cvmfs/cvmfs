@@ -4,12 +4,12 @@
 #include <tbb/task.h>
 
 #include "char_buffer.h"
+#include "file_scrubbing_task.h"
 
 namespace upload {
 
 class Chunk;
 class IoDispatcher;
-class Reader;
 class File;
 
 /**
@@ -67,19 +67,15 @@ class ChunkProcessingTask : public tbb::task {
  * it will spawn ChunkProcessingTasks that take care of the actual crunching of
  * Chunk contents.
  */
-class FileScrubbingTask : public tbb::task {
+class FileScrubbingTask : public AbstractFileScrubbingTask<File> {
  protected:
   typedef std::vector<off_t> CutMarks;
 
  public:
-  FileScrubbingTask(File *file, CharBuffer *buffer, Reader *reader) :
-    file_(file), buffer_(buffer), reader_(reader), next_(NULL) {}
-
-  /** Associate the FileScrubbingTask with its successor */
-  void SetNext(FileScrubbingTask *next) {
-    next->increment_ref_count();
-    next_ = next;
-  }
+  FileScrubbingTask(File            *file,
+                    CharBuffer      *buffer,
+                    AbstractReader  *reader) :
+    AbstractFileScrubbingTask<File>(file, buffer, reader) {}
 
   tbb::task* execute();
 
@@ -92,16 +88,6 @@ class FileScrubbingTask : public tbb::task {
    */
   CutMarks FindNextChunkCutMarks();
 
-  /**
-   * Decide if the next FileScrubbingTask can be directly returned for pro-
-   * cessing in TBB
-   */
-  tbb::task* Next() {
-    return (next_ != NULL && next_->decrement_ref_count() == 0)
-      ? next_
-      : NULL;
-  }
-
   void QueueForDeferredProcessing(Chunk *chunk) {
     assert (chunk != NULL);
     chunks_to_process_.push_back(chunk);
@@ -110,12 +96,6 @@ class FileScrubbingTask : public tbb::task {
   void CommitFinishedChunks() const;
 
  private:
-  File                *file_;   ///< the associated file that is to be processed
-  CharBuffer          *buffer_; ///< the CharBuffer containing the current data Block
-  Reader              *reader_; ///< the Reader that is responsible for the given data Block
-  FileScrubbingTask   *next_;   ///< the next FileScrubbingTask
-                                ///< (if NULL, no more data will come after this FileScrubbingTask)
-
   std::vector<Chunk*>  chunks_to_process_; ///< Filled on runtime of FileScrubbingTask with all
                                            ///< Chunks that need to "see" the data in buffer_
 };
