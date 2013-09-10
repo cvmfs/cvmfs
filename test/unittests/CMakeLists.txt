@@ -61,6 +61,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_file_processing/processor.cc
   ${CVMFS_SOURCE_DIR}/upload_file_processing/file.cc
   ${CVMFS_SOURCE_DIR}/upload_file_processing/chunk.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/async_reader.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
   ${CVMFS_SOURCE_DIR}/upload_local.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
