@@ -179,6 +179,39 @@ TEST_F (T_AsyncReader, ReadSmallFile) {
   f->CheckHash();
 }
 
+unsigned int g_FileReadCallback_Callback_calls = 0;
+void FileReadCallback_Callback(TestFile* const& file) {
+  file->CheckHash();
+  ++g_FileReadCallback_Callback_calls;
+}
+
+TEST_F (T_AsyncReader, FileReadCallback) {
+  const unsigned int file_count = 5;
+
+  std::vector<TestFile*> files;
+  files.push_back(new TestFile(GetBigFile(),   GetBigFileHash()));
+  files.push_back(new TestFile(GetEmptyFile(), GetEmptyFileHash()));
+  files.push_back(new TestFile(GetSmallFile(), GetSmallFileHash()));
+  files.push_back(new TestFile(GetSmallFile(), GetSmallFileHash()));
+  files.push_back(new TestFile(GetBigFile(),   GetBigFileHash()));
+
+  const size_t        max_buffer_size = 524288;
+  const unsigned int  max_buffers_in_flight = 5;
+  MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.RegisterListener(FileReadCallback_Callback);
+
+  std::vector<TestFile*>::const_iterator i    = files.begin();
+  std::vector<TestFile*>::const_iterator iend = files.end();
+  for (; i < iend; ++i) {
+    reader.ScheduleRead(*i);
+  }
+
+  reader.Wait();
+
+  EXPECT_EQ (file_count, g_FileReadCallback_Callback_calls)
+    << "number of callback invocation does not match";
+}
+
 
 TEST_F (T_AsyncReader, ReadHugeFile) {
   TestFile *f = new TestFile(GetHugeFile(), GetHugeFileHash());
