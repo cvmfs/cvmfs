@@ -172,7 +172,7 @@ tbb::task* FileScrubbingTask::execute() {
   CommitFinishedChunks();
 
   // go on with the next file buffer
-  return Next();
+  return Finalize();
 }
 
 
