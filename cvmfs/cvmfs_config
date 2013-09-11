@@ -32,6 +32,11 @@ case $sys_arch in
     else
       fuser="/bin/fuser"  # Ubuntu, SuSE
     fi
+    if [ -x /usr/bin/fusermount ]; then
+      fusermount="/usr/bin/fusermount"  # RHEL, SuSE
+    else
+      fusermount="/bin/fusermount"  # Ubuntu
+    fi
     if [ ! -x /usr/bin/attr ]; then
       # Fedora
       if [ ! -x /bin/attr ]; then
@@ -213,10 +218,18 @@ cvmfs_chksetup() {
     fi
   done
 
-  # Fusermount (not necessary user under Mac OS X)
+  # Fusermount (not necessary under Mac OS X)
   if [ "$sys_arch" = "Linux" ]; then
-    if [ ! -x /usr/bin/fusermount -a ! -x /bin/fusermount ]; then
-      echo "Warning: failed to locate fusermount"
+    if [ ! -x $fusermount ]; then
+      echo "Error: failed to locate fusermount"
+      num_errors=$(($num_errors+1))
+    fi
+    if [ ! -u $fusermount ]; then
+      echo "Error: fusermount needs to be a suid binary"
+      num_errors=$(($num_errors+1))
+    fi
+    if ! runas $CVMFS_USER "$fusermount -V" > /dev/null 2>&1; then
+      echo "Error: failed to run $fusermount as user $CVMFS_USER"
       num_errors=$(($num_errors+1))
     fi
   fi
