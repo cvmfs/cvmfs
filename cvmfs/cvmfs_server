@@ -598,6 +598,10 @@ get_expiry() {
   local stratum0=$1
 
   local expires=$(get_item $stratum0/.cvmfswhitelist 'noproxy' | head -2 | tail -1 | tail -c15)
+  if echo $expires | grep -q -E --invert-match '^[0-9]{14}$'; then
+    echo -1
+    return 1
+  fi
   local year=$(echo $expires | head -c4)
   local month=$(echo $expires | head -c6 | tail -c2)
   local day=$(echo $expires | head -c8 | tail -c2)
