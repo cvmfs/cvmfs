@@ -12,6 +12,18 @@
 
 namespace upload
 {
+  struct LocalStreamHandle : public UploadStreamHandle {
+    LocalStreamHandle(const callback_t   *commit_callback,
+                      const int           tmp_fd,
+                      const std::string  &tmp_path) :
+      UploadStreamHandle(commit_callback),
+      file_descriptor(tmp_fd),
+      temporary_path(tmp_path) {}
+
+    const int         file_descriptor;
+    const std::string temporary_path;
+  };
+
   /**
    * The LocalSpooler implements the AbstractSpooler interface to push files
    * into a local CVMFS repository backend.
@@ -36,10 +48,13 @@ namespace upload
                 const std::string  &remote_path,
                 const callback_t   *callback = NULL);
 
-    void Upload(const std::string  &local_path,
-                const hash::Any    &content_hash,
-                const std::string  &hash_suffix,
-                const callback_t   *callback = NULL);
+    UploadStreamHandle* InitStreamedUpload(const callback_t *callback = NULL);
+    void Upload(UploadStreamHandle  *handle,
+                CharBuffer          *buffer,
+                const callback_t    *callback = NULL);
+    void FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                const hash::Any     content_hash,
+                                const std::string   hash_suffix);
 
     bool Remove(const std::string &file_to_delete);
 
@@ -54,6 +69,8 @@ namespace upload
    protected:
     int Move(const std::string &local_path,
              const std::string &remote_path) const;
+
+    int CreateAndOpenTemporaryChunkFile(std::string *path) const;
 
    private:
     // state information

@@ -22,6 +22,9 @@ set (CVMFS_UNITTEST_SOURCES
   t_pipe.cc
   t_managed_exec.cc
   t_prng.cc
+  t_buffer.cc
+  t_chunk_detectors.cc
+  t_file_processing.cc
   t_test_utils.cc
 
   # test utility functions
@@ -51,6 +54,18 @@ set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/file_processor.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/io_dispatcher.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/processor.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/file.cc
+  ${CVMFS_SOURCE_DIR}/upload_file_processing/chunk.cc
+  ${CVMFS_SOURCE_DIR}/upload_facility.cc
+  ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
 )
 
 #
@@ -74,6 +89,7 @@ set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 #
 # build CernVM-FS test cases
 #
+include_directories (${INCLUDE_DIRECTORIES})
 add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
 add_dependencies (${PROJECT_TEST_NAME} googletest)
 
@@ -81,11 +97,15 @@ if (SQLITE3_BUILTIN)
   add_dependencies (${PROJECT_TEST_NAME} sqlite3)
 endif (SQLITE3_BUILTIN)
 
+if (TBB_PRIVATE_LIB)
+  add_dependencies (${PROJECT_TEST_NAME} libtbb)
+endif (TBB_PRIVATE_LIB)
+
 set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
-                       ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} pthread)
+                       ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
 
 #
 # Integrate the test running into CMake
