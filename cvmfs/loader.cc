@@ -766,6 +766,7 @@ int main(int argc, char *argv[]) {
     }
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s (%d)",
              cvmfs_exports_->fnGetErrorMsg().c_str(), retval);
+    cvmfs_exports_->fnFini();
     return retval;
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
