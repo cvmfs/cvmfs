@@ -34,18 +34,11 @@ class AbstractFileScrubbingTask : public tbb::task {
     file_(file), buffer_(buffer), reader_(NULL), is_last_(is_last_piece),
     next_(NULL) {}
 
-  ~AbstractFileScrubbingTask() {
-    reader_->ReleaseBuffer(buffer_);
-    if (IsLast()) {
-      reader_->FinalizedFile(file_);
-    }
-  }
-
-        FileT*      file()         { return file_;   }
-        CharBuffer* buffer()       { return buffer_; }
-  const FileT*      file()   const { return file_;   }
-  const CharBuffer* buffer() const { return buffer_; }
-  bool        IsLast() const { return is_last_; }
+        FileT*      file()         { return file_;    }
+        CharBuffer* buffer()       { return buffer_;  }
+  const FileT*      file()   const { return file_;    }
+  const CharBuffer* buffer() const { return buffer_;  }
+  bool              IsLast() const { return is_last_; }
 
   /** Associate the FileScrubbingTask with its successor */
   void SetNext(tbb::task *next) {
@@ -58,6 +51,15 @@ class AbstractFileScrubbingTask : public tbb::task {
   }
 
  protected:
+  tbb::task* Finalize() {
+    reader_->ReleaseBuffer(buffer_);
+    if (is_last_) {
+      reader_->FinalizedFile(file_);
+    }
+
+    return Next();
+  }
+
   /**
    * Decide if the next FileScrubbingTask can be directly returned for pro-
    * cessing in TBB

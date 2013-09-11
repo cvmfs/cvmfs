@@ -74,7 +74,7 @@ class DummyFileScrubbingTask :
     UpdateSha1(file, buffer);
     UpdateMetaData(file, buffer);
 
-    return Next();
+    return Finalize();
   }
 
   void UpdateSha1(TestFile *file, upload::CharBuffer *buffer) {
