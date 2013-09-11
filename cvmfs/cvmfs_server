@@ -619,7 +619,14 @@ get_expiry() {
 
 check_expiry() {
   local stratum0=$1
-  [ $(get_expiry $stratum0) -ge 0 ]
+  local expiry="-1"
+
+  expiry=$(get_expiry $stratum0)
+  if [ $? -ne 0 ]; then
+    die "Failed to retrieve repository expiry date"
+  fi
+
+  [ $expiry -ge 0 ]
 }
 
 
