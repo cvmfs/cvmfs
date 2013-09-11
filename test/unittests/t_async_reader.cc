@@ -14,8 +14,10 @@
 
 class TestFile : public upload::AbstractFile {
  public:
-  TestFile(const std::string path) :
+  TestFile(const std::string path,
+           const FileSandbox::ExpectedHashString &expected_hash) :
     AbstractFile(path, GetFileSize(path)),
+    expected_hash_(hash::kSha1, hash::HexPtr(expected_hash.first)),
     read_offset_(0)
   {
     const int sha1_retval = SHA1_Init(&sha1_context_);
@@ -30,12 +32,25 @@ class TestFile : public upload::AbstractFile {
     return hash::Any(hash::kSha1, sha1_digest_, SHA_DIGEST_LENGTH);
   }
 
+  const hash::Any& GetExpectedHash() const {
+    return expected_hash_;
+  }
+
+  void CheckHash() const {
+    const hash::Any computed_hash = GetHash();
+    EXPECT_EQ (expected_hash_, computed_hash)
+      << "content hashes do not fit!" << std::endl
+      << "expected: " << expected_hash_.ToString() << std::endl
+      << "computed: " << computed_hash.ToString();
+  }
+
   void IncreaseReadOffset(const size_t size) { read_offset_ += size; }
 
  private:
   // sha1 administrative data
   SHA_CTX        sha1_context_;
   unsigned char  sha1_digest_[SHA_DIGEST_LENGTH];
+  hash::Any      expected_hash_;
 
   // file scrubbing bookkeeping (only important for testing purposes)
   off_t          read_offset_;
@@ -106,16 +121,6 @@ class T_AsyncReader : public FileSandbox {
     RemoveSandbox();
   }
 
-  void CheckHash(const ExpectedHashString &expected_hash,
-                 const hash::Any          &computed_hash) const {
-    ASSERT_EQ ("", expected_hash.second) << "no hash suffixes in this Test!";
-
-    hash::Any e = hash::Any(hash::kSha1, hash::HexPtr(expected_hash.first));
-    EXPECT_EQ (e, computed_hash) << "content hashes do not fit!" << std::endl
-                                 << "expected: " << e.ToString() << std::endl
-                                 << "computed: " << computed_hash.ToString();
-  }
-
   ExpectedHashString GetEmptyFileHash(const std::string suffix = "") const {
     return std::make_pair("da39a3ee5e6b4b0d3255bfef95601890afd80709", suffix);
   }
@@ -153,16 +158,16 @@ TEST_F (T_AsyncReader, ReadEmptyFile) {
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
 
-  TestFile *f = new TestFile(GetEmptyFile());
+  TestFile *f = new TestFile(GetEmptyFile(), GetEmptyFileHash());
   reader.ScheduleRead(f);
   reader.Wait();
 
-  CheckHash(GetEmptyFileHash(), f->GetHash());
+  f->CheckHash();
 }
 
 
 TEST_F (T_AsyncReader, ReadSmallFile) {
-  TestFile *f = new TestFile(GetSmallFile());
+  TestFile *f = new TestFile(GetSmallFile(), GetSmallFileHash());
 
   const size_t        max_buffer_size = f->size() * 3; // will fit in one buffer
   const unsigned int  max_buffers_in_flight = 10;
@@ -171,12 +176,12 @@ TEST_F (T_AsyncReader, ReadSmallFile) {
   reader.ScheduleRead(f);
   reader.Wait();
 
-  CheckHash(GetSmallFileHash(), f->GetHash());
+  f->CheckHash();
 }
 
 
 TEST_F (T_AsyncReader, ReadHugeFile) {
-  TestFile *f = new TestFile(GetHugeFile());
+  TestFile *f = new TestFile(GetHugeFile(), GetHugeFileHash());
 
   const size_t        max_buffer_size = 524288; // will NOT fit in one buffer
   const unsigned int  max_buffers_in_flight = 10;
@@ -185,7 +190,7 @@ TEST_F (T_AsyncReader, ReadHugeFile) {
   reader.ScheduleRead(f);
   reader.Wait();
 
-  CheckHash(GetHugeFileHash(), f->GetHash());
+  f->CheckHash();
 }
 
 
@@ -195,7 +200,7 @@ TEST_F (T_AsyncReader, ReadManyBigFile) {
   std::vector<TestFile*> files;
   files.reserve(file_count);
   for (int i = 0; i < file_count; ++i) {
-    files.push_back(new TestFile(GetBigFile()));
+    files.push_back(new TestFile(GetBigFile(), GetBigFileHash()));
   }
 
   const size_t        max_buffer_size = 524288;
@@ -213,6 +218,6 @@ TEST_F (T_AsyncReader, ReadManyBigFile) {
   std::vector<TestFile*>::const_iterator j    = files.begin();
   std::vector<TestFile*>::const_iterator jend = files.end();
   for (; j < jend; ++j) {
-    CheckHash(GetBigFileHash(), (*j)->GetHash());
+    (*j)->CheckHash();
   }
 }
