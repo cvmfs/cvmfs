@@ -1,4 +1,5 @@
 2.1.15:
+  * Improve logging on mount
   * Properly finalize Fuse module on mount failures
   * Build system: fix libattr devel detection
   * Fix detecting the service utility under Ubuntu in cvmfs_config

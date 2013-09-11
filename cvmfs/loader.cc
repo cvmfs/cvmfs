@@ -634,7 +634,8 @@ int main(int argc, char *argv[]) {
   fuse_opt_add_arg(mount_options, "-onodev");
   if (suid_mode_) {
     if (getuid() != 0) {
-      PrintError("must be root to mount with suid option");
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "must be root to mount with suid option");
       abort();
     }
     fuse_opt_add_arg(mount_options, "-osuid");
@@ -688,8 +689,9 @@ int main(int argc, char *argv[]) {
       rpl.rlim_cur = nfiles;
       retval = setrlimit(RLIMIT_NOFILE, &rpl);
       if (retval != 0) {
-        PrintError("Failed to set maximum number of open files, "
-                   "insufficient permissions");
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                 "Failed to set maximum number of open files, "
+                 "insufficient permissions");
         // TODO detect valgrind and don't fail
         return kFailPermission;
       }
@@ -701,7 +703,8 @@ int main(int argc, char *argv[]) {
     if ((chown(mount_point_->c_str(), uid_, gid_) != 0) ||
         (chmod(mount_point_->c_str(), 0755) != 0))
     {
-      PrintError("Failed to grab mountpoint (" + StringifyInt(errno) + ")");
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to grab mountpoint (%d)", errno);
       return kFailPermission;
     }
   }
@@ -712,7 +715,8 @@ int main(int argc, char *argv[]) {
              uid_, gid_);
     const bool retrievable = (suid_mode_ || ! disable_watchdog_);
     if (!SwitchCredentials(uid_, gid_, retrievable)) {
-      PrintError("Failed to drop credentials");
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to drop credentials");
       return kFailPermission;
     }
   }
@@ -728,7 +732,7 @@ int main(int argc, char *argv[]) {
              "CernVM-FS: running in single threaded mode");
   }
   if (debug_mode_) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
              "CernVM-FS: running in debug mode");
   }
 
@@ -739,7 +743,8 @@ int main(int argc, char *argv[]) {
   *socket_path_ += "/cvmfs." + *repository_name_;
   retval = loader_talk::Init(*socket_path_);
   if (!retval) {
-    PrintError("Failed to initialize loader socket");
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "Failed to initialize loader socket");
     return kFailLoaderTalk;
   }
 
@@ -751,8 +756,8 @@ int main(int argc, char *argv[]) {
            "CernVM-FS: loading Fuse module... ");
   cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
   if (!cvmfs_exports_) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load cvmfs library: %s",
-             dlerror());
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to load cvmfs library: %s", dlerror());
     return kFailLoadLibrary;
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
@@ -772,16 +777,15 @@ int main(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   // Mount
-  LogCvmfs(kLogCvmfs, kLogSyslog,
-           "CernVM-FS: linking %s to repository %s",
-           mount_point_->c_str(), repository_name_->c_str());
   atomic_init64(&num_operations_);
   atomic_init32(&blocking_);
 
   if (suid_mode_) {
     const bool retrievable = true;
     if (!SwitchCredentials(0, getgid(), retrievable)) {
-      PrintError("failed to re-gain root permissions for mounting");
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "failed to re-gain root permissions for mounting");
+      cvmfs_exports_->fnFini();
       return kFailPermission;
     }
   }
@@ -789,17 +793,19 @@ int main(int argc, char *argv[]) {
   struct fuse_chan *channel;
   channel = fuse_mount(mount_point_->c_str(), mount_options);
   if (!channel) {
-    PrintError("Failed to create Fuse channel");
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to create Fuse channel");
+    cvmfs_exports_->fnFini();
     return kFailMount;
   }
-  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
-           mount_point_->c_str());
 
   // drop credentials
   if (suid_mode_) {
     const bool retrievable = ! disable_watchdog_;
     if (!SwitchCredentials(uid_, gid_, retrievable)) {
-      PrintError("failed to drop permissions after mounting");
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "failed to drop permissions after mounting");
+      cvmfs_exports_->fnFini();
       return kFailPermission;
     }
   }
@@ -810,11 +816,18 @@ int main(int argc, char *argv[]) {
   session = fuse_lowlevel_new(mount_options, &loader_operations,
                               sizeof(loader_operations), NULL);
   if (!session) {
-    PrintError("Failed to create Fuse session");
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to create Fuse session");
     fuse_unmount(mount_point_->c_str(), channel);
+    cvmfs_exports_->fnFini();
     return kFailMount;
   }
 
+  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
+           mount_point_->c_str());
+  LogCvmfs(kLogCvmfs, kLogSyslog,
+           "CernVM-FS: linking %s to repository %s",
+           mount_point_->c_str(), repository_name_->c_str());
   if (!foreground_)
     Daemonize();
 
