@@ -1,4 +1,6 @@
 2.1.15:
+  * Build system: fix libattr devel detection
+  * Fix detecting the service utility under Ubuntu in cvmfs_config
   * Replace leveldb usleep by SafeSleepMs
   * Switch to leveldb 1.12.0 (IA-64 compatibility)
   * Fix parsing of config file without trailing newline
