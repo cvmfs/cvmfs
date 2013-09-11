@@ -42,6 +42,7 @@ void Init() {
 
 void Fini() {
   delete config_;
+  config_ = NULL;
 }
 
 
