@@ -29,8 +29,9 @@ cvmfs_run_test() {
   fi
   sudo cat $stacktrace_path >> $logfile 2>&1
 
-  # clean up the broken mount point
-  sudo umount /cvmfs/${repo} >> $logfile 2>&1 || return 7
+  # clean up the broken mount point (should fail!)
+  # CernVM-FS should umount the broken mount point on its own
+  sudo umount -l /cvmfs/${repo} >> $logfile 2>&1 && return 7
   
   return 0
 }

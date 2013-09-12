@@ -18,9 +18,9 @@ print_lock = threading.Lock()
 def print_msg(msg):
 	global print_lock
 	print_lock.acquire()
-	print >> sys.stderr, "[Silent Socket]" , msg
+	print "[Silent Socket]" , msg
 	print_lock.release()
-	sys.stderr.flush()
+	sys.stdout.flush()
 
 
 class SilentHandler(SocketServer.BaseRequestHandler):
@@ -56,8 +56,6 @@ try:
 	else:
 		usage()
 
-	print os.getpid()
-	sys.stdout.flush()
 	print_msg("starting a " + server_protocol + " server on port " + str(server_port))
 	server.serve_forever()
 except socket.error, msg:

@@ -42,7 +42,7 @@ cvmfs_run_test() {
   local h2=$?
   sudo cvmfs_talk -i atlas.cern.ch host info >> $logfile 2>&1
 
-  sudo kill -9 $http_pid >> $logfile 2>&1
+  sudo kill $http_pid >> $logfile 2>&1
 
   [ $h1 -eq 0 ] && [ $h2 -eq 0 ] || retval=5
 
