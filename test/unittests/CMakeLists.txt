@@ -23,6 +23,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_managed_exec.cc
   t_prng.cc
   t_test_utils.cc
+  t_sanitizer.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -48,6 +49,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/shortstring.h
+  ${CVMFS_SOURCE_DIR}/sanitizer.h
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
 
   ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
