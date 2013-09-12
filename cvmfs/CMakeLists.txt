@@ -29,6 +29,7 @@ set (CVMFS_CLIENT_SOURCES
   prng.h util.cc util.h
   backoff.h backoff.cc
   duplex_zlib.h compression.h compression.cc
+  sanitizer.cc sanitizer.h
   download.cc download.h
   wpad.cc wpad.h
   manifest.h manifest.cc
@@ -113,6 +114,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_spooler_result.h
   json_document.h json_document.cc
 
+  sanitizer.cc sanitizer.h
   duplex_curl.h download.h download.cc
   signature.cc signature.h
 
