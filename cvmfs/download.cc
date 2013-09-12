@@ -54,6 +54,7 @@
 #include "util.h"
 #include "compression.h"
 #include "smalloc.h"
+#include "sanitizer.h"
 
 using namespace std;  // NOLINT
 
@@ -978,7 +979,8 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 #endif
   cernvm_id += string(VERSION);
   if (getenv("CERNVM_UUID") != NULL) {
-    cernvm_id += " " + string(getenv("CERNVM_UUID"));
+    cernvm_id += " " +
+      sanitizer::InputSanitizer("az AZ 09 -").Filter(getenv("CERNVM_UUID"));
   }
 
   http_headers_ = curl_slist_append(http_headers_, "Connection: Keep-Alive");
