@@ -970,22 +970,26 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   statistics_ = new Statistics();
 
   // Prepare HTTP headers
-  string custom_header;
+  string cernvm_id = "User-Agent: cvmfs ";
+#ifdef CVMFS_LIBCVMFS
+  cernvm_id += "libcvmfs ";
+#else
+  cernvm_id += "Fuse ";
+#endif
+  cernvm_id += string(VERSION);
   if (getenv("CERNVM_UUID") != NULL) {
-    custom_header = "X-CVMFS2 " + string(VERSION) + " " +
-    string(getenv("CERNVM_UUID"));
-  } else {
-    custom_header = "X-CVMFS2 " + string(VERSION) + " anonymous";
+    cernvm_id += " " + string(getenv("CERNVM_UUID"));
   }
+
   http_headers_ = curl_slist_append(http_headers_, "Connection: Keep-Alive");
   http_headers_ = curl_slist_append(http_headers_, "Pragma:");
-  http_headers_ = curl_slist_append(http_headers_, custom_header.c_str());
+  http_headers_ = curl_slist_append(http_headers_, cernvm_id.c_str());
   http_headers_nocache_ = curl_slist_append(http_headers_nocache_,
                                             "Pragma: no-cache");
   http_headers_nocache_ = curl_slist_append(http_headers_nocache_,
                                             "Cache-Control: no-cache");
   http_headers_nocache_ = curl_slist_append(http_headers_nocache_,
-                                            custom_header.c_str());
+                                            cernvm_id.c_str());
 
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
