@@ -786,7 +786,7 @@ cvmfs_reload() {
 
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
     for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
-      kill -SIGUSR1 $(cat $pidfile)
+      kill -s USR1 $(cat $pidfile)
       rm -f $pidfile
     done
   fi
