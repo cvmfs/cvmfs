@@ -755,6 +755,9 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
   size = GetFileSize(temp_path.c_str());
   assert(size > 0);
   if (uint64_t(size) > quota::GetMaxFileSize()) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "failed to load catalog %s (too big)",
+             hash.ToString().c_str());
     AbortTransaction(temp_path);
     backoff_throttle_.Throttle();
     return catalog::kLoadNoSpace;
