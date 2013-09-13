@@ -255,6 +255,14 @@ struct ContextPtr {
     size = GetContextSize(a);
     buffer = NULL;
   }
+
+  explicit ContextPtr(const ContextPtr &other) :
+    algorithm(other.algorithm),
+    size(other.size)
+  {
+    buffer = malloc(size);
+    memcpy(buffer, other.buffer, size);
+  }
 };
 
 void Init(ContextPtr &context);
