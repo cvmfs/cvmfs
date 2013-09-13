@@ -2267,6 +2267,11 @@ static string GetErrorMsg() {
 
 static void Fini() {
   signal(SIGALRM, SIG_DFL);
+
+  // Must be before quota is stopped
+  delete cvmfs::catalog_manager_;
+  cvmfs::catalog_manager_ = NULL;
+
   tracer::Fini();
   if (g_signature_ready) cvmfs::signature_manager_->Fini();
   if (g_download_ready) cvmfs::download_manager_->Fini();
@@ -2289,7 +2294,6 @@ static void Fini() {
   delete cvmfs::remount_fence_;
   delete cvmfs::signature_manager_;
   delete cvmfs::download_manager_;
-  delete cvmfs::catalog_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::chunk_tables_;
@@ -2306,7 +2310,6 @@ static void Fini() {
   cvmfs::remount_fence_ = NULL;
   cvmfs::signature_manager_ = NULL;
   cvmfs::download_manager_ = NULL;
-  cvmfs::catalog_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::chunk_tables_ = NULL;

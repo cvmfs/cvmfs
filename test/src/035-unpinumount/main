@@ -1,0 +1,21 @@
+
+cvmfs_test_name="Unpin catalogs on umount"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount sft.cern.ch || return 1
+  cvmfs_mount atlas.cern.ch || return 1
+  
+  ls /cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase >> $logfile 2>&1 || return 2
+  
+  num_pinned=$(sudo cvmfs_talk -i sft.cern.ch cache list pinned | wc -l)
+  [ $num_pinned -eq 3 ] || return 3
+
+  cvmfs_umount atlas.cern.ch || return 4
+  num_pinned=$(sudo cvmfs_talk -i sft.cern.ch cache list pinned | wc -l)
+  [ $num_pinned -eq 1 ] || return 5
+ 
+  return 0
+}
+

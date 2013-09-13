@@ -66,7 +66,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   CatalogManager(const std::string &repo_name,
                  signature::SignatureManager *signature_manager,
                  download::DownloadManager *download_manager);
-  virtual ~CatalogManager() { };
+  virtual ~CatalogManager();
 
   bool InitFixed(const hash::Any &root_hash);
 

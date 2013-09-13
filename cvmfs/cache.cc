@@ -968,6 +968,20 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
 }
 
 
+CatalogManager::~CatalogManager() {
+  LogCvmfs(kLogCache, kLogDebug, "unpinning / unloading all catalogs");
+
+  if (cache_mode_ == kCacheReadWrite) {
+    for (map<PathString, hash::Any>::iterator i = mounted_catalogs_.begin(),
+         iend = mounted_catalogs_.end(); i != iend; ++i)
+    {
+      quota::Unpin(i->second);
+    }
+  }
+  mounted_catalogs_.clear();
+}
+
+
 void ManifestEnsemble::FetchCertificate(const hash::Any &hash) {
   uint64_t size;
   bool retval = Open2Mem(hash, &cert_buf, &size);
