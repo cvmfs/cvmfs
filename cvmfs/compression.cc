@@ -179,12 +179,13 @@ StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
           z_ret = Z_DATA_ERROR;  // and fall through
         case Z_STREAM_ERROR:
         case Z_DATA_ERROR:
+          return kStreamDataError;
         case Z_MEM_ERROR:
-          return kStreamError;
+          return kStreamIOError;
       }
       size_t have = kZChunk - strm->avail_out;
       if (fwrite(out, 1, have, f) != have || ferror(f))
-        return kStreamError;
+        return kStreamIOError;
     } while (strm->avail_out == 0);
 
     pos += kZChunk;
@@ -495,7 +496,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash) {
 
 bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
   bool result = false;
-  StreamStates stream_state = kStreamError;
+  StreamStates stream_state = kStreamIOError;
   z_stream strm;
   size_t have;
   unsigned char buf[kBufferSize];
@@ -504,7 +505,7 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
 
   while ((have = fread(buf, 1, kBufferSize, fsrc)) > 0) {
     stream_state = DecompressZStream2File(&strm, fdest, buf, have);
-    if (stream_state == kStreamError)
+    if ((stream_state == kStreamDataError) || (stream_state == kStreamIOError))
       goto decompress_file2file_final;
   }
   LogCvmfs(kLogCompress, kLogDebug, "end of decompression, state=%d, error=%d",

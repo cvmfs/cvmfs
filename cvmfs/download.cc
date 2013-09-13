@@ -196,10 +196,15 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         zlib::DecompressZStream2File(&info->zstream,
                                      info->destination_file,
                                      ptr, num_bytes);
-      if (retval == zlib::kStreamError) {
+      if (retval == zlib::kStreamDataError) {
         LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
                  info->url->c_str());
         info->error_code = kFailBadData;
+        return 0;
+      } else if (retval == zlib::kStreamIOError) {
+        LogCvmfs(kLogDownload, kLogSyslogErr, "decompressing %s, local IO error",
+                 info->url->c_str());
+        info->error_code = kFailLocalIO;
         return 0;
       }
     } else {

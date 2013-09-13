@@ -27,7 +27,8 @@ bool CopyPath2Mem(const std::string &path,
 namespace zlib {
 
 enum StreamStates {
-  kStreamError = 0,
+  kStreamDataError = 0,
+  kStreamIOError,
   kStreamContinue,
   kStreamEnd,
 };
