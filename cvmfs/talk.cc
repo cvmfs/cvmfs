@@ -451,7 +451,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         Answer(con_fd, options::Dump());
       } else if (line == "hotpatch history") {
         string history_str =
-          StringifyTime(cvmfs::loader_exports_->boot_time, false) +
+          StringifyTime(cvmfs::loader_exports_->boot_time, true) +
           "    (start of CernVM-FS loader " +
           cvmfs::loader_exports_->loader_version + ")\n";
         for (loader::EventList::const_iterator i =
