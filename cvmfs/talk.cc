@@ -458,7 +458,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
              cvmfs::loader_exports_->history.begin(),
              iEnd = cvmfs::loader_exports_->history.end(); i != iEnd; ++i)
         {
-          history_str += StringifyTime((*i)->timestamp, false) +
+          history_str += StringifyTime((*i)->timestamp, true) +
             "    (loaded CernVM-FS Fuse Module " +
             (*i)->so_version + ")\n";
         }
