@@ -103,14 +103,19 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
 
-  upload_file_chunker.h upload_file_chunker.cc
-  upload_file_chunker_xor32.h upload_file_chunker_xor32.cc
-  upload_file_processor.h upload_file_processor.cc
+  file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
+  file_processing/char_buffer.h
+  file_processing/chunk.h file_processing/chunk.cc
+  file_processing/chunk_detector.h file_processing/chunk_detector.cc
+  file_processing/file.h file_processing/file.cc
+  file_processing/io_dispatcher.h file_processing/io_dispatcher.cc
+  file_processing/processor.h file_processing/processor.cc
+  file_processing/file_processor.h file_processing/file_processor.cc
+
   upload.h upload.cc
   upload_spooler_definition.h upload_spooler_definition.cc
   upload_facility.h upload_facility.cc
   upload_local.h upload_local.cc
-  upload_riak.h upload_riak.cc
   upload_spooler_result.h
   json_document.h json_document.cc
 
@@ -145,6 +150,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_info.h swissknife_info.cc
   swissknife_history.h swissknife_history.cc
   swissknife_migrate.h swissknife_migrate.cc
+  swissknife_scrub.h swissknife_scrub.cc
   swissknife.h swissknife.cc)
 
 

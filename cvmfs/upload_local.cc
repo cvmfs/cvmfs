@@ -10,6 +10,8 @@
 #include "compression.h"
 #include "util.h"
 
+#include "file_processing/char_buffer.h"
+
 using namespace upload;
 
 
@@ -45,7 +47,7 @@ void LocalUploader::Upload(const std::string &local_path,
                                           "upload of file '%s'",
              local_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, 1, local_path);
+    Respond(callback, UploaderResults(1, local_path));
     return;
   }
 
@@ -57,7 +59,7 @@ void LocalUploader::Upload(const std::string &local_path,
                                           "area: '%s'",
              local_path.c_str(), tmp_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, retcode, local_path);
+    Respond(callback, UploaderResults(retcode, local_path));
     return;
   }
 
@@ -70,23 +72,110 @@ void LocalUploader::Upload(const std::string &local_path,
              tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
   }
-  Respond(callback, retcode, local_path);
+  Respond(callback, UploaderResults(retcode, local_path));
 }
 
 
-void LocalUploader::Upload(const std::string  &local_path,
-                           const hash::Any    &content_hash,
-                           const std::string  &hash_suffix,
-                           const callback_t   *callback) {
-  const int retcode = Move(local_path,
-                           "data" + content_hash.MakePath(1,2) + hash_suffix);
-  if (retcode != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move file '%s' to the "
-                                          "final location: '%s'",
-             local_path.c_str(), content_hash.ToString().c_str());
+int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
+  const std::string tmp_path = CreateTempPath(temporary_path_ + "/" + "chunk",
+                                              0644);
+  if (tmp_path.empty()) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "Failed to create temp file for "
+                                          "upload of file chunk.");
     atomic_inc32(&copy_errors_);
+    return -1;
   }
-  Respond(callback, retcode, local_path);
+
+  const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
+  if (tmp_fd < 0) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "Failed to open temp file '%s' for "
+                                          "upload of file chunk (errno: %d",
+             tmp_path.c_str(), errno);
+    unlink(tmp_path.c_str());
+    atomic_inc32(&copy_errors_);
+    return tmp_fd;
+  }
+
+  *path = tmp_path;
+  return tmp_fd;
+}
+
+
+UploadStreamHandle* LocalUploader::InitStreamedUpload(
+                                                   const callback_t *callback) {
+  std::string tmp_path;
+  const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
+  if (tmp_fd < 0) {
+    return NULL;
+  }
+
+  return new LocalStreamHandle(callback, tmp_fd, tmp_path);
+}
+
+
+void LocalUploader::Upload(UploadStreamHandle  *handle,
+                           CharBuffer          *buffer,
+                           const callback_t    *callback) {
+  assert (buffer->IsInitialized());
+  LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
+
+  const size_t bytes_written = write(local_handle->file_descriptor,
+                                     buffer->ptr(),
+                                     buffer->used_bytes());
+  if (bytes_written != buffer->used_bytes()) {
+    const int cpy_errno = errno;
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to write %d bytes to '%s' "
+                                          "(errno: %d)",
+             buffer->used_bytes(),
+             local_handle->temporary_path.c_str(),
+             cpy_errno);
+    atomic_inc32(&copy_errors_);
+    Respond(callback, UploaderResults(cpy_errno, buffer));
+    return;
+  }
+
+  Respond(callback, UploaderResults(0, buffer));
+}
+
+
+void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                           const hash::Any     content_hash,
+                                           const std::string   hash_suffix) {
+  int retval = 0;
+  LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
+
+  retval = close(local_handle->file_descriptor);
+  if (retval != 0) {
+    const int cpy_errno = errno;
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to close temp file '%s' "
+                                          "(errno: %d)",
+             local_handle->temporary_path.c_str(), cpy_errno);
+    atomic_inc32(&copy_errors_);
+    Respond(handle->commit_callback, UploaderResults(cpy_errno));
+    return;
+  }
+
+  const std::string final_path = upstream_path_ + "/data" +
+                                 content_hash.MakePath(1, 2) +
+                                 hash_suffix;
+
+  retval = rename(local_handle->temporary_path.c_str(), final_path.c_str());
+  if (retval != 0) {
+    const int cpy_errno = errno;
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move temp file '%s' to "
+                                          "final location '%s' (errno: %d)",
+             local_handle->temporary_path.c_str(),
+             final_path.c_str(),
+             cpy_errno);
+    atomic_inc32(&copy_errors_);
+    Respond(handle->commit_callback, UploaderResults(cpy_errno));
+    return;
+  }
+
+  const callback_t *callback = handle->commit_callback;
+  delete local_handle;
+
+  Respond(callback, UploaderResults(0));
 }
 
 
