@@ -10,8 +10,6 @@
 #include <vector>
 #include <cassert>
 
-#include <iostream> // TODO: remove
-
 #include <zlib.h>
 #include <openssl/sha.h>
 

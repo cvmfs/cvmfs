@@ -5,8 +5,6 @@
 #include "io_dispatcher.h"
 
 #include <cassert>
-#include <sstream>
-#include <cstdio>
 #include <cerrno>
 
 #include "file.h"

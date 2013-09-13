@@ -4,9 +4,6 @@
 
 #include "chunk.h"
 
-#include <sstream>
-#include <cstdio>
-
 #include "io_dispatcher.h"
 #include "file.h"
 #include "../file_chunk.h"
