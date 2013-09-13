@@ -11,7 +11,6 @@
 #include <cassert>
 
 #include <zlib.h>
-#include <openssl/sha.h>
 
 #include <tbb/atomic.h>
 
@@ -37,14 +36,15 @@ class Chunk {
   Chunk(File* file, const off_t offset) :
     file_(file), file_offset_(offset), chunk_size_(0),
     is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
-    zlib_initialized_(false), sha1_initialized_(false),
+    zlib_initialized_(false), content_hash_context_(hash::kSha1),
+    content_hash_(hash::kSha1), content_hash_initialized_(false),
     upload_stream_handle_(NULL), bytes_written_(0)
   {
     Initialize();
   }
 
   bool IsInitialized()         const { return zlib_initialized_ &&
-                                              sha1_initialized_;             }
+                                              content_hash_initialized_;     }
   bool IsFullyProcessed()      const { return done_;                         }
   bool IsBulkChunk()           const { return is_bulk_chunk_;                }
   bool IsFullyDefined()        const { return is_fully_defined_;             }
@@ -70,21 +70,18 @@ class Chunk {
     deferred_write_ = true;
   }
 
-  File*          file()                   const { return file_;               }
-  off_t          offset()                 const { return file_offset_;        }
-  size_t         size()                   const { return chunk_size_;         }
-  void       set_size(const size_t size) {
+  File*             file()                   const { return file_;             }
+  off_t             offset()                 const { return file_offset_;      }
+  size_t            size()                   const { return chunk_size_;       }
+  void          set_size(const size_t size) {
     chunk_size_       = size;
     is_fully_defined_ = true;
   }
 
-  SHA_CTX&       sha1_context()                 { return sha1_context_;       }
-  hash::Any      sha1() const                   { return hash::Any(
-                                                          hash::kSha1,
-                                                          sha1_digest_,
-                                                          SHA_DIGEST_LENGTH); }
-  std::string    hash_suffix() const;
-  z_stream&      zlib_context()                 { return zlib_context_;       }
+  hash::ContextPtr& content_hash_context() { return content_hash_context_;     }
+  const hash::Any&  content_hash() const   { return content_hash_;             }
+  std::string       hash_suffix() const;
+  z_stream&         zlib_context()                 { return zlib_context_;     }
 
   UploadStreamHandle* upload_stream_handle() const { return upload_stream_handle_; }
   void set_upload_stream_handle(UploadStreamHandle* ush) {
@@ -126,9 +123,9 @@ class Chunk {
   z_stream                 zlib_context_;
   bool                     zlib_initialized_;
 
-  SHA_CTX                  sha1_context_;
-  unsigned char            sha1_digest_[SHA_DIGEST_LENGTH];
-  bool                     sha1_initialized_;
+  hash::ContextPtr         content_hash_context_;
+  hash::Any                content_hash_;
+  bool                     content_hash_initialized_;
 
   UploadStreamHandle      *upload_stream_handle_; ///< opaque handle for streamed upload
   size_t                   bytes_written_;        ///< bytes already uploaded (compressed)

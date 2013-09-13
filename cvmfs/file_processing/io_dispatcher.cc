@@ -81,7 +81,7 @@ void IoDispatcher::CommitChunk(Chunk* chunk) {
 
   // Finalize the streamed upload for the committed Chunk
   uploader_->FinalizeStreamedUpload(chunk->upload_stream_handle(),
-                                    chunk->sha1(),
+                                    chunk->content_hash(),
                                     chunk->hash_suffix());
 }
 

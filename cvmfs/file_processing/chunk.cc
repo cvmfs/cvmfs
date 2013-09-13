@@ -39,8 +39,8 @@ void Chunk::Initialize() {
   done_            = false;
   compressed_size_ = 0;
 
-  const int sha1_retval = SHA1_Init(&sha1_context_);
-  assert (sha1_retval == 1);
+  content_hash_context_.buffer = malloc(content_hash_context_.size);
+  hash::Init(content_hash_context_);
 
   zlib_context_.zalloc   = Z_NULL;
   zlib_context_.zfree    = Z_NULL;
@@ -50,16 +50,17 @@ void Chunk::Initialize() {
   const int zlib_retval = deflateInit(&zlib_context_, Z_DEFAULT_COMPRESSION);
   assert (zlib_retval == 0);
 
-  zlib_initialized_ = true;
-  sha1_initialized_ = true;
+  zlib_initialized_         = true;
+  content_hash_initialized_ = true;
 }
 
 
 void Chunk::Finalize() {
   assert (! done_);
 
-  const int fin_rc = SHA1_Final(sha1_digest_, &sha1_context_);
-  assert (fin_rc == 1);
+  hash::Final(content_hash_context_, &content_hash_);
+  free(content_hash_context_.buffer);
+  content_hash_context_.buffer = NULL;
 
   assert (zlib_context_.avail_in == 0);
   const int retcode = deflateEnd(&zlib_context_);
@@ -88,8 +89,9 @@ Chunk::Chunk(const Chunk &other) :
   deferred_write_(other.deferred_write_),
   deferred_buffers_(other.deferred_buffers_),
   zlib_initialized_(false),
-  sha1_context_(other.sha1_context_),
-  sha1_initialized_(other.sha1_initialized_),
+  content_hash_context_(other.content_hash_context_),
+  content_hash_(other.content_hash_),
+  content_hash_initialized_(other.content_hash_initialized_),
   upload_stream_handle_(NULL),
   bytes_written_(other.bytes_written_),
   compressed_size_(other.compressed_size_)

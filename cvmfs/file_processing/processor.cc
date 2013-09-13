@@ -9,6 +9,7 @@
 #include "io_dispatcher.h"
 #include "file.h"
 #include "chunk.h"
+#include "../hash.h"
 
 using namespace upload;
 
@@ -71,8 +72,8 @@ tbb::task* ChunkProcessingTask::execute() {
 void ChunkProcessingTask::Crunch(const unsigned char  *data,
                                  const size_t          bytes,
                                  const bool            finalize) const {
-  z_stream  &stream   = chunk_->zlib_context();
-  SHA_CTX   &sha1_ctx = chunk_->sha1_context();
+  z_stream         &stream = chunk_->zlib_context();
+  hash::ContextPtr &ch_ctx = chunk_->content_hash_context();
 
   // estimate the size needed for the data to compress
   const size_t max_output_size = deflateBound(&stream, bytes);
@@ -101,10 +102,9 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
       compress_buffer->SetUsedBytes(bytes_produced);
       compress_buffer->SetBaseOffset(chunk_->compressed_size());
       chunk_->add_compressed_size(bytes_produced);
-      const int sha_retcode = SHA1_Update(&sha1_ctx,
-                                           compress_buffer->ptr(),
-                                           compress_buffer->used_bytes());
-      assert (sha_retcode == 1);
+      hash::Update(compress_buffer->ptr(),
+                   compress_buffer->used_bytes(),
+                   ch_ctx);
       chunk_->ScheduleWrite(compress_buffer);
     }
 

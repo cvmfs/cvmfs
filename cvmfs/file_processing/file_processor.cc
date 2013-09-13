@@ -66,7 +66,7 @@ void FileProcessor::FileDone(File *file) {
   assert (file != NULL);
   assert (! file->path().empty());
   assert (file->bulk_chunk() != NULL);
-  assert (! file->bulk_chunk()->sha1().IsNull());
+  assert (! file->bulk_chunk()->content_hash().IsNull());
 
   // extract crucial information from the Chunk structures and wrap them into
   // the global FileChunk data structure
@@ -76,7 +76,7 @@ void FileProcessor::FileDone(File *file) {
   ChunkVector::const_iterator iend = generated_chunks.end();
   for (; i != iend; ++i) {
     Chunk *current_chunk = *i;
-    resulting_chunks.PushBack(FileChunk(current_chunk->sha1(),
+    resulting_chunks.PushBack(FileChunk(current_chunk->content_hash(),
                                         current_chunk->offset(),
                                         current_chunk->size()));
   }
@@ -85,7 +85,7 @@ void FileProcessor::FileDone(File *file) {
            file->path().c_str());
   NotifyListeners(SpoolerResult(0,
                                 file->path(),
-                                file->bulk_chunk()->sha1(),
+                                file->bulk_chunk()->content_hash(),
                                 resulting_chunks));
 }
 
