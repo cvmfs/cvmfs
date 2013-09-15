@@ -422,7 +422,11 @@ static void ProcessCommandBunch(const unsigned num,
   }
 
   retval = sqlite3_exec(db_, "COMMIT", NULL, NULL, NULL);
-  assert(retval == SQLITE_OK);
+  if (retval != SQLITE_OK) {
+    LogCvmfs(kLogQuota, kLogSyslogErr,
+             "failed to commit to cachedb, error %d", retval);
+    abort();
+  }
 }
 
 
