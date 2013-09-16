@@ -408,7 +408,19 @@ cvmfs_chksetup() {
           num_warnings=$(($num_warnings+1))
         fi
       else
-        echo "Warning: no cache quota set for $fqrn.  Cvmfs will abort() if the cache partition is full."
+        echo "Warning: no cache quota set for $fqrn.  Cvmfs will abort if the cache partition is full."
+        num_warnings=$(($num_warnings+1))
+      fi
+
+      # Compare quota limit with available space on the file system hosting the cache
+      local total_kb=$(df -Pk "$cache_dir" | tail -n 1 | awk '{print $2}')
+      local total_mb=$(($total_kb/1024))
+      if [ $CVMFS_QUOTA_LIMIT -gt $total_mb ]; then
+        echo "Error: file system hosting the cache for $fqrn too small (quota: ${CVMFS_QUOTA_LIMIT}M, total space: ${total_mb}M)."
+        num_errors=$(($num_errors+1))
+      fi
+      if [ $(($CVMFS_QUOTA_LIMIT*115/100)) -gt $total_mb ]; then
+        echo "Warning: less than 15% safety margin on file system hosting the cache for $fqrn (quota: ${CVMFS_QUOTA_LIMIT}M, total space: ${total_mb}M)."
         num_warnings=$(($num_warnings+1))
       fi
 
