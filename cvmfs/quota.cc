@@ -786,7 +786,6 @@ bool RebuildDatabase() {
   platform_dirent64 *d;
   DIR *dirp = NULL;
   string path;
-  set<string> catalogs;
 
   LogCvmfs(kLogQuota, kLogSyslog | kLogDebug, "re-building cache-database");
 
@@ -799,31 +798,6 @@ bool RebuildDatabase() {
   }
 
   gauge_ = 0;
-
-  // Gather file catalog hash values
-  // TODO: distiction does not exist anymore
-  if ((dirp = opendir(cache_dir_->c_str())) == NULL) {
-    LogCvmfs(kLogQuota, kLogDebug, "failed to open directory %s", path.c_str());
-    goto build_return;
-  }
-  while ((d = platform_readdir(dirp)) != NULL) {
-    if (d->d_type != DT_REG) continue;
-
-    const string name = d->d_name;
-    if (name.substr(0, 14) == "cvmfs.checksum") {
-      FILE *f = fopen(((*cache_dir_) + "/" + name).c_str(), "r");
-      if (f != NULL) {
-        char sha1[40];
-        if (fread(sha1, 1, 40, f) == 40) {
-          LogCvmfs(kLogQuota, kLogDebug, "added %s to catalog list",
-                   string(sha1, 40).c_str());
-          catalogs.insert(string(sha1, 40).c_str());
-        }
-        fclose(f);
-      }
-    }
-  }
-  closedir(dirp);
 
   // Insert files from cache sub-directories 00 - ff
   sqlite3_prepare_v2(db_, "INSERT INTO fscache (sha1, size, actime) "
@@ -878,10 +852,8 @@ bool RebuildDatabase() {
     sqlite3_bind_text(stmt_insert, 1, &sha1[0], sha1.length(), SQLITE_STATIC);
     sqlite3_bind_int64(stmt_insert, 2, sqlite3_column_int64(stmt_select, 1));
     sqlite3_bind_int64(stmt_insert, 3, seq++);
-    if (catalogs.find(sha1) != catalogs.end())
-      sqlite3_bind_int64(stmt_insert, 4, kFileCatalog);
-    else
-      sqlite3_bind_int64(stmt_insert, 4, kFileRegular);
+    sqlite3_bind_int64(stmt_insert, 4, kFileRegular); // might also be a catalog
+                                                      // (information is lost)
 
     if (sqlite3_step(stmt_insert) != SQLITE_DONE) {
       LogCvmfs(kLogQuota, kLogDebug, "could not insert into cache catalog");
