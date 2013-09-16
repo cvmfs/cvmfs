@@ -5,8 +5,8 @@
 # on a Stratum 0/1 server
 
 set -e # ESSENTIAL! Don't remove this!
-       # Stops the server script in case anything unexpected occures, so that
-       # malfunctions cause as less as possible damage.
+       # Stops the server script in case anything unexpected occurs, so that
+       # malfunctions cause as less damage as possible.
        # For example a crashing `cvmfs_server publish` is prevented from wiping
        # the scratch area, giving us a chance to fix and retry the process.
 
@@ -157,7 +157,7 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type]
                 <fully qualified repository name>
                 Creates a new repository with a given name
-  add-replica   [-u stratum1 upstream storage] [-o owner]
+  add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -1168,6 +1168,7 @@ mkfs() {
 
 add_replica() {
   local name
+  local alias_name
   local stratum0
   local public_key
   local upstream
@@ -1175,7 +1176,7 @@ add_replica() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:" option
+  while getopts "o:u:n:" option
   do
     case $option in
       u)
@@ -1183,6 +1184,9 @@ add_replica() {
       ;;
       o)
         owner=$OPTARG
+      ;;
+      n)
+        alias_name=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1198,24 +1202,30 @@ add_replica() {
   stratum0=$1
   public_key=$2
 
+  # get the name of the repository pointed to by $stratum0
   name=$(cvmfs_swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
+  if [ x$alias_name = x"" ]; then
+    alias_name=$name
+  else
+    alias_name=$(get_repository_name $alias_name)
+  fi
 
   # sanity checks
   is_master_replica $stratum0 || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
-  if check_repository_existence $name; then
-    if is_stratum0 $name; then
-      die "Repository $name already exists as a Stratum0 repository.\nYou cannot create a Stratum1 replica for $name on this machine."
+  if check_repository_existence $alias_name; then
+    if is_stratum0 $alias_name; then
+      die "Repository $alias_name already exists as a Stratum0 repository.\nUse -n to create an aliased Stratum1 replica for $name on this machine."
     else
-      die "There is already a Stratum1 repository $name"
+      die "There is already a Stratum1 repository $alias_name"
     fi
   fi
 
   # default values
-  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
+  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$alias_name/data/txn" "/srv/cvmfs/$alias_name")
 
   # additional configuration
-  local cvmfs_user=`get_cvmfs_owner $name $owner`
-  local spool_dir="/var/spool/cvmfs/${name}"
+  local cvmfs_user=`get_cvmfs_owner $alias_name $owner`
+  local spool_dir="/var/spool/cvmfs/${alias_name}"
   local temp_dir="${spool_dir}/tmp"
   local repository_dir;
   if is_local_upstream $upstream; then
@@ -1231,8 +1241,8 @@ add_replica() {
   check_upstream_validity $upstream
 
   echo -n "Creating configuration files... "
-  mkdir -p /etc/cvmfs/repositories.d/${name}
-  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+  mkdir -p /etc/cvmfs/repositories.d/${alias_name}
+  cat > /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
 # Created by cvmfs_server.
 CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
 CVMFS_REPOSITORY_NAME=$name
@@ -1242,7 +1252,7 @@ CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_UPSTREAM_STORAGE=$upstream
 EOF
-  cat > /etc/cvmfs/repositories.d/${name}/replica.conf << EOF
+  cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
 # Created by cvmfs_server.
 CVMFS_NUM_WORKERS=16
 CVMFS_PUBLIC_KEY=$public_key
@@ -1250,9 +1260,9 @@ CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
   if is_local_upstream $upstream; then
-    cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
+    cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${alias_name}.conf << EOF
 # Translation URL to real pathname
-Alias /cvmfs/$name ${repository_dir}
+Alias /cvmfs/$alias_name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
     AllowOverride All
@@ -1290,9 +1300,9 @@ EOF
 
   echo "\
 
-Use 'cvmfs_server snapshot' to replicate $name.
+Use 'cvmfs_server snapshot' to replicate $alias_name.
 Make sure to install the repository public key in /etc/cvmfs/keys/
-You might have to add the key in /etc/cvmfs/repositories.d/${name}/replica.conf"
+You might have to add the key in /etc/cvmfs/repositories.d/${alias_name}/replica.conf"
 }
 
 
@@ -1582,7 +1592,7 @@ resign() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   is_root || die "Only root can resign repositories"
-  is_stratum0 $name || die "This is not a stratum 0 repository ($name)"
+  is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
   load_repo_config $name
@@ -1739,6 +1749,8 @@ list() {
     fi
     . ${repository}/server.conf
     local name=$(basename $repository)
+
+    # figure out the schema version of the repository
     local version_info=""
     local creator_version=$(repository_creator_version)
     if ! version_equal $creator_version; then
@@ -1751,7 +1763,16 @@ list() {
       version_info=""
     fi
 
-    echo "$name ($CVMFS_REPOSITORY_TYPE) $version_info"
+    # collect additional information about aliased stratum1 repos
+    local stratum1_info=""
+    if is_stratum1 $name; then
+      if [ "$CVMFS_REPOSITORY_NAME" != "$name" ]; then
+        stratum1_info="-> $CVMFS_REPOSITORY_NAME"
+      fi
+    fi
+
+    # print out repository information list
+    echo "$name ($CVMFS_REPOSITORY_TYPE) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
@@ -2176,6 +2197,7 @@ rollback() {
 
 
 snapshot() {
+  local alias_name
   local name
   local user
   local spool_dir
@@ -2188,15 +2210,16 @@ snapshot() {
 
   # get repository name
   check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
+  alias_name=$(get_or_guess_repository_name $1)
 
   # sanity checks
-  check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum1 $name || die "This is not a stratum 1 repository"
+  check_repository_existence $alias_name || die "The repository $alias_name does not exist"
+  is_stratum1 $alias_name || die "This is not a stratum 1 repository"
 
   # get repository information
-  load_repo_config $name
-  . /etc/cvmfs/repositories.d/$name/replica.conf
+  load_repo_config $alias_name
+  . /etc/cvmfs/repositories.d/$alias_name/replica.conf
+  name=$CVMFS_REPOSITORY_NAME
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
