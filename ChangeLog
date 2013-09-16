@@ -1,4 +1,7 @@
 2.1.15:
+  * Allow for multi-repo operations and wildcards in 
+    cvmfs_server
+  * Allow for stratum 1 aliases
   * Add simple check for cache space to 'cvmfs_config chksetup'
   * Unpin catalogs on unmount
   * Fix treatment of local I/O errors during stream decompression
