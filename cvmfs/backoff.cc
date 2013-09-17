@@ -11,6 +11,7 @@
 
 #include "util.h"
 #include "smalloc.h"
+#include "logging.h"
 
 using namespace std;  // NOLINT
 
@@ -59,6 +60,7 @@ void BackoffThrottle::Throttle() {
       delay = max_delay_ms_;
 
     pthread_mutex_unlock(lock_);
+    LogCvmfs(kLogCvmfs, kLogDebug, "backoff throttle %d ms", delay);
     SafeSleepMs(delay);
     pthread_mutex_lock(lock_);
   }
