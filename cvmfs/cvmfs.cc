@@ -2267,6 +2267,7 @@ static string GetErrorMsg() {
 
 static void Fini() {
   signal(SIGALRM, SIG_DFL);
+  if (g_talk_ready) talk::Fini();
 
   // Must be before quota is stopped
   delete cvmfs::catalog_manager_;
@@ -2275,7 +2276,6 @@ static void Fini() {
   tracer::Fini();
   if (g_signature_ready) cvmfs::signature_manager_->Fini();
   if (g_download_ready) cvmfs::download_manager_->Fini();
-  if (g_talk_ready) talk::Fini();
   if (g_monitor_ready) monitor::Fini();
   if (g_quota_ready) {
     if (cvmfs::unpin_listener_) {
