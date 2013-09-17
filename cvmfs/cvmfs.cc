@@ -2283,7 +2283,6 @@ static void Fini() {
   tracer::Fini();
   if (g_signature_ready) cvmfs::signature_manager_->Fini();
   if (g_download_ready) cvmfs::download_manager_->Fini();
-  if (g_monitor_ready) monitor::Fini();
   if (g_quota_ready) {
     if (cvmfs::unpin_listener_) {
       quota::UnregisterUnpinListener(cvmfs::unpin_listener_);
@@ -2340,6 +2339,8 @@ static void Fini() {
   if (g_sqlite_scratch) free(g_sqlite_scratch);
   g_sqlite_page_cache = NULL;
   g_sqlite_scratch = NULL;
+
+  if (g_monitor_ready) monitor::Fini();
 
   delete g_boot_error;
   g_boot_error = NULL;
