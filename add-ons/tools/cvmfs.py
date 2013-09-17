@@ -4,10 +4,13 @@ from urllib2 import urlopen, URLError, HTTPError
 import sys
 import os
 import zlib
+import md5
 import tempfile
 import subprocess
 import urlparse
 import datetime
+import collections
+import ctypes
 
 # figure out which sqlite module to use
 # in Python 2.4 an old version is present
@@ -24,6 +27,16 @@ if not foundSqlite3:
 		foundSqlite = True
 	except ImportError, e:
 		pass
+
+
+def _SplitMD5(md5digest):
+	hi = lo = 0
+	for i in range(0, 8):
+		lo = lo | (ord(md5digest[i]) << (i * 8))
+	for i in range(8,16):
+		hi = hi | (ord(md5digest[i]) << ((i - 8) * 8))
+	return ctypes.c_int64(lo).value, ctypes.c_int64(hi).value  # signed int!
+
 
 
 class Manifest:
@@ -106,6 +119,7 @@ class DirectoryEntry:
 		self.md5path_2 = 0
 		self.parent_1  = 0
 		self.parent_2  = 0
+		self.flags     = 0
 		self.size      = 0
 		self.mode      = 0
 		self.mtime     = 0
@@ -113,11 +127,15 @@ class DirectoryEntry:
 		self.symlink   = ""
 
 	def __str__(self):
-		return "<DirectoryEntry for " + self.name + ">"
+		return "<DirectoryEntry for '" + self.name + "'>"
 
 	def __repr__(self):
-		return "<DirectoryEntry " + self.name + " - " + \
-		       md5path_1 + "|" + md5path_2 + ">"
+		return "<DirectoryEntry '" + self.name + "' - " + \
+		       str(self.md5path_1) + "|" + str(self.md5path_2) + ">"
+
+
+	def IsDirectory(self):
+		return (self.flags & 1) > 0
 
 
 	def BacktracePath(self, containing_catalog, repo):
@@ -126,7 +144,8 @@ class DirectoryEntry:
 		path    = self.name
 		catalog = containing_catalog
 		while True:
-			p_dirent = catalog.FindDirectoryEntry(dirent.parent_1, dirent.parent_2)
+			p_dirent = catalog.FindDirectoryEntrySplitMd5(dirent.parent_1, \
+				                                            dirent.parent_2)
 			if p_dirent != None:
 				path = p_dirent.name + "/" + path
 				dirent = p_dirent
@@ -135,6 +154,51 @@ class DirectoryEntry:
 			else:
 				break
 		return path
+
+
+
+class CatalogIterator:
+	""" Iterates through all directory entries of a Catalog """
+
+	def __init__(self, catalog):
+		self.catalog = catalog
+		self.backlog = collections.deque()
+		root_path = ""
+		if not self.catalog.IsRoot():
+			root_path = self.catalog.root_prefix
+		self._Push((root_path, self.catalog.FindDirectoryEntry(root_path)))
+
+
+	def __iter__(self):
+		return self
+
+
+	def next(self):
+		if not self._HasMore():
+			raise StopIteration()
+		return self._RecursionStep()
+
+
+	def _HasMore(self):
+		return len(self.backlog) > 0
+
+
+	def _Push(self, path):
+		self.backlog.append(path)
+
+
+	def _Pop(self):
+		return self.backlog.popleft()
+
+
+	def _RecursionStep(self):
+		path, dirent = self._Pop()
+		if dirent.IsDirectory():
+			new_dirents = self.catalog.ListDirectorySplitMD5(dirent.md5path_1, \
+				                                               dirent.md5path_2)
+			for new_dirent in new_dirents:
+				self._Push((path + "/" + new_dirent.name, new_dirent))
+		return path, dirent
 
 
 
@@ -160,6 +224,10 @@ class Catalog:
 
 	def __repr__(self):
 		return self.__str__()
+
+
+	def __iter__(self):
+		return CatalogIterator(self)
 
 
 	def OpenInteractive(self):
@@ -189,10 +257,45 @@ class Catalog:
 		return best_match
 
 
-	def FindDirectoryEntry(self, md5path_1, md5path_2):
-		""" Finds the DirectoryEntry residing under the given MD5 hashed path """
-		res = self.RunSql("SELECT parent_1, parent_2, size, mode, mtime, name,  \
-			                        symlink                                       \
+	def ListDirectory(self, path):
+		""" Create a directory listing of the given directory path """
+		parent_1, parent_2 = _SplitMD5(md5.md5(path).digest())
+		return self.ListDirectorySplitMD5(parent_1, parent_2)
+
+
+	def ListDirectorySplitMD5(self, parent_1, parent_2):
+		""" Create a directory listing of DirectoryEntry items based on MD5 path """
+		res = self.RunSql("SELECT md5path_1, md5path_2, parent_1, parent_2,     \
+			                        flags, size, mode, mtime, name, symlink       \
+			                 FROM catalog                                         \
+			                 WHERE parent_1 = " + str(parent_1) + " AND           \
+			                       parent_2 = " + str(parent_2) + "               \
+			                 ORDER BY name ASC;")
+		listing = []
+		for result in res:
+			e = DirectoryEntry()
+			e.md5path_1, e.md5path_2,	e.parent_1, e.parent_2, e.flags, e.size,  \
+			e.mode, e.mtime, e.name, e.symlink = result
+			listing.append(e)
+		return listing
+
+
+	def FindDirectoryEntry(self, path):
+		""" Finds the DirectoryEntry for a given path """
+		md5path = md5.md5(path)
+		return self.FindDirectoryEntryMD5(md5path)
+
+
+	def FindDirectoryEntryMD5(self, md5path):
+		""" Finds the DirectoryEntry for a given MD5 hashed path """
+		lo, hi = _SplitMD5(md5path.digest())
+		return self.FindDirectoryEntrySplitMD5(lo, hi)
+
+
+	def FindDirectoryEntrySplitMD5(self, md5path_1, md5path_2):
+		""" Finds the DirectoryEntry for the given split MD5 hashed path """
+		res = self.RunSql("SELECT parent_1, parent_2, flags, size, mode, mtime, \
+			                        name, symlink                                 \
 			                 FROM catalog                                         \
 			                 WHERE md5path_1 = " + str(md5path_1) + " AND         \
 			                       md5path_2 = " + str(md5path_2) + "             \
@@ -202,7 +305,8 @@ class Catalog:
 		e = DirectoryEntry()
 		e.md5path_1 = md5path_1
 		e.md5path_2 = md5path_2
-		e.parent_1, e.parent_2, e.size, e.mode, e.mtime, e.name, e.symlink = res[0]
+		e.parent_1, e.parent_2, e.flags, e.size, e.mode, \
+		e.mtime, e.name, e.symlink = res[0]
 		return e
 
 
