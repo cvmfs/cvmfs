@@ -61,7 +61,7 @@ void UmountOnCrash() {
     }
   }
   if (!still_mounted) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "crash cleanup handler: %s not mounted",
+    LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler: %s not mounted",
              mountpoint_->c_str());
     return;
   }
