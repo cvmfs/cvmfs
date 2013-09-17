@@ -667,8 +667,8 @@ void DownloadManager::Backoff(JobInfo *info) {
  * \return true if another download should be performed, false otherwise
  */
 bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
-  //LogCvmfs(kLogDownload, kLogDebug, "Verify Download (curl error %d)",
-  //         curl_error);
+  LogCvmfs(kLogDownload, kLogDebug, "Verify downloaded url %s (curl error %d)",
+           info->url->c_str(), curl_error);
   UpdateStatistics(info->curl_handle);
 
   // Verification and error classification
