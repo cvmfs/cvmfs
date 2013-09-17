@@ -88,12 +88,12 @@ RegisterUnpinListener(catalog::AbstractCatalogManager *catalog_manager,
 
 
 void UnregisterUnpinListener(ListenerHandle *handle) {
-  UnregisterBackChannel(handle->pipe_backchannel, handle->repository_name);
-
   const char terminate = 'T';
   WritePipe(handle->pipe_terminate[1], &terminate, sizeof(terminate));
   pthread_join(handle->thread_listener, NULL);
   ClosePipe(handle->pipe_terminate);
+
+  UnregisterBackChannel(handle->pipe_backchannel, handle->repository_name);
 
   delete handle;
 }

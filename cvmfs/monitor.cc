@@ -425,6 +425,7 @@ void Fini() {
   cache_dir_ = NULL;
   exe_path_ = NULL;
   platform_spinlock_destroy(&lock_handler_);
+  LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");
 }
 
 /**
