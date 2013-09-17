@@ -5,7 +5,8 @@ do_faulty_mount() {
   cvmfs_mount $repo \
               "CVMFS_DNS_SERVER=127.0.0.1" \
               "CVMFS_TIMEOUT=3" \
-              "CVMFS_TIMEOUT_DIRECT=3"
+              "CVMFS_TIMEOUT_DIRECT=3" \
+              "CVMFS_MAX_RETRIES=0"
 }
 
 cvmfs_run_test() {
@@ -34,7 +35,9 @@ cvmfs_run_test() {
   local seconds
   seconds=$(stop_watch do_faulty_mount)
 
-  if [ $seconds -gt 8 ]; then
+  num_host=$(cvmfs_config showconfig $repo |grep CVMFS_SERVER_URL | tr \; \\n  | wc -l)
+
+  if [ $seconds -gt $(($num_host*3 + 2)) ]; then
     echo "timeout was too long: $seconds (expected at most 8)" >> $logfile
     CVMFS_TIME_WARNING_FLAG=1
   fi
