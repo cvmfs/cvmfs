@@ -5,8 +5,8 @@ script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
 # custom kernel packages
-knl_firmware="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.14.1.el6/kernel-firmware-2.6.32-358.14.1.el6.aufs21.x86_64.rpm"
-knl="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.14.1.el6/kernel-2.6.32-358.14.1.el6.aufs21.x86_64.rpm"
+knl_firmware="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.18.1.el6/kernel-firmware-2.6.32-358.18.1.el6.aufs21.x86_64.rpm"
+knl="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.18.1.el6/kernel-2.6.32-358.18.1.el6.aufs21.x86_64.rpm"
 aufs_util="http://ecsft.cern.ch/dist/cvmfs/kernel/aufs2-util/aufs2-util-2.1-2.x86_64.rpm"
 
 # download the custom kernel RPMs (including AUFS)
