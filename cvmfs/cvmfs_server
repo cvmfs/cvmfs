@@ -1012,6 +1012,7 @@ create_spool_area_for_new_repository() {
 
 setup_and_mount_new_repository() {
   local name=$1
+  local unionfs=$2
 
   # get repository information
   load_repo_config $name
@@ -1239,7 +1240,7 @@ mkfs() {
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name || die "fail!"
+  setup_and_mount_new_repository $name $unionfs || die "fail!"
   echo "done"
 
   if [ $replicable -eq 1 ]; then
@@ -1557,7 +1558,7 @@ import() {
 
   # do final setup
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name || die "fail!"
+  setup_and_mount_new_repository $name aufs || die "fail!"
   echo "done"
 
   # make stratum0 repository replicable if requested
