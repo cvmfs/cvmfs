@@ -153,16 +153,16 @@ do
   # check the final test result
   case $RETVAL in
     0)
-      rm -rf "$workdir"
+      sudo rm -rf "$workdir" >> $logfile
       echo "OK"
       ;;
     $CVMFS_MEMORY_WARNING)
-      rm -rf "$workdir"
+      sudo rm -rf "$workdir" >> $logfile
       report_warning "Memory limit exceeded!" >> $logfile
       echo "Memory Warning!"
       ;;
     $CVMFS_TIME_WARNING)
-      rm -rf "$workdir"
+      sudo rm -rf "$workdir" >> $logfile
       report_warning "Time limit exceeded!" >> $logfile
       echo "Time Warning!"
       ;;
