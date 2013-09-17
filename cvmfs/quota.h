@@ -18,6 +18,8 @@ struct Any;
 
 namespace quota {
 
+static const std::string checksum_file_prefix = "cvmfschecksum";
+
 bool Init(const std::string &cache_dir, const uint64_t limit,
           const uint64_t cleanup_threshold, const bool rebuild_database);
 bool InitShared(const std::string &exe_path, const std::string &cache_dir,
