@@ -9,7 +9,7 @@
 # `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
 
-CVMFS_TEST_DEBUGLOG=
+CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
