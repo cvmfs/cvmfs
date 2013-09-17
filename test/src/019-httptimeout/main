@@ -5,7 +5,8 @@ do_faulty_mount() {
   cvmfs_mount "atlas.cern.ch"          \
               "CVMFS_TIMEOUT=3"        \
               "CVMFS_TIMEOUT_DIRECT=3" \
-              "CVMFS_HTTP_PROXY=DIRECT"
+              "CVMFS_HTTP_PROXY=DIRECT" \
+              "CVMFS_MAX_RETRIES=0"
 }
 
 cvmfs_run_test() {
@@ -48,8 +49,8 @@ cvmfs_run_test() {
 
   sudo rm -f /etc/cvmfs/domain.d/cern.ch.local >> $logfile 2>&1 || retval=6
 
-  if [ $seconds -gt 6 ]; then
-    echo "mounting took too long with $seconds seconds (expected 6)" >> $logfile
+  if [ $seconds -gt 8 ]; then
+    echo "mounting took too long with $seconds seconds (expected 8)" >> $logfile
     CVMFS_TIME_WARNING_FLAG=1
   fi
 
