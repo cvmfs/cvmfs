@@ -5,6 +5,7 @@
 #ifndef CVMFS_BACKOFF_H_
 #define CVMFS_BACKOFF_H_
 
+#include <pthread.h>
 #include "prng.h"
 
 /**
@@ -27,6 +28,7 @@ class BackoffThrottle {
   {
     Init(init_delay_ms, max_delay_ms, reset_after_ms);
   }
+  ~BackoffThrottle();
   void Throttle();
   void Reset();
  private:
@@ -39,6 +41,7 @@ class BackoffThrottle {
   unsigned reset_after_ms_;
   time_t last_throttle_;
   Prng prng_;
+  pthread_mutex_t *lock_;
 };
 
 #endif  // CVMFS_BACKOFF_H_

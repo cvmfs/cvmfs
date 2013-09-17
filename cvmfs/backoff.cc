@@ -8,7 +8,9 @@
 #include "backoff.h"
 
 #include <ctime>
+
 #include "util.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -21,6 +23,17 @@ void BackoffThrottle::Init(const unsigned init_delay_ms,
   max_delay_ms_ = max_delay_ms;
   reset_after_ms_ = reset_after_ms;
   prng_.InitLocaltime();
+
+  lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
+  assert(retval == 0);
+}
+
+
+BackoffThrottle::~BackoffThrottle() {
+  pthread_mutex_destroy(lock_);
+  free(lock_);
 }
 
 
@@ -32,7 +45,9 @@ void BackoffThrottle::Reset() {
 
 void BackoffThrottle::Throttle() {
   time_t now = time(NULL);
-  if (now - last_throttle_ < reset_after_ms_) {
+
+  pthread_mutex_lock(lock_);
+  if (now - last_throttle_ < reset_after_ms_/1000) {
     if (delay_range_ < max_delay_ms_) {
       if (delay_range_ == 0)
         delay_range_ = init_delay_ms_;
@@ -42,7 +57,11 @@ void BackoffThrottle::Throttle() {
     unsigned delay = prng_.Next(delay_range_) + 1;
     if (delay > max_delay_ms_)
       delay = max_delay_ms_;
+
+    pthread_mutex_unlock(lock_);
     SafeSleepMs(delay);
+    pthread_mutex_lock(lock_);
   }
   last_throttle_ = now;
+  pthread_mutex_unlock(lock_);
 }
