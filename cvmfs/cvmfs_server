@@ -487,6 +487,20 @@ try_mount_remount_cycle_overlayfs() {
 }
 
 
+# download a given file from the backend storage
+# @param noproxy  (optional)
+get_item() {
+  local url="$1"
+  local noproxy="$2"
+
+  if [ x"$noproxy" != x"" ]; then
+    unset http_proxy && curl "$url" 2>/dev/null
+  else
+    curl "$url" 2>/dev/null
+  fi
+}
+
+
 # checks if the right number of arguments was provided
 # if the wrong number was provided it will kill the script after printing the
 # usage text and an error message
@@ -677,7 +691,11 @@ create_whitelist() {
 get_expiry() {
   local stratum0=$1
 
-  local expires=$(curl $stratum0/.cvmfswhitelist 2>/dev/null | head -2 | tail -1 | tail -c15)
+  local expires=$(get_item $stratum0/.cvmfswhitelist 'noproxy' | head -2 | tail -1 | tail -c15)
+  if echo $expires | grep -q -E --invert-match '^[0-9]{14}$'; then
+    echo -1
+    return 1
+  fi
   local year=$(echo $expires | head -c4)
   local month=$(echo $expires | head -c6 | tail -c2)
   local day=$(echo $expires | head -c8 | tail -c2)
@@ -695,7 +713,14 @@ get_expiry() {
 
 check_expiry() {
   local stratum0=$1
-  [ $(get_expiry $stratum0) -ge 0 ]
+  local expiry="-1"
+
+  expiry=$(get_expiry $stratum0)
+  if [ $? -ne 0 ]; then
+    die "Failed to retrieve repository expiry date"
+  fi
+
+  [ $expiry -ge 0 ]
 }
 
 
