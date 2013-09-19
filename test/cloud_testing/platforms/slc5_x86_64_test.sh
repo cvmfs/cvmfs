@@ -10,7 +10,6 @@ run_unittests --gtest_shuffle || retval=$?
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-./run.sh $TEST_LOGFILE -x src/024-reload-during-asetup  \
-                          src/5* || retval=$?
+./run.sh $TEST_LOGFILE -x src/5* || retval=$?
 
 exit $retval
