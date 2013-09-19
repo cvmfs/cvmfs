@@ -6,6 +6,7 @@ import sys
 import time
 import threading
 import os
+import datetime
 
 def usage():
 	print >> sys.stderr, "This opens a socket on a given port number and waits for connection."
@@ -25,7 +26,7 @@ def print_msg(msg):
 
 class SilentHandler(SocketServer.BaseRequestHandler):
 	def handle(self):
-		print_msg("incoming connection: " + str(self.client_address))
+		print_msg("(" + str(datetime.datetime.now()) + ") incoming connection: " + str(self.client_address))
 		time.sleep(100000000)
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
