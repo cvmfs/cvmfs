@@ -2453,7 +2453,7 @@ snapshot() {
 
 
 migrate_2_1_6() {
-  local name=$name
+  local name=$1
 
   # get repository information
   load_repo_config $name
@@ -2523,12 +2523,13 @@ EOF
 
 
 migrate_2_1_7() {
-  local name=$name
+  local name=$1
+  local destination_version="$(cvmfs_version_string)"
 
   # get repository information
   load_repo_config $name
 
-  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string '2.1.12')"
+  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string '$destination_version')"
 
   echo "--> creating client.local"
   sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
@@ -2568,7 +2569,7 @@ migrate_2_1_7() {
   echo "done"
 
   echo "--> updating server.conf"
-  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=2.1.12/" /etc/cvmfs/repositories.d/$name/server.conf
+  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" /etc/cvmfs/repositories.d/$name/server.conf
 }
 
 
