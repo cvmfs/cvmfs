@@ -1,0 +1,28 @@
+cvmfs_test_name="Produce a Huge Repository"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+
+  echo "starting transaction to edit repository" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "generating an artificial but more or less representative repo" >> $logfile
+  make_huge_repo $repo_dir >> $logfile 2>&1 || return 1
+
+  echo "creating CVMFS snapshot" >> $logfile
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  return 0
+}
+
