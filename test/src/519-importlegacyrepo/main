@@ -31,6 +31,12 @@ cvmfs_run_test() {
     ${guinea_pig}/.cvmfspublished >> $logfile 2>&1 || return 6
   cvmfs_server skeleton -o $CVMFS_TEST_USER ${download_location} >> $logfile 2>&1 || return 7
 
+  # set SELinux boolean to allow access by httpd
+  if [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]; then
+    echo "SELinux is present... better silence it for httpd >.<" >> $logfile
+    sudo setsebool httpd_enable_homedirs true >> $logfile 2>&1
+  fi
+
   # resign freshly downloaded repository (since we lack its private keys)
   echo "remove original repository signature and resign it with the stolen keys" >> $logfile
   cat ${download_location}/.cvmfspublished | head -n6 > ${download_location}/.cvmfspublished_unsigned || return 8
