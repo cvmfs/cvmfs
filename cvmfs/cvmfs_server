@@ -255,9 +255,18 @@ check_repository_compatibility() {
     return 0 # trivial case... no update of CernVM-FS taken place
   fi
 
-  # repository format changed from 2.1.6 to 2.1.7
-  # config files changed as of 2.1.12 for stratum 0
-  # Currently all other version updates do not need a migration
+  # Migration History:
+  #   2.1.6 -> 2.1.7
+  #     -> repository format changed
+  #
+  #   2.1.7+ -> 2.1.15
+  #     -> config files changed (adding client.local)
+  #     -> adjustments in /etc/fstab
+  #     -> additional statistics counters in file catalogs
+  #
+  #   2.1.15+
+  #     < nothing changed yet >
+  #
   if [ "$CVMFS_REPOSITORY_TYPE" != "stratum0" ] && [ "$creator" != "2.1.6" ] && \
      version_greater_or_equal "2.1.7";
   then
