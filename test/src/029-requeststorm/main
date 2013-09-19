@@ -31,7 +31,7 @@ cvmfs_run_test() {
 
   cvmfs_mount sft.cern.ch || return 1
 
-  local repeat=16
+  local repeat=24
 
   sudo cvmfs_talk -i sft.cern.ch proxy set "invalid" >> $logfile
   seconds=$(stop_watch load_catalog $logfile /cvmfs/sft.cern.ch/lcg/external $repeat)
