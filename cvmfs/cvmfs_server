@@ -2572,6 +2572,9 @@ migrate_2_1_7() {
 
   echo "--> updating server.conf"
   sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" /etc/cvmfs/repositories.d/$name/server.conf
+
+  # reload (updated) repository information
+  load_repo_config $name
 }
 
 
