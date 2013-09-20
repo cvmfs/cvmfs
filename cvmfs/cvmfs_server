@@ -280,6 +280,16 @@ check_repository_compatibility() {
     return 0 # trivial case... no update of CernVM-FS taken place
   fi
 
+  if version_lower_or_equal "$creator"; then
+    if [ $# -gt 0 ]; then
+      return 1 # nokill
+    fi
+    echo "This repository was created with CernVM-FS $creator which is newer
+than the currently installed version $(cvmfs_version_string). Please install at
+least CernVM-FS $creator to manipulate this repository."
+    exit 1
+  fi
+
   # Migration History:
   #   2.1.6 -> 2.1.7
   #     -> repository format changed
