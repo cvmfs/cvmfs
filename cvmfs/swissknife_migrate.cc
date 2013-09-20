@@ -1334,6 +1334,7 @@ bool CommandMigrate::MigrationWorker_217::RunMigration(PendingCatalog *data) con
   return CheckDatabaseSchemaCompatibility (data) &&
          StartDatabaseTransaction         (data) &&
          GenerateNewStatisticsCounters    (data) &&
+         UpdateCatalogSchema              (data) &&
          CommitDatabaseTransaction        (data);
 }
 
@@ -1434,6 +1435,27 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
 
   // Push the generated statistics counters up to the parent catalog
   data->nested_statistics.Set(stats_counters);
+
+  return true;
+}
+
+
+bool CommandMigrate::MigrationWorker_217::UpdateCatalogSchema
+                                                  (PendingCatalog *data) const {
+  assert(!data->HasNew());
+  const Database &writable = GetWritable(data->old_catalog)->database();
+  Sql update_schema_version(writable,
+    "UPDATE properties SET value = :schema_version WHERE key = 'schema';");
+
+  const bool retval =
+    update_schema_version.BindDouble(1, 2.5) &&
+    update_schema_version.Execute();
+  if (!retval) {
+    Error("Failed to update catalog schema version",
+          update_schema_version,
+          data);
+    return false;
+  }
 
   return true;
 }
