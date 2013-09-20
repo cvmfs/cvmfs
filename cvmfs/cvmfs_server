@@ -2539,7 +2539,7 @@ migrate_2_1_7() {
   # get repository information
   load_repo_config $name
 
-  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string '$destination_version')"
+  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string $destination_version)"
 
   echo "--> creating client.local"
   sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
