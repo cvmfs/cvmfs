@@ -2496,7 +2496,7 @@ migrate_2_1_6() {
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_CREATOR_VERSION=2.1.7
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
@@ -2517,7 +2517,7 @@ EOF
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_CREATOR_VERSION=2.1.7
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
@@ -2534,7 +2534,7 @@ EOF
 
 migrate_2_1_7() {
   local name=$1
-  local destination_version="$(cvmfs_version_string)"
+  local destination_version="2.1.15"
 
   # get repository information
   load_repo_config $name
@@ -2620,7 +2620,6 @@ migrate() {
     # do the migrations...
     if [ $(repository_creator_version) = "2.1.6" ]; then
       migrate_2_1_6 $name
-      repository_creator_version="2.1.7"
     fi
 
     if [ $(repository_creator_version) = "2.1.7" -o  \
@@ -2633,7 +2632,6 @@ migrate() {
          $(repository_creator_version) = "2.1.14" ];
     then
       migrate_2_1_7 $name
-      repository_creator_version="2.1.15"
     fi
 
   done
