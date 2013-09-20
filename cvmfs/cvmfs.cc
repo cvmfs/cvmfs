@@ -1706,9 +1706,9 @@ static void LogSqliteError(void *user_data __attribute__((unused)),
   {
     log_dest |= kLogSyslogErr;
   } else if ((sqlite_error & SQLITE_WARNING) == SQLITE_WARNING) {
-    log_dest |= kLogSyslogWarn;
+    //log_dest |= kLogSyslogWarn;
   } else if ((sqlite_error & SQLITE_NOTICE) == SQLITE_NOTICE) {
-    log_dest |= kLogSyslog;
+    //log_dest |= kLogSyslog;
   }
   LogCvmfs(kLogCvmfs, log_dest, "SQlite3: %s (%d)", message, sqlite_error);
 }
