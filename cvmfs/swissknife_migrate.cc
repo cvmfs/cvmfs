@@ -180,6 +180,11 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                                 gid_);
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_20x>(context, manifest_path);
+  } else if (migration_base == "2.1.7") {
+    MigrationWorker_217::worker_context context(spooler_definition.temporary_path,
+                                                collect_catalog_statistics);
+    migration_succeeded =
+      DoMigrationAndCommit<MigrationWorker_217>(context, manifest_path);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;
     Error(err_msg);
