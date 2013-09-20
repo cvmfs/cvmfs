@@ -243,6 +243,24 @@ mangle_version_string() {
   fi
 }
 
+# only called by check_repository_compatibility()!
+# @param nokill  (optional) see check_repository_compatibility()
+repo_is_incompatible() {
+  # if 'nokill' is set, be silent and just return 1
+  if [ $# -gt 0 ]; then
+    return 1
+  fi
+
+  echo "\
+This Repository was created with CernVM-FS $(mangle_version_string $creator).
+You are currently running CernVM-FS $(mangle_version_string $current), which is
+incompatible to $(mangle_version_string $creator).
+
+Please run \`cvmfs_server migrate\` to update your repository before proceeding."
+  exit 1
+}
+
+
 # checks if the sourced server.conf is compatible with the running version of
 # this script.
 # Note: this assumes that server.conf was already sourced!
@@ -267,32 +285,25 @@ check_repository_compatibility() {
   #   2.1.15+
   #     < nothing changed yet >
   #
-  if [ "$CVMFS_REPOSITORY_TYPE" != "stratum0" ] && [ "$creator" != "2.1.6" ] && \
-     version_greater_or_equal "2.1.7";
+  # Note: I tried to make this code as verbose as possible
+  #
+  if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
+    repo_is_incompatible $nokill
+    return $?
+  fi
+
+  if [ "$creator" = "2.1.7"  ] || [ "$creator" = "2.1.8"  ] || \
+     [ "$creator" = "2.1.9"  ] || [ "$creator" = "2.1.10" ] || \
+     [ "$creator" = "2.1.11" ] || [ "$creator" = "2.1.12" ] || \
+     [ "$creator" = "2.1.13" ] || [ "$creator" = "2.1.14" ];
   then
-    return 0
+    if version_greater_or_equal "2.1.15"; then
+      repo_is_incompatible $nokill
+      return $?
+    fi
   fi
 
-  if [ "$creator" != "2.1.6" ] && [ "$creator" != "2.1.7" ] && \
-     [ "$creator" != "2.1.8" ] && [ "$creator" != "2.1.9" ] && \
-     [ "$creator" != "2.1.10" ] && [ "$creator" != "2.1.11" ] && \
-     version_greater_or_equal "2.1.12";
-  then
-    return 0
-  fi
-
-  # if 'nokill' is set, be silent and just return 1
-  if [ $# -gt 0 ]; then
-    return 1
-  fi
-
-  echo "\
-This Repository was created with CernVM-FS $(mangle_version_string $creator).
-You are currently running CernVM-FS $(mangle_version_string $current), which is
-incompatible to $(mangle_version_string $creator).
-
-Please run \`cvmfs_server migrate\` to update your repository before proceeding."
-  exit 1
+  return 0
 }
 
 
