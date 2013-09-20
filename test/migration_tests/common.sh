@@ -111,10 +111,10 @@ install_package() {
   local pkg_path=$1
 
   if has_binary yum; then
-    yum -y install --nogpgcheck $pkg_path > /dev/null
+    sudo yum -y install --nogpgcheck $pkg_path > /dev/null
   elif has_binary dpkg; then
-    dpkg --install $pkg_path > /dev/null
-    apt-get -f install > /dev/null
+    sudo dpkg --install $pkg_path > /dev/null
+    sudo apt-get -f install > /dev/null
   else
     return 1
   fi
@@ -125,9 +125,9 @@ uninstall_package() {
   local pkg_name=$1
 
   if has_binary yum; then
-    yum -y erase $pkg_name > /dev/null
+    sudo yum -y erase $pkg_name > /dev/null
   elif has_binary apt-get; then
-    apt-get remove $pkg_name > /dev/null
+    sudo apt-get remove $pkg_name > /dev/null
   else
     return 1
   fi
