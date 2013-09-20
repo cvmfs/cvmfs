@@ -180,6 +180,7 @@ class CommandMigrate : public Command {
     bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
     bool StartDatabaseTransaction         (PendingCatalog *data) const;
     bool GenerateNewStatisticsCounters    (PendingCatalog *data) const;
+    bool UpdateCatalogSchema              (PendingCatalog *data) const;
     bool CommitDatabaseTransaction        (PendingCatalog *data) const;
 
     catalog::WritableCatalog* GetWritable(const catalog::Catalog *catalog) const;
