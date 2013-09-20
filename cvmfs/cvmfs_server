@@ -124,19 +124,25 @@ cvmfs_version_string() {
 version_major() { echo $1 | cut --delimiter=. --fields=1; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+compare_versions() {
+  local lv=$1
+  local comparison_operator=$2
+  local rv=$3
+  [ $(version_major $lv) $comparison_operator $(version_major $rv) ] && \
+  [ $(version_minor $lv) $comparison_operator $(version_minor $rv) ] && \
+  [ $(version_patch $lv) $comparison_operator $(version_patch $rv) ]
+}
 version_greater_or_equal() {
   local needle=$1
-  local current=$(cvmfs_version_string)
-  [ $(version_major $current) -ge $(version_major $needle) ] && \
-  [ $(version_minor $current) -ge $(version_minor $needle) ] && \
-  [ $(version_patch $current) -ge $(version_patch $needle) ]
+  compare_versions $(cvmfs_version_string) -ge $needle
+}
+version_lower_or_equal() {
+  local needle=$1
+  compare_versions $(cvmfs_version_string) -le $needle
 }
 version_equal() {
   local needle=$1
-  local current=$(cvmfs_version_string)
-  [ $(version_major $current) -eq $(version_major $needle) ] && \
-  [ $(version_minor $current) -eq $(version_minor $needle) ] && \
-  [ $(version_patch $current) -eq $(version_patch $needle) ]
+  [ "$(cvmfs_version_string)" = "$needle" ]
 }
 
 # prints some help information optionally followed by an error message
@@ -243,47 +249,78 @@ mangle_version_string() {
   fi
 }
 
+# only called by check_repository_compatibility()!
+# @param creator  the creator version of the (incompatible) repository
+# @param nokill   (optional) see check_repository_compatibility()
+repo_is_incompatible() {
+  local creator=$1
+  # if 'nokill' is set, be silent and just return 1
+  if [ $# -gt 1 ]; then
+    return 1
+  fi
+
+  echo "\
+This repository was created with CernVM-FS $(mangle_version_string $creator).
+You are currently running CernVM-FS $(cvmfs_version_string), which is
+incompatible to $(mangle_version_string $creator).
+
+Please run \`cvmfs_server migrate\` to update your repository before proceeding."
+  exit 1
+}
+
+
 # checks if the sourced server.conf is compatible with the running version of
 # this script.
 # Note: this assumes that server.conf was already sourced!
 # @param nokill  (optional) if not set -> `exit 1` on incompatibility
 check_repository_compatibility() {
   local creator=$(repository_creator_version)
-  local current=$(cvmfs_version_string)
   local nokill=$1
-  if [ "$creator" = "$current" ]; then
+  if version_equal "$creator"; then
     return 0 # trivial case... no update of CernVM-FS taken place
   fi
 
-  # repository format changed from 2.1.6 to 2.1.7
-  # config files changed as of 2.1.12 for stratum 0
-  # Currently all other version updates do not need a migration
-  if [ "$CVMFS_REPOSITORY_TYPE" != "stratum0" ] && [ "$creator" != "2.1.6" ] && \
-     version_greater_or_equal "2.1.7";
+  if version_lower_or_equal "$creator"; then
+    if [ $# -gt 0 ]; then
+      return 1 # nokill
+    fi
+    echo "This repository was created with CernVM-FS $creator which is newer
+than the currently installed version $(cvmfs_version_string). Please install at
+least CernVM-FS $creator to manipulate this repository."
+    exit 1
+  fi
+
+  # Migration History:
+  #   2.1.6 -> 2.1.7
+  #     -> repository format changed
+  #
+  #   2.1.7+ -> 2.1.15
+  #     -> config files changed (adding client.local)
+  #     -> adjustments in /etc/fstab
+  #     -> additional statistics counters in file catalogs
+  #
+  #   2.1.15+
+  #     < nothing changed yet >
+  #
+  # Note: I tried to make this code as verbose as possible
+  #
+  if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
+    repo_is_incompatible "$creator" $nokill
+    return $?
+  fi
+
+  if [ "$creator" = "2.1.7"  ] || [ "$creator" = "2.1.8"  ] || \
+     [ "$creator" = "2.1.9"  ] || [ "$creator" = "2.1.10" ] || \
+     [ "$creator" = "2.1.11" ] || [ "$creator" = "2.1.12" ] || \
+     [ "$creator" = "2.1.13" ] || [ "$creator" = "2.1.14" ];
   then
-    return 0
+    if version_greater_or_equal "2.1.15"; then
+      repo_is_incompatible "$creator" $nokill
+      return $?
+    fi
   fi
 
-  if [ "$creator" != "2.1.6" ] && [ "$creator" != "2.1.7" ] && \
-     [ "$creator" != "2.1.8" ] && [ "$creator" != "2.1.9" ] && \
-     [ "$creator" != "2.1.10" ] && [ "$creator" != "2.1.11" ] && \
-     version_greater_or_equal "2.1.12";
-  then
-    return 0
-  fi
-
-  # if 'nokill' is set, be silent and just return 1
-  if [ $# -gt 0 ]; then
-    return 1
-  fi
-
-  echo "\
-This Repository was created with CernVM-FS $(mangle_version_string $creator).
-You are currently running CernVM-FS $(mangle_version_string $current), which is
-incompatible to $(mangle_version_string $creator).
-
-Please run \`cvmfs_server migrate\` to update your repository before proceeding."
-  exit 1
+  return 0
 }
 
 
@@ -2444,7 +2481,7 @@ snapshot() {
 
 
 migrate_2_1_6() {
-  local name=$name
+  local name=$1
 
   # get repository information
   load_repo_config $name
@@ -2476,7 +2513,7 @@ migrate_2_1_6() {
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_CREATOR_VERSION=2.1.7
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
@@ -2488,7 +2525,6 @@ CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
 CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
 CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
-CVMFS_UNION_FS_TYPE=aufs
 EOF
   fi
 
@@ -2498,7 +2534,7 @@ EOF
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
+CVMFS_CREATOR_VERSION=2.1.7
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
@@ -2514,24 +2550,34 @@ EOF
 
 
 migrate_2_1_7() {
-  local name=$name
+  local name=$1
+  local destination_version="2.1.15"
 
   # get repository information
   load_repo_config $name
 
-  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string '2.1.12')"
+  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string $destination_version)"
 
-  echo "--> creating client.local"
-  sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
-
-  echo "--> adjusting /etc/fstab"
-  sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
-  if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
-    echo "Failed!"
-    false
+  if [ ! -f ${CVMFS_SPOOL_DIR}/client.local ]; then
+    echo "--> creating client.local"
+    sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local" || die "fail!"
   fi
 
-  echo "--> analyzing file catalogs for addtional statistics counters"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  if ! cat $server_conf | grep -q CVMFS_UNION_FS_TYPE; then
+    echo "--> setting AUFS as used overlay file system"
+    echo "CVMFS_UNION_FS_TYPE=aufs" >> $server_conf
+  fi
+
+  if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
+    echo "--> adjusting /etc/fstab"
+    sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
+    if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
+      die "fail!"
+    fi
+  fi
+
+  echo "--> analyzing file catalogs for additional statistics counters"
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local new_manifest="${temp_dir}/new_manifest"
 
@@ -2543,7 +2589,7 @@ migrate_2_1_7() {
     -t $temp_dir \
     -o $new_manifest \
     -k /etc/cvmfs/keys/$name.pub \
-    -s || die "fail!"
+    -s || die "fail! (migrating catalogs)"
   chown ${CVMFS_USER} $new_manifest
 
   # sign new (migrated) repository revision
@@ -2559,7 +2605,21 @@ migrate_2_1_7() {
   echo "done"
 
   echo "--> updating server.conf"
-  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=2.1.12/" /etc/cvmfs/repositories.d/$name/server.conf
+  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" /etc/cvmfs/repositories.d/$name/server.conf
+
+  # reload (updated) repository information
+  load_repo_config $name
+
+  # update repository information
+  echo "--> remounting (migrated) repository"
+  local remote_hash
+  remote_hash=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
+
+  sudo umount /cvmfs/$name              > /dev/null 2>&1 || die "fail! (unmounting /cvmfs/$name)"
+  sudo umount ${CVMFS_SPOOL_DIR}/rdonly > /dev/null 2>&1 || die "fail! (unmounting ${CVMFS_SPOOL_DIR}/rdonly)"
+  set_ro_root_hash $name $remote_hash
+  sudo mount ${CVMFS_SPOOL_DIR}/rdonly  > /dev/null 2>&1 || die "fail! (mounting ${CVMFS_SPOOL_DIR}/$name)"
+  sudo mount /cvmfs/$name               > /dev/null 2>&1 || die "fail! (mounting /cvmfs/$name)"
 }
 
 
@@ -2588,14 +2648,16 @@ migrate() {
     # do the migrations...
     if [ $(repository_creator_version) = "2.1.6" ]; then
       migrate_2_1_6 $name
-      repository_creator_version="2.1.7"
     fi
 
-    if [ $(repository_creator_version) = "2.1.7" -o \
-         $(repository_creator_version) = "2.1.8" -o \
-         $(repository_creator_version) = "2.1.9" -o \
+    if [ $(repository_creator_version) = "2.1.7" -o  \
+         $(repository_creator_version) = "2.1.8" -o  \
+         $(repository_creator_version) = "2.1.9" -o  \
          $(repository_creator_version) = "2.1.10" -o \
-         $(repository_creator_version) = "2.1.11" ];
+         $(repository_creator_version) = "2.1.11" -o \
+         $(repository_creator_version) = "2.1.12" -o \
+         $(repository_creator_version) = "2.1.13" -o \
+         $(repository_creator_version) = "2.1.14" ];
     then
       migrate_2_1_7 $name
     fi
