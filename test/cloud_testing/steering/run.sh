@@ -224,6 +224,8 @@ run_test_cases() {
 
   echo -n "running test cases on VM ($ip)... "
   run_script_on_virtual_machine $ip $remote_run_script \
+      -s $server_package                               \
+      -c $client_package                               \
       -r $platform_run_script
   check_retcode $?
 

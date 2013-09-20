@@ -13,6 +13,8 @@ usage() {
   echo
   echo "Mandatory options:"
   echo "-r <test script>      platform specific script (inside the cvmfs sources)"
+  echo "-s <server package>   CernVM-FS server package to be tested"
+  echo "-c <client package>   CernVM-FS client package to be tested"
   echo
   echo "Optional parameters:"
   echo "-p <platform path>    custom search path for platform specific script"
@@ -33,6 +35,8 @@ cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
 platform_script=""
 platform_script_path=""
 test_username="sftnight"
+server_package=""
+client_package=""
 
 # from now on everything is logged to the logfile
 # Note: the only output of this script is the absolute path to the generated
@@ -40,10 +44,16 @@ test_username="sftnight"
 exec &> $cvmfs_run_log
 
 # read parameters
-while getopts "r:p:u:" option; do
+while getopts "r:s:c:p:u:" option; do
   case $option in
     r)
       platform_script=$OPTARG
+      ;;
+    s)
+      server_package=$OPTARG
+      ;;
+    c)
+      client_package=$OPTARG
       ;;
     p)
       platform_script_path=$OPTARG
@@ -59,7 +69,9 @@ while getopts "r:p:u:" option; do
 done
 
 # check if we have all bits and pieces
-if [ x$platform_script = "x" ]; then
+if [ x$platform_script = "x" ] ||
+   [ x$client_package  = "x" ] ||
+   [ x$server_package  = "x" ]; then
   usage "Missing parameter(s)"
 fi
 
@@ -81,4 +93,6 @@ fi
 echo "running platform specific script $platform_script ..."
 sudo -H -u $test_username sh $platform_script_abs -t $cvmfs_source_directory   \
                                                   -l $cvmfs_test_log           \
+                                                  -s $server_package           \
+                                                  -c $client_package           \
                                                   -u $cvmfs_unittest_log

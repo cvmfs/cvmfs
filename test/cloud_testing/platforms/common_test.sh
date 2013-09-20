@@ -5,19 +5,29 @@
 # After sourcing this file the following variables are set:
 #
 #    SOURCE_DIRECTORY   location of the CernVM-FS sources forming above packages
+#    SERVER_PACKAGE     location of the CernVM-FS server package to test
+#    CLIENT_PACKAGE     location of the CernVM-FS client package to test
 #    TEST_LOGFILE       location of the test logfile to be used
 #    UNITTEST_LOGFILE   location of the unit test logfile to be used
 #
 
 SOURCE_DIRECTORY=""
+SERVER_PACKAGE=""
+CLIENT_PACKAGE=""
 TEST_LOGFILE=""
 UNITTEST_LOGFILE=""
 
 # parse script parameters (same for all platforms)
-while getopts "t:l:u:" option; do
+while getopts "t:s:c:l:u:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
+      ;;
+    s)
+      SERVER_PACKAGE=$OPTARG
+      ;;
+    c)
+      CLIENT_PACKAGE=$OPTARG
       ;;
     l)
       TEST_LOGFILE=$OPTARG
@@ -35,7 +45,9 @@ done
 # check that all mandatory parameters are set
 if [ x$SOURCE_DIRECTORY = "x" ] ||
    [ x$TEST_LOGFILE     = "x" ] ||
-   [ x$UNITTEST_LOGFILE = "x" ]; then
+   [ x$UNITTEST_LOGFILE = "x" ] ||
+   [ x$SERVER_PACKAGE   = "x" ] ||
+   [ x$CLIENT_PACKAGE   = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
