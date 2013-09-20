@@ -124,19 +124,25 @@ cvmfs_version_string() {
 version_major() { echo $1 | cut --delimiter=. --fields=1; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+compare_versions() {
+  local lv=$1
+  local comparison_operator=$2
+  local rv=$3
+  [ $(version_major $lv) $comparison_operator $(version_major $rv) ] && \
+  [ $(version_minor $lv) $comparison_operator $(version_minor $rv) ] && \
+  [ $(version_patch $lv) $comparison_operator $(version_patch $rv) ]
+}
 version_greater_or_equal() {
   local needle=$1
-  local current=$(cvmfs_version_string)
-  [ $(version_major $current) -ge $(version_major $needle) ] && \
-  [ $(version_minor $current) -ge $(version_minor $needle) ] && \
-  [ $(version_patch $current) -ge $(version_patch $needle) ]
+  compare_versions $(cvmfs_version_string) -ge $needle
+}
+version_lower_or_equal() {
+  local needle=$1
+  compare_versions $(cvmfs_version_string) -le $needle
 }
 version_equal() {
   local needle=$1
-  local current=$(cvmfs_version_string)
-  [ $(version_major $current) -eq $(version_major $needle) ] && \
-  [ $(version_minor $current) -eq $(version_minor $needle) ] && \
-  [ $(version_patch $current) -eq $(version_patch $needle) ]
+  [ "$(cvmfs_version_string)" = "$needle" ]
 }
 
 # prints some help information optionally followed by an error message
