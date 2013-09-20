@@ -2617,13 +2617,17 @@ migrate() {
       repository_creator_version="2.1.7"
     fi
 
-    if [ $(repository_creator_version) = "2.1.7" -o \
-         $(repository_creator_version) = "2.1.8" -o \
-         $(repository_creator_version) = "2.1.9" -o \
+    if [ $(repository_creator_version) = "2.1.7" -o  \
+         $(repository_creator_version) = "2.1.8" -o  \
+         $(repository_creator_version) = "2.1.9" -o  \
          $(repository_creator_version) = "2.1.10" -o \
-         $(repository_creator_version) = "2.1.11" ];
+         $(repository_creator_version) = "2.1.11" -o \
+         $(repository_creator_version) = "2.1.12" -o \
+         $(repository_creator_version) = "2.1.13" -o \
+         $(repository_creator_version) = "2.1.14" ];
     then
       migrate_2_1_7 $name
+      repository_creator_version="2.1.15"
     fi
 
   done
