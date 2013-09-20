@@ -250,16 +250,18 @@ mangle_version_string() {
 }
 
 # only called by check_repository_compatibility()!
-# @param nokill  (optional) see check_repository_compatibility()
+# @param creator  the creator version of the (incompatible) repository
+# @param nokill   (optional) see check_repository_compatibility()
 repo_is_incompatible() {
+  local creator=$1
   # if 'nokill' is set, be silent and just return 1
-  if [ $# -gt 0 ]; then
+  if [ $# -gt 1 ]; then
     return 1
   fi
 
   echo "\
-This Repository was created with CernVM-FS $(mangle_version_string $creator).
-You are currently running CernVM-FS $(mangle_version_string $current), which is
+This repository was created with CernVM-FS $(mangle_version_string $creator).
+You are currently running CernVM-FS $(cvmfs_version_string), which is
 incompatible to $(mangle_version_string $creator).
 
 Please run \`cvmfs_server migrate\` to update your repository before proceeding."
@@ -294,7 +296,7 @@ check_repository_compatibility() {
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
-    repo_is_incompatible $nokill
+    repo_is_incompatible "$creator" $nokill
     return $?
   fi
 
@@ -304,7 +306,7 @@ check_repository_compatibility() {
      [ "$creator" = "2.1.13" ] || [ "$creator" = "2.1.14" ];
   then
     if version_greater_or_equal "2.1.15"; then
-      repo_is_incompatible $nokill
+      repo_is_incompatible "$creator" $nokill
       return $?
     fi
   fi
