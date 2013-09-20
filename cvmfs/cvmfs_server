@@ -275,9 +275,8 @@ Please run \`cvmfs_server migrate\` to update your repository before proceeding.
 # @param nokill  (optional) if not set -> `exit 1` on incompatibility
 check_repository_compatibility() {
   local creator=$(repository_creator_version)
-  local current=$(cvmfs_version_string)
   local nokill=$1
-  if [ "$creator" = "$current" ]; then
+  if version_equal "$creator"; then
     return 0 # trivial case... no update of CernVM-FS taken place
   fi
 
