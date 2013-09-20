@@ -275,7 +275,10 @@ static bool DoCleanup(const uint64_t leave_size) {
     sqlite3_reset(stmt_rm_);
 
     if (!result) {
-      LogCvmfs(kLogQuota, kLogDebug, "could not remove lru-entry");
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+               "failed to find %s in cache database (%d). "
+               "Cache database is out of sync.  Restart cvmfs with clean cache.",
+               hash_str.c_str(), result);
       return false;
     }
   } while (gauge_ > leave_size);
@@ -302,7 +305,13 @@ static bool DoCleanup(const uint64_t leave_size) {
     }
   }
 
-  return gauge_ <= leave_size;
+  if (gauge_ > leave_size) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "request to clean until %"PRIu64", but effective gauge is %"PRIu64,
+             leave_size, gauge_);
+    return false;
+  }
+  return true;
 }
 
 
