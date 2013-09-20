@@ -70,16 +70,31 @@ die() {
 }
 
 
-run_unittests() {
-  echo -n "running CernVM-FS unit tests... "
-  cvmfs_unittests $@ >> $UNITTEST_LOGFILE 2>&1
-
-  local ut_retval=$?
-  if [ $ut_retval -ne 0 ]; then
+check_result() {
+  local res=$1
+  if [ $res -ne 0 ]; then
     echo "Failed!"
   else
     echo "OK"
   fi
+}
+
+
+run_unittests() {
+  echo -n "running CernVM-FS unit tests... "
+  cvmfs_unittests $@ >> $UNITTEST_LOGFILE 2>&1
+  local ut_retval=$?
+  check_result $ut_retval
 
   return $ut_retval
+}
+
+
+run_migrationtests() {
+  echo -n "running CernVM-FS migration tests... "
+  sh $(SOURCE_DIRECTORY)/test/migration_tests/001-hotpatch.sh
+  local mt_retval=$?
+  check_result $mt_retval
+
+  return $mt_retval
 }
