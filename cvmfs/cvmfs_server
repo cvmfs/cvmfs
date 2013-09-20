@@ -2592,6 +2592,17 @@ migrate_2_1_7() {
 
   # reload (updated) repository information
   load_repo_config $name
+
+  # update repository information
+  echo "--> remounting (migrated) repository"
+  local remote_hash
+  remote_hash=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
+
+  sudo umount /cvmfs/$name
+  sudo umount ${CVMFS_SPOOL_DIR}/rdonly
+  set_ro_root_hash $name $remote_hash
+  sudo mount ${CVMFS_SPOOL_DIR}/rdonly
+  sudo mount /cvmfs/$name
 }
 
 
