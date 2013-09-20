@@ -2560,7 +2560,7 @@ migrate_2_1_7() {
     fi
   fi
 
-  echo "--> analyzing file catalogs for addtional statistics counters"
+  echo "--> analyzing file catalogs for additional statistics counters"
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local new_manifest="${temp_dir}/new_manifest"
 
