@@ -2541,17 +2541,23 @@ migrate_2_1_7() {
 
   echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string $destination_version)"
 
-  echo "--> creating client.local"
-  sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
+  if [ ! -f ${CVMFS_SPOOL_DIR}/client.local ]; then
+    echo "--> creating client.local"
+    sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local" || die "fail!"
+  fi
 
-  echo "--> setting AUFS as used overlay file system"
-  echo "CVMFS_UNION_FS_TYPE=aufs" >> /etc/cvmfs/repositories.d/${name}/server.conf
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  if ! cat $server_conf | grep -q CVMFS_UNION_FS_TYPE; then
+    echo "--> setting AUFS as used overlay file system"
+    echo "CVMFS_UNION_FS_TYPE=aufs" >> $server_conf
+  fi
 
-  echo "--> adjusting /etc/fstab"
-  sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
   if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
-    echo "Failed!"
-    false
+    echo "--> adjusting /etc/fstab"
+    sed -i -e "s|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|cvmfs2#${CVMFS_REPOSITORY_NAME} ${CVMFS_SPOOL_DIR}/rdonly fuse allow_other,config=/etc/cvmfs/repositories.d/${CVMFS_REPOSITORY_NAME}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}|" /etc/fstab
+    if ! grep client.local /etc/fstab | grep -q ${CVMFS_REPOSITORY_NAME}; then
+      die "fail!"
+    fi
   fi
 
   echo "--> analyzing file catalogs for addtional statistics counters"
