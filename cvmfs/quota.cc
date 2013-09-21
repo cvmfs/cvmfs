@@ -245,6 +245,9 @@ static bool DoCleanup(const uint64_t leave_size) {
   string hash_str;
   vector<string> trash;
 
+  // gauge taking into account the items moved to trash
+  // (not necessarily removed from db)
+  uint64_t real_gauge_ = gauge_;
   do {
     sqlite3_reset(stmt_lru_);
     if (sqlite3_step(stmt_lru_) != SQLITE_ROW) {
@@ -264,6 +267,7 @@ static bool DoCleanup(const uint64_t leave_size) {
     // to not run into an endless loop
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
       trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
+      real_gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
     }
 
     sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
@@ -282,7 +286,7 @@ static bool DoCleanup(const uint64_t leave_size) {
     gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
     LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
              hash_str.c_str(), gauge_);
-  } while (gauge_ > leave_size);
+  } while (real_gauge_ > leave_size);
 
   // Double fork avoids zombie, forked removal process must not flush file
   // buffers
@@ -306,10 +310,10 @@ static bool DoCleanup(const uint64_t leave_size) {
     }
   }
 
-  if (gauge_ > leave_size) {
+  if (real_gauge_ > leave_size) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "request to clean until %"PRIu64", but effective gauge is %"PRIu64,
-             leave_size, gauge_);
+             leave_size, real_gauge_);
     return false;
   }
   return true;
