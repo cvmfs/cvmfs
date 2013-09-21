@@ -1062,7 +1062,7 @@ init_recover:
                      -1, &stmt_rm_, NULL);
   sqlite3_prepare_v2(db_,
                      "SELECT sha1, size FROM cache_catalog WHERE acseq=(SELECT min(acseq) "
-                     "FROM cache_catalog WHERE pinned=0);", -1, &stmt_lru_, NULL);
+                     "FROM cache_catalog WHERE pinned<>2);", -1, &stmt_lru_, NULL);
   sqlite3_prepare_v2(db_,
                      ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileRegular) +
                       ";").c_str(), -1, &stmt_list_, NULL);
