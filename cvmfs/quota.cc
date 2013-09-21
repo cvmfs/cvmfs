@@ -129,6 +129,7 @@ map<hash::Md5, int> *back_channels_ = NULL;
 sqlite3 *db_ = NULL;
 sqlite3_stmt *stmt_touch_ = NULL;
 sqlite3_stmt *stmt_unpin_ = NULL;
+sqlite3_stmt *stmt_pin_ = NULL;
 sqlite3_stmt *stmt_new_ = NULL;
 sqlite3_stmt *stmt_lru_ = NULL;
 sqlite3_stmt *stmt_size_ = NULL;
@@ -245,9 +246,6 @@ static bool DoCleanup(const uint64_t leave_size) {
   string hash_str;
   vector<string> trash;
 
-  // gauge taking into account the items moved to trash
-  // (not necessarily removed from db)
-  uint64_t real_gauge_ = gauge_;
   do {
     sqlite3_reset(stmt_lru_);
     if (sqlite3_step(stmt_lru_) != SQLITE_ROW) {
@@ -263,30 +261,33 @@ static bool DoCleanup(const uint64_t leave_size) {
 
     // That's a critical condition.  We must not delete a not yet inserted
     // pinned file as it is already reserved (but will be inserted later).
-    // However, we must remove it temporarily from the cache database in order
-    // to not run into an endless loop
+    // Instead, set the pin bit in the db to not run into an endless loop
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
       trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
-      real_gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
+      gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
+      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
+               hash_str.c_str(), gauge_);
+
+      sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
+                        SQLITE_STATIC);
+      result = (sqlite3_step(stmt_rm_) == SQLITE_DONE);
+      sqlite3_reset(stmt_rm_);
+
+      if (!result) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+                 "failed to find %s in cache database (%d). "
+                 "Cache database is out of sync.  Restart cvmfs with clean cache.",
+                 hash_str.c_str(), result);
+        return false;
+      }
+    } else {
+      sqlite3_bind_text(stmt_pin_, 1, &hash_str[0], hash_str.length(),
+                        SQLITE_STATIC);
+      result = (sqlite3_step(stmt_pin_) == SQLITE_DONE);
+      sqlite3_reset(stmt_pin_);
+      assert((result == SQLITE_DONE) || (result == SQLITE_OK));
     }
-
-    sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
-                      SQLITE_STATIC);
-    result = (sqlite3_step(stmt_rm_) == SQLITE_DONE);
-    sqlite3_reset(stmt_rm_);
-
-    if (!result) {
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-               "failed to find %s in cache database (%d). "
-               "Cache database is out of sync.  Restart cvmfs with clean cache.",
-               hash_str.c_str(), result);
-      return false;
-    }
-
-    gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
-    LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
-             hash_str.c_str(), gauge_);
-  } while (real_gauge_ > leave_size);
+  } while (gauge_ > leave_size);
 
   // Double fork avoids zombie, forked removal process must not flush file
   // buffers
@@ -310,10 +311,10 @@ static bool DoCleanup(const uint64_t leave_size) {
     }
   }
 
-  if (real_gauge_ > leave_size) {
+  if (gauge_ > leave_size) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "request to clean until %"PRIu64", but effective gauge is %"PRIu64,
-             leave_size, real_gauge_);
+             leave_size, gauge_);
     return false;
   }
   return true;
@@ -1041,6 +1042,8 @@ init_recover:
                      "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
   sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=0 "
                      "WHERE sha1=:sha1;", -1, &stmt_unpin_, NULL);
+  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=1 "
+                     "WHERE sha1=:sha1;", -1, &stmt_pin_, NULL);
   sqlite3_prepare_v2(db_,
                      "INSERT OR REPLACE INTO cache_catalog "
                      "(sha1, size, acseq, path, type, pinned) "
@@ -1079,6 +1082,7 @@ static void CloseDatabase() {
   if (stmt_size_) sqlite3_finalize(stmt_size_);
   if (stmt_touch_) sqlite3_finalize(stmt_touch_);
   if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
+  if (stmt_pin_) sqlite3_finalize(stmt_pin_);
   if (stmt_new_) sqlite3_finalize(stmt_new_);
   if (db_) sqlite3_close(db_);
   UnlockFile(fd_lock_cachedb_);
@@ -1089,6 +1093,8 @@ static void CloseDatabase() {
   stmt_rm_ = NULL;
   stmt_size_ = NULL;
   stmt_touch_ = NULL;
+  stmt_unpin_ = NULL;
+  stmt_pin_ = NULL;
   stmt_new_ = NULL;
   db_ = NULL;
 
