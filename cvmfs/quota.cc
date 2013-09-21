@@ -285,7 +285,7 @@ static bool DoCleanup(const uint64_t leave_size) {
                         SQLITE_STATIC);
       result = (sqlite3_step(stmt_pin_) == SQLITE_DONE);
       sqlite3_reset(stmt_pin_);
-      assert((result == SQLITE_DONE) || (result == SQLITE_OK));
+      assert(result);
     }
   } while (gauge_ > leave_size);
 
