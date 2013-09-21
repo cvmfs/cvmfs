@@ -1398,8 +1398,7 @@ case "$1" in
       exit 1
     fi
     shift 1
-    cvmfs_umount $@
-    cvmfs_wipecache $@
+    cvmfs_umount $@ && cvmfs_wipecache $@
     RETVAL=$?
     ;;
 
