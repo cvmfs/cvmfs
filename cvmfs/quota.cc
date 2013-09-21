@@ -264,9 +264,6 @@ static bool DoCleanup(const uint64_t leave_size) {
     // to not run into an endless loop
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
       trash.push_back((*cache_dir_) + hash.MakePath(1, 2));
-      gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
-      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
-               hash_str.c_str(), gauge_);
     }
 
     sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
@@ -281,6 +278,10 @@ static bool DoCleanup(const uint64_t leave_size) {
                hash_str.c_str(), result);
       return false;
     }
+
+    gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
+    LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
+             hash_str.c_str(), gauge_);
   } while (gauge_ > leave_size);
 
   // Double fork avoids zombie, forked removal process must not flush file
@@ -621,8 +622,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
                 pinned_ -= size;
               }
             } else {
-              LogCvmfs(kLogQuota, kLogDebug, "could not delete %s, error %d",
-                       hash_str.c_str(), retval);
+              LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+                       "failed to delete %s (%d)", hash_str.c_str(), retval);
             }
             sqlite3_reset(stmt_rm_);
           } else {
