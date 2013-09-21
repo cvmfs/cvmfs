@@ -129,7 +129,8 @@ map<hash::Md5, int> *back_channels_ = NULL;
 sqlite3 *db_ = NULL;
 sqlite3_stmt *stmt_touch_ = NULL;
 sqlite3_stmt *stmt_unpin_ = NULL;
-sqlite3_stmt *stmt_pin_ = NULL;
+sqlite3_stmt *stmt_block_ = NULL;
+sqlite3_stmt *stmt_unblock_ = NULL;
 sqlite3_stmt *stmt_new_ = NULL;
 sqlite3_stmt *stmt_lru_ = NULL;
 sqlite3_stmt *stmt_size_ = NULL;
@@ -281,13 +282,17 @@ static bool DoCleanup(const uint64_t leave_size) {
         return false;
       }
     } else {
-      sqlite3_bind_text(stmt_pin_, 1, &hash_str[0], hash_str.length(),
+      sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
                         SQLITE_STATIC);
-      result = (sqlite3_step(stmt_pin_) == SQLITE_DONE);
-      sqlite3_reset(stmt_pin_);
+      result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
+      sqlite3_reset(stmt_block_);
       assert(result);
     }
   } while (gauge_ > leave_size);
+
+  result = (sqlite3_step(stmt_unblock_) == SQLITE_DONE);
+  sqlite3_reset(stmt_unblock_);
+  assert(result);
 
   // Double fork avoids zombie, forked removal process must not flush file
   // buffers
@@ -1042,8 +1047,10 @@ init_recover:
                      "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
   sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=0 "
                      "WHERE sha1=:sha1;", -1, &stmt_unpin_, NULL);
+  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=2 "
+                     "WHERE sha1=:sha1;", -1, &stmt_block_, NULL);
   sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=1 "
-                     "WHERE sha1=:sha1;", -1, &stmt_pin_, NULL);
+                     "WHERE pinned=2;", -1, &stmt_unblock_, NULL);
   sqlite3_prepare_v2(db_,
                      "INSERT OR REPLACE INTO cache_catalog "
                      "(sha1, size, acseq, path, type, pinned) "
@@ -1059,7 +1066,7 @@ init_recover:
   sqlite3_prepare_v2(db_,
                      ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileRegular) +
                       ";").c_str(), -1, &stmt_list_, NULL);
-  sqlite3_prepare_v2(db_, "SELECT path FROM cache_catalog WHERE pinned=1;",
+  sqlite3_prepare_v2(db_, "SELECT path FROM cache_catalog WHERE pinned<>0;",
                      -1, &stmt_list_pinned_, NULL);
   sqlite3_prepare_v2(db_,
                      ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) +
@@ -1082,7 +1089,8 @@ static void CloseDatabase() {
   if (stmt_size_) sqlite3_finalize(stmt_size_);
   if (stmt_touch_) sqlite3_finalize(stmt_touch_);
   if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
-  if (stmt_pin_) sqlite3_finalize(stmt_pin_);
+  if (stmt_block_) sqlite3_finalize(stmt_block_);
+  if (stmt_unblock_) sqlite3_finalize(stmt_unblock_);
   if (stmt_new_) sqlite3_finalize(stmt_new_);
   if (db_) sqlite3_close(db_);
   UnlockFile(fd_lock_cachedb_);
@@ -1094,7 +1102,8 @@ static void CloseDatabase() {
   stmt_size_ = NULL;
   stmt_touch_ = NULL;
   stmt_unpin_ = NULL;
-  stmt_pin_ = NULL;
+  stmt_block_ = NULL;
+  stmt_unblock_ = NULL;
   stmt_new_ = NULL;
   db_ = NULL;
 
