@@ -1690,27 +1690,30 @@ loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 
 static void LogSqliteError(void *user_data __attribute__((unused)),
-                           int sqlite_error, const char *message)
+                           int sqlite_extended_error, const char *message)
 {
   int log_dest = kLogDebug;
-  if (((sqlite_error & SQLITE_INTERNAL) == SQLITE_INTERNAL) ||
-      ((sqlite_error & SQLITE_PERM) == SQLITE_PERM) ||
-      ((sqlite_error & SQLITE_NOMEM) == SQLITE_NOMEM) ||
-      ((sqlite_error & SQLITE_IOERR) == SQLITE_IOERR) ||
-      ((sqlite_error & SQLITE_CORRUPT) == SQLITE_CORRUPT) ||
-      ((sqlite_error & SQLITE_FULL) == SQLITE_FULL) ||
-      ((sqlite_error & SQLITE_CANTOPEN) == SQLITE_CANTOPEN) ||
-      ((sqlite_error & SQLITE_MISUSE) == SQLITE_MISUSE) ||
-      ((sqlite_error & SQLITE_FORMAT) == SQLITE_FORMAT) ||
-      ((sqlite_error & SQLITE_NOTADB) == SQLITE_NOTADB))
-  {
-    log_dest |= kLogSyslogErr;
-  } else if ((sqlite_error & SQLITE_WARNING) == SQLITE_WARNING) {
-    //log_dest |= kLogSyslogWarn;
-  } else if ((sqlite_error & SQLITE_NOTICE) == SQLITE_NOTICE) {
-    //log_dest |= kLogSyslog;
+  int sqlite_error = sqlite_extended_error & 0xFF;
+  switch (sqlite_error) {
+    case SQLITE_INTERNAL:
+    case SQLITE_PERM:
+    case SQLITE_NOMEM:
+    case SQLITE_IOERR:
+    case SQLITE_CORRUPT:
+    case SQLITE_FULL:
+    case SQLITE_CANTOPEN:
+    case SQLITE_MISUSE:
+    case SQLITE_FORMAT:
+    case SQLITE_NOTADB:
+      log_dest |= kLogSyslogErr;
+      break;
+    case SQLITE_WARNING:
+    case SQLITE_NOTICE:
+    default:
+      break;
   }
-  LogCvmfs(kLogCvmfs, log_dest, "SQlite3: %s (%d)", message, sqlite_error);
+  LogCvmfs(kLogCvmfs, log_dest, "SQlite3: %s (%d)",
+           message, sqlite_extended_error);
 }
 
 
