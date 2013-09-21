@@ -1417,7 +1417,7 @@ void DownloadManager::ProbeHosts() {
       if (info.destination_mem.data)
         free(info.destination_mem.data);
       if (result == kFailOk) {
-        host_rtt[i] = int(DiffTimeSeconds(tv_start, tv_end));
+        host_rtt[i] = int(DiffTimeSeconds(tv_start, tv_end) * 1000);
         LogCvmfs(kLogDownload, kLogDebug, "probing host %s had %dms rtt",
                  url.c_str(), host_rtt[i]);
       } else {
