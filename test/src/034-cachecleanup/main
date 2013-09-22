@@ -1,0 +1,15 @@
+
+cvmfs_test_name="Cache cleanup"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount "atlas.cern.ch,atlas-condb.cern.ch" \
+    "CVMFS_QUOTA_LIMIT=750" || return 1
+
+  find /cvmfs/atlas-condb.cern.ch -type f -size +100M -size -200M | head -n 64 | \
+    xargs file > /dev/null || return 1
+
+  return 0
+}
+
