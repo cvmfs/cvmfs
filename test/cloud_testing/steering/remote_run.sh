@@ -43,6 +43,11 @@ client_package=""
 #       log files
 exec &> $cvmfs_run_log
 
+# switch to working directory
+cd $cvmfs_workspace
+
+ls -lisa
+
 # read parameters
 while getopts "r:s:c:p:u:" option; do
   case $option in
@@ -50,10 +55,10 @@ while getopts "r:s:c:p:u:" option; do
       platform_script=$OPTARG
       ;;
     s)
-      server_package=$OPTARG
+      server_package=$(readlink --canonicalize $(basename $OPTARG))
       ;;
     c)
-      client_package=$OPTARG
+      client_package=$(readlink --canonicalize $(basename $OPTARG))
       ;;
     p)
       platform_script_path=$OPTARG
@@ -75,6 +80,16 @@ if [ x$platform_script = "x" ] ||
   usage "Missing parameter(s)"
 fi
 
+# check if the needed packages are downloaded
+if [ ! -f $server_package ] ||
+   [ ! -f $client_package ]; then
+  usage "Missing package(s)"
+fi
+
+# export the location of the client and server packages
+export CVMFS_CLIENT_PACKAGE=$client_package
+export CVMFS_SERVER_PACKAGE=$server_package
+
 # change working directory to test workspace
 cd $cvmfs_workspace
 
@@ -91,8 +106,8 @@ fi
 
 # run the platform specific script to perform CernVM-FS tests
 echo "running platform specific script $platform_script ..."
-sudo -H -u $test_username sh $platform_script_abs -t $cvmfs_source_directory   \
-                                                  -l $cvmfs_test_log           \
-                                                  -s $server_package           \
-                                                  -c $client_package           \
-                                                  -u $cvmfs_unittest_log
+sudo -H -E -u $test_username sh $platform_script_abs -t $cvmfs_source_directory\
+                                                     -l $cvmfs_test_log        \
+                                                     -s $server_package        \
+                                                     -c $client_package        \
+                                                     -u $cvmfs_unittest_log
