@@ -136,3 +136,17 @@ uninstall_package() {
   fi
 }
 
+
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+
+# check availability of packages
+if [ x$CVMFS_CLIENT_PACKAGE = x"" ] || [ ! -f $CVMFS_CLIENT_PACKAGE ]; then
+  echo "CernVM-FS client package '$CVMFS_CLIENT_PACKAGE' not found!"
+fi
+
+if [ x$CVMFS_SERVER_PACKAGE = x"" ] || [ ! -f $CVMFS_SERVER_PACKAGE ]; then
+  echo "CernVM-FS server package '$CVMFS_SERVER_PACKAGE' not found!"
+fi
