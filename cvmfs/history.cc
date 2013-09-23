@@ -132,14 +132,13 @@ bool Database::Create(const string &filename, const string &repository_name)
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
     "  timestamp INTEGER, channel INTEGER, description TEXT,"
     "  CONSTRAINT pk_tags PRIMARY KEY (name))";
-  retval =
-  sqlite::Sql(sqlite_db, sql_create).Execute();
+  retval = sqlite::Sql(sqlite_db, sql_create).Execute();
   if (!retval)
     goto create_schema_fail;
 
   sql_create = "CREATE TABLE properties (key TEXT, value TEXT, "
                "CONSTRAINT pk_properties PRIMARY KEY (key));";
-  sqlite::Sql(sqlite_db, sql_create).Execute();
+  retval = sqlite::Sql(sqlite_db, sql_create).Execute();
   if (!retval)
     goto create_schema_fail;
 
@@ -153,6 +152,7 @@ bool Database::Create(const string &filename, const string &repository_name)
   sql_fqrn = new sqlite::Sql(sqlite_db, "INSERT INTO properties "
                              "(key, value) VALUES ('fqrn', :name);");
   retval = sql_fqrn->BindText(1, repository_name) && sql_fqrn->Execute();
+  delete sql_fqrn;
   if (!retval)
     goto create_schema_fail;
 

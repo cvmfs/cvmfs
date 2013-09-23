@@ -195,6 +195,7 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
                                        const string &scratch_path) :
   SyncUnion(mediator, rdonly_path, union_path, scratch_path)
 {
+  hardlink_lower_inode_ = 0;
 }
 
 
@@ -270,7 +271,7 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
   "\n"
   "To find all files that are part of this hardlink group, use:\n"
   "find %s -inum %"PRIu64"\n"
-  "\n"    
+  "\n"
   "To restore all hardlinks in this group, try something like:\n"
   "for file in $(find %s -inum %"PRIu64"); do rm ${file} && ln %s ${file}; done\n"
   "\n"

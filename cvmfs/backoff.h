@@ -7,13 +7,14 @@
 
 #include <pthread.h>
 #include "prng.h"
+#include "util.h"
 
 /**
  * When Throttle() is called in quick succession, the exponential backoff will
  * start (sleep).  The class forgets a call to Throttle() after reset_after_ms
  * milliseconds.
  */
-class BackoffThrottle {
+class BackoffThrottle : public SingleCopy {
  public:
   static const unsigned kDefaultInitDelay = 32;  /**< 32ms */
   static const unsigned kDefaultMaxDelay = 2000; /**< Maximum 2 seconds */

@@ -32,7 +32,7 @@ class BigVector {
     CopyFrom(other);
   }
 
-  BigVector<Item> operator= (const BigVector<Item> &other) {
+  BigVector<Item> &operator= (const BigVector<Item> &other) {
     if (&other == this)
       return *this;
 

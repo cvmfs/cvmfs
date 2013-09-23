@@ -29,6 +29,7 @@ WritableCatalog::WritableCatalog(const string     &path,
   sql_update_(NULL),
   sql_chunk_insert_(NULL),
   sql_chunks_remove_(NULL),
+  sql_chunks_count_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
   dirty_(false)

@@ -177,10 +177,16 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
       FILE *fcompressed_history = CreateTempFile(temp_dir, 0600, "w",
                                                  &hist_compressed_path);
+      if (!fcompressed_history) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create temp file");
+        delete manifest;
+        goto sign_fail;
+      }
       if (!zlib::CompressPath2File(history_path, fcompressed_history,
                                    &history_hash))
       {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to compress history");
+        fclose(fcompressed_history);
         delete manifest;
         goto sign_fail;
       }

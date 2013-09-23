@@ -38,6 +38,7 @@ static bool GetHistoryDbHash(const string &repository_url,
 {
   manifest::ManifestEnsemble manifest_ensemble;
   manifest::Manifest *manifest = NULL;
+  bool free_manifest = false;
   if (IsRemote(repository_url)) {
     manifest::Failures retval;
     retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
@@ -50,6 +51,7 @@ static bool GetHistoryDbHash(const string &repository_url,
     manifest = manifest_ensemble.manifest;
   } else {
     manifest = manifest::Manifest::LoadFile(repository_url + "/.cvmfspublished");
+    free_manifest = true;
   }
   if (!manifest) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
@@ -63,10 +65,12 @@ static bool GetHistoryDbHash(const string &repository_url,
              "wrong manifest, expected catalog %s, found catalog %s",
              expected_root_hash.ToString().c_str(),
              manifest->catalog_hash().ToString().c_str());
+    if (free_manifest) delete manifest;
     return false;
   }
 
   *historydb_hash = manifest->history();
+  if (free_manifest) delete manifest;
   return true;
 }
 

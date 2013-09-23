@@ -19,7 +19,6 @@ void BackoffThrottle::Init(const unsigned init_delay_ms,
                            const unsigned max_delay_ms,
                            const unsigned reset_after_ms)
 {
-  Reset();
   init_delay_ms_ = init_delay_ms;
   max_delay_ms_ = max_delay_ms;
   reset_after_ms_ = reset_after_ms;
@@ -29,6 +28,8 @@ void BackoffThrottle::Init(const unsigned init_delay_ms,
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
+
+  Reset();
 }
 
 
@@ -39,8 +40,10 @@ BackoffThrottle::~BackoffThrottle() {
 
 
 void BackoffThrottle::Reset() {
+  pthread_mutex_lock(lock_);
   delay_range_ = 0;
   last_throttle_ = 0;
+  pthread_mutex_unlock(lock_);
 }
 
 
