@@ -104,13 +104,3 @@ run_unittests() {
 
   return $ut_retval
 }
-
-
-run_migrationtests() {
-  echo -n "running CernVM-FS migration tests... "
-  sh $(SOURCE_DIRECTORY)/test/migration_tests/001-hotpatch.sh
-  local mt_retval=$?
-  check_result $mt_retval
-
-  return $mt_retval
-}
