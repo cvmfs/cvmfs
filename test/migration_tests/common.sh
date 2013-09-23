@@ -117,7 +117,7 @@ install_package() {
     sudo yum -y install --nogpgcheck $pkg_path
   elif has_binary dpkg; then
     sudo dpkg --install $pkg_path
-    sudo apt-get -f install
+    sudo apt-get --assume-yes -f install
   else
     return 1
   fi
@@ -130,7 +130,7 @@ uninstall_package() {
   if has_binary yum; then
     sudo yum -y erase $pkg_name
   elif has_binary apt-get; then
-    sudo apt-get remove $pkg_name
+    sudo apt-get --assume-yes remove $pkg_name
   else
     return 1
   fi
