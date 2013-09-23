@@ -64,8 +64,8 @@ class CommandMigrate : public Command {
     inline const std::string root_path() const {
       return old_catalog->path().ToString();
     }
-    inline const bool IsRoot() const { return old_catalog->IsRoot(); }
-    inline const bool HasNew() const { return new_catalog != NULL;   }
+    inline bool IsRoot() const { return old_catalog->IsRoot(); }
+    inline bool HasNew() const { return new_catalog != NULL;   }
 
     bool                              success;
 
