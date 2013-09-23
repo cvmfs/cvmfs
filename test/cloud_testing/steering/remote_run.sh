@@ -46,8 +46,6 @@ exec &> $cvmfs_run_log
 # switch to working directory
 cd $cvmfs_workspace
 
-ls -lisa
-
 # read parameters
 while getopts "r:s:c:p:u:" option; do
   case $option in
