@@ -31,6 +31,9 @@ guess_package_url() {
     local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9]\)\.[0-9] .*$/\1/')
     local architecture=$(uname -m)
     if [ x"$slc_major_version" = x"5" ] || [ x"$slc_major_version" = x"6" ]; then
+      if [ x"$slc_major_version" = x"5" ] && [ x"$architecture" = x"i686" ]; then
+        architecture="i386"
+      fi
       package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.${architecture}.rpm"
     fi
 
