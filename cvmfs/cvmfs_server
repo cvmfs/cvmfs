@@ -2274,24 +2274,27 @@ publish() {
       -t ${spool_dir}/tmp \
       -r ${upstream}"
 
-    $user_shell "$sync_command" || (sudo /bin/mount -o remount,rw /cvmfs/$name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
-    local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-    local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-    tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"
-    echo "Tagging $name"
-    $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
-    $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
-    echo "Remounting newly created repository revision"
-    sudo umount /cvmfs/$name
-    sudo umount ${spool_dir}/rdonly
-    set_ro_root_hash $name $trunk_hash
-    sudo rm -rf ${spool_dir}/scratch
-    rm -rf ${spool_dir}/tmp/*
-    $user_shell "mkdir ${spool_dir}/scratch"
-    sudo mount ${spool_dir}/rdonly > /dev/null
-    sudo mount /cvmfs/$name
-    rm -f ${spool_dir}/in_transaction
-    publish_after_hook $name
+    $user_shell "$sync_command" || \
+      (sudo /bin/mount -o remount,rw /cvmfs/$name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
+    if [ -f ${spool_dir}/tmp/manifest ]; then
+      local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
+      local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
+      tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"
+      echo "Tagging $name"
+      $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
+      $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+      echo "Remounting newly created repository revision"
+      sudo umount /cvmfs/$name
+      sudo umount ${spool_dir}/rdonly
+      set_ro_root_hash $name $trunk_hash
+      sudo rm -rf ${spool_dir}/scratch
+      rm -rf ${spool_dir}/tmp/*
+      $user_shell "mkdir ${spool_dir}/scratch"
+      sudo mount ${spool_dir}/rdonly > /dev/null
+      sudo mount /cvmfs/$name
+      rm -f ${spool_dir}/in_transaction
+      publish_after_hook $name
+    fi
 
   done
 

@@ -8,7 +8,10 @@
 #ifndef CVMFS_FS_TRAVERSAL_H_
 #define CVMFS_FS_TRAVERSAL_H_
 
+#include <errno.h>
+
 #include <cassert>
+#include <cstdlib>
 
 #include <string>
 #include <set>
@@ -135,7 +138,12 @@ class FileSystemTraversal {
     LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "entering %s (%s -- %s)",
              path.c_str(), parent_path.c_str(), dir_name.c_str());
     dip = opendir(path.c_str());
-    assert(dip);
+    if (!dip) {
+      LogCvmfs(kLogFsTraversal, kLogStderr, "Failed to open %s (%d).\n"
+               "Please check directory permissions.",
+               path.c_str(), errno);
+      abort();
+    }
     Notify(fn_enter_dir, parent_path, dir_name);
 
     // Walk through the open directory notifying the user about contents
