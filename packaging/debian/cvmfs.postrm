@@ -23,8 +23,8 @@ case "$1" in
     purge|remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
         # remove cvmfs user/group
         echo "removing cvmfs user/group..."
-	getent passwd cvmfs > /dev/null && deluser cvmfs
-        getent group cvmfs >/dev/null && delgroup cvmfs
+	#getent passwd cvmfs > /dev/null && deluser cvmfs
+        #getent group cvmfs >/dev/null && delgroup cvmfs
     ;;
 
     *)
