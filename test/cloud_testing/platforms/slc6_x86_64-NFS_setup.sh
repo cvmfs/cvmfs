@@ -25,7 +25,3 @@ echo "installing additional RPM packages..."
 install_from_repo gcc
 install_from_repo gcc-c++
 
-# rebooting the system (returning 0 value)
-echo "sleep 1 && reboot" > killme.sh
-sudo nohup sh < killme.sh &
-exit 0
