@@ -23,7 +23,6 @@ usage() {
   echo "Optional parameters:"
   echo "-p <platform path>         custom search path for platform specific script"
   echo "-u <user name>             user name to use for test run"
-  echo "-o <old client package>    CernVM-FS client package to be hotpatched on"
   echo
   echo "You must provide http addresses for all packages and tar balls. They will"
   echo "be downloaded and executed to test CVMFS on various platforms"
@@ -61,8 +60,6 @@ platform_script=""
 platform_script_path=""
 server_package=""
 client_package=""
-old_client_package=""
-old_client_package_provided=0
 keys_package=""
 source_tarball=""
 unittest_package=""
@@ -88,7 +85,7 @@ touch $cvmfs_unittest_log
 exec &> $cvmfs_setup_log
 
 # read parameters
-while getopts "r:s:c:o:t:g:k:p:u:" option; do
+while getopts "r:s:c:t:g:k:p:u:" option; do
   case $option in
     r)
       platform_script=$OPTARG
@@ -98,9 +95,6 @@ while getopts "r:s:c:o:t:g:k:p:u:" option; do
       ;;
     c)
       client_package=$OPTARG
-      ;;
-    o)
-      old_client_package=$OPTARG
       ;;
     t)
       source_tarball=$OPTARG
@@ -134,10 +128,6 @@ if [ x$platform_script  = "x" ] ||
   usage "Missing parameter(s)"
 fi
 
-if [ x$(echo $old_client_package | head -c4) = x"http" ]; then
-  old_client_package_provided=1
-fi
-
 # create test user account if necessary
 id $test_username > /dev/null 2>&1
 if [ $? -ne 0 ]; then
@@ -162,9 +152,6 @@ download $client_package
 download $keys_package
 download $source_tarball
 download $unittest_package
-if [ $old_client_package_provided -eq 1 ]; then
-  download $old_client_package
-fi
 
 # get local file path of downloaded files
 server_package=$(readlink --canonicalize $(basename $server_package))
@@ -172,11 +159,6 @@ client_package=$(readlink --canonicalize $(basename $client_package))
 keys_package=$(readlink --canonicalize $(basename $keys_package))
 source_tarball=$(readlink --canonicalize $(basename $source_tarball))
 unittest_package=$(readlink --canonicalize $(basename $unittest_package))
-if [ $old_client_package_provided -eq 1 ]; then
-  old_client_package=$(readlink --canonicalize $(basename $old_client_package))
-else
-  old_client_package="notprovided"
-fi
 
 # extract the source tarball
 extract_location=$(basename $source_tarball .tar.gz | sed 's/_/-/')
@@ -217,7 +199,6 @@ fi
 echo "running platform specific script $platform_script... "
 sudo -H -u $test_username sh $platform_script_abs -s $server_package           \
                                                   -c $client_package           \
-                                                  -o $old_client_package       \
                                                   -g $unittest_package         \
                                                   -k $keys_package             \
                                                   -t $cvmfs_source_directory   \

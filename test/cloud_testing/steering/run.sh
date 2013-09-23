@@ -30,7 +30,6 @@ platform_run_script=""
 platform_setup_script=""
 server_package=""
 client_package=""
-old_client_package="notprovided"
 keys_package=""
 source_tarball=""
 unittest_package=""
@@ -72,7 +71,6 @@ usage() {
   echo
   echo "Optional parameters:"
   echo " -e <EC2 config file>       local location of the ec2_config.sh file"
-  echo " -o <old client package>    CernVM-FS client package to be hotpatched on"
   echo " -d <results destination>   Directory to store final test session logs"
   echo
   echo "You must provide http addresses for all packages and tar balls. They will"
@@ -200,7 +198,6 @@ setup_virtual_machine() {
   run_script_on_virtual_machine $ip $remote_setup_script \
       -s $server_package                                 \
       -c $client_package                                 \
-      -o $old_client_package                             \
       -t $source_tarball                                 \
       -g $unittest_package                               \
       -k $keys_package                                   \
@@ -227,6 +224,8 @@ run_test_cases() {
 
   echo -n "running test cases on VM ($ip)... "
   run_script_on_virtual_machine $ip $remote_run_script \
+      -s $server_package                               \
+      -c $client_package                               \
       -r $platform_run_script
   check_retcode $?
 
@@ -288,7 +287,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:s:c:o:t:g:k:e:a:d:" option; do
+while getopts "r:b:s:c:t:g:k:e:a:d:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -301,9 +300,6 @@ while getopts "r:b:s:c:o:t:g:k:e:a:d:" option; do
       ;;
     c)
       client_package=$OPTARG
-      ;;
-    o)
-      old_client_package=$OPTARG
       ;;
     t)
       source_tarball=$OPTARG
