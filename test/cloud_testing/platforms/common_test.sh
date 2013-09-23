@@ -17,6 +17,22 @@ CLIENT_PACKAGE=""
 TEST_LOGFILE=""
 UNITTEST_LOGFILE=""
 
+usage() {
+  local msg=$1
+
+  echo "$msg"
+  echo
+  echo "Mandatory options:"
+  echo " -t <cvmfs source tree>     CernVM-FS source tree location"
+  echo " -s <cvmfs server package>  CernVM-FS server package to be tested"
+  echo " -c <cvmfs client package>  CernVM-FS client package to be tested"
+  echo " -l <test logfile>          logfile to write test results into"
+  echo " -u <unittest logfile>      logfile to write unittest outputs into"
+
+  exit 1
+}
+
+
 # parse script parameters (same for all platforms)
 while getopts "t:s:c:l:u:" option; do
   case $option in
