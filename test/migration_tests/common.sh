@@ -77,7 +77,7 @@ package_version() {
   if has_binary rpm; then
     rpm -qp --queryformat='%{VERSION}' $pkg_path 2>/dev/null
   elif has_binary dpkg; then
-    dpkg --info $pkg_path 2>/dev/null | grep -e "^ Version:" | sed 's/^ Version: \(.*\)$/\1/'
+    dpkg --info $pkg_path 2>/dev/null | grep -e "^ Version:" | sed 's/^ Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
   else
     return 1
   fi
@@ -90,7 +90,7 @@ installed_package_version() {
   if has_binary yum; then
     yum info $pkg_name 2>/dev/null | grep -e "^Version" | sed 's/Version.*: \(.*\)$/\1/'
   elif has_binary dpkg; then
-    dpkg --status $pkg_name 2>/dev/null | grep -e "^Version:" | sed 's/^Version: \(.*\)$/\1/'
+    dpkg --status $pkg_name 2>/dev/null | grep -e "^Version:" | sed 's/^Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
   else
     return 1
   fi
