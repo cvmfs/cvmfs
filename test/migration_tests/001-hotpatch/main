@@ -1,0 +1,105 @@
+#!/bin/sh
+
+cvmfs_test_name="Hotpatching During Linux Kernel TAR"
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../common.sh
+
+  # download upstream package
+  current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
+  echo "Version of testee:        $current_version" >> $logfile
+  previous_version=$(decrement_version $current_version)
+  echo "Version to be downloaded: $previous_version" >> $logfile
+  upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
+  echo "Download URL:             $upstream_package_url" >> $logfile
+  wget --no-check-certificate $upstream_package_url >> $logfile 2>&1 || return 2
+  upstream_package=$(basename $upstream_package_url)
+  echo "Upstream Package:         $upstream_package"  >> $logfile
+
+  # make sure that there is no version of CernVM-FS installed
+  if is_installed "cvmfs"; then
+    installed_version=$(installed_package_version "cvmfs")
+    echo "uninstalling CernVM-FS $installed_version" >> $logfile
+    uninstall_package "cvmfs" >> $logfile 2>&1 || return 3
+  fi
+
+  # install the upstream CernVM-FS package
+  echo "installing CernVM-FS $previous_version" >> $logfile
+  install_package $upstream_package >> $logfile 2>&1 || return 4
+
+  # make sure that autofs is running
+  echo "switching on autofs" >> $logfile
+  autofs_switch on  >> $logfile 2>&1 || return 5
+  autofs_switch off >> $logfile 2>&1 || return 5
+  autofs_switch on  >> $logfile 2>&1 || return 5
+
+  # make CernVM-FS ready to go
+  echo "setting up CernVM-FS (cvmfs_config setup)" >> $logfile
+  sudo cvmfs_config setup    >> $logfile 2>&1 || return 6
+  sudo cvmfs_config chksetup >> $logfile 2>&1 || return 6
+
+  # mount a repository
+  echo "mounting sft.cern.ch" >> $logfile
+  cvmfs_mount sft.cern.ch >> $logfile 2>&1 || return 7
+
+  # do some hammering on the file system (without interruption)
+  echo "tar linux kernel (without interruption)" >> $logfile
+  local linux_source='/cvmfs/sft.cern.ch/lcg/external/experimental/linux/linux-*'
+  local tar_log="tar.log"
+  touch $tar_log >> $logfile 2>&1 || return 8
+  tar_log=$(readlink --canonicalize $tar_log)
+  echo "TAR log: $tar_log" >> $logfile
+  tar cvf kernel_1.tar.gz $linux_source > $tar_log 2>&1 || return 9
+  local md5_1=$(md5sum kernel_1.tar.gz | cut --delimiter=' ' --field=1)
+  rm -f kernel_1.tar.gz >> $logfile 2>&1 || return 10
+
+  # do some hammering on the file system
+  echo "starting to tar the linux kernel (log output in separate file)" >> $logfile
+  tar cvf kernel_2.tar.gz $linux_source >> $tar_log 2>&1 &
+  tar_pid=$!
+  echo "tar runs under PID $tar_pid" >> $logfile
+
+  # wait some time to bring tar up to speed
+  echo "giving tar some time to screw around" >> $logfile
+  sleep 15 >> $logfile 2>&1 || return 10
+
+  echo "==><><><><><><><><><><==" >> $logfile
+  echo "==> FUN STARTS HERE  <==" >> $logfile
+  echo "==><><><><><><><><><><==" >> $logfile
+
+  # do the CernVM-FS package update
+  echo "updating CernVM-FS package to version $current_version" >> $logfile
+  kill -0 $tar_pid || return 11 # tar finished already >.<
+  install_package $CVMFS_CLIENT_PACKAGE >> $logfile 2>&1 || return 12
+  kill -0 $tar_pid || return 13 # tar finished already >.<
+
+  # wait for the file system hammering to finish and collect the pieces
+  echo "waiting for tar to be finished... " >> $logfile
+  wait $tar_pid >> $logfile 2>&1 || return 14
+  tar_exit_code=$?
+  echo "tar is done (exit code: $tar_exit_code)" >> $logfile
+  local md5_2=$(md5sum kernel_2.tar.gz | cut --delimiter=' ' --field=1)
+  rm -f kernel_2.tar.gz || return 15
+
+  # do some hammering on the file system (after update)
+  echo "tar linux kernel (without interruption - after update)" >> $logfile
+  tar cvf kernel_3.tar.gz $linux_source > $tar_log 2>&1 || return 16
+  local md5_3=$(md5sum kernel_3.tar.gz | cut --delimiter=' ' --field=1)
+  rm -f kernel_3.tar.gz || return 17
+
+  # check the outcome
+  echo "compare the output of all tar runs" >> $logfile
+  echo "MD5 (before update): $md5_1" >> $logfile
+  echo "MD5 (with reload):   $md5_2" >> $logfile
+  echo "MD5 (after update):  $md5_3" >> $logfile
+  if [ x"$md5_1" != x"$md5_2" ] ||
+     [ x"$md5_2" != x"$md5_3" ]; then
+    return 18
+  fi
+
+  # all done
+  return $tar_exit_code
+}
