@@ -33,9 +33,10 @@ usage() {
 
 download() {
   local url=$1
-  local download_output=$(wget $url 2>&1)
+  local download_output=
 
   echo -n "downloading $url ... "
+  download_output=$(wget --no-check-certificate $url 2>&1)
 
   if [ $? -ne 0 ]; then
     echo "fail"
