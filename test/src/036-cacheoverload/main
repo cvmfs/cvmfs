@@ -15,7 +15,7 @@ cvmfs_run_test() {
   for d in /cvmfs/atlas.cern.ch/repo/sw/software/*; do 
     nohup du -ch --max-depth=3 $d/ >/dev/null 2>&1 & 
   done
-  disown -a
+  disown -a 2>&1
   sleep 1200
   
   pid_after=$(sudo cvmfs_talk -i atlas.cern.ch pid)
@@ -24,7 +24,8 @@ cvmfs_run_test() {
   fi
 
   killall -9 cvmfs2 du 2>/dev/null
-  sleep 10
+  sleep 60
+  killall -9 cvmfs2 du 2>/dev/null
 
   return $RETVAL
 }
