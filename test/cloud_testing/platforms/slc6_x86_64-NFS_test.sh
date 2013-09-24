@@ -4,8 +4,11 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_test.sh
 
+ut_retval=0
+it_retval=0
+mg_retval=0
+
 # run tests
-retval=0
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
 ./run.sh $TEST_LOGFILE -x src/001-chksetup             \
@@ -14,6 +17,9 @@ cd ${SOURCE_DIRECTORY}/test
                           src/007-testjobs             \
                           src/008-default_domain       \
                           src/024-reload-during-asetup \
-                          src/5* || retval=$?
+                          src/5* || it_retval=$?
 
-exit $retval
+echo "running CernVM-FS migration test cases..."
+./run.sh $TEST_LOGFILE.migration migration_tests/001-hotpatch || mg_retval=$?
+
+[ $ut_retval -eq 0 ] && [ $it_retval -eq 0 ] && [ $mg_retval -eq 0 ]

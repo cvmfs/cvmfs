@@ -26,6 +26,6 @@ cd ${SOURCE_DIRECTORY}/test
                           src/518-hardlinkstresstest || it_retval=$?
 
 echo "running CernVM-FS migration test cases..."
-./run.sh $TEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
+./run.sh $TEST_LOGFILE.migration migration_tests/001-hotpatch || mg_retval=$?
 
 [ $ut_retval -eq 0 ] && [ $it_retval -eq 0 ] && [ $mg_retval -eq 0 ]
