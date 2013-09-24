@@ -42,11 +42,11 @@ cvmfs_run_test() {
 
   # mount a repository
   echo "mounting sft.cern.ch" >> $logfile
-  cvmfs_mount sft.cern.ch >> $logfile 2>&1 || return 7
+  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=20" >> $logfile 2>&1 || return 7
 
   # do some hammering on the file system (without interruption)
   echo "tar linux kernel (without interruption)" >> $logfile
-  local linux_source='/cvmfs/sft.cern.ch/lcg/external/experimental/linux/linux-*'
+  local linux_source='/cvmfs/sft.cern.ch/lcg/external/experimental/linux'
   local tar_log="tar.log"
   touch $tar_log >> $logfile 2>&1 || return 8
   tar_log=$(readlink --canonicalize $tar_log)
@@ -63,7 +63,7 @@ cvmfs_run_test() {
 
   # wait some time to bring tar up to speed
   echo "giving tar some time to screw around" >> $logfile
-  sleep 15 >> $logfile 2>&1 || return 10
+  sleep 5 >> $logfile 2>&1 || return 10
 
   echo "==><><><><><><><><><><==" >> $logfile
   echo "==> FUN STARTS HERE  <==" >> $logfile
