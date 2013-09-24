@@ -169,3 +169,5 @@ die() {
   echo $msg
   exit 103
 }
+
+echo "Hostname is $(hostname)"
