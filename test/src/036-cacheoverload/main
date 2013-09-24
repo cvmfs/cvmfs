@@ -23,9 +23,9 @@ cvmfs_run_test() {
     RETVAL=1
   fi
 
-  killall -9 cvmfs2 du 2>/dev/null
+  sudo killall -9 cvmfs2 du 2>/dev/null
   sleep 60
-  killall -9 cvmfs2 du 2>/dev/null
+  sudo killall -9 cvmfs2 du 2>/dev/null
 
   return $RETVAL
 }
