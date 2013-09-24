@@ -171,6 +171,7 @@ unsigned max_ttl_ = 0;
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 catalog::InodeGenerationAnnotation *inode_annotation_ = NULL;
 cache::CatalogManager *catalog_manager_ = NULL;
+quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 signature::SignatureManager *signature_manager_ = NULL;
 download::DownloadManager *download_manager_ = NULL;
@@ -2254,9 +2255,11 @@ static void Spawn() {
   }
   cvmfs::download_manager_->Spawn();
   quota::Spawn();
+  cvmfs::watchdog_listener_ =
+    quota::RegisterWatchdogListener(*cvmfs::repository_name_ + "-watchdog");
   cvmfs::unpin_listener_ =
     quota::RegisterUnpinListener(cvmfs::catalog_manager_,
-                                 *cvmfs::repository_name_);
+                                 *cvmfs::repository_name_ + "-unpin");
   talk::Spawn();
   if (cvmfs::nfs_maps_)
     nfs_maps::Spawn();
@@ -2288,8 +2291,12 @@ static void Fini() {
   if (g_download_ready) cvmfs::download_manager_->Fini();
   if (g_quota_ready) {
     if (cvmfs::unpin_listener_) {
-      quota::UnregisterUnpinListener(cvmfs::unpin_listener_);
+      quota::UnregisterListener(cvmfs::unpin_listener_);
       cvmfs::unpin_listener_ = NULL;
+    }
+    if (cvmfs::watchdog_listener_) {
+      quota::UnregisterListener(cvmfs::watchdog_listener_);
+      cvmfs::watchdog_listener_ = NULL;
     }
     quota::Fini();
   }

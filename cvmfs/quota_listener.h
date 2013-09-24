@@ -30,7 +30,8 @@ struct ListenerHandle;
 ListenerHandle *
 RegisterUnpinListener(catalog::AbstractCatalogManager *catalog_manager,
                       const std::string &repository_name);
-void UnregisterUnpinListener(ListenerHandle *handle);
+ListenerHandle * RegisterWatchdogListener(const std::string &repository_name);
+void UnregisterListener(ListenerHandle *handle);
 
 }  // namespace quota
 

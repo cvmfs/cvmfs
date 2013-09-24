@@ -8,6 +8,8 @@
 #include <pthread.h>
 #include <poll.h>
 
+#include <cstdlib>
+
 #include "quota.h"
 #include "catalog_mgr.h"
 #include "smalloc.h"
@@ -68,6 +70,53 @@ static void *MainUnpinListener(void *data) {
 }
 
 
+static void *MainWatchdogListener(void *data) {
+  ListenerHandle *handle = static_cast<ListenerHandle *>(data);
+  LogCvmfs(kLogQuota, kLogDebug, "starting cache manager watchdog for %s",
+           handle->repository_name.c_str());
+
+  struct pollfd *watch_fds =
+  static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
+  watch_fds[0].fd = handle->pipe_terminate[0];
+  watch_fds[0].events = POLLIN | POLLPRI;
+  watch_fds[0].revents = 0;
+  watch_fds[1].fd = handle->pipe_backchannel[0];
+  watch_fds[1].events = POLLIN | POLLPRI;
+  watch_fds[1].revents = 0;
+  while (true) {
+    int retval = poll(watch_fds, 2, -1);
+    if (retval < 0) {
+      continue;
+    }
+
+    // Terminate I/O thread
+    if (watch_fds[0].revents)
+      break;
+
+    // Release pinned catalogs
+    if (watch_fds[1].revents) {
+      if ((watch_fds[1].revents & POLLERR) ||
+          (watch_fds[1].revents & POLLHUP) ||
+          (watch_fds[1].revents & POLLNVAL))
+      {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+                 "cache manager disappeared, aborting");
+        abort();
+      }
+      // Clean the pipe
+      watch_fds[1].revents = 0;
+      char dummy;
+      ReadPipe(handle->pipe_backchannel[0], &dummy, sizeof(dummy));
+    }
+  }
+  free(watch_fds);
+
+  LogCvmfs(kLogQuota, kLogDebug, "stopping cache manager watchdog for %s",
+           handle->repository_name.c_str());
+  return NULL;
+}
+
+
 /**
  * Registers a back channel that reacts on high watermark of pinned chunks
  */
@@ -87,7 +136,26 @@ RegisterUnpinListener(catalog::AbstractCatalogManager *catalog_manager,
 }
 
 
-void UnregisterUnpinListener(ListenerHandle *handle) {
+/**
+ * Registers a back channel that kills the fuse module if the cache manager
+ * disappears
+ */
+ListenerHandle *
+RegisterWatchdogListener(const string &repository_name) {
+  ListenerHandle *handle = new ListenerHandle();
+  quota::RegisterBackChannel(handle->pipe_backchannel, repository_name);
+  MakePipe(handle->pipe_terminate);
+  handle->catalog_manager = NULL;
+  handle->repository_name = repository_name;
+  int retval = pthread_create(&handle->thread_listener, NULL,
+                              MainWatchdogListener,
+                              static_cast<void *>(handle));
+  assert(retval == 0);
+  return handle;
+}
+
+
+void UnregisterListener(ListenerHandle *handle) {
   const char terminate = 'T';
   WritePipe(handle->pipe_terminate[1], &terminate, sizeof(terminate));
   pthread_join(handle->thread_listener, NULL);
