@@ -1412,6 +1412,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   shared_ = false;
   spawned_ = false;
 
+  protocol_revision_ = kProtocolRevision;
   limit_ = limit;
   pinned_ = 0;
   cleanup_threshold_ = cleanup_threshold;
