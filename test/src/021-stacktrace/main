@@ -5,7 +5,7 @@ cvmfs_run_test() {
   logfile=$1
 
   local repo=lhcb.cern.ch
-  local stacktrace_path="/var/lib/cvmfs/shared/stacktrace.${repo}"
+  local stacktrace_path="$(get_cvmfs_cachedir $repo)/stacktrace.${repo}"
 
   # make sure that there is no stack trace file present
   sudo rm -f $stacktrace_path > /dev/null
