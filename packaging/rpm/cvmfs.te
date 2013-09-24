@@ -30,7 +30,7 @@ allow mount_t self:capability fowner;
 allow mount_t self:netlink_audit_socket create;
 allow mount_t shadow_t:file open;
 allow mount_t var_lib_t:file { rename create unlink setattr getattr };
-allow mount_t var_lib_t:dir { create add_name remove_name };
+allow mount_t var_lib_t:dir { create add_name remove_name rmdir };
 allow mount_t var_lib_t:sock_file { create unlink };
 allow mount_t var_lib_t:fifo_file { create open unlink };
 allow mount_t var_t:file { rename create unlink };
