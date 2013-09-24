@@ -346,14 +346,16 @@ cvmfs_chksetup() {
           echo "Error: $cache_dir is not writable by $CVMFS_USER"
           num_errors=$(($num_errors+1))
         fi
-        for i in {0..255}
-          do
-            local chunk_dir; chunk_dir="$cache_dir/`printf \"%.2x\n\" $i`"
-              if [ ! -d $chunk_dir ]; then
-                echo "Error: chunk directory $chunk_dir missing.  Is tmpwatch interfering?"
-                num_errors=$(($num_errors+1))
-              fi
-          done
+        if [ "$(ls -A $cache_dir)" ]; then
+          for i in {0..255}
+            do
+              local chunk_dir; chunk_dir="$cache_dir/`printf \"%.2x\n\" $i`"
+                if [ ! -d $chunk_dir ]; then
+                  echo "Error: chunk directory $chunk_dir missing.  Is tmpwatch interfering?"
+                  num_errors=$(($num_errors+1))
+                fi
+            done
+        fi
       fi
 
       # Check readability of config files
@@ -413,7 +415,11 @@ cvmfs_chksetup() {
       fi
 
       # Compare quota limit with available space on the file system hosting the cache
-      local total_kb=$(df -Pk "$cache_dir" | tail -n 1 | awk '{print $2}')
+      local cache_dir_parent="$cache_dir"
+      #while [ ! -d "$cache_dir_parent" ]; do
+      #  cache_dir_parent=$(dirname "$cache_dir_parent")
+      #done
+      local total_kb=$(df -Pk "$cache_dir_parent" | tail -n 1 | awk '{print $2}')
       local total_mb=$(($total_kb/1024))
       if [ $CVMFS_QUOTA_LIMIT -gt $total_mb ]; then
         echo "Error: file system hosting the cache for $fqrn too small (quota: ${CVMFS_QUOTA_LIMIT}M, total space: ${total_mb}M)."
