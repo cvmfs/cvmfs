@@ -12,7 +12,7 @@ cvmfs_run_test() {
   
   cache_dir=$(get_cvmfs_cachedir lhcb.cern.ch)
   sudo [ -f ${cache_dir}/cachedb ] || return 2
-  sudo [ -f ${cache_dir}/cachemgr.running ] || return 3
+  sudo [ -f ${cache_dir}/cachemgr.running ] || cvmfs_config showconfig lhcb.cern.ch | grep -q CVMFS_SHARED_CACHE=no || return 3
   sudo [ -f ${cache_dir}/running.lhcb.cern.ch ] || return 4
   cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab >> $logfile || return 5
   cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
