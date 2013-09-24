@@ -12,6 +12,7 @@ cd ${SOURCE_DIRECTORY}/test
                           src/005-asetup               \
                           src/007-testjobs             \
                           src/024-reload-during-asetup \
+			  src/035-unpinumount          \
                           src/5* || retval=$?
 
 exit $retval
