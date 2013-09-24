@@ -416,9 +416,9 @@ cvmfs_chksetup() {
 
       # Compare quota limit with available space on the file system hosting the cache
       local cache_dir_parent="$cache_dir"
-      #while [ ! -d "$cache_dir_parent" ]; do
-      #  cache_dir_parent=$(dirname "$cache_dir_parent")
-      #done
+      while [ ! -d "$cache_dir_parent" ]; do
+        cache_dir_parent=$(dirname "$cache_dir_parent")
+      done
       local total_kb=$(df -Pk "$cache_dir_parent" | tail -n 1 | awk '{print $2}')
       local total_mb=$(($total_kb/1024))
       if [ $CVMFS_QUOTA_LIMIT -gt $total_mb ]; then
