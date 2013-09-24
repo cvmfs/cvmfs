@@ -18,7 +18,7 @@ require {
 	class process { sigstop signull sigkill };
 	class file { open execmod execute_no_trans rename create unlink setattr getattr };
 	class netlink_audit_socket create;
-	class dir { add_name remove_name create write };
+	class dir { add_name remove_name create write rmdir };
 }
 
 #============= mount_t ==============
