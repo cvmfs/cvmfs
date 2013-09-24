@@ -123,7 +123,7 @@ do
   fi
 
   # write some status info to the screen
-  echo "-- Testing ${cvmfs_test_name} ($(date))" >> $logfile
+  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $(basename $t | head -c3))" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
 
   # check if test should be skipped
