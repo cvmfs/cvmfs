@@ -17,6 +17,7 @@ cd ${SOURCE_DIRECTORY}/test
                           src/007-testjobs             \
                           src/008-default_domain       \
                           src/024-reload-during-asetup \
+                          src/026-tightcache           \
                           src/5* || it_retval=$?
 
 echo "running CernVM-FS migration test cases..."
