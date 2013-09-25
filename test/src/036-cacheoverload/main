@@ -21,7 +21,7 @@ cvmfs_run_test() {
   pid_after=$(sudo cvmfs_talk -i atlas.cern.ch pid)
   if [ x"$pid_before" != x"$pid_after" ]; then
     echo "PID mismatch: pid before $pid_before, pid after $pid_after" >> $logfile
-    RETVAL=1
+    RETVAL=2
   fi
 
   sudo killall -9 cvmfs2 du 2>/dev/null
