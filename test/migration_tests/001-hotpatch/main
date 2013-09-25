@@ -42,7 +42,7 @@ cvmfs_run_test() {
 
   # mount a repository
   echo "mounting sft.cern.ch" >> $logfile
-  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=20" >> $logfile 2>&1 || return 7
+  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=10" >> $logfile 2>&1 || return 7
 
   # do some hammering on the file system (without interruption)
   echo "tar linux kernel (without interruption)" >> $logfile
