@@ -37,7 +37,7 @@
   * Add experimental support for overlayfs as an alternative to
     aufs
   * Enforce hard limit on number of concurrent HTTP connections
-  * Switch to libcurl 7.31.0
+  * Switch to libcurl 7.32.0
   * Switch to zlib 1.2.8
   * Switch to c-ares 1.10.0
   * Fix "one too often" fail-over
