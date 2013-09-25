@@ -393,11 +393,7 @@ class PolymorphicConstruction {
   virtual ~PolymorphicConstruction() {};
 
   static AbstractProductT* Construct(const ParameterT &param) {
-    // lazy registration of plugins
-    if (registered_plugins_.empty()) {
-      AbstractProductT::RegisterPlugins();
-    }
-    assert (!registered_plugins_.empty());
+    LazilyRegisterPlugins();
 
     // select and initialize the correct plugin at runtime
     // (polymorphic construction)
@@ -420,6 +416,26 @@ class PolymorphicConstruction {
   }
 
  protected:
+  static void LazilyRegisterPlugins() {
+    // Thread Safety Note:
+    //   Double Checked Locking with atomics!
+    //   Simply double checking registered_plugins_.empty() is _not_ thread safe
+    //   since a second thread might find a registered_plugins_ list that is
+    //   currently under construction and therefore _not_ empty but also _not_
+    //   fully initialized!
+    // See StackOverflow: http://stackoverflow.com/questions/8097439/lazy-initialized-caching-how-do-i-make-it-thread-safe
+    if(atomic_read32(&needs_init_)) {
+      pthread_mutex_lock(&init_mutex_);
+      if(atomic_read32(&needs_init_)) {
+        AbstractProductT::RegisterPlugins();
+        atomic_dec32(&needs_init_);
+      }
+      pthread_mutex_unlock(&init_mutex_);
+    }
+
+    assert (!registered_plugins_.empty());
+  }
+
   template <class ConcreteProductT>
   static void RegisterPlugin() {
     registered_plugins_.push_back(
@@ -433,7 +449,18 @@ class PolymorphicConstruction {
 
  private:
   static RegisteredPlugins registered_plugins_;
+  static atomic_int32      needs_init_;
+  static pthread_mutex_t   init_mutex_;
 };
+
+template <class AbstractProductT, typename ParameterT>
+atomic_int32
+PolymorphicConstruction<AbstractProductT, ParameterT>::needs_init_ = 1;
+
+template <class AbstractProductT, typename ParameterT>
+pthread_mutex_t
+PolymorphicConstruction<AbstractProductT, ParameterT>::init_mutex_ =
+                                                      PTHREAD_MUTEX_INITIALIZER;
 
 // init the static member registered_plugins_ inside the PolymorphicConstruction
 // template... whoa, what ugly code :o)
