@@ -4,13 +4,14 @@
 # Common functionality for cloud platform test execution engine (test setup)
 # After sourcing this file the following variables are set:
 #
-#  SERVER_PACKAGE       location of the CernVM-FS server package to install
-#  CLIENT_PACKAGE       location of the CernVM-FS client package to install
-#  KEYS_PACKAGE         location of the CernVM-FS public keys package
-#  SOURCE_DIRECTORY     location of the CernVM-FS sources forming above packages
-#  UNITTEST_PACKAGE     location of the CernVM-FS unit test package
-#  TEST_LOGFILE         location of the test logfile to be used
-#  UNITTEST_LOGFILE     location of the unit test logfile to be used
+#  SERVER_PACKAGE        location of the CernVM-FS server package to install
+#  CLIENT_PACKAGE        location of the CernVM-FS client package to install
+#  KEYS_PACKAGE          location of the CernVM-FS public keys package
+#  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
+#  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
+#  TEST_LOGFILE          location of the test logfile to be used
+#  UNITTEST_LOGFILE      location of the unit test logfile to be used
+#  MIGRATIONTEST_LOGFILE location of the migration test logfile to be used
 #
 
 SERVER_PACKAGE=""
@@ -20,9 +21,10 @@ KEYS_PACKAGE=""
 SOURCE_DIRECTORY=""
 TEST_LOGFILE=""
 UNITTEST_LOGFILE=""
+MIGRATIONTEST_LOGFILE=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:k:t:g:l:u:" option; do
+while getopts "s:c:k:t:g:l:u:m:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
@@ -45,6 +47,9 @@ while getopts "s:c:k:t:g:l:u:" option; do
     u)
       UNITTEST_LOGFILE=$OPTARG
       ;;
+    m)
+      MIGRATIONTEST_LOGFILE=$OPTARG
+      ;;
     ?)
       shift $(($OPTIND-2))
       usage "Unrecognized option: $1"
@@ -53,13 +58,14 @@ while getopts "s:c:k:t:g:l:u:" option; do
 done
 
 # check that all mandatory parameters are set
-if [ x$SERVER_PACKAGE   = "x" ] ||
-   [ x$CLIENT_PACKAGE   = "x" ] ||
-   [ x$KEYS_PACKAGE     = "x" ] ||
-   [ x$SOURCE_DIRECTORY = "x" ] ||
-   [ x$UNITTEST_PACKAGE = "x" ] ||
-   [ x$TEST_LOGFILE     = "x" ] ||
-   [ x$UNITTEST_LOGFILE = "x" ]; then
+if [ x$SERVER_PACKAGE        = "x" ] ||
+   [ x$CLIENT_PACKAGE        = "x" ] ||
+   [ x$KEYS_PACKAGE          = "x" ] ||
+   [ x$SOURCE_DIRECTORY      = "x" ] ||
+   [ x$UNITTEST_PACKAGE      = "x" ] ||
+   [ x$TEST_LOGFILE          = "x" ] ||
+   [ x$UNITTEST_LOGFILE      = "x" ] ||
+   [ x$MIGRATIONTEST_LOGFILE = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
