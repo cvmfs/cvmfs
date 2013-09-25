@@ -24,6 +24,7 @@ cvmfs_setup_log="${cvmfs_workspace}/setup.log"
 cvmfs_run_log="${cvmfs_workspace}/run.log"
 cvmfs_test_log="${cvmfs_workspace}/test.log"
 cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
+cvmfs_migrationtest_log="${cvmfs_workspace}/migrationtest.log"
 
 # global variables for external script parameters
 platform_run_script=""
@@ -251,6 +252,7 @@ get_test_results() {
   local retval_test_log
   local retval_setup_log
   local retval_unittest_log
+  local retval_migrationtest_log
 
   echo -n "retrieving test results... "
   retrieve_file_from_virtual_machine                  \
@@ -273,11 +275,17 @@ get_test_results() {
       $cvmfs_unittest_log                             \
       ${log_destination}/$(basename $cvmfs_unittest_log)
   retval_unittest_log=$?
+  retrieve_file_from_virtual_machine                  \
+      $ip                                             \
+      $cvmfs_migrationtest_log                        \
+      ${log_destination}/$(basename $cvmfs_migrationtest_log)
+  retval_migrationtest_log=$?
 
-  [ $retval_test_log     -eq 0 ] && \
-  [ $retval_run_log      -eq 0 ] && \
-  [ $retval_setup_log    -eq 0 ] && \
-  [ $retval_unittest_log -eq 0 ]
+  [ $retval_test_log          -eq 0 ] && \
+  [ $retval_run_log           -eq 0 ] && \
+  [ $retval_setup_log         -eq 0 ] && \
+  [ $retval_unittest_log      -eq 0 ] && \
+  [ $retval_migrationtest_log -eq 0 ]
   check_retcode $?
 }
 
