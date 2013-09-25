@@ -3,3 +3,4 @@ test/test.log
 *._.DS_Store
 build/
 benchmark/
+*.pyc

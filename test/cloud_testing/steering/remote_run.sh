@@ -30,6 +30,7 @@ cvmfs_setup_log="${cvmfs_workspace}/setup.log"
 cvmfs_run_log="${cvmfs_workspace}/run.log"
 cvmfs_test_log="${cvmfs_workspace}/test.log"
 cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
+cvmfs_migrationtest_log="${cvmfs_workspace}/migrationtest.log"
 
 # parameterized variables
 platform_script=""
@@ -108,4 +109,5 @@ sudo -H -E -u $test_username sh $platform_script_abs -t $cvmfs_source_directory\
                                                      -l $cvmfs_test_log        \
                                                      -s $server_package        \
                                                      -c $client_package        \
-                                                     -u $cvmfs_unittest_log
+                                                     -u $cvmfs_unittest_log    \
+                                                     -m $cvmfs_migrationtest_log
