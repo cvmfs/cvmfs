@@ -13,11 +13,11 @@ project (${PROJECT_NAME})
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.1.15
+## CVMFS_VERSION 2.1.16
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 1)
-set (CernVM-FS_VERSION_PATCH 15)
+set (CernVM-FS_VERSION_PATCH 16)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #

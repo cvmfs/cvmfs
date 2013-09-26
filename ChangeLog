@@ -1,3 +1,5 @@
+2.1.16:
+
 2.1.15:
   * Fix race in cvmfs_server publish
   * Fix rare inconsistency in runtime size tracking of the cache
