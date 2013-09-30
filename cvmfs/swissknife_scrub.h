@@ -13,6 +13,7 @@
 
 #include "file_processing/async_reader.h"
 #include "file_processing/file.h"
+#include "hash.h"
 
 namespace swissknife {
 
@@ -21,17 +22,20 @@ class CommandScrub : public Command {
   class StoredFile : public upload::AbstractFile {
    public:
     StoredFile(const std::string &path, const std::string &expected_hash);
-    void Update(const void *data, const size_t nbytes);
-    hash::Any GetHash();
+    void Update(const unsigned char *data, const size_t nbytes);
+    void Finalize();
 
+    const hash::Any& content_hash() const {
+      assert(hash_done_); return content_hash_;
+    }
     const hash::Any& expected_hash() const { return expected_hash_; }
 
    private:
-    bool           sha1_done_;
-    SHA_CTX        sha1_context_;
-    unsigned char  sha1_digest_[SHA_DIGEST_LENGTH];
+    bool             hash_done_;
+    hash::ContextPtr hash_context_;
 
-    hash::Any      expected_hash_;
+    hash::Any        content_hash_;
+    hash::Any        expected_hash_;
   };
 
   class FileScrubbingTask : public upload::AbstractFileScrubbingTask<StoredFile> {

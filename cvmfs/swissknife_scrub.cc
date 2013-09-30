@@ -18,30 +18,28 @@ const size_t kHashStringLength  = 40;
 CommandScrub::StoredFile::StoredFile(const std::string &path,
                                      const std::string &expected_hash) :
   AbstractFile(path, GetFileSize(path)),
-  sha1_done_(false),
+  hash_done_(false),
+  hash_context_(hash::kSha1),
   expected_hash_(hash::kSha1, hash::HexPtr(expected_hash))
 {
-  const int sha1_retval = SHA1_Init(&sha1_context_);
-  assert (sha1_retval == 1);
+  hash_context_.buffer = malloc(hash_context_.size);
+  hash::Init(hash_context_);
 }
 
 
-void CommandScrub::StoredFile::Update(const void *data, const size_t nbytes) {
-  assert (! sha1_done_);
-  const int sha1_retval = SHA1_Update(&sha1_context_, data, nbytes);
-  assert (sha1_retval);
+void CommandScrub::StoredFile::Update(const unsigned char *data,
+                                      const size_t nbytes) {
+  assert (! hash_done_);
+  hash::Update(data, nbytes, hash_context_);
 }
 
 
-hash::Any CommandScrub::StoredFile::GetHash() {
-  if (! sha1_done_) {
-    const int sha1_retval = SHA1_Final(sha1_digest_, &sha1_context_);
-    assert (sha1_retval == 1);
-    sha1_done_ = true;
-  }
-
-  assert (sha1_done_);
-  return hash::Any(hash::kSha1, sha1_digest_, SHA_DIGEST_LENGTH);
+void CommandScrub::StoredFile::Finalize() {
+  assert (! hash_done_);
+  hash::Final(hash_context_, &content_hash_);
+  free(hash_context_.buffer);
+  hash_context_.buffer = NULL;
+  hash_done_ = true;
 }
 
 
@@ -51,6 +49,9 @@ tbb::task* CommandScrub::FileScrubbingTask::execute() {
   upload::CharBuffer  *buffer = FileScrubbingTask::buffer();
 
   file->Update(buffer->ptr(), buffer->used_bytes());
+  if (IsLast()) {
+    file->Finalize();
+  }
 
   return Finalize();
 }
@@ -90,10 +91,10 @@ void CommandScrub::SymlinkCallback(const std::string &relative_path,
 
 
 void CommandScrub::FileProcessedCallback(StoredFile* const& file) {
-  if (file->GetHash() != file->expected_hash()) {
+  if (file->content_hash() != file->expected_hash()) {
     std::stringstream ss;
     ss << "mismatch of file name and content hash: "
-       << file->GetHash().ToString();
+       << file->content_hash().ToString();
     PrintWarning(ss.str(), file->path());
   }
 }
