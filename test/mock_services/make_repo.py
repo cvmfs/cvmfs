@@ -16,12 +16,12 @@ def PrintError(msg):
 
 
 class RepoFactory:
-	def __init__(self, max_dir_depth, max_subdirs, max_files_per_dir,    \
+	def __init__(self, max_dir_depth, num_subdirs, num_files_per_dir,    \
                symlink_ratio, hardlink_ratio, repo_dir, min_file_size, \
                max_file_size):
 		self.max_dir_depth      = max_dir_depth
-		self.max_subdirs        = max_subdirs
-		self.max_files_per_dir  = max_files_per_dir
+		self.num_subdirs        = num_subdirs
+		self.num_files_per_dir  = num_files_per_dir
 		self.symlink_ratio      = symlink_ratio
 		self.hardlink_ratio     = hardlink_ratio
 		self.repo_dir           = repo_dir
@@ -36,16 +36,30 @@ class RepoFactory:
 	def Produce(self):
 		self._Recurse(self.repo_dir, 1)
 
+	def PredictResults(self):
+		directories = 0
+		files       = 0
+		bytes       = 0
+		for i in range(self.max_dir_depth):
+			directories += self.num_subdirs ** (i + 1)
+		files = (directories + 1) * self.num_files_per_dir
+		bytes = files * (max_file_size - min_file_size) / 2
+		print "Prediction:"
+		print "   directories to be produced:  " , directories
+		print "   files to be produced:        " , files
+		print "   bytes to be written (aprox): " , bytes
+
 	def PrintReport(self):
-		print "directories produced:" , self.dirs_produced
-		print "files produced:      " , self.files_produced
-		print "symlinks produced:   " , self.symlinks_produced
-		print "hardlinks produced:  " , self.hardlinks_produced
-		print "------------------------------------------------"
-		print "sum of dirents:      " , (self.dirs_produced + \
-                                     self.files_produced + \
-                                     self.symlinks_produced + \
-                                     self.hardlinks_produced)
+		print "Results:"
+		print "   directories produced:" , self.dirs_produced
+		print "   files produced:      " , self.files_produced
+		print "   symlinks produced:   " , self.symlinks_produced
+		print "   hardlinks produced:  " , self.hardlinks_produced
+		print "   ------------------------------------------------"
+		print "   sum of dirents:      " , (self.dirs_produced + \
+                                        self.files_produced + \
+                                        self.symlinks_produced + \
+                                        self.hardlinks_produced)
 		print
 		print "overall produced" , self.bytes_produced , "bytes --> avg." , \
           (self.bytes_produced / self.files_produced) , "bytes/file"
@@ -58,8 +72,7 @@ class RepoFactory:
 	def _ProduceFilesHardlinksAndSymlinks(self, path):
 		master_file = ''.join([path, "/master"])
 		self._ProduceFile(master_file)
-		for i in range(random.randint(self.max_files_per_dir / 2,  \
-                                  self.max_files_per_dir - 1)):
+		for i in range(self.num_files_per_dir - 1):
 			random_val = random.random()
 			if random_val < self.symlink_ratio:
 				self._ProduceSymlink(''.join([path, "/symlink", str(i)]), master_file)
@@ -89,7 +102,7 @@ class RepoFactory:
 	def _ProduceDirs(self, path, dir_level):
 		if dir_level > self.max_dir_depth:
 			return
-		for i in range(random.randint(self.max_subdirs / 2, self.max_subdirs)):
+		for i in range(self.num_subdirs):
 			new_dir = ''.join([path, "/dir", str(i)])
 			self._ProduceDir(new_dir)
 			self._Recurse(new_dir, dir_level + 1)
@@ -104,8 +117,8 @@ usage = "usage: %prog [options] <destination path>\n\
 This creates dummy file system content based on the parameters provided."
 parser = OptionParser(usage)
 parser.add_option("-d", "--max-dir-depth",     dest="max_dir_depth",     default=7,      help="the maximal directory structure depth")
-parser.add_option("-n", "--max-subdirs",       dest="max_subdirs",       default=5,      help="maximal number of sub-directories per stage")
-parser.add_option("-f", "--max-files-per-dir", dest="max_files_per_dir", default=30,     help="maximal number of files per directory")
+parser.add_option("-n", "--num-subdirs",       dest="num_subdirs",       default=5,      help="number of sub-directories per stage")
+parser.add_option("-f", "--num-files-per-dir", dest="num_files_per_dir", default=30,     help="number of files per directory")
 parser.add_option("-s", "--min-file-size",     dest="min_file_size",     default=0,      help="minimal file size for random file contents")
 parser.add_option("-b", "--max-file-size",     dest="max_file_size",     default=102400, help="maximal file size for random file contents")
 
@@ -115,8 +128,8 @@ if len(args) != 1:
 	parser.error("Please provide the mandatory arguments")
 try:
 	max_dir_depth     = int(options.max_dir_depth)
-	max_subdirs       = int(options.max_subdirs)
-	max_files_per_dir = int(options.max_files_per_dir)
+	num_subdirs       = int(options.num_subdirs)
+	num_files_per_dir = int(options.num_files_per_dir)
 	min_file_size     = int(options.min_file_size)
 	max_file_size     = int(options.max_file_size)
 except ValueError:
@@ -134,12 +147,14 @@ if min_file_size < 0 or max_file_size < 0 or min_file_size > max_file_size:
 	PrintError("file size restrictions do not make sense.")
 
 repo_factory = RepoFactory(max_dir_depth,     \
-                           max_subdirs,       \
-                           max_files_per_dir, \
+                           num_subdirs,       \
+                           num_files_per_dir, \
                            symlink_ratio,     \
                            hardlink_ratio,    \
                            repo_dir,          \
                            min_file_size,     \
                            max_file_size)
+repo_factory.PredictResults()
+print
 repo_factory.Produce()
 repo_factory.PrintReport()

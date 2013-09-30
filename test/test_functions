@@ -376,9 +376,9 @@ create_filled_repo() {
 make_huge_repo() {
   local repo_dir=$1
   python ${TEST_ROOT}/mock_services/make_repo.py \
-    --max-dir-depth        8                     \
-    --max-subdirs         10                     \
-    --max-files-per-dir   15                     \
+    --max-dir-depth        7                     \
+    --num-subdirs          5                     \
+    --num-files-per-dir    5                     \
     --min-file-size        0                     \
     --max-file-size     5120                     \
     $repo_dir
