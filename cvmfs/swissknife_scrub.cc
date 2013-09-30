@@ -121,6 +121,7 @@ std::string CommandScrub::CheckPathAndExtractHash(
   if (has_object_modifier   &&
       last_character != 'H' &&
       last_character != 'C' &&
+      last_character != 'P' &&
       last_character != 'X') {
     std::stringstream ss;
     ss << "unknown object modifier: " << last_character;
