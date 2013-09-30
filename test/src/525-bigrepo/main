@@ -1,4 +1,4 @@
-cvmfs_test_name="Produce a Huge Repository"
+cvmfs_test_name="Split a Huge Repository into Nested Catalogs"
 cvmfs_test_autofs_on_startup=false
 
 
@@ -22,6 +22,50 @@ cvmfs_run_test() {
 
   echo "check catalog integrity" >> $logfile
   check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "find out how many file system items are in the repo" >> $logfile
+  local num_1
+  num_1=$(find $repo_dir | wc -l 2>>$logfile)
+  echo "found $num_1 file system entries" >> $logfile
+
+  echo "starting a new transaction" >> $logfile
+  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "creating nested catalog markers" >> $logfile
+  local num_nested_catalogs=0
+  for dir in $(find $repo_dir -maxdepth 1 -mindepth 1 -type d); do
+    touch $dir/.cvmfscatalog >> $logfile 2>&1 || return $?
+    num_nested_catalogs=$(( $num_nested_catalogs + 1 ))
+  done
+  echo "generated $num_nested_catalogs catalogs" >> $logfile
+
+  echo "creating nested catalogs by cvmfs_server publish" >> $logfile
+  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "check catalog integrity" >> $logfile
+  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+
+  echo "check if all nested catalogs are present" >> $logfile
+  for dir in $(find $repo_dir -maxdepth 1 -mindepth 1 -type d); do
+    local nested_root
+    nested_root=$(basename $dir)
+    echo -n "checking: /$nested_root ... " >> $logfile
+    check_catalog_presence "/$nested_root" $CVMFS_TEST_REPO >> $logfile 2>&1 || { echo "not found" >> $logfile; return 2; }
+    echo "found" >> $logfile
+  done
+
+  echo "check again for the number of file system entries" >> $logfile
+  local num_2
+  num_2=$(find $repo_dir | wc -l 2>>$logfile)
+  echo "found $num_2 file system entries" >> $logfile
+
+  echo "check if file system entries match" >> $logfile
+  local num_diff
+  num_diff=$(( $num_2 - $num_1 ))
+  if [ $num_diff -ne $num_nested_catalogs ]; then
+    echo "first there have been $num_1 entries, now there are $num_2"
+    return 3
+  fi
 
   return 0
 }
