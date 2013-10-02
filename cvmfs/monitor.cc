@@ -361,6 +361,8 @@ static void Watchdog() {
   ControlFlow::Flags control_flow;
 
   if (!pipe_watchdog_->Read(&control_flow)) {
+    // Re-activate µSyslog, if necessary
+    SetLogMicroSyslog(GetLogMicroSyslog());
     LogEmergency("unexpected termination (" + StringifyInt(control_flow) + ")");
     if (on_crash_) on_crash_();
   } else {
@@ -374,6 +376,8 @@ static void Watchdog() {
         break;
 
       default:
+        // Re-activate µSyslog, if necessary
+        SetLogMicroSyslog(GetLogMicroSyslog());
         LogEmergency("unexpected error");
         break;
     }
@@ -453,15 +457,16 @@ void Spawn() {
           pipe_pid.Write(watchdog_pid);
           close(pipe_pid.write_end);
           // Close all unused file descriptors
-          string usyslog_save = GetLogMicroSyslog();
+          // close also usyslog, only get it back if necessary
+          //string usyslog_save = GetLogMicroSyslog();
           string debuglog_save = GetLogDebugFile();
-          SetLogMicroSyslog("");
+          //SetLogMicroSyslog("");
           SetLogDebugFile("");
           for (int fd = 0; fd < max_fd; fd++) {
             if (fd != pipe_watchdog_->read_end)
               close(fd);
           }
-          SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
+          //SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
           Watchdog();
           exit(0);
