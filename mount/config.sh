@@ -50,7 +50,7 @@ cvmfs_readconfig() {
               /etc/cernvm/site.conf
   do
     if [ -f $file ]; then
-      eval `sed 's/=\$(.*)//g' $file |  sed -n -e  '/^[^+]/s/\([^=]*\)[=]\(.*\)/\1="\2"; /gp'`
+      eval `cat $file | tr -d \" | sed 's/=\$(.*)//g' | sed -n -e  '/^[^+]/s/\([^=]*\)[=]\(.*\)/\1="\2"; /gp'`
     fi
   done
 
