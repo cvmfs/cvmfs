@@ -1,0 +1,139 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef UPLOAD_FILE_PROCESSING_CHUNK_H
+#define UPLOAD_FILE_PROCESSING_CHUNK_H
+
+#include <sys/types.h>
+#include <string>
+#include <vector>
+#include <cassert>
+
+#include <zlib.h>
+
+#include <tbb/atomic.h>
+
+#include "char_buffer.h"
+#include "../hash.h"
+
+namespace upload {
+
+struct UploadStreamHandle;
+
+class IoDispatcher;
+class File;
+
+/**
+ * The Chunk class describes a file chunk in processing. It holds state infor-
+ * mation for compression and hashing as well as other chunk specific meta data.
+ * Note that it deliberately _does not_ contain the actual chunk data which is
+ * managed dynamically by a stream of Buffers. Still the Chunk class is in
+ * charge of scheduling (or deferred scheduling) the write of processed Buffers.
+ */
+class Chunk {
+ public:
+  Chunk(File* file, const off_t offset) :
+    file_(file), file_offset_(offset), chunk_size_(0),
+    is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
+    zlib_initialized_(false), content_hash_context_(hash::kSha1),
+    content_hash_(hash::kSha1), content_hash_initialized_(false),
+    upload_stream_handle_(NULL), bytes_written_(0)
+  {
+    Initialize();
+  }
+
+  bool IsInitialized()         const { return zlib_initialized_ &&
+                                              content_hash_initialized_;     }
+  bool IsFullyProcessed()      const { return done_;                         }
+  bool IsBulkChunk()           const { return is_bulk_chunk_;                }
+  bool IsFullyDefined()        const { return is_fully_defined_;             }
+  bool HasUploadStreamHandle() const { return upload_stream_handle_ != NULL; }
+
+  void Finalize();
+  void ScheduleCommit();
+  Chunk* CopyAsBulkChunk(const size_t file_size);
+  void SetAsBulkChunk() { is_bulk_chunk_ = true; }
+
+  void ScheduleWrite(CharBuffer *buffer);
+
+  /**
+   * An enabled deferred write mode instructs the Chunk object to store Buffers
+   * instead of directly sending them to the IoDispatcher for write out.
+   * This is used for Files that might become chunked to produce a bulk chunk
+   * together with the actual file chunks.
+   * Deferred writes of Buffers are issued as soon as the final decision for
+   * file chunking is made. (See protected member FlushDeferredWrites())
+   */
+  void EnableDeferredWrite() {
+    assert (! HasUploadStreamHandle());
+    deferred_write_ = true;
+  }
+
+  File*             file()                   const { return file_;             }
+  off_t             offset()                 const { return file_offset_;      }
+  size_t            size()                   const { return chunk_size_;       }
+  void          set_size(const size_t size) {
+    chunk_size_       = size;
+    is_fully_defined_ = true;
+  }
+
+  hash::ContextPtr& content_hash_context() { return content_hash_context_;     }
+  const hash::Any&  content_hash() const   { return content_hash_;             }
+  std::string       hash_suffix() const;
+  z_stream&         zlib_context()                 { return zlib_context_;     }
+
+  UploadStreamHandle* upload_stream_handle() const { return upload_stream_handle_; }
+  void set_upload_stream_handle(UploadStreamHandle* ush) {
+    assert (! HasUploadStreamHandle());
+    upload_stream_handle_ = ush;
+  }
+
+  size_t         bytes_written()          const { return bytes_written_;      }
+  size_t         compressed_size()        const { return compressed_size_;    }
+  void       add_bytes_written(const size_t new_bytes) {
+    bytes_written_ += new_bytes;
+  }
+  void       add_compressed_size(const size_t new_bytes) {
+    compressed_size_ += new_bytes;
+  }
+
+ protected:
+  void Initialize();
+  void FlushDeferredWrites(const bool delete_buffers = true);
+
+ private:
+  Chunk(const Chunk &other);
+  Chunk& operator=(const Chunk &other);  // don't copy assign
+
+ private:
+  File                    *file_;              ///< This is a chunk of File
+  off_t                    file_offset_;       ///< Offset in the associated File
+  size_t                   chunk_size_;        ///< Size of the chunk
+                                               ///< Note: might not be defined from
+                                               ///<       from the beginning
+  tbb::atomic<bool>        done_;
+  bool                     is_bulk_chunk_;
+  bool                     is_fully_defined_;
+
+  bool                     deferred_write_;
+  std::vector<CharBuffer*> deferred_buffers_;  ///< Buffers stored for a deferred write
+                                               ///< (see EnableDeferredWrite())
+
+  z_stream                 zlib_context_;
+  bool                     zlib_initialized_;
+
+  hash::ContextPtr         content_hash_context_;
+  hash::Any                content_hash_;
+  bool                     content_hash_initialized_;
+
+  UploadStreamHandle      *upload_stream_handle_; ///< opaque handle for streamed upload
+  size_t                   bytes_written_;        ///< bytes already uploaded (compressed)
+  tbb::atomic<size_t>      compressed_size_;      ///< size of the compressed data
+};
+
+typedef std::vector<Chunk*> ChunkVector;
+
+}
+
+#endif /* UPLOAD_FILE_PROCESSING_CHUNK_H */

@@ -32,7 +32,7 @@
  *
  * Stage 2 aka. the upload is handled by one of the concrete Uploader classes.
  * Uploaders have a thin interface described in the AbstractUploader class.
- * The file processor uses a concrete Uploader to push files into the backend
+ * The FileProcessor uses a concrete Uploader to push files into the backend
  * storage as part of it's processing.
  * Furthermore the user can directly upload files using the Spooler::Upload()
  * method as described in the next paragraph.
@@ -94,8 +94,8 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 
-#include "upload_file_processor.h"
 #include "upload_facility.h"
+#include "file_processing/file_processor.h"
 
 namespace upload
 {
