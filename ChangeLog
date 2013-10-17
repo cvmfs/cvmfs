@@ -1,4 +1,6 @@
 2.1.16:
+  * TBB driven, parallel file processing engine in server
+  * Follow rpm scheme in deb packaging (client, server, keys)
   * Add fnal stratum 1 to default configuration
   * Fix read-only cache mode
 
