@@ -5,22 +5,26 @@
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
 
-# This is the debhelper compatibility version to use.
-export DH_COMPAT=4
-
+# TODO:
+#  -> Support debian multiarch
+#       CMake's GNUInstallDirs supports multiarch beginning from CMake 2.8.8...
+#       Recipe to migrate:
+#         1. uncomment the two lines below this comment
+#         2. uncomment appropriate lines in the debian/control file
+#         3. replace 'usr/lib/<libname>' by 'usr/lib/*/<libname>'
+#            in debian/*.install and debian/*.dirs files
+#
+#DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+#DEB_CONFIGURE_EXTRA_FLAGS += --libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH)
 
 Makefile: 
 	dh_testdir
-	cmake -DBUILD_SERVER=no -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr
 
 build: build-stamp
 build-stamp: Makefile
 	dh_testdir
-
-	# Add here commands to compile the package.
-	$(MAKE)
-	#docbook-to-man debian/myproject.sgml > myproject.1
-
+	dh_auto_build
 	touch build-stamp
 
 clean:
@@ -32,15 +36,18 @@ clean:
 	
 	dh_clean
 
-install: build
+debian/%.install: debian/%.install.in
+	sed "s/@CVMFS_VERSION@/$(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')/g" $< > $@
+
+install: build debian/cvmfs.install debian/cvmfs-keys.install debian/cvmfs-server.install debian/cvmfs-unittests.install
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	dh_prep
 	dh_installdirs
 	
 	# Add here commands to install the package into debian/gentoo.
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/cvmfs
-#	install -m0644 $(CURDIR)/mount/cernvm_rsa.pub $(CURDIR)/debian/cvmfs/etc/cvmfs/
+	dh_auto_install --destdir=${CURDIR}/debian/tmp
+	dh_install --sourcedir=${CURDIR}/debian/tmp
 
 # Build architecture-independent files here.
 binary-indep: build install
