@@ -255,12 +255,20 @@ struct ContextPtr {
     size = GetContextSize(a);
     buffer = NULL;
   }
+
+  explicit ContextPtr(const ContextPtr &other) :
+    algorithm(other.algorithm),
+    size(other.size)
+  {
+    buffer = malloc(size);
+    memcpy(buffer, other.buffer, size);
+  }
 };
 
-void Init(ContextPtr context);
+void Init(ContextPtr &context);
 void Update(const unsigned char *buffer, const unsigned buffer_size,
-            ContextPtr context);
-void Final(ContextPtr context, Any *any_digest);
+            ContextPtr &context);
+void Final(ContextPtr &context, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
 bool HashFile(const std::string filename, Any *any_digest);

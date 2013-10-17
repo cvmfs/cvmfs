@@ -3,7 +3,6 @@
  */
 
 #include "upload.h"
-#include "upload_file_chunker.h"
 
 #include "util_concurrency.h"
 
@@ -40,24 +39,12 @@ bool Spooler::Initialize() {
   }
 
   // configure the file processor context
-  file_processor_ = new FileProcessor(spooler_definition_,
-                                      uploader_.weak_ref());
+  file_processor_ = new FileProcessor(uploader_.weak_ref(),
+                                      spooler_definition_.use_file_chunking,
+                                      spooler_definition_.min_file_chunk_size,
+                                      spooler_definition_.avg_file_chunk_size,
+                                      spooler_definition_.max_file_chunk_size);
   file_processor_->RegisterListener(&Spooler::ProcessingCallback, this);
-
-  // initialize the file processor environment
-  if (! file_processor_->Initialize()) {
-    LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize concurrent "
-                                       "processing in Spooler.");
-    return false;
-  }
-
-  // configure the file chunking size restrictions
-  if (spooler_definition_.use_file_chunking) {
-    ChunkGenerator::SetFileChunkRestrictions(
-          spooler_definition_.min_file_chunk_size,
-          spooler_definition_.avg_file_chunk_size,
-          spooler_definition_.max_file_chunk_size);
-  }
 
   // all done...
   return true;
@@ -118,11 +105,10 @@ void Spooler::WaitForUpload() const {
 
 void Spooler::WaitForTermination() const {
   uploader_->WaitForUpload();
-  file_processor_->WaitForTermination();
+  file_processor_->WaitForProcessing();
 }
 
 
 unsigned int Spooler::GetNumberOfErrors() const {
-  return file_processor_->GetNumberOfErrors() +
-         uploader_->GetNumberOfErrors();
+  return uploader_->GetNumberOfErrors();
 }

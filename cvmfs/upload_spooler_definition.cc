@@ -43,6 +43,8 @@ SpoolerDefinition::SpoolerDefinition(
     driver_type = Local;
   } else if (upstream[0] == "riak") {
     driver_type = Riak;
+  } else if (upstream[0] == "mock") {
+    driver_type = Unknown; // for unit testing purpose only!
   } else {
     LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
       upstream[0].c_str());

@@ -5,13 +5,11 @@
 #include "upload_facility.h"
 
 #include "upload_local.h"
-#include "upload_riak.h"
 
 using namespace upload;
 
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
-  RegisterPlugin<RiakUploader>();
 }
 
 
@@ -37,14 +35,12 @@ void AbstractUploader::DisablePrecaching() {}
 void AbstractUploader::EnablePrecaching() {}
 
 
-void AbstractUploader::Respond(const callback_t  *callback,
-                               const int          return_code,
-                               const std::string  local_path) {
+void AbstractUploader::Respond(const callback_t       *callback,
+                               const UploaderResults  &result) const {
   if (callback == NULL) {
     return;
   }
 
-  const UploaderResults result(return_code, local_path);
   (*callback)(result);
   delete callback;
 }
