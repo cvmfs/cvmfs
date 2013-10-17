@@ -84,7 +84,7 @@ void Reader<FileScrubbingTaskT, FileT>::FinalizedFile(AbstractFile *file) {
 
   // notify subscribed callbacks for a finalized file
   FileT *concrete_file = static_cast<FileT*>(file);
-  NotifyListeners(concrete_file);
+  this->NotifyListeners(concrete_file);
 
   // check if all files have been processed
   {
