@@ -142,7 +142,7 @@ class Reader : public AbstractReader,
     pthread_cond_init(&reading_done_, NULL);
   }
 
-  ~Reader() {
+  virtual ~Reader() {
     Terminate();
     pthread_cond_destroy(&reading_done_);
     pthread_cond_destroy(&free_file_slots_);
