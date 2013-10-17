@@ -7,12 +7,54 @@
 
 #include "swissknife.h"
 
+#include <string>
+#include <openssl/sha.h>
+#include <cassert>
+
+#include "file_processing/async_reader.h"
+#include "file_processing/file.h"
+#include "hash.h"
+
 namespace swissknife {
 
 class CommandScrub : public Command {
+ private:
+  class StoredFile : public upload::AbstractFile {
+   public:
+    StoredFile(const std::string &path, const std::string &expected_hash);
+    void Update(const unsigned char *data, const size_t nbytes);
+    void Finalize();
+
+    const hash::Any& content_hash() const {
+      assert(hash_done_); return content_hash_;
+    }
+    const hash::Any& expected_hash() const { return expected_hash_; }
+
+   private:
+    bool             hash_done_;
+    hash::ContextPtr hash_context_;
+
+    hash::Any        content_hash_;
+    hash::Any        expected_hash_;
+  };
+
+  class FileScrubbingTask : public upload::AbstractFileScrubbingTask<StoredFile> {
+   public:
+    FileScrubbingTask(StoredFile           *file,
+                      upload::CharBuffer *buffer,
+                      const bool          is_last_piece) :
+      upload::AbstractFileScrubbingTask<StoredFile>(file, buffer, is_last_piece) {}
+
+   protected:
+    tbb::task* execute();
+  };
+
+  typedef upload::Reader<FileScrubbingTask, StoredFile> ScrubbingReader;
+
  public:
-  ~CommandScrub() { };
-  std::string GetName() { return "info"; }
+  CommandScrub() : reader_(NULL), warnings_(0) {}
+  ~CommandScrub();
+  std::string GetName() { return "scrub"; }
   std::string GetDescription() {
     return "CernVM File System repository file storage checker. Finds silent "
            "disk corruptions by recomputing all file content checksums in the "
@@ -20,6 +62,28 @@ class CommandScrub : public Command {
   };
   ParameterList GetParams();
   int Main(const ArgumentList &args);
+
+
+ protected:
+  void FileCallback(const std::string &relative_path,
+                    const std::string &file_name);
+  void SymlinkCallback(const std::string &relative_path,
+                       const std::string &symlink_name);
+
+  void FileProcessedCallback(StoredFile* const& file);
+
+  void PrintWarning(const std::string &msg, const std::string &path) const;
+
+
+ private:
+  std::string CheckPathAndExtractHash(const std::string &relative_path,
+                                      const std::string &file_name,
+                                      const std::string &full_path) const;
+
+ private:
+  std::string           repo_path_;
+  ScrubbingReader      *reader_;
+  mutable unsigned int  warnings_;
 };
 
 }
