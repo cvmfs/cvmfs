@@ -81,18 +81,18 @@ class FileSystemTraversal {
    */
   FileSystemTraversal(T *delegate,
                       const std::string &relative_to_directory,
-                      const bool recurse)
+                      const bool recurse) :
+    fn_enter_dir(NULL),
+    fn_leave_dir(NULL),
+    fn_new_file(NULL),
+    fn_new_symlink(NULL),
+    fn_ignore_file(NULL),
+    fn_new_dir_prefix(NULL),
+    fn_new_dir_postfix(NULL),
+    delegate_(delegate),
+    relative_to_directory_(relative_to_directory),
+    recurse_(recurse)
   {
-    delegate_ = delegate;
-    relative_to_directory_ = relative_to_directory;
-    recurse_ = recurse;
-    fn_enter_dir = NULL;
-    fn_leave_dir = NULL;
-    fn_new_file = NULL;
-    fn_new_symlink = NULL;
-    fn_ignore_file = NULL;
-    fn_new_dir_prefix = NULL;
-    fn_new_dir_postfix = NULL;
     Init();
   }
 
