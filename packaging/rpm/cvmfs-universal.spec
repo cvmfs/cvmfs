@@ -311,6 +311,14 @@ fi
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
+%{_libdir}/libtbb_cvmfs.so
+%{_libdir}/libtbb_cvmfs.so.2
+%{_libdir}/libtbbmalloc_cvmfs.so
+%{_libdir}/libtbbmalloc_cvmfs.so.2
+%{_libdir}/libtbb_cvmfs_debug.so
+%{_libdir}/libtbb_cvmfs_debug.so.2
+%{_libdir}/libtbbmalloc_cvmfs_debug.so
+%{_libdir}/libtbbmalloc_cvmfs_debug.so.2
 
 %changelog
 * Tue Jun 04 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.12
