@@ -91,6 +91,17 @@ target_link_libraries (${PROJECT_TEST_NAME} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBR
                        ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} pthread)
 
 #
+# Install the generated unit test binary
+#
+if (INSTALL_UNITTESTS)
+  install (
+    TARGETS        ${PROJECT_TEST_NAME}
+    RUNTIME
+    DESTINATION    bin
+  )
+endif (INSTALL_UNITTESTS)
+
+#
 # Integrate the test running into CMake
 #
 add_test (NAME unittests COMMAND ${PROJECT_TEST_NAME})
