@@ -43,7 +43,7 @@ class AbstractReader {
     pthread_cond_init(&free_slot_condition_, NULL);
   }
 
-  ~AbstractReader() {
+  virtual ~AbstractReader() {
     pthread_mutex_destroy(&free_slot_mutex_);
     pthread_cond_destroy(&free_slot_condition_);
   }
