@@ -118,7 +118,7 @@ CernVM-FS tools to maintain Stratum 0/1 repositories
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
-Requires: cvmfs-server >= 2.1.16 # cvmfs specific TBB shared libraries
+Requires: cvmfs-server = %{version} # cvmfs specific TBB shared libraries (since 2.1.16)
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
