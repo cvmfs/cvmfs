@@ -137,9 +137,9 @@ export CFLAGS="-march=i686"
 export CXXFLAGS="-march=i686"
 %endif
 %if 0%{?suse_version}
-cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes .
+%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes .
 %endif
 make %{?_smp_mflags}
 
@@ -188,7 +188,6 @@ export DONT_STRIP=1
 rm -rf $RPM_BUILD_ROOT
 
 make DESTDIR=$RPM_BUILD_ROOT install
-cp test/unittests/CernVM-FS_test $RPM_BUILD_ROOT/usr/bin/cvmfs_unittests
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
