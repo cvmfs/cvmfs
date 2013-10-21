@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 tmpdir=$1
 [ -z $tmpdir ] && exit 1
 cvmfsrpm=$2
