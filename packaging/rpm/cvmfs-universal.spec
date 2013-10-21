@@ -118,6 +118,7 @@ CernVM-FS tools to maintain Stratum 0/1 repositories
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
+Requires: cvmfs-server = %{version}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
