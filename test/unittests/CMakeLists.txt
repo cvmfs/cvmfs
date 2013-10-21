@@ -2,7 +2,7 @@
 #
 # global test configuration
 #
-set (PROJECT_TEST_NAME "${PROJECT_NAME}_test")
+set (PROJECT_TEST_NAME "cvmfs_unittests")
 
 #
 # unit test source files
