@@ -37,7 +37,7 @@ def spawn_instance(connection, ami, key_name, flavor):
                                            key_name=key_name,
                                            instance_type=flavor)
     if len(reservation.instances) != 1:
-      print_error("Failed to start instance")
+      print_error("Failed to start instance (#: " + reservation.instances + ")")
       return None
 
     instance = reservation.instances[0]
@@ -53,7 +53,7 @@ def spawn_instance(connection, ami, key_name, flavor):
     return instance
 
   except Exception, e:
-    print e
+    print_error("Exception: " + e)
     return None
 
 
