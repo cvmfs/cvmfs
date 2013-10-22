@@ -35,7 +35,8 @@ def spawn_instance(connection, ami, key_name, flavor):
   try:
     reservation = connection.run_instances(ami,
                                            key_name=key_name,
-                                           instance_type=flavor)
+                                           instance_type=flavor,
+                                           user_data="#cloud-config\nresize_rootfs: True")
     if len(reservation.instances) != 1:
       print_error("Failed to start instance (#: " + reservation.instances + ")")
       return None
