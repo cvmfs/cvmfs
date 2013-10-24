@@ -1,5 +1,8 @@
 #!/bin/sh
 
+script_location=$(dirname $(readlink --canonicalize $0))
+. ${script_location}/common.sh
+
 #
 # Common functionality for cloud platform test execution engine (test setup)
 # After sourcing this file the following variables are set:
@@ -169,11 +172,5 @@ attach_user_group() {
   sudo /usr/sbin/usermod -a -G $groupname $username || return 1
 }
 
-
-die() {
-  local msg="$1"
-  echo $msg
-  exit 103
-}
 
 echo "Hostname is $(hostname)"
