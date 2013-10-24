@@ -4,6 +4,18 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+# create additional disk partitions to accomodate CVMFS test repos
+echo -n "creating additional disk partitions... "
+disk_to_partition=/dev/vda
+free_disk_space=$(get_unpartitioned_space $disk_to_partition)
+if [ $free_disk_space -lt 25000000000 ]; then # at least 25GB required
+  die "fail (not enough unpartitioned disk space - $free_disk_space bytes)"
+fi
+partition_size=$(( $free_disk_space / 2 - 10240000))
+create_partition $disk_to_partition $partition_size || die "fail (creating partition 1)"
+create_partition $disk_to_partition $partition_size || die "fail (creating partition 2)"
+echo "done"
+
 # custom kernel packages
 knl_firmware="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.18.1.el6/kernel-firmware-2.6.32-358.18.1.el6.aufs21.x86_64.rpm"
 knl="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.18.1.el6/kernel-2.6.32-358.18.1.el6.aufs21.x86_64.rpm"
