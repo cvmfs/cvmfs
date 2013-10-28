@@ -147,7 +147,7 @@ do
          cvmfs_run_test $logfile $(pwd)/${t}    && \
          retval=\$?                             && \
          retval=\$(mangle_test_retval \$retval) && \
-         exit \$retval"
+         exit \$retval" >> $logfile 2>&1
   RETVAL=$?
 
   # check the final test result
