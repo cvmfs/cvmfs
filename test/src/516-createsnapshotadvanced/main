@@ -115,36 +115,36 @@ cvmfs_run_test() {
   local mnt_point="$(pwd)/mountpount"
   local replica_name="$CVMFS_TEST_REPO.replic"
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  echo "starting transaction to edit repository" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository" >> $logfile
-  produce_files_in $repo_dir >> $logfile 2>&1 || return 3
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch space for comparison" >> $logfile
-  produce_files_in $reference_dir >> $logfile 2>&1 || return 4
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot" >> $logfile
-  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare the results of cvmfs to our reference copy" >> $logfile
-  compare_directories $repo_dir $reference_dir >> $logfile || return $?
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
 
-  echo "check catalog integrity" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "check catalog integrity"
+  check_catalogs $CVMFS_TEST_REPO || return $?
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  echo "create Stratum1 repository on the same machine" >> $logfile
-  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER -n $replica_name http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub >> $logfile 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 7; }
+  echo "create Stratum1 repository on the same machine"
+  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER -n $replica_name http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || { desaster_cleanup $mnt_point $replica_name; return 7; }
 
-  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica" >> $logfile
-  sudo cvmfs_server snapshot $replica_name >> $logfile 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 9; }
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }
 
-  echo "mount the Stratum1 repository on a local mountpoint" >> $logfile
+  echo "mount the Stratum1 repository on a local mountpoint"
   mkdir $mnt_point cache
   cat > private.conf << EOF
 CVMFS_CACHE_BASE=$(pwd)/cache
@@ -155,14 +155,14 @@ CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
 EOF
   cvmfs2 -d -o config=private.conf test.cern.ch $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 10; }
 
-  echo "check if the Stratum1 repository contains exactly the same as the reference copy" >> $logfile
-  compare_directories $mnt_point $reference_dir >> $logfile || { desaster_cleanup $mnt_point $replica_name; return 11; }
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 11; }
 
-  echo "unmount the Stratum1 repository" >> $logfile
-  sudo umount $mnt_point >> $logfile 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 12; }
+  echo "unmount the Stratum1 repository"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 12; }
 
-  echo "clean up" >> $logfile
-  sudo cvmfs_server rmfs -f $replica_name >> $logfile 2>&1
+  echo "clean up"
+  sudo cvmfs_server rmfs -f $replica_name
 
   return 0
 }

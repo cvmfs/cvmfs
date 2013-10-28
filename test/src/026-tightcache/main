@@ -8,11 +8,11 @@ cvmfs_run_test() {
     "CVMFS_QUOTA_LIMIT=2000" \
     "CVMFS_CHECK_PERMISSIONS=no" || return 1
   
-  echo "Walking through /cvmfs/atlas.cern.ch" >> $logfile
-  find /cvmfs/atlas.cern.ch > /dev/null 2>>$logfile
+  echo "Walking through /cvmfs/atlas.cern.ch"
+  find /cvmfs/atlas.cern.ch > /dev/null
   local retval=$?
   if [ $retval -ne 0 ]; then
-    echo "retval $retval" >> $logfile
+    echo "retval $retval"
     return 2
   fi
  
