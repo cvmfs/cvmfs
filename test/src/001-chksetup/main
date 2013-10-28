@@ -5,7 +5,7 @@ cvmfs_run_test() {
   logfile=$1
 
   sudo sh -c 'echo CVMFS_HTTP_PROXY=DIRECT > /etc/cvmfs/default.local' || return 1
-  sudo cvmfs_config chksetup >> $logfile || return 2
+  sudo cvmfs_config chksetup || return 2
  
   return 0
 }

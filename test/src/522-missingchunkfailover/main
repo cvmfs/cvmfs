@@ -14,20 +14,20 @@ cvmfs_run_test() {
   local replica_name="$CVMFS_TEST_REPO.replic"
   local mnt_point="$scratch_dir/mountpoint"
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
-  create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  echo "create a replica of the fresh repository" >> $logfile
+  echo "create a replica of the fresh repository"
   sudo cvmfs_server add-replica             \
     -o $CVMFS_TEST_USER                     \
     -n $replica_name                        \
     http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO \
-    /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub >> $logfile 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 2; }
+    /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || { desaster_cleanup $mnt_point $replica_name; return 2; }
 
-  echo "create a snapshot of the Stratum1 repository" >> $logfile
-  cvmfs_server snapshot $replica_name >> $logfile 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 3; }
+  echo "create a snapshot of the Stratum1 repository"
+  cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 3; }
 
-  echo "delete all file data chunks in the Stratum0 repository" >> $logfile
+  echo "delete all file data chunks in the Stratum0 repository"
   # go through the repo backend storage and search for data chunk pathes
   # that do not end with a capital letter (catalog, history, certificate) except
   # a capital P (big file data chunks) and delete them
@@ -36,7 +36,7 @@ cvmfs_run_test() {
     rm -f $f || { desaster_cleanup $mnt_point $replica_name; return 4; }
   done
 
-  echo "mount the repository on a local mountpoint with references to Stratum1 and Stratum0" >> $logfile
+  echo "mount the repository on a local mountpoint with references to Stratum1 and Stratum0"
   mkdir $mnt_point cache || { desaster_cleanup $mnt_point $replica_name; return 5; }
   cat > private.conf << EOF
 CVMFS_CACHE_BASE=$(pwd)/cache
@@ -47,14 +47,14 @@ CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
 EOF
   cvmfs2 -d -o config=private.conf $CVMFS_TEST_REPO $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 6; }
 
-  echo "try to access files in the repository" >> $logfile
+  echo "try to access files in the repository"
   for f in $(find $mnt_point -maxdepth 1 -type f); do
-    cat $f >> $logfile 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 7; }
+    cat $f || { desaster_cleanup $mnt_point $replica_name; return 7; }
   done
 
-  echo "clean up" >> $logfile
-  sudo umount $mnt_point >> $logfile 2>&1 || return 8
-  sudo cvmfs_server rmfs -f $replica_name >> $logfile 2>&1 || return 9
+  echo "clean up"
+  sudo umount $mnt_point || return 8
+  sudo cvmfs_server rmfs -f $replica_name || return 9
 
   return 0
 }

@@ -16,22 +16,22 @@ cvmfs_run_test() {
   local retcode=0
   local server_pid=0
 
-  echo "restarting autofs" >> $logfile
-  autofs_switch off >> $logfile 2>&1 || return 10
-  autofs_switch on  >> $logfile 2>&1 || return 11
+  echo "restarting autofs"
+  autofs_switch off || return 10
+  autofs_switch on  || return 11
 
-  echo "trying to mount $repo first" >> $logfile
+  echo "trying to mount $repo first"
   cvmfs_mount $repo || return 1
 
-  echo "unmounting and cleaning" >> $logfile
+  echo "unmounting and cleaning"
   cvmfs_clean || return 2
 
-  echo "starting mocked and silent DNS server" >> $logfile
+  echo "starting mocked and silent DNS server"
   server_pid=$(open_silent_port UDP 53 $logfile)
 
-  echo "silent DNS server running as PID $server_pid" >> $logfile
+  echo "silent DNS server running as PID $server_pid"
 
-  echo "trying to mount again with unresponsive DNS" >> $logfile
+  echo "trying to mount again with unresponsive DNS"
   local seconds
   seconds=$(stop_watch do_faulty_mount)
 
@@ -39,12 +39,12 @@ cvmfs_run_test() {
 
   local expected_max=$(($num_host*3 + 2))
   if [ $seconds -gt $expected_max ]; then
-    echo "timeout was too long: $seconds (expected at most $expected_max)" >> $logfile
+    echo "timeout was too long: $seconds (expected at most $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 
-  echo "killing the mocked DNS server" >> $logfile
-  sudo kill $server_pid >> $logfile 2>&1 || retcode=6
+  echo "killing the mocked DNS server"
+  sudo kill $server_pid || retcode=6
 
   return $retcode
 }

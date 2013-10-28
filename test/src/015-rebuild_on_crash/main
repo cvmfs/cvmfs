@@ -14,19 +14,19 @@ cvmfs_run_test() {
   sudo [ -f ${cache_dir}/cachedb ] || return 2
   sudo [ -f ${cache_dir}/cachemgr.running ] || cvmfs_config showconfig lhcb.cern.ch | grep -q CVMFS_SHARED_CACHE=no || return 3
   sudo [ -f ${cache_dir}/running.lhcb.cern.ch ] || return 4
-  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab >> $logfile || return 5
+  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab || return 5
   cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
   if echo $cache_list | grep -q "automatic rebuild"; then
-    echo "$cache_list" >> $logfile
+    echo "$cache_list"
     return 6
   fi
 
   cvmfs_umount lhcb.cern.ch || return 10
-  ls /cvmfs/lhcb.cern.ch >> $logfile || return 11
-  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab >> $logfile || return 12
+  ls /cvmfs/lhcb.cern.ch || return 11
+  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab || return 12
   cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
   if echo $cache_list | grep -q "automatic rebuild"; then
-    echo "$cache_list" >> $logfile
+    echo "$cache_list"
     return 13
   fi
   
@@ -34,10 +34,10 @@ cvmfs_run_test() {
   sudo kill -9 $pid || return 21
   cvmfs_umount lhcb.cern.ch || return 22
   
-  ls /cvmfs/lhcb.cern.ch >> $logfile || return 30
+  ls /cvmfs/lhcb.cern.ch || return 30
   cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
   if echo $cache_list | grep -v -q "automatic rebuild"; then
-    echo "$cache_list" >> $logfile
+    echo "$cache_list"
     return 31
   fi
   

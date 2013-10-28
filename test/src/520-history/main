@@ -160,108 +160,108 @@ cvmfs_run_test() {
   local third_tag="third_tag"
   local third_tag_desc="last tag revision"
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log >> $logfile 2>&1 || return $?
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository" >> $logfile
-  produce_files_in $repo_dir >> $logfile 2>&1 || return 3
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch spaces for comparison" >> $logfile
-  produce_files_in $reference_dir1 >> $logfile 2>&1 || return 4
-  produce_files_in $reference_dir2 >> $logfile 2>&1 || return 4
-  produce_files_in $reference_dir3 >> $logfile 2>&1 || return 4
-  produce_files_in $reference_dir4 >> $logfile 2>&1 || return 4
+  echo "putting exactly the same stuff in the scratch spaces for comparison"
+  produce_files_in $reference_dir1 || return 4
+  produce_files_in $reference_dir2 || return 4
+  produce_files_in $reference_dir3 || return 4
+  produce_files_in $reference_dir4 || return 4
 
-  echo "creating CVMFS snapshot" >> $logfile
-  publish_repo $CVMFS_TEST_REPO -a $first_tag -t "$first_tag_desc" >> $logfile 2>&1 || return $?
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO -a $first_tag -t "$first_tag_desc" || return $?
 
-  echo "compare the results of cvmfs to our reference copy" >> $logfile
-  compare_directories $repo_dir $reference_dir1 >> $logfile || return $?
-
-  # ============================================================================
-
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
-
-  echo "change stuff in the repository" >> $logfile
-  change_files_1_in $repo_dir >> $logfile 2>&1 || return 7
-
-  echo "change exactly the same stuff in the scratch spaces" >> $logfile 2>&1
-  change_files_1_in $reference_dir2 >> $logfile 2>&1 || return 8
-  change_files_1_in $reference_dir3 >> $logfile 2>&1 || return 8
-  change_files_1_in $reference_dir4 >> $logfile 2>&1 || return 8
-
-  echo "creating CVMFS snapshot" >> $logfile
-  publish_repo $CVMFS_TEST_REPO -a $second_tag -t "$second_tag_desc" >> $logfile 2>&1 || return $?
-
-  echo "compare the changed directories" >> $logfile
-  compare_directories $repo_dir $reference_dir2 >> $logfile 2>&1 || return $?
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir1 || return $?
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository" >> $logfile
-  change_files_2_in $repo_dir >> $logfile 2>&1 || return 7
+  echo "change stuff in the repository"
+  change_files_1_in $repo_dir || return 7
 
-  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
-  change_files_2_in $reference_dir3 >> $logfile 2>&1 || return 8
+  echo "change exactly the same stuff in the scratch spaces"
+  change_files_1_in $reference_dir2 || return 8
+  change_files_1_in $reference_dir3 || return 8
+  change_files_1_in $reference_dir4 || return 8
 
-  echo "creating CVMFS snapshot" >> $logfile
-  publish_repo $CVMFS_TEST_REPO -a $third_tag -t "$third_tag_desc" >> $logfile 2>&1 || return $?
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO -a $second_tag -t "$second_tag_desc" || return $?
 
-  echo "compare the changed directories" >> $logfile
-  compare_directories $repo_dir $reference_dir3 >> $logfile 2>&1 || return $?
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir2 || return $?
 
   # ============================================================================
 
-  echo "check catalog integrity" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "current tag statistics:" >> $logfile
-  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+  echo "change stuff in the repository"
+  change_files_2_in $repo_dir || return 7
 
-  echo "check tag descriptions" >> $logfile
+  echo "change exactly the same stuff in the scratch space"
+  change_files_2_in $reference_dir3 || return 8
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO -a $third_tag -t "$third_tag_desc" || return $?
+
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir3 || return $?
+
+  # ============================================================================
+
+  echo "check catalog integrity"
+  check_catalogs $CVMFS_TEST_REPO || return $?
+
+  echo "current tag statistics:"
+  cvmfs_server lstags $CVMFS_TEST_REPO
+
+  echo "check tag descriptions"
   if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag"       && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"; then
-    echo "all tags and their descriptions found" >> $logfile
+    echo "all tags and their descriptions found"
   else
     return 9
   fi
 
   # ============================================================================
 
-  echo "start transaction to rollback" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "start transaction to rollback"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "rollback to second tagged revision: $second_tag" >> $logfile
-  cvmfs_server rollback -f -t $second_tag $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "rollback to second tagged revision: $second_tag"
+  cvmfs_server rollback -f -t $second_tag $CVMFS_TEST_REPO || return $?
 
-  echo "compare to reference directory" >> $logfile
-  compare_directories $repo_dir $reference_dir2 >> $logfile 2>&1 || return 10
+  echo "compare to reference directory"
+  compare_directories $repo_dir $reference_dir2 || return 10
 
-  echo "check catalog integrity" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "check catalog integrity"
+  check_catalogs $CVMFS_TEST_REPO || return $?
 
-  echo "current tag statistics:" >> $logfile
-  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+  echo "current tag statistics:"
+  cvmfs_server lstags $CVMFS_TEST_REPO
 
-  echo "check tag descriptions" >> $logfile
+  echo "check tag descriptions"
   if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc"; then
-    echo "all tags and their descriptions found" >> $logfile
+    echo "all tags and their descriptions found"
   else
     return 11
   fi
@@ -272,30 +272,30 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository" >> $logfile
-  change_files_3_in $repo_dir >> $logfile 2>&1 || return 13
+  echo "change stuff in the repository"
+  change_files_3_in $repo_dir || return 13
 
-  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
-  change_files_3_in $reference_dir4 >> $logfile 2>&1 || return 14
+  echo "change exactly the same stuff in the scratch space"
+  change_files_3_in $reference_dir4 || return 14
 
-  echo "creating CVMFS snapshot" >> $logfile
-  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare the changed directories" >> $logfile
-  compare_directories $repo_dir $reference_dir4 >> $logfile 2>&1 || return $?
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir4 || return $?
 
-  echo "current tag statistics:" >> $logfile
-  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+  echo "current tag statistics:"
+  cvmfs_server lstags $CVMFS_TEST_REPO
 
-  echo "check tag descriptions" >> $logfile
+  echo "check tag descriptions"
   if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$second_tag_desc"; then
-    echo "all tags and their descriptions found" >> $logfile
+    echo "all tags and their descriptions found"
   else
     return 15
   fi
@@ -306,25 +306,25 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "start transaction to rollback" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "start transaction to rollback"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "rollback to first tagged revision: $first_tag" >> $logfile
-  cvmfs_server rollback -f -t $first_tag $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "rollback to first tagged revision: $first_tag"
+  cvmfs_server rollback -f -t $first_tag $CVMFS_TEST_REPO || return $?
 
-  echo "compare to reference directory" >> $logfile
-  compare_directories $repo_dir $reference_dir1 >> $logfile 2>&1 || return 17
+  echo "compare to reference directory"
+  compare_directories $repo_dir $reference_dir1 || return 17
 
-  echo "check catalog integrity" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "check catalog integrity"
+  check_catalogs $CVMFS_TEST_REPO || return $?
 
-  echo "current tag statistics:" >> $logfile
-  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+  echo "current tag statistics:"
+  cvmfs_server lstags $CVMFS_TEST_REPO
 
-  echo "check tag descriptions" >> $logfile
+  echo "check tag descriptions"
   if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"; then
-    echo "all tags and their descriptions found" >> $logfile
+    echo "all tags and their descriptions found"
   else
     return 18
   fi
@@ -337,44 +337,44 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "create a couple of revisions..." >> $logfile
+  echo "create a couple of revisions..."
   iterations=5
   while [ $iterations -gt 0 ]; do
-    echo "init a new transaction in $CVMFS_TEST_REPO" >> $logfile
-    start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+    echo "init a new transaction in $CVMFS_TEST_REPO"
+    start_transaction $CVMFS_TEST_REPO || return $?
 
-    echo "creating CVMFS snapshot" >> $logfile
-    publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+    echo "creating CVMFS snapshot"
+    publish_repo $CVMFS_TEST_REPO || return $?
 
     iterations=$(( $iterations - 1))
   done
 
-  echo "check catalog integrity" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "check catalog integrity"
+  check_catalogs $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "init a new transaction to move a tag" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "init a new transaction to move a tag"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
   local newest_hash=$(sudo cvmfs_server lstags | tail -n1 | awk '{print $3}')
 
-  echo "moving tag '$first_tag' to hash '$newest_hash'" >> $logfile
-  publish_repo $CVMFS_TEST_REPO -a $first_tag -h $newest_hash -t "$first_tag_desc+1" >> $logfile 2>&1 || return $?
+  echo "moving tag '$first_tag' to hash '$newest_hash'"
+  publish_repo $CVMFS_TEST_REPO -a $first_tag -h $newest_hash -t "$first_tag_desc+1" || return $?
 
-  echo "compare to reference directory" >> $logfile
-  compare_directories $repo_dir $reference_dir1 >> $logfile 2>&1 || return 20
+  echo "compare to reference directory"
+  compare_directories $repo_dir $reference_dir1 || return 20
 
-  echo "check catalog integrity" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "check catalog integrity"
+  check_catalogs $CVMFS_TEST_REPO || return $?
 
-  echo "current tag statistics:" >> $logfile
-  cvmfs_server lstags $CVMFS_TEST_REPO >> $logfile 2>&1
+  echo "current tag statistics:"
+  cvmfs_server lstags $CVMFS_TEST_REPO
 
-  echo "check tag descriptions" >> $logfile
+  echo "check tag descriptions"
   if cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server lstags $CVMFS_TEST_REPO | grep -q "$first_tag_desc+1"; then
-    echo "all tags and their descriptions found" >> $logfile
+    echo "all tags and their descriptions found"
   else
     return 21
   fi

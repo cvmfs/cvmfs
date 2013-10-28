@@ -14,22 +14,22 @@ cvmfs_run_test() {
 
   local repo="atlas.cern.ch"
 
-  echo "restarting autofs" >> $logfile
-  autofs_switch off >> $logfile 2>&1 || return 10
-  autofs_switch on  >> $logfile 2>&1 || return 11
+  echo "restarting autofs"
+  autofs_switch off || return 10
+  autofs_switch on  || return 11
 
-  echo "trying to mount $repo first" >> $logfile
+  echo "trying to mount $repo first"
   cvmfs_mount $repo || return 1
 
-  echo "unmounting and cleaning" >> $logfile
+  echo "unmounting and cleaning"
   cvmfs_clean || return 2
 
-  echo "trying to mount again with unreachable DNS" >> $logfile
+  echo "trying to mount again with unreachable DNS"
   local seconds
   seconds=$(stop_watch do_faulty_mount)
 
   if [ $seconds -gt 5 ]; then
-    echo "timeout was too long: $seconds (expected at most 5)" >> $logfile
+    echo "timeout was too long: $seconds (expected at most 5)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 
