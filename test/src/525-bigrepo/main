@@ -25,7 +25,7 @@ cvmfs_run_test() {
 
   echo "find out how many file system items are in the repo"
   local num_1
-  num_1=$(find $repo_dir | wc -l 2>>$logfile)
+  num_1=$(find $repo_dir | wc -l)
   echo "found $num_1 file system entries"
 
   echo "starting a new transaction"
@@ -56,7 +56,7 @@ cvmfs_run_test() {
 
   echo "check again for the number of file system entries"
   local num_2
-  num_2=$(find $repo_dir | wc -l 2>>$logfile)
+  num_2=$(find $repo_dir | wc -l)
   echo "found $num_2 file system entries"
 
   echo "check if file system entries match"
