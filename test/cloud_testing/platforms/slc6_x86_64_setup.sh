@@ -23,14 +23,14 @@ aufs_util="http://ecsft.cern.ch/dist/cvmfs/kernel/aufs2-util/aufs2-util-2.1-2.x8
 
 # download the custom kernel RPMs (including AUFS)
 echo -n "download custom kernel RPMs... "
-wget $knl_firmware > /dev/null 2>&1 || die "fail"
-wget $knl          > /dev/null 2>&1 || die "fail"
+wget $knl_firmware > /dev/null || die "fail"
+wget $knl          > /dev/null || die "fail"
 echo "done"
 
 # install custom kernel
 echo -n "install custom kernel RPMs... "
-sudo rpm -ivh $(basename $knl_firmware) > /dev/null 2>&1 || die "fail"
-sudo rpm -ivh $(basename $knl)          > /dev/null 2>&1 || die "fail"
+sudo rpm -ivh $(basename $knl_firmware) > /dev/null || die "fail"
+sudo rpm -ivh $(basename $knl)          > /dev/null || die "fail"
 echo "done"
 
 # download AUFS user space tools
