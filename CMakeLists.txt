@@ -159,7 +159,7 @@ endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
 
 include (GNUInstallDirs OPTIONAL)
 if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-  message (WARNING "Did not find default library path for this system. Guessing '${CVMFS_INSTALL_LIBDIR}' ...")
+  message (WARNING " Did not find default library path for this system. Guessing '${CVMFS_INSTALL_LIBDIR}' ...")
   set (CMAKE_INSTALL_LIBDIR ${CVMFS_INSTALL_LIBDIR})
 endif (NOT DEFINED CMAKE_INSTALL_LIBDIR)
 
