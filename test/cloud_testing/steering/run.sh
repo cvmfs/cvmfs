@@ -15,7 +15,7 @@
 # internal script configuration
 script_location=$(dirname $(readlink --canonicalize $0))
 reachability_timeout=90   # * 10 seconds
-accessibility_timeout=180 # * 10 seconds
+accessibility_timeout=270 # * 10 seconds
 
 # static information (check also remote_setup.sh and remote_run.sh)
 cvmfs_workspace="/tmp/cvmfs-test-workspace"
