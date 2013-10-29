@@ -104,7 +104,7 @@ check_package_manager_response() {
   if [ $retcode -ne 0 ]; then
     echo "fail"
     echo "$pkg_mgr_name said:"
-    echo $package_mgr_output
+    echo $pkg_mgr_output
     exit 102
   else
     echo "done"
