@@ -4,7 +4,7 @@ Version: 1.0.13
 Release: 1
 Source0: %{name}-%{version}.tar.gz
 Group: System/Filesystems
-License: Copyright (c) 2009, CERN.  Distributed unter the BSD License.
+License: Copyright (c) 2009, CERN.  Distributed under the BSD License.
 Requires: cvmfs >= 0.2.61
 BuildArch: noarch
 %description

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+script_location=$(dirname $(readlink --canonicalize $0))
+. ${script_location}/common.sh
+
 #
 # Common functionality for cloud platform test execution engine (test session)
 # After sourcing this file the following variables are set:
@@ -84,13 +87,6 @@ fi
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
-
-
-die() {
-  local msg="$1"
-  echo $msg
-  exit 103
-}
 
 
 check_result() {

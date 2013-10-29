@@ -16,50 +16,50 @@ cvmfs_run_test() {
   local retval=0
   local stratum1="http://cvmfs-stratum-one.cern.ch/opt"
 
-  echo "restarting autofs" >> $logfile
-  autofs_switch off >> $logfile 2>&1 || return 10
-  autofs_switch on  >> $logfile 2>&1 || return 11
+  echo "restarting autofs"
+  autofs_switch off || return 10
+  autofs_switch on  || return 11
 
-  echo "configure cvmfs with a host serving an empty directory" >> $logfile
+  echo "configure cvmfs with a host serving an empty directory"
   sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.0.1:8000/@org@;$stratum1/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
 
-  echo "create the empty directory to be served and add .cvmfspublished, .cvmfswhitelist and certificate to it" >> $logfile
-  mkdir -p empty/atlas/data            >> $logfile 2>&1 || return 1
-  cd empty/atlas                       >> $logfile 2>&1 || return 2
-  wget $stratum1/atlas/.cvmfspublished >> $logfile 2>&1 || return 3
-  wget $stratum1/atlas/.cvmfswhitelist >> $logfile 2>&1 || return 4
+  echo "create the empty directory to be served and add .cvmfspublished, .cvmfswhitelist and certificate to it"
+  mkdir -p empty/atlas/data            || return 1
+  cd empty/atlas                       || return 2
+  wget $stratum1/atlas/.cvmfspublished || return 3
+  wget $stratum1/atlas/.cvmfswhitelist || return 4
   for line in $(cat .cvmfspublished); do
     if [ $(echo $line | head -c1) = "X" ]; then
       local cert
       cert=$(echo $line | tail -c41)
-      echo "found certificate $cert in .cvmfspublished. downloading..." >> $logfile
-      mkdir -p data/$(echo $cert | head -c2) >> $logfile 2>&1 || return 5
-      cd data/$(echo $cert | head -c2)       >> $logfile 2>&1 || return 6
-      wget $stratum1/atlas/data/$(echo $cert | head -c2)/$(echo $cert | tail -c39)X  >> $logfile 2>&1 || return 7
-      cd ../.. >> $logfile 2>&1 || return 8
+      echo "found certificate $cert in .cvmfspublished. downloading..."
+      mkdir -p data/$(echo $cert | head -c2) || return 5
+      cd data/$(echo $cert | head -c2)       || return 6
+      wget $stratum1/atlas/data/$(echo $cert | head -c2)/$(echo $cert | tail -c39)X || return 7
+      cd ../.. || return 8
     fi
   done
   cd ..
 
-  echo "run a simple HTTP server" >> $logfile
+  echo "run a simple HTTP server"
   cmd="python -m SimpleHTTPServer 8000"
   http_pid=$(run_background_service $logfile "$cmd")
   if [ $? -ne 0 ]; then return 9; fi
-  echo "simple HTTP server serving empty directory started with PID $http_pid" >> $logfile
+  echo "simple HTTP server serving empty directory started with PID $http_pid"
 
-  echo "try to mount cvmfs" >> $logfile
+  echo "try to mount cvmfs"
   seconds=$(stop_watch do_faulty_mount)
 
-  echo "try to list the repository" >> $logfile
-  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || retval=10
+  echo "try to list the repository"
+  ls /cvmfs/atlas.cern.ch || retval=10
 
-  echo "killing simple HTTP server" >> $logfile
-  sudo kill $http_pid >> $logfile 2>&1 || retval=11
+  echo "killing simple HTTP server"
+  sudo kill $http_pid || retval=11
 
-  sudo rm -f /etc/cvmfs/domain.d/cern.ch.local >> $logfile 2>&1 || retval=12
+  sudo rm -f /etc/cvmfs/domain.d/cern.ch.local || retval=12
 
   if [ $seconds -gt 6 ]; then
-    echo "mounting took too long with $seconds seconds (expected 6)" >> $logfile
+    echo "mounting took too long with $seconds seconds (expected 6)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 

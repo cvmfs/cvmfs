@@ -20,7 +20,7 @@ cvmfs_run_test() {
   
   pid_after=$(sudo cvmfs_talk -i atlas.cern.ch pid)
   if [ x"$pid_before" != x"$pid_after" ]; then
-    echo "PID mismatch: pid before $pid_before, pid after $pid_after" >> $logfile
+    echo "PID mismatch: pid before $pid_before, pid after $pid_after"
     RETVAL=2
   fi
 

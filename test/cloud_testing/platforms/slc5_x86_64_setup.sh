@@ -8,6 +8,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 echo "installing RPM packages... "
 install_rpm $KEYS_PACKAGE
 install_rpm $CLIENT_PACKAGE
+install_rpm $SERVER_PACKAGE   # only needed for tbb shared libs (unit tests)
 install_rpm $UNITTEST_PACKAGE
 
 # setup environment

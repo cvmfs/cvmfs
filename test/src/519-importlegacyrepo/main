@@ -15,72 +15,72 @@ cvmfs_run_test() {
   local upstream="local,${download_location}/data/txn,${download_location}"
 
   # create a test repository (to steal its keys)
-  echo "create dummy repository and steal its keys" >> $logfile
-  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return 1
-  mkdir $keys_location >> $logfile 2>&1 || return 2
-  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.* $keys_location >> $logfile 2>&1 || return 3
-  destroy_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return 4
+  echo "create dummy repository and steal its keys"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  mkdir $keys_location || return 2
+  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.* $keys_location || return 3
+  destroy_repo $CVMFS_TEST_REPO || return 4
 
   # download a 2.0 repository
-  echo "download Guinea Pig repository $guinea_pig" >> $logfile
+  echo "download Guinea Pig repository $guinea_pig"
   python ${script_location}/downloadCatalogs.py \
     --directory ${download_location}/data \
-    $guinea_pig >> $logfile 2>&1 || return 5
+    $guinea_pig || return 5
   wget \
     --directory-prefix $download_location \
-    ${guinea_pig}/.cvmfspublished >> $logfile 2>&1 || return 6
-  cvmfs_server skeleton -o $CVMFS_TEST_USER ${download_location} >> $logfile 2>&1 || return 7
+    ${guinea_pig}/.cvmfspublished || return 6
+  cvmfs_server skeleton -o $CVMFS_TEST_USER ${download_location} || return 7
 
   # set SELinux boolean to allow access by httpd
   if [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]; then
-    echo "SELinux is present... better silence it for httpd >.<" >> $logfile
-    sudo setsebool httpd_enable_homedirs true >> $logfile 2>&1
+    echo "SELinux is present... better silence it for httpd >.<"
+    sudo setsebool httpd_enable_homedirs true
   fi
 
   # resign freshly downloaded repository (since we lack its private keys)
-  echo "remove original repository signature and resign it with the stolen keys" >> $logfile
+  echo "remove original repository signature and resign it with the stolen keys"
   cat ${download_location}/.cvmfspublished | head -n6 > ${download_location}/.cvmfspublished_unsigned || return 8
-  mkdir $temp_dir >> $logfile 2>&1 || return 9
+  mkdir $temp_dir || return 9
   cvmfs_swissknife sign \
     -c ${keys_location}/${CVMFS_TEST_REPO}.crt \
     -k ${keys_location}/${CVMFS_TEST_REPO}.key \
     -n ${CVMFS_TEST_REPO} \
     -m ${download_location}/.cvmfspublished_unsigned \
     -t $temp_dir \
-    -r $upstream >> $logfile 2>&1 || return 10
+    -r $upstream || return 10
 
   # import the prepared guinea pig legacy repository into a fresh repository
-  echo "import legacy repository into fresh repository" >> $logfile
+  echo "import legacy repository into fresh repository"
   sudo cvmfs_server import \
     -o $CVMFS_TEST_USER \
     -u $upstream \
     -k $keys_location \
     -s \
-    $CVMFS_TEST_REPO >> $logfile 2>&1 || return 11
+    $CVMFS_TEST_REPO || return 11
 
   # check if the migrated and imported catalogs are sane
-  echo "check migrated catalogs without checking data chunks (we did not download them)" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO -c >> $logfile 2>&1 || return 12
+  echo "check migrated catalogs without checking data chunks (we did not download them)"
+  check_catalogs $CVMFS_TEST_REPO -c || return 12
 
   # cheate a new repository revision of the migrated catalogs
-  echo "create a new repository revision" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
-  cd $repo_dir >> $logfile 2>&1
-    rm -fR $(ls -d */ | head -n1) >> $logfile 2>&1
-    mkdir -p foo bar >> $logfile 2>&1
+  echo "create a new repository revision"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cd $repo_dir
+    rm -fR $(ls -d */ | head -n1)
+    mkdir -p foo bar
     echo "no meaningful stuff" > foo/bar
     echo "even less meaning"   > bar/foo
-    ln foo/bar foo/baz >> $logfile 2>&1
-    ln -s ../foo/baz bar/baz >> $logfile 2>&1
-  cd $scratch_dir >> $logfile 2>&1
-  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+    ln foo/bar foo/baz
+    ln -s ../foo/baz bar/baz
+  cd $scratch_dir
+  publish_repo $CVMFS_TEST_REPO || return $?
 
   # check if still everything is fine
-  echo "check catalogs again" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO -c >> $logfile 2>&1 || return 13
+  echo "check catalogs again"
+  check_catalogs $CVMFS_TEST_REPO -c || return 13
 
   # see if the files ended up in the catalog
-  echo "check created files" >> $logfile
+  echo "check created files"
   local content=$(cat ${repo_dir}/foo/bar)
   [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 14
   [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 15

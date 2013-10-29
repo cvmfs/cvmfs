@@ -14,31 +14,31 @@ cvmfs_run_test() {
   local retcode=0
   local seconds=100
 
-  echo "restarting autofs" >> $logfile
-  autofs_switch off >> $logfile 2>&1 || return 10
-  autofs_switch on  >> $logfile 2>&1 || return 11
+  echo "restarting autofs"
+  autofs_switch off || return 10
+  autofs_switch on  || return 11
 
-  echo "configure cvmfs with a number of unreachable hosts" >> $logfile
+  echo "configure cvmfs with a number of unreachable hosts"
   sudo sh -c "echo \"CVMFS_SERVER_URL=\\\"http://127.0.0.1:80;http://127.0.0.2:8080;http://cvmfs-stratum-one.cern.ch/opt/@org@\\\"\" > /etc/cvmfs/domain.d/cern.ch.local" || return 1
 
-  echo "try to mount cvmfs" >> $logfile
+  echo "try to mount cvmfs"
   seconds=$(stop_watch do_faulty_mount)
-  sudo rm -f /etc/cvmfs/domain.d/cern.ch.local >> $logfile 2>&1
+  sudo rm -f /etc/cvmfs/domain.d/cern.ch.local
 
-  echo "try to list the repository" >> $logfile
-  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 2
+  echo "try to list the repository"
+  ls /cvmfs/atlas.cern.ch || return 2
 
   if [ $seconds -gt 8 ]; then
-    echo "mounting took too long with $seconds seconds (expected 8)" >> $logfile
+    echo "mounting took too long with $seconds seconds (expected 8)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 
-  echo "checking host chain" >> $logfile
-  sudo cvmfs_talk -i atlas.cern.ch host probe >> $logfile 2>&1 || return 3
+  echo "checking host chain"
+  sudo cvmfs_talk -i atlas.cern.ch host probe || return 3
   sudo cvmfs_talk -i atlas.cern.ch host info | grep 127.0.0.1 | grep -q "host down"
   local h1=$?
   sudo cvmfs_talk -i atlas.cern.ch host info | grep 127.0.0.2 | grep -q "host down"
   local h2=$?
-  sudo cvmfs_talk -i atlas.cern.ch host info >> $logfile 2>&1
+  sudo cvmfs_talk -i atlas.cern.ch host info
   [ $h1 -eq 0 ] && [ $h2 -eq 0 ] || return 4
 }
