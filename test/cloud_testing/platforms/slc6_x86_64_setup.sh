@@ -25,8 +25,8 @@ aufs_util="https://ecsft.cern.ch/dist/cvmfs/kernel/aufs2-util/aufs2-util-${aufs_
 
 # download the custom kernel RPMs (including AUFS)
 echo -n "download custom kernel RPMs for $knl_version ... "
-wget $knl_firmware > /dev/null || die "fail"
-wget $knl          > /dev/null || die "fail"
+wget --no-check-certificate $knl_firmware > /dev/null || die "fail"
+wget --no-check-certificate $knl          > /dev/null || die "fail"
 echo "done"
 
 # install custom kernel
