@@ -17,7 +17,7 @@ create_partition $disk_to_partition $partition_size || die "fail (creating parti
 echo "done"
 
 # custom kernel packages
-knl_version=$(uname -r)
+knl_version=$(uname -r | sed -e 's/^\(.*\.el[56]\)\.[0-9a-z_]*$/\1/') # remove (optional) architecture string
 aufs_util_version="2.1-2"
 knl_firmware="http://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-firmware-${knl_version}.aufs21.x86_64.rpm"
 knl="http://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-${knl_version}.aufs21.x86_64.rpm"
