@@ -95,8 +95,16 @@ if [ $retval -eq 1 ]; then
   echo "Failed to read CernVM-FS configuration"
   exit 1
 fi
-if [ $retval -eq 2 ]; then
-  if [ x"$CVMFS_STRICT_MOUNT" = x"yes" ]; then
+if [ x"$CVMFS_STRICT_MOUNT" = x"yes" ]; then
+  found_repo=0
+  for r in `echo "$CVMFS_REPOSITORIES" | sed 's/,/ /g'`
+  do
+    if [ `cvmfs_mkfqrn $r` == $fqrn ]; then
+      found_repo=1
+      break
+    fi
+  done
+  if [ $found_repo -eq 0 ]; then
     echo "Not allowed to mount $fqrn, add it to CVMFS_REPOSITORIES"
     exit 1
   fi

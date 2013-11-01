@@ -1,4 +1,5 @@
 2.1.16:
+  * Fix CVMFS_STRICT_MOUNT
   * TBB driven, parallel file processing engine in server
   * Follow rpm scheme in deb packaging (client, server, keys)
   * Add fnal stratum 1 to default configuration
