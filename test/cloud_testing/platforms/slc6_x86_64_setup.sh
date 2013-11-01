@@ -17,20 +17,22 @@ create_partition $disk_to_partition $partition_size || die "fail (creating parti
 echo "done"
 
 # custom kernel packages
-knl_firmware="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.18.1.el6/kernel-firmware-2.6.32-358.18.1.el6.aufs21.x86_64.rpm"
-knl="http://ecsft.cern.ch/dist/cvmfs/kernel/2.6.32-358.18.1.el6/kernel-2.6.32-358.18.1.el6.aufs21.x86_64.rpm"
-aufs_util="http://ecsft.cern.ch/dist/cvmfs/kernel/aufs2-util/aufs2-util-2.1-2.x86_64.rpm"
+knl_version=$(uname -r | sed -e 's/^\(.*\.el[56]\)\.[0-9a-z_]*$/\1/') # remove (optional) architecture string
+aufs_util_version="2.1-2"
+knl_firmware="https://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-firmware-${knl_version}.aufs21.x86_64.rpm"
+knl="https://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-${knl_version}.aufs21.x86_64.rpm"
+aufs_util="https://ecsft.cern.ch/dist/cvmfs/kernel/aufs2-util/aufs2-util-${aufs_util_version}.x86_64.rpm"
 
 # download the custom kernel RPMs (including AUFS)
-echo -n "download custom kernel RPMs... "
-wget $knl_firmware > /dev/null 2>&1 || die "fail"
-wget $knl          > /dev/null 2>&1 || die "fail"
+echo -n "download custom kernel RPMs for $knl_version ... "
+wget --no-check-certificate $knl_firmware > /dev/null || die "fail"
+wget --no-check-certificate $knl          > /dev/null || die "fail"
 echo "done"
 
 # install custom kernel
 echo -n "install custom kernel RPMs... "
-sudo rpm -ivh $(basename $knl_firmware) > /dev/null 2>&1 || die "fail"
-sudo rpm -ivh $(basename $knl)          > /dev/null 2>&1 || die "fail"
+sudo rpm -ivh $(basename $knl_firmware) > /dev/null || die "fail"
+sudo rpm -ivh $(basename $knl)          > /dev/null || die "fail"
 echo "done"
 
 # download AUFS user space tools
