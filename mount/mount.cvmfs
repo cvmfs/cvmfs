@@ -125,11 +125,6 @@ if [ $? -eq 0 ]; then
 fi
 
 repository=`echo $CVMFS_SERVER_URL | sed "s/@org@/$org/g" | sed "s/@fqrn@/$fqrn/g"`
-if [ x$CERNVM_CDN_HOST != x ]
-then
-  mdir=`echo $repository |  cut -d/ -f4-`
-  repository="$repository,http://$CERNVM_CDN_HOST/$mdir"
-fi
 name=$fqrn
 
 uid=`id -u $CVMFS_USER 2> /dev/null` && gid=`id -g $CVMFS_USER 2> /dev/null`

@@ -47,8 +47,13 @@ if (MACOSX)
 		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
 	)
 else (MACOSX)
-	install (
-		FILES			auto.cvmfs
+  set (CVMFS_AUTO_SOURCES
+    auto.cvmfs.cc
+  )
+  add_executable (auto.cvmfs ${CVMFS_AUTO_SOURCES})
+
+        install (
+		TARGETS			auto.cvmfs
 		DESTINATION		"/etc"
 		PERMISSIONS		OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 	)
@@ -62,7 +67,7 @@ else (MACOSX)
 	install (
 		FILES 			config.sh default.conf
 		DESTINATION		"/etc/cvmfs"
-		PERMISSIONS		OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ 
+		PERMISSIONS		OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 	)
 
 	install (
