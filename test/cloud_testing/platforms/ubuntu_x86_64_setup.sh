@@ -21,6 +21,7 @@ echo "done"
 
 # install deb packages
 echo "installing DEB packages... "
+install_deb $KEYS_PACKAGE
 install_deb $CLIENT_PACKAGE
 
 # setup environment
@@ -37,9 +38,3 @@ echo "done"
 echo "installing test dependencies..."
 install_from_repo gcc  || die "fail (installing gcc)"
 install_from_repo make || die "fail (installing make)"
-
-# restarting autofs (propylactic)
-echo -n "restarting autofs (proactive)... "
-sudo service autofs stop > /dev/null  || die "fail (service autofs stop)"
-sudo service autofs start > /dev/null || die "fail (service autofs start)"
-echo "done"
