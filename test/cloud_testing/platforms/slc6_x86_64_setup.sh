@@ -16,8 +16,9 @@ create_partition $disk_to_partition $partition_size || die "fail (creating parti
 create_partition $disk_to_partition $partition_size || die "fail (creating partition 2)"
 echo "done"
 
-# custom kernel packages
-knl_version=$(uname -r | sed -e 's/^\(.*\.el[56]\)\.[0-9a-z_]*$/\1/') # remove (optional) architecture string
+# custom kernel packages (figures out the newest installed kernel, downloads and
+#                         installs the associated patched aufs version of it)
+knl_version=$(yum list installed | grep -e '^kernel\.x86_64' | awk '{ print $2 }' | sort -r | head -n1)
 aufs_util_version="2.1-2"
 knl_firmware="https://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-firmware-${knl_version}.aufs21.x86_64.rpm"
 knl="https://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-${knl_version}.aufs21.x86_64.rpm"
