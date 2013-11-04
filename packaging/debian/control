@@ -16,7 +16,7 @@ Description: CernVM File System Public Keys
 Package: cvmfs
 Architecture: i386 amd64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb
+Depends: cvmfs-keys (= ${source:Version}), bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System
