@@ -779,11 +779,17 @@ cvmfs_reload() {
   local m
   for m in $mount_list
   do
+    cd "$m" 2>/dev/null || continue
     get_attr fqrn ${m}; fqrn=$attr_value
     get_attr pid ${m}; pid=$attr_value
+    if [ -z "$fqrn" ] || [ -z "$pid" ]; then
+      cd /
+      continue
+    fi
     echo "Pausing ${fqrn} on ${m}"
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    cd "$m" && cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
       awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
+    cd /
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
     echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
   done

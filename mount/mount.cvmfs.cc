@@ -154,6 +154,23 @@ static bool GetCacheDir(const string &fqrn, string *cachedir) {
 }
 
 
+static bool WaitForReload() {
+  string param;
+  int retval = options::GetValue("CVMFS_RELOAD_SOCKETS", &param);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_RELOAD_SOCKETS required");
+    return false;
+  }
+  string reload_guard = param + "/cvmfs.pause";
+  if (FileExists(reload_guard)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Waiting for CernVM-FS reload...");
+    while (FileExists(reload_guard))
+      SafeSleepMs(250);
+  }
+  return true;
+}
+
+
 static bool GetCvmfsUser(string *cvmfs_user) {
   string param;
   int retval = options::GetValue("CVMFS_USER", &param);
@@ -220,6 +237,8 @@ int main(int argc, char **argv) {
   string cvmfs_user;
   string cachedir;
   // Environment checks
+  retval = WaitForReload();
+  if (!retval) return 1;
   retval = GetCacheDir(fqrn, &cachedir);
   if (!retval) return 1;
   retval = GetCvmfsUser(&cvmfs_user);

@@ -1,4 +1,6 @@
 2.1.16:
+  * Fix multiple race conditions when repositories are unmounted
+    during reload
   * Do not pull previous catalogs from snapshots
   * Replace mount helper shell script by binary
   * Replace autofs map shell script by binary
