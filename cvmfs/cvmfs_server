@@ -1102,7 +1102,7 @@ aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,
 EOF
   fi
   sudo -H -u $cvmfs_user sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
-  mount $rdonly_dir > /dev/null
+  mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
 }
 
