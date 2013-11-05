@@ -22,16 +22,6 @@ cvmfs_getdomain() {
    echo $fqrn | sed 's/^[^\.]*\.\(.*\)/\1/'
 }
 
-
-repository_start() {
-  :
-}
-
-repository_stop() {
-  :
-}
-
-
 cvmfs_readconfig() {
   local fqrn; fqrn=$1
   local org; org=`cvmfs_getorg $fqrn`
