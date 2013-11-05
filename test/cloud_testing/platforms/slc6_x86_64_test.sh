@@ -18,9 +18,14 @@ format_partition_ext4 $disk_to_partition$partition_2 || die "fail (formatting pa
 echo "done"
 
 # mount additional disk partitions on strategic cvmfs location
-echo -n "mounting new disk partitions into cvmfs spectific locations... "
+echo -n "mounting new disk partitions into cvmfs specific locations... "
 mount_partition $disk_to_partition$partition_1 /srv/cvmfs       || die "fail (mounting /srv/cvmfs $?)"
 mount_partition $disk_to_partition$partition_2 /var/spool/cvmfs || die "fail (mounting /var/spool/cvmfs $?)"
+echo "done"
+
+# allow apache access to the mounted server file system
+echo -n "setting SELinux labels for apache... "
+chcon -Rv --type=httpd_sys_content_t /srv > /dev/null || die "fail"
 echo "done"
 
 # start apache
