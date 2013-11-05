@@ -295,13 +295,13 @@ int main(int argc, char **argv) {
   // Exec cvmfs2, from here on errors return 32 (mount error)
   int fd_stdin, fd_stdout, fd_stderr;
   pid_t pid_cvmfs;
-  vector<string> argv;
-  argv.push_back("-o");
-  argv.push_back(JoinStrings(mount_options, ","));
-  argv.push_back(fqrn);
-  argv.push_back(mountpoint);
+  vector<string> cvmfs_args;
+  cvmfs_args.push_back("-o");
+  cvmfs_args.push_back(JoinStrings(mount_options, ","));
+  cvmfs_args.push_back(fqrn);
+  cvmfs_args.push_back(mountpoint);
   retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr,
-                         cvmfs_binary, argv, false, &pid_cvmfs);
+                         cvmfs_binary, cvmfs_args, false, &pid_cvmfs);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to launch %s",
              cvmfs_binary.c_str());
