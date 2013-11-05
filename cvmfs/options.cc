@@ -154,13 +154,21 @@ void ParseDefault(const string &repository_name) {
   ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf");
   ParsePath("/etc/cvmfs/domain.d/" + domain + ".local");
 
-  ParsePath("/etc/cvmfs/config.d/" + repository_name + ".conf");
-  ParsePath("/etc/cvmfs/config.d/" + repository_name + ".local");
+  if (repository_name != "") {
+    ParsePath("/etc/cvmfs/config.d/" + repository_name + ".conf");
+    ParsePath("/etc/cvmfs/config.d/" + repository_name + ".local");
+  }
 }
 
 
 void ClearConfig() {
   config_->clear();
+}
+
+
+bool IsDefined(const std::string &key) {
+  map<string, ConfigValue>::const_iterator iter = config_->find(key);
+  return iter != config_->end();
 }
 
 

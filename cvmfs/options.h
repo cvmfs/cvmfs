@@ -23,6 +23,7 @@ void Fini();
 void ParsePath(const std::string &config_file);
 void ParseDefault(const std::string &repository_name);
 void ClearConfig();
+bool IsDefined(const std::string &key);
 bool GetValue(const std::string &key, std::string *value);
 bool GetSource(const std::string &key, std::string *value);
 bool IsOn(const std::string &param_value);

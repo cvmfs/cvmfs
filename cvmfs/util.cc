@@ -27,6 +27,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include <cctype>
 #include <cstdlib>
@@ -578,6 +580,55 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
 }
 
 
+/**
+ * Name -> UID from passwd database
+ */
+bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
+  struct passwd *result;
+  result = getpwnam(username.c_str());
+  if (result == NULL)
+    return false;
+  *uid = result->pw_uid;
+  *main_gid = result->pw_gid;
+  return true;
+}
+
+
+/**
+ * Name -> GID from groups database
+ */
+bool GetGidOf(const std::string &groupname, gid_t *gid) {
+  struct group *result;
+  result = getgrnam(groupname.c_str());
+  if (result == NULL)
+    return false;
+  *gid = result->gr_gid;
+  return true;
+}
+
+
+/**
+ * Adds gid to the list of supplementary groups
+ */
+bool AddGroup2Persona(const gid_t gid) {
+  int ngroups = getgroups(0, NULL);
+  gid_t *groups = static_cast<gid_t *>(smalloc((ngroups+1) * sizeof(gid_t)));
+  int retval = getgroups(ngroups, groups);
+  if (retval < 0) {
+    free(groups);
+    return false;
+  }
+  for (int i = 0; i < ngroups; ++i) {
+    if (groups[i] == gid)
+      return true;
+  }
+  groups[ngroups-1] = gid;
+  retval = setgroups(ngroups+1, groups);
+  free(groups);
+  return retval == 0;
+}
+
+
 string StringifyBool(const bool value) {
   return value ? "yes" : "no";
 }
@@ -911,7 +962,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
                    const std::string               &binary_path,
                    const std::vector<std::string>  &argv,
                    const bool                       double_fork,
-                         pid_t                     *child_pid) {
+                         pid_t                     *child_pid)
+{
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -936,7 +988,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
                    map_fildes,
                    true,
                    double_fork,
-                   child_pid)) {
+                   child_pid))
+  {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);
@@ -1017,7 +1070,8 @@ bool ManagedExec(const vector<string>  &command_line,
                  const map<int, int>   &map_fildes,
                  const bool             drop_credentials,
                  const bool             double_fork,
-                       pid_t           *child_pid) {
+                       pid_t           *child_pid)
+{
   assert(command_line.size() >= 1);
 
   Pipe pipe_fork;

@@ -403,18 +403,18 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     printf("%s", msg);
     if (!(mask & kLogNoLinebreak))
       printf("\n");
-    else
-      fflush(stdout);
+    fflush(stdout);
     pthread_mutex_unlock(&lock_stdout);
   }
 
   if (mask & kLogStderr) {
     pthread_mutex_lock(&lock_stderr);
     if (mask & kLogShowSource)
-      printf("(%s) ", module_names[source]);
+      fprintf(stderr, "(%s) ", module_names[source]);
     fprintf(stderr, "%s", msg);
     if (!(mask & kLogNoLinebreak))
-      printf("\n");
+      fprintf(stderr, "\n");
+    fflush(stderr);
     pthread_mutex_unlock(&lock_stderr);
   }
 

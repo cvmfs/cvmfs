@@ -1,3 +1,18 @@
+set (CVMFS_MOUNT_SOURCES
+  ../cvmfs/smalloc.h
+  ../cvmfs/platform.h ../cvmfs/platform_linux.h ../cvmfs/platform_osx.h
+  ../cvmfs/util.h ../cvmfs/util.cc
+  ../cvmfs/logging.h ../cvmfs/logging_internal.h ../cvmfs/logging.cc
+  ../cvmfs/options.h ../cvmfs/options.cc
+  ../cvmfs/sanitizer.h ../cvmfs/sanitizer.cc
+  mount.cvmfs.cc
+)
+set (CVMFS_MOUNT_CFLAGS "${CVMFS_MOUNT_CFLAGS} -I${CMAKE_SOURCE_DIR}/cvmfs")
+add_executable (mount.cvmfs ${CVMFS_MOUNT_SOURCES})
+target_link_libraries (mount.cvmfs pthread)
+set_target_properties (mount.cvmfs PROPERTIES COMPILE_FLAGS "${CVMFS_MOUNT_CFLAGS}")
+
+
 if (MACOSX)
 	install (
 		FILES			auto_cvmfs
