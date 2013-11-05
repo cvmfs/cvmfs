@@ -776,6 +776,7 @@ cvmfs_reload() {
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
 
+  cd /
   local m
   for m in $mount_list
   do
@@ -1016,7 +1017,7 @@ cvmfs_bugreport() {
 
    echo
    echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
-   echo "Please attach this file to your problem describtion and send it as a"
+   echo "Please attach this file to your problem description and send it as a"
    echo "Savannah bug report to https://savannah.cern.ch/projects/cernvm"
 }
 
