@@ -6,8 +6,8 @@ cvmfs_test_autofs_on_startup=false
 # TODO: replace this by upcoming CVMFS versions...
 cvmfs_versions="http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.11/cvmfs-2.1.11.tar.gz
 http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.12/cvmfs-2.1.12.tar.gz
-http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.11/cvmfs-2.1.11.tar.gz
-http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.12/cvmfs-2.1.12.tar.gz"
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.14/cvmfs-2.1.14.tar.gz
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.15/cvmfs-2.1.15.tar.gz"
 
 
 # retrieve the URL at a given index (dash workaround)
@@ -201,7 +201,7 @@ cvmfs_run_test() {
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
-  
+
   echo "downloading some previous versions of the CVMFS code as test data..."
   download_and_untar_cvmfs_versions || return $?
 
