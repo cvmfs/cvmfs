@@ -54,6 +54,13 @@ class RepositorySanitizer : public InputSanitizer {
   virtual ~RepositorySanitizer() { };
 };
 
+
+class IntegerSanitizer : public InputSanitizer {
+ public:
+  IntegerSanitizer() : InputSanitizer("09") { };
+  virtual ~IntegerSanitizer() { };
+};
+
 }  // namespace sanitizer
 
 

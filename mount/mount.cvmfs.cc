@@ -11,6 +11,9 @@
 #include <errno.h>
 #include <sys/select.h>
 #include <sys/wait.h>
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 
 #include <cstdio>
 #include <cstdlib>
@@ -200,8 +203,8 @@ int main(int argc, char **argv) {
   // For Ubuntu 8.04 automounter
   if (HasPrefix(device, "/cvmfs/", false))
     device = device.substr(7);
-  sanitizer::RepositorySanitizer sanitizer;
-  if (!sanitizer.IsValid(device)) {
+  sanitizer::RepositorySanitizer repository_sanitizer;
+  if (!repository_sanitizer.IsValid(device)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Invalid repository: %s", device.c_str());
     return 1;
   }
@@ -255,11 +258,74 @@ int main(int argc, char **argv) {
              cachedir.c_str());
     return 1;
   }
-  sysret = chown(cachedir.c_str(), uid_cvmfs, 0);
+  retval = MkdirDeep("/var/run/cvmfs", 0755);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create socket directory");
+    return 1;
+  }
+  sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
   if (sysret != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
              cachedir.c_str(), cvmfs_user.c_str());
+    return 1;
   }
+  sysret = chown("/var/run/cvmfs", uid_cvmfs, getegid());
+  if (sysret != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
+             "/var/run/cvmfs", cvmfs_user.c_str());
+    return 1;
+  }
+
+  // Set maximum number of files
+#ifdef __APPLE__
+  string param;
+  if (options::GetValue("CVMFS_NFILES", &param)) {
+    sanitizer::IntegerSanitizer integer_sanitizer;
+    if (!integer_sanitizer.IsValid(param)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Invalid CVMFS_NFILES: %s",
+               param.c_str());
+      return 1;
+    }
+    int nfiles = String2Uint64(param);
+    if ((nfiles < 128) || (nfiles > 524288)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Invalid CVMFS_NFILES: %s",
+               param.c_str());
+      return 1;
+    }
+    int nfiles_all = nfiles + 512;
+    int sys_nfiles, sys_nfiles_all;
+    size_t len = sizeof(sys_nfiles);
+    int mib[2];
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_MAXFILESPERPROC;
+    retval = sysctl(mib, 2, &sys_nfiles, &len, NULL, 0);
+    if ((retval != 0) || (sys_nfiles < 0)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILESPERPROC");
+      return 1;
+    }
+    if (sys_nfiles < nfiles) {
+      mib[1] = KERN_MAXFILES;
+      retval = sysctl(mib, 2, &sys_nfiles_all, &len, NULL, 0);
+      if ((retval != 0) || (sys_nfiles_all < 0)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILES");
+        return 1;
+      }
+      if (sys_nfiles_all < nfiles_all) {
+        retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
+        if (retval != 0) {
+          LogCvmfs(kLogCvmfs, kLogStderr, "Failed to set KERN_MAXFILES");
+          return 1;
+        }
+      }
+      mib[1] = KERN_MAXFILESPERPROC;
+      retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
+      if (retval != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to set KERN_MAXFILESPERPROC");
+        return 1;
+      }
+    }
+  }
+#endif
 
   AddMountOption("fsname=cvmfs2", &mount_options);
   AddMountOption("allow_other", &mount_options);
