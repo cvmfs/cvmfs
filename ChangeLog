@@ -1,4 +1,5 @@
 2.1.16:
+  * Do not pull previous catalogs from snapshots
   * Replace autofs map shell script by binary
   * Fix potential endless loop in 'cvmfs_config setup'
   * Fix CVMFS_STRICT_MOUNT

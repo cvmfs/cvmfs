@@ -228,7 +228,6 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
     }
   }
 
-
   // Nested catalogs
   if (with_nested) {
     catalog::Catalog::NestedCatalogList *nested_catalogs =
@@ -430,6 +429,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "", true);
+  pull_history = false;
   for (map<string, hash::Any>::const_iterator i = historic_tags.begin(),
        iEnd = historic_tags.end(); i != iEnd; ++i)
   {
