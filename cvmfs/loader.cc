@@ -41,6 +41,7 @@
 #include "util.h"
 #include "atomic.h"
 #include "loader_talk.h"
+#include "sanitizer.h"
 
 using namespace std;  // NOLINT
 
@@ -591,7 +592,8 @@ int main(int argc, char *argv[]) {
   int retval;
 
   // Jump into alternative process flavors (e.g. shared cache manager)
-  // We are here due to a fork+execve (ManagedExec in util.cc)
+  // We are here due to a fork+execve (ManagedExec in util.cc) or due to
+  // utility calls of cvmfs2
   if ((argc > 1) && (strstr(argv[1], "__") == argv[1])) {
     if (string(argv[1]) == string("__RELOAD__")) {
       if (argc < 3)
@@ -604,6 +606,43 @@ int main(int argc, char *argv[]) {
         CreateFile(string(argv[2]) + ".paused.crashed", 0600);
       }
       return retval;
+    }
+
+    if (string(argv[1]) == string("__MK_ALIEN_CACHE__")) {
+      if (argc < 5)
+        return 1;
+      string alien_cache_dir = argv[2];
+      sanitizer::IntegerSanitizer sanitizer;
+      if (!sanitizer.IsValid(argv[3]) || !sanitizer.IsValid(argv[4]))
+        return 1;
+      uid_t uid_owner = String2Uint64(argv[3]);
+      gid_t gid_owner = String2Uint64(argv[4]);
+
+      int retval = MkdirDeep(alien_cache_dir, 0770);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create %s",
+                 alien_cache_dir.c_str());
+        return 1;
+      }
+      retval = chown(alien_cache_dir.c_str(), uid_owner, gid_owner);
+      if (retval != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to set owner of %s to %d:%d",
+                 alien_cache_dir.c_str(), uid_owner, gid_owner);
+        return 1;
+      }
+      retval = SwitchCredentials(uid_owner, gid_owner, false);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to impersonate %d:%d",
+                 uid_owner, gid_owner);
+        return 1;
+      }
+      // Allow access to user and group
+      retval = MakeCacheDirectories(alien_cache_dir, 0770);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache skeleton");
+        return 1;
+      }
+      return 0;
     }
 
     debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;

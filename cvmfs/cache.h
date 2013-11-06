@@ -5,6 +5,7 @@
 #ifndef CVMFS_CACHE_H_
 #define CVMFS_CACHE_H_
 
+#include <sys/types.h>
 #include <stdint.h>
 
 #include <string>

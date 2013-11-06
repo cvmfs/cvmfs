@@ -9,6 +9,7 @@ set (CVMFS_LOADER_SOURCES
   logging_internal.h logging.h logging.cc
   hash.h hash.cc
   util.h util.cc
+  sanitizer.h sanitizer.cc
   options.h options.cc
   globals.h globals.cc
   loader_talk.h loader_talk.cc
