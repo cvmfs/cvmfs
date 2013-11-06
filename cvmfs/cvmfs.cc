@@ -1988,8 +1988,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (platform_stat(("running." + *cvmfs::repository_name_).c_str(),
                     &info) == 0)
   {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "looks like cvmfs has been "
-             "crashed previously, rebuilding cache database");
+    string msg;
+    if (quota_limit > 0) {
+      msg = "looks like cvmfs has been crashed previously, "
+            "rebuilding cache database";
+    } else {
+      msg = "looks like cvmfs has been crashed previously";
+    }
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "%s", msg.c_str());
     rebuild_cachedb = true;
   }
   retval = open(("running." + *cvmfs::repository_name_).c_str(),
