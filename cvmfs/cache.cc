@@ -110,6 +110,7 @@ struct ThreadLocalStorage {
 typedef map< hash::Any, vector<int> * > ThreadQueues;
 
 string *cache_path_ = NULL;
+bool alien_cache_ = false;
 ThreadQueues *queues_download_ = NULL;  /**< maps currently
   downloaded chunks to an array of writer's ends of a pipe to signal the waiting
   threads when the download has finished */
@@ -150,15 +151,18 @@ static void TLSDestructor(void *data) {
  *
  * \return True on success, false otherwise
  */
-bool Init(const string &cache_path) {
+bool Init(const string &cache_path, const bool alien_cache) {
   cache_mode_ = kCacheReadWrite;
   cache_path_ = new string(cache_path);
+  alien_cache_ = alien_cache;
   queues_download_ = new ThreadQueues();
   tls_blocks_ = new vector<ThreadLocalStorage *>();
   atomic_init64(&num_download_);
 
-  if (!MakeCacheDirectories(cache_path, 0700))
-    return false;
+  if (!alien_cache_) {
+    if (!MakeCacheDirectories(cache_path, 0700))
+      return false;
+  }
 
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
     LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr,
@@ -365,6 +369,10 @@ static int CommitTransaction(const string &final_path,
   LogCvmfs(kLogCache, kLogDebug, "commit %s %s",
            final_path.c_str(), temp_path.c_str());
 
+  if (alien_cache_) {
+    int retval = chmod(temp_path.c_str(), 0660);
+    assert(retval == 0);
+  }
   result = rename(temp_path.c_str(), final_path.c_str());
   if (result < 0) {
     result = -errno;
@@ -774,6 +782,8 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
     return catalog::kLoadNoSpace;
   }
 
+  retval = chmod(temp_path.c_str(), 0660);
+  assert(retval == 0);
   retval = rename(temp_path.c_str(), catalog_path->c_str());
   if (retval != 0) {
     quota::Remove(hash);
@@ -823,7 +833,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   char tmp[40];
   if (file_checksum && (fread(tmp, 1, 40, file_checksum) == 40)) {
     cache_hash = hash::Any(hash::kSha1, hash::HexPtr(string(tmp, 40)));
-    if (!FileExists("." + cache_hash.MakePath(1, 2))) {
+    if (!FileExists(*cache_path_ + cache_hash.MakePath(1, 2))) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
       cache_hash = hash::Any();
     } else {
@@ -859,7 +869,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
       // TODO remove code duplication
       if (catalog_path) {
         if (cache_mode_ == kCacheReadWrite) {
-          *catalog_path = "." + cache_hash.MakePath(1, 2);
+          *catalog_path = *cache_path_ + cache_hash.MakePath(1, 2);
           int64_t size = GetFileSize(*catalog_path);
           assert(size >= 0);
           retval = quota::Pin(cache_hash, uint64_t(size),
@@ -888,7 +898,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   // Short way out, use cached copy
   if (ensemble.manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
-      *catalog_path = "." + cache_hash.MakePath(1, 2);
+      *catalog_path = *cache_path_ + cache_hash.MakePath(1, 2);
       // quota::Pin is only effective on first load, afterwards it is a NOP
       if (cache_mode_ == kCacheReadWrite) {
         int64_t size = GetFileSize(*catalog_path);
@@ -928,21 +938,23 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   CommitFromMem(ensemble.manifest->certificate(),
                 ensemble.cert_buf, ensemble.cert_size,
                 "certificate for " + repo_name_);
-  int fdchksum = open(checksum_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
-  if (fdchksum >= 0) {
+  string newchksum_path;
+  FILE *fnewchksum = CreateTempFile(checksum_path, alien_cache_ ? 0660 : 0600,
+                                    "w", &newchksum_path);
+  if (fnewchksum != NULL) {
     string cache_checksum =
       ensemble.manifest->catalog_hash().ToString() +
       "T" + StringifyInt(ensemble.manifest->publish_timestamp());
-
-    file_checksum = fdopen(fdchksum, "w");
-    if (file_checksum) {
-      if (fwrite(&(cache_checksum[0]), 1, cache_checksum.length(),
-                 file_checksum) != cache_checksum.length())
-      {
-        unlink(checksum_path.c_str());
-      }
-      fclose(file_checksum);
-    } else {
+    if (fwrite(&(cache_checksum[0]), 1, cache_checksum.length(),
+               fnewchksum) != cache_checksum.length())
+    {
+      fclose(fnewchksum);
+      unlink(newchksum_path.c_str());
+      unlink(checksum_path.c_str());
+    }
+    fclose(fnewchksum);
+    if (rename(newchksum_path.c_str(), checksum_path.c_str()) != 0) {
+      unlink(newchksum_path.c_str());
       unlink(checksum_path.c_str());
     }
   } else {

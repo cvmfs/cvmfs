@@ -40,7 +40,7 @@ enum CacheModes {
   kCacheReadOnly,
 };
 
-bool Init(const std::string &cache_path);
+bool Init(const std::string &cache_path, const bool alien_cache);
 void Fini();
 
 int Open(const hash::Any &id);

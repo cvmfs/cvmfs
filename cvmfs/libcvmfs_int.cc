@@ -441,7 +441,7 @@ int cvmfs_int_init(
   running_created = true;
 
   // Creates a set of cache directories (256 directories named 00..ff)
-  if (!cache::Init(relative_cachedir)) {
+  if (!cache::Init(relative_cachedir, false)) {
     PrintError("Failed to setup cache in " + *cvmfs::cachedir_ +
                ": " + strerror(errno));
     goto cvmfs_cleanup;

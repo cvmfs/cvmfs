@@ -1747,6 +1747,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   string root_hash = "";
   string repository_tag = "";
+  string alien_cache = ".";  // default: exclusive cache
   map<uint64_t, uint64_t> uid_map;
   map<uint64_t, uint64_t> gid_map;
 
@@ -1855,6 +1856,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
       shared_cache = false;
       cachedir = cachedir + "/" + loader_exports->repository_name;
     }
+  }
+  if (options::GetValue("CVMFS_ALIEN_CACHE", &parameter)) {
+    alien_cache = parameter;
   }
   if (options::GetValue("CVMFS_UID_MAP", &parameter)) {
     retval = options::ParseUIntMap(parameter, &uid_map);
@@ -1999,7 +2003,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   g_running_created = true;
 
   // Creates a set of cache directories (256 directories named 00..ff)
-  if (!cache::Init(".")) {
+  if (alien_cache != ".") {
+    if (shared_cache || quota_limit > 0) {
+      *g_boot_error = "Failure: quota management and alien cache mutually "
+                      "exclusive.  Turn of quota limit and shared cache.";
+      return loader::kFailCacheDir;
+    }
+  }
+  if (!cache::Init(alien_cache, alien_cache != ".")) {
     *g_boot_error = "Failed to setup cache in " + *cvmfs::cachedir_ +
                     ": " + strerror(errno);
     return loader::kFailCacheDir;
