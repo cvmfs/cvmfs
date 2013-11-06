@@ -4,3 +4,4 @@ test/test.log
 build/
 benchmark/
 *.pyc
+test/cloud_testing/ec2_config.sh
