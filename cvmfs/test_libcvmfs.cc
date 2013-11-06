@@ -40,7 +40,7 @@ int cvmfs_test_list( const char *path )
 		fprintf(stderr,"%s: %s\n",path,strerror(errno));
 		return -1;
 	}
-	
+
 
 	for(i=0;buffer[i];i++) {
 		sprintf(filepath,"%s/%s",path,buffer[i]);
@@ -79,7 +79,7 @@ int main( int argc, char *argv[] )
 	char line[TEST_LINE_MAX];
 	char path[TEST_LINE_MAX];
 
-	const char *options = "repo_name=cms.cern.ch,url=http://cvmfs-stratum-one.cern.ch/opt/cms;http://cernvmfs.gridpp.rl.ac.uk/opt/cms;http://cvmfs.racf.bnl.gov/opt/cms,cachedir=test-libcvmfs-cache,pubkey=cern.pubkey";
+	const char *options = "repo_name=cms.cern.ch,url=http://cvmfs-stratum-one.cern.ch/opt/cms;http://cernvmfs.gridpp.rl.ac.uk/opt/cms;http://cvmfs.racf.bnl.gov/opt/cms,cachedir=test-libcvmfs-cache,alien_cachedir=alien-libcvmfs-cache,pubkey=cern.pubkey";
 
 	printf("%s: initializing with options: %s\n",argv[0],options);
 
@@ -96,7 +96,7 @@ int main( int argc, char *argv[] )
 		if(!fgets(line,sizeof(line),stdin)) break;
 
 		line[strlen(line)-1] = 0;
-	
+
 		if(sscanf(line,"list %s",path)==1) {
 			cvmfs_test_list(path);
 		} else if(sscanf(line,"cat %s",path)==1) {

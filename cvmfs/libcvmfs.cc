@@ -32,6 +32,7 @@ struct cvmfs_opts {
   unsigned timeout_direct;
   string   url;
   string   cachedir;
+  string   alien_cachedir;
   string   proxies;
   string   tracefile;
   string   pubkey;
@@ -51,6 +52,7 @@ struct cvmfs_opts {
     timeout(2),
     timeout_direct(2),
     cachedir("/var/cache/cvmfs2/default"),
+    alien_cachedir(""),
     pubkey("/etc/cvmfs/keys/cern.ch.pub"),
     blacklist(""),
     allow_unsigned(false),
@@ -117,6 +119,7 @@ struct cvmfs_opts {
     CVMFS_OPT(timeout);
     CVMFS_OPT(timeout_direct);
     CVMFS_OPT(cachedir);
+    CVMFS_OPT(alien_cachedir);
     CVMFS_OPT(proxies);
     CVMFS_OPT(tracefile);
     CVMFS_OPT(allow_unsigned);
@@ -209,6 +212,7 @@ struct cvmfs_opts {
             " timeout=SECONDS         Timeout for network operations (default is %d)\n"
             " timeout_direct=SECONDS  Timeout for network operations without proxy (default is %d)\n"
             " cachedir=DIR            Where to store disk cache\n"
+            " alien_cachedir=DIR      Store data chunks separately\n"
             " proxies=HTTP_PROXIES    Set the HTTP proxy list, such as 'proxy1|proxy2;DIRECT'\n"
             " tracefile=FILE          Trace FUSE opaerations into FILE\n"
             " pubkey=PEMFILE          Public RSA key that is used to verify the whitelist signature.\n"
@@ -495,6 +499,7 @@ int cvmfs_init(char const *options)
                           cvmfs_opts.mountpoint,
                           cvmfs_opts.pubkey,
                           cvmfs_opts.cachedir,
+                          cvmfs_opts.alien_cachedir,
                           false, /* cd_to_cachedir */
                           cvmfs_opts.quota_limit,
                           cvmfs_opts.quota_threshold,

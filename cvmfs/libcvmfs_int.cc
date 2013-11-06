@@ -302,6 +302,7 @@ int cvmfs_int_init(
   const std::string &cvmfs_opts_mountpoint,
   const std::string &cvmfs_opts_pubkey,
   const std::string &cvmfs_opts_cachedir,
+  const std::string &cvmfs_opts_alien_cachedir,
   bool cvmfs_opts_cd_to_cachedir,
   int64_t cvmfs_opts_quota_limit,
   int64_t cvmfs_opts_quota_threshold,
@@ -334,6 +335,7 @@ int cvmfs_int_init(
   catalog_ready = false;
   running_created = false;
   enable_async_downloads = cvmfs_opts_enable_async_downloads;
+  string chunk_cachedir;
 
   cvmfs::boot_time_ = time(NULL);
   SetupLibcryptoMt();
@@ -440,8 +442,17 @@ int cvmfs_int_init(
   close(retval);
   running_created = true;
 
-  // Creates a set of cache directories (256 directories named 00..ff)
-  if (!cache::Init(relative_cachedir, false)) {
+  // Creates a set of cache directories (256 directories named 00..ff) if not
+  // using alien cachdir
+  chunk_cachedir = relative_cachedir;
+  if (cvmfs_opts_alien_cachedir != "") {
+    if (cvmfs_opts_quota_limit > 0) {
+      PrintError("Quota management and alien cache mutually exclusive");
+      goto cvmfs_cleanup;
+    }
+    chunk_cachedir = cvmfs_opts_alien_cachedir;
+  }
+  if (!cache::Init(chunk_cachedir, cvmfs_opts_alien_cachedir != "")) {
     PrintError("Failed to setup cache in " + *cvmfs::cachedir_ +
                ": " + strerror(errno));
     goto cvmfs_cleanup;

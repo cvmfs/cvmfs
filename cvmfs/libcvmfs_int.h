@@ -51,6 +51,7 @@ int cvmfs_int_init(
   const std::string &cvmfs_opts_mountpoint,
   const std::string &cvmfs_opts_pubkey,
   const std::string &cvmfs_opts_cachedir,
+  const std::string &cvmfs_opts_alien_cachedir,
   bool cvmfs_opts_cd_to_cachedir,
   int64_t cvmfs_opts_quota_limit,
   int64_t cvmfs_opts_quota_threshold,
