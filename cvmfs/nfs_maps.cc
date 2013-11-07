@@ -124,7 +124,7 @@ class ForkAwareEnv : public leveldb::EnvWrapper {
 ForkAwareEnv *fork_aware_env_ = NULL;
 
 
-static void PutPath2Inode(const hash::Md5 &path, const uint64_t inode) {
+static void PutPath2Inode(const shash::Md5 &path, const uint64_t inode) {
   leveldb::Status status;
   leveldb::Slice key(reinterpret_cast<const char *>(path.digest),
                      path.GetDigestSize());
@@ -162,7 +162,7 @@ static void PutInode2Path(const uint64_t inode, const PathString &path) {
 /**
  * \return 0 if path is not found, the stored inode otherwise
  */
-static uint64_t FindInode(const hash::Md5 &path) {
+static uint64_t FindInode(const shash::Md5 &path) {
   leveldb::Status status;
   leveldb::Slice key(reinterpret_cast<const char *>(path.digest),
                      path.GetDigestSize());
@@ -196,7 +196,7 @@ uint64_t GetInode(const PathString &path) {
   if (use_shared_db_)
     return nfs_shared_maps::GetInode(path);
 
-  const hash::Md5 md5_path(path.GetChars(), path.GetLength());
+  const shash::Md5 md5_path(path.GetChars(), path.GetLength());
   uint64_t inode = FindInode(md5_path);
   if (inode != 0)
     return inode;
@@ -331,7 +331,7 @@ bool Init(const string &leveldb_dir, const uint64_t root_inode,
   LogCvmfs(kLogNfsMaps, kLogDebug, "path2inode opened");
 
   // Fetch highest issued inode
-  seq_ = FindInode(hash::Md5(hash::AsciiPtr("?seq")));
+  seq_ = FindInode(shash::Md5(shash::AsciiPtr("?seq")));
   LogCvmfs(kLogNfsMaps, kLogDebug, "Sequence number is %"PRIu64, seq_);
   if (seq_ == 0) {
     seq_ = root_inode_;
@@ -363,7 +363,7 @@ void Fini() {
     return nfs_shared_maps::Fini();
 
   // Write highest issued sequence number
-  PutPath2Inode(hash::Md5(hash::AsciiPtr("?seq")), seq_);
+  PutPath2Inode(shash::Md5(shash::AsciiPtr("?seq")), seq_);
 
   delete db_path2inode_;
   delete cache_path2inode_;

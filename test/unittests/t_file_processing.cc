@@ -74,7 +74,7 @@ class MockUploader : public upload::AbstractUploader {
  public:
   struct Result {
     Result(MockStreamHandle  *handle,
-           const hash::Any   &computed_content_hash,
+           const shash::Any  &computed_content_hash,
            const std::string &hash_suffix) :
       computed_content_hash(computed_content_hash),
       hash_suffix(hash_suffix)
@@ -99,14 +99,14 @@ class MockUploader : public upload::AbstractUploader {
       sha1_retval = SHA1_Final(sha1_digest_, &sha_context);
       ASSERT_EQ (1, sha1_retval) << "failed to finalize SHA1 checksum";
 
-      recomputed_content_hash = hash::Any(hash::kSha1,
-                                          sha1_digest_,
-                                          SHA_DIGEST_LENGTH);
+      recomputed_content_hash = shash::Any(shash::kSha1,
+                                           sha1_digest_,
+                                           SHA_DIGEST_LENGTH);
     }
 
-    hash::Any   computed_content_hash;
-    hash::Any   recomputed_content_hash;
-    std::string hash_suffix;
+    shash::Any   computed_content_hash;
+    shash::Any   recomputed_content_hash;
+    std::string  hash_suffix;
   };
   typedef std::vector<Result> Results;
 
@@ -146,7 +146,7 @@ class MockUploader : public upload::AbstractUploader {
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
-                              const hash::Any             content_hash,
+                              const shash::Any            content_hash,
                               const std::string           hash_suffix) {
     MockStreamHandle *local_handle = static_cast<MockStreamHandle*>(handle);
 
@@ -302,14 +302,14 @@ class T_FileProcessing : public FileSandbox {
     EXPECT_EQ (reference_hash_strings.size(), results.size())
       << "number of generated chunks did not match";
 
-    // convert hash strings into hash::Any structs
-    typedef std::vector<std::pair<hash::Any, std::string> > ExpectedHashes;
+    // convert hash strings into shash::Any structs
+    typedef std::vector<std::pair<shash::Any, std::string> > ExpectedHashes;
     ExpectedHashes reference_hashes;
     ExpectedHashStrings::const_iterator i    = reference_hash_strings.begin();
     ExpectedHashStrings::const_iterator iend = reference_hash_strings.end();
     for (; i != iend; ++i) {
       reference_hashes.push_back(
-        std::make_pair(hash::Any(hash::kSha1, hash::HexPtr(i->first)),
+        std::make_pair(shash::Any(shash::kSha1, shash::HexPtr(i->first)),
                        i->second)
       );
     }
@@ -491,11 +491,11 @@ struct CallbackTest {
     result_chunk_list   = result.file_chunks;
   }
 
-  static hash::Any     result_content_hash;
+  static shash::Any    result_content_hash;
   static std::string   result_local_path;
   static FileChunkList result_chunk_list;
 };
-hash::Any     CallbackTest::result_content_hash;
+shash::Any    CallbackTest::result_content_hash;
 std::string   CallbackTest::result_local_path;
 FileChunkList CallbackTest::result_chunk_list;
 
@@ -507,9 +507,9 @@ TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
   processor.Process(GetSmallFile(), true, "T");
   processor.WaitForProcessing();
 
-  hash::Any expected_content_hash(
-    hash::kSha1,
-    hash::HexPtr(GetSmallFileBulkHash().first));
+  shash::Any expected_content_hash(
+    shash::kSha1,
+    shash::HexPtr(GetSmallFileBulkHash().first));
   EXPECT_EQ (expected_content_hash, CallbackTest::result_content_hash);
   EXPECT_EQ (GetSmallFile(),        CallbackTest::result_local_path);
   EXPECT_EQ (0u,                    CallbackTest::result_chunk_list.size());
@@ -524,9 +524,9 @@ TEST_F(T_FileProcessing, ProcessingCallbackForBigFile) {
   processor.Process(GetBigFile(), true, "T");
   processor.WaitForProcessing();
 
-  hash::Any expected_content_hash(
-    hash::kSha1,
-    hash::HexPtr(GetBigFileBulkHash().first));
+  shash::Any expected_content_hash(
+    shash::kSha1,
+    shash::HexPtr(GetBigFileBulkHash().first));
   const size_t number_of_chunks = GetBigFileChunkHashes().size();
   EXPECT_EQ (expected_content_hash, CallbackTest::result_content_hash);
   EXPECT_EQ (GetBigFile(),          CallbackTest::result_local_path);

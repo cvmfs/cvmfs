@@ -92,22 +92,22 @@ struct JobInfo {
   } destination_mem;
   FILE *destination_file;
   const std::string *destination_path;
-  const hash::Any *expected_hash;
+  const shash::Any *expected_hash;
 
   // One constructor per destination + head request
   JobInfo() { wait_at[0] = wait_at[1] = -1; head_request = false; }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const std::string *p, const hash::Any *h) : url(u), compressed(c),
+          const std::string *p, const shash::Any *h) : url(u), compressed(c),
           probe_hosts(ph), head_request(false),
           destination(kDestinationPath), destination_path(p), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
-          const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
+          const shash::Any *h) : url(u), compressed(c), probe_hosts(ph),
           head_request(false),
           destination(kDestinationFile), destination_file(f), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const hash::Any *h) : url(u), compressed(c), probe_hosts(ph),
+          const shash::Any *h) : url(u), compressed(c), probe_hosts(ph),
           head_request(false), destination(kDestinationMem), expected_hash(h)
           { wait_at[0] = wait_at[1] = -1; }
   JobInfo(const std::string *u, const bool ph) :
@@ -124,7 +124,7 @@ struct JobInfo {
   // Internal state, don't touch
   CURL *curl_handle;
   z_stream zstream;
-  hash::ContextPtr hash_context;
+  shash::ContextPtr hash_context;
   int wait_at[2];  /**< Pipe used for the return value */
   std::string proxy;
   bool nocache;

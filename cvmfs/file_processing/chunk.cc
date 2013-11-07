@@ -40,7 +40,7 @@ void Chunk::Initialize() {
   compressed_size_ = 0;
 
   content_hash_context_.buffer = malloc(content_hash_context_.size);
-  hash::Init(content_hash_context_);
+  shash::Init(content_hash_context_);
 
   zlib_context_.zalloc   = Z_NULL;
   zlib_context_.zfree    = Z_NULL;
@@ -58,7 +58,7 @@ void Chunk::Initialize() {
 void Chunk::Finalize() {
   assert (! done_);
 
-  hash::Final(content_hash_context_, &content_hash_);
+  shash::Final(content_hash_context_, &content_hash_);
   free(content_hash_context_.buffer);
   content_hash_context_.buffer = NULL;
 

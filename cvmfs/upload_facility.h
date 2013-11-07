@@ -109,7 +109,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *
    */
    virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
-                                       const hash::Any     content_hash,
+                                       const shash::Any    content_hash,
                                        const std::string   hash_suffix) = 0;
 
   /**

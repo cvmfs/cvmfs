@@ -107,7 +107,7 @@ struct ThreadLocalStorage {
   download::JobInfo download_job;
 };
 
-typedef map< hash::Any, vector<int> * > ThreadQueues;
+typedef map< shash::Any, vector<int> * > ThreadQueues;
 
 string *cache_path_ = NULL;
 bool alien_cache_ = false;
@@ -212,7 +212,7 @@ void TearDown2ReadOnly() {
  * @param[in] id content hash of the catalog entry.
  * \return Absolute path in local cache.
  */
-static inline string GetPathInCache(const hash::Any &id) {
+static inline string GetPathInCache(const shash::Any &id) {
   return *cache_path_ + id.MakePath(1, 2);
 }
 
@@ -235,7 +235,7 @@ static inline string GetTempName()
  * @param[in] id content hash of the catalog entry.
  * \return A file descriptor if file is in cache.  Error code of open() else.
  */
-int Open(const hash::Any &id) {
+int Open(const shash::Any &id) {
   const string path = GetPathInCache(id);
   int result = ::open(path.c_str(), O_RDONLY);
 
@@ -260,7 +260,7 @@ int Open(const hash::Any &id) {
  * @param[out] size Size of the file
  * \return True if successful, false otherwise.
  */
-static bool Open2Mem(const hash::Any &id,
+static bool Open2Mem(const shash::Any &id,
                      unsigned char **buffer, uint64_t *size)
 {
   *size = 0;
@@ -302,7 +302,7 @@ static bool Open2Mem(const hash::Any &id,
  * @param[out] temp_path Absolute path of the temporoary file in local cache
  * \return File descriptor of temporary file, error code of mkstemp() else
  */
-static int StartTransaction(const hash::Any &id,
+static int StartTransaction(const shash::Any &id,
                             string *final_path, string *temp_path)
 {
   if (cache_mode_ == kCacheReadOnly)
@@ -362,7 +362,7 @@ static int AbortTransaction(const string &temp_path) {
 static int CommitTransaction(const string &final_path,
                              const string &temp_path,
                              const string &cvmfs_path,
-                             const hash::Any &hash,
+                             const shash::Any &hash,
                              const uint64_t size)
 {
   int result;
@@ -390,7 +390,7 @@ static int CommitTransaction(const string &final_path,
  * Commits the memory blob buffer to the given chunk id and name on cvmfs.
  * No checking! The hash and the memory blob need to match.
  */
-static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
+static bool CommitFromMem(const shash::Any &id, const unsigned char *buffer,
                           const uint64_t size, const std::string &cvmfs_path)
 {
   string temp_path;
@@ -427,10 +427,10 @@ static bool CommitFromMem(const hash::Any &id, const unsigned char *buffer,
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-static int Fetch(const hash::Any &checksum,
-                 const string    &hash_suffix,
-                 const uint64_t   size,
-                 const string    &cvmfs_path,
+static int Fetch(const shash::Any &checksum,
+                 const string     &hash_suffix,
+                 const uint64_t    size,
+                 const string     &cvmfs_path,
                  download::DownloadManager *download_manager)
 {
   CallGuard call_guard;
@@ -660,7 +660,7 @@ CatalogManager::CatalogManager(const string &repo_name,
 /**
  * Specialized initialization that uses a fixed root hash.
  */
-bool CatalogManager::InitFixed(const hash::Any &root_hash) {
+bool CatalogManager::InitFixed(const shash::Any &root_hash) {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog with root hash %s",
            root_hash.ToString().c_str());
   WriteLock();
@@ -675,9 +675,9 @@ bool CatalogManager::InitFixed(const hash::Any &root_hash) {
 }
 
 
-catalog::Catalog *CatalogManager::CreateCatalog(const PathString &mountpoint,
-                                                const hash::Any  &catalog_hash,
-                                                catalog::Catalog *parent_catalog)
+catalog::Catalog *CatalogManager::CreateCatalog(const PathString  &mountpoint,
+                                                const shash::Any  &catalog_hash,
+                                                catalog::Catalog  *parent_catalog)
 {
   mounted_catalogs_[mountpoint] = loaded_catalogs_[mountpoint];
   loaded_catalogs_.erase(mountpoint);
@@ -697,7 +697,7 @@ void CatalogManager::ActivateCatalog(const catalog::Catalog *catalog) {
 }
 
 
-catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
+catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
                                                   const string &cvmfs_path,
                                                   std::string *catalog_path)
 {
@@ -794,10 +794,10 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const hash::Any &hash,
 }
 
 
-catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
-                                               const hash::Any  &hash,
-                                               std::string      *catalog_path,
-                                               hash::Any        *catalog_hash)
+catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
+                                               const shash::Any  &hash,
+                                               std::string       *catalog_path,
+                                               shash::Any        *catalog_hash)
 {
   CallGuard call_guard;
   string cvmfs_path = "file catalog at " + repo_name_ + ":" +
@@ -806,7 +806,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   bool retval;
 
   // send the catalog hash to a blind memory position if it zero (save some ifs)
-  hash::Any blind_hash;
+  shash::Any blind_hash;
   if (catalog_hash == NULL) {
     catalog_hash = &blind_hash;
   }
@@ -825,17 +825,17 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
   const string checksum_path = (*cache_path_) + "/" +
                                quota::checksum_file_prefix + "." + repo_name_;
-  hash::Any cache_hash;
+  shash::Any cache_hash;
   uint64_t cache_last_modified = 0;
 
   // Load local checksum
   FILE *file_checksum = fopen(checksum_path.c_str(), "r");
   char tmp[40];
   if (file_checksum && (fread(tmp, 1, 40, file_checksum) == 40)) {
-    cache_hash = hash::Any(hash::kSha1, hash::HexPtr(string(tmp, 40)));
+    cache_hash = shash::Any(shash::kSha1, shash::HexPtr(string(tmp, 40)));
     if (!FileExists(*cache_path_ + cache_hash.MakePath(1, 2))) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
-      cache_hash = hash::Any();
+      cache_hash = shash::Any();
     } else {
       // Get local last modified time
       char buf_modified;
@@ -952,7 +952,7 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
            catalog->path().c_str());
 
-  map<PathString, hash::Any>::iterator iter =
+  map<PathString, shash::Any>::iterator iter =
     mounted_catalogs_.find(catalog->path());
   assert(iter != mounted_catalogs_.end());
 
@@ -969,7 +969,7 @@ CatalogManager::~CatalogManager() {
   LogCvmfs(kLogCache, kLogDebug, "unpinning / unloading all catalogs");
 
   if (cache_mode_ == kCacheReadWrite) {
-    for (map<PathString, hash::Any>::iterator i = mounted_catalogs_.begin(),
+    for (map<PathString, shash::Any>::iterator i = mounted_catalogs_.begin(),
          iend = mounted_catalogs_.end(); i != iend; ++i)
     {
       quota::Unpin(i->second);
@@ -979,7 +979,7 @@ CatalogManager::~CatalogManager() {
 }
 
 
-void ManifestEnsemble::FetchCertificate(const hash::Any &hash) {
+void ManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   uint64_t size;
   bool retval = Open2Mem(hash, &cert_buf, &size);
   cert_size = size;

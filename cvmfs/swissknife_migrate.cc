@@ -246,7 +246,7 @@ bool CommandMigrate::DoMigrationAndCommit(
   // Commit the new (migrated) repository revision...
   LogCvmfs(kLogCatalog, kLogStdout,
            "\nCommitting migrated repository revision...");
-  const hash::Any   &root_catalog_hash = root_catalog->new_catalog_hash.Get();
+  const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash.Get();
   const std::string &root_catalog_path = root_catalog->root_path();
   manifest::Manifest manifest(root_catalog_hash,
                               root_catalog_path);
@@ -268,7 +268,7 @@ bool CommandMigrate::DoMigrationAndCommit(
 
 
 void CommandMigrate::CatalogCallback(const Catalog*    catalog,
-                                     const hash::Any&  catalog_hash,
+                                     const shash::Any& catalog_hash,
                                      const unsigned    tree_level)
 {
   std::string tree_indent;
@@ -529,7 +529,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::UpdateNestedCatalogRefer
   for (; i != iend; ++i) {
     PendingCatalog *nested_catalog = *i;
     const std::string &root_path   = nested_catalog->root_path();
-    const hash::Any catalog_hash   = nested_catalog->new_catalog_hash.Get();
+    const shash::Any catalog_hash  = nested_catalog->new_catalog_hash.Get();
 
     // insert the updated nested catalog reference into the new catalog
     const bool retval =
@@ -642,7 +642,7 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
 
   // Attach the just created nested catalog database
   WritableCatalog *writable_catalog =
-    WritableCatalog::AttachFreely(root_path, catalog_db, hash::Any(hash::kSha1));
+    WritableCatalog::AttachFreely(root_path, catalog_db, shash::Any(shash::kSha1));
   if (writable_catalog == NULL) {
     Error("Failed to open database for new catalog");
     unlink(catalog_db.c_str());
@@ -839,10 +839,10 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     const std::string   root_path   = data->root_path();
     const std::string   file_path   = root_path +
                                       "/" + nested_marker.name().ToString();
-    const hash::Md5    &path_hash   = hash::Md5(file_path.data(),
-                                                file_path.size());
-    const hash::Md5    &parent_hash = hash::Md5(root_path.data(),
-                                                root_path.size());
+    const shash::Md5    &path_hash   = shash::Md5(file_path.data(),
+                                                  file_path.size());
+    const shash::Md5    &parent_hash = shash::Md5(root_path.data(),
+                                                  root_path.size());
     retval = insert_nested_marker.BindPathHash(path_hash)         &&
              insert_nested_marker.BindParentPathHash(parent_hash) &&
              insert_nested_marker.BindDirent(nested_marker)       &&
@@ -1017,8 +1017,8 @@ bool CommandMigrate::MigrationWorker_20x::MigrateNestedCatalogMountPoints(
 
     // update the nested catalog mountpoint directory entry with the correct
     // linkcount that was determined while processing the nested catalog
-    const hash::Md5 mountpoint_hash = hash::Md5(root_path.data(),
-                                                root_path.size());
+    const shash::Md5 mountpoint_hash = shash::Md5(root_path.data(),
+                                                  root_path.size());
     retval =
       update_mntpnt_linkcount.BindInt64(1, root_entry.linkcount());
       update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
@@ -1060,8 +1060,8 @@ bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
     PendingCatalog *nested_catalog = *i;
     const DirectoryEntry nested_root_entry = nested_catalog->root_entry.Get();
     const std::string &nested_root_path    = nested_catalog->root_path();
-    const hash::Md5 mountpoint_path_hash = hash::Md5(nested_root_path.data(),
-                                                     nested_root_path.size());
+    const shash::Md5 mountpoint_path_hash = shash::Md5(nested_root_path.data(),
+                                                       nested_root_path.size());
 
     // Retrieve the nested catalog mountpoint from the current catalog
     retval = lookup_mountpoint.BindPathHash(mountpoint_path_hash) &&
@@ -1167,7 +1167,7 @@ bool CommandMigrate::GenerateNestedCatalogMarkerChunk() {
 
 
 void CommandMigrate::CreateNestedCatalogMarkerDirent(
-  const hash::Any &content_hash)
+  const shash::Any &content_hash)
 {
   // Generate it only once
   assert (nested_catalog_marker_.name_.ToString() != ".cvmfscatalog");
@@ -1272,7 +1272,7 @@ bool CommandMigrate::MigrationWorker_20x::FindRootEntryInformation(
   bool retval;
 
   std::string root_path = data->root_path();
-  hash::Md5 root_path_hash = hash::Md5(root_path.data(), root_path.size());
+  shash::Md5 root_path_hash = shash::Md5(root_path.data(), root_path.size());
 
   SqlLookupPathHash lookup_root_entry(writable);
   retval = lookup_root_entry.BindPathHash(root_path_hash) &&

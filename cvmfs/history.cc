@@ -192,7 +192,7 @@ Tag SqlTag::RetrieveTag() {
   Tag result;
   result.name = string(reinterpret_cast<const char *>(RetrieveText(0)));
   const string hash_str(reinterpret_cast<const char *>(RetrieveText(1)));
-  result.root_hash = hash::Any(hash::kSha1, hash::HexPtr(hash_str));
+  result.root_hash = shash::Any(shash::kSha1, shash::HexPtr(hash_str));
   result.revision = RetrieveInt64(2);
   result.timestamp = RetrieveInt64(3);
   result.channel = static_cast<UpdateChannel>(RetrieveInt64(4));
@@ -279,7 +279,7 @@ bool TagList::FindRevision(const unsigned revision, Tag *tag) {
 }
 
 
-bool TagList::FindHash(const hash::Any &hash, Tag *tag) {
+bool TagList::FindHash(const shash::Any &hash, Tag *tag) {
   assert(tag);
   for (unsigned i = 0; i < list_.size(); ++i) {
     if (list_[i].root_hash == hash) {
@@ -311,8 +311,8 @@ TagList::Failures TagList::Insert(const Tag &tag) {
 }
 
 
-map<string, hash::Any> TagList::GetAllHashes() {
-  map<string, hash::Any> result;
+map<string, shash::Any> TagList::GetAllHashes() {
+  map<string, shash::Any> result;
   for (unsigned i = 0; i < list_.size(); ++i) {
     result[list_[i].name] = list_[i].root_hash;
   }

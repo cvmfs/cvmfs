@@ -34,7 +34,7 @@
 
 namespace glue {
 
-static inline uint32_t hasher_md5(const hash::Md5 &key) {
+static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
   return (uint32_t) *((uint32_t *)key.digest + 1);
 }
@@ -168,7 +168,7 @@ class StringHeap : public SingleCopy {
 class PathStore {
  public:
   PathStore() {
-    map_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+    map_.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
     string_heap_ = new StringHeap();
   }
 
@@ -179,7 +179,7 @@ class PathStore {
   explicit PathStore(const PathStore &other);
   PathStore &operator= (const PathStore &other);
 
-  void Insert(const hash::Md5 &md5path, const PathString &path) {
+  void Insert(const shash::Md5 &md5path, const PathString &path) {
     PathInfo info;
     bool found = map_.Lookup(md5path, &info);
     if (found) {
@@ -196,8 +196,8 @@ class PathStore {
     }
 
     PathString parent_path = GetParentPath(path);
-    new_entry.parent = hash::Md5(parent_path.GetChars(),
-                                 parent_path.GetLength());
+    new_entry.parent = shash::Md5(parent_path.GetChars(),
+                                  parent_path.GetLength());
     Insert(new_entry.parent, parent_path);
 
     const uint16_t name_length = path.GetLength() - parent_path.GetLength() - 1;
@@ -206,7 +206,7 @@ class PathStore {
     map_.Insert(md5path, new_entry);
   }
 
-  bool Lookup(const hash::Md5 &md5path, PathString *path) {
+  bool Lookup(const shash::Md5 &md5path, PathString *path) {
     PathInfo info;
     bool retval = map_.Lookup(md5path, &info);
     if (!retval)
@@ -222,7 +222,7 @@ class PathStore {
     return true;
   }
 
-  void Erase(const hash::Md5 &md5path) {
+  void Erase(const shash::Md5 &md5path) {
     PathInfo info;
     bool found = map_.Lookup(md5path, &info);
     if (!found)
@@ -234,7 +234,7 @@ class PathStore {
       string_heap_->RemoveString(info.name);
       if (string_heap_->GetUsage() < 0.75) {
         StringHeap *new_string_heap = new StringHeap(string_heap_->used());
-        hash::Md5 empty_path = map_.empty_key();
+        shash::Md5 empty_path = map_.empty_key();
         for (unsigned i = 0; i < map_.capacity(); ++i) {
           if (map_.keys()[i] != empty_path) {
             (map_.values() + i)->name =
@@ -262,14 +262,14 @@ class PathStore {
     PathInfo() {
       refcnt = 1;
     }
-    hash::Md5 parent;
+    shash::Md5 parent;
     uint32_t refcnt;
     StringRef name;
   };
 
   void CopyFrom(const PathStore &other);
 
-  SmallHashDynamic<hash::Md5, PathInfo> map_;
+  SmallHashDynamic<shash::Md5, PathInfo> map_;
   StringHeap *string_heap_;
 };
 
@@ -280,24 +280,24 @@ class PathStore {
 class PathMap {
  public:
   PathMap() {
-    map_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+    map_.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
   }
 
-  bool LookupPath(const hash::Md5 &md5path, PathString *path) {
+  bool LookupPath(const shash::Md5 &md5path, PathString *path) {
     bool found = path_store_.Lookup(md5path, path);
     return found;
   }
 
   uint64_t LookupInode(const PathString &path) {
     uint64_t inode;
-    bool found = map_.Lookup(hash::Md5(path.GetChars(), path.GetLength()),
+    bool found = map_.Lookup(shash::Md5(path.GetChars(), path.GetLength()),
                              &inode);
     if (found) return inode;
     return 0;
   }
 
-  hash::Md5 Insert(const PathString &path, const uint64_t inode) {
-    hash::Md5 md5path(path.GetChars(), path.GetLength());
+  shash::Md5 Insert(const PathString &path, const uint64_t inode) {
+    shash::Md5 md5path(path.GetChars(), path.GetLength());
     if (!map_.Contains(md5path)) {
       path_store_.Insert(md5path, path);
       map_.Insert(md5path, inode);
@@ -305,7 +305,7 @@ class PathMap {
     return md5path;
   }
 
-  void Erase(const hash::Md5 &md5path) {
+  void Erase(const shash::Md5 &md5path) {
     bool found = map_.Contains(md5path);
     if (found) {
       path_store_.Erase(md5path);
@@ -318,7 +318,7 @@ class PathMap {
     path_store_.Clear();
   }
  private:
-  SmallHashDynamic<hash::Md5, uint64_t> map_;
+  SmallHashDynamic<shash::Md5, uint64_t> map_;
   PathStore path_store_;
 };
 
@@ -332,12 +332,12 @@ class InodeMap {
     map_.Init(16, 0, hasher_inode);
   }
 
-  bool LookupMd5Path(const uint64_t inode, hash::Md5 *md5path) {
+  bool LookupMd5Path(const uint64_t inode, shash::Md5 *md5path) {
     bool found = map_.Lookup(inode, md5path);
     return found;
   }
 
-  void Insert(const uint64_t inode, const hash::Md5 &md5path) {
+  void Insert(const uint64_t inode, const shash::Md5 &md5path) {
     map_.Insert(inode, md5path);
   }
 
@@ -347,7 +347,7 @@ class InodeMap {
 
   void Clear() { map_.Clear(); }
  private:
-  SmallHashDynamic<uint64_t, hash::Md5> map_;
+  SmallHashDynamic<uint64_t, shash::Md5> map_;
 };
 
 
@@ -435,7 +435,7 @@ class InodeTracker {
   {
     Lock();
     bool new_inode = inode_references_.Get(inode, by);
-    hash::Md5 md5path = path_map_.Insert(path, inode);
+    shash::Md5 md5path = path_map_.Insert(path, inode);
     inode_map_.Insert(inode, md5path);
     Unlock();
 
@@ -452,7 +452,7 @@ class InodeTracker {
     bool removed = inode_references_.Put(inode, by);
     if (removed) {
       // TODO: pop operation (Lookup+Erase)
-      hash::Md5 md5path;
+      shash::Md5 md5path;
       bool found = inode_map_.LookupMd5Path(inode, &md5path);
       assert(found);
       inode_map_.Erase(inode);
@@ -465,7 +465,7 @@ class InodeTracker {
 
   bool FindPath(const uint64_t inode, PathString *path) {
     Lock();
-    hash::Md5 md5path;
+    shash::Md5 md5path;
     bool found = inode_map_.LookupMd5Path(inode, &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);

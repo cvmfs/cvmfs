@@ -267,7 +267,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   g_download_manager->Init(1, true);
 
   catalog::WritableCatalogManager
-    catalog_manager(hash::Any(hash::kSha1, hash::HexPtr(params.base_hash)),
+    catalog_manager(shash::Any(shash::kSha1, shash::HexPtr(params.base_hash)),
                     params.stratum0, params.dir_temp, params.spooler,
                     g_download_manager);
   publish::SyncMediator mediator(&catalog_manager, &params);

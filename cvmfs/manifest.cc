@@ -89,18 +89,18 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   map<char, string>::const_iterator iter;
 
   // Required keys
-  hash::Any catalog_hash;
-  hash::Md5 root_path;
+  shash::Any catalog_hash;
+  shash::Md5 root_path;
   uint32_t ttl;
   uint64_t revision;
 
   iter = content.find('C');
   if ((iter = content.find('C')) == content.end())
     return NULL;
-  catalog_hash = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+  catalog_hash = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
   if ((iter = content.find('R')) == content.end())
     return NULL;
-  root_path = hash::Md5(hash::HexPtr(iter->second));
+  root_path = shash::Md5(shash::HexPtr(iter->second));
   if ((iter = content.find('D')) == content.end())
     return NULL;
   ttl = String2Uint64(iter->second);
@@ -109,20 +109,20 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   revision = String2Uint64(iter->second);
 
   // Optional keys
-  hash::Any micro_catalog_hash;
+  shash::Any micro_catalog_hash;
   string repository_name;
-  hash::Any certificate;
-  hash::Any history;
+  shash::Any certificate;
+  shash::Any history;
   uint64_t publish_timestamp = 0;
 
   if ((iter = content.find('L')) != content.end())
-    micro_catalog_hash = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+    micro_catalog_hash = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
   if ((iter = content.find('N')) != content.end())
     repository_name = iter->second;
   if ((iter = content.find('X')) != content.end())
-    certificate = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+    certificate = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
   if ((iter = content.find('H')) != content.end())
-    history = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+    history = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
 
@@ -137,7 +137,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
       history::UpdateChannel channel =
         static_cast<history::UpdateChannel>(channel_int);
       channel_tops.push_back(history::TagList::ChannelTag(
-        channel, hash::Any(hash::kSha1, hash::HexPtr(elements[i].substr(2)))));
+        channel, shash::Any(shash::kSha1,
+                            shash::HexPtr(elements[i].substr(2)))));
     }
   }
 
@@ -147,9 +148,9 @@ Manifest *Manifest::Load(const map<char, string> &content) {
 }
 
 
-Manifest::Manifest(const hash::Any &catalog_hash, const string &root_path) {
+Manifest::Manifest(const shash::Any &catalog_hash, const string &root_path) {
   catalog_hash_ = catalog_hash;
-  root_path_ = hash::Md5(hash::AsciiPtr(root_path));
+  root_path_ = shash::Md5(shash::AsciiPtr(root_path));
   ttl_ = catalog::Catalog::kDefaultTTL;
   revision_ = 0;
   publish_timestamp_ = 0;

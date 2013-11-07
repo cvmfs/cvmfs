@@ -10,7 +10,7 @@
 
 #include "manifest.h"
 
-namespace hash {
+namespace shash {
 struct Any;
 }
 
@@ -55,7 +55,7 @@ struct ManifestEnsemble {
     if (whitelist_buf) free(whitelist_buf);
   }
   // Can be overwritte to fetch certificate from cache
-  virtual void FetchCertificate(const hash::Any &hash) { }
+  virtual void FetchCertificate(const shash::Any &hash) { }
 
   Manifest *manifest;
   unsigned char *raw_manifest_buf;
@@ -68,7 +68,7 @@ struct ManifestEnsemble {
 
 
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
-               const uint64_t minimum_timestamp, const hash::Any *base_catalog,
+               const uint64_t minimum_timestamp, const shash::Any *base_catalog,
                signature::SignatureManager *signature_manager,
                download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble);

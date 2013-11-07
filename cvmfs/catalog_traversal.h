@@ -45,14 +45,14 @@ class CatalogTraversal {
    *                            (starting at zero)
    */
   typedef void (T::*Callback)(const catalog::Catalog* catalog,
-                              const hash::Any&        catalog_hash,
+                              const shash::Any&       catalog_hash,
                               const unsigned          tree_level);
 
 
  protected:
   struct CatalogJob {
     CatalogJob(const std::string      &path,
-               const hash::Any        &hash,
+               const shash::Any       &hash,
                const unsigned          tree_level,
                      catalog::Catalog *parent = NULL) :
       path(path),
@@ -68,7 +68,7 @@ class CatalogTraversal {
       parent(parent) {}
 
     const std::string       path;
-    const hash::Any         hash;
+    const shash::Any        hash;
     const unsigned          tree_level;
           catalog::Catalog *parent;
   };
@@ -271,8 +271,8 @@ class CatalogTraversal {
   }
 
 
-  inline bool FetchCatalog(const hash::Any& catalog_hash,
-                                  std::string *catalog_file)
+  inline bool FetchCatalog(const shash::Any& catalog_hash,
+                           std::string *catalog_file)
   {
     return (is_remote_) ? DownloadCatalog  (catalog_hash, catalog_file)
                         : DecompressCatalog(catalog_hash, catalog_file);
@@ -285,7 +285,7 @@ class CatalogTraversal {
    * @param catalog_file   output parameter for the loaded catalog file
    * @return               true, if catalog was successfully downloaded
    */
-  bool DownloadCatalog(const hash::Any& catalog_hash,
+  bool DownloadCatalog(const shash::Any& catalog_hash,
                        std::string *catalog_file) {
     catalog_file->clear();
 
@@ -312,7 +312,7 @@ class CatalogTraversal {
    * @param catalog_hash   the SHA-1 hash of the catalog to be extracted
    * @return               the path to the extracted catalog file
    */
-  bool DecompressCatalog(const hash::Any& catalog_hash,
+  bool DecompressCatalog(const shash::Any& catalog_hash,
                          std::string *catalog_file) {
     catalog_file->clear();
 

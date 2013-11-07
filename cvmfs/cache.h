@@ -43,7 +43,7 @@ enum CacheModes {
 bool Init(const std::string &cache_path, const bool alien_cache);
 void Fini();
 
-int Open(const hash::Any &id);
+int Open(const shash::Any &id);
 int FetchDirent(const catalog::DirectoryEntry &d,
                 const std::string &cvmfs_path,
                 download::DownloadManager *download_manager);
@@ -69,11 +69,11 @@ class CatalogManager : public catalog::AbstractCatalogManager {
                  download::DownloadManager *download_manager);
   virtual ~CatalogManager();
 
-  bool InitFixed(const hash::Any &root_hash);
+  bool InitFixed(const shash::Any &root_hash);
 
-  hash::Any GetRootHash() {
+  shash::Any GetRootHash() {
     ReadLock();
-    hash::Any result = mounted_catalogs_[PathString("", 0)];
+    shash::Any result = mounted_catalogs_[PathString("", 0)];
     Unlock();
     return result;
   }
@@ -86,26 +86,26 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   uint64_t loaded_inodes() const { return loaded_inodes_; }
 
  protected:
-  catalog::LoadError LoadCatalog(const PathString &mountpoint,
-                                 const hash::Any  &hash,
-                                 std::string      *catalog_path,
-                                 hash::Any        *catalog_hash);
+  catalog::LoadError LoadCatalog(const PathString  &mountpoint,
+                                 const shash::Any  &hash,
+                                 std::string       *catalog_path,
+                                 shash::Any        *catalog_hash);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
-                                  const hash::Any  &catalog_hash,
+                                  const shash::Any  &catalog_hash,
                                   catalog::Catalog *parent_catalog);
   void ActivateCatalog(const catalog::Catalog *catalog);
 
  private:
-  catalog::LoadError LoadCatalogCas(const hash::Any &hash,
+  catalog::LoadError LoadCatalogCas(const shash::Any &hash,
                                     const std::string &cvmfs_path,
                                     std::string *catalog_path);
 
   /**
    * required for unpinning
    */
-  std::map<PathString, hash::Any> loaded_catalogs_;
-  std::map<PathString, hash::Any> mounted_catalogs_;
+  std::map<PathString, shash::Any> loaded_catalogs_;
+  std::map<PathString, shash::Any> mounted_catalogs_;
 
   std::string repo_name_;
   signature::SignatureManager *signature_manager_;
@@ -127,7 +127,7 @@ class ManifestEnsemble : public manifest::ManifestEnsemble {
   explicit ManifestEnsemble(cache::CatalogManager *catalog_mgr) {
     catalog_mgr_ = catalog_mgr;
   }
-  void FetchCertificate(const hash::Any &hash);
+  void FetchCertificate(const shash::Any &hash);
  private:
    cache::CatalogManager *catalog_mgr_;
 };

@@ -25,7 +25,7 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-namespace hash {
+namespace shash {
 
 enum Algorithms {
   kMd5 = 0,

@@ -23,7 +23,7 @@ namespace upload
   struct SpoolerResult {
     SpoolerResult(const int             return_code = -1,
                   const std::string     &local_path  = "",
-                  const hash::Any       &digest      = hash::Any(),
+                  const shash::Any      &digest      = shash::Any(),
                   const FileChunkList   &file_chunks = FileChunkList()) :
       return_code(return_code),
       local_path(local_path),
@@ -34,7 +34,7 @@ namespace upload
 
     int           return_code;  //!< the return value of the spooler operation
     std::string   local_path;   //!< the local_path previously given as input
-    hash::Any     content_hash; //!< the content_hash of the bulk file derived
+    shash::Any    content_hash; //!< the content_hash of the bulk file derived
                                 //!< during processing
     FileChunkList file_chunks;  //!< the file chunks generated during processing
   };

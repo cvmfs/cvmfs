@@ -39,7 +39,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
 
   CatalogTraversal<CommandListCatalogs> traversal(
-    this, 
+    this,
     &CommandListCatalogs::CatalogCallback,
     repo_url,
     repo_name,
@@ -50,7 +50,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
 
 
 void CommandListCatalogs::CatalogCallback(const catalog::Catalog* catalog,
-                                          const hash::Any&        catalog_hash,
+                                          const shash::Any&       catalog_hash,
                                           const unsigned          tree_level) {
   std::string tree_indent;
   std::string hash_string;
@@ -72,7 +72,7 @@ void CommandListCatalogs::CatalogCallback(const catalog::Catalog* catalog,
   path = catalog->path().ToString();
   if (path.empty())
     path = "/";
-  
+
   LogCvmfs(kLogCatalog, kLogStdout, "%s%s%s",
     tree_indent.c_str(), hash_string.c_str(), path.c_str());
 }

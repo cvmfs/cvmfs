@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace hash {
+namespace shash {
 struct Any;
 }
 
@@ -32,13 +32,13 @@ int MainCacheManager(int argc, char **argv);
 bool RebuildDatabase();
 bool Cleanup(const uint64_t leave_size);
 
-void Insert(const hash::Any &hash, const uint64_t size,
+void Insert(const shash::Any &hash, const uint64_t size,
             const std::string &cmvfs_path);
-bool Pin(const hash::Any &hash, const uint64_t size,
+bool Pin(const shash::Any &hash, const uint64_t size,
          const std::string &path_on_cvmfs, const bool is_catalog);
-void Unpin(const hash::Any &hash);
-void Touch(const hash::Any &hash);
-void Remove(const hash::Any &file);
+void Unpin(const shash::Any &hash);
+void Touch(const shash::Any &hash);
+void Remove(const shash::Any &file);
 std::vector<std::string> List();
 std::vector<std::string> ListPinned();
 std::vector<std::string> ListCatalogs();

@@ -130,7 +130,7 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
  * If base_url is empty, uses the probe_hosts feature from download module.
  */
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
-               const uint64_t minimum_timestamp, const hash::Any *base_catalog,
+               const uint64_t minimum_timestamp, const shash::Any *base_catalog,
                signature::SignatureManager *signature_manager,
                download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble)
@@ -144,7 +144,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
   const string whitelist_url = base_url + string("/.cvmfswhitelist");
   download::JobInfo download_whitelist(&whitelist_url, false, probe_hosts, NULL);
-  hash::Any certificate_hash;
+  shash::Any certificate_hash;
   string certificate_url = base_url + "/data";  // rest is in manifest
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
                                          &certificate_hash);
@@ -175,7 +175,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     result = kFailNameMismatch;
     goto cleanup;
   }
-  if (ensemble->manifest->root_path() != hash::Md5(hash::AsciiPtr(""))) {
+  if (ensemble->manifest->root_path() != shash::Md5(shash::AsciiPtr(""))) {
     result = kFailRootMismatch;
     goto cleanup;
   }

@@ -30,7 +30,7 @@ class CommandListCatalogs : public Command {
   int Main(const ArgumentList &args);
 
   void CatalogCallback(const catalog::Catalog* catalog,
-                       const hash::Any&        catalog_hash,
+                       const shash::Any&       catalog_hash,
                        const unsigned          tree_level);
 
  private:

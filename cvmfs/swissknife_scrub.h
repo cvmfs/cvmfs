@@ -25,17 +25,17 @@ class CommandScrub : public Command {
     void Update(const unsigned char *data, const size_t nbytes);
     void Finalize();
 
-    const hash::Any& content_hash() const {
+    const shash::Any& content_hash() const {
       assert(hash_done_); return content_hash_;
     }
-    const hash::Any& expected_hash() const { return expected_hash_; }
+    const shash::Any& expected_hash() const { return expected_hash_; }
 
    private:
-    bool             hash_done_;
-    hash::ContextPtr hash_context_;
+    bool              hash_done_;
+    shash::ContextPtr hash_context_;
 
-    hash::Any        content_hash_;
-    hash::Any        expected_hash_;
+    shash::Any        content_hash_;
+    shash::Any        expected_hash_;
   };
 
   class FileScrubbingTask : public upload::AbstractFileScrubbingTask<StoredFile> {

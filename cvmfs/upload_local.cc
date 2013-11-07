@@ -139,7 +139,7 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
 
 
 void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
-                                           const hash::Any     content_hash,
+                                           const shash::Any    content_hash,
                                            const std::string   hash_suffix) {
   int retval = 0;
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);

@@ -178,7 +178,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     return 0;
 
   if (info->expected_hash)
-    hash::Update((unsigned char *)ptr, num_bytes, info->hash_context);
+    shash::Update((unsigned char *)ptr, num_bytes, info->hash_context);
 
   if (info->destination == kDestinationMem) {
     // Write to memory
@@ -489,7 +489,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   }
   if (info->expected_hash) {
     assert(info->hash_context.buffer != NULL);
-    hash::Init(info->hash_context);
+    shash::Init(info->hash_context);
   }
 
   if ((info->destination == kDestinationMem) &&
@@ -676,8 +676,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_OK:
       // Verify content hash
       if (info->expected_hash) {
-        hash::Any match_hash;
-        hash::Final(info->hash_context, &match_hash);
+        shash::Any match_hash;
+        shash::Final(info->hash_context, &match_hash);
         if (match_hash != *(info->expected_hash)) {
           LogCvmfs(kLogDownload, kLogDebug,
                    "hash verification of %s failed (expected %s, got %s)",
@@ -824,7 +824,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       rewind(info->destination_file);
     }
     if (info->expected_hash)
-      hash::Init(info->hash_context);
+      shash::Init(info->hash_context);
     if (info->compressed)
       zlib::DecompressInit(&info->zstream);
 
@@ -1098,9 +1098,9 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     return result;
 
   if (info->expected_hash) {
-    const hash::Algorithms algorithm = info->expected_hash->algorithm;
+    const shash::Algorithms algorithm = info->expected_hash->algorithm;
     info->hash_context.algorithm = algorithm;
-    info->hash_context.size = hash::GetContextSize(algorithm);
+    info->hash_context.size = shash::GetContextSize(algorithm);
     info->hash_context.buffer = alloca(info->hash_context.size);
   }
 

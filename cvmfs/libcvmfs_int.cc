@@ -209,7 +209,7 @@ static bool GetDirentForPath(const PathString &path,
     PathString p;
     return GetDirentForPath(p,dirent);
   }
-  hash::Md5 md5path(path.GetChars(), path.GetLength());
+  shash::Md5 md5path(path.GetChars(), path.GetLength());
   if (md5path_cache_->Lookup(md5path, dirent))
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
@@ -542,7 +542,7 @@ int cvmfs_int_init(
                           cvmfs::download_manager_);
   if (!cvmfs_opts_root_hash.empty()) {
     retval = cvmfs::catalog_manager_->InitFixed(
-      hash::Any(hash::kSha1, hash::HexPtr(string(cvmfs_opts_root_hash))));
+      shash::Any(shash::kSha1, shash::HexPtr(string(cvmfs_opts_root_hash))));
   } else {
     retval = cvmfs::catalog_manager_->Init();
   }

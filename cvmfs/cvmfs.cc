@@ -540,7 +540,7 @@ static bool GetDirentForPath(const PathString &path,
   if (!nfs_maps_)
     live_inode = inode_tracker_->FindInode(path);
 
-  hash::Md5 md5path(path.GetChars(), path.GetLength());
+  shash::Md5 md5path(path.GetChars(), path.GetLength());
   if (md5path_cache_->Lookup(md5path, dirent)) {
     if (dirent->GetSpecial() == catalog::kDirentNegative)
       return false;
@@ -1424,7 +1424,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       if (fd < 0) {
         attribute_value = "Not in cache";
       } else {
-        hash::Any hash(hash::kSha1);
+        shash::Any hash(shash::kSha1);
         FILE *f = fdopen(fd, "r");
         if (!f) {
           fuse_reply_err(req, EIO);
@@ -2182,7 +2182,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       *g_boot_error = "Failed to fetch manifest";
       return loader::kFailHistory;
     }
-    hash::Any history_hash = ensemble.manifest->history();
+    shash::Any history_hash = ensemble.manifest->history();
     if (history_hash.IsNull()) {
       *g_boot_error = "No history";
       return loader::kFailHistory;
@@ -2217,7 +2217,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
-    hash::Any hash(hash::kSha1, hash::HexPtr(string(root_hash)));
+    shash::Any hash(shash::kSha1, shash::HexPtr(string(root_hash)));
     retval = cvmfs::catalog_manager_->InitFixed(hash);
   } else {
     retval = cvmfs::catalog_manager_->Init();

@@ -116,30 +116,30 @@ class Sql : public sqlite::Sql {
    * @param idx_low offset of least significant bits in database query
    * @result the retrieved MD5 hash
    */
-  inline hash::Md5 RetrieveMd5(const int idx_high, const int idx_low) const
+  inline shash::Md5 RetrieveMd5(const int idx_high, const int idx_low) const
   {
-    return hash::Md5(RetrieveInt64(idx_high), RetrieveInt64(idx_low));
+    return shash::Md5(RetrieveInt64(idx_high), RetrieveInt64(idx_low));
   }
 
   /**
    * Wrapper for retrieving a SHA1 hash from a blob field.
    */
-  inline hash::Any RetrieveSha1Blob(const int idx_column) const {
+  inline shash::Any RetrieveSha1Blob(const int idx_column) const {
     if (RetrieveBytes(idx_column) > 0) {
-      return hash::Any(hash::kSha1,
+      return shash::Any(shash::kSha1,
         static_cast<const unsigned char *>(RetrieveBlob(idx_column)),
         RetrieveBytes(idx_column));
     }
-    return hash::Any(hash::kSha1);
+    return shash::Any(shash::kSha1);
   }
 
   /**
    * Wrapper for retrieving a SHA1 hash from a text field.
    */
-  inline hash::Any RetrieveSha1Hex(const int idx_column) const {
+  inline shash::Any RetrieveSha1Hex(const int idx_column) const {
     const std::string hash_string = std::string(
       reinterpret_cast<const char *>(RetrieveText(idx_column)));
-    return hash::Any(hash::kSha1, hash::HexPtr(hash_string));
+    return shash::Any(shash::kSha1, shash::HexPtr(hash_string));
   }
 
   /**
@@ -149,7 +149,9 @@ class Sql : public sqlite::Sql {
    * @param hash the hash to bind in the query
    * @result true on success, false otherwise
    */
-  inline bool BindMd5(const int idx_high, const int idx_low, const hash::Md5 &hash) {
+  inline bool BindMd5(const int idx_high, const int idx_low,
+                      const shash::Md5 &hash)
+  {
     uint64_t high, low;
     hash.ToIntPair(&high, &low);
     const bool retval = BindInt64(idx_high, high) && BindInt64(idx_low, low);
@@ -162,7 +164,7 @@ class Sql : public sqlite::Sql {
    * @param hash the hash to bind in the query
    * @result true on success, false otherwise
    */
-  inline bool BindSha1Blob(const int idx_column, const struct hash::Any &hash) {
+  inline bool BindSha1Blob(const int idx_column, const shash::Any &hash) {
     if (hash.IsNull()) {
       return BindNull(idx_column);
     } else {
@@ -276,14 +278,14 @@ class SqlLookup : public SqlDirent {
    * This method retrieves the saved path hash from the database
    * @return the MD5 path hash of a freshly performed lookup
    */
-  hash::Md5 GetPathHash() const;
+  shash::Md5 GetPathHash() const;
 
   /**
    * DirectoryEntries do not contain their parent path hash.
    * This method retrieves the saved parent path hash from the database
    * @return the MD5 parent path hash of a freshly performed lookup
    */
-  hash::Md5 GetParentPathHash() const;
+  shash::Md5 GetParentPathHash() const;
 };
 
 
@@ -293,7 +295,7 @@ class SqlLookup : public SqlDirent {
 class SqlListing : public SqlLookup {
  public:
   SqlListing(const Database &database);
-  bool BindPathHash(const struct hash::Md5 &hash);
+  bool BindPathHash(const struct shash::Md5 &hash);
 };
 
 
@@ -303,7 +305,7 @@ class SqlListing : public SqlLookup {
 class SqlLookupPathHash : public SqlLookup {
  public:
   SqlLookupPathHash(const Database &database);
-  bool BindPathHash(const struct hash::Md5 &hash);
+  bool BindPathHash(const struct shash::Md5 &hash);
 };
 
 
@@ -331,7 +333,7 @@ class SqlDirentTouch : public Sql {
   SqlDirentTouch(const Database &database);
 
   bool BindDirentBase(const DirectoryEntryBase &entry);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
 };
 
 
@@ -342,7 +344,7 @@ class SqlNestedCatalogLookup : public Sql {
  public:
   SqlNestedCatalogLookup(const Database &database);
   bool BindSearchPath(const PathString &path);
-  hash::Any GetContentHash() const;
+  shash::Any GetContentHash() const;
 };
 
 
@@ -353,7 +355,7 @@ class SqlNestedCatalogListing : public Sql {
  public:
   SqlNestedCatalogListing(const Database &database);
   PathString GetMountpoint() const;
-  hash::Any GetContentHash() const;
+  shash::Any GetContentHash() const;
 };
 
 
@@ -363,8 +365,8 @@ class SqlNestedCatalogListing : public Sql {
 class SqlDirentInsert : public SqlDirentWrite {
  public:
   SqlDirentInsert(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
-  bool BindParentPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
+  bool BindParentPathHash(const shash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
 };
 
@@ -375,7 +377,7 @@ class SqlDirentInsert : public SqlDirentWrite {
 class SqlDirentUpdate : public SqlDirentWrite {
  public:
   SqlDirentUpdate(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
 };
 
@@ -386,7 +388,7 @@ class SqlDirentUpdate : public SqlDirentWrite {
 class SqlDirentUnlink : public Sql {
  public:
   SqlDirentUnlink(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
 };
 
 
@@ -399,7 +401,7 @@ class SqlDirentUnlink : public Sql {
 class SqlIncLinkcount : public Sql {
  public:
   SqlIncLinkcount(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
   bool BindDelta(const int delta);
 };
 
@@ -410,7 +412,7 @@ class SqlIncLinkcount : public Sql {
 class SqlChunkInsert : public Sql {
  public:
   SqlChunkInsert(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
   bool BindFileChunk(const FileChunk &chunk);
 };
 
@@ -421,7 +423,7 @@ class SqlChunkInsert : public Sql {
 class SqlChunksRemove : public Sql {
  public:
   SqlChunksRemove(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
 };
 
 
@@ -431,7 +433,7 @@ class SqlChunksRemove : public Sql {
 class SqlChunksListing : public Sql {
  public:
   SqlChunksListing(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
   FileChunk GetFileChunk() const;
 };
 
@@ -442,7 +444,7 @@ class SqlChunksListing : public Sql {
 class SqlChunksCount : public Sql {
  public:
   SqlChunksCount(const Database &database);
-  bool BindPathHash(const hash::Md5 &hash);
+  bool BindPathHash(const shash::Md5 &hash);
   int GetChunkCount() const;
 };
 
@@ -499,7 +501,7 @@ class SqlAllChunks : public Sql {
  public:
   SqlAllChunks(const Database &database);
   bool Open();
-  bool Next(hash::Any *hash, ChunkTypes *type);
+  bool Next(shash::Any *hash, ChunkTypes *type);
   bool Close();
 };
 

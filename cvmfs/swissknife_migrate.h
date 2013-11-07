@@ -78,7 +78,7 @@ class CommandMigrate : public Command {
 
     CatalogStatistics                 statistics;
 
-    Future<hash::Any>                 new_catalog_hash;
+    Future<shash::Any>                new_catalog_hash;
   };
 
   class PendingCatalogMap : public std::map<std::string, const PendingCatalog*>,
@@ -205,7 +205,7 @@ class CommandMigrate : public Command {
 
  protected:
   void CatalogCallback(const catalog::Catalog* catalog,
-                       const hash::Any&        catalog_hash,
+                       const shash::Any&       catalog_hash,
                        const unsigned          tree_level);
   void MigrationCallback(PendingCatalog *const &data);
   void UploadCallback(const upload::SpoolerResult &result);
@@ -221,7 +221,7 @@ class CommandMigrate : public Command {
   void AnalyzeCatalogStatistics() const;
 
   bool GenerateNestedCatalogMarkerChunk();
-  void CreateNestedCatalogMarkerDirent(const hash::Any &content_hash);
+  void CreateNestedCatalogMarkerDirent(const shash::Any &content_hash);
 
  private:
   unsigned int           file_descriptor_limit_;

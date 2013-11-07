@@ -21,15 +21,15 @@ class Manifest {
  public:
   static Manifest *LoadFile(const std::string &path);
   static Manifest *LoadMem(const unsigned char *buffer, const unsigned length);
-  Manifest(const hash::Any &catalog_hash, const std::string &root_path);
-  Manifest(const hash::Any &catalog_hash,
-           const hash::Md5 &root_path,
+  Manifest(const shash::Any &catalog_hash, const std::string &root_path);
+  Manifest(const shash::Any &catalog_hash,
+           const shash::Md5 &root_path,
            const uint32_t ttl,
            const uint64_t revision,
-           const hash::Any &micro_catalog_hash,
+           const shash::Any &micro_catalog_hash,
            const std::string &repository_name,
-           const hash::Any certificate,
-           const hash::Any history,
+           const shash::Any certificate,
+           const shash::Any history,
            const uint64_t publish_timestamp,
            const std::vector<history::TagList::ChannelTag> &channel_tops) :
     catalog_hash_(catalog_hash), root_path_(root_path), ttl_(ttl),
@@ -44,10 +44,10 @@ class Manifest {
 
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
-  void set_certificate(const hash::Any &certificate) {
+  void set_certificate(const shash::Any &certificate) {
     certificate_ = certificate;
   }
-  void set_history(const hash::Any &history_db) {
+  void set_history(const shash::Any &history_db) {
     history_ = history_db;
   }
   void set_repository_name(const std::string &repository_name) {
@@ -61,21 +61,21 @@ class Manifest {
   }
 
   std::string repository_name() const { return repository_name_; }
-  hash::Md5 root_path() const { return root_path_; }
-  hash::Any catalog_hash() const { return catalog_hash_; }
-  hash::Any certificate() const { return certificate_; }
-  hash::Any history() const { return history_; }
+  shash::Md5 root_path() const { return root_path_; }
+  shash::Any catalog_hash() const { return catalog_hash_; }
+  shash::Any certificate() const { return certificate_; }
+  shash::Any history() const { return history_; }
   uint64_t publish_timestamp() const { return publish_timestamp_; }
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
-  hash::Any catalog_hash_;
-  hash::Md5 root_path_;
+  shash::Any catalog_hash_;
+  shash::Md5 root_path_;
   uint32_t ttl_;
   uint64_t revision_;
-  hash::Any micro_catalog_hash_;
+  shash::Any micro_catalog_hash_;
   std::string repository_name_;
-  hash::Any certificate_;
-  hash::Any history_;
+  shash::Any certificate_;
+  shash::Any history_;
   uint64_t publish_timestamp_;
   // ordered, newest releases first
   std::vector<history::TagList::ChannelTag> channel_tops_;

@@ -19,24 +19,24 @@ CommandScrub::StoredFile::StoredFile(const std::string &path,
                                      const std::string &expected_hash) :
   AbstractFile(path, GetFileSize(path)),
   hash_done_(false),
-  hash_context_(hash::kSha1),
-  expected_hash_(hash::kSha1, hash::HexPtr(expected_hash))
+  hash_context_(shash::kSha1),
+  expected_hash_(shash::kSha1, shash::HexPtr(expected_hash))
 {
   hash_context_.buffer = malloc(hash_context_.size);
-  hash::Init(hash_context_);
+  shash::Init(hash_context_);
 }
 
 
 void CommandScrub::StoredFile::Update(const unsigned char *data,
                                       const size_t nbytes) {
   assert (! hash_done_);
-  hash::Update(data, nbytes, hash_context_);
+  shash::Update(data, nbytes, hash_context_);
 }
 
 
 void CommandScrub::StoredFile::Finalize() {
   assert (! hash_done_);
-  hash::Final(hash_context_, &content_hash_);
+  shash::Final(hash_context_, &content_hash_);
   free(hash_context_.buffer);
   hash_context_.buffer = NULL;
   hash_done_ = true;

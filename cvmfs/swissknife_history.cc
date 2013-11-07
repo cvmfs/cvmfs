@@ -33,8 +33,8 @@ static bool IsRemote(const string &repository)
  */
 static bool GetHistoryDbHash(const string &repository_url,
                              const string &repository_name,
-                             const hash::Any &expected_root_hash,
-                             hash::Any *historydb_hash)
+                             const shash::Any &expected_root_hash,
+                             shash::Any *historydb_hash)
 {
   manifest::ManifestEnsemble manifest_ensemble;
   manifest::Manifest *manifest = NULL;
@@ -76,7 +76,7 @@ static bool GetHistoryDbHash(const string &repository_url,
 
 
 static bool FetchTagList(const string &repository_url,
-                         const hash::Any &history_hash,
+                         const shash::Any &history_hash,
                          const std::string tmp_path,
                          history::Database *history_db,
                          history::TagList *tag_list)
@@ -107,16 +107,16 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   const string repository_name = *args.find('n')->second;
   const string repository_key_path = *args.find('k')->second;
   const string history_path = *args.find('o')->second;
-  const hash::Any base_hash(hash::kSha1, hash::HexPtr(*args.find('b')->second));
-  const hash::Any trunk_hash(hash::kSha1, hash::HexPtr(*args.find('t')->second));
+  const shash::Any base_hash(shash::kSha1, shash::HexPtr(*args.find('b')->second));
+  const shash::Any trunk_hash(shash::kSha1, shash::HexPtr(*args.find('t')->second));
   const unsigned trunk_revision = String2Uint64(*args.find('i')->second);
-  hash::Any tag_hash = trunk_hash;
+  shash::Any tag_hash = trunk_hash;
   string delete_tag;
   if (args.find('d') != args.end()) {
     delete_tag = *args.find('d')->second;
   }
   if (args.find('h') != args.end()) {
-    tag_hash = hash::Any(hash::kSha1, hash::HexPtr(*args.find('h')->second));
+    tag_hash = shash::Any(shash::kSha1, shash::HexPtr(*args.find('h')->second));
   }
   history::Tag new_tag;
   if (args.find('a') != args.end()) {
@@ -135,7 +135,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   bool list_only = false;
   if (args.find('l') != args.end())
     list_only = true;
-  hash::Any history_hash;
+  shash::Any history_hash;
   history::Database tag_db;
   history::TagList tag_list;
   int retval;
@@ -245,11 +245,11 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   const string repository_name = *args.find('n')->second;
   const string repository_key_path = *args.find('k')->second;
   const string history_path = *args.find('o')->second;
-  const hash::Any base_hash(hash::kSha1, hash::HexPtr(*args.find('b')->second));
+  const shash::Any base_hash(shash::kSha1, shash::HexPtr(*args.find('b')->second));
   const string target_tag_name = *args.find('t')->second;
   const string manifest_path = *args.find('m')->second;
   const string temp_dir = *args.find('d')->second;
-  hash::Any history_hash;
+  shash::Any history_hash;
   history::Database tag_db;
   history::TagList tag_list;
   history::Tag target_tag;
@@ -257,7 +257,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   string catalog_path;
   catalog::WritableCatalog *catalog = NULL;
   manifest::Manifest *manifest = NULL;
-  hash::Any hash_republished_catalog(hash::kSha1);
+  shash::Any hash_republished_catalog(shash::kSha1);
   int retval;
 
   // Download & verify manifest & history database

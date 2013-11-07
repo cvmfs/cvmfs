@@ -56,8 +56,8 @@ class SyncItem {
   bool IsOpaqueDirectory() const;
   bool IsNew() const;
 
-  inline hash::Any GetContentHash() const { return content_hash_; }
-  inline void SetContentHash(const hash::Any &hash) { content_hash_ = hash; }
+  inline shash::Any GetContentHash() const { return content_hash_; }
+  inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
 
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
@@ -110,7 +110,7 @@ class SyncItem {
   std::string relative_parent_path_;
   std::string filename_;
   // The hash of regular file's content
-  hash::Any content_hash_;
+  shash::Any content_hash_;
   const SyncUnion *union_engine_;
 
   mutable EntryStat rdonly_stat_;

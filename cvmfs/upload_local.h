@@ -53,7 +53,7 @@ namespace upload
                 CharBuffer          *buffer,
                 const callback_t    *callback = NULL);
     void FinalizeStreamedUpload(UploadStreamHandle *handle,
-                                const hash::Any     content_hash,
+                                const shash::Any    content_hash,
                                 const std::string   hash_suffix);
 
     bool Remove(const std::string &file_to_delete);

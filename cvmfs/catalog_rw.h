@@ -36,13 +36,13 @@ class WritableCatalog : public Catalog {
 
  public:
   WritableCatalog(const std::string &path,
-                  const hash::Any   &catalog_hash,
+                  const shash::Any  &catalog_hash,
                   Catalog           *parent);
   virtual ~WritableCatalog();
 
   static WritableCatalog *AttachFreely(const std::string &root_path,
                                        const std::string &file,
-                                       const hash::Any   &catalog_hash,
+                                       const shash::Any  &catalog_hash,
                                              Catalog     *parent = NULL);
 
   void Transaction();
@@ -54,9 +54,9 @@ class WritableCatalog : public Catalog {
 
   void AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
                 const std::string &parent_path);
-  void TouchEntry(const DirectoryEntryBase &entry, const hash::Md5 &path_hash);
+  void TouchEntry(const DirectoryEntryBase &entry, const shash::Md5 &path_hash);
   inline void TouchEntry(const DirectoryEntryBase &entry, const std::string &path) {
-    TouchEntry(entry, hash::Md5(hash::AsciiPtr(path)));
+    TouchEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
   void RemoveEntry(const std::string &entry_path);
   void IncLinkcount(const std::string &path_within_group, const int delta);
@@ -70,24 +70,24 @@ class WritableCatalog : public Catalog {
   // Nested catalog references
   void InsertNestedCatalog(const std::string &mountpoint,
                            Catalog *attached_reference,
-                           const hash::Any content_hash);
-  void UpdateNestedCatalog(const std::string &path, const hash::Any &hash);
+                           const shash::Any content_hash);
+  void UpdateNestedCatalog(const std::string &path, const shash::Any &hash);
   void RemoveNestedCatalog(const std::string &mountpoint,
                            Catalog **attached_reference);
 
   void UpdateLastModified();
   void IncrementRevision();
   void SetRevision(const uint64_t new_revision);
-  void SetPreviousRevision(const hash::Any &hash);
+  void SetPreviousRevision(const shash::Any &hash);
 
  protected:
   sqlite::DbOpenMode DatabaseOpenMode() const {
     return sqlite::kDbOpenReadWrite;
   }
 
-  void UpdateEntry(const DirectoryEntry &entry, const hash::Md5 &path_hash);
+  void UpdateEntry(const DirectoryEntry &entry, const shash::Md5 &path_hash);
   inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path) {
-    UpdateEntry(entry, hash::Md5(hash::AsciiPtr(path)));
+    UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
   inline void AddEntry(const DirectoryEntry &entry, const std::string &path) {

@@ -257,7 +257,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       if (entries[i].IsNestedCatalogMountpoint()) {
         // Find transition point
         computed_counters->self.nested_catalogs++;
-        hash::Any tmp;
+        shash::Any tmp;
         if (!catalog->FindNested(full_path, &tmp)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
                    full_path.c_str());
@@ -384,7 +384,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 }
 
 
-string CommandCheck::DownloadPiece(const hash::Any catalog_hash,
+string CommandCheck::DownloadPiece(const shash::Any catalog_hash,
                                    const char suffix)
 {
   string source = "data" + catalog_hash.MakePath(1,2);
@@ -403,7 +403,7 @@ string CommandCheck::DownloadPiece(const hash::Any catalog_hash,
 }
 
 
-string CommandCheck::DecompressPiece(const hash::Any catalog_hash,
+string CommandCheck::DecompressPiece(const shash::Any catalog_hash,
                                      const char suffix)
 {
   string source = "data" + catalog_hash.MakePath(1,2);
@@ -420,7 +420,7 @@ string CommandCheck::DecompressPiece(const hash::Any catalog_hash,
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
 bool CommandCheck::InspectTree(const string &path,
-                               const hash::Any &catalog_hash,
+                               const shash::Any &catalog_hash,
                                const catalog::DirectoryEntry *transition_point,
                                catalog::DeltaCounters *computed_counters)
 {
@@ -614,7 +614,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  hash::Any root_hash = manifest->catalog_hash();
+  shash::Any root_hash = manifest->catalog_hash();
   if (tag_name != "") {
     if (manifest->history().IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "no history");

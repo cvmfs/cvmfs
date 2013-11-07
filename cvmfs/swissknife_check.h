@@ -39,12 +39,12 @@ class CommandCheck : public Command {
 
  protected:
   bool InspectTree(const std::string &path,
-                   const hash::Any &catalog_hash,
+                   const shash::Any &catalog_hash,
                    const catalog::DirectoryEntry *transition_point,
                    catalog::DeltaCounters *computed_counters);
-  std::string DecompressPiece(const hash::Any catalog_hash,
+  std::string DecompressPiece(const shash::Any catalog_hash,
                               const char suffix);
-  std::string DownloadPiece(const hash::Any catalog_hash,
+  std::string DownloadPiece(const shash::Any catalog_hash,
                             const char suffix);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,

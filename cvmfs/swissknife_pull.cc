@@ -41,7 +41,7 @@ namespace {
 
 struct ChunkJob {
   unsigned char type;
-  unsigned char digest[hash::kMaxDigestSize];
+  unsigned char digest[shash::kMaxDigestSize];
 };
 
 
@@ -128,7 +128,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   assert(ftmp);
   int retval;
   if (compress) {
-    hash::Any dummy(hash::kSha1);
+    shash::Any dummy(shash::kSha1);
     retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
   } else {
     retval = CopyMem2File(buffer, size, ftmp);
@@ -153,8 +153,8 @@ static void *MainWorker(void *data) {
     if (next_chunk.type == 255)
       break;
 
-    hash::Any chunk_hash(hash::kSha1, next_chunk.digest,
-                         hash::kDigestSizes[hash::kSha1]);
+    shash::Any chunk_hash(shash::kSha1, next_chunk.digest,
+                          shash::kDigestSizes[shash::kSha1]);
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
     string chunk_path = "data" + chunk_hash.MakePath(1, 2);
@@ -193,7 +193,7 @@ static void *MainWorker(void *data) {
 }
 
 
-static bool Pull(const hash::Any &catalog_hash, const std::string &path,
+static bool Pull(const shash::Any &catalog_hash, const std::string &path,
                  const bool with_nested)
 {
   int retval;
@@ -208,7 +208,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
   int64_t gauge_new = atomic_read64(&overall_new);
 
   // Download and uncompress catalog
-  hash::Any chunk_hash;
+  shash::Any chunk_hash;
   catalog::ChunkTypes chunk_type;
   catalog::Catalog *catalog = NULL;
   string file_catalog;
@@ -287,7 +287,7 @@ static bool Pull(const hash::Any &catalog_hash, const std::string &path,
 
   // Previous catalogs
   if (pull_history) {
-    hash::Any previous_catalog = catalog->GetPreviousRevision();
+    shash::Any previous_catalog = catalog->GetPreviousRevision();
     if (previous_catalog.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Start of catalog, no more history");
     } else {
@@ -370,7 +370,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
-  map<string, hash::Any> historic_tags;
+  map<string, shash::Any> historic_tags;
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
@@ -434,7 +434,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   // Fetch tag list
   if (!ensemble.manifest->history().IsNull()) {
-    hash::Any history_hash = ensemble.manifest->history();
+    shash::Any history_hash = ensemble.manifest->history();
     const string history_url = *stratum0_url + "/data" +
       history_hash.MakePath(1, 2) + "H";
     const string history_path = *temp_dir + "/" + history_hash.ToString();
@@ -487,7 +487,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "", true);
   pull_history = false;
-  for (map<string, hash::Any>::const_iterator i = historic_tags.begin(),
+  for (map<string, shash::Any>::const_iterator i = historic_tags.begin(),
        iEnd = historic_tags.end(); i != iEnd; ++i)
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",

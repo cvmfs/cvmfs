@@ -146,8 +146,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       delete manifest;
       goto sign_fail;
     }
-    hash::Any certificate_hash(hash::kSha1);
-    hash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
+    shash::Any certificate_hash(shash::kSha1);
+    shash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
     const string cert_path_tmp = temp_dir + "/cvmfspublisher.tmp";
     if (!CopyMem2Path((unsigned char *)compr_buf, compr_size, cert_path_tmp)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to save certificate");
@@ -161,7 +161,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     spooler->Upload(cert_path_tmp, cert_hash_path);
 
     // Safe history database
-    hash::Any history_hash(hash::kSha1);
+    shash::Any history_hash(shash::kSha1);
     if (history_path != "") {
       history::Database tag_db;
       if (!tag_db.Open(history_path, sqlite::kDbOpenReadOnly)) {
@@ -203,8 +203,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     manifest->set_publish_timestamp(time(NULL));
 
     string signed_manifest = manifest->ExportString();
-    hash::Any published_hash(hash::kSha1);
-    hash::HashMem(
+    shash::Any published_hash(shash::kSha1);
+    shash::HashMem(
       reinterpret_cast<const unsigned char *>(signed_manifest.data()),
       signed_manifest.length(), &published_hash);
     signed_manifest += "--\n" + published_hash.ToString() + "\n";

@@ -89,24 +89,24 @@ class DirectoryEntryBase {
     { }
 
   // accessors
-  inline bool IsRegular() const                { return S_ISREG(mode_); }
-  inline bool IsLink() const                   { return S_ISLNK(mode_); }
-  inline bool IsDirectory() const              { return S_ISDIR(mode_); }
+  inline bool IsRegular() const                 { return S_ISREG(mode_); }
+  inline bool IsLink() const                    { return S_ISLNK(mode_); }
+  inline bool IsDirectory() const               { return S_ISDIR(mode_); }
 
-  inline inode_t inode() const                 { return inode_; }
-  inline inode_t parent_inode() const          { return parent_inode_; }
+  inline inode_t inode() const                  { return inode_; }
+  inline inode_t parent_inode() const           { return parent_inode_; }
   //inline uint32_t generation() const           { return generation_; }
-  inline uint32_t linkcount() const            { return linkcount_; }
-  inline NameString name() const               { return name_; }
-  inline LinkString symlink() const            { return symlink_; }
+  inline uint32_t linkcount() const             { return linkcount_; }
+  inline NameString name() const                { return name_; }
+  inline LinkString symlink() const             { return symlink_; }
 
-  inline time_t mtime() const                  { return mtime_; }
-  inline unsigned int mode() const             { return mode_; }
-  inline uid_t uid() const                     { return uid_; }
-  inline gid_t gid() const                     { return gid_; }
+  inline time_t mtime() const                   { return mtime_; }
+  inline unsigned int mode() const              { return mode_; }
+  inline uid_t uid() const                      { return uid_; }
+  inline gid_t gid() const                      { return gid_; }
 
-  inline hash::Any checksum() const            { return checksum_; }
-  inline const hash::Any *checksum_ptr() const { return &checksum_; }
+  inline shash::Any checksum() const            { return checksum_; }
+  inline const shash::Any *checksum_ptr() const { return &checksum_; }
 
   inline uint64_t size() const {
     return (IsLink()) ? symlink().GetLength() : size_;
@@ -181,7 +181,7 @@ class DirectoryEntryBase {
 
   // checksum is not part of the file system intrinsics, though can be computed
   // just using the file contents... we therefore put it in this base class.
-  hash::Any checksum_;
+  shash::Any checksum_;
 };
 
 /**

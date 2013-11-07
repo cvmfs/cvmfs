@@ -63,7 +63,7 @@ void AbstractCatalogManager::SetOwnerMaps(const OwnerMap &uid_map,
 bool AbstractCatalogManager::Init() {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog");
   WriteLock();
-  bool attached = MountCatalog(PathString("", 0), hash::Any(), NULL);
+  bool attached = MountCatalog(PathString("", 0), shash::Any(), NULL);
   Unlock();
 
   if (!attached) {
@@ -83,16 +83,16 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remounting repositories (dry run %d)", dry_run);
   if (dry_run)
-    return LoadCatalog(PathString("", 0), hash::Any(), NULL, NULL);
+    return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
 
   WriteLock();
   if (remount_listener_)
     remount_listener_->BeforeRemount(this);
 
-  string    catalog_path;
-  hash::Any catalog_hash;
+  string     catalog_path;
+  shash::Any catalog_hash;
   const LoadError load_error = LoadCatalog(PathString("", 0),
-                                           hash::Any(),
+                                           shash::Any(),
                                            &catalog_path,
                                            &catalog_hash);
   if (load_error == kLoadNew) {
@@ -191,7 +191,7 @@ void AbstractCatalogManager::DetachNested() {
   } else {
     atomic_inc64(&statistics_.num_lookup_inode);
     // Lookup including parent entry
-    hash::Md5 parent_md5path;
+    shash::Md5 parent_md5path;
     DirectoryEntry parent;
     bool found_parent = false;
 
@@ -586,15 +586,15 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
  * Loading of catalogs is implemented by derived classes.
  */
 Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
-                                              const hash::Any &hash,
+                                              const shash::Any &hash,
                                               Catalog *parent_catalog)
 {
   Catalog *attached_catalog = NULL;
   if (IsAttached(mountpoint, &attached_catalog))
     return attached_catalog;
 
-  string    catalog_path;
-  hash::Any catalog_hash;
+  string     catalog_path;
+  shash::Any catalog_hash;
   const LoadError retval = LoadCatalog( mountpoint,
                                         hash,
                                        &catalog_path,

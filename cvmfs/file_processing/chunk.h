@@ -36,8 +36,8 @@ class Chunk {
   Chunk(File* file, const off_t offset) :
     file_(file), file_offset_(offset), chunk_size_(0),
     is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
-    zlib_initialized_(false), content_hash_context_(hash::kSha1),
-    content_hash_(hash::kSha1), content_hash_initialized_(false),
+    zlib_initialized_(false), content_hash_context_(shash::kSha1),
+    content_hash_(shash::kSha1), content_hash_initialized_(false),
     upload_stream_handle_(NULL), bytes_written_(0)
   {
     Initialize();
@@ -78,10 +78,10 @@ class Chunk {
     is_fully_defined_ = true;
   }
 
-  hash::ContextPtr& content_hash_context() { return content_hash_context_;     }
-  const hash::Any&  content_hash() const   { return content_hash_;             }
-  std::string       hash_suffix() const;
-  z_stream&         zlib_context()                 { return zlib_context_;     }
+  shash::ContextPtr& content_hash_context() { return content_hash_context_;     }
+  const shash::Any&  content_hash() const   { return content_hash_;             }
+  std::string        hash_suffix() const;
+  z_stream&          zlib_context()                 { return zlib_context_;     }
 
   UploadStreamHandle* upload_stream_handle() const { return upload_stream_handle_; }
   void set_upload_stream_handle(UploadStreamHandle* ush) {
@@ -123,8 +123,8 @@ class Chunk {
   z_stream                 zlib_context_;
   bool                     zlib_initialized_;
 
-  hash::ContextPtr         content_hash_context_;
-  hash::Any                content_hash_;
+  shash::ContextPtr        content_hash_context_;
+  shash::Any               content_hash_;
   bool                     content_hash_initialized_;
 
   UploadStreamHandle      *upload_stream_handle_; ///< opaque handle for streamed upload

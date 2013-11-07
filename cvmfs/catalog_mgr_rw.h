@@ -52,7 +52,7 @@ namespace catalog {
 
 class WritableCatalogManager : public AbstractCatalogManager {
  public:
-  WritableCatalogManager(const hash::Any   &base_hash,
+  WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
@@ -99,11 +99,11 @@ class WritableCatalogManager : public AbstractCatalogManager {
   void EnforceSqliteMemLimit() { }
 
   LoadError LoadCatalog(const PathString &mountpoint,
-                        const hash::Any  &hash,
+                        const shash::Any &hash,
                         std::string      *catalog_path,
-                        hash::Any        *catalog_hash);
+                        shash::Any       *catalog_hash);
   Catalog* CreateCatalog(const PathString &mountpoint,
-                         const hash::Any  &catalog_hash,
+                         const shash::Any &catalog_hash,
                          Catalog *parent_catalog);
 
   void AddFile(const DirectoryEntry  &entry,
@@ -135,7 +135,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
   int GetModifiedCatalogsRecursively(const Catalog *catalog,
                                      WritableCatalogList *result) const;
 
-  hash::Any SnapshotCatalog(WritableCatalog *catalog) const;
+  shash::Any SnapshotCatalog(WritableCatalog *catalog) const;
 
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
@@ -146,7 +146,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
   // private lock of WritableCatalogManager
   pthread_mutex_t            *sync_lock_;
-  hash::Any                  base_hash_;
+  shash::Any                 base_hash_;
   std::string                stratum0_;
   std::string                dir_temp_;
   upload::Spooler            *spooler_;

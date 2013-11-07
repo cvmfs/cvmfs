@@ -778,7 +778,7 @@ typename LruCache<Key, Value>::ConcreteMemoryAllocator
   *LruCache<Key, Value>::allocator_ = NULL;
 
 // Hash functions
-static inline uint32_t hasher_md5(const hash::Md5 &key) {
+static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
   return (uint32_t) *((uint32_t *)key.digest + 1);
 }
@@ -786,7 +786,7 @@ static inline uint32_t hasher_md5(const hash::Md5 &key) {
 static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
 }
-//uint32_t hasher_md5(const hash::Md5 &key);
+//uint32_t hasher_md5(const shash::Md5 &key);
 //uint32_t hasher_inode(const fuse_ino_t &inode);
 
 
@@ -853,48 +853,48 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
 
 
 class Md5PathCache :
-  public LruCache<hash::Md5, catalog::DirectoryEntry>
+  public LruCache<shash::Md5, catalog::DirectoryEntry>
 {
  public:
   Md5PathCache(unsigned int cache_size) :
-    LruCache<hash::Md5, catalog::DirectoryEntry>(
-      cache_size, hash::Md5(hash::AsciiPtr("!")), hasher_md5)
+    LruCache<shash::Md5, catalog::DirectoryEntry>(
+      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5)
   {
     dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }
 
-  bool Insert(const hash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
+  bool Insert(const shash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
     LogCvmfs(kLogLru, kLogDebug, "insert md5 --> dirent: %s -> '%s'",
              hash.ToString().c_str(), dirent.name().c_str());
     const bool result =
-      LruCache<hash::Md5, catalog::DirectoryEntry>::Insert(hash, dirent);
+      LruCache<shash::Md5, catalog::DirectoryEntry>::Insert(hash, dirent);
     return result;
   }
 
-  bool InsertNegative(const hash::Md5 &hash) {
+  bool InsertNegative(const shash::Md5 &hash) {
     const bool result = Insert(hash, dirent_negative_);
     if (result)
       atomic_inc64(&statistics_.num_insert_negative);
     return result;
   }
 
-  bool Lookup(const hash::Md5 &hash, catalog::DirectoryEntry *dirent) {
+  bool Lookup(const shash::Md5 &hash, catalog::DirectoryEntry *dirent) {
     const bool result =
-      LruCache<hash::Md5, catalog::DirectoryEntry>::Lookup(hash, dirent);
+      LruCache<shash::Md5, catalog::DirectoryEntry>::Lookup(hash, dirent);
     LogCvmfs(kLogLru, kLogDebug, "lookup md5 --> dirent: %s (%s)",
              hash.ToString().c_str(), result ? "hit" : "miss");
     return result;
   }
 
-  bool Forget(const hash::Md5 &hash) {
+  bool Forget(const shash::Md5 &hash) {
     LogCvmfs(kLogLru, kLogDebug, "forget md5: %s",
              hash.ToString().c_str());
-    return LruCache<hash::Md5, catalog::DirectoryEntry>::Forget(hash);
+    return LruCache<shash::Md5, catalog::DirectoryEntry>::Forget(hash);
   }
 
   void Drop() {
     LogCvmfs(kLogLru, kLogDebug, "dropping md5path cache");
-    LruCache<hash::Md5, catalog::DirectoryEntry>::Drop();
+    LruCache<shash::Md5, catalog::DirectoryEntry>::Drop();
   }
 
  private:

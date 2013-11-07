@@ -25,7 +25,7 @@ const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
  */
 Catalog* Catalog::AttachFreely(const string     &root_path,
                                const string     &file,
-                               const hash::Any  &catalog_hash,
+                               const shash::Any &catalog_hash,
                                      Catalog    *parent) {
   Catalog *catalog =
     new Catalog(PathString(root_path.data(), root_path.length()),
@@ -41,7 +41,7 @@ Catalog* Catalog::AttachFreely(const string     &root_path,
 
 
 Catalog::Catalog(const PathString &path,
-                 const hash::Any &catalog_hash,
+                 const shash::Any &catalog_hash,
                  Catalog *parent) :
   read_only_(true),
   catalog_hash_(catalog_hash),
@@ -192,7 +192,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
  * @return true if lookup was successful, false otherwise
  */
 bool Catalog::LookupInode(const inode_t inode, DirectoryEntry *dirent,
-                          hash::Md5 *parent_md5path) const
+                          shash::Md5 *parent_md5path) const
 {
   assert(IsInitialized());
 
@@ -221,7 +221,7 @@ bool Catalog::LookupInode(const inode_t inode, DirectoryEntry *dirent,
  * @param dirent will be set to the found DirectoryEntry
  * @return true if DirectoryEntry was successfully found, false otherwise
  */
-bool Catalog::LookupMd5Path(const hash::Md5 &md5path,
+bool Catalog::LookupMd5Path(const shash::Md5 &md5path,
                             DirectoryEntry *dirent) const
 {
   assert(IsInitialized());
@@ -246,7 +246,7 @@ bool Catalog::LookupMd5Path(const hash::Md5 &md5path,
  * @param listing will be set to the resulting DirectoryEntryList
  * @return true on successful listing, false otherwise
  */
-bool Catalog::ListingMd5PathStat(const hash::Md5 &md5path,
+bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
                                  StatEntryList *listing) const
 {
   assert(IsInitialized());
@@ -277,7 +277,7 @@ bool Catalog::ListingMd5PathStat(const hash::Md5 &md5path,
  * @param listing will be set to the resulting DirectoryEntryList
  * @return true on successful listing, false otherwise
  */
-bool Catalog::ListingMd5Path(const hash::Md5 &md5path,
+bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
                              DirectoryEntryList *listing) const
 {
   assert(IsInitialized());
@@ -301,7 +301,7 @@ bool Catalog::AllChunksBegin() {
 }
 
 
-bool Catalog::AllChunksNext(hash::Any *hash, ChunkTypes *type) {
+bool Catalog::AllChunksNext(shash::Any *hash, ChunkTypes *type) {
   return sql_all_chunks_->Next(hash, type);
 }
 
@@ -311,7 +311,7 @@ bool Catalog::AllChunksEnd() {
 }
 
 
-bool Catalog::ListMd5PathChunks(const hash::Md5  &md5path,
+bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
                                 FileChunkList    *chunks) const
 {
   assert(IsInitialized() && chunks->IsEmpty());
@@ -365,11 +365,11 @@ uint64_t Catalog::GetNumEntries() const {
 }
 
 
-hash::Any Catalog::GetPreviousRevision() const {
+shash::Any Catalog::GetPreviousRevision() const {
   const string sql =
     "SELECT value FROM properties WHERE key='previous_revision';";
 
-  hash::Any result(hash::kSha1);
+  shash::Any result(shash::kSha1);
   pthread_mutex_lock(lock_);
   Sql stmt(database(), sql);
   if (stmt.FetchRow())
@@ -470,7 +470,7 @@ Catalog::NestedCatalogList *Catalog::ListNestedCatalogs() const {
 /**
  * Looks for a specific registered nested catalog based on a path.
  */
-bool Catalog::FindNested(const PathString &mountpoint, hash::Any *hash) const {
+bool Catalog::FindNested(const PathString &mountpoint, shash::Any *hash) const {
   pthread_mutex_lock(lock_);
   sql_lookup_nested_->BindSearchPath(mountpoint);
   bool found = sql_lookup_nested_->FetchRow();
@@ -609,7 +609,7 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
  * @param md5path the MD5 hash of the entry to check
  * @param dirent the DirectoryEntry to perform coherence fixes on
  */
-void Catalog::FixTransitionPoint(const hash::Md5 &md5path,
+void Catalog::FixTransitionPoint(const shash::Md5 &md5path,
                                  DirectoryEntry *dirent) const
 {
   if (dirent->IsNestedCatalogRoot() && !IsRoot()) {

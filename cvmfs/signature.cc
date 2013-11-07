@@ -250,8 +250,8 @@ string SignatureManager::FingerprintCertificate() {
   buffer_size = i2d_X509(certificate_, &buffer);
   if (buffer_size < 0) return "";
 
-  hash::Any hash(hash::kSha1);
-  hash::HashMem(buffer, buffer_size, &hash);
+  shash::Any hash(shash::kSha1);
+  shash::HashMem(buffer, buffer_size, &hash);
   free(buffer);
 
   const string hash_str = hash.ToString();
@@ -473,11 +473,11 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
     hash_str.push_back(buffer[pos++]);
   } while (true);
   // TODO: more hashes
-  if (hash_str.length() != 2*hash::kDigestSizes[hash::kSha1])
+  if (hash_str.length() != 2*shash::kDigestSizes[shash::kSha1])
     return false;
-  hash::Any hash_printed(hash::kSha1, hash::HexPtr(hash_str));
-  hash::Any hash_computed(hash_printed.algorithm);
-  hash::HashMem(buffer, letter_length, &hash_computed);
+  shash::Any hash_printed(shash::kSha1, shash::HexPtr(hash_str));
+  shash::Any hash_computed(hash_printed.algorithm);
+  shash::HashMem(buffer, letter_length, &hash_computed);
   if (hash_printed != hash_computed)
     return false;
 

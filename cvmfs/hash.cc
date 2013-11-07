@@ -17,7 +17,7 @@ using namespace std;  // NOLINT
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-namespace hash {
+namespace shash {
 
 /**
  * Allows the caller to create the context on the stack.

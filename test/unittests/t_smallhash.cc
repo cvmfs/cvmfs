@@ -13,7 +13,7 @@ static uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
 }
 
-static uint32_t hasher_md5(const hash::Md5 &key) {
+static uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
   return (uint32_t) *((uint32_t *)key.digest + 1);
 }
@@ -22,7 +22,7 @@ class T_Smallhash : public ::testing::Test {
  protected:
   virtual void SetUp() {
     smallhash_.Init(16, -1, hasher_int);
-    smallhash_md5_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+    smallhash_md5_.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
     multihash_.Init(kNumHashmaps, -1, hasher_int);
     active_multihash = &multihash_;
 
@@ -65,7 +65,7 @@ class T_Smallhash : public ::testing::Test {
   static const unsigned kNumHashmaps = 42;
   static const unsigned kNumThreads = 8;
   SmallHashDynamic<int, int> smallhash_;
-  SmallHashDynamic<hash::Md5, int> smallhash_md5_;
+  SmallHashDynamic<shash::Md5, int> smallhash_md5_;
   MultiHash<int, int> multihash_;
   static MultiHash<int, int> *active_multihash;
 };
@@ -85,7 +85,7 @@ TEST_F(T_Smallhash, Insert) {
 TEST_F(T_Smallhash, InsertMd5) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
-    hash::Md5 random_hash;
+    shash::Md5 random_hash;
     random_hash.Randomize();
     smallhash_md5_.Insert(random_hash, i);
   }
@@ -97,7 +97,7 @@ TEST_F(T_Smallhash, InsertMd5) {
 TEST_F(T_Smallhash, InsertAndCopyMd5) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
-    hash::Md5 random_hash;
+    shash::Md5 random_hash;
     random_hash.Randomize();
     smallhash_md5_.Insert(random_hash, i);
   }
@@ -105,8 +105,8 @@ TEST_F(T_Smallhash, InsertAndCopyMd5) {
   const uint32_t max_collisions = std::numeric_limits<uint32_t>::max() / N;
   EXPECT_GT(max_collisions, smallhash_md5_.max_collisions_);
 
-  SmallHashDynamic<hash::Md5, int> new_smallhash_md5;
-  new_smallhash_md5.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+  SmallHashDynamic<shash::Md5, int> new_smallhash_md5;
+  new_smallhash_md5.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
   new_smallhash_md5 = smallhash_md5_;
 
   EXPECT_EQ(N, smallhash_md5_.size());

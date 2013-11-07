@@ -180,7 +180,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
     platform_disable_kcache(fd_src);
 
     // Compress every file and calculate SHA-1 of stream
-    hash::Any hash(hash::kSha1);
+    shash::Any hash(shash::kSha1);
     if (!zlib::CompressFd2Null(fd_src, &hash)) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",
                path.c_str());

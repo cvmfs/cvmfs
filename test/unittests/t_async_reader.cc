@@ -17,7 +17,7 @@ class TestFile : public upload::AbstractFile {
   TestFile(const std::string path,
            const FileSandbox::ExpectedHashString &expected_hash) :
     AbstractFile(path, GetFileSize(path)),
-    expected_hash_(hash::kSha1, hash::HexPtr(expected_hash.first)),
+    expected_hash_(shash::kSha1, shash::HexPtr(expected_hash.first)),
     read_offset_(0)
   {
     const int sha1_retval = SHA1_Init(&sha1_context_);
@@ -28,16 +28,16 @@ class TestFile : public upload::AbstractFile {
   SHA_CTX*       sha1_context()      { return &sha1_context_; }
   off_t          read_offset() const { return read_offset_; }
 
-  hash::Any GetHash() const {
-    return hash::Any(hash::kSha1, sha1_digest_, SHA_DIGEST_LENGTH);
+  shash::Any GetHash() const {
+    return shash::Any(shash::kSha1, sha1_digest_, SHA_DIGEST_LENGTH);
   }
 
-  const hash::Any& GetExpectedHash() const {
+  const shash::Any& GetExpectedHash() const {
     return expected_hash_;
   }
 
   void CheckHash() const {
-    const hash::Any computed_hash = GetHash();
+    const shash::Any computed_hash = GetHash();
     EXPECT_EQ (expected_hash_, computed_hash)
       << "content hashes do not fit!" << std::endl
       << "expected: " << expected_hash_.ToString() << std::endl
@@ -50,7 +50,7 @@ class TestFile : public upload::AbstractFile {
   // sha1 administrative data
   SHA_CTX        sha1_context_;
   unsigned char  sha1_digest_[SHA_DIGEST_LENGTH];
-  hash::Any      expected_hash_;
+  shash::Any     expected_hash_;
 
   // file scrubbing bookkeeping (only important for testing purposes)
   off_t          read_offset_;

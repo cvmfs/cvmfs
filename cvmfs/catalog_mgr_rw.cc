@@ -29,7 +29,7 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 WritableCatalogManager::WritableCatalogManager(
-  const hash::Any           &base_hash,
+  const shash::Any          &base_hash,
   const std::string         &stratum0,
   const string              &dir_temp,
   upload::Spooler           *spooler,
@@ -68,11 +68,11 @@ bool WritableCatalogManager::Init() {
  * @return 0 on success, different otherwise
  */
 LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
-                                              const hash::Any &hash,
+                                              const shash::Any &hash,
                                               std::string *catalog_path,
-                                              hash::Any   *catalog_hash)
+                                              shash::Any  *catalog_hash)
 {
-  hash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
+  shash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
   const string url = stratum0_ + "/data" + effective_hash.MakePath(1, 2) + "C";
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
                                   catalog_path);
@@ -109,7 +109,7 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
  * @return a pointer to the catalog stub structure created
  */
 Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
-                                               const hash::Any  &catalog_hash,
+                                               const shash::Any &catalog_hash,
                                                Catalog          *parent_catalog)
 {
   return new WritableCatalog(mountpoint.ToString(),
@@ -141,7 +141,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   root_entry.mtime_             = time(NULL);
   root_entry.uid_               = getuid();
   root_entry.gid_               = getgid();
-  root_entry.checksum_          = hash::Any(hash::kSha1);
+  root_entry.checksum_          = shash::Any(shash::kSha1);
   root_entry.linkcount_         = 2;
   string root_path = "";
 
@@ -154,7 +154,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
 
   // Compress root catalog;
   string file_path_compressed = file_path + ".compressed";
-  hash::Any hash_catalog(hash::kSha1);
+  shash::Any hash_catalog(shash::kSha1);
   bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
                                         &hash_catalog);
   if (!retval) {
@@ -507,7 +507,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
              "updating transition point at %s", entry_path.c_str());
 
     // find and mount nested catalog assciated to this transition point
-    hash::Any nested_hash;
+    shash::Any nested_hash;
     retval = catalog->FindNested(transition_path, &nested_hash);
     assert(retval);
     Catalog *nested_catalog;
@@ -563,7 +563,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Attach the just created nested catalog
   Catalog *new_catalog =
     CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()),
-                  hash::Any(),
+                  shash::Any(),
                   old_catalog);
   retval = AttachCatalog(database_file_path, new_catalog);
   assert(retval);
@@ -579,7 +579,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Add the newly created nested catalog to the references of the containing
   // catalog
   old_catalog->InsertNestedCatalog(new_catalog->path().ToString(), NULL,
-                                   hash::Any(hash::kSha1));
+                                   shash::Any(shash::kSha1));
 
   // Fix subtree counters in new nested catalogs: subtree is the sum of all
   // entries of all "grand-nested" catalogs
@@ -666,7 +666,7 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
                (*i)->database_path().c_str(), (*i)->path().c_str());
       getchar();
     }
-    hash::Any hash = SnapshotCatalog(*i);
+    shash::Any hash = SnapshotCatalog(*i);
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
@@ -724,7 +724,7 @@ int WritableCatalogManager::GetModifiedCatalogsRecursively(
  * Makes a new catalog revision.  Compresses and uploads catalog.  Returns
  * content hash.
  */
-hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
+shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   const
 {
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
@@ -744,7 +744,7 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   if (catalog->IsRoot()) {
     catalog->SetPreviousRevision(base_hash_);
   } else {
-    hash::Any hash_previous;
+    shash::Any hash_previous;
     const bool retval =
       catalog->parent()->FindNested(catalog->path(), &hash_previous);
     assert (retval);
@@ -752,7 +752,7 @@ hash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   }
 
   // Compress catalog
-  hash::Any hash_catalog(hash::kSha1);
+  shash::Any hash_catalog(shash::kSha1);
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_catalog))

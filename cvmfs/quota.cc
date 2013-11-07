@@ -89,7 +89,7 @@ struct LruCommand {
   CommandType command_type;
   uint64_t size;
   int return_pipe;  // For cleanup, listing, and reservations
-  unsigned char digest[hash::kMaxDigestSize];
+  unsigned char digest[shash::kMaxDigestSize];
   uint16_t path_length;  // Maximum 512-sizeof(LruCommand) in order to guarantee
                          // atomic pipe operations
 };
@@ -110,7 +110,7 @@ int pipe_lru_[2];
 bool shared_;
 bool spawned_;
 bool initialized_ = false;
-map<hash::Any, uint64_t> *pinned_chunks_ = NULL;
+map<shash::Any, uint64_t> *pinned_chunks_ = NULL;
 int fd_lock_cachedb_;
 uint32_t protocol_revision_ = 0;
 
@@ -124,7 +124,7 @@ uint64_t seq_;  /**< Current access sequence number.  Gets increased on every
                      access/insert operation. */
 string *cache_dir_ = NULL;
 /// Maps Md5 over channel id to writeable file descriptor.
-map<hash::Md5, int> *back_channels_ = NULL;
+map<shash::Md5, int> *back_channels_ = NULL;
 
 sqlite3 *db_ = NULL;
 sqlite3_stmt *stmt_touch_ = NULL;
@@ -206,7 +206,7 @@ static void CloseReturnPipe(int pipe[2]) {
 static void BroadcastBackchannels(const string &message) {
   assert(message.length() > 0);
 
-  for (map<hash::Md5, int>::iterator i = back_channels_->begin(),
+  for (map<shash::Md5, int>::iterator i = back_channels_->begin(),
        iend = back_channels_->end(); i != iend; )
   {
     LogCvmfs(kLogQuota, kLogDebug, "broadcasting %s to %s",
@@ -221,7 +221,7 @@ static void BroadcastBackchannels(const string &message) {
       if (remove_backchannel) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
                  "removing back channel %s", i->first.ToString().c_str());
-        map<hash::Md5, int>::iterator remove_me = i;
+        map<shash::Md5, int>::iterator remove_me = i;
         ++i;
         back_channels_->erase(remove_me);
       } else {
@@ -257,8 +257,8 @@ static bool DoCleanup(const uint64_t leave_size) {
     hash_str = string(reinterpret_cast<const char *>(
                       sqlite3_column_text(stmt_lru_, 0)));
     LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
-    hash::Any hash(hash::kSha1, hash::HexPtr(
-      hash_str.substr(0, 2*hash::kDigestSizes[hash::kSha1])));
+    shash::Any hash(shash::kSha1, shash::HexPtr(
+      hash_str.substr(0, 2*shash::kDigestSizes[shash::kSha1])));
 
     // That's a critical condition.  We must not delete a not yet inserted
     // pinned file as it is already reserved (but will be inserted later).
@@ -359,7 +359,7 @@ static void ProcessCommandBunch(const unsigned num,
   assert(retval == SQLITE_OK);
 
   for (unsigned i = 0; i < num; ++i) {
-    const hash::Any hash(hash::kSha1, commands[i].digest,
+    const shash::Any hash(shash::kSha1, commands[i].digest,
                          sizeof(commands[i].digest));
     const string hash_str = hash.ToString();
     const unsigned size = commands[i].size;
@@ -458,7 +458,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
   LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
   sqlite3_soft_heap_limit(kSqliteMemPerThread);
 
-  back_channels_ = new map<hash::Md5, int>;
+  back_channels_ = new map<shash::Md5, int>;
   LruCommand command_buffer[kCommandBufferSize];
   char path_buffer[kCommandBufferSize*kMaxCvmfsPath];
   unsigned num_commands = 0;
@@ -498,8 +498,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       if (return_pipe < 0)
         continue;
 
-      const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
-                           sizeof(command_buffer[num_commands].digest));
+      const shash::Any hash(shash::kSha1, command_buffer[num_commands].digest,
+                            sizeof(command_buffer[num_commands].digest));
       const string hash_str(hash.ToString());
       LogCvmfs(kLogQuota, kLogDebug, "reserve %d bytes for %s",
                size, hash_str.c_str());
@@ -530,10 +530,10 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
       UnlinkReturnPipe(command_buffer[num_commands].return_pipe);
       Block2Nonblock(return_pipe);  // back channels are opportunistic
-      hash::Md5 hash;
+      shash::Md5 hash;
       memcpy(hash.digest, command_buffer[num_commands].digest,
-             hash::kDigestSizes[hash::kMd5]);
-      map<hash::Md5, int>::const_iterator iter = back_channels_->find(hash);
+             shash::kDigestSizes[shash::kMd5]);
+      map<shash::Md5, int>::const_iterator iter = back_channels_->find(hash);
       if (iter != back_channels_->end()) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
                  "closing left-over back channel %s", hash.ToString().c_str());
@@ -549,10 +549,10 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     }
 
     if (command_type == kUnregisterBackChannel) {
-      hash::Md5 hash;
+      shash::Md5 hash;
       memcpy(hash.digest, command_buffer[num_commands].digest,
-             hash::kDigestSizes[hash::kMd5]);
-      map<hash::Md5, int>::iterator iter = back_channels_->find(hash);
+             shash::kDigestSizes[shash::kMd5]);
+      map<shash::Md5, int>::iterator iter = back_channels_->find(hash);
       if (iter != back_channels_->end()) {
         LogCvmfs(kLogQuota, kLogDebug,
                  "closing back channel %s", hash.ToString().c_str());
@@ -567,11 +567,11 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
     // Unpinnings are also handled immediately with respect to the pinned gauge
     if (command_type == kUnpin) {
-      const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
-                           sizeof(command_buffer[num_commands].digest));
+      const shash::Any hash(shash::kSha1, command_buffer[num_commands].digest,
+                            sizeof(command_buffer[num_commands].digest));
       const string hash_str(hash.ToString());
 
-      map<hash::Any, uint64_t>::iterator iter = pinned_chunks_->find(hash);
+      map<shash::Any, uint64_t>::iterator iter = pinned_chunks_->find(hash);
       if (iter != pinned_chunks_->end()) {
         pinned_ -= iter->second;
         pinned_chunks_->erase(iter);
@@ -607,8 +607,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       sqlite3_stmt *this_stmt_list = NULL;
       switch (command_type) {
         case kRemove: {
-          const hash::Any hash(hash::kSha1, command_buffer[num_commands].digest,
-                               sizeof(command_buffer[num_commands].digest));
+          const shash::Any hash(shash::kSha1, command_buffer[num_commands].digest,
+                                sizeof(command_buffer[num_commands].digest));
           const string hash_str = hash.ToString();
           LogCvmfs(kLogQuota, kLogDebug, "manually removing %s",
                    hash_str.c_str());
@@ -701,7 +701,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
   // Unpin
   command_buffer[0].command_type = kTouch;
-  for (map<hash::Any, uint64_t>::const_iterator i = pinned_chunks_->begin(),
+  for (map<shash::Any, uint64_t>::const_iterator i = pinned_chunks_->begin(),
        iEnd = pinned_chunks_->end(); i != iEnd; ++i)
   {
     memcpy(command_buffer[0].digest, i->first.digest, i->first.GetDigestSize());
@@ -722,7 +722,7 @@ void RegisterBackChannel(int back_channel[2], const string &channel_id) {
   assert(initialized_);
 
   if ((limit_ != 0) && (protocol_revision_ >= 1)) {
-    hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
+    shash::Md5 hash = shash::Md5(shash::AsciiPtr(channel_id));
     MakeReturnPipe(back_channel);
 
     LruCommand cmd;
@@ -753,7 +753,7 @@ void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
   assert(initialized_);
 
   if ((limit_ != 0) && (protocol_revision_ >= 1)) {
-    hash::Md5 hash = hash::Md5(hash::AsciiPtr(channel_id));
+    shash::Md5 hash = shash::Md5(shash::AsciiPtr(channel_id));
 
     LruCommand cmd;
     cmd.command_type = kUnregisterBackChannel;
@@ -1274,7 +1274,7 @@ int MainCacheManager(int argc, char **argv) {
   shared_ = true;
   spawned_ = true;
   pinned_ = 0;
-  pinned_chunks_ = new map<hash::Any, uint64_t>();
+  pinned_chunks_ = new map<shash::Any, uint64_t>();
 
   // Process command line arguments
   cache_dir_ = new string(argv[2]);
@@ -1417,7 +1417,7 @@ bool Init(const string &cache_dir, const uint64_t limit,
   pinned_ = 0;
   cleanup_threshold_ = cleanup_threshold;
   cache_dir_ = new string(cache_dir);
-  pinned_chunks_ = new map<hash::Any, uint64_t>();
+  pinned_chunks_ = new map<shash::Any, uint64_t>();
 
   // Initialize cache catalog
   if (!InitDatabase(rebuild_database))
@@ -1507,7 +1507,7 @@ bool Cleanup(const uint64_t leave_size) {
 }
 
 
-static void DoInsert(const hash::Any &hash, const uint64_t size,
+static void DoInsert(const shash::Any &hash, const uint64_t size,
                      const string &cvmfs_path, const CommandType command_type)
 {
   const string hash_str = hash.ToString();
@@ -1532,7 +1532,7 @@ static void DoInsert(const hash::Any &hash, const uint64_t size,
  * Inserts a new file into cache catalog.  This file gets a new,
  * highest sequence number. Does cache cleanup if necessary.
  */
-void Insert(const hash::Any &any_hash, const uint64_t size,
+void Insert(const shash::Any &any_hash, const uint64_t size,
             const string &cvmfs_path)
 {
   assert(initialized_);
@@ -1547,7 +1547,7 @@ void Insert(const hash::Any &any_hash, const uint64_t size,
  *
  * \return True on success, false otherwise
  */
-bool Pin(const hash::Any &hash, const uint64_t size,
+bool Pin(const shash::Any &hash, const uint64_t size,
          const string &cvmfs_path, const bool is_catalog)
 {
   assert(initialized_);
@@ -1613,7 +1613,7 @@ bool Pin(const hash::Any &hash, const uint64_t size,
 }
 
 
-void Unpin(const hash::Any &hash) {
+void Unpin(const shash::Any &hash) {
   if (limit_ == 0) return;
   LogCvmfs(kLogQuota, kLogDebug, "Unpin %s", hash.ToString().c_str());
 
@@ -1627,7 +1627,7 @@ void Unpin(const hash::Any &hash) {
 /**
  * Updates the sequence number of the file specified by the hash.
  */
-void Touch(const hash::Any &hash) {
+void Touch(const shash::Any &hash) {
   assert(initialized_);
   if (limit_ == 0) return;
 
@@ -1641,7 +1641,7 @@ void Touch(const hash::Any &hash) {
 /**
  * Removes a chunk from cache, if it exists.
  */
-void Remove(const hash::Any &hash) {
+void Remove(const shash::Any &hash) {
   assert(initialized_);
   string hash_str = hash.ToString();
 

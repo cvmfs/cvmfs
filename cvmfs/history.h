@@ -30,7 +30,7 @@ struct Tag {
     channel = kChannelTrunk;
   }
 
-  Tag(const std::string &n, const hash::Any &h, const unsigned r,
+  Tag(const std::string &n, const shash::Any &h, const unsigned r,
       const time_t t, const UpdateChannel c, const std::string &d)
   {
     name = n;
@@ -50,7 +50,7 @@ struct Tag {
   }
 
   std::string name;
-  hash::Any root_hash;
+  shash::Any root_hash;
   unsigned revision;
   time_t timestamp;
   UpdateChannel channel;
@@ -107,10 +107,10 @@ class SqlTag : public sqlite::Sql {
 class TagList {
  public:
   struct ChannelTag {
-    ChannelTag(const UpdateChannel c, const hash::Any &h) :
+    ChannelTag(const UpdateChannel c, const shash::Any &h) :
       channel(c), root_hash(h) { }
     UpdateChannel channel;
-    hash::Any root_hash;
+    shash::Any root_hash;
   };
 
   enum Failures {
@@ -120,14 +120,14 @@ class TagList {
 
   bool FindTag(const std::string &name, Tag *tag);
   bool FindRevision(const unsigned revision, Tag *tag);
-  bool FindHash(const hash::Any &hash, Tag *tag);
+  bool FindHash(const shash::Any &hash, Tag *tag);
   Failures Insert(const Tag &tag);
   void Remove(const std::string &name);
   void Rollback(const unsigned until_revision);
   // Ordered list, newest releases first
   std::vector<ChannelTag> GetChannelTops();
   std::string List();
-  std::map<std::string, hash::Any> GetAllHashes();
+  std::map<std::string, shash::Any> GetAllHashes();
 
   bool Load(Database *database);
   bool Store(Database *database);

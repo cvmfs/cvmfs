@@ -17,9 +17,9 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-WritableCatalog::WritableCatalog(const string     &path,
-                                 const hash::Any  &catalog_hash,
-                                 Catalog          *parent) :
+WritableCatalog::WritableCatalog(const string      &path,
+                                 const shash::Any  &catalog_hash,
+                                 Catalog           *parent) :
   Catalog(PathString(path.data(), path.length()),
           catalog_hash,  // This is 0 for a newly created catalog!
           parent),
@@ -38,10 +38,10 @@ WritableCatalog::WritableCatalog(const string     &path,
 }
 
 
-WritableCatalog *WritableCatalog::AttachFreely(const string     &root_path,
-                                               const string     &file,
-                                               const hash::Any  &catalog_hash,
-                                                     Catalog    *parent) {
+WritableCatalog *WritableCatalog::AttachFreely(const string      &root_path,
+                                               const string      &file,
+                                               const shash::Any  &catalog_hash,
+                                                     Catalog     *parent) {
   WritableCatalog *catalog =
     new WritableCatalog(root_path, catalog_hash, parent);
   const bool successful_init = catalog->InitStandalone(file);
@@ -134,8 +134,8 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
 {
   SetDirty();
 
-  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
-  hash::Md5 parent_hash((hash::AsciiPtr(parent_path)));
+  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
+  shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry %s", entry_path.c_str());
 
@@ -158,7 +158,7 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
  * @param entry_path the full path of the DirectoryEntry to delete
  */
 void WritableCatalog::RemoveEntry(const string &file_path) {
-  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(file_path));
+  shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(file_path));
 
   DirectoryEntry entry;
   bool retval = LookupMd5Path(path_hash, &entry);
@@ -187,7 +187,7 @@ void WritableCatalog::IncLinkcount(const string &path_within_group,
 {
   SetDirty();
 
-  hash::Md5 path_hash = hash::Md5(hash::AsciiPtr(path_within_group));
+  shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(path_within_group));
 
   bool retval =
     sql_inc_linkcount_->BindPathHash(path_hash) &&
@@ -199,7 +199,7 @@ void WritableCatalog::IncLinkcount(const string &path_within_group,
 
 
 void WritableCatalog::TouchEntry(const DirectoryEntryBase &entry,
-                                 const hash::Md5 &path_hash) {
+                                 const shash::Md5 &path_hash) {
   SetDirty();
 
   bool retval =
@@ -212,7 +212,7 @@ void WritableCatalog::TouchEntry(const DirectoryEntryBase &entry,
 
 
 void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
-                                  const hash::Md5 &path_hash) {
+                                  const shash::Md5 &path_hash) {
   SetDirty();
 
   bool retval =
@@ -227,7 +227,7 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
                                    const FileChunk &chunk) {
   SetDirty();
 
-  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
+  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding chunk for %s from offset %d "
                                         "and chunk size: %d bytes",
@@ -251,7 +251,7 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
  * @param entry_path   the file path to clear from it's file chunks
  */
 void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
-  hash::Md5 path_hash((hash::AsciiPtr(entry_path)));
+  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
   bool retval;
 
   // subtract the number of chunks from the statistics counters
@@ -307,7 +307,7 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
 /**
  * Sets the content hash of the previous catalog revision.
  */
-void WritableCatalog::SetPreviousRevision(const hash::Any &hash) {
+void WritableCatalog::SetPreviousRevision(const shash::Any &hash) {
   const string sql = "INSERT OR REPLACE INTO properties "
     "(key, value) VALUES ('previous_revision', '" + hash.ToString() + "');";
   bool retval = Sql(database(), sql).Execute();
@@ -410,7 +410,7 @@ void WritableCatalog::MoveCatalogsToNested(
   for (vector<string>::const_iterator i = nested_catalogs.begin(),
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
-    hash::Any hash_nested;
+    shash::Any hash_nested;
     bool retval = FindNested(PathString(i->data(), i->length()),
                              &hash_nested);
     assert(retval);
@@ -450,7 +450,7 @@ void WritableCatalog::MoveFileChunksToNested(
  */
 void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
                                           Catalog *attached_reference,
-                                          const hash::Any content_hash)
+                                          const shash::Any content_hash)
 {
   const string sha1_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
@@ -484,7 +484,7 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
 void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                                           Catalog **attached_reference)
 {
-  hash::Any dummy;
+  shash::Any dummy;
   bool retval = FindNested(PathString(mountpoint.data(), mountpoint.length()),
                            &dummy);
   assert(retval);
@@ -516,7 +516,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
  * @param hash the hash to set the given nested catalog link to
  */
 void WritableCatalog::UpdateNestedCatalog(const string &path,
-                                          const hash::Any &hash)
+                                          const shash::Any &hash)
 {
   const string sha1_str = hash.ToString();
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 "

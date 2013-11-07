@@ -203,9 +203,9 @@ class AbstractCatalogManager {
    * Both the input as well as the output hash can be 0.
    */
   virtual LoadError LoadCatalog(const PathString &mountpoint,
-                                const hash::Any &hash,
-                                std::string *catalog_path,
-                                hash::Any   *catalog_hash) = 0;
+                                const shash::Any &hash,
+                                std::string  *catalog_path,
+                                shash::Any   *catalog_hash) = 0;
   virtual void UnloadCatalog(const Catalog *catalog) { };
   virtual void ActivateCatalog(const Catalog *catalog) { };
 
@@ -218,11 +218,11 @@ class AbstractCatalogManager {
    * @param parent_catalog  the parent of the catalog to create
    * @return a newly created (derived) Catalog
    */
-  virtual Catalog* CreateCatalog(const PathString &mountpoint,
-                                 const hash::Any  &catalog_hash,
+  virtual Catalog* CreateCatalog(const PathString  &mountpoint,
+                                 const shash::Any  &catalog_hash,
                                  Catalog *parent_catalog) = 0;
 
-  Catalog *MountCatalog(const PathString &mountpoint, const hash::Any &hash,
+  Catalog *MountCatalog(const PathString &mountpoint, const shash::Any &hash,
                         Catalog *parent_catalog);
   bool MountSubtree(const PathString &path, const Catalog *entry_point,
                     Catalog **leaf_catalog);

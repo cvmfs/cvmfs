@@ -155,12 +155,12 @@ bool Database::Create(const string &filename,
   bool retval = false;
 
   // Path hashes
-  hash::Md5 root_path_hash = hash::Md5(hash::AsciiPtr(root_path));
-  hash::Md5 root_parent_hash;
+  shash::Md5 root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
+  shash::Md5 root_parent_hash;
   if (root_path == "")
-    root_parent_hash = hash::Md5();
+    root_parent_hash = shash::Md5();
   else
-    root_parent_hash = hash::Md5(hash::AsciiPtr(GetParentPath(root_path)));
+    root_parent_hash = shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
 
   // Create the new catalog file and open it
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new catalog at '%s'",
@@ -406,12 +406,12 @@ string SqlLookup::GetFieldsToSelect(const Database &database) const {
 }
 
 
-hash::Md5 SqlLookup::GetPathHash() const {
+shash::Md5 SqlLookup::GetPathHash() const {
   return RetrieveMd5(8, 9);
 }
 
 
-hash::Md5 SqlLookup::GetParentPathHash() const {
+shash::Md5 SqlLookup::GetParentPathHash() const {
   return RetrieveMd5(10, 11);
 }
 
@@ -486,7 +486,7 @@ SqlListing::SqlListing(const Database &database) {
 }
 
 
-bool SqlListing::BindPathHash(const struct hash::Md5 &hash) {
+bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -501,7 +501,7 @@ SqlLookupPathHash::SqlLookupPathHash(const Database &database) {
   Init(database.sqlite_db(), statement);
 }
 
-bool SqlLookupPathHash::BindPathHash(const struct hash::Md5 &hash) {
+bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -552,7 +552,7 @@ bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
 }
 
 
-bool SqlDirentTouch::BindPathHash(const hash::Md5 &hash) {
+bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(9, 10, hash);
 }
 
@@ -571,10 +571,10 @@ bool SqlNestedCatalogLookup::BindSearchPath(const PathString &path) {
 }
 
 
-hash::Any SqlNestedCatalogLookup::GetContentHash() const {
+shash::Any SqlNestedCatalogLookup::GetContentHash() const {
   const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(0)));
-  return (sha1.empty()) ? hash::Any(hash::kSha1) :
-                          hash::Any(hash::kSha1, hash::HexPtr(sha1));
+  return (sha1.empty()) ? shash::Any(shash::kSha1) :
+                          shash::Any(shash::kSha1, shash::HexPtr(sha1));
 }
 
 
@@ -592,10 +592,10 @@ PathString SqlNestedCatalogListing::GetMountpoint() const {
 }
 
 
-hash::Any SqlNestedCatalogListing::GetContentHash() const {
+shash::Any SqlNestedCatalogListing::GetContentHash() const {
   const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(1)));
-  return (sha1.empty()) ? hash::Any(hash::kSha1) :
-                          hash::Any(hash::kSha1, hash::HexPtr(sha1));
+  return (sha1.empty()) ? shash::Any(shash::kSha1) :
+                          shash::Any(shash::kSha1, shash::HexPtr(sha1));
 }
 
 
@@ -614,12 +614,12 @@ SqlDirentInsert::SqlDirentInsert(const Database &database) {
 }
 
 
-bool SqlDirentInsert::BindPathHash(const hash::Md5 &hash) {
+bool SqlDirentInsert::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
 
-bool SqlDirentInsert::BindParentPathHash(const hash::Md5 &hash) {
+bool SqlDirentInsert::BindParentPathHash(const shash::Md5 &hash) {
   return BindMd5(3, 4, hash);
 }
 
@@ -647,7 +647,7 @@ SqlDirentUpdate::SqlDirentUpdate(const Database &database) {
 }
 
 
-bool SqlDirentUpdate::BindPathHash(const hash::Md5 &hash) {
+bool SqlDirentUpdate::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(11, 12, hash);
 }
 
@@ -666,7 +666,7 @@ SqlDirentUnlink::SqlDirentUnlink(const Database &database) {
        "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
-bool SqlDirentUnlink::BindPathHash(const hash::Md5 &hash) {
+bool SqlDirentUnlink::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -690,7 +690,7 @@ SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
 }
 
 
-bool SqlIncLinkcount::BindPathHash(const hash::Md5 &hash) {
+bool SqlIncLinkcount::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(2, 3, hash);
 }
 
@@ -712,7 +712,7 @@ SqlChunkInsert::SqlChunkInsert(const Database &database) {
 }
 
 
-bool SqlChunkInsert::BindPathHash(const hash::Md5 &hash) {
+bool SqlChunkInsert::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -736,7 +736,7 @@ SqlChunksRemove::SqlChunksRemove(const Database &database) {
 }
 
 
-bool SqlChunksRemove::BindPathHash(const hash::Md5 &hash) {
+bool SqlChunksRemove::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -755,7 +755,7 @@ SqlChunksListing::SqlChunksListing(const Database &database) {
 }
 
 
-bool SqlChunksListing::BindPathHash(const hash::Md5 &hash) {
+bool SqlChunksListing::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -780,7 +780,7 @@ SqlChunksCount::SqlChunksCount(const Database &database) {
 }
 
 
-bool SqlChunksCount::BindPathHash(const hash::Md5 &hash) {
+bool SqlChunksCount::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
@@ -893,7 +893,7 @@ bool SqlAllChunks::Open() {
 }
 
 
-bool SqlAllChunks::Next(hash::Any *hash, ChunkTypes *type) {
+bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
   if (FetchRow()) {
     *hash = RetrieveSha1Blob(0);
     *type = static_cast<ChunkTypes>(RetrieveInt(1));
