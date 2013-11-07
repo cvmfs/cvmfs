@@ -53,6 +53,7 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest, hash::Any *compressed_hash);
 bool CompressPath2File(const std::string &src, FILE *fdest,
                        hash::Any *compressed_hash);
 bool DecompressFile2File(FILE *fsrc, FILE *fdest);
+bool DecompressPath2File(const std::string &src, FILE *fdest);
 
 bool CompressMem2File(const unsigned char *buf, const size_t size,
                       FILE *fdest, hash::Any *compressed_hash);

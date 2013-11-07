@@ -938,26 +938,9 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString &mountpoint,
   CommitFromMem(ensemble.manifest->certificate(),
                 ensemble.cert_buf, ensemble.cert_size,
                 "certificate for " + repo_name_);
-  string newchksum_path;
-  FILE *fnewchksum = CreateTempFile(checksum_path, alien_cache_ ? 0660 : 0600,
-                                    "w", &newchksum_path);
-  if (fnewchksum != NULL) {
-    string cache_checksum =
-      ensemble.manifest->catalog_hash().ToString() +
-      "T" + StringifyInt(ensemble.manifest->publish_timestamp());
-    if (fwrite(&(cache_checksum[0]), 1, cache_checksum.length(),
-               fnewchksum) != cache_checksum.length())
-    {
-      fclose(fnewchksum);
-      unlink(newchksum_path.c_str());
-      unlink(checksum_path.c_str());
-    }
-    fclose(fnewchksum);
-    if (rename(newchksum_path.c_str(), checksum_path.c_str()) != 0) {
-      unlink(newchksum_path.c_str());
-      unlink(checksum_path.c_str());
-    }
-  } else {
+  retval = ensemble.manifest->ExportChecksum(*cache_path_,
+                                             alien_cache_ ? 0660 : 0600);
+  if (!retval) {
     unlink(checksum_path.c_str());
   }
 

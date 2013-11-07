@@ -40,6 +40,7 @@ class Manifest {
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
+  bool ExportChecksum(const std::string &directory, const int mode) const;
 
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }

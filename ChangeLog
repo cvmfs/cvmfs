@@ -1,4 +1,5 @@
 2.1.16:
+  * Experimental support for replicating into client cache
   * Experimental support for "alien cache" (CVMFS_ALIEN_CACHE)
   * Fix multiple race conditions when repositories are unmounted
     during reload

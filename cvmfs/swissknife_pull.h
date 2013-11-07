@@ -29,6 +29,8 @@ class CommandPull : public Command {
     result.push_back(Parameter('t', "timeout (s)", true, false));
     result.push_back(Parameter('a', "number of retries", true, false));
     result.push_back(Parameter('p', "pull catalog history, too", true, true));
+    result.push_back(Parameter('c', "preload cache instead of stratum 1",
+                               true, true));
     return result;
   }
   int Main(const ArgumentList &args);

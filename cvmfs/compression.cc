@@ -521,6 +521,17 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
 }
 
 
+bool DecompressPath2File(const string &src, FILE *fdest) {
+  FILE *fsrc = fopen(src.c_str(), "r");
+  if (!fsrc)
+    return false;
+
+  bool retval = DecompressFile2File(fsrc, fdest);
+  fclose(fsrc);
+  return retval;
+}
+
+
 bool CompressMem2File(const unsigned char *buf, const size_t size,
                       FILE *fdest, hash::Any *compressed_hash) {
   int z_ret, flush;

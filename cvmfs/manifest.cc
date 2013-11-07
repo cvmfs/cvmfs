@@ -209,4 +209,32 @@ bool Manifest::Export(const std::string &path) const {
   return true;
 }
 
+
+/**
+ * Writes the cvmfschecksum.$repository file.  Atomic store.
+ */
+bool Manifest::ExportChecksum(const string &directory, const int mode) const {
+  string checksum_path = MakeCanonicalPath(directory) + "/cvmfschecksum." +
+                         repository_name_;
+  string checksum_tmp_path;
+  FILE *fchksum = CreateTempFile(checksum_path, mode, "w", &checksum_tmp_path);
+  if (fchksum == NULL)
+    return false;
+  string cache_checksum = catalog_hash_.ToString() + "T" +
+                          StringifyInt(publish_timestamp_);
+  int written = fwrite(&(cache_checksum[0]), 1, cache_checksum.length(),
+                       fchksum);
+  fclose(fchksum);
+  if (static_cast<unsigned>(written) != cache_checksum.length()) {
+    unlink(checksum_tmp_path.c_str());
+    return false;
+  }
+  int retval = rename(checksum_tmp_path.c_str(), checksum_path.c_str());
+  if (retval != 0) {
+    unlink(checksum_tmp_path.c_str());
+    return false;
+  }
+  return true;
+}
+
 }  // namespace manifest
