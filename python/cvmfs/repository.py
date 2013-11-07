@@ -105,6 +105,28 @@ class LocalRepository(Repository):
 
 
 
+class RemoteRepository(Repository):
+    """ Concrete Repository implementation for a repository reachable by HTTP """
+    def __init__(self, repo_url):
+        self.url = urlparse.urlunparse(urlparse.urlparse(repo_url))
+        Repository.__init__(self)
+
+
+    def __str__(self):
+        return "<Remote Repository " + self.fqrn + " at " + self.url + ">"
+
+
+    def retrieve_file(self, file_name):
+        file_url = self.url + "/" + file_name
+        tmp_file = tempfile.NamedTemporaryFile('w+b')
+        response = urlopen(file_url)
+        tmp_file.write(response.read())
+        tmp_file.seek(0)
+        tmp_file.flush()
+        return tmp_file
+
+
+
 def all():
     d = _common._REPO_CONFIG_PATH
     if not os.path.isdir(d):
