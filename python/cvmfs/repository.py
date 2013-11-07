@@ -42,7 +42,7 @@ class FileNotFoundInRepository(Exception):
         self.file_name = file_name
 
     def __str__(self):
-        return repr(self.repo) + " - " + repr(self.file_name)
+        return repr(self.file_name)
 
 
 
@@ -127,11 +127,11 @@ class RemoteRepository(Repository):
 
 
 
-def all():
+def all_local():
     d = _common._REPO_CONFIG_PATH
     if not os.path.isdir(d):
         raise _common.CvmfsNotInstalled
-    return [ Repository(repo) for repo in os.listdir(d) if os.path.isdir(os.path.join(d, repo)) ]
+    return [ LocalRepository(repo) for repo in os.listdir(d) if os.path.isdir(os.path.join(d, repo)) ]
 
-def all_stratum0():
-    return [ repo for repo in all() if repo.type == 'stratum0' ]
+def all_local_stratum0():
+    return [ repo for repo in all_local() if repo.type == 'stratum0' ]
