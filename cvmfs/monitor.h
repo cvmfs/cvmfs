@@ -5,6 +5,7 @@
 #ifndef CVMFS_MONITOR_H_
 #define CVMFS_MONITOR_H_
 
+#include <sys/types.h>
 #include <string>
 
 namespace monitor {

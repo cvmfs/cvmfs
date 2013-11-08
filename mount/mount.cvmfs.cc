@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
   const string fqrn = MkFqrn(device);
   options::ParseDefault(fqrn);
 
-  bool retval;
+  int retval;
   int sysret;
   string cvmfs_user;
   string cachedir;
