@@ -14,11 +14,11 @@ import _common
 from manifest import Manifest
 
 class RepositoryNotFound(Exception):
-    def __init__(self, repo_fqrn):
-        self.fqrn = repo_fqrn
+    def __init__(self, repo_path):
+        self.path = repo_path
 
     def __str__(self):
-        return self.fqrn + " not found"
+        return self.path + " not found"
 
 class UnknownRepositoryType(Exception):
     def __init__(self, repo_fqrn, repo_type):
@@ -119,8 +119,11 @@ class RemoteRepository(Repository):
     def retrieve_file(self, file_name):
         file_url = self.url + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
-        response = urlopen(file_url)
-        tmp_file.write(response.read())
+        try:
+            response = urlopen(file_url)
+            tmp_file.write(response.read())
+        except HTTPError, e:
+            raise RepositoryNotFound(file_url)
         tmp_file.seek(0)
         tmp_file.flush()
         return tmp_file
