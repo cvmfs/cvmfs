@@ -90,7 +90,7 @@ class Catalog : public SingleCopy {
   friend class SqlLookup;                  // for mangled inode and uid/gid maps
   friend class swissknife::CommandMigrate; // for catalog version migration
  public:
-  static const uint64_t kDefaultTTL = 3600;  /**< 1 hour default TTL */
+  static const uint64_t kDefaultTTL = 900;  /**< 15 minutes default TTL */
 
   Catalog(const PathString  &path,
           const shash::Any   &catalog_hash,
