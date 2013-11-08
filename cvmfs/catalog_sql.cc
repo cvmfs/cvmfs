@@ -337,13 +337,28 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
       continue;
 
      expand_symlink_getenv:
-      const unsigned environ_var_length = rpar-c;
+      // Check for default value
+      const char *default_separator = c;
+      const char *default_value = rpar;
+      while (default_separator != rpar) {
+        if ((*default_separator == ':') && (*(default_separator + 1) == '=')) {
+          default_value = default_separator+2;
+          break;
+        }
+        default_separator++;
+      }
+
+      const unsigned environ_var_length = default_separator-c;
       char environ_var[environ_var_length+1];
       environ_var[environ_var_length] = '\0';
       memcpy(environ_var, c, environ_var_length);
       const char *environ_value = getenv(environ_var);  // Don't free!
-      if (environ_value)
+      if (environ_value) {
         result.Append(environ_value, strlen(environ_value));
+      } else {
+        const unsigned default_length = rpar-default_value;
+        result.Append(default_value, default_length);
+      }
       c = rpar;
       continue;
     }
@@ -419,7 +434,9 @@ shash::Md5 SqlLookup::GetParentPathHash() const {
 /**
  * This method is a friend of DirectoryEntry.
  */
-DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
+DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
+                                    const bool expand_symlink) const
+{
   DirectoryEntry result;
 
   const unsigned database_flags = RetrieveInt(5);
@@ -469,7 +486,8 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog) const {
   result.checksum_ = RetrieveSha1Blob(0);
   result.name_.Assign(name, strlen(name));
   result.symlink_.Assign(symlink, strlen(symlink));
-  ExpandSymlink(&result.symlink_);
+  if (expand_symlink)
+    ExpandSymlink(&result.symlink_);
 
   return result;
 }

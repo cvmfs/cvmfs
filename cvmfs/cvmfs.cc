@@ -1397,6 +1397,17 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   const string attr = name;
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
+  if (d.IsLink()) {
+    PathString path;
+    bool retval = GetPathForInode(ino, &path);
+    assert(retval);
+    catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
+      catalog::kLookupSole | catalog::kLookupRawSymlink);
+    catalog::DirectoryEntry raw_symlink;
+    retval = catalog_manager_->LookupPath(path, lookup_options, &raw_symlink);
+    assert(retval);
+    d.set_symlink(raw_symlink.symlink());
+  }
   remount_fence_->Leave();
 
   if (!found) {
@@ -1438,6 +1449,13 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         fclose(f);
         attribute_value = hash.ToString() + " (SHA-1)";
       }
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
+  } else if ((attr == "xfsroot.rawlink") || (attr == "user.rawlink")) {
+    if (d.IsLink()) {
+      attribute_value = d.symlink().ToString();
     } else {
       fuse_reply_err(req, ENOATTR);
       return;
@@ -1553,6 +1571,10 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
     attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
+  }
+  if (d.IsLink()) {
+    const char symlink_list[] = "xfsroot.rawlink\0user.rawlink\0";
+    attribute_list += string(symlink_list, sizeof(symlink_list)-1);
   }
 
   if (size == 0) {

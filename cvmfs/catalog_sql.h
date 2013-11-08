@@ -271,7 +271,8 @@ class SqlLookup : public SqlDirent {
    * @param catalog the catalog in which the DirectoryEntry resides
    * @return the retrieved DirectoryEntry
    */
-  DirectoryEntry GetDirent(const Catalog *catalog) const;
+  DirectoryEntry GetDirent(const Catalog *catalog,
+                           const bool expand_symlink = true) const;
 
   /**
    * DirectoryEntrys do not contain their path hash.

@@ -32,8 +32,9 @@ const unsigned kSqliteMemPerThread = 1*1024*1024;
  * Lookup a directory entry including its parent entry or not.
  */
 enum LookupOptions {
-  kLookupSole = 0,
-  kLookupFull,
+  kLookupSole        = 0x01,
+  kLookupFull        = 0x02,
+  kLookupRawSymlink  = 0x10,
 };
 
 

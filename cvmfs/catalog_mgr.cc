@@ -315,7 +315,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
            path.c_str(), best_fit->path().c_str());
 
   // Look for parent entry
-  if (options == kLookupFull) {
+  if ((options & kLookupFull) == kLookupFull) {
     assert (dirent != NULL);
 
     DirectoryEntry parent;
@@ -335,6 +335,13 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
       goto lookup_path_notfound;
     }
     dirent->set_parent_inode(parent.inode());
+  }
+
+  if ((options & kLookupRawSymlink) == kLookupRawSymlink) {
+    LinkString raw_symlink;
+    bool retval = best_fit->LookupRawSymlink(path, &raw_symlink);
+    assert(retval);  // Must be true, we have just found the entry
+    dirent->set_symlink(raw_symlink);
   }
 
   Unlock();

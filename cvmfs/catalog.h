@@ -111,6 +111,7 @@ class Catalog : public SingleCopy {
   {
     return LookupMd5Path(shash::Md5(path.GetChars(), path.GetLength()), dirent);
   }
+  bool LookupRawSymlink(const PathString &path, LinkString *raw_symlink) const;
 
   bool ListingMd5Path(const shash::Md5 &md5path,
                       DirectoryEntryList *listing) const;
@@ -213,6 +214,8 @@ class Catalog : public SingleCopy {
                           DirectoryEntry *dirent) const;
 
  private:
+  bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
+                   DirectoryEntry *dirent) const;
   Database *database_;
   pthread_mutex_t *lock_;
 

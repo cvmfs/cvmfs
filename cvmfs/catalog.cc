@@ -218,11 +218,12 @@ bool Catalog::LookupInode(const inode_t inode, DirectoryEntry *dirent,
 /**
  * Performs a lookup on this Catalog for a given MD5 path hash.
  * @param md5path the MD5 hash of the searched path
+ * @param expand_symlink indicates if variables in symlink should be resolved
  * @param dirent will be set to the found DirectoryEntry
  * @return true if DirectoryEntry was successfully found, false otherwise
  */
-bool Catalog::LookupMd5Path(const shash::Md5 &md5path,
-                            DirectoryEntry *dirent) const
+bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
+                          DirectoryEntry *dirent) const
 {
   assert(IsInitialized());
 
@@ -230,13 +231,38 @@ bool Catalog::LookupMd5Path(const shash::Md5 &md5path,
   sql_lookup_md5path_->BindPathHash(md5path);
   bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
-    *dirent = sql_lookup_md5path_->GetDirent(this);
+    *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
     FixTransitionPoint(md5path, dirent);
   }
   sql_lookup_md5path_->Reset();
   pthread_mutex_unlock(lock_);
 
   return found;
+}
+
+
+/**
+ * Performs a lookup on this Catalog for a given MD5 path hash.
+ * @param md5path the MD5 hash of the searched path
+ * @param dirent will be set to the found DirectoryEntry
+ * @return true if DirectoryEntry was successfully found, false otherwise
+ */
+bool Catalog::LookupMd5Path(const shash::Md5 &md5path,
+                            DirectoryEntry *dirent) const
+{
+  return LookupEntry(md5path, true, dirent);
+}
+
+
+bool Catalog::LookupRawSymlink(const PathString &path,
+                               LinkString *raw_symlink) const
+{
+  DirectoryEntry dirent;
+  bool result = (LookupEntry(shash::Md5(path.GetChars(), path.GetLength()),
+                             false, &dirent));
+  if (result)
+    raw_symlink->Assign(dirent.symlink());
+  return result;
 }
 
 

@@ -128,6 +128,9 @@ class DirectoryEntryBase {
     assert(linkcount > 0);
     linkcount_ = linkcount;
   }
+  inline void set_symlink(const LinkString &symlink) {
+    symlink_ = symlink;
+  }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.

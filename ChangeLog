@@ -1,4 +1,6 @@
 2.1.16:
+  * Add support for default values in variant symlinks
+  * Add support for extended attribute "rawlink"
   * Fix compile errors with Apple clang 5
   * Experimental support for replicating into client cache
   * Experimental support for "alien cache" (CVMFS_ALIEN_CACHE)
