@@ -25,7 +25,7 @@ echo "done"
 
 # allow apache access to the mounted server file system
 echo -n "setting SELinux labels for apache... "
-chcon -Rv --type=httpd_sys_content_t /srv > /dev/null || die "fail"
+sudo chcon -Rv --type=httpd_sys_content_t /srv > /dev/null || die "fail"
 echo "done"
 
 # start apache
