@@ -1,4 +1,5 @@
 2.1.16:
+  * Opportunistically clean up before loading files > 25M
   * Change default catalog TTL to 15 minutes
   * Add support for default values in variant symlinks
   * Add support for extended attribute "rawlink"

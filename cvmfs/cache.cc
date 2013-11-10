@@ -64,6 +64,8 @@ using namespace std;  // NOLINT
 
 namespace cache {
 
+uint64_t kBigFile = 25*1024*1024;  // As of 25M, a file is considered "big file"
+
 /**
  * A CallQuard object can be placed at the beginning of a function.  It counts
  * the number of so-annotated functions that are in flight.  The Drainout() call
@@ -452,6 +454,12 @@ static int Fetch(const shash::Any &checksum,
                                    "requested but only %"PRIu64" bytes free)",
              size, quota::GetMaxFileSize());
     return -ENOSPC;
+  }
+
+  // Opportunitically clean up cache for large files
+  if ((size >= kBigFile) && (quota::GetCapacity() > 0)) {
+    assert(quota::GetCapacity() >= size);
+    quota::Cleanup(quota::GetCapacity() - size);
   }
 
   // Initialize TLS
