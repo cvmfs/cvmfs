@@ -38,29 +38,31 @@ if (MACOSX)
 		PERMISSIONS		OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 	)
 
-	install (
-		FILES			keys/cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	if (INSTALL_CERN_KEYS)
+		install (
+			FILES			keys/cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
 
-  install (
-		FILES			keys/cern-it1.cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	  install (
+			FILES			keys/cern-it1.cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
 
-  install (
-		FILES			keys/cern-it2.cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	  install (
+			FILES			keys/cern-it2.cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
 
-  install (
-		FILES			keys/cern-it3.cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	  install (
+			FILES			keys/cern-it3.cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
+	endif (INSTALL_CERN_KEYS)
 else (MACOSX)
   set (CVMFS_AUTO_SOURCES
     auto.cvmfs.cc
@@ -91,27 +93,29 @@ else (MACOSX)
 		PERMISSIONS		OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 	)
 
-	install (
-		FILES			keys/cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	if (INSTALL_CERN_KEYS)
+		install (
+			FILES			keys/cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
 
-  install (
-		FILES			keys/cern-it1.cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	  install (
+			FILES			keys/cern-it1.cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
 
-  install (
-		FILES			keys/cern-it2.cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	  install (
+			FILES			keys/cern-it2.cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
 
-  install (
-		FILES			keys/cern-it3.cern.ch.pub
-		DESTINATION		"/etc/cvmfs/keys"
-		PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
-	)
+	  install (
+			FILES			keys/cern-it3.cern.ch.pub
+			DESTINATION		"/etc/cvmfs/keys"
+			PERMISSIONS		OWNER_READ GROUP_READ WORLD_READ
+		)
+	endif (INSTALL_CERN_KEYS)
 endif (MACOSX)
