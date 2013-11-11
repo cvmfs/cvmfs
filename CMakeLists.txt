@@ -64,37 +64,38 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 # check if we use Clang
 #
 if (CMAKE_CXX_COMPILER MATCHES ".*clang")
-	set(USING_CLANG 1)
+  set(USING_CLANG 1)
 endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
 #
 # provide some options to the user
 #
-option (BUILD_CVMFS "Build the CernVM-FS FUSE module" ON)
+option (BUILD_CVMFS           "Build the CernVM-FS FUSE module"                                  ON)
 if (MACOSX)
-	option (BUILD_LIBCVMFS "Build the CernVM-FS client library" OFF)
+  option (BUILD_LIBCVMFS      "Build the CernVM-FS client library"                               OFF)
 else ()
-	option (BUILD_LIBCVMFS "Build the CernVM-FS client library" ON)
+  option (BUILD_LIBCVMFS      "Build the CernVM-FS client library"                               ON)
 endif()
-option (BUILD_SERVER "Build writer's end programs" ON)
-option (BUILD_SERVER_DEBUG "Build writer's end programs with debug symbols and debug outputs" OFF)
-option (BUILD_UNITTESTS    "Build the CernVM-FS unit test set"                   OFF)
-option (INSTALL_UNITTESTS  "Install the unit test binary (mainly for packaging)" OFF)
-option (SQLITE3_BUILTIN    "Don't use system SQLite3"                            ON)
-option (LIBCURL_BUILTIN    "Don't use system libcurl"                            ON)
-option (ZLIB_BUILTIN       "Don't use system zlib"                               ON)
-option (SPARSEHASH_BUILTIN "Don't use system installation of google sparse hash" ON)
-option (LEVELDB_BUILTIN    "Don't use system leveldb"                            ON)
-option (TBB_PRIVATE_LIB    "Compile our own TBB shared libraries"                ON)
-option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin" ON)
+option (BUILD_SERVER          "Build writer's end programs"                                      ON)
+option (BUILD_SERVER_DEBUG    "Build writer's end programs with debug symbols and debug outputs" OFF)
+option (BUILD_UNITTESTS       "Build the CernVM-FS unit test set"                                OFF)
+option (INSTALL_UNITTESTS     "Install the unit test binary (mainly for packaging)"              OFF)
+option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
+option (INSTALL_CERN_KEYS     "Install CERN specific public key chain"                           ON)
+option (SQLITE3_BUILTIN       "Don't use system SQLite3"                                         ON)
+option (LIBCURL_BUILTIN       "Don't use system libcurl"                                         ON)
+option (ZLIB_BUILTIN          "Don't use system zlib"                                            ON)
+option (SPARSEHASH_BUILTIN    "Don't use system installation of google sparse hash"              ON)
+option (LEVELDB_BUILTIN       "Don't use system leveldb"                                         ON)
+option (TBB_PRIVATE_LIB       "Compile our own TBB shared libraries"                             ON)
 
 #
 # set name of fuse library (-losxfuse for osxfuse)
 #
 if (MACOSX)
-	set(LIBFUSE osxfuse)
+  set(LIBFUSE osxfuse)
 else (MACOSX)
-	set(LIBFUSE fuse)
+  set(LIBFUSE fuse)
 endif(MACOSX)
 
 #
@@ -124,12 +125,12 @@ file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
 #
 
 if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
-	message (STATUS "running bootstrap.sh ...")
-	execute_process (
+  message (STATUS "running bootstrap.sh ...")
+  execute_process (
     COMMAND           sh ${CMAKE_SOURCE_DIR}/bootstrap.sh ${EXTERNALS_BUILD_LOCATION}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     RESULT_VARIABLE   BOOTSTRAPPING_RESULT
-	)
+  )
   if (BOOTSTRAPPING_RESULT GREATER 0)
     message (FATAL_ERROR "bootstrapping failed")
   endif (BOOTSTRAPPING_RESULT GREATER 0)
@@ -146,8 +147,8 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwi
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT FALSE)
   set (CVMFS_INSTALL_LIBDIR "lib")
-	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
-	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
 else (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT TRUE)
   if (NOT DEBIAN)
@@ -164,8 +165,8 @@ if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
 endif (NOT DEFINED CMAKE_INSTALL_LIBDIR)
 
 if (NOT USING_CLANG)
-	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
-	set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
+  set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
 endif (NOT USING_CLANG)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
@@ -217,8 +218,8 @@ look_for_include_files (${REQUIRED_HEADERS})
 # configure the config.h.in file
 #
 configure_file (
-	"${CMAKE_SOURCE_DIR}/config_cmake.h.in"
-	"${CMAKE_BINARY_DIR}/cvmfs_config.h"
+  "${CMAKE_SOURCE_DIR}/config_cmake.h.in"
+  "${CMAKE_BINARY_DIR}/cvmfs_config.h"
 )
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 
@@ -318,24 +319,24 @@ include_directories (${INCLUDE_DIRECTORIES})
 add_subdirectory (cvmfs)
 
 if (INSTALL_MOUNT_SCRIPTS)
-	add_subdirectory (mount)
+  add_subdirectory (mount)
 endif (INSTALL_MOUNT_SCRIPTS)
 
 #
 # compile the unit tests
 #
 if (BUILD_UNITTESTS)
-	enable_testing ()
-	add_subdirectory (test/unittests)
+  enable_testing ()
+  add_subdirectory (test/unittests)
 endif (BUILD_UNITTESTS)
 
 #
 # Documentation
 #
 install (
-		FILES                   README AUTHORS ChangeLog COPYING
-		DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
-		PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
+    FILES                   README AUTHORS ChangeLog COPYING
+    DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
+    PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
         )
 
 #
