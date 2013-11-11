@@ -19,7 +19,7 @@ export DH_VERBOSE=1
 
 Makefile: 
 	dh_testdir
-	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr
+	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_CERN_KEYS=no -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr
 
 build: build-stamp
 build-stamp: Makefile
@@ -39,7 +39,7 @@ clean:
 debian/%.install: debian/%.install.in
 	sed "s/@CVMFS_VERSION@/$(shell dpkg-parsechangelog | sed -n -e 's/^Version: \([0-9]\.[0-9]\.[0-9][0-9]*\).*/\1/p')/g" $< > $@
 
-install: build debian/cvmfs.install debian/cvmfs-keys.install debian/cvmfs-server.install debian/cvmfs-unittests.install
+install: build debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-unittests.install
 	dh_testdir
 	dh_testroot
 	dh_prep
