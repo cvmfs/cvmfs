@@ -1,0 +1,17 @@
+
+Copyright:
+
+    Copyright (c) 2013, CERN.
+
+License:
+
+    Distributed unter the BSD License.
+
+The Debian packaging is:
+
+    Copyright (C) 2013 Jakob Blomer <jblomer@cern.ch>
+
+You are free to distribute this software under the terms of
+the BSD License.
+On Debian systems, the complete text of the BSD License can be 
+found in the file `/usr/share/common-licenses/BSD'.
