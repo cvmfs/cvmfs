@@ -62,7 +62,7 @@ class Manifest:
         elif key_char == "N":
             self.repository_name  = data
         elif key_char == "L":
-            self.unknown_field1   = data # TODO: ask Jakob what L means
+            self.micro_catalog    = data
         else:
             raise UnknownManifestField(key_char)
 
