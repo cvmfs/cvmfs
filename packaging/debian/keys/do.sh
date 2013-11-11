@@ -34,8 +34,7 @@ cp -R $srctree/* ${workdir}/tmp
 echo "done"
 
 echo -n "initializing build environment... "
-mkdir ${workdir}/src/cvmfs.orig ${workdir}/src/cvmfs
-cp -R $srctree/* ${workdir}/src/cvmfs.orig
+mkdir ${workdir}/src/cvmfs
 cp -R $srctree/* ${workdir}/src/cvmfs
 mkdir ${workdir}/src/cvmfs/debian
 cp -R ${workdir}/tmp/packaging/debian/keys/* ${workdir}/src/cvmfs/debian
