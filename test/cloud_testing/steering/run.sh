@@ -32,7 +32,6 @@ testee_url=""
 platform=""
 platform_run_script=""
 platform_setup_script=""
-source_tarball=""
 ec2_config="ec2_config.sh"
 ami_name=""
 log_destination="."
@@ -42,6 +41,7 @@ server_package=""
 client_package=""
 keys_package=""
 unittest_package=""
+source_tarball="source.tar.gz" # will be prepended by ${testee_url} later
 
 # global variables (get filled by spawn_virtual_machine)
 ip_address=""
@@ -68,7 +68,6 @@ usage() {
   echo "Mandatory options:"
   echo " -u <testee URL>            URL to the nightly build directory to be tested"
   echo " -p <platform name>         name of the platform to be tested"
-  echo " -t <cvmfs source tarball>  CernVM-FS sources containing associated tests"
   echo " -b <setup script>          platform specific setup script (inside the tarball)"
   echo " -r <run script>            platform specific test script (inside the tarball)"
   echo " -a <AMI name>              the virtual machine image to spawn"
@@ -355,7 +354,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:u:p:t:e:a:d:" option; do
+while getopts "r:b:u:p:e:a:d:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -368,9 +367,6 @@ while getopts "r:b:u:p:t:e:a:d:" option; do
       ;;
     p)
       platform=$OPTARG
-      ;;
-    t)
-      source_tarball=$OPTARG
       ;;
     e)
       ec2_config=$OPTARG
@@ -393,7 +389,6 @@ if [ x$platform_run_script   = "x" ] ||
    [ x$platform_setup_script = "x" ] ||
    [ x$platform              = "x" ] ||
    [ x$testee_url            = "x" ] ||
-   [ x$source_tarball        = "x" ] ||
    [ x$ami_name              = "x" ]; then
   usage "Missing parameter(s)"
 fi
@@ -417,6 +412,7 @@ client_package="${testee_url}/${client_package}"
 server_package="${testee_url}/${server_package}"
 unittest_package="${testee_url}/${unittest_package}"
 keys_package="${keys_package_base_url}/${keys_package}"
+source_tarball="${testee_url}/${source_tarball}"
 
 # load EC2 configuration
 . $ec2_config
