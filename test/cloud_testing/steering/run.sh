@@ -101,6 +101,66 @@ check_timeout() {
 }
 
 
+# Reads the package map produced by the nightly build process to map supported
+# platforms to their associated packages.
+# pkgmap-format (ini-style):
+#     [<platform name>]
+#     client=<url to client package>
+#     server=<url to server package>
+#     ...=...
+#     [<next package name]
+#     ...=...
+#
+# @param pkgmap_url    URL where to find the package map file
+# @param platform      the platform name to be searched for
+# @param package       the package to be retrieved from the pkgmap
+# @return              0 on success (queried package URL through stdout)
+read_package_map() {
+  local pkgmap_url=$1
+  local platform=$2
+  local package=$3
+  local pkgmap_path
+
+  local platform_found=0
+  local package_url=""
+
+  # download the package map
+  pkgmap_path=$(basename $pkgmap_url)
+  wget --no-check-certificate --quiet $pkgmap_url 2>/dev/null || return 1
+
+  for line in $(cat $pkgmap_path); do
+    # search the desired platform
+    if [ $platform_found -eq 0 ] && [ x"$line" = x"[$platform]" ]; then
+      platform_found=1
+      continue
+    fi
+
+    # when the platform was found, look for the desired package name
+    if [ $platform_found -eq 1 ]; then
+      # if the next platform starts, we didn't find the desired package
+      if echo "$line" | grep -q -e '^\[.*\]$'; then
+        break
+      fi
+
+      # check for desired package name and possibly return successfully
+      if [ x"$(echo "$line" | cut -d= -f1)" = x"$package" ]; then
+        package_url=$(echo "$line" | cut -d= -f2)
+        break
+      fi
+    fi
+  done
+
+  # remove the downloaded pkgmap and check if the desired package URL was found
+  rm -f $pkgmap_path > /dev/null 2>&1
+  if [ x"$package_url" != x"" ]; then
+    echo "$package_url"
+    return 0
+  else
+    return 2
+  fi
+}
+
+
 spawn_virtual_machine() {
   local ami=$1
 
