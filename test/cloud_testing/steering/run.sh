@@ -118,16 +118,11 @@ read_package_map() {
   local pkgmap_url=$1
   local platform=$2
   local package=$3
-  local pkgmap_path
 
   local platform_found=0
   local package_url=""
 
-  # download the package map
-  pkgmap_path=$(basename $pkgmap_url)
-  wget --no-check-certificate --quiet $pkgmap_url 2>/dev/null || return 1
-
-  for line in $(cat $pkgmap_path); do
+  for line in $(wget --no-check-certificate --quiet --output-document=- $pkgmap_url); do
     # search the desired platform
     if [ $platform_found -eq 0 ] && [ x"$line" = x"[$platform]" ]; then
       platform_found=1
@@ -149,8 +144,7 @@ read_package_map() {
     fi
   done
 
-  # remove the downloaded pkgmap and check if the desired package URL was found
-  rm -f $pkgmap_path > /dev/null 2>&1
+  # check if the desired package URL was found
   if [ x"$package_url" != x"" ]; then
     echo "$package_url"
     return 0
