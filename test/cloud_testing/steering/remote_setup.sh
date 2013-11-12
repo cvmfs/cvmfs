@@ -164,7 +164,7 @@ source_tarball=$(readlink --canonicalize $(basename $source_tarball))
 unittest_package=$(readlink --canonicalize $(basename $unittest_package))
 
 # extract the source tarball
-extract_location=$(basename $source_tarball .tar.gz | sed 's/_/-/')
+extract_location=$(tar -tzf $source_tar | head -n1)
 echo -n "extracting the CernVM-FS source file into $extract_location... "
 tar_output=$(tar -xzf $source_tarball)
 if [ $? -ne 0 ] || [ ! -d $extract_location ]; then
