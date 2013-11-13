@@ -1,0 +1,5 @@
+cvmfs-keys (1.4-1) lucid; urgency=low
+
+  * Initial release.
+
+ -- Rene Meusel <rene.meusel@cern.ch>  Mon, 11 Nov 2013 14:55:33 +0000
