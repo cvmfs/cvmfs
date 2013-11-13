@@ -612,6 +612,8 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
  */
 bool AddGroup2Persona(const gid_t gid) {
   int ngroups = getgroups(0, NULL);
+  if (ngroups < 0)
+    return false;
   gid_t *groups = static_cast<gid_t *>(smalloc((ngroups+1) * sizeof(gid_t)));
   int retval = getgroups(ngroups, groups);
   if (retval < 0) {
@@ -622,7 +624,7 @@ bool AddGroup2Persona(const gid_t gid) {
     if (groups[i] == gid)
       return true;
   }
-  groups[ngroups-1] = gid;
+  groups[ngroups] = gid;
   retval = setgroups(ngroups+1, groups);
   free(groups);
   return retval == 0;
