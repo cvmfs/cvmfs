@@ -36,5 +36,7 @@ echo "done"
 
 # install test dependencies
 echo "installing test dependencies..."
-install_from_repo gcc  || die "fail (installing gcc)"
-install_from_repo make || die "fail (installing make)"
+install_from_repo gcc                           || die "fail (installing gcc)"
+install_from_repo make                          || die "fail (installing make)"
+install_from_repo sqlite3                       || die "fail (installing sqlite3)"
+install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
