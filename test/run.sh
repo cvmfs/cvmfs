@@ -190,5 +190,6 @@ echo "Skipped:  $num_skipped"
 echo "Passed:   $num_passed"
 echo "Warnings: $num_warnings"
 echo "Failures: $num_failures"
+echo ""
 
 exit $num_failures
