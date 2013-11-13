@@ -40,3 +40,8 @@ install_from_repo gcc                           || die "fail (installing gcc)"
 install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
 install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
+
+# setting up the AUFS kernel module
+echo -n "loading AUFS kernel module..."
+sudo modprobe aufs || die "fail"
+echo "done"
