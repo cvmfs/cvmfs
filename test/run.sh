@@ -36,6 +36,7 @@ export TEST_ROOT
 
 num_tests=0
 num_skipped=0
+num_passed=0
 num_failures=0
 num_warnings=0
 
@@ -54,6 +55,11 @@ report_warning() {
   local message="$1"
   echo $message
   num_warnings=$(($num_warnings+1))
+}
+report_passed() {
+  local message="$1"
+  echo $message
+  num_passed=$(($num_passed+1))
 }
 report_skipped() {
   local message="$1"
@@ -154,6 +160,7 @@ do
   case $RETVAL in
     0)
       sudo rm -rf "$workdir" >> $logfile
+      report_passed "Test passed" >> $logfile
       echo "OK"
       ;;
     $CVMFS_MEMORY_WARNING)
@@ -180,6 +187,7 @@ echo "Finished test suite" >> $logfile
 echo ""
 echo "Tests:    $num_tests"
 echo "Skipped:  $num_skipped"
+echo "Passed:   $num_passed"
 echo "Warnings: $num_warnings"
 echo "Failures: $num_failures"
 
