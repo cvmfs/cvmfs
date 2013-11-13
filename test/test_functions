@@ -369,7 +369,7 @@ create_filled_repo() {
 }
 
 
-# generates a huge dummy repository content with 2.500.000 directory entries
+# generates a huge dummy repository content with 500.000 directory entries
 # in a somewhat representative directory structure
 #
 # @param  repo_dir   where to put the dummy dirents
