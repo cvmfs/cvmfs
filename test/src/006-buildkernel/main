@@ -10,10 +10,11 @@ cvmfs_run_test() {
 
   rm -rf $outdir
   cd /cvmfs/sft.cern.ch/lcg/external/experimental/linux
-  ./compileKernel.sh 2.6.32.57 $outdir 8 || return 2
-  ./compileKernel.sh 2.6.32.57 $outdir 8 || return 3
+  echo "writing kernel compile output to build_kernel.log"
+  ./compileKernel.sh 2.6.32.57 $outdir 8 >> build_kernel.log || return 2
+  ./compileKernel.sh 2.6.32.57 $outdir 8 >> build_kernel.log || return 3
   sudo cvmfs_talk -i sft.cern.ch cleanup 0 || return 4
-  ./compileKernel.sh 2.6.32.57 $outdir 8 || return 5
+  ./compileKernel.sh 2.6.32.57 $outdir 8 >> build_kernel.log || return 5
 
   ps aux | grep cvmfs2 | grep sft.cern.ch
   check_memory sft.cern.ch 50000
