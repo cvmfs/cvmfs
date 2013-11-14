@@ -131,11 +131,6 @@ cp %{SOURCE1} SELinux
 %endif
 
 %build
-%ifarch x86_64
-%else
-export CFLAGS="-march=i686"
-export CXXFLAGS="-march=i686"
-%endif
 %if 0%{?suse_version}
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
@@ -313,6 +308,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Thu Nov 14 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16
+- Fixes for ARM builds
 * Tue Jun 04 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.12
 - Add cvmfs_swissknife_debug binary
 - Add cvmfs-unittests package
@@ -333,9 +330,9 @@ fi
 - Compatibility fixes for OpenSuSE
 * Mon Feb 20 2012 Jakob Blomer <jblomer@cern.ch>
 - Brought selinux back into main package
-* Fri Feb 18 2012 Jakob Blomer <jblomer@cern.ch>
+* Sat Feb 18 2012 Jakob Blomer <jblomer@cern.ch>
 - Included Brian's latest changes: group creation bug fixes, selinux as sub package
-* Wed Feb 16 2012 Jakob Blomer <jblomer@cern.ch>
+* Thu Feb 16 2012 Jakob Blomer <jblomer@cern.ch>
 - SuSE compatibility, disabled SELinux for SuSE
 * Wed Feb 15 2012 Jakob Blomer <jblomer@cern.ch>
 - Small adjustments to run with continueous integration
