@@ -51,7 +51,7 @@ void BackoffThrottle::Throttle() {
   time_t now = time(NULL);
 
   pthread_mutex_lock(lock_);
-  if (now - last_throttle_ < reset_after_ms_/1000) {
+  if (unsigned(now - last_throttle_) < reset_after_ms_/1000) {
     if (delay_range_ < max_delay_ms_) {
       if (delay_range_ == 0)
         delay_range_ = init_delay_ms_;
