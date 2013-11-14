@@ -14,15 +14,14 @@ cvmfs_run_test() {
 
   local repo="atlas.cern.ch"
 
-  echo "restarting autofs"
-  autofs_switch off || return 10
-  autofs_switch on  || return 11
-
   echo "trying to mount $repo first"
   cvmfs_mount $repo || return 1
 
+  echo "check if the repo is listable"
+  ls /cvmfs/$repo || return 2
+
   echo "unmounting and cleaning"
-  cvmfs_clean || return 2
+  cvmfs_clean || return 3
 
   echo "trying to mount again with unreachable DNS"
   local seconds
@@ -32,6 +31,9 @@ cvmfs_run_test() {
     echo "timeout was too long: $seconds (expected at most 5)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
+
+  echo "check if repo is _not_ listable"
+  ls /cvmfs/$repo && return 4
 
   return 0
 }
