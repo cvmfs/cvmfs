@@ -17,6 +17,9 @@ cvmfs_run_test() {
   echo "trying to mount $repo first"
   cvmfs_mount $repo || return 1
 
+  echo "check if the repo is listable"
+  ls /cvmfs/$repo || return 2
+
   echo "unmounting and cleaning"
   cvmfs_clean || return 2
 
@@ -28,6 +31,9 @@ cvmfs_run_test() {
     echo "timeout was too long: $seconds (expected at most 5)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
+
+  echo "check if repo is _not_ listable"
+  ls /cvmfs/$repo && return 4
 
   return 0
 }
