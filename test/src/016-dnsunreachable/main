@@ -21,7 +21,7 @@ cvmfs_run_test() {
   ls /cvmfs/$repo || return 2
 
   echo "unmounting and cleaning"
-  cvmfs_clean || return 2
+  cvmfs_clean || return 3
 
   echo "trying to mount again with unreachable DNS"
   local seconds
