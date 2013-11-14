@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
   vector<string> mount_options;
 
   // Option parsing
-  char c;
+  int c;
   while ((c = getopt(argc, argv, "vfnho:")) != -1) {
     switch (c) {
       case 'f':

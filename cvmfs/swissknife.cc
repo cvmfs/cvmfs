@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
         if (!params[j].switch_only())
           option_string.push_back(':');
       }
-      char c;
+      int c;
       while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
         bool valid_option = false;
         for (unsigned j = 0; j < params.size(); ++j) {

@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
   atomic_init32(&g_modified_cache);
   g_current_dir = new string();
 
-  char c;
+  int c;
   while ((c = getopt(argc, argv, "hvpfj:")) != -1) {
     switch (c) {
       case 'h':
