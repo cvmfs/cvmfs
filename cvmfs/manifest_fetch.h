@@ -45,14 +45,15 @@ enum Failures {
 struct ManifestEnsemble {
   ManifestEnsemble() {
     manifest = NULL;
-    raw_manifest_buf = cert_buf = whitelist_buf = NULL;
-    raw_manifest_size = cert_size = whitelist_size = 0;
+    raw_manifest_buf = cert_buf = whitelist_buf = whitelist_pkcs7_buf = NULL;
+    raw_manifest_size = cert_size = whitelist_size = whitelist_pkcs7_size = 0;
   }
   virtual ~ManifestEnsemble() {
     delete manifest;
     if (raw_manifest_buf) free(raw_manifest_buf);
     if (cert_buf) free(cert_buf);
     if (whitelist_buf) free(whitelist_buf);
+    if (whitelist_pkcs7_buf) free(whitelist_pkcs7_buf);
   }
   // Can be overwritte to fetch certificate from cache
   virtual void FetchCertificate(const shash::Any &hash) { }
@@ -61,9 +62,11 @@ struct ManifestEnsemble {
   unsigned char *raw_manifest_buf;
   unsigned char *cert_buf;
   unsigned char *whitelist_buf;
+  unsigned char *whitelist_pkcs7_buf;
   unsigned raw_manifest_size;
   unsigned cert_size;
   unsigned whitelist_size;
+  unsigned whitelist_pkcs7_size;
 };
 
 
