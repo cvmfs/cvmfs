@@ -363,7 +363,10 @@ class T_FileProcessing : public FileSandbox {
   void TestProcessFiles(const std::vector<std::string> &file_pathes,
                         const ExpectedHashStrings      &reference_hash_strings,
                         const bool                      use_chunking = true) {
-    upload::FileProcessor processor(&uploader_, use_chunking);
+    upload::FileProcessor processor(&uploader_, use_chunking,
+                                    MockUploader::min_chunk_size,
+                                    MockUploader::avg_chunk_size,
+                                    MockUploader::max_chunk_size);
 
     std::vector<std::string>::const_iterator i    = file_pathes.begin();
     std::vector<std::string>::const_iterator iend = file_pathes.end();
@@ -436,7 +439,10 @@ class T_FileProcessing : public FileSandbox {
 
 
 TEST_F(T_FileProcessing, Initialize) {
-  upload::FileProcessor processor(&uploader_, true);
+  upload::FileProcessor processor(&uploader_, true,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
   processor.WaitForProcessing();
 }
 
@@ -535,7 +541,10 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunking) {
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWaves) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(&uploader_, use_chunking);
+  upload::FileProcessor processor(&uploader_, use_chunking,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
 
   // first wave...
   processor.Process(GetEmptyFile(), true);
@@ -588,7 +597,10 @@ FileChunkList CallbackTest::result_chunk_list;
 
 TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(&uploader_, use_chunking);
+  upload::FileProcessor processor(&uploader_, use_chunking,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
   processor.Process(GetSmallFile(), true, "T");
@@ -605,7 +617,10 @@ TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
 
 TEST_F(T_FileProcessing, ProcessingCallbackForBigFile) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(&uploader_, use_chunking);
+  upload::FileProcessor processor(&uploader_, use_chunking,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
   processor.Process(GetBigFile(), true, "T");
