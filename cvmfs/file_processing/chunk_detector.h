@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <vector>
 #include <sys/types.h>
+#include <gtest/gtest_prod.h>
 
 #include "char_buffer.h"
 
@@ -87,6 +88,8 @@ class StaticOffsetDetector : public ChunkDetector {
  *     Dissertation of Dipl.-Ing. Kendy Kutzner - 14. Februar 2008
  */
 class Xor32Detector : public ChunkDetector {
+  FRIEND_TEST(T_ChunkDetectors, Xor32);
+
  protected:
   typedef std::pair<size_t, uint32_t> Threshold;
   typedef std::vector<Threshold> Thresholds;
@@ -117,7 +120,7 @@ class Xor32Detector : public ChunkDetector {
     return ChunkDetector::NoCut(offset);
   }
 
-  inline void xor32(const char byte) {
+  inline void xor32(const unsigned char byte) {
     xor32_ = (xor32_ << 1) ^ byte;
   }
 
