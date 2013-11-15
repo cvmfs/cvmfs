@@ -96,6 +96,70 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetector) {
 }
 
 
+TEST_F(T_ChunkDetectors, Xor32) {
+  Xor32Detector xor32_detector(1, 2, 4); // chunk sizes are not important here!
+
+  // table of test data:
+  //   <input value> , <expected xor32 value>
+  const uint32_t value_count = 96;
+  uint32_t values[value_count] = {
+      5u,          5u,
+    255u,        245u,
+      0u,        490u,
+     32u,       1012u,
+     27u,       2035u,
+     11u,       4077u,
+     87u,       8077u,
+    128u,      16282u,
+    127u,      32587u,
+    224u,      65142u,
+     63u,     130259u,
+     11u,     260525u,
+      1u,     521051u,
+    103u,    1042129u,
+     73u,    2084331u,
+     22u,    4168640u,
+    235u,    8337259u,
+     17u,   16674503u,
+      3u,   33349005u,
+     90u,   66698048u,
+    210u,  133396050u,
+    163u,  266791943u,
+     12u,  533583874u,
+     79u, 1067167819u,
+     53u, 2134335651u,
+      2u, 4268671300u,
+    100u, 4242375404u,
+    193u, 4189783321u,
+     64u, 4084599410u,
+    242u, 3874231318u,
+     14u, 3453495330u,
+    111u, 2612023339u,
+     83u,  929079301u,
+    253u, 1858158839u,
+    207u, 3716317473u,
+    172u, 3137667822u,
+     62u, 1980368354u,
+    190u, 3960736634u,
+    114u, 3626505862u,
+     39u, 2958044459u,
+      6u, 1621121616u,
+    175u, 3242243087u,
+     93u, 2189518915u,
+    238u,   84070504u,
+    184u,  168140904u,
+     84u,  336281732u,
+     29u,  672563477u,
+    200u, 1345127138u
+  };
+
+  for (unsigned int i = 0; i < value_count; i+=2) {
+    xor32_detector.xor32(static_cast<unsigned char>(values[i]));
+    EXPECT_EQ (values[i+1], xor32_detector.xor32_);
+  }
+}
+
+
 TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
   const size_t base = 512000;
   const size_t min_chk_size = base;
