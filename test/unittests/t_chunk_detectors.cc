@@ -5,6 +5,8 @@
 #include "../../cvmfs/file_processing/char_buffer.h"
 #include "../../cvmfs/prng.h"
 
+namespace upload {
+
 class T_ChunkDetectors : public ::testing::Test {
  protected:
   void CreateBuffers(const size_t buffer_size) {
@@ -19,7 +21,7 @@ class T_ChunkDetectors : public ::testing::Test {
     // produce some test data
     size_t i = 0;
     while (i < full_size) {
-      upload::CharBuffer * buffer = new upload::CharBuffer(buffer_size);
+      CharBuffer * buffer = new CharBuffer(buffer_size);
       buffer->SetUsedBytes(std::min(full_size - i, buffer_size));
       buffer->SetBaseOffset(i);
 
@@ -47,7 +49,7 @@ class T_ChunkDetectors : public ::testing::Test {
   }
 
  protected:
-  typedef std::vector<upload::CharBuffer*> Buffers;
+  typedef std::vector<CharBuffer*> Buffers;
   Buffers buffers_;
 
  private:
@@ -57,11 +59,11 @@ class T_ChunkDetectors : public ::testing::Test {
 TEST_F(T_ChunkDetectors, StaticOffsetChunkDetector) {
   const size_t static_chunk_size = 1024;
 
-  upload::StaticOffsetDetector static_offset_detector(static_chunk_size);
+  StaticOffsetDetector static_offset_detector(static_chunk_size);
   EXPECT_FALSE (static_offset_detector.MightFindChunks(static_chunk_size));
   EXPECT_TRUE  (static_offset_detector.MightFindChunks(static_chunk_size + 1));
 
-  upload::CharBuffer buffer(static_chunk_size);
+  CharBuffer buffer(static_chunk_size);
   buffer.SetUsedBytes(static_chunk_size / 2);
 
   off_t next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
@@ -99,7 +101,7 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
   const size_t min_chk_size = base;
   const size_t avg_chk_size = base * 2;
   const size_t max_chk_size = base * 4;
-  upload::Xor32Detector xor32_detector(min_chk_size,
+  Xor32Detector xor32_detector(min_chk_size,
                                        avg_chk_size,
                                        max_chk_size);
 
@@ -143,7 +145,7 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
 
     // go through all the buffers and check if the chunker produces the
     // expected results
-    upload::Xor32Detector detector(base, base * 2, base * 4);
+    Xor32Detector detector(base, base * 2, base * 4);
     off_t next_cut = 0;
     off_t last_cut = 0;
     int   cut      = 0;
@@ -183,3 +185,5 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
     }
   }
 }
+
+} // namespace
