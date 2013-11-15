@@ -214,8 +214,11 @@ class T_FileProcessing : public FileSandbox {
 
   ExpectedHashStrings GetBigFileChunkHashes() const {
     ExpectedHashStrings h;
-    h.push_back(std::make_pair("eef05f8b57bfd1178e761e1ea4cf02d0409e5a63", "P"));
-    h.push_back(std::make_pair("aa965b9d3c790713320a9358c09ab2d1819d35e3", "P"));
+    h.push_back(std::make_pair("b1ed4a3c29df719de4e29d8afe0e16f968226a8e", "P"));
+    h.push_back(std::make_pair("fdc1bc2795cac33e9ff61f0c1c5f1815498362f6", "P"));
+    h.push_back(std::make_pair("b928e5935b6a35278a81f9f859b13d3e83d88052", "P"));
+    h.push_back(std::make_pair("bbd189584d78de0ad603ef5a7de3f770ab0bf3f8", "P"));
+    h.push_back(std::make_pair("c8b7e7c3595244afe1cd946e4fd90ecbea34967f", "P"));
     return h;
   }
 
@@ -225,30 +228,114 @@ class T_FileProcessing : public FileSandbox {
 
   ExpectedHashStrings GetHugeFileChunkHashes() const {
     ExpectedHashStrings h;
-    h.push_back(std::make_pair("4bee676ffd0d311db73eba75e4a465436e966601", "P"));
-    h.push_back(std::make_pair("0c4e853758b11d4056d9271a436124fcd2044bc5", "P"));
-    h.push_back(std::make_pair("f81e89aefef730e31d1ede44bed1041766e592ac", "P"));
-    h.push_back(std::make_pair("5bddaa73a861157f77b07e334514517370601760", "P"));
-    h.push_back(std::make_pair("b005701a6f772e92a68927dd1a07bd6de928deee", "P"));
-    h.push_back(std::make_pair("aeb08953ac450f250f95acdedae5f4858f7abf43", "P"));
-    h.push_back(std::make_pair("ec4610784f80d2f2522c37f134d22dfa10d39da6", "P"));
-    h.push_back(std::make_pair("c2b5ebc14c405c9787c6e16a66d0a28b73cae833", "P"));
-    h.push_back(std::make_pair("daba9e1c983c65ef9a23043ee376c145d61ccc1b", "P"));
-    h.push_back(std::make_pair("e287f1bff654cb4a83b29ea08813e2c1bd285f2e", "P"));
-    h.push_back(std::make_pair("bb9455534f5d9bbb642033fcdeb61e12c63aeb7f", "P"));
-    h.push_back(std::make_pair("101361a4995d5cfbd37401f57f45227c1da4145a", "P"));
-    h.push_back(std::make_pair("ad56161c6884a81e3fa7e0b2496e8ddbcaff457a", "P"));
-    h.push_back(std::make_pair("be9873d23f880799e74c0bc55fa0619de073d31c", "P"));
-    h.push_back(std::make_pair("b7b8996e8a5e537bd22fa3a16040910089455036", "P"));
-    h.push_back(std::make_pair("5b086558e63c486efe951af118deee3b78132246", "P"));
-    h.push_back(std::make_pair("1acc092c0cae7cf86cb7cbce0b0faf3df72ecb8b", "P"));
-    h.push_back(std::make_pair("be48464ac14395321c71c000d25c3835a6dbfed1", "P"));
-    h.push_back(std::make_pair("c3a18c087b2c42bc9fa4e307fb5dbb13a6aaceb2", "P"));
-    h.push_back(std::make_pair("bc8cf85e6d29e05b90dac42ce0bc474ea92648e5", "P"));
-    h.push_back(std::make_pair("89065b8f67172f07ff0b794cfc975b1bc0520794", "P"));
-    h.push_back(std::make_pair("ce2d607984eabad83acb3242b8f43c8f51337871", "P"));
-    h.push_back(std::make_pair("5dd076bf24590b966ebf29f252ac119fad80face", "P"));
-    h.push_back(std::make_pair("c79d08a1689889ef064774c4c3d2ef3378a69ff6", "P"));
+    h.push_back(std::make_pair("5f59af1e046b05e512102c598a644feaafb7a103", "P"));
+    h.push_back(std::make_pair("d898735fc27d1e5d081f0b6ad3cf0f7d71978304", "P"));
+    h.push_back(std::make_pair("e1c43da8ce10d6039c86755d30036625342ddbac", "P"));
+    h.push_back(std::make_pair("94e8266eb774a2107b14883751206bda7f4913dd", "P"));
+    h.push_back(std::make_pair("1218cd9840f03b4ab3c0ed58cf78fc39c93db320", "P"));
+    h.push_back(std::make_pair("4ad2b87e457e1fb4ab88aa88bfd7ebce9c5ca227", "P"));
+    h.push_back(std::make_pair("59ec5f1a966d16e4f20b60c92f530331eeb76056", "P"));
+    h.push_back(std::make_pair("e297fa139a837d7b9de1f21efc024dd7cedd9f99", "P"));
+    h.push_back(std::make_pair("8a0f8511afc80eb0382b5e454ccdd847751ca914", "P"));
+    h.push_back(std::make_pair("78e6966a426088eeaea9c8221b4bcf785bf6a1fd", "P"));
+    h.push_back(std::make_pair("bd12e4a53157393ac2636922a89f979edc0444a2", "P"));
+    h.push_back(std::make_pair("94d9a6ef192885c2880f4bd717c5e6fd1b322bd6", "P"));
+    h.push_back(std::make_pair("91da9fafce3a1b791e473519d0330f10f43959ed", "P"));
+    h.push_back(std::make_pair("f82dd934989b99dcb9c7b3e77eed2da89d852543", "P"));
+    h.push_back(std::make_pair("ce23d12cf133a9b4eb36a2222c18919248c83222", "P"));
+    h.push_back(std::make_pair("9eab18a2c6d7c38a381e5650324c832d80128375", "P"));
+    h.push_back(std::make_pair("da8aa7fc16c2c8eba6990acea79d7527505ac85d", "P"));
+    h.push_back(std::make_pair("7777fcaceae803568c25e3b028dbc78601264c23", "P"));
+    h.push_back(std::make_pair("e8d21488e822a5ca7c4fa01ddb90020d46ce254a", "P"));
+    h.push_back(std::make_pair("cc2adf011cd610c1a54f6978c179d112d046f8c8", "P"));
+    h.push_back(std::make_pair("6cfe6ccf9dbd967ccc41b6ea02c5c4ac55e4acec", "P"));
+    h.push_back(std::make_pair("7f920c74a0c0ed6e6e7e0461d2bae024de71fd35", "P"));
+    h.push_back(std::make_pair("89c04af09410412e94094a2643e4d075f0c9b5ea", "P"));
+    h.push_back(std::make_pair("b43ff42f85c61d593c2ec623dc33b4e2ed5186a1", "P"));
+    h.push_back(std::make_pair("5edf0d35f748aa7889965268691215a895bf20dd", "P"));
+    h.push_back(std::make_pair("6bc191d38680aa3826a034ef85858b598072f2cd", "P"));
+    h.push_back(std::make_pair("a86aef847fb57e9d97116a48ea96b4bc595abcf0", "P"));
+    h.push_back(std::make_pair("477f0c4bedbdb6ad6378395a6630a5b51ba83faf", "P"));
+    h.push_back(std::make_pair("53b0f1f1b48084122e826c472a6bcdcc27469c76", "P"));
+    h.push_back(std::make_pair("a01bda9eacbb0e3e907a2d42e31fb834e4813786", "P"));
+    h.push_back(std::make_pair("5861c8f0d79eba277df8f234af61ff0ed630ce0a", "P"));
+    h.push_back(std::make_pair("622dbca4284a718566e1800e7fe3143818ce82a2", "P"));
+    h.push_back(std::make_pair("08ee0ecd11badd592fae70be2a463c00967e7ad2", "P"));
+    h.push_back(std::make_pair("e18299d4b826792453b553950c9881cf1e32518f", "P"));
+    h.push_back(std::make_pair("da6c557d7c4c0ca5cd52e607c08af51fc2932917", "P"));
+    h.push_back(std::make_pair("0c9ae2edbb9e211603d88152fc6da09bbd3fb5a3", "P"));
+    h.push_back(std::make_pair("621b6408362964c9975350c48e9df98c68ca37b4", "P"));
+    h.push_back(std::make_pair("1b2fd0513bf738b6c3784c7211ccf253d1fdd7b4", "P"));
+    h.push_back(std::make_pair("2c9c414a94a32ea61f87dd76444f2704b3025efb", "P"));
+    h.push_back(std::make_pair("f215b9ddcf6a614e1c71e533bf1bcd1130902776", "P"));
+    h.push_back(std::make_pair("340bf76ed5f34a1147ec57018c70387d275a66ed", "P"));
+    h.push_back(std::make_pair("26ea7c4bb725f778bc771a156d981e2dd7edab50", "P"));
+    h.push_back(std::make_pair("a381169605b795e5b5991acc3f019cb9cd3f1727", "P"));
+    h.push_back(std::make_pair("8c82806ce94a753e4282bbc733ffd47ac3e70306", "P"));
+    h.push_back(std::make_pair("96d88b72077b4907a2308a1b9dbb0ef4299c933a", "P"));
+    h.push_back(std::make_pair("d7e927f1c74f5e7819b789b003437a52485699a6", "P"));
+    h.push_back(std::make_pair("336455de0b6a008cb252dfe93edfcea8069d75c2", "P"));
+    h.push_back(std::make_pair("88a8eefb5383ec676870338b3dbe394e80f7b0de", "P"));
+    h.push_back(std::make_pair("2bc320860bd3b1fc0fb2df3a03cd7d2daf2cc177", "P"));
+    h.push_back(std::make_pair("91ded4765294a9b7e34d06f57a5a5a9a21b1ee64", "P"));
+    h.push_back(std::make_pair("beadda974fd09806ea7776e0295f498851351269", "P"));
+    h.push_back(std::make_pair("78ddd560f249dd79a3f86eeae9adb2c5eb4635df", "P"));
+    h.push_back(std::make_pair("653d3026a54e48cb6d2010e1a388eef0a37a6180", "P"));
+    h.push_back(std::make_pair("1ab877f51016f832391fcae1ea251a0ce61fb1b6", "P"));
+    h.push_back(std::make_pair("7260fdc231aa9819b0f1861cd1e1345f50875c10", "P"));
+    h.push_back(std::make_pair("8bc6f847e0607ecd753c5e08d0bee639c5b9447b", "P"));
+    h.push_back(std::make_pair("9836e4237e0b6630f1b0450ec065ae3b658318e8", "P"));
+    h.push_back(std::make_pair("358c0b5ce237578d238c0ec11f109462213c12fa", "P"));
+    h.push_back(std::make_pair("36b4b6d69cdca800cc814ad40a3fcea1aff6c6a3", "P"));
+    h.push_back(std::make_pair("e012ac32f8d8d5ed9a6a5a92564d21fd4d03dcc4", "P"));
+    h.push_back(std::make_pair("60a3c4c2c5df7cc4010158e243d023b7525602f2", "P"));
+    h.push_back(std::make_pair("e990ca08098bb8bdbf291a397f9338d18f9db554", "P"));
+    h.push_back(std::make_pair("74109700ec3804bf3616c9d80e6acf0c9f8fe4ee", "P"));
+    h.push_back(std::make_pair("bb002635ba0690f911f81a6f63dd00a5ad5f25ae", "P"));
+    h.push_back(std::make_pair("b9db553972a21d0f856a508e235f65e6693e342e", "P"));
+    h.push_back(std::make_pair("d35bda0cd389113d45bf264dbafd62e3b5b2cbf6", "P"));
+    h.push_back(std::make_pair("93b15e04be918f4fc8eafe1e9bb7922902637ab0", "P"));
+    h.push_back(std::make_pair("04286a3d861abe0d411ea6139f2529d87c2d03bd", "P"));
+    h.push_back(std::make_pair("23c5706471c2228f5be3c5e1a6a1cfbc9b8f1258", "P"));
+    h.push_back(std::make_pair("b810304158612ca13b87e9bcb842b25e07ed2e6e", "P"));
+    h.push_back(std::make_pair("88d1bb0deef7f878868172d2e8a51a400d70895e", "P"));
+    h.push_back(std::make_pair("1394b54a1c998a3ef08e49b4b3b0549ab8c31530", "P"));
+    h.push_back(std::make_pair("e29edd5049e47fb04327c8f569c7906247169f85", "P"));
+    h.push_back(std::make_pair("5cc73345f165b16c6bcb1cc812505459399ec371", "P"));
+    h.push_back(std::make_pair("bc954f87b62a96e0c8d245fe0120e5e019ba8564", "P"));
+    h.push_back(std::make_pair("34a58e8dfd9f29c8b6a21bed281bd0ac31cb1a22", "P"));
+    h.push_back(std::make_pair("9616141471575586fb2e2a37aa0669b3bae3ff12", "P"));
+    h.push_back(std::make_pair("ff03320fe5d23a55c1d7d9e840576454a5678a6f", "P"));
+    h.push_back(std::make_pair("26a4926e3bfef1cc3ec5b57058566409d4b24e7c", "P"));
+    h.push_back(std::make_pair("6ebeb7e0fbda3807fe41c36c3410a66fb9c7d12e", "P"));
+    h.push_back(std::make_pair("feb29285ecaf1bff2765b93c3bcdd6d767677876", "P"));
+    h.push_back(std::make_pair("47f39515f0752b7b709c69198525f56a787521b3", "P"));
+    h.push_back(std::make_pair("8cedc81fa643344a02d97396c96ff1f53594f15e", "P"));
+    h.push_back(std::make_pair("0b0bb1adfc98cb59b6188e5ce15b4f80ce13ff05", "P"));
+    h.push_back(std::make_pair("04eca4afa27e11ca22f65b1a9860701828cde7ef", "P"));
+    h.push_back(std::make_pair("b89bab0c79d131c902b152759749d91d1d607429", "P"));
+    h.push_back(std::make_pair("95a5c16a9d8d2d75377f5aaca8cca8a7a6ba45e5", "P"));
+    h.push_back(std::make_pair("0469f502c017cbd062b36ab362e1a55ef2a43bd5", "P"));
+    h.push_back(std::make_pair("966f9289f379be2596d99d5df3732c013bbe0ebf", "P"));
+    h.push_back(std::make_pair("94bd02bd9f74af14f0bd38013e410fe122d7aafb", "P"));
+    h.push_back(std::make_pair("f58c84765e26f488a7a764dc264173d3151b533e", "P"));
+    h.push_back(std::make_pair("bea982f20a74d304a356c68dc871ea81f621c69e", "P"));
+    h.push_back(std::make_pair("5be00fd3e8ea277520672a7007aa13730ad0943d", "P"));
+    h.push_back(std::make_pair("43216bc79ea767943103866b222938ec424f93d8", "P"));
+    h.push_back(std::make_pair("aa4c65b5bb52f072e0aeafc2a6e2e4731dafb1c5", "P"));
+    h.push_back(std::make_pair("f8b737ce0f65549dbe03f0a26741e277a7afbd49", "P"));
+    h.push_back(std::make_pair("1c0d64d7282ecd21faf5bf83170d651c45105deb", "P"));
+    h.push_back(std::make_pair("89c8ced4578651823580f3778a7b122e8fdcb044", "P"));
+    h.push_back(std::make_pair("8259a641794f51c4e23d788222f30223f14e355b", "P"));
+    h.push_back(std::make_pair("b52db5fdb938e535b5a4d34e5347aed97f537c4a", "P"));
+    h.push_back(std::make_pair("9883edacdb12fbe68935d51050fd03d403164e53", "P"));
+    h.push_back(std::make_pair("04b1ea7fce402d7a7e9ae70c830d1e19748e2eb4", "P"));
+    h.push_back(std::make_pair("f9cff039047aa2ac3de1c86bd42b6a6dc263c15b", "P"));
+    h.push_back(std::make_pair("457e220a21765f851851a0e51d567d797390a9b1", "P"));
+    h.push_back(std::make_pair("a686de7b0e34aa3203c315b6cb6c6f20dc673b09", "P"));
+    h.push_back(std::make_pair("4d0a49e9d41a974003e756bee9529858703f78b5", "P"));
+    h.push_back(std::make_pair("7efc06549b4b427a712c4d92d6038840358cf098", "P"));
+    h.push_back(std::make_pair("39edd8ce508240e59a82b206c18a724483349d62", "P"));
     return h;
   }
 
@@ -276,7 +363,10 @@ class T_FileProcessing : public FileSandbox {
   void TestProcessFiles(const std::vector<std::string> &file_pathes,
                         const ExpectedHashStrings      &reference_hash_strings,
                         const bool                      use_chunking = true) {
-    upload::FileProcessor processor(&uploader_, use_chunking);
+    upload::FileProcessor processor(&uploader_, use_chunking,
+                                    MockUploader::min_chunk_size,
+                                    MockUploader::avg_chunk_size,
+                                    MockUploader::max_chunk_size);
 
     std::vector<std::string>::const_iterator i    = file_pathes.begin();
     std::vector<std::string>::const_iterator iend = file_pathes.end();
@@ -349,7 +439,10 @@ class T_FileProcessing : public FileSandbox {
 
 
 TEST_F(T_FileProcessing, Initialize) {
-  upload::FileProcessor processor(&uploader_, true);
+  upload::FileProcessor processor(&uploader_, true,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
   processor.WaitForProcessing();
 }
 
@@ -448,7 +541,10 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunking) {
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWaves) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(&uploader_, use_chunking);
+  upload::FileProcessor processor(&uploader_, use_chunking,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
 
   // first wave...
   processor.Process(GetEmptyFile(), true);
@@ -501,7 +597,10 @@ FileChunkList CallbackTest::result_chunk_list;
 
 TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(&uploader_, use_chunking);
+  upload::FileProcessor processor(&uploader_, use_chunking,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
   processor.Process(GetSmallFile(), true, "T");
@@ -518,7 +617,10 @@ TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
 
 TEST_F(T_FileProcessing, ProcessingCallbackForBigFile) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(&uploader_, use_chunking);
+  upload::FileProcessor processor(&uploader_, use_chunking,
+                                  MockUploader::min_chunk_size,
+                                  MockUploader::avg_chunk_size,
+                                  MockUploader::max_chunk_size);
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
   processor.Process(GetBigFile(), true, "T");
