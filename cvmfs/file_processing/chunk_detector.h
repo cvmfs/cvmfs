@@ -120,7 +120,7 @@ class Xor32Detector : public ChunkDetector {
     return ChunkDetector::NoCut(offset);
   }
 
-  inline void xor32(const char byte) {
+  inline void xor32(const unsigned char byte) {
     xor32_ = (xor32_ << 1) ^ byte;
   }
 
