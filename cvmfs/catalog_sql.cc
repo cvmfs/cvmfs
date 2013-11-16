@@ -341,7 +341,7 @@ void SqlDirent::ExpandSymlink(LinkString *raw_symlink) const {
       const char *default_separator = c;
       const char *default_value = rpar;
       while (default_separator != rpar) {
-        if ((*default_separator == ':') && (*(default_separator + 1) == '=')) {
+        if ((*default_separator == ':') && (*(default_separator + 1) == '-')) {
           default_value = default_separator+2;
           break;
         }
