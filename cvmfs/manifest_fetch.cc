@@ -19,19 +19,26 @@ using namespace std;  // NOLINT
 
 namespace manifest {
 
+enum WhitelistValidity {
+  kWlInvalid,
+  kWlVerifyLetter,
+  kWlVerifyPkcs7,
+};
+
 /**
  * Checks whether the fingerprint of the loaded PEM certificate is listed on the
  * whitelist stored in a memory chunk.
  */
-static bool VerifyWhitelist(const unsigned char *whitelist,
-                            const unsigned whitelist_size,
-                            const string &expected_repository,
-                            signature::SignatureManager *signature_manager)
+static WhitelistValidity VerifyWhitelist(
+  const unsigned char *whitelist,
+  const unsigned whitelist_size,
+  const string &expected_repository,
+  signature::SignatureManager *signature_manager)
 {
   const string fingerprint = signature_manager->FingerprintCertificate();
   if (fingerprint == "") {
     LogCvmfs(kLogSignature, kLogDebug, "invalid fingerprint");
-    return false;
+    return kWlInvalid;
   }
   LogCvmfs(kLogSignature, kLogDebug,
            "checking certificate with fingerprint %s against whitelist",
@@ -40,12 +47,13 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
   time_t local_timestamp = time(NULL);
   string line;
   unsigned payload_bytes = 0;
+  bool verify_pkcs7 = false;
 
   // Check timestamp (UTC), ignore issue date (legacy)
   line = GetLineMem(reinterpret_cast<const char *>(whitelist), whitelist_size);
   if (line.length() != 14) {
     LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
-    return false;
+    return kWlInvalid;
   }
   payload_bytes += 15;
 
@@ -54,7 +62,7 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
                     whitelist_size-payload_bytes);
   if (line.length() != 15) {
     LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
-    return false;
+    return kWlInvalid;
   }
   struct tm tm_wl;
   memset(&tm_wl, 0, sizeof(struct tm));
@@ -69,14 +77,14 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
            StringifyTime(timestamp, false).c_str());
   if (timestamp < 0) {
     LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp");
-    return false;
+    return kWlInvalid;
   }
   LogCvmfs(kLogSignature, kLogDebug,  "local time: %s",
            StringifyTime(local_timestamp, true).c_str());
   if (local_timestamp > timestamp) {
     LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
              "whitelist lifetime verification failed, expired");
-    return false;
+    return kWlInvalid;
   }
   payload_bytes += 16;
 
@@ -88,26 +96,37 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
              "repository name on the whitelist does not match "
              "(found %s, expected %s)",
              line.c_str(), expected_repository.c_str());
-    return false;
+    return kWlInvalid;
   }
   payload_bytes += line.length() + 1;
+
+  // Check for PKCS7
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
+                    whitelist_size-payload_bytes);
+  if (line == "PKCS7") {
+    LogCvmfs(kLogSignature, kLogDebug, "whitelist verification: PKCS7");
+    verify_pkcs7 = true;
+    payload_bytes += line.length() + 1;
+    line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
+                      whitelist_size-payload_bytes);
+  }
 
   // Search the fingerprint
   bool found = false;
   do {
-    line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                      whitelist_size-payload_bytes);
     if (line == "--") break;
     if (line.substr(0, 59) == fingerprint)
       found = true;
+    line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
+                      whitelist_size-payload_bytes);
     payload_bytes += line.length() + 1;
   } while (payload_bytes < whitelist_size);
   payload_bytes += line.length() + 1;
 
   if (!found) {
-    LogCvmfs(kLogSignature, kLogDebug,
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
              "the certificate's fingerprint is not on the whitelist");
-    return false;
+    return kWlInvalid;
   }
 
   // Check local blacklist
@@ -117,11 +136,11 @@ static bool VerifyWhitelist(const unsigned char *whitelist,
     if (blacklisted_certificates[i].substr(0, 59) == fingerprint) {
       LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
                "blacklisted fingerprint (%s)", fingerprint.c_str());
-      return false;
+      return kWlInvalid;
     }
   }
 
-  return true;
+  return verify_pkcs7 ? kWlVerifyPkcs7 : kWlVerifyLetter;
 }
 
 
@@ -144,6 +163,9 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
   const string whitelist_url = base_url + string("/.cvmfswhitelist");
   download::JobInfo download_whitelist(&whitelist_url, false, probe_hosts, NULL);
+  const string whitelist_pkcs7_url = whitelist_url + string(".pkcs7");
+  download::JobInfo download_whitelist_pkcs7(
+    &whitelist_pkcs7_url, false, probe_hosts, NULL);
   shash::Any certificate_hash;
   string certificate_url = base_url + "/data";  // rest is in manifest
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
@@ -228,21 +250,41 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   ensemble->whitelist_buf =
     reinterpret_cast<unsigned char *>(download_whitelist.destination_mem.data);
   ensemble->whitelist_size = download_whitelist.destination_mem.size;
-  retval = signature_manager->VerifyLetter(ensemble->whitelist_buf,
-                                           ensemble->whitelist_size, true);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "failed to verify repository whitelist");
-    result = kFailBadWhitelist;
-    goto cleanup;
-  }
+
   retval = VerifyWhitelist(ensemble->whitelist_buf, ensemble->whitelist_size,
                            repository_name, signature_manager);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "failed to verify repository certificate against whitelist");
-    result = kFailBadWhitelist;
-    goto cleanup;
+  switch (retval) {
+    case kWlInvalid:
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "failed to verify repository certificate against whitelist");
+      result = kFailBadWhitelist;
+      goto cleanup;
+    case kWlVerifyLetter:
+      retval = signature_manager->VerifyLetter(ensemble->whitelist_buf,
+                                               ensemble->whitelist_size, true);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+                 "failed to verify repository whitelist");
+        result = kFailBadWhitelist;
+        goto cleanup;
+      }
+      break;
+    case kWlVerifyPkcs7:
+      // Load the separate whitelist signature as well
+      retval = download_manager->Fetch(&download_whitelist_pkcs7);
+      if (retval != download::kFailOk) {
+        result = kFailLoad;
+        goto cleanup;
+      }
+      ensemble->whitelist_pkcs7_buf =
+        reinterpret_cast<unsigned char *>(
+          download_whitelist_pkcs7.destination_mem.data);
+      ensemble->whitelist_pkcs7_size =
+        download_whitelist_pkcs7.destination_mem.size;
+      // TODO: verify
+      break;
+    default:
+      abort();
   }
 
   return kFailOk;
@@ -253,12 +295,15 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   if (ensemble->raw_manifest_buf) free(ensemble->raw_manifest_buf);
   if (ensemble->cert_buf) free(ensemble->cert_buf);
   if (ensemble->whitelist_buf) free(ensemble->whitelist_buf);
+  if (ensemble->whitelist_pkcs7_buf) free(ensemble->whitelist_pkcs7_buf);
   ensemble->raw_manifest_buf = NULL;
   ensemble->cert_buf = NULL;
   ensemble->whitelist_buf = NULL;
+  ensemble->whitelist_pkcs7_buf = NULL;
   ensemble->raw_manifest_size = 0;
   ensemble->cert_size = 0;
   ensemble->whitelist_size = 0;
+  ensemble->whitelist_pkcs7_size = 0;
   return result;
 }
 

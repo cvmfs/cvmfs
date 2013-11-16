@@ -40,7 +40,7 @@ enum Failures {
 
 /**
  * A manifest requires the certificate and the whitelist to be verified.
- * All three are an ensemble.
+ * All three (for with the pkcs7 signature of the whitelist) are an ensemble.
  */
 struct ManifestEnsemble {
   ManifestEnsemble() {
