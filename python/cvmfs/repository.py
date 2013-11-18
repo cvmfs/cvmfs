@@ -8,7 +8,7 @@ This file is part of the CernVM File System auxiliary tools.
 import os
 import urlparse
 import tempfile
-from urllib2 import urlopen, URLError, HTTPError
+import requests
 
 import _common
 from manifest import Manifest
@@ -49,9 +49,12 @@ class FileNotFoundInRepository(Exception):
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
     def __init__(self):
-        with self.retrieve_file(_common._MANIFEST_NAME) as manifest_file:
-            self.manifest = Manifest(manifest_file)
-        self.fqrn = self.manifest.repository_name
+        try:
+            with self.retrieve_file(_common._MANIFEST_NAME) as manifest_file:
+                self.manifest = Manifest(manifest_file)
+            self.fqrn = self.manifest.repository_name
+        except FileNotFoundInRepository, e:
+            raise RepositoryNotFound(self._storage_location)
 
 
     def retrieve_file(self, file_name):
@@ -108,7 +111,7 @@ class LocalRepository(Repository):
 class RemoteRepository(Repository):
     """ Concrete Repository implementation for a repository reachable by HTTP """
     def __init__(self, repo_url):
-        self.url = urlparse.urlunparse(urlparse.urlparse(repo_url))
+        self._storage_location = urlparse.urlunparse(urlparse.urlparse(repo_url))
         Repository.__init__(self)
 
 
@@ -117,13 +120,12 @@ class RemoteRepository(Repository):
 
 
     def retrieve_file(self, file_name):
-        file_url = self.url + "/" + file_name
+        file_url = self._storage_location + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
-        try:
-            response = urlopen(file_url)
-            tmp_file.write(response.read())
-        except HTTPError, e:
-            raise RepositoryNotFound(file_url)
+        response = requests.get(file_url)
+        if response.status_code != requests.codes.ok:
+            raise FileNotFoundInRepository(self, file_url)
+        tmp_file.write(response.content)
         tmp_file.seek(0)
         tmp_file.flush()
         return tmp_file
