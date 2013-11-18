@@ -113,10 +113,35 @@ class RemoteRepository(Repository):
     def __init__(self, repo_url):
         self._storage_location = urlparse.urlunparse(urlparse.urlparse(repo_url))
         Repository.__init__(self)
+        if self.has_rest_api():
+            self._get_repo_information()
+        print self.has_rest_api()
 
 
     def __str__(self):
         return "<Remote Repository " + self.fqrn + " at " + self.url + ">"
+
+
+    def _get_rest_url(self, method_name):
+        return "/".join((self._storage_location,
+                         _common._REST_CONNECTOR,
+                         method_name))
+
+
+    def has_rest_api(self):
+        if not hasattr(self, '_rest_api'):
+            api_url = self._get_rest_url('status')
+            response = requests.head(api_url)
+            self._has_rest_api = (response.status_code == requests.codes.ok)
+        return self._has_rest_api
+
+
+    def _get_repo_information(self):
+        api_url = self._get_rest_url('info')
+        response = requests.get(api_url)
+        response.raise_for_status()
+        data = response.json()
+        print data
 
 
     def retrieve_file(self, file_name):
