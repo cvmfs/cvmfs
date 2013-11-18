@@ -9,6 +9,8 @@ import os
 import urlparse
 import tempfile
 import requests
+import time
+import datetime
 
 import _common
 from manifest import Manifest
@@ -49,12 +51,30 @@ class FileNotFoundInRepository(Exception):
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
     def __init__(self):
+        self._read_manifest()
+        if self.type == 'stratum1':
+            self._get_last_snapshot_timestamp()
+            print self.last_snapshot
+
+
+    def _read_manifest(self):
         try:
             with self.retrieve_file(_common._MANIFEST_NAME) as manifest_file:
                 self.manifest = Manifest(manifest_file)
             self.fqrn = self.manifest.repository_name
         except FileNotFoundInRepository, e:
             raise RepositoryNotFound(self._storage_location)
+
+
+    def _get_last_snapshot_timestamp(self):
+        try:
+            with self.retrieve_file(_common._LAST_SNAPSHOT_NAME) as snap_file:
+                line        = snap_file.readline()
+                time_struct = time.strptime(line, '%a %b %d %H:%M:%S %Z %Y\n')
+                timestamp   = time.mktime(time_struct)
+                self.last_snapshot = datetime.datetime.fromtimestamp(timestamp)
+        except FileNotFoundInRepository, e:
+            pass
 
 
     def retrieve_file(self, file_name):
@@ -112,10 +132,9 @@ class RemoteRepository(Repository):
     """ Concrete Repository implementation for a repository reachable by HTTP """
     def __init__(self, repo_url):
         self._storage_location = urlparse.urlunparse(urlparse.urlparse(repo_url))
-        Repository.__init__(self)
         if self.has_rest_api():
             self._get_repo_information()
-        print self.has_rest_api()
+        Repository.__init__(self)
 
 
     def __str__(self):
@@ -141,7 +160,7 @@ class RemoteRepository(Repository):
         response = requests.get(api_url)
         response.raise_for_status()
         data = response.json()
-        print data
+        self.type = data['type']
 
 
     def retrieve_file(self, file_name):
