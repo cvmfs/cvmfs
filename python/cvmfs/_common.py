@@ -8,7 +8,10 @@ This file is part of the CernVM File System auxiliary tools.
 _REPO_CONFIG_PATH   = "/etc/cvmfs/repositories.d"
 _SERVER_CONFIG_NAME = "server.conf"
 
+_REST_CONNECTOR     = "control"
+
 _MANIFEST_NAME      = ".cvmfspublished"
+_LAST_SNAPSHOT_NAME = ".cvmfs_last_snapshot"
 
 
 class CvmfsNotInstalled(Exception):
