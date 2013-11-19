@@ -50,6 +50,46 @@ class Lockable : SingleCopy {
 // -----------------------------------------------------------------------------
 //
 
+/**
+ * Used to allow for static polymorphism in the RAII template to statically
+ * decide which 'lock' functions to use, if we have more than one possiblity.
+ * (I.e. Read/Write locks)
+ * Note: Static Polymorphism - Strategy Pattern
+ *
+ * TODO: eventually replace this by C++11 typed enum
+ */
+struct _RAII_Polymorphism {
+  enum T {
+    None,
+    ReadLock,
+    WriteLock
+  };
+};
+
+
+/**
+ * Basic template wrapper class for any kind of RAII-like behavior.
+ * The user is supposed to provide a template specialization of Enter() and
+ * Leave(). On creation of the RAII object it will call Enter() respectively
+ * Leave() on destruction. The gold standard example is a LockGard (see below).
+ *
+ * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
+ */
+template <typename T, _RAII_Polymorphism::T P = _RAII_Polymorphism::None>
+class RAII : SingleCopy {
+ public:
+  inline RAII(T &object) : ref_(object)  { Enter(); }
+  inline RAII(T *object) : ref_(*object) { Enter(); }
+  inline ~RAII()                         { Leave(); }
+
+ protected:
+  inline void Enter() { ref_.Lock();   }
+  inline void Leave() { ref_.Unlock(); }
+
+ private:
+  T &ref_;
+};
+
 
 /**
  * This is a simple scoped lock implementation. Every object that provides the
@@ -60,95 +100,45 @@ class Lockable : SingleCopy {
  * the LockGuard runs out of scope it will automatically release the lock. This
  * ensures a clean unlock in a lot of situations!
  *
- * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
+ * TODO: C++11 replace this by a type alias to RAII
  */
 template <typename LockableT>
-class LockGuard : SingleCopy {
+class LockGuard : public RAII<LockableT> {
  public:
-  inline LockGuard(const LockableT &lock) :
-    ref_(lock) { ref_.Lock(); }
-  inline LockGuard(const LockableT *lock) :
-    ref_(*lock) { ref_.Lock(); }
-  inline ~LockGuard() { ref_.Unlock(); }
-
- private:
-  const LockableT &ref_;
+  inline LockGuard(LockableT &object) : RAII<LockableT>(object) {}
+  inline LockGuard(LockableT *object) : RAII<LockableT>(object) {}
 };
 
-/**
- * Used to allow for static polymorphism in the LockGuardAdapter to statically
- * decide which lock functions to use, if we have more than one possiblity.
- * (I.e. Read/Write locks)
- *
- * TODO: eventually replace this by C++11 typed enum
- */
-struct _LGA_Polymorphism {
-  enum T {
-    None,
-    ReadLock,
-    WriteLock
-  };
-};
 
-/**
- * Wraps lockable objects that do not conform to the Lock()/Unlock() interface
- * but use something different. For example pthread_mutex_t can be used with our
- * LockGuard template by the help of this little adapter template
- *
- * Additionally this adapter allows for static (say: compile time) polymorphism
- * to allow the use locks with multiple lock functions (i.e. pthread_rwlock_t)
- *
- * In order to implement new locking capabilities simply specialize the template
- * for your lock type and provide the needed adapter.
- */
-template <typename T,
-          _LGA_Polymorphism::T polymorph = _LGA_Polymorphism::None>
-class LockGuardAdapter : SingleCopy {
- public:
-  inline LockGuardAdapter(T &lock) : ref_(&lock) {};
-  inline LockGuardAdapter(T *lock) : ref_(lock)  {};
-  inline void Lock() const;
-  inline void Unlock() const;
+template <>
+inline void RAII<pthread_mutex_t>::Enter() { pthread_mutex_lock(&ref_);   }
+template <>
+inline void RAII<pthread_mutex_t>::Leave() { pthread_mutex_unlock(&ref_); }
+typedef RAII<pthread_mutex_t> MutexLockGuard;
 
- private:
-  mutable T *ref_;
-};
 
-template <> /// Locks a pthread_mutex_t
-inline void LockGuardAdapter<pthread_mutex_t>::Lock() const {
-  pthread_mutex_lock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::ReadLock>::Enter() {
+  pthread_rwlock_rdlock(&ref_);
 }
-template <> /// Unlocks a pthread_mutex_t
-inline void LockGuardAdapter<pthread_mutex_t>::Unlock() const {
-  pthread_mutex_unlock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::ReadLock>::Leave() {
+  pthread_rwlock_unlock(&ref_);
 }
-template <> /// Read-Locks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::ReadLock>::Lock() const {
-  pthread_rwlock_rdlock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::WriteLock>::Enter() {
+  pthread_rwlock_wrlock(&ref_);
 }
-template <> /// Read-Unlocks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::ReadLock>::Unlock() const {
-  pthread_rwlock_unlock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::WriteLock>::Leave() {
+  pthread_rwlock_unlock(&ref_);
 }
-template <> /// Write-Locks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::WriteLock>::Lock() const {
-  pthread_rwlock_wrlock(ref_);
-}
-template <> /// Read-Unlocks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::WriteLock>::Unlock() const {
-  pthread_rwlock_unlock(ref_);
-}
-
-// convenience typedefs to use special locks with the LockGuard template
-typedef LockGuard<LockGuardAdapter<pthread_mutex_t> > MutexLockGuard;
-typedef LockGuard<LockGuardAdapter<pthread_rwlock_t,
-                                   _LGA_Polymorphism::ReadLock> > ReadLockGuard;
-typedef LockGuard<LockGuardAdapter<pthread_rwlock_t,
-                                   _LGA_Polymorphism::WriteLock> > WriteLockGuard;
+typedef RAII<pthread_rwlock_t, _RAII_Polymorphism::ReadLock>  ReadLockGuard;
+typedef RAII<pthread_rwlock_t, _RAII_Polymorphism::WriteLock> WriteLockGuard;
 
 
 //
