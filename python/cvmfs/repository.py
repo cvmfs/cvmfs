@@ -13,6 +13,7 @@ import time
 import datetime
 
 import _common
+import cvmfs
 from manifest import Manifest
 
 class RepositoryNotFound(Exception):
@@ -94,7 +95,8 @@ class LocalRepository(Repository):
             raise UnknownRepositoryType(repo_fqrn, self.type)
         self._storage_location = self._get_repo_location()
         Repository.__init__(self)
-        self.fqrn = repo_fqrn
+        self.version = cvmfs.server_version
+        self.fqrn    = repo_fqrn
 
 
     def read_server_config(self, config_field):
@@ -132,8 +134,7 @@ class RemoteRepository(Repository):
     """ Concrete Repository implementation for a repository reachable by HTTP """
     def __init__(self, repo_url):
         self._storage_location = urlparse.urlunparse(urlparse.urlparse(repo_url))
-        if self.has_rest_api():
-            self._get_repo_information()
+        self._try_to_get_repo_information()
         Repository.__init__(self)
 
 
@@ -149,18 +150,23 @@ class RemoteRepository(Repository):
 
     def has_rest_api(self):
         if not hasattr(self, '_rest_api'):
-            api_url = self._get_rest_url('status')
+            api_url = self._get_rest_url('stratum1_status')
             response = requests.head(api_url)
             self._has_rest_api = (response.status_code == requests.codes.ok)
         return self._has_rest_api
 
 
-    def _get_repo_information(self):
-        api_url = self._get_rest_url('info')
-        response = requests.get(api_url)
-        response.raise_for_status()
-        data = response.json()
-        self.type = data['type']
+    def _try_to_get_repo_information(self):
+        if self.has_rest_api():
+            api_url = self._get_rest_url('info')
+            response = requests.get(api_url)
+            response.raise_for_status()
+            data = response.json()
+            self.type    = data['type']
+            self.version = data['version']
+        else:
+            self.type    = 'unknown'
+            self.version = 'unknown'
 
 
     def retrieve_file(self, file_name):
