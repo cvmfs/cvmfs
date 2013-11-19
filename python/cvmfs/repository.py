@@ -156,17 +156,24 @@ class RemoteRepository(Repository):
         return self._has_rest_api
 
 
+    def _get_rest_request(self, method_name):
+        api_url  = self._get_rest_url(method_name)
+        response = requests.get(api_url)
+        response.raise_for_status()
+        return response.json()
+
+
     def _try_to_get_repo_information(self):
         if self.has_rest_api():
-            api_url = self._get_rest_url('info')
-            response = requests.get(api_url)
-            response.raise_for_status()
-            data = response.json()
-            self.type    = data['type']
-            self.version = data['version']
+            general_infos      = self._get_rest_request('info')
+            snapshotting_state = self._get_rest_request('stratum1_status')
+            self.type          = general_infos['type']
+            self.version       = general_infos['version']
+            self.snapshotting  = (snapshotting_state['state'] == 'snapshotting')
         else:
-            self.type    = 'unknown'
-            self.version = 'unknown'
+            self.type          = 'unknown'
+            self.version       = 'unknown'
+            self.snapshotting  = False
 
 
     def retrieve_file(self, file_name):
