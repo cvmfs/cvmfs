@@ -47,6 +47,13 @@ class FileNotFoundInRepository(Exception):
     def __str__(self):
         return repr(self.file_name)
 
+class CannotReplicate(Exception):
+    def __init__(self, repo):
+        self.repo = repo
+
+    def __str__(self):
+        return repr(self.repo)
+
 
 
 class Repository:
@@ -182,6 +189,12 @@ class RemoteRepository(Repository):
             self.type          = 'unknown'
             self.version       = 'unknown'
             self.snapshotting  = False
+
+
+    def start_replication(self):
+        res = self._POST_rest_request('replicate')
+        if res['result'] != 'ok':
+            raise CannotReplicate(self)
 
 
     def retrieve_file(self, file_name):
