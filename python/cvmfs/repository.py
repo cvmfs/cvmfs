@@ -146,7 +146,10 @@ class RemoteRepository(Repository):
 
 
     def __str__(self):
-        return "<Remote Repository " + self.fqrn + " at " + self.url + ">"
+        return self._storage_location
+
+    def __repr__(self):
+        return "<Remote Repository " + self.fqrn + " at " + self._storage_location + ">"
 
 
     def _get_rest_url(self, method_name):
