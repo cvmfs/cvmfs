@@ -156,17 +156,25 @@ class RemoteRepository(Repository):
         return self._has_rest_api
 
 
-    def _get_rest_request(self, method_name):
-        api_url  = self._get_rest_url(method_name)
-        response = requests.get(api_url)
+    def __rest_request(self, http_verb_method, rest_method_name):
+        api_url  = self._get_rest_url(rest_method_name)
+        response = http_verb_method(api_url)
         response.raise_for_status()
         return response.json()
 
 
+    def _GET_rest_request(self, method_name):
+        return self.__rest_request(requests.get, method_name)
+
+
+    def _POST_rest_request(self, method_name):
+        return self.__rest_request(requests.post, method_name)
+
+
     def _try_to_get_repo_information(self):
         if self.has_rest_api():
-            general_infos      = self._get_rest_request('info')
-            snapshotting_state = self._get_rest_request('stratum1_status')
+            general_infos      = self._GET_rest_request('info')
+            snapshotting_state = self._GET_rest_request('stratum1_status')
             self.type          = general_infos['type']
             self.version       = general_infos['version']
             self.snapshotting  = (snapshotting_state['state'] == 'snapshotting')
