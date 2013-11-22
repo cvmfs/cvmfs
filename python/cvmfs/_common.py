@@ -12,6 +12,7 @@ _REST_CONNECTOR        = "control"
 
 _MANIFEST_NAME         = ".cvmfspublished"
 _LAST_REPLICATION_NAME = ".cvmfs_last_snapshot"
+_REPLICATING_NAME      = ".cvmfs_is_snapshotting"
 
 
 class CvmfsNotInstalled(Exception):
