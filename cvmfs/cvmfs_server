@@ -2461,6 +2461,13 @@ snapshot() {
       echo "Initial snapshot"
     fi
 
+    # put a magic file in the repository root to signal a snapshot in progress
+    $user_shell "sh -c \"date > ${spool_dir}/tmp/snapshotting\""
+    $user_shell "cvmfs_swissknife upload -r ${upstream} \
+      -i ${spool_dir}/tmp/snapshotting \
+      -o .cvmfs_is_snapshotting"
+
+    # do the actual snapshot actions
     $user_shell "cvmfs_swissknife pull -m $name \
       -u $stratum0 \
       -r ${upstream} \
@@ -2473,6 +2480,11 @@ snapshot() {
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
       -o .cvmfs_last_snapshot"
+
+    # remove the magic file
+    $user_shell "cvmfs_swissknife remove -r ${upstream} \
+      -o .cvmfs_is_snapshotting"
+
 
   done
 
