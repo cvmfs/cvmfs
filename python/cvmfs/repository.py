@@ -9,8 +9,8 @@ import os
 import urlparse
 import tempfile
 import requests
-import time
-import datetime
+from datetime import datetime
+import dateutil.parser
 
 import _common
 import cvmfs
@@ -74,10 +74,7 @@ class Repository:
 
 
     def __read_timestamp(self, timestamp_string):
-        line        = timestamp_string
-        time_struct = time.strptime(line, '%a %b %d %H:%M:%S %Z %Y\n')
-        timestamp   = time.mktime(time_struct)
-        return datetime.datetime.fromtimestamp(timestamp)
+        return dateutil.parser.parse(timestamp_string)
 
 
     def _try_to_get_last_replication_timestamp(self):

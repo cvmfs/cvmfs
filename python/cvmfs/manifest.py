@@ -5,7 +5,8 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-import datetime
+from datetime import datetime
+from dateutil.tz import tzutc
 
 class UnknownManifestField:
     def __init__(self, key_char):
@@ -52,7 +53,7 @@ class Manifest:
         elif key_char == "H":
             self.history_database = data
         elif key_char == "T":
-            self.last_modified    = datetime.datetime.fromtimestamp(int(data))
+            self.last_modified    = datetime.fromtimestamp(int(data), tz=tzutc())
         elif key_char == "R":
             self.root_hash        = data
         elif key_char == "D":
