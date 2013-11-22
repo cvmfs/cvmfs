@@ -11,6 +11,7 @@ import tempfile
 import requests
 from datetime import datetime
 import dateutil.parser
+from dateutil.tz import tzutc
 
 import _common
 import cvmfs
@@ -82,10 +83,10 @@ class Repository:
             with self.retrieve_file(_common._LAST_REPLICATION_NAME) as rf:
                 timestamp = rf.readline()
                 self.last_replication = self.__read_timestamp(timestamp)
+            if not hasattr(self, 'type'):
+                self.type = 'stratum1'
         except FileNotFoundInRepository, e:
-            pass
-        if hasattr(self, 'last_replication') and not hasattr(self, 'type'):
-            self.type = 'stratum1'
+            self.last_replication = datetime.fromtimestamp(0, tz=tzutc())
 
 
     def _try_to_get_replication_state(self):
