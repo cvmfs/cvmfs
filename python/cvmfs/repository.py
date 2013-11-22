@@ -177,7 +177,7 @@ class RemoteRepository(Repository):
 
     def has_rest_api(self):
         if not hasattr(self, '_rest_api'):
-            api_url = self._get_rest_url('stratum1_status')
+            api_url = self._get_rest_url('info')
             response = requests.head(api_url)
             self._has_rest_api = (response.status_code == requests.codes.ok)
         return self._has_rest_api
@@ -199,16 +199,12 @@ class RemoteRepository(Repository):
 
 
     def _try_to_get_repo_information(self):
+        self.type          = 'unknown'
+        self.version       = 'unknown'
         if self.has_rest_api():
             general_infos      = self._GET_rest_request('info')
-            snapshotting_state = self._GET_rest_request('stratum1_status')
             self.type          = general_infos['type']
             self.version       = general_infos['version']
-            self.snapshotting  = (snapshotting_state['state'] == 'snapshotting')
-        else:
-            self.type          = 'unknown'
-            self.version       = 'unknown'
-            self.snapshotting  = False
 
 
     def start_replication(self):
