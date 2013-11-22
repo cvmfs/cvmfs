@@ -60,7 +60,7 @@ class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
     def __init__(self):
         self._read_manifest()
-        self._try_to_get_last_snapshot_timestamp()
+        self._try_to_get_last_replication_timestamp()
 
 
     def _read_manifest(self):
@@ -72,16 +72,14 @@ class Repository:
             raise RepositoryNotFound(self._storage_location)
 
 
-    def _try_to_get_last_snapshot_timestamp(self):
+    def _try_to_get_last_replication_timestamp(self):
         try:
-            with self.retrieve_file(_common._LAST_SNAPSHOT_NAME) as snap_file:
-                line        = snap_file.readline()
-                time_struct = time.strptime(line, '%a %b %d %H:%M:%S %Z %Y\n')
-                timestamp   = time.mktime(time_struct)
-                self.last_snapshot = datetime.datetime.fromtimestamp(timestamp)
+            with self.retrieve_file(_common._LAST_REPLICATION_NAME) as rf:
+                timestamp = rf.readline()
+                self.last_replication = self.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
-        if hasattr(self, 'last_snapshot') and not hasattr(self, 'type'):
+        if hasattr(self, 'last_replication') and not hasattr(self, 'type'):
             self.type = 'stratum1'
 
 
