@@ -15,6 +15,9 @@ die() {
   exit 1
 }
 
+# set default locale
+export LANG=C
+
 
 ################################################################################
 #                                                                              #
@@ -2461,18 +2464,34 @@ snapshot() {
       echo "Initial snapshot"
     fi
 
-    $user_shell "cvmfs_swissknife pull -m $name \
-      -u $stratum0 \
-      -r ${upstream} \
-      -x ${spool_dir}/tmp \
-      -k $public_key \
-      -n $num_workers \
-      -t $timeout \
-      -a $retries $with_history $log_level"
+    # put a magic file in the repository root to signal a snapshot in progress
+    $user_shell "sh -c \"date > ${spool_dir}/tmp/snapshotting\""
+    $user_shell "cvmfs_swissknife upload -r ${upstream} \
+      -i ${spool_dir}/tmp/snapshotting \
+      -o .cvmfs_is_snapshotting"
+
+    # command to remove the magic file when finished (or aborted)
+    delete_command="cvmfs_swissknife remove \
+                      -r ${upstream} \
+                      -o .cvmfs_is_snapshotting"
+
+    # do the actual snapshot actions
+    $user_shell "trap \"$delete_command\" HUP INT TERM QUIT && \
+      cvmfs_swissknife pull -m $name \
+        -u $stratum0 \
+        -r ${upstream} \
+        -x ${spool_dir}/tmp \
+        -k $public_key \
+        -n $num_workers \
+        -t $timeout \
+        -a $retries $with_history $log_level"
     $user_shell "sh -c \"date > ${spool_dir}/tmp/last_snapshot\""
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
       -o .cvmfs_last_snapshot"
+
+    # remove magic file after successful replication
+    $user_shell "$delete_command"
 
   done
 
