@@ -167,6 +167,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
+                [-a silence apache warning]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -1333,10 +1334,11 @@ add_replica() {
   local public_key
   local upstream
   local owner
+  local silence_httpd_warning=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:" option
+  while getopts "o:u:n:a" option
   do
     case $option in
       u)
@@ -1347,6 +1349,9 @@ add_replica() {
       ;;
       n)
         alias_name=$OPTARG
+      ;;
+      a)
+        silence_httpd_warning=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1395,8 +1400,12 @@ add_replica() {
   # additional sanity checks
   is_root || die "Only root can create a new repository"
   check_user $cvmfs_user || die "No user $cvmfs_user"
-  if is_local_upstream $upstream; then
-    check_apache || die "Apache must be installed and running"
+  if is_local_upstream $upstream && ! check_apache; then
+    if [ $silence_httpd_warning -eq 1 ]; then
+      echo "Warning: Apache is needed to access this CVMFS replication"
+    else
+      die "Apache must be installed and running"
+    fi
   fi
   check_upstream_validity $upstream
 
