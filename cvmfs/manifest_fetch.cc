@@ -103,7 +103,7 @@ static WhitelistValidity VerifyWhitelist(
   // Check for PKCS7
   line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
                     whitelist_size-payload_bytes);
-  if (line == "PKCS7") {
+  if (line == "Vpkcs7") {
     LogCvmfs(kLogSignature, kLogDebug, "whitelist verification: PKCS7");
     verify_pkcs7 = true;
     payload_bytes += line.length() + 1;
