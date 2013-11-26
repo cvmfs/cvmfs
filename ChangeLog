@@ -1,4 +1,5 @@
 2.1.16:
+  * Optionally disable httpd check in cvmfs_server
   * Enforce immediate host failover on HTTP 404 errors
   * Fix build system for 32bit ARM
   * Opportunistically clean up before loading files > 25M
