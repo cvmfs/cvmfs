@@ -281,7 +281,18 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
           download_whitelist_pkcs7.destination_mem.data);
       ensemble->whitelist_pkcs7_size =
         download_whitelist_pkcs7.destination_mem.size;
-      // TODO: verify
+      retval =
+        signature_manager->VerifyLetterPkcs7(ensemble->whitelist_buf,
+                                             ensemble->whitelist_size,
+                                             ensemble->whitelist_pkcs7_buf,
+                                             ensemble->whitelist_pkcs7_size);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+                 "failed to verify repository whitelist (PKCS#7): %s",
+                 signature_manager->GetCryptoError().c_str());
+        result = kFailBadWhitelist;
+        goto cleanup;
+      }
       break;
     default:
       abort();
