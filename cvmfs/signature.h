@@ -36,6 +36,7 @@ class SignatureManager {
                           const unsigned buffer_size);
   bool WriteCertificateMem(unsigned char **buffer, unsigned *buffer_size);
   bool KeysMatch();
+  bool VerifyCaChain();
   std::string Whois();
   std::string FingerprintCertificate();
 

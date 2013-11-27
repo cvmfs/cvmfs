@@ -2172,6 +2172,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
              public_keys.c_str());
   }
+  if (!cvmfs::signature_manager_->LoadTrustedCaCrl("/root/certs/hash")) {
+    *g_boot_error = "failed to load trusted certificates";
+    return loader::kFailSignature;
+  }
   g_signature_ready = true;
   if (FileExists("/etc/cvmfs/blacklist")) {
     if (!cvmfs::signature_manager_->LoadBlacklist("/etc/cvmfs/blacklist")) {

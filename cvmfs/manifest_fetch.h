@@ -34,6 +34,7 @@ enum Failures {
   kFailBadCertificate,
   kFailBadSignature,
   kFailBadWhitelist,
+  kFailInvalidCertificate,
   kFailUnknown,
 };
 

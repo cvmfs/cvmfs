@@ -3,8 +3,8 @@
  *
  * This is a wrapper around OpenSSL's libcrypto.  It supports
  * signing of data with an X.509 certificate and verifiying
- * a signature against a certificate.  The certificates act only as key
- * store, there is no verification against the CA chain.
+ * a signature against a certificate.  The certificates can act only as key
+ * store, in which case there is no verification against the CA chain.
  *
  * It also supports verification of plain RSA signatures (for the whitelist).
  *
@@ -40,6 +40,7 @@ const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch.pub";
 
 
 static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "certificate chain verification: %d", ok);
   if (ok) return ok;
 
   int error = X509_STORE_CTX_get_error(ctx);
@@ -70,6 +71,7 @@ SignatureManager::SignatureManager() {
 
 void SignatureManager::InitX509Store() {
   if (x509_store_) X509_STORE_free(x509_store_);
+  x509_lookup_ = NULL;
   x509_store_ = X509_STORE_new();
   assert(x509_store_ != NULL);
 
@@ -86,9 +88,8 @@ void SignatureManager::InitX509Store() {
   assert(retval == 1);
   X509_VERIFY_PARAM_free(param);
 
-  X509_LOOKUP *lookup =
-    X509_STORE_add_lookup(x509_store_, X509_LOOKUP_hash_dir());
-  assert(lookup != NULL);
+  x509_lookup_ = X509_STORE_add_lookup(x509_store_, X509_LOOKUP_hash_dir());
+  assert(x509_lookup_ != NULL);
 
   X509_STORE_set_verify_cb_func(x509_store_, CallbackCertVerify);
 }
@@ -307,11 +308,17 @@ vector<string> SignatureManager::GetBlacklistedCertificates() {
 bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
   InitX509Store();
 
-  return true;
-  /*if (path_list == "") {
+  /* TODO if (path_list == "") {
     return true;
+  }*/
+  const vector<string> paths = SplitString(path_list, ':');
+  for (unsigned i = 0; i < paths.size(); ++i) {
+    int retval = X509_LOOKUP_add_dir(x509_lookup_, paths[i].c_str(),
+                                     X509_FILETYPE_PEM);
+    if (!retval)
+      return false;
   }
-  const vector<string> pem_files = SplitString(path_list, ':');*/
+  return true;
 }
 
 
@@ -406,6 +413,25 @@ bool SignatureManager::KeysMatch() {
     result = true;
   }
   if (signature) free(signature);
+  return result;
+}
+
+
+/**
+ * Verifies the currently loaded certificate against the trusted CA chain.
+ */
+bool SignatureManager::VerifyCaChain() {
+  if (!certificate_)
+    return false;
+
+  X509_STORE_CTX *csc = NULL;
+  csc = X509_STORE_CTX_new();
+  assert(csc);
+
+  X509_STORE_CTX_init(csc, x509_store_, certificate_, NULL);
+  bool result = X509_verify_cert(csc) == 1;
+  X509_STORE_CTX_free(csc);
+
   return result;
 }
 
