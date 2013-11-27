@@ -360,6 +360,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
+  string trusted_certs;
+  if (args.find('y') != args.end())
+    trusted_certs = *args.find('y')->second;
   if (args.find('n') != args.end())
     num_parallel = String2Uint64(*args.find('n')->second);
   if (args.find('t') != args.end())
@@ -423,6 +426,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: using public key(s) %s",
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
+  }
+  if (trusted_certs != "") {
+    if (!g_signature_manager->LoadTrustedCaCrl(trusted_certs)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "trusted certificates from %s could not be loaded",
+               trusted_certs.c_str());
+      goto fini;
+    }
   }
 
   retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
@@ -531,6 +542,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       bool retval = ensemble.manifest->ExportChecksum(*preload_cachedir, 0660);
       assert(retval);
     } else {
+      // pkcs#7 structure contains content + certificate + signature
+      // So there is no race with whitelist and pkcs7 signature being out of sync
+      if (ensemble.whitelist_pkcs7_buf) {
+        StoreBuffer(ensemble.whitelist_pkcs7_buf, ensemble.whitelist_pkcs7_size,
+                    ".cvmfswhitelist.pkcs7", 0, false);
+      }
       StoreBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
                   ".cvmfswhitelist", 0, false);
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,

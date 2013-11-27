@@ -54,10 +54,8 @@ class SignatureManager {
                  const unsigned char *signature, unsigned signature_size);
   bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
                     const bool by_rsa);
-  bool VerifyLetterPkcs7(const unsigned char *buffer,
-                         const unsigned buffer_size,
-                         const unsigned char *signature,
-                         unsigned signature_size);
+  bool VerifyPkcs7(const unsigned char *buffer, const unsigned buffer_size,
+                   unsigned char **content, unsigned *content_size);
  private:
   void InitX509Store();
   void CutLetter(const unsigned char *buffer, const unsigned buffer_size,

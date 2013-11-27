@@ -289,7 +289,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     }
   }
   if (wl_examination & kWlVerifyPkcs7) {
-    // Load the separate whitelist signature as well
+    // Load the separate whitelist pkcs7 structure
     retval = download_manager->Fetch(&download_whitelist_pkcs7);
     if (retval != download::kFailOk) {
       result = kFailLoad;
@@ -300,15 +300,32 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                                       download_whitelist_pkcs7.destination_mem.data);
     ensemble->whitelist_pkcs7_size =
     download_whitelist_pkcs7.destination_mem.size;
+    unsigned char *extracted_whitelist;
+    unsigned extracted_whitelist_size;
     retval =
-    signature_manager->VerifyLetterPkcs7(ensemble->whitelist_buf,
-                                         ensemble->whitelist_size,
-                                         ensemble->whitelist_pkcs7_buf,
-                                         ensemble->whitelist_pkcs7_size);
+      signature_manager->VerifyPkcs7(ensemble->whitelist_pkcs7_buf,
+                                     ensemble->whitelist_pkcs7_size,
+                                     &extracted_whitelist,
+                                     &extracted_whitelist_size);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
                "failed to verify repository whitelist (PKCS#7): %s",
                signature_manager->GetCryptoError().c_str());
+      result = kFailBadWhitelist;
+      goto cleanup;
+    }
+    LogCvmfs(kLogCvmfs, kLogDebug, "Extracted pkcs#7 whitelist:\n%s",
+             string(reinterpret_cast<char *>(extracted_whitelist),
+                    extracted_whitelist_size).c_str());
+    // Check once again the extracted whitelist
+    wl_examination =
+      VerifyWhitelist(extracted_whitelist, extracted_whitelist_size,
+                      repository_name, signature_manager);
+    free(extracted_whitelist);
+    if (wl_examination == kWlInvalid) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "failed to verify repository certificate against pkcs#7 "
+               "whitelist");
       result = kFailBadWhitelist;
       goto cleanup;
     }

@@ -619,51 +619,58 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
 
 
 /**
- * Verifies a detached PKCS#7 signature using the loaded trusted CAs/CRLs
+ * Verifies a PKCS#7 binary content + signature structure
+ * using the loaded trusted CAs/CRLs
  */
-bool SignatureManager::VerifyLetterPkcs7(const unsigned char *buffer,
-                                         const unsigned buffer_size,
-                                         const unsigned char *signature,
-                                         unsigned signature_size)
+bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
+                                   const unsigned buffer_size,
+                                   unsigned char **content,
+                                   unsigned *content_size)
 {
-  unsigned pos_after_mark;
-  unsigned letter_length;
-  CutLetter(buffer, buffer_size, &letter_length, &pos_after_mark);
-  if (letter_length == 0) {
-    LogCvmfs(kLogSignature, kLogDebug, "empty pkcs#7 letter");
-    return false;
-  }
+  *content = NULL;
+  *content_size = 0;
 
-  BIO *bp_signature = BIO_new(BIO_s_mem());
-  if (!bp_signature) return false;
-  if (BIO_write(bp_signature, signature, signature_size) <= 0) {
-    BIO_free(bp_signature);
+  BIO *bp_pkcs7 = BIO_new(BIO_s_mem());
+  if (!bp_pkcs7) return false;
+  if (BIO_write(bp_pkcs7, buffer, buffer_size) <= 0) {
+    BIO_free(bp_pkcs7);
     return false;
   }
 
   PKCS7 *pkcs7 = NULL;
-  pkcs7 = PEM_read_bio_PKCS7(bp_signature, NULL, NULL, NULL);
-  BIO_free(bp_signature);
+  pkcs7 = PEM_read_bio_PKCS7(bp_pkcs7, NULL, NULL, NULL);
+  BIO_free(bp_pkcs7);
   if (!pkcs7) {
     LogCvmfs(kLogSignature, kLogDebug, "invalid pkcs#7 signature");
     return false;
   }
 
   BIO *bp_content = BIO_new(BIO_s_mem());
-  if (!bp_content) return false;
-  if (BIO_write(bp_content, buffer, letter_length) <= 0) {
-    BIO_free(bp_content);
+  if (!bp_content) {
     PKCS7_free(pkcs7);
     return false;
   }
 
   int flags = 0;
   STACK_OF(X509) *extra_signers = NULL;
-  BIO *output_content = NULL;
-  bool result = PKCS7_verify(pkcs7, extra_signers, x509_store_, bp_content,
-                             output_content, flags);
+  BIO *indata = NULL;
+  bool result = PKCS7_verify(pkcs7, extra_signers, x509_store_, indata,
+                             bp_content, flags);
   PKCS7_free(pkcs7);
+
+  BUF_MEM *bufmem_content;
+  BIO_get_mem_ptr(bp_content, &bufmem_content);
+  // BIO_free() leaves BUF_MEM alone
+  (void) BIO_set_close(bp_content, BIO_NOCLOSE);
   BIO_free(bp_content);
+  if (bufmem_content->data == NULL) {
+    LogCvmfs(kLogSignature, kLogDebug, "empty pkcs#7 structure");
+    return false;
+  }
+  *content = reinterpret_cast<unsigned char *>(bufmem_content->data);
+  *content_size = bufmem_content->length;
+  free(bufmem_content);
+
   return result == 1;
 }
 
