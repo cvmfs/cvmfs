@@ -434,6 +434,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                trusted_certs.c_str());
       goto fini;
     }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: using trusted certificates in %s",
+             JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
   }
 
   retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
