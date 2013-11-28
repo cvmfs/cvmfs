@@ -55,7 +55,8 @@ class SignatureManager {
   bool VerifyLetter(const unsigned char *buffer, const unsigned buffer_size,
                     const bool by_rsa);
   bool VerifyPkcs7(const unsigned char *buffer, const unsigned buffer_size,
-                   unsigned char **content, unsigned *content_size);
+                   unsigned char **content, unsigned *content_size,
+                   std::vector<std::string> *alt_uris);
  private:
   void InitX509Store();
   void CutLetter(const unsigned char *buffer, const unsigned buffer_size,

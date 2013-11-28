@@ -296,28 +296,49 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
       goto cleanup;
     }
     ensemble->whitelist_pkcs7_buf =
-    reinterpret_cast<unsigned char *>(
-                                      download_whitelist_pkcs7.destination_mem.data);
+      reinterpret_cast<unsigned char *>(
+        download_whitelist_pkcs7.destination_mem.data);
     ensemble->whitelist_pkcs7_size =
     download_whitelist_pkcs7.destination_mem.size;
     unsigned char *extracted_whitelist;
     unsigned extracted_whitelist_size;
+    vector<string> alt_uris;
     retval =
       signature_manager->VerifyPkcs7(ensemble->whitelist_pkcs7_buf,
                                      ensemble->whitelist_pkcs7_size,
                                      &extracted_whitelist,
-                                     &extracted_whitelist_size);
+                                     &extracted_whitelist_size,
+                                     &alt_uris);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-               "failed to verify repository whitelist (PKCS#7): %s",
+               "failed to verify repository whitelist (pkcs#7): %s",
                signature_manager->GetCryptoError().c_str());
       result = kFailBadWhitelist;
       goto cleanup;
     }
+
+    // Check for subject alternative name matching the repository name
+    bool found_uri = false;
+    for (unsigned i = 0; i < alt_uris.size(); ++i) {
+      LogCvmfs(kLogSignature, kLogDebug, "found pkcs#7 signer uri %s",
+               alt_uris[i].c_str());
+      if (alt_uris[i] == "cvmfs:" + repository_name) {
+        found_uri = true;
+        break;
+      }
+    }
+    if (!found_uri) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "failed to find whitelist signer with SAN/URI cvmfs:%s",
+               repository_name.c_str());
+      result = kFailBadWhitelist;
+      goto cleanup;
+    }
+
+    // Check once again the extracted whitelist
     LogCvmfs(kLogCvmfs, kLogDebug, "Extracted pkcs#7 whitelist:\n%s",
              string(reinterpret_cast<char *>(extracted_whitelist),
                     extracted_whitelist_size).c_str());
-    // Check once again the extracted whitelist
     wl_examination =
       VerifyWhitelist(extracted_whitelist, extracted_whitelist_size,
                       repository_name, signature_manager);
