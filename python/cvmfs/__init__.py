@@ -32,13 +32,19 @@ def __extract_version_string(input_str):
     return match.groups()[0]
 
 
+def check_output(popen_args):
+    """ instead of using subprocess.check_output that was
+        introduced with python 2.7                        """
+    return subprocess.Popen(popen_args,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT).communicate()[0]
+
+
 def _get_server_version():
     output = ''
     try:
-        output = subprocess.check_output(['cvmfs_server'],
-                                         stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError, e:
-        return __extract_version_string(e.output)
+        output = check_output(['cvmfs_server'])
+        return __extract_version_string(output)
     except OSError, e:
         raise ServerNotInstalled()
 
@@ -46,8 +52,7 @@ def _get_server_version():
 def _get_client_version():
     output = ''
     try:
-        output = subprocess.check_output(['cvmfs2', '--version'],
-                                         stderr=subprocess.STDOUT)
+        output = check_output(['cvmfs2', '--version'])
     except OSError, e:
         raise ClientNotInstalled()
     return __extract_version_string(output)
