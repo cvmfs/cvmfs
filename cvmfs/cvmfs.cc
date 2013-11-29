@@ -1770,6 +1770,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string root_hash = "";
   string repository_tag = "";
   string alien_cache = ".";  // default: exclusive cache
+  string trusted_certs = "/etc/grid-security/certificates";
   map<uint64_t, uint64_t> uid_map;
   map<uint64_t, uint64_t> gid_map;
 
@@ -1833,6 +1834,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     proxies = parameter;
   if (options::GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
+  if (options::GetValue("CVMFS_TRUSTED_CERTS", &parameter))
+    trusted_certs = parameter;
   if (options::GetValue("CVMFS_KEYS_DIR", &parameter)) {
     // Collect .pub files from CVMFS_KEYS_DIR
     public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
@@ -1896,7 +1899,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailOptions;
     }
   }
-
 
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
@@ -2171,6 +2173,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
              public_keys.c_str());
+  }
+  if (trusted_certs != "") {
+    if (!cvmfs::signature_manager_->LoadTrustedCaCrl(trusted_certs)) {
+      *g_boot_error = "failed to load trusted certificates";
+      return loader::kFailSignature;
+    }
   }
   g_signature_ready = true;
   if (FileExists("/etc/cvmfs/blacklist")) {

@@ -1033,6 +1033,7 @@ CVMFS_QUOTA_LIMIT=4000
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
+CVMFS_TRUSTED_CERTS=/etc/cvmfs/repositories.d/${name}/trusted_certs
 CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
@@ -1855,7 +1856,8 @@ lstags() {
   local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
   cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
     -i 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
-    -k /etc/cvmfs/keys/${name}.pub -l
+    -k /etc/cvmfs/keys/${name}.pub \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs -l
   rm -f ${CVMFS_SPOOL_DIR}/show_history
 }
 
@@ -2277,6 +2279,7 @@ publish() {
       -n $name \
       -o ${spool_dir}/tmp/history \
       -k /etc/cvmfs/keys/${name}.pub \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
       $add_tag $remove_tag"
     local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
       -k /etc/cvmfs/keys/${name}.key \
@@ -2389,6 +2392,7 @@ rollback() {
     -b $base_hash \
     -n $name \
     -k /etc/cvmfs/keys/${name}.pub \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
     -o ${spool_dir}/tmp/history \
     -m ${spool_dir}/tmp/manifest \
     -d ${spool_dir}/tmp \
@@ -2620,6 +2624,7 @@ migrate_2_1_7() {
     -t $temp_dir \
     -o $new_manifest \
     -k /etc/cvmfs/keys/$name.pub \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
     -s || die "fail! (migrating catalogs)"
   chown ${CVMFS_USER} $new_manifest
 

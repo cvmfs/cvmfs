@@ -34,6 +34,7 @@ class CommandTag : public Command {
     result.push_back(Parameter('h', "tag hash (if different from trunk)",
                                true, false));
     result.push_back(Parameter('l', "list tags", true, true));
+    result.push_back(Parameter('z', "trusted certificate dir(s)", true, false));
 
     return result;
   }
@@ -62,6 +63,7 @@ class CommandRollback : public Command {
     result.push_back(Parameter('m', "manifest output file", false, false));
     result.push_back(Parameter('t', "revert to this tag", false, false));
     result.push_back(Parameter('d', "temp directory", false, false));
+    result.push_back(Parameter('z', "trusted certificate dir(s)", true, false));
     return result;
   }
   int Main(const ArgumentList &args);
