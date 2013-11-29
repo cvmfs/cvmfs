@@ -112,11 +112,15 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   const unsigned trunk_revision = String2Uint64(*args.find('i')->second);
   shash::Any tag_hash = trunk_hash;
   string delete_tag;
+  string trusted_certs;
   if (args.find('d') != args.end()) {
     delete_tag = *args.find('d')->second;
   }
   if (args.find('h') != args.end()) {
     tag_hash = shash::Any(shash::kSha1, shash::HexPtr(*args.find('h')->second));
+  }
+  if (args.find('z') != args.end()) {
+    trusted_certs = *args.find('z')->second;
   }
   history::Tag new_tag;
   if (args.find('a') != args.end()) {
@@ -147,6 +151,13 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key %s",
              repository_key_path.c_str());
     return 1;
+  }
+  if (trusted_certs != "") {
+    retval = g_signature_manager->LoadTrustedCaCrl(trusted_certs);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
+      return 1;
+    }
   }
   g_download_manager->Init(1, true);
   int result = 1;
@@ -249,6 +260,11 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   const string target_tag_name = *args.find('t')->second;
   const string manifest_path = *args.find('m')->second;
   const string temp_dir = *args.find('d')->second;
+  string trusted_certs;
+  if (args.find('z') != args.end()) {
+    trusted_certs = *args.find('z')->second;
+  }
+
   shash::Any history_hash;
   history::Database tag_db;
   history::TagList tag_list;
@@ -267,6 +283,13 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key %s",
              repository_key_path.c_str());
     return 1;
+  }
+  if (trusted_certs != "") {
+    retval = g_signature_manager->LoadTrustedCaCrl(trusted_certs);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
+      return 1;
+    }
   }
   g_download_manager->Init(1, true);
   int result = 1;

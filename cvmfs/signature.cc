@@ -3,8 +3,8 @@
  *
  * This is a wrapper around OpenSSL's libcrypto.  It supports
  * signing of data with an X.509 certificate and verifiying
- * a signature against a certificate.  The certificates act only as key
- * store, there is no verification against the CA chain.
+ * a signature against a certificate.  The certificates can act only as key
+ * store, in which case there is no verification against the CA chain.
  *
  * It also supports verification of plain RSA signatures (for the whitelist).
  *
@@ -14,15 +14,20 @@
 #include "cvmfs_config.h"
 #include "signature.h"
 
-#include <string>
-#include <vector>
+#include <openssl/pkcs7.h>
+#include <openssl/x509v3.h>
 
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <cctype>
+#include <cassert>
+
+#include <string>
+#include <vector>
 
 #include "platform.h"
+#include "logging.h"
 #include "hash.h"
 #include "util.h"
 #include "smalloc.h"
@@ -34,14 +39,66 @@ namespace signature {
 
 const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch.pub";
 
+
+static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "certificate chain verification: %d", ok);
+  if (ok) return ok;
+
+  int error = X509_STORE_CTX_get_error(ctx);
+  X509 *current_cert = X509_STORE_CTX_get_current_cert(ctx);
+  string subject = "subject n/a";
+  if (current_cert) {
+    char *buffer = NULL;
+    buffer = X509_NAME_oneline(X509_get_subject_name(current_cert), NULL, 0);
+    if (buffer) {
+      subject = string(buffer);
+      free(buffer);
+    }
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+           "certificate verification error: %s, error %s (%d)",
+           subject.c_str(), X509_verify_cert_error_string(error), error);
+  return ok;
+}
+
+
 SignatureManager::SignatureManager() {
   private_key_ = NULL;
   certificate_ = NULL;
+  x509_store_ = NULL;
+  x509_lookup_ = NULL;
+}
+
+
+void SignatureManager::InitX509Store() {
+  if (x509_store_) X509_STORE_free(x509_store_);
+  x509_lookup_ = NULL;
+  x509_store_ = X509_STORE_new();
+  assert(x509_store_ != NULL);
+
+  int retval;
+  X509_VERIFY_PARAM *param = X509_VERIFY_PARAM_new();
+  assert(param != NULL);
+  unsigned long verify_flags =
+    X509_V_FLAG_CRL_CHECK |
+    X509_V_FLAG_CRL_CHECK_ALL |
+    X509_V_FLAG_POLICY_CHECK;
+  retval = X509_VERIFY_PARAM_set_flags(param, verify_flags);
+  assert(retval == 1);
+  retval = X509_STORE_set1_param(x509_store_, param);
+  assert(retval == 1);
+  X509_VERIFY_PARAM_free(param);
+
+  x509_lookup_ = X509_STORE_add_lookup(x509_store_, X509_LOOKUP_hash_dir());
+  assert(x509_lookup_ != NULL);
+
+  X509_STORE_set_verify_cb_func(x509_store_, CallbackCertVerify);
 }
 
 
 void SignatureManager::Init() {
   OpenSSL_add_all_algorithms();
+  InitX509Store();
 }
 
 
@@ -55,9 +112,15 @@ void SignatureManager::Fini() {
       RSA_free(public_keys_[i]);
     public_keys_.clear();
   }
+  // Lookup is freed automatically
+  if (x509_store_) X509_STORE_free(x509_store_);
+
   EVP_cleanup();
+
   private_key_ = NULL;
   certificate_ = NULL;
+  x509_store_ = NULL;
+  x509_lookup_ = NULL;
 }
 
 
@@ -237,6 +300,30 @@ vector<string> SignatureManager::GetBlacklistedCertificates() {
 
 
 /**
+ * Loads CA certificates CRLs from a ":" separated list of paths.
+ * The information is used for proper X509 verification.
+ * The format of the certificates and CRLs has to be OpenSSL hashed certs.
+ * The path can be something like /etc/grid-security/certificates.
+ * If path_list is empty, the default path is taken.
+ */
+bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
+  InitX509Store();
+
+  /* TODO if (path_list == "") {
+    return true;
+  }*/
+  const vector<string> paths = SplitString(path_list, ':');
+  for (unsigned i = 0; i < paths.size(); ++i) {
+    int retval = X509_LOOKUP_add_dir(x509_lookup_, paths[i].c_str(),
+                                     X509_FILETYPE_PEM);
+    if (!retval)
+      return false;
+  }
+  return true;
+}
+
+
+/**
  * Returns SHA-1 hash from DER encoded certificate, encoded the same way
  * OpenSSL does (01:AB:...).
  * Empty string on failure.
@@ -332,6 +419,25 @@ bool SignatureManager::KeysMatch() {
 
 
 /**
+ * Verifies the currently loaded certificate against the trusted CA chain.
+ */
+bool SignatureManager::VerifyCaChain() {
+  if (!certificate_)
+    return false;
+
+  X509_STORE_CTX *csc = NULL;
+  csc = X509_STORE_CTX_new();
+  assert(csc);
+
+  X509_STORE_CTX_init(csc, x509_store_, certificate_, NULL);
+  bool result = X509_verify_cert(csc) == 1;
+  X509_STORE_CTX_free(csc);
+
+  return result;
+}
+
+
+/**
  * Signs a data block using the loaded private key.
  *
  * \return True on sucess, false otherwise
@@ -375,10 +481,10 @@ bool SignatureManager::Sign(const unsigned char *buffer,
  *
  * \return True if signature is valid, false on error or otherwise
  */
- bool SignatureManager::Verify(const unsigned char *buffer,
-                               const unsigned buffer_size,
-                               const unsigned char *signature,
-                               const unsigned signature_size)
+bool SignatureManager::Verify(const unsigned char *buffer,
+                              const unsigned buffer_size,
+                              const unsigned char *signature,
+                              const unsigned signature_size)
 {
   if (!certificate_) return false;
 
@@ -436,6 +542,37 @@ bool SignatureManager::VerifyRsa(const unsigned char *buffer,
 
 
 /**
+ * Strips a signature from the letter (if exists)
+ */
+void SignatureManager::CutLetter(const unsigned char *buffer,
+                                 const unsigned buffer_size,
+                                 unsigned *letter_length,
+                                 unsigned *pos_after_mark)
+{
+  unsigned pos = 0;
+  *letter_length = *pos_after_mark = 0;
+  do {
+    if (pos == buffer_size) {
+      *pos_after_mark = pos;  // Careful: pos_after_mark points out of buffer
+      *letter_length = pos;
+      break;
+    }
+
+    if ((buffer[pos] == '\n') && (pos+4 <= buffer_size) &&
+        (buffer[pos+1] == '-') && (buffer[pos+2] == '-') &&
+        (buffer[pos+3] == '\n'))
+    {
+      *letter_length = pos+1;
+      pos += 4;
+      break;
+    }
+    pos++;
+  } while (true);
+  *pos_after_mark = pos;
+}
+
+
+/**
  * Checks a document of the form
  *  <ASCII LINES>
  *  --
@@ -448,18 +585,9 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
 {
   unsigned pos = 0;
   unsigned letter_length = 0;
-  do {
-    if (pos > buffer_size-3)
-      return false;
-    if ((buffer[pos] == '-') && (buffer[pos+1] == '-') &&
-        (buffer[pos+2] == '\n'))
-    {
-      letter_length = pos;
-      pos += 3;
-      break;
-    }
-    pos++;
-  } while (true);
+  CutLetter(buffer, buffer_size, &letter_length, &pos);
+  if (pos >= buffer_size)
+    return false;
 
   string hash_str = "";
   unsigned hash_pos = pos;
@@ -488,6 +616,98 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
     return Verify(&buffer[hash_pos], hash_str.length(),
                   &buffer[pos], buffer_size-pos);
   }
+}
+
+
+/**
+ * Verifies a PKCS#7 binary content + signature structure
+ * using the loaded trusted CAs/CRLs
+ */
+bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
+                                   const unsigned buffer_size,
+                                   unsigned char **content,
+                                   unsigned *content_size,
+                                   vector<string> *alt_uris)
+{
+  *content = NULL;
+  *content_size = 0;
+
+  BIO *bp_pkcs7 = BIO_new(BIO_s_mem());
+  if (!bp_pkcs7) return false;
+  if (BIO_write(bp_pkcs7, buffer, buffer_size) <= 0) {
+    BIO_free(bp_pkcs7);
+    return false;
+  }
+
+  PKCS7 *pkcs7 = NULL;
+  pkcs7 = PEM_read_bio_PKCS7(bp_pkcs7, NULL, NULL, NULL);
+  BIO_free(bp_pkcs7);
+  if (!pkcs7) {
+    LogCvmfs(kLogSignature, kLogDebug, "invalid pkcs#7 signature");
+    return false;
+  }
+
+  BIO *bp_content = BIO_new(BIO_s_mem());
+  if (!bp_content) {
+    PKCS7_free(pkcs7);
+    return false;
+  }
+
+  int flags = 0;
+  STACK_OF(X509) *extra_signers = NULL;
+  BIO *indata = NULL;
+  bool result = PKCS7_verify(pkcs7, extra_signers, x509_store_, indata,
+                             bp_content, flags);
+  if (result != 1) {
+    BIO_free(bp_content);
+    PKCS7_free(pkcs7);
+    return false;
+  }
+
+  BUF_MEM *bufmem_content;
+  BIO_get_mem_ptr(bp_content, &bufmem_content);
+  // BIO_free() leaves BUF_MEM alone
+  (void) BIO_set_close(bp_content, BIO_NOCLOSE);
+  BIO_free(bp_content);
+  *content = reinterpret_cast<unsigned char *>(bufmem_content->data);
+  *content_size = bufmem_content->length;
+  free(bufmem_content);
+  if (*content == NULL) {
+    PKCS7_free(pkcs7);
+    LogCvmfs(kLogSignature, kLogDebug, "empty pkcs#7 structure");
+    return false;
+  }
+
+  // Extract signing certificates
+  STACK_OF(X509) *signers = NULL;
+  signers = PKCS7_get0_signers(pkcs7, NULL, 0);
+  assert(signers);
+
+  // Extract alternative names
+  for (int i = 0; i < sk_X509_num(signers); ++i) {
+    X509* this_signer = sk_X509_value(signers, i);
+    GENERAL_NAMES *subject_alt_names = NULL;
+    subject_alt_names = reinterpret_cast<GENERAL_NAMES *>(
+      X509_get_ext_d2i(this_signer, NID_subject_alt_name, NULL, NULL));
+    if (subject_alt_names != NULL) {
+      for (int j = 0; j < sk_GENERAL_NAME_num(subject_alt_names); ++j) {
+        GENERAL_NAME *this_name = sk_GENERAL_NAME_value(subject_alt_names, j);
+        if (this_name->type != GEN_URI)
+          continue;
+
+        char *name_ptr = reinterpret_cast<char *>(
+          ASN1_STRING_data(this_name->d.uniformResourceIdentifier));
+        int name_len =
+          ASN1_STRING_length(this_name->d.uniformResourceIdentifier);
+        if (!name_ptr || (name_len <= 0))
+          continue;
+        alt_uris->push_back(string(name_ptr, name_len));
+      }
+    }
+  }
+  sk_X509_free(signers);
+  PKCS7_free(pkcs7);
+  return true;
 }
 
 }  // namespace signature
