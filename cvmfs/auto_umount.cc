@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "config.h"
+#include "cvmfs_config.h"
 #include "auto_umount.h"
 
 #include <unistd.h>
