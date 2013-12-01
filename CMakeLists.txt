@@ -88,6 +88,7 @@ option (PACPARSER_BUILTIN     "Don't use system installation of pacparser"      
 option (ZLIB_BUILTIN          "Don't use system zlib"                                            ON)
 option (SPARSEHASH_BUILTIN    "Don't use system installation of google sparse hash"              ON)
 option (LEVELDB_BUILTIN       "Don't use system leveldb"                                         ON)
+option (GOOGLETEST_BUILTIN    "Don't use system installation of google test"                     ON)
 option (TBB_PRIVATE_LIB       "Compile our own TBB shared libraries"                             ON)
 
 #
@@ -326,7 +327,13 @@ endif (NOT MACOSX)
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/include)
+if (GOOGLETEST_BUILTIN)
+  include (${GOOGLETEST_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLETEST_BUILTIN_LOCATION}/include)
+else (GOOGLETEST_BUILTIN)
+  find_package (GTest REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
+endif (GOOGLETEST_BUILTIN)
 
 include_directories (${INCLUDE_DIRECTORIES})
 
