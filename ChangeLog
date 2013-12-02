@@ -1,4 +1,5 @@
 2.1.16:
+  * Fix parsing of CVMFS_MAX_TTL parameter
   * Optionally disable httpd check in cvmfs_server
   * Enforce immediate host failover on HTTP 404 errors
   * Experimental support for pkcs#7 signed whitelists

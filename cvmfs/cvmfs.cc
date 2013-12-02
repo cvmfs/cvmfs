@@ -167,7 +167,7 @@ string *repository_name_ = NULL;  /**< Expected repository name,
 string *repository_tag_ = NULL;
 pid_t pid_ = 0;  /**< will be set after deamon() */
 time_t boot_time_;
-unsigned max_ttl_ = 0;
+unsigned max_ttl_ = 0;  /**< unit: seconds */
 pthread_mutex_t lock_max_ttl_ = PTHREAD_MUTEX_INITIALIZER;
 catalog::InodeGenerationAnnotation *inode_annotation_ = NULL;
 cache::CatalogManager *catalog_manager_ = NULL;
@@ -262,9 +262,9 @@ unsigned GetMaxTTL() {
 }
 
 
-void SetMaxTTL(const unsigned value) {
+void SetMaxTTL(const unsigned value_minutes) {
   pthread_mutex_lock(&lock_max_ttl_);
-  max_ttl_ = value*60;
+  max_ttl_ = value_minutes*60;
   pthread_mutex_unlock(&lock_max_ttl_);
 }
 
@@ -1910,7 +1910,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::mountpoint_ = new string(loader_exports->mount_point);
   g_uid = geteuid();
   g_gid = getegid();
-  cvmfs::max_ttl_ = max_ttl;
+  cvmfs::SetMaxTTL(max_ttl);
   if (kcache_timeout) {
     cvmfs::kcache_timeout_ =
       (kcache_timeout == -1) ? 0.0 : double(kcache_timeout);
