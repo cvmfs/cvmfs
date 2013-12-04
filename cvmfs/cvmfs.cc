@@ -2326,7 +2326,7 @@ static string GetErrorMsg() {
 
 
 static void Fini() {
-  signal(SIGALRM, SIG_DFL);
+  signal(SIGALRM, SIG_IGN);
   if (g_talk_ready) talk::Fini();
 
   // Must be before quota is stopped
@@ -2424,7 +2424,7 @@ static int AltProcessFlavor(int argc, char **argv) {
 
 static bool MaintenanceMode(const int fd_progress) {
   SendMsg2Socket(fd_progress, "Entering maintenance mode\n");
-  signal(SIGALRM, SIG_DFL);
+  signal(SIGALRM, SIG_IGN);
   atomic_cas32(&cvmfs::maintenance_mode_, 0, 1);
   string msg_progress = "Draining out kernel caches (" +
                         StringifyInt((int)cvmfs::kcache_timeout_) + "s)\n";

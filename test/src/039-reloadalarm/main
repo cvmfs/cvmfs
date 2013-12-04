@@ -1,0 +1,22 @@
+
+cvmfs_test_name="Reload racing with ALARM signal"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount "atlas.cern.ch" \
+    "CVMFS_MAX_TTL=1" || return 1
+  
+  ls /cvmfs/atlas.cern.ch
+  RETVAL=$?
+  if [ $RETVAL -ne 0 ]; then
+    return 2
+  fi
+  sleep 5
+  
+  sudo cvmfs_config reload || return 3
+  ls /cvmfs/atlas.cern.ch || return 4
+
+  return 0
+}
+
