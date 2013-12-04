@@ -967,19 +967,7 @@ CVMFS_UNION_FS_TYPE=$unionfs
 EOF
   cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
 # Created by cvmfs_server.  Don't touch.
-# For pushing files to the worker nodes
-Alias /fanout/cvmfs/$name /cvmfs/$name
 <Directory "/cvmfs/$name">
-    Options -MultiViews
-    AllowOverride All
-    Order allow,deny
-    Allow from all
-    EnableMMAP Off
-    EnableSendFile Off
-</Directory>
-# For pushing catalogs to upstream storage
-Alias /fanout/$temp_dir $temp_dir
-<Directory "$temp_dir">
     Options -MultiViews
     AllowOverride All
     Order allow,deny
