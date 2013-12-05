@@ -57,8 +57,13 @@ void SyncMediator::Add(SyncItem &entry) {
 
   if (entry.IsRegularFile() || entry.IsSymlink()) {
     // Create a nested catalog if we find a new catalog marker
-    if (entry.IsCatalogMarker() && entry.IsNew())
+    // The IsNew() condition can fail if the catalog has just been deleted
+    //if (entry.IsCatalogMarker() && entry.IsNew())
+    if (entry.IsCatalogMarker() &&
+        !catalog_manager_->IsTransitionPoint("/" + entry.relative_parent_path()))
+    {
       CreateNestedCatalog(entry);
+    }
 
     // A file is a hard link if the link count is greater than 1
     if (entry.GetUnionLinkcount() > 1)
@@ -486,20 +491,22 @@ void SyncMediator::PublishHardlinksCallback(const upload::SpoolerResult &result)
 
 
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
-  if (params_->print_changeset)
+  if (params_->print_changeset) {
     LogCvmfs(kLogPublish, kLogStdout, "[add] Nested catalog at %s",
              GetParentPath(requestFile.GetUnionPath()).c_str());
-	if (!params_->dry_run) {
+  }
+  if (!params_->dry_run) {
     catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path());
   }
 }
 
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
-  if (params_->print_changeset)
+  if (params_->print_changeset) {
     LogCvmfs(kLogPublish, kLogStdout, "[rem] Nested catalog at %s",
              GetParentPath(requestFile.GetUnionPath()).c_str());
-	if (!params_->dry_run) {
+  }
+  if (!params_->dry_run) {
     catalog_manager_->RemoveNestedCatalog(requestFile.relative_parent_path());
   }
 }
@@ -512,7 +519,7 @@ void SyncMediator::AddFile(SyncItem &entry) {
   if (entry.IsSymlink() && !params_->dry_run) {
   // Symlinks are completely stored in the catalog
     catalog_manager_->AddFile(entry.CreateBasicCatalogDirent(),
-                             entry.relative_parent_path());
+                              entry.relative_parent_path());
   } else {
     // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);

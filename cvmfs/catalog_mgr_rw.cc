@@ -645,6 +645,29 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
 }
 
 
+/**
+ * Checks if a nested catalog starts at this path.  The path must be valid.
+ */
+bool WritableCatalogManager::IsTransitionPoint(const string &path) {
+  SyncLock();
+  WritableCatalog *catalog;
+  if (!FindCatalog(path, &catalog)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for directory '%s' cannot be found", path.c_str());
+    assert(false);
+  }
+  DirectoryEntry entry;
+  if (!catalog->LookupPath(PathString(path.data(), path.length()), &entry)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "directory '%s' cannot be found",
+             path.c_str());
+    assert(false);
+  }
+  const bool result = entry.IsNestedCatalogRoot();
+  SyncUnlock();
+  return result;
+}
+
+
 void WritableCatalogManager::PrecalculateListings() {
   // TODO
 }

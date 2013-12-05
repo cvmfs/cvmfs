@@ -27,6 +27,7 @@ SyncItem::SyncItem(const string &relative_parent_path,
 
 
 bool SyncItem::IsNew() const {
+  // Careful: this can also mean delete + recreate
   StatRdOnly();
   return (rdonly_stat_.error_code == ENOENT);
 }

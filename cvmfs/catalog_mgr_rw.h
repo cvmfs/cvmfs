@@ -87,6 +87,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
   // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
+  bool IsTransitionPoint(const std::string &path);
 
   /**
    * TODO
