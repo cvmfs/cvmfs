@@ -438,6 +438,21 @@ get_apache_conf_path() {
 }
 
 
+# returns the apache configuration string for 'allow from all'
+# Note: this is necessary, since apache 2.4.x formulates that different
+#
+# @return   a configuration snippet to allow s'th from all hosts (stdout)
+get_compatible_apache_allow_from_all_config() {
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "Require all granted"
+  else
+    local nl='
+'
+    echo "Order allow,deny${nl}    Allow from all"
+  fi
+}
+
+
 # checks if cvmfs2 client is installed
 #
 # @return  0 if cvmfs2 client is installed
@@ -1049,8 +1064,7 @@ EOF
 <Directory "/cvmfs/$name">
     Options -MultiViews
     AllowOverride All
-    Order allow,deny
-    Allow from all
+    $(get_compatible_apache_allow_from_all_config)
     EnableMMAP Off
     EnableSendFile Off
 </Directory>
@@ -1065,8 +1079,7 @@ Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
     AllowOverride All
-    Order allow,deny
-    Allow from all
+    $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
     EnableSendFile Off
@@ -1503,8 +1516,7 @@ Alias /cvmfs/$alias_name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
     AllowOverride All
-    Order allow,deny
-    Allow from all
+    $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
     EnableSendFile Off
