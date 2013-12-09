@@ -6,7 +6,7 @@ cvmfs_run_test() {
 
   local tmpdir=$(mktemp -d)
   echo "tmpdir is $tmpdir"
-  cvmfs2 __MK_ALIEN_CACHE__ "$tmpdir" $(id -u cvmfs) $(id -g cvmfs) || return 2  
+  sudo cvmfs2 __MK_ALIEN_CACHE__ "$tmpdir" $(id -u cvmfs) $(id -g cvmfs) || return 2  
 
   cvmfs_mount "atlas.cern.ch" \
     "CVMFS_ALIEN_CACHE=$tmpdir" \
