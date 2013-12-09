@@ -12,7 +12,7 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "removing vital file"
-  rm -f /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+  sudo rm -f /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO
