@@ -403,6 +403,13 @@ check_apache() {
 }
 
 
+# retrieves the apache version string "2.x.xx"
+get_apache_version() {
+  ${APACHE_SERVICE} -v | head -n1 | \
+    sed 's/^Server version: Apache\/\([0-9]\.[0-9]\.[0-9][0-9]*\).*$/\1/'
+}
+
+
 # checks if cvmfs2 client is installed
 #
 # @return  0 if cvmfs2 client is installed
