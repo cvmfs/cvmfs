@@ -42,6 +42,7 @@ client_package=""
 # from now on everything is logged to the logfile
 # Note: the only output of this script is the absolute path to the generated
 #       log files
+sudo chmod a+w $cvmfs_run_log
 exec &> $cvmfs_run_log
 
 # switch to working directory
