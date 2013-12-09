@@ -35,6 +35,7 @@ platform_setup_script=""
 ec2_config="ec2_config.sh"
 ami_name=""
 log_destination="."
+username="root"
 
 # package download locations
 server_package=""
@@ -75,6 +76,7 @@ usage() {
   echo "Optional parameters:"
   echo " -e <EC2 config file>       local location of the ec2_config.sh file"
   echo " -d <results destination>   Directory to store final test session logs"
+  echo " -m <ssh user name>         User name to be used for VM login (default: root)"
 
   exit 1
 }
@@ -179,6 +181,7 @@ spawn_virtual_machine() {
 
 wait_for_virtual_machine() {
   local ip=$1
+  local username=$2
 
   # wait for the virtual machine to respond to pings
   echo -n "waiting for IP ($ip) to become reachable... "
@@ -197,7 +200,7 @@ wait_for_virtual_machine() {
                                    -o UserKnownHostsFile=/dev/null \
                                    -o LogLevel=ERROR               \
                                    -o BatchMode=yes                \
-              root@$ip 'echo hallo' > /dev/null 2>&1; do
+              ${username}@${ip} 'echo hallo' > /dev/null 2>&1; do
     sleep 10
     timeout=$(( $timeout - 1 ))
   done
@@ -221,44 +224,47 @@ tear_down_virtual_machine() {
 
 run_script_on_virtual_machine() {
   local ip=$1
-  local script_path=$2
-  shift 2
+  local username=$2
+  local script_path=$3
+  shift 3
 
   ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
                            -o UserKnownHostsFile=/dev/null \
                            -o LogLevel=ERROR               \
                            -o BatchMode=yes                \
-      root@$ip 'cat | bash /dev/stdin' $@ < $script_path
+      $username@$ip 'cat | bash /dev/stdin' $@ < $script_path
 }
 
 
 retrieve_file_from_virtual_machine() {
   local ip=$1
-  local file_path=$2
-  local dest_path=$3
+  local username=$2
+  local file_path=$3
+  local dest_path=$4
 
   scp -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no \
-      root@${ip}:${file_path} ${dest_path} > /dev/null 2>&1
+      $username@${ip}:${file_path} ${dest_path} > /dev/null 2>&1
 }
 
 
 setup_virtual_machine() {
   local ip=$1
+  local username=$2
 
   local remote_setup_script
   remote_setup_script="${script_location}/remote_setup.sh"
 
   echo -n "setting up VM ($ip) for CernVM-FS test suite... "
-  run_script_on_virtual_machine $ip $remote_setup_script \
-      -s $server_package                                 \
-      -c $client_package                                 \
-      -t $source_tarball                                 \
-      -g $unittest_package                               \
-      -k $keys_package                                   \
+  run_script_on_virtual_machine $ip $username $remote_setup_script \
+      -s $server_package                                           \
+      -c $client_package                                           \
+      -t $source_tarball                                           \
+      -g $unittest_package                                         \
+      -k $keys_package                                             \
       -r $platform_setup_script
   check_retcode $?
   if [ $? -ne 0 ]; then
-    handle_test_failure $ip
+    handle_test_failure $ip $username
     return 1
   fi
 
@@ -270,6 +276,7 @@ setup_virtual_machine() {
 
 run_test_cases() {
   local ip=$1
+  local username=$2
 
   local retcode
   local log_files
@@ -277,22 +284,23 @@ run_test_cases() {
   remote_run_script="${script_location}/remote_run.sh"
 
   echo -n "running test cases on VM ($ip)... "
-  run_script_on_virtual_machine $ip $remote_run_script \
-      -s $server_package                               \
-      -c $client_package                               \
+  run_script_on_virtual_machine $ip $username $remote_run_script \
+      -s $server_package                                         \
+      -c $client_package                                         \
       -r $platform_run_script
   check_retcode $?
 
   if [ $? -ne 0 ]; then
-    handle_test_failure $ip
+    handle_test_failure $ip $username
   fi
 }
 
 
 handle_test_failure() {
   local ip=$1
+  local username=$2
 
-  get_test_results $ip
+  get_test_results $ip $username
 
   echo "at least one test case failed... skipping destructions of VM!"
   exit 100
@@ -301,6 +309,7 @@ handle_test_failure() {
 
 get_test_results() {
   local ip=$1
+  local username=$2
   local retval_run_log
   local retval_test_log
   local retval_setup_log
@@ -310,26 +319,31 @@ get_test_results() {
   echo -n "retrieving test results... "
   retrieve_file_from_virtual_machine                  \
       $ip                                             \
+      $username                                       \
       $cvmfs_test_log                                 \
       ${log_destination}/$(basename $cvmfs_test_log)
   retval_test_log=$?
   retrieve_file_from_virtual_machine                  \
       $ip                                             \
+      $username                                       \
       $cvmfs_run_log                                  \
       ${log_destination}/$(basename $cvmfs_run_log)
   retval_run_log=$?
   retrieve_file_from_virtual_machine                  \
       $ip                                             \
+      $username                                       \
       $cvmfs_setup_log                                \
       ${log_destination}/$(basename $cvmfs_setup_log)
   retval_setup_log=$?
   retrieve_file_from_virtual_machine                  \
       $ip                                             \
+      $username                                       \
       $cvmfs_unittest_log                             \
       ${log_destination}/$(basename $cvmfs_unittest_log)
   retval_unittest_log=$?
   retrieve_file_from_virtual_machine                  \
       $ip                                             \
+      $username                                       \
       $cvmfs_migrationtest_log                        \
       ${log_destination}/$(basename $cvmfs_migrationtest_log)
   retval_migrationtest_log=$?
@@ -348,7 +362,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:u:p:e:a:d:" option; do
+while getopts "r:b:u:p:e:a:d:m:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -370,6 +384,9 @@ while getopts "r:b:u:p:e:a:d:" option; do
       ;;
     d)
       log_destination=$OPTARG
+      ;;
+    m)
+      username=$OPTARG
       ;;
     ?)
       shift $(($OPTIND-2))
@@ -414,12 +431,12 @@ source_tarball="${testee_url}/${source_tarball}"
 # spawn the virtual machine image, run the platform specific setup script
 # on it, wait for the spawning and setup to be complete and run the actual
 # test suite on the VM.
-spawn_virtual_machine     $ami_name    || die "Aborting..."
-wait_for_virtual_machine  $ip_address  || die "Aborting..."
-setup_virtual_machine     $ip_address  || die "Aborting..."
-wait_for_virtual_machine  $ip_address  || die "Aborting..."
-run_test_cases            $ip_address  || die "Aborting..."
-get_test_results          $ip_address  || die "Aborting..."
-tear_down_virtual_machine $instance_id || die "Aborting..."
+spawn_virtual_machine     $ami_name              || die "Aborting..."
+wait_for_virtual_machine  $ip_address  $username || die "Aborting..."
+setup_virtual_machine     $ip_address  $username || die "Aborting..."
+wait_for_virtual_machine  $ip_address  $username || die "Aborting..."
+run_test_cases            $ip_address  $username || die "Aborting..."
+get_test_results          $ip_address  $username || die "Aborting..."
+tear_down_virtual_machine $instance_id           || die "Aborting..."
 
 echo "all done"
