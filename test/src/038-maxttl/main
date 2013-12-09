@@ -4,7 +4,7 @@ cvmfs_test_name="Proper application of CVMFS_MAX_TTL"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount "atlas.cern.ch" \
+  cvmfs_mount "lhcb.cern.ch" \
     "CVMFS_MAX_TTL=1" || return 1
   
   ls /cvmfs/lhcb.cern.ch
