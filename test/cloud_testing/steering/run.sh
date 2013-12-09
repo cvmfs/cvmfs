@@ -109,7 +109,7 @@ check_timeout() {
 #     client=<url to client package>
 #     server=<url to server package>
 #     ...=...
-#     [<next package name]
+#     [<next platform name>]
 #     ...=...
 #
 # @param pkgmap_url    URL where to find the package map file
