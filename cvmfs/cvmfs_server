@@ -963,6 +963,30 @@ set_ro_root_hash() {
 }
 
 
+# writes apache configuration file
+# This figures out where to put the apache configuration file depending
+# on the running apache version
+# Note: Configuration file content is expected to come through stdin
+#
+# @param   file_name  the name of the apache config file (no path!)
+# @return             0 on succes
+create_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)"
+
+  # create (or append) the conf file
+  cat - >> ${conf_path}/${file_name} || return 1
+
+  # the new apache requires the enable the config afterwards
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    a2enconf $file_name > /dev/null || return 2
+  fi
+
+  return 0
+}
+
+
 # puts all configuration files in place that are need for a stratum0 repository
 #
 # @param name        the name of the repository
@@ -1000,7 +1024,7 @@ CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_UNION_FS_TYPE=$unionfs
 EOF
-  cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
+  create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 <Directory "/cvmfs/$name">
     Options -MultiViews
@@ -1015,7 +1039,7 @@ EOF
   # ONLY FOR LOCAL UPSTREAM
   if is_local_upstream $upstream; then
     local repository_dir=$(get_upstream_config $upstream)
-    cat >> /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
+    create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
@@ -1453,7 +1477,7 @@ CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
   if is_local_upstream $upstream; then
-    cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${alias_name}.conf << EOF
+    create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$alias_name ${repository_dir}
 <Directory "${repository_dir}">
