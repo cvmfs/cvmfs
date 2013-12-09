@@ -5,7 +5,7 @@ cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount "atlas.cern.ch,atlas-nightlies.cern.ch,atlas-condb.cern.ch" \
-    "CVMFS_QUOTA_LIMIT=1000" \
+    "CVMFS_QUOTA_LIMIT=1500" \
     "CVMFS_CHECK_PERMISSIONS=no" || return 1
   
   RETVAL=0
