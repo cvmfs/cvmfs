@@ -403,6 +403,56 @@ check_apache() {
 }
 
 
+# retrieves the apache version string "2.x.xx"
+get_apache_version() {
+  ${APACHE_SERVICE} -v | head -n1 | \
+    sed 's/^Server version: Apache\/\([0-9]\.[0-9]\.[0-9][0-9]*\).*$/\1/'
+}
+
+
+# figure out apache config file mode
+#
+# @return   apache config mode (stdout) (see globals below)
+APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
+APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
+get_apache_conf_mode() {
+  local minor_apache_version=$(version_minor "$(get_apache_version)")
+  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
+    echo $APACHE_CONF_MODE_NEW
+  else
+    echo $APACHE_CONF_MODE_OLD
+  fi
+}
+
+
+# find location of apache configuration files
+#
+# @return   the location of apache configuration files (stdout)
+get_apache_conf_path() {
+  local res_path="/etc/${APACHE_CONF}"
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "${res_path}/conf-available"
+  else
+    echo "${res_path}/conf.d"
+  fi
+}
+
+
+# returns the apache configuration string for 'allow from all'
+# Note: this is necessary, since apache 2.4.x formulates that different
+#
+# @return   a configuration snippet to allow s'th from all hosts (stdout)
+get_compatible_apache_allow_from_all_config() {
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "Require all granted"
+  else
+    local nl='
+'
+    echo "Order allow,deny${nl}    Allow from all"
+  fi
+}
+
+
 # checks if cvmfs2 client is installed
 #
 # @return  0 if cvmfs2 client is installed
@@ -928,6 +978,50 @@ set_ro_root_hash() {
 }
 
 
+# writes apache configuration file
+# This figures out where to put the apache configuration file depending
+# on the running apache version
+# Note: Configuration file content is expected to come through stdin
+#
+# @param   file_name  the name of the apache config file (no path!)
+# @return             0 on succes
+create_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)"
+
+  # create (or append) the conf file
+  cat - >> ${conf_path}/${file_name} || return 1
+
+  # the new apache requires the enable the config afterwards
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    a2enconf $file_name > /dev/null || return 2
+  fi
+
+  return 0
+}
+
+
+# removes apache config files dependent on the apache version in place
+# Note: As of apache 2.4.x `a2disconf` needs to be called before removal
+#
+# @param   file_name  the name of the conf file to be removed (no path!)
+# @return  0 on successful removal
+remove_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)/${file_name}"
+
+  # disable configuration on newer apache versions
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    a2disconf $file_name > /dev/null || return 1
+  fi
+
+  # remove configuration file
+  rm -f $conf_path
+}
+
+
 # puts all configuration files in place that are need for a stratum0 repository
 #
 # @param name        the name of the repository
@@ -965,13 +1059,12 @@ CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_UNION_FS_TYPE=$unionfs
 EOF
-  cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
+  create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 <Directory "/cvmfs/$name">
     Options -MultiViews
     AllowOverride All
-    Order allow,deny
-    Allow from all
+    $(get_compatible_apache_allow_from_all_config)
     EnableMMAP Off
     EnableSendFile Off
 </Directory>
@@ -980,14 +1073,13 @@ EOF
   # ONLY FOR LOCAL UPSTREAM
   if is_local_upstream $upstream; then
     local repository_dir=$(get_upstream_config $upstream)
-    cat >> /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf << EOF
+    create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
     AllowOverride All
-    Order allow,deny
-    Allow from all
+    $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
     EnableSendFile Off
@@ -1418,14 +1510,13 @@ CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
   if is_local_upstream $upstream; then
-    cat > /etc/${APACHE_CONF}/conf.d/cvmfs.${alias_name}.conf << EOF
+    create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$alias_name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
     AllowOverride All
-    Order allow,deny
-    Allow from all
+    $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
     EnableSendFile Off
@@ -1729,7 +1820,7 @@ rmfs() {
           /etc/cvmfs/keys/$name.crt
     fi
     if is_local_upstream $upstream; then
-      rm -f /etc/${APACHE_CONF}/conf.d/cvmfs.${name}.conf
+      remove_apache_config_file "cvmfs.${name}.conf"
       reload_apache > /dev/null
     fi
     sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
