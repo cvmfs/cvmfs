@@ -69,6 +69,13 @@ source_tarball=""
 unittest_package=""
 test_username="sftnight"
 
+# RHEL (SLC) requires a tty for sudo... work around that
+if [ $(id -u) -eq 0 ]; then
+  if ! cat /etc/sudoers | grep -q "Defaults:root !requiretty"; then
+    echo "Defaults:root !requiretty" | tee --append /etc/sudoers > /dev/null 2>&1
+  fi
+fi
+
 # create a workspace
 sudo rm -fR $cvmfs_workspace > /dev/null 2>&1
 mkdir -p $cvmfs_workspace
@@ -144,11 +151,6 @@ if [ $? -ne 0 ]; then
   fi
   echo "$test_username ALL = NOPASSWD: ALL"  | sudo tee --append /etc/sudoers
   echo "Defaults:$test_username !requiretty" | sudo tee --append /etc/sudoers
-fi
-
-# adapt sudo configuration for non-tty usage if necessary
-if ! sudo cat /etc/sudoers | grep -q "Defaults:root !requiretty"; then
-  echo "Defaults:root !requiretty" | sudo tee --append /etc/sudoers
 fi
 
 # download the needed packages
