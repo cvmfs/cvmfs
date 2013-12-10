@@ -48,6 +48,8 @@ download() {
   fi
 }
 
+export LC_ALL=C
+
 # static information (check also remote_run.sh and run.sh)
 cvmfs_workspace="/tmp/cvmfs-test-workspace"
 cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
@@ -68,6 +70,7 @@ unittest_package=""
 test_username="sftnight"
 
 # create a workspace
+sudo rm -fR $cvmfs_workspace > /dev/null 2>&1
 mkdir -p $cvmfs_workspace
 if [ $? -ne 0 ]; then
   echo "failed to create workspace $cvmfs_workspace"
@@ -134,18 +137,18 @@ fi
 # create test user account if necessary
 id $test_username > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-  /usr/sbin/useradd $test_username
+  sudo /usr/sbin/useradd $test_username
   if [ $? -ne 0 ]; then
     echo "cannot create user account $test_username"
     exit 4
   fi
-  echo "$test_username ALL = NOPASSWD: ALL"  | tee --append /etc/sudoers
-  echo "Defaults:$test_username !requiretty" | tee --append /etc/sudoers
+  echo "$test_username ALL = NOPASSWD: ALL"  | sudo tee --append /etc/sudoers
+  echo "Defaults:$test_username !requiretty" | sudo tee --append /etc/sudoers
 fi
 
 # adapt sudo configuration for non-tty usage if necessary
-if ! cat /etc/sudoers | grep -q "Defaults:root !requiretty"; then
-  echo "Defaults:root !requiretty" | tee --append /etc/sudoers
+if ! sudo cat /etc/sudoers | grep -q "Defaults:root !requiretty"; then
+  echo "Defaults:root !requiretty" | sudo tee --append /etc/sudoers
 fi
 
 # download the needed packages
@@ -185,7 +188,7 @@ else
 fi
 
 # chown the source tree to allow $test_username to work with it
-chown -R $test_username:$test_username $cvmfs_workspace
+sudo chown -R $test_username:$test_username $cvmfs_workspace
 
 # find the platform specific script
 if [ x$platform_script_path = "x" ]; then

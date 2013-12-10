@@ -1,5 +1,6 @@
 #!/bin/sh
 
+export LC_ALL=C
 
 # splits onelined CSV strings and prints the desired field offset
 #
