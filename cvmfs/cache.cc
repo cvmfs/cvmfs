@@ -161,23 +161,19 @@ bool Init(const string &cache_path, const bool alien_cache) {
   tls_blocks_ = new vector<ThreadLocalStorage *>();
   atomic_init64(&num_download_);
 
-  if(alien_cache_)
-  {
-	  if (!MakeCacheDirectories(cache_path, 0770))
-	  {
-		  /* Ignore possible EEXIST when two different processes race to create
-		   * the directory hierarchy. */
-		  if(errno != EEXIST)
-			  return false;
-	  }
+  if (alien_cache_) {
+    if (!MakeCacheDirectories(cache_path, 0770)) {
+      /* Ignore possible EEXIST when two different processes race to create
+       * the directory hierarchy. */
+      if(errno != EEXIST)
+        return false;
+    }
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "Cache directory structure created.");
+  } else {
+    if (!MakeCacheDirectories(cache_path, 0700))
+      return false;
   }
-  else
-  {
-	  if (!MakeCacheDirectories(cache_path, 0700))
-		  return false;
-  }
-
-  LogCvmfs(kLogCache, kLogDebug, "Cache directory structure created.");
 
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
     LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr,
