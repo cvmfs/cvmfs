@@ -4,38 +4,40 @@ cvmfs_test_name="Rebuild cache db after crash"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount lhcb.cern.ch || return 1
+  local repo="atlas.cern.ch"
+
+  cvmfs_mount ${repo} || return 1
 
   local cache_dir
   local cache_list
   local pid
   
-  cache_dir=$(get_cvmfs_cachedir lhcb.cern.ch)
+  cache_dir=$(get_cvmfs_cachedir ${repo})
   sudo [ -f ${cache_dir}/cachedb ] || return 2
-  sudo [ -f ${cache_dir}/cachemgr.running ] || cvmfs_config showconfig lhcb.cern.ch | grep -q CVMFS_SHARED_CACHE=no || return 3
-  sudo [ -f ${cache_dir}/running.lhcb.cern.ch ] || return 4
-  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab || return 5
-  cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
+  sudo [ -f ${cache_dir}/cachemgr.running ] || cvmfs_config showconfig ${repo} | grep -q CVMFS_SHARED_CACHE=no || return 3
+  sudo [ -f ${cache_dir}/running.${repo} ] || return 4
+  cat /cvmfs/${repo}/.cvmfsdirtab || return 5
+  cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -q "automatic rebuild"; then
     echo "$cache_list"
     return 6
   fi
 
-  cvmfs_umount lhcb.cern.ch || return 10
-  ls /cvmfs/lhcb.cern.ch || return 11
-  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab || return 12
-  cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
+  cvmfs_umount ${repo} || return 10
+  ls /cvmfs/${repo} || return 11
+  cat /cvmfs/${repo}/.cvmfsdirtab || return 12
+  cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -q "automatic rebuild"; then
     echo "$cache_list"
     return 13
   fi
   
-  pid=$(sudo cvmfs_talk -i lhcb.cern.ch pid cachemgr) || return 20
+  pid=$(sudo cvmfs_talk -i ${repo} pid cachemgr) || return 20
   sudo kill -9 $pid || return 21
-  cvmfs_umount lhcb.cern.ch || return 22
+  cvmfs_umount ${repo} || return 22
   
-  ls /cvmfs/lhcb.cern.ch || return 30
-  cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
+  ls /cvmfs/${repo} || return 30
+  cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -v -q "automatic rebuild"; then
     echo "$cache_list"
     return 31
