@@ -70,7 +70,7 @@ unittest_package=""
 test_username="sftnight"
 
 # create a workspace
-sudo rm -fR $cvmfs_workspace > /dev/null
+sudo rm -fR $cvmfs_workspace > /dev/null 2>&1
 mkdir -p $cvmfs_workspace
 if [ $? -ne 0 ]; then
   echo "failed to create workspace $cvmfs_workspace"
