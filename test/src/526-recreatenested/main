@@ -2,14 +2,14 @@ cvmfs_test_name="Recreate nested catalog tree"
 cvmfs_test_autofs_on_startup=false
 
 produce_files_in() {
-	local working_dir=$1
+  local working_dir=$1
 
-	pushdir $working_dir
+  pushdir $working_dir
 
-	mkdir -p nested/foo/bar
-        touch nested/.cvmfscatalog
-	
-	popdir
+  mkdir -p nested/foo/bar
+  touch nested/.cvmfscatalog
+
+  popdir
 }
 
 cvmfs_run_test() {
