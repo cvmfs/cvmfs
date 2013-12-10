@@ -48,6 +48,8 @@ download() {
   fi
 }
 
+export LC_ALL=C
+
 # static information (check also remote_run.sh and run.sh)
 cvmfs_workspace="/tmp/cvmfs-test-workspace"
 cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"

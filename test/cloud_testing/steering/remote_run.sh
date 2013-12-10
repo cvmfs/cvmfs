@@ -23,6 +23,8 @@ usage() {
   exit 1
 }
 
+export LC_ALL=C
+
 # static information (check also remote_setup.sh and run.sh)
 cvmfs_workspace="/tmp/cvmfs-test-workspace"
 cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
