@@ -13,7 +13,7 @@ cvmfs_run_test() {
     return 2
   fi
 
-  local ttl=$(sudo cvmfs_talk -i lhcb max ttl info)
+  local ttl="$(sudo cvmfs_talk -i lhcb max ttl info)"
   if [ "$ttl" != "1 minutes" ]; then
     echo "wrong ttl, expected 1 minutes got $ttl"
     return 3

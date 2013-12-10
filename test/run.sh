@@ -4,6 +4,7 @@ usage() {
   echo "$0 <logfile> [<test list> | -x <exclusion list>]"
 }
 
+export LC_ALL=C
 
 # set up a log file
 logfile=$1
