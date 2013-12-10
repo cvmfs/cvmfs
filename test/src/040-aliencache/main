@@ -16,8 +16,8 @@ cvmfs_run_test() {
   ls /cvmfs/atlas.cern.ch || return 3
   cvmfs_umount atlas.cern.ch
 
-  local files=$(find $tmpdir -type f | wc -l)
-  rm -rf "$tmpdir"
+  local files=$(sudo find $tmpdir -type f | wc -l)
+  sudo rm -rf "$tmpdir"
   if [ $files -eq 0 ]; then
     return 5
   fi
