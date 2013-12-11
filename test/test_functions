@@ -59,6 +59,10 @@ service_switch() {
       echo "stopping $service_name..."
       sudo $service_binary $service_name stop || return 101
       ;;
+    restart)
+      echo "restarting $service_name..."
+      sudo $service_binary $service_name restart || return 102
+      ;;
     *)
       echo "unrecognized state switching for $service_name"
       return 102
@@ -88,11 +92,19 @@ service_should_switch() {
   return 1
 }
 
+
+# checks if autofs is running on /cvmfs
+# @return   0 when autofs is mounted on /cvmfs
+autofs_check() {
+  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+}
+
+
 # ensures that autofs is on or off
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 autofs_switch() {
-  cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+  autofs_check
   service_should_switch $1 $?
   if [ $? -eq 0 ]; then
     service_switch autofs $1
