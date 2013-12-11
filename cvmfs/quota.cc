@@ -29,6 +29,7 @@
 #include <inttypes.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <dirent.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -1260,6 +1261,29 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
 }
 
 
+static void CleanupPipes(const string &cache_dir) {
+  DIR *dirp = opendir(cache_dir.c_str());
+  assert(dirp != NULL);
+
+  platform_dirent64 *dent;
+  bool found_leftovers = false;
+  while ((dent = platform_readdir(dirp)) != NULL) {
+    const string name = dent->d_name;
+    const string path = cache_dir + "/" + name;
+    platform_stat64 info;
+    platform_stat(path.c_str(), &info);
+    if (S_ISFIFO(info.st_mode) && (name.substr(0, 4) == "pipe")) {
+      if (!found_leftovers) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                 "removing left-over FIFOs from cache directory");
+      }
+      found_leftovers = true;
+      unlink(path.c_str());
+    }
+  }
+}
+
+
 /**
  * Entry point for the shared cache manager process
  */
@@ -1321,6 +1345,8 @@ int MainCacheManager(int argc, char **argv) {
     static_cast<char *>(sqlite3_malloc(tmp_dir.length() + 1));
   strcpy(sqlite3_temp_directory, tmp_dir.c_str());
 
+  // Cleanup leftover named pipes
+  CleanupPipes(*cache_dir_);
 
   if (!InitDatabase(rebuild)) {
     UnlockFile(fd_lockfile_fifo);
