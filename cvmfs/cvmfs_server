@@ -176,7 +176,7 @@ Supported Commands:
                 < -k path to keys> <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
-                [-a tag name] [-c tag channel] [ -t tag description ] [ -h hash ]
+                [-a tag name] [-c tag channel] [ -t tag description] [ -h hash]
                 [-r tag name]
                 <fully qualified name>
                 Make a new repository snapshot
