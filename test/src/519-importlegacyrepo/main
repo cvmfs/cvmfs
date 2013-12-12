@@ -55,6 +55,7 @@ cvmfs_run_test() {
     -o $CVMFS_TEST_USER \
     -u $upstream \
     -k $keys_location \
+    -l \
     -s \
     $CVMFS_TEST_REPO || return 11
 
