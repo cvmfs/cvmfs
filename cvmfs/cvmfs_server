@@ -1684,31 +1684,42 @@ import() {
   if has_selinux; then
     chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
   fi
-  cvmfs_swissknife migrate \
-    -v "2.0.x" \
-    -r $storage_location \
-    -n $name \
-    -u $upstream \
-    -t $temp_dir \
-    -k "${global_key_dir}/$public_key" \
-    -o $new_manifest \
-    -p $cvmfs_uid \
-    -g $cvmfs_gid \
-    -f \
-    $statistics_flag || die "fail!"
-  chown $cvmfs_user $new_manifest
-
-  # sign new (migrated) repository revision
-  echo -n "Signing newly imported Repository... "
-  create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
-    -c ${global_key_dir}/${certificate} \
-    -k ${global_key_dir}/${private_key} \
-    -n $name \
-    -m $new_manifest \
-    -t $temp_dir \
-    -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
   echo "done"
+
+  # migrate old catalogs
+  if [ $is_legacy -ne 0 ]; then
+    echo "Migrating old catalogs (may take a while)... "
+    local new_manifest="${temp_dir}/new_manifest"
+    local statistics_flag
+    if [ $show_statistics -ne 0 ]; then
+      statistics_flag="-s"
+    fi
+    cvmfs_swissknife migrate \
+      -v "2.0.x" \
+      -r $storage_location \
+      -n $name \
+      -u $upstream \
+      -t $temp_dir \
+      -k "${global_key_dir}/$public_key" \
+      -o $new_manifest \
+      -p $cvmfs_uid \
+      -g $cvmfs_gid \
+      -f \
+      $statistics_flag || die "fail!"
+    chown $cvmfs_user $new_manifest
+
+    # sign new (migrated) repository revision
+    echo -n "Signing newly imported Repository... "
+    create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+    sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+      -c ${global_key_dir}/${certificate} \
+      -k ${global_key_dir}/${private_key} \
+      -n $name \
+      -m $new_manifest \
+      -t $temp_dir \
+      -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
+    echo "done"
+  fi
 
   # do final setup
   echo -n "Mounting CernVM-FS Storage... "
