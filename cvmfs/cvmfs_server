@@ -171,9 +171,10 @@ Supported Commands:
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
-                [-s show migration statistics] [-c file ownership (UID:GID)]
+                [-l import legacy repo (2.0.x)] [-s show migration statistics] 
+                [-c file ownership (UID:GID)]
                 < -k path to keys> <fully qualified repository name>
-                Imports a CernVM-FS 2.0.x repository into a fresh 2.1.x repo
+                Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
                 [-a tag name] [-c tag channel] [ -t tag description ] [ -h hash ]
                 [-r tag name]
@@ -1565,12 +1566,13 @@ import() {
   local upstream
   local owner
   local file_ownership
+  local is_legacy=0
   local show_statistics=0
   local replicable=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:sm" option; do
+  while getopts "w:o:c:u:k:l:sm" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1587,6 +1589,9 @@ import() {
       k)
         keys_location=$OPTARG
       ;;
+      l)
+        is_legacy=1
+        ;;
       s)
         show_statistics=1
       ;;
