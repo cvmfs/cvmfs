@@ -1060,6 +1060,10 @@ CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_UNION_FS_TYPE=$unionfs
 EOF
+
+  # make sure that the config file does not exist, yet
+  remove_apache_config_file "cvmfs.${name}.conf" || true
+
   create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 <Directory "/cvmfs/$name">
