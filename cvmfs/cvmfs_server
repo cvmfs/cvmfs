@@ -1678,16 +1678,11 @@ import() {
   load_repo_config $name
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
 
-  # migrate old catalogs
-  echo "Importing and Migrating old catalogs (may take a while)... "
-  chown -R $cvmfs_user $storage_location
+  # import storage location
+  echo -n "Importing CernVM-FS storage... "
+  chown -R $cvmfs_user $storage_location || die "fail!"
   if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null
-  fi
-  local new_manifest="${temp_dir}/new_manifest"
-  local statistics_flag
-  if [ $show_statistics -ne 0 ]; then
-    statistics_flag="-s"
+    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
   fi
   cvmfs_swissknife migrate \
     -v "2.0.x" \
