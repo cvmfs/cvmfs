@@ -1636,7 +1636,7 @@ import() {
   for pki_file in $pki_keys; do
     [ -f "${keys_location}/$pki_file" ] || die "Cannot find $pki_file in $keys_location"
   done
-  [ x"$keys_location" = "x" ] && die "Please provide the location of the 2.0.x repository security keys (-k)"
+  [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
 
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
