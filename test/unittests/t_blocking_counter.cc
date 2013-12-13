@@ -114,8 +114,11 @@ TEST_F(T_BlockingCounter, IncrementAndWait) {
   EXPECT_EQ (2,          T_BlockingCounter::concurrent_state_);
   EXPECT_EQ (max_value_, uint_counter_);
 
-  const int killed = pthread_cancel(thread);
+  const int killed = pthread_kill(thread, 0);
   EXPECT_EQ (ESRCH, killed) << "Thread did not exit properly";
+  if (killed == ESRCH) {
+    pthread_cancel(thread);
+  }
 }
 
 
@@ -150,6 +153,9 @@ TEST_F(T_BlockingCounter, BecomeZero) {
   EXPECT_EQ (3,  T_BlockingCounter::concurrent_state_) << "Thread didn't wake up "
                                                        << "for zero'ed counter!";
 
-  const int killed = pthread_cancel(thread);
+  const int killed = pthread_kill(thread, 0);
   EXPECT_EQ (ESRCH, killed) << "Thread did not exit properly";
+  if (killed == ESRCH) {
+    pthread_cancel(thread);
+  }
 }
