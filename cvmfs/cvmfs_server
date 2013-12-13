@@ -1666,7 +1666,9 @@ import() {
   local global_key_dir="/etc/cvmfs/keys"
   mkdir -p $global_key_dir
   for pki_file in $pki_keys; do
-    cp "${keys_location}/$pki_file" $global_key_dir    || die "fail! (cannot copy $pki_file)"
+    if [ ! -f "${global_key_dir}/$pki_file" ]; then
+      cp "${keys_location}/$pki_file" $global_key_dir  || die "fail! (cannot copy $pki_file)"
+    fi
     chmod 444 "${global_key_dir}/${pki_file}"          || die "fail! (cannot chmod $pki_file)"
     chown $cvmfs_user "${global_key_dir}/${pki_file}"  || die "fail! (cannot chown $pki_file)"
   done
