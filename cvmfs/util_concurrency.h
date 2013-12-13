@@ -195,6 +195,54 @@ class Future : SingleCopy {
 //
 
 
+/**
+ * This is a semaphore-like counter. On creation the user specifies a maximal
+ * value. If a thread wants to increase the counter to a higher value it blocks
+ * and waits until something else decreases the counter.
+ */
+template <typename T>
+class BlockingCounter : SingleCopy {
+ public:
+  BlockingCounter(const T maximal_value);
+  virtual ~BlockingCounter();
+
+  T Increment() { return ++(*this); }
+  T Decrement() { return --(*this); }
+
+  const T& MaximalValue() const { return maximal_value_; }
+  void WaitForZero() const;
+
+  T operator++();
+  T operator++(int);
+  T operator--();
+  T operator--(int);
+
+  operator T() const { return value_; }
+  BlockingCounter<T>& operator=(const T &other);
+
+ private:
+  // those expect mutex_ to be locked before they are called!
+  void UnsafeIncrement();
+  void UnsafeDecrement();
+  void UnsafeAssign(const T &value);
+
+ private:
+  const T                 maximal_value_;
+  T                       value_;
+
+  mutable pthread_mutex_t mutex_;
+          pthread_cond_t  free_slot_;
+  mutable pthread_cond_t  became_zero_;
+};
+
+typedef BlockingCounter<unsigned int> BlockingIntCounter;
+
+
+//
+// -----------------------------------------------------------------------------
+//
+
+
 template <typename ParamT>
 class Observable;
 

@@ -64,6 +64,116 @@ const T& Future<T>::Get() const {
 
 //
 // +----------------------------------------------------------------------------
+// |  BlockingCounter
+//
+
+
+template <typename T>
+BlockingCounter<T>::BlockingCounter(const T maximal_value) :
+  maximal_value_(maximal_value),
+  value_(0)
+{
+  const bool init_successful = (pthread_mutex_init(&mutex_, NULL)      == 0  &&
+                                pthread_cond_init(&free_slot_, NULL)   == 0  &&
+                                pthread_cond_init(&became_zero_, NULL) == 0);
+  assert (init_successful);
+}
+
+
+template <typename T>
+BlockingCounter<T>::~BlockingCounter() {
+  pthread_mutex_destroy(&mutex_);
+  pthread_cond_destroy(&free_slot_);
+  pthread_cond_destroy(&became_zero_);
+}
+
+
+template <typename T>
+void BlockingCounter<T>::WaitForZero() const {
+  MutexLockGuard guard(mutex_);
+  while (value_ != T(0)) {
+    pthread_cond_wait(&became_zero_, &mutex_);
+  }
+}
+
+
+template <typename T>
+T BlockingCounter<T>::operator++() {
+  MutexLockGuard guard(mutex_);
+  UnsafeIncrement();
+  return value_;
+}
+
+
+template <typename T>
+T BlockingCounter<T>::operator++(int) {
+  MutexLockGuard guard(mutex_);
+  const T output = value_;
+  UnsafeIncrement();
+  return output;
+}
+
+
+template <typename T>
+T BlockingCounter<T>::operator--() {
+  MutexLockGuard guard(mutex_);
+  UnsafeDecrement();
+  return value_;
+}
+
+
+template <typename T>
+T BlockingCounter<T>::operator--(int) {
+  MutexLockGuard guard(mutex_);
+  const T output = value_;
+  UnsafeDecrement();
+  return output;
+}
+
+
+template <typename T>
+BlockingCounter<T>& BlockingCounter<T>::operator=(const T &other) {
+  MutexLockGuard guard(mutex_);
+  UnsafeAssign(other);
+  return *this;
+}
+
+
+template <typename T>
+void BlockingCounter<T>::UnsafeIncrement() {
+  while (value_ >= maximal_value_) {
+    pthread_cond_wait(&free_slot_, &mutex_);
+  }
+  UnsafeAssign(value_ + T(1));
+}
+
+
+template <typename T>
+void BlockingCounter<T>::UnsafeDecrement() {
+  assert (value_ > T(0));
+  UnsafeAssign(value_ - T(1));
+}
+
+
+template <typename T>
+void BlockingCounter<T>::UnsafeAssign(const T &value) {
+  assert (value >= T(0));
+  assert (value <= maximal_value_);
+
+  value_ = value;
+
+  if (value_ < maximal_value_) {
+    pthread_cond_broadcast(&free_slot_);
+  }
+
+  if (value_ == T(0)) {
+    pthread_cond_broadcast(&became_zero_);
+  }
+}
+
+
+//
+// +----------------------------------------------------------------------------
 // |  Observable
 //
 
