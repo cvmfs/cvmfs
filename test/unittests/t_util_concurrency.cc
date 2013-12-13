@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "../../cvmfs/util_concurrency.h"
 
@@ -100,15 +101,30 @@ TEST(T_UtilConcurrency, ReadLockGuard) {
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 //
 
+bool g_acquire_write_lock_killer = true;
+
+void *acquire_write_lock(void *lock) {
+  pthread_rwlock_t &rwlock = *static_cast<pthread_rwlock_t*>(lock);
+
+  WriteLockGuard lck(rwlock);
+  while (g_acquire_write_lock_killer);
+  return NULL;
+}
 
 TEST(T_UtilConcurrency, WriteLockGuard) {
   pthread_rwlock_t rwlock;
   int retcode = pthread_rwlock_init(&rwlock, NULL);
   ASSERT_EQ (0, retcode);
 
-  {
-    WriteLockGuard lock(rwlock);
+  pthread_t thread;
+  const int res = pthread_create(&thread,
+                                  NULL,
+                                 &acquire_write_lock,
+                                  static_cast<void*>(&rwlock));
+  ASSERT_EQ (0, res);
 
+  sleep(1);
+  {
     retcode = pthread_rwlock_tryrdlock(&rwlock);
     EXPECT_EQ (EBUSY, retcode) << "WriteLockGuard didn't lock - rdlock possible";
     if (0 == retcode) {
@@ -123,6 +139,9 @@ TEST(T_UtilConcurrency, WriteLockGuard) {
       ASSERT_EQ (0, retcode);
     }
   }
+
+  g_acquire_write_lock_killer = false;
+  pthread_join(thread, NULL);
 
   retcode = pthread_rwlock_trywrlock(&rwlock);
   EXPECT_EQ (0, retcode) << "WriteLockGuard didn't unlock";
