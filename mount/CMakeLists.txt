@@ -7,11 +7,17 @@ set (CVMFS_MOUNT_SOURCES
   ../cvmfs/sanitizer.h ../cvmfs/sanitizer.cc
   mount.cvmfs.cc
 )
-set (CVMFS_MOUNT_CFLAGS "${CVMFS_MOUNT_CFLAGS} -I${CMAKE_SOURCE_DIR}/cvmfs")
-add_executable (mount.cvmfs ${CVMFS_MOUNT_SOURCES})
-target_link_libraries (mount.cvmfs pthread)
-set_target_properties (mount.cvmfs PROPERTIES COMPILE_FLAGS "${CVMFS_MOUNT_CFLAGS}")
 
+if (MACOSX)
+  set (MOUNT_TARGET_NAME "mount_cvmfs")
+else (MACOSX)
+  set (MOUNT_TARGET_NAME "mount.cvmfs")
+endif (MACOSX)
+
+add_executable (${MOUNT_TARGET_NAME} ${CVMFS_MOUNT_SOURCES})
+target_link_libraries (${MOUNT_TARGET_NAME} pthread)
+set (CVMFS_MOUNT_CFLAGS "${CVMFS_MOUNT_CFLAGS} -I${CMAKE_SOURCE_DIR}/cvmfs")
+set_target_properties (${MOUNT_TARGET_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_MOUNT_CFLAGS}")
 
 if (MACOSX)
   install (
@@ -20,9 +26,8 @@ if (MACOSX)
   )
 
   install (
-    FILES         mount.cvmfs
+    TARGETS       ${MOUNT_TARGET_NAME}
     DESTINATION   "/sbin"
-    RENAME        mount_cvmfs
     PERMISSIONS   OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
@@ -76,7 +81,7 @@ else (MACOSX)
   )
 
   install (
-    TARGETS       mount.cvmfs
+    TARGETS       ${MOUNT_TARGET_NAME}
     DESTINATION   "/sbin"
     PERMISSIONS   OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
