@@ -654,9 +654,9 @@ bool SqlNestedCatalogLookup::BindSearchPath(const PathString &path) {
 
 
 shash::Any SqlNestedCatalogLookup::GetContentHash() const {
-  const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(0)));
-  return (sha1.empty()) ? shash::Any(shash::kSha1) :
-                          shash::Any(shash::kSha1, shash::HexPtr(sha1));
+  const string hash = string(reinterpret_cast<const char *>(RetrieveText(0)));
+  return (hash.empty()) ? shash::Any(shash::kAny) :
+                          shash::MkFromHexPtr(shash::HexPtr(hash));
 }
 
 
@@ -687,9 +687,9 @@ PathString SqlNestedCatalogListing::GetMountpoint() const {
 
 
 shash::Any SqlNestedCatalogListing::GetContentHash() const {
-  const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(1)));
-  return (sha1.empty()) ? shash::Any(shash::kSha1) :
-                          shash::Any(shash::kSha1, shash::HexPtr(sha1));
+  const string hash = string(reinterpret_cast<const char *>(RetrieveText(1)));
+  return (hash.empty()) ? shash::Any(shash::kAny) :
+                          shash::MkFromHexPtr(shash::HexPtr(hash));
 }
 
 
