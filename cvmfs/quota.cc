@@ -88,7 +88,7 @@ enum CommandType {
 
 struct LruCommand {
   CommandType command_type;
-  uint64_t size;
+  uint64_t size;    // Last 3 bits store hash algorithm
   int return_pipe;  // For cleanup, listing, and reservations
   unsigned char digest[shash::kMaxDigestSize];
   uint16_t path_length;  // Maximum 512-sizeof(LruCommand) in order to guarantee
