@@ -131,6 +131,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
 
+  shash::Algorithms hash_algorithm = spooler->GetHashAlgorithm();
+
   // A newly created catalog always needs a root entry
   // we create and configure this here
   DirectoryEntry root_entry;
@@ -141,7 +143,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   root_entry.mtime_             = time(NULL);
   root_entry.uid_               = getuid();
   root_entry.gid_               = getgid();
-  root_entry.checksum_          = shash::Any(shash::kSha1);
+  root_entry.checksum_          = shash::Any(hash_algorithm);
   root_entry.linkcount_         = 2;
   string root_path = "";
 
@@ -159,7 +161,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
     return NULL;
   }
   string file_path_compressed = file_path + ".compressed";
-  shash::Any hash_catalog(shash::kSha1);
+  shash::Any hash_catalog(hash_algorithm);
   bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
                                         &hash_catalog);
   if (!retval) {
@@ -790,7 +792,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   assert(catalog_size > 0);
 
   // Compress catalog
-  shash::Any hash_catalog(shash::kSha1);
+  shash::Any hash_catalog(spooler_->GetHashAlgorithm());
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_catalog))
@@ -803,7 +805,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   spooler_->Upload(catalog->database_path() + ".compressed",
                    "data" + hash_catalog.MakePath(1, 2) + "C");
 
-  // Update registered catalog SHA1 in nested catalog
+  // Update registered catalog hash in nested catalog
   if (!catalog->IsRoot()) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());

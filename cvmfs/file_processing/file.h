@@ -11,6 +11,7 @@
 #include <tbb/atomic.h>
 
 #include "../platform.h"
+#include "../hash.h"
 
 #include "char_buffer.h"
 #include "chunk_detector.h"
@@ -33,6 +34,7 @@ class File : public AbstractFile {
   File(const std::string  &path,
        IoDispatcher       *io_dispatcher,
        ChunkDetector      *chunk_detector,
+       shash::Algorithms  hash_algorithm,
        const std::string  &hash_suffix    = "");
   ~File();
 
@@ -91,6 +93,7 @@ class File : public AbstractFile {
 
  private:
   const bool                  might_become_chunked_; ///< Result of the chunkedness forecast
+  const shash::Algorithms     hash_algorithm_;       ///< Secure hash algorithm creating content-addressable storage
   const std::string           hash_suffix_;          ///< Suffix to be appended to the bulk chunk content hash
 
   ChunkVector                 chunks_;               ///< List of generated Chunks

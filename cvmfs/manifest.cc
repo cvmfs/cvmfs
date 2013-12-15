@@ -97,7 +97,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   iter = content.find('C');
   if ((iter = content.find('C')) == content.end())
     return NULL;
-  catalog_hash = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+  catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('R')) == content.end())
     return NULL;
   root_path = shash::Md5(shash::HexPtr(iter->second));
@@ -119,13 +119,13 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
   if ((iter = content.find('L')) != content.end())
-    micro_catalog_hash = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+    micro_catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('N')) != content.end())
     repository_name = iter->second;
   if ((iter = content.find('X')) != content.end())
-    certificate = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+    certificate = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('H')) != content.end())
-    history = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+    history = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
 
@@ -140,8 +140,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
       history::UpdateChannel channel =
         static_cast<history::UpdateChannel>(channel_int);
       channel_tops.push_back(history::TagList::ChannelTag(
-        channel, shash::Any(shash::kSha1,
-                            shash::HexPtr(elements[i].substr(2)))));
+        channel, MkFromHexPtr(shash::HexPtr(elements[i].substr(2)))));
     }
   }
 

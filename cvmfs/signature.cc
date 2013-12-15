@@ -327,11 +327,13 @@ bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
 
 
 /**
- * Returns SHA-1 hash from DER encoded certificate, encoded the same way
+ * Returns cryptographic hash from DER encoded certificate, encoded the same way
  * OpenSSL does (01:AB:...).
  * Empty string on failure.
  */
-string SignatureManager::FingerprintCertificate() {
+string SignatureManager::FingerprintCertificate(
+  const shash::Algorithms hash_algorithm)
+{
   if (!certificate_) return "";
 
   int buffer_size;
@@ -340,14 +342,16 @@ string SignatureManager::FingerprintCertificate() {
   buffer_size = i2d_X509(certificate_, &buffer);
   if (buffer_size < 0) return "";
 
-  shash::Any hash(shash::kSha1);
+  shash::Any hash(hash_algorithm);
   shash::HashMem(buffer, buffer_size, &hash);
   free(buffer);
 
   const string hash_str = hash.ToString();
   string result;
   for (unsigned i = 0; i < hash_str.length(); ++i) {
-    if ((i > 0) && (i%2 == 0)) result += ":";
+    if (i < 2*shash::kDigestSizes[hash_algorithm]) {
+      if ((i > 0) && (i%2 == 0)) result += ":";
+    }
     result += toupper(hash_str[i]);
   }
   return result;
@@ -609,10 +613,7 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
     }
     hash_str.push_back(buffer[pos++]);
   } while (true);
-  // TODO: more hashes
-  if (hash_str.length() != 2*shash::kDigestSizes[shash::kSha1])
-    return false;
-  shash::Any hash_printed(shash::kSha1, shash::HexPtr(hash_str));
+  shash::Any hash_printed = shash::MkFromHexPtr(shash::HexPtr(hash_str));
   shash::Any hash_computed(hash_printed.algorithm);
   shash::HashMem(buffer, letter_length, &hash_computed);
   if (hash_printed != hash_computed)

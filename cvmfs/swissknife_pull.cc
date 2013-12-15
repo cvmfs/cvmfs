@@ -335,6 +335,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   unsigned timeout = 10;
   int fd_lockfile = -1;
+  string spooler_definition_str;
   manifest::ManifestEnsemble ensemble;
 
   // Option parsing
@@ -354,10 +355,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (preload_cache) {
     preload_cachedir = new string(*args.find('r')->second);
   } else {
-    const upload::SpoolerDefinition spooler_definition(*args.find('r')->second);
-    spooler = upload::Spooler::Construct(spooler_definition);
-    assert(spooler);
-    spooler->RegisterListener(&SpoolerOnUpload);
+    spooler_definition_str = *args.find('r')->second;
   }
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
@@ -446,6 +444,16 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
     goto fini;
+  }
+
+  // Manifest available, now the spooler's hash algorithm can be determined
+  {
+    const upload::SpoolerDefinition
+      spooler_definition(spooler_definition_str,
+                         ensemble.manifest->GetHashAlgorithm());
+    spooler = upload::Spooler::Construct(spooler_definition);
+    assert(spooler);
+    spooler->RegisterListener(&SpoolerOnUpload);
   }
 
   // Fetch tag list

@@ -296,6 +296,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
+Any MkFromHexPtr(const HexPtr hex);
 
 }  // namespace hash
 

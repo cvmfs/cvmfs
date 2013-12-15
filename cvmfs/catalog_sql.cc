@@ -20,6 +20,7 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+// Changelog
 const float Database::kLatestSchema = 2.5;
 const float Database::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
 const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
@@ -325,7 +326,25 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   if (entry.IsChunkedFile())
     database_flags |= kFlagFileChunk;
 
+  if (!entry.checksum_ptr()->IsNull())
+    StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
+
   return database_flags;
+}
+
+void SqlDirent::StoreHashAlgorithm(const shash::Algorithms algo,
+                                   unsigned *flags) const
+{
+  // Md5 unusable for content hashes
+  *flags |= (algo - 1) << kFlagPosHash;
+}
+
+shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
+  unsigned in_flags = ((7 << kFlagPosHash) & flags) >> kFlagPosHash;
+  // Skip Md5
+  in_flags++;
+  assert(in_flags < shash::kAny);
+  return static_cast<shash::Algorithms>(in_flags);
 }
 
 uint32_t SqlDirent::Hardlinks2Linkcount(const uint64_t hardlinks) const {
@@ -424,7 +443,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                   entry.linkcount_);
 
   return (
-    BindSha1Blob(hash_idx, entry.checksum_) &&
+    BindHashBlob(hash_idx, entry.checksum_) &&
     BindInt64(hardlinks_idx, hardlinks) &&
     BindInt64(size_idx, entry.size_) &&
     BindInt(mode_idx, entry.mode_) &&
@@ -494,6 +513,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.uid_             = g_uid;
     result.gid_             = g_gid;
     result.is_chunked_file_ = false;
+    result.checksum_        = RetrieveHashBlob(0, shash::kSha1);
   } else {
     const uint64_t hardlinks = RetrieveInt64(1);
     result.linkcount_        = Hardlinks2Linkcount(hardlinks);
@@ -503,6 +523,8 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.uid_              = RetrieveInt64(13);
     result.gid_              = RetrieveInt64(14);
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
+    result.checksum_         =
+      RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
     if (result.catalog_->uid_map_) {
       OwnerMap::const_iterator i = result.catalog_->uid_map_->find(result.uid_);
       if (i != result.catalog_->uid_map_->end())
@@ -518,7 +540,6 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.mode_     = RetrieveInt(3);
   result.size_     = RetrieveInt64(2);
   result.mtime_    = RetrieveInt64(4);
-  result.checksum_ = RetrieveSha1Blob(0);
   result.name_.Assign(name, strlen(name));
   result.symlink_.Assign(symlink, strlen(symlink));
   if (expand_symlink)
@@ -593,7 +614,7 @@ SqlDirentTouch::SqlDirentTouch(const Database &database) {
 
 bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
   return (
-    BindSha1Blob(1, entry.checksum_)                                       &&
+    BindHashBlob(1, entry.checksum_)                                       &&
     BindInt64   (2, entry.size_)                                           &&
     BindInt     (3, entry.mode_)                                           &&
     BindInt64   (4, entry.mtime_)                                          &&
@@ -799,7 +820,7 @@ bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
   return
     BindInt64(3,    chunk.offset())       &&
     BindInt64(4,    chunk.size())         &&
-    BindSha1Blob(5, chunk.content_hash());
+    BindHashBlob(5, chunk.content_hash());
 }
 
 
@@ -839,7 +860,7 @@ bool SqlChunksListing::BindPathHash(const shash::Md5 &hash) {
 
 
 FileChunk SqlChunksListing::GetFileChunk() const {
-  return FileChunk(RetrieveSha1Blob(2),
+  return FileChunk(RetrieveHashBlob(2, shash::kSha1),
                    RetrieveInt64(0),
                    RetrieveInt64(1));
 }
@@ -973,7 +994,7 @@ bool SqlAllChunks::Open() {
 
 bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
   if (FetchRow()) {
-    *hash = RetrieveSha1Blob(0);
+    *hash = RetrieveHashBlob(0, shash::kSha1);
     *type = static_cast<ChunkTypes>(RetrieveInt(1));
     return true;
   }

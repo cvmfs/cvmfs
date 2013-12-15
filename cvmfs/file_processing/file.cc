@@ -14,10 +14,12 @@ using namespace upload;
 File::File(const std::string  &path,
            IoDispatcher       *io_dispatcher,
            ChunkDetector      *chunk_detector,
+           shash::Algorithms  hash_algorithm,
            const std::string  &hash_suffix) :
   AbstractFile(path, GetFileSize(path)),
   might_become_chunked_(chunk_detector != NULL &&
                         chunk_detector->MightFindChunks(size())),
+  hash_algorithm_(hash_algorithm),
   hash_suffix_(hash_suffix),
   bulk_chunk_(NULL),
   io_dispatcher_(io_dispatcher),
@@ -66,7 +68,7 @@ void File::CreateInitialChunk() {
   assert (chunks_.size() == 0);
 
   const off_t offset = 0;
-  Chunk *new_chunk   = new Chunk(this, offset);
+  Chunk *new_chunk   = new Chunk(this, offset, hash_algorithm_);
 
   if (might_become_chunked_) {
     // for a potentially chunked file, the initial chunk needs to defer the
@@ -106,7 +108,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   // will start at 'offset'
   latest_chunk->set_size(offset - latest_chunk->offset());
   Chunk *predecessor = latest_chunk;
-  AddChunk(new Chunk(this, offset));
+  AddChunk(new Chunk(this, offset, hash_algorithm_));
 
   return predecessor;
 }

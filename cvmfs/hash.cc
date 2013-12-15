@@ -30,6 +30,23 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
   return kAny;
 }
 
+
+Any MkFromHexPtr(const HexPtr hex) {
+  Any result;
+
+  const unsigned length = hex.str->length();
+  if (length == 2*kDigestSizes[kMd5])
+    result = Any(kMd5, hex);
+  if (length == 2*kDigestSizes[kSha1])
+    result = Any(kSha1, hex);
+  // TODO compare -rmd160
+  if ((length == 2*kDigestSizes[kRmd160] + kSuffixLengths[kRmd160]))
+    result = Any(kRmd160, hex);
+
+  return result;
+}
+
+
 /**
  * Allows the caller to create the context on the stack.
  */

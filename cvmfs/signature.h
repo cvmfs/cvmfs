@@ -17,6 +17,8 @@
 #include <openssl/rsa.h>
 #include <openssl/engine.h>
 
+#include "hash.h"
+
 namespace signature {
 
 class SignatureManager {
@@ -38,7 +40,7 @@ class SignatureManager {
   bool KeysMatch();
   bool VerifyCaChain();
   std::string Whois();
-  std::string FingerprintCertificate();
+  std::string FingerprintCertificate(const shash::Algorithms hash_algorithm);
 
   bool LoadPublicRsaKeys(const std::string &path_list);
   bool LoadBlacklist(const std::string &path_blacklist);

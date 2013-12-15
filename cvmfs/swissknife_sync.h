@@ -62,6 +62,8 @@ class CommandCreate : public Command {
     result.push_back(Parameter('r', "spooler definition", false, false));
     result.push_back(Parameter('l', "log level (0-4, default: 2)",
                                true, false));
+    result.push_back(Parameter('a', "hash algorithm (default: SHA-1)",
+                               true, false));
     return result;
   }
   int Main(const ArgumentList &args);
@@ -80,11 +82,13 @@ class CommandUpload : public Command {
     result.push_back(Parameter('i', "local file", false, false));
     result.push_back(Parameter('o', "destination path", false, false));
     result.push_back(Parameter('r', "spooler definition", false, false));
+    result.push_back(Parameter('a', "hash algorithm (default: SHA-1)",
+                               true, false));
     return result;
   }
   int Main(const ArgumentList &args);
 };
-  
+
 
 class CommandPeek : public Command {
 public:
@@ -143,9 +147,9 @@ class CommandSync : public Command {
     result.push_back(Parameter('x', "print change set", true, true));
     result.push_back(Parameter('y', "dry run", true, true));
     result.push_back(Parameter('m', "create micro catalogs", true, true));
-    result.push_back(Parameter('i', "ignore x-directory hardlinks", 
+    result.push_back(Parameter('i', "ignore x-directory hardlinks",
                                true, true));
-    result.push_back(Parameter('d', "pause publishing to allow for catalog tweaks", 
+    result.push_back(Parameter('d', "pause publishing to allow for catalog tweaks",
                                true, true));
     result.push_back(Parameter('z', "log level (0-4, default: 2)",
                                true, false));
@@ -158,6 +162,8 @@ class CommandSync : public Command {
     result.push_back(Parameter('h', "maximal file chunk size in bytes", true,
                                false));
     result.push_back(Parameter('f', "union filesystem type", true, false));
+    result.push_back(Parameter('e', "hash algorithm (default: SHA-1)",
+                               true, false));
     return result;
   }
   int Main(const ArgumentList &args);

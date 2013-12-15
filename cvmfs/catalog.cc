@@ -395,11 +395,11 @@ shash::Any Catalog::GetPreviousRevision() const {
   const string sql =
     "SELECT value FROM properties WHERE key='previous_revision';";
 
-  shash::Any result(shash::kSha1);
+  shash::Any result;
   pthread_mutex_lock(lock_);
   Sql stmt(database(), sql);
   if (stmt.FetchRow())
-    result = stmt.RetrieveSha1Hex(0);
+    result = stmt.RetrieveHashHex(0);
   pthread_mutex_unlock(lock_);
 
   return result;

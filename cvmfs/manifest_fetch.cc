@@ -33,16 +33,16 @@ static int VerifyWhitelist(
   const unsigned char *whitelist,
   const unsigned whitelist_size,
   const string &expected_repository,
+  const string &expected_fingerprint,
   signature::SignatureManager *signature_manager)
 {
-  const string fingerprint = signature_manager->FingerprintCertificate();
-  if (fingerprint == "") {
+  if (expected_fingerprint == "") {
     LogCvmfs(kLogSignature, kLogDebug, "invalid fingerprint");
     return kWlInvalid;
   }
   LogCvmfs(kLogSignature, kLogDebug,
            "checking certificate with fingerprint %s against whitelist",
-           fingerprint.c_str());
+           expected_fingerprint.c_str());
 
   time_t local_timestamp = time(NULL);
   string line;
@@ -128,7 +128,7 @@ static int VerifyWhitelist(
   bool found = false;
   do {
     if (line == "--") break;
-    if (line.substr(0, 59) == fingerprint)
+    if (line.substr(0, 59) == expected_fingerprint)
       found = true;
 
     payload_bytes += line.length() + 1;
@@ -147,9 +147,9 @@ static int VerifyWhitelist(
   vector<string> blacklisted_certificates =
     signature_manager->GetBlacklistedCertificates();
   for (unsigned i = 0; i < blacklisted_certificates.size(); ++i) {
-    if (blacklisted_certificates[i].substr(0, 59) == fingerprint) {
+    if (blacklisted_certificates[i].substr(0, 59) == expected_fingerprint) {
       LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
-               "blacklisted fingerprint (%s)", fingerprint.c_str());
+               "blacklisted fingerprint (%s)", expected_fingerprint.c_str());
       return kWlInvalid;
     }
   }
@@ -176,6 +176,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   Failures result = kFailUnknown;
   int retval;
   int wl_examination;
+  string cert_fingerprint;
 
   const string manifest_url = base_url + string("/.cvmfspublished");
   download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
@@ -248,6 +249,8 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
     result = kFailBadCertificate;
     goto cleanup;
   }
+  cert_fingerprint =
+    signature_manager->FingerprintCertificate(certificate_hash.algorithm);
 
   // Verify manifest
   retval = signature_manager->VerifyLetter(ensemble->raw_manifest_buf,
@@ -271,7 +274,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
 
   wl_examination =
     VerifyWhitelist(ensemble->whitelist_buf, ensemble->whitelist_size,
-                    repository_name, signature_manager);
+                    repository_name, cert_fingerprint, signature_manager);
   if (wl_examination == kWlInvalid) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository certificate against whitelist");
@@ -341,7 +344,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                     extracted_whitelist_size).c_str());
     wl_examination =
       VerifyWhitelist(extracted_whitelist, extracted_whitelist_size,
-                      repository_name, signature_manager);
+                      repository_name, cert_fingerprint, signature_manager);
     free(extracted_whitelist);
     if (wl_examination == kWlInvalid) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,

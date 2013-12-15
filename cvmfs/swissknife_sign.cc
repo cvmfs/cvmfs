@@ -57,10 +57,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  // Connect to the spooler
-  const upload::SpoolerDefinition sd(spooler_definition);
-  spooler = upload::Spooler::Construct(sd);
-
   signature::SignatureManager signature_manager;
   signature_manager.Init();
 
@@ -140,6 +136,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       goto sign_fail;
     }
 
+    // Connect to the spooler
+    const upload::SpoolerDefinition sd(spooler_definition,
+                                       manifest->GetHashAlgorithm());
+    spooler = upload::Spooler::Construct(sd);
+
     // Safe certificate
     void *compr_buf;
     uint64_t compr_size;
@@ -165,7 +166,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     spooler->Upload(cert_path_tmp, cert_hash_path);
 
     // Safe history database
-    shash::Any history_hash(shash::kSha1);
+    shash::Any history_hash(manifest->GetHashAlgorithm());
     if (history_path != "") {
       history::Database tag_db;
       if (!tag_db.Open(history_path, sqlite::kDbOpenReadOnly)) {
@@ -207,7 +208,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     manifest->set_publish_timestamp(time(NULL));
 
     string signed_manifest = manifest->ExportString();
-    shash::Any published_hash(shash::kSha1);
+    shash::Any published_hash(manifest->GetHashAlgorithm());
     shash::HashMem(
       reinterpret_cast<const unsigned char *>(signed_manifest.data()),
       signed_manifest.length(), &published_hash);
@@ -218,7 +219,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     unsigned sig_size;
     if (!signature_manager.Sign(reinterpret_cast<const unsigned char *>(
                                 published_hash.ToString().data()),
-                                2*published_hash.GetDigestSize(),
+                                published_hash.GetHexSize(),
                                 &sig, &sig_size))
     {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");

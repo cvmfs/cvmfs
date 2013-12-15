@@ -1047,6 +1047,7 @@ create_config_files_for_new_repository() {
   local stratum0=$3
   local cvmfs_user=$4
   local unionfs=$5
+  local hash_algo=$6
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -1071,6 +1072,7 @@ CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
 CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_UNION_FS_TYPE=$unionfs
+CVMFS_HASH_ALGORITHM=$hash_algo
 EOF
 
   # make sure that the config file does not exist, yet
@@ -1299,10 +1301,11 @@ mkfs() {
   local owner
   local replicable=1
   local unionfs
+  local hash_algo
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:" option; do
+  while getopts "w:u:o:mf:a:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1318,6 +1321,9 @@ mkfs() {
       ;;
       f)
         unionfs=$OPTARG
+      ;;
+      a)
+        hash_algo=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1335,6 +1341,7 @@ mkfs() {
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
   [ x"$unionfs" = x ] && unionfs=aufs
+  [ x"$hash_algo" = x ] && hash_algo=sha1
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
@@ -1359,7 +1366,7 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo
   echo "done"
 
   # create security keys and certificates
@@ -1384,6 +1391,7 @@ mkfs() {
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
     -t $temp_dir \
     -r $upstream \
+    -a $hash_algo \
     -o ${temp_dir}/new_manifest" > /dev/null || die "fail! (cannot init repo)"
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \
@@ -2316,6 +2324,10 @@ publish() {
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
+    hash_algo=$CVMFS_HASH_ALGORITHM
+    if [ x"$hash_algo" != "x" ]; then
+      hash_algo="-e $hash_algo"
+    fi
 
     # more sanity checks
     check_repository_compatibility
@@ -2369,7 +2381,7 @@ publish() {
       -r ${upstream} \
       -w $stratum0 \
       -o ${spool_dir}/tmp/manifest \
-      $log_level $tweaks_option"
+      $hash_algo $log_level $tweaks_option"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
