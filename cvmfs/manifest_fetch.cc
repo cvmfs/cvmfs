@@ -128,7 +128,7 @@ static int VerifyWhitelist(
   bool found = false;
   do {
     if (line == "--") break;
-    if (line.substr(0, 59) == expected_fingerprint)
+    if (line.substr(0, expected_fingerprint.length()) == expected_fingerprint)
       found = true;
 
     payload_bytes += line.length() + 1;

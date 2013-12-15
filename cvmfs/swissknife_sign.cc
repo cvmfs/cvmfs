@@ -151,7 +151,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       delete manifest;
       goto sign_fail;
     }
-    shash::Any certificate_hash(shash::kSha1);
+    shash::Any certificate_hash(manifest->GetHashAlgorithm());
     shash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
     const string cert_path_tmp = temp_dir + "/cvmfspublisher.tmp";
     if (!CopyMem2Path((unsigned char *)compr_buf, compr_size, cert_path_tmp)) {
