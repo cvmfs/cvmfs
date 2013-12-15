@@ -6,7 +6,7 @@
  * according to their content hash.
  *
  * The procedure is
- *   -# Look in the catalog for SHA1 hash
+ *   -# Look in the catalog for content hash
  *   -# If it is in local cache: return file descriptor
  *   -# Otherwise download, store in cache and return fd
  *

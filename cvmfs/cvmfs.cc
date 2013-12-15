@@ -4,7 +4,8 @@
  *
  * CernVM-FS shows a remote HTTP directory as local file system.  The client
  * sees all available files.  On first access, a file is downloaded and
- * cached locally.  All downloaded pieces are verified with SHA1.
+ * cached locally.  All downloaded pieces are verified by a cryptographic
+ * content hash.
  *
  * To do so, a directory hive has to be transformed into a CVMFS2
  * "repository".  This can be done by the CernVM-FS server tools.
@@ -1423,7 +1424,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
   } else if (attr == "user.hash") {
     if (!d.checksum().IsNull()) {
-      attribute_value = d.checksum().ToString() + " (SHA-1)";
+      attribute_value = d.checksum().ToString();
     } else {
       fuse_reply_err(req, ENOATTR);
       return;
@@ -1435,7 +1436,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       if (fd < 0) {
         attribute_value = "Not in cache";
       } else {
-        shash::Any hash(shash::kSha1);
+        shash::Any hash(d.checksum().algorithm);
         FILE *f = fdopen(fd, "r");
         if (!f) {
           fuse_reply_err(req, EIO);
@@ -1447,7 +1448,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
           return;
         }
         fclose(f);
-        attribute_value = hash.ToString() + " (SHA-1)";
+        attribute_value = hash.ToString();
       }
     } else {
       fuse_reply_err(req, ENOATTR);
