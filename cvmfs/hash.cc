@@ -8,6 +8,7 @@
 #include <alloca.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
+#include <openssl/ripemd.h>
 
 #include <cstdio>
 
@@ -19,6 +20,16 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
+const char *kSuffixes[] = {"", "", "-rmd160", ""};
+
+Algorithms ParseHashAlgorithm(const string &algorithm_option) {
+  if (algorithm_option == "sha1")
+    return kSha1;
+  if (algorithm_option == "rmd160")
+    return kRmd160;
+  return kAny;
+}
+
 /**
  * Allows the caller to create the context on the stack.
  */
@@ -28,6 +39,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
       return sizeof(MD5_CTX);
     case kSha1:
       return sizeof(SHA_CTX);
+    case kRmd160:
+      return sizeof(RIPEMD160_CTX);
     default:
       LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
                "context for unspecified hash. Aborting...");
@@ -44,6 +57,10 @@ void Init(ContextPtr &context) {
     case kSha1:
       assert(context.size == sizeof(SHA_CTX));
       SHA1_Init(reinterpret_cast<SHA_CTX *>(context.buffer));
+      break;
+    case kRmd160:
+      assert(context.size == sizeof(RIPEMD160_CTX));
+      RIPEMD160_Init(reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
     default:
       abort();  // Undefined hash
@@ -64,6 +81,11 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
       SHA1_Update(reinterpret_cast<SHA_CTX *>(context.buffer),
                   buffer, buffer_length);
       break;
+    case kRmd160:
+      assert(context.size == sizeof(RIPEMD160_CTX));
+      RIPEMD160_Update(reinterpret_cast<RIPEMD160_CTX *>(context.buffer),
+                       buffer, buffer_length);
+      break;
     default:
       abort();  // Undefined hash
   }
@@ -80,6 +102,11 @@ void Final(ContextPtr &context, Any *any_digest) {
       assert(context.size == sizeof(SHA_CTX));
       SHA1_Final(any_digest->digest,
                  reinterpret_cast<SHA_CTX *>(context.buffer));
+      break;
+    case kRmd160:
+      assert(context.size == sizeof(RIPEMD160_CTX));
+      RIPEMD160_Final(any_digest->digest,
+                      reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
     default:
       abort();  // Undefined hash
