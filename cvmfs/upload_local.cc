@@ -37,6 +37,11 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 }
 
 
+void LocalUploader::WorkerThread() {
+
+}
+
+
 void LocalUploader::Upload(const std::string &local_path,
                            const std::string &remote_path,
                            const callback_t   *callback) {

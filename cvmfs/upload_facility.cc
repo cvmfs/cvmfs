@@ -15,8 +15,10 @@ void AbstractUploader::RegisterPlugins() {
 
 
 AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition) :
-  spooler_definition_(spooler_definition)
-{}
+  spooler_definition_(spooler_definition),
+  writer_thread_(&ThreadProxy<AbstractUploader>,
+                 this,
+                 &AbstractUploader::WriteThread) {}
 
 
 bool AbstractUploader::Initialize() {

@@ -126,7 +126,6 @@ class IoDispatcher {
     tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
     max_read_buffer_size_(max_read_buffer_size),
     reader_(max_read_buffer_size_, tbb_workers_ * 10),
-    write_thread_(&IoDispatcher::ThreadEntry, this, &IoDispatcher::WriteThread),
     uploader_(uploader),
     file_processor_(file_processor)
   {
@@ -138,18 +137,9 @@ class IoDispatcher {
 
   ~IoDispatcher() {
     Wait();
-    TearDown();
 
-     pthread_mutex_destroy(&processing_done_mutex_);
-     pthread_cond_destroy(&processing_done_condition_);
-  }
-
-  /**
-   * Wrapper function to bind the IoDispatcher* to its worker thread spawning
-   */
-  static void ThreadEntry(IoDispatcher *delegate,
-                          MethodPtr     method) {
-    (*delegate.*method)();
+    pthread_mutex_destroy(&processing_done_mutex_);
+    pthread_cond_destroy(&processing_done_condition_);
   }
 
   /**
@@ -190,21 +180,14 @@ class IoDispatcher {
    */
   void ScheduleWrite(Chunk       *chunk,
                      CharBuffer  *buffer,
-                     const bool   delete_buffer = true) {
-    assert (buffer != NULL && chunk != NULL);
-    assert (buffer->used_bytes() > 0);
-    write_queue_.push(WriteJob(chunk, buffer, delete_buffer));
-  }
+                     const bool   delete_buffer = true);
 
   /**
    * This is called by the processing pipeline to a schedule the commit of a
    * specific Chunk. A Chunk must be committed only after all data blocks have
    * been processed and uploaded.
    */
-  void ScheduleCommit(Chunk *chunk) {
-    assert (chunk != NULL);
-    write_queue_.push(WriteJob(chunk));
-  }
+  void ScheduleCommit(Chunk *chunk);
 
   /**
    * Newly generated Chunks need to be registered to keep track of the number
@@ -213,19 +196,6 @@ class IoDispatcher {
   void RegisterChunk(Chunk *chunk) {
     ++chunks_in_flight_;
   }
-
-  void TearDown() {
-    assert(write_thread_.joinable());
-    write_queue_.push(WriteJob());
-    write_thread_.join();
-  }
-
-  void WriteThread();
-
-  void WriteBufferToChunk(Chunk       *chunk,
-                          CharBuffer  *buffer,
-                          const bool   delete_buffer);
-  void CommitChunk(Chunk* chunk);
 
   void ChunkUploadCompleteCallback(const UploaderResults &results, Chunk* chunk);
   void BufferUploadCompleteCallback(const UploaderResults      &results,
@@ -238,13 +208,10 @@ class IoDispatcher {
   tbb::atomic<unsigned int>        chunks_in_flight_;          ///< number of Chunks currently in processing
   tbb::atomic<unsigned int>        file_count_;                ///< overall number of processed files
 
-  WriteJobQueue                    write_queue_;               ///< JobQueue for writing
-
   pthread_mutex_t                  processing_done_mutex_;
   pthread_cond_t                   processing_done_condition_;
 
   Reader<FileScrubbingTask, File>  reader_;                    ///< dedicated File Reader object
-  tbb::tbb_thread                  write_thread_;
 
   AbstractUploader                *uploader_;                  ///< (weak) reference to the used AbstractUploaer
   FileProcessor                   *file_processor_;            ///< (weak) reference to the FileProcesser in command

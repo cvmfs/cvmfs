@@ -5,6 +5,9 @@
 #ifndef CVMFS_UPLOAD_FACILITY_
 #define CVMFS_UPLOAD_FACILITY_
 
+#include <tbb/tbb_thread.h>
+#include <tbb/concurrent_queue.h>
+
 #include "util.h"
 #include "util_concurrency.h"
 
@@ -74,6 +77,39 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
  protected:
   typedef Callbackable<UploaderResults>::callback_t* callback_ptr;
 
+  struct UploadJob {
+    enum Type {
+      Upload,
+      Commit,
+      Terminate
+    };
+
+    UploadJob(UploadStreamHandle  *handle,
+              CharBuffer          *buffer,
+              const callback_t    *callback = NULL) :
+      type(Upload), stream_handle(handle), buffer(buffer), callback(callback) {}
+
+    UploadJob(UploadStreamHandle  *handle,
+              const shash::Any    &content_hash,
+              const std::string   &hash_suffix) :
+      type(Commit), stream_handle(handle), buffer(NULL), callback(NULL),
+      content_hash(content_hash), hash_suffix(hash_suffix) {}
+
+    UploadJob() :
+      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
+
+    Type                 type;
+    UploadStreamHandle  *stream_handle;
+
+    // type=Upload specific fields
+    CharBuffer          *buffer;
+    const callback_t    *callback;
+
+    // type=Commit specific fields
+    shash::Any           content_hash;
+    std::string          hash_suffix;
+  };
+
  public:
   virtual ~AbstractUploader() {};
 
@@ -92,25 +128,33 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                       const std::string  &remote_path,
                       const callback_t   *callback = NULL) = 0;
 
+
   /**
    *
    */
   virtual UploadStreamHandle* InitStreamedUpload(
                                        const callback_t   *callback = NULL) = 0;
 
-  /**
-   *
-   */
-  virtual void Upload(UploadStreamHandle  *handle,
-                      CharBuffer          *buffer,
-                      const callback_t    *callback = NULL) = 0;
 
   /**
    *
    */
-   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
-                                       const shash::Any    content_hash,
-                                       const std::string   hash_suffix) = 0;
+  void ScheduleUpload(UploadStreamHandle  *handle,
+                      CharBuffer          *buffer,
+                      const callback_t    *callback = NULL) {
+    upload_queue_.push(UploadJob(handle, buffer, callback));
+  }
+
+
+  /**
+   *
+   */
+  void ScheduleCommit(UploadStreamHandle  *handle,
+                      const shash::Any    &content_hash,
+                      const std::string   &hash_suffix) {
+    upload_queue_.push(UploadJob(handle, content_hash, hash_suffix));
+  }
+
 
   /**
    * Removes a file from the backend storage. This is done synchronously in any
@@ -124,6 +168,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    */
   virtual bool Remove(const std::string &file_to_delete) = 0;
 
+
   /**
    * Checks if a file is already present in the backend storage
    *
@@ -131,6 +176,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return      true if the file was found in the backend storage
    */
   virtual bool Peek(const std::string &path) const = 0;
+
 
   /**
    * Waits until the current upload queue is empty.
@@ -140,9 +186,9 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *       not defined (it returns also on intermediate empty queues)
    */
   virtual void WaitForUpload() const;
+
+
   virtual unsigned int GetNumberOfErrors() const = 0;
-
-
   static void RegisterPlugins();
 
 
@@ -161,12 +207,32 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   void Respond(const callback_t       *callback,
                const UploaderResults  &result) const;
 
+
+  UploadJob AcquireNewJob() {
+    UploadJob job;
+    upload_queue_.pop(job);
+    return job;
+  }
+
+
+  bool TryToAcquireNewJob(UploadJob &job_slot) {
+    return upload_queue_.try_pop(job_slot);
+  }
+
+
+  virtual void WorkerThread() = 0;
+
+
+  void WriteThread() { this->WorkerThread(); }
+
   const SpoolerDefinition& spooler_definition() const {
     return spooler_definition_;
   }
 
  private:
-  const SpoolerDefinition spooler_definition_;
+  const SpoolerDefinition                   spooler_definition_;
+  tbb::concurrent_bounded_queue<UploadJob>  upload_queue_;
+  tbb::tbb_thread                           writer_thread_;
 };
 
 }

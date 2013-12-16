@@ -15,49 +15,24 @@
 
 using namespace upload;
 
-
-void IoDispatcher::WriteThread() {
-  bool running = true;
-
-  while (running) {
-    WriteJob write_job;
-    write_queue_.pop(write_job);
-
-    switch (write_job.type) {
-      case WriteJob::TearDown:
-        running = false;
-        break;
-      case WriteJob::CommitChunk:
-        CommitChunk(write_job.chunk);
-        break;
-      case WriteJob::UploadChunk:
-        WriteBufferToChunk(write_job.chunk,
-                           write_job.buffer,
-                           write_job.delete_buffer);
-        break;
-      default:
-        assert (false);
-    }
-  }
-}
-
-
-void IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
-                                      CharBuffer  *buffer,
-                                      const bool   delete_buffer) {
+void IoDispatcher::ScheduleWrite(Chunk       *chunk,
+                                 CharBuffer  *buffer,
+                                 const bool   delete_buffer) {
   assert (chunk != NULL);
-  assert (buffer != NULL);
   assert (chunk->IsInitialized());
-  assert (buffer->IsInitialized());
 
-  const size_t bytes_to_write = buffer->used_bytes();
-  assert (bytes_to_write > 0u);
+  assert (buffer != NULL);
+  assert (buffer->IsInitialized());
+  assert (buffer->used_bytes() > 0);
+
   assert (chunk->bytes_written() == static_cast<size_t>(buffer->base_offset()));
 
   // Initialize a streamed upload in the AbstractUploader implementation if it
   // has not been done before for this Chunk.
   if (! chunk->HasUploadStreamHandle()) {
     UploadStreamHandle *handle = uploader_->InitStreamedUpload(
+      // the closure passed here, is called by the AbstractUploader as soon as
+      // it successfully committed the complete chunk
       AbstractUploader::MakeClosure(&IoDispatcher::ChunkUploadCompleteCallback,
                                     this,
                                     chunk));
@@ -65,8 +40,8 @@ void IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
     chunk->set_upload_stream_handle(handle);
   }
 
-  // Upload the provided data Block into the chunk in a streamed fashion
-  uploader_->Upload(chunk->upload_stream_handle(), buffer,
+  // Schedule the upload of the provided data Block into the chunk
+  uploader_->ScheduleUpload(chunk->upload_stream_handle(), buffer,
     AbstractUploader::MakeClosure(&IoDispatcher::BufferUploadCompleteCallback,
                                   this,
                                   BufferUploadCompleteParam(chunk,
@@ -75,20 +50,20 @@ void IoDispatcher::WriteBufferToChunk(Chunk       *chunk,
 }
 
 
-void IoDispatcher::CommitChunk(Chunk* chunk) {
+void IoDispatcher::ScheduleCommit(Chunk* chunk) {
   assert (chunk->IsFullyProcessed());
   assert (chunk->HasUploadStreamHandle());
 
   // Finalize the streamed upload for the committed Chunk
-  uploader_->FinalizeStreamedUpload(chunk->upload_stream_handle(),
-                                    chunk->content_hash(),
-                                    chunk->hash_suffix());
+  uploader_->ScheduleCommit(chunk->upload_stream_handle(),
+                            chunk->content_hash(),
+                            chunk->hash_suffix());
 }
 
 
 void IoDispatcher::BufferUploadCompleteCallback(
-                                    const UploaderResults        &results,
-                                    BufferUploadCompleteParam     buffer_info) {
+                                      const UploaderResults      &results,
+                                      BufferUploadCompleteParam   buffer_info) {
   Chunk      *chunk         = buffer_info.chunk;
   CharBuffer *buffer        = buffer_info.buffer;
   const bool  delete_buffer = buffer_info.delete_buffer;
