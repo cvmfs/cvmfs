@@ -30,12 +30,6 @@ void AbstractUploader::TearDown() {}
 void AbstractUploader::WaitForUpload() const {}
 
 
-void AbstractUploader::DisablePrecaching() {}
-
-
-void AbstractUploader::EnablePrecaching() {}
-
-
 void AbstractUploader::Respond(const callback_t       *callback,
                                const UploaderResults  &result) const {
   if (callback == NULL) {

@@ -142,19 +142,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   virtual void WaitForUpload() const;
   virtual unsigned int GetNumberOfErrors() const = 0;
 
-  /**
-   * Disables all precaching behavior in order to finish upload jobs as fast as
-   * possible to avoid deadlocks with user-code that waits for files to be up-
-   * loaded.
-   *
-   * Note: precaching is supposed to be activated by default
-   */
-  virtual void DisablePrecaching();
-
-  /**
-   * Re-enables precaching behavior.
-   */
-  virtual void EnablePrecaching();
 
   static void RegisterPlugins();
 
