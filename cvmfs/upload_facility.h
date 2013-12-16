@@ -61,6 +61,7 @@ struct UploadStreamHandle {
 
   UploadStreamHandle(const callback_t *commit_callback) :
     commit_callback(commit_callback) {}
+  virtual ~UploadStreamHandle() {}
 
   const callback_t *commit_callback;
 };
