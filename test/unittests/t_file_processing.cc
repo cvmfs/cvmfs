@@ -125,6 +125,31 @@ class MockUploader : public upload::AbstractUploader {
     results_.clear();
   }
 
+  void WorkerThread() {
+    bool running = true;
+    while (running) {
+      UploadJob job = AcquireNewJob();
+      switch (job.type) {
+        case UploadJob::Upload:
+          Upload(job.stream_handle,
+                 job.buffer,
+                 job.callback);
+          break;
+        case UploadJob::Commit:
+          FinalizeStreamedUpload(job.stream_handle,
+                                 job.content_hash,
+                                 job.hash_suffix);
+          break;
+        case UploadJob::Terminate:
+          running = false;
+          break;
+        default:
+          FAIL() << "Unrecognized UploadJob type";
+          break;
+      }
+    }
+  }
+
   void Upload(const std::string  &local_path,
               const std::string  &remote_path,
               const callback_t   *callback = NULL) {
