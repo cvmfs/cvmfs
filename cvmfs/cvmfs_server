@@ -171,11 +171,12 @@ Supported Commands:
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
-                [-s show migration statistics] [-c file ownership (UID:GID)]
+                [-l import legacy repo (2.0.x)] [-s show migration statistics] 
+                [-c file ownership (UID:GID)]
                 < -k path to keys> <fully qualified repository name>
-                Imports a CernVM-FS 2.0.x repository into a fresh 2.1.x repo
+                Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
-                [-a tag name] [-c tag channel] [ -t tag description ] [ -h hash ]
+                [-a tag name] [-c tag channel] [ -t tag description] [ -h hash]
                 [-r tag name]
                 <fully qualified name>
                 Make a new repository snapshot
@@ -1059,6 +1060,10 @@ CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_UNION_FS_TYPE=$unionfs
 EOF
+
+  # make sure that the config file does not exist, yet
+  remove_apache_config_file "cvmfs.${name}.conf" || true
+
   create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 <Directory "/cvmfs/$name">
@@ -1565,12 +1570,13 @@ import() {
   local upstream
   local owner
   local file_ownership
+  local is_legacy=0
   local show_statistics=0
   local replicable=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:sm" option; do
+  while getopts "w:o:c:u:k:l:sm" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1587,6 +1593,9 @@ import() {
       k)
         keys_location=$OPTARG
       ;;
+      l)
+        is_legacy=1
+        ;;
       s)
         show_statistics=1
       ;;
@@ -1631,7 +1640,7 @@ import() {
   for pki_file in $pki_keys; do
     [ -f "${keys_location}/$pki_file" ] || die "Cannot find $pki_file in $keys_location"
   done
-  [ x"$keys_location" = "x" ] && die "Please provide the location of the 2.0.x repository security keys (-k)"
+  [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
 
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
@@ -1657,7 +1666,9 @@ import() {
   local global_key_dir="/etc/cvmfs/keys"
   mkdir -p $global_key_dir
   for pki_file in $pki_keys; do
-    cp "${keys_location}/$pki_file" $global_key_dir    || die "fail! (cannot copy $pki_file)"
+    if [ ! -f "${global_key_dir}/$pki_file" ]; then
+      cp "${keys_location}/$pki_file" $global_key_dir  || die "fail! (cannot copy $pki_file)"
+    fi
     chmod 444 "${global_key_dir}/${pki_file}"          || die "fail! (cannot chmod $pki_file)"
     chown $cvmfs_user "${global_key_dir}/${pki_file}"  || die "fail! (cannot chown $pki_file)"
   done
@@ -1673,42 +1684,48 @@ import() {
   load_repo_config $name
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
 
-  # migrate old catalogs
-  echo "Importing and Migrating old catalogs (may take a while)... "
-  chown -R $cvmfs_user $storage_location
+  # import storage location
+  echo -n "Importing CernVM-FS storage... "
+  chown -R $cvmfs_user $storage_location || die "fail!"
   if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null
+    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
   fi
-  local new_manifest="${temp_dir}/new_manifest"
-  local statistics_flag
-  if [ $show_statistics -ne 0 ]; then
-    statistics_flag="-s"
-  fi
-  cvmfs_swissknife migrate \
-    -v "2.0.x" \
-    -r $storage_location \
-    -n $name \
-    -u $upstream \
-    -t $temp_dir \
-    -k "${global_key_dir}/$public_key" \
-    -o $new_manifest \
-    -p $cvmfs_uid \
-    -g $cvmfs_gid \
-    -f \
-    $statistics_flag || die "fail!"
-  chown $cvmfs_user $new_manifest
-
-  # sign new (migrated) repository revision
-  echo -n "Signing newly imported Repository... "
-  create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
-    -c ${global_key_dir}/${certificate} \
-    -k ${global_key_dir}/${private_key} \
-    -n $name \
-    -m $new_manifest \
-    -t $temp_dir \
-    -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
   echo "done"
+
+  # migrate old catalogs
+  if [ $is_legacy -ne 0 ]; then
+    echo "Migrating old catalogs (may take a while)... "
+    local new_manifest="${temp_dir}/new_manifest"
+    local statistics_flag
+    if [ $show_statistics -ne 0 ]; then
+      statistics_flag="-s"
+    fi
+    cvmfs_swissknife migrate \
+      -v "2.0.x" \
+      -r $storage_location \
+      -n $name \
+      -u $upstream \
+      -t $temp_dir \
+      -k "${global_key_dir}/$public_key" \
+      -o $new_manifest \
+      -p $cvmfs_uid \
+      -g $cvmfs_gid \
+      -f \
+      $statistics_flag || die "fail!"
+    chown $cvmfs_user $new_manifest
+
+    # sign new (migrated) repository revision
+    echo -n "Signing newly imported Repository... "
+    create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+    sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+      -c ${global_key_dir}/${certificate} \
+      -k ${global_key_dir}/${private_key} \
+      -n $name \
+      -m $new_manifest \
+      -t $temp_dir \
+      -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
+    echo "done"
+  fi
 
   # do final setup
   echo -n "Mounting CernVM-FS Storage... "
