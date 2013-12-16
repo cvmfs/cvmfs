@@ -26,9 +26,6 @@ bool AbstractUploader::Initialize() {
 }
 
 
-void AbstractUploader::TearDown() {}
-
-
 void AbstractUploader::WaitForUpload() const {}
 
 

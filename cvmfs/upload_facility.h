@@ -133,15 +133,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   virtual bool Initialize();
 
   /**
-   * This can be used to de-initialize anything that cannot be torn down in the
-   * destructor. The method is called right before the destructor of Abstract-
-   * Uploader and its derived class is executed.
-   *
-   * Note: Please up-call this method!
-   */
-  virtual void TearDown();
-
-  /**
    * Uploads the file at the path local_path into the backend storage under the
    * path remote_path. When the upload has finished it calls callback.
    * Note: This method might be implemented in a synchronous way.
