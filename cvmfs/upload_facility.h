@@ -118,7 +118,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   };
 
  public:
-  virtual ~AbstractUploader() {};
+  virtual ~AbstractUploader() {
+    upload_queue_.push(UploadJob()); // Termination signal
+    writer_thread_.join();
+  }
 
   /**
    * This is called right after the constructor of AbstractUploader or/and its
