@@ -1,4 +1,5 @@
 2.1.16:
+  * Support importing a 2.1 repository
   * Remove left-over FIFOs from cache directory
   * Fix publish of recreated nested catalog hierarchies
   * Fix race between catalog reload and Fuse module reload
