@@ -1065,7 +1065,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
       // Retrieve File chunks from the catalog
       FileChunkList *chunks = new FileChunkList();
-      if (!dirent.catalog()->ListFileChunks(path, chunks) || chunks->IsEmpty()) {
+      if (!dirent.catalog()->ListFileChunks(path, dirent.hash_algorithm(),
+                                            chunks) ||
+          chunks->IsEmpty())
+      {
         LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
                  "but no chunks found in the catalog %s.", path.c_str(),
                  dirent.catalog()->path().c_str());
@@ -1614,7 +1617,8 @@ bool Pin(const string &path) {
     return false;
   if (dirent.IsChunkedFile()) {
     FileChunkList chunks;
-    dirent.catalog()->ListFileChunks(PathString(path), &chunks);
+    dirent.catalog()->ListFileChunks(PathString(path), dirent.hash_algorithm(),
+                                     &chunks);
     for (unsigned i = 0; i < chunks.size(); ++i) {
       bool retval =
         quota::Pin(chunks.AtPtr(i)->content_hash(), chunks.AtPtr(i)->size(),

@@ -454,7 +454,7 @@ class SqlChunksListing : public Sql {
  public:
   SqlChunksListing(const Database &database);
   bool BindPathHash(const shash::Md5 &hash);
-  FileChunk GetFileChunk() const;
+  FileChunk GetFileChunk(const shash::Algorithms interpret_hash_as) const;
 };
 
 

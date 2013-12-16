@@ -107,6 +107,7 @@ class DirectoryEntryBase {
 
   inline shash::Any checksum() const            { return checksum_; }
   inline const shash::Any *checksum_ptr() const { return &checksum_; }
+  inline shash::Algorithms hash_algorithm() const { return checksum_.algorithm; }
 
   inline uint64_t size() const {
     return (IsLink()) ? symlink().GetLength() : size_;

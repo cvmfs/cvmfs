@@ -133,12 +133,16 @@ class Catalog : public SingleCopy {
   bool AllChunksNext(shash::Any *hash, ChunkTypes *type);
   bool AllChunksEnd();
 
-  inline bool ListFileChunks(const PathString &path, FileChunkList *chunks) const
+  inline bool ListFileChunks(const PathString &path,
+                             const shash::Algorithms interpret_hashes_as,
+                             FileChunkList *chunks) const
   {
     return ListMd5PathChunks(shash::Md5(path.GetChars(), path.GetLength()),
-                             chunks);
+                             interpret_hashes_as, chunks);
   }
-  bool ListMd5PathChunks(const shash::Md5 &md5path, FileChunkList *chunks) const;
+  bool ListMd5PathChunks(const shash::Md5 &md5path,
+                         const shash::Algorithms interpret_hashes_as,
+                         FileChunkList *chunks) const;
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;

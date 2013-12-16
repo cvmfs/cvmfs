@@ -337,7 +337,13 @@ bool Catalog::AllChunksEnd() {
 }
 
 
+/**
+ * Hash algorithm is given by the unchunked file.
+ * Could be figured out by a join but it is faster if the user of this
+ * method tells us.
+ */
 bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
+                                const shash::Algorithms interpret_hashes_as,
                                 FileChunkList    *chunks) const
 {
   assert(IsInitialized() && chunks->IsEmpty());
@@ -345,7 +351,7 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
   pthread_mutex_lock(lock_);
   sql_chunks_listing_->BindPathHash(md5path);
   while (sql_chunks_listing_->FetchRow()) {
-    chunks->PushBack(sql_chunks_listing_->GetFileChunk());
+    chunks->PushBack(sql_chunks_listing_->GetFileChunk(interpret_hashes_as));
   }
   sql_chunks_listing_->Reset();
   pthread_mutex_unlock(lock_);

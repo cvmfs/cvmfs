@@ -859,8 +859,10 @@ bool SqlChunksListing::BindPathHash(const shash::Md5 &hash) {
 }
 
 
-FileChunk SqlChunksListing::GetFileChunk() const {
-  return FileChunk(RetrieveHashBlob(2, shash::kSha1),
+FileChunk SqlChunksListing::GetFileChunk(
+  const shash::Algorithms interpret_hash_as) const
+{
+  return FileChunk(RetrieveHashBlob(2, interpret_hash_as),
                    RetrieveInt64(0),
                    RetrieveInt64(1));
 }
