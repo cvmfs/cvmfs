@@ -22,17 +22,6 @@ namespace upload { // TODO: remove this... wrong namespace (for testing)
 
 class AbstractFile;
 
-/**
- * Wrapper function to bind an arbitrary this* to a method call in a C-style
- * spawned thread function
- */
-template <class DelegateT>
-void ThreadProxy(DelegateT        *delegate,
-                 void (DelegateT::*method)()) {
-  (*delegate.*method)();
-}
-
-
 class AbstractReader {
  public:
   AbstractReader(const unsigned int max_buffers_in_flight) :

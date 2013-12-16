@@ -472,6 +472,19 @@ typename PolymorphicConstruction<AbstractProductT, ParameterT>::RegisteredPlugin
 PolymorphicConstruction<AbstractProductT, ParameterT>::registered_plugins_;
 
 
+/**
+ * Wrapper function to bind an arbitrary this* to a method call in a C-style
+ * spawned thread function.
+ * The method called by the ThreadProxy template is meant to look like this:
+ *   void foo();
+ */
+template <class DelegateT>
+void ThreadProxy(DelegateT        *delegate,
+                 void (DelegateT::*method)()) {
+  (*delegate.*method)();
+}
+
+
 template<typename T, class A = std::allocator<T> >
 class Buffer {
  public:

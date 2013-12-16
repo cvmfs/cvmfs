@@ -5,6 +5,7 @@
 #include "upload_facility.h"
 
 #include "upload_local.h"
+#include "util.h"
 
 using namespace upload;
 
