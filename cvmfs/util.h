@@ -19,6 +19,7 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <gtest/gtest_prod.h>
 
 #include "murmur.h"
 #include "platform.h"
@@ -328,7 +329,6 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
   }
 };
 
-
 /**
  * Template to simplify the polymorphic creation of a number of concrete classes
  * that share the common base class AbstractProductT. Use this to create flexible
@@ -388,6 +388,8 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  */
 template <class AbstractProductT, typename ParameterT>
 class PolymorphicConstruction {
+  FRIEND_TEST(T_UploadFacility, InitializeAndTearDown);
+
  private:
   typedef AbstractFactory<AbstractProductT, ParameterT> Factory;
   typedef std::vector<Factory*> RegisteredPlugins;
