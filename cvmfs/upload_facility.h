@@ -49,6 +49,13 @@ struct UploaderResults {
 };
 
 
+/**
+ * Each implementation of AbstractUploader must provide its own derivate of the
+ * UploadStreamHandle that is supposed to contain state information for the
+ * streamed upload of one specific chunk.
+ * Each UploadStreamHandle contains a callback object that is invoked as soon as
+ * the streamed upload is committed.
+ */
 struct UploadStreamHandle {
   typedef CallbackBase<UploaderResults> callback_t;
 
@@ -113,12 +120,28 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
  public:
   virtual ~AbstractUploader() {};
 
+  /**
+   * This is called right after the constructor of AbstractUploader or/and its
+   * derived class has been executed. You can override that to do additional
+   * initialization that cannot be done in the constructor itself.
+   *
+   * @return   true on successful initialization
+   */
   virtual bool Initialize();
+
+  /**
+   * This can be used to de-initialize anything that cannot be torn down in the
+   * destructor. The method is called right before the destructor of Abstract-
+   * Uploader and its derived class is executed.
+   *
+   * Note: Please up-call this method!
+   */
   virtual void TearDown();
 
   /**
    * Uploads the file at the path local_path into the backend storage under the
    * path remote_path. When the upload has finished it calls callback.
+   * Note: This method might be implemented in a synchronous way.
    *
    * @param local_path   path to the file to be uploaded
    * @param remote_path  desired path for the file in the backend storage
@@ -130,14 +153,34 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
+   * This method is called before the first data Block of a streamed upload is
+   * scheduled (see above implementation of UploadStreamHandle for details).
    *
+   * Note: This method is called in the context of a TBB worker thread and must
+   *       both be thread safe and non-blocking!
+   *
+   * @param callback   (optional) this callback will be invoked once this parti-
+   *                   cular streamed upload is committed.
+   * @return           a pointer to the initialized UploadStreamHandle
    */
   virtual UploadStreamHandle* InitStreamedUpload(
                                        const callback_t   *callback = NULL) = 0;
 
 
   /**
+   * This method schedules a CharBuffer to be uploaded in the context of the
+   * given UploadStreamHandle. The actual upload will happen asynchronously by
+   * a concrete implementation of AbstractUploader. As soon has the scheduled
+   * upload job is complete (either successful or not) the optionally passed
+   * callback is supposed to be invoked using AbstractUploader::Respond().
    *
+   * Note: This method is called in the context of a TBB worker thread it is
+   *       supposed to be non-blocking!
+   *
+   * @param handle    Pointer to a previously acquired UploadStreamHandle
+   * @param buffer    CharBuffer containing the data Block to be uploaded
+   * @param callback  (optional) callback object to be invoked once the given
+   *                  upload is finished (see AbstractUploader::Respond())
    */
   void ScheduleUpload(UploadStreamHandle  *handle,
                       CharBuffer          *buffer,
@@ -147,7 +190,16 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
+   * This method schedules a commit job as soon as all data Blocks of a streamed
+   * upload are (successfully) uploaded. The concrete implementation of Abstract
+   * Uploader is supposed to clean up the streamed upload.
    *
+   * Note: This method is called in the context of a TBB worker thread it is
+   *       supposed to be non-blocking!
+   *
+   * @param handle        Pointer to a previously acquired UploadStreamHandle
+   * @param content_hash  the content hash of the full uploaded data Chunk
+   * @param hash_suffix   the suffix string to be appended to the content hash
    */
   void ScheduleCommit(UploadStreamHandle  *handle,
                       const shash::Any    &content_hash,
@@ -157,8 +209,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
-   * Removes a file from the backend storage. This is done synchronously in any
-   * case.
+   * Removes a file from the backend storage. This might be done synchronously.
    *
    * Note: This method is currently used very sparsely! If this changes in the
    *       future, one might think about doing deletion asynchronously!
@@ -170,7 +221,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
-   * Checks if a file is already present in the backend storage
+   * Checks if a file is already present in the backend storage. This might be a
+   * synchronous operation.
    *
    * @param path  the path of the file to be checked
    * @return      true if the file was found in the backend storage
@@ -208,6 +260,16 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                const UploaderResults  &result) const;
 
 
+  /**
+   * Acquires a job from the job queue.
+   *
+   * Note: if there are no jobs in the queue, it will block the calling thread
+   *       until new work is available in the job queue.
+   *       Consider to use TryToAcquireNewJob() if you do not want to block!
+   *
+   * @return   an UploadJob to be processed by the concrete implementation of
+   *           AbstractUploader
+   */
   UploadJob AcquireNewJob() {
     UploadJob job;
     upload_queue_.pop(job);
@@ -215,14 +277,35 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   }
 
 
+  /**
+   * Tries to acquires a job from the job queue. If there is no work in the job
+   * queue, it will _not_ wait but immediately return with 'false'.
+   *
+   * Note: This method will not block on an empty queue (see AcquireNewJob())!
+   *
+   * @param job_slot   a reference for an UploadJob slot to be pulled
+   * @return           true if a job was successfully popped
+   */
   bool TryToAcquireNewJob(UploadJob &job_slot) {
     return upload_queue_.try_pop(job_slot);
   }
 
 
+  /**
+   * This purely virtual function is called once the AbstractUploader has started
+   * its dedicated writer thread. Overwrite this method to implement your event
+   * loop that is supposed to run in its own thread. In this event loop you are
+   * supposed to pull upload jobs using AbstractUploader::AcquireNewJob().
+   * If this method returns, AbstractUploader's write thread is terminated, so
+   * make sure to exit that method if and only if you receive an UploadJob like:
+   *   UploadJob.type == UploadJob::Terminate
+   */
   virtual void WorkerThread() = 0;
 
 
+  /**
+   * This is the entry point into the worker thread.
+   */
   void WriteThread() { this->WorkerThread(); }
 
   const SpoolerDefinition& spooler_definition() const {
