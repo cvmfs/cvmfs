@@ -86,17 +86,7 @@ void Reader<FileScrubbingTaskT, FileT>::FinalizedFile(AbstractFile *file) {
   FileT *concrete_file = static_cast<FileT*>(file);
   this->NotifyListeners(concrete_file);
 
-  // check if all files have been processed
-  {
-    MutexLockGuard lock(files_in_flight_mutex_);
-    --files_in_flight_;
-    if (files_in_flight_ == 0) {
-      pthread_cond_broadcast(&reading_done_);
-    }
-    if (files_in_flight_ <= max_files_in_flight_ / 2) {
-      pthread_cond_broadcast(&free_file_slots_);
-    }
-  }
+  --files_in_flight_counter_;
 }
 
 
