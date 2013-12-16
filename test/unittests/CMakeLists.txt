@@ -16,6 +16,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_atomic.cc
   t_smallhash.cc
   t_bigvector.cc
+  t_util.cc
   t_util_concurrency.cc
   t_catalog_counters.cc
   t_fs_traversal.cc
