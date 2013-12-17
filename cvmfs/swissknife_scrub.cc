@@ -9,9 +9,8 @@
 #include "logging.h"
 #include "smalloc.h"
 
-#include <sstream>
-
 using namespace swissknife;
+using namespace std;  // NOLINT
 
 const size_t      kHashSubtreeLength = 2;
 const size_t      kHashStringLength  = 40;
@@ -125,10 +124,8 @@ void CommandScrub::SymlinkCallback(const std::string &relative_path,
 
 void CommandScrub::FileProcessedCallback(StoredFile* const& file) {
   if (file->content_hash() != file->expected_hash()) {
-    std::stringstream ss;
-    ss << "mismatch of file name and content hash: "
-       << file->content_hash().ToString();
-    PrintWarning(ss.str(), file->path());
+    PrintWarning("mismatch of file name and content hash: " +
+                 file->content_hash().ToString(), file->path());
   }
 }
 
@@ -136,7 +133,8 @@ void CommandScrub::FileProcessedCallback(StoredFile* const& file) {
 std::string CommandScrub::CheckPathAndExtractHash(
                                            const std::string &relative_path,
                                            const std::string &file_name,
-                                           const std::string &full_path) const {
+                                           const std::string &full_path) const
+{
   // check for a valid object modifier on the end of the file name
   const char last_character = *(file_name.end() - 1); // TODO: C++11: file_name.back()
   bool has_object_modifier = false;
@@ -150,9 +148,8 @@ std::string CommandScrub::CheckPathAndExtractHash(
       last_character != 'X' && // certificate
       last_character != 'L')   // micro catalogs (currently only reserved)
   {
-    std::stringstream ss;
-    ss << "unknown object modifier: " << last_character;
-    PrintWarning(ss.str(), full_path);
+    PrintWarning("unknown object modifier: " + string(&last_character, 1),
+                 full_path);
     return "";
   }
 
@@ -161,10 +158,10 @@ std::string CommandScrub::CheckPathAndExtractHash(
         file_name.size() != kHashStringLength - kHashSubtreeLength)
        ||
        (has_object_modifier &&
-        file_name.size() != kHashStringLength - kHashSubtreeLength + 1)) {
-    std::stringstream ss;
-    ss << "malformed file name length: " << file_name.size();
-    PrintWarning(ss.str(), full_path);
+        file_name.size() != kHashStringLength - kHashSubtreeLength + 1))
+  {
+    PrintWarning("malformed file name length: " +
+                 StringifyInt(file_name.size()), full_path);
     return "";
   }
 

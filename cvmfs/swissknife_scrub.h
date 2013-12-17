@@ -8,7 +8,6 @@
 #include "swissknife.h"
 
 #include <string>
-#include <openssl/sha.h>
 #include <cassert>
 
 #include "file_processing/async_reader.h"
