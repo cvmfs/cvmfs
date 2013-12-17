@@ -64,6 +64,64 @@ const T& Future<T>::Get() const {
 
 //
 // +----------------------------------------------------------------------------
+// |  SynchronizingCounter
+//
+
+
+template <typename T>
+SynchronizingCounter<T>::SynchronizingCounter() {
+  atomic_init64(&value_);
+  const bool init_successful = (pthread_mutex_init(&mutex_, NULL)      == 0 &&
+                                pthread_cond_init(&became_zero_, NULL) == 0);
+  assert (init_successful);
+}
+
+
+template <typename T>
+SynchronizingCounter<T>::~SynchronizingCounter() {
+  pthread_cond_destroy(&became_zero_);
+  pthread_mutex_destroy(&mutex_);
+}
+
+
+template <typename T>
+void SynchronizingCounter<T>::WaitForZero() const {
+  MutexLockGuard lock(mutex_);
+  while (atomic_read64(&value_) != T(0)) {
+    pthread_cond_wait(&became_zero_, &mutex_);
+  }
+}
+
+
+template <typename T>
+SynchronizingCounter<T>&  SynchronizingCounter<T>::operator=(const T &other){
+  value_ = other; // assignment is atomic in any case!
+  if (other == T(0)) {
+    Notify();
+  }
+  return *this;
+}
+
+
+template <typename T>
+T SynchronizingCounter<T>::AddAndPossiblyNotify(const T addend) {
+  const T retval = atomic_xadd64(&value_, addend);
+  if (retval == -addend) {
+    Notify();
+  }
+  return retval;
+}
+
+
+template <typename T>
+void SynchronizingCounter<T>::Notify() {
+  MutexLockGuard lock(mutex_);
+  pthread_cond_broadcast(&became_zero_);
+}
+
+
+//
+// +----------------------------------------------------------------------------
 // |  BlockingCounter
 //
 

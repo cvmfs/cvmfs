@@ -195,6 +195,57 @@ class Future : SingleCopy {
 //
 
 
+
+/**
+ * This counter can be counted up and down using the usual increment/decrement
+ * operators. Additionally threads can wait for it to become zero.
+ * Internally it uses atomics for the counting and a POSIX conditional variable
+ * to signal the 'zero state'.
+ *
+ * Note: Since counting is done with atomics, the conditional variable's mutex
+ *       is only locked in case a counting operation hit the 'zero state' and
+ *       _not_ for each counting operation.
+ *
+ * Caveat: This class is templated, but currently all but T=atomic_int64 might
+ *         produce undefined behaviour. TODO: implement flexible atomic template
+ */
+template <typename T>
+class SynchronizingCounter : SingleCopy {
+ public:
+  SynchronizingCounter();
+  ~SynchronizingCounter();
+
+  T Increment() { return ++(*this); }
+  T Decrement() { return --(*this); }
+
+  void WaitForZero() const;
+
+  T operator++()    { return AddAndPossiblyNotify(T(1))  + T(1); }
+  T operator++(int) { return AddAndPossiblyNotify(T(1));         }
+  T operator--()    { return AddAndPossiblyNotify(T(-1)) - T(1); }
+  T operator--(int) { return AddAndPossiblyNotify(T(-1));        }
+
+  operator T() const { return static_cast<T>(atomic_read64(&value_)); }
+  SynchronizingCounter<T>& operator=(const T &other);
+
+ protected:
+  T AddAndPossiblyNotify(const T addend);
+  void Notify();
+
+ private:
+  mutable T               value_; // thanks C-style interface >.<
+  mutable pthread_mutex_t mutex_;
+  mutable pthread_cond_t  became_zero_;
+};
+
+typedef SynchronizingCounter<atomic_int64> SynchronizingIntCounter;
+
+
+//
+// -----------------------------------------------------------------------------
+//
+
+
 /**
  * This is a semaphore-like counter. On creation the user specifies a maximal
  * value. If a thread wants to increase the counter to a higher value it blocks
