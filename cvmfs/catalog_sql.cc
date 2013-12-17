@@ -974,15 +974,23 @@ bool SqlCreateCounter::BindInitialValue(const int64_t value) {
 
 
 SqlAllChunks::SqlAllChunks(const Database &database) {
+  int hash_mask = 7 << SqlDirent::kFlagPosHash;
+  string flags2hash =
+    " ((flags&" + StringifyInt(hash_mask) + ") >> " +
+    StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
+
   string sql = "SELECT DISTINCT hash, "
   "CASE WHEN flags & " + StringifyInt(SqlDirent::kFlagFile) + " THEN " +
     StringifyInt(kChunkFile) + " " +
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
     StringifyInt(kChunkMicroCatalog) + " END " +
-  "AS chunk_type FROM catalog WHERE hash IS NOT NULL";
+  "AS chunk_type, " + flags2hash +
+  "FROM catalog WHERE hash IS NOT NULL";
   if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
-    sql += " UNION SELECT DISTINCT hash, " + StringifyInt(kChunkPiece) + " " +
-      "FROM chunks";
+    sql += " UNION SELECT DISTINCT chunks.hash, " + StringifyInt(kChunkPiece) +
+      ", " + flags2hash + "FROM chunks, catalog WHERE "
+      "chunks.md5path_1=catalog.md5path_1 AND "
+      "chunks.md5path_2=catalog.md5path_2";
   }
   sql += ";";
   Init(database.sqlite_db(), sql);
@@ -996,7 +1004,7 @@ bool SqlAllChunks::Open() {
 
 bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
   if (FetchRow()) {
-    *hash = RetrieveHashBlob(0, shash::kSha1);
+    *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)));
     *type = static_cast<ChunkTypes>(RetrieveInt(1));
     return true;
   }
