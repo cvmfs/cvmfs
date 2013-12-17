@@ -28,6 +28,10 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
+/**
+ * Don't change order!  The integer value of the enum constants is used
+ * as file catalog flags.
+ */
 enum Algorithms {
   kMd5 = 0,
   kSha1,
