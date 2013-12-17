@@ -7,7 +7,7 @@
 
 
 struct thread_args {
-  int                    state;
+  int                      state;
   SynchronizingIntCounter *counter;
 };
 
