@@ -60,20 +60,25 @@ class MockUploader_UF : public AbstractUploader {
 
 
   void WorkerThread() {
-    bool running = true;
-    worker_thread_running = true;
+    bool running               = true;
+    worker_thread_running      = true;
+    const callback_t *callback = NULL;
+    MockStreamHandle* handle   = NULL;
 
     while (running) {
       UploadJob job = AcquireNewJob();
       switch (job.type) {
         case UploadJob::Upload:
-          static_cast<MockStreamHandle*>(job.stream_handle)->uploads++;
-          Respond(job.callback, upload::UploaderResults(0, job.buffer));
+          handle = static_cast<MockStreamHandle*>(job.stream_handle);
+          handle->uploads++;
+          Respond(job.callback, UploaderResults(0, job.buffer));
           break;
         case UploadJob::Commit:
-          static_cast<MockStreamHandle*>(job.stream_handle)->commits++;
-          Respond(job.stream_handle->commit_callback, UploaderResults(0));
-          delete job.stream_handle;
+          handle = static_cast<MockStreamHandle*>(job.stream_handle);
+          handle->commits++;
+          callback = handle->commit_callback;
+          delete handle;
+          Respond(callback, UploaderResults(0));
           break;
         case UploadJob::Terminate:
           running = false;
@@ -83,6 +88,8 @@ class MockUploader_UF : public AbstractUploader {
           break;
       }
     }
+
+    EXPECT_EQ (0, jobs_in_flight()) << "Unfinished Jobs in the pipeline";
 
     worker_thread_running = false;
   }
@@ -163,13 +170,23 @@ TEST(T_UploadFacility, InitializeAndTearDown) {
 //
 
 
-int chunk_upload_complete_callback_calls = 0;
-void ChunkUploadCompleteCallback(const UploaderResults &results) {
+volatile int chunk_upload_complete_callback_calls = 0;
+void ChunkUploadCompleteCallback_T_Callbacks(const UploaderResults &results) {
+  EXPECT_EQ (UploaderResults::kChunkCommit,  results.type);
+  EXPECT_EQ (0,                              results.return_code);
+  EXPECT_EQ ("",                             results.local_path);
+  EXPECT_EQ (static_cast<CharBuffer*>(NULL), results.buffer);
   ++chunk_upload_complete_callback_calls;
 }
 
-int buffer_upload_complete_callback_calls = 0;
-void BufferUploadCompleteCallback(const UploaderResults &results) {
+volatile int buffer_upload_complete_callback_calls = 0;
+void BufferUploadCompleteCallback_T_Callbacks(const UploaderResults &results) {
+  EXPECT_EQ (UploaderResults::kBufferUpload, results.type);
+  EXPECT_EQ (0,                              results.return_code);
+  EXPECT_EQ ("",                             results.local_path);
+  EXPECT_NE (static_cast<CharBuffer*>(NULL), results.buffer);
+  EXPECT_LT (size_t(0),                      results.buffer->used_bytes());
+  EXPECT_LE (0,                              results.buffer->base_offset());
   ++buffer_upload_complete_callback_calls;
 }
 
@@ -183,7 +200,7 @@ TEST(T_UploadFacility, Callbacks) {
   EXPECT_EQ (0, MockStreamHandle::instances);
 
   UploadStreamHandle *handle = uploader->InitStreamedUpload(
-      AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback));
+      AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Callbacks));
   ASSERT_NE (static_cast<void*>(NULL), handle);
 
   EXPECT_EQ (1, MockStreamHandle::instances);
@@ -197,7 +214,7 @@ TEST(T_UploadFacility, Callbacks) {
   b1.SetUsedBytes(1000);
   b1.SetBaseOffset(0);
   uploader->ScheduleUpload(handle, &b1,
-    AbstractUploader::MakeCallback(&BufferUploadCompleteCallback));
+    AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Callbacks));
 
   sleep(1);
 
@@ -208,7 +225,7 @@ TEST(T_UploadFacility, Callbacks) {
   b2.SetUsedBytes(1000);
   b2.SetBaseOffset(1000);
   uploader->ScheduleUpload(handle, &b2,
-    AbstractUploader::MakeCallback(&BufferUploadCompleteCallback));
+    AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Callbacks));
 
   sleep(1);
 
