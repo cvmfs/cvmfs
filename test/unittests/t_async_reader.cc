@@ -2,8 +2,9 @@
 
 #include <openssl/sha.h>
 
-#include <iostream>
 #include <cassert>
+#include <pthread.h>
+#include <unistd.h>
 
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
@@ -11,6 +12,8 @@
 #include "../../cvmfs/file_processing/async_reader.h"
 
 #include "c_file_sandbox.h"
+
+namespace upload {
 
 class TestFile : public upload::AbstractFile {
  public:
@@ -104,9 +107,8 @@ class DummyFileScrubbingTask :
 
 
 class T_AsyncReader : public FileSandbox {
- protected:
+ public:
   typedef upload::Reader<DummyFileScrubbingTask, TestFile> MyReader;
-
 
  public:
   T_AsyncReader() :
@@ -253,4 +255,76 @@ TEST_F (T_AsyncReader, ReadManyBigFile) {
   for (; j < jend; ++j) {
     (*j)->CheckHash();
   }
+}
+
+
+void *deadlock_test(void *v_files) {
+  std::vector<TestFile*> &files = *static_cast<std::vector<TestFile*>*>(v_files);
+
+  const size_t        max_buffer_size = 524288;
+  const unsigned int  max_buffers_in_flight = 5; // less buffers than files
+  T_AsyncReader::MyReader reader(max_buffer_size, max_buffers_in_flight);
+
+  // do multiple waits (empty queue... should return immediately)
+  reader.Wait();
+  reader.Wait();
+  reader.Wait();
+  reader.Wait();
+  reader.Wait();
+
+  // process files and wait in between
+  std::vector<TestFile*>::const_iterator i    = files.begin();
+  std::vector<TestFile*>::const_iterator iend = files.end();
+  int k = 0;
+  for (; i < iend; ++i, ++k) {
+    reader.ScheduleRead(*i);
+    if (k % 100 == 0) {
+      reader.Wait();
+    }
+  }
+
+  // wait for everything to finish
+  reader.Wait();
+
+  // check that the file reading worked
+  std::vector<TestFile*>::const_iterator j    = files.begin();
+  std::vector<TestFile*>::const_iterator jend = files.end();
+  for (; j < jend; ++j) {
+    (*j)->CheckHash();
+  }
+
+  return (void*)1337;
+}
+
+TEST_F (T_AsyncReader, MultipleWaits) {
+  const int file_count = 10000;
+  std::vector<TestFile*> files;
+  files.reserve(file_count);
+  for (int i = 0; i < file_count; ++i) {
+    files.push_back(new TestFile(GetSmallFile(), GetSmallFileHash()));
+  }
+
+  pthread_t thread;
+  const int res = pthread_create(&thread,
+                                  NULL,
+                                 &deadlock_test,
+                                  static_cast<void*>(&files));
+  ASSERT_EQ (0, res);
+
+  unsigned int timeout = 10;
+  while (pthread_kill(thread, 0) != ESRCH && timeout > 0) {
+    sleep(1);
+    --timeout;
+  }
+  EXPECT_LT (0u, timeout) << "Timeout expired (possible Deadlock!)";
+  if (timeout == 0) {
+    pthread_cancel(thread);
+  } else {
+    void *return_value;
+    const int join_res = pthread_join(thread, &return_value);
+    ASSERT_EQ (0, join_res);
+    EXPECT_EQ ((void*)1337, return_value);
+  }
+}
+
 }
