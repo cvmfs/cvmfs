@@ -8,7 +8,7 @@ cvmfs_run_test() {
     "CVMFS_INITIAL_GENERATION=4294967295" || return 1
   ls /cvmfs/lhcb.cern.ch || return 2
 
-  tail -1 $CVMFS_TEST_SYSLOG_TARGET | grep 32bit || return 3  
+  sudo sh -c "tail -1 $CVMFS_TEST_SYSLOG_TARGET | grep 32bit" || return 3  
 
   return 0
 }
