@@ -86,13 +86,47 @@ enum CommandType {
   kGetProtocolRevision,
 };
 
+/**
+ * That could be done in more elegant way.  However, we might have a situation
+ * with old cache manager serving new clients (or vice versa) and we don't want
+ * to change the memory layout of LruCommand.
+ */
 struct LruCommand {
   CommandType command_type;
-  uint64_t size;    // Last 3 bits store hash algorithm
+  uint64_t size;    // Careful! Last 3 bits store hash algorithm
   int return_pipe;  // For cleanup, listing, and reservations
   unsigned char digest[shash::kMaxDigestSize];
   uint16_t path_length;  // Maximum 512-sizeof(LruCommand) in order to guarantee
                          // atomic pipe operations
+
+  LruCommand() : size(0), return_pipe(-1) { }
+
+  void SetSize(const uint64_t new_size) {
+    uint64_t mask = 7;
+    mask = ~(mask << (64-3));
+    size = (new_size & mask) | size;
+  }
+
+  uint64_t GetSize() const {
+    uint64_t mask = 7;
+    mask = ~(mask << (64-3));
+    return size & mask;
+  }
+
+  void StoreHash(const shash::Any &hash) {
+    memcpy(digest, hash.digest, hash.GetDigestSize());
+    // Exclude MD5
+    uint64_t algo_flags = hash.algorithm - 1;
+    algo_flags = algo_flags << (64-3);
+    size |= algo_flags;
+  }
+
+  shash::Any RetrieveHash() const {
+    uint64_t algo_flags = size >> (64-3);
+    shash::Any result(static_cast<shash::Algorithms>(algo_flags+1));
+    memcpy(result.digest, digest, result.GetDigestSize());
+    return result;
+  }
 };
 
 /**
@@ -258,8 +292,7 @@ static bool DoCleanup(const uint64_t leave_size) {
     hash_str = string(reinterpret_cast<const char *>(
                       sqlite3_column_text(stmt_lru_, 0)));
     LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
-    shash::Any hash(shash::kSha1, shash::HexPtr(
-      hash_str.substr(0, 2*shash::kDigestSizes[shash::kSha1])));
+    shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(hash_str));
 
     // That's a critical condition.  We must not delete a not yet inserted
     // pinned file as it is already reserved (but will be inserted later).
@@ -360,10 +393,9 @@ static void ProcessCommandBunch(const unsigned num,
   assert(retval == SQLITE_OK);
 
   for (unsigned i = 0; i < num; ++i) {
-    const shash::Any hash(shash::kSha1, commands[i].digest,
-                         sizeof(commands[i].digest));
+    const shash::Any hash = commands[i].RetrieveHash();
     const string hash_str = hash.ToString();
-    const unsigned size = commands[i].size;
+    const unsigned size = commands[i].GetSize();
     LogCvmfs(kLogQuota, kLogDebug, "processing %s (%d)",
              hash_str.c_str(), commands[i].command_type);
 
@@ -469,7 +501,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
   {
     const CommandType command_type = command_buffer[num_commands].command_type;
     LogCvmfs(kLogQuota, kLogDebug, "received command %d", command_type);
-    const uint64_t size = command_buffer[num_commands].size;
+    const uint64_t size = command_buffer[num_commands].GetSize();
 
     // Inserts and pins come with a cvmfs path
     if ((command_type == kInsert) || (command_type == kPin) ||
@@ -499,8 +531,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       if (return_pipe < 0)
         continue;
 
-      const shash::Any hash(shash::kSha1, command_buffer[num_commands].digest,
-                            sizeof(command_buffer[num_commands].digest));
+      const shash::Any hash = command_buffer[num_commands].RetrieveHash();
       const string hash_str(hash.ToString());
       LogCvmfs(kLogQuota, kLogDebug, "reserve %d bytes for %s",
                size, hash_str.c_str());
@@ -568,8 +599,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
 
     // Unpinnings are also handled immediately with respect to the pinned gauge
     if (command_type == kUnpin) {
-      const shash::Any hash(shash::kSha1, command_buffer[num_commands].digest,
-                            sizeof(command_buffer[num_commands].digest));
+      const shash::Any hash = command_buffer[num_commands].RetrieveHash();
       const string hash_str(hash.ToString());
 
       map<shash::Any, uint64_t>::iterator iter = pinned_chunks_->find(hash);
@@ -608,8 +638,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
       sqlite3_stmt *this_stmt_list = NULL;
       switch (command_type) {
         case kRemove: {
-          const shash::Any hash(shash::kSha1, command_buffer[num_commands].digest,
-                                sizeof(command_buffer[num_commands].digest));
+          const shash::Any hash = command_buffer[num_commands].RetrieveHash();
           const string hash_str = hash.ToString();
           LogCvmfs(kLogQuota, kLogDebug, "manually removing %s",
                    hash_str.c_str());
@@ -705,7 +734,7 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
   for (map<shash::Any, uint64_t>::const_iterator i = pinned_chunks_->begin(),
        iEnd = pinned_chunks_->end(); i != iEnd; ++i)
   {
-    memcpy(command_buffer[0].digest, i->first.digest, i->first.GetDigestSize());
+    command_buffer[0].StoreHash(i->first);
     ProcessCommandBunch(1, command_buffer, path_buffer);
   }
   delete back_channels_;
@@ -729,6 +758,7 @@ void RegisterBackChannel(int back_channel[2], const string &channel_id) {
     LruCommand cmd;
     cmd.command_type = kRegisterBackChannel;
     cmd.return_pipe = back_channel[1];
+    // Not StoreHash().  This is an MD5 hash.
     memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
@@ -758,6 +788,7 @@ void UnregisterBackChannel(int back_channel[2], const string &channel_id) {
 
     LruCommand cmd;
     cmd.command_type = kUnregisterBackChannel;
+    // Not StoreHash().  This is an MD5 hash.
     memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
@@ -837,8 +868,8 @@ bool RebuildDatabase() {
       if (d->d_type != DT_REG) continue;
 
       if (stat((path + "/" + string(d->d_name)).c_str(), &info) == 0) {
-        string sha1 = string(hex) + string(d->d_name);
-        sqlite3_bind_text(stmt_insert, 1, sha1.c_str(), sha1.length(),
+        string hash = string(hex) + string(d->d_name);
+        sqlite3_bind_text(stmt_insert, 1, hash.data(), hash.length(),
                           SQLITE_STATIC);
         sqlite3_bind_int64(stmt_insert, 2, info.st_size);
         sqlite3_bind_int64(stmt_insert, 3, info.st_atime);
@@ -868,9 +899,9 @@ bool RebuildDatabase() {
     "VALUES (:sha1, :s, :seq, 'unknown (automatic rebuild)', :t, 0);",
     -1, &stmt_insert, NULL);
   while (sqlite3_step(stmt_select) == SQLITE_ROW) {
-    const string sha1 = string(
+    const string hash = string(
       reinterpret_cast<const char *>(sqlite3_column_text(stmt_select, 0)));
-    sqlite3_bind_text(stmt_insert, 1, &sha1[0], sha1.length(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt_insert, 1, &hash[0], hash.length(), SQLITE_STATIC);
     sqlite3_bind_int64(stmt_insert, 2, sqlite3_column_int64(stmt_select, 1));
     sqlite3_bind_int64(stmt_insert, 3, seq++);
     sqlite3_bind_int64(stmt_insert, 4, kFileRegular); // might also be a catalog
@@ -1545,9 +1576,10 @@ static void DoInsert(const shash::Any &hash, const uint64_t size,
 
   LruCommand *cmd = reinterpret_cast<LruCommand *>(
                       alloca(sizeof(LruCommand) + path_length));
+  new (cmd) LruCommand;
   cmd->command_type = command_type;
-  cmd->size = size;
-  memcpy(cmd->digest, hash.digest, hash.GetDigestSize());
+  cmd->SetSize(size);
+  cmd->StoreHash(hash);
   cmd->path_length = path_length;
   memcpy(reinterpret_cast<char *>(cmd)+sizeof(LruCommand),
          &cvmfs_path[0], path_length);
@@ -1625,8 +1657,8 @@ bool Pin(const shash::Any &hash, const uint64_t size,
 
   LruCommand cmd;
   cmd.command_type = kReserve;
-  cmd.size = size;
-  memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+  cmd.SetSize(size);
+  cmd.StoreHash(hash);
   cmd.return_pipe = pipe_reserve[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
   bool result;
@@ -1646,7 +1678,7 @@ void Unpin(const shash::Any &hash) {
 
   LruCommand cmd;
   cmd.command_type = kUnpin;
-  memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+  cmd.StoreHash(hash);
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 }
 
@@ -1660,7 +1692,7 @@ void Touch(const shash::Any &hash) {
 
   LruCommand cmd;
   cmd.command_type = kTouch;
-  memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+  cmd.StoreHash(hash);
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 }
 
@@ -1679,7 +1711,7 @@ void Remove(const shash::Any &hash) {
     LruCommand cmd;
     cmd.command_type = kRemove;
     cmd.return_pipe = pipe_remove[1];
-    memcpy(cmd.digest, hash.digest, hash.GetDigestSize());
+    cmd.StoreHash(hash);
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
     bool success;

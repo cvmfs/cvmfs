@@ -30,7 +30,7 @@ namespace shash {
 
 /**
  * Don't change order!  The integer value of the enum constants is used
- * as file catalog flags.
+ * as file catalog flags and as flags in communication with the cache manager.
  */
 enum Algorithms {
   kMd5 = 0,
@@ -201,6 +201,8 @@ struct Digest {
   }
 
   bool operator <(const Digest<digest_size_, algorithm_> &other) const {
+    if (this->algorithm != other.algorithm)
+      return (this->algorithm < other.algorithm);
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (this->digest[i] > other.digest[i])
         return false;
@@ -211,6 +213,8 @@ struct Digest {
   }
 
   bool operator >(const Digest<digest_size_, algorithm_> &other) const {
+    if (this->algorithm != other.algorithm)
+      return (this->algorithm > other.algorithm);
     for (int i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (this->digest[i] < other.digest[i])
         return false;
