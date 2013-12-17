@@ -254,16 +254,12 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
 
 int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   const string spooler_definition = *args.find('r')->second;
-  // TODO
-  const upload::SpoolerDefinition sd(spooler_definition, shash::kSha1);
-  upload::Spooler *spooler = upload::Spooler::Construct(sd);
-  assert(spooler);
-
   const string repository_url = MakeCanonicalPath(*args.find('u')->second);
   const string repository_name = *args.find('n')->second;
   const string repository_key_path = *args.find('k')->second;
   const string history_path = *args.find('o')->second;
-  const shash::Any base_hash(shash::kSha1, shash::HexPtr(*args.find('b')->second));
+  const shash::Any base_hash(
+    shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second)));
   const string target_tag_name = *args.find('t')->second;
   const string manifest_path = *args.find('m')->second;
   const string temp_dir = *args.find('d')->second;
@@ -272,6 +268,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     trusted_certs = *args.find('z')->second;
   }
 
+  upload::Spooler *spooler = NULL;
   shash::Any history_hash;
   history::Database tag_db;
   history::TagList tag_list;
@@ -280,7 +277,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   string catalog_path;
   catalog::WritableCatalog *catalog = NULL;
   manifest::Manifest *manifest = NULL;
-  shash::Any hash_republished_catalog(shash::kSha1);
+  shash::Any hash_republished_catalog;
   int64_t size_republished_catalog = 0;
   int retval;
 
@@ -359,6 +356,12 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   // Upload catalog
   size_republished_catalog = GetFileSize(catalog->database_path());
   assert(size_republished_catalog > 0);
+  spooler = upload::Spooler::Construct(
+    upload::SpoolerDefinition(spooler_definition,
+                              target_tag.root_hash.algorithm));
+  assert(spooler);
+
+  hash_republished_catalog.algorithm = target_tag.root_hash.algorithm;
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_republished_catalog))
