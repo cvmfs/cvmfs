@@ -253,12 +253,15 @@ class AbstractCatalogManager {
   virtual void EnforceSqliteMemLimit();
 
  private:
+  void CheckInodeWatermark();
+
   /**
    * This list is only needed to find a catalog given an inode.
    * This might possibly be done by walking the catalog tree, similar to
    * finding a catalog given the path.
    */
   CatalogList catalogs_;
+  int inode_watermark_status_;  /**< 0: OK, 1: > 32bit */
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
   uint64_t incarnation_;  /**< counts how often the inodes have been invalidated */

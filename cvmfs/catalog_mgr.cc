@@ -19,6 +19,7 @@ namespace catalog {
 
 
 AbstractCatalogManager::AbstractCatalogManager() {
+  inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
   revision_cache_ = 0;
   inode_annotation_ = NULL;
@@ -53,6 +54,22 @@ void AbstractCatalogManager::SetOwnerMaps(const OwnerMap &uid_map,
 {
   uid_map_ = uid_map;
   gid_map_ = gid_map;
+}
+
+
+void AbstractCatalogManager::CheckInodeWatermark() {
+  if (inode_watermark_status_ > 0)
+    return;
+
+  uint64_t highest_inode = inode_gauge_;
+  if (inode_annotation_)
+    highest_inode += inode_annotation_->GetGeneration();
+  uint64_t uint32_border = 1;
+  uint32_border = uint32_border << 32;
+  if (highest_inode >= uint32_border) {
+    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn, "inodes excess 32bit");
+    inode_watermark_status_++;
+  }
 }
 
 
@@ -109,6 +126,7 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
       inode_annotation_->IncGeneration(old_inode_gauge);
     }
   }
+  CheckInodeWatermark();
   Unlock();
 
   return load_error;
@@ -659,6 +677,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
     inode_gauge_ -= inode_chunk_size;
     return false;
   }
+  CheckInodeWatermark();
 
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty())
