@@ -1,5 +1,8 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * Careful: any real schema migration as of now requires taking care of
+ * hash algorithm
  */
 
 #include "swissknife_migrate.h"
