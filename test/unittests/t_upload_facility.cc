@@ -11,15 +11,15 @@
 using namespace upload;
 
 
-struct MockStreamHandle : public upload::UploadStreamHandle {
-  MockStreamHandle(const callback_t *commit_callback) :
+struct MockStreamHandle_UF : public upload::UploadStreamHandle {
+  MockStreamHandle_UF(const callback_t *commit_callback) :
     UploadStreamHandle(commit_callback),
     commits(0), uploads(0)
   {
     ++instances;
   }
 
-  ~MockStreamHandle() {
+  ~MockStreamHandle_UF() {
     --instances;
   }
 
@@ -29,7 +29,7 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
   static int instances;
 };
 
-int MockStreamHandle::instances = 0;
+int MockStreamHandle_UF::instances = 0;
 
 
 /**
@@ -63,18 +63,18 @@ class MockUploader_UF : public AbstractUploader {
     bool running               = true;
     worker_thread_running      = true;
     const callback_t *callback = NULL;
-    MockStreamHandle* handle   = NULL;
+    MockStreamHandle_UF* handle   = NULL;
 
     while (running) {
       UploadJob job = AcquireNewJob();
       switch (job.type) {
         case UploadJob::Upload:
-          handle = static_cast<MockStreamHandle*>(job.stream_handle);
+          handle = static_cast<MockStreamHandle_UF*>(job.stream_handle);
           handle->uploads++;
           Respond(job.callback, UploaderResults(0, job.buffer));
           break;
         case UploadJob::Commit:
-          handle = static_cast<MockStreamHandle*>(job.stream_handle);
+          handle = static_cast<MockStreamHandle_UF*>(job.stream_handle);
           handle->commits++;
           callback = handle->commit_callback;
           delete handle;
@@ -96,7 +96,7 @@ class MockUploader_UF : public AbstractUploader {
 
   upload::UploadStreamHandle* InitStreamedUpload(
                                             const callback_t *callback = NULL) {
-    return new MockStreamHandle(callback);
+    return new MockStreamHandle_UF(callback);
   }
 
   bool Initialize() {
@@ -197,13 +197,13 @@ TEST(T_UploadFacility, Callbacks) {
 
   EXPECT_EQ (0, chunk_upload_complete_callback_calls);
   EXPECT_EQ (0, buffer_upload_complete_callback_calls);
-  EXPECT_EQ (0, MockStreamHandle::instances);
+  EXPECT_EQ (0, MockStreamHandle_UF::instances);
 
   UploadStreamHandle *handle = uploader->InitStreamedUpload(
       AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Callbacks));
   ASSERT_NE (static_cast<void*>(NULL), handle);
 
-  EXPECT_EQ (1, MockStreamHandle::instances);
+  EXPECT_EQ (1, MockStreamHandle_UF::instances);
 
   sleep(1);
 
@@ -240,7 +240,7 @@ TEST(T_UploadFacility, Callbacks) {
 
   EXPECT_EQ (1, chunk_upload_complete_callback_calls);
   EXPECT_EQ (2, buffer_upload_complete_callback_calls);
-  EXPECT_EQ (0, MockStreamHandle::instances);
+  EXPECT_EQ (0, MockStreamHandle_UF::instances);
 }
 
 
