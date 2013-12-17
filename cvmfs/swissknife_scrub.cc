@@ -19,9 +19,7 @@ const std::string kTxnDirectoryName  = "txn";
 CommandScrub::StoredFile::StoredFile(const std::string &path,
                                      const std::string &expected_hash) :
   AbstractFile(path, GetFileSize(path)),
-  hash_done_(false),
-  hash_context_(shash::kSha1),
-  expected_hash_(shash::kSha1, shash::HexPtr(expected_hash))
+  hash_done_(false)
 {
   hash_context_.buffer = smalloc(hash_context_.size);
   shash::Init(hash_context_);
@@ -150,18 +148,6 @@ std::string CommandScrub::CheckPathAndExtractHash(
   {
     PrintWarning("unknown object modifier: " + string(&last_character, 1),
                  full_path);
-    return "";
-  }
-
-  // check for a fitting file name length of the object
-  if ( (!has_object_modifier &&
-        file_name.size() != kHashStringLength - kHashSubtreeLength)
-       ||
-       (has_object_modifier &&
-        file_name.size() != kHashStringLength - kHashSubtreeLength + 1))
-  {
-    PrintWarning("malformed file name length: " +
-                 StringifyInt(file_name.size()), full_path);
     return "";
   }
 
