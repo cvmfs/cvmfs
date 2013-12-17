@@ -1,0 +1,15 @@
+
+cvmfs_test_name="Warn on high inode watermark"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount "lhcb.cern.ch" \
+    "CVMFS_INITIAL_GENERATION=4294967295" || return 1
+  ls /cvmfs/lhcb.cern.ch || return 2
+
+  tail -1 $CVMFS_TEST_SYSLOG_TARGET | grep 32bit || return 3  
+
+  return 0
+}
+
