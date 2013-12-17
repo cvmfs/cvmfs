@@ -847,21 +847,23 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   // Load local checksum
   FILE *file_checksum = fopen(checksum_path.c_str(), "r");
-  char tmp[40];
-  if (file_checksum && (fread(tmp, 1, 40, file_checksum) == 40)) {
-    cache_hash = shash::Any(shash::kSha1, shash::HexPtr(string(tmp, 40)));
+  char tmp[128];
+  int read_bytes;
+  if (file_checksum && (read_bytes = fread(tmp, 1, 128, file_checksum)) > 0) {
+    // Separate hash from timestamp
+    int separator_pos = 0;
+    for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
+         ++separator_pos) { }
+    cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)));
     if (!FileExists(*cache_path_ + cache_hash.MakePath(1, 2))) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
       cache_hash = shash::Any();
     } else {
       // Get local last modified time
-      char buf_modified;
       string str_modified;
-      if ((fread(&buf_modified, 1, 1, file_checksum) == 1) &&
-          (buf_modified == 'T'))
-      {
-        while (fread(&buf_modified, 1, 1, file_checksum) == 1)
-          str_modified += string(&buf_modified, 1);
+      if ((tmp[separator_pos] == 'T') && (read_bytes > (separator_pos+1))) {
+        str_modified = string(tmp+separator_pos+1,
+                              read_bytes-(separator_pos+1));
         cache_last_modified = String2Uint64(str_modified);
         LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s",
                  StringifyTime(cache_last_modified, true).c_str());
