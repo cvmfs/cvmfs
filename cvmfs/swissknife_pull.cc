@@ -156,7 +156,7 @@ static void *MainWorker(void *data) {
       break;
 
     shash::Any chunk_hash(next_chunk.hash_algorithm, next_chunk.digest,
-                          shash::kDigestSizes[shash::kSha1]);
+                          shash::kDigestSizes[next_chunk.hash_algorithm]);
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
     string chunk_path = "data" + chunk_hash.MakePath(1, 2);
