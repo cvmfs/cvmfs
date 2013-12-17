@@ -236,9 +236,77 @@ TEST(T_UploadFacility, Callbacks) {
                            shash::Any(),
                            "");
 
-  sleep(1);
+  uploader->WaitForUpload();
 
   EXPECT_EQ (1, chunk_upload_complete_callback_calls);
   EXPECT_EQ (2, buffer_upload_complete_callback_calls);
   EXPECT_EQ (0, MockStreamHandle::instances);
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+size_t overall_size_ordering = 0;
+bool ordering_test_done = false;
+void ChunkUploadCompleteCallback_T_Ordering(const UploaderResults &results) {
+  ordering_test_done = true;
+}
+
+void BufferUploadCompleteCallback_T_Ordering(const UploaderResults &results) {
+  EXPECT_EQ (UploaderResults::kBufferUpload, results.type);
+  ASSERT_NE (static_cast<CharBuffer*>(NULL), results.buffer);
+  EXPECT_LT (size_t(0), results.buffer->used_bytes());
+
+  EXPECT_EQ (static_cast<off_t>(overall_size_ordering), results.buffer->base_offset());
+  overall_size_ordering += results.buffer->used_bytes();
+}
+
+// Caveat: 'offset' it automatically updated!
+CharBuffer* MakeBuffer(const size_t  buffer_size,
+                             size_t &offset,
+                       const size_t  used_bytes) {
+  CharBuffer *buffer = new CharBuffer(buffer_size);
+  assert (buffer != NULL);
+  buffer->SetUsedBytes(used_bytes);
+  buffer->SetBaseOffset(static_cast<off_t>(offset));
+  offset += used_bytes;
+  return buffer;
+}
+
+TEST(T_UploadFacility, DataBlockBasicOrdering) {
+  MockUploader_UF *uploader =
+                       new MockUploader_UF(MockUploader_UF::spooler_definition);
+
+  UploadStreamHandle *handle = uploader->InitStreamedUpload(
+      AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Ordering));
+  ASSERT_NE (static_cast<void*>(NULL), handle);
+
+  std::vector<CharBuffer*> buffers;
+  size_t overall_size = 0;
+  buffers.push_back(MakeBuffer(1024, overall_size,  384));
+  buffers.push_back(MakeBuffer(2048, overall_size, 1024));
+  buffers.push_back(MakeBuffer(4096, overall_size, 4096));
+  buffers.push_back(MakeBuffer(8192, overall_size, 6172));
+  buffers.push_back(MakeBuffer( 768, overall_size,  128));
+  buffers.push_back(MakeBuffer(2000, overall_size, 1921));
+  buffers.push_back(MakeBuffer(9999, overall_size, 9999));
+  buffers.push_back(MakeBuffer( 100, overall_size,   10));
+  buffers.push_back(MakeBuffer(4096, overall_size,  128));
+  buffers.push_back(MakeBuffer(4627, overall_size, 1950));
+  ASSERT_EQ (size_t(25812), overall_size);
+
+  std::vector<CharBuffer*>::const_iterator i    = buffers.begin();
+  std::vector<CharBuffer*>::const_iterator iend = buffers.end();
+  for (; i != iend; ++i) {
+    uploader->ScheduleUpload(handle, *i,
+      AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Ordering));
+  }
+
+  uploader->ScheduleCommit(handle, shash::Any(), "");
+  uploader->WaitForUpload();
+
+  EXPECT_EQ (overall_size, overall_size_ordering);
+  EXPECT_TRUE (ordering_test_done);
 }
