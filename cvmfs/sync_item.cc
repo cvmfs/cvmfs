@@ -22,7 +22,7 @@ SyncItem::SyncItem(const string &relative_parent_path,
   filename_(filename),
   union_engine_(union_engine)
 {
-  content_hash_.algorithm = shash::kSha1;
+  content_hash_.algorithm = shash::kAny;
 }
 
 
