@@ -26,15 +26,6 @@ bool AbstractUploader::Initialize() {
 }
 
 
-void AbstractUploader::WaitForUpload() const {}
-
-
-void AbstractUploader::Respond(const callback_t       *callback,
-                               const UploaderResults  &result) const {
-  if (callback == NULL) {
-    return;
-  }
-
-  (*callback)(result);
-  delete callback;
+void AbstractUploader::WaitForUpload() const {
+  jobs_in_flight_.WaitForZero();
 }

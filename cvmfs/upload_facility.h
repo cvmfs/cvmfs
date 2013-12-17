@@ -180,6 +180,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   void ScheduleUpload(UploadStreamHandle  *handle,
                       CharBuffer          *buffer,
                       const callback_t    *callback = NULL) {
+    ++jobs_in_flight_;
     upload_queue_.push(UploadJob(handle, buffer, callback));
   }
 
@@ -199,6 +200,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   void ScheduleCommit(UploadStreamHandle  *handle,
                       const shash::Any    &content_hash,
                       const std::string   &hash_suffix) {
+    ++jobs_in_flight_;
     upload_queue_.push(UploadJob(handle, content_hash, hash_suffix));
   }
 
@@ -234,7 +236,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    */
   virtual void WaitForUpload() const;
 
-
   virtual unsigned int GetNumberOfErrors() const = 0;
   static void RegisterPlugins();
 
@@ -252,7 +253,14 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *       by any means!
    */
   void Respond(const callback_t       *callback,
-               const UploaderResults  &result) const;
+               const UploaderResults  &result) const {
+    if (callback != NULL) {
+      (*callback)(result);
+      delete callback;
+    }
+
+    --jobs_in_flight_;
+  }
 
 
   /**
@@ -307,10 +315,16 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     return spooler_definition_;
   }
 
+  const SynchronizingIntCounter& jobs_in_flight() const {
+    return jobs_in_flight_;
+  }
+
  private:
   const SpoolerDefinition                   spooler_definition_;
   tbb::concurrent_bounded_queue<UploadJob>  upload_queue_;
   tbb::tbb_thread                           writer_thread_;
+
+  mutable SynchronizingIntCounter           jobs_in_flight_;
 };
 
 }
