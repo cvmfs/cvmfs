@@ -49,22 +49,7 @@ struct UploaderResults {
 };
 
 
-/**
- * Each implementation of AbstractUploader must provide its own derivate of the
- * UploadStreamHandle that is supposed to contain state information for the
- * streamed upload of one specific chunk.
- * Each UploadStreamHandle contains a callback object that is invoked as soon as
- * the streamed upload is committed.
- */
-struct UploadStreamHandle {
-  typedef CallbackBase<UploaderResults> callback_t;
-
-  UploadStreamHandle(const callback_t *commit_callback) :
-    commit_callback(commit_callback) {}
-  virtual ~UploadStreamHandle() {}
-
-  const callback_t *commit_callback;
-};
+struct UploadStreamHandle;
 
 
 /**
@@ -326,6 +311,26 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
   mutable SynchronizingIntCounter           jobs_in_flight_;
 };
+
+
+
+/**
+ * Each implementation of AbstractUploader must provide its own derivate of the
+ * UploadStreamHandle that is supposed to contain state information for the
+ * streamed upload of one specific chunk.
+ * Each UploadStreamHandle contains a callback object that is invoked as soon as
+ * the streamed upload is committed.
+ */
+struct UploadStreamHandle {
+  typedef AbstractUploader::callback_t callback_t;
+
+  UploadStreamHandle(const callback_t *commit_callback) :
+    commit_callback(commit_callback) {}
+  virtual ~UploadStreamHandle() {}
+
+  const callback_t *commit_callback;
+};
+
 
 }
 

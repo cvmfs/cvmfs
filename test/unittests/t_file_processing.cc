@@ -21,7 +21,7 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
     UploadStreamHandle(commit_callback),
     data(NULL), nbytes(0), marker(0) {}
 
-  ~MockStreamHandle() {
+  virtual ~MockStreamHandle() {
     if (data != NULL) {
       free(data);
       data   = NULL;
