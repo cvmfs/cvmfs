@@ -94,8 +94,8 @@ void SynchronizingCounter<T>::WaitForZero() const {
 
 
 template <typename T>
-SynchronizingCounter<T>&  SynchronizingCounter<T>::operator=(const T &other){
-  value_ = other; // assignment is atomic in any case!
+SynchronizingCounter<T>&  SynchronizingCounter<T>::operator=(const T &other) {
+  atomic_write64(&value_, other);
   if (other == T(0)) {
     Notify();
   }
