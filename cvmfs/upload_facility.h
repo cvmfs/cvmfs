@@ -127,9 +127,12 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param remote_path  desired path for the file in the backend storage
    * @param callback     (optional) gets notified when the upload was finished
    */
-  virtual void Upload(const std::string  &local_path,
-                      const std::string  &remote_path,
-                      const callback_t   *callback = NULL) = 0;
+  void Upload(const std::string  &local_path,
+              const std::string  &remote_path,
+              const callback_t   *callback = NULL) {
+    ++jobs_in_flight_;
+    FileUpload(local_path, remote_path, callback);
+  }
 
 
   /**
@@ -227,6 +230,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
  protected:
   AbstractUploader(const SpoolerDefinition& spooler_definition);
+
+  virtual void FileUpload(const std::string  &local_path,
+                          const std::string  &remote_path,
+                          const callback_t   *callback = NULL) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please

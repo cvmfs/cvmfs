@@ -44,9 +44,9 @@ namespace upload
      * This method calls NotifyListeners and invokes a callback for all
      * registered listeners (see the Observable template for details).
      */
-    void Upload(const std::string  &local_path,
-                const std::string  &remote_path,
-                const callback_t   *callback = NULL);
+    void FileUpload(const std::string  &local_path,
+                    const std::string  &remote_path,
+                    const callback_t   *callback = NULL);
 
     UploadStreamHandle* InitStreamedUpload(const callback_t *callback = NULL);
     void Upload(UploadStreamHandle  *handle,

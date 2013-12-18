@@ -152,9 +152,9 @@ class MockUploader : public upload::AbstractUploader {
     }
   }
 
-  void Upload(const std::string  &local_path,
-              const std::string  &remote_path,
-              const callback_t   *callback = NULL) {
+  void FileUpload(const std::string  &local_path,
+                  const std::string  &remote_path,
+                  const callback_t   *callback = NULL) {
     assert (MockUploader::not_implemented);
   }
 

@@ -64,9 +64,9 @@ void LocalUploader::WorkerThread() {
 }
 
 
-void LocalUploader::Upload(const std::string &local_path,
-                           const std::string &remote_path,
-                           const callback_t   *callback) {
+void LocalUploader::FileUpload(const std::string &local_path,
+                               const std::string &remote_path,
+                               const callback_t   *callback) {
   // create destination in backend storage temporary directory
   std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
   if (tmp_path.empty()) {
