@@ -101,7 +101,7 @@ TEST(T_UtilConcurrency, ReadLockGuard) {
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 //
 
-bool g_acquire_write_lock_killer = true;
+volatile bool g_acquire_write_lock_killer = true;
 
 void *acquire_write_lock(void *lock) {
   pthread_rwlock_t &rwlock = *static_cast<pthread_rwlock_t*>(lock);
