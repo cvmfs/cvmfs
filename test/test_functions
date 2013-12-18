@@ -22,6 +22,7 @@ CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for te
 
 CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=aufs} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
+CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 
 die() {
   echo -e $1 >&2
@@ -323,7 +324,7 @@ create_repo() {
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs -o $uid -m -f ${CVMFS_TEST_UNIONFS} $repo || return 102
+  sudo cvmfs_server mkfs -o $uid -m -f ${CVMFS_TEST_UNIONFS} -a ${CVMFS_TEST_HASHALGO} $repo || return 102
 
   if [ x$debug_log != x ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a /etc/cvmfs/repositories.d/${repo}/client.conf
