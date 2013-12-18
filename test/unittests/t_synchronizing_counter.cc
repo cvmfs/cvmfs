@@ -48,8 +48,10 @@ class T_SynchronizingCounter : public ::testing::Test {
     for (unsigned int i = 0; i < n_threads_; ++i) {
       const int killed = pthread_kill(threads_[i], 0);
       EXPECT_EQ (ESRCH, killed) << "Thread did not exit properly";
-      if (killed == ESRCH) {
+      if (killed != ESRCH) {
         pthread_cancel(threads_[i]);
+      } else {
+        pthread_join(threads_[i], NULL);
       }
     }
 
