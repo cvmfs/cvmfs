@@ -195,47 +195,99 @@ class Future : SingleCopy {
 //
 
 
+
+/**
+ * This counter can be counted up and down using the usual increment/decrement
+ * operators. Additionally threads can wait for it to become zero.
+ * Internally it uses atomics for the counting and a POSIX conditional variable
+ * to signal the 'zero state'.
+ *
+ * Note: Since counting is done with atomics, the conditional variable's mutex
+ *       is only locked in case a counting operation hit the 'zero state' and
+ *       _not_ for each counting operation.
+ *
+ * Caveat: This class is templated, but currently all but T=atomic_int64 might
+ *         produce undefined behaviour. TODO: implement flexible atomic template
+ */
+template <typename T>
+class SynchronizingCounter : SingleCopy {
+ public:
+  SynchronizingCounter();
+  ~SynchronizingCounter();
+
+  T Increment() { return ++(*this); }
+  T Decrement() { return --(*this); }
+
+  void WaitForZero() const;
+
+  T operator++()    { return AddAndPossiblyNotify(T(1))  + T(1); }
+  T operator++(int) { return AddAndPossiblyNotify(T(1));         }
+  T operator--()    { return AddAndPossiblyNotify(T(-1)) - T(1); }
+  T operator--(int) { return AddAndPossiblyNotify(T(-1));        }
+
+  operator T() const { return static_cast<T>(atomic_read64(&value_)); }
+  SynchronizingCounter<T>& operator=(const T &other);
+
+ protected:
+  T AddAndPossiblyNotify(const T addend);
+  void Notify();
+
+ private:
+  mutable T               value_; // thanks C-style interface >.<
+  mutable pthread_mutex_t mutex_;
+  mutable pthread_cond_t  became_zero_;
+};
+
+typedef SynchronizingCounter<atomic_int64> SynchronizingIntCounter;
+
+
+//
+// -----------------------------------------------------------------------------
+//
+
+
 /**
  * This is a semaphore-like counter. On creation the user specifies a maximal
  * value. If a thread wants to increase the counter to a higher value it blocks
  * and waits until something else decreases the counter.
+ * Additionally one can put a thread to sleep waiting for the BlockingCounter to
+ * become zero. (See SynchronizingCounter)
+ *
+ * Caveat: Due to the used atomic implementation the template does only work
+ *         with int64_t for the moment!
  */
 template <typename T>
-class BlockingCounter : SingleCopy {
+class BlockingCounter : public SynchronizingCounter<T> {
  public:
   BlockingCounter(const T maximal_value);
-  virtual ~BlockingCounter();
+  ~BlockingCounter();
 
   T Increment() { return ++(*this); }
   T Decrement() { return --(*this); }
 
   const T& MaximalValue() const { return maximal_value_; }
-  void WaitForZero() const;
 
-  T operator++();
-  T operator++(int);
-  T operator--();
-  T operator--(int);
+  T operator++()    { return PossiblyWaitAndIncrement();        }
+  T operator++(int) { return PossiblyWaitAndIncrement() - T(1); }
+  T operator--()    { return DecrementAndSignal();              }
+  T operator--(int) { return DecrementAndSignal()       + T(1); }
 
-  operator T() const { return value_; }
   BlockingCounter<T>& operator=(const T &other);
 
  private:
-  // those expect mutex_ to be locked before they are called!
-  void UnsafeIncrement();
-  void UnsafeDecrement();
-  void UnsafeAssign(const T &value);
+  T PossiblyWaitAndIncrement();
+  T WaitAndIncrement();
+  T DecrementAndSignal();
+  void Signal(const T value);
 
  private:
   const T                 maximal_value_;
-  T                       value_;
 
   mutable pthread_mutex_t mutex_;
           pthread_cond_t  free_slot_;
-  mutable pthread_cond_t  became_zero_;
 };
 
-typedef BlockingCounter<unsigned int> BlockingIntCounter;
+typedef BlockingCounter<int64_t> BlockingIntCounter;
 
 
 //

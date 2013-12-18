@@ -64,18 +64,75 @@ const T& Future<T>::Get() const {
 
 //
 // +----------------------------------------------------------------------------
+// |  SynchronizingCounter
+//
+
+
+template <typename T>
+SynchronizingCounter<T>::SynchronizingCounter() {
+  atomic_init64(&value_);
+  const bool init_successful = (pthread_mutex_init(&mutex_, NULL)      == 0 &&
+                                pthread_cond_init(&became_zero_, NULL) == 0);
+  assert (init_successful);
+}
+
+
+template <typename T>
+SynchronizingCounter<T>::~SynchronizingCounter() {
+  pthread_cond_destroy(&became_zero_);
+  pthread_mutex_destroy(&mutex_);
+}
+
+
+template <typename T>
+void SynchronizingCounter<T>::WaitForZero() const {
+  MutexLockGuard lock(mutex_);
+  while (atomic_read64(&value_) != T(0)) {
+    pthread_cond_wait(&became_zero_, &mutex_);
+  }
+}
+
+
+template <typename T>
+SynchronizingCounter<T>&  SynchronizingCounter<T>::operator=(const T &other) {
+  atomic_write64(&value_, other);
+  if (other == T(0)) {
+    Notify();
+  }
+  return *this;
+}
+
+
+template <typename T>
+T SynchronizingCounter<T>::AddAndPossiblyNotify(const T addend) {
+  const T retval = atomic_xadd64(&value_, addend);
+  if (retval == -addend) {
+    Notify();
+  }
+  return retval;
+}
+
+
+template <typename T>
+void SynchronizingCounter<T>::Notify() {
+  MutexLockGuard lock(mutex_);
+  pthread_cond_broadcast(&became_zero_);
+}
+
+
+//
+// +----------------------------------------------------------------------------
 // |  BlockingCounter
 //
 
 
 template <typename T>
 BlockingCounter<T>::BlockingCounter(const T maximal_value) :
-  maximal_value_(maximal_value),
-  value_(0)
+  maximal_value_(maximal_value)
 {
+  assert (maximal_value > 0);
   const bool init_successful = (pthread_mutex_init(&mutex_, NULL)      == 0  &&
-                                pthread_cond_init(&free_slot_, NULL)   == 0  &&
-                                pthread_cond_init(&became_zero_, NULL) == 0);
+                                pthread_cond_init(&free_slot_, NULL)   == 0);
   assert (init_successful);
 }
 
@@ -84,90 +141,60 @@ template <typename T>
 BlockingCounter<T>::~BlockingCounter() {
   pthread_mutex_destroy(&mutex_);
   pthread_cond_destroy(&free_slot_);
-  pthread_cond_destroy(&became_zero_);
-}
-
-
-template <typename T>
-void BlockingCounter<T>::WaitForZero() const {
-  MutexLockGuard guard(mutex_);
-  while (value_ != T(0)) {
-    pthread_cond_wait(&became_zero_, &mutex_);
-  }
-}
-
-
-template <typename T>
-T BlockingCounter<T>::operator++() {
-  MutexLockGuard guard(mutex_);
-  UnsafeIncrement();
-  return value_;
-}
-
-
-template <typename T>
-T BlockingCounter<T>::operator++(int) {
-  MutexLockGuard guard(mutex_);
-  const T output = value_;
-  UnsafeIncrement();
-  return output;
-}
-
-
-template <typename T>
-T BlockingCounter<T>::operator--() {
-  MutexLockGuard guard(mutex_);
-  UnsafeDecrement();
-  return value_;
-}
-
-
-template <typename T>
-T BlockingCounter<T>::operator--(int) {
-  MutexLockGuard guard(mutex_);
-  const T output = value_;
-  UnsafeDecrement();
-  return output;
 }
 
 
 template <typename T>
 BlockingCounter<T>& BlockingCounter<T>::operator=(const T &other) {
-  MutexLockGuard guard(mutex_);
-  UnsafeAssign(other);
+  SynchronizingCounter<T>::operator=(other);
+  Signal(other);
   return *this;
 }
 
 
 template <typename T>
-void BlockingCounter<T>::UnsafeIncrement() {
-  while (value_ >= maximal_value_) {
+T BlockingCounter<T>::PossiblyWaitAndIncrement() {
+  T value = SynchronizingCounter<T>::Increment();
+  if (value > maximal_value_) {
+    SynchronizingCounter<T>::Decrement();
+    value = WaitAndIncrement();
+  }
+  return value;
+}
+
+
+template <typename T>
+T BlockingCounter<T>::WaitAndIncrement() {
+  MutexLockGuard lock(mutex_);
+  T value;
+  while ((value = SynchronizingCounter<T>::Increment()) > maximal_value_) {
+    SynchronizingCounter<T>::Decrement();
     pthread_cond_wait(&free_slot_, &mutex_);
   }
-  UnsafeAssign(value_ + T(1));
+  return value;
 }
 
 
 template <typename T>
-void BlockingCounter<T>::UnsafeDecrement() {
-  assert (value_ > T(0));
-  UnsafeAssign(value_ - T(1));
+T BlockingCounter<T>::DecrementAndSignal() {
+  const T value = SynchronizingCounter<T>::Decrement();
+  assert (value >= T(0));
+  Signal(value);
+  return value;
 }
 
 
 template <typename T>
-void BlockingCounter<T>::UnsafeAssign(const T &value) {
+void BlockingCounter<T>::Signal(const T value) {
   assert (value >= T(0));
   assert (value <= maximal_value_);
 
-  value_ = value;
-
-  if (value_ < maximal_value_) {
+  if (value == maximal_value_) {
+    return;
+  } else if (value == maximal_value_ - T(1)) {
+    pthread_cond_signal(&free_slot_);
+  } else {
     pthread_cond_broadcast(&free_slot_);
-  }
-
-  if (value_ == T(0)) {
-    pthread_cond_broadcast(&became_zero_);
   }
 }
 
