@@ -38,6 +38,18 @@ static int64_t inline __attribute__((used)) atomic_read64(atomic_int64 *a) {
 }
 
 
+static void inline __attribute__((used)) atomic_write32(atomic_int32  *a,
+                                                        int32_t        value) {
+  while (! __sync_bool_compare_and_swap(a, atomic_read32(a), value));
+}
+
+
+static void inline __attribute__((used)) atomic_write64(atomic_int64  *a,
+                                                        int64_t        value) {
+  while (! __sync_bool_compare_and_swap(a, atomic_read64(a), value));
+}
+
+
 static void inline __attribute__((used)) atomic_inc32(atomic_int32 *a) {
   (void) __sync_fetch_and_add(a, 1);
 }
