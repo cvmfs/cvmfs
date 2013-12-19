@@ -1566,7 +1566,7 @@ You might have to add the key in /etc/cvmfs/repositories.d/${alias_name}/replica
 import() {
   local name
   local stratum0
-  local keys_location
+  local keys_location="/etc/cvmfs/keys"
   local upstream
   local owner
   local file_ownership
