@@ -19,6 +19,7 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <gtest/gtest_prod.h>
 
 #include "murmur.h"
 #include "platform.h"
@@ -328,7 +329,6 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
   }
 };
 
-
 /**
  * Template to simplify the polymorphic creation of a number of concrete classes
  * that share the common base class AbstractProductT. Use this to create flexible
@@ -388,6 +388,8 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  */
 template <class AbstractProductT, typename ParameterT>
 class PolymorphicConstruction {
+  FRIEND_TEST(T_UploadFacility, InitializeAndTearDown);
+
  private:
   typedef AbstractFactory<AbstractProductT, ParameterT> Factory;
   typedef std::vector<Factory*> RegisteredPlugins;
@@ -470,6 +472,19 @@ PolymorphicConstruction<AbstractProductT, ParameterT>::init_mutex_ =
 template <class AbstractProductT, typename ParameterT>
 typename PolymorphicConstruction<AbstractProductT, ParameterT>::RegisteredPlugins
 PolymorphicConstruction<AbstractProductT, ParameterT>::registered_plugins_;
+
+
+/**
+ * Wrapper function to bind an arbitrary this* to a method call in a C-style
+ * spawned thread function.
+ * The method called by the ThreadProxy template is meant to look like this:
+ *   void foo();
+ */
+template <class DelegateT>
+void ThreadProxy(DelegateT        *delegate,
+                 void (DelegateT::*method)()) {
+  (*delegate.*method)();
+}
 
 
 template<typename T, class A = std::allocator<T> >

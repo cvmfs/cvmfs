@@ -37,9 +37,36 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 }
 
 
-void LocalUploader::Upload(const std::string &local_path,
-                           const std::string &remote_path,
-                           const callback_t   *callback) {
+void LocalUploader::WorkerThread() {
+  bool running = true;
+  while (running) {
+    UploadJob job = AcquireNewJob();
+    switch (job.type) {
+      case UploadJob::Upload:
+        Upload(job.stream_handle,
+               job.buffer,
+               job.callback);
+        break;
+      case UploadJob::Commit:
+        FinalizeStreamedUpload(job.stream_handle,
+                               job.content_hash,
+                               job.hash_suffix);
+        break;
+      case UploadJob::Terminate:
+        running = false;
+        break;
+      default:
+        const bool unknown_job_type = false;
+        assert (unknown_job_type);
+        break;
+    }
+  }
+}
+
+
+void LocalUploader::FileUpload(const std::string &local_path,
+                               const std::string &remote_path,
+                               const callback_t   *callback) {
   // create destination in backend storage temporary directory
   std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
   if (tmp_path.empty()) {

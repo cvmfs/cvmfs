@@ -17,11 +17,11 @@
 #include "c_file_sandbox.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {
-  MockStreamHandle(const callback_t   *commit_callback) :
+  MockStreamHandle(const callback_t *commit_callback) :
     UploadStreamHandle(commit_callback),
     data(NULL), nbytes(0), marker(0) {}
 
-  ~MockStreamHandle() {
+  virtual ~MockStreamHandle() {
     if (data != NULL) {
       free(data);
       data   = NULL;
@@ -32,12 +32,12 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
 
   void Extend(const size_t bytes) {
     if (data == NULL) {
-      data = (char*)malloc(bytes);
-      ASSERT_NE(static_cast<char*>(0), data)
+      data = (unsigned char*)malloc(bytes);
+      ASSERT_NE(static_cast<unsigned char*>(0), data)
         << "failed to malloc " << bytes << " bytes";
     } else {
-      data = (char*)realloc(data, nbytes + bytes);
-      ASSERT_NE(static_cast<char*>(0), data)
+      data = (unsigned char*)realloc(data, nbytes + bytes);
+      ASSERT_NE(static_cast<unsigned char*>(0), data)
         << "failed to realloc to extend by " << bytes << " bytes";
     }
 
@@ -47,13 +47,15 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
   void Append(const upload::CharBuffer *buffer) {
     const size_t bytes = buffer->used_bytes();
     Extend(bytes);
-    memcpy(data + marker, buffer->ptr(), bytes);
+    unsigned char* b_ptr = buffer->ptr();
+    unsigned char* r_ptr = data + marker;
+    memcpy(r_ptr, b_ptr, bytes);
     marker += bytes;
   }
 
-  char*  data;
-  size_t nbytes;
-  off_t  marker;
+  unsigned char* data;
+  size_t         nbytes;
+  off_t          marker;
 };
 
 /**
@@ -85,7 +87,7 @@ class MockUploader : public upload::AbstractUploader {
         << "returned content hash differs from recomputed content hash";
     }
 
-    void RecomputeContentHash(const char* data, const size_t nbytes) {
+    void RecomputeContentHash(const unsigned char* data, const size_t nbytes) {
       SHA_CTX sha_context;
       int sha1_retval;
 
@@ -125,9 +127,34 @@ class MockUploader : public upload::AbstractUploader {
     results_.clear();
   }
 
-  void Upload(const std::string  &local_path,
-              const std::string  &remote_path,
-              const callback_t   *callback = NULL) {
+  void WorkerThread() {
+    bool running = true;
+    while (running) {
+      UploadJob job = AcquireNewJob();
+      switch (job.type) {
+        case UploadJob::Upload:
+          Upload(job.stream_handle,
+                 job.buffer,
+                 job.callback);
+          break;
+        case UploadJob::Commit:
+          FinalizeStreamedUpload(job.stream_handle,
+                                 job.content_hash,
+                                 job.hash_suffix);
+          break;
+        case UploadJob::Terminate:
+          running = false;
+          break;
+        default:
+          FAIL() << "Unrecognized UploadJob type";
+          break;
+      }
+    }
+  }
+
+  void FileUpload(const std::string  &local_path,
+                  const std::string  &remote_path,
+                  const callback_t   *callback = NULL) {
     assert (MockUploader::not_implemented);
   }
 
@@ -139,8 +166,9 @@ class MockUploader : public upload::AbstractUploader {
   void Upload(upload::UploadStreamHandle  *handle,
               upload::CharBuffer          *buffer,
               const callback_t            *callback = NULL) {
-    MockStreamHandle *local_handle = static_cast<MockStreamHandle*>(handle);
+    MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
     local_handle->Append(buffer);
+
 
     Respond(callback, upload::UploaderResults(0, buffer));
   }
@@ -148,14 +176,14 @@ class MockUploader : public upload::AbstractUploader {
   void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
                               const shash::Any            content_hash,
                               const std::string           hash_suffix) {
-    MockStreamHandle *local_handle = static_cast<MockStreamHandle*>(handle);
+    MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
 
     // summarize the results produced by the FileProcessor
     results_.push_back(Result(local_handle, content_hash, hash_suffix));
 
     // remove the stream handle and fire callback
     const callback_t *callback = local_handle->commit_callback;
-    delete local_handle;
+    delete handle;
     Respond(callback, upload::UploaderResults(0));
   }
 
