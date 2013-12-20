@@ -187,9 +187,9 @@ TEST_F(T_Atomic, TransactionalAssignment) {
   const int32_t value2 = 42;
   const int32_t value3 = 128;
 
-  const int64_t value4 = 124786234862;
+  const int64_t value4 = 1247623;
   const int64_t value5 = 53847432;
-  const int64_t value6 = 0xFFFFFFFFFFFFFF;
+  const int64_t value6 = 0xFFFFFFFF;
 
   atomic_write32(&atomic32_, value1);
   EXPECT_EQ (value1, atomic_read32(&atomic32_));
