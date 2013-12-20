@@ -171,7 +171,7 @@ Supported Commands:
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
-                [-l import legacy repo (2.0.x)] [-s show migration statistics] 
+                [-l import legacy repo (2.0.x)] [-s show migration statistics]
                 [-c file ownership (UID:GID)]
                 < -k path to keys> <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
@@ -1123,15 +1123,6 @@ CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
 CVMFS_NFS_SOURCE=no
-EOF
-  cat >> /etc/sudoers << EOF
-$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,ro /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/mount -o remount\,rw /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/umount /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/umount $rdonly_dir # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/mount $rdonly_dir # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/mount /cvmfs/$name # added by CernVM-FS for $name
-$cvmfs_user localhost = NOPASSWD: /bin/rm -rf $scratch_dir # added by CernVM-FS for $name
 EOF
 }
 
@@ -2124,13 +2115,13 @@ transaction() {
     transaction_before_hook $name
     if [ "$base_hash" != "$remote_hash" ]; then
       echo "Repository $name has changed!  Remounting remote hash $remote_hash"
-      sudo umount /cvmfs/$name
-      sudo umount ${spool_dir}/rdonly
+      cvmfs_suid_helper rw_umount $name
+      cvmfs_suid_helper rdonly_umount $name
       set_ro_root_hash $name $remote_hash
-      sudo mount ${spool_dir}/rdonly
-      sudo mount /cvmfs/$name
+      cvmfs_suid_helper rdonly_mount $name
+      cvmfs_suid_helper rw_mount $name
     fi
-    sudo mount -o remount,rw /cvmfs/$name
+    cvmfs_suid_helper open $name
     touch ${spool_dir}/in_transaction
     transaction_after_hook $name
 
@@ -2200,11 +2191,10 @@ abort() {
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
     abort_before_hook $name
-    sudo umount /cvmfs/$name
+    cvmfs_suid_helper rw_umount $name
     rm -rf ${spool_dir}/tmp/*
-    sudo rm -rf ${spool_dir}/scratch
-    $user_shell "mkdir /var/spool/cvmfs/${name}/scratch"
-    sudo mount /cvmfs/$name
+    cvmfs_suid_helper clear_scratch $name
+    cvmfs_suid_helper rw_mount $name
     rm -f ${spool_dir}/in_transaction
     abort_after_hook $name
 
@@ -2344,7 +2334,7 @@ publish() {
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
     publish_before_hook $name
-    sudo /bin/mount -o remount,ro /cvmfs/$name
+    cvmfs_suid_helper lock $name
     local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
@@ -2386,7 +2376,7 @@ publish() {
       -r ${upstream}"
 
     $user_shell "$sync_command" || \
-      (sudo /bin/mount -o remount,rw /cvmfs/$name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
+      (cvmfs_suid_helper open $name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
     if [ -f ${spool_dir}/tmp/manifest ]; then
       local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
       local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
@@ -2395,14 +2385,13 @@ publish() {
       $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
       $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
       echo "Remounting newly created repository revision"
-      sudo umount /cvmfs/$name
-      sudo umount ${spool_dir}/rdonly
+      cvmfs_suid_helper rw_umount $name
+      cvmfs_suid_helper rdonly_umount $name
       set_ro_root_hash $name $trunk_hash
-      sudo rm -rf ${spool_dir}/scratch
+      cvmfs_suid_helper clear_scratch $name
       rm -rf ${spool_dir}/tmp/*
-      $user_shell "mkdir ${spool_dir}/scratch"
-      sudo mount ${spool_dir}/rdonly > /dev/null
-      sudo mount /cvmfs/$name
+      cvmfs_suid_helper rdonly_mount $name > /dev/null
+      cvmfs_suid_helper rw_mount $name
       rm -f ${spool_dir}/in_transaction
       publish_after_hook $name
     fi
@@ -2480,7 +2469,7 @@ rollback() {
   [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   publish_before_hook
-  sudo /bin/mount -o remount,ro /cvmfs/$name
+  cvmfs_suid_helper lock $name
   local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
 
   local rollback_command="$swissknife rollback -u $stratum0 \
@@ -2505,14 +2494,13 @@ rollback() {
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
-  sudo umount /cvmfs/$name
-  sudo umount ${spool_dir}/rdonly
+  cvmfs_suid_helper rw_umount $name
+  cvmfs_suid_helper rdonly_umount $name
   set_ro_root_hash $name $trunk_hash
-  sudo rm -rf ${spool_dir}/scratch
+  cvmfs_suid_helper clear_scratch $name
   rm -rf ${spool_dir}/tmp/*
-  $user_shell "mkdir ${spool_dir}/scratch"
-  sudo mount ${spool_dir}/rdonly > /dev/null
-  sudo mount /cvmfs/$name
+  cvmfs_suid_helper rdonly_mount $name > /dev/null
+  cvmfs_suid_helper rw_mount $name
   rm -f ${spool_dir}/in_transaction
   publish_after_hook $name
 }
@@ -2747,11 +2735,11 @@ migrate_2_1_7() {
   local remote_hash
   remote_hash=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
 
-  sudo umount /cvmfs/$name              > /dev/null 2>&1 || die "fail! (unmounting /cvmfs/$name)"
-  sudo umount ${CVMFS_SPOOL_DIR}/rdonly > /dev/null 2>&1 || die "fail! (unmounting ${CVMFS_SPOOL_DIR}/rdonly)"
+  cvmfs_suid_helper rw_umount $name     > /dev/null 2>&1 || die "fail! (unmounting /cvmfs/$name)"
+  cvmfs_suid_helper rdonly_umount $name > /dev/null 2>&1 || die "fail! (unmounting ${CVMFS_SPOOL_DIR}/rdonly)"
   set_ro_root_hash $name $remote_hash
-  sudo mount ${CVMFS_SPOOL_DIR}/rdonly  > /dev/null 2>&1 || die "fail! (mounting ${CVMFS_SPOOL_DIR}/$name)"
-  sudo mount /cvmfs/$name               > /dev/null 2>&1 || die "fail! (mounting /cvmfs/$name)"
+  cvmfs_suid_helper rdonly_mount $name  > /dev/null 2>&1 || die "fail! (mounting ${CVMFS_SPOOL_DIR}/$name)"
+  cvmfs_suid_helper rw_mount $name      > /dev/null 2>&1 || die "fail! (mounting /cvmfs/$name)"
 }
 
 

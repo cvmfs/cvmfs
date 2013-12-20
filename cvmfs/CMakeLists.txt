@@ -159,6 +159,10 @@ set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
   ${CVMFS_SWISSKNIFE_SOURCES}
 )
 
+set (CVMFS_SUID_HELPER_SOURCES
+  cvmfs_suid_helper.cc
+)
+
 #
 # configure some compiler flags for proper build
 #
@@ -307,6 +311,7 @@ endif (BUILD_LIBCVMFS)
 if (BUILD_SERVER)
   # create targets with according sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
+  add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
 
   include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   add_dependencies (cvmfs_swissknife libvjson)
@@ -405,6 +410,13 @@ if (BUILD_SERVER)
     TARGETS     cvmfs_swissknife
     RUNTIME
     DESTINATION    bin
+  )
+
+  install (
+    TARGETS     cvmfs_suid_helper
+    RUNTIME
+    DESTINATION    bin
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID
   )
 
   if (BUILD_SERVER_DEBUG)
