@@ -1,4 +1,5 @@
 2.1.16:
+  * Replace sudo magic in cvmfs_server by cvmfs_suid_helper
   * Record to syslog when highest inode exceeds 32bit
   * Support for user.inode_max extended attribute
   * Support importing a 2.1 repository
