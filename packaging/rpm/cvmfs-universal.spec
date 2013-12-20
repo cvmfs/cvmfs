@@ -290,6 +290,7 @@ fi
 %defattr(-,root,root)
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
+%{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server 
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
@@ -308,6 +309,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Fri Dec 20 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16
+- Add cvmfs_suid_binary
 * Thu Nov 14 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16
 - Fixes for ARM builds
 * Tue Jun 04 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.12
