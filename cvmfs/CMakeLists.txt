@@ -160,6 +160,7 @@ set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
+  platform.h platform_osx.h platform_linux.h
   cvmfs_suid_helper.cc
 )
 

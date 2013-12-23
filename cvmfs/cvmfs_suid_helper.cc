@@ -18,6 +18,7 @@
 
 #include <string>
 
+#include "platform.h"
 
 using namespace std;  // NOLINT
 
@@ -85,13 +86,13 @@ static bool ClearWorkingDir() {
   DIR *dirp = opendir(".");
   if (dirp == NULL)
     return false;
-  struct dirent64 *dirent;
-  while ((dirent = readdir64(dirp)) != NULL) {
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp)) != NULL) {
     if ((strcmp(dirent->d_name, ".") == 0) || (strcmp(dirent->d_name, "..") == 0))
       continue;
 
-    struct stat64 info;
-    retval = lstat64(dirent->d_name, &info);
+    platform_stat64 info;
+    retval = platform_lstat(dirent->d_name, &info);
     if (retval != 0)
       return false;
 
@@ -160,8 +161,8 @@ int main(int argc, char *argv[]) {
   const string fqrn = argv[2];
 
   // Verify if repository exists
-  struct stat64 info;
-  retval = lstat64((string(kSpoolArea) + "/" + fqrn).c_str(), &info);
+  platform_stat64 info;
+  retval = platform_lstat((string(kSpoolArea) + "/" + fqrn).c_str(), &info);
   if (retval != 0) {
     fprintf(stderr, "unknown repository: %s\n", fqrn.c_str());
     return 1;
