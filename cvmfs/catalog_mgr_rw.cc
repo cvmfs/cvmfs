@@ -508,7 +508,8 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
 
     // find and mount nested catalog assciated to this transition point
     shash::Any nested_hash;
-    retval = catalog->FindNested(transition_path, &nested_hash);
+    uint64_t nested_size;
+    retval = catalog->FindNested(transition_path, &nested_hash, &nested_size);
     assert(retval);
     Catalog *nested_catalog;
     nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
@@ -579,7 +580,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Add the newly created nested catalog to the references of the containing
   // catalog
   old_catalog->InsertNestedCatalog(new_catalog->path().ToString(), NULL,
-                                   shash::Any(shash::kSha1));
+                                   shash::Any(shash::kSha1), 0);
 
   // Fix subtree counters in new nested catalogs: subtree is the sum of all
   // entries of all "grand-nested" catalogs
@@ -768,11 +769,16 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
     catalog->SetPreviousRevision(base_hash_);
   } else {
     shash::Any hash_previous;
+    uint64_t size_previous;
     const bool retval =
-      catalog->parent()->FindNested(catalog->path(), &hash_previous);
+      catalog->parent()->FindNested(catalog->path(),
+                                    &hash_previous, &size_previous);
     assert (retval);
     catalog->SetPreviousRevision(hash_previous);
   }
+
+  uint64_t catalog_size = GetFileSize(catalog->database_path());
+  assert(catalog_size > 0);
 
   // Compress catalog
   shash::Any hash_catalog(shash::kSha1);
@@ -792,7 +798,8 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   if (!catalog->IsRoot()) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());
-    parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog);
+    parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog,
+                                catalog_size);
   }
 
   return hash_catalog;

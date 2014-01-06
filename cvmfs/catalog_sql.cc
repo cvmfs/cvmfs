@@ -99,12 +99,12 @@ Database::Database(const std::string filename,
 
     Sql sql_revision(*this,
                      "SELECT value FROM properties WHERE key='schema_revision';");
-    if (sql_schema.FetchRow()) {
-      schema_revision_ = sql_schema.RetrieveInt64(0);
+    if (sql_revision.FetchRow()) {
+      schema_revision_ = sql_revision.RetrieveInt64(0);
     }
   }
-  LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f",
-           schema_version_);
+  LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f revision %u",
+           schema_version_, schema_revision_);
   if ( (schema_version_ >= 2.0-kSchemaEpsilon)                   &&
        (!IsEqualSchema(schema_version_, kLatestSupportedSchema)) &&
        (!IsEqualSchema(schema_version_, 2.4)           ||
@@ -118,6 +118,7 @@ Database::Database(const std::string filename,
   // Live schema upgrade
   if (open_mode == sqlite::kDbOpenReadWrite) {
     if (IsEqualSchema(schema_version_, 2.5) && (schema_revision_ == 0)) {
+      LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
       Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
       if (!sql_upgrade.Execute()) {
         LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
@@ -613,8 +614,16 @@ bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
 
 
 SqlNestedCatalogLookup::SqlNestedCatalogLookup(const Database &database) {
-  Init(database.sqlite_db(),
-       "SELECT sha1 FROM nested_catalogs WHERE path=:path;");
+  if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+      (database.schema_revision() >= 1))
+  {
+    // Internally converts NULL to 0 for size
+    Init(database.sqlite_db(),
+         "SELECT sha1, size FROM nested_catalogs WHERE path=:path;");
+  } else {
+    Init(database.sqlite_db(),
+         "SELECT sha1, 0 FROM nested_catalogs WHERE path=:path;");
+  }
 }
 
 
@@ -630,11 +639,23 @@ shash::Any SqlNestedCatalogLookup::GetContentHash() const {
 }
 
 
+uint64_t SqlNestedCatalogLookup::GetSize() const {
+  return RetrieveInt64(1);
+}
+
+
 //------------------------------------------------------------------------------
 
 
 SqlNestedCatalogListing::SqlNestedCatalogListing(const Database &database) {
-  Init(database.sqlite_db(), "SELECT path, sha1 FROM nested_catalogs;");
+  if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+      (database.schema_revision() >= 1))
+  {
+    // Internally converts NULL to 0 for size
+    Init(database.sqlite_db(), "SELECT path, sha1, size FROM nested_catalogs;");
+  } else {
+    Init(database.sqlite_db(), "SELECT path, sha1, 0 FROM nested_catalogs;");
+  }
 }
 
 
@@ -648,6 +669,11 @@ shash::Any SqlNestedCatalogListing::GetContentHash() const {
   const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(1)));
   return (sha1.empty()) ? shash::Any(shash::kSha1) :
                           shash::Any(shash::kSha1, shash::HexPtr(sha1));
+}
+
+
+uint64_t SqlNestedCatalogListing::GetSize() const {
+  return RetrieveInt64(2);
 }
 
 

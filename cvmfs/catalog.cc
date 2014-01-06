@@ -484,6 +484,7 @@ Catalog::NestedCatalogList *Catalog::ListNestedCatalogs() const {
     NestedCatalog nested;
     nested.path = sql_list_nested_->GetMountpoint();
     nested.hash = sql_list_nested_->GetContentHash();
+    nested.size = sql_list_nested_->GetSize();
     result->push_back(nested);
   }
   sql_list_nested_->Reset();
@@ -496,12 +497,15 @@ Catalog::NestedCatalogList *Catalog::ListNestedCatalogs() const {
 /**
  * Looks for a specific registered nested catalog based on a path.
  */
-bool Catalog::FindNested(const PathString &mountpoint, shash::Any *hash) const {
+bool Catalog::FindNested(const PathString &mountpoint,
+                         shash::Any *hash, uint64_t *size) const
+{
   pthread_mutex_lock(lock_);
   sql_lookup_nested_->BindSearchPath(mountpoint);
   bool found = sql_lookup_nested_->FetchRow();
   if (found && (hash != NULL)) {
     *hash = sql_lookup_nested_->GetContentHash();
+    *size = sql_lookup_nested_->GetSize();
   }
   sql_lookup_nested_->Reset();
   pthread_mutex_unlock(lock_);

@@ -258,7 +258,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         // Find transition point
         computed_counters->self.nested_catalogs++;
         shash::Any tmp;
-        if (!catalog->FindNested(full_path, &tmp)) {
+        uint64_t tmp2;
+        if (!catalog->FindNested(full_path, &tmp, &tmp2)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
                    full_path.c_str());
           retval = false;
@@ -421,6 +422,7 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash,
  */
 bool CommandCheck::InspectTree(const string &path,
                                const shash::Any &catalog_hash,
+                               const uint64_t catalog_size,
                                const catalog::DirectoryEntry *transition_point,
                                catalog::DeltaCounters *computed_counters)
 {
@@ -438,6 +440,8 @@ bool CommandCheck::InspectTree(const string &path,
     return false;
   }
 
+  int64_t catalog_file_size = GetFileSize(tmp_file);
+  assert(catalog_file_size > 0);
   const catalog::Catalog *catalog =
     catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
   unlink(tmp_file.c_str());
@@ -448,6 +452,13 @@ bool CommandCheck::InspectTree(const string &path,
   }
 
   int retval = true;
+
+  if (uint64_t(catalog_file_size) != catalog_size) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "catalog file size mismatch, "
+             "expected %"PRIu64", got %"PRIu64,
+             catalog_size, catalog_file_size);
+    retval = false;
+  }
 
   if (catalog->root_prefix() != PathString(path.data(), path.length())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "root prefix mismatch; "
@@ -524,8 +535,8 @@ bool CommandCheck::InspectTree(const string &path,
       retval = false;
     } else {
       catalog::DeltaCounters nested_counters;
-      if (!InspectTree(i->path.ToString(), i->hash, &nested_transition_point,
-                       &nested_counters))
+      if (!InspectTree(i->path.ToString(), i->hash, i->size,
+                       &nested_transition_point, &nested_counters))
         retval = false;
       nested_counters.PopulateToParent(*computed_counters);
     }
@@ -655,7 +666,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   catalog::DeltaCounters computed_counters;
-  bool retval = InspectTree("", root_hash, NULL, &computed_counters);
+  bool retval = InspectTree("", root_hash, 0, NULL, &computed_counters);
 
   delete manifest;
   return retval ? 0 : 1;

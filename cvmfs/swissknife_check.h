@@ -40,6 +40,7 @@ class CommandCheck : public Command {
  protected:
   bool InspectTree(const std::string &path,
                    const shash::Any &catalog_hash,
+                   const uint64_t catalog_size,
                    const catalog::DirectoryEntry *transition_point,
                    catalog::DeltaCounters *computed_counters);
   std::string DecompressPiece(const shash::Any catalog_hash,

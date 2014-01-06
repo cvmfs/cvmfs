@@ -411,15 +411,16 @@ void WritableCatalog::MoveCatalogsToNested(
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     shash::Any hash_nested;
+    uint64_t size_nested;
     bool retval = FindNested(PathString(i->data(), i->length()),
-                             &hash_nested);
+                             &hash_nested, &size_nested);
     assert(retval);
 
     Catalog *attached_reference = NULL;
     RemoveNestedCatalog(*i, &attached_reference);
 
     new_nested_catalog->InsertNestedCatalog(*i, attached_reference,
-                                            hash_nested);
+                                            hash_nested, size_nested);
   }
 }
 
@@ -450,16 +451,18 @@ void WritableCatalog::MoveFileChunksToNested(
  */
 void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
                                           Catalog *attached_reference,
-                                          const shash::Any content_hash)
+                                          const shash::Any content_hash,
+                                          const uint64_t size)
 {
   const string sha1_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
 
-  Sql stmt(database(),
-    "INSERT INTO nested_catalogs (path, sha1) VALUES (:p, :sha1);");
+  Sql stmt(database(), "INSERT INTO nested_catalogs (path, sha1, size) "
+                       "VALUES (:p, :sha1, :size);");
   bool retval =
     stmt.BindText(1, mountpoint) &&
     stmt.BindText(2, sha1_string) &&
+    stmt.BindInt64(3, size) &&
     stmt.Execute();
   assert(retval);
 
@@ -485,8 +488,9 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
                                           Catalog **attached_reference)
 {
   shash::Any dummy;
+  uint64_t dummy_size;
   bool retval = FindNested(PathString(mountpoint.data(), mountpoint.length()),
-                           &dummy);
+                           &dummy, &dummy_size);
   assert(retval);
 
   Sql stmt(database(),
@@ -516,16 +520,18 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
  * @param hash the hash to set the given nested catalog link to
  */
 void WritableCatalog::UpdateNestedCatalog(const string &path,
-                                          const shash::Any &hash)
+                                          const shash::Any &hash,
+                                          const uint64_t size)
 {
   const string sha1_str = hash.ToString();
-  const string sql = "UPDATE nested_catalogs SET sha1 = :sha1 "
+  const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size "
     "WHERE path = :path;";
   Sql stmt(database(), sql);
 
   bool retval =
     stmt.BindText(1, sha1_str) &&
-    stmt.BindText(2, path) &&
+    stmt.BindInt64(2, size) &&
+    stmt.BindText(3, path) &&
     stmt.Execute();
 
   assert(retval);
@@ -566,7 +572,7 @@ void WritableCatalog::CopyCatalogsToParent() {
        iEnd = nested_catalog_references->end(); i != iEnd; ++i)
   {
     Catalog *child = FindChild(i->path);
-    parent->InsertNestedCatalog(i->path.ToString(), child, i->hash);
+    parent->InsertNestedCatalog(i->path.ToString(), child, i->hash, i->size);
     parent->delta_counters_.self.nested_catalogs--;  // Will be fixed later
   }
 }

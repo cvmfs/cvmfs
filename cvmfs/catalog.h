@@ -166,10 +166,12 @@ class Catalog : public SingleCopy {
   typedef struct {
     PathString path;
     shash::Any hash;
+    uint64_t size;
   } NestedCatalog;
   typedef std::vector<NestedCatalog> NestedCatalogList;
   NestedCatalogList *ListNestedCatalogs() const;
-  bool FindNested(const PathString &mountpoint, shash::Any *hash) const;
+  bool FindNested(const PathString &mountpoint,
+                  shash::Any *hash, uint64_t *size) const;
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   void SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map);

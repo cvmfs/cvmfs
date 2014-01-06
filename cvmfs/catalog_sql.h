@@ -72,6 +72,7 @@ class Database {
   sqlite3 *sqlite_db() const { return sqlite_db_; }
   std::string filename() const { return filename_; }
   float schema_version() const { return schema_version_; }
+  unsigned schema_revision() const { return schema_revision_; }
   bool ready() const { return ready_; }
 
   /**
@@ -350,6 +351,7 @@ class SqlNestedCatalogLookup : public Sql {
   SqlNestedCatalogLookup(const Database &database);
   bool BindSearchPath(const PathString &path);
   shash::Any GetContentHash() const;
+  uint64_t GetSize() const;
 };
 
 
@@ -361,6 +363,7 @@ class SqlNestedCatalogListing : public Sql {
   SqlNestedCatalogListing(const Database &database);
   PathString GetMountpoint() const;
   shash::Any GetContentHash() const;
+  uint64_t GetSize() const;
 };
 
 

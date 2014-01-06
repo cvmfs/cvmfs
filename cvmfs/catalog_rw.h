@@ -70,8 +70,10 @@ class WritableCatalog : public Catalog {
   // Nested catalog references
   void InsertNestedCatalog(const std::string &mountpoint,
                            Catalog *attached_reference,
-                           const shash::Any content_hash);
-  void UpdateNestedCatalog(const std::string &path, const shash::Any &hash);
+                           const shash::Any content_hash,
+                           const uint64_t size);
+  void UpdateNestedCatalog(const std::string &path,
+                           const shash::Any &hash, const uint64_t size);
   void RemoveNestedCatalog(const std::string &mountpoint,
                            Catalog **attached_reference);
 
