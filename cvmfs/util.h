@@ -388,8 +388,6 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  */
 template <class AbstractProductT, typename ParameterT>
 class PolymorphicConstruction {
-  FRIEND_TEST(T_UploadFacility, InitializeAndTearDown);
-
  private:
   typedef AbstractFactory<AbstractProductT, ParameterT> Factory;
   typedef std::vector<Factory*> RegisteredPlugins;
@@ -441,6 +439,22 @@ class PolymorphicConstruction {
     assert (!registered_plugins_.empty());
   }
 
+  /**
+   * Friend class for testability (see test/unittests/testutil.h)
+   */
+  friend class PolymorphicConstructionUnittestAdapter;
+
+  /**
+   * Registers a plugin that is polymorphically constructable afterwards.
+   * Warning: Multiple registrations of the same ConcreteProductT might lead to
+   *          undefined behaviour!
+   *
+   * @param ConcreteProductT  the concrete implementation of AbstractProductT
+   *                          that should be registered as constructable.
+   *
+   * Note: You shall not need to use this method anywhere in your code
+   *       except in AbstractProductT::RegisterPlugins().
+   */
   template <class ConcreteProductT>
   static void RegisterPlugin() {
     registered_plugins_.push_back(
@@ -451,6 +465,23 @@ class PolymorphicConstruction {
   }
 
   virtual bool Initialize() { return true; };
+
+ private:
+  /**
+   * This method clears the list of registered plugins.
+   * Note: A user of PolymorphicConstruction is _not_ supposed to use this! The
+   *       method is meant to be used solely for testing purposes! In particular
+   *       a unit test registering a mocked plugin is supposed to clear up after
+   *       _each_ unit test! see: gtest: SetUp() / TearDown() and
+   *                              PolymorphicConstructionUnittestAdapter
+   *
+   *       DO NOT USE THIS OUTSIDE UNIT TESTS!!
+   *       -> Global state is nasty!
+   */
+  static void UnregisterAllPlugins() {
+    registered_plugins_.clear();
+    needs_init_ = 1;
+  }
 
  private:
   static RegisteredPlugins registered_plugins_;
