@@ -23,6 +23,10 @@ namespace catalog {
 const float Database::kLatestSchema = 2.5;
 const float Database::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
 const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
+// ChangeLog
+//   0 --> 1: add size column to nested catalog table,
+//            add schema_revision property
+const unsigned Database::kLatestSchemaRevision = 1;
 
 
 static void SqlError(const std::string &error_msg, const Database &database) {
@@ -39,6 +43,7 @@ Database::Database(const std::string filename,
   filename_ = filename;
   ready_ = false;
   schema_version_ = 0.0;
+  schema_revision_ = 0;
   sqlite_db_ = NULL;
 
   int flags = SQLITE_OPEN_NOMUTEX;
@@ -84,12 +89,18 @@ Database::Database(const std::string filename,
   }
   close(fd_readahead);
 
-  {  // Get schema version
+  {  // Get schema version and revision
     Sql sql_schema(*this, "SELECT value FROM properties WHERE key='schema';");
     if (sql_schema.FetchRow()) {
       schema_version_ = sql_schema.RetrieveDouble(0);
     } else {
       schema_version_ = 1.0;
+    }
+
+    Sql sql_revision(*this,
+                     "SELECT value FROM properties WHERE key='schema_revision';");
+    if (sql_schema.FetchRow()) {
+      schema_revision_ = sql_schema.RetrieveInt64(0);
     }
   }
   LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f",
@@ -104,6 +115,25 @@ Database::Database(const std::string filename,
     goto database_failure;
   }
 
+  // Live schema upgrade
+  if (open_mode == sqlite::kDbOpenReadWrite) {
+    if (IsEqualSchema(schema_version_, 2.5) && (schema_revision_ == 0)) {
+      Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
+      if (!sql_upgrade.Execute()) {
+        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
+        goto database_failure;
+      }
+      Sql sql_revision(*this, "INSERT INTO properties (key, value) VALUES "
+                       "('schema_revision', 1);");
+      if (!sql_revision.Execute()) {
+        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+        goto database_failure;
+      }
+
+      schema_revision_ = 1;
+    }
+  }
+
   ready_ = true;
   return;
 
@@ -116,10 +146,12 @@ Database::Database(const std::string filename,
 /**
  * Private constructor.  Used to create a new sqlite database.
  */
-Database::Database(const std::string &filename, const float schema) :
+Database::Database(const std::string &filename,
+                   const float schema, const unsigned revision) :
   sqlite_db_(NULL),
   filename_(filename),
   schema_version_(schema),
+  schema_revision_(revision),
   read_write_(true),
   ready_(false)
 {
@@ -165,7 +197,7 @@ bool Database::Create(const string &filename,
   // Create the new catalog file and open it
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new catalog at '%s'",
            filename.c_str());
-  Database database(filename, kLatestSchema);
+  Database database(filename, kLatestSchema, kLatestSchemaRevision);
   if (!database.ready()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "Cannot create and open catalog database file '%s'",
@@ -195,7 +227,7 @@ bool Database::Create(const string &filename,
     "CREATE TABLE properties (key TEXT, value TEXT, "
     "CONSTRAINT pk_properties PRIMARY KEY (key));")               .Execute()  &&
   Sql(database,
-    "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, "
+    "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
     "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
   Sql(database,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
@@ -210,8 +242,10 @@ bool Database::Create(const string &filename,
   Sql insert_initial_properties(database,
     "INSERT INTO properties (key, value) "
     "VALUES ('revision', 0), "
-    "       ('schema',   :schema);");
+    "       ('schema',   :schema), "
+    "       ('schema_revision', :schema_revision);");
   insert_initial_properties.BindDouble(1, kLatestSchema);
+  insert_initial_properties.BindDouble(2, kLatestSchemaRevision);
 
   if (!insert_initial_properties.Execute()) {
     SqlError("failed to insert default initial values into the newly created "

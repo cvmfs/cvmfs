@@ -54,6 +54,8 @@ class Database {
   static const float kLatestSchema;
   static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
   static const float kSchemaEpsilon;  // floats get imprecise in SQlite
+  // backwards-compatible schema changes
+  static const unsigned kLatestSchemaRevision;
 
   static bool IsEqualSchema(const float value, const float compare) {
     return (value > compare - kSchemaEpsilon &&
@@ -81,11 +83,13 @@ class Database {
    */
   std::string GetLastErrorMsg() const;
  private:
-  Database(const std::string &filename, const float schema);
+  Database(const std::string &filename,
+           const float schema, const unsigned revision);
 
   sqlite3 *sqlite_db_;
   std::string filename_;
   float schema_version_;
+  unsigned schema_revision_;
   bool read_write_;
   bool ready_;
 };
