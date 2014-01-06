@@ -2394,6 +2394,8 @@ publish() {
       cvmfs_suid_helper rw_mount $name
       rm -f ${spool_dir}/in_transaction
       publish_after_hook $name
+    else
+      exit 1
     fi
 
   done
