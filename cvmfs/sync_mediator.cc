@@ -59,10 +59,19 @@ void SyncMediator::Add(SyncItem &entry) {
     // Create a nested catalog if we find a new catalog marker
     // The IsNew() condition can fail if the catalog has just been deleted
     //if (entry.IsCatalogMarker() && entry.IsNew())
-    if (entry.IsCatalogMarker() &&
-        !catalog_manager_->IsTransitionPoint("/" + entry.relative_parent_path()))
+    if (entry.IsCatalogMarker())
     {
-      CreateNestedCatalog(entry);
+      if (entry.relative_parent_path() == "") {
+        LogCvmfs(kLogPublish, kLogStderr,
+                 "Error: nested catalog marker in root directory");
+        abort();
+      } else {
+        if (!catalog_manager_->IsTransitionPoint(
+               "/" + entry.relative_parent_path()))
+        {
+          CreateNestedCatalog(entry);
+        }
+      }
     }
 
     // A file is a hard link if the link count is greater than 1
