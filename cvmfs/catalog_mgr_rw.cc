@@ -153,6 +153,11 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   }
 
   // Compress root catalog;
+  int64_t catalog_size = GetFileSize(file_path);
+  if (catalog_size < 0) {
+    unlink(file_path.c_str());
+    return NULL;
+  }
   string file_path_compressed = file_path + ".compressed";
   shash::Any hash_catalog(shash::kSha1);
   bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
@@ -167,7 +172,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
 
   // Create manifest
   const string manifest_path = dir_temp + "/manifest";
-  manifest::Manifest *manifest = new manifest::Manifest(hash_catalog, "");
+  manifest::Manifest *manifest =
+    new manifest::Manifest(hash_catalog, catalog_size, "");
 
   // Upload catalog
   spooler->Upload(file_path_compressed,
@@ -701,8 +707,11 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
       }
 
       // .cvmfspublished
+      int64_t catalog_size = GetFileSize((*i)->database_path());
+      if (catalog_size < 0)
+        return NULL;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "Committing repository manifest");
-      result = new manifest::Manifest(hash, "");
+      result = new manifest::Manifest(hash, catalog_size, "");
       result->set_ttl((*i)->GetTTL());
       result->set_revision((*i)->GetRevision());
     }

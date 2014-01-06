@@ -109,12 +109,15 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   revision = String2Uint64(iter->second);
 
   // Optional keys
+  uint64_t catalog_size = 0;
   shash::Any micro_catalog_hash;
   string repository_name;
   shash::Any certificate;
   shash::Any history;
   uint64_t publish_timestamp = 0;
 
+  if ((iter = content.find('B')) != content.end())
+    catalog_size = String2Uint64(iter->second);
   if ((iter = content.find('L')) != content.end())
     micro_catalog_hash = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
   if ((iter = content.find('N')) != content.end())
@@ -142,14 +145,18 @@ Manifest *Manifest::Load(const map<char, string> &content) {
     }
   }
 
-  return new Manifest(catalog_hash, root_path, ttl, revision,
+  return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
                       history, publish_timestamp, channel_tops);
 }
 
 
-Manifest::Manifest(const shash::Any &catalog_hash, const string &root_path) {
+Manifest::Manifest(const shash::Any &catalog_hash,
+                   const uint64_t catalog_size,
+                   const string &root_path)
+{
   catalog_hash_ = catalog_hash;
+  catalog_size_ = catalog_size;
   root_path_ = shash::Md5(shash::AsciiPtr(root_path));
   ttl_ = catalog::Catalog::kDefaultTTL;
   revision_ = 0;
@@ -163,6 +170,7 @@ Manifest::Manifest(const shash::Any &catalog_hash, const string &root_path) {
 string Manifest::ExportString() const {
   string manifest =
     "C" + catalog_hash_.ToString() + "\n" +
+    "B" + StringifyInt(catalog_size_) + "\n" +
     "R" + root_path_.ToString() + "\n" +
     "D" + StringifyInt(ttl_) + "\n" +
     "S" + StringifyInt(revision_) + "\n";

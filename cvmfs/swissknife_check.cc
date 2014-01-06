@@ -453,7 +453,7 @@ bool CommandCheck::InspectTree(const string &path,
 
   int retval = true;
 
-  if (uint64_t(catalog_file_size) != catalog_size) {
+  if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "catalog file size mismatch, "
              "expected %"PRIu64", got %"PRIu64,
              catalog_size, catalog_file_size);
@@ -626,6 +626,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   shash::Any root_hash = manifest->catalog_hash();
+  uint64_t root_size = manifest->catalog_size();
   if (tag_name != "") {
     if (manifest->history().IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "no history");
@@ -661,12 +662,13 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
     root_hash = tag.root_hash;
+    root_size = 0;  // TODO
     LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting repository tag %s",
              tag_name.c_str());
   }
 
   catalog::DeltaCounters computed_counters;
-  bool retval = InspectTree("", root_hash, 0, NULL, &computed_counters);
+  bool retval = InspectTree("", root_hash, root_size, NULL, &computed_counters);
 
   delete manifest;
   return retval ? 0 : 1;

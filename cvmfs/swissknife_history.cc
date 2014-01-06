@@ -6,6 +6,7 @@
 #include "swissknife_history.h"
 
 #include <ctime>
+#include <cassert>
 
 #include "hash.h"
 #include "util.h"
@@ -274,6 +275,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   catalog::WritableCatalog *catalog = NULL;
   manifest::Manifest *manifest = NULL;
   shash::Any hash_republished_catalog(shash::kSha1);
+  int64_t size_republished_catalog = 0;
   int retval;
 
   // Download & verify manifest & history database
@@ -349,6 +351,8 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   catalog->SetRevision(trunk_tag.revision + 1);
 
   // Upload catalog
+  size_republished_catalog = GetFileSize(catalog->database_path());
+  assert(size_republished_catalog > 0);
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_republished_catalog))
@@ -363,7 +367,9 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   spooler->WaitForUpload();
   spooler->WaitForTermination();
   unlink((catalog->database_path() + ".compressed").c_str());
-  manifest = new manifest::Manifest(hash_republished_catalog, "");
+  manifest =
+    new manifest::Manifest(hash_republished_catalog, size_republished_catalog,
+                           "");
   manifest->set_ttl(catalog->GetTTL());
   manifest->set_revision(catalog->GetRevision());
   retval = manifest->Export(manifest_path);

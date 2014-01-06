@@ -21,8 +21,11 @@ class Manifest {
  public:
   static Manifest *LoadFile(const std::string &path);
   static Manifest *LoadMem(const unsigned char *buffer, const unsigned length);
-  Manifest(const shash::Any &catalog_hash, const std::string &root_path);
   Manifest(const shash::Any &catalog_hash,
+           const uint64_t catalog_size,
+           const std::string &root_path);
+  Manifest(const shash::Any &catalog_hash,
+           const uint64_t catalog_size,
            const shash::Md5 &root_path,
            const uint32_t ttl,
            const uint64_t revision,
@@ -32,10 +35,16 @@ class Manifest {
            const shash::Any history,
            const uint64_t publish_timestamp,
            const std::vector<history::TagList::ChannelTag> &channel_tops) :
-    catalog_hash_(catalog_hash), root_path_(root_path), ttl_(ttl),
-    revision_(revision), micro_catalog_hash_(micro_catalog_hash),
-    repository_name_(repository_name), certificate_(certificate),
-    history_(history), publish_timestamp_(publish_timestamp),
+    catalog_hash_(catalog_hash),
+    catalog_size_(catalog_size),
+    root_path_(root_path),
+    ttl_(ttl),
+    revision_(revision),
+    micro_catalog_hash_(micro_catalog_hash),
+    repository_name_(repository_name),
+    certificate_(certificate),
+    history_(history),
+    publish_timestamp_(publish_timestamp),
     channel_tops_(channel_tops) { };
 
   std::string ExportString() const;
@@ -63,12 +72,14 @@ class Manifest {
   std::string repository_name() const { return repository_name_; }
   shash::Md5 root_path() const { return root_path_; }
   shash::Any catalog_hash() const { return catalog_hash_; }
+  uint64_t catalog_size() const { return catalog_size_; }
   shash::Any certificate() const { return certificate_; }
   shash::Any history() const { return history_; }
   uint64_t publish_timestamp() const { return publish_timestamp_; }
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
   shash::Any catalog_hash_;
+  uint64_t catalog_size_;
   shash::Md5 root_path_;
   uint32_t ttl_;
   uint64_t revision_;

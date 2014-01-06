@@ -248,7 +248,8 @@ bool CommandMigrate::DoMigrationAndCommit(
            "\nCommitting migrated repository revision...");
   const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash.Get();
   const std::string &root_catalog_path = root_catalog->root_path();
-  manifest::Manifest manifest(root_catalog_hash,
+  // TODO
+  manifest::Manifest manifest(root_catalog_hash, 0,
                               root_catalog_path);
   const Catalog* new_catalog = (root_catalog->HasNew())
                                  ? root_catalog->new_catalog
