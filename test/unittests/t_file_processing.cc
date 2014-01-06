@@ -115,7 +115,8 @@ class MockUploader : public upload::AbstractUploader {
 
  public:
   MockUploader(const upload::SpoolerDefinition &spooler_definition) :
-    AbstractUploader(spooler_definition) {}
+    AbstractUploader(spooler_definition),
+    worker_thread_running(false) {}
 
   static MockUploader* MockConstruct() {
     return dynamic_cast<MockUploader*>(
@@ -141,6 +142,8 @@ class MockUploader : public upload::AbstractUploader {
   }
 
   void WorkerThread() {
+    worker_thread_running = true;
+
     bool running = true;
     while (running) {
       UploadJob job = AcquireNewJob();
@@ -163,6 +166,8 @@ class MockUploader : public upload::AbstractUploader {
           break;
       }
     }
+
+    worker_thread_running = false;
   }
 
   void FileUpload(const std::string  &local_path,
@@ -213,6 +218,9 @@ class MockUploader : public upload::AbstractUploader {
 
  protected:
   Results results_;
+
+ public:
+  volatile bool worker_thread_running;
 };
 
 const std::string MockUploader::sandbox_path    = "/tmp/cvmfs_ut_fileprocessing";
@@ -482,6 +490,13 @@ class T_FileProcessing : public FileSandbox {
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
+
+
+TEST_F(T_FileProcessing, UploaderInitialized) {
+  sleep(1);
+  ASSERT_NE (static_cast<MockUploader*>(NULL), uploader_);
+  ASSERT_TRUE (uploader_->worker_thread_running);
+}
 
 
 TEST_F(T_FileProcessing, Initialize) {
