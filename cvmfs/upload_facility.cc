@@ -15,13 +15,25 @@ void AbstractUploader::RegisterPlugins() {
 
 
 AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition) :
-  spooler_definition_(spooler_definition),
-  writer_thread_(&ThreadProxy<AbstractUploader>,
-                 this,
-                 &AbstractUploader::WriteThread) {}
+  spooler_definition_(spooler_definition) {}
 
 
 bool AbstractUploader::Initialize() {
+  // late initialization of the writer_thread_ field. This is necessary, since
+  // AbstractUploader::WriteThread is pure virtual and relies on a concrete sub-
+  // class being initialized before the writer_thread_ starts running
+  tbb::tbb_thread thread(&ThreadProxy<AbstractUploader>,
+                          this,
+                         &AbstractUploader::WriteThread);
+
+  // tbb::tbb_thread assignment operator 'moves' the thread handle so _does not_
+  // 'copy' the operating system thread construct. The assertions check for this
+  // behaviour.
+  assert (! writer_thread_.joinable());
+  writer_thread_ = thread;
+  assert (writer_thread_.joinable());
+  assert (! thread.joinable());
+
   return true;
 }
 
