@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include "../../cvmfs/directory_entry.h"
+#include "../../cvmfs/util.h"
 
 pid_t GetParentPid(const pid_t pid);
 
@@ -18,5 +19,18 @@ class DirectoryEntryTestFactory {
 };
 
 } /* namespace catalog */
+
+class PolymorphicConstructionUnittestAdapter {
+ public:
+  template <class AbstractProductT, class ConcreteProductT>
+  static void RegisterPlugin() {
+    AbstractProductT::template RegisterPlugin<ConcreteProductT>();
+  }
+
+  template <class AbstractProductT>
+  static void UnregisterAllPlugins() {
+    AbstractProductT::UnregisterAllPlugins();
+  }
+};
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */
