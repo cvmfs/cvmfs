@@ -23,6 +23,7 @@ class CommandTag : public Command {
                                false, false));
     result.push_back(Parameter('b', "base hash", false, false));
     result.push_back(Parameter('t', "trunk hash", false, false));
+    result.push_back(Parameter('s', "trunk catalog size", false, false));
     result.push_back(Parameter('i', "trunk revision", false, false));
     result.push_back(Parameter('n', "repository name", false, false));
     result.push_back(Parameter('k', "repository public key", false, false));

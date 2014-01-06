@@ -110,6 +110,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   const string history_path = *args.find('o')->second;
   const shash::Any base_hash(shash::kSha1, shash::HexPtr(*args.find('b')->second));
   const shash::Any trunk_hash(shash::kSha1, shash::HexPtr(*args.find('t')->second));
+  const uint64_t trunk_catalog_size = String2Uint64(*args.find('s')->second);
   const unsigned trunk_revision = String2Uint64(*args.find('i')->second);
   shash::Any tag_hash = trunk_hash;
   string delete_tag;
@@ -128,6 +129,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
     vector<string> fields = SplitString(*args.find('a')->second, '@');
     new_tag.name = fields[0];
     new_tag.root_hash = trunk_hash;  // might be changed later
+    new_tag.size = trunk_catalog_size;  // might be changed later
     new_tag.revision = trunk_revision;  // might be changed later
     new_tag.timestamp = time(NULL);
     if (fields.size() > 1) {
@@ -222,7 +224,8 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
     tag_list.Remove("trunk-previous");
     tag_list.Remove("trunk");
     history::Tag tag_trunk(
-      "trunk", trunk_hash, trunk_revision, time(NULL), history::kChannelTrunk,
+      "trunk", trunk_hash, trunk_catalog_size, trunk_revision, time(NULL),
+      history::kChannelTrunk,
       "latest published snapshot, automatically updated");
     retval = tag_list.Insert(tag_trunk);
     assert(retval == history::TagList::kFailOk);

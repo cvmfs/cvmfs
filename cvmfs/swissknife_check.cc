@@ -662,7 +662,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
     root_hash = tag.root_hash;
-    root_size = 0;  // TODO
+    root_size = tag.size;
     LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting repository tag %s",
              tag_name.c_str());
   }

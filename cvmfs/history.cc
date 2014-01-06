@@ -19,6 +19,7 @@ namespace history {
 const float Database::kLatestSchema = 1.0;
 const float Database::kLatestSupportedSchema = 1.0;
 const float Database::kSchemaEpsilon = 0.0005;
+const unsigned Database::kLatestSchemaRevision = 1;
 
 bool Database::Open(const std::string filename,
                     const sqlite::DbOpenMode open_mode)
@@ -26,6 +27,7 @@ bool Database::Open(const std::string filename,
   filename_ = filename;
   ready_ = false;
   schema_version_ = 0.0;
+  schema_revision_ = 0;
   sqlite_db_ = NULL;
 
   int flags = SQLITE_OPEN_NOMUTEX;
@@ -53,7 +55,7 @@ bool Database::Open(const std::string filename,
   }
   sqlite3_extended_result_codes(sqlite_db_, 1);
 
-  {  // Get schema version
+  {  // Get schema version and revision
     sqlite::Sql sql_schema(sqlite_db_,
                            "SELECT value FROM properties WHERE key='schema';");
     if (sql_schema.FetchRow()) {
@@ -63,15 +65,40 @@ bool Database::Open(const std::string filename,
                filename_.c_str());
       goto database_failure;
     }
+    sqlite::Sql sql_schema_revision(sqlite_db_,
+      "SELECT value FROM properties WHERE key='schema_revision';");
+    if (sql_schema_revision.FetchRow()) {
+      schema_revision_ = sql_schema_revision.RetrieveInt(0);
+    }
   }
-  LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f",
-           schema_version_);
+  LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f revision %d",
+           schema_version_, schema_revision_);
   if ((schema_version_ < kLatestSupportedSchema-kSchemaEpsilon) ||
       (schema_version_ > kLatestSchema+kSchemaEpsilon))
   {
     LogCvmfs(kLogCatalog, kLogDebug, "schema version %f not supported (%s)",
              schema_version_, filename.c_str());
     goto database_failure;
+  }
+  // Live schema upgrade
+  if (open_mode == sqlite::kDbOpenReadWrite) {
+    if (schema_revision_ == 0) {
+      LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
+      sqlite::Sql sql_upgrade(sqlite_db_, "ALTER TABLE tags ADD size INTEGER;");
+      if (!sql_upgrade.Execute()) {
+        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
+        goto database_failure;
+      }
+      sqlite::Sql sql_revision(sqlite_db_,
+                               "INSERT INTO properties (key, value) VALUES "
+                               "('schema_revision', 1);");
+      if (!sql_revision.Execute()) {
+        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+        goto database_failure;
+      }
+
+      schema_revision_ = 1;
+    }
   }
 
   ready_ = true;
@@ -87,10 +114,13 @@ bool Database::Open(const std::string filename,
 /**
  * Private constructor.  Used to create a new sqlite database.
  */
-Database::Database(sqlite3 *sqlite_db, const float schema, const bool rw) {
+Database::Database(sqlite3 *sqlite_db, const float schema,
+                   const unsigned schema_revision, const bool rw)
+{
   sqlite_db_ = sqlite_db;
   filename_ = "TMP";
   schema_version_ = schema;
+  schema_revision_ = schema_revision;
   read_write_ = rw;
   ready_ = false;  // Don't close on delete
 }
@@ -109,6 +139,7 @@ bool Database::Create(const string &filename, const string &repository_name)
 {
   sqlite3 *sqlite_db;
   sqlite::Sql *sql_schema;
+  sqlite::Sql *sql_schema_revision;
   sqlite::Sql *sql_fqrn;
   int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
                    SQLITE_OPEN_CREATE;
@@ -125,12 +156,12 @@ bool Database::Create(const string &filename, const string &repository_name)
     return false;
   }
   sqlite3_extended_result_codes(sqlite_db, 1);
-  Database database(sqlite_db, kLatestSchema, true);
+  Database database(sqlite_db, kLatestSchema, kLatestSchemaRevision, true);
 
   bool retval;
   string sql_create =
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
-    "  timestamp INTEGER, channel INTEGER, description TEXT,"
+    "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
     "  CONSTRAINT pk_tags PRIMARY KEY (name))";
   retval = sqlite::Sql(sqlite_db, sql_create).Execute();
   if (!retval)
@@ -146,6 +177,15 @@ bool Database::Create(const string &filename, const string &repository_name)
                                "(key, value) VALUES ('schema', :schema);");
   retval = sql_schema->BindDouble(1, kLatestSchema) && sql_schema->Execute();
   delete sql_schema;
+  if (!retval)
+    goto create_schema_fail;
+
+  sql_schema_revision =
+    new sqlite::Sql(sqlite_db, "INSERT INTO properties "
+                               "(key, value) VALUES ('schema_revision', :r);");
+  retval = sql_schema_revision->BindInt(1, kLatestSchemaRevision) &&
+           sql_schema_revision->Execute();
+  delete sql_schema_revision;
   if (!retval)
     goto create_schema_fail;
 
@@ -183,7 +223,8 @@ bool SqlTag::BindTag(const Tag &tag) {
     BindInt64(3, tag.revision) &&
     BindInt64(4, tag.timestamp) &&
     BindInt64(5, tag.channel) &&
-    BindText(6, tag.description)
+    BindText(6, tag.description) &&
+    BindInt64(7, tag.size)
   );
 }
 
@@ -197,6 +238,7 @@ Tag SqlTag::RetrieveTag() {
   result.timestamp = RetrieveInt64(3);
   result.channel = static_cast<UpdateChannel>(RetrieveInt64(4));
   result.description = string(reinterpret_cast<const char *>(RetrieveText(5)));
+  result.size = RetrieveInt64(6);
   return result;
 }
 
@@ -206,9 +248,14 @@ Tag SqlTag::RetrieveTag() {
 
 bool TagList::Load(Database *database) {
   assert(database);
+  string size_field = "0";
+  if (database->schema_revision() >= 1)
+    size_field = "size";
   SqlTag sql_load(*database,
-                  "SELECT name, hash, revision, timestamp, channel, description"
-                  " FROM tags ORDER BY revision;");
+    // NULL for size automatically converted to 0
+    "SELECT name, hash, revision, timestamp, channel, description, " +
+    size_field +
+    " FROM tags ORDER BY revision;");
   while (sql_load.FetchRow())
     list_.push_back(sql_load.RetrieveTag());
 
@@ -224,8 +271,8 @@ bool TagList::Store(Database *database) {
 
   SqlTag sql_store(*database,
     "INSERT INTO tags "
-    "(name, hash, revision, timestamp, channel, description) VALUES "
-    "(:n, :h, :r, :t, :c, :d);");
+    "(name, hash, revision, timestamp, channel, description, size) VALUES "
+    "(:n, :h, :r, :t, :c, :d, :s);");
   for (unsigned i = 0; i < list_.size(); ++i) {
     retval = sql_store.BindTag(list_[i]);
     assert(retval);
@@ -243,10 +290,19 @@ bool TagList::Store(Database *database) {
 
 
 string TagList::List() {
-  string result = "NAME | HASH | REVISION | TIMESTAMP | CHANNEL | DESCRIPTION\n";
+  string result =
+    "NAME | HASH | SIZE | REVISION | TIMESTAMP | CHANNEL | DESCRIPTION\n";
   for (unsigned i = 0; i < list_.size(); ++i) {
     Tag tag(list_[i]);
+    string tag_size = "n/a";
+    if (tag.size > 0 && tag.size < 1024)
+      tag_size = StringifyInt(tag.size);
+    else if (tag.size >= 1024 && tag.size < 1024*1024)
+      tag_size = StringifyInt(tag.size/1024) + "kB";
+    else if (tag.size >= 1024*1024)
+      tag_size = StringifyInt(tag.size/(1024*1024)) + "MB";
     result += tag.name + " | " + tag.root_hash.ToString() + " | " +
+              tag_size + " | " +
               StringifyInt(tag.revision) + " | " +
               StringifyTime(tag.timestamp, true) + " | " +
               StringifyInt(tag.channel) + " | " + tag.description + "\n";

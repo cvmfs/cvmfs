@@ -1942,7 +1942,7 @@ lstags() {
   . /etc/cvmfs/repositories.d/$name/server.conf
   local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
   cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
-    -i 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
+    -i 0 -s 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
     -k /etc/cvmfs/keys/${name}.pub \
     -z /etc/cvmfs/repositories.d/${name}/trusted_certs -l
   rm -f ${CVMFS_SPOOL_DIR}/show_history
@@ -2380,7 +2380,8 @@ publish() {
     if [ -f ${spool_dir}/tmp/manifest ]; then
       local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
       local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-      tag_command="$tag_command -t $trunk_hash -i $trunk_revision $tag_hash"
+      local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
+      tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
       echo "Tagging $name"
       $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
       $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
