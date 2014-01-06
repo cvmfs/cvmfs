@@ -28,6 +28,8 @@ class AbstractReader {
     buffers_in_flight_counter_(max_buffers_in_flight)
   {}
 
+  virtual ~AbstractReader() {}
+
   /**
    * Releases CharBuffers that were previously allocated by the Reader. This
    * needs to be called for each Buffer that was created using CreateBuffer.
