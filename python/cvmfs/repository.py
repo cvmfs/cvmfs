@@ -83,7 +83,7 @@ class Repository:
             with self.retrieve_file(_common._LAST_REPLICATION_NAME) as rf:
                 timestamp = rf.readline()
                 self.last_replication = self.__read_timestamp(timestamp)
-            if not hasattr(self, 'type'):
+            if not self.has_repository_type():
                 self.type = 'stratum1'
         except FileNotFoundInRepository, e:
             self.last_replication = datetime.fromtimestamp(0, tz=tzutc())
@@ -98,6 +98,10 @@ class Repository:
                 self.replicating_since = self.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
+
+
+    def has_repository_type(self):
+        return hasattr(self, 'type') and self.type != 'unknown'
 
 
     def retrieve_file(self, file_name):
