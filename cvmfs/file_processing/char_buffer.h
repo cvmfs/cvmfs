@@ -30,6 +30,16 @@ class CharBuffer : public Buffer<unsigned char,
     Buffer<unsigned char, tbb::scalable_allocator<unsigned char> >(size),
     base_offset_(0) {}
 
+  CharBuffer* Clone() const {
+    assert (IsInitialized());
+    CharBuffer* new_buffer = new CharBuffer(size_bytes());
+    assert (new_buffer->IsInitialized());
+    new_buffer->SetUsedBytes(used_bytes());
+    new_buffer->SetBaseOffset(base_offset());
+    memcpy(new_buffer->ptr(), ptr(), size());
+    return new_buffer;
+  }
+
   void SetBaseOffset(const off_t offset) { base_offset_ = offset; }
   off_t base_offset() const { return base_offset_; }
 
