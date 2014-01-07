@@ -248,8 +248,13 @@ bool CommandMigrate::DoMigrationAndCommit(
            "\nCommitting migrated repository revision...");
   const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash.Get();
   const std::string &root_catalog_path = root_catalog->root_path();
-  // TODO
-  manifest::Manifest manifest(root_catalog_hash, 0,
+  const int64_t root_catalog_size =
+    GetFileSize(root_catalog->new_catalog->database_path());
+  if (root_catalog_size <= 0) {
+    Error("Getting root catalog file size failed.\nAborting...");
+    return false;
+  }
+  manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
                               root_catalog_path);
   const Catalog* new_catalog = (root_catalog->HasNew())
                                  ? root_catalog->new_catalog
