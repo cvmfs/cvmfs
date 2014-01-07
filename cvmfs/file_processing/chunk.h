@@ -38,7 +38,8 @@ class Chunk {
     is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
     zlib_initialized_(false), content_hash_context_(shash::kSha1),
     content_hash_(shash::kSha1), content_hash_initialized_(false),
-    upload_stream_handle_(NULL), bytes_written_(0)
+    upload_stream_handle_(NULL), current_deflate_buffer_(NULL),
+    bytes_written_(0)
   {
     Initialize();
   }
@@ -55,7 +56,19 @@ class Chunk {
   Chunk* CopyAsBulkChunk(const size_t file_size);
   void SetAsBulkChunk() { is_bulk_chunk_ = true; }
 
-  void ScheduleWrite(CharBuffer *buffer);
+  /**
+   * Provides the ChunkProcessingTask with memory for the data compression. The
+   * user (i.e. ChunkProcessingTask::Crunch()) is responsible to set the
+   * used_bytes_ field of the provided CharBuffer after data has been added.
+   * This method returns always the same buffer until it is full. In that case
+   * the filled CharBuffer is automatically scheduled for writing and a fresh
+   * CharBuffer is provided.
+   *
+   * @param bytes  an estimate of how much memory needs to be provided.
+   * @return       a CharBuffer to write compression results
+   *               (Note: The CharBuffer might already contain data!)
+   */
+  CharBuffer* GetDeflateBuffer(const size_t bytes);
 
   /**
    * An enabled deferred write mode instructs the Chunk object to store Buffers
@@ -94,13 +107,11 @@ class Chunk {
   void       add_bytes_written(const size_t new_bytes) {
     bytes_written_ += new_bytes;
   }
-  void       add_compressed_size(const size_t new_bytes) {
-    compressed_size_ += new_bytes;
-  }
 
  protected:
   void Initialize();
   void FlushDeferredWrites(const bool delete_buffers = true);
+  void ScheduleWrite(CharBuffer *buffer);
 
  private:
   Chunk(const Chunk &other);
@@ -127,9 +138,10 @@ class Chunk {
   shash::Any               content_hash_;
   bool                     content_hash_initialized_;
 
-  UploadStreamHandle      *upload_stream_handle_; ///< opaque handle for streamed upload
-  size_t                   bytes_written_;        ///< bytes already uploaded (compressed)
-  tbb::atomic<size_t>      compressed_size_;      ///< size of the compressed data
+  UploadStreamHandle      *upload_stream_handle_;   ///< opaque handle for streamed upload
+  CharBuffer              *current_deflate_buffer_; ///< current deflate destination buffer
+  size_t                   bytes_written_;          ///< bytes already uploaded (compressed)
+  tbb::atomic<size_t>      compressed_size_;        ///< size of the compressed data
 };
 
 typedef std::vector<Chunk*> ChunkVector;

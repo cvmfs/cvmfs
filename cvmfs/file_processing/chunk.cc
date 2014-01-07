@@ -10,8 +10,23 @@
 
 using namespace upload;
 
+
+CharBuffer* Chunk::GetDeflateBuffer(const size_t bytes) {
+  if (current_deflate_buffer_              == NULL ||
+      current_deflate_buffer_->free_bytes() <  64) {
+    if (current_deflate_buffer_ != NULL) {
+      ScheduleWrite(current_deflate_buffer_);
+    }
+    current_deflate_buffer_ = new CharBuffer(bytes);
+  }
+
+  return current_deflate_buffer_;
+}
+
+
 void Chunk::ScheduleWrite(CharBuffer *buffer) {
-  assert (buffer->used_bytes() > 0);
+  buffer->SetBaseOffset(compressed_size_);
+  compressed_size_ += buffer->used_bytes();
 
   if (deferred_write_) {
     assert (! HasUploadStreamHandle());
@@ -66,6 +81,11 @@ void Chunk::Finalize() {
   const int retcode = deflateEnd(&zlib_context_);
   assert (retcode == Z_OK);
 
+  if (current_deflate_buffer_ != NULL) {
+    ScheduleWrite(current_deflate_buffer_);
+    current_deflate_buffer_ = NULL;
+  }
+
   if (deferred_write_) {
     FlushDeferredWrites();
   }
@@ -100,6 +120,8 @@ Chunk::Chunk(const Chunk &other) :
   assert (! other.HasUploadStreamHandle());
   assert (other.bytes_written_ == 0);
   assert (other.zlib_context_.avail_in == 0);
+
+  current_deflate_buffer_ = other.current_deflate_buffer_->Clone();
 
   const int retval = deflateCopy(&zlib_context_,
                                  const_cast<z_streamp>(&other.zlib_context_));
