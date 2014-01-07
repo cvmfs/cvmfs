@@ -46,6 +46,11 @@ class SmallHashBase {
     bytes_allocated_ = 0;
     num_collisions_ = 0;
     max_collisions_ = 0;
+
+    // Properly initialized by Init()
+    capacity_ = 0;
+    initial_capacity_ = 0;
+    size_ = 0;
   }
 
   ~SmallHashBase() {
@@ -242,6 +247,10 @@ class SmallHashDynamic :
 
   SmallHashDynamic() : Base() {
     num_migrates_ = 0;
+
+    // Properly set by Init
+    threshold_grow_ = 0;
+    threshold_shrink_ = 0;
   }
 
   explicit SmallHashDynamic(const SmallHashDynamic<Key, Value> &other) : Base()

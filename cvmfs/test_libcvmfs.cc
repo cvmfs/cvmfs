@@ -43,7 +43,7 @@ int cvmfs_test_list( const char *path )
 
 
 	for(i=0;buffer[i];i++) {
-		sprintf(filepath,"%s/%s",path,buffer[i]);
+		snprintf(filepath,TEST_LINE_MAX,"%s/%s",path,buffer[i]);
 		cvmfs_stat(filepath,&info);
 		printf("%10llu %s\n",(long long unsigned)info.st_size,buffer[i]);
 	}

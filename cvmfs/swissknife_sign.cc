@@ -65,7 +65,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   signature_manager.Init();
 
   // Load certificate
-  unsigned char *cert_buf;
+  unsigned char *cert_buf = NULL;
   unsigned cert_buf_size;
   if (certificate == "") {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
@@ -96,6 +96,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       newrsett.c_lflag &= ~ECHO;
       if(tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
         LogCvmfs(kLogCvmfs, kLogStderr, "terminal failure");
+        free(cert_buf);
         return 2;
       }
 
@@ -114,14 +115,17 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       }
       retry++;
     } while (!success && (retry < 3));
-    if (!success)
+    if (!success) {
+      free(cert_buf);
       return 2;
+    }
   }
   if (!signature_manager.KeysMatch()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "the private key doesn't seem to match your certificate (%s)",
              signature_manager.GetCryptoError().c_str());
     signature_manager.UnloadPrivateKey();
+    free(cert_buf);
     return 2;
   }
 
@@ -270,6 +274,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     unlink(hist_compressed_path.c_str());
   delete spooler;
   signature_manager.Fini();
+  if (cert_buf) free(cert_buf);
   return 1;
 }
 

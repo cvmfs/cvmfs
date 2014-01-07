@@ -387,6 +387,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (fd_lockfile < 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to lock on %s",
                (*temp_dir + "/lock_snapshot").c_str());
+      free(workers);
       return 1;
     }
   }

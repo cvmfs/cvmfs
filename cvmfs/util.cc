@@ -537,9 +537,9 @@ class RemoveTreeHelper {
  */
 bool RemoveTree(const string &path) {
   platform_stat64 info;
-  platform_lstat(path.c_str(), &info);
-  if (errno == ENOENT)
-    return true;
+  int retval = platform_lstat(path.c_str(), &info);
+  if (retval != 0)
+    return errno == ENOENT;
   if (!S_ISDIR(info.st_mode))
     return false;
 
