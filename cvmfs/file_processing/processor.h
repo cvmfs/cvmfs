@@ -45,7 +45,7 @@ class ChunkProcessingTask : public tbb::task {
    */
   void Crunch(const unsigned char  *data,
               const size_t          bytes,
-              const bool            finalize) const;
+              const bool            finalize);
 
  private:
   Chunk        *chunk_;   ///< the associated Chunk object (will be updated)

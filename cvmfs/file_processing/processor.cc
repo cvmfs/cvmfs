@@ -71,55 +71,51 @@ tbb::task* ChunkProcessingTask::execute() {
 
 void ChunkProcessingTask::Crunch(const unsigned char  *data,
                                  const size_t          bytes,
-                                 const bool            finalize) const {
-  z_stream         &stream  = chunk_->zlib_context();
+                                 const bool            finalize) {
+  z_stream          &stream = chunk_->zlib_context();
   shash::ContextPtr &ch_ctx = chunk_->content_hash_context();
 
-  // estimate the size needed for the data to compress
+  // estimate how much space we are going to need approximately
   const size_t max_output_size = deflateBound(&stream, bytes);
-  CharBuffer *compress_buffer  = new CharBuffer(max_output_size);
 
   // state the input data in the zlib stream for the next compression step
-  stream.avail_in  = bytes;
-  stream.next_in   = const_cast<unsigned char*>(data); // sry, but zlib forces me...
+  stream.avail_in = bytes;
+  stream.next_in  = const_cast<unsigned char*>(data); // sry, but zlib forces me...
   const int flush = (finalize) ? Z_FINISH : Z_NO_FLUSH;
 
   int retcode = -1;
   while (true) {
-    // state the current output buffer in the zlib stream
-    stream.avail_out = compress_buffer->size();
-    stream.next_out  = compress_buffer->ptr();
+    // obtain a destination CharBuffer for the compression results from the
+    // currently processed Chunk.
+    CharBuffer *compress_buffer = chunk_->GetDeflateBuffer(max_output_size);
+    assert (compress_buffer != NULL);
+    assert (compress_buffer->free_bytes() > 0);
+
+    // initialize the zlib stream with the characteristics of the output buffer
+    const CharBuffer::pointer_t output_start = compress_buffer->free_space_ptr();
+    const size_t                output_space = compress_buffer->free_bytes();
+    stream.avail_out = output_space;
+    stream.next_out  = output_start;
 
     // do the compression step
     retcode = deflate(&stream, flush);
     assert (retcode == Z_OK || retcode == Z_STREAM_END);
 
-    // check if zlib produced any bytes, define the byte offset and size of the
-    // produced output data Block, update the running content hash with the
-    // fresh compression data and schedule it for writing
-    const size_t bytes_produced = compress_buffer->size() - stream.avail_out;
-    if (bytes_produced > 0) {
-      compress_buffer->SetUsedBytes(bytes_produced);
-      compress_buffer->SetBaseOffset(chunk_->compressed_size());
-      chunk_->add_compressed_size(bytes_produced);
-      shash::Update(compress_buffer->ptr(),
-                    compress_buffer->used_bytes(),
-                    ch_ctx);
-      chunk_->ScheduleWrite(compress_buffer);
-    }
+    // check if zlib produced any bytes, update the used_bytes information in
+    // the compression buffer and update the running content hash with the fresh
+    // data
+    const size_t bytes_produced = output_space - stream.avail_out;
+    compress_buffer->SetUsedBytes(compress_buffer->used_bytes() + bytes_produced);
+    shash::Update(output_start, bytes_produced, ch_ctx);
 
     // check if the compression for the given input data has finished and stop
     // the compression loop
-    if ((flush == Z_NO_FLUSH && retcode == Z_OK) ||
+    if ((flush == Z_NO_FLUSH && retcode == Z_OK && stream.avail_in == 0) ||
         (flush == Z_FINISH   && retcode == Z_STREAM_END)) {
       break;
     }
 
-    // when the estimated output buffer size was not sufficient we provide 4k
-    // fallback buffers until all input data has been consumed
-    if (stream.avail_out == 0) {
-      compress_buffer = new CharBuffer(4096);
-    }
+    assert (stream.avail_out == 0);
   }
 }
 
