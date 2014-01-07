@@ -521,6 +521,8 @@ void ThreadProxy(DelegateT        *delegate,
 template<typename T, class A = std::allocator<T> >
 class Buffer {
  public:
+  typedef typename A::pointer pointer_t;
+
   Buffer() : used_(0), size_(0), buffer_(NULL), initialized_(false) {}
 
   Buffer(const size_t size) : used_(0), size_(0), buffer_(NULL),
@@ -551,6 +553,16 @@ class Buffer {
     return buffer_;
   }
 
+  typename A::pointer free_space_ptr() {
+    assert (IsInitialized());
+    return buffer_ + used();
+  }
+
+  const typename A::pointer free_space_ptr() const {
+    assert (IsInitialized());
+    return buffer_ + used();
+  }
+
   void SetUsed(const size_t items) {
     assert (items <= size());
     used_ = items;
@@ -562,10 +574,12 @@ class Buffer {
     used_ = bytes / sizeof(T);
   }
 
-  size_t size()        const { return size_;             }
-  size_t size_bytes()  const { return size_ * sizeof(T); }
-  size_t used()        const { return used_;             }
-  size_t used_bytes()  const { return used_ * sizeof(T); }
+  size_t size()        const { return size_;              }
+  size_t size_bytes()  const { return size_ * sizeof(T);  }
+  size_t used()        const { return used_;              }
+  size_t used_bytes()  const { return used_ * sizeof(T);  }
+  size_t free()        const { return size_ - used_;      }
+  size_t free_bytes()  const { return free() * sizeof(T); }
 
  private:
   Buffer(const Buffer &other) { assert (false); } // no copy!
