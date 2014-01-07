@@ -621,8 +621,10 @@ bool AddGroup2Persona(const gid_t gid) {
     return false;
   }
   for (int i = 0; i < ngroups; ++i) {
-    if (groups[i] == gid)
+    if (groups[i] == gid) {
+      free(groups);
       return true;
+    }
   }
   groups[ngroups] = gid;
   retval = setgroups(ngroups+1, groups);

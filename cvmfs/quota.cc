@@ -1281,6 +1281,7 @@ static void CleanupPipes(const string &cache_dir) {
       unlink(path.c_str());
     }
   }
+  closedir(dirp);
 }
 
 

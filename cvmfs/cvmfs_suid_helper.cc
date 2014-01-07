@@ -93,8 +93,10 @@ static bool ClearWorkingDir() {
 
     platform_stat64 info;
     retval = platform_lstat(dirent->d_name, &info);
-    if (retval != 0)
+    if (retval != 0) {
+      closedir(dirp);
       return false;
+    }
 
     if (S_ISDIR(info.st_mode)) {
       // Recursion

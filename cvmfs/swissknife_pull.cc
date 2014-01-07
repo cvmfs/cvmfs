@@ -107,6 +107,7 @@ static void Store(const string &local_path, const string &remote_path,
                local_path.c_str(), dest_path.c_str());
       abort();
     }
+    fclose(fdest);
     retval = rename(tmp_dest.c_str(), dest_path.c_str());
     assert(retval == 0);
     unlink(local_path.c_str());

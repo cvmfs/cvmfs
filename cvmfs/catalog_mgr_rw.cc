@@ -213,7 +213,8 @@ bool WritableCatalogManager::FindCatalog(const string &path,
   if (!retval)
     return false;
 
-  bool found = LookupPath(path, kLookupSole, NULL);
+  catalog::DirectoryEntry dummy;
+  bool found = LookupPath(path, kLookupSole, &dummy);
   if (!found || !catalog->IsWritable())
     return false;
 

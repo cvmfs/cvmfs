@@ -20,6 +20,7 @@
 
 #include <string>
 #include "logging.h"
+#include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -260,7 +261,7 @@ struct ContextPtr {
     algorithm(other.algorithm),
     size(other.size)
   {
-    buffer = malloc(size);
+    buffer = smalloc(size);
     memcpy(buffer, other.buffer, size);
   }
 };

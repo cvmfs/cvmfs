@@ -257,7 +257,8 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
                                         DirectoryEntry *dirent)
 {
   // initialize as non-negative
-  if (dirent != NULL) *dirent = DirectoryEntry();
+  assert(dirent);
+  *dirent = DirectoryEntry();
 
   // create a dummy negative directory entry
   const DirectoryEntry dirent_negative =
