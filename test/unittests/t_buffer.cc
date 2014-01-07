@@ -114,3 +114,62 @@ TEST(T_Buffer, CharBuffer) {
   EXPECT_EQ (100u, buffer.size());
   EXPECT_EQ (100u, buffer.free());
 }
+
+TEST(T_Buffer, FreeSpacePointer) {
+  upload::CharBuffer buffer;
+  EXPECT_FALSE (buffer.IsInitialized());
+  EXPECT_EQ (0, buffer.base_offset());
+
+  const char *str = "This is a simple test!";
+  const size_t str_length = strlen(str) + 1;
+  buffer.Allocate(str_length);
+  memset(buffer.ptr(), 0, str_length);
+  EXPECT_TRUE (buffer.IsInitialized());
+  EXPECT_EQ (str_length, buffer.free_bytes());
+
+  const off_t test_off = 10;
+  memcpy(buffer.ptr(), str, test_off);
+  EXPECT_EQ (str_length, buffer.free_bytes());
+  EXPECT_NE (std::string(str), std::string(reinterpret_cast<const char*>(buffer.ptr())));
+  EXPECT_EQ (std::string("This is a "), std::string(reinterpret_cast<const char*>(buffer.ptr())));
+
+  buffer.SetUsedBytes(test_off);
+  EXPECT_EQ (static_cast<size_t>(test_off), buffer.used_bytes());
+  EXPECT_EQ (str_length - test_off,         buffer.free_bytes());
+  EXPECT_EQ (buffer.ptr() + test_off,       buffer.free_space_ptr());
+
+  memcpy(buffer.free_space_ptr(), str + test_off, str_length - test_off);
+  EXPECT_EQ (std::string(str), std::string(reinterpret_cast<const char*>(buffer.ptr())));
+  EXPECT_NE (str_length, buffer.used_bytes());
+}
+
+TEST(T_Buffer, CloneCharBuffer) {
+  upload::CharBuffer buffer;
+  EXPECT_FALSE (buffer.IsInitialized());
+  EXPECT_EQ (0, buffer.base_offset());
+
+  const char *str = "This is a simple test!";
+  const size_t str_length = strlen(str) + 1;
+  buffer.Allocate(str_length);
+  EXPECT_TRUE (buffer.IsInitialized());
+  EXPECT_EQ (str_length, buffer.free_bytes());
+
+  memcpy(buffer.ptr(), str, str_length);
+  buffer.SetUsedBytes(str_length);
+  EXPECT_EQ (str_length,                buffer.used_bytes());
+  EXPECT_EQ (0u,                        buffer.free_bytes());
+  EXPECT_EQ (buffer.ptr() + str_length, buffer.free_space_ptr());
+  EXPECT_EQ (std::string(str), std::string(reinterpret_cast<const char*>(buffer.ptr())));
+
+
+  const off_t test_base_off = 128;
+  buffer.SetBaseOffset(test_base_off);
+  EXPECT_EQ (test_base_off, buffer.base_offset());
+
+  upload::CharBuffer *other = buffer.Clone();
+  EXPECT_EQ (std::string(str), std::string(reinterpret_cast<const char*>(other->ptr())));
+  EXPECT_EQ (0u,            other->free());
+  EXPECT_EQ (str_length,    other->size());
+  EXPECT_EQ (str_length,    other->used_bytes());
+  EXPECT_EQ (test_base_off, other->base_offset());
+}
