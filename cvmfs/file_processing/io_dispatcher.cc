@@ -23,7 +23,6 @@ void IoDispatcher::ScheduleWrite(Chunk       *chunk,
 
   assert (buffer != NULL);
   assert (buffer->IsInitialized());
-  assert (buffer->used_bytes() > 0);
 
   // Initialize a streamed upload in the AbstractUploader implementation if it
   // has not been done before for this Chunk.
