@@ -15,7 +15,7 @@ void AbstractUploader::RegisterPlugins() {
 
 
 AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition) :
-  spooler_definition_(spooler_definition) {}
+  spooler_definition_(spooler_definition), torn_down_(false) {}
 
 
 bool AbstractUploader::Initialize() {
@@ -34,7 +34,16 @@ bool AbstractUploader::Initialize() {
   assert (writer_thread_.joinable());
   assert (! thread.joinable());
 
-  return true;
+  // wait for the thread to call back...
+  return thread_started_executing_.Get();
+}
+
+
+void AbstractUploader::TearDown() {
+  assert (! torn_down_);
+  upload_queue_.push(UploadJob()); // Termination signal
+  writer_thread_.join();
+  torn_down_ = true;
 }
 
 
