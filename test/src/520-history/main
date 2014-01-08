@@ -154,11 +154,11 @@ cvmfs_run_test() {
   local reference_dir4=$scratch_dir/reference_dir4
 
   local first_tag="initial"
-  local first_tag_desc="initial tag"
+  local first_tag_desc="initial-tag"
   local second_tag="intermediate"
-  local second_tag_desc="intermediate revision"
+  local second_tag_desc="intermediate-revision"
   local third_tag="third_tag"
-  local third_tag_desc="last tag revision"
+  local third_tag_desc="last-tag-revision"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log || return $?
