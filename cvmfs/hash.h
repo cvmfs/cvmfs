@@ -241,29 +241,17 @@ unsigned GetContextSize(const Algorithms algorithm);
  * deferr the storage allocation for the context to alloca.
  */
 struct ContextPtr {
-  Algorithms algorithm;
-  void *buffer;
-  unsigned size;
+  Algorithms  algorithm;
+  void       *buffer;
+  unsigned    size;
 
-  ContextPtr() {
-    algorithm = kAny;
-    size = 0;
-    buffer = NULL;
-  }
+  ContextPtr() : algorithm(kAny), buffer(NULL), size(0) {}
 
-  explicit ContextPtr(const Algorithms a) {
-    algorithm = a;
-    size = GetContextSize(a);
-    buffer = NULL;
-  }
+  explicit ContextPtr(const Algorithms a) :
+    algorithm(a), buffer(NULL), size(GetContextSize(a)) {}
 
   explicit ContextPtr(const ContextPtr &other) :
-    algorithm(other.algorithm),
-    size(other.size)
-  {
-    buffer = smalloc(size);
-    memcpy(buffer, other.buffer, size);
-  }
+    algorithm(other.algorithm), buffer(NULL), size(other.size) {}
 };
 
 void Init(ContextPtr &context);

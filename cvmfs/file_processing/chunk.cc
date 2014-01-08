@@ -123,6 +123,11 @@ Chunk::Chunk(const Chunk &other) :
 
   current_deflate_buffer_ = other.current_deflate_buffer_->Clone();
 
+  content_hash_context_.buffer = malloc(content_hash_context_.size);
+  memcpy(      content_hash_context_.buffer,
+         other.content_hash_context_.buffer,
+               content_hash_context_.size);
+
   const int retval = deflateCopy(&zlib_context_,
                                  const_cast<z_streamp>(&other.zlib_context_));
   assert (retval == Z_OK);
