@@ -92,6 +92,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   assert (might_become_chunked_);
 
   Chunk *latest_chunk = current_chunk();
+  assert (latest_chunk != NULL);
   assert (! latest_chunk->IsFullyDefined());
 
   // copy the initially created Chunk as the bulk_chunk_ as soon as we create
