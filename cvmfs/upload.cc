@@ -51,12 +51,6 @@ bool Spooler::Initialize() {
 }
 
 
-void Spooler::TearDown() {
-  WaitForTermination();
-  uploader_->TearDown();
-}
-
-
 void Spooler::Process(const std::string &local_path,
                       const bool         allow_chunking) {
   file_processor_->Process(local_path, allow_chunking);

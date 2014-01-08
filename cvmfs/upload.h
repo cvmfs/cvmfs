@@ -118,8 +118,6 @@ namespace upload
    */
   class Spooler : public Observable<SpoolerResult> {
    public:
-
-   public:
     static Spooler* Construct(const SpoolerDefinition &spooler_definition);
     virtual ~Spooler();
 
@@ -212,16 +210,6 @@ namespace upload
      */
     bool Initialize();
 
-    /**
-     * This method is called right before the Spooler object will terminate.
-     * Implement this to do global clean up work. You should not finish jobs
-     * in this method, since it is meant to be called after the Spooler has
-     * stopped its actual work or was terminated prematurely.
-     */
-    void TearDown();
-
-
-   protected:
     /**
      * @param spooler_definition   the SpoolerDefinition structure that defines
      *                             some intrinsics of the concrete Spoolers.
