@@ -240,7 +240,8 @@ unsigned GetContextSize(const Algorithms algorithm);
  * Holds an OpenSSL context, only required for hash operations.  Allows to
  * deferr the storage allocation for the context to alloca.
  */
-struct ContextPtr {
+class ContextPtr {
+ public:
   Algorithms  algorithm;
   void       *buffer;
   unsigned    size;
@@ -252,6 +253,12 @@ struct ContextPtr {
 
   explicit ContextPtr(const ContextPtr &other) :
     algorithm(other.algorithm), buffer(NULL), size(other.size) {}
+
+ private:
+  ContextPtr& operator=(const ContextPtr &other) {
+    const bool not_implemented = false;
+    assert (not_implemented);
+  }
 };
 
 void Init(ContextPtr &context);
