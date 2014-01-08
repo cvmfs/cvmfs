@@ -348,3 +348,15 @@ TEST_F(T_UploadFacility, DataBlockBasicOrdering) {
 
   delete uploader;
 }
+
+TEST_F(T_UploadFacility, InitDtorRace) {
+  MockUploader_UF *uploader = dynamic_cast<MockUploader_UF*>(
+              AbstractUploader::Construct(MockUploader_UF::spooler_definition));
+
+  ASSERT_NE (static_cast<MockUploader_UF*>(NULL), uploader);
+  EXPECT_TRUE (uploader->initialize_called);
+
+  uploader->WaitForUpload();
+  uploader->TearDown();
+  delete uploader;
+}
