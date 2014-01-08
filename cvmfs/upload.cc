@@ -53,6 +53,7 @@ bool Spooler::Initialize() {
 
 void Spooler::TearDown() {
   WaitForTermination();
+  uploader_->TearDown();
 }
 
 
