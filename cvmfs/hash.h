@@ -251,6 +251,12 @@ class ContextPtr {
   explicit ContextPtr(const Algorithms a) :
     algorithm(a), buffer(NULL), size(GetContextSize(a)) {}
 
+  /**
+   * Produces a duplicated ContextPtr
+   * Warning: Since the buffer handling is up to the user, the actual context
+   *          buffer is _not_ copied by this copy constructor and needs to be
+   *          dealt with by the caller! (i.e. memcpy'ed from old to new)
+   */
   explicit ContextPtr(const ContextPtr &other) :
     algorithm(other.algorithm), buffer(NULL), size(other.size) {}
 
