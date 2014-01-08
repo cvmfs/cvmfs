@@ -7,6 +7,7 @@
 #include "io_dispatcher.h"
 #include "file.h"
 #include "../file_chunk.h"
+#include "../smalloc.h"
 
 using namespace upload;
 
@@ -54,7 +55,7 @@ void Chunk::Initialize() {
   done_            = false;
   compressed_size_ = 0;
 
-  content_hash_context_.buffer = malloc(content_hash_context_.size);
+  content_hash_context_.buffer = smalloc(content_hash_context_.size);
   shash::Init(content_hash_context_);
 
   zlib_context_.zalloc   = Z_NULL;
@@ -123,7 +124,7 @@ Chunk::Chunk(const Chunk &other) :
 
   current_deflate_buffer_ = other.current_deflate_buffer_->Clone();
 
-  content_hash_context_.buffer = malloc(content_hash_context_.size);
+  content_hash_context_.buffer = smalloc(content_hash_context_.size);
   memcpy(      content_hash_context_.buffer,
          other.content_hash_context_.buffer,
                content_hash_context_.size);
