@@ -641,6 +641,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStdout, "failed to load history database %s",
                manifest->history().ToString().c_str());
+      delete manifest;
       return 1;
     }
     history::Database tag_db;
@@ -648,6 +649,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStdout, "failed to open history database");
       unlink(tmp_file.c_str());
+      delete manifest;
       return 1;
     }
     history::TagList tag_list;
@@ -659,6 +661,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStdout, "no such tag: %s", tag_name.c_str());
       unlink(tmp_file.c_str());
+      delete manifest;
       return 1;
     }
     root_hash = tag.root_hash;
