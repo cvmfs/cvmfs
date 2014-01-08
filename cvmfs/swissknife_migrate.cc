@@ -1026,8 +1026,8 @@ bool CommandMigrate::MigrationWorker_20x::MigrateNestedCatalogMountPoints(
     const shash::Md5 mountpoint_hash = shash::Md5(root_path.data(),
                                                   root_path.size());
     retval =
-      update_mntpnt_linkcount.BindInt64(1, root_entry.linkcount());
-      update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
+      update_mntpnt_linkcount.BindInt64(1, root_entry.linkcount()) &&
+      update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash)       &&
       update_mntpnt_linkcount.Execute();
     if (!retval) {
       Error("Failed to update linkcount of nested catalog mountpoint",
