@@ -179,7 +179,9 @@ TEST_F(T_UploadFacility, InitializeAndTearDown) {
   sleep(1);
   EXPECT_TRUE (MockUploader_UF::worker_thread_running);
 
+  uploader->TearDown();
   delete uploader;
+
   EXPECT_FALSE (MockUploader_UF::worker_thread_running);
 }
 
@@ -261,10 +263,13 @@ TEST_F(T_UploadFacility, Callbacks) {
                            "");
 
   uploader->WaitForUpload();
+  uploader->TearDown();
 
   EXPECT_EQ (1, chunk_upload_complete_callback_calls);
   EXPECT_EQ (2, buffer_upload_complete_callback_calls);
   EXPECT_EQ (0, MockStreamHandle_UF::instances);
+
+  delete uploader;
 }
 
 
@@ -336,7 +341,22 @@ TEST_F(T_UploadFacility, DataBlockBasicOrdering) {
 
   uploader->ScheduleCommit(handle, shash::Any(), "");
   uploader->WaitForUpload();
+  uploader->TearDown();
 
   EXPECT_EQ (overall_size, overall_size_ordering);
   EXPECT_TRUE (ordering_test_done);
+
+  delete uploader;
+}
+
+TEST_F(T_UploadFacility, InitDtorRace) {
+  MockUploader_UF *uploader = dynamic_cast<MockUploader_UF*>(
+              AbstractUploader::Construct(MockUploader_UF::spooler_definition));
+
+  ASSERT_NE (static_cast<MockUploader_UF*>(NULL), uploader);
+  EXPECT_TRUE (uploader->initialize_called);
+
+  uploader->WaitForUpload();
+  uploader->TearDown();
+  delete uploader;
 }

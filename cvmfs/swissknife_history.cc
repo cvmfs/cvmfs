@@ -368,7 +368,6 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   spooler->Upload(catalog->database_path() + ".compressed",
                   "data" + hash_republished_catalog.MakePath(1, 2) + "C");
   spooler->WaitForUpload();
-  spooler->WaitForTermination();
   unlink((catalog->database_path() + ".compressed").c_str());
   manifest =
     new manifest::Manifest(hash_republished_catalog, size_republished_catalog,

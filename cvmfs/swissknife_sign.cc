@@ -251,7 +251,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     spooler->Upload(manifest_path, ".cvmfspublished");
 
     spooler->WaitForUpload();
-    spooler->WaitForTermination();
     unlink(cert_path_tmp.c_str());
     if (hist_compressed_path != "")
       unlink(hist_compressed_path.c_str());

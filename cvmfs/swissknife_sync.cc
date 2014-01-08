@@ -103,6 +103,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     PrintError("Failed to create new repository");
     return 1;
   }
+
+  spooler->WaitForUpload();
   delete spooler;
 
   if (!manifest->Export(manifest_path)) {
@@ -126,11 +128,13 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   assert(spooler);
   spooler->Upload(source, dest);
   spooler->WaitForUpload();
-  spooler->WaitForTermination();
+
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
     return 1;
   }
+
+  delete spooler;
 
   return 0;
 }
@@ -144,7 +148,7 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Peek(file_to_peek);
-  spooler->WaitForTermination();
+
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to peek for %s",
              file_to_peek.c_str());
@@ -155,6 +159,9 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
   LogCvmfs(kLogCatalog, kLogStdout, "%s available", file_to_peek.c_str());
+
+  delete spooler;
+
   return 0;
 }
 
@@ -167,12 +174,14 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Remove(file_to_delete);
-  spooler->WaitForTermination();
+
   if (spooler->GetNumberOfErrors() > 0 || ! success) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
              file_to_delete.c_str());
     return 1;
   }
+
+  delete spooler;
 
   return 0;
 }
@@ -302,7 +311,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // finalize the spooler
   params.spooler->WaitForUpload();
-  params.spooler->WaitForTermination();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

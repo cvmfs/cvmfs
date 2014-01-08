@@ -105,8 +105,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
  public:
   virtual ~AbstractUploader() {
-    upload_queue_.push(UploadJob()); // Termination signal
-    writer_thread_.join();
+    assert (torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
   }
 
   /**
@@ -117,6 +116,14 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return   true on successful initialization
    */
   virtual bool Initialize();
+
+  /**
+   * This must be called right before the destruction of the AbstractUploader!
+   * You are _not_ supposed to overwrite this method in your concrete Uploader.
+   * Please do all your cleanup work in your destructor, but keep in mind that
+   * your WorkerThread() will already be terminated by this TearDown() method.
+   */
+  void TearDown();
 
   /**
    * Uploads the file at the path local_path into the backend storage under the
@@ -291,6 +298,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * its dedicated writer thread. Overwrite this method to implement your event
    * loop that is supposed to run in its own thread. In this event loop you are
    * supposed to pull upload jobs using AbstractUploader::AcquireNewJob().
+   *
    * If this method returns, AbstractUploader's write thread is terminated, so
    * make sure to exit that method if and only if you receive an UploadJob like:
    *   UploadJob.type == UploadJob::Terminate
@@ -301,7 +309,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   /**
    * This is the entry point into the worker thread.
    */
-  void WriteThread() { this->WorkerThread(); }
+  void WriteThread() {
+    thread_started_executing_.Set(true);
+    this->WorkerThread();
+  }
 
   const SpoolerDefinition& spooler_definition() const {
     return spooler_definition_;
@@ -315,8 +326,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   const SpoolerDefinition                   spooler_definition_;
   tbb::concurrent_bounded_queue<UploadJob>  upload_queue_;
   tbb::tbb_thread                           writer_thread_;
+  bool                                      torn_down_;
 
   mutable SynchronizingIntCounter           jobs_in_flight_;
+  Future<bool>                              thread_started_executing_;
 };
 
 

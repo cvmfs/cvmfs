@@ -233,7 +233,7 @@ class SynchronizingCounter : SingleCopy {
   void Notify();
 
  private:
-  mutable T               value_; // thanks C-style interface >.<
+  mutable T               value_;
   mutable pthread_mutex_t mutex_;
   mutable pthread_cond_t  became_zero_;
 };
