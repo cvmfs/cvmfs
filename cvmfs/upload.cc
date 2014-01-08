@@ -104,12 +104,6 @@ void Spooler::WaitForUpload() const {
 }
 
 
-void Spooler::WaitForTermination() const {
-  uploader_->WaitForUpload();
-  file_processor_->WaitForProcessing();
-}
-
-
 unsigned int Spooler::GetNumberOfErrors() const {
   return uploader_->GetNumberOfErrors();
 }

@@ -198,15 +198,6 @@ namespace upload
     void WaitForUpload() const;
 
     /**
-     * Blocks until all jobs are processed and all worker threads terminated
-     * successfully. Afterwards the spooler will be out of service.
-     * Call this after you have called WaitForUpload() to wait until the
-     * Spooler terminates.
-     * Note: after calling this method NO JOBS should be scheduled anymore.
-     */
-    void WaitForTermination() const;
-
-    /**
      * Checks how many of the already processed jobs have failed.
      *
      * @return   the number of failed jobs at the time this method is invoked

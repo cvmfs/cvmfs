@@ -179,7 +179,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   spooler->Upload(file_path_compressed,
                   "data" + hash_catalog.MakePath(1, 2) + "C");
   spooler->WaitForUpload();
-  spooler->WaitForTermination();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",

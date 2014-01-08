@@ -126,7 +126,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   assert(spooler);
   spooler->Upload(source, dest);
   spooler->WaitForUpload();
-  spooler->WaitForTermination();
+
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
     return 1;
@@ -144,7 +144,7 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Peek(file_to_peek);
-  spooler->WaitForTermination();
+
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to peek for %s",
              file_to_peek.c_str());
@@ -167,7 +167,7 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Remove(file_to_delete);
-  spooler->WaitForTermination();
+
   if (spooler->GetNumberOfErrors() > 0 || ! success) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
              file_to_delete.c_str());
@@ -302,7 +302,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // finalize the spooler
   params.spooler->WaitForUpload();
-  params.spooler->WaitForTermination();
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
