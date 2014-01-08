@@ -103,6 +103,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     PrintError("Failed to create new repository");
     return 1;
   }
+
+  spooler->WaitForUpload();
   delete spooler;
 
   if (!manifest->Export(manifest_path)) {
@@ -132,6 +134,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  delete spooler;
+
   return 0;
 }
 
@@ -155,6 +159,9 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
   LogCvmfs(kLogCatalog, kLogStdout, "%s available", file_to_peek.c_str());
+
+  delete spooler;
+
   return 0;
 }
 
@@ -173,6 +180,8 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
              file_to_delete.c_str());
     return 1;
   }
+
+  delete spooler;
 
   return 0;
 }
