@@ -17,7 +17,7 @@ class AbstractFile {
     path_(path), size_(size) {}
 
   const std::string& path() const { return path_; }
-  const size_t       size() const { return size_; }
+        size_t       size() const { return size_; }
 
  private:
   const std::string  path_;

@@ -77,7 +77,7 @@ class Reader : public AbstractReader,
    */
   struct OpenFile {
     OpenFile() :
-      file(NULL), file_marker(0), previous_task(NULL),
+      file(NULL), file_descriptor(0), file_marker(0), previous_task(NULL),
       previous_sync_task(NULL) {}
 
     FileT               *file;               ///< reference to the associated File structure

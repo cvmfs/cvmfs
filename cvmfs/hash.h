@@ -240,29 +240,30 @@ unsigned GetContextSize(const Algorithms algorithm);
  * Holds an OpenSSL context, only required for hash operations.  Allows to
  * deferr the storage allocation for the context to alloca.
  */
-struct ContextPtr {
-  Algorithms algorithm;
-  void *buffer;
-  unsigned size;
+class ContextPtr {
+ public:
+  Algorithms  algorithm;
+  void       *buffer;
+  unsigned    size;
 
-  ContextPtr() {
-    algorithm = kAny;
-    size = 0;
-    buffer = NULL;
-  }
+  ContextPtr() : algorithm(kAny), buffer(NULL), size(0) {}
 
-  explicit ContextPtr(const Algorithms a) {
-    algorithm = a;
-    size = GetContextSize(a);
-    buffer = NULL;
-  }
+  explicit ContextPtr(const Algorithms a) :
+    algorithm(a), buffer(NULL), size(GetContextSize(a)) {}
 
+  /**
+   * Produces a duplicated ContextPtr
+   * Warning: Since the buffer handling is up to the user, the actual context
+   *          buffer is _not_ copied by this copy constructor and needs to be
+   *          dealt with by the caller! (i.e. memcpy'ed from old to new)
+   */
   explicit ContextPtr(const ContextPtr &other) :
-    algorithm(other.algorithm),
-    size(other.size)
-  {
-    buffer = smalloc(size);
-    memcpy(buffer, other.buffer, size);
+    algorithm(other.algorithm), buffer(NULL), size(other.size) {}
+
+ private:
+  ContextPtr& operator=(const ContextPtr &other) {
+    const bool not_implemented = false;
+    assert (not_implemented);
   }
 };
 

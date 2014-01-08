@@ -131,8 +131,10 @@ class IoDispatcher {
   {
     chunks_in_flight_  = 0;
     file_count_        = 0;
-    pthread_mutex_init(&processing_done_mutex_,    NULL);
-    pthread_cond_init(&processing_done_condition_, NULL);
+    const bool mutex_inits_successful = (
+      pthread_mutex_init(&processing_done_mutex_,    NULL) == 0 &&
+      pthread_cond_init(&processing_done_condition_, NULL) == 0);
+    assert (mutex_inits_successful);
   }
 
   ~IoDispatcher() {
