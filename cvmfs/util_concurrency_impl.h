@@ -497,10 +497,16 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
   }
 
   // spawn the callback processing thread
-  pthread_create(&callback_thread_,
-                 NULL,
-                 &ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper,
-          (void*)&thread_context_);
+  const int retval =
+    pthread_create(&callback_thread_,
+                    NULL,
+                   &ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper,
+            (void*)&thread_context_);
+    if (retval != 0) {
+      LogCvmfs(kLogConcurrency, kLogWarning, "Failed to spawn the callback "
+                                             "worker thread");
+      success = false;
+    }
 
   // wait for all workers to report in...
   {
