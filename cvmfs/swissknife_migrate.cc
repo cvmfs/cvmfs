@@ -248,12 +248,7 @@ bool CommandMigrate::DoMigrationAndCommit(
            "\nCommitting migrated repository revision...");
   const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash.Get();
   const std::string &root_catalog_path = root_catalog->root_path();
-  const int64_t root_catalog_size =
-    GetFileSize(root_catalog->new_catalog->database_path());
-  if (root_catalog_size <= 0) {
-    Error("Getting root catalog file size failed.\nAborting...");
-    return false;
-  }
+  const size_t root_catalog_size = root_catalog->new_catalog_size.Get();
   manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
                               root_catalog_path);
   const Catalog* new_catalog = (root_catalog->HasNew())
@@ -324,6 +319,15 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     pending_catalogs_[path] = data;
   }
   catalog_statistics_list_.Insert(data->statistics);
+
+  // check the size of the uncompressed catalog file
+  size_t new_catalog_size = GetFileSize(path);
+  if (new_catalog_size <= 0) {
+    Error("Failed to get uncompressed file size of catalog!", data);
+    exit(2);
+    return;
+  }
+  data->new_catalog_size.Set(new_catalog_size);
 
   // Schedule the compression and upload of the catalog
   spooler_->ProcessCatalog(path);
@@ -524,7 +528,8 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::UpdateNestedCatalogRefer
   const Database &writable = new_catalog->database();
 
   Sql add_nested_catalog(writable,
-    "INSERT OR REPLACE INTO nested_catalogs (path, sha1) VALUES (:path, :sha1);"
+    "INSERT OR REPLACE INTO nested_catalogs (path,   sha1,  size) "
+    "                VALUES                 (:path, :sha1, :size);"
   );
 
   // go through all nested catalogs and update their references (we are curently
@@ -533,14 +538,16 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::UpdateNestedCatalogRefer
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
-    PendingCatalog *nested_catalog = *i;
-    const std::string &root_path   = nested_catalog->root_path();
-    const shash::Any catalog_hash  = nested_catalog->new_catalog_hash.Get();
+    PendingCatalog    *nested_catalog  = *i;
+    const std::string &root_path       = nested_catalog->root_path();
+    const shash::Any   catalog_hash    = nested_catalog->new_catalog_hash.Get();
+    const size_t       catalog_size    = nested_catalog->new_catalog_size.Get();
 
     // insert the updated nested catalog reference into the new catalog
     const bool retval =
-      add_nested_catalog.BindText(1, root_path)               &&
-      add_nested_catalog.BindText(2, catalog_hash.ToString()) &&
+      add_nested_catalog.BindText (1, root_path)               &&
+      add_nested_catalog.BindText (2, catalog_hash.ToString()) &&
+      add_nested_catalog.BindInt64(3, catalog_size)            &&
       add_nested_catalog.Execute();
     if (! retval) {
       Error("Failed to add nested catalog link", add_nested_catalog, data);
