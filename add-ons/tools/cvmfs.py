@@ -66,21 +66,23 @@ class Manifest:
 		key_char = line[0]
 		data     = line[1:-1]
 		if key_char == "C":
-			self.root_catalog     = data
+			self.root_catalog      = data
+		if key_char == "B":
+			self.root_catalog_size = int(data)
 		if key_char == "X":
-			self.certificate      = data
+			self.certificate       = data
 		if key_char == "H":
-			self.history_database = data
+			self.history_database  = data
 		if key_char == "T":
-			self.last_modified    = datetime.datetime.fromtimestamp(int(data))
+			self.last_modified     = datetime.datetime.fromtimestamp(int(data))
 		if key_char == "R":
-			self.root_hash        = data
+			self.root_hash         = data
 		if key_char == "D":
-			self.ttl              = int(data)
+			self.ttl               = int(data)
 		if key_char == "S":
-			self.revision         = int(data)
+			self.revision          = int(data)
 		if key_char == "N":
-			self.name             = data
+			self.name              = data
 
 
 	def _CheckValidity(self):
@@ -99,9 +101,10 @@ class Manifest:
 class CatalogReference:
 	""" Wraps a catalog reference to nested catalogs as found in Catalogs """
 
-	def __init__(self, root_path, clg_hash):
+	def __init__(self, root_path, clg_hash, clg_size):
 		self.root_path = root_path
 		self.hash      = clg_hash
+		self.size      = clg_size
 
 	def __str__(self):
 		return "<CatalogReference for " + self.root_path + " - " + self.hash + ">"
@@ -237,10 +240,12 @@ class Catalog:
 
 	def ListNested(self):
 		""" List CatalogReferences to all contained nested catalogs """
-		catalogs = self.RunSql("SELECT path, sha1 FROM nested_catalogs;")
+		catalogs = self.RunSql("SELECT path, sha1, size FROM nested_catalogs;")
 		nested_catalogs = []
 		for catalog in catalogs:
-			nested_catalogs.append(CatalogReference(catalog[0], catalog[1]))
+			nested_catalogs.append(CatalogReference(catalog[0],
+				                                    catalog[1],
+				                                    catalog[2]))
 		return nested_catalogs
 
 
