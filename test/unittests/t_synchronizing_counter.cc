@@ -297,6 +297,12 @@ void *thread_wait_for_increment(void *arg) {
   return NULL;
 }
 
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 TEST_F(T_SynchronizingCounter, WaitForIncrement) {
   const unsigned int n_threads = 5;
   SynchronizingIntCounter counter;
@@ -335,5 +341,62 @@ TEST_F(T_SynchronizingCounter, WaitForIncrement) {
   CheckStateValues(4, "Threads didn't continue properly on Increment()");
 
   JoinThreads();
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+void *concurrent_increment(void *arg) {
+  const thread_args &state = *static_cast<thread_args*>(arg);
+
+  for (int i = 0; i < state.state; ++i) {
+    state.counter->Increment();
+  }
+
+  return NULL;
+}
+
+void *concurrent_decrement(void *arg) {
+  const thread_args &state = *static_cast<thread_args*>(arg);
+
+  for (int i = 0; i < state.state; ++i) {
+    state.counter->Decrement();
+  }
+
+  return NULL;
+}
+
+
+TEST_F(T_SynchronizingCounter, MultiThreadCounting) {
+  const int thread_count = 10;
+  ASSERT_EQ (0, thread_count % 2);
+
+  SynchronizingIntCounter counter;
+
+  pthread_t   threads[thread_count];
+  thread_args states[thread_count];
+
+  for (int i = 0; i < thread_count; ++i) {
+    states[i].counter = &counter;
+    states[i].state   = 14452394;
+
+    void *(*start_routine) (void *) = (i % 2 == 0)
+                                    ? &concurrent_increment
+                                    : &concurrent_decrement;
+    const int ret = pthread_create(&threads[i],
+                                    NULL,
+                                    start_routine,
+                                    static_cast<void*>(&states[i]));
+    ASSERT_EQ (0, ret);
+  }
+
+  for (int i = 0; i < thread_count; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+
+  EXPECT_EQ (0, counter);
 }
 
