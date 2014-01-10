@@ -79,6 +79,7 @@ class CommandMigrate : public Command {
     CatalogStatistics                 statistics;
 
     Future<shash::Any>                new_catalog_hash;
+    Future<size_t>                    new_catalog_size;
   };
 
   class PendingCatalogMap : public std::map<std::string, const PendingCatalog*>,

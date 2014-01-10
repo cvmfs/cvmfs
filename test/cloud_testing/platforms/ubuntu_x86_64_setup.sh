@@ -9,6 +9,19 @@ echo -n "configure package manager for non-interactive usage... "
 export DEBIAN_FRONTEND=noninteractive
 echo "done"
 
+# sudo cannot resolve host name right after startup for some reason
+echo -n "wait for sudo to work properly... "
+timeout=1800
+while sudo echo "foo" 2>&1 | grep -q "unable to resolve host"; do
+  sleep 1
+  timeout=$(( $timeout - 1 ))
+  if [ $timeout -le 0 ]; then
+    echo "FAIL!"
+    exit 1
+  fi
+done
+echo "done"
+
 # update package manager cache
 echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
