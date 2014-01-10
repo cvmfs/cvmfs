@@ -4,7 +4,7 @@ cvmfs_test_name="Read-only cache"
 cvmfs_run_test() {
   logfile=$1
 
-  local tmpdir=$(mktemp -d)
+  local tmpdir=$(mktemp -d --tmpdir=/var/lib/cvmfs)
   sudo mount -t tmpfs tmpfs $tmpdir || return 1
 
   cvmfs_mount atlas.cern.ch \
