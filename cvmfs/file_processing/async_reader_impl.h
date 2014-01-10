@@ -5,8 +5,36 @@
 
 namespace upload { // TODO: remove this... wrong namespace (for testing)
 
+
+template <class FileScrubbingTaskT, class FileT>
+bool Reader<FileScrubbingTaskT, FileT>::Initialize() {
+  // TODO: exactly the same Initialize()/TearDown() concept is implemented
+  //       in AbstractUploader. It might be worth to facter out that code into
+  //       an extra template that handles clean thread creation/destruction
+  //       and perhaps the connection of the thread using a tbb::[...]queue
+  tbb::tbb_thread thread(&ThreadProxy<Reader>,
+                          this,
+                         &Reader<FileScrubbingTaskT, FileT>::ReadThread);
+
+  assert (! read_thread_.joinable());
+  read_thread_ = thread;
+  assert (read_thread_.joinable());
+  assert (! thread.joinable());
+
+  // wait for the thread to call back...
+  const bool successful_startup = thread_started_executing_.Get();
+  if (successful_startup) {
+    running_ = true;
+  }
+
+  return successful_startup;
+}
+
+
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::ReadThread() {
+  thread_started_executing_.Set(true);
+
   while (HasData()) {
     // acquire a new job from the job queue:
     // -> if the queue is empty, just continue on the work currently in flight

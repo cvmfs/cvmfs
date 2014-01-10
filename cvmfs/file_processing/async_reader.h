@@ -108,14 +108,14 @@ class Reader : public AbstractReader,
     draining_(false),
     files_in_flight_counter_(max_files_in_flight),
     tbb_worker_count_(number_of_tbb_threads),
-    read_thread_(&ThreadProxy<Reader>,
-                 this,
-                 &Reader<FileScrubbingTaskT, FileT>::ReadThread),
-    running_(true) {}
+    running_(false) {}
 
   virtual ~Reader() {
-    Terminate();
+    assert (! running_);
   }
+
+  bool Initialize();
+  void TearDown() { Terminate(); }
 
   void ScheduleRead(FileT *file) {
     assert (running_);
@@ -170,6 +170,7 @@ class Reader : public AbstractReader,
 
   const unsigned int  tbb_worker_count_;
   tbb::tbb_thread     read_thread_;
+  Future<bool>        thread_started_executing_;
   bool                running_;
 };
 
