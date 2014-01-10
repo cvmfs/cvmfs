@@ -4,7 +4,7 @@ cvmfs_test_name="Alien cache"
 cvmfs_run_test() {
   logfile=$1
 
-  local tmpdir=$(mktemp -d)
+  local tmpdir=$(mktemp -d --tmpdir=/var/lib/cvmfs)
   echo "tmpdir is $tmpdir"
   sudo cvmfs2 __MK_ALIEN_CACHE__ "$tmpdir" $(id -u cvmfs) $(id -g cvmfs) || return 2  
 
