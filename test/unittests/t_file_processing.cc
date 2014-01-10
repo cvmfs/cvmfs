@@ -252,6 +252,9 @@ class T_FileProcessing : public FileSandbox {
   void TearDown() {
     RemoveSandbox(MockUploader::sandbox_tmp_dir);
     PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<upload::AbstractUploader>();
+
+    uploader_->TearDown();
+    delete uploader_;
   }
 
   ExpectedHashString GetEmptyFileBulkHash(const std::string suffix = "") const {
