@@ -5,10 +5,18 @@ cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount "lhcb.cern.ch" \
-    "CVMFS_INITIAL_GENERATION=4294967295" || return 1
+    "CVMFS_INITIAL_GENERATION=4294967295" \
+    "CVMFS_USYSLOG=/tmp/usyslog" || return 1
   ls /cvmfs/lhcb.cern.ch || return 2
 
-  sudo sh -c "tail -1 $CVMFS_TEST_SYSLOG_TARGET | grep 32bit" || return 3  
+  sudo sh -c "tail -2 /tmp/usyslog | grep 32bit"  
+  RETVAL=$?
+
+  sudo rm -f /tmp/usyslog*
+
+  if [ $RETVAL -ne 0 ]; then
+    return 3
+  fi
 
   return 0
 }
