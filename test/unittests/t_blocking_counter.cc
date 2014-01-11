@@ -230,8 +230,6 @@ TEST_F(T_BlockingCounter, BecomeZero) {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
 
-#include <iostream>
-
 
 TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZero) {
   T_BlockingCounter::concurrent_state_ = 0;
