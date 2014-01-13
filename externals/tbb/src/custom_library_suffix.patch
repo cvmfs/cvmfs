@@ -1,8 +1,8 @@
 diff --git build/linux.inc build/linux.inc
-index 1c96d86..0a2150c 100644
+index 49decc6..5a9b25e 100644
 --- build/linux.inc
 +++ build/linux.inc
-@@ -122,22 +122,22 @@ TBB.DEF = $(TBB.LST:.lst=.def)
+@@ -123,22 +123,22 @@ TBB.DEF = $(TBB.LST:.lst=.def)
  
  TBB.DLL = $(TBB_NO_VERSION.DLL).$(SONAME_SUFFIX)
  TBB.LIB = $(TBB.DLL)
@@ -10,8 +10,8 @@ index 1c96d86..0a2150c 100644
 +TBB_NO_VERSION.DLL=libtbb$(CUSTOM_SUFFIX)$(CPF_SUFFIX)$(DEBUG_SUFFIX).$(DLL)
  LINK_TBB.LIB = $(TBB_NO_VERSION.DLL)
  
--MALLOC_NO_VERSION.DLL = libtbbmalloc$(DEBUG_SUFFIX).$(DLL)
-+MALLOC_NO_VERSION.DLL = libtbbmalloc$(CUSTOM_SUFFIX)$(DEBUG_SUFFIX).$(DLL)
+-MALLOC_NO_VERSION.DLL = libtbbmalloc$(DEBUG_SUFFIX).$(MALLOC_DLL)
++MALLOC_NO_VERSION.DLL = libtbbmalloc$(CUSTOM_SUFFIX)$(DEBUG_SUFFIX).$(MALLOC_DLL)
  MALLOC.DEF = $(MALLOC_ROOT)/$(def_prefix)-tbbmalloc-export.def
  MALLOC.DLL = $(MALLOC_NO_VERSION.DLL).$(SONAME_SUFFIX)
  MALLOC.LIB = $(MALLOC_NO_VERSION.DLL)
@@ -30,10 +30,10 @@ index 1c96d86..0a2150c 100644
  RML.DLL = $(RML_NO_VERSION.DLL).1
  RML.LIB = $(RML_NO_VERSION.DLL)
 diff --git build/macos.inc build/macos.inc
-index 3a772e5..2371183 100644
+index c020e70..b4bcae4 100644
 --- build/macos.inc
 +++ build/macos.inc
-@@ -103,12 +103,12 @@ def_prefix = $(if $(findstring 64,$(arch)),mac64,mac32)
+@@ -105,12 +105,12 @@ def_prefix = $(if $(findstring 64,$(arch)),mac64,mac32)
  
  TBB.LST = $(tbb_root)/src/tbb/$(def_prefix)-tbb-export.lst
  TBB.DEF = $(TBB.LST:.lst=.def)
@@ -43,8 +43,8 @@ index 3a772e5..2371183 100644
  LINK_TBB.LIB = $(TBB.LIB)
  
  MALLOC.DEF = $(MALLOC_ROOT)/$(def_prefix)-tbbmalloc-export.def
--MALLOC.DLL = libtbbmalloc$(DEBUG_SUFFIX).$(DLL)
-+MALLOC.DLL = libtbbmalloc$(CUSTOM_SUFFIX)$(DEBUG_SUFFIX).$(DLL)
+-MALLOC.DLL = libtbbmalloc$(DEBUG_SUFFIX).$(MALLOC_DLL)
++MALLOC.DLL = libtbbmalloc$(CUSTOM_SUFFIX)$(DEBUG_SUFFIX).$(MALLOC_DLL)
  MALLOC.LIB = $(MALLOC.DLL)
  LINK_MALLOC.LIB = $(MALLOC.LIB)
  
