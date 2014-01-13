@@ -287,7 +287,7 @@ class BlockingCounter : public SynchronizingCounter<T> {
           pthread_cond_t  free_slot_;
 };
 
-typedef BlockingCounter<int64_t> BlockingIntCounter;
+typedef BlockingCounter<atomic_int64> BlockingIntCounter;
 
 
 //

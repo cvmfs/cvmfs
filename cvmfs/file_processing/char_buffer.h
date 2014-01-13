@@ -32,11 +32,11 @@ class CharBuffer : public Buffer<unsigned char,
 
   CharBuffer* Clone() const {
     assert (IsInitialized());
-    CharBuffer* new_buffer = new CharBuffer(size_bytes());
+    CharBuffer* new_buffer = new CharBuffer(size());
     assert (new_buffer->IsInitialized());
     new_buffer->SetUsedBytes(used_bytes());
     new_buffer->SetBaseOffset(base_offset());
-    memcpy(new_buffer->ptr(), ptr(), size());
+    memcpy(new_buffer->ptr(), ptr(), size_bytes());
     return new_buffer;
   }
 
