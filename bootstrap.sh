@@ -9,7 +9,7 @@ ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.12.0
 GOOGLETEST_VERSION=1.7.0
-TBB_VERSION=4.1-4
+TBB_VERSION=4.2-2
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <decompress location>"
