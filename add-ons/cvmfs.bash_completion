@@ -1,0 +1,63 @@
+# Bash completion script for cvmfs_config.
+#
+# Steve Traylen, <steve.traylen@cern.ch>, 13th January 2013 
+
+__local_repos()
+{
+    eval $(grep '^CVMFS_REPOSITORIES=' /etc/cvmfs/default.local)
+    __local_repos=$(echo $CVMFS_REPOSITORIES | sed 's/,/ /g' )
+    unset CVMFS_REPOSITORIES
+    echo $__local_repos
+}
+
+
+_cvmfs_config()
+{
+  local cur prev opts
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  local -r cmds="setup chksetup showconfig stat status probe reload umount bugreport"
+
+  case "${prev}" in
+    setup)
+      COMPREPLY=( $(compgen -W "nouser nocfgmod" ${cur}) )
+      return 0
+      ;;
+    showconfig)
+      COMPREPLY=( $(compgen -W "$(__local_repos)" ${cur}) )
+      return 0
+    ;;
+    stat)
+      case "${cur}" in
+       -*)
+         COMPREPLY=( $(compgen -W "-v" ${cur}) )
+         return 0
+         ;;
+       *)
+         COMPREPLY=( $(compgen -W "$(__local_repos)" ${cur} )  )
+         return 0
+         ;;
+      esac
+    ;;
+    reload)
+      case "${cur}" in
+       -*)
+         COMPREPLY=( $(compgen -W "-c" ${cur}) )
+         return 0
+         ;;
+       *)
+         COMPREPLY=( $(compgen -W "$(__local_repos)" ${cur})  )
+         return 0
+         ;;
+      esac
+    ;;
+  esac
+  COMPREPLY=( $(compgen -W "${cmds}" -- ${cur}) )
+  return 0
+
+}
+
+complete -F _cvmfs_config cvmfs_config
+
