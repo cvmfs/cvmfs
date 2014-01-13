@@ -64,10 +64,14 @@ class TestFile : public upload::AbstractFile {
 class DummyFileScrubbingTask :
                             public upload::AbstractFileScrubbingTask<TestFile> {
  public:
-  DummyFileScrubbingTask(TestFile                *file,
-                         upload::CharBuffer      *buffer,
-                         const bool               is_last_piece) :
-    upload::AbstractFileScrubbingTask<TestFile>(file, buffer, is_last_piece) {}
+  DummyFileScrubbingTask(TestFile            *file,
+                         upload::CharBuffer  *buffer,
+                         const bool           is_last_piece,
+                         AbstractReader      *reader) :
+    upload::AbstractFileScrubbingTask<TestFile>(file,
+                                                buffer,
+                                                is_last_piece,
+                                                reader) {}
 
  protected:
   tbb::task* execute() {
