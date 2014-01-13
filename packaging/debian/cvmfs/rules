@@ -74,7 +74,7 @@ binary-arch: build install
 	dh_link
 #	dh_strip
 	dh_compress
-	dh_fixperms
+	dh_fixperms --exclude cvmfs_suid_helper
 	dh_makeshlibs
 	dh_installdeb
 #        dh_perl
