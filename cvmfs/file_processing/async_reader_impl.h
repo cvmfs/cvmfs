@@ -195,8 +195,8 @@ bool Reader<FileScrubbingTaskT, FileT>::
   FileScrubbingTaskT *new_task =
     new(tbb::task::allocate_root()) FileScrubbingTaskT(open_file.file,
                                                        buffer,
-                                                       finished_reading);
-  new_task->SetReader(this);
+                                                       finished_reading,
+                                                       this);
   new_task->increment_ref_count();
   tbb::task *sync_task = new(new_task->allocate_child()) tbb::empty_task();
 
