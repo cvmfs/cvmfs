@@ -538,7 +538,7 @@ class Buffer {
   void Allocate(const size_t size) {
     assert (!IsInitialized());
     size_        = size;
-    buffer_      = A().allocate(size_bytes());
+    buffer_      = allocator_.allocate(size_bytes());
     initialized_ = true;
   }
 
@@ -589,7 +589,7 @@ class Buffer {
     if (size_ == 0) {
       return;
     }
-    A().deallocate(buffer_, size_bytes());
+    allocator_.deallocate(buffer_, size_bytes());
     buffer_      = NULL;
     size_        = 0;
     used_        = 0;
@@ -597,6 +597,7 @@ class Buffer {
   }
 
  private:
+  A                    allocator_;
   size_t               used_;
   size_t               size_;
   typename A::pointer  buffer_;
