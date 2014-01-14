@@ -4,6 +4,7 @@ cvmfs_test_name="Warn on high inode watermark"
 cvmfs_run_test() {
   logfile=$1
 
+  sudo rm -f /tmp/usyslog*
   cvmfs_mount "lhcb.cern.ch" \
     "CVMFS_INITIAL_GENERATION=4294967295" \
     "CVMFS_USYSLOG=/tmp/usyslog" || return 1
