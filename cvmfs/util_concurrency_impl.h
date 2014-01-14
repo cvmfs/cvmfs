@@ -147,7 +147,9 @@ BlockingCounter<T>::~BlockingCounter() {
 template <typename T>
 BlockingCounter<T>& BlockingCounter<T>::operator=(const T &other) {
   SynchronizingCounter<T>::operator=(other);
-  Signal(other);
+  if (other < maximal_value_) {
+    Signal(other);
+  }
   return *this;
 }
 
@@ -179,7 +181,9 @@ template <typename T>
 T BlockingCounter<T>::DecrementAndSignal() {
   const T value = SynchronizingCounter<T>::Decrement();
   assert (value >= T(0));
-  Signal(value);
+  if (value < maximal_value_) {
+    Signal(value);
+  }
   return value;
 }
 
@@ -187,11 +191,10 @@ T BlockingCounter<T>::DecrementAndSignal() {
 template <typename T>
 void BlockingCounter<T>::Signal(const T value) {
   assert (value >= T(0));
-  assert (value <= maximal_value_);
+  assert (value <  maximal_value_);
+  MutexLockGuard lock(mutex_);
 
-  if (value == maximal_value_) {
-    return;
-  } else if (value == maximal_value_ - T(1)) {
+  if (value == maximal_value_ - T(1)) {
     pthread_cond_signal(&free_slot_);
   } else {
     pthread_cond_broadcast(&free_slot_);
