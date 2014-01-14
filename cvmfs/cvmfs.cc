@@ -1773,7 +1773,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string root_hash = "";
   string repository_tag = "";
   string alien_cache = ".";  // default: exclusive cache
-  string trusted_certs = "/etc/grid-security/certificates";
+  string trusted_certs = "";
   map<uint64_t, uint64_t> uid_map;
   map<uint64_t, uint64_t> gid_map;
   uint64_t initial_generation = 0;
