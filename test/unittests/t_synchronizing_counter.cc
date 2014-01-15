@@ -7,8 +7,8 @@
 
 
 struct thread_args {
-  int                      state;
-  SynchronizingIntCounter *counter;
+  int                            state;
+  SynchronizingCounter<int64_t> *counter;
 };
 
 
@@ -21,8 +21,8 @@ class T_SynchronizingCounter : public ::testing::Test {
   }
 
  protected:
-  void StartThreads(const unsigned int     number_of_threads,
-                    SynchronizingIntCounter &counter_to_test,
+  void StartThreads(const unsigned int             number_of_threads,
+                    SynchronizingCounter<int64_t> &counter_to_test,
                     void *(*thread_function)(void*)) {
     n_threads_ = number_of_threads;
     threads_   = new pthread_t[n_threads_];
@@ -83,7 +83,7 @@ class T_SynchronizingCounter : public ::testing::Test {
 
 
 TEST_F(T_SynchronizingCounter, Initialize) {
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
 }
 
@@ -94,7 +94,7 @@ TEST_F(T_SynchronizingCounter, Initialize) {
 
 
 TEST_F(T_SynchronizingCounter, Increment) {
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
 
   counter++;
@@ -124,7 +124,7 @@ TEST_F(T_SynchronizingCounter, Increment) {
 
 
 TEST_F(T_SynchronizingCounter, Assign) {
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
 
   counter = 100;
@@ -141,7 +141,7 @@ TEST_F(T_SynchronizingCounter, Assign) {
 
 
 TEST_F(T_SynchronizingCounter, Decrement) {
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
 
   counter = 100;
@@ -184,7 +184,7 @@ void *thread_wait_for_assignment(void *arg) {
 }
 
 TEST_F(T_SynchronizingCounter, WaitForAssignment) {
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
 
   counter = 1;
@@ -233,7 +233,7 @@ void *thread_wait_for_decrement(void *arg) {
 
 TEST_F(T_SynchronizingCounter, WaitForDecrement) {
   const unsigned int n_threads = 5;
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
 
   counter = 1;
@@ -305,7 +305,7 @@ void *thread_wait_for_increment(void *arg) {
 
 TEST_F(T_SynchronizingCounter, WaitForIncrement) {
   const unsigned int n_threads = 5;
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
 
   counter = -1;
@@ -374,7 +374,7 @@ TEST_F(T_SynchronizingCounter, MultiThreadCounting) {
   const int thread_count = 10;
   ASSERT_EQ (0, thread_count % 2);
 
-  SynchronizingIntCounter counter;
+  SynchronizingCounter<int64_t> counter;
 
   pthread_t   threads[thread_count];
   thread_args states[thread_count];
