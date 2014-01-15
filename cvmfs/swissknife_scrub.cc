@@ -7,6 +7,7 @@
 #include "swissknife_scrub.h"
 #include "fs_traversal.h"
 #include "logging.h"
+#include "smalloc.h"
 
 #include <sstream>
 
@@ -22,7 +23,7 @@ CommandScrub::StoredFile::StoredFile(const std::string &path,
   hash_context_(shash::kSha1),
   expected_hash_(shash::kSha1, shash::HexPtr(expected_hash))
 {
-  hash_context_.buffer = malloc(hash_context_.size);
+  hash_context_.buffer = smalloc(hash_context_.size);
   shash::Init(hash_context_);
 }
 
