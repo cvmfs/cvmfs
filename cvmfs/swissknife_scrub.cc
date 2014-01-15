@@ -13,8 +13,9 @@
 
 using namespace swissknife;
 
-const size_t kHashSubtreeLength = 2;
-const size_t kHashStringLength  = 40;
+const size_t      kHashSubtreeLength = 2;
+const size_t      kHashStringLength  = 40;
+const std::string kTxnDirectoryName  = "txn";
 
 CommandScrub::StoredFile::StoredFile(const std::string &path,
                                      const std::string &expected_hash) :
@@ -69,8 +70,19 @@ swissknife::ParameterList CommandScrub::GetParams() {
 
 void CommandScrub::FileCallback(const std::string &relative_path,
                                 const std::string &file_name) {
-  assert (relative_path.size() > 0 && file_name.size() > 0);
+  assert (file_name.size() > 0);
+
+  if (relative_path.size() == 0) {
+    PrintWarning("unexpected regular file", repo_path_ + "/" + file_name);
+    return;
+  }
+
   const std::string full_path = repo_path_ + "/" + relative_path + "/" + file_name;
+
+  if (relative_path == kTxnDirectoryName) {
+    PrintWarning("transaction directory should be empty", full_path);
+    return;
+  }
 
   const std::string hash_string = CheckPathAndExtractHash(relative_path,
                                                           file_name,
@@ -84,10 +96,30 @@ void CommandScrub::FileCallback(const std::string &relative_path,
 }
 
 
+void CommandScrub::DirCallback(const std::string &relative_path,
+                               const std::string &dir_name) {
+  const std::string full_path = repo_path_ + "/" + relative_path + "/" + dir_name;
+  // check for nested subdirs
+  if (relative_path.size() > 0) {
+    PrintWarning("unexpected subdir in CAS subdir", full_path);
+    return;
+  }
+
+  // check CAS hash subdirectory name length
+  if (! dir_name.empty()                      &&
+        dir_name.size() != kHashSubtreeLength &&
+        dir_name        != kTxnDirectoryName) {
+    std::stringstream ss;
+    ss << "malformed CAS subdir length: " << dir_name.size();
+    PrintWarning(ss.str(), full_path);
+  }
+}
+
+
 void CommandScrub::SymlinkCallback(const std::string &relative_path,
                                    const std::string &symlink_name) {
-  PrintWarning("unexpected symlink",
-               repo_path_ + "/" + relative_path + "/" + symlink_name);
+  const std::string full_path = repo_path_ + "/" + relative_path + "/" + symlink_name;
+  PrintWarning("unexpected symlink", full_path);
 }
 
 
@@ -105,14 +137,6 @@ std::string CommandScrub::CheckPathAndExtractHash(
                                            const std::string &relative_path,
                                            const std::string &file_name,
                                            const std::string &full_path) const {
-  // check CAS hash subdirectory name length
-  if (relative_path.size() != kHashSubtreeLength) {
-    std::stringstream ss;
-    ss << "malformed CAS subdir length: " << relative_path.size();
-    PrintWarning(ss.str(), full_path);
-    return "";
-  }
-
   // check for a valid object modifier on the end of the file name
   const char last_character = *(file_name.end() - 1); // TODO: C++11: file_name.back()
   bool has_object_modifier = false;
@@ -136,14 +160,6 @@ std::string CommandScrub::CheckPathAndExtractHash(
        ||
        (has_object_modifier &&
         file_name.size() != kHashStringLength - kHashSubtreeLength + 1)) {
-    std::stringstream ss1;
-    ss1        << has_object_modifier << std::endl
-              << file_name << std::endl;
-
-              PrintWarning(ss1.str(), full_path);
-
-              assert (false);
-
     std::stringstream ss;
     ss << "malformed file name length: " << file_name.size();
     PrintWarning(ss.str(), full_path);
@@ -154,7 +170,36 @@ std::string CommandScrub::CheckPathAndExtractHash(
   const std::string hash_string = (!has_object_modifier)
     ? relative_path + file_name
     : relative_path + file_name.substr(0, kHashStringLength - kHashSubtreeLength);
-  return hash_string;
+
+  // check if the resulting hash string is sane
+  if (CheckHashString(hash_string, full_path)) {
+    return hash_string;
+  } else {
+    return "";
+  }
+}
+
+
+
+bool CommandScrub::CheckHashString(const std::string &hash_string,
+                                   const std::string &full_path) const {
+  if (hash_string.size() != kHashStringLength) {
+    PrintWarning("malformed hash string length", full_path);
+    return false;
+  }
+
+  for (unsigned int i = 0; i < hash_string.size(); ++i) {
+    const char c = hash_string[i];
+    if ( ! ( (c >= 48 /* '0' */ && c <=  57 /* '9' */) ||
+             (c >= 97 /* 'a' */ && c <= 102 /* 'f' */) ) ) {
+      std::stringstream ss;
+      ss << "illegal hash character (" << c << ") found";
+      PrintWarning(ss.str(), full_path);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 
@@ -175,6 +220,7 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
   // initialize file system recursion engine
   FileSystemTraversal<CommandScrub> traverser(this, repo_path_, true);
   traverser.fn_new_file    = &CommandScrub::FileCallback;
+  traverser.fn_enter_dir   = &CommandScrub::DirCallback;
   traverser.fn_new_symlink = &CommandScrub::SymlinkCallback;
   traverser.Recurse(repo_path_);
 
@@ -189,7 +235,7 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
 void CommandScrub::PrintWarning(const std::string &msg,
                                 const std::string &path) const {
   MutexLockGuard l(warning_mutex_);
-  LogCvmfs(kLogUtility, kLogStderr, "%s | at: %s\n", msg.c_str(), path.c_str());
+  LogCvmfs(kLogUtility, kLogStderr, "%s | at: %s", msg.c_str(), path.c_str());
   ++warnings_;
 }
 

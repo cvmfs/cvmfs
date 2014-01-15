@@ -72,6 +72,8 @@ class CommandScrub : public Command {
  protected:
   void FileCallback(const std::string &relative_path,
                     const std::string &file_name);
+  void DirCallback(const std::string &relative_path,
+                   const std::string &dir_name);
   void SymlinkCallback(const std::string &relative_path,
                        const std::string &symlink_name);
 
@@ -84,6 +86,8 @@ class CommandScrub : public Command {
   std::string CheckPathAndExtractHash(const std::string &relative_path,
                                       const std::string &file_name,
                                       const std::string &full_path) const;
+  bool CheckHashString(const std::string &hash_string,
+                       const std::string &full_path) const;
 
  private:
   std::string              repo_path_;
