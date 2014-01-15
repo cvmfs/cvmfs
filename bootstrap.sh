@@ -96,11 +96,12 @@ do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 do_copy     "sqlite3"
 do_copy     "vjson"
 
-patch_external "leveldb"  "dont_search_snappy.patch" \
-			  "dont_search_tcmalloc.patch"
-patch_external "tbb"      "custom_library_suffix.patch"        \
-                          "symlink_to_build_directories.patch"
-patch_external "vjson"    "missing_include.patch"
+patch_external "leveldb"     "dont_search_snappy.patch" \
+			     "dont_search_tcmalloc.patch"
+patch_external "tbb"         "custom_library_suffix.patch"        \
+                             "symlink_to_build_directories.patch"
+patch_external "vjson"       "missing_include.patch"
+patch_external "sparsehash"  "fix_sl4_compilation.patch"
 
 # create a hint that bootstrapping is already done
 touch "$externals_build_dir/.decompressionDone"
