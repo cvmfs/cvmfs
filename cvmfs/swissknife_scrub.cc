@@ -170,6 +170,7 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
   const unsigned int max_buffers_in_flight = 100;
   reader_ = new ScrubbingReader(max_buffer_size, max_buffers_in_flight);
   reader_->RegisterListener(&CommandScrub::FileProcessedCallback, this);
+  reader_->Initialize();
 
   // initialize file system recursion engine
   FileSystemTraversal<CommandScrub> traverser(this, repo_path_, true);
@@ -179,6 +180,7 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
 
   // wait for reader to finish all jobs
   reader_->Wait();
+  reader_->TearDown();
 
   return (warnings_ == 0) ? 0 : 1;
 }
