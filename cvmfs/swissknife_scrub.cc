@@ -45,9 +45,9 @@ void CommandScrub::StoredFile::Finalize() {
 
 
 
-tbb::task* CommandScrub::FileScrubbingTask::execute() {
-  StoredFile          *file   = FileScrubbingTask::file();
-  upload::CharBuffer  *buffer = FileScrubbingTask::buffer();
+tbb::task* CommandScrub::StoredFileScrubbingTask::execute() {
+  StoredFile          *file   = StoredFileScrubbingTask::file();
+  upload::CharBuffer  *buffer = StoredFileScrubbingTask::buffer();
 
   file->Update(buffer->ptr(), buffer->used_bytes());
   if (IsLast()) {

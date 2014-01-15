@@ -38,18 +38,23 @@ class CommandScrub : public Command {
     shash::Any        expected_hash_;
   };
 
-  class FileScrubbingTask : public upload::AbstractFileScrubbingTask<StoredFile> {
+  class StoredFileScrubbingTask :
+                          public upload::AbstractFileScrubbingTask<StoredFile> {
    public:
-    FileScrubbingTask(StoredFile           *file,
-                      upload::CharBuffer *buffer,
-                      const bool          is_last_piece) :
-      upload::AbstractFileScrubbingTask<StoredFile>(file, buffer, is_last_piece) {}
+    StoredFileScrubbingTask(StoredFile              *file,
+                            upload::CharBuffer      *buffer,
+                            const bool               is_last_piece,
+                            upload::AbstractReader  *reader) :
+      upload::AbstractFileScrubbingTask<StoredFile>(file,
+                                                    buffer,
+                                                    is_last_piece,
+                                                    reader) {}
 
    protected:
     tbb::task* execute();
   };
 
-  typedef upload::Reader<FileScrubbingTask, StoredFile> ScrubbingReader;
+  typedef upload::Reader<StoredFileScrubbingTask, StoredFile> ScrubbingReader;
 
  public:
   CommandScrub() : reader_(NULL), warnings_(0) {}
