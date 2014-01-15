@@ -85,6 +85,7 @@ class T_SynchronizingCounter : public ::testing::Test {
 TEST_F(T_SynchronizingCounter, Initialize) {
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 }
 
 
@@ -96,6 +97,7 @@ TEST_F(T_SynchronizingCounter, Initialize) {
 TEST_F(T_SynchronizingCounter, Increment) {
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 
   counter++;
   EXPECT_EQ (1, counter);
@@ -126,6 +128,7 @@ TEST_F(T_SynchronizingCounter, Increment) {
 TEST_F(T_SynchronizingCounter, Assign) {
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 
   counter = 100;
   EXPECT_EQ (100, counter);
@@ -143,6 +146,7 @@ TEST_F(T_SynchronizingCounter, Assign) {
 TEST_F(T_SynchronizingCounter, Decrement) {
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 
   counter = 100;
   EXPECT_EQ (100, counter);
@@ -186,6 +190,7 @@ void *thread_wait_for_assignment(void *arg) {
 TEST_F(T_SynchronizingCounter, WaitForAssignment) {
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 
   counter = 1;
 
@@ -235,6 +240,7 @@ TEST_F(T_SynchronizingCounter, WaitForDecrement) {
   const unsigned int n_threads = 5;
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 
   counter = 1;
 
@@ -307,6 +313,7 @@ TEST_F(T_SynchronizingCounter, WaitForIncrement) {
   const unsigned int n_threads = 5;
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 
   counter = -1;
 
@@ -375,6 +382,8 @@ TEST_F(T_SynchronizingCounter, MultiThreadCounting) {
   ASSERT_EQ (0, thread_count % 2);
 
   SynchronizingCounter<int64_t> counter;
+  EXPECT_EQ (0, counter);
+  EXPECT_FALSE (counter.HasMaximalValue());
 
   pthread_t   threads[thread_count];
   thread_args states[thread_count];

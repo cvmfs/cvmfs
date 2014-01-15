@@ -7,7 +7,12 @@
 class T_BlockingCounter : public ::testing::Test {
  protected:
   T_BlockingCounter() : max_value_(100),
-                        int_counter_(max_value_) {}
+                        int_counter_(max_value_)
+  {
+    EXPECT_TRUE (int_counter_.HasMaximalValue());
+    EXPECT_EQ   (0, int_counter_);
+    EXPECT_EQ   (max_value_, int_counter_.maximal_value());
+  }
 
   virtual void SetUp() {}
 
