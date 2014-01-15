@@ -161,6 +161,10 @@ std::string CommandScrub::CheckPathAndExtractHash(
 int CommandScrub::Main(const swissknife::ArgumentList &args) {
   repo_path_ = *args.find('r')->second;
 
+  // initialize warning printer mutex
+  const bool mutex_init = (pthread_mutex_init(&warning_mutex_, NULL) == 0);
+  assert (mutex_init);
+
   // initialize asynchronous reader
   const size_t       max_buffer_size = 512 * 1024;
   const unsigned int max_buffers_in_flight = 100;
@@ -182,6 +186,7 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
 
 void CommandScrub::PrintWarning(const std::string &msg,
                                 const std::string &path) const {
+  MutexLockGuard l(warning_mutex_);
   LogCvmfs(kLogUtility, kLogStderr, "%s | at: %s\n", msg.c_str(), path.c_str());
   ++warnings_;
 }
@@ -192,4 +197,6 @@ CommandScrub::~CommandScrub() {
     delete reader_;
     reader_ = NULL;
   }
+
+  pthread_mutex_destroy(&warning_mutex_);
 }

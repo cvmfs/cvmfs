@@ -86,9 +86,10 @@ class CommandScrub : public Command {
                                       const std::string &full_path) const;
 
  private:
-  std::string           repo_path_;
-  ScrubbingReader      *reader_;
-  mutable unsigned int  warnings_;
+  std::string              repo_path_;
+  ScrubbingReader         *reader_;
+  mutable unsigned int     warnings_;
+  mutable pthread_mutex_t  warning_mutex_;
 };
 
 }
