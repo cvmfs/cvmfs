@@ -69,136 +69,48 @@ const T& Future<T>::Get() const {
 
 
 template <typename T>
-SynchronizingCounter<T>::SynchronizingCounter() {
-  atomic_init64(&value_);
-  const bool init_successful = (pthread_mutex_init(&mutex_, NULL)      == 0 &&
-                                pthread_cond_init(&became_zero_, NULL) == 0);
-  assert (init_successful);
-}
+void SynchronizingCounter<T>::SetValueUnprotected(const T new_value) {
+  // make sure that 0 <= new_value <= maximal_value_ if maximal_value_ != 0
+  assert ( ! HasMaximalValue() ||
+          (new_value >= T(0) && new_value <= maximal_value_));
 
+  value_ = new_value;
 
-template <typename T>
-SynchronizingCounter<T>::~SynchronizingCounter() {
-  pthread_cond_destroy(&became_zero_);
-  pthread_mutex_destroy(&mutex_);
-}
-
-
-template <typename T>
-void SynchronizingCounter<T>::WaitForZero() const {
-  MutexLockGuard lock(mutex_);
-  while (atomic_read64(&value_) != T(0)) {
-    pthread_cond_wait(&became_zero_, &mutex_);
+  if (value_ == T(0)) {
+    pthread_cond_broadcast(&became_zero_);
   }
-}
 
-
-template <typename T>
-SynchronizingCounter<T>&  SynchronizingCounter<T>::operator=(const T &other) {
-  atomic_write64(&value_, other);
-  if (other == T(0)) {
-    Notify();
-  }
-  return *this;
-}
-
-
-template <typename T>
-T SynchronizingCounter<T>::AddAndPossiblyNotify(const T addend) {
-  const T retval = atomic_xadd64(&value_, addend);
-  if (retval == -addend) {
-    Notify();
-  }
-  return retval;
-}
-
-
-template <typename T>
-void SynchronizingCounter<T>::Notify() {
-  MutexLockGuard lock(mutex_);
-  pthread_cond_broadcast(&became_zero_);
-}
-
-
-//
-// +----------------------------------------------------------------------------
-// |  BlockingCounter
-//
-
-
-template <typename T>
-BlockingCounter<T>::BlockingCounter(const T maximal_value) :
-  maximal_value_(maximal_value)
-{
-  assert (maximal_value > 0);
-  const bool init_successful = (pthread_mutex_init(&mutex_, NULL)      == 0  &&
-                                pthread_cond_init(&free_slot_, NULL)   == 0);
-  assert (init_successful);
-}
-
-
-template <typename T>
-BlockingCounter<T>::~BlockingCounter() {
-  pthread_mutex_destroy(&mutex_);
-  pthread_cond_destroy(&free_slot_);
-}
-
-
-template <typename T>
-BlockingCounter<T>& BlockingCounter<T>::operator=(const T &other) {
-  SynchronizingCounter<T>::operator=(other);
-  if (other < maximal_value_) {
-    Signal(other);
-  }
-  return *this;
-}
-
-
-template <typename T>
-T BlockingCounter<T>::PossiblyWaitAndIncrement() {
-  T value = SynchronizingCounter<T>::Increment();
-  if (value > maximal_value_) {
-    SynchronizingCounter<T>::Decrement();
-    value = WaitAndIncrement();
-  }
-  return value;
-}
-
-
-template <typename T>
-T BlockingCounter<T>::WaitAndIncrement() {
-  MutexLockGuard lock(mutex_);
-  T value;
-  while ((value = SynchronizingCounter<T>::Increment()) > maximal_value_) {
-    SynchronizingCounter<T>::Decrement();
-    pthread_cond_wait(&free_slot_, &mutex_);
-  }
-  return value;
-}
-
-
-template <typename T>
-T BlockingCounter<T>::DecrementAndSignal() {
-  const T value = SynchronizingCounter<T>::Decrement();
-  assert (value >= T(0));
-  if (value < maximal_value_) {
-    Signal(value);
-  }
-  return value;
-}
-
-
-template <typename T>
-void BlockingCounter<T>::Signal(const T value) {
-  assert (value >= T(0));
-  assert (value <  maximal_value_);
-  MutexLockGuard lock(mutex_);
-
-  if (value == maximal_value_ - T(1)) {
-    pthread_cond_signal(&free_slot_);
-  } else {
+  if (maximal_value_ != T(0) && value_ < maximal_value_) {
     pthread_cond_broadcast(&free_slot_);
   }
+}
+
+
+template <typename T>
+void SynchronizingCounter<T>::WaitForFreeSlotUnprotected() {
+  while (HasMaximalValue() && value_ >= maximal_value_) {
+    pthread_cond_wait(&free_slot_, &mutex_);
+  }
+  assert (! HasMaximalValue() || value_ < maximal_value_);
+}
+
+
+template <typename T>
+void SynchronizingCounter<T>::Initialize() {
+  const bool init_successful = (
+    pthread_mutex_init(&mutex_,       NULL) == 0 &&
+    pthread_cond_init (&became_zero_, NULL) == 0 &&
+    pthread_cond_init (&free_slot_,   NULL) == 0
+  );
+  assert (init_successful);
+}
+
+
+template <typename T>
+void SynchronizingCounter<T>::Destroy() {
+  pthread_mutex_destroy(&mutex_);
+  pthread_cond_destroy (&became_zero_);
+  pthread_cond_destroy (&free_slot_);
 }
 
 

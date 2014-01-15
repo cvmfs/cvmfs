@@ -195,99 +195,90 @@ class Future : SingleCopy {
 //
 
 
-
 /**
  * This counter can be counted up and down using the usual increment/decrement
- * operators. Additionally threads can wait for it to become zero.
- * Internally it uses atomics for the counting and a POSIX conditional variable
- * to signal the 'zero state'.
+ * operators. It allows threads to wait for it to become zero as well as to
+ * block when a specified maximal value would be exceeded by an increment.
  *
- * Note: Since counting is done with atomics, the conditional variable's mutex
- *       is only locked in case a counting operation hit the 'zero state' and
- *       _not_ for each counting operation.
+ * Note: If a maximal value is specified on creation, the SynchronizingCounter
+ *       is assumed to never leave the interval [0, maximal_value]! Otherwise
+ *       the numerical limits of the specified template parameter define this
+ *       interval and an increment _never_ blocks.
  *
- * Caveat: This class is templated, but currently all but T=atomic_int64 might
- *         produce undefined behaviour. TODO: implement flexible atomic template
+ * Caveat: This implementation uses a simple mutex mechanism and therefore might
+ *         become a scalability bottle neck!
  */
 template <typename T>
 class SynchronizingCounter : SingleCopy {
  public:
-  SynchronizingCounter();
-  ~SynchronizingCounter();
+  SynchronizingCounter() :
+    value_(T(0)), maximal_value_(T(0)) { Initialize(); }
 
-  T Increment() { return ++(*this); }
-  T Decrement() { return --(*this); }
+  SynchronizingCounter(const T maximal_value) :
+    value_(T(0)), maximal_value_(maximal_value)
+  {
+    assert (maximal_value > T(0));
+    Initialize();
+  }
 
-  void WaitForZero() const;
+  ~SynchronizingCounter() { Destroy(); }
 
-  T operator++()    { return AddAndPossiblyNotify(T(1))  + T(1); }
-  T operator++(int) { return AddAndPossiblyNotify(T(1));         }
-  T operator--()    { return AddAndPossiblyNotify(T(-1)) - T(1); }
-  T operator--(int) { return AddAndPossiblyNotify(T(-1));        }
+  T Increment() {
+    MutexLockGuard l(mutex_);
+    WaitForFreeSlotUnprotected();
+    SetValueUnprotected(value_ + T(1));
+    return value_;
+  }
 
-  operator T() const { return static_cast<T>(atomic_read64(&value_)); }
-  SynchronizingCounter<T>& operator=(const T &other);
+  T Decrement() {
+    MutexLockGuard l(mutex_);
+    SetValueUnprotected(value_ - T(1));
+    return value_;
+  }
+
+  void WaitForZero() const {
+    MutexLockGuard l(mutex_);
+    while (value_ != T(0)) {
+      pthread_cond_wait(&became_zero_, &mutex_);
+    }
+    assert (value_ == T(0));
+  }
+
+  bool HasMaximalValue() const { return maximal_value_ != T(0); }
+  T      maximal_value() const { return maximal_value_;         }
+
+  T operator++()    { return Increment();        }
+  T operator++(int) { return Increment() - T(1); }
+  T operator--()    { return Decrement();        }
+  T operator--(int) { return Decrement() + T(1); }
+
+  operator T() const {
+    MutexLockGuard l(mutex_);
+    return value_;
+  }
+
+  SynchronizingCounter<T>& operator=(const T &other) {
+    MutexLockGuard l(mutex_);
+    SetValueUnprotected(other);
+    return *this;
+  }
 
  protected:
-  T AddAndPossiblyNotify(const T addend);
-  void Notify();
+  void SetValueUnprotected(const T new_value);
+  void WaitForFreeSlotUnprotected();
 
  private:
-  mutable T               value_;
-  mutable pthread_mutex_t mutex_;
-  mutable pthread_cond_t  became_zero_;
-};
-
-typedef SynchronizingCounter<atomic_int64> SynchronizingIntCounter;
-
-
-//
-// -----------------------------------------------------------------------------
-//
-
-
-/**
- * This is a semaphore-like counter. On creation the user specifies a maximal
- * value. If a thread wants to increase the counter to a higher value it blocks
- * and waits until something else decreases the counter.
- * Additionally one can put a thread to sleep waiting for the BlockingCounter to
- * become zero. (See SynchronizingCounter)
- *
- * Caveat: Due to the used atomic implementation the template does only work
- *         with int64_t for the moment!
- */
-template <typename T>
-class BlockingCounter : public SynchronizingCounter<T> {
- public:
-  BlockingCounter(const T maximal_value);
-  ~BlockingCounter();
-
-  T Increment() { return ++(*this); }
-  T Decrement() { return --(*this); }
-
-  const T& MaximalValue() const { return maximal_value_; }
-
-  T operator++()    { return PossiblyWaitAndIncrement();        }
-  T operator++(int) { return PossiblyWaitAndIncrement() - T(1); }
-  T operator--()    { return DecrementAndSignal();              }
-  T operator--(int) { return DecrementAndSignal()       + T(1); }
-
-  BlockingCounter<T>& operator=(const T &other);
+  void Initialize();
+  void Destroy();
 
  private:
-  T PossiblyWaitAndIncrement();
-  T WaitAndIncrement();
-  T DecrementAndSignal();
-  void Signal(const T value);
-
- private:
+        T                 value_;
   const T                 maximal_value_;
 
   mutable pthread_mutex_t mutex_;
+  mutable pthread_cond_t  became_zero_;
           pthread_cond_t  free_slot_;
 };
-
-typedef BlockingCounter<atomic_int64> BlockingIntCounter;
 
 
 //
