@@ -213,9 +213,9 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
   assert (mutex_init);
 
   // initialize asynchronous reader
-  const size_t       max_buffer_size = 512 * 1024;
-  const unsigned int max_buffers_in_flight = 100;
-  reader_ = new ScrubbingReader(max_buffer_size, max_buffers_in_flight);
+  const size_t       max_buffer_size     = 512 * 1024;
+  const unsigned int max_files_in_flight = 100;
+  reader_ = new ScrubbingReader(max_buffer_size, max_files_in_flight);
   reader_->RegisterListener(&CommandScrub::FileProcessedCallback, this);
   reader_->Initialize();
 
