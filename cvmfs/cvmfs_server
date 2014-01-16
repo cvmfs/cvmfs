@@ -197,7 +197,8 @@ Supported Commands:
                 Print summary about the repository
   lstags        <fully qualified name>
                 Print named tags (snapshots) of the repository
-  check         [-c disable data chunk existence check]
+  check         [-c disable data chunk existence check] 
+                [-i check data integrity] (may take some time)]
                 [-t tag (check given tag instead of trunk)]
                 <fully qualified name>
                 Checks if the repository is sane
@@ -1957,15 +1958,19 @@ check() {
   local upstream
   local repository_dir
   local check_chunks=1
+  local check_integrity=0
   local tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ct:" option
+  while getopts "cit:" option
   do
     case $option in
       c)
         check_chunks=0
+      ;;
+      i)
+        check_integrity=1
       ;;
       t)
         tag="-t $OPTARG"
@@ -2006,6 +2011,12 @@ check() {
 
   echo "Verifying $name"
   cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
+
+  if [ $check_integrity -ne 0 ]; then
+    echo
+    echo "Checking Storage Integrity of $name ... (may take a while)"
+    cvmfs_swissknife scrub -r ${repository_dir}/data
+  fi
 }
 
 
