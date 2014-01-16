@@ -422,3 +422,56 @@ TEST_F(T_LocalUploader, UploadManyFiles) {
     CompareFileContents(i->first, AbsoluteDestinationPath(i->second));
   }
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_LocalUploader, SingleStreamedUpload) {
+  const unsigned int number_of_buffers = 10;
+  Buffers buffers = MakeRandomizedBuffers(number_of_buffers, 1337);
+
+  EXPECT_EQ (0u, delegate_.buffer_upload_complete_invocations);
+  EXPECT_EQ (0u, delegate_.streamed_upload_complete_invocations);
+
+  UploadStreamHandle *handle = uploader_->InitStreamedUpload(
+                                 AbstractUploader::MakeClosure(
+                                   &UploadCallbacks::StreamedUploadComplete,
+                                   &delegate_,
+                                   0));
+  ASSERT_NE (static_cast<UploadStreamHandle*>(NULL), handle);
+
+  EXPECT_EQ (0u, delegate_.buffer_upload_complete_invocations);
+  EXPECT_EQ (0u, delegate_.streamed_upload_complete_invocations);
+
+  Buffers::const_iterator i    = buffers.begin();
+  Buffers::const_iterator iend = buffers.end();
+  for (; i != iend; ++i) {
+    uploader_->ScheduleUpload(handle, *i,
+                 AbstractUploader::MakeClosure(
+                   &UploadCallbacks::BufferUploadComplete,
+                   &delegate_,
+                   UploaderResults(0, *i)));
+  }
+  uploader_->WaitForUpload();
+
+  EXPECT_EQ (number_of_buffers, delegate_.buffer_upload_complete_invocations);
+  EXPECT_EQ (0u,                delegate_.streamed_upload_complete_invocations);
+
+  shash::Any content_hash(shash::kSha1);
+  content_hash.Randomize();
+  const std::string hash_suffix = "A";
+  uploader_->ScheduleCommit(handle, content_hash, hash_suffix);
+  uploader_->WaitForUpload();
+
+  EXPECT_EQ (number_of_buffers, delegate_.buffer_upload_complete_invocations);
+  EXPECT_EQ (1u,                delegate_.streamed_upload_complete_invocations);
+
+  const std::string dest = "data/" + content_hash.MakePath(1, 2) + hash_suffix;
+  EXPECT_TRUE (CheckFile(dest));
+  CompareBuffersAndFileContents(buffers, AbsoluteDestinationPath(dest));
+
+  FreeBuffers(buffers);
+}
