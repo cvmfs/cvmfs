@@ -22,7 +22,9 @@ using namespace upload;
 class UploadCallbacks {
  public:
   UploadCallbacks() {
-    simple_upload_invocations = 0;
+    simple_upload_invocations            = 0;
+    streamed_upload_complete_invocations = 0;
+    buffer_upload_complete_invocations   = 0;
   }
 
   void SimpleUploadClosure(const UploaderResults &results,
@@ -34,8 +36,28 @@ class UploadCallbacks {
     ++simple_upload_invocations;
   }
 
+  void StreamedUploadComplete(const UploaderResults &results,
+                                    int              return_code) {
+    EXPECT_EQ (UploaderResults::kChunkCommit,  results.type);
+    EXPECT_EQ ("",                             results.local_path);
+    EXPECT_EQ (static_cast<CharBuffer*>(NULL), results.buffer);
+    EXPECT_EQ (return_code,                    results.return_code);
+    ++streamed_upload_complete_invocations;
+  }
+
+  void BufferUploadComplete(const UploaderResults &results,
+                                  UploaderResults  expected) {
+    EXPECT_EQ (UploaderResults::kBufferUpload, results.type);
+    EXPECT_EQ ("",                             results.local_path);
+    EXPECT_EQ (expected.buffer,                results.buffer);
+    EXPECT_EQ (expected.return_code,           results.return_code);
+    ++buffer_upload_complete_invocations;
+  }
+
  public:
   tbb::atomic<unsigned int> simple_upload_invocations;
+  tbb::atomic<unsigned int> streamed_upload_complete_invocations;
+  tbb::atomic<unsigned int> buffer_upload_complete_invocations;
 };
 
 
@@ -44,6 +66,9 @@ class T_LocalUploader : public FileSandbox {
   static const std::string sandbox_path;
   static const std::string dest_dir;
   static const std::string tmp_dir;
+
+ public:
+  typedef std::vector<CharBuffer*> Buffers;
 
  public:
   T_LocalUploader() :
@@ -95,6 +120,38 @@ class T_LocalUploader : public FileSandbox {
                                                             max_chunk_size);
   }
 
+  Buffers MakeRandomizedBuffers(const unsigned int buffer_count,
+                                const          int rng_seed) const {
+    Buffers result;
+
+    Prng rng;
+    rng.InitSeed(rng_seed);
+
+    for (unsigned int i = 0; i < buffer_count; ++i) {
+      const size_t buffer_size  = rng.Next(1024 * 1024);
+      const size_t bytes_to_use = rng.Next(buffer_size);
+
+      CharBuffer *buffer = new CharBuffer(buffer_size);
+      for (unsigned int i = 0; i < bytes_to_use; ++i) {
+        *(buffer->ptr() + i) = rng.Next(256);
+      }
+      buffer->SetUsedBytes(bytes_to_use);
+
+      result.push_back(buffer);
+    }
+
+    return result;
+  }
+
+  void FreeBuffers(Buffers &buffers) const {
+    Buffers::const_iterator i    = buffers.begin();
+    Buffers::const_iterator iend = buffers.end();
+    for (; i != iend; ++i) {
+      delete (*i);
+    }
+    buffers.clear();
+  }
+
   bool CheckFile(const std::string &remote_path) const {
     const std::string absolute_path = AbsoluteDestinationPath(remote_path);
     return FileExists(absolute_path);
@@ -109,6 +166,22 @@ class T_LocalUploader : public FileSandbox {
     shash::Any testee_hash    = HashFile(testee_path);
     shash::Any reference_hash = HashFile(reference_path);
     EXPECT_EQ (reference_hash, testee_hash);
+  }
+
+  void CompareBuffersAndFileContents(const Buffers     &buffers,
+                                     const std::string &file_path) const {
+    size_t buffers_size = 0;
+    Buffers::const_iterator i    = buffers.begin();
+    Buffers::const_iterator iend = buffers.end();
+    for (; i != iend; ++i) {
+      buffers_size += (*i)->used_bytes();
+    }
+    const size_t file_size = GetFileSize(file_path);
+    EXPECT_EQ (file_size, buffers_size);
+
+    shash::Any buffers_hash = HashBuffers(buffers);
+    shash::Any file_hash    = HashFile(file_path);
+    EXPECT_EQ (file_hash, buffers_hash);
   }
 
   std::string AbsoluteDestinationPath(const std::string &remote_path) const {
@@ -137,6 +210,27 @@ class T_LocalUploader : public FileSandbox {
   void HashFileInternal(const std::string &path, shash::Any *hash) const {
     const bool successful = shash::HashFile(path, hash);
     ASSERT_TRUE (successful);
+  }
+
+  shash::Any HashBuffers(const Buffers &buffers) const {
+    shash::Any buffers_hash(shash::kMd5);
+    HashBuffersInternal(buffers, &buffers_hash);
+    return buffers_hash;
+  }
+
+  void HashBuffersInternal(const Buffers &buffers, shash::Any *hash) const {
+    shash::ContextPtr ctx(shash::kMd5);
+    ctx.buffer = alloca(ctx.size);
+    shash::Init(ctx);
+
+    Buffers::const_iterator i    = buffers.begin();
+    Buffers::const_iterator iend = buffers.end();
+    for (; i != iend; ++i) {
+      CharBuffer *current_buffer = *i;
+      shash::Update(current_buffer->ptr(), current_buffer->used_bytes(), ctx);
+    }
+
+    shash::Final(ctx, hash);
   }
 
  protected:
