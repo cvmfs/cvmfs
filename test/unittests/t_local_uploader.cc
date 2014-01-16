@@ -98,11 +98,15 @@ class T_LocalUploader : public FileSandbox {
     return FileExists(absolute_path);
   }
 
-  bool CompareFileContents(const std::string &testee_path,
+  void CompareFileContents(const std::string &testee_path,
                            const std::string &reference_path) const {
+    const size_t testee_size    = GetFileSize(testee_path);
+    const size_t reference_size = GetFileSize(reference_path);
+    EXPECT_EQ (reference_size, testee_size);
+
     shash::Any testee_hash    = HashFile(testee_path);
     shash::Any reference_hash = HashFile(reference_path);
-    return testee_hash == reference_hash;
+    EXPECT_EQ (reference_hash, testee_hash);
   }
 
   std::string AbsoluteDestinationPath(const std::string &remote_path) const {
@@ -124,7 +128,7 @@ class T_LocalUploader : public FileSandbox {
   shash::Any HashFile(const std::string &path) const {
     shash::Any result(shash::kMd5);
     // googletest requires method that use EXPECT_* or ASSERT_* to return void
-    HashFileInternal (path, &result);
+    HashFileInternal(path, &result);
     return result;
   }
 
@@ -170,8 +174,7 @@ TEST_F(T_LocalUploader, SimpleFileUpload) {
 
   EXPECT_TRUE (CheckFile(dest_name));
   EXPECT_EQ (1u, delegate_.simple_upload_invocations);
-  EXPECT_TRUE (CompareFileContents(big_file_path,
-                                   AbsoluteDestinationPath(dest_name)));
+  CompareFileContents(big_file_path, AbsoluteDestinationPath(dest_name));
 }
 
 
@@ -192,8 +195,7 @@ TEST_F(T_LocalUploader, PeekIntoStorage) {
 
   EXPECT_TRUE (CheckFile(dest_name));
   EXPECT_EQ (1u, delegate_.simple_upload_invocations);
-  EXPECT_TRUE (CompareFileContents(small_file_path,
-                                   AbsoluteDestinationPath(dest_name)));
+  CompareFileContents(small_file_path, AbsoluteDestinationPath(dest_name));
 
   const bool file_exists = uploader_->Peek(dest_name);
   EXPECT_TRUE (file_exists);
@@ -220,8 +222,7 @@ TEST_F(T_LocalUploader, RemoveFromStorage) {
 
   EXPECT_TRUE (CheckFile(dest_name));
   EXPECT_EQ (1u, delegate_.simple_upload_invocations);
-  EXPECT_TRUE (CompareFileContents(small_file_path,
-                                   AbsoluteDestinationPath(dest_name)));
+  CompareFileContents(small_file_path, AbsoluteDestinationPath(dest_name));
 
   const bool file_exists = uploader_->Peek(dest_name);
   EXPECT_TRUE (file_exists);
@@ -252,8 +253,7 @@ TEST_F(T_LocalUploader, UploadEmptyFile) {
 
   EXPECT_TRUE (CheckFile(dest_name));
   EXPECT_EQ (1u, delegate_.simple_upload_invocations);
-  EXPECT_TRUE (CompareFileContents(empty_file_path,
-                                   AbsoluteDestinationPath(dest_name)));
+  CompareFileContents(empty_file_path, AbsoluteDestinationPath(dest_name));
   EXPECT_EQ (0, GetFileSize(AbsoluteDestinationPath(dest_name)));
 }
 
@@ -275,8 +275,7 @@ TEST_F(T_LocalUploader, UploadHugeFile) {
 
   EXPECT_TRUE (CheckFile(dest_name));
   EXPECT_EQ (1u, delegate_.simple_upload_invocations);
-  EXPECT_TRUE (CompareFileContents(huge_file_path,
-                                   AbsoluteDestinationPath(dest_name)));
+  CompareFileContents(huge_file_path, AbsoluteDestinationPath(dest_name));
 }
 
 
@@ -324,7 +323,6 @@ TEST_F(T_LocalUploader, UploadManyFiles) {
   EXPECT_EQ (number_of_files, delegate_.simple_upload_invocations);
   for (i = files.begin(); i != iend; ++i) {
     EXPECT_TRUE (CheckFile(i->second));
-    EXPECT_TRUE (CompareFileContents(i->first,
-                                     AbsoluteDestinationPath(i->second)));
+    CompareFileContents(i->first, AbsoluteDestinationPath(i->second));
   }
 }
