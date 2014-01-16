@@ -131,11 +131,11 @@ cvmfs_run_test() {
 
   echo "saving repository keys"
   mkdir keys || return 8
-  mv ${keys_dir}/$CVMFS_TEST_REPO.crt       \
-     ${keys_dir}/$CVMFS_TEST_REPO.key       \
-     ${keys_dir}/$CVMFS_TEST_REPO.masterkey \
-     ${keys_dir}/$CVMFS_TEST_REPO.pub       \
-     keys || return 9
+  sudo mv ${keys_dir}/$CVMFS_TEST_REPO.crt       \
+          ${keys_dir}/$CVMFS_TEST_REPO.key       \
+          ${keys_dir}/$CVMFS_TEST_REPO.masterkey \
+          ${keys_dir}/$CVMFS_TEST_REPO.pub       \
+          keys || return 9
 
   echo "recreating repository spool area"
   sudo cvmfs_server import \
