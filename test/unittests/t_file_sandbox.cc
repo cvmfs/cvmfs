@@ -94,7 +94,7 @@ TEST_F(T_FileSandbox, SmallFile) {
   EXPECT_EQ (50 * 1024, file_size) << "small file size does not match";
 
   shash::Any sha = HashFile(small_file);
-  EXPECT_EQ ("5f0956f4e6b99a57b60b590c326570b5a172e895", sha.ToString());
+  EXPECT_EQ ("e86f148ca3a9a1ad9cf19979548e61c38bfa1384", sha.ToString());
 }
 
 
