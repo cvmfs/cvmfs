@@ -234,3 +234,46 @@ TEST_F(T_LocalUploader, RemoveFromStorage) {
 }
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_LocalUploader, UploadEmptyFile) {
+  const std::string empty_file_path = GetEmptyFile();
+  const std::string dest_name     = "empty_file";
+
+  uploader_->Upload(empty_file_path, dest_name,
+    AbstractUploader::MakeClosure(&UploadCallbacks::SimpleUploadClosure,
+                                  &delegate_,
+                                  UploaderResults(0, empty_file_path)));
+  uploader_->WaitForUpload();
+
+  EXPECT_TRUE (CheckFile(dest_name));
+  EXPECT_EQ (1u, delegate_.simple_upload_invocations);
+  EXPECT_TRUE (CompareFileContents(empty_file_path,
+                                   AbsoluteDestinationPath(dest_name)));
+  EXPECT_EQ (0, GetFileSize(AbsoluteDestinationPath(dest_name)));
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_LocalUploader, UploadHugeFile) {
+  const std::string huge_file_path = GetHugeFile();
+  const std::string dest_name     = "huge_file";
+
+  uploader_->Upload(huge_file_path, dest_name,
+    AbstractUploader::MakeClosure(&UploadCallbacks::SimpleUploadClosure,
+                                  &delegate_,
+                                  UploaderResults(0, huge_file_path)));
+  uploader_->WaitForUpload();
+
+  EXPECT_TRUE (CheckFile(dest_name));
+  EXPECT_EQ (1u, delegate_.simple_upload_invocations);
+  EXPECT_TRUE (CompareFileContents(huge_file_path,
+                                   AbsoluteDestinationPath(dest_name)));
+}
