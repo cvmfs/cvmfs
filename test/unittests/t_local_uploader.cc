@@ -68,7 +68,17 @@ class T_LocalUploader : public FileSandbox {
   static const std::string tmp_dir;
 
  public:
-  typedef std::vector<CharBuffer*> Buffers;
+  struct StreamHandle {
+    StreamHandle() : handle(NULL), content_hash(shash::kMd5) {
+      content_hash.Randomize();
+    }
+
+    UploadStreamHandle *handle;
+    shash::Any          content_hash;
+  };
+
+  typedef std::vector<CharBuffer*>                       Buffers;
+  typedef std::vector<std::pair<Buffers, StreamHandle> > BufferStreams;
 
  public:
   T_LocalUploader() :
@@ -128,8 +138,8 @@ class T_LocalUploader : public FileSandbox {
     rng.InitSeed(rng_seed);
 
     for (unsigned int i = 0; i < buffer_count; ++i) {
-      const size_t buffer_size  = rng.Next(1024 * 1024);
-      const size_t bytes_to_use = rng.Next(buffer_size);
+      const size_t buffer_size  = rng.Next(1024 * 1024) + 10;
+      const size_t bytes_to_use = rng.Next(buffer_size) +  5;
 
       CharBuffer *buffer = new CharBuffer(buffer_size);
       for (unsigned int i = 0; i < bytes_to_use; ++i) {
@@ -144,12 +154,39 @@ class T_LocalUploader : public FileSandbox {
   }
 
   void FreeBuffers(Buffers &buffers) const {
-    Buffers::const_iterator i    = buffers.begin();
+    Buffers::iterator       i    = buffers.begin();
     Buffers::const_iterator iend = buffers.end();
     for (; i != iend; ++i) {
       delete (*i);
     }
     buffers.clear();
+  }
+
+  BufferStreams MakeRandomizedBufferStreams(const unsigned int stream_count,
+                                            const unsigned int max_buffers_per_stream,
+                                            const          int rng_seed) const {
+    BufferStreams streams;
+
+    Prng rng;
+    rng.InitSeed(rng_seed);
+
+    for (unsigned int i = 0; i < stream_count; ++i) {
+      const unsigned int buffers = rng.Next(max_buffers_per_stream) + 1;
+      streams.push_back(
+        std::make_pair(MakeRandomizedBuffers(buffers, rng.Next(1234567)),
+                       StreamHandle()));
+    }
+
+    return streams;
+  }
+
+  void FreeBufferStreams(BufferStreams &streams) const {
+    BufferStreams::iterator       i    = streams.begin();
+    BufferStreams::const_iterator iend = streams.end();
+    for (; i != iend; ++i) {
+      FreeBuffers(i->first);
+    }
+    streams.clear();
   }
 
   bool CheckFile(const std::string &remote_path) const {
