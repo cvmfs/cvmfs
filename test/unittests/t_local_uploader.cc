@@ -512,3 +512,79 @@ TEST_F(T_LocalUploader, SingleStreamedUpload) {
 
   FreeBuffers(buffers);
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_LocalUploader, MultipleStreamedUpload) {
+  const unsigned int number_of_files        = 100;
+  const unsigned int max_buffers_per_stream = 15;
+  const std::string  hash_suffix            = "K";
+  BufferStreams streams = MakeRandomizedBufferStreams(number_of_files,
+                                                      max_buffers_per_stream,
+                                                      42);
+
+  EXPECT_EQ (0u, delegate_.buffer_upload_complete_invocations);
+  EXPECT_EQ (0u, delegate_.streamed_upload_complete_invocations);
+
+  BufferStreams::iterator       i    = streams.begin();
+  BufferStreams::const_iterator iend = streams.end();
+  for (; i != iend; ++i) {
+    UploadStreamHandle *handle = uploader_->InitStreamedUpload(
+                                   AbstractUploader::MakeClosure(
+                                     &UploadCallbacks::StreamedUploadComplete,
+                                     &delegate_,
+                                     0));
+    ASSERT_NE (static_cast<UploadStreamHandle*>(NULL), handle);
+    i->second.handle = handle;
+  }
+
+  EXPECT_EQ (0u, delegate_.buffer_upload_complete_invocations);
+  EXPECT_EQ (0u, delegate_.streamed_upload_complete_invocations);
+
+  // go through the handles and schedule buffers for them in a round robin
+  // fashion --> we want to test concurrent streamed upload behaviour
+  BufferStreams active_streams   = streams;
+  unsigned int number_of_buffers = 0;
+  BufferStreams::iterator j      = active_streams.begin();
+  while (! active_streams.empty()) {
+          Buffers       &buffers        = j->first;
+    const StreamHandle  &current_handle = j->second;
+
+    if (! buffers.empty()) {
+      CharBuffer *current_buffer = buffers.front();
+      ASSERT_NE (static_cast<CharBuffer*>(NULL), current_buffer);
+      ++number_of_buffers;
+      uploader_->ScheduleUpload(current_handle.handle, current_buffer,
+                   AbstractUploader::MakeClosure(
+                     &UploadCallbacks::BufferUploadComplete,
+                     &delegate_,
+                     UploaderResults(0, buffers.front())));
+      buffers.erase(buffers.begin());
+    } else {
+      uploader_->ScheduleCommit(current_handle.handle,
+                                current_handle.content_hash,
+                                hash_suffix);
+      j = active_streams.erase(j);
+    }
+  }
+
+  uploader_->WaitForUpload();
+
+  EXPECT_EQ (number_of_buffers, delegate_.buffer_upload_complete_invocations);
+  EXPECT_EQ (number_of_files,   delegate_.streamed_upload_complete_invocations);
+
+  BufferStreams::const_iterator k    = streams.begin();
+  BufferStreams::const_iterator kend = streams.end();
+  for (; k != kend; ++k) {
+    const shash::Any &content_hash = k->second.content_hash;
+    const std::string dest = "data/" + content_hash.MakePath(1, 2) + hash_suffix;
+    EXPECT_TRUE (CheckFile(dest));
+    CompareBuffersAndFileContents(k->first, AbsoluteDestinationPath(dest));
+  }
+
+  FreeBufferStreams(streams);
+}
