@@ -40,7 +40,7 @@ echo "done"
 
 # start apache
 echo -n "starting apache... "
-sudo service httpd start > /dev/null 2>&1 || die "fail"
+sudo /sbin/service httpd start > /dev/null 2>&1 || die "fail"
 echo "OK"
 
 # install test dependencies
