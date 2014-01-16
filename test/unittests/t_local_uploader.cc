@@ -4,8 +4,6 @@
 #include <sstream>
 #include <tbb/atomic.h>
 
-#include <iostream> // TODO: remove me!
-
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/upload_spooler_definition.h"
 #include "../../cvmfs/upload_local.h"
