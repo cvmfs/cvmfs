@@ -96,8 +96,8 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   return 0
 }

@@ -579,8 +579,10 @@ get_catalog_count() {
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure
+# additionally it might check the backend storage integrity as well when
+# provided with -i
 # @param repo    the repository to be checked
-check_catalogs() {
+check_repository() {
   local repo=$1
   shift 1
 

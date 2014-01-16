@@ -90,8 +90,8 @@ cvmfs_run_test() {
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "check if eventually the right catalogs are present in the repository"
   check_final_nested_catalog_presence $CVMFS_TEST_REPO || return $?

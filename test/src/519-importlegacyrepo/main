@@ -61,7 +61,7 @@ cvmfs_run_test() {
 
   # check if the migrated and imported catalogs are sane
   echo "check migrated catalogs without checking data chunks (we did not download them)"
-  check_catalogs $CVMFS_TEST_REPO -c || return 12
+  check_repository $CVMFS_TEST_REPO -c || return 12
 
   # cheate a new repository revision of the migrated catalogs
   echo "create a new repository revision"
@@ -78,7 +78,7 @@ cvmfs_run_test() {
 
   # check if still everything is fine
   echo "check catalogs again"
-  check_catalogs $CVMFS_TEST_REPO -c || return 13
+  check_repository $CVMFS_TEST_REPO -c || return 13
 
   # see if the files ended up in the catalog
   echo "check created files"
