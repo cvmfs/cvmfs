@@ -114,7 +114,7 @@ bool HashFile(const std::string filename, Any *any_digest) {
   unsigned char io_buffer[4096];
   int actual_bytes;
   while ((actual_bytes = fread(io_buffer, 1, 4096, file))) {
-    Update(io_buffer, 4096, context);
+    Update(io_buffer, actual_bytes, context);
   }
 
   if (ferror(file)) {
