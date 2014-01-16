@@ -7,13 +7,18 @@
 class T_BlockingCounter : public ::testing::Test {
  protected:
   T_BlockingCounter() : max_value_(100),
-                        int_counter_(max_value_) {}
+                        int_counter_(max_value_)
+  {
+    EXPECT_TRUE (int_counter_.HasMaximalValue());
+    EXPECT_EQ   (0, int_counter_);
+    EXPECT_EQ   (max_value_, int_counter_.maximal_value());
+  }
 
   virtual void SetUp() {}
 
   static void *concurrent_incrementer(void *counter) {
-    BlockingIntCounter &cntr =
-      *static_cast<BlockingIntCounter*>(counter);
+    SynchronizingCounter<int64_t> &cntr =
+      *static_cast<SynchronizingCounter<int64_t>*>(counter);
 
     T_BlockingCounter::concurrent_state_ = 1;
     ++cntr;
@@ -23,8 +28,8 @@ class T_BlockingCounter : public ::testing::Test {
   }
 
   static void *concurrent_zero_waiter(void *counter) {
-    BlockingIntCounter &cntr =
-      *static_cast<BlockingIntCounter*>(counter);
+    SynchronizingCounter<int64_t> &cntr =
+      *static_cast<SynchronizingCounter<int64_t>*>(counter);
 
     cntr.WaitForZero();
     ++cntr;
@@ -41,8 +46,8 @@ class T_BlockingCounter : public ::testing::Test {
   }
 
   static void *concurrent_increment_zero_wait(void *counter) {
-    BlockingIntCounter &cntr =
-      *static_cast<BlockingIntCounter*>(counter);
+    SynchronizingCounter<int64_t> &cntr =
+      *static_cast<SynchronizingCounter<int64_t>*>(counter);
     T_BlockingCounter::concurrent_state_ = 1;
 
     cntr.Increment();
@@ -57,7 +62,7 @@ class T_BlockingCounter : public ::testing::Test {
 
   struct thread_state {
     thread_state() : counter(NULL), state(0) {}
-    BlockingIntCounter *counter;
+    SynchronizingCounter<int64_t> *counter;
     int                 state;
   };
 
@@ -73,7 +78,7 @@ class T_BlockingCounter : public ::testing::Test {
 
  protected:
   int max_value_;
-  BlockingIntCounter int_counter_;
+  SynchronizingCounter<int64_t> int_counter_;
   static int concurrent_state_;
 };
 
@@ -87,7 +92,7 @@ int T_BlockingCounter::concurrent_state_ = 0;
 
 TEST_F(T_BlockingCounter, Initialize) {
   EXPECT_EQ (  0, int_counter_);
-  EXPECT_EQ (100, int_counter_.MaximalValue());
+  EXPECT_EQ (100, int_counter_.maximal_value());
 }
 
 

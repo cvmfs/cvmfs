@@ -318,7 +318,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     return spooler_definition_;
   }
 
-  const SynchronizingIntCounter& jobs_in_flight() const {
+  const SynchronizingCounter<int32_t>& jobs_in_flight() const {
     return jobs_in_flight_;
   }
 
@@ -328,7 +328,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   tbb::tbb_thread                           writer_thread_;
   bool                                      torn_down_;
 
-  mutable SynchronizingIntCounter           jobs_in_flight_;
+  mutable SynchronizingCounter<int32_t>     jobs_in_flight_;
   Future<bool>                              thread_started_executing_;
 };
 

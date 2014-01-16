@@ -50,7 +50,7 @@ class AbstractReader {
 
 
  private:
-  BlockingIntCounter buffers_in_flight_counter_;
+  SynchronizingCounter<uint32_t> buffers_in_flight_counter_;
 };
 
 
@@ -160,18 +160,18 @@ class Reader : public AbstractReader,
   void FinalizedFile(AbstractFile *file);
 
  private:
-  JobQueue            queue_;           ///< reference to the JobQueue (see IoDispatcher)
-  const size_t        max_buffer_size_; ///< size of data Blocks to read-in
+  JobQueue                        queue_;           ///< reference to the JobQueue (see IoDispatcher)
+  const size_t                    max_buffer_size_; ///< size of data Blocks to read-in
 
-  bool                draining_;
-  OpenFileList        open_files_;
+  bool                            draining_;
+  OpenFileList                    open_files_;
 
-  BlockingIntCounter  files_in_flight_counter_;
+  SynchronizingCounter<uint32_t>  files_in_flight_counter_;
 
-  const unsigned int  tbb_worker_count_;
-  tbb::tbb_thread     read_thread_;
-  Future<bool>        thread_started_executing_;
-  bool                running_;
+  const unsigned int              tbb_worker_count_;
+  tbb::tbb_thread                 read_thread_;
+  Future<bool>                    thread_started_executing_;
+  bool                            running_;
 };
 
 }
