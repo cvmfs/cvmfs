@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 #include <string>
+#include <sstream>
 #include <tbb/atomic.h>
 
 #include <iostream> // TODO: remove me!
@@ -276,4 +277,54 @@ TEST_F(T_LocalUploader, UploadHugeFile) {
   EXPECT_EQ (1u, delegate_.simple_upload_invocations);
   EXPECT_TRUE (CompareFileContents(huge_file_path,
                                    AbsoluteDestinationPath(dest_name)));
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_LocalUploader, UploadManyFiles) {
+  const unsigned int number_of_files = 500;
+  typedef std::vector<std::pair<std::string, std::string> > Files;
+
+  Files files;
+  for (unsigned int i = 0; i < number_of_files; ++i) {
+    std::stringstream ss; ss << "file" << i;
+    const std::string dest_name = ss.str();
+    std::string file;
+    switch (i % 3) {
+      case 0:
+        file = GetEmptyFile();
+        break;
+      case 1:
+        file = GetSmallFile();
+        break;
+      case 2:
+        file = GetBigFile();
+        break;
+      default:
+        FAIL();
+        break;
+    }
+    files.push_back(std::make_pair(file, dest_name));
+  }
+
+  Files::const_iterator i    = files.begin();
+  Files::const_iterator iend = files.end();
+  for (; i != iend; ++i) {
+    uploader_->Upload(i->first, i->second,
+      AbstractUploader::MakeClosure(&UploadCallbacks::SimpleUploadClosure,
+                                    &delegate_,
+                                    UploaderResults(0, i->first)));
+  }
+  uploader_->WaitForUpload();
+
+  EXPECT_EQ (number_of_files, delegate_.simple_upload_invocations);
+  for (i = files.begin(); i != iend; ++i) {
+    EXPECT_TRUE (CheckFile(i->second));
+    EXPECT_TRUE (CompareFileContents(i->first,
+                                     AbsoluteDestinationPath(i->second)));
+  }
 }
