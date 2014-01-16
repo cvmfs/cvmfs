@@ -27,8 +27,10 @@ class UploadCallbacks {
 
   void SimpleUploadClosure(const UploaderResults &results,
                                  UploaderResults  expected) {
-    EXPECT_EQ (expected.return_code, results.return_code);
-    EXPECT_EQ (expected.local_path,  results.local_path);
+    EXPECT_EQ (UploaderResults::kFileUpload,   results.type);
+    EXPECT_EQ (static_cast<CharBuffer*>(NULL), results.buffer);
+    EXPECT_EQ (expected.return_code,           results.return_code);
+    EXPECT_EQ (expected.local_path,            results.local_path);
     ++simple_upload_invocations;
   }
 
