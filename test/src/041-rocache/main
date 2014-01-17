@@ -18,6 +18,7 @@ cvmfs_run_test() {
     cvmfs_umount atlas.cern.ch
     sudo umount -l $tmpdir
     sudo rmdir $tmpdir
+    return 4
   fi
   sudo cvmfs_talk -i atlas.cern.ch tear down to read-only || return 3
   sudo mount -o remount,ro $tmpdir
