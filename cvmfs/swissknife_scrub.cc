@@ -144,10 +144,12 @@ std::string CommandScrub::CheckPathAndExtractHash(
     has_object_modifier = true;
   }
   if (has_object_modifier   &&
-      last_character != 'H' &&
-      last_character != 'C' &&
-      last_character != 'P' &&
-      last_character != 'X') {
+      last_character != 'H' && // history
+      last_character != 'C' && // catalog
+      last_character != 'P' && // partial
+      last_character != 'X' && // certificate
+      last_character != 'L')   // micro catalogs (currently only reserved)
+  {
     std::stringstream ss;
     ss << "unknown object modifier: " << last_character;
     PrintWarning(ss.str(), full_path);
