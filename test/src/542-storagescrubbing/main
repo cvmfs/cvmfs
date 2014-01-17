@@ -260,14 +260,13 @@ cvmfs_run_test() {
   echo "$result" | grep "${cut_object_dest}" | grep "malformed"  || return 19
   echo "$result" | grep "${alien_file}"      | grep "unexpected" || return 19
   [ $(echo "$result" | wc -l) -eq 7 ]                            || return 19
-  
 #
  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 
-  echo "put a temporary in the transaction directory"
-  local txn_alien="I_should_not_be_here"
-  sudo touch ${storage_location}/txn/${txn_alien} || return 20
+  echo "introduce an illegal hash character in an object name"
+  local illegal_hash="ff/86c3cc55cd98adc2166aa9ab86d135dafe4g5e"
+  sudo touch "${storage_location}/${illegal_hash}" || return 20
 
   echo "check backend sanity using cvmfs_swissknife scrub"
   local result="$(cvmfs_swissknife scrub -r $storage_location 2>&1)"
@@ -278,16 +277,16 @@ cvmfs_run_test() {
   echo "$result" | grep "${alien_object}"    | grep "modifier"    || return 21
   echo "$result" | grep "${cut_object_dest}" | grep "malformed"   || return 21
   echo "$result" | grep "${alien_file}"      | grep "unexpected"  || return 21
-  echo "$result" | grep "${txn_alien}"       | grep "transaction" || return 21
+  echo "$result" | grep "${illegal_hash}"    | grep "illegal"     || return 21
   [ $(echo "$result" | wc -l) -eq 8 ]                             || return 21
   
 #
  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 
-  echo "introduce an illegal hash character in an object name"
-  local illegal_hash="ff/86c3cc55cd98adc2166aa9ab86d135dafe4g5e"
-  sudo touch "${storage_location}/${illegal_hash}" || return 22
+  echo "corrupt an object file with a modifier"
+  local broken_modifier=$(choose_random_backend_file_matching $storage_location '[B-Z]$') # A is taken by 'illegal modifier'
+  sudo head -n1000 /dev/urandom > $broken_modifier || return 22
 
   echo "check backend sanity using cvmfs_swissknife scrub"
   local result="$(cvmfs_swissknife scrub -r $storage_location 2>&1)"
@@ -298,38 +297,16 @@ cvmfs_run_test() {
   echo "$result" | grep "${alien_object}"    | grep "modifier"    || return 23
   echo "$result" | grep "${cut_object_dest}" | grep "malformed"   || return 23
   echo "$result" | grep "${alien_file}"      | grep "unexpected"  || return 23
-  echo "$result" | grep "${txn_alien}"       | grep "transaction" || return 23
   echo "$result" | grep "${illegal_hash}"    | grep "illegal"     || return 23
+  echo "$result" | grep "${broken_modifier}" | grep "mismatch"    || return 23
   [ $(echo "$result" | wc -l) -eq 9 ]                             || return 23
   
 #
  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 
-  echo "corrupt an object file with a modifier"
-  local broken_modifier=$(choose_random_backend_file_matching $storage_location '[B-Z]$') # A is taken by 'illegal modifier'
-  sudo head -n1000 /dev/urandom > $broken_modifier || return 24
-
-  echo "check backend sanity using cvmfs_swissknife scrub"
-  local result="$(cvmfs_swissknife scrub -r $storage_location 2>&1)"
-  echo "$result" | grep "${corrupted_file}"  | grep "mismatch"    || return 25
-  echo "$result" | grep "${symlink_name}"    | grep "symlink"     || return 25
-  echo "$result" | grep "${cas_subdir}"      | grep "malformed"   || return 25
-  echo "$result" | grep "${cas_subsubdir}"   | grep "unexpected"  || return 25
-  echo "$result" | grep "${alien_object}"    | grep "modifier"    || return 25
-  echo "$result" | grep "${cut_object_dest}" | grep "malformed"   || return 25
-  echo "$result" | grep "${alien_file}"      | grep "unexpected"  || return 25
-  echo "$result" | grep "${txn_alien}"       | grep "transaction" || return 25
-  echo "$result" | grep "${illegal_hash}"    | grep "illegal"     || return 25
-  echo "$result" | grep "${broken_modifier}" | grep "mismatch"    || return 25
-  [ $(echo "$result" | wc -l) -eq 10 ]                            || return 25
-  
-#
- # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
-
   echo "cvmfs_server check should NOT report a sane repository after this rage"
-  check_catalogs $CVMFS_TEST_REPO && return 26
+  check_catalogs $CVMFS_TEST_REPO && return 24
 
   return 0
 }
