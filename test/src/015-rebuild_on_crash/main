@@ -36,6 +36,8 @@ cvmfs_run_test() {
   sudo kill -9 $pid || return 21
   cvmfs_umount ${repo} || return 22
   
+  service_switch autofs restart || return 23
+
   ls /cvmfs/${repo} || return 30
   cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -v -q "automatic rebuild"; then
