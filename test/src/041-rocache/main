@@ -4,7 +4,9 @@ cvmfs_test_name="Read-only cache"
 cvmfs_run_test() {
   logfile=$1
 
-  local tmpdir=$(sudo mktemp -d --tmpdir=/var/lib/cvmfs)
+  local tmpdir=$(sudo mktemp -d /var/lib/cvmfs/tmp.XXXXXXXX)
+  [ x"$tmpdir" = x"" ] && return 9
+  echo "tmpdir is $tmpdir"
   sudo mount -t tmpfs tmpfs $tmpdir || return 1
 
   cvmfs_mount atlas.cern.ch \
@@ -15,14 +17,15 @@ cvmfs_run_test() {
     echo "r/o remount is not supposed to work at this stage"
     cvmfs_umount atlas.cern.ch
     sudo umount -l $tmpdir
-    rmdir $tmpdir
+    sudo rmdir $tmpdir
+    return 4
   fi
   sudo cvmfs_talk -i atlas.cern.ch tear down to read-only || return 3
   sudo mount -o remount,ro $tmpdir
   retval=$?
   cvmfs_umount atlas.cern.ch
   sudo umount -l $tmpdir
-  rmdir $tmpdir
+  sudo rmdir $tmpdir
 
   return $retval
 }

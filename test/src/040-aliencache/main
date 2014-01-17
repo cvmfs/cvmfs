@@ -4,7 +4,8 @@ cvmfs_test_name="Alien cache"
 cvmfs_run_test() {
   logfile=$1
 
-  local tmpdir=$(sudo mktemp -d --tmpdir=/var/lib/cvmfs)
+  local tmpdir=$(sudo mktemp -d /var/lib/cvmfs/tmp.XXXXXXXX)
+  [ x"$tmpdir" = x"" ] && return 9
   echo "tmpdir is $tmpdir"
   sudo chown cvmfs:cvmfs $tmpdir
   sudo cvmfs2 __MK_ALIEN_CACHE__ "$tmpdir" $(id -u cvmfs) $(id -g cvmfs) || return 2  
@@ -24,7 +25,7 @@ cvmfs_run_test() {
   fi
 
   local cachedir=$(cvmfs_config showconfig atlas.cern.ch | grep CVMFS_CACHE_DIR | cut -d" " -f1 | cut -d= -f2)
-  local subdirs=$(find $cachedir -mindepth 1 -type d | wc -l)
+  local subdirs=$(sudo find $cachedir -mindepth 1 -type d | wc -l)
   if [ "$subdirs" != 0 ]; then
     ls $cachedir
     return 4
