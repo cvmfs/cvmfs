@@ -80,7 +80,7 @@ void CommandScrub::FileCallback(const std::string &relative_path,
   const std::string full_path = repo_path_ + "/" + relative_path + "/" + file_name;
 
   if (relative_path == kTxnDirectoryName) {
-    PrintWarning("transaction directory should be empty", full_path);
+    // transaction directory should be ignored
     return;
   }
 
