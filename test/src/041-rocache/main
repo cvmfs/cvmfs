@@ -17,14 +17,14 @@ cvmfs_run_test() {
     echo "r/o remount is not supposed to work at this stage"
     cvmfs_umount atlas.cern.ch
     sudo umount -l $tmpdir
-    rmdir $tmpdir
+    sudo rmdir $tmpdir
   fi
   sudo cvmfs_talk -i atlas.cern.ch tear down to read-only || return 3
   sudo mount -o remount,ro $tmpdir
   retval=$?
   cvmfs_umount atlas.cern.ch
   sudo umount -l $tmpdir
-  rmdir $tmpdir
+  sudo rmdir $tmpdir
 
   return $retval
 }
