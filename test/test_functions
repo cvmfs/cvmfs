@@ -632,6 +632,15 @@ publish_repo() {
   return 0
 }
 
+
+# sources the repository server configuration file for the given repo name
+# @param name  the name of the repository to load the configs for
+load_repo_config() {
+  local name=$1
+  . /etc/cvmfs/repositories.d/${name}/server.conf
+}
+
+
 # runs the given command and measures the time it took to execute
 stop_watch() {
   begin=$(date +%s)

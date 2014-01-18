@@ -38,18 +38,23 @@ class CommandScrub : public Command {
     shash::Any        expected_hash_;
   };
 
-  class FileScrubbingTask : public upload::AbstractFileScrubbingTask<StoredFile> {
+  class StoredFileScrubbingTask :
+                          public upload::AbstractFileScrubbingTask<StoredFile> {
    public:
-    FileScrubbingTask(StoredFile           *file,
-                      upload::CharBuffer *buffer,
-                      const bool          is_last_piece) :
-      upload::AbstractFileScrubbingTask<StoredFile>(file, buffer, is_last_piece) {}
+    StoredFileScrubbingTask(StoredFile              *file,
+                            upload::CharBuffer      *buffer,
+                            const bool               is_last_piece,
+                            upload::AbstractReader  *reader) :
+      upload::AbstractFileScrubbingTask<StoredFile>(file,
+                                                    buffer,
+                                                    is_last_piece,
+                                                    reader) {}
 
    protected:
     tbb::task* execute();
   };
 
-  typedef upload::Reader<FileScrubbingTask, StoredFile> ScrubbingReader;
+  typedef upload::Reader<StoredFileScrubbingTask, StoredFile> ScrubbingReader;
 
  public:
   CommandScrub() : reader_(NULL), warnings_(0) {}
@@ -67,6 +72,8 @@ class CommandScrub : public Command {
  protected:
   void FileCallback(const std::string &relative_path,
                     const std::string &file_name);
+  void DirCallback(const std::string &relative_path,
+                   const std::string &dir_name);
   void SymlinkCallback(const std::string &relative_path,
                        const std::string &symlink_name);
 
@@ -79,11 +86,14 @@ class CommandScrub : public Command {
   std::string CheckPathAndExtractHash(const std::string &relative_path,
                                       const std::string &file_name,
                                       const std::string &full_path) const;
+  bool CheckHashString(const std::string &hash_string,
+                       const std::string &full_path) const;
 
  private:
-  std::string           repo_path_;
-  ScrubbingReader      *reader_;
-  mutable unsigned int  warnings_;
+  std::string              repo_path_;
+  ScrubbingReader         *reader_;
+  mutable unsigned int     warnings_;
+  mutable pthread_mutex_t  warning_mutex_;
 };
 
 }
