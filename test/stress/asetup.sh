@@ -19,16 +19,16 @@ stress_single() {
   id=$1
 
   echo "[$id] Start stress test"
+  cd $id
   rm -f .stopped
   rm -f benchmark
   while [ ! -f .stop ]; do
-    rm -f .asetup.save
     local next_release=$(select_random)
     echo "[$id] Setup release $next_release"
     local start_time=`date -u +%s`
-    sh -c "source ${RELEASE_BASE}/${next_release}/cmtsite/asetup.sh ${next_release},notest --cmtconfig ${PLATFORM}" > /dev/null 2>&1
+    source_output=$(sh -c "source ${RELEASE_BASE}/${next_release}/cmtsite/asetup.sh ${next_release},notest --cmtconfig ${PLATFORM} 2>/dev/null && echo \$AtlasArea")
     local end_time=`date -u +%s`
-    if [ ! -f .asetup.save ]; then
+    if ! echo "$source_output" | tail -n1 | grep -q $next_release; then
       echo "ERROR: failure while setup release ${RELEASE_BASE}/${next_release}" 1>&2
     else
       local duration=$(($end_time - $start_time))
@@ -54,9 +54,7 @@ for i in $(seq 1 $CPUS); do
   id=$(mkId $i)
   rm -rf "$id"
   mkdir $id
-  cd $id
   stress_single $id &
-  cd ..
 done
 
 while [ ! -f .stop ]; do
@@ -68,10 +66,10 @@ for i in $(seq 1 $CPUS); do
   touch "$(mkId $i)"/.stop
 done
 for i in $(seq 1 $CPUS); do
-  while [ ! "$(mkId $i)"/.stopped ]; do
+  while [ ! -f "$(mkId $i)"/.stopped ]; do
     sleep 1
   done
 done
 echo "STOPPED"
-rm .stop
+rm -f .stop
 
