@@ -48,8 +48,8 @@ cvmfs_run_test() {
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   local preload_dir=$scratch_dir/preload_dir
   echo "preloading $preload_dir"

@@ -184,8 +184,8 @@ copy_version() {
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "check if requested nested catalogs are present"
   check_catalog_configuration $version $repo_name || return $?

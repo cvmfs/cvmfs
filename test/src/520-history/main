@@ -221,8 +221,8 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "current tag statistics:"
   cvmfs_server lstags $CVMFS_TEST_REPO
@@ -250,8 +250,8 @@ cvmfs_run_test() {
   echo "compare to reference directory"
   compare_directories $repo_dir $reference_dir2 || return 10
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "current tag statistics:"
   cvmfs_server lstags $CVMFS_TEST_REPO
@@ -315,8 +315,8 @@ cvmfs_run_test() {
   echo "compare to reference directory"
   compare_directories $repo_dir $reference_dir1 || return 17
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "current tag statistics:"
   cvmfs_server lstags $CVMFS_TEST_REPO
@@ -349,8 +349,8 @@ cvmfs_run_test() {
     iterations=$(( $iterations - 1))
   done
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   # ============================================================================
 
@@ -365,8 +365,8 @@ cvmfs_run_test() {
   echo "compare to reference directory"
   compare_directories $repo_dir $reference_dir1 || return 20
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "current tag statistics:"
   cvmfs_server lstags $CVMFS_TEST_REPO

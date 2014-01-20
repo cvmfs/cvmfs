@@ -116,8 +116,8 @@ cvmfs_run_test() {
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "unmounting repository"
   sudo umount $repo_dir || return 4
@@ -142,8 +142,8 @@ cvmfs_run_test() {
     -o $CVMFS_TEST_USER \
     $CVMFS_TEST_REPO || return 10
 
-  echo "validating catalogs"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "creating new revision of recreated repository"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -154,8 +154,8 @@ cvmfs_run_test() {
   echo "publish changes"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "check the catalogs again"
-  check_catalogs $CVMFS_TEST_REPO || return $? 
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   return 0
 }

@@ -137,8 +137,8 @@ cvmfs_run_test() {
   echo "--> redirecting publishing output to publish_output.log"
   publish_repo $CVMFS_TEST_REPO > publish_output.log || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "find location of backend storage"
   load_repo_config $CVMFS_TEST_REPO || return 4

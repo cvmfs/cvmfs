@@ -21,8 +21,8 @@ cvmfs_run_test() {
   echo "--> redirecting publishing output to publish_output_1.log"
   publish_repo $CVMFS_TEST_REPO > publish_output_1.log || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "find out how many file system items are in the repo"
   local num_1
@@ -44,8 +44,8 @@ cvmfs_run_test() {
   echo "--> redirecting publishing output to publish_output_2.log"
   publish_repo $CVMFS_TEST_REPO > publish_output_2.log || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "check if all nested catalogs are present"
   for dir in $(find $repo_dir -maxdepth 1 -mindepth 1 -type d); do
