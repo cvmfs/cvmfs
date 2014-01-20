@@ -101,7 +101,7 @@ class Manifest:
 class CatalogReference:
 	""" Wraps a catalog reference to nested catalogs as found in Catalogs """
 
-	def __init__(self, root_path, clg_hash, clg_size):
+	def __init__(self, root_path, clg_hash, clg_size = 0):
 		self.root_path = root_path
 		self.hash      = clg_hash
 		self.size      = clg_size
@@ -240,13 +240,16 @@ class Catalog:
 
 	def ListNested(self):
 		""" List CatalogReferences to all contained nested catalogs """
-		catalogs = self.RunSql("SELECT path, sha1, size FROM nested_catalogs;")
-		nested_catalogs = []
-		for catalog in catalogs:
-			nested_catalogs.append(CatalogReference(catalog[0],
-				                                    catalog[1],
-				                                    catalog[2]))
-		return nested_catalogs
+		new_version = (self.schema <= 1.2 and self.schema_revision > 0)
+		if new_version:
+			sql_query = "SELECT path, sha1, size FROM nested_catalogs;"
+		else:
+			sql_query = "SELECT path, sha1 FROM nested_catalogs;"
+		catalogs = self.RunSql(sql_query)
+		if new_version:
+			return [ CatalogReference(clg[0], clg[1], clg[2]) for clg in catalogs ]
+		else:
+			return [ CatalogReference(clg[0], clg[1]) for clg in catalogs ]
 
 
 	def FindNestedForPath(self, needle_path):
@@ -345,6 +348,8 @@ class Catalog:
 		props = self.RunSql("SELECT key, value FROM properties;")
 		for prop in props:
 			self._ReadProperty(prop)
+		if not hasattr(self, 'schema_revision'):
+			self.schema_revision = 0
 
 
 	def _ReadProperty(self, prop):
@@ -355,6 +360,8 @@ class Catalog:
 			self.revision          = prop_value
 		if prop_key == "schema":
 			self.schema            = float(prop_value)
+		if prop_key == "schema_revision":
+			self.schema_revision   = int(prop_value)
 		if prop_key == "last_modified":
 			self.last_modified     = datetime.datetime.fromtimestamp(int(prop_value))
 		if prop_key == "previous_revision":
