@@ -66,15 +66,17 @@ class Sql {
     last_error_code_ = sqlite3_bind_null(statement_, index);
     return Successful();
   }
-  bool BindText(const int index, const std::string &value) {
-    last_error_code_ = sqlite3_bind_text(statement_, index,
-                                         value.data(), value.length(),
-                                         SQLITE_STATIC);
-    return Successful();
+  bool BindTextTransient(const int index, const std::string &value) {
+    return BindText(index, value.data(), value.length(), SQLITE_TRANSIENT);
   }
-  bool BindText(const int index, const char* value, const int size) {
-    last_error_code_ = sqlite3_bind_text(statement_, index, value, size,
-                                         SQLITE_STATIC);
+  bool BindText(const int index, const std::string &value) {
+    return BindText(index, value.data(), value.length(), SQLITE_STATIC);
+  }
+  bool BindText(const int   index,
+                const char* value,
+                const int   size,
+                void(*dtor)(void*) = SQLITE_STATIC) {
+    last_error_code_ = sqlite3_bind_text(statement_, index, value, size, dtor);
     return Successful();
   }
 
