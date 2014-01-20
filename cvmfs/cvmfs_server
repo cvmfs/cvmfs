@@ -2006,17 +2006,17 @@ check() {
   repository_dir=$(get_upstream_config $upstream)
 
   # do it!
-  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
-  [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
-
-  echo "Verifying $name"
-  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
-
   if [ $check_integrity -ne 0 ]; then
     echo
     echo "Checking Storage Integrity of $name ... (may take a while)"
-    cvmfs_swissknife scrub -r ${repository_dir}/data
+    cvmfs_swissknife scrub -r ${repository_dir}/data || die "FAIL!"
   fi
+
+  [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
+  [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
+
+  echo "Verifying Catalog Integrity of $name ..."
+  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
 }
 
 
