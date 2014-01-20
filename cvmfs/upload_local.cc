@@ -107,16 +107,16 @@ int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
   const std::string tmp_path = CreateTempPath(temporary_path_ + "/" + "chunk",
                                               0644);
   if (tmp_path.empty()) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "Failed to create temp file for "
-                                          "upload of file chunk.");
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to create temp file for upload of "
+                                      "file chunk.");
     atomic_inc32(&copy_errors_);
     return -1;
   }
 
   const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
   if (tmp_fd < 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "Failed to open temp file '%s' for "
-                                          "upload of file chunk (errno: %d",
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to open temp file '%s' for upload "
+                                      "of file chunk (errno: %d)",
              tmp_path.c_str(), errno);
     unlink(tmp_path.c_str());
     atomic_inc32(&copy_errors_);
