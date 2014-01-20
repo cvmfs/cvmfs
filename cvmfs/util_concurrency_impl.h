@@ -14,7 +14,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 
 template <typename T>
-Future<T>::Future() : object_was_set_(false) {
+Future<T>::Future() : object_(), object_was_set_(false) {
   const bool init_successful = (pthread_mutex_init(&mutex_, NULL)     == 0   &&
                                 pthread_cond_init(&object_set_, NULL) == 0);
   assert (init_successful);
