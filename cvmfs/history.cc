@@ -219,7 +219,7 @@ std::string Database::GetLastErrorMsg() const {
 bool SqlTag::BindTag(const Tag &tag) {
   return (
     BindText(1, tag.name) &&
-    BindText(2, tag.root_hash.ToString()) &&
+    BindTextTransient(2, tag.root_hash.ToString()) && // temporary from ToString
     BindInt64(3, tag.revision) &&
     BindInt64(4, tag.timestamp) &&
     BindInt64(5, tag.channel) &&
