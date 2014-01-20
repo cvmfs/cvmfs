@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include "../logging.h"
+
 
 namespace upload { // TODO: remove this... wrong namespace (for testing)
 
@@ -90,6 +92,11 @@ bool Reader<FileScrubbingTaskT, FileT>::TryToAcquireNewJob(FileJob &next_job) {
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
   const int fd = open(file->path().c_str(), O_RDONLY, 0);
+  if (fd < 0 && errno == EMFILE) {
+    LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to a lack of file"
+                                      "descriptors! Please increase this limit. "
+                                      "(see unlimit -n)");
+  }
   assert (fd > 0);
 
   OpenFile open_file;
