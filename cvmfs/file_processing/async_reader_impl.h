@@ -3,7 +3,7 @@
  */
 
 #include "../logging.h"
-
+#include <cerrno>
 
 namespace upload { // TODO: remove this... wrong namespace (for testing)
 
