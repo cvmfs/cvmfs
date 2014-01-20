@@ -544,6 +544,12 @@ contains() {
 }
 
 
+_cleanup_tmrc() {
+  local tmpdir=$1
+  umount ${tmpdir}/c > /dev/null 2>&1 || umount -l > /dev/null 2>&1
+  rm -fR ${tmpdir}   > /dev/null 2>&1
+}
+
 # for some reason `mount -o remount,(ro|rw) /cvmfs/$name` does not work on older
 # platforms if we set the SELinux context=... parameter in /etc/fstab
 # this dry-runs the whole mount, remount, unmount cycle to find out if it works
@@ -556,10 +562,9 @@ try_mount_remount_cycle_aufs() {
   mount -t aufs \
     -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
     try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
-  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
-  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
-  rm -fR ${tmpdir}
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
+  _cleanup_tmrc $tmpdir
   return 0
 }
 
@@ -572,10 +577,9 @@ try_mount_remount_cycle_overlayfs() {
   mount -t overlayfs \
     -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
     try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
-  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
-  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
-  rm -fR ${tmpdir}
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
+  _cleanup_tmrc $tmpdir
   return 0
 }
 

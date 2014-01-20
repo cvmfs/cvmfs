@@ -8,6 +8,16 @@ ut_retval=0
 it_retval=0
 mg_retval=0
 
+# check $PATH variable
+extend_path() {
+  local path_entry=$1
+  if ! echo "$PATH" | grep -q $path_entry; then
+    export PATH="$PATH:$path_entry"
+  fi
+}
+extend_path "/usr/sbin"
+extend_path "/sbin"
+
 # running unit test suite
 run_unittests --gtest_shuffle || ut_retval=$?
 

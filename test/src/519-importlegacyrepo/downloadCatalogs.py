@@ -79,8 +79,11 @@ def downloadCatalog(repositoryUrl, catalogName, catalogDirectory, beVerbose):
 		if beVerbose:
 			print "retrieving " + catalogName + " - " + str(fileSize) + " bytes"
 
-		with open(dest, "wb") as local_file:
+		local_file = open(dest, "wb")
+		try:
 			local_file.write(f.read())
+		finally:
+			local_file.close()
 	except HTTPError, e:
 		printError("HTTP: " + e.code + url)
 	except URLError, e:
