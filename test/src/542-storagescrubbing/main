@@ -306,7 +306,7 @@ cvmfs_run_test() {
 #
 
   echo "cvmfs_server check should NOT report a sane repository after this rage"
-  check_catalogs $CVMFS_TEST_REPO && return 24
+  check_repository $CVMFS_TEST_REPO && return 24
 
   return 0
 }
