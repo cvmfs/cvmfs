@@ -14,8 +14,8 @@
 
 # internal script configuration
 script_location=$(dirname $(readlink --canonicalize $0))
-reachability_timeout=90   # * 10 seconds
-accessibility_timeout=270 # * 10 seconds
+reachability_timeout=1800  # (  30 minutes )
+accessibility_timeout=7200 # ( 120 minutes )
 keys_package_base_url="https://ecsft.cern.ch/dist/cvmfs/cvmfs-keys"
 
 # static information (check also remote_setup.sh and remote_run.sh)
@@ -188,7 +188,7 @@ wait_for_virtual_machine() {
   local timeout=$reachability_timeout
   while [ $timeout -gt 0 ] && ! ping -c 1 $ip > /dev/null 2>&1; do
     sleep 10
-    timeout=$(( $timeout - 1 ))
+    timeout=$(( $timeout - 10 ))
   done
   if ! check_timeout $timeout; then return 1; fi
 
@@ -202,7 +202,7 @@ wait_for_virtual_machine() {
                                    -o BatchMode=yes                \
               ${username}@${ip} 'echo hallo' > /dev/null 2>&1; do
     sleep 10
-    timeout=$(( $timeout - 1 ))
+    timeout=$(( $timeout - 10 ))
   done
   if ! check_timeout $timeout; then return 1; fi
 }
