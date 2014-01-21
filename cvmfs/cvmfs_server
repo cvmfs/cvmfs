@@ -885,6 +885,10 @@ reload_apache() {
    echo "done"
 }
 
+restart_apache() {
+  ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null
+}
+
 
 # lowers restrictions of hardlink creation if needed
 # allows AUFS to properly whiteout files without root privileges
@@ -928,7 +932,7 @@ ensure_enabled_apache_modules() {
 
   # restart apache if needed
   if [ $restart -ne 0 ]; then
-    ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null 2>&1 | { echo "Warning: Failed to restart apache after enabling necessary modules"; retcode=2; }
+    restart_apache 2>/dev/null | { echo "Warning: Failed to restart apache after enabling necessary modules"; retcode=2; }
   fi
 
   return $retcode
