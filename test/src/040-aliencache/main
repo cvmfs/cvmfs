@@ -25,9 +25,9 @@ cvmfs_run_test() {
   fi
 
   local cachedir=$(cvmfs_config showconfig atlas.cern.ch | grep CVMFS_CACHE_DIR | cut -d" " -f1 | cut -d= -f2)
-  local subdirs=$(sudo find $cachedir -mindepth 1 -type d | wc -l)
+  local subdirs=$(sudo find $cachedir -maxdepth 1 -type d ! -name "nfs_maps*" | wc -l)
   if [ "$subdirs" != 0 ]; then
-    ls $cachedir
+    sudo ls $cachedir
     return 4
   fi
  
