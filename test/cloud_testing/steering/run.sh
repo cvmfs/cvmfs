@@ -102,9 +102,12 @@ check_retcode() {
 
 
 check_timeout() {
-  timeout_state=$1
+  local timeout_state=$1
+  local timeout_start=$2
+  local waiting_time=$(( ( $timeout_start - $timeout_state ) / 60 ))
+
   [ $timeout_state -ne 0 ]
-  check_retcode $?
+  check_retcode $? "waited $waiting_time minutes"
 }
 
 
@@ -196,7 +199,7 @@ wait_for_virtual_machine() {
     sleep 10
     timeout=$(( $timeout - 10 ))
   done
-  if ! check_timeout $timeout; then return 1; fi
+  if ! check_timeout $timeout $reachability_timeout; then return 1; fi
 
   # wait for the virtual machine to become accessible via ssh
   echo -n "waiting for VM ($ip) to become accessible... "
@@ -210,7 +213,7 @@ wait_for_virtual_machine() {
     sleep 10
     timeout=$(( $timeout - 10 ))
   done
-  if ! check_timeout $timeout; then return 1; fi
+  if ! check_timeout $timeout $accessibility_timeout; then return 1; fi
 }
 
 
