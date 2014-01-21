@@ -84,11 +84,17 @@ usage() {
 
 check_retcode() {
   local retcode=$1
+  local additional_msg="$2"
 
   if [ $retcode -ne 0 ]; then
-    echo "fail"
+    echo -n "fail"
   else
-    echo "okay"
+    echo -n "okay"
+  fi
+  if [ x"$additional_msg" != x"" ]; then
+    echo " ($additional_msg)"
+  else
+    echo ""
   fi
 
   return $retcode
