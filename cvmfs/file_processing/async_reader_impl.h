@@ -95,7 +95,7 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
   if (fd < 0 && errno == EMFILE) {
     LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to a lack of file"
                                       "descriptors! Please increase this limit. "
-                                      "(see unlimit -n)");
+                                      "(see ulimit -n)");
   }
   assert (fd > 0);
 
