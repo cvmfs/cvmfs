@@ -80,7 +80,7 @@ void SynchronizingCounter<T>::SetValueUnprotected(const T new_value) {
     pthread_cond_broadcast(&became_zero_);
   }
 
-  if (maximal_value_ != T(0) && value_ < maximal_value_) {
+  if (HasMaximalValue() && value_ < maximal_value_) {
     pthread_cond_broadcast(&free_slot_);
   }
 }
