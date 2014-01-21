@@ -14,8 +14,8 @@
 
 # internal script configuration
 script_location=$(dirname $(readlink --canonicalize $0))
-reachability_timeout=90   # * 10 seconds
-accessibility_timeout=270 # * 10 seconds
+reachability_timeout=1800  # (  30 minutes )
+accessibility_timeout=7200 # ( 120 minutes )
 keys_package_base_url="https://ecsft.cern.ch/dist/cvmfs/cvmfs-keys"
 
 # static information (check also remote_setup.sh and remote_run.sh)
@@ -84,11 +84,17 @@ usage() {
 
 check_retcode() {
   local retcode=$1
+  local additional_msg="$2"
 
   if [ $retcode -ne 0 ]; then
-    echo "fail"
+    echo -n "fail"
   else
-    echo "okay"
+    echo -n "okay"
+  fi
+  if [ x"$additional_msg" != x"" ]; then
+    echo " ($additional_msg)"
+  else
+    echo ""
   fi
 
   return $retcode
@@ -96,9 +102,12 @@ check_retcode() {
 
 
 check_timeout() {
-  timeout_state=$1
+  local timeout_state=$1
+  local timeout_start=$2
+  local waiting_time=$(( ( $timeout_start - $timeout_state ) / 60 ))
+
   [ $timeout_state -ne 0 ]
-  check_retcode $?
+  check_retcode $? "waited $waiting_time minutes"
 }
 
 
@@ -188,9 +197,9 @@ wait_for_virtual_machine() {
   local timeout=$reachability_timeout
   while [ $timeout -gt 0 ] && ! ping -c 1 $ip > /dev/null 2>&1; do
     sleep 10
-    timeout=$(( $timeout - 1 ))
+    timeout=$(( $timeout - 10 ))
   done
-  if ! check_timeout $timeout; then return 1; fi
+  if ! check_timeout $timeout $reachability_timeout; then return 1; fi
 
   # wait for the virtual machine to become accessible via ssh
   echo -n "waiting for VM ($ip) to become accessible... "
@@ -202,9 +211,9 @@ wait_for_virtual_machine() {
                                    -o BatchMode=yes                \
               ${username}@${ip} 'echo hallo' > /dev/null 2>&1; do
     sleep 10
-    timeout=$(( $timeout - 1 ))
+    timeout=$(( $timeout - 10 ))
   done
-  if ! check_timeout $timeout; then return 1; fi
+  if ! check_timeout $timeout $accessibility_timeout; then return 1; fi
 }
 
 
