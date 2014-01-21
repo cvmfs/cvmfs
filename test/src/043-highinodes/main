@@ -11,7 +11,7 @@ cvmfs_run_test() {
     "CVMFS_USYSLOG=/tmp/usyslog" 
   df | grep lhcb.cern.ch || return 2
 
-  sudo sh -c "tail -2 /tmp/usyslog | grep 32bit"  
+  sudo sh -c "cat /tmp/usyslog | grep 32bit"  
   RETVAL=$?
 
   sudo rm -f /tmp/usyslog*
