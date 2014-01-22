@@ -5,6 +5,3 @@ Nagios check for the cvmfs client
 
 tools
 Python scripts to access repository catalogs
-
-cvmfs.bash_completion
-Bash completion script for cvmfs_config.
