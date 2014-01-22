@@ -16,7 +16,7 @@ cd ${SOURCE_DIRECTORY}/test
                           src/007-testjobs             \
                           src/024-reload-during-asetup \
 			  src/035-unpinumount          \
-                          src/043-highinodes           \
+                          src/042-cleanuppipes         \
                           src/5* || it_retval=$?
 
 echo "running CernVM-FS migration test cases..."
