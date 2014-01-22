@@ -203,6 +203,7 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
+mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
 
 # Keys are in cvmfs-keys
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -294,6 +295,8 @@ fi
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %config %{_sysconfdir}/cvmfs/default.conf
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
+%dir %{_sysconfdir}/bash_completion.d
+%config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README ChangeLog
 
 %files devel 
