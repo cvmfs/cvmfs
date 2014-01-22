@@ -5,6 +5,8 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+from manifest import *
+
 import subprocess
 import re
 
