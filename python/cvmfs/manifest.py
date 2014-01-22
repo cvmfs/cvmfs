@@ -8,14 +8,14 @@ This file is part of the CernVM File System auxiliary tools.
 from datetime import datetime
 from dateutil.tz import tzutc
 
-class UnknownManifestField:
+class UnknownManifestField(Exception):
     def __init__(self, key_char):
         self.key_char = key_char
 
     def __str__(self):
         return self.key_char
 
-class ManifestValidityError:
+class ManifestValidityError(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
 
