@@ -203,7 +203,6 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
-mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
 
 # Keys are in cvmfs-keys
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -226,9 +225,6 @@ popd
 # Hardlink identical policy module packages together
 /usr/sbin/hardlink -cv $RPM_BUILD_ROOT%{_datadir}/selinux
 %endif
-
-# Install bash_completion scripts.
-install -p -m 0644 add-ons/cvmfs.bash_completion $RPM_BUILD_ROOT/etc/bash_completion.d/cvmfs
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -298,8 +294,6 @@ fi
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %config %{_sysconfdir}/cvmfs/default.conf
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
-%dir %{_sysconfdir}/bash_completion.d
-%config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README ChangeLog
 
 %files devel 
@@ -331,8 +325,6 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
-* Mon Jan 13 2014 Steve Traylen <steve.traylen@cern.ch> - 2.1.17
-- Add bash completion script
 * Tue Jan 21 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.17
 - SL4 compatibility fixes
 * Fri Dec 20 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16
