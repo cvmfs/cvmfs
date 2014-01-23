@@ -22,6 +22,7 @@ class CvmfsNotInstalled(Exception):
     def __init__(self):
         Exception.__init__(self, "It seems that cvmfs is not installed on this machine!")
 
+
 def _split_md5(md5digest):
     hi = lo = 0
     for i in range(0, 8):
@@ -29,3 +30,14 @@ def _split_md5(md5digest):
     for i in range(8,16):
         hi = hi | (ord(md5digest[i]) << ((i - 8) * 8))
     return ctypes.c_int64(lo).value, ctypes.c_int64(hi).value  # signed int!
+
+def _combine_md5(lo, hi):
+    md5digest = [ '\x00','\x00','\x00','\x00','\x00','\x00','\x00','\x00',
+                  '\x00','\x00','\x00','\x00','\x00','\x00','\x00','\x00' ]
+    for i in range(0, 8):
+        md5digest[i] = chr(lo & 0xFF)
+        lo = lo >> 8
+    for i in range(8,16):
+        md5digest[i] = chr(hi & 0xFF)
+        hi = hi >> 8
+    return ''.join(md5digest)
