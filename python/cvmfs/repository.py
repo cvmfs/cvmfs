@@ -16,6 +16,7 @@ from dateutil.tz import tzutc
 import _common
 import cvmfs
 from manifest import Manifest
+from catalog import Catalog
 
 class RepositoryNotFound(Exception):
     def __init__(self, repo_path):
@@ -60,6 +61,7 @@ class CannotReplicate(Exception):
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
     def __init__(self):
+        self._opened_catalogs = {}
         self._read_manifest()
         self._try_to_get_last_replication_timestamp()
         self._try_to_get_replication_state()
@@ -128,9 +130,17 @@ class Repository:
 
     def retrieve_catalog(self, catalog_hash):
         """ Download and open a catalog from the repository """
+        if catalog_hash in self._opened_catalogs:
+            return self._opened_catalogs[catalog_hash]
+        else:
+            return self._retrieve_and_open_catalog(catalog_hash)
+
+    def _retrieve_and_open_catalog(self, catalog_hash):
         catalog_path = "data/" + catalog_hash[:2] + "/" + catalog_hash[2:] + "C"
         catalog_file = self.retrieve_file(catalog_path)
-        return Catalog(catalog_file)
+        new_catalog = Catalog(catalog_file)
+        self._opened_catalogs[catalog_hash] = new_catalog
+        return new_catalog
 
 
 
