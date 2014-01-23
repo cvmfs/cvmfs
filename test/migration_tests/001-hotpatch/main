@@ -40,82 +40,82 @@ cvmfs_run_test() {
 
   # download upstream package
   current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
-  echo "Version of testee:        $current_version" >> $logfile
+  echo "Version of testee:        $current_version"
   previous_version=$(decrement_version $current_version)
-  echo "Version to be downloaded: $previous_version" >> $logfile
+  echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
-  echo "Download URL:             $upstream_package_url" >> $logfile
-  wget --no-check-certificate --quiet $upstream_package_url >> $logfile 2>&1 || return 2
+  echo "Download URL:             $upstream_package_url"
+  wget --no-check-certificate --quiet $upstream_package_url || return 2
   upstream_package=$(basename $upstream_package_url)
-  echo "Upstream Package:         $upstream_package"  >> $logfile
+  echo "Upstream Package:         $upstream_package"
 
   # make sure that there is no version of CernVM-FS installed
   if is_installed "cvmfs"; then
     installed_version=$(installed_package_version "cvmfs")
-    echo "uninstalling CernVM-FS $installed_version" >> $logfile
-    uninstall_package "cvmfs" >> $logfile 2>&1 || return 3
+    echo "uninstalling CernVM-FS $installed_version"
+    uninstall_package "cvmfs" || return 3
   fi
 
   # install the upstream CernVM-FS package
-  echo "installing CernVM-FS $previous_version" >> $logfile
-  install_package $upstream_package >> $logfile 2>&1 || return 4
+  echo "installing CernVM-FS $previous_version"
+  install_package $upstream_package || return 4
 
   # make sure that autofs is running
-  echo "switching on autofs" >> $logfile
-  autofs_switch on  >> $logfile 2>&1 || return 5
-  autofs_switch off >> $logfile 2>&1 || return 5
-  autofs_switch on  >> $logfile 2>&1 || return 5
+  echo "switching on autofs"
+  autofs_switch on  || return 5
+  autofs_switch off || return 5
+  autofs_switch on  || return 5
 
   # make CernVM-FS ready to go
-  echo "setting up CernVM-FS (cvmfs_config setup)" >> $logfile
-  sudo cvmfs_config setup    >> $logfile 2>&1 || return 6
-  sudo cvmfs_config chksetup >> $logfile 2>&1 || return 6
+  echo "setting up CernVM-FS (cvmfs_config setup)"
+  sudo cvmfs_config setup    || return 6
+  sudo cvmfs_config chksetup || return 6
 
   # mount a repository
-  echo "mounting sft.cern.ch" >> $logfile
-  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=10" >> $logfile 2>&1 || return 7
+  echo "mounting sft.cern.ch"
+  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=10" || return 7
 
   # do some hammering on the file system (without interruption)
-  echo "tar $src_dir (without interruption)" >> $logfile
+  echo "tar $src_dir (without interruption)"
   md5_1=$(tar_gzip_and_hash $src_dir $tar_log1)
 
   # do some hammering on the file system
-  sudo cvmfs_talk -i sft cleanup 0 >> $logfile
-  echo "starting to tar $src_dir (log output in separate file)" >> $logfile
+  sudo cvmfs_talk -i sft cleanup 0
+  echo "starting to tar $src_dir (log output in separate file)"
   tar_gzip_and_hash $src_dir $tar_log2 $md5_output &
   local tar_pid=$!
-  echo "tar runs under PID $tar_pid" >> $logfile
+  echo "tar runs under PID $tar_pid"
 
   # wait some time to bring tar up to speed
-  echo "giving tar some time to screw around" >> $logfile
-  sleep 5 >> $logfile 2>&1 || return 10
+  echo "giving tar some time to screw around"
+  sleep 5 || return 10
 
-  echo "==><><><><><><><><><><==" >> $logfile
-  echo "==> FUN STARTS HERE  <==" >> $logfile
-  echo "==><><><><><><><><><><==" >> $logfile
+  echo "==><><><><><><><><><><=="
+  echo "==> FUN STARTS HERE  <=="
+  echo "==><><><><><><><><><><=="
 
   # do the CernVM-FS package update
-  echo "updating CernVM-FS package to version $current_version" >> $logfile
+  echo "updating CernVM-FS package to version $current_version"
   kill -0 $tar_pid || return 11 # tar finished already >.<
-  install_package $CVMFS_CLIENT_PACKAGE >> $logfile 2>&1 || return 12
+  install_package $CVMFS_CLIENT_PACKAGE || return 12
   kill -0 $tar_pid || return 13 # tar finished already >.<
 
   # wait for the file system hammering to finish and collect the pieces
-  echo "waiting for tar to be finished... " >> $logfile
-  wait $tar_pid >> $logfile 2>&1 || return 14
+  echo "waiting for tar to be finished... "
+  wait $tar_pid || return 14
   tar_exit_code=$?
-  echo "tar is done (exit code: $tar_exit_code)" >> $logfile
+  echo "tar is done (exit code: $tar_exit_code)"
   md5_2=$(cat $md5_output)
 
   # do some hammering on the file system (after update)
-  echo "tar $src_dir (without interruption - after update)" >> $logfile
+  echo "tar $src_dir (without interruption - after update)"
   md5_3=$(tar_gzip_and_hash $src_dir $tar_log3)
 
   # check the outcome
-  echo "compare the output of all tar runs" >> $logfile
-  echo "MD5 (before update): $md5_1" >> $logfile
-  echo "MD5 (with reload):   $md5_2" >> $logfile
-  echo "MD5 (after update):  $md5_3" >> $logfile
+  echo "compare the output of all tar runs"
+  echo "MD5 (before update): $md5_1"
+  echo "MD5 (with reload):   $md5_2"
+  echo "MD5 (after update):  $md5_3"
   if [ x"$md5_1" != x"$md5_2" ] ||
      [ x"$md5_2" != x"$md5_3" ]; then
     return 18
