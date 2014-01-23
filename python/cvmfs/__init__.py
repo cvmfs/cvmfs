@@ -5,7 +5,11 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-from manifest import *
+from manifest     import *
+from repository   import *
+from availability import *
+from _common      import _split_md5
+from _common      import _combine_md5
 
 import subprocess
 import re
