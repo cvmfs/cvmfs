@@ -1,6 +1,28 @@
 
 cvmfs_test_name="Hotpatching During Linux Kernel TAR"
 
+
+skip_bytes() {
+    local num_of_bytes=$1
+    dd bs=512k 2>/dev/null | { dd bs=$num_of_bytes count=1 > /dev/null 2>&1; dd bs=512k 2>/dev/null; }
+}
+
+tar_gzip_and_hash() {
+    local dir_path=$1
+    local tar_log=$2
+    local result_file=$3
+
+    local md5_result
+    md5_result=$(tar czv $dir_path 2>$tar_log | skip_bytes 6 | md5sum | head -c32)
+
+    if [ x"$result_file" != x"" ]; then
+      echo -n "$md5_result" > $result_file
+    else
+      echo -n "$md5_result"
+    fi
+}
+
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
