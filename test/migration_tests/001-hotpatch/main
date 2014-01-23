@@ -29,6 +29,15 @@ cvmfs_run_test() {
 
   . ${script_location}/../common.sh
 
+  local src_dir='/cvmfs/sft.cern.ch/lcg/external/experimental'
+  local tar_log1="tar_1.log"
+  local tar_log2="tar_2.log"
+  local tar_log3="tar_3.log"
+  local md5_1=""
+  local md5_2=""
+  local md5_3=""
+  local md5_output="async_md5.checksum"
+
   # download upstream package
   current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
   echo "Version of testee:        $current_version" >> $logfile
@@ -67,21 +76,14 @@ cvmfs_run_test() {
   cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=10" >> $logfile 2>&1 || return 7
 
   # do some hammering on the file system (without interruption)
-  echo "tar linux kernel (without interruption)" >> $logfile
-  local linux_source='/cvmfs/sft.cern.ch/lcg/external/experimental/linux'
-  local tar_log="tar.log"
-  touch $tar_log >> $logfile 2>&1 || return 8
-  tar_log=$(readlink --canonicalize $tar_log)
-  echo "TAR log: $tar_log" >> $logfile
-  tar cvf kernel_1.tar.gz $linux_source > $tar_log 2>&1 || return 9
-  local md5_1=$(md5sum kernel_1.tar.gz | cut --delimiter=' ' --field=1)
-  rm -f kernel_1.tar.gz >> $logfile 2>&1 || return 10
+  echo "tar $src_dir (without interruption)" >> $logfile
+  md5_1=$(tar_gzip_and_hash $src_dir $tar_log1)
 
   # do some hammering on the file system
   sudo cvmfs_talk -i sft cleanup 0 >> $logfile
-  echo "starting to tar the linux kernel (log output in separate file)" >> $logfile
-  tar cvf kernel_2.tar.gz $linux_source >> $tar_log 2>&1 &
-  tar_pid=$!
+  echo "starting to tar $src_dir (log output in separate file)" >> $logfile
+  tar_gzip_and_hash $src_dir $tar_log2 $md5_output &
+  local tar_pid=$!
   echo "tar runs under PID $tar_pid" >> $logfile
 
   # wait some time to bring tar up to speed
@@ -103,14 +105,11 @@ cvmfs_run_test() {
   wait $tar_pid >> $logfile 2>&1 || return 14
   tar_exit_code=$?
   echo "tar is done (exit code: $tar_exit_code)" >> $logfile
-  local md5_2=$(md5sum kernel_2.tar.gz | cut --delimiter=' ' --field=1)
-  rm -f kernel_2.tar.gz || return 15
+  md5_2=$(cat $md5_output)
 
   # do some hammering on the file system (after update)
-  echo "tar linux kernel (without interruption - after update)" >> $logfile
-  tar cvf kernel_3.tar.gz $linux_source > $tar_log 2>&1 || return 16
-  local md5_3=$(md5sum kernel_3.tar.gz | cut --delimiter=' ' --field=1)
-  rm -f kernel_3.tar.gz || return 17
+  echo "tar $src_dir (without interruption - after update)" >> $logfile
+  md5_3=$(tar_gzip_and_hash $src_dir $tar_log3)
 
   # check the outcome
   echo "compare the output of all tar runs" >> $logfile
