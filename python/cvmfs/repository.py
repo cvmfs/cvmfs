@@ -109,6 +109,31 @@ class Repository:
         raise Exception("Not implemented!")
 
 
+    def retrieve_root_catalog(self):
+        return self.retrieve_catalog(self.manifest.root_catalog)
+
+
+    def retrieve_catalog_for_path(self, needle_path):
+        """ Recursively walk down the Catalogs and find the best fit for a path """
+        clg = self.retrieve_root_catalog()
+        nested_reference = None
+        while True:
+            new_nested_reference = clg.FindNestedForPath(needle_path)
+            if new_nested_reference == None:
+                break
+            nested_reference = new_nested_reference
+            clg = self.retrieve_catalog(nested_reference.hash)
+        return clg
+
+
+    def retrieve_catalog(self, catalog_hash):
+        """ Download and open a catalog from the repository """
+        catalog_path = "data/" + catalog_hash[:2] + "/" + catalog_hash[2:] + "C"
+        catalog_file = self.retrieve_file(catalog_path)
+        return Catalog(catalog_file)
+
+
+
 
 class LocalRepository(Repository):
     def __init__(self, repo_fqrn):
