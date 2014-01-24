@@ -76,18 +76,21 @@ void SignatureManager::InitX509Store() {
   x509_store_ = X509_STORE_new();
   assert(x509_store_ != NULL);
 
+  unsigned long verify_flags =
+    X509_V_FLAG_CRL_CHECK |
+    X509_V_FLAG_CRL_CHECK_ALL;
+#if OPENSSL_VERSION_NUMBER < 0x00908000L
+  X509_STORE_set_flags(x509_store_, verify_flags);
+#else
   int retval;
   X509_VERIFY_PARAM *param = X509_VERIFY_PARAM_new();
   assert(param != NULL);
-  unsigned long verify_flags =
-    X509_V_FLAG_CRL_CHECK |
-    X509_V_FLAG_CRL_CHECK_ALL |
-    X509_V_FLAG_POLICY_CHECK;
   retval = X509_VERIFY_PARAM_set_flags(param, verify_flags);
   assert(retval == 1);
   retval = X509_STORE_set1_param(x509_store_, param);
   assert(retval == 1);
   X509_VERIFY_PARAM_free(param);
+#endif
 
   x509_lookup_ = X509_STORE_add_lookup(x509_store_, X509_LOOKUP_hash_dir());
   assert(x509_lookup_ != NULL);
@@ -494,8 +497,14 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   EVP_MD_CTX_init(&ctx);
   if (EVP_VerifyInit(&ctx, EVP_sha1()) &&
       EVP_VerifyUpdate(&ctx, buffer, buffer_size) &&
+#if OPENSSL_VERSION_NUMBER < 0x00908000L
+      EVP_VerifyFinal(&ctx, const_cast<unsigned char *>(signature), signature_size,
+                      X509_get_pubkey(certificate_))
+#else
       EVP_VerifyFinal(&ctx, signature, signature_size,
-                      X509_get_pubkey(certificate_)))
+                      X509_get_pubkey(certificate_))
+#endif
+    )
   {
     result = true;
   }

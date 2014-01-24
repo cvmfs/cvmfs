@@ -4,16 +4,23 @@
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
+%if ! 0%{?dist}
+  %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
+  %if 0%{?redhat_major} == 4
+    %define el4 1
+    %define dist .el4
+  %endif
+%endif
 
 %define __strip /bin/true
 %define debug_package %{nil}
-%if 0%{?el6} || 0%{?el5}
+%if 0%{?el6} || 0%{?el5} || 0%{?el4}
 %define __os_install_post %{nil}
 %endif
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.16
+Version: 2.1.17
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -23,8 +30,13 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+%if 0%{?el4}
+BuildRequires: gcc4
+BuildRequires: gcc4-c++
+%else
 BuildRequires: gcc
 BuildRequires: gcc-c++
+%endif
 BuildRequires: cmake
 BuildRequires: fuse-devel
 BuildRequires: pkgconfig
@@ -62,7 +74,7 @@ Requires: fuse-libs
 Requires: glibc-common
 Requires: which
 Requires: shadow-utils
-  %if 0%{?el5}
+  %if 0%{?el5} || 0%{?el4}
 Requires: SysVinit
   %else
 Requires: sysvinit-tools
@@ -131,6 +143,10 @@ cp %{SOURCE1} SELinux
 %endif
 
 %build
+%if 0%{?el4}
+export CC=gcc4
+export CXX=g++4
+%endif
 %if 0%{?suse_version}
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
@@ -187,6 +203,7 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
+mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
 
 # Keys are in cvmfs-keys
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -278,6 +295,8 @@ fi
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %config %{_sysconfdir}/cvmfs/default.conf
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
+%dir %{_sysconfdir}/bash_completion.d
+%config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README ChangeLog
 
 %files devel 
@@ -309,6 +328,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Tue Jan 21 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.17
+- SL4 compatibility fixes
 * Fri Dec 20 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16
 - Add cvmfs_suid_binary
 * Thu Nov 14 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16

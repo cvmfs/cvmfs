@@ -100,8 +100,8 @@ cvmfs_mkfqrn() {
 # @param subcommand   the subcommand to be called
 # @return   0 if the command was recognized
 is_subcommand() {
-  subcommand=$1
-  supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
+  local subcommand="$1"
+  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info lstags check transaction abort snapshot skeleton migrate"
 
   for possible_command in $supported_commands; do
