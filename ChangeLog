@@ -1,3 +1,5 @@
+2.1.17:
+
 2.1.16:
   * Track uncompressed catalog sizes
   * Replace sudo magic in cvmfs_server by cvmfs_suid_helper
