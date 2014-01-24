@@ -140,6 +140,7 @@ const std::string MockUploader_UF::sandbox_tmp_dir = MockUploader_UF::sandbox_pa
 const SpoolerDefinition MockUploader_UF::spooler_definition =
   SpoolerDefinition("mock," + sandbox_path + "," +
                               sandbox_tmp_dir,
+                    shash::kSha1,
                     true,
                     min_chunk_size,
                     avg_chunk_size,

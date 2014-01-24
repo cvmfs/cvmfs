@@ -123,9 +123,12 @@ class T_LocalUploader : public FileSandbox {
     const size_t avg_chunk_size  = 1;   // only testing the upload module.
     const size_t max_chunk_size  = 2;
 
-    return SpoolerDefinition(definition, use_file_chunking, min_chunk_size,
-                                                            avg_chunk_size,
-                                                            max_chunk_size);
+    return SpoolerDefinition(definition,
+                             shash::kSha1,
+                             use_file_chunking,
+                             min_chunk_size,
+                             avg_chunk_size,
+                             max_chunk_size);
   }
 
   Buffers MakeRandomizedBuffers(const unsigned int buffer_count,

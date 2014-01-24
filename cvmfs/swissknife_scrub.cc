@@ -106,9 +106,8 @@ void CommandScrub::DirCallback(const std::string &relative_path,
   if (! dir_name.empty()                      &&
         dir_name.size() != kHashSubtreeLength &&
         dir_name        != kTxnDirectoryName) {
-    std::stringstream ss;
-    ss << "malformed CAS subdir length: " << dir_name.size();
-    PrintWarning(ss.str(), full_path);
+    PrintWarning("malformed CAS subdir length: " +
+                 StringifyInt(dir_name.size()), full_path);
   }
 }
 
@@ -177,9 +176,8 @@ bool CommandScrub::CheckHashString(const std::string &hash_string,
     const char c = hash_string[i];
     if ( ! ( (c >= 48 /* '0' */ && c <=  57 /* '9' */) ||
              (c >= 97 /* 'a' */ && c <= 102 /* 'f' */) ) ) {
-      std::stringstream ss;
-      ss << "illegal hash character (" << c << ") found";
-      PrintWarning(ss.str(), full_path);
+      PrintWarning("illegal hash character (" + string(&c, 1) + ") found",
+                   full_path);
       return false;
     }
   }
