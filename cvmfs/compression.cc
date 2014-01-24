@@ -205,8 +205,8 @@ bool CompressPath2Path(const string &src, const string &dest) {
 
   FILE *fdest = fopen(dest.c_str(), "w");
   if (!fdest) {
-    LogCvmfs(kLogCompress, kLogDebug, "open %s as compression destination "
-             "failed", dest.c_str());
+    LogCvmfs(kLogCompress, kLogDebug, "open %s as compression destination  "
+             "failed with errno=%d", dest.c_str(), errno);
     fclose(fsrc);
     return false;
   }
@@ -234,7 +234,7 @@ bool CompressPath2Path(const string &src, const string &dest,
   FILE *fdest = fopen(dest.c_str(), "w");
   if (!fdest) {
     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression destination "
-             "failed", dest.c_str());
+             "failed with errno=%d", dest.c_str(), errno);
     fclose(fsrc);
     return false;
   }

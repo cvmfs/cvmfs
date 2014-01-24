@@ -43,6 +43,8 @@ SpoolerDefinition::SpoolerDefinition(
   // recognize and configure the spooler driver
   if (upstream[0]        == "local") {
     driver_type = Local;
+  } else if (upstream[0] == "S3") {
+    driver_type = S3;
   } else if (upstream[0] == "mock") {
     driver_type = Unknown; // for unit testing purpose only!
   } else {
