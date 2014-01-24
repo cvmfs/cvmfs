@@ -1,4 +1,5 @@
 2.1.17:
+  * Fix build system for SL4
 
 2.1.16:
   * Track uncompressed catalog sizes
