@@ -9,7 +9,7 @@ ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.12.0
 GOOGLETEST_VERSION=1.7.0
-TBB_VERSION=4.1-4
+TBB_VERSION=4.2-2
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <decompress location>"
@@ -97,7 +97,7 @@ do_copy     "sqlite3"
 do_copy     "vjson"
 
 patch_external "leveldb"  "dont_search_snappy.patch" \
-			  "dont_search_tcmalloc.patch"
+                          "dont_search_tcmalloc.patch"
 patch_external "tbb"      "custom_library_suffix.patch"        \
                           "symlink_to_build_directories.patch"
 patch_external "vjson"    "missing_include.patch"
