@@ -4,7 +4,8 @@
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
-%if ! 0%{?dist}
+%if 0%{?dist}
+%else
   %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
   %if 0%{?redhat_major} == 4
     %define el4 1
