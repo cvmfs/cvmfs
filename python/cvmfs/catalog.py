@@ -12,6 +12,7 @@ import datetime
 import collections
 import md5
 import os
+import subprocess
 
 
 from _common import _split_md5
@@ -198,6 +199,11 @@ class Catalog:
         cursor = self.db_handle_.cursor()
         cursor.execute(sql)
         return cursor.fetchall()
+
+
+    def open_interactive(self):
+        """ Spawns a sqlite shell for interactive catalog database inspection """
+        subprocess.call(['sqlite3', self.catalog_file_.name])
 
 
     def is_root(self):
