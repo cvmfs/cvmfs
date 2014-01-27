@@ -258,6 +258,8 @@ class Catalog:
 
 
     def _canonicalize_path(self, path):
+        if not path:
+            return ""
         return os.path.realpath(path)
 
 
