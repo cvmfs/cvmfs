@@ -1,8 +1,10 @@
-2.1.17:
-  * Fail-over proxy (not host) on HTTP 403 error
+2.1.18:
   * Switch to TBB 4.2 update 2 
   * Bash completion for cvmfs_config and cvmfs_server
   * Fix build system for SL4
+
+2.1.17:
+  * Fix proxy failover on HTTP 403 errors (introduced in 2.1.16)
 
 2.1.16:
   * Track uncompressed catalog sizes
