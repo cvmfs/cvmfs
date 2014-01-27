@@ -316,10 +316,12 @@ class RemoteRepository(Repository):
     def retrieve_file(self, file_name):
         file_url = self._storage_location + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
-        response = requests.get(file_url)
+        response = requests.get(file_url, stream=True)
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(self, file_url)
-        tmp_file.write(response.content)
+        for chunk in response.iter_content(chunk_size=4096):
+            if chunk:
+                tmp_file.write(chunk)
         tmp_file.seek(0)
         tmp_file.flush()
         return tmp_file
