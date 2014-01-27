@@ -9,6 +9,7 @@ import os
 import urlparse
 import tempfile
 import requests
+import collections
 from datetime import datetime
 import dateutil.parser
 from dateutil.tz import tzutc
@@ -57,6 +58,71 @@ class CannotReplicate(Exception):
         return repr(self.repo)
 
 
+class RepositoryIterator:
+    """ Iterates through all directory entries in a whole Repository """
+
+    def __init__(self, repository):
+        self.repository      = repository
+        self.catalog_backlog = collections.deque()
+        self.current_catalog = None
+        self._push(repository.retrieve_root_catalog())
+        self.current_catalog_iterator = self._get_next_catalog_iterator()
+
+
+    def __iter__(self):
+        return self
+
+
+    def next(self):
+        full_path, dirent = self._get_next_dirent()
+        if dirent.is_nested_catalog_mountpoint():
+            self._queue_next_catalog(self.current_catalog, full_path)
+            return self.next() # same directory entry is also in nested catalog
+        return full_path, dirent
+
+
+    def _get_next_dirent(self):
+        try:
+            return self.current_catalog_iterator.next()
+        except StopIteration, e:
+            self.current_catalog_iterator = self._get_next_catalog_iterator()
+            return self.current_catalog_iterator.next()
+
+
+    def _get_next_catalog_iterator(self):
+        if not self._has_more():
+            raise StopIteration()
+        self.current_catalog = self._pop()
+        return self.current_catalog.__iter__()
+
+
+    def _queue_next_catalog(self, catalog, catalog_mountpoint):
+        nested_ref = catalog.find_nested_for_path(catalog_mountpoint)
+        catalog = nested_ref.fetch_from(self.repository)
+        self._push(catalog)
+
+
+    def _has_more(self):
+        return len(self.catalog_backlog) > 0
+
+
+    def _push(self, path):
+        self.catalog_backlog.append(path)
+
+
+    def _pop(self):
+        return self.catalog_backlog.popleft()
+
+
+    def _recursion_step(self):
+        path, dirent = self._pop()
+        if dirent.is_directory():
+            new_dirents = self.catalog.list_directory_split_md5(dirent.md5path_1, \
+                                                                dirent.md5path_2)
+            for new_dirent in new_dirents:
+                self._push((path + "/" + new_dirent.name, new_dirent))
+        return path, dirent
+
 
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
@@ -65,6 +131,10 @@ class Repository:
         self._read_manifest()
         self._try_to_get_last_replication_timestamp()
         self._try_to_get_replication_state()
+
+
+    def __iter__(self):
+        return RepositoryIterator(self)
 
 
     def _read_manifest(self):
