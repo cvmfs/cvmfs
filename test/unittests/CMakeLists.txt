@@ -96,6 +96,10 @@ if (SQLITE3_BUILTIN)
   add_dependencies (${PROJECT_TEST_NAME} sqlite3)
 endif (SQLITE3_BUILTIN)
 
+if (ZLIB_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} zlib)
+endif (ZLIB_BUILTIN)
+
 if (TBB_PRIVATE_LIB)
   add_dependencies (${PROJECT_TEST_NAME} libtbb)
 endif (TBB_PRIVATE_LIB)
