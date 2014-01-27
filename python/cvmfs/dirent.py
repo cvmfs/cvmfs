@@ -5,6 +5,16 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+class _Flags:
+    """ Definition of used dirent flags (see cvmfs/catalog_sql.h) """
+    Directory               = 1
+    NestedCatalogMountpoint = 2
+    NestedCatalogRoot       = 32
+    File                    = 4
+    Link                    = 8
+    FileStat                = 16 # unused
+    FileChunk               = 64
+
 
 class DirectoryEntry:
     """ Thin wrapper around a DirectoryEntry as it is saved in the Catalogs """
@@ -28,9 +38,20 @@ class DirectoryEntry:
         return "<DirectoryEntry '" + self.name + "' - " + \
                str(self.md5path_1) + "|" + str(self.md5path_2) + ">"
 
-
     def is_directory(self):
-        return (self.flags & 1) > 0
+        return (self.flags & _Flags.Directory) > 0
+
+    def is_nested_catalog_mountpoint(self):
+        return (self.flags & _Flags.NestedCatalogMountpoint) > 0
+
+    def is_nested_catalog_root(self):
+        return (self.flags & _Flags.NestedCatalogRoot) > 0
+
+    def is_file(self):
+        return (self.flags & _Flags.File) > 0
+
+    def is_symlink(self):
+        return (self.flags & _Flags.Link) > 0
 
     def path_hash(self):
         return self.md5path_1, self.md5path_2
