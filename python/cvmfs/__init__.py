@@ -35,7 +35,8 @@ def __extract_version_string(input_str):
 def _get_server_version():
     output = ''
     try:
-        output = subprocess.check_output(['cvmfs_server'])
+        output = subprocess.check_output(['cvmfs_server'],
+                                         stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError, e:
         return __extract_version_string(e.output)
     except OSError, e:
@@ -45,7 +46,8 @@ def _get_server_version():
 def _get_client_version():
     output = ''
     try:
-        output = subprocess.check_output(['cvmfs2', '--version'])
+        output = subprocess.check_output(['cvmfs2', '--version'],
+                                         stderr=subprocess.STDOUT)
     except OSError, e:
         raise ClientNotInstalled()
     return __extract_version_string(output)
@@ -59,7 +61,7 @@ client_version = None
 
 try:
     server_version = _get_server_version()
-except ServerNotInstalled, e:
+except (ServerNotInstalled, VersionNotDetected) as e:
     has_server = False
 
 try:
