@@ -61,12 +61,16 @@ class CannotReplicate(Exception):
 class RepositoryIterator:
     """ Iterates through all directory entries in a whole Repository """
 
+    class _CatalogIterator:
+        def __init__(self, catalog):
+            self.catalog          = catalog
+            self.catalog_iterator = catalog.__iter__()
+
+
     def __init__(self, repository):
-        self.repository      = repository
-        self.catalog_backlog = collections.deque()
-        self.current_catalog = None
-        self._push(repository.retrieve_root_catalog())
-        self.current_catalog_iterator = self._get_next_catalog_iterator()
+        self.repository    = repository
+        self.catalog_stack = collections.deque()
+        self._push_catalog(repository.retrieve_root_catalog())
 
 
     def __iter__(self):
@@ -76,52 +80,41 @@ class RepositoryIterator:
     def next(self):
         full_path, dirent = self._get_next_dirent()
         if dirent.is_nested_catalog_mountpoint():
-            self._queue_next_catalog(self.current_catalog, full_path)
+            self._fetch_and_push_catalog(full_path)
             return self.next() # same directory entry is also in nested catalog
         return full_path, dirent
 
 
     def _get_next_dirent(self):
         try:
-            return self.current_catalog_iterator.next()
+            return self._get_current_catalog().catalog_iterator.next()
         except StopIteration, e:
-            self.current_catalog_iterator = self._get_next_catalog_iterator()
-            return self.current_catalog_iterator.next()
+            self._pop_catalog()
+            if not self._has_more():
+                raise StopIteration()
+            return self._get_next_dirent()
 
 
-    def _get_next_catalog_iterator(self):
-        if not self._has_more():
-            raise StopIteration()
-        self.current_catalog = self._pop()
-        return self.current_catalog.__iter__()
-
-
-    def _queue_next_catalog(self, catalog, catalog_mountpoint):
-        nested_ref = catalog.find_nested_for_path(catalog_mountpoint)
-        catalog = nested_ref.fetch_from(self.repository)
-        self._push(catalog)
+    def _fetch_and_push_catalog(self, catalog_mountpoint):
+        current_catalog = self._get_current_catalog().catalog
+        nested_ref      = current_catalog.find_nested_for_path(catalog_mountpoint)
+        new_catalog     = nested_ref.fetch_from(self.repository)
+        self._push_catalog(new_catalog)
 
 
     def _has_more(self):
-        return len(self.catalog_backlog) > 0
+        return len(self.catalog_stack) > 0
 
 
-    def _push(self, path):
-        self.catalog_backlog.append(path)
+    def _push_catalog(self, catalog):
+        catalog_iterator = self._CatalogIterator(catalog)
+        self.catalog_stack.append(catalog_iterator)
 
+    def _get_current_catalog(self):
+        return self.catalog_stack[-1]
 
-    def _pop(self):
-        return self.catalog_backlog.popleft()
-
-
-    def _recursion_step(self):
-        path, dirent = self._pop()
-        if dirent.is_directory():
-            new_dirents = self.catalog.list_directory_split_md5(dirent.md5path_1, \
-                                                                dirent.md5path_2)
-            for new_dirent in new_dirents:
-                self._push((path + "/" + new_dirent.name, new_dirent))
-        return path, dirent
+    def _pop_catalog(self):
+        return self.catalog_stack.pop()
 
 
 class Repository:
