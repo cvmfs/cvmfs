@@ -138,7 +138,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
         // 5XX returned by host
         info->error_code = kFailHostHttp;
       } else if ((header_line.length() > i+2) && (header_line[i] == '4') &&
-                 (header_line[i+1] == '0') && (header_line[i] == '4'))
+                 (header_line[i+1] == '0') && (header_line[i+2] == '4'))
       {
         // 404: the stratum 1 does not have the newest files
         info->error_code = kFailHostHttp;
