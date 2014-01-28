@@ -47,23 +47,25 @@ class Manifest:
         key_char = line[0]
         data     = line[1:-1]
         if   key_char == "C":
-            self.root_catalog     = data
-        elif key_char == "X":
-            self.certificate      = data
-        elif key_char == "H":
-            self.history_database = data
-        elif key_char == "T":
-            self.last_modified    = datetime.fromtimestamp(int(data), tz=tzutc())
+            self.root_catalog      = data
         elif key_char == "R":
-            self.root_hash        = data
+            self.root_hash         = data
+        elif key_char == "B":
+            self.root_catalog_size = int(data)
+        elif key_char == "X":
+            self.certificate       = data
+        elif key_char == "H":
+            self.history_database  = data
+        elif key_char == "T":
+            self.last_modified     = datetime.fromtimestamp(int(data), tz=tzutc())
         elif key_char == "D":
-            self.ttl              = int(data)
+            self.ttl               = int(data)
         elif key_char == "S":
-            self.revision         = int(data)
+            self.revision          = int(data)
         elif key_char == "N":
-            self.repository_name  = data
+            self.repository_name   = data
         elif key_char == "L":
-            self.micro_catalog    = data
+            self.micro_catalog     = data
         else:
             raise UnknownManifestField(key_char)
 
