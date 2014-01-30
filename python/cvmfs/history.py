@@ -44,6 +44,10 @@ class History(DatabaseObject):
         return self.__str__()
 
 
+    def __iter__(self):
+        return self.list_tags().__iter__()
+
+
     def list_tags(self):
         results = self.run_sql(RevisionTag.sql_query())
         return [ RevisionTag(sql_res) for sql_res in results ]
