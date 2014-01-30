@@ -5,17 +5,13 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-import tempfile
-import zlib
-import sqlite3
 import datetime
 import collections
 import md5
 import os
-import subprocess
 
 
-from _common import _split_md5
+from _common import _split_md5, DatabaseObject
 from dirent  import DirectoryEntry
 
 
@@ -83,20 +79,14 @@ class CatalogReference:
 
 
 
-class Catalog:
+class Catalog(DatabaseObject):
     """ Wraps the basic functionality of CernVM-FS Catalogs """
 
     def __init__(self, catalog_file):
-        self._decompress(catalog_file)
-        self._open_database()
+        DatabaseObject.__init__(self, catalog_file)
         self._read_properties()
         self._guess_root_prefix_if_needed()
         self._check_validity()
-
-
-    def __del__(self):
-        self.db_handle_.close()
-        self.catalog_file_.close()
 
 
     def __str__(self):
@@ -194,49 +184,19 @@ class Catalog:
         return e
 
 
-    def run_sql(self, sql):
-        """ Run an arbitrary SQL query on the catalog database """
-        cursor = self.db_handle_.cursor()
-        cursor.execute(sql)
-        return cursor.fetchall()
-
-
-    def open_interactive(self):
-        """ Spawns a sqlite shell for interactive catalog database inspection """
-        subprocess.call(['sqlite3', self.catalog_file_.name])
-
-
     def is_root(self):
         """ Checks if this is the root catalog (based on the root prefix) """
         return self.root_prefix == "/"
 
 
-    def _decompress(self, catalog_file):
-        """ Unzip a catalog file to a temporary referenced by self.catalog_file_ """
-        self.catalog_file_ = tempfile.NamedTemporaryFile('w+b')
-        self.catalog_file_.write(zlib.decompress(catalog_file.read()))
-        self.catalog_file_.flush()
-
-
-    def _open_database(self):
-        """ Create and configure a database handle to the Catalog """
-        self.db_handle_ = sqlite3.connect(self.catalog_file_.name)
-        self.db_handle_.text_factory = str
-
-
     def _read_properties(self):
-        """ Retrieve all properties stored in the catalog database """
-        props = self.run_sql("SELECT key, value FROM properties;")
-        for prop in props:
-            self._read_property(prop)
+        self.read_properties_table(lambda prop_key, prop_value:
+            self._read_property(prop_key, prop_value))
         if not hasattr(self, 'schema_revision'):
             self.schema_revision = 0
 
-
-    def _read_property(self, prop):
+    def _read_property(self, prop_key, prop_value):
         """ Detect catalog properties and store them as public class members """
-        prop_key   = prop[0]
-        prop_value = prop[1]
         if prop_key == "revision":
             self.revision          = prop_value
         if prop_key == "schema":
