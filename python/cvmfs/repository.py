@@ -174,6 +174,12 @@ class Repository:
         raise Exception("Not implemented!")
 
 
+    def retrieve_object(self, object_hash, hash_suffix = ''):
+        """ Retrieves an object from the content addressable storage """
+        path = "data/" + object_hash[:2] + "/" + object_hash[2:] + hash_suffix
+        return self.retrieve_file(path)
+
+
     def retrieve_root_catalog(self):
         return self.retrieve_catalog(self.manifest.root_catalog)
 
@@ -199,8 +205,7 @@ class Repository:
             return self._retrieve_and_open_catalog(catalog_hash)
 
     def _retrieve_and_open_catalog(self, catalog_hash):
-        catalog_path = "data/" + catalog_hash[:2] + "/" + catalog_hash[2:] + "C"
-        catalog_file = self.retrieve_file(catalog_path)
+        catalog_file = self.retrieve_object(catalog_hash, 'C')
         new_catalog = Catalog(catalog_file)
         self._opened_catalogs[catalog_hash] = new_catalog
         return new_catalog
