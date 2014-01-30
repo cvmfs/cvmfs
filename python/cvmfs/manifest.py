@@ -42,6 +42,10 @@ class Manifest:
         return self.__str__()
 
 
+    def has_history(self):
+        return hasattr(self, 'history_database')
+
+
     def _read_line(self, line):
         """ Parse lines that appear in .cvmfspublished """
         key_char = line[0]

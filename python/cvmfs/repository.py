@@ -18,6 +18,7 @@ import _common
 import cvmfs
 from manifest import Manifest
 from catalog import Catalog
+from history import History
 
 class RepositoryNotFound(Exception):
     def __init__(self, repo_path):
@@ -167,6 +168,15 @@ class Repository:
 
     def has_repository_type(self):
         return hasattr(self, 'type') and self.type != 'unknown'
+
+
+    def has_history(self):
+        return self.manifest.has_history()
+
+
+    def retrieve_history(self):
+        history_db = self.retrieve_object(self.manifest.history_database, 'H')
+        return History(history_db)
 
 
     def retrieve_file(self, file_name):
