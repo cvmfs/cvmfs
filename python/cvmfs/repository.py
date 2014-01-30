@@ -51,6 +51,13 @@ class FileNotFoundInRepository(Exception):
     def __str__(self):
         return repr(self.file_name)
 
+class HistoryNotFound(Exception):
+    def __init__(self, repo):
+        self.repo = repo
+
+    def __str__(self):
+        return repr(self.repo)
+
 class CannotReplicate(Exception):
     def __init__(self, repo):
         self.repo = repo
@@ -175,6 +182,8 @@ class Repository:
 
 
     def retrieve_history(self):
+        if not self.has_history():
+            raise HistoryNotFound(self)
         history_db = self.retrieve_object(self.manifest.history_database, 'H')
         return History(history_db)
 
