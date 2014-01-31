@@ -16,20 +16,25 @@ SyncItem::SyncItem(const string &relative_parent_path,
                    const string &filename,
                    const SyncItemType entry_type,
                    const SyncUnion *union_engine) :
-  type_(entry_type),
+  union_engine_(union_engine),
   whiteout_(false),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
-  union_engine_(union_engine)
+  scratch_type_(entry_type),
+  rdonly_type_(GetRdOnlyFiletype())
 {
   content_hash_.algorithm = shash::kAny;
 }
 
 
-bool SyncItem::IsNew() const {
-  // Careful: this can also mean delete + recreate
+SyncItemType SyncItem::GetRdOnlyFiletype() const {
   StatRdOnly();
-  return (rdonly_stat_.error_code == ENOENT);
+  if (rdonly_stat_.error_code == ENOENT)  return kItemNew;
+  if (S_ISDIR(rdonly_stat_.stat.st_mode)) return kItemDir;
+  if (S_ISREG(rdonly_stat_.stat.st_mode)) return kItemFile;
+  if (S_ISLNK(rdonly_stat_.stat.st_mode)) return kItemSymlink;
+  PrintWarning("'" + GetRelativePath() + "' has an unsupported file type!");
+  abort();
 }
 
 
@@ -39,17 +44,17 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   filename_ = actual_filename;
 
   // Find the entry in the repository
-  StatRdOnly();
+  StatRdOnly(true); // <== refreshing the stat (filename might have changed)
   if (rdonly_stat_.error_code != 0) {
-    PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not"
+    PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
                  "found in repository.");
+    abort();
     return;
   }
 
   // What is deleted?
-  if (S_ISDIR(rdonly_stat_.stat.st_mode)) type_ = kItemDir;
-  else if (S_ISREG(rdonly_stat_.stat.st_mode)) type_ = kItemFile;
-  else if (S_ISLNK(rdonly_stat_.stat.st_mode)) type_ = kItemSymlink;
+  rdonly_type_  = GetRdOnlyFiletype();
+  scratch_type_ = GetRdOnlyFiletype();
 }
 
 
@@ -77,10 +82,12 @@ uint64_t SyncItem::GetUnionInode() const {
 }
 
 
-void SyncItem::StatGeneric(const string &path, EntryStat *info) {
+void SyncItem::StatGeneric(const string  &path,
+                           EntryStat     *info,
+                           const bool     refresh) {
+  if (info->obtained && !refresh) return;
   int retval = platform_lstat(path.c_str(), &info->stat);
-  if (retval != 0)
-    info->error_code = errno;
+  info->error_code = (retval != 0) ? errno : 0;
   info->obtained = true;
 }
 
