@@ -18,7 +18,8 @@ namespace publish {
 enum SyncItemType {
   kItemDir,
   kItemFile,
-  kItemSymlink
+  kItemSymlink,
+  kItemNew
 };
 
 
@@ -48,13 +49,16 @@ class SyncItem {
            const SyncItemType entry_type,
            const SyncUnion *union_engine);
 
-  inline bool IsDirectory() const { return type_ == kItemDir; }
-  inline bool IsRegularFile() const { return type_ == kItemFile; }
-  inline bool IsSymlink() const { return type_ == kItemSymlink; }
-  inline bool IsWhiteout() const { return whiteout_; }
-  inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog"; }
+  inline bool IsDirectory()     const { return scratch_type_ == kItemDir;     }
+  inline bool WasDirectory()    const { return rdonly_type_  == kItemDir;     }
+  inline bool IsRegularFile()   const { return scratch_type_ == kItemFile;    }
+  inline bool WasRegularFile()  const { return rdonly_type_  == kItemFile;    }
+  inline bool IsSymlink()       const { return scratch_type_ == kItemSymlink; }
+  inline bool WasSymlink()      const { return rdonly_type_  == kItemSymlink; }
+  inline bool IsWhiteout()      const { return whiteout_;                     }
+  inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
   bool IsOpaqueDirectory() const;
-  bool IsNew() const;
+  bool IsNew() const { return rdonly_type_ == kItemNew; }
 
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
@@ -93,6 +97,9 @@ class SyncItem {
             (filename_ == other.filename_));
   }
 
+ protected:
+  SyncItemType GetRdOnlyFiletype() const;
+
  private:
   /**
    * Structure to cache stat calls to the different file locations.
@@ -105,32 +112,35 @@ class SyncItem {
     platform_stat64 stat;
   };
 
-  SyncItemType type_;
-  bool whiteout_;
-  std::string relative_parent_path_;
-  std::string filename_;
-  // The hash of regular file's content
-  shash::Any content_hash_;
   const SyncUnion *union_engine_;
 
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
   mutable EntryStat scratch_stat_;
 
+  bool whiteout_;
+  std::string relative_parent_path_;
+  std::string filename_;
+
+  SyncItemType scratch_type_;
+  SyncItemType rdonly_type_;
+
+  // The hash of regular file's content
+  shash::Any content_hash_;
+
   // Lazy evaluation and caching of results of file stats
-  inline void StatRdOnly() const {
-    if (rdonly_stat_.obtained) return;
-    StatGeneric(GetRdOnlyPath(), &rdonly_stat_);
+  inline void StatRdOnly(const bool refresh = false) const {
+    StatGeneric(GetRdOnlyPath(), &rdonly_stat_, refresh);
   }
-  inline void StatUnion() const {
-    if (union_stat_.obtained) return;
-    StatGeneric(GetUnionPath(), &union_stat_);
+  inline void StatUnion(const bool refresh = false) const {
+    StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  inline void StatOverlay() const {
-    if (scratch_stat_.obtained) return;
-    StatGeneric(GetScratchPath(), &scratch_stat_);
+  inline void StatOverlay(const bool refresh = false) const {
+    StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
   }
-  static void StatGeneric(const std::string &path, EntryStat *info);
+  static void StatGeneric(const std::string  &path,
+                          EntryStat          *info,
+                          const bool          refresh);
 };
 
 typedef std::map<std::string, SyncItem> SyncItemList;
