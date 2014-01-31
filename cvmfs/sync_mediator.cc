@@ -117,12 +117,12 @@ void SyncMediator::Touch(SyncItem &entry) {
  * Remove an entry from the repository. Directories will be recursively removed.
  */
 void SyncMediator::Remove(SyncItem &entry) {
-  if (entry.IsDirectory()) {
+  if (entry.WasDirectory()) {
     RemoveDirectoryRecursively(entry);
     return;
   }
 
-  if (entry.IsRegularFile() || entry.IsSymlink()) {
+  if (entry.WasRegularFile() || entry.WasSymlink()) {
     // First remove the file...
     RemoveFile(entry);
 
