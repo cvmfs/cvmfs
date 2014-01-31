@@ -39,7 +39,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "checking repository health"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "starting transaction to recreate nested catalog tree"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -51,7 +51,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "checking repository health after recreating nested catalog structure"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   find /cvmfs/$CVMFS_TEST_REPO -type f -exec cat {} \; >/dev/null || return 10
   sudo find /var/spool/cvmfs/$CVMFS_TEST_REPO/cache -type f | grep rmd160 || return 11
@@ -65,7 +65,7 @@ cvmfs_run_test() {
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 13; }
 
   echo "check catalog integrity"
-  check_catalogs $replica_name || return $?
+  check_repository $replica_name -i || return $?
 
   echo "changing hash algorithm to sha1"
   sudo sed -i -e 's/CVMFS_HASH_ALGORITHM=rmd160/CVMFS_HASH_ALGORITHM=sha1/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
