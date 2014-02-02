@@ -187,8 +187,10 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   if (info->destination == kDestinationMem) {
     // Write to memory
-    if (info->destination_mem.pos + num_bytes > info->destination_mem.size)
+    if (info->destination_mem.pos + num_bytes > info->destination_mem.size) {
+      info->error_code = kFailBadData;
       return 0;
+    }
     memcpy(info->destination_mem.data + info->destination_mem.pos,
            ptr, num_bytes);
     info->destination_mem.pos += num_bytes;
