@@ -202,7 +202,7 @@ class Catalog(DatabaseObject):
         if prop_key == "schema":
             self.schema            = float(prop_value)
         if prop_key == "schema_revision":
-            self.schema_revision   = int(prop_value)
+            self.schema_revision   = float(prop_value)
         if prop_key == "last_modified":
             self.last_modified     = datetime.datetime.fromtimestamp(int(prop_value))
         if prop_key == "previous_revision":
