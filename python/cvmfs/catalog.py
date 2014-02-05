@@ -7,7 +7,7 @@ This file is part of the CernVM File System auxiliary tools.
 
 import datetime
 import collections
-import md5
+import hashlib
 import os
 
 
@@ -132,7 +132,7 @@ class Catalog(DatabaseObject):
     def list_directory(self, path):
         """ Create a directory listing of the given directory path """
         real_path = self._canonicalize_path(path)
-        parent_1, parent_2 = _split_md5(md5.md5(real_path).digest())
+        parent_1, parent_2 = _split_md5(hashlib.md5(real_path).digest())
         return self.list_directory_split_md5(parent_1, parent_2)
 
 
@@ -156,7 +156,7 @@ class Catalog(DatabaseObject):
     def find_directory_entry(self, path):
         """ Finds the DirectoryEntry for a given path """
         real_path = self._canonicalize_path(path)
-        md5path = md5.md5(real_path)
+        md5path = hashlib.md5(real_path)
         return self.find_directory_entry_md5(md5path)
 
 
