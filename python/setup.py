@@ -4,7 +4,7 @@
 from setuptools import setup, find_packages
 
 setup(
-  name='cvmfsutils',
+  name='python-cvmfsutils',
   version='0.1.0',
   url='http://cernvm.cern.ch',
   author='Rene Meusel',

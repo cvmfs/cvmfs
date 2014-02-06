@@ -6,6 +6,6 @@ benchmark/
 *.pyc
 test/cloud_testing/ec2_config.sh
 python/dist/*
-python/cvmfsutils.egg-info/*
+python/python_cvmfsutils.egg-info/*
 python/MANIFEST
 
