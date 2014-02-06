@@ -494,7 +494,6 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   DirectoryEntry result;
 
   const unsigned database_flags = RetrieveInt(5);
-  result.catalog_ = const_cast<Catalog *>(catalog);
   //result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
@@ -525,14 +524,14 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
     result.checksum_         =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
-    if (result.catalog_->uid_map_) {
-      OwnerMap::const_iterator i = result.catalog_->uid_map_->find(result.uid_);
-      if (i != result.catalog_->uid_map_->end())
+    if (catalog->uid_map_) {
+      OwnerMap::const_iterator i = catalog->uid_map_->find(result.uid_);
+      if (i != catalog->uid_map_->end())
         result.uid_ = i->second;
     }
-    if (result.catalog_->gid_map_) {
-      OwnerMap::const_iterator i = result.catalog_->gid_map_->find(result.gid_);
-      if (i != result.catalog_->gid_map_->end())
+    if (catalog->gid_map_) {
+      OwnerMap::const_iterator i = catalog->gid_map_->find(result.gid_);
+      if (i != catalog->gid_map_->end())
         result.gid_ = i->second;
     }
   }

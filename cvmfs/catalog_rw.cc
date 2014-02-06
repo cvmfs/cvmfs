@@ -431,7 +431,7 @@ void WritableCatalog::MoveFileChunksToNested(
 {
   FileChunkList chunks;
   // Moving opaque chunks, we don't care about the hash algorithm
-  ListFileChunks(PathString(full_path), shash::kAny, &chunks);
+  ListPathChunks(PathString(full_path), shash::kAny, &chunks);
   assert (chunks.size() > 0);
 
   for (unsigned i = 0; i < chunks.size(); ++i) {

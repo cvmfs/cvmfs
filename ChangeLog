@@ -1,4 +1,6 @@
 2.1.18:
+  * Fix race between cached chunked files and catalog updates
+  * Fix false caching of catalog object in dirent
   * Support for RIPEMD-160 hash algorithm in lieu of SHA-1
   * Switch to TBB 4.2 update 2 
   * Bash completion for cvmfs_config and cvmfs_server
