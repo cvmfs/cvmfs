@@ -106,7 +106,7 @@ class RepositoryIterator:
     def _fetch_and_push_catalog(self, catalog_mountpoint):
         current_catalog = self._get_current_catalog().catalog
         nested_ref      = current_catalog.find_nested_for_path(catalog_mountpoint)
-        new_catalog     = nested_ref.fetch_from(self.repository)
+        new_catalog     = nested_ref.retrieve_from(self.repository)
         self._push_catalog(new_catalog)
 
 

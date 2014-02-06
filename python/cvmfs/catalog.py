@@ -74,7 +74,7 @@ class CatalogReference:
     def __repr__(self):
         return "<CatalogReference for " + self.root_path + ">"
 
-    def fetch_from(self, source_repository):
+    def retrieve_from(self, source_repository):
         return source_repository.retrieve_catalog(self.hash)
 
 
