@@ -133,7 +133,7 @@ class Catalog : public SingleCopy {
   bool AllChunksNext(shash::Any *hash, ChunkTypes *type);
   bool AllChunksEnd();
 
-  inline bool ListFileChunks(const PathString &path,
+  inline bool ListPathChunks(const PathString &path,
                              const shash::Algorithms interpret_hashes_as,
                              FileChunkList *chunks) const
   {

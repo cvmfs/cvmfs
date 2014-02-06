@@ -19,6 +19,7 @@
 
 #include "catalog.h"
 #include "directory_entry.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "atomic.h"
 #include "util.h"
@@ -161,6 +162,10 @@ class AbstractCatalogManager {
     return Listing(p, listing);
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
+
+  bool ListFileChunks(const PathString &path,
+                      const shash::Algorithms interpret_hashes_as,
+                      FileChunkList *chunks);
 
   void RegisterRemountListener(RemountListener *listener) {
     WriteLock();

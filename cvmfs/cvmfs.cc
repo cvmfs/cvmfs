@@ -1024,7 +1024,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     ReplyNegative(dirent, req);
     return;
   }
-  remount_fence_->Leave();
 
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
@@ -1034,18 +1033,22 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   //}
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
+    remount_fence_->Leave();
     fuse_reply_err(req, EOPNOTSUPP);
     return;
   }
 #endif
   if (fi->flags & O_EXCL) {
+    remount_fence_->Leave();
     fuse_reply_err(req, EEXIST);
     return;
   }
 
   atomic_inc64(&num_fs_open_);  // Count actual open / fetch operations
 
-  if (dirent.IsChunkedFile()) {
+  if (!dirent.IsChunkedFile()) {
+    remount_fence_->Leave();
+  } else {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "chunked file %s opened (download delayed to read() call)",
              path.c_str());
@@ -1054,6 +1057,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd)
     {
       atomic_dec32(&open_files_);
+      remount_fence_->Leave();
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
       return;
@@ -1065,16 +1069,17 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
       // Retrieve File chunks from the catalog
       FileChunkList *chunks = new FileChunkList();
-      if (!dirent.catalog()->ListFileChunks(path, dirent.hash_algorithm(),
-                                            chunks) ||
+      if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
+                                           chunks) ||
           chunks->IsEmpty())
       {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
-                 "but no chunks found in the catalog %s.", path.c_str(),
-                 dirent.catalog()->path().c_str());
+        remount_fence_->Leave();
+        LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+                 "'chunked', but no chunks found.", path.c_str());
         fuse_reply_err(req, EIO);
         return;
       }
+      remount_fence_->Leave();
 
       chunk_tables_->Lock();
       // Check again to avoid race
@@ -1088,6 +1093,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         chunk_tables_->inode2references.Insert(ino, refctr+1);
       }
     } else {
+      remount_fence_->Leave();
       uint32_t refctr;
       bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
       assert(retval);
@@ -1611,14 +1617,18 @@ bool Pin(const string &path) {
   catalog::DirectoryEntry dirent;
   remount_fence_->Enter();
   const bool found = GetDirentForPath(PathString(path), &dirent);
-  remount_fence_->Leave();
-
-  if (!found || !dirent.IsRegular())
+  if (!found || !dirent.IsRegular()) {
+    remount_fence_->Leave();
     return false;
-  if (dirent.IsChunkedFile()) {
+  }
+
+  if (!dirent.IsChunkedFile()) {
+    remount_fence_->Leave();
+  } else {
     FileChunkList chunks;
-    dirent.catalog()->ListFileChunks(PathString(path), dirent.hash_algorithm(),
+    catalog_manager_->ListFileChunks(PathString(path), dirent.hash_algorithm(),
                                      &chunks);
+    remount_fence_->Leave();
     for (unsigned i = 0; i < chunks.size(); ++i) {
       bool retval =
         quota::Pin(chunks.AtPtr(i)->content_hash(), chunks.AtPtr(i)->size(),
