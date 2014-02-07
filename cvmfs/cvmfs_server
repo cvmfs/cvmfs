@@ -732,7 +732,8 @@ create_master_key() {
   echo -n "Creating CernVM-FS master key for $name in $master_pub... "
   openssl genrsa -out $master_key 2048 > /dev/null 2>&1
   openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
-  chmod 444 $master_key $master_pub
+  chmod 400 $master_key
+  chmod 444 $master_pub
   chown $user $master_key $master_pub
   echo "done"
 }
