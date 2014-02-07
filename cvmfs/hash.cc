@@ -31,6 +31,27 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
 }
 
 
+bool HexPtr::IsValid() const {
+  // Check for a fitting hashing algorithm
+  const Algorithms algorithm = DetermineAlgorithm();
+  if (algorithm == kUnknown) {
+    return false;
+  }
+
+  // Check hash characters for illegal digits ([0-9a-f] i.e. hex)
+  const std::string &hash_string = *str;
+  for (unsigned int i = 0; i < 2*kDigestSizes[algorithm]; ++i) {
+    const char c = hash_string[i];
+    if ( ! ( (c >= 48 /* '0' */ && c <=  57 /* '9' */) ||
+             (c >= 97 /* 'a' */ && c <= 102 /* 'f' */) ) ) {
+      return false;
+    }
+  }
+
+  // TODO: check hash suffix
+  return true;
+}
+
 Algorithms HexPtr::DetermineAlgorithm() const {
   static const Algorithms algorithms[] = { kMd5, kSha1, kRmd160 };
   static const size_t num_algos  = sizeof(algorithms) / sizeof(algorithms[0]);
