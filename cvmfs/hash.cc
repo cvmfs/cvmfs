@@ -31,6 +31,23 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
 }
 
 
+Algorithms HexPtr::DetermineAlgorithm() const {
+  static const Algorithms algorithms[] = { kMd5, kSha1, kRmd160 };
+  static const size_t num_algos  = sizeof(algorithms) / sizeof(algorithms[0]);
+
+  // TODO: check hash suffixes!
+  const size_t len = str->length();
+  for (unsigned int i = 0; i < num_algos; ++i) {
+    const Algorithms algorithm = algorithms[i];
+    if (len == 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm]) {
+      return algorithm;
+    }
+  }
+
+  return kUnknown;
+}
+
+
 Any MkFromHexPtr(const HexPtr hex) {
   Any result;
 

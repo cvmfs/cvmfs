@@ -37,6 +37,7 @@ enum Algorithms {
   kSha1,
   kRmd160,
   kAny,
+  kUnknown
 };
 
 
@@ -64,6 +65,8 @@ const unsigned kMaxSuffixLength = 7;
 struct HexPtr {
   const std::string *str;
   explicit HexPtr(const std::string &s) { str = &s; }
+
+  Algorithms DetermineAlgorithm() const;
 };
 
 struct AsciiPtr {
