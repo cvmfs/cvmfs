@@ -24,8 +24,6 @@ cd ${SOURCE_DIRECTORY}/test
                           src/524-corruptmanifestfailover || it_retval=$?
 
 echo "running CernVM-FS migration test cases..."
-echo "--> disabled! CernVM-FS 2.1.15 has a different debian packaging model"
-echo "    Re-Enable after 2.1.16 is released"
-#./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
+./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
 
 [ $ut_retval -eq 0 ] && [ $it_retval -eq 0 ] && [ $mg_retval -eq 0 ]
