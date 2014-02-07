@@ -104,6 +104,9 @@ setup_environment() {
     fi
   fi
 
+  # increase ulimit (mainly for server tests)
+  sudo ulimit -n 65536 ||  return 105
+
   # reset the test warning flags
   reset_test_warning_flags
 
