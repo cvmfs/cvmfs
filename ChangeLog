@@ -1,4 +1,5 @@
 2.1.18:
+  * Fix permissions of private keys on repository creation
   * Fix race between cached chunked files and catalog updates
   * Fix false caching of catalog object in dirent
   * Support for RIPEMD-160 hash algorithm in lieu of SHA-1
