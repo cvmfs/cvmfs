@@ -37,6 +37,7 @@ enum Algorithms {
   kSha1,
   kRmd160,
   kAny,
+  kUnknown
 };
 
 
@@ -64,6 +65,9 @@ const unsigned kMaxSuffixLength = 7;
 struct HexPtr {
   const std::string *str;
   explicit HexPtr(const std::string &s) { str = &s; }
+
+  bool IsValid() const;
+  Algorithms DetermineAlgorithm() const;
 };
 
 struct AsciiPtr {
@@ -304,7 +308,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
-Any MkFromHexPtr(const HexPtr hex);
+Any MkFromHexPtr(const HexPtr &hex);
 
 }  // namespace hash
 
