@@ -753,7 +753,8 @@ create_cert() {
   openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$name CernVM-FS Release Managers" -key $key -out $csr > /dev/null 2>&1
   openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
   rm -f $csr
-  chmod 444 $key $crt
+  chmod 444 $crt
+  chmod 400 $key
   chown $user $master_key $master_pub
   echo "done"
 }
