@@ -38,7 +38,7 @@ bool HexPtr::IsValid() const {
   }
 
   // Walk through all algorithms
-  for (unsigned j = 0; j <= kAny; ++j) {
+  for (unsigned j = 0; j < kAny; ++j) {
     const unsigned hex_length = 2*kDigestSizes[j];
     const unsigned suffix_length = kSuffixLengths[j];
     if (i == hex_length) {
