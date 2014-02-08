@@ -22,6 +22,42 @@ namespace shash {
 
 const char *kSuffixes[] = {"", "", "-rmd160", ""};
 
+
+bool HexPtr::IsValid() const {
+  if (str->empty())
+    return false;
+
+  const unsigned l = str->length();
+  unsigned i = 0;  // String position of *c
+  const char *c = str->data();  // Walks through the string
+  for ( ; i < l; ++i, ++c) {
+    if (*c == '-')
+      break;
+    if ((*c < '0') || (*c > 'f') || ((*c > '9') && (*c < 'a')))
+      return false;
+  }
+
+  // Walk through all algorithms
+  for (unsigned j = 0; j <= kAny; ++j) {
+    const unsigned hex_length = 2*kDigestSizes[j];
+    const unsigned suffix_length = kSuffixLengths[j];
+    if (i == hex_length) {
+      // Right suffix?
+      for ( ; (i < l) && (i-hex_length < suffix_length); ++i, ++c) {
+        if (*c != kSuffixes[j][i-hex_length])
+          break;
+      }
+      if (i == l)
+        return true;
+      i = hex_length;
+      c = str->data() + i;
+    }
+  }
+
+  return false;
+}
+
+
 Algorithms ParseHashAlgorithm(const string &algorithm_option) {
   if (algorithm_option == "sha1")
     return kSha1;

@@ -277,7 +277,7 @@ cvmfs_run_test() {
   echo "$result" | grep "${alien_object}"    | grep "modifier"    || return 21
   echo "$result" | grep "${cut_object_dest}" | grep "malformed"   || return 21
   echo "$result" | grep "${alien_file}"      | grep "unexpected"  || return 21
-  echo "$result" | grep "${illegal_hash}"    | grep "illegal"     || return 21
+  echo "$result" | grep "${illegal_hash}"    | grep "malformed"   || return 21
   [ $(echo "$result" | wc -l) -eq 8 ]                             || return 21
   
 #
@@ -297,7 +297,7 @@ cvmfs_run_test() {
   echo "$result" | grep "${alien_object}"    | grep "modifier"    || return 23
   echo "$result" | grep "${cut_object_dest}" | grep "malformed"   || return 23
   echo "$result" | grep "${alien_file}"      | grep "unexpected"  || return 23
-  echo "$result" | grep "${illegal_hash}"    | grep "illegal"     || return 23
+  echo "$result" | grep "${illegal_hash}"    | grep "malformed"   || return 23
   echo "$result" | grep "${broken_modifier}" | grep "mismatch"    || return 23
   [ $(echo "$result" | wc -l) -eq 9 ]                             || return 23
   
