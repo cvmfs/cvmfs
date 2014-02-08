@@ -24,12 +24,12 @@ const char *kSuffixes[] = {"", "", "-rmd160", ""};
 
 
 bool HexPtr::IsValid() const {
-  if (str->empty())
-    return false;
-
   const unsigned l = str->length();
-  unsigned i = 0;  // String position of *c
+  if (l == 0)
+    return false;
   const char *c = str->data();  // Walks through the string
+  unsigned i = 0;  // String position of *c
+
   for ( ; i < l; ++i, ++c) {
     if (*c == '-')
       break;
