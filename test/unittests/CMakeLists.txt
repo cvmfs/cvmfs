@@ -34,6 +34,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_file_sandbox.cc
   t_synchronizing_counter.cc
   t_blocking_counter.cc
+  t_shash.cc
 
   # test utility functions
   testutil.cc testutil.h

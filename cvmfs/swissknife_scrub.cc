@@ -90,6 +90,11 @@ void CommandScrub::FileCallback(const std::string &relative_path,
     return;
   }
 
+  if (! shash::HexPtr(hash_string).IsValid()) {
+    PrintWarning("malformed content hash: " + hash_string, full_path);
+    return;
+  }
+
   assert (reader_ != NULL);
   reader_->ScheduleRead(new StoredFile(full_path, hash_string));
 }
