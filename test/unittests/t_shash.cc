@@ -2,14 +2,7 @@
 
 #include "../../cvmfs/hash.h"
 
-class T_Shash : public ::testing::Test {
- protected:
-  virtual void SetUp() {
-  }
-};
-
-
-TEST_F(T_Shash, VerifyHex) {
+TEST(T_Shash, VerifyHex) {
   EXPECT_EQ(shash::HexPtr("").IsValid(), false);
   EXPECT_EQ(shash::HexPtr("012abc").IsValid(), false);
   EXPECT_EQ(shash::HexPtr("A68b329da9893e34099c7d8ad5cb9c94").IsValid(), false);
