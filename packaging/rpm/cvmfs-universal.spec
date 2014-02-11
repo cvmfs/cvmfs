@@ -334,6 +334,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Tue Feb 11 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
+- Fedora 20 compatibility fixes
 * Tue Jan 21 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.17
 - SL4 compatibility fixes
 * Fri Dec 20 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16
