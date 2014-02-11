@@ -1,6 +1,6 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?fc17}
+%if 0%{?el6} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -213,6 +213,11 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
 %if 0%{?suse_version}
 mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
+%endif
+
+# Fix docdir on FC20
+%if 0%{?fc20}
+rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
 %endif
 
 %if 0%{?selinux_cvmfs}
