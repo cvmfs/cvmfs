@@ -1,6 +1,6 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?fc17}
+%if 0%{?el6} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -215,6 +215,11 @@ mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 %endif
 
+# Fix docdir on FC20
+%if 0%{?fc20}
+rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
+%endif
+
 %if 0%{?selinux_cvmfs}
 pushd SELinux
 for variant in %{selinux_variants}
@@ -329,6 +334,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Tue Feb 11 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
+- Fedora 20 compatibility fixes
 * Tue Jan 21 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.17
 - SL4 compatibility fixes
 * Fri Dec 20 2013 Jakob Blomer <jblomer@cern.ch> - 2.1.16

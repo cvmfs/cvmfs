@@ -1,4 +1,5 @@
 2.1.18:
+  * Fix RPM spec file for FC20
   * Add cvmfs Python library
   * Fix permissions of private keys on repository creation
   * Fix race between cached chunked files and catalog updates
