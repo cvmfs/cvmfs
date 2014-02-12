@@ -294,6 +294,8 @@ class MemoryMappedFile : SingleCopy {
  *                          polymorphically constructed by this factory
  * @param ParameterT        the type of the parameter that is used to figure out
  *                          which class should be instanciated at runtime
+ * @param InfoT             wrapper type for introspection data of registered
+ *                          plugins
  */
 template <class AbstractProductT, typename ParameterT, typename InfoT>
 class AbstractFactory {
@@ -308,8 +310,8 @@ class AbstractFactory {
 
 
 /**
- * Concrete (but templated) implementation of the AbstractFactory template to
- * wrap the creation of a specific class instance. Namely ConcreteProductT.
+ * Implementation of the AbstractFactory template to wrap the creation of a
+ * specific class instance. Namely ConcreteProductT. (Note: still abstract)
  * See the description of PolymorphicCreation for more details
  *
  * @param ConcreteProductT  the class that will be instanciated by this factory
@@ -317,6 +319,8 @@ class AbstractFactory {
  * @param AbstractProductT  the base class of all used ConcreteProductT classes
  * @param ParameterT        the type of the parameter that is used to poly-
  *                          morphically create a specific ConcreteProductT
+ * @param InfoT             wrapper type for introspection data of registered
+ *                          plugins
  */
 template <class ConcreteProductT,
           class AbstractProductT,
@@ -337,6 +341,12 @@ class AbstractFactoryImpl2 : public AbstractFactory<AbstractProductT,
 };
 
 
+/**
+ * Template to add an implementation of Introspect() based on the type of InfoT.
+ * Generally Introspect() will call ConcreteProductT::GetInfo() and return it's
+ * result. However if InfoT = void, this method still needs to be stubbed.
+ * (See also the template specialization for InfoT = void below)
+ */
 template <class ConcreteProductT,
           class AbstractProductT,
           typename ParameterT,
@@ -352,6 +362,10 @@ class AbstractFactoryImpl :
   }
 };
 
+/**
+ * Template specialization for InfoT = void that only stubs the abstract method
+ * Introspect().
+ */
 template <class ConcreteProductT,
           class AbstractProductT,
           typename ParameterT>
@@ -386,6 +400,9 @@ class AbstractFactoryImpl<ConcreteProductT,
  *     virtual method `bool Initialize()` which will be called directly after
  *     creation of a ConcreteProductT. If it returns false, the constructed in-
  *     stance is deleted and the list of plugins is traversed further.
+ *  5. (OPTIONAL) The ConcreteProductTs can implement a `static InfoT GetInfo()`
+ *     that can be used for run-time introspection of registered plugins using
+ *     PolymorphicConstruction<AbstractProductT, ParameterT, InfoT>::Introspect()
  *
  * A possible class hierarchy could look like this:
  *
@@ -423,6 +440,9 @@ class AbstractFactoryImpl<ConcreteProductT,
  * @param ParameterT        the type of the parameter that is used to poly-
  *                          morphically instantiate one of the subclasses of
  *                          AbstractProductT
+ * @param InfoT             (optional) wrapper type for introspection data of
+ *                          registered plugins. InfoT AbstractProductT::GetInfo()
+ *                          needs to be implemented for each plugin
  */
 template <class AbstractProductT, typename ParameterT, typename InfoT>
 class PolymorphicConstructionImpl {
@@ -531,6 +551,13 @@ class PolymorphicConstructionImpl {
 };
 
 
+/**
+ * Interface template for PolymorphicConstruction.
+ * This adds the static method Introspect() to each PolymorphicConstruction type
+ * implementation if (and only if) InfoT is not void.
+ * Backward compatibility: if InfoT is not defined (i.e. is void), Introspect()
+ *                         is not defined at all! (see template specialization)
+ */
 template <class AbstractProductT, typename ParameterT, typename InfoT = void>
 class PolymorphicConstruction :
        public PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> {
@@ -557,6 +584,10 @@ class PolymorphicConstruction :
   }
 };
 
+/**
+ * Template specialization for backward compatibility that _does not_ implement
+ * a static Introspect() method when the InfoT parameter is not given or is void
+ */
 template <class AbstractProductT, typename ParameterT>
 class PolymorphicConstruction<AbstractProductT, ParameterT, void> :
       public PolymorphicConstructionImpl<AbstractProductT, ParameterT, void> {};
