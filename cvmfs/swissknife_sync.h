@@ -47,14 +47,15 @@ struct SyncParameters {
 
 namespace swissknife {
 
-class CommandCreate : public Command {
+class CommandCreate : public Command<CommandCreate> {
  public:
+  CommandCreate(const std::string &param) : Command(param) {}
   ~CommandCreate() { };
-  std::string GetName() { return "create"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "create"; };
+  static std::string GetDescription() {
     return "Bootstraps a fresh repository.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary storage"));
@@ -64,18 +65,19 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Switch   ('v', "repository containing volatile files"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 
-class CommandUpload : public Command {
+class CommandUpload : public Command<CommandUpload> {
  public:
+  CommandUpload(const std::string &param) : Command(param) {}
   ~CommandUpload() { };
-  std::string GetName() { return "upload"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "upload"; };
+  static std::string GetDescription() {
     return "Uploads a local file to the repository.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('i', "local file"));
     r.push_back(Parameter::Mandatory('o', "destination path"));
@@ -83,52 +85,55 @@ class CommandUpload : public Command {
     r.push_back(Parameter::Optional ('a', "hash algorithm (default: SHA-1)"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 
-class CommandPeek : public Command {
+class CommandPeek : public Command<CommandPeek> {
 public:
+  CommandPeek(const std::string &param) : Command(param) {}
   ~CommandPeek() { };
-  std::string GetName() { return "peek"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "peek"; };
+  static std::string GetDescription() {
     return "Checks whether a file exists in the repository.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('d', "destination path"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 
-class CommandRemove : public Command {
+class CommandRemove : public Command<CommandRemove> {
  public:
+  CommandRemove(const std::string &param) : Command(param) {}
   ~CommandRemove() { };
-  std::string GetName() { return "remove"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "remove"; };
+  static std::string GetDescription() {
     return "Removes a file in the repository storage.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('o', "path to file"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 
-class CommandSync : public Command {
+class CommandSync : public Command<CommandSync> {
  public:
+  CommandSync(const std::string &param) : Command(param) {}
   ~CommandSync() { };
-  std::string GetName() { return "sync"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "sync"; };
+  static std::string GetDescription() {
     return "Pushes changes from scratch area back to the repository.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('u', "union volume"));
     r.push_back(Parameter::Mandatory('s', "scratch directory"));
@@ -152,7 +157,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional ('e', "hash algorithm (default: SHA-1)"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 
  protected:
   bool ReadFileChunkingArgs(const swissknife::ArgumentList &args,

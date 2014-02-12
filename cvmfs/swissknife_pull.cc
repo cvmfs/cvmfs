@@ -333,7 +333,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
 }
 
 
-int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandPull::Run(const swissknife::ArgumentList &args) {
   int retval;
   unsigned timeout = 10;
   int fd_lockfile = -1;

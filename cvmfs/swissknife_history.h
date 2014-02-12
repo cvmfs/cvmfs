@@ -10,14 +10,13 @@
 
 namespace swissknife {
 
-class CommandTag : public Command {
+class CommandTag : public Command<CommandTag> {
  public:
+  CommandTag(const std::string &param) : Command(param) {}
   ~CommandTag() { };
-  std::string GetName() { return "tag"; };
-  std::string GetDescription() {
-    return "Tags a snapshot.";
-  };
-  ParameterList GetParams() {
+  static std::string GetName() { return "tag"; }
+  static std::string GetDescription() { return "Tags a snapshot."; }
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('r', "repository directory / url"));
     r.push_back(Parameter::Mandatory('b', "base hash"));
@@ -35,19 +34,21 @@ class CommandTag : public Command {
 
     return r;
   }
-  int Main(const ArgumentList &args);
+
+  int Run(const ArgumentList &args);
 };
 
 
-class CommandRollback : public Command {
+class CommandRollback : public Command<CommandRollback> {
  public:
+  CommandRollback(const std::string &param) : Command(param) {}
   ~CommandRollback() { };
-  std::string GetName() { return "rollback"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "rollback"; };
+  static std::string GetDescription() {
     return "Re-publishes a previous tagged snapshot.  All intermediate "
            "snapshots become inaccessible.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Mandatory('u', "repository directory / url"));
@@ -61,7 +62,7 @@ class CommandRollback : public Command {
     r.push_back(Parameter::Optional ('z', "trusted certificate dir(s)"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 }  // namespace swissknife

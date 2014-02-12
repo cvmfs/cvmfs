@@ -9,14 +9,15 @@
 
 namespace swissknife {
 
-class CommandPull : public Command {
+class CommandPull : public Command<CommandPull> {
  public:
+  CommandPull(const std::string &param) : Command(param) {}
   ~CommandPull() { };
-  std::string GetName() { return "pull"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "pull"; };
+  static std::string GetDescription() {
     return "Makes a Stratum 1 replica of a Stratum 0 repository.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('u', "repository url"));
     r.push_back(Parameter::Mandatory('m', "repository name"));
@@ -32,7 +33,7 @@ class CommandPull : public Command {
     r.push_back(Parameter::Switch   ('c', "preload cache instead of stratum 1"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 }

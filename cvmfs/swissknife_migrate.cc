@@ -19,7 +19,8 @@ using namespace std;  // NOLINT
 
 catalog::DirectoryEntry  CommandMigrate::nested_catalog_marker_;
 
-CommandMigrate::CommandMigrate() :
+CommandMigrate::CommandMigrate(const std::string &param) :
+  Command(param),
   file_descriptor_limit_(8192),
   catalog_count_(0),
   uid_(0),
@@ -30,7 +31,7 @@ CommandMigrate::CommandMigrate() :
 }
 
 
-ParameterList CommandMigrate::GetParams() {
+ParameterList CommandMigrate::GetParameters() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v', "migration base version ( 2.0.x | 2.1.7 )"));
   r.push_back(Parameter::Mandatory('r', "repository URL (absolute local path "
@@ -72,7 +73,7 @@ static void Error(const std::string                     &message,
 }
 
 
-int CommandMigrate::Main(const ArgumentList &args) {
+int CommandMigrate::Run(const ArgumentList &args) {
   const std::string &migration_base     = *args.find('v')->second;
   const std::string &repo_url           = *args.find('r')->second;
   const std::string &spooler            = *args.find('u')->second;

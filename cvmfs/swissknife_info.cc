@@ -42,7 +42,7 @@ static bool Exists(const string &repository, const string &file)
   }
 }
 
-swissknife::ParameterList swissknife::CommandInfo::GetParams() {
+swissknife::ParameterList swissknife::CommandInfo::GetParameters() {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
   r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
@@ -56,7 +56,7 @@ swissknife::ParameterList swissknife::CommandInfo::GetParams() {
 }
 
 
-int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandInfo::Run(const swissknife::ArgumentList &args) {
   if (args.find('l') != args.end()) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
@@ -153,7 +153,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 //
 
 
-int swissknife::CommandVersion::Main(const ArgumentList &args) {
+int swissknife::CommandVersion::Run(const ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "%s", PACKAGE_VERSION);
   return 0;
 }

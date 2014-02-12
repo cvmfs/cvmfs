@@ -34,7 +34,7 @@
 using namespace std;  // NOLINT
 
 
-int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandSign::Run(const swissknife::ArgumentList &args) {
   string manifest_path = *args.find('m')->second;
   string spooler_definition = *args.find('r')->second;
   string temp_dir = *args.find('t')->second;

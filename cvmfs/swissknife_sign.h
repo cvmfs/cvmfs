@@ -9,14 +9,15 @@
 
 namespace swissknife {
 
-class CommandSign : public Command {
+class CommandSign : public Command<CommandSign> {
  public:
+  CommandSign(const std::string &param) : Command(param) {}
   ~CommandSign() { };
-  std::string GetName() { return "sign"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "sign"; };
+  static std::string GetDescription() {
     return "Adds a signature to the repository manifest.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('m', "manifest file"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
@@ -28,7 +29,7 @@ class CommandSign : public Command {
     r.push_back(Parameter::Optional ('h', "history path"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 }  // namespace swissknife

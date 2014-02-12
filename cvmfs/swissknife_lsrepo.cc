@@ -8,12 +8,8 @@
 
 using namespace swissknife;
 
-CommandListCatalogs::CommandListCatalogs() :
-  print_tree_(false),
-  print_hash_(false) {}
 
-
-ParameterList CommandListCatalogs::GetParams() {
+ParameterList CommandListCatalogs::GetParameters() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Optional ('n', "fully qualified repository name"));
@@ -24,7 +20,7 @@ ParameterList CommandListCatalogs::GetParams() {
 }
 
 
-int CommandListCatalogs::Main(const ArgumentList &args) {
+int CommandListCatalogs::Run(const ArgumentList &args) {
   print_tree_ = (args.count('t') > 0);
   print_hash_ = (args.count('d') > 0);
 

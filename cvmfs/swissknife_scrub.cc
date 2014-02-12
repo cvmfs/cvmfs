@@ -60,7 +60,7 @@ tbb::task* CommandScrub::StoredFileScrubbingTask::execute() {
 
 
 
-swissknife::ParameterList CommandScrub::GetParams() {
+swissknife::ParameterList CommandScrub::GetParameters() {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory"));
   r.push_back(Parameter::Switch   ('m', "machine readable output"));
@@ -188,7 +188,7 @@ std::string CommandScrub::CheckPathAndExtractHash(
 }
 
 
-int CommandScrub::Main(const swissknife::ArgumentList &args) {
+int CommandScrub::Run(const swissknife::ArgumentList &args) {
   repo_path_               = MakeCanonicalPath(*args.find('r')->second);
   machine_readable_output_ = (args.find('m') != args.end());
 

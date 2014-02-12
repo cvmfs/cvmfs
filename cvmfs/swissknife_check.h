@@ -15,16 +15,17 @@ class DownloadManager;
 
 namespace swissknife {
 
-class CommandCheck : public Command {
+class CommandCheck : public Command<CommandCheck> {
  public:
+  CommandCheck(const std::string &param) : Command(param) {}
   ~CommandCheck() { };
-  std::string GetName() { return "check"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "check"; };
+  static std::string GetDescription() {
     return "CernVM File System repository sanity checker\n"
       "This command checks the consisteny of the file catalogs of a "
         "cvmfs repository.";
   };
-  ParameterList GetParams() {
+  static ParameterList GetParameters() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('r', "repository directory / url"));
     r.push_back(Parameter::Optional ('t', "check specific repository tag"));
@@ -32,7 +33,7 @@ class CommandCheck : public Command {
     r.push_back(Parameter::Switch   ('c', "check availability of data chunks"));
     return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 
  protected:
   bool InspectTree(const std::string &path,

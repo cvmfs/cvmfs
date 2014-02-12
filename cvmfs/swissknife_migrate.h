@@ -25,7 +25,7 @@ namespace catalog {
 
 namespace swissknife {
 
-class CommandMigrate : public Command {
+class CommandMigrate : public Command<CommandMigrate> {
  protected:
   struct CatalogStatistics {
     CatalogStatistics() : max_row_id(0), entry_count(0), hardlink_group_count(0),
@@ -189,16 +189,16 @@ class CommandMigrate : public Command {
   };
 
  public:
-  CommandMigrate();
+  CommandMigrate(const std::string &param);
   ~CommandMigrate() { };
-  std::string GetName() { return "migrate"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "migrate"; };
+  static std::string GetDescription() {
     return "CernVM-FS catalog repository migration \n"
       "This command migrates the whole catalog structure of a given repository";
   };
-  ParameterList GetParams();
+  static ParameterList GetParameters();
 
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 
   static void FixNestedCatalogTransitionPoint(
                           catalog::DirectoryEntry &mountpoint,
