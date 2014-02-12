@@ -295,7 +295,7 @@ class MemoryMappedFile : SingleCopy {
  * @param ParameterT        the type of the parameter that is used to figure out
  *                          which class should be instanciated at runtime
  */
-template <class AbstractProductT, typename ParameterT>
+template <class AbstractProductT, typename ParameterT, typename InfoT>
 class AbstractFactory {
  public:
   AbstractFactory() {}
@@ -303,6 +303,7 @@ class AbstractFactory {
 
   virtual bool WillHandle(const ParameterT &param) const = 0;
   virtual AbstractProductT* Construct(const ParameterT &param) const = 0;
+  virtual InfoT Introspect() const = 0;
 };
 
 
@@ -317,8 +318,14 @@ class AbstractFactory {
  * @param ParameterT        the type of the parameter that is used to poly-
  *                          morphically create a specific ConcreteProductT
  */
-template <class ConcreteProductT, class AbstractProductT, typename ParameterT>
-class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT> {
+template <class ConcreteProductT,
+          class AbstractProductT,
+          typename ParameterT,
+          typename InfoT>
+class AbstractFactoryImpl2 : public AbstractFactory<AbstractProductT,
+                                                    ParameterT,
+                                                    InfoT>
+{
  public:
   inline bool WillHandle(const ParameterT &param) const {
     return ConcreteProductT::WillHandle(param);
@@ -327,6 +334,37 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
     AbstractProductT* product = new ConcreteProductT(param);
     return product;
   }
+};
+
+
+template <class ConcreteProductT,
+          class AbstractProductT,
+          typename ParameterT,
+          typename InfoT>
+class AbstractFactoryImpl :
+  public AbstractFactoryImpl2<ConcreteProductT,
+                              AbstractProductT,
+                              ParameterT,
+                              InfoT>
+{
+  inline InfoT Introspect() const {
+    return ConcreteProductT::GetInfo();
+  }
+};
+
+template <class ConcreteProductT,
+          class AbstractProductT,
+          typename ParameterT>
+class AbstractFactoryImpl<ConcreteProductT,
+                          AbstractProductT,
+                          ParameterT,
+                          void> :
+  public AbstractFactoryImpl2<ConcreteProductT,
+                              AbstractProductT,
+                              ParameterT,
+                              void>
+{
+  inline void Introspect() const {}
 };
 
 /**
@@ -386,14 +424,14 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  *                          morphically instantiate one of the subclasses of
  *                          AbstractProductT
  */
-template <class AbstractProductT, typename ParameterT>
-class PolymorphicConstruction {
- private:
-  typedef AbstractFactory<AbstractProductT, ParameterT> Factory;
+template <class AbstractProductT, typename ParameterT, typename InfoT>
+class PolymorphicConstructionImpl {
+ protected:
+  typedef AbstractFactory<AbstractProductT, ParameterT, InfoT> Factory;
   typedef std::vector<Factory*> RegisteredPlugins;
 
  public:
-  virtual ~PolymorphicConstruction() {};
+  virtual ~PolymorphicConstructionImpl() {};
 
   static AbstractProductT* Construct(const ParameterT &param) {
     LazilyRegisterPlugins();
@@ -460,7 +498,8 @@ class PolymorphicConstruction {
     registered_plugins_.push_back(
       new AbstractFactoryImpl<ConcreteProductT,
                               AbstractProductT,
-                              ParameterT>()
+                              ParameterT,
+                              InfoT>()
     );
   }
 
@@ -483,26 +522,61 @@ class PolymorphicConstruction {
     needs_init_ = 1;
   }
 
- private:
+ protected:
   static RegisteredPlugins registered_plugins_;
+
+ private:
   static atomic_int32      needs_init_;
   static pthread_mutex_t   init_mutex_;
 };
 
-template <class AbstractProductT, typename ParameterT>
-atomic_int32
-PolymorphicConstruction<AbstractProductT, ParameterT>::needs_init_ = 1;
+
+template <class AbstractProductT, typename ParameterT, typename InfoT = void>
+class PolymorphicConstruction :
+       public PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> {
+ private:
+  typedef PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> T;
+  typedef typename T::RegisteredPlugins RegisteredPlugins;
+
+ public:
+  typedef std::vector<InfoT> IntrospectionData;
+
+  static IntrospectionData Introspect() {
+    IntrospectionData introspection_data;
+    introspection_data.reserve(T::registered_plugins_.size());
+    const RegisteredPlugins &plugins = T::registered_plugins_;
+
+    T::LazilyRegisterPlugins();
+    typename RegisteredPlugins::const_iterator i    = plugins.begin();
+    typename RegisteredPlugins::const_iterator iend = plugins.end();
+    for (; i != iend; ++i) {
+      introspection_data.push_back((*i)->Introspect());
+    }
+
+    return introspection_data;
+  }
+};
 
 template <class AbstractProductT, typename ParameterT>
+class PolymorphicConstruction<AbstractProductT, ParameterT, void> :
+      public PolymorphicConstructionImpl<AbstractProductT, ParameterT, void> {};
+
+
+
+template <class AbstractProductT, typename ParameterT, typename InfoT>
+atomic_int32
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::needs_init_ = 1;
+
+template <class AbstractProductT, typename ParameterT, typename InfoT>
 pthread_mutex_t
-PolymorphicConstruction<AbstractProductT, ParameterT>::init_mutex_ =
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::init_mutex_ =
                                                       PTHREAD_MUTEX_INITIALIZER;
 
-// init the static member registered_plugins_ inside the PolymorphicConstruction
+// init the static member registered_plugins_ inside the PolymorphicConstructionImpl
 // template... whoa, what ugly code :o)
-template <class AbstractProductT, typename ParameterT>
-typename PolymorphicConstruction<AbstractProductT, ParameterT>::RegisteredPlugins
-PolymorphicConstruction<AbstractProductT, ParameterT>::registered_plugins_;
+template <class AbstractProductT, typename ParameterT, typename InfoT>
+typename PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::RegisteredPlugins
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::registered_plugins_;
 
 
 /**
