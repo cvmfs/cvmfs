@@ -55,18 +55,14 @@ class CommandCreate : public Command {
     return "Bootstraps a fresh repository.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('o', "manifest output file", false, false));
-    result.push_back(Parameter('t', "directory for temporary storage",
-                               false, false));
-    result.push_back(Parameter('r', "spooler definition", false, false));
-    result.push_back(Parameter('l', "log level (0-4, default: 2)",
-                               true, false));
-    result.push_back(Parameter('a', "hash algorithm (default: SHA-1)",
-                               true, false));
-    result.push_back(Parameter('v', "repository containing volatile files",
-                               true, true));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Mandatory('o', "manifest output file"));
+    r.push_back(Parameter::Mandatory('t', "directory for temporary storage"));
+    r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
+    r.push_back(Parameter::Optional ('a', "hash algorithm (default: SHA-1)"));
+    r.push_back(Parameter::Switch   ('v', "repository containing volatile files"));
+    return r;
   }
   int Main(const ArgumentList &args);
 };
@@ -80,13 +76,12 @@ class CommandUpload : public Command {
     return "Uploads a local file to the repository.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('i', "local file", false, false));
-    result.push_back(Parameter('o', "destination path", false, false));
-    result.push_back(Parameter('r', "spooler definition", false, false));
-    result.push_back(Parameter('a', "hash algorithm (default: SHA-1)",
-                               true, false));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Mandatory('i', "local file"));
+    r.push_back(Parameter::Mandatory('o', "destination path"));
+    r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    r.push_back(Parameter::Optional ('a', "hash algorithm (default: SHA-1)"));
+    return r;
   }
   int Main(const ArgumentList &args);
 };
@@ -100,10 +95,10 @@ public:
     return "Checks whether a file exists in the repository.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('d', "destination path", false, false));
-    result.push_back(Parameter('r', "spooler definition", false, false));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Mandatory('d', "destination path"));
+    r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    return r;
   }
   int Main(const ArgumentList &args);
 };
@@ -117,10 +112,10 @@ class CommandRemove : public Command {
     return "Removes a file in the repository storage.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('o', "path to file", false, false));
-    result.push_back(Parameter('r', "spooler definition", false, false));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Mandatory('o', "path to file"));
+    r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    return r;
   }
   int Main(const ArgumentList &args);
 };
@@ -134,39 +129,28 @@ class CommandSync : public Command {
     return "Pushes changes from scratch area back to the repository.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('u', "union volume", false, false));
-    result.push_back(Parameter('s', "scratch directory", false, false));
-    result.push_back(Parameter('c', "r/o volume", false, false));
-    result.push_back(Parameter('t', "directory for temporary storage",
-                               false, false));
-    result.push_back(Parameter('b', "base hash", false, false));
-    result.push_back(Parameter('w', "stratum 0 base url", false, false));
-    result.push_back(Parameter('o', "manifest output file", false, false));
-    result.push_back(Parameter('r', "spooler definition", false, false));
-
-    result.push_back(Parameter('n', "create new repository", true, true));
-    result.push_back(Parameter('x', "print change set", true, true));
-    result.push_back(Parameter('y', "dry run", true, true));
-    result.push_back(Parameter('m', "create micro catalogs", true, true));
-    result.push_back(Parameter('i', "ignore x-directory hardlinks",
-                               true, true));
-    result.push_back(Parameter('d', "pause publishing to allow for catalog tweaks",
-                               true, true));
-    result.push_back(Parameter('z', "log level (0-4, default: 2)",
-                               true, false));
-
-    result.push_back(Parameter('p', "enable file chunking", true, true));
-    result.push_back(Parameter('a', "desired average chunk size in bytes", true,
-                               false));
-    result.push_back(Parameter('l', "minimal file chunk size in bytes", true,
-                               false));
-    result.push_back(Parameter('h', "maximal file chunk size in bytes", true,
-                               false));
-    result.push_back(Parameter('f', "union filesystem type", true, false));
-    result.push_back(Parameter('e', "hash algorithm (default: SHA-1)",
-                               true, false));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Mandatory('u', "union volume"));
+    r.push_back(Parameter::Mandatory('s', "scratch directory"));
+    r.push_back(Parameter::Mandatory('c', "r/o volume"));
+    r.push_back(Parameter::Mandatory('t', "directory for tee"));
+    r.push_back(Parameter::Mandatory('b', "base hash"));
+    r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
+    r.push_back(Parameter::Mandatory('o', "manifest output file"));
+    r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    r.push_back(Parameter::Switch   ('n', "create new repository"));
+    r.push_back(Parameter::Switch   ('x', "print change set"));
+    r.push_back(Parameter::Switch   ('y', "dry run"));
+    r.push_back(Parameter::Switch   ('m', "create micro catalogs"));
+    r.push_back(Parameter::Switch   ('i', "ignore x-directory hardlinks"));
+    r.push_back(Parameter::Switch   ('p', "enable file chunking"));
+    r.push_back(Parameter::Optional ('z', "log level (0-4, default: 2)"));
+    r.push_back(Parameter::Optional ('a', "desired average chunk size in bytes"));
+    r.push_back(Parameter::Optional ('l', "minimal file chunk size in bytes"));
+    r.push_back(Parameter::Optional ('h', "maximal file chunk size in bytes"));
+    r.push_back(Parameter::Optional ('f', "union filesystem type"));
+    r.push_back(Parameter::Optional ('e', "hash algorithm (default: SHA-1)"));
+    return r;
   }
   int Main(const ArgumentList &args);
 

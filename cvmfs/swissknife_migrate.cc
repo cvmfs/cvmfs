@@ -31,33 +31,21 @@ CommandMigrate::CommandMigrate() :
 
 
 ParameterList CommandMigrate::GetParams() {
-  ParameterList result;
-  result.push_back(Parameter('v', "migration base version ( 2.0.x | 2.1.7 )",
-                             false, false));
-  result.push_back(Parameter('r', "repository URL (absolute local path "
-                                  "or remote URL)",
-                             false, false));
-  result.push_back(Parameter('u', "upstream definition string",
-                             false, false));
-  result.push_back(Parameter('o', "manifest output file",
-                             false, false));
-  result.push_back(Parameter('t', "temporary directory for catalog decompress",
-                             false, false));
-  result.push_back(Parameter('p', "user id to be used for this repository",
-                             true, false));
-  result.push_back(Parameter('g', "group id to be used for this repository",
-                             true, false));
-  result.push_back(Parameter('n', "fully qualified repository name",
-                             true, false));
-  result.push_back(Parameter('k', "repository master key(s)",
-                             true, false));
-  result.push_back(Parameter('f', "fix nested catalog transition points",
-                             true, true));
-  result.push_back(Parameter('l', "disable linkcount analysis of files",
-                             true, true));
-  result.push_back(Parameter('s', "enable collection of catalog statistics",
-                             true, true));
-  return result;
+  ParameterList r;
+  r.push_back(Parameter::Mandatory('v', "migration base version ( 2.0.x | 2.1.7 )"));
+  r.push_back(Parameter::Mandatory('r', "repository URL (absolute local path "
+                                        "or remote URL)"));
+  r.push_back(Parameter::Mandatory('u', "upstream definition string"));
+  r.push_back(Parameter::Mandatory('o', "manifest output file"));
+  r.push_back(Parameter::Mandatory('t', "temporary directory for catalog decompress"));
+  r.push_back(Parameter::Optional ('p', "user id to be used for this repository"));
+  r.push_back(Parameter::Optional ('g', "group id to be used for this repository"));
+  r.push_back(Parameter::Optional ('n', "fully qualified repository name"));
+  r.push_back(Parameter::Optional ('k', "repository master key(s)"));
+  r.push_back(Parameter::Switch   ('f', "fix nested catalog transition points"));
+  r.push_back(Parameter::Switch   ('l', "disable linkcount analysis of files"));
+  r.push_back(Parameter::Switch   ('s', "enable collection of catalog statistics"));
+  return r;
 }
 
 

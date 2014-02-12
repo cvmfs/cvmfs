@@ -14,18 +14,13 @@ CommandListCatalogs::CommandListCatalogs() :
 
 
 ParameterList CommandListCatalogs::GetParams() {
-  ParameterList result;
-  result.push_back(Parameter('r', "repository URL (absolute local path or remote URL)",
-                             false, false));
-  result.push_back(Parameter('n', "fully qualified repository name",
-                             true, false));
-  result.push_back(Parameter('k', "repository master key(s)",
-                             true, false));
-  result.push_back(Parameter('t', "print tree structure of catalogs",
-                             true, true));
-  result.push_back(Parameter('d', "print digest for each catalog",
-                             true, true));
-  return result;
+  ParameterList r;
+  r.push_back(Parameter::Mandatory('r', "repository URL (absolute local path or remote URL)"));
+  r.push_back(Parameter::Optional ('n', "fully qualified repository name"));
+  r.push_back(Parameter::Optional ('k', "repository master key(s)"));
+  r.push_back(Parameter::Switch   ('t', "print tree structure of catalogs"));
+  r.push_back(Parameter::Switch   ('d', "print digest for each catalog"));
+  return r;
 }
 
 
