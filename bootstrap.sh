@@ -99,7 +99,8 @@ do_copy     "vjson"
 patch_external "leveldb"     "dont_search_snappy.patch"           \
                              "dont_search_tcmalloc.patch"
 patch_external "tbb"         "custom_library_suffix.patch"        \
-                             "symlink_to_build_directories.patch"
+                             "symlink_to_build_directories.patch" \
+                             "32bit_mock.patch"
 patch_external "vjson"       "missing_include.patch"
 patch_external "sparsehash"  "fix_sl4_compilation.patch"
 

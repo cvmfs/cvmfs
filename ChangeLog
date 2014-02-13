@@ -1,4 +1,5 @@
 2.1.18:
+  * Fix TBB build system for 32bit on 64bit mock environments
   * Fix RPM spec file for FC20
   * Add cvmfs Python library
   * Fix permissions of private keys on repository creation
