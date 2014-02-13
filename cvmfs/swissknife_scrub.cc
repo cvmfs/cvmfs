@@ -63,7 +63,7 @@ tbb::task* CommandScrub::StoredFileScrubbingTask::execute() {
 swissknife::ParameterList CommandScrub::GetParams() {
   swissknife::ParameterList result;
   result.push_back(Parameter('r', "repository directory", false, false));
-  // to be extended...
+  result.push_back(Parameter('m', "machine readable output", true, true));
   return result;
 }
 
@@ -170,7 +170,8 @@ std::string CommandScrub::CheckPathAndExtractHash(
 
 
 int CommandScrub::Main(const swissknife::ArgumentList &args) {
-  repo_path_ = *args.find('r')->second;
+  repo_path_               = *args.find('r')->second;
+  machine_readable_output_ = (args.find('m') != args.end());
 
   // initialize warning printer mutex
   const bool mutex_init = (pthread_mutex_init(&warning_mutex_, NULL) == 0);
