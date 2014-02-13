@@ -31,6 +31,7 @@ class CommandScrub : public Command<CommandScrub> {
     };
 
     static const char* ToString(const Type t);
+    static const char* ToDocString(const Type t);
   };
 
  private:
