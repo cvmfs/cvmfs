@@ -68,6 +68,28 @@ swissknife::ParameterList CommandScrub::GetParams() {
 }
 
 
+ const char* CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
+  switch (t) {
+    case Alerts::kUnexpectedFile:
+      return "unexpected regular file";
+    case Alerts::kUnexpectedSymlink:
+      return "unexpected symlink";
+    case Alerts::kUnexpectedSubdir:
+      return "unexpected subdir in CAS subdir";
+    case Alerts::kUnexpectedModifier:
+      return "unknown object modifier";
+    case Alerts::kMalformedHash:
+      return "malformed content hash";
+    case Alerts::kMalformedCasSubdir:
+      return "malformed CAS subdir length";
+    case Alerts::kContentHashMismatch:
+      return "mismatch of file name and content hash";
+    default:
+      return "unknown alert";
+  }
+}
+
+
 void CommandScrub::FileCallback(const std::string &relative_path,
                                 const std::string &file_name)
 {
@@ -199,11 +221,33 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
 }
 
 
+void CommandScrub::PrintAlert(const Alerts::Type   type,
+                              const std::string   &path,
+                              const std::string   &affected_hash) const {
+  MutexLockGuard l(alerts_mutex_);
+
+  const char *msg = Alerts::ToString(type);
+
+  if (machine_readable_output_) {
+    LogCvmfs(kLogUtility, kLogStderr, "%d %s %s", type, path.c_str(), affected_hash.c_str());
+  } else {
+    LogCvmfs(kLogUtility, kLogStderr, "%s | at: %s", msg, path.c_str());
+  }
+
+  ++alerts_;
+}
+
+
 void CommandScrub::PrintWarning(const std::string &msg,
                                 const std::string &path) const {
   MutexLockGuard l(warning_mutex_);
   LogCvmfs(kLogUtility, kLogStderr, "%s | at: %s", msg.c_str(), path.c_str());
   ++warnings_;
+}
+
+
+void CommandScrub::ShowAlertsHelpMessage() const {
+  LogCvmfs(kLogUtility, kLogStdout, "to come...");
 }
 
 

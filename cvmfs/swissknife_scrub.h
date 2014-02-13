@@ -18,6 +18,22 @@ namespace swissknife {
 
 class CommandScrub : public Command {
  private:
+  struct Alerts {
+    enum Type {
+      kUnexpectedFile = 1,
+      kUnexpectedSymlink,
+      kUnexpectedSubdir,
+      kUnexpectedModifier,
+      kMalformedHash,
+      kMalformedCasSubdir,
+      kContentHashMismatch,
+      kNumberOfErrorTypes // This should _always_ stay the last entry!
+    };
+
+    static const char* ToString(const Type t);
+  };
+
+ private:
   class StoredFile : public upload::AbstractFile {
    public:
     StoredFile(const std::string &path, const std::string &expected_hash);
@@ -80,6 +96,10 @@ class CommandScrub : public Command {
 
   void PrintWarning(const std::string &msg, const std::string &path) const;
 
+  void PrintAlert(const Alerts::Type   type,
+                  const std::string   &path,
+                  const std::string   &affected_hash = "") const;
+  void ShowAlertsHelpMessage() const;
 
  private:
   std::string CheckPathAndExtractHash(const std::string &relative_path,
