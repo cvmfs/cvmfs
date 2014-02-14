@@ -29,13 +29,16 @@ void Usage();
 class Parameter {
  public:
   static Parameter Mandatory(const char key, const std::string &desc) {
-    return Parameter(key, desc, false, false);
+    return Parameter(key, desc, false, false, false);
   }
   static Parameter Optional(const char key, const std::string &desc) {
-    return Parameter(key, desc, true, false);
+    return Parameter(key, desc, true, false, false);
   }
   static Parameter Switch(const char key, const std::string &desc) {
-    return Parameter(key, desc, true, true);
+    return Parameter(key, desc, true, true, false);
+  }
+  static Parameter HelpSwitch(const char key, const std::string &desc) {
+    return Parameter(key, desc, true, true, true);
   }
 
   char key() const { return key_; }
@@ -43,18 +46,22 @@ class Parameter {
   bool optional() const { return optional_; }
   bool mandatory() const { return !optional_; }
   bool switch_only() const { return switch_only_; }
+  bool help_switch() const { return help_switch_; }
 
  protected:
   Parameter(const char          key,
             const std::string  &desc,
             const bool          opt,
-            const bool          switch_only) :
+            const bool          switch_only,
+            const bool          help_switch) :
     key_(key),
     description_(desc),
     optional_(opt),
-    switch_only_(switch_only)
+    switch_only_(switch_only),
+    help_switch_(help_switch)
   {
     assert (! switch_only_ || optional_); // switches are optional by definition
+    assert (! help_switch_ || switch_only_); // help switches _are_ switches
   }
 
  private:
@@ -62,6 +69,7 @@ class Parameter {
   std::string description_;
   bool optional_;
   bool switch_only_;
+  bool help_switch_;
 };
 
 typedef std::vector<Parameter> ParameterList;

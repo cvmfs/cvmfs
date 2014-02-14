@@ -104,6 +104,7 @@ ArgumentList AbstractCommand::ParseArguments(int argc, char **argv,
                                              ParameterList &params) const
 {
   ArgumentList args;
+  bool found_help_switch = false;
 
   optind = 1;
   std::string option_string = "";
@@ -133,6 +134,10 @@ ArgumentList AbstractCommand::ParseArguments(int argc, char **argv,
         }
         args[c] = argument;
 
+        if (i->help_switch()) {
+          found_help_switch = true;
+        }
+
         break;
       }
     }
@@ -144,12 +149,15 @@ ArgumentList AbstractCommand::ParseArguments(int argc, char **argv,
   }
 
   // check if all mandatory parameters are found
-  i = params.begin();
-  for (; i != iend; ++i) {
-    if (i->mandatory() && args.find(i->key()) == args.end()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "parameter -%c missing",
-               i->key());
-      exit(1);
+  // (Note: the help switch might override all other mandatory options)
+  if (! found_help_switch) {
+    i = params.begin();
+    for (; i != iend; ++i) {
+      if (i->mandatory() && args.find(i->key()) == args.end()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "parameter -%c missing",
+                 i->key());
+        exit(1);
+      }
     }
   }
 
