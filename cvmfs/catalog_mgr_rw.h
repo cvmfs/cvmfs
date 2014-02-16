@@ -59,6 +59,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
                          download::DownloadManager *download_manager);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
+                                              const bool volatile_content,
                                               upload::Spooler   *spooler);
 
   bool Init();

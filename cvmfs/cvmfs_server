@@ -166,7 +166,8 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
   mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
-                [-m replicable] [-f union filesystem type]
+                [-m replicable] [-f union filesystem type] [-v volatile content]
+                [-a hash algorithm (default: SHA-1)]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
@@ -200,7 +201,7 @@ Supported Commands:
                 Print summary about the repository
   lstags        <fully qualified name>
                 Print named tags (snapshots) of the repository
-  check         [-c disable data chunk existence check] 
+  check         [-c disable data chunk existence check]
                 [-i check data integrity] (may take some time)]
                 [-t tag (check given tag instead of trunk)]
                 <fully qualified name>
@@ -1312,12 +1313,13 @@ mkfs() {
   local upstream
   local owner
   local replicable=1
+  local volatile_content=0
   local unionfs
   local hash_algo
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:a:" option; do
+  while getopts "w:u:o:mf:a:v" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1336,6 +1338,9 @@ mkfs() {
       ;;
       a)
         hash_algo=$OPTARG
+      ;;
+      v)
+        volatile_content=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1400,10 +1405,14 @@ mkfs() {
 
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+  local volatile_opt=
+  if [ $volatile_content -eq 1 ]; then
+    volatile_opt="-v"
+  fi
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
     -t $temp_dir \
     -r $upstream \
-    -a $hash_algo \
+    -a $hash_algo $volatile_opt \
     -o ${temp_dir}/new_manifest" > /dev/null || die "fail! (cannot init repo)"
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \

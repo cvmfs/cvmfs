@@ -66,6 +66,7 @@ class Database {
   ~Database();
   static bool Create(const std::string &filename,
                      const std::string &root_path,
+                     const bool volatile_content,
                      const DirectoryEntry &root_entry
                                              = DirectoryEntry(kDirentNegative));
 

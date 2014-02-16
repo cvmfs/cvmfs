@@ -64,6 +64,8 @@ class CommandCreate : public Command {
                                true, false));
     result.push_back(Parameter('a', "hash algorithm (default: SHA-1)",
                                true, false));
+    result.push_back(Parameter('v', "repository containing volatile files",
+                               true, true));
     return result;
   }
   int Main(const ArgumentList &args);
