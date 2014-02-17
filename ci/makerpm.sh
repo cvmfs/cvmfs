@@ -29,6 +29,9 @@ fi
 enforce_target=
 if [ "$(uname -m)" = "i686" ]; then
   enforce_target="--target=i686"
+fi
+if [ "$(uname -m)" = "x86_64" -a $(getconf LONG_BIT) = 32 ]; then
+  enforce_target="--target=i686"
 fi 
 rpmbuild --define="_topdir $packagedir" --define="_tmppath ${packagedir}/TMP" $enforce_target -ba cvmfs-universal.spec
 
