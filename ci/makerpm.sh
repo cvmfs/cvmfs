@@ -26,5 +26,9 @@ if [ $? -eq 0 ]; then
   sed -i -e "s/^%setup -q/%setup -q -n cvmfs-$version/" cvmfs-universal.spec || exit 7
 fi
 
-rpmbuild --define="_topdir $packagedir" --define="_tmppath ${packagedir}/TMP" -ba cvmfs-universal.spec
+enforce_target=
+if [ "$(uname -m)" = "i686" ]; then
+  enforce_target="--target=i686"
+fi 
+rpmbuild --define="_topdir $packagedir" --define="_tmppath ${packagedir}/TMP" $enforce_target -ba cvmfs-universal.spec
 
