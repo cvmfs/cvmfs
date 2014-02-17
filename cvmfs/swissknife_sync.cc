@@ -99,6 +99,9 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  bool volatile_content = false;
+  if (args.find('v') != args.end())
+    volatile_content = true;
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
@@ -106,7 +109,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest =
-    catalog::WritableCatalogManager::CreateRepository(dir_temp, spooler);
+    catalog::WritableCatalogManager::CreateRepository(
+      dir_temp, volatile_content, spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;

@@ -649,7 +649,8 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
     Error("Failed to create temporary file for the new catalog database.");
     return false;
   }
-  retval = Database::Create(catalog_db, root_path);
+  const bool volatile_content = false;
+  retval = Database::Create(catalog_db, root_path, volatile_content);
   if (!retval) {
     Error("Failed to create database for new catalog");
     unlink(catalog_db.c_str());

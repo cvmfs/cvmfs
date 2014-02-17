@@ -374,6 +374,7 @@ static int CommitTransaction(const string &final_path,
                              const string &temp_path,
                              const string &cvmfs_path,
                              const shash::Any &hash,
+                             const bool volatile_content,
                              const uint64_t size)
 {
   int result;
@@ -390,7 +391,11 @@ static int CommitTransaction(const string &final_path,
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(temp_path.c_str());
   } else {
-    quota::Insert(hash, size, cvmfs_path);
+    if (volatile_content) {
+      quota::InsertVolatile(hash, size, cvmfs_path);
+    } else {
+      quota::Insert(hash, size, cvmfs_path);
+    }
   }
 
   return result;
@@ -418,7 +423,9 @@ static bool CommitFromMem(const shash::Any &id, const unsigned char *buffer,
     return false;
   }
 
-  return CommitTransaction(final_path, temp_path, cvmfs_path, id, size) == 0;
+  const bool volatile_content = false;
+  return CommitTransaction(final_path, temp_path, cvmfs_path, id,
+                           volatile_content, size) == 0;
 }
 
 
@@ -442,6 +449,7 @@ static int Fetch(const shash::Any &checksum,
                  const string     &hash_suffix,
                  const uint64_t    size,
                  const string     &cvmfs_path,
+                 const bool        volatile_content,
                  download::DownloadManager *download_manager)
 {
   CallGuard call_guard;
@@ -578,7 +586,7 @@ static int Fetch(const shash::Any &checksum,
       goto fetch_finalize;
     }
     result = cache::CommitTransaction(final_path, temp_path, cvmfs_path,
-                                      checksum, size);
+                                      checksum, volatile_content, size);
     if (result == 0) {
       platform_disable_kcache(fd_return);
       result = fd_return;
@@ -627,9 +635,11 @@ static int Fetch(const shash::Any &checksum,
  */
 int FetchDirent(const catalog::DirectoryEntry &d,
                 const string &cvmfs_path,
+                const bool volatile_content,
                 download::DownloadManager *download_manager)
 {
-  return Fetch(d.checksum(), "", d.size(), cvmfs_path, download_manager);
+  return Fetch(d.checksum(), "", d.size(), cvmfs_path, volatile_content,
+               download_manager);
 }
 
 
@@ -642,13 +652,16 @@ int FetchDirent(const catalog::DirectoryEntry &d,
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int FetchChunk(const FileChunk &chunk, const string &cvmfs_path,
+int FetchChunk(const FileChunk &chunk,
+               const string &cvmfs_path,
+               const bool volatile_content,
                download::DownloadManager *download_manager)
 {
   return Fetch(chunk.content_hash(),
                FileChunk::kCasSuffix,
                chunk.size(),
                cvmfs_path,
+               volatile_content,
                download_manager);
 }
 

@@ -183,6 +183,7 @@ glue::InodeTracker *inode_tracker_ = NULL;
 
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
+bool volatile_repository_ = false;
 
 /**
  * in maintenance mode, cache timeout is 0 and catalogs are not reloaded
@@ -421,6 +422,7 @@ static void RemountFinish() {
       inode_generation_info_.inode_generation =
         inode_annotation_->GetGeneration();
     }
+    volatile_repository_ = catalog_manager_->GetVolatileFlag();
     remount_fence_->Unblock();
 
     inode_cache_->Resume();
@@ -1114,7 +1116,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
-                          download_manager_);
+                          volatile_repository_, download_manager_);
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
@@ -1225,6 +1227,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         string verbose_path = "Part of " + chunks.path.ToString();
         chunk_fd.fd = cache::FetchChunk(*chunks.list->AtPtr(chunk_idx),
                                         verbose_path,
+                                        volatile_repository_,
                                         download_manager_);
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
@@ -1636,7 +1639,7 @@ bool Pin(const string &path) {
       if (!retval)
         return false;
       int fd = cache::FetchChunk(*chunks.AtPtr(i), "Part of " + path,
-                                 download_manager_);
+                                 volatile_repository_, download_manager_);
       if (fd < 0) {
         quota::Unpin(chunks.AtPtr(i)->content_hash());
         return false;
@@ -1654,7 +1657,8 @@ bool Pin(const string &path) {
   bool retval = quota::Pin(dirent.checksum(), dirent.size(), path, false);
   if (!retval)
     return false;
-  int fd = cache::FetchDirent(dirent, path, download_manager_);
+  int fd = cache::FetchDirent(dirent, path, volatile_repository_,
+                              download_manager_);
   if (fd < 0) {
     quota::Unpin(dirent.checksum());
     return false;
@@ -2285,6 +2289,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::inode_annotation_->GetGeneration();
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %"PRIu64,
            uint64_t(cvmfs::catalog_manager_->GetRootInode()));
+
+  if (cvmfs::catalog_manager_->GetVolatileFlag()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "content of repository flagged as VOLATILE");
+    cvmfs::volatile_repository_ = true;
+  }
 
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
   auto_umount::SetMountpoint(*cvmfs::mountpoint_);

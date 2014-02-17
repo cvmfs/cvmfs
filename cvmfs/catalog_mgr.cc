@@ -405,6 +405,14 @@ uint64_t AbstractCatalogManager::GetRevision() const {
 }
 
 
+bool AbstractCatalogManager::GetVolatileFlag() const {
+  ReadLock();
+  const bool volatile_flag = GetRootCatalog()->volatile_flag();
+  Unlock();
+  return volatile_flag;
+}
+
+
 uint64_t AbstractCatalogManager::GetTTL() const {
   ReadLock();
   const uint64_t revision = GetRootCatalog()->GetTTL();

@@ -184,6 +184,7 @@ Database::~Database() {
  */
 bool Database::Create(const string &filename,
                       const string &root_path,
+                      const bool volatile_content,
                       const DirectoryEntry &root_entry)
 {
   bool retval = false;
@@ -253,6 +254,16 @@ bool Database::Create(const string &filename,
     SqlError("failed to insert default initial values into the newly created "
              "catalog tables.", database);
     return false;
+  }
+
+  if (volatile_content) {
+    Sql insert_volatile_flag(database,
+      "INSERT INTO properties (key, value) VALUES ('volatile', 1);");
+    if (!insert_volatile_flag.Execute()) {
+      SqlError("failed to insert volatil flag into the newly created "
+               "catalog tables.", database);
+      return false;
+    }
   }
 
   // create initial statistics counters

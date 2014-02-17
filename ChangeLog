@@ -1,4 +1,5 @@
 2.1.18:
+  * Add "volatile" repository and volatile cache class (CVM-263)
   * Fix TBB build system for 32bit on 64bit mock environments
   * Fix RPM spec file for FC20
   * Add cvmfs Python library

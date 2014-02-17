@@ -126,6 +126,7 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
+  const bool volatile_content,
   upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
@@ -148,7 +149,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   string root_path = "";
 
   // Create the database schema and the inital root entry
-  if (!Database::Create(file_path, root_path, root_entry)) {
+  if (!Database::Create(file_path, root_path, volatile_content, root_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
              file_path.c_str());
     return NULL;
@@ -565,8 +566,10 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // for the new nested catalog
   const string database_file_path = CreateTempPath(dir_temp_ + "/catalog",
                                                    0666);
+  const bool volatile_content = false;
   retval =
-    Database::Create(database_file_path, nested_root_path, new_root_entry);
+    Database::Create(database_file_path, nested_root_path, volatile_content,
+                     new_root_entry);
   assert(retval);
 
   // Attach the just created nested catalog

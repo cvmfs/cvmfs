@@ -160,6 +160,7 @@ class Catalog : public SingleCopy {
   inline std::string database_path() const { return database_->filename(); }
   inline PathString root_prefix() const { return root_prefix_; }
   inline shash::Any hash() const { return catalog_hash_; }
+  inline bool volatile_flag() const { return volatile_flag_; }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && initialized_;
@@ -228,6 +229,7 @@ class Catalog : public SingleCopy {
   const shash::Any catalog_hash_;
   PathString root_prefix_;
   PathString path_;
+  bool volatile_flag_;
 
   Catalog *parent_;
   NestedCatalogMap children_;
