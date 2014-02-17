@@ -46,9 +46,11 @@ void Fini();
 int Open(const shash::Any &id);
 int FetchDirent(const catalog::DirectoryEntry &d,
                 const std::string &cvmfs_path,
+                const bool volatile_content,
                 download::DownloadManager *download_manager);
 int FetchChunk(const FileChunk &chunk,
                const std::string &cvmfs_path,
+               const bool volatile_content,
                download::DownloadManager *download_manager);
 int64_t GetNumDownloads();
 

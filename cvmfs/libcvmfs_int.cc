@@ -637,8 +637,9 @@ int cvmfs_open(const char *c_path)
     return -ENOENT;
   }
 
+  const bool volatile_content = false;
   fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
-                          cvmfs::download_manager_);
+                          volatile_content, cvmfs::download_manager_);
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {

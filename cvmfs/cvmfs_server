@@ -1408,6 +1408,7 @@ mkfs() {
   local volatile_opt=
   if [ $volatile_content -eq 1 ]; then
     volatile_opt="-v"
+    echo -n "(repository flagged volatile)... "
   fi
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
     -t $temp_dir \

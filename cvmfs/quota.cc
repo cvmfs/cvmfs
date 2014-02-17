@@ -55,6 +55,7 @@ using namespace std;  // NOLINT
 namespace quota {
 
 const uint32_t kProtocolRevision = 1;  // Start of keeping revisions
+const uint64_t kVolatileFlag = 1ULL << 63;
 
 static void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
@@ -84,6 +85,7 @@ enum CommandType {
   kRegisterBackChannel,
   kUnregisterBackChannel,
   kGetProtocolRevision,
+  kInsertVolatile,
 };
 
 /**
@@ -433,6 +435,7 @@ static void ProcessCommandBunch(const unsigned num,
       case kPin:
       case kPinRegular:
       case kInsert:
+      case kInsertVolatile:
         // It could already be in, check
         exists = Contains(hash_str);
 
@@ -448,7 +451,11 @@ static void ProcessCommandBunch(const unsigned num,
         sqlite3_bind_text(stmt_new_, 1, &hash_str[0], hash_str.length(),
                           SQLITE_STATIC);
         sqlite3_bind_int64(stmt_new_, 2, size);
-        sqlite3_bind_int64(stmt_new_, 3, seq_++);
+        if (commands[i].command_type == kInsertVolatile) {
+          sqlite3_bind_int64(stmt_new_, 3, (seq_++) | kVolatileFlag);
+        } else {
+          sqlite3_bind_int64(stmt_new_, 3, seq_++);
+        }
         sqlite3_bind_text(stmt_new_, 4, &paths[i*kMaxCvmfsPath],
                           commands[i].path_length, SQLITE_STATIC);
         sqlite3_bind_int64(stmt_new_, 5, (commands[i].command_type == kPin) ?
@@ -457,7 +464,7 @@ static void ProcessCommandBunch(const unsigned num,
           ((commands[i].command_type == kPin) ||
            (commands[i].command_type == kPinRegular)) ? 1 : 0);
         retval = sqlite3_step(stmt_new_);
-        LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, pin %d: %d",
+        LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, method %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
           LogCvmfs(kLogQuota, kLogSyslogErr,
@@ -504,8 +511,8 @@ static void *MainCommandServer(void *data __attribute__((unused))) {
     const uint64_t size = command_buffer[num_commands].GetSize();
 
     // Inserts and pins come with a cvmfs path
-    if ((command_type == kInsert) || (command_type == kPin) ||
-        (command_type == kPinRegular))
+    if ((command_type == kInsert) || (command_type == kInsertVolatile) ||
+        (command_type == kPin) || (command_type == kPinRegular))
     {
       const int path_length = command_buffer[num_commands].path_length;
       ReadPipe(pipe_lru_[0], &path_buffer[kMaxCvmfsPath*num_commands],
@@ -1063,7 +1070,7 @@ init_recover:
   sqlite3_finalize(stmt);
 
   // Highest seq-no?
-  sql = "SELECT coalesce(max(acseq), 0) FROM cache_catalog;";
+  sql = "SELECT coalesce(max(acseq & (~(1<<63))), 0) FROM cache_catalog;";
   sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, NULL);
   if (sqlite3_step(stmt) == SQLITE_ROW) {
     seq_ = sqlite3_column_int64(stmt, 0)+1;
@@ -1075,7 +1082,8 @@ init_recover:
   sqlite3_finalize(stmt);
 
   // Prepare touch, new, remove statements
-  sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET acseq=:seq "
+  sqlite3_prepare_v2(db_,
+                     "UPDATE cache_catalog SET acseq=:seq | (acseq&(1<<63)) "
                      "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
   sqlite3_prepare_v2(db_, "UPDATE cache_catalog SET pinned=0 "
                      "WHERE sha1=:sha1;", -1, &stmt_unpin_, NULL);
@@ -1086,15 +1094,18 @@ init_recover:
   sqlite3_prepare_v2(db_,
                      "INSERT OR REPLACE INTO cache_catalog "
                      "(sha1, size, acseq, path, type, pinned) "
-                     "VALUES (:sha1, :s, :seq, :p, :t, :pin);", -1, &stmt_new_, NULL);
+                     "VALUES (:sha1, :s, :seq, :p, :t, :pin);",
+                     -1, &stmt_new_, NULL);
   sqlite3_prepare_v2(db_,
                      "SELECT size, pinned FROM cache_catalog WHERE sha1=:sha1;",
                      -1, &stmt_size_, NULL);
   sqlite3_prepare_v2(db_, "DELETE FROM cache_catalog WHERE sha1=:sha1;",
                      -1, &stmt_rm_, NULL);
   sqlite3_prepare_v2(db_,
-                     "SELECT sha1, size FROM cache_catalog WHERE acseq=(SELECT min(acseq) "
-                     "FROM cache_catalog WHERE pinned<>2);", -1, &stmt_lru_, NULL);
+                     "SELECT sha1, size FROM cache_catalog WHERE "
+                     "acseq=(SELECT min(acseq) "
+                     "FROM cache_catalog WHERE pinned<>2);",
+                     -1, &stmt_lru_, NULL);
   sqlite3_prepare_v2(db_,
                      ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileRegular) +
                       ";").c_str(), -1, &stmt_list_, NULL);
@@ -1569,8 +1580,8 @@ static void DoInsert(const shash::Any &hash, const uint64_t size,
                      const string &cvmfs_path, const CommandType command_type)
 {
   const string hash_str = hash.ToString();
-  LogCvmfs(kLogQuota, kLogDebug, "insert into lru %s, path %s",
-           hash_str.c_str(), cvmfs_path.c_str());
+  LogCvmfs(kLogQuota, kLogDebug, "insert into lru %s, path %s, method %d",
+           hash_str.c_str(), cvmfs_path.c_str(), command_type);
   const unsigned path_length = (cvmfs_path.length() > kMaxCvmfsPath) ?
     kMaxCvmfsPath : cvmfs_path.length();
 
@@ -1598,6 +1609,20 @@ void Insert(const shash::Any &any_hash, const uint64_t size,
   if (limit_ == 0) return;
   DoInsert(any_hash, size, cvmfs_path, kInsert);
 }
+
+
+/**
+ * Inserts a new file into cache catalog.  This file is marked as volatile
+ * and gets a new highest sequence number with the first bit set.  Cache cleanup
+ * treats these files with priority.
+ */
+void InsertVolatile(const shash::Any &any_hash, const uint64_t size,
+                    const string &cvmfs_path)
+{
+  assert(initialized_);
+  if (limit_ == 0) return;
+  DoInsert(any_hash, size, cvmfs_path, kInsertVolatile);
+ }
 
 
 /**

@@ -315,6 +315,7 @@ create_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
+  local extra_options="$4"
 
   echo "Shutting down autofs for the cvmfs mounts"
   autofs_switch off || return 100
@@ -325,9 +326,9 @@ create_repo() {
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs -o $uid -m -f ${CVMFS_TEST_UNIONFS} -a ${CVMFS_TEST_HASHALGO} $repo || return 102
+  sudo cvmfs_server mkfs -o $uid -m -f ${CVMFS_TEST_UNIONFS} -a ${CVMFS_TEST_HASHALGO} $extra_options $repo || return 102
 
-  if [ x$debug_log != x ]; then
+  if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a /etc/cvmfs/repositories.d/${repo}/client.conf
   fi
 }
@@ -337,8 +338,9 @@ create_empty_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
+  local extra_options="$4"
 
-  create_repo $repo $uid $debug_log || return 101
+  create_repo $repo $uid $debug_log $extra_options || return 101
 
   sudo cvmfs_server transaction $repo || return 102
   rm -f /cvmfs/$repo/new_repository

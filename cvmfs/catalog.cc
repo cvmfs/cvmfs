@@ -46,6 +46,7 @@ Catalog::Catalog(const PathString &path,
   read_only_(true),
   catalog_hash_(catalog_hash),
   path_(path),
+  volatile_flag_(false),
   parent_(parent),
   initialized_(false)
 {
@@ -161,6 +162,12 @@ bool Catalog::OpenDatabase(const string &db_path) {
                "no root prefix for root catalog file %s", db_path.c_str());
     }
   }
+
+  // Get volatile content flag
+  Sql sql_volatile_flag(database(), "SELECT value FROM properties "
+                        "WHERE key='volatile';");
+  if (sql_volatile_flag.FetchRow())
+    volatile_flag_ = sql_volatile_flag.RetrieveInt(0);
 
   // Read Catalog Counter Statistics
   const bool statistics_loaded =

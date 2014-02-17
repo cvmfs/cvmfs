@@ -179,6 +179,7 @@ class AbstractCatalogManager {
     ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;
   }
   uint64_t GetRevision() const;
+  bool GetVolatileFlag() const;
   uint64_t GetTTL() const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;

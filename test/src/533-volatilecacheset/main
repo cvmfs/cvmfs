@@ -15,7 +15,7 @@ cvmfs_run_test() {
   logfile=$1
 
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
-  create_empty_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER || return $?
+  create_empty_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER NO -v || return $?
 
   echo "ceating 20M in normal repository"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -70,6 +70,7 @@ EOF
   if grep volatile cachelist; then
     return 15
   fi
+  sqlite3 cache/shared/cachedb 'SELECT * FROM cache_catalog;'
 
   return 0
 }
