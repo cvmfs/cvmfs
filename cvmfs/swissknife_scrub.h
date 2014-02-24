@@ -108,6 +108,9 @@ class CommandScrub : public Command {
   bool CheckHashString(const std::string &hash_string,
                        const std::string &full_path) const;
 
+  std::string MakeFullPath(const std::string &relative_path,
+                           const std::string &file_name) const;
+
  private:
   std::string                   repo_path_;
   bool                          machine_readable_output_;

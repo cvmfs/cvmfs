@@ -93,9 +93,9 @@ swissknife::ParameterList CommandScrub::GetParams() {
 void CommandScrub::FileCallback(const std::string &relative_path,
                                 const std::string &file_name)
 {
-  assert (file_name.size() > 0);
+  assert (! file_name.empty());
 
-  if (relative_path.size() == 0) {
+  if (relative_path.empty()) {
     PrintAlert(Alerts::kUnexpectedFile, repo_path_ + "/" + file_name);
     return;
   }
@@ -104,7 +104,7 @@ void CommandScrub::FileCallback(const std::string &relative_path,
     return;
   }
 
-  const string full_path = repo_path_ + "/" + relative_path + "/" + file_name;
+  const string full_path = MakeFullPath(relative_path, file_name);
   const std::string hash_string = CheckPathAndExtractHash(relative_path,
                                                           file_name,
                                                           full_path);
@@ -125,7 +125,7 @@ void CommandScrub::FileCallback(const std::string &relative_path,
 void CommandScrub::DirCallback(const std::string &relative_path,
                                const std::string &dir_name)
 {
-  const string full_path = repo_path_ + "/" + relative_path + "/" + dir_name;
+  const string full_path = MakeFullPath(relative_path, dir_name);
   // Check for nested subdirs
   if (relative_path.size() > 0) {
     PrintAlert(Alerts::kUnexpectedSubdir, full_path);
@@ -145,8 +145,7 @@ void CommandScrub::DirCallback(const std::string &relative_path,
 void CommandScrub::SymlinkCallback(const std::string &relative_path,
                                    const std::string &symlink_name)
 {
-  const string full_path = repo_path_ + "/" + relative_path + "/" +
-                           symlink_name;
+  const string full_path = MakeFullPath(relative_path, symlink_name);
   PrintAlert(Alerts::kUnexpectedSymlink, full_path);
 }
 
@@ -190,7 +189,7 @@ std::string CommandScrub::CheckPathAndExtractHash(
 
 
 int CommandScrub::Main(const swissknife::ArgumentList &args) {
-  repo_path_               = *args.find('r')->second;
+  repo_path_               = MakeCanonicalPath(*args.find('r')->second);
   machine_readable_output_ = (args.find('m') != args.end());
 
   // initialize alert printer mutex
@@ -235,6 +234,15 @@ void CommandScrub::PrintAlert(const Alerts::Type   type,
   }
 
   ++alerts_;
+}
+
+
+std::string CommandScrub::MakeFullPath(const std::string &relative_path,
+                                       const std::string &file_name) const
+{
+  return (relative_path.empty())
+              ? repo_path_ + "/" + file_name
+              : repo_path_ + "/" + relative_path + "/" + file_name;
 }
 
 
