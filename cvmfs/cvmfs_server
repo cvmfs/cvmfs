@@ -2182,7 +2182,7 @@ transaction() {
     check_repository_compatibility
     check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     if [ $force -eq 0 ]; then
-      is_in_transaction $name && { echo "Repository $name in already in a transaction"; continue; }
+      is_in_transaction $name && { echo "Repository $name is already in a transaction"; continue; }
     fi
 
     # do it!
