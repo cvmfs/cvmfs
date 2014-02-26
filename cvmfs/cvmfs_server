@@ -520,7 +520,19 @@ is_master_replica() {
 is_in_transaction() {
   local name=$1
   load_repo_config $name
-  [ -f ${CVMFS_SPOOL_DIR}/in_transaction ]
+  [ -d ${CVMFS_SPOOL_DIR}/in_transaction ]
+}
+
+open_transaction() {
+  local name=$1
+  load_repo_config $name
+  mkdir ${CVMFS_SPOOL_DIR}/in_transaction > /dev/null 2>&1 || die "Failed to open transaction"
+}
+
+close_transaction() {
+  local name=$1
+  load_repo_config $name
+  rmdir ${CVMFS_SPOOL_DIR}/in_transaction
 }
 
 
@@ -2184,7 +2196,7 @@ transaction() {
       cvmfs_suid_helper rw_mount $name
     fi
     cvmfs_suid_helper open $name
-    touch ${spool_dir}/in_transaction
+    open_transaction       $name
     transaction_after_hook $name
 
   done
@@ -2257,7 +2269,7 @@ abort() {
     rm -rf ${spool_dir}/tmp/*
     cvmfs_suid_helper clear_scratch $name
     cvmfs_suid_helper rw_mount $name
-    rm -f ${spool_dir}/in_transaction
+    close_transaction $name
     abort_after_hook $name
 
   done
@@ -2459,7 +2471,7 @@ publish() {
       rm -rf ${spool_dir}/tmp/*
       cvmfs_suid_helper rdonly_mount $name > /dev/null
       cvmfs_suid_helper rw_mount $name
-      rm -f ${spool_dir}/in_transaction
+      close_transaction $name
       publish_after_hook $name
     else
       exit 1
@@ -2570,7 +2582,7 @@ rollback() {
   rm -rf ${spool_dir}/tmp/*
   cvmfs_suid_helper rdonly_mount $name > /dev/null
   cvmfs_suid_helper rw_mount $name
-  rm -f ${spool_dir}/in_transaction
+  close_transaction $name
   publish_after_hook $name
 }
 
