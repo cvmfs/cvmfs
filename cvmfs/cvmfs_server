@@ -2121,7 +2121,7 @@ list() {
 
     # find out if the repository is currently in a transaction
     local transaction_info=""
-    if is_stratum0 && is_in_transaction $name; then
+    if is_stratum0 $name && is_in_transaction $name; then
       transaction_info=" - in transaction"
     fi
 
