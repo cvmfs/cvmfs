@@ -513,6 +513,16 @@ is_master_replica() {
   [ "x$is_master_replica" = "xtrue" ]
 }
 
+# checks if a repository is currently in a transaction
+#
+# @param name  the repository name to be checked
+# @return      0 if in a transaction
+is_in_transaction() {
+  local name=$1
+  load_repo_config $name
+  [ -f ${CVMFS_SPOOL_DIR}/in_transaction ]
+}
+
 
 # checks if a user exists in the system
 #
@@ -2099,7 +2109,7 @@ list() {
 
     # find out if the repository is currently in a transaction
     local transaction_info=""
-    if is_stratum0 && [ -f ${CVMFS_SPOOL_DIR}/in_transaction ]; then
+    if is_stratum0 && is_in_transaction $name; then
       transaction_info=" - in transaction"
     fi
 
@@ -2160,7 +2170,7 @@ transaction() {
     check_repository_compatibility
     check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     if [ $force -eq 0 ]; then
-      [ -f ${spool_dir}/in_transaction ] && { echo "Repository $name in already in a transaction"; continue; }
+      is_in_transaction $name && { echo "Repository $name in already in a transaction"; continue; }
     fi
 
     # do it!
@@ -2226,7 +2236,7 @@ abort() {
 
     # more sanity checks
     check_repository_compatibility
-    [ -f ${spool_dir}/in_transaction ] || { echo "Repository $name is not in a transaction"; continue; }
+    is_in_transaction $name || { echo "Repository $name is not in a transaction"; continue; }
     $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1 continue; }
 
     # better ask the user once again!
@@ -2353,8 +2363,8 @@ publish() {
 
     # more sanity checks
     check_repository_compatibility
-    check_expiry $stratum0                  || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
-    [ -f ${spool_dir}/in_transaction ]      || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
+    check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
+    is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1; continue; }
     if [ "x$add_tag" != "x" ] && \
        lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
@@ -2509,8 +2519,8 @@ rollback() {
 
   # more sanity checks
   check_repository_compatibility
-  check_expiry $stratum0 || die "Repository whitelist is expired!"
-  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
+  check_expiry $stratum0  || die "Repository whitelist is expired!"
+  is_in_transaction $name || die "Not in a transaction"
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   if [ $force -ne 1 ]; then
