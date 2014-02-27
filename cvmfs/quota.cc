@@ -1364,6 +1364,8 @@ int MainCacheManager(int argc, char **argv) {
   if (!foreground)
     Daemonize();
 
+  back_channels_ = new map<shash::Md5, int>;
+
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo = LockFile(*cache_dir_ + "/lock_cachemgr.fifo");
   if (fd_lockfile_fifo < 0) {
@@ -1492,6 +1494,8 @@ bool Init(const string &cache_dir, const uint64_t limit,
   if (!InitDatabase(rebuild_database))
     return false;
 
+  back_channels_ = new map<shash::Md5, int>;
+
   MakePipe(pipe_lru_);
   initialized_ = true;
 
@@ -1543,6 +1547,11 @@ void Fini() {
   CloseDatabase();
   initialized_ = false;
   protocol_revision_ = 0;
+
+  if (back_channels_) {
+    delete back_channels_;
+    back_channels_ = NULL;
+  }
 }
 
 

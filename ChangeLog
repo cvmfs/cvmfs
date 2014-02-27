@@ -1,5 +1,6 @@
 2.1.18:
-  * Fix rpmbuild on SL6 32bit
+  * Fix crash in exclusive cache mode if unpin listener is called
+    on mount (CVM-267) 
   * Add "volatile" repository and volatile cache class (CVM-263)
   * Fix TBB build system for 32bit on 64bit mock environments
   * Fix RPM spec file for FC20
