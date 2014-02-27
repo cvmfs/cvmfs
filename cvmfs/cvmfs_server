@@ -513,6 +513,45 @@ is_master_replica() {
   [ "x$is_master_replica" = "xtrue" ]
 }
 
+# checks if a repository is currently in a transaction
+#
+# @param name  the repository name to be checked
+# @return      0 if in a transaction
+is_in_transaction() {
+  local name=$1
+  load_repo_config $name
+  [ -d ${CVMFS_SPOOL_DIR}/in_transaction ]
+}
+
+open_transaction() {
+  local name=$1
+  load_repo_config $name
+  mkdir ${CVMFS_SPOOL_DIR}/in_transaction > /dev/null 2>&1 || die "Failed to open transaction"
+}
+
+close_transaction() {
+  local name=$1
+  load_repo_config $name
+  rmdir ${CVMFS_SPOOL_DIR}/in_transaction
+}
+
+# checks if a repository is currently runing a publish procedure
+#
+# @param name  the repository name to be checked
+# @return      0 if a publishing procedure is running
+is_publishing() {
+  local name=$1
+  load_repo_config $name
+  [ -d ${CVMFS_SPOOL_DIR}/is_publishing ]
+}
+
+publishing_lock() {
+  local name=$1
+  load_repo_config $name
+  mkdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1 || die "Failed to acquire publishing lock"
+  trap "rmdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1" 0
+}
+
 
 # checks if a user exists in the system
 #
@@ -2099,7 +2138,7 @@ list() {
 
     # find out if the repository is currently in a transaction
     local transaction_info=""
-    if is_stratum0 && [ -f ${CVMFS_SPOOL_DIR}/in_transaction ]; then
+    if is_stratum0 $name && is_in_transaction $name; then
       transaction_info=" - in transaction"
     fi
 
@@ -2160,7 +2199,7 @@ transaction() {
     check_repository_compatibility
     check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     if [ $force -eq 0 ]; then
-      [ -f ${spool_dir}/in_transaction ] && { echo "Repository $name in already in a transaction"; continue; }
+      is_in_transaction $name && { echo "Repository $name is already in a transaction"; continue; }
     fi
 
     # do it!
@@ -2174,7 +2213,7 @@ transaction() {
       cvmfs_suid_helper rw_mount $name
     fi
     cvmfs_suid_helper open $name
-    touch ${spool_dir}/in_transaction
+    open_transaction       $name
     transaction_after_hook $name
 
   done
@@ -2217,7 +2256,8 @@ abort() {
   for name in $names; do
 
     # sanity checks
-    is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    is_stratum0 $name   || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    is_publishing $name && { echo "Repository $name is currently published (aborting abort)"; retcode=1; continue; }
 
     # get repository information
     load_repo_config $name
@@ -2226,7 +2266,7 @@ abort() {
 
     # more sanity checks
     check_repository_compatibility
-    [ -f ${spool_dir}/in_transaction ] || { echo "Repository $name is not in a transaction"; continue; }
+    is_in_transaction $name || { echo "Repository $name is not in a transaction"; continue; }
     $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1 continue; }
 
     # better ask the user once again!
@@ -2247,7 +2287,7 @@ abort() {
     rm -rf ${spool_dir}/tmp/*
     cvmfs_suid_helper clear_scratch $name
     cvmfs_suid_helper rw_mount $name
-    rm -f ${spool_dir}/in_transaction
+    close_transaction $name
     abort_after_hook $name
 
   done
@@ -2338,7 +2378,8 @@ publish() {
   for name in $names; do
 
     # sanity checks
-    is_stratum0 $name || die "This is not a stratum 0 repository"
+    is_stratum0 $name   || die "This is not a stratum 0 repository"
+    is_publishing $name && die "Another publish process is active for $name"
 
     # get repository information
     load_repo_config $name
@@ -2353,8 +2394,8 @@ publish() {
 
     # more sanity checks
     check_repository_compatibility
-    check_expiry $stratum0                  || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
-    [ -f ${spool_dir}/in_transaction ]      || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
+    check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
+    is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1; continue; }
     if [ "x$add_tag" != "x" ] && \
        lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
@@ -2390,6 +2431,7 @@ publish() {
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
     publish_before_hook $name
+    publishing_lock $name
     cvmfs_suid_helper lock $name
     local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
     local log_level=
@@ -2449,7 +2491,7 @@ publish() {
       rm -rf ${spool_dir}/tmp/*
       cvmfs_suid_helper rdonly_mount $name > /dev/null
       cvmfs_suid_helper rw_mount $name
-      rm -f ${spool_dir}/in_transaction
+      close_transaction $name
       publish_after_hook $name
     else
       exit 1
@@ -2498,7 +2540,8 @@ rollback() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum0 $name || die "This is not a stratum 0 repository"
+  is_stratum0 $name                || die "This is not a stratum 0 repository"
+  is_publishing $name              && die "Repository $name is currently being published"
 
   # get repository information
   . /etc/cvmfs/repositories.d/$name/server.conf
@@ -2509,8 +2552,8 @@ rollback() {
 
   # more sanity checks
   check_repository_compatibility
-  check_expiry $stratum0 || die "Repository whitelist is expired!"
-  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
+  check_expiry $stratum0  || die "Repository whitelist is expired!"
+  is_in_transaction $name || die "Not in a transaction"
   $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
 
   if [ $force -ne 1 ]; then
@@ -2528,6 +2571,7 @@ rollback() {
   [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   publish_before_hook
+  publishing_lock $name
   cvmfs_suid_helper lock $name
   local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
 
@@ -2560,7 +2604,7 @@ rollback() {
   rm -rf ${spool_dir}/tmp/*
   cvmfs_suid_helper rdonly_mount $name > /dev/null
   cvmfs_suid_helper rw_mount $name
-  rm -f ${spool_dir}/in_transaction
+  close_transaction $name
   publish_after_hook $name
 }
 
