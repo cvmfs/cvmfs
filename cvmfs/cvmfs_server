@@ -2211,10 +2211,11 @@ transaction() {
 
     # more sanity checks
     check_repository_compatibility
-    check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     if [ $force -eq 0 ]; then
       is_in_transaction $name && { echo "Repository $name is already in a transaction"; continue; }
     fi
+    check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
+    [ $(get_expiry $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
 
     # do it!
     transaction_before_hook $name
