@@ -840,6 +840,10 @@ create_whitelist() {
 }
 
 
+# figures out the time to expiry of the repository's whitelist
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          number of seconds until expiry (negativ if already expired)
 get_expiry() {
   local stratum0=$1
 
@@ -863,6 +867,10 @@ get_expiry() {
 }
 
 
+# checks if the repository's whitelist is valid
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          0 if whitelist is still valid
 check_expiry() {
   local stratum0=$1
   local expiry="-1"
