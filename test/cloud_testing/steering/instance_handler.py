@@ -100,7 +100,7 @@ def create_instance(parent_parser, argv):
   instance   = spawn_instance(connection, ami, key_name, flavor)
 
   if instance != None:
-    print instance.id , instance.ip_address
+    print instance.id , instance.private_ip_address
   else:
     print_error("Failed to start instance")
     exit(2)
