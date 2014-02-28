@@ -2142,8 +2142,14 @@ list() {
       transaction_info=" - in transaction"
     fi
 
+    # check if the repository whitelist is expired
+    local whitelist_info=""
+    if is_stratum0 $name && ! check_expiry $CVMFS_STRATUM0; then
+      whitelist_info=" - whitelist expired"
+    fi
+
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE$transaction_info) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE$transaction_info$whitelist_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
