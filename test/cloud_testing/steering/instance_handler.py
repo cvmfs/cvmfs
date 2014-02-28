@@ -19,7 +19,7 @@ def wait_for_instance(instance):
   return end - start
 
 
-def connect_to_ibex(access_key, secret_key, endpoint):
+def connect_to_openstack(access_key, secret_key, endpoint):
   region = boto.ec2.regioninfo.RegionInfo(name        = "nova",
                                           endpoint    = endpoint)
   connection = boto.connect_ec2(aws_access_key_id     = access_key,
@@ -96,11 +96,11 @@ def create_instance(parent_parser, argv):
   key_name   = arguments.key[0]
   flavor     = arguments.flavor[0]
 
-  connection = connect_to_ibex(access_key, secret_key, endpoint)
+  connection = connect_to_openstack(access_key, secret_key, endpoint)
   instance   = spawn_instance(connection, ami, key_name, flavor)
 
   if instance != None:
-    print instance.id , instance.ip_address
+    print instance.id , instance.private_ip_address
   else:
     print_error("Failed to start instance")
     exit(2)
@@ -121,7 +121,7 @@ def terminate_instance(parent_parser, argv):
   endpoint    = arguments.cloud_endpoint[0]
   instance_id = arguments.instance_id[0]
 
-  connection = connect_to_ibex(access_key, secret_key, endpoint)
+  connection = connect_to_openstack(access_key, secret_key, endpoint)
   successful = kill_instance(connection, instance_id)
 
   if not successful:
