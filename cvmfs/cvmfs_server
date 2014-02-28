@@ -840,6 +840,10 @@ create_whitelist() {
 }
 
 
+# figures out the time to expiry of the repository's whitelist
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          number of seconds until expiry (negativ if already expired)
 get_expiry() {
   local stratum0=$1
 
@@ -863,6 +867,10 @@ get_expiry() {
 }
 
 
+# checks if the repository's whitelist is valid
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          0 if whitelist is still valid
 check_expiry() {
   local stratum0=$1
   local expiry="-1"
@@ -2203,10 +2211,11 @@ transaction() {
 
     # more sanity checks
     check_repository_compatibility
-    check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     if [ $force -eq 0 ]; then
       is_in_transaction $name && { echo "Repository $name is already in a transaction"; continue; }
     fi
+    check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
+    [ $(get_expiry $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
 
     # do it!
     transaction_before_hook $name
