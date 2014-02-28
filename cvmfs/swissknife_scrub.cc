@@ -63,18 +63,40 @@ tbb::task* CommandScrub::StoredFileScrubbingTask::execute() {
 swissknife::ParameterList CommandScrub::GetParams() {
   swissknife::ParameterList result;
   result.push_back(Parameter('r', "repository directory", false, false));
-  // to be extended...
+  result.push_back(Parameter('m', "machine readable output", true, true));
   return result;
+}
+
+
+ const char* CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
+  switch (t) {
+    case Alerts::kUnexpectedFile:
+      return "unexpected regular file";
+    case Alerts::kUnexpectedSymlink:
+      return "unexpected symlink";
+    case Alerts::kUnexpectedSubdir:
+      return "unexpected subdir in CAS subdir";
+    case Alerts::kUnexpectedModifier:
+      return "unknown object modifier";
+    case Alerts::kMalformedHash:
+      return "malformed content hash";
+    case Alerts::kMalformedCasSubdir:
+      return "malformed CAS subdir length";
+    case Alerts::kContentHashMismatch:
+      return "mismatch of file name and content hash";
+    default:
+      return "unknown alert";
+  }
 }
 
 
 void CommandScrub::FileCallback(const std::string &relative_path,
                                 const std::string &file_name)
 {
-  assert (file_name.size() > 0);
+  assert (! file_name.empty());
 
-  if (relative_path.size() == 0) {
-    PrintWarning("unexpected regular file", repo_path_ + "/" + file_name);
+  if (relative_path.empty()) {
+    PrintAlert(Alerts::kUnexpectedFile, repo_path_ + "/" + file_name);
     return;
   }
   if (relative_path == kTxnDirectoryName) {
@@ -82,7 +104,7 @@ void CommandScrub::FileCallback(const std::string &relative_path,
     return;
   }
 
-  const string full_path = repo_path_ + "/" + relative_path + "/" + file_name;
+  const string full_path = MakeFullPath(relative_path, file_name);
   const std::string hash_string = CheckPathAndExtractHash(relative_path,
                                                           file_name,
                                                           full_path);
@@ -91,7 +113,7 @@ void CommandScrub::FileCallback(const std::string &relative_path,
   }
 
   if (! shash::HexPtr(hash_string).IsValid()) {
-    PrintWarning("malformed content hash: " + hash_string, full_path);
+    PrintAlert(Alerts::kMalformedHash, full_path, hash_string);
     return;
   }
 
@@ -103,10 +125,10 @@ void CommandScrub::FileCallback(const std::string &relative_path,
 void CommandScrub::DirCallback(const std::string &relative_path,
                                const std::string &dir_name)
 {
-  const string full_path = repo_path_ + "/" + relative_path + "/" + dir_name;
+  const string full_path = MakeFullPath(relative_path, dir_name);
   // Check for nested subdirs
   if (relative_path.size() > 0) {
-    PrintWarning("unexpected subdir in CAS subdir", full_path);
+    PrintAlert(Alerts::kUnexpectedSubdir, full_path);
     return;
   }
 
@@ -115,8 +137,7 @@ void CommandScrub::DirCallback(const std::string &relative_path,
         dir_name.size() != kHashSubtreeLength &&
         dir_name        != kTxnDirectoryName)
   {
-    PrintWarning("malformed CAS subdir length: " +
-                 StringifyInt(dir_name.size()), full_path);
+    PrintAlert(Alerts::kMalformedCasSubdir, full_path);
   }
 }
 
@@ -124,16 +145,15 @@ void CommandScrub::DirCallback(const std::string &relative_path,
 void CommandScrub::SymlinkCallback(const std::string &relative_path,
                                    const std::string &symlink_name)
 {
-  const string full_path = repo_path_ + "/" + relative_path + "/" +
-                           symlink_name;
-  PrintWarning("unexpected symlink", full_path);
+  const string full_path = MakeFullPath(relative_path, symlink_name);
+  PrintAlert(Alerts::kUnexpectedSymlink, full_path);
 }
 
 
 void CommandScrub::FileProcessedCallback(StoredFile* const& file) {
   if (file->content_hash() != file->expected_hash()) {
-    PrintWarning("mismatch of file name and content hash: " +
-                 file->content_hash().ToString(), file->path());
+    PrintAlert(Alerts::kContentHashMismatch, file->path(),
+               file->content_hash().ToString());
   }
 }
 
@@ -156,8 +176,7 @@ std::string CommandScrub::CheckPathAndExtractHash(
       last_character != 'X' && // certificate
       last_character != 'L')   // micro catalogs (currently only reserved)
   {
-    PrintWarning("unknown object modifier: " + string(&last_character, 1),
-                 full_path);
+    PrintAlert(Alerts::kUnexpectedModifier, full_path);
     return "";
   }
 
@@ -170,10 +189,11 @@ std::string CommandScrub::CheckPathAndExtractHash(
 
 
 int CommandScrub::Main(const swissknife::ArgumentList &args) {
-  repo_path_ = *args.find('r')->second;
+  repo_path_               = MakeCanonicalPath(*args.find('r')->second);
+  machine_readable_output_ = (args.find('m') != args.end());
 
-  // initialize warning printer mutex
-  const bool mutex_init = (pthread_mutex_init(&warning_mutex_, NULL) == 0);
+  // initialize alert printer mutex
+  const bool mutex_init = (pthread_mutex_init(&alerts_mutex_, NULL) == 0);
   assert (mutex_init);
 
   // initialize asynchronous reader
@@ -194,15 +214,40 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
   reader_->Wait();
   reader_->TearDown();
 
-  return (warnings_ == 0) ? 0 : 1;
+  return (alerts_ == 0) ? 0 : 1;
 }
 
 
-void CommandScrub::PrintWarning(const std::string &msg,
-                                const std::string &path) const {
-  MutexLockGuard l(warning_mutex_);
-  LogCvmfs(kLogUtility, kLogStderr, "%s | at: %s", msg.c_str(), path.c_str());
-  ++warnings_;
+void CommandScrub::PrintAlert(const Alerts::Type   type,
+                              const std::string   &path,
+                              const std::string   &affected_hash) const {
+  MutexLockGuard l(alerts_mutex_);
+
+  const char *msg = Alerts::ToString(type);
+  if (machine_readable_output_) {
+    LogCvmfs(kLogUtility, kLogStderr, "%d %s %s",
+             type,
+             ((affected_hash.empty()) ? "-" : affected_hash.c_str()),
+             path.c_str());
+  } else {
+    LogCvmfs(kLogUtility, kLogStderr, "%s | at: %s", msg, path.c_str());
+  }
+
+  ++alerts_;
+}
+
+
+std::string CommandScrub::MakeFullPath(const std::string &relative_path,
+                                       const std::string &file_name) const
+{
+  return (relative_path.empty())
+              ? repo_path_ + "/" + file_name
+              : repo_path_ + "/" + relative_path + "/" + file_name;
+}
+
+
+void CommandScrub::ShowAlertsHelpMessage() const {
+  LogCvmfs(kLogUtility, kLogStdout, "to come...");
 }
 
 
@@ -212,5 +257,5 @@ CommandScrub::~CommandScrub() {
     reader_ = NULL;
   }
 
-  pthread_mutex_destroy(&warning_mutex_);
+  pthread_mutex_destroy(&alerts_mutex_);
 }

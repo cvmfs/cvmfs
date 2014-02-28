@@ -1,0 +1,366 @@
+cvmfs_test_name="Local File Backend Health Check (Machine Readable)"
+cvmfs_test_autofs_on_startup=false
+
+inflate_file() {
+  local destination_file=$1
+  local source_file=$2
+  local desired_file_size=$3
+
+  touch $destination_file
+  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
+    cat $source_file >> $destination_file
+  done
+}
+
+produce_files_in() {
+	local working_dir=$1
+
+	pushdir $working_dir
+
+  # create some small files that most likely get not chunked
+  mkdir small_files
+  echo "Die Sonne tönt nach alter Weise"     > small_files/verse1
+  echo "In Brudersphären Wettgesang,"        > small_files/verse2
+  echo "Und ihre vorgeschriebne Reise"       > small_files/verse3
+  echo "Vollendet sie mit Donnergang."       > small_files/verse4
+  echo "Ihr Anblick gibt den Engeln Stärke," > small_files/verse5
+  echo "Wenn keiner sie ergründen mag;"      > small_files/verse6
+  echo "Die unbegreiflich hohen Werke"       > small_files/verse7
+  echo "Sind herrlich wie am ersten Tag."    > small_files/verse8
+
+  # create a full poem in one file that will get concatinated later
+  local bigtxtfile=small_files/heidenroeslein
+  touch $bigtxtfile
+  echo "Heidenröslein"                     >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "Sah ein Knab' ein Röslein stehn, " >> $bigtxtfile
+  echo "Röslein auf der Heiden, "          >> $bigtxtfile
+  echo "War so jung und morgenschön, "     >> $bigtxtfile
+  echo "Lief er schnell es nah zu sehn, "  >> $bigtxtfile
+  echo "Sah's mit vielen Freuden. "        >> $bigtxtfile
+  echo "Röslein, Röslein, Röslein rot, "   >> $bigtxtfile
+  echo "Röslein auf der Heiden. "          >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "Knabe sprach: ich breche diche, "  >> $bigtxtfile
+  echo "Röslein auf der Heiden! "          >> $bigtxtfile
+  echo "Röslein sprach: ich steche dich, " >> $bigtxtfile
+  echo "Daß du ewig denkst an mich, "      >> $bigtxtfile
+  echo "Und ich will's nicht leiden. "     >> $bigtxtfile
+  echo "Röslein, Röslein, Röslein rot, "   >> $bigtxtfile
+  echo "Röslein auf der Heiden. "          >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "Und der wilde Knabe brach"         >> $bigtxtfile
+  echo "'s Röslein auf der Heiden; "       >> $bigtxtfile
+  echo "Röslein wehrte sich und stach, "   >> $bigtxtfile
+  echo "Half ihr doch kein Weh und Ach, "  >> $bigtxtfile
+  echo "Mußt' es eben leiden. "            >> $bigtxtfile
+  echo "Röslein, Röslein, Röslein rot, "   >> $bigtxtfile
+  echo "Röslein auf der Heiden."           >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "  Johann Wolfgang von Goethe"      >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+
+  # create a big binary file that will get chunked
+  mkdir big_file
+  inflate_file big_file/1megabyte /bin/ls 1000000
+  inflate_file big_file/10megabyte big_file/1megabyte 1000000
+  inflate_file big_file/50megabyte big_file/10megabyte 50000000
+
+  # create a big ascii text file that will get chunked
+  inflate_file big_file/einige_heidenroeslein $bigtxtfile 100000
+  inflate_file big_file/ein_paar_heidenroeslein big_file/einige_heidenroeslein 1000000
+  inflate_file big_file/ein_paar_mehr_heidenroeslein big_file/ein_paar_heidenroeslein 10000000
+  inflate_file big_file/viele_heidenroeslein big_file/ein_paar_mehr_heidenroeslein 60000000
+
+  # create a lot more garbage files for entropy
+  local directories=0
+  local random_dir="random_crap"
+  while [ $directories -lt 40 ]; do
+    local dir_name="${random_dir}/$(head -c5 /dev/urandom | md5sum | head -c10)"
+    local files=0;
+
+    mkdir -p "$dir_name"
+    while [ $files -lt 400 ]; do
+      local file_name="$(head -c5 /dev/urandom | md5sum | head -c10)"
+      local bytes_to_produce="$(od -A n -t u -N 2 /dev/urandom)"
+
+      head -c$bytes_to_produce /dev/urandom > ${dir_name}/${file_name}
+      files=$(( $files + 1 ))
+    done
+    directories=$(( $directories + 1 ))
+  done
+  touch ${random_dir}/.cvmfscatalog
+
+	popdir
+}
+
+choose_random_line() {
+  local lines="$1"
+
+  local line_count=$(echo "$lines" | wc -l)
+  local random_number=$(( $(od -A n -t u -N 4 /dev/urandom) % $line_count + 1 ))
+
+  echo "$lines" | head -n $random_number | tail -n 1
+}
+
+choose_random_backend_file() {
+  local storage_path=$1
+  local files="$(find "$storage_path" -type f)"
+  choose_random_line "$files"
+}
+
+choose_random_backend_file_matching() {
+  local storage_path=$1
+  local regexp_pattern=$2
+
+  local files="$(find "$storage_path" -type f | grep $regexp_pattern)"
+  choose_random_line "$files"
+}
+
+
+contains_line() {
+  local haystack="$1"
+  local needle="$2"
+
+  echo "$haystack" | grep -q "$needle"
+}
+
+msg_unknown_file() {
+  local unexpected_file=$1
+  echo -n "1 - $unexpected_file"
+}
+
+msg_symlink() {
+  local symlink_path=$1
+  echo -n "2 - $symlink_path"
+}
+
+msg_cas_subdir() {
+  local cas_subdir=$1
+  echo -n "3 - $cas_subdir"
+}
+
+msg_unknown_modifier() {
+  local object_path=$1
+  echo -n "4 - $object_path"
+}
+
+msg_malformed_hash() {
+  local malformed_object=$1
+  local malformed_hash=
+  malformed_hash=$(echo $malformed_object | sed 's/^.*\/\([0-9a-f][0-9a-f]\)\/\(.*\)$/\1\2/')
+  echo -n "5 $malformed_hash $malformed_object"
+}
+
+msg_malformed_cas() {
+  local cas_subdir=$1
+  echo -n "6 - $cas_subdir"
+}
+
+msg_hash_mismatch() {
+  local file_path=$1
+  echo -n "7 `sha1sum $file_path | cut -d' ' -f1` $file_path"
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  echo "--> redirecting publishing output to publish_output.log"
+  publish_repo $CVMFS_TEST_REPO > publish_output.log || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "find location of backend storage"
+  load_repo_config $CVMFS_TEST_REPO || return 4
+  local storage_location="$(echo $CVMFS_UPSTREAM_STORAGE | cut -d, -f3)/data"
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  cvmfs_swissknife scrub -r $storage_location || return 5
+
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "corrupt a regular file in the backend storage"
+  local corrupted_file=$(choose_random_backend_file_matching $storage_location '[^A-Z]$')
+  sudo head -n1000 /dev/urandom > $corrupted_file || return 6
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch $corrupted_file)" || return 7
+  [ $(echo "$result" | wc -l) -eq 1 ]                            || return 7
+
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "putting a symlink in the backend storage"
+  local symlink_file=$(choose_random_backend_file $storage_location)
+  local symlink_name="random_symlink"
+  local symlink_path="${storage_location}/${symlink_name}"
+  sudo ln -s "$symlink_file" "${symlink_path}" || return 8
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch $corrupted_file)" || return 9
+  contains_line "$result" "$(msg_symlink       $symlink_path)"   || return 9
+  [ $(echo "$result" | wc -l) -eq 2 ]                            || return 9
+  
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "create an extra CAS directory"
+  local cas_subdir="malformed_subdir"
+  local cas_subdir_path="${storage_location}/${cas_subdir}"
+  sudo mkdir -p ${cas_subdir_path} || return 10
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch $corrupted_file)"  || return 11
+  contains_line "$result" "$(msg_symlink       $symlink_path)"    || return 11
+  contains_line "$result" "$(msg_malformed_cas $cas_subdir_path)" || return 11
+  [ $(echo "$result" | wc -l) -eq 3 ]                             || return 11
+  
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "create a subdir in a CAS subdir"
+  local cas_subsubdir="annoying_orange"
+  local cas_subsubdir_path="${storage_location}/7f/${cas_subsubdir}"
+  sudo mkdir -p ${cas_subsubdir_path} || return 12
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch $corrupted_file)"     || return 13
+  contains_line "$result" "$(msg_symlink       $symlink_path)"       || return 13
+  contains_line "$result" "$(msg_malformed_cas $cas_subdir_path)"    || return 13
+  contains_line "$result" "$(msg_cas_subdir    $cas_subsubdir_path)" || return 13
+  [ $(echo "$result" | wc -l) -eq 4 ]                                || return 13
+  
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "create objects with unknown object modifiers"
+  local alien_object="da/39a3ee5e6b4b0d3255bfef95601890afd80709A"
+  local alien_object_path="${storage_location}/${alien_object}"
+  sudo touch "${alien_object_path}" || return 14
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch    $corrupted_file)"     || return 15
+  contains_line "$result" "$(msg_symlink          $symlink_path)"       || return 15
+  contains_line "$result" "$(msg_malformed_cas    $cas_subdir_path)"    || return 15
+  contains_line "$result" "$(msg_cas_subdir       $cas_subsubdir_path)" || return 15
+  contains_line "$result" "$(msg_unknown_modifier $alien_object_path)"  || return 15
+  [ $(echo "$result" | wc -l) -eq 5 ]                                   || return 15
+  
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "cutting the file name of an object"
+  local cut_object=$(choose_random_backend_file $storage_location)
+  local cut_object_length=$(echo -n "$cut_object" | wc -c)
+  local cut_object_dest="$(echo -n $cut_object | head -c $(( $cut_object_length - 5 )) )"
+  sudo mv "$cut_object" "$cut_object_dest" || return 16
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch    $corrupted_file)"     || return 17
+  contains_line "$result" "$(msg_symlink          $symlink_path)"       || return 17
+  contains_line "$result" "$(msg_malformed_cas    $cas_subdir_path)"    || return 17
+  contains_line "$result" "$(msg_cas_subdir       $cas_subsubdir_path)" || return 17
+  contains_line "$result" "$(msg_unknown_modifier $alien_object_path)"  || return 17
+  contains_line "$result" "$(msg_malformed_hash   $cut_object_dest)"    || return 17
+  [ $(echo "$result" | wc -l) -eq 6 ]                                   || return 17
+  
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "put a file in the backend storage root"
+  local alien_file="hausaufgaben"
+  local alien_file_path="${storage_location}/${alien_file}"
+  echo "ueberfluessig" | sudo tee ${alien_file_path} || return 18
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch    $corrupted_file)"     || return 19
+  contains_line "$result" "$(msg_symlink          $symlink_path)"       || return 19
+  contains_line "$result" "$(msg_malformed_cas    $cas_subdir_path)"    || return 19
+  contains_line "$result" "$(msg_cas_subdir       $cas_subsubdir_path)" || return 19
+  contains_line "$result" "$(msg_unknown_modifier $alien_object_path)"  || return 19
+  contains_line "$result" "$(msg_malformed_hash   $cut_object_dest)"    || return 19
+  contains_line "$result" "$(msg_unknown_file     $alien_file_path)"    || return 19
+  [ $(echo "$result" | wc -l) -eq 7 ]                                   || return 19
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "introduce an illegal hash character in an object name"
+  local illegal_hash="ff/86c3cc55cd98adc2166aa9ab86d135dafe4g5e"
+  local illegal_hash_path="${storage_location}/${illegal_hash}"
+  sudo touch "$illegal_hash_path" || return 20
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch    $corrupted_file)"     || return 21
+  contains_line "$result" "$(msg_symlink          $symlink_path)"       || return 21
+  contains_line "$result" "$(msg_malformed_cas    $cas_subdir_path)"    || return 21
+  contains_line "$result" "$(msg_cas_subdir       $cas_subsubdir_path)" || return 21
+  contains_line "$result" "$(msg_unknown_modifier $alien_object_path)"  || return 21
+  contains_line "$result" "$(msg_malformed_hash   $cut_object_dest)"    || return 21
+  contains_line "$result" "$(msg_unknown_file     $alien_file_path)"    || return 21
+  contains_line "$result" "$(msg_malformed_hash   $illegal_hash_path)"  || return 21
+  [ $(echo "$result" | wc -l) -eq 8 ]                                   || return 21
+  
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "corrupt an object file with a modifier"
+  local broken_modifier=$(choose_random_backend_file_matching $storage_location '[B-Z]$') # A is taken by 'illegal modifier'
+  sudo head -n1000 /dev/urandom > $broken_modifier || return 22
+
+  echo "check backend sanity using cvmfs_swissknife scrub"
+  local result="$(cvmfs_swissknife scrub -r $storage_location -m 2>&1)"
+  contains_line "$result" "$(msg_hash_mismatch    $corrupted_file)"     || return 23
+  contains_line "$result" "$(msg_symlink          $symlink_path)"       || return 23
+  contains_line "$result" "$(msg_malformed_cas    $cas_subdir_path)"    || return 23
+  contains_line "$result" "$(msg_cas_subdir       $cas_subsubdir_path)" || return 23
+  contains_line "$result" "$(msg_unknown_modifier $alien_object_path)"  || return 23
+  contains_line "$result" "$(msg_malformed_hash   $cut_object_dest)"    || return 23
+  contains_line "$result" "$(msg_unknown_file     $alien_file_path)"    || return 23
+  contains_line "$result" "$(msg_malformed_hash   $illegal_hash_path)"  || return 23
+  contains_line "$result" "$(msg_hash_mismatch    $broken_modifier)"    || return 23
+  [ $(echo "$result" | wc -l) -eq 9 ]                                   || return 23
+  
+#
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+  echo "cvmfs_server check should NOT report a sane repository after this rage"
+  check_repository $CVMFS_TEST_REPO && return 24
+
+  return 0
+}
+

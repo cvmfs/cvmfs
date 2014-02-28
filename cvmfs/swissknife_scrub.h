@@ -18,6 +18,22 @@ namespace swissknife {
 
 class CommandScrub : public Command {
  private:
+  struct Alerts {
+    enum Type {
+      kUnexpectedFile = 1,
+      kUnexpectedSymlink,
+      kUnexpectedSubdir,
+      kUnexpectedModifier,
+      kMalformedHash,
+      kMalformedCasSubdir,
+      kContentHashMismatch,
+      kNumberOfErrorTypes // This should _always_ stay the last entry!
+    };
+
+    static const char* ToString(const Type t);
+  };
+
+ private:
   class StoredFile : public upload::AbstractFile {
    public:
     StoredFile(const std::string &path, const std::string &expected_hash);
@@ -56,7 +72,9 @@ class CommandScrub : public Command {
   typedef upload::Reader<StoredFileScrubbingTask, StoredFile> ScrubbingReader;
 
  public:
-  CommandScrub() : reader_(NULL), warnings_(0) {}
+  CommandScrub() : machine_readable_output_(false),
+                   reader_(NULL),
+                   alerts_(0) {}
   ~CommandScrub();
   std::string GetName() { return "scrub"; }
   std::string GetDescription() {
@@ -78,8 +96,10 @@ class CommandScrub : public Command {
 
   void FileProcessedCallback(StoredFile* const& file);
 
-  void PrintWarning(const std::string &msg, const std::string &path) const;
-
+  void PrintAlert(const Alerts::Type   type,
+                  const std::string   &path,
+                  const std::string   &affected_hash = "") const;
+  void ShowAlertsHelpMessage() const;
 
  private:
   std::string CheckPathAndExtractHash(const std::string &relative_path,
@@ -88,11 +108,16 @@ class CommandScrub : public Command {
   bool CheckHashString(const std::string &hash_string,
                        const std::string &full_path) const;
 
+  std::string MakeFullPath(const std::string &relative_path,
+                           const std::string &file_name) const;
+
  private:
-  std::string              repo_path_;
-  ScrubbingReader         *reader_;
-  mutable unsigned int     warnings_;
-  mutable pthread_mutex_t  warning_mutex_;
+  std::string                   repo_path_;
+  bool                          machine_readable_output_;
+  ScrubbingReader              *reader_;
+
+  mutable unsigned int          alerts_;
+  mutable pthread_mutex_t       alerts_mutex_;
 };
 
 }
