@@ -2020,7 +2020,7 @@ lstags() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
   cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
     -i 0 -s 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
@@ -2112,8 +2112,8 @@ list() {
       echo "Warning: unexpected file '$repository' in directory /etc/cvmfs/repositories.d/"
       continue
     fi
-    . ${repository}/server.conf
     local name=$(basename $repository)
+    load_repo_config $name
 
     # figure out the schema version of the repository
     local version_info=""
@@ -2544,7 +2544,7 @@ rollback() {
   is_publishing $name              && die "Repository $name is currently being published"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
