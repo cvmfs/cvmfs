@@ -247,4 +247,8 @@ TEST_F(T_PolymorphicConstruction, CreateFirst) {
   EXPECT_EQ (1u, AbstractPolyCtorMock::register_plugin_calls);
   EXPECT_EQ (1u, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ (1u, FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, ThirdPolyCtorMock::constructor_calls);
+
+  delete mock;
 }
