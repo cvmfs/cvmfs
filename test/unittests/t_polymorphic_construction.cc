@@ -127,8 +127,10 @@ class ThirdPolyCtorMock : public AbstractPolyCtorMock {
   static const std::string  message;
 
   static unsigned int constructor_calls;
+  static unsigned int initialize_calls;
   static void Reset() {
     ThirdPolyCtorMock::constructor_calls = 0;
+    ThirdPolyCtorMock::initialize_calls  = 0;
   }
 
  public:
@@ -145,8 +147,14 @@ class ThirdPolyCtorMock : public AbstractPolyCtorMock {
                              ThirdPolyCtorMock::message);
   }
 
+  bool Initialize() {
+    ThirdPolyCtorMock::initialize_calls++;
+    return AbstractPolyCtorMock::Initialize();
+  }
+
 };
 unsigned int      ThirdPolyCtorMock::constructor_calls = 0;
+unsigned int      ThirdPolyCtorMock::initialize_calls  = 0;
 const std::string ThirdPolyCtorMock::message           = "Third à l'appareil.";
 
 //
