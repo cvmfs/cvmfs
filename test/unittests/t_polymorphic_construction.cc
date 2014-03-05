@@ -63,7 +63,7 @@ class FirstPolyCtorMock : public AbstractPolyCtorMock {
 
   static unsigned int constructor_calls;
   static void Reset() {
-    FirstPolyCtorMock::constructor_calls++;
+    FirstPolyCtorMock::constructor_calls = 0;
   }
 
  public:
@@ -95,7 +95,7 @@ class SecondPolyCtorMock : public AbstractPolyCtorMock {
 
   static unsigned int constructor_calls;
   static void Reset() {
-    SecondPolyCtorMock::constructor_calls++;
+    SecondPolyCtorMock::constructor_calls = 0;
   }
 
  public:
@@ -127,7 +127,7 @@ class ThirdPolyCtorMock : public AbstractPolyCtorMock {
 
   static unsigned int constructor_calls;
   static void Reset() {
-    ThirdPolyCtorMock::constructor_calls++;
+    ThirdPolyCtorMock::constructor_calls = 0;
   }
 
  public:
@@ -177,7 +177,7 @@ class T_PolymorphicConstruction : public ::testing::Test {
  protected:
   void SetUp() {
     PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<AbstractPolyCtorMock>();
-    AbstractPolyCtorMock::Reset();
+    AbstractPolyCtorMock::ResetAll();
   }
 };
 
