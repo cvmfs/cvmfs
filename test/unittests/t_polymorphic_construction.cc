@@ -25,10 +25,12 @@ class AbstractPolyCtorMock : public PolymorphicConstruction<AbstractPolyCtorMock
  public:
   static unsigned int constructor_calls;
   static unsigned int initialize_calls;
+  static unsigned int initializes_failed;
   static unsigned int register_plugin_calls;
   static void Reset() {
     AbstractPolyCtorMock::constructor_calls     = 0;
     AbstractPolyCtorMock::initialize_calls      = 0;
+    AbstractPolyCtorMock::initializes_failed    = 0;
     AbstractPolyCtorMock::register_plugin_calls = 0;
   }
 
@@ -43,6 +45,9 @@ class AbstractPolyCtorMock : public PolymorphicConstruction<AbstractPolyCtorMock
 
   virtual bool Initialize() {
     AbstractPolyCtorMock::initialize_calls++;
+    if (param_.fail) {
+      AbstractPolyCtorMock::initializes_failed++;
+    }
     return !param_.fail;
   }
 
@@ -51,6 +56,7 @@ class AbstractPolyCtorMock : public PolymorphicConstruction<AbstractPolyCtorMock
 };
 unsigned int AbstractPolyCtorMock::constructor_calls     = 0;
 unsigned int AbstractPolyCtorMock::initialize_calls      = 0;
+unsigned int AbstractPolyCtorMock::initializes_failed    = 0;
 unsigned int AbstractPolyCtorMock::register_plugin_calls = 0;
 
 //
