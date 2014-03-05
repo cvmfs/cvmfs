@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <string>
+#include <cstdlib>
 
 #include "../../cvmfs/util.h"
 
@@ -251,4 +252,128 @@ TEST_F(T_PolymorphicConstruction, CreateFirst) {
   EXPECT_EQ (0u, ThirdPolyCtorMock::constructor_calls);
 
   delete mock;
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_PolymorphicConstruction, CreateSecond) {
+  EXPECT_EQ (0u, AbstractPolyCtorMock::register_plugin_calls);
+
+  DecisionType t;
+  t.type = 1;
+  AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
+  EXPECT_NE (static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_EQ (1u, AbstractPolyCtorMock::register_plugin_calls);
+  EXPECT_EQ (1u, AbstractPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ (1u, SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, ThirdPolyCtorMock::constructor_calls);
+
+  delete mock;
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_PolymorphicConstruction, CreateThird) {
+  EXPECT_EQ (0u, AbstractPolyCtorMock::register_plugin_calls);
+
+  DecisionType t;
+  t.type = 2;
+  AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
+  EXPECT_NE (static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_EQ (1u, AbstractPolyCtorMock::register_plugin_calls);
+  EXPECT_EQ (1u, AbstractPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ (1u, ThirdPolyCtorMock::constructor_calls);
+
+  delete mock;
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_PolymorphicConstruction, CreateUnknown) {
+  EXPECT_EQ (0u, AbstractPolyCtorMock::register_plugin_calls);
+
+  DecisionType t;
+  t.type = -1;
+  AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
+  EXPECT_EQ (static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_EQ (1u, AbstractPolyCtorMock::register_plugin_calls);
+  EXPECT_EQ (0u, AbstractPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ (0u, ThirdPolyCtorMock::constructor_calls);
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_PolymorphicConstruction, CreateAll) {
+  EXPECT_EQ (0u, AbstractPolyCtorMock::register_plugin_calls);
+
+  for (int i = 0; i < 3; ++i) {
+    DecisionType t;
+    t.type = i;
+    AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
+    EXPECT_NE (static_cast<AbstractPolyCtorMock*>(NULL), mock);
+    delete mock;
+  }
+
+  EXPECT_EQ (1u, AbstractPolyCtorMock::register_plugin_calls);
+  EXPECT_EQ (3u, AbstractPolyCtorMock::constructor_calls);
+  EXPECT_EQ (1u, FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ (1u, SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ (1u, ThirdPolyCtorMock::constructor_calls);
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_PolymorphicConstruction, CreateMany) {
+  EXPECT_EQ (0u, AbstractPolyCtorMock::register_plugin_calls);
+
+  const unsigned int runs = 100000;
+  unsigned int ctors[] = { 0, 0, 0, 0 };
+
+  for (unsigned int i = 0; i < runs; ++i) {
+    DecisionType t;
+    t.type = rand() % 4;
+    AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
+    if (t.type == 3) {
+      EXPECT_EQ (static_cast<AbstractPolyCtorMock*>(NULL), mock);
+    } else {
+      EXPECT_NE (static_cast<AbstractPolyCtorMock*>(NULL), mock);
+    }
+    ++ctors[t.type];
+    delete mock;
+  }
+
+  EXPECT_EQ (1u, AbstractPolyCtorMock::register_plugin_calls);
+
+  const unsigned int all_ctors = ctors[0] + ctors[1] + ctors[2];
+  const unsigned int fails     = runs - all_ctors;
+  EXPECT_EQ (all_ctors, AbstractPolyCtorMock::constructor_calls);
+  EXPECT_EQ (ctors[0],  FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ (ctors[1],  SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ (ctors[2],  ThirdPolyCtorMock::constructor_calls);
+  EXPECT_EQ (ctors[3],  fails);
 }
