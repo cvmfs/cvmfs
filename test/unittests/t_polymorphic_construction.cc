@@ -378,9 +378,9 @@ TEST_F(T_PolymorphicConstruction, CreateMany) {
       EXPECT_EQ (static_cast<AbstractPolyCtorMock*>(NULL), mock);
     } else {
       EXPECT_NE (static_cast<AbstractPolyCtorMock*>(NULL), mock);
+      delete mock;
     }
     ++ctors[t.type];
-    delete mock;
   }
 
   EXPECT_EQ (1u, AbstractPolyCtorMock::register_plugin_calls);
