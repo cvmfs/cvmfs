@@ -762,6 +762,35 @@ get_or_guess_multiple_repository_names() {
 }
 
 
+# checks and warns in inconsistent repository states.
+#
+# @param name  the FQRN of the repository to be checked
+health_check() {
+  local name=$1
+
+  # check mounted union file system
+  if ! cat /proc/mounts | grep -q " /cvmfs/$name "; then
+    die "/cvmfs/$name is not mounted properly."
+  fi
+
+  # check mounted read-only cvmfs client
+  if ! cat /proc/mounts | grep -q " /var/spool/cvmfs/$name/rdonly "; then
+    die "/var/spool/cvmfs/$name/rdonly is not mounted properly."
+  fi
+
+  # check transaction status
+  if is_in_transaction $name; then
+    if ! cat /proc/mounts | grep -q " /cvmfs/$name .*rw"; then
+      die "$name is in a transaction but /cvmfs/$name is not mounted read/write"
+    fi
+  else
+    if ! cat /proc/mounts | grep -q " /cvmfs/$name .*ro"; then
+      die "$name is not in a transaction but /cvmfs/$name is mounted read-only"
+    fi
+  fi
+}
+
+
 create_master_key() {
   local name=$1
   local user=$2
@@ -1951,6 +1980,7 @@ resign() {
 
     # sanity checks
     is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -2077,6 +2107,7 @@ check() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
+  health_check $name
 
   # get repository information
   load_repo_config $name
@@ -2201,6 +2232,7 @@ transaction() {
 
     # sanity checks
     is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -2394,6 +2426,7 @@ publish() {
 
     # sanity checks
     is_stratum0 $name   || die "This is not a stratum 0 repository"
+    health_check $name
     is_publishing $name && die "Another publish process is active for $name"
 
     # get repository information
@@ -2556,6 +2589,7 @@ rollback() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
+  health_check $name
   is_publishing $name              && die "Repository $name is currently being published"
 
   # get repository information
@@ -2882,6 +2916,7 @@ migrate() {
 
     # more sanity checks
     check_repository_compatibility "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
+    health_check $name
 
     # do the migrations...
     if [ $(repository_creator_version) = "2.1.6" ]; then
