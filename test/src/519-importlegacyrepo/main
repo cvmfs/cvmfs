@@ -86,5 +86,8 @@ cvmfs_run_test() {
   [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 14
   [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 15
 
+  # remove the test repository
+  destroy_repo $CVMFS_TEST_REPO || return 16
+
   return 0
 }
