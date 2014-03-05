@@ -762,6 +762,35 @@ get_or_guess_multiple_repository_names() {
 }
 
 
+# checks and warns in inconsistent repository states.
+#
+# @param name  the FQRN of the repository to be checked
+health_check() {
+  local name=$1
+
+  # check mounted union file system
+  if ! cat /proc/mounts | grep -q " /cvmfs/$name "; then
+    die "/cvmfs/$name is not mounted properly."
+  fi
+
+  # check mounted read-only cvmfs client
+  if ! cat /proc/mounts | grep -q " /var/spool/cvmfs/$name/rdonly "; then
+    die "/var/spool/cvmfs/$name/rdonly is not mounted properly."
+  fi
+
+  # check transaction status
+  if is_in_transaction $name; then
+    if ! cat /proc/mounts | grep -q " /cvmfs/$name .*rw"; then
+      die "$name is in a transaction but /cvmfs/$name is not mounted read/write"
+    fi
+  else
+    if ! cat /proc/mounts | grep -q " /cvmfs/$name .*ro"; then
+      die "$name is not in a transaction but /cvmfs/$name is mounted read-only"
+    fi
+  fi
+}
+
+
 create_master_key() {
   local name=$1
   local user=$2
