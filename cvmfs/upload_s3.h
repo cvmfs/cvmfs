@@ -29,16 +29,6 @@ namespace upload
     const std::string temporary_path;
   };
 
-class UrlConstructor : public s3fanout::AbstractUrlConstructor {
-public:
-  virtual std::string MkUrl(const std::string &bucket, const std::string &objkey2) {
-    //return "http://" + bucket + ".s3.amazonaws.com/" + objkey;
-    //std::cerr<<"MkUrl: "<<"http://" + bucket + ".olhw-s3.cern.ch/" + objkey2<<std::endl;
-    //return "http://" + bucket + ".olhw-s3.cern.ch/" + objkey2;
-    //return "http://" + bucket + ".swift.cern.ch/" + objkey2;
-    return "http://swift.cern.ch/" + bucket + "/" + objkey2;
-  }
-};
 
   /**
    * The S3Spooler implements the AbstractSpooler interface to push files
@@ -91,6 +81,7 @@ public:
     int CreateAndOpenTemporaryChunkFile(std::string *path) const;
 
    private:
+    s3fanout::S3FanoutManager *s3fanout_mgr;
     bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
     int getKeyIndex(unsigned int use_bucket);
     std::string getBucketName(unsigned int use_bucket);

@@ -12,10 +12,6 @@
 
 using namespace upload;
 
-const std::string kStandardPort = "80";
-static s3fanout::S3FanoutManager s3fanout_mgr;
-static int s3fanout_mgr_inited_ = 0;
-static UrlConstructor url_constructor;
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
   AbstractUploader(spooler_definition),
@@ -26,18 +22,14 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
     abort();
   }
 
-  if(s3fanout_mgr_inited_ != 1) {
-    s3fanout_mgr_inited_ = 1;
-    s3fanout_mgr.Init(1024, &url_constructor); // max connections
-    s3fanout_mgr.SetRetryParameters(3, 100, 2000);
-    s3fanout_mgr.Spawn();
-  }
-
   assert (spooler_definition.IsValid() &&
           spooler_definition.driver_type == SpoolerDefinition::S3);
 
+  s3fanout_mgr = s3fanout::S3FanoutManager::instance();
+
   atomic_init32(&copy_errors_);
 }
+
 
 bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition) {
   // Default Spooler Configuration Scheme:
@@ -58,6 +50,7 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
     return true;
   }
 
+  const std::string kStandardPort = "80";
   number_of_buckets_ = 1;
   full_host_name_    = host[0] + ":" + ((host.size() == 2) ? host[1] : kStandardPort);
   keys_.push_back(std::make_pair(config[1], config[2]));
@@ -144,10 +137,10 @@ unsigned int S3Uploader::GetNumberOfErrors() const {
 
 void S3Uploader::WorkerThread() {
 
-  s3fanout_mgr.watch_fds_ =
+  s3fanout_mgr->watch_fds_ =
     static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
-  s3fanout_mgr.watch_fds_size_ = 2;
-  s3fanout_mgr.watch_fds_inuse_ = 2;
+  s3fanout_mgr->watch_fds_size_ = 2;
+  s3fanout_mgr->watch_fds_inuse_ = 2;
 
   LogCvmfs(kLogS3Fanout, kLogDebug, "WorkerThread running.");
 
@@ -155,7 +148,7 @@ void S3Uploader::WorkerThread() {
   while (running) {
     UploadJob job; 
    
-    if(s3fanout_mgr.watch_fds_inuse_ < 300) {
+    if(s3fanout_mgr->watch_fds_inuse_ < 300) {
 
     bool newjob = TryToAcquireNewJob(job);
 
@@ -185,43 +178,43 @@ void S3Uploader::WorkerThread() {
 
     int still_running = 0;
     int timeout = 1;
-    int retval2 = poll(s3fanout_mgr.watch_fds_, s3fanout_mgr.watch_fds_inuse_,
+    int retval2 = poll(s3fanout_mgr->watch_fds_, s3fanout_mgr->watch_fds_inuse_,
                       timeout);
     if (retval2 < 0) {
       continue;
     }
  
-    LogCvmfs(kLogS3Fanout, kLogDebug, "WorkerThread running - %d.", s3fanout_mgr.watch_fds_inuse_);
+    LogCvmfs(kLogS3Fanout, kLogDebug, "WorkerThread running - %d.", s3fanout_mgr->watch_fds_inuse_);
 
     // Activity on curl sockets
-    for (unsigned i = 2; i < s3fanout_mgr.watch_fds_inuse_; ++i) {
-      if (s3fanout_mgr.watch_fds_[i].revents) {
+    for (unsigned i = 2; i < s3fanout_mgr->watch_fds_inuse_; ++i) {
+      if (s3fanout_mgr->watch_fds_[i].revents) {
         int ev_bitmask = 0;
-        if (s3fanout_mgr.watch_fds_[i].revents & (POLLIN | POLLPRI))
+        if (s3fanout_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
           ev_bitmask |= CURL_CSELECT_IN;
-        if (s3fanout_mgr.watch_fds_[i].revents & (POLLOUT | POLLWRBAND))
+        if (s3fanout_mgr->watch_fds_[i].revents & (POLLOUT | POLLWRBAND))
           ev_bitmask |= CURL_CSELECT_OUT;
-        if (s3fanout_mgr.watch_fds_[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+        if (s3fanout_mgr->watch_fds_[i].revents & (POLLERR | POLLHUP | POLLNVAL))
           ev_bitmask |= CURL_CSELECT_ERR;
-        s3fanout_mgr.watch_fds_[i].revents = 0;
+        s3fanout_mgr->watch_fds_[i].revents = 0;
 
-        int retval = curl_multi_socket_action(s3fanout_mgr.curl_multi_,
-                                          s3fanout_mgr.watch_fds_[i].fd,
+        int retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+                                          s3fanout_mgr->watch_fds_[i].fd,
                                           ev_bitmask,
                                           &still_running);
         LogCvmfs(kLogS3Fanout, kLogDebug, "socket action on socket %d, returned with %d, still_running %d", 
-		 s3fanout_mgr.watch_fds_[i].fd, retval, still_running);
+		 s3fanout_mgr->watch_fds_[i].fd, retval, still_running);
       }
     }
 
     // Check if transfers are completed
     CURLMsg *curl_msg;
     int msgs_in_queue;
-    while ((curl_msg = curl_multi_info_read(s3fanout_mgr.curl_multi_,
+    while ((curl_msg = curl_multi_info_read(s3fanout_mgr->curl_multi_,
                                             &msgs_in_queue)))
       {
 	if (curl_msg->msg == CURLMSG_DONE) {
-	  s3fanout_mgr.statistics_->num_requests++;
+	  s3fanout_mgr->statistics_->num_requests++;
 	  s3fanout::JobInfo *info;
 	  CURL *easy_handle = curl_msg->easy_handle;
 	  int curl_error = curl_msg->data.result;
@@ -229,17 +222,17 @@ void S3Uploader::WorkerThread() {
 	  LogCvmfs(kLogS3Fanout, kLogDebug, "Done message for curl_msg->msg: %s", info->object_key->c_str()); 
 	  //: %s", info->origin_path->c_str());
 
-	  curl_multi_remove_handle(s3fanout_mgr.curl_multi_, easy_handle);
-	  if (s3fanout_mgr.VerifyAndFinalize(curl_error, info)) {
-	    curl_multi_add_handle(s3fanout_mgr.curl_multi_, easy_handle);
+	  curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
+	  if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
+	    curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
 	    //int retval = 
-	    curl_multi_socket_action(s3fanout_mgr.curl_multi_,
+	    curl_multi_socket_action(s3fanout_mgr->curl_multi_,
 					      CURL_SOCKET_TIMEOUT,
 					      0,
 					      &still_running);
 	  } else {
 	    // Return easy handle into pool and write result back
-	    s3fanout_mgr.ReleaseCurlHandle(info, easy_handle);
+	    s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
 
 	    /*	    if(info->mmf != ) {
 	      Respond((callback_t*)info->callback, upload::UploaderResults(0, info->mmf->file_path()));
@@ -353,6 +346,7 @@ int S3Uploader::uploadFile(std::string   filename,
     int k = getKeyIndex(use_bucket);
     s3fanout::JobInfo *info = new s3fanout::JobInfo(&keys_.at(k).first,  // access key
 						    &keys_.at(k).second, // secret key
+						    full_hostname,
 						    &bucket_name,
 						    &hash, 
 						    (unsigned char*)buff, size_of_file);
@@ -366,25 +360,25 @@ int S3Uploader::uploadFile(std::string   filename,
 	       filename.data());
 	       }*/
 				
-    CURL *handle = s3fanout_mgr.AcquireCurlHandle();
+    CURL *handle = s3fanout_mgr->AcquireCurlHandle();
     if(handle == NULL) {
       LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
       return -1;
     }
 
-    s3fanout::Failures init_failure = s3fanout_mgr.InitializeRequest(info, handle);
+    s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info, handle);
     if (init_failure != s3fanout::kFailOk) {
       // FIXME: report failure
       LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload file: %s" ,
 	       filename.data());
     }
-    //s3fanout_mgr.SetUrlOptions2(info, url_constructor.MkUrl(bucket_name, filename+"2"));
-    s3fanout_mgr.SetUrlOptions(info);
+    //s3fanout_mgr->SetUrlOptions2(info, url_constructor.MkUrl(bucket_name, filename+"2"));
+    s3fanout_mgr->SetUrlOptions(info);
 
-    curl_multi_add_handle(s3fanout_mgr.curl_multi_, handle);
+    curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
     int still_running = 0, retval = 0; 
     do {
-      retval = curl_multi_socket_action(s3fanout_mgr.curl_multi_,
+      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
 					CURL_SOCKET_TIMEOUT,
 					0,
 					&still_running);

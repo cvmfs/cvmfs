@@ -4,57 +4,40 @@
  * Runs a thread using libcurls asynchronous I/O mode to push data to S3
  */
 
-//TODO: MS for time summing
-#define __STDC_FORMAT_MACROS
-
 #include "cvmfs_config.h"
 #include "s3fanout.h"
 
-#include "upload_facility.h"
-
-#include <stdint.h>
-#include <inttypes.h>
-#include <unistd.h>
 #include <pthread.h>
-#include <alloca.h>
-#include <errno.h>
-#include <poll.h>
-#include <sys/time.h>
 
-#include <cassert>
-#include <cstdlib>
-#include <cstring>
-#include <cstdio>
-
-#include <set>
-
-#include "duplex_curl.h"
-#include "logging.h"
-#include "atomic.h"
-#include "hash.h"
-#include "prng.h"
-#include "util.h"
-#include "compression.h"
-#include "smalloc.h"
-#include "sanitizer.h"
-
-#include <iostream>
-
-using namespace std;  // NOLINT
+using namespace std; 
 
 namespace s3fanout {
 
-static Failures PrepareOrigin(JobInfo *info) {
-  info->origin_mem.pos = 0;
+/** 
+ * S3FanoutManager static variable for the compiler to find.
+ */
+S3FanoutManager *S3FanoutManager::_s3fm = NULL;
+static UrlConstructor url_constructor;
 
-  if (info->origin == kOriginPath) {
-    assert(info->origin_path != NULL);
-    info->origin_file = fopen(info->origin_path->c_str(), "r");
-    if (info->origin_file == NULL)
-      return kFailLocalIO;
-  }
+/**
+ * Use this to get the S3FanoutManager instance.
+ */
+S3FanoutManager *S3FanoutManager::instance() {
+  static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+  pthread_once(&once_control, &S3FanoutManager::init);
+  return _s3fm;
+}
 
-  return kFailOk;
+
+/**
+ * S3FanoutManager initialisation as a SingletonOA class.
+ */
+void S3FanoutManager::init() {
+  static S3FanoutManager s;
+  s.Init(1024, &url_constructor); // max connections
+  s.SetRetryParameters(3, 100, 2000);
+  s.Spawn();
+  _s3fm = &s;
 }
 
 
@@ -369,6 +352,18 @@ void *S3FanoutManager::MainUpload(void *data) {
   return NULL;
 }
 
+static Failures PrepareOrigin(JobInfo *info) {
+  info->origin_mem.pos = 0;
+
+  if (info->origin == kOriginPath) {
+    assert(info->origin_path != NULL);
+    info->origin_file = fopen(info->origin_path->c_str(), "r");
+    if (info->origin_file == NULL)
+      return kFailLocalIO;
+  }
+
+  return kFailOk;
+}
 
 //------------------------------------------------------------------------------
 
@@ -561,20 +556,7 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) {
   curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
   pthread_mutex_unlock(lock_options_);
 
-  string url = url_constructor_->MkUrl(*(info->bucket), *(info->object_key));
-  curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
-  //LogCvmfs(kLogDownload, kLogDebug, "set url %s for info %p / curl handle %p",
-	   //         EscapeUrl((url_prefix + *(info->url))).c_str(), info, curl_handle);
-}
-
-void S3FanoutManager::SetUrlOptions2(JobInfo *info, std::string url) {
-  CURL *curl_handle = info->curl_handle;
-
-  pthread_mutex_lock(lock_options_);
-  curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
-  pthread_mutex_unlock(lock_options_);
-
-  //string url = url_constructor2_->MkUrl(*(info->bucket), *(info->object_key));
+  string url = url_constructor_->MkUrl(info->hostname, *(info->bucket), *(info->object_key));
   curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   //LogCvmfs(kLogDownload, kLogDebug, "set url %s for info %p / curl handle %p",
 	   //         EscapeUrl((url_prefix + *(info->url))).c_str(), info, curl_handle);
@@ -868,7 +850,8 @@ int S3FanoutManager::Push(JobInfo *info) {
     MakePipe(info->wait_at);
   }
   WritePipe(pipe_jobs_[1], &info, sizeof(info));
-  std::cout<<"Pipes: "<<info->wait_at[0]<<" - "<<info->wait_at[1]<<std::endl;
+  LogCvmfs(kLogS3Fanout, kLogDebug, "Pipes: %d - %d",
+	   info->wait_at[0], info->wait_at[1]);
 
   return info->wait_at[0];
 }

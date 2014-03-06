@@ -5,24 +5,11 @@
 #ifndef CVMFS_S3FANOUT_H_
 #define CVMFS_S3FANOUT_H_
 
-#include <stdint.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <poll.h>
 #include <semaphore.h>
-
-#include <cstdio>
-
-#include <string>
-#include <vector>
-#include <set>
+#include <poll.h>
 
 #include "duplex_curl.h"
-#include "compression.h"
 #include "prng.h"
-#include "hash.h"
-#include "atomic.h"
-#include "util.h"
 #include "util_concurrency.h"
 
 namespace s3fanout {
@@ -87,11 +74,13 @@ struct JobInfo {
     size_t pos;
     const unsigned char *data;
   } origin_mem; 
+
   const std::string *origin_path;
   const std::string *access_key;
   const std::string *secret_key;
   const std::string *bucket;
   const std::string *object_key;
+  std::string hostname;
   bool test_and_set;
   void *callback; // Callback to be called when job is finished
   MemoryMappedFile *mmf;
@@ -99,17 +88,19 @@ struct JobInfo {
   // One constructor per destination + head request
   JobInfo() { wait_at[0] = wait_at[1] = -1; http_headers = NULL; }
   JobInfo(const std::string *a, const std::string *s,
+	  std::string h,
           const std::string *b, const std::string *k, const std::string *p) :
           origin(kOriginPath), 
 	  origin_path(p),
-          access_key(a), secret_key(s), bucket(b), object_key(k)
+	  access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
           { wait_at[0] = wait_at[1] = -1; http_headers = NULL;
             test_and_set = false; }
   JobInfo(const std::string *a, const std::string *s,
+	  std::string h,
           const std::string *b, const std::string *k,
           const unsigned char *buffer, size_t size) :
           origin(kOriginMem),
-          access_key(a), secret_key(s), bucket(b), object_key(k)          
+          access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
           { wait_at[0] = wait_at[1] = -1; http_headers = NULL;
             test_and_set = false;
             origin_mem.size = size; origin_mem.data = buffer; }
@@ -131,18 +122,30 @@ struct JobInfo {
   unsigned backoff_ms;
 };  // JobInfo
 
-
 class AbstractUrlConstructor {
  public:
-  virtual std::string MkUrl(const std::string &bucket,
+  virtual std::string MkUrl(const std::string &host,
+			    const std::string &bucket,
                             const std::string &objkey) = 0;
 };
 
+class UrlConstructor : public s3fanout::AbstractUrlConstructor {
+public:
+  virtual std::string MkUrl(const std::string &host, 
+			    const std::string &bucket, 
+			    const std::string &objkey2) {
+    //return "http://" + bucket + ".s3.amazonaws.com/" + objkey;
+    //std::cerr<<"MkUrl: "<<"http://" + bucket + ".olhw-s3.cern.ch/" + objkey2<<std::endl;
+    //return "http://" + bucket + ".olhw-s3.cern.ch/" + objkey2;
+    //return "http://" + bucket + ".swift.cern.ch/" + objkey2;
+    //return "http://swift.cern.ch/" + bucket + "/" + objkey2;
+    return "http://" + host + "/" + bucket + "/" + objkey2;
+  }
+};
 
 class S3FanoutManager {
  public:
-  S3FanoutManager();
-  ~S3FanoutManager();
+  static S3FanoutManager *instance();
 
   void Init(const unsigned max_pool_handles,
             AbstractUrlConstructor *url_constructor);
@@ -158,7 +161,6 @@ class S3FanoutManager {
                           const unsigned backoff_max_ms);
 
   // private:
-
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainUpload(void *data);
@@ -167,7 +169,6 @@ class S3FanoutManager {
   void ReleaseCurlHandle(JobInfo *info, CURL *handle);
   Failures InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);
-  void SetUrlOptions2(JobInfo *info, std::string url);
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
@@ -214,6 +215,15 @@ class S3FanoutManager {
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
   Statistics *statistics_;
+
+ private:
+  S3FanoutManager();
+  ~S3FanoutManager();
+  S3FanoutManager(const S3FanoutManager&) {};
+  S3FanoutManager& operator= (const S3FanoutManager&) {};
+  static void init();
+  static S3FanoutManager *_s3fm;
+
 };  // S3FanoutManager
 
 }  // namespace s3fanout
