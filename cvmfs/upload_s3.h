@@ -7,12 +7,9 @@
 
 #include "upload_facility.h"
 
-#include "util_concurrency.h"
-#include "atomic.h"
-
-#include "s3fanout.h"
-
-#include <iostream>
+namespace s3fanout {
+  class S3FanoutManager;
+}
 
 namespace upload
 {
@@ -86,19 +83,16 @@ namespace upload
     int getKeyIndex(unsigned int use_bucket);
     std::string getBucketName(unsigned int use_bucket);
     int select_bucket(std::string rem_filename);
-    int uploadFile(std::string   filename,
-		   char          *buff,
-		   unsigned long size_of_file,
-		   const std::string   &bucket_name,
-		   std::string   full_hostname,
-		   const std::string   &hash,
-		   int use_bucket,
-		   int block_until_finished,
+    int uploadFile(std::string       filename,
+		   char              *buff,
+		   unsigned long     size_of_file,
+		   int               block_until_finished,
 		   const callback_t  *callback,
-		   MemoryMappedFile *mmf);
+		   MemoryMappedFile  *mmf);
 
     // state information
     std::string full_host_name_;
+    std::string host_name_;
     std::string bucket_body_name_;
     int         number_of_buckets_;
     std::vector< std::pair<std::string, std::string> > keys_;

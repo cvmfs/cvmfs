@@ -79,8 +79,8 @@ struct JobInfo {
   const std::string *access_key;
   const std::string *secret_key;
   const std::string *bucket;
-  const std::string *object_key;
-  std::string hostname;
+  const std::string object_key;
+  const std::string hostname;
   bool test_and_set;
   void *callback; // Callback to be called when job is finished
   MemoryMappedFile *mmf;
@@ -89,7 +89,7 @@ struct JobInfo {
   JobInfo() { wait_at[0] = wait_at[1] = -1; http_headers = NULL; }
   JobInfo(const std::string *a, const std::string *s,
 	  std::string h,
-          const std::string *b, const std::string *k, const std::string *p) :
+          const std::string *b, const std::string k, const std::string *p) :
           origin(kOriginPath), 
 	  origin_path(p),
 	  access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
@@ -97,7 +97,7 @@ struct JobInfo {
             test_and_set = false; }
   JobInfo(const std::string *a, const std::string *s,
 	  std::string h,
-          const std::string *b, const std::string *k,
+          const std::string *b, const std::string k,
           const unsigned char *buffer, size_t size) :
           origin(kOriginMem),
           access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
@@ -145,22 +145,34 @@ public:
 
 class S3FanoutManager {
  public:
-  static S3FanoutManager *instance();
+  static S3FanoutManager *Instance();
 
   void Init(const unsigned max_pool_handles,
             AbstractUrlConstructor *url_constructor);
   void Fini();
   void Spawn();
+
   int Push(JobInfo *info);
 
+  const Statistics &GetStatistics();
   void SetTimeout(const unsigned seconds);
   void GetTimeout(unsigned *seconds);
-  const Statistics &GetStatistics();
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
+  int GetNumberOfActiveJobs();
+  int GetCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs);
 
-  // private:
+  private:
+  S3FanoutManager();
+  ~S3FanoutManager();
+  S3FanoutManager(const S3FanoutManager&);
+  S3FanoutManager& operator= (const S3FanoutManager&);
+  static void Initialise();
+  static S3FanoutManager *s3fm_;
+
+  int PollConnections();
+
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainUpload(void *data);
@@ -215,14 +227,6 @@ class S3FanoutManager {
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
   Statistics *statistics_;
-
- private:
-  S3FanoutManager();
-  ~S3FanoutManager();
-  S3FanoutManager(const S3FanoutManager&) {};
-  S3FanoutManager& operator= (const S3FanoutManager&) {};
-  static void init();
-  static S3FanoutManager *_s3fm;
 
 };  // S3FanoutManager
 
