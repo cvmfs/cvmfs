@@ -768,6 +768,11 @@ get_or_guess_multiple_repository_names() {
 health_check() {
   local name=$1
 
+  # for stratum 1 repositories there are no health checks
+  if is_stratum1 $name; then
+    return 0
+  fi
+
   # check mounted union file system
   if ! cat /proc/mounts | grep -q " /cvmfs/$name "; then
     die "/cvmfs/$name is not mounted properly."
