@@ -320,7 +320,7 @@ create_repo() {
   echo "Shutting down autofs for the cvmfs mounts"
   autofs_switch off || return 100
 
-  if cvmfs_server list | grep -q $repo; then
+  if cvmfs_server list | grep -q "^$repo "; then
     echo "Repository $repo is already present... removing it"
     destroy_repo $repo || return 101
   fi
