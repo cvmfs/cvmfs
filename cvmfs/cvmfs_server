@@ -1047,10 +1047,10 @@ create_repository_skeleton() {
   done
   mkdir -p ${directory}/data/txn
   if [ x$(id -un) != x$user ]; then
-    chown -R $user $directory
+    chown -R $user ${directory}/
   fi
   if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $directory > /dev/null
+    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
   fi
   echo "done"
 }
