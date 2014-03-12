@@ -1256,7 +1256,7 @@ create_spool_area_for_new_repository() {
   if [ $create_skeleton -eq 1 ] && is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
     local repository_dir
     repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
-    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
+    create_repository_skeleton $repository_dir $CVMFS_USER > /dev/null
   fi
 }
 
