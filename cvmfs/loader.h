@@ -47,6 +47,35 @@ enum Failures {
   kFailWpad,
 };
 
+inline const char* ToString(const Failures error) {
+  return (const char*[]){
+    "OK",
+    "unknown error",
+    "illegal options",
+    "permission denied",
+    "failed to mount",
+    "unable to init loader talk socket",
+    "cannot run FUSE event loop",
+    "failed to load shared library",
+    "incompatible library version",
+    "cache directory problem",
+    "peering problem",
+    "NFS maps init failure",
+    "quota init failure",
+    "watchdog spawning failure",
+    "talk socket init failure",
+    "signature verification failure",
+    "catalog init failure",
+    "maintenance mode",
+    "state saving failure",
+    "state restore failure",
+    "already mounted somewhere else",
+    "trying to double mount",
+    "history init failure",
+    "proxy auto-discovery failed"
+  }[error];
+}
+
 
 enum StateId {
   kStateUnknown = 0,
