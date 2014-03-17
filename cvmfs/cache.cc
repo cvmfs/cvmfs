@@ -941,7 +941,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
         if (!retval) {
           LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                    "failed to pin cached root catalog (no space)");
-          return catalog::kLoadFail;
+          return catalog::kLoadNoSpace;
         }
       }
       loaded_catalogs_[mountpoint] = cache_hash;
