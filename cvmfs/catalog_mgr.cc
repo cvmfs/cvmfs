@@ -583,8 +583,8 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
                                        &catalog_path,
                                        &catalog_hash);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d)",
-             mountpoint.c_str(), retval);
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
+             mountpoint.c_str(), retval, ToString(retval));
     return NULL;
   }
 
