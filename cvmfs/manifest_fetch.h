@@ -38,6 +38,22 @@ enum Failures {
   kFailUnknown,
 };
 
+inline const char* ToString(const Failures error) {
+  return (const char*[]){
+    "OK",
+    "failed to load",
+    "loading incomplete",
+    "repository name mismatch",
+    "root catalog mismatch",
+    "outdated manifest",
+    "bad certificate",
+    "bad signature",
+    "bad whitelist",
+    "invalid certificate",
+    "unknown error"
+  }[error];
+}
+
 
 /**
  * A manifest requires the certificate and the whitelist to be verified.
