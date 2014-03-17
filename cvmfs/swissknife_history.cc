@@ -370,7 +370,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
                                catalog->database_path() + ".compressed",
                                &hash_republished_catalog))
   {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to compress catalog (%d)");
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to compress catalog");
     delete catalog;
     unlink(catalog_path.c_str());
     goto rollback_fini;
