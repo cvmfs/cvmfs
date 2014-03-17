@@ -1141,7 +1141,8 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   }
 
   if (result != kFailOk) {
-    LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d)", result);
+    LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
+             ToString(result));
 
     if (info->destination == kDestinationPath)
       unlink(info->destination_path->c_str());
@@ -1428,8 +1429,8 @@ void DownloadManager::ProbeHosts() {
         LogCvmfs(kLogDownload, kLogDebug, "probing host %s had %dms rtt",
                  url.c_str(), host_rtt[i]);
       } else {
-        LogCvmfs(kLogDownload, kLogDebug, "error while probing host %s: %d",
-                 url.c_str(), result);
+        LogCvmfs(kLogDownload, kLogDebug, "error while probing host %s: %d - %s",
+                 url.c_str(), result, ToString(result));
         host_rtt[i] = INT_MAX;
       }
     }

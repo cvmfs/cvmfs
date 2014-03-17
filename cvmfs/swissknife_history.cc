@@ -84,15 +84,17 @@ static bool FetchTagList(const string &repository_url,
                          history::TagList *tag_list)
 {
   int retval;
+  download::Failures dl_retval;
+
   if (!history_hash.IsNull()) {
     const string url = repository_url + "/data" +
       history_hash.MakePath(1, 2) + "H";
     download::JobInfo download_history(&url, true, false, &tmp_path,
                                        &history_hash);
-    retval = g_download_manager->Fetch(&download_history);
-    if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d)",
-               retval);
+    dl_retval = g_download_manager->Fetch(&download_history);
+    if (dl_retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
+               dl_retval, ToString(dl_retval));
       return false;
     }
   }
@@ -281,6 +283,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   shash::Any hash_republished_catalog;
   int64_t size_republished_catalog = 0;
   int retval;
+  download::Failures dl_retval;
 
   // Download & verify manifest & history database
   g_signature_manager->Init();
@@ -338,10 +341,10 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
       target_tag.root_hash.MakePath(1, 2) + "C";
     download::JobInfo download_catalog(&catalog_url, true, false, &catalog_path,
                                        &target_tag.root_hash);
-    retval = g_download_manager->Fetch(&download_catalog);
-    if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog (%d)",
-               retval);
+    dl_retval = g_download_manager->Fetch(&download_catalog);
+    if (dl_retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog (%d - %s)",
+               dl_retval, ToString(dl_retval));
       goto rollback_fini;
     }
   }

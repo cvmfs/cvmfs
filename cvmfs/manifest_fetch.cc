@@ -175,6 +175,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   const bool probe_hosts = base_url == "";
   Failures result = kFailUnknown;
   int retval;
+  download::Failures dl_retval;
   int wl_examination;
   string cert_fingerprint;
 
@@ -190,10 +191,11 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
                                          &certificate_hash);
 
-  retval = download_manager->Fetch(&download_manifest);
-  if (retval != download::kFailOk) {
+  dl_retval = download_manager->Fetch(&download_manifest);
+  if (dl_retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-             "failed to download repository manifest (%d)", retval);
+             "failed to download repository manifest (%d - %s)",
+             dl_retval, ToString(dl_retval));
     return kFailLoad;
   }
 

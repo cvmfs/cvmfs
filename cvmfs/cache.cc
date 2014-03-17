@@ -784,8 +784,9 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
   fclose(catalog_file);
   if (download_catalog.error_code != download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-             "unable to load catalog with key %s (%d)",
-             hash.ToString().c_str(), download_catalog.error_code);
+             "unable to load catalog with key %s (%d - %s)",
+             hash.ToString().c_str(), download_catalog.error_code,
+             ToString(download_catalog.error_code));
     AbortTransaction(temp_path);
     backoff_throttle_.Throttle();
     return catalog::kLoadFail;

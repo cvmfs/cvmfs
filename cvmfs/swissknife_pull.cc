@@ -177,8 +177,8 @@ static void *MainWorker(void *data) {
       do {
         retval = g_download_manager->Fetch(&download_chunk);
         if (retval != download::kFailOk) {
-          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
-                   url_chunk.c_str(), retval);
+          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s), abort",
+                   url_chunk.c_str(), retval, ToString(retval));
           abort();
         }
         attempts++;
@@ -199,6 +199,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
                  const bool with_nested)
 {
   int retval;
+  download::Failures dl_retval;
 
   // Check if the catalog already exists
   if (Peek("data" + catalog_hash.MakePath(1, 2), 'C')) {
@@ -233,11 +234,11 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
                              catalog_hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url_catalog, false, false,
                                      fcatalog_vanilla, &catalog_hash);
-  retval = g_download_manager->Fetch(&download_catalog);
+  dl_retval = g_download_manager->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
-             catalog_hash.ToString().c_str(), retval);
+  if (dl_retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d - %s)",
+             catalog_hash.ToString().c_str(), dl_retval, ToString(dl_retval));
     goto pull_cleanup;
   }
   retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
@@ -336,6 +337,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
   manifest::Failures m_retval;
+  download::Failures dl_retval;
   unsigned timeout = 10;
   int fd_lockfile = -1;
   string spooler_definition_str;
@@ -470,10 +472,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     download::JobInfo download_history(&history_url, false, false,
                                        &history_path,
                                        &history_hash);
-    retval = g_download_manager->Fetch(&download_history);
-    if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d)",
-               retval);
+    dl_retval = g_download_manager->Fetch(&download_history);
+    if (dl_retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
+               dl_retval, ToString(dl_retval));
       goto fini;
     }
     retval = zlib::DecompressPath2Path(history_path,

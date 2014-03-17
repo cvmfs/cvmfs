@@ -299,8 +299,9 @@ class CatalogTraversal {
     download::Failures retval = download_manager_.Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s (%d)",
-             catalog_hash.ToString().c_str(), retval);
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s"
+                                                 " (%d - %s)",
+             catalog_hash.ToString().c_str(), retval, ToString(retval));
       return false;
     }
 
