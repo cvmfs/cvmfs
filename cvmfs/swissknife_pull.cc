@@ -335,6 +335,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
 
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
+  manifest::Failures m_retval;
   unsigned timeout = 10;
   int fd_lockfile = -1;
   string spooler_definition_str;
@@ -441,10 +442,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
   }
 
-  retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
+  m_retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
                            g_signature_manager, g_download_manager, &ensemble);
-  if (retval != manifest::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
+  if (m_retval != manifest::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d - %s)",
+             m_retval, ToString(m_retval));
     goto fini;
   }
 

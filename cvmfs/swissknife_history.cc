@@ -46,8 +46,9 @@ static bool GetHistoryDbHash(const string &repository_url,
                              g_signature_manager, g_download_manager,
                              &manifest_ensemble);
     if (retval != manifest::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest (%d)",
-               retval);
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
+                                      "(%d - %s)",
+               retval, ToString(retval));
     }
     manifest = manifest_ensemble.manifest;
   } else {

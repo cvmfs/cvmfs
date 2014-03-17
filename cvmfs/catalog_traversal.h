@@ -251,20 +251,22 @@ class CatalogTraversal {
       signature_manager.Fini();
 
       // Check if manifest was loaded correctly
-      if (retval == manifest::kFailNameMismatch) {
+      if (retval == manifest::kFailOk) {
+        manifest = new manifest::Manifest(*manifest_ensemble.manifest);
+      } else if (retval == manifest::kFailNameMismatch) {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
                  "repository name mismatch. No name provided?");
-      }
-      if (retval == manifest::kFailBadSignature   ||
-          retval == manifest::kFailBadCertificate ||
-          retval == manifest::kFailBadWhitelist)
+      } else if (retval == manifest::kFailBadSignature   ||
+                 retval == manifest::kFailBadCertificate ||
+                 retval == manifest::kFailBadWhitelist)
       {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
                  "repository signature mismatch. No key(s) provided?");
+      } else {
+        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+                 "failed to load manifest (%d - %s)",
+                 retval, ToString(retval));
       }
-
-      if (retval == manifest::kFailOk)
-        manifest = new manifest::Manifest(*manifest_ensemble.manifest);
     }
 
     return manifest;

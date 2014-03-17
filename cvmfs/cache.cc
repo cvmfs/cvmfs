@@ -895,8 +895,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
                                      download_manager_,
                                      &ensemble);
   if (manifest_failure != manifest::kFailOk) {
-    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d)",
-             manifest_failure);
+    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
+             manifest_failure, ToString(manifest_failure));
     if (!cache_hash.IsNull()) {
       // TODO remove code duplication
       if (catalog_path) {
