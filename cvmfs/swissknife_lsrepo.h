@@ -8,6 +8,7 @@
 #include "swissknife.h"
 
 #include "hash.h"
+#include "catalog_traversal.h"
 
 namespace catalog {
   class Catalog;
@@ -29,9 +30,7 @@ class CommandListCatalogs : public Command {
 
   int Main(const ArgumentList &args);
 
-  void CatalogCallback(const catalog::Catalog* catalog,
-                       const shash::Any&       catalog_hash,
-                       const unsigned          tree_level);
+  void CatalogCallback(const CatalogTraversalData &data);
 
  private:
   bool print_tree_;
