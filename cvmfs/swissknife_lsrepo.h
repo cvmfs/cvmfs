@@ -30,7 +30,7 @@ class CommandListCatalogs : public Command {
 
   int Main(const ArgumentList &args);
 
-  void CatalogCallback(const CatalogTraversalData &data);
+  void CatalogCallback(const ReadonlyCatalogTraversal::CallbackData &data);
 
  private:
   bool print_tree_;
