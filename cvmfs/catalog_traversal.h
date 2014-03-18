@@ -59,6 +59,33 @@ struct CatalogTraversalData {
  */
 template<class CatalogT>
 class CatalogTraversal : public Observable<CatalogTraversalData> {
+ public:
+  /**
+   * @param repo_url    the path to the repository to be traversed:
+   *                    -> either absolute path to the local catalogs
+   *                    -> or an URL to a remote repository
+   * @param repo_name   fully qualified repository name (used for remote
+   *                    repository signature check) (optional)
+   * @param repo_keys   a comma separated list of public key file
+   *                    locations to verify the repository manifest file
+   * @param history     depth of the desired catalog history traversal
+   *                    (default: 1 - only HEAD catalogs are traversed)
+   * @param no_close    do not close catalogs after they were attached
+   *                    (catalogs retain their parent/child pointers)
+   * @param tmp_dir     path to the temporary directory to be used
+   *                    (default: /tmp)
+   */
+  struct ConstructorParams {
+    ConstructorParams() : history(0), no_close(false), tmp_dir("/tmp") {}
+
+    std::string   repo_url;
+    std::string   repo_name;
+    std::string   repo_keys;
+    unsigned int  history;
+    bool          no_close;
+    std::string   tmp_dir;
+  };
+
  protected:
   struct CatalogJob {
     CatalogJob(const std::string      &path,
@@ -86,28 +113,17 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
 
  public:
   /**
-   * Constructs a new catalog traversal engine.
-   * @param repo_url           the path to the repository to be traversed:
-   *                           -> either absolute path to the local catalogs
-   *                           -> or an URL to a remote repository
-   * @param repo_name          fully qualified repository name (used for remote
-   *                           repository signature check) (optional)
-   * @param repo_keys          a comma separated list of public key file
-   *                           locations to verify the repository manifest file
-   * @param no_close           do not close catalogs after they were attached
-   *                           (catalogs retain their parent/child pointers)
+   * Constructs a new catalog traversal engine based on the construction
+   * parameters described in struct ConstructionParams.
    */
-	CatalogTraversal(const std::string& repo_url,
-                   const std::string& repo_name = "",
-                   const std::string& repo_keys = "",
-                   const bool         no_close = false,
-                   const std::string& tmp_dir  = "/tmp") :
-    repo_url_(MakeCanonicalPath(repo_url)),
-    repo_name_(repo_name),
-    repo_keys_(repo_keys),
-    is_remote_(repo_url.substr(0, 7) == "http://"),
-    no_close_(no_close),
-    temporary_directory_(tmp_dir)
+	CatalogTraversal(const ConstructorParams &params) :
+    repo_url_(MakeCanonicalPath(params.repo_url)),
+    repo_name_(params.repo_name),
+    repo_keys_(params.repo_keys),
+    is_remote_(params.repo_url.substr(0, 7) == "http://"),
+    no_close_(params.no_close),
+    temporary_directory_(params.tmp_dir),
+    history_depth_(params.history)
   {
     if (is_remote_)
       download_manager_.Init(1, true);
