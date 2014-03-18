@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_CATALOG_TRAVERSAL_H_
+#define CVMFS_CATALOG_TRAVERSAL_H_
+
 #include <string>
 #include <stack>
 
@@ -357,3 +360,5 @@ class CatalogTraversal {
 };
 
 }
+
+#endif /* CVMFS_CATALOG_TRAVERSAL_H_*/
