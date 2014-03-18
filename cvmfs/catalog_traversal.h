@@ -350,6 +350,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
   download::DownloadManager download_manager_;
 };
 
+typedef CatalogTraversal<catalog::Catalog> SimpleCatalogTraversal;
+
 }
 
 #endif /* CVMFS_CATALOG_TRAVERSAL_H_*/
