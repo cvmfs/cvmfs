@@ -9,7 +9,6 @@
 
 #include <sys/resource.h>
 
-#include "catalog_traversal.h"
 #include "catalog_sql.h"
 #include "catalog_rw.h"
 #include "logging.h"
@@ -132,14 +131,13 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
-  CatalogTraversal<CommandMigrate, WritableCatalog> traversal(
-    this,
-    &CommandMigrate::CatalogCallback,
+  CatalogTraversal<WritableCatalog> traversal(
     repo_url,
     repo_name,
     repo_keys,
     generate_full_catalog_tree,
     decompress_tmp_dir);
+  traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
   catalog_loading_stopwatch_.Start();
   const bool loading_successful = traversal.Traverse();
   catalog_loading_stopwatch_.Stop();
@@ -271,28 +269,25 @@ bool CommandMigrate::DoMigrationAndCommit(
 }
 
 
-void CommandMigrate::CatalogCallback(const Catalog*    catalog,
-                                     const shash::Any& catalog_hash,
-                                     const unsigned    tree_level)
-{
+void CommandMigrate::CatalogCallback(const CatalogTraversalData &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string path;
 
-  for (unsigned int i = 1; i < tree_level; ++i) {
+  for (unsigned int i = 1; i < data.tree_level; ++i) {
     tree_indent += "\u2502  ";
   }
 
-  if (tree_level > 0) {
+  if (data.tree_level > 0) {
     tree_indent += "\u251C\u2500 ";
   }
 
-  hash_string = catalog_hash.ToString();
+  hash_string = data.catalog_hash.ToString();
 
-  path = catalog->path().ToString();
+  path = data.catalog->path().ToString();
   if (path.empty()) {
     path = "/";
-    root_catalog_ = catalog;
+    root_catalog_ = data.catalog;
   }
 
   LogCvmfs(kLogCatalog, kLogStdout, "%s%s %s",
