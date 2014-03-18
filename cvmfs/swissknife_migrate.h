@@ -14,6 +14,7 @@
 #include "hash.h"
 #include "util.h"
 #include "util_concurrency.h"
+#include "catalog_traversal.h"
 #include "catalog.h"
 #include "upload.h"
 #include "atomic.h"
@@ -205,9 +206,7 @@ class CommandMigrate : public Command {
   static const catalog::DirectoryEntry& GetNestedCatalogMarkerDirent();
 
  protected:
-  void CatalogCallback(const catalog::Catalog* catalog,
-                       const shash::Any&       catalog_hash,
-                       const unsigned          tree_level);
+  void CatalogCallback(const CatalogTraversalData &data);
   void MigrationCallback(PendingCatalog *const &data);
   void UploadCallback(const upload::SpoolerResult &result);
 
