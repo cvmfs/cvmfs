@@ -73,7 +73,6 @@ unsigned int S3Uploader::GetNumberOfErrors() const {
 
 
 void S3Uploader::WorkerThread() {
-  const int maximum_number_of_concurrent_jobs = 300;
 
   LogCvmfs(kLogS3Fanout, kLogDebug, "Upload_S3 WorkerThread started.");
 
@@ -81,13 +80,19 @@ void S3Uploader::WorkerThread() {
   while (running) {
     UploadJob job; 
 
-    // Check for new jobs
-    if(s3fanout_mgr->GetNumberOfActiveJobs() < maximum_number_of_concurrent_jobs) {
-      bool newjob = TryToAcquireNewJob(job);
+    //LogCvmfs(kLogS3Fanout, kLogDebug, "Upload_S3 running.");
+
+    // Check for new jobs, if they can be pushed in
+    bool newjob=true;
+    while(newjob) {
+      if(s3fanout_mgr->PushAcquire() != 0)
+	break;
+      newjob = TryToAcquireNewJob(job);
 
       if(newjob) {
 	switch (job.type) {
 	case UploadJob::Upload:
+	  s3fanout_mgr->PushRelease();
 	  Upload(job.stream_handle,
 		 job.buffer,
 		 job.callback);
@@ -98,6 +103,7 @@ void S3Uploader::WorkerThread() {
 				 job.hash_suffix);
 	  break;
 	case UploadJob::Terminate:
+	  s3fanout_mgr->PushRelease();
 	  running = false;
 	  break;
 	default:
@@ -105,6 +111,8 @@ void S3Uploader::WorkerThread() {
 	  assert (unknown_job_type);
 	  break;
 	}
+      }else{
+	s3fanout_mgr->PushRelease();
       }
     }
 
@@ -130,6 +138,10 @@ void S3Uploader::WorkerThread() {
 void S3Uploader::FileUpload(const std::string &local_path,
 			    const std::string &remote_path,
 			    const callback_t  *callback) {
+
+  while(s3fanout_mgr->PushAcquire() != 0) {
+    usleep(100*1000);
+  }
 
   // Check that we can read the given file
   MemoryMappedFile *mmf = new MemoryMappedFile(local_path);

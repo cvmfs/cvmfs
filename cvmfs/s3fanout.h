@@ -153,6 +153,8 @@ class S3FanoutManager {
   void Spawn();
 
   int Push(JobInfo *info);
+  int PushAcquire();
+  int PushRelease();
 
   const Statistics &GetStatistics();
   void SetTimeout(const unsigned seconds);

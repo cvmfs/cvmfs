@@ -37,8 +37,9 @@ S3FanoutManager *S3FanoutManager::Instance() {
  * S3FanoutManager initialisation as a Singleton class.
  */
 void S3FanoutManager::Initialise() {
+  const int maximum_number_of_concurrent_jobs = 20;
   static S3FanoutManager s;
-  s.Init(1024, &url_constructor); // max connections
+  s.Init(maximum_number_of_concurrent_jobs, &url_constructor); // max connections
   s.SetRetryParameters(3, 100, 2000);
   s.Spawn();
 
@@ -138,9 +139,12 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
  */
 int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                         void *userp, void *socketp) {
-  LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
-           "handle %p, socket %d, action %d, up %d, sp %d", easy, s, action, userp, socketp);
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(userp);
+  int ajobs = 0;
+  sem_getvalue(&s3fanout_mgr->available_jobs_, &ajobs);
+  LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
+           "handle %p, socket %d, action %d, up %d, sp %d, fds_inuse %d, jobs %d", easy, s, action, userp, socketp, 
+	   s3fanout_mgr->watch_fds_inuse_, ajobs);
   if (action == CURL_POLL_NONE)
     return 0;
 
@@ -320,6 +324,7 @@ void *S3FanoutManager::MainUpload(void *data) {
           // Return easy handle into pool and write result back
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
 
+	  // FIXME: is this needed?
 	  FinalReport r;
 	  r.f=info->error_code;
 	  r.s1=info->wait_at[0];
@@ -359,6 +364,7 @@ CURL *S3FanoutManager::AcquireCurlHandle() {
     //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_READFUNCTION, CallbackCurlData);
+    curl_easy_setopt(handle, CURLOPT_DNS_CACHE_TIMEOUT, 0);
   } else {
     handle = *(pool_handles_idle_->begin());
     pool_handles_idle_->erase(pool_handles_idle_->begin());
@@ -669,6 +675,27 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 
+/**
+ * Tries to get push job permit. 
+ *
+ * @return 0 if push is allowed, otherwise not
+ */
+int S3FanoutManager::PushAcquire() {
+  /*
+  if(pool_handles_inuse_->size() < pool_max_handles_) {
+    return 0;
+  }
+  return 1;*/
+
+  return sem_trywait(&available_jobs_);
+}
+
+
+int S3FanoutManager::PushRelease() {
+  return sem_post(&available_jobs_);
+}
+
+
 S3FanoutManager::S3FanoutManager() {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
@@ -716,7 +743,7 @@ void S3FanoutManager::Init(const unsigned max_pool_handles,
   watch_fds_max_ = 4*pool_max_handles_;
 
   max_available_jobs_ = 4*pool_max_handles_;
-  sem_init(&available_jobs_, 1, max_available_jobs_);
+  assert(sem_init(&available_jobs_, 1, max_available_jobs_) == 0);
 
   opt_timeout_ = 20;
   statistics_ = new Statistics();
@@ -729,6 +756,7 @@ void S3FanoutManager::Init(const unsigned max_pool_handles,
                     static_cast<void *>(this));
   //curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
   //curl_multi_setopt(curl_multi_, CURLMOPT_MAX_PIPELINE_LENGTH, 64);
+  //curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
                     pool_max_handles_);
 
