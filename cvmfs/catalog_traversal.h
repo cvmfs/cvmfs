@@ -33,14 +33,17 @@ struct CatalogTraversalData {
   CatalogTraversalData(const catalog::Catalog* catalog,
                        const shash::Any&       catalog_hash,
                        const unsigned          tree_level,
-                       const size_t            file_size) :
+                       const size_t            file_size,
+                       const unsigned int      history_depth) :
     catalog(catalog), catalog_hash(catalog_hash), tree_level(tree_level),
-    file_size(file_size) {}
+    file_size(file_size),
+    history_depth(history_depth) {}
 
   const catalog::Catalog*  catalog;
   const shash::Any         catalog_hash;
   const unsigned int       tree_level;
   const size_t             file_size;
+  const unsigned int       history_depth;
 };
 
 /**
@@ -91,22 +94,18 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     CatalogJob(const std::string      &path,
                const shash::Any       &hash,
                const unsigned          tree_level,
+               const unsigned          history_depth,
                      catalog::Catalog *parent = NULL) :
       path(path),
       hash(hash),
       tree_level(tree_level),
-      parent(parent) {}
-    CatalogJob(const catalog::Catalog::NestedCatalog &nested_catalog,
-               const unsigned                         tree_level,
-                     catalog::Catalog                *parent = NULL) :
-      path(nested_catalog.path.ToString()),
-      hash(nested_catalog.hash),
-      tree_level(tree_level),
+      history_depth(history_depth),
       parent(parent) {}
 
     const std::string       path;
     const shash::Any        hash;
     const unsigned          tree_level;
+    const unsigned          history_depth;
           catalog::Catalog *parent;
   };
   typedef std::stack<CatalogJob> CatalogJobStack;
@@ -155,7 +154,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
 
     // add the root catalog of the repository as the first element on the job
     // stack
-    CatalogJob job("", manifest->catalog_hash(), 0);
+    CatalogJob job("", manifest->catalog_hash(), 0, 0);
     catalog_stack_.push(job);
 
     delete manifest;
@@ -216,6 +215,38 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
                                          job.hash,
                                          job.tree_level,
                                          file_size));
+                                         job.history_depth));
+
+    // Inception! Go deeper into the catalog tree
+    PushReferencedCatalogs(catalog, job);
+
+    // We are done with this catalog
+    if (!no_close_) {
+      delete catalog;
+    }
+
+    return true;
+  }
+
+
+  unsigned int PushReferencedCatalogs(      catalog::Catalog  *catalog,
+                                      const CatalogJob        &job) {
+    unsigned int pushed_catalogs = 0;
+
+    // Only Root catalogs may be used as entry points into previous revisions
+    if (job.history_depth < history_depth_ && catalog->IsRoot()) {
+      shash::Any previous_revision = catalog->GetPreviousRevision();
+      if (! previous_revision.IsNull()) {
+        const bool pushed = MightPush(CatalogJob("",
+                                                 previous_revision,
+                                                 0,
+                                                 job.history_depth + 1,
+                                                 NULL));
+        if (pushed) {
+          ++pushed_catalogs;
+        }
+      }
+    }
 
     // Inception! Go to the next catalog level
     // Note: taking a copy of the result of ListNestedCatalogs() here for
@@ -227,13 +258,22 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
          i != iEnd; ++i)
     {
       catalog::Catalog* parent = (no_close_) ? catalog : NULL;
-      catalog_stack_.push(CatalogJob(*i, job.tree_level + 1, parent));
+      const bool pushed = MightPush(CatalogJob(i->path.ToString(),
+                                               i->hash,
+                                               job.tree_level + 1,
+                                               job.history_depth,
+                                               parent));
+      if (pushed) {
+        ++pushed_catalogs;
+      }
     }
 
-    // We are done with this catalog
-    if (!no_close_) {
-      delete catalog;
-    }
+    return pushed_catalogs;
+  }
+
+
+  bool MightPush(const CatalogJob &job) {
+    catalog_stack_.push(job);
     return true;
   }
 
@@ -370,13 +410,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
   }
 
  private:
-  const std::string repo_url_;
-  const std::string repo_name_;
-  const std::string repo_keys_;
-  const bool        is_remote_;
-  const bool        no_close_;
-  const std::string temporary_directory_;
-  CatalogJobStack   catalog_stack_;
+  const std::string   repo_url_;
+  const std::string   repo_name_;
+  const std::string   repo_keys_;
+  const bool          is_remote_;
+  const bool          no_close_;
+  const std::string   temporary_directory_;
+  const unsigned int  history_depth_;
+  CatalogJobStack     catalog_stack_;
   download::DownloadManager download_manager_;
 };
 
