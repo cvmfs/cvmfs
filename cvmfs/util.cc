@@ -126,6 +126,11 @@ NameString GetFileName(const PathString &path) {
 }
 
 
+bool IsAbsolutePath(const std::string &path) {
+  return (! path.empty() && path[0] == '/');
+}
+
+
 /**
  * Abort() on failure
  */
@@ -356,6 +361,16 @@ bool DirectoryExists(const std::string &path) {
   platform_stat64 info;
   return ((platform_lstat(path.c_str(), &info) == 0) &&
           S_ISDIR(info.st_mode));
+}
+
+
+/**
+ * Checks if the symlink file path exists.
+ */
+bool SymlinkExists(const string &path) {
+  platform_stat64 info;
+  return ((platform_lstat(path.c_str(), &info) == 0) &&
+          S_ISLNK(info.st_mode));
 }
 
 
