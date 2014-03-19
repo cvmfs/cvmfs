@@ -456,7 +456,11 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
     }
 
     library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
-    if (library_handle_) {
+    if (library_handle_ == NULL) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "failed to load cvmfs library at %s: %s", i->c_str(), dlerror());
+    } else {
+      found_library_file = true;
       break;
     }
   }
@@ -820,8 +824,6 @@ int main(int argc, char *argv[]) {
            "CernVM-FS: loading Fuse module... ");
   cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
   if (!cvmfs_exports_) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "failed to load cvmfs library: %s", dlerror());
     return kFailLoadLibrary;
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
