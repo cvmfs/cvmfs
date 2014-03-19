@@ -131,6 +131,7 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
 bool FileExists(const std::string &path);
 int64_t GetFileSize(const std::string &path);
 bool DirectoryExists(const std::string &path);
+bool SymlinkExists(const std::string &path);
 bool MkdirDeep(const std::string &path, const mode_t mode);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
