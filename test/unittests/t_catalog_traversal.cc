@@ -171,6 +171,15 @@ class T_CatalogTraversal : public ::testing::Test {
  public:
   MockCatalog *dummy_catalog_hierarchy;
 
+ private:
+  typedef std::map<std::string, MockCatalog*>    CatalogPathMap;
+  typedef std::map<unsigned int, CatalogPathMap> RevisionMap;
+
+  const unsigned int max_revision;
+
+ public:
+  T_CatalogTraversal() : max_revision(6) {}
+
  protected:
   void SetUp() {
     SetupDummyCatalogs();
@@ -178,6 +187,35 @@ class T_CatalogTraversal : public ::testing::Test {
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
+  }
+
+ private:
+  CatalogPathMap& GetCatalogTree(const unsigned int  revision,
+                                 RevisionMap        &revisions) const {
+    RevisionMap::iterator rev_itr = revisions.find(revision);
+    assert (rev_itr != revisions.end());
+    return rev_itr->second;
+  }
+
+  MockCatalog* GetRevisionHead(const unsigned int revision,
+                               RevisionMap &revisions) const {
+    CatalogPathMap &catalogs = GetCatalogTree(revision, revisions);
+    CatalogPathMap::iterator catalogs_itr = catalogs.find("");
+    assert (catalogs_itr != catalogs.end());
+    assert (catalogs_itr->second->revision() == revision);
+    assert (catalogs_itr->second->IsRoot());
+    return catalogs_itr->second;
+  }
+
+  MockCatalog* GetBranchHead(const std::string   &root_path,
+                             const unsigned int   revision,
+                             RevisionMap         &revisions) const {
+    CatalogPathMap &catalogs = GetCatalogTree(revision, revisions);
+    CatalogPathMap::iterator catalogs_itr = catalogs.find(root_path);
+    assert (catalogs_itr != catalogs.end());
+    assert (catalogs_itr->second->revision()  == revision);
+    assert (catalogs_itr->second->root_path() == root_path);
+    return catalogs_itr->second;
   }
 
   void SetupDummyCatalogs() {
@@ -209,72 +247,151 @@ class T_CatalogTraversal : public ::testing::Test {
      *    Revision 3:   - adds branch 1-1
      *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated
      *    Revision 5:   - adds branch 1-3
+     *    Revision 6:   - removes branch 1-0
      *
      */
-    MockCatalog *head = CreateAndRegisterCatalog("", root_hash, 42);
 
-    Make_10_Branch(head);
-    Make_11_Branch(head);
-    Make_12_Branch(head);
-    Make_13_Branch(head);
+    RevisionMap revisions;
+    for (unsigned int r = 1; r <= max_revision; ++r) {
+      MakeRevision(r, revisions);
+    }
   }
 
-  void Make_10_Branch(MockCatalog *parent) {
-    MockCatalog *_10 = CreateAndRegisterCatalog("/00/10",          GetRandomHash(), 13124, parent);
-    MockCatalog *_20 = CreateAndRegisterCatalog("/00/10/20",       GetRandomHash(), 23524, _10);
-    MockCatalog *_21 = CreateAndRegisterCatalog("/00/10/21",       GetRandomHash(), 74546, _10);
-    MockCatalog *_30 = CreateAndRegisterCatalog("/00/10/20/30",    GetRandomHash(), 66234, _20);
-    MockCatalog *_31 = CreateAndRegisterCatalog("/00/10/20/31",    GetRandomHash(), 87365, _20);
-    MockCatalog *_32 = CreateAndRegisterCatalog("/00/10/20/32",    GetRandomHash(), 93405, _20);
-    MockCatalog *_40 = CreateAndRegisterCatalog("/00/10/20/30/40", GetRandomHash(), 85617, _30);
+  void MakeRevision(const unsigned int revision, RevisionMap &revisions) {
+    // sanity checks
+    RevisionMap::const_iterator rev_itr = revisions.find(revision);
+    ASSERT_EQ (revisions.end(), rev_itr);
+    ASSERT_LE (1u, revision);
+    ASSERT_GE (max_revision, revision);
+
+    // create map for new catalog tree
+    revisions[revision] = CatalogPathMap();
+
+    // create the root catalog
+    MockCatalog *root_catalog = (revision < max_revision)
+      ? CreateAndRegisterCatalog("", revision, revisions)
+      : CreateAndRegisterCatalog("", revision, revisions, NULL, root_hash);
+
+    // create the catalog hierarchy depending on the revision
+    switch (revision) {
+      case 1:
+        // NOOP
+        break;
+      case 2:
+        MakeBranch("/00/10", revision, revisions);
+        break;
+      case 3:
+        MakeBranch("/00/11", revision, revisions);
+        root_catalog->RegisterChild(GetBranchHead("/00/10", 2, revisions));
+        break;
+      case 4:
+        MakeBranch("/00/12", revision, revisions);
+        MakeBranch("/00/11", revision, revisions);
+        root_catalog->RegisterChild(GetBranchHead("/00/10", 2, revisions));
+        break;
+      case 5:
+        MakeBranch("/00/13", revision, revisions);
+        root_catalog->RegisterChild(GetBranchHead("/00/10", 2, revisions));
+        root_catalog->RegisterChild(GetBranchHead("/00/11", 4, revisions));
+        root_catalog->RegisterChild(GetBranchHead("/00/12", 4, revisions));
+        break;
+      case 6:
+        root_catalog->RegisterChild(GetBranchHead("/00/11", 4, revisions));
+        root_catalog->RegisterChild(GetBranchHead("/00/12", 4, revisions));
+        root_catalog->RegisterChild(GetBranchHead("/00/13", 5, revisions));
+        dummy_catalog_hierarchy = root_catalog; // sets current repo HEAD
+        break;
+      default:
+        FAIL() << "hit revision: " << revision;
+    }
   }
 
-  void Make_11_Branch(MockCatalog *parent) {
-    MockCatalog *_11 = CreateAndRegisterCatalog("/00/11",          GetRandomHash(), 87648, parent);
-    MockCatalog *_22 = CreateAndRegisterCatalog("/00/11/22",       GetRandomHash(), 86546, _11);
-    MockCatalog *_23 = CreateAndRegisterCatalog("/00/11/23",       GetRandomHash(), 98565, _11);
-    MockCatalog *_24 = CreateAndRegisterCatalog("/00/11/24",       GetRandomHash(), 45271, _11);
-    MockCatalog *_33 = CreateAndRegisterCatalog("/00/11/22/33",    GetRandomHash(), 17412, _22);
-    MockCatalog *_34 = CreateAndRegisterCatalog("/00/11/22/34",    GetRandomHash(), 89127, _22);
-    MockCatalog *_41 = CreateAndRegisterCatalog("/00/11/22/34/41", GetRandomHash(), 10987, _34);
-    MockCatalog *_42 = CreateAndRegisterCatalog("/00/11/22/34/42", GetRandomHash(), 40987, _34);
-    MockCatalog *_43 = CreateAndRegisterCatalog("/00/11/22/34/43", GetRandomHash(), 12234, _34);
+  void MakeBranch(const std::string &branch, const unsigned int revision, RevisionMap &revisions) {
+    MockCatalog *revision_root = GetRevisionHead(revision, revisions);
+
+    if (branch == "/00/10") {
+      MockCatalog *_10 = CreateAndRegisterCatalog("/00/10",          revision, revisions, revision_root);
+      MockCatalog *_20 = CreateAndRegisterCatalog("/00/10/20",       revision, revisions,           _10);
+                         CreateAndRegisterCatalog("/00/10/21",       revision, revisions,           _10);
+      MockCatalog *_30 = CreateAndRegisterCatalog("/00/10/20/30",    revision, revisions,           _20);
+                         CreateAndRegisterCatalog("/00/10/20/31",    revision, revisions,           _20);
+                         CreateAndRegisterCatalog("/00/10/20/32",    revision, revisions,           _20);
+                         CreateAndRegisterCatalog("/00/10/20/30/40", revision, revisions,           _30);
+
+    } else if (branch == "/00/11") {
+      MockCatalog *_11 = CreateAndRegisterCatalog("/00/11",          revision, revisions, revision_root);
+      MockCatalog *_22 = CreateAndRegisterCatalog("/00/11/22",       revision, revisions,           _11);
+                         CreateAndRegisterCatalog("/00/11/23",       revision, revisions,           _11);
+                         CreateAndRegisterCatalog("/00/11/24",       revision, revisions,           _11);
+                         CreateAndRegisterCatalog("/00/11/22/33",    revision, revisions,           _22);
+      MockCatalog *_34 = CreateAndRegisterCatalog("/00/11/22/34",    revision, revisions,           _22);
+                         CreateAndRegisterCatalog("/00/11/22/34/41", revision, revisions,           _34);
+                         CreateAndRegisterCatalog("/00/11/22/34/42", revision, revisions,           _34);
+                         CreateAndRegisterCatalog("/00/11/22/34/43", revision, revisions,           _34);
+
+    } else if (branch == "/00/12") {
+      MockCatalog *_12 = CreateAndRegisterCatalog("/00/12",          revision, revisions, revision_root);
+                         CreateAndRegisterCatalog("/00/12/25",       revision, revisions,           _12);
+      MockCatalog *_26 = CreateAndRegisterCatalog("/00/12/26",       revision, revisions,           _12);
+                         CreateAndRegisterCatalog("/00/12/27",       revision, revisions,           _12);
+                         CreateAndRegisterCatalog("/00/12/26/35",    revision, revisions,           _26);
+                         CreateAndRegisterCatalog("/00/12/26/36",    revision, revisions,           _26);
+                         CreateAndRegisterCatalog("/00/12/26/37",    revision, revisions,           _26);
+                         CreateAndRegisterCatalog("/00/12/26/38",    revision, revisions,           _26);
+
+    } else if (branch == "/00/13") {
+      MockCatalog *_13 = CreateAndRegisterCatalog("/00/13",          revision, revisions, revision_root);
+                         CreateAndRegisterCatalog("/00/13/28",       revision, revisions,          _13);
+                         CreateAndRegisterCatalog("/00/13/29",       revision, revisions,          _13);
+
+    } else {
+      FAIL();
+    }
   }
 
-  void Make_12_Branch(MockCatalog *parent) {
-    MockCatalog *_12 = CreateAndRegisterCatalog("/00/12",       GetRandomHash(), 39272, parent);
-    MockCatalog *_25 = CreateAndRegisterCatalog("/00/12/25",    GetRandomHash(), 91999, _12);
-    MockCatalog *_26 = CreateAndRegisterCatalog("/00/12/26",    GetRandomHash(), 11111, _12);
-    MockCatalog *_27 = CreateAndRegisterCatalog("/00/12/27",    GetRandomHash(), 12344, _12);
-    MockCatalog *_35 = CreateAndRegisterCatalog("/00/12/26/35", GetRandomHash(), 99992, _26);
-    MockCatalog *_36 = CreateAndRegisterCatalog("/00/12/26/36", GetRandomHash(), 12333, _26);
-    MockCatalog *_37 = CreateAndRegisterCatalog("/00/12/26/37", GetRandomHash(), 23442, _26);
-    MockCatalog *_38 = CreateAndRegisterCatalog("/00/12/26/38", GetRandomHash(), 14112, _26);
-  }
+  MockCatalog* CreateAndRegisterCatalog(
+                  const std::string  &root_path,
+                  const unsigned int  revision,
+                  RevisionMap        &revisions,
+                  MockCatalog        *parent       = NULL,
+                  const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
+    // produce a random hash if no catalog has was given
+    shash::Any effective_clg_hash = catalog_hash;
+    if (effective_clg_hash.IsNull()) {
+      effective_clg_hash.Randomize();
+    }
 
-  void Make_13_Branch(MockCatalog *parent) {
-    MockCatalog *_13 = CreateAndRegisterCatalog("/00/13",    GetRandomHash(), 14120, parent);
-    MockCatalog *_28 = CreateAndRegisterCatalog("/00/13/28", GetRandomHash(), 92370, _13);
-    MockCatalog *_29 = CreateAndRegisterCatalog("/00/13/29", GetRandomHash(), 14122, _13);
-  }
+    // get catalog tree for current revision
+    CatalogPathMap &catalogs = GetCatalogTree(revision, revisions);
 
- private:
-  MockCatalog* CreateAndRegisterCatalog(const std::string &root_path,
-                                        const shash::Any  &catalog_hash,
-                                        const uint64_t     catalog_size,
-                                        MockCatalog       *parent   = NULL,
-                                        MockCatalog       *previous = NULL) {
-    MockCatalog *catalog = new MockCatalog(root_path, catalog_hash, catalog_size,
-                                           parent, previous);
+    // find previous catalog from the RevisionsMaps (if there is one)
+    MockCatalog *previous_catalog = NULL;
+    if (revision > 1) {
+      RevisionMap::iterator prev_rev_itr = revisions.find(revision - 1);
+      assert (prev_rev_itr != revisions.end());
+      CatalogPathMap::iterator prev_clg_itr =
+        prev_rev_itr->second.find(root_path);
+      if (prev_clg_itr != prev_rev_itr->second.end()) {
+        previous_catalog = prev_clg_itr->second;
+      }
+    }
+
+    // produce the new catalog with references to it's predecessor and parent
+    MockCatalog *catalog = new MockCatalog(root_path,
+                                           effective_clg_hash,
+                                           dice_.Next(10000),
+                                           revision,
+                                           parent,
+                                           previous_catalog);
+
+    // register the new catalog in the data structures
     MockCatalog::RegisterCatalog(catalog);
+    catalogs[root_path] = catalog;
     return catalog;
   }
 
-  shash::Any GetRandomHash() const {
-    shash::Any hash(shash::kSha1);
-    hash.Randomize();
-    return hash;
-  }
+ private:
+  Prng dice_;
 };
 
 
