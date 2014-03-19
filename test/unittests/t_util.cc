@@ -40,9 +40,10 @@ TEST(T_Util, ThreadProxy) {
 
 TEST(T_Util, IsAbsolutePath) {
   const bool empty = IsAbsolutePath("");
-  EXPECT_EQ (false, empty) << "empty path string treated as absolute";
+  EXPECT_FALSE (empty) << "empty path string treated as absolute";
+
   const bool relative = IsAbsolutePath("foo.bar");
-  EXPECT_EQ (false, relative) << "relative path treated as absolute";
+  EXPECT_FALSE (relative) << "relative path treated as absolute";
   const bool absolute = IsAbsolutePath("/tmp/foo.bar");
-  EXPECT_EQ (true, absolute) << "absolute path not recognized";
+  EXPECT_TRUE (absolute) << "absolute path not recognized";
 }

@@ -127,7 +127,7 @@ CvmfsExports *cvmfs_exports_;
 LoaderExports *loader_exports_;
 
 
-static void Usage(const std::string &exename) {
+static void Usage(const string &exename) {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "The CernVM File System\n"
     "Version %s\n"
@@ -437,15 +437,15 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   bool found_library_file = false;
   library_name = platform_libname(library_name);
 
-  static std::vector<std::string> library_paths;  // TODO: C++11 initializer
+  static vector<string> library_paths;  // TODO: C++11 initializer
   if (library_paths.empty()) {
     library_paths.push_back(library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
     library_paths.push_back("/usr/lib64/" + library_name);
   }
 
-  std::vector<std::string>::const_iterator i    = library_paths.begin();
-  std::vector<std::string>::const_iterator iend = library_paths.end();
+  vector<string>::const_iterator i    = library_paths.begin();
+  vector<string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {  // TODO: C++11 range based for
     if (IsAbsolutePath(*i)) {
       if (FileExists(*i) || SymlinkExists(*i)) {
