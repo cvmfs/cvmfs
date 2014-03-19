@@ -434,8 +434,8 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
                                  LoaderExports *loader_exports)
 {
   string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
-  bool found_library_file = false;
   library_name = platform_libname(library_name);
+  string error_messages;
 
   static vector<string> library_paths;  // TODO: C++11 initializer
   if (library_paths.empty()) {
@@ -447,31 +447,18 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   vector<string>::const_iterator i    = library_paths.begin();
   vector<string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {  // TODO: C++11 range based for
-    if (IsAbsolutePath(*i)) {
-      if (FileExists(*i) || SymlinkExists(*i)) {
-        found_library_file = true;
-      } else {
-        continue;
-      }
-    }
-
     library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
-    if (library_handle_ == NULL) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "failed to load cvmfs library at %s: %s", i->c_str(), dlerror());
-    } else {
-      found_library_file = true;
+    if (library_handle_ != NULL) {
       break;
     }
-  }
 
-  if (! found_library_file) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "failed to locate cvmfs library, tried: '%s'",
-             JoinStrings(library_paths, "' '").c_str());
+    error_messages += string(dlerror()) + "\n";
   }
 
   if (! library_handle_) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to load cvmfs library, tried: '%s'\n%s",
+             JoinStrings(library_paths, "' '").c_str(), error_messages.c_str());
     return NULL;
   }
 
