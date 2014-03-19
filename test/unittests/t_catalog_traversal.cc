@@ -171,10 +171,81 @@ class T_CatalogTraversal : public ::testing::Test {
   }
 
   void SetupDummyCatalogs() {
-    MockCatalog *head_root = CreateAndRegisterCatalog("", root_hash, 42);
-    shash::Any other;
-    other.Randomize();
-    MockCatalog *minus1_root = CreateAndRegisterCatalog("", other, 1337, head_root);
+    /**
+     * Dummy catalog hierarchy:
+     *
+     *  0-0 HEAD
+     *   |
+     *   +-------------------+---------------+---------------+
+     *   |                   |               |               |
+     *  1-0                 1-1             1-2             1-3
+     *   |                   |               |               |
+     *   +-------------+     +----+----+     +----+----+     +----+
+     *   |             |     |    |    |     |    |    |     |    |
+     *  2-0           2-1   2-2  2-3  2-4   2-5  2-6  2-7   2-8  2-9
+     *   |                   |                    |
+     *   +----+----+         +-----+              +-----+-----+-----+
+     *   |    |    |         |     |              |     |     |     |
+     *  3-0  3-1  3-2       3-3   3-4            3-5   3-6   3-7   3-8
+     *   |                         |
+     *   |                         +-----+-----+
+     *   |                         |     |     |
+     *  4-0                       4-1   4-2   4-3
+     *
+     * Parts of the hierarchy are created multiple times in order to get some
+     * historic catalogs. To simplify the creation the history looks like so:
+     *    Revision 1:   - only the root catalog (0-0)
+     *    Revision 2:   - adds branch 1-0
+     *    Revision 3:   - adds branch 1-1
+     *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated
+     *    Revision 5:   - adds branch 1-3
+     *
+     */
+    MockCatalog *head = CreateAndRegisterCatalog("", root_hash, 42);
+
+    Make_10_Branch(head);
+    Make_11_Branch(head);
+    Make_12_Branch(head);
+    Make_13_Branch(head);
+  }
+
+  void Make_10_Branch(MockCatalog *parent) {
+    MockCatalog *_10 = CreateAndRegisterCatalog("/00/10",          GetRandomHash(), 13124, parent);
+    MockCatalog *_20 = CreateAndRegisterCatalog("/00/10/20",       GetRandomHash(), 23524, _10);
+    MockCatalog *_21 = CreateAndRegisterCatalog("/00/10/21",       GetRandomHash(), 74546, _10);
+    MockCatalog *_30 = CreateAndRegisterCatalog("/00/10/20/30",    GetRandomHash(), 66234, _20);
+    MockCatalog *_31 = CreateAndRegisterCatalog("/00/10/20/31",    GetRandomHash(), 87365, _20);
+    MockCatalog *_32 = CreateAndRegisterCatalog("/00/10/20/32",    GetRandomHash(), 93405, _20);
+    MockCatalog *_40 = CreateAndRegisterCatalog("/00/10/20/30/40", GetRandomHash(), 85617, _30);
+  }
+
+  void Make_11_Branch(MockCatalog *parent) {
+    MockCatalog *_11 = CreateAndRegisterCatalog("/00/11",          GetRandomHash(), 87648, parent);
+    MockCatalog *_22 = CreateAndRegisterCatalog("/00/11/22",       GetRandomHash(), 86546, _11);
+    MockCatalog *_23 = CreateAndRegisterCatalog("/00/11/23",       GetRandomHash(), 98565, _11);
+    MockCatalog *_24 = CreateAndRegisterCatalog("/00/11/24",       GetRandomHash(), 45271, _11);
+    MockCatalog *_33 = CreateAndRegisterCatalog("/00/11/22/33",    GetRandomHash(), 17412, _22);
+    MockCatalog *_34 = CreateAndRegisterCatalog("/00/11/22/34",    GetRandomHash(), 89127, _22);
+    MockCatalog *_41 = CreateAndRegisterCatalog("/00/11/22/34/41", GetRandomHash(), 10987, _34);
+    MockCatalog *_42 = CreateAndRegisterCatalog("/00/11/22/34/42", GetRandomHash(), 40987, _34);
+    MockCatalog *_43 = CreateAndRegisterCatalog("/00/11/22/34/43", GetRandomHash(), 12234, _34);
+  }
+
+  void Make_12_Branch(MockCatalog *parent) {
+    MockCatalog *_12 = CreateAndRegisterCatalog("/00/12",       GetRandomHash(), 39272, parent);
+    MockCatalog *_25 = CreateAndRegisterCatalog("/00/12/25",    GetRandomHash(), 91999, _12);
+    MockCatalog *_26 = CreateAndRegisterCatalog("/00/12/26",    GetRandomHash(), 11111, _12);
+    MockCatalog *_27 = CreateAndRegisterCatalog("/00/12/27",    GetRandomHash(), 12344, _12);
+    MockCatalog *_35 = CreateAndRegisterCatalog("/00/12/26/35", GetRandomHash(), 99992, _26);
+    MockCatalog *_36 = CreateAndRegisterCatalog("/00/12/26/36", GetRandomHash(), 12333, _26);
+    MockCatalog *_37 = CreateAndRegisterCatalog("/00/12/26/37", GetRandomHash(), 23442, _26);
+    MockCatalog *_38 = CreateAndRegisterCatalog("/00/12/26/38", GetRandomHash(), 14112, _26);
+  }
+
+  void Make_13_Branch(MockCatalog *parent) {
+    MockCatalog *_13 = CreateAndRegisterCatalog("/00/13",    GetRandomHash(), 14120, parent);
+    MockCatalog *_28 = CreateAndRegisterCatalog("/00/13/28", GetRandomHash(), 92370, _13);
+    MockCatalog *_29 = CreateAndRegisterCatalog("/00/13/29", GetRandomHash(), 14122, _13);
   }
 
  private:
@@ -187,6 +258,12 @@ class T_CatalogTraversal : public ::testing::Test {
                                            parent, previous);
     MockCatalog::RegisterCatalog(catalog);
     return catalog;
+  }
+
+  shash::Any GetRandomHash() const {
+    shash::Any hash(shash::kSha1);
+    hash.Randomize();
+    return hash;
   }
 };
 
