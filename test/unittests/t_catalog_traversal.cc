@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 #include <string>
 #include <map>
+#include <cassert>
 #include <iostream> // TODO: remove me!
+#include "../../cvmfs/prng.h"
 
 #include "../../cvmfs/catalog_traversal.h"
 #include "../../cvmfs/manifest.h"
@@ -78,10 +80,12 @@ class MockCatalog {
   MockCatalog(const std::string &root_path,
               const shash::Any  &catalog_hash,
               const uint64_t     catalog_size,
-              MockCatalog *parent = NULL,
+              const unsigned int revision,
+              MockCatalog *parent   = NULL,
               MockCatalog *previous = NULL) :
     parent_(parent), previous_(previous), root_path_(root_path),
-    catalog_hash_(catalog_hash), catalog_size_(catalog_size)
+    catalog_hash_(catalog_hash), catalog_size_(catalog_size),
+    revision_(revision)
   {
     if (parent != NULL) {
       parent->RegisterChild(this);
@@ -119,8 +123,12 @@ class MockCatalog {
   const std::string& root_path()    const { return root_path_;    }
   const shash::Any&  catalog_hash() const { return catalog_hash_; }
   uint64_t           catalog_size() const { return catalog_size_; }
+  unsigned int       revision()     const { return revision_;     }
 
- protected:
+  MockCatalog*       parent()       const { return parent_;       }
+  MockCatalog*       previous()     const { return previous_;     }
+
+ public:
   void RegisterChild(MockCatalog *child) {
     NestedCatalog nested;
     nested.path  = PathString(child->root_path());
@@ -130,10 +138,11 @@ class MockCatalog {
     children_.push_back(nested);
   }
 
+ protected:
   MockCatalog* Clone() const {
     MockCatalog *new_catalog = new MockCatalog(root_path_, catalog_hash_,
-                                               catalog_size_, parent_,
-                                               previous_);
+                                               catalog_size_, revision_,
+                                               parent_, previous_);
     new_catalog->children_ = children_;
     return new_catalog;
   }
@@ -144,6 +153,7 @@ class MockCatalog {
   const std::string   root_path_;
   const shash::Any    catalog_hash_;
   const uint64_t      catalog_size_;
+  const unsigned int  revision_;
 
   NestedCatalogList   children_;
 };
