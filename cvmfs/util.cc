@@ -126,6 +126,11 @@ NameString GetFileName(const PathString &path) {
 }
 
 
+bool IsAbsolutePath(const std::string &path) {
+  return (! path.empty() && path[0] == '/');
+}
+
+
 /**
  * Abort() on failure
  */

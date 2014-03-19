@@ -37,3 +37,12 @@ TEST(T_Util, ThreadProxy) {
   EXPECT_EQ (canary, dummy.result_value);
 }
 
+
+TEST(T_Util, IsAbsolutePath) {
+  const bool empty = IsAbsolutePath("");
+  EXPECT_EQ (false, empty) << "empty path string treated as absolute";
+  const bool relative = IsAbsolutePath("foo.bar");
+  EXPECT_EQ (false, relative) << "relative path treated as absolute";
+  const bool absolute = IsAbsolutePath("/tmp/foo.bar");
+  EXPECT_EQ (true, absolute) << "absolute path not recognized";
+}
