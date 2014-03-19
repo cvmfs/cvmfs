@@ -436,15 +436,15 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
   library_name = platform_libname(library_name);
 
-  static std::vector<std::string> library_pathes;  // TODO: C++11 initializer
-  if (library_pathes.empty()) {
-    library_pathes.push_back(library_name);
-    library_pathes.push_back("/usr/lib/"   + library_name);
-    library_pathes.push_back("/usr/lib64/" + library_name);
+  static std::vector<std::string> library_paths;  // TODO: C++11 initializer
+  if (library_paths.empty()) {
+    library_paths.push_back(library_name);
+    library_paths.push_back("/usr/lib/"   + library_name);
+    library_paths.push_back("/usr/lib64/" + library_name);
   }
 
-  std::vector<std::string>::const_iterator i    = library_pathes.begin();
-  std::vector<std::string>::const_iterator iend = library_pathes.end();
+  std::vector<std::string>::const_iterator i    = library_paths.begin();
+  std::vector<std::string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {  // TODO: C++11 range based for
     library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
     if (library_handle_) {
