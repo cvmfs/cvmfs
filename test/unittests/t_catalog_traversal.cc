@@ -41,6 +41,12 @@ class MockCatalog {
  public:
   typedef std::map<shash::Any, MockCatalog*> AvailableCatalogs;
   static AvailableCatalogs available_catalogs;
+  static unsigned int      instances;
+
+  static void Reset() {
+    MockCatalog::instances = 0;
+    MockCatalog::UnregisterCatalogs();
+  }
 
   static void RegisterCatalog(MockCatalog *catalog) {
     ASSERT_EQ (MockCatalog::available_catalogs.end(),
@@ -90,6 +96,11 @@ class MockCatalog {
     if (parent != NULL) {
       parent->RegisterChild(this);
     }
+    ++MockCatalog::instances;
+  }
+
+  ~MockCatalog() {
+    --MockCatalog::instances;
   }
 
  public: /* API in this 'public block' is used by CatalogTraversal
@@ -159,6 +170,7 @@ class MockCatalog {
 };
 
 MockCatalog::AvailableCatalogs MockCatalog::available_catalogs;
+unsigned int                   MockCatalog::instances;
 
 
 //
@@ -173,22 +185,28 @@ class T_CatalogTraversal : public ::testing::Test {
  public:
   MockCatalog *dummy_catalog_hierarchy;
 
- private:
+ protected:
   typedef std::map<std::string, MockCatalog*>    CatalogPathMap;
   typedef std::map<unsigned int, CatalogPathMap> RevisionMap;
 
   const unsigned int max_revision;
+  const unsigned int intial_catalog_instances;
 
  public:
-  T_CatalogTraversal() : max_revision(6) {}
+  T_CatalogTraversal() :
+    max_revision(6),
+    intial_catalog_instances(42) /* depends on max_revision */ {}
 
  protected:
   void SetUp() {
+    MockCatalog::Reset();
     SetupDummyCatalogs();
+    EXPECT_EQ (intial_catalog_instances, MockCatalog::instances);
   }
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
+    EXPECT_EQ (0u, MockCatalog::instances);
   }
 
   void CheckVisitedCatalogs(const CatalogIdentifiers expected,
