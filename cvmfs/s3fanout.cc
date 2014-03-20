@@ -37,7 +37,7 @@ S3FanoutManager *S3FanoutManager::Instance() {
  * S3FanoutManager initialisation as a Singleton class.
  */
 void S3FanoutManager::Initialise() {
-  const int maximum_number_of_concurrent_jobs = 20;
+  const int maximum_number_of_concurrent_jobs = 5;
   static S3FanoutManager s;
   s.Init(maximum_number_of_concurrent_jobs, &url_constructor); // max connections
   s.SetRetryParameters(3, 100, 2000);
@@ -222,61 +222,46 @@ void *S3FanoutManager::MainUpload(void *data) {
   s3fanout_mgr->watch_fds_[1].revents = 0;
   s3fanout_mgr->watch_fds_inuse_ = 2;
 
-  int still_running = 0;
-  struct timeval timeval_start, timeval_stop;
-  gettimeofday(&timeval_start, NULL);
+  int still_running = 1;
   while (true) {
-    int timeout;
-    if (still_running) {
-      timeout = 1;
-    } else {
-      timeout = -1;
-      gettimeofday(&timeval_stop, NULL);
-      s3fanout_mgr->statistics_->transfer_time +=
-        DiffTimeSeconds(timeval_start, timeval_stop);
+
+    JobInfo *info = NULL;
+    pthread_mutex_lock(s3fanout_mgr->jobs_todo_lock_);
+    if(!s3fanout_mgr->jobs_todo_.empty()) {
+      info = s3fanout_mgr->jobs_todo_.back();
+      s3fanout_mgr->jobs_todo_.pop_back();
     }
+    pthread_mutex_unlock(s3fanout_mgr->jobs_todo_lock_);
+
+    if(info != NULL) {
+      CURL *handle = s3fanout_mgr->AcquireCurlHandle();
+      if(handle == NULL) {
+	LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
+	assert(handle != NULL);
+      }
+
+      s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info, handle);
+      assert(init_failure == s3fanout::kFailOk);
+      s3fanout_mgr->SetUrlOptions(info);
+      
+      curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
+      int still_running = 0, retval = 0; 
+      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+					CURL_SOCKET_TIMEOUT,
+					0,
+					&still_running);
+
+      LogCvmfs(kLogS3Fanout, kLogDebug, "curl_multi_socket_action: %d - %d", retval, still_running);
+    }
+
+    int timeout = 1;
     int retval = poll(s3fanout_mgr->watch_fds_, s3fanout_mgr->watch_fds_inuse_,
                       timeout);
     if (retval < 0) {
       continue;
     }
 
-    // Handle timeout
-    if (retval == 0) {
-      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
-                                        CURL_SOCKET_TIMEOUT,
-                                        0,
-                                        &still_running);
-    }
-
-    // Terminate I/O thread
-    if (s3fanout_mgr->watch_fds_[0].revents)
-      break;
-
-    // New job arrives
-    if (s3fanout_mgr->watch_fds_[1].revents) {
-      s3fanout_mgr->watch_fds_[1].revents = 0;
-      JobInfo *info;
-      ReadPipe(s3fanout_mgr->pipe_jobs_[0], &info, sizeof(info));
-      if (!still_running) {
-        gettimeofday(&timeval_start, NULL);
-      }
-      CURL *handle = s3fanout_mgr->AcquireCurlHandle();
-      info->request = info->test_and_set ? JobInfo::kReqHead : JobInfo::kReqPut;
-      Failures init_failure = s3fanout_mgr->InitializeRequest(info, handle);
-      if (init_failure != kFailOk) {
-        s3fanout_mgr->ReleaseCurlHandle(info, handle);
-        info->error_code = init_failure;
-        WritePipe(info->wait_at[1], &info->error_code,
-                  sizeof(info->error_code));
-      }
-      s3fanout_mgr->SetUrlOptions(info);
-      curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
-      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
-                                        CURL_SOCKET_TIMEOUT,
-                                        0,
-                                        &still_running);
-    }
+    //LogCvmfs(kLogS3Fanout, kLogDebug, "Upload I/O thread: %d", retval);
 
     // Activity on curl sockets
     for (unsigned i = 2; i < s3fanout_mgr->watch_fds_inuse_; ++i) {
@@ -324,12 +309,9 @@ void *S3FanoutManager::MainUpload(void *data) {
           // Return easy handle into pool and write result back
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
 
-	  // FIXME: is this needed?
-	  FinalReport r;
-	  r.f=info->error_code;
-	  r.s1=info->wait_at[0];
-	  r.s2=info->wait_at[1];
-	  WritePipe(info->wait_at[1], &r, sizeof(r));
+	  pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
+	  s3fanout_mgr->jobs_completed_.push_back(info);
+	  pthread_mutex_unlock(s3fanout_mgr->jobs_completed_lock_);
         }
       }
     }
@@ -671,7 +653,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->origin_file = NULL;
   }
 
-  return false;  // stop transfer and return to Push()
+  return false;  // stop transfer 
 }
 
 
@@ -715,6 +697,14 @@ S3FanoutManager::S3FanoutManager() {
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_options_, NULL);
   assert(retval == 0);
+  jobs_completed_lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(jobs_completed_lock_, NULL);
+  assert(retval == 0);
+  jobs_todo_lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(jobs_todo_lock_, NULL);
+  assert(retval == 0);
 
   opt_timeout_ = 0;
   opt_backoff_init_ms_ = 0;
@@ -729,6 +719,10 @@ S3FanoutManager::S3FanoutManager() {
 S3FanoutManager::~S3FanoutManager() {
   pthread_mutex_destroy(lock_options_);
   free(lock_options_);
+  pthread_mutex_destroy(jobs_completed_lock_);
+  free(jobs_completed_lock_);
+  pthread_mutex_destroy(jobs_todo_lock_);
+  free(jobs_todo_lock_);
 }
 
 
@@ -881,15 +875,26 @@ int S3FanoutManager::PollConnections() {
 
 
 int S3FanoutManager::GetCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs) {
-  int still_running = 0;
+  //int still_running = 0;
 
   // Poll the status of current jobs
+  /*
   int retval2 = PollConnections();
   if (retval2 < 0) {
     // No events, we continue
     return 0;
-  }
+  }*/
 
+  // Get completed jobs
+  pthread_mutex_lock(jobs_completed_lock_);
+  for(std::vector<s3fanout::JobInfo*>::iterator it = jobs_completed_.begin(); it != jobs_completed_.end(); ++it) {
+    //s3fanout::JobInfo *info = *it;
+    jobs.push_back(*it);
+  }
+  jobs_completed_.clear();
+  pthread_mutex_unlock(jobs_completed_lock_);
+
+  /*
   // Activity on curl sockets
   for (unsigned i = 2; i < watch_fds_inuse_; ++i) {
     if (watch_fds_[i].revents) {
@@ -937,32 +942,17 @@ int S3FanoutManager::GetCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs) {
       }
     }
   }
+  */
 
   return 0;
 }
 
 
 int S3FanoutManager::Push(JobInfo *info) {	 
-  CURL *handle = AcquireCurlHandle();
-  if(handle == NULL) {
-    LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
-    return -1;
-  }
 
-  s3fanout::Failures init_failure = InitializeRequest(info, handle);
-  if (init_failure != s3fanout::kFailOk) {
-    return -1;
-  }
-  SetUrlOptions(info);
-
-  curl_multi_add_handle(curl_multi_, handle);
-  int still_running = 0, retval = 0; 
-  retval = curl_multi_socket_action(curl_multi_,
-				    CURL_SOCKET_TIMEOUT,
-				    0,
-				    &still_running);
-
-  LogCvmfs(kLogS3Fanout, kLogDebug, "curl_multi_socket_action: %d - %d", retval, still_running);
+  pthread_mutex_lock(jobs_todo_lock_);
+  jobs_todo_.push_back(info);
+  pthread_mutex_unlock(jobs_todo_lock_);
   
   return 0;
 }

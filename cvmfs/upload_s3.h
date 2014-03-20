@@ -80,13 +80,9 @@ namespace upload
    private:
     s3fanout::S3FanoutManager *s3fanout_mgr;
     bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
-    int getKeyIndex(unsigned int use_bucket);
-    std::string getBucketName(unsigned int use_bucket);
-    int select_bucket(std::string rem_filename);
     int uploadFile(std::string       filename,
 		   char              *buff,
 		   unsigned long     size_of_file,
-		   int               block_until_finished,
 		   const callback_t  *callback,
 		   MemoryMappedFile  *mmf);
 

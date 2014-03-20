@@ -165,14 +165,8 @@ void S3Uploader::FileUpload(const std::string &local_path,
 	   mmf->size());
 
   // Try to upload the file
-  int res = -1, retries = 5;
-  do {
-    if(retries < 5) {
-      usleep(50*1000);
-    }
-    res = uploadFile(remote_path, (char*)mmf->buffer(), mmf->size(),
-		     0, callback, mmf);
-  }while(retries-- > 0 && res != 0);
+  assert(uploadFile(remote_path, (char*)mmf->buffer(), mmf->size(),
+	 callback, mmf) == 0);
 
   LogCvmfs(kLogS3Fanout, kLogDebug, "Uploading from file finished: %s", local_path.c_str());
 }
@@ -184,10 +178,9 @@ void S3Uploader::FileUpload(const std::string &local_path,
 int S3Uploader::uploadFile(std::string       filename, 
 			   char              *buff, 
 			   unsigned long     size_of_file,
-			   int               block_until_finished,
 			   const callback_t  *callback,
 			   MemoryMappedFile  *mmf) {
-  int retme = 0, k = 0;
+  int k = 0;
 
   s3fanout::JobInfo *info = new s3fanout::JobInfo(&keys_.at(k).first,  // access key
 						  &keys_.at(k).second, // secret key
@@ -202,13 +195,12 @@ int S3Uploader::uploadFile(std::string       filename,
   info->mmf = mmf;
 
   if(s3fanout_mgr->Push(info) != 0) {
-    // FIXME: report failure?
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload file: %s" ,
 	     filename.data());
     return -1;
   }
 
-  return retme;
+  return 0;
 }
 
 
@@ -332,18 +324,12 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 
   // We try few times
   const callback_t *callback = handle->commit_callback;
-  int res = -1, retries = 5;
-  do {
-    if(retries < 5) {
-      usleep(50*1000);
-    }
-    res = uploadFile(final_path, 
-		     (char*)mmf->buffer(), 
-		     (long unsigned int)mmf->size(),
-		     0, callback, mmf);
-  }while(retries-- > 0 && res != 0);
+  assert(uploadFile(final_path, 
+		    (char*)mmf->buffer(), 
+		    (long unsigned int)mmf->size(),
+		    callback, mmf) == 0);
 
-  if (res != 0) {
+  /*if (res != 0) {
     const int cpy_errno = errno;
     LogCvmfs(kLogS3Fanout, kLogStderr, "failed to move temp file '%s' to "
 	                               "final location '%s' (errno: %d)",
@@ -353,7 +339,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     atomic_inc32(&copy_errors_);
     Respond(handle->commit_callback, UploaderResults(cpy_errno));
     return;
-  }
+    }*/
 
   LogCvmfs(kLogS3Fanout, kLogDebug, "Uploading from stream finished: %s", local_handle->temporary_path.c_str());
 

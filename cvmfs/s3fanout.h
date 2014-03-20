@@ -178,6 +178,10 @@ class S3FanoutManager {
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainUpload(void *data);
+  std::vector<s3fanout::JobInfo*> jobs_todo_;
+  pthread_mutex_t *jobs_todo_lock_;
+  std::vector<s3fanout::JobInfo*> jobs_completed_;
+  pthread_mutex_t *jobs_completed_lock_;
 
   CURL *AcquireCurlHandle();
   void ReleaseCurlHandle(JobInfo *info, CURL *handle);
