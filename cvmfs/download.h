@@ -123,6 +123,7 @@ struct JobInfo {
 
   // Internal state, don't touch
   CURL *curl_handle;
+  curl_slist *headers;
   z_stream zstream;
   shash::ContextPtr hash_context;
   int wait_at[2];  /**< Pipe used for the return value */
@@ -134,6 +135,35 @@ struct JobInfo {
   unsigned char num_retries;
   unsigned backoff_ms;
 };  // JobInfo
+
+
+/**
+ * Manages blocks of arrays of curl_slist storing header strings.  In contrast 
+ * to curl's slists, these ones don't take ownership of the header strings.
+ * Overall number of elements is limited as number of concurrent connections
+ * is limited.
+ *
+ * Only use curl_slist objects created in the same HeaderLists instance in this
+ * class
+ */
+class HeaderLists {
+ public:
+  ~HeaderLists();
+  curl_slist *GetList(const char *header);
+  curl_slist *DuplicateList(curl_slist *slist);
+  void AppendHeader(curl_slist *slist, const char *header);
+  void PutList(curl_slist *slist);
+
+ private:
+  static const unsigned kBlockSize = 4096/sizeof(curl_slist);
+
+  bool IsUsed(curl_slist *slist) { return slist->data != NULL; }
+  curl_slist *Get(const char *header);
+  void Put(curl_slist *slist);
+  void AddBlock();
+
+  std::vector<curl_slist *> blocks_;  // List of curl_slist blocks
+};
 
 
 class DownloadManager {
@@ -184,14 +214,17 @@ class DownloadManager {
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
+  void InitHeaders();
+  void FiniHeaders();
 
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
-  curl_slist *http_headers_;
-  curl_slist *http_headers_nocache_;
+  HeaderLists *header_lists_;
+  curl_slist *default_headers_;
+  char *user_agent_;
 
   pthread_t thread_download_;
   atomic_int32 multi_threaded_;
