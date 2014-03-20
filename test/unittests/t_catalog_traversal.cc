@@ -166,6 +166,8 @@ MockCatalog::AvailableCatalogs MockCatalog::available_catalogs;
 //
 
 typedef CatalogTraversal<MockCatalog, MockObjectFetcher> MockedCatalogTraversal;
+typedef std::pair<unsigned int, std::string>             CatalogIdentifier;
+typedef std::vector<CatalogIdentifier>                   CatalogIdentifiers;
 
 class T_CatalogTraversal : public ::testing::Test {
  public:
@@ -187,6 +189,29 @@ class T_CatalogTraversal : public ::testing::Test {
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
+  }
+
+  void CheckVisitedCatalogs(const CatalogIdentifiers expected,
+                            const CatalogIdentifiers observed) {
+    EXPECT_EQ (expected.size(), observed.size());
+    typedef CatalogIdentifiers::const_iterator itr;
+    itr i    = expected.begin();
+    itr iend = expected.end();
+    for (; i != iend; ++i) {
+      bool found = false;
+
+      itr j    = observed.begin();
+      itr jend = observed.end();
+      for (; j != jend; ++j) {
+        if (*i == *j) {
+          found = true;
+          break;
+        }
+      }
+
+      EXPECT_TRUE (found) << "didn't find catalog: " << i->second << " "
+                          << "(revision: " << i->first << ")";
+    }
   }
 
  private:
@@ -411,6 +436,45 @@ TEST_F(T_CatalogTraversal, Initialize) {
 //
 
 
-  CatalogTraversal<MockCatalog, MockObjectFetcher> traverse(params);
-  traverse.Traverse();
+CatalogIdentifiers SimpleTraversal_visited_catalogs;
+void SimpleTraversalCallback(const MockedCatalogTraversal::CallbackData &data) {
+  SimpleTraversal_visited_catalogs.push_back(
+    std::make_pair(data.catalog->revision(), data.catalog->root_path()));
 }
+
+TEST_F(T_CatalogTraversal, SimpleTraversal) {
+  SimpleTraversal_visited_catalogs.clear();
+  EXPECT_EQ (0u, SimpleTraversal_visited_catalogs.size());
+
+  CatalogTraversalParams params;
+  MockedCatalogTraversal traverse(params);
+  traverse.RegisterListener(&SimpleTraversalCallback);
+  traverse.Traverse();
+
+  CatalogIdentifiers catalogs;
+  catalogs.push_back(std::make_pair(6, ""));
+  catalogs.push_back(std::make_pair(5, "/00/13"));
+  catalogs.push_back(std::make_pair(5, "/00/13/29"));
+  catalogs.push_back(std::make_pair(5, "/00/13/28"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(4, "/00/11"));
+  catalogs.push_back(std::make_pair(4, "/00/11/24"));
+  catalogs.push_back(std::make_pair(4, "/00/11/23"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+
+  CheckVisitedCatalogs(catalogs, SimpleTraversal_visited_catalogs);
+}
+
+
