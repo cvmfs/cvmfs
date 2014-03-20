@@ -86,37 +86,29 @@ struct JobInfo {
   MemoryMappedFile *mmf;
 
   // One constructor per destination + head request
-  JobInfo() { wait_at[0] = wait_at[1] = -1; http_headers = NULL; }
+  JobInfo() { http_headers = NULL; }
   JobInfo(const std::string *a, const std::string *s,
 	  std::string h,
           const std::string *b, const std::string k, const std::string *p) :
           origin(kOriginPath), 
 	  origin_path(p),
 	  access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { wait_at[0] = wait_at[1] = -1; http_headers = NULL;
-            test_and_set = false; }
+          { http_headers = NULL; test_and_set = false; }
   JobInfo(const std::string *a, const std::string *s,
 	  std::string h,
           const std::string *b, const std::string k,
           const unsigned char *buffer, size_t size) :
           origin(kOriginMem),
           access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { wait_at[0] = wait_at[1] = -1; http_headers = NULL;
-            test_and_set = false;
+          { http_headers = NULL; test_and_set = false;
             origin_mem.size = size; origin_mem.data = buffer; }
-  ~JobInfo() {
-    if (wait_at[0] >= 0) {
-      close(wait_at[0]);
-      close(wait_at[1]);
-    }
-  }
+  ~JobInfo() {}
 
   // Internal state, don't touch
   CURL *curl_handle;
   struct curl_slist *http_headers;
   FILE *origin_file;
   RequestType request;
-  int wait_at[2];  /**< Pipe used for the return value */
   Failures error_code;
   unsigned char num_retries;
   unsigned backoff_ms;
@@ -134,11 +126,6 @@ public:
   virtual std::string MkUrl(const std::string &host, 
 			    const std::string &bucket, 
 			    const std::string &objkey2) {
-    //return "http://" + bucket + ".s3.amazonaws.com/" + objkey;
-    //std::cerr<<"MkUrl: "<<"http://" + bucket + ".olhw-s3.cern.ch/" + objkey2<<std::endl;
-    //return "http://" + bucket + ".olhw-s3.cern.ch/" + objkey2;
-    //return "http://" + bucket + ".swift.cern.ch/" + objkey2;
-    //return "http://swift.cern.ch/" + bucket + "/" + objkey2;
     return "http://" + host + "/" + bucket + "/" + objkey2;
   }
 };
@@ -152,9 +139,8 @@ class S3FanoutManager {
   void Fini();
   void Spawn();
 
-  int Push(JobInfo *info);
-  int PushAcquire();
-  int PushRelease();
+  int PushNewJob(JobInfo *info);
+  int PopCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs);
 
   const Statistics &GetStatistics();
   void SetTimeout(const unsigned seconds);
@@ -162,8 +148,6 @@ class S3FanoutManager {
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
-  int GetNumberOfActiveJobs();
-  int GetCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs);
 
   private:
   S3FanoutManager();
@@ -172,8 +156,6 @@ class S3FanoutManager {
   S3FanoutManager& operator= (const S3FanoutManager&);
   static void Initialise();
   static S3FanoutManager *s3fm_;
-
-  int PollConnections();
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -208,10 +190,9 @@ class S3FanoutManager {
   std::string *user_agent_;
 
   pthread_t thread_upload_;
+  bool thread_upload_run_;
   atomic_int32 multi_threaded_;
-  int pipe_terminate_[2];
 
-  int pipe_jobs_[2];
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;
   uint32_t watch_fds_inuse_;

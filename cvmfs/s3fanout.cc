@@ -205,25 +205,13 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
 
 
 /**
- * Worker thread event loop.  Waits on new JobInfo structs on a pipe.
+ * Worker thread event loop. 
  */
 void *S3FanoutManager::MainUpload(void *data) {
   LogCvmfs(kLogS3Fanout, kLogDebug, "Upload I/O thread started");
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(data);
 
-  s3fanout_mgr->watch_fds_ =
-    static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
-  s3fanout_mgr->watch_fds_size_ = 2;
-  s3fanout_mgr->watch_fds_[0].fd = s3fanout_mgr->pipe_terminate_[0];
-  s3fanout_mgr->watch_fds_[0].events = POLLIN | POLLPRI;
-  s3fanout_mgr->watch_fds_[0].revents = 0;
-  s3fanout_mgr->watch_fds_[1].fd = s3fanout_mgr->pipe_jobs_[0];
-  s3fanout_mgr->watch_fds_[1].events = POLLIN | POLLPRI;
-  s3fanout_mgr->watch_fds_[1].revents = 0;
-  s3fanout_mgr->watch_fds_inuse_ = 2;
-
-  int still_running = 1;
-  while (true) {
+  while (s3fanout_mgr->thread_upload_run_) {
 
     JobInfo *info = NULL;
     pthread_mutex_lock(s3fanout_mgr->jobs_todo_lock_);
@@ -264,7 +252,7 @@ void *S3FanoutManager::MainUpload(void *data) {
     //LogCvmfs(kLogS3Fanout, kLogDebug, "Upload I/O thread: %d", retval);
 
     // Activity on curl sockets
-    for (unsigned i = 2; i < s3fanout_mgr->watch_fds_inuse_; ++i) {
+    for (unsigned i = 0; i < s3fanout_mgr->watch_fds_inuse_; ++i) {
       if (s3fanout_mgr->watch_fds_[i].revents) {
         int ev_bitmask = 0;
         if (s3fanout_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
@@ -275,6 +263,7 @@ void *S3FanoutManager::MainUpload(void *data) {
           ev_bitmask |= CURL_CSELECT_ERR;
         s3fanout_mgr->watch_fds_[i].revents = 0;
 
+	int still_running = 0;
         retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
                                           s3fanout_mgr->watch_fds_[i].fd,
                                           ev_bitmask,
@@ -301,6 +290,7 @@ void *S3FanoutManager::MainUpload(void *data) {
         curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
         if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
           curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
+	  int still_running = 0;
           retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
                                             CURL_SOCKET_TIMEOUT,
                                             0,
@@ -656,28 +646,6 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   return false;  // stop transfer 
 }
 
-
-/**
- * Tries to get push job permit. 
- *
- * @return 0 if push is allowed, otherwise not
- */
-int S3FanoutManager::PushAcquire() {
-  /*
-  if(pool_handles_inuse_->size() < pool_max_handles_) {
-    return 0;
-  }
-  return 1;*/
-
-  return sem_trywait(&available_jobs_);
-}
-
-
-int S3FanoutManager::PushRelease() {
-  return sem_post(&available_jobs_);
-}
-
-
 S3FanoutManager::S3FanoutManager() {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
@@ -686,8 +654,6 @@ S3FanoutManager::S3FanoutManager() {
   user_agent_ = new string();
 
   atomic_init32(&multi_threaded_);
-  pipe_terminate_[0] = pipe_terminate_[1] = -1;
-  pipe_jobs_[0] = pipe_jobs_[1] = -1;
   watch_fds_ = NULL;
   watch_fds_size_ = 0;
   watch_fds_inuse_ = 0;
@@ -768,21 +734,15 @@ void S3FanoutManager::Init(const unsigned max_pool_handles,
   watch_fds_ =
     static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
   watch_fds_size_ = 2;
-  watch_fds_inuse_ = 2;
+  watch_fds_inuse_ = 0;
 }
 
 
 void S3FanoutManager::Fini() {
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
-    char buf = 'T';
-    WritePipe(pipe_terminate_[1], &buf, 1);
+    thread_upload_run_ = false;
     pthread_join(thread_upload_, NULL);
-    // All handles are removed from the multi stack
-    close(pipe_terminate_[1]);
-    close(pipe_terminate_[0]);
-    close(pipe_jobs_[1]);
-    close(pipe_jobs_[0]);
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
@@ -811,11 +771,10 @@ void S3FanoutManager::Fini() {
  * Spawns the I/O worker thread.  No way back except Fini(); Init();
  */
 void S3FanoutManager::Spawn() {
-  MakePipe(pipe_terminate_);
-  MakePipe(pipe_jobs_);
 
   LogCvmfs(kLogS3Fanout, kLogDebug, "S3FanoutManager spawned");  
 
+  thread_upload_run_ = true;
   int retval = pthread_create(&thread_upload_, NULL, MainUpload,
                               static_cast<void *>(this));
   assert(retval == 0);
@@ -852,8 +811,7 @@ const Statistics &S3FanoutManager::GetStatistics() {
 
 void S3FanoutManager::SetRetryParameters(const unsigned max_retries,
                                          const unsigned backoff_init_ms,
-                                         const unsigned backoff_max_ms)
-{
+                                         const unsigned backoff_max_ms) {
   pthread_mutex_lock(lock_options_);
   opt_max_retries_ = max_retries;
   opt_backoff_init_ms_ = backoff_init_ms;
@@ -861,94 +819,27 @@ void S3FanoutManager::SetRetryParameters(const unsigned max_retries,
   pthread_mutex_unlock(lock_options_);
 }
 
+/**
+ * Get completed jobs, so they can be cleaned and deleted properly.
+ */
+int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs) {
 
-int S3FanoutManager::GetNumberOfActiveJobs() {
-  return watch_fds_inuse_;
-}
-
-
-int S3FanoutManager::PollConnections() {
-  int timeout = 1;
-  int retval = poll(watch_fds_, watch_fds_inuse_, timeout);
-  return retval;
-}
-
-
-int S3FanoutManager::GetCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs) {
-  //int still_running = 0;
-
-  // Poll the status of current jobs
-  /*
-  int retval2 = PollConnections();
-  if (retval2 < 0) {
-    // No events, we continue
-    return 0;
-  }*/
-
-  // Get completed jobs
   pthread_mutex_lock(jobs_completed_lock_);
   for(std::vector<s3fanout::JobInfo*>::iterator it = jobs_completed_.begin(); it != jobs_completed_.end(); ++it) {
-    //s3fanout::JobInfo *info = *it;
     jobs.push_back(*it);
   }
   jobs_completed_.clear();
   pthread_mutex_unlock(jobs_completed_lock_);
 
-  /*
-  // Activity on curl sockets
-  for (unsigned i = 2; i < watch_fds_inuse_; ++i) {
-    if (watch_fds_[i].revents) {
-      int ev_bitmask = 0;
-      if (watch_fds_[i].revents & (POLLIN | POLLPRI))
-	ev_bitmask |= CURL_CSELECT_IN;
-      if (watch_fds_[i].revents & (POLLOUT | POLLWRBAND))
-	ev_bitmask |= CURL_CSELECT_OUT;
-      if (watch_fds_[i].revents & (POLLERR | POLLHUP | POLLNVAL))
-	ev_bitmask |= CURL_CSELECT_ERR;
-      watch_fds_[i].revents = 0;
-
-      int retval = curl_multi_socket_action(curl_multi_,
-					    watch_fds_[i].fd,
-					    ev_bitmask,
-					    &still_running);
-      LogCvmfs(kLogS3Fanout, kLogDebug, "socket action on socket %d, returned with %d, still_running %d", 
-	       watch_fds_[i].fd, retval, still_running);
-    }
-  }
-
-  // Check if transfers are completed
-  CURLMsg *curl_msg;
-  int msgs_in_queue;
-  while ((curl_msg = curl_multi_info_read(curl_multi_, &msgs_in_queue))) {
-    if (curl_msg->msg == CURLMSG_DONE) {
-      statistics_->num_requests++;
-      s3fanout::JobInfo *info;
-      CURL *easy_handle = curl_msg->easy_handle;
-      int curl_error = curl_msg->data.result;
-      assert(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info)==CURLE_OK);
-      LogCvmfs(kLogS3Fanout, kLogDebug, "Done message for curl_msg->msg: %s", info->object_key.c_str()); 
-
-      curl_multi_remove_handle(curl_multi_, easy_handle);
-      if (VerifyAndFinalize(curl_error, info)) {
-	curl_multi_add_handle(curl_multi_, easy_handle);
-	curl_multi_socket_action(curl_multi_,
-				 CURL_SOCKET_TIMEOUT,
-				 0,
-				 &still_running);
-      } else {
-	// Return easy handle into pool and write result back
-	ReleaseCurlHandle(info, easy_handle);
-	jobs.push_back(info);
-      }
-    }
-  }
-  */
-
   return 0;
 }
 
+/**
+ * Push new job to be uploaded to the S3 cloud storage.
+ */
+int S3FanoutManager::PushNewJob(JobInfo *info) {	 
 
-int S3FanoutManager::Push(JobInfo *info) {	 
+  sem_wait(&available_jobs_);
 
   pthread_mutex_lock(jobs_todo_lock_);
   jobs_todo_.push_back(info);

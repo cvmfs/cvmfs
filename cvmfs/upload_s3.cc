@@ -80,46 +80,35 @@ void S3Uploader::WorkerThread() {
   while (running) {
     UploadJob job; 
 
-    //LogCvmfs(kLogS3Fanout, kLogDebug, "Upload_S3 running.");
-
-    // Check for new jobs, if they can be pushed in
-    bool newjob=true;
-    while(newjob) {
-      if(s3fanout_mgr->PushAcquire() != 0)
+    // Try to get new job
+    bool newjob = TryToAcquireNewJob(job);
+    if(newjob) {
+      switch (job.type) {
+      case UploadJob::Upload:
+	Upload(job.stream_handle,
+	       job.buffer,
+	       job.callback);
 	break;
-      newjob = TryToAcquireNewJob(job);
-
-      if(newjob) {
-	switch (job.type) {
-	case UploadJob::Upload:
-	  s3fanout_mgr->PushRelease();
-	  Upload(job.stream_handle,
-		 job.buffer,
-		 job.callback);
-	  break;
-	case UploadJob::Commit:
-	  FinalizeStreamedUpload(job.stream_handle,
-				 job.content_hash,
-				 job.hash_suffix);
-	  break;
-	case UploadJob::Terminate:
-	  s3fanout_mgr->PushRelease();
-	  running = false;
-	  break;
-	default:
-	  const bool unknown_job_type = false;
-	  assert (unknown_job_type);
-	  break;
-	}
-      }else{
-	s3fanout_mgr->PushRelease();
+      case UploadJob::Commit:
+	// Note, this block until upload is possible
+	FinalizeStreamedUpload(job.stream_handle,
+			       job.content_hash,
+			       job.hash_suffix);
+	break;
+      case UploadJob::Terminate:
+	running = false;
+	break;
+      default:
+	const bool unknown_job_type = false;
+	assert (unknown_job_type);
+	break;
       }
     }
 
-    // Check CURL activity
+    // Get and clean completed jobs
     std::vector<s3fanout::JobInfo*> jobs;
     jobs.clear();
-    s3fanout_mgr->GetCompletedJobs(jobs);
+    s3fanout_mgr->PopCompletedJobs(jobs);
     for(std::vector<s3fanout::JobInfo*>::iterator it = jobs.begin(); it != jobs.end(); ++it) {
       // Report and clean completed jobs
       s3fanout::JobInfo *info = *it;
@@ -138,10 +127,6 @@ void S3Uploader::WorkerThread() {
 void S3Uploader::FileUpload(const std::string &local_path,
 			    const std::string &remote_path,
 			    const callback_t  *callback) {
-
-  while(s3fanout_mgr->PushAcquire() != 0) {
-    usleep(100*1000);
-  }
 
   // Check that we can read the given file
   MemoryMappedFile *mmf = new MemoryMappedFile(local_path);
@@ -194,7 +179,7 @@ int S3Uploader::uploadFile(std::string       filename,
   info->callback = (void *)callback;
   info->mmf = mmf;
 
-  if(s3fanout_mgr->Push(info) != 0) {
+  if(s3fanout_mgr->PushNewJob(info) != 0) {
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload file: %s" ,
 	     filename.data());
     return -1;
