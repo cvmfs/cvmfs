@@ -500,3 +500,34 @@ TEST_F(T_CatalogTraversal, SimpleTraversal) {
 }
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+std::vector<MockCatalog*> SimpleTraversalNoCloseCallback_visited_catalogs;
+void SimpleTraversalNoCloseCallback(
+                             const MockedCatalogTraversal::CallbackData &data) {
+  SimpleTraversalNoCloseCallback_visited_catalogs.push_back(
+    const_cast<MockCatalog*>(data.catalog));
+}
+
+TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
+  CatalogTraversalParams params;
+  params.no_close = true;
+  MockedCatalogTraversal traverse(params);
+  traverse.RegisterListener(&SimpleTraversalNoCloseCallback);
+  traverse.Traverse();
+
+  EXPECT_EQ (21u + intial_catalog_instances, MockCatalog::instances);
+
+  std::vector<MockCatalog*>::const_iterator i, iend;
+  for (i    = SimpleTraversalNoCloseCallback_visited_catalogs.begin(),
+       iend = SimpleTraversalNoCloseCallback_visited_catalogs.end();
+       i != iend; ++i) {
+    delete *i;
+  }
+  SimpleTraversalNoCloseCallback_visited_catalogs.clear();
+}
+
+
