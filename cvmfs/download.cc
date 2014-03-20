@@ -229,8 +229,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 /**
  * Called when new curl sockets arrive or existing curl sockets depart.
  */
-int DownloadManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
-                                        void *userp, void *socketp)
+int DownloadManager::CallbackCurlSocket(CURL *easy,
+                                        curl_socket_t s,
+                                        int action,
+                                        void *userp,
+                                        void *socketp)
 {
   //LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
   //         "handle %p, socket %d, action %d", easy, s, action);
