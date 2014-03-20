@@ -195,16 +195,20 @@ class T_CatalogTraversal : public ::testing::Test {
                             const CatalogIdentifiers observed) {
     EXPECT_EQ (expected.size(), observed.size());
     typedef CatalogIdentifiers::const_iterator itr;
+
+    unsigned int _i = 0;
     itr i    = expected.begin();
     itr iend = expected.end();
     for (; i != iend; ++i) {
       bool found = false;
 
+      unsigned int _j = 0;
       itr j    = observed.begin();
       itr jend = observed.end();
       for (; j != jend; ++j) {
         if (*i == *j) {
           found = true;
+          EXPECT_EQ (_i, _j) << "traversing order changed";
           break;
         }
       }
