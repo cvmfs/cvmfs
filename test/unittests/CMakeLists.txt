@@ -35,6 +35,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_synchronizing_counter.cc
   t_blocking_counter.cc
   t_shash.cc
+  t_header_lists.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -42,6 +43,7 @@ set (CVMFS_UNITTEST_SOURCES
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
   ${CVMFS_SOURCE_DIR}/logging.h
+  ${CVMFS_SOURCE_DIR}/logging_internal.h
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/murmur.h
   ${CVMFS_SOURCE_DIR}/smallhash.h
@@ -62,7 +64,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/shortstring.h
   ${CVMFS_SOURCE_DIR}/sanitizer.h
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
-
+  ${CVMFS_SOURCE_DIR}/duplex_curl.h
+  ${CVMFS_SOURCE_DIR}/download.h
+  ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 
@@ -78,6 +82,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/compression.h
 )
 
 #
@@ -92,6 +97,10 @@ set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 include_directories (${INCLUDE_DIRECTORIES})
 add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
 add_dependencies (${PROJECT_TEST_NAME} googletest)
+
+if (LIBCURL_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+endif (LIBCURL_BUILTIN)
 
 if (SQLITE3_BUILTIN)
   add_dependencies (${PROJECT_TEST_NAME} sqlite3)
@@ -108,7 +117,8 @@ endif (TBB_PRIVATE_LIB)
 set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
-target_link_libraries (${PROJECT_TEST_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
+target_link_libraries (${PROJECT_TEST_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} 
+                         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                        ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
 
 #

@@ -490,6 +490,16 @@ void HeaderLists::PutList(curl_slist *slist) {
 }
 
 
+string HeaderLists::Print(curl_slist *slist) {
+  string verbose;
+  while (slist) {
+    verbose += string(slist->data) + "\n";
+    slist = slist->next;
+  }
+  return verbose;
+}
+
+
 curl_slist *HeaderLists::Get(const char *header) {
   for (unsigned i = 0; i < blocks_.size(); ++i) {
     for (unsigned j = 0; j < kBlockSize; ++j) {

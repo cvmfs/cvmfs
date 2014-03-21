@@ -16,6 +16,8 @@
 #include <vector>
 #include <set>
 
+#include "gtest/gtest_prod.h"
+
 #include "duplex_curl.h"
 #include "compression.h"
 #include "prng.h"
@@ -147,12 +149,14 @@ struct JobInfo {
  * class
  */
 class HeaderLists {
+  FRIEND_TEST(T_HeaderLists, Intrinsics);
  public:
   ~HeaderLists();
   curl_slist *GetList(const char *header);
   curl_slist *DuplicateList(curl_slist *slist);
   void AppendHeader(curl_slist *slist, const char *header);
   void PutList(curl_slist *slist);
+  std::string Print(curl_slist *slist);
 
  private:
   static const unsigned kBlockSize = 4096/sizeof(curl_slist);
