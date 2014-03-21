@@ -553,6 +553,7 @@ static int Fetch(const shash::Any &checksum,
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
   tls->download_job.expected_hash = &checksum;
+  tls->download_job.extra_info = &cvmfs_path;
   download_manager->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {
@@ -780,6 +781,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
 
   const string url = "/data" + hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url, true, true, catalog_file, &hash);
+  download_catalog.extra_info = &cvmfs_path;
   download_manager_->Fetch(&download_catalog);
   fclose(catalog_file);
   if (download_catalog.error_code != download::kFailOk) {

@@ -89,6 +89,24 @@ static string EscapeUrl(const string &url) {
 }
 
 
+/**
+ * escaped array needs to be sufficiently large.  It's size is calculated by
+ * passing NULL to EscapeHeader.
+ */
+static unsigned EscapeHeader(const string &header, char *escaped) {
+  unsigned esc_pos = 0;
+  for (unsigned i = 0, s = header.size(); i < s; ++i) {
+    if ((header[i] == 0) || (header[i] == 10) || (header[i] == 13))
+      continue;
+    if (escaped != NULL)
+      escaped[esc_pos] = header[i];
+    esc_pos++;
+  }
+
+  return esc_pos;
+}
+
+
 static Failures PrepareDownloadDestination(JobInfo *info) {
   info->destination_mem.size = 0;
   info->destination_mem.pos = 0;
@@ -583,13 +601,16 @@ void DownloadManager::ReleaseCurlHandle(CURL *handle) {
 void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   // Initialize internal download state
   info->curl_handle = handle;
-  info->headers = header_lists_->DuplicateList(default_headers_);
   info->error_code = kFailOk;
   info->nocache = false;
   info->num_used_proxies = 1;
   info->num_used_hosts = 1;
   info->num_retries = 0;
   info->backoff_ms = 0;
+  info->headers = header_lists_->DuplicateList(default_headers_);
+  if (info->extra_header) {
+    header_lists_->AppendHeader(info->headers, info->extra_header);
+  }
   if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
   }
@@ -1223,6 +1244,18 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->hash_context.algorithm = algorithm;
     info->hash_context.size = shash::GetContextSize(algorithm);
     info->hash_context.buffer = alloca(info->hash_context.size);
+  }
+
+  // Prepare cvmfs-info: header, allocate string on the stack
+  info->extra_header = NULL;
+  if (info->extra_info) {
+    const char *header_name = "cvmfs-info: ";
+    const unsigned header_size = 1 + strlen(header_name) +
+      EscapeHeader(*(info->extra_info), NULL);
+    info->extra_header = static_cast<char *>(alloca(header_size));
+    memcpy(info->extra_header, header_name, strlen(header_name));
+    EscapeHeader(*(info->extra_info), info->extra_header + strlen(header_name));
+    info->extra_header[header_size-1] = '\0';
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {

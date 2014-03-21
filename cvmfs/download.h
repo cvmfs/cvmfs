@@ -95,27 +95,29 @@ struct JobInfo {
   FILE *destination_file;
   const std::string *destination_path;
   const shash::Any *expected_hash;
+  const std::string *extra_info;
 
   // One constructor per destination + head request
-  JobInfo() { wait_at[0] = wait_at[1] = -1; head_request = false; }
+  JobInfo() { wait_at[0] = wait_at[1] = -1; head_request = false;
+              extra_info = NULL; }
   JobInfo(const std::string *u, const bool c, const bool ph,
           const std::string *p, const shash::Any *h) : url(u), compressed(c),
           probe_hosts(ph), head_request(false),
           destination(kDestinationPath), destination_path(p), expected_hash(h)
-          { wait_at[0] = wait_at[1] = -1; }
+          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
   JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
           const shash::Any *h) : url(u), compressed(c), probe_hosts(ph),
           head_request(false),
           destination(kDestinationFile), destination_file(f), expected_hash(h)
-          { wait_at[0] = wait_at[1] = -1; }
+          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
   JobInfo(const std::string *u, const bool c, const bool ph,
           const shash::Any *h) : url(u), compressed(c), probe_hosts(ph),
           head_request(false), destination(kDestinationMem), expected_hash(h)
-          { wait_at[0] = wait_at[1] = -1; }
+          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
   JobInfo(const std::string *u, const bool ph) :
           url(u), compressed(false), probe_hosts(ph), head_request(true),
           destination(kDestinationNone), expected_hash(NULL)
-          { wait_at[0] = wait_at[1] = -1; }
+          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
   ~JobInfo() {
     if (wait_at[0] >= 0) {
       close(wait_at[0]);
@@ -126,6 +128,7 @@ struct JobInfo {
   // Internal state, don't touch
   CURL *curl_handle;
   curl_slist *headers;
+  char *extra_header;
   z_stream zstream;
   shash::ContextPtr hash_context;
   int wait_at[2];  /**< Pipe used for the return value */
