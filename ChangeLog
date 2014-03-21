@@ -1,4 +1,5 @@
 2.1.18:
+  * Add cvmfs-info header sending the requested path (CVM-580)
   * Improve error logging when loading the cvmfs library 
     (cf. CVM-595)
   * Fix crash in exclusive cache mode if unpin listener is called
