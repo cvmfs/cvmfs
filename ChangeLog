@@ -1,4 +1,6 @@
 2.1.18:
+  * Log to syslog in addition to stderr when debug log cannot
+    be opened (CVM-273)
   * Fix false parsing of /etc/cvmfs/domaind.d/cern.ch.* on mount
     (CVM-600)
   * Improve error logging when loading the cvmfs library (cf. CVM-595)
