@@ -1,6 +1,7 @@
 2.1.18:
-  * Improve error logging when loading the cvmfs library 
-    (cf. CVM-595)
+  * Fix false parsing of /etc/cvmfs/domaind.d/cern.ch.* on mount
+    (CVM-600)
+  * Improve error logging when loading the cvmfs library (cf. CVM-595)
   * Fix crash in exclusive cache mode if unpin listener is called
     on mount (CVM-267) 
   * Add "volatile" repository and volatile cache class (CVM-263)
