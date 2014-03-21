@@ -309,13 +309,16 @@ void SetLogDebugFile(const string &filename) {
     if ((fclose(file_debug) < 0)) {
       fprintf(stderr, "could not close current log file (%d), aborting\n",
               errno);
+
       abort();
     }
   }
   int fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
   if ((fd < 0) || ((file_debug = fdopen(fd, "a")) == NULL)) {
-    fprintf(stderr, "could not open log file %s (%d), aborting\n",
+    fprintf(stderr, "could not open debug log file %s (%d), aborting\n",
             filename.c_str(), errno);
+    syslog(syslog_facility | LOG_ERR, "could not open debug log file %s (%d), "
+           "aborting\n", filename.c_str(), errno);
     abort();
   }
   delete path_debug;
