@@ -51,12 +51,12 @@ def spawn_instance(connection, ami, key_name, flavor):
     instance = reservation.instances[0]
     if instance.state != "pending":
       print_error("Instance failed at startup (State: " + instance.state + ")")
-      return None
+      return instance
 
     waiting_time = wait_for_instance(instance)
     if instance.state != "running":
       print_error("Failed to boot up instance (State: " + instance.state + ")")
-      return None
+      return instance
 
     return instance
 
