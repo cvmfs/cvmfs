@@ -37,7 +37,7 @@ S3FanoutManager *S3FanoutManager::Instance() {
  * S3FanoutManager initialisation as a Singleton class.
  */
 void S3FanoutManager::Initialise() {
-  const int maximum_number_of_concurrent_jobs = 5;
+  const int maximum_number_of_concurrent_jobs = 100;
   static S3FanoutManager s;
   s.Init(maximum_number_of_concurrent_jobs, &url_constructor); // max connections
   s.SetRetryParameters(3, 100, 2000);
@@ -115,7 +115,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     const size_t send_size = avail_bytes < num_bytes ? avail_bytes : num_bytes;
     memcpy(ptr, info->origin_mem.data + info->origin_mem.pos, send_size);
     info->origin_mem.pos += send_size;
-    LogCvmfs(kLogS3Fanout, kLogDebug, "pushed out %d bytes", send_size);
+    LogCvmfs(kLogS3Fanout, kLogDebug, "mem pushed out %d bytes", send_size);
     return send_size;
   } else if (info->origin == kOriginPath) {
     size_t read_bytes = fread(ptr, 1, num_bytes, info->origin_file);
@@ -126,7 +126,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         return CURL_READFUNC_ABORT;
       }
     }
-    LogCvmfs(kLogS3Fanout, kLogDebug, "pushed out %d bytes", read_bytes);
+    LogCvmfs(kLogS3Fanout, kLogDebug, "file pushed out %d bytes", read_bytes);
     return read_bytes;
   }
 
@@ -242,14 +242,25 @@ void *S3FanoutManager::MainUpload(void *data) {
       LogCvmfs(kLogS3Fanout, kLogDebug, "curl_multi_socket_action: %d - %d", retval, still_running);
     }
 
+    // Check events with 1ms timeout
     int timeout = 1;
     int retval = poll(s3fanout_mgr->watch_fds_, s3fanout_mgr->watch_fds_inuse_,
                       timeout);
-    if (retval < 0) {
-      continue;
+    if (retval == 0) {
+      // Handle timeout
+      int still_running = 0;
+      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+					CURL_SOCKET_TIMEOUT,
+					0,
+					&still_running);
+      if(retval != CURLM_OK) {
+	LogCvmfs(kLogS3Fanout, kLogDebug, "Error, timeout due to: %d", retval);
+	assert(retval == CURLM_OK);
+      }
+    }else if (retval < 0) {
+      LogCvmfs(kLogS3Fanout, kLogDebug, "Error, event poll failed: %d", errno);
+      assert(retval >= 0);
     }
-
-    //LogCvmfs(kLogS3Fanout, kLogDebug, "Upload I/O thread: %d", retval);
 
     // Activity on curl sockets
     for (unsigned i = 0; i < s3fanout_mgr->watch_fds_inuse_; ++i) {
@@ -336,7 +347,7 @@ CURL *S3FanoutManager::AcquireCurlHandle() {
     //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_READFUNCTION, CallbackCurlData);
-    curl_easy_setopt(handle, CURLOPT_DNS_CACHE_TIMEOUT, 0);
+    //curl_easy_setopt(handle, CURLOPT_DNS_CACHE_TIMEOUT, 0);
   } else {
     handle = *(pool_handles_idle_->begin());
     pool_handles_idle_->erase(pool_handles_idle_->begin());
