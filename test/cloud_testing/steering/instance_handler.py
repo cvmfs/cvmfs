@@ -61,7 +61,7 @@ def spawn_instance(connection, ami, key_name, flavor):
     return instance
 
   except Exception, e:
-    print_error("Exception: " + e)
+    print_error("Exception: " + str(e))
     return None
 
 
@@ -70,7 +70,7 @@ def kill_instance(connection, instance_id):
   try:
     terminated_instances = connection.terminate_instances(instance_id)
   except Exception, e:
-    print e
+    print_error("Exception: " + str(e))
   return len(terminated_instances) == 1
 
 
