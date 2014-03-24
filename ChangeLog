@@ -1,4 +1,5 @@
 2.1.18:
+  * Reduce default verbosity of 'cvmfs_server publish' (CVM-269)
   * Fix automounter map on EL6.2 (CVM-601)
   * Log to syslog in addition to stderr when debug log cannot
     be opened (CVM-273)
