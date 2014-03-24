@@ -10,11 +10,14 @@ def print_error(msg):
   print >> sys.stderr , "[Error]" , msg
 
 
-def wait_for_instance(instance):
+def wait_for_instance(instance, timeout = 900):
   start = time.time()
-  while instance.state == "pending":
+  counter = 0
+  polling_interval = 15
+  while instance.state == "pending" and counter < timeout:
     instance.update()
-    time.sleep(15)
+    time.sleep(polling_interval)
+    counter += polling_interval
   end = time.time()
   return end - start
 
