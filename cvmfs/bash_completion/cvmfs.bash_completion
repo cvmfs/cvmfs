@@ -67,9 +67,9 @@ __hosted_repos() {
   local predicate="$1"
   local reply=
   if [ x"$predicate" != x"" ]; then
-    reply=$(cvmfs_server list | awk "$predicate")
+    reply=$(cvmfs_server list 2>/dev/null | awk "$predicate")
   else
-    reply=$(cvmfs_server list)
+    reply=$(cvmfs_server list 2>/dev/null)
   fi
   echo "$reply" | awk '{ print $1 }'
 }
