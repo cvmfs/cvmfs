@@ -79,6 +79,16 @@ typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
  */
 class SyncMediator {
   friend class SyncUnion;
+ private:
+  enum ChangesetAction {
+    kAdd,
+    kAddCatalog,
+    kAddHardlinks,
+    kTouch,
+    kRemove,
+    kRemoveCatalog
+  };
+
  public:
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                const SyncParameters *params);
@@ -101,6 +111,9 @@ class SyncMediator {
   void RegisterUnionEngine(SyncUnion *engine) {
     union_engine_ = engine;
   }
+
+  void PrintChangesetNotice(const ChangesetAction action,
+                            const std::string &extra_info) const;
 
   // Called after figuring out the type of a path (file, symlink, dir)
   void AddFile(SyncItem &entry);

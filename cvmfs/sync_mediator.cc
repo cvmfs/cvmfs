@@ -500,10 +500,8 @@ void SyncMediator::PublishHardlinksCallback(const upload::SpoolerResult &result)
 
 
 void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
-  if (params_->print_changeset) {
-    LogCvmfs(kLogPublish, kLogStdout, "[add] Nested catalog at %s",
-             GetParentPath(requestFile.GetUnionPath()).c_str());
-  }
+  const std::string notice = "Nested catalog at ";
+  PrintChangesetNotice(kAddCatalog, notice + requestFile.GetUnionPath());
   if (!params_->dry_run) {
     catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path());
   }
@@ -511,19 +509,44 @@ void SyncMediator::CreateNestedCatalog(SyncItem &requestFile) {
 
 
 void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
-  if (params_->print_changeset) {
-    LogCvmfs(kLogPublish, kLogStdout, "[rem] Nested catalog at %s",
-             GetParentPath(requestFile.GetUnionPath()).c_str());
-  }
+  const std::string notice = "Nested catalog at ";
+  PrintChangesetNotice(kRemoveCatalog, notice + requestFile.GetUnionPath());
   if (!params_->dry_run) {
     catalog_manager_->RemoveNestedCatalog(requestFile.relative_parent_path());
   }
 }
 
 
+void SyncMediator::PrintChangesetNotice(const ChangesetAction  action,
+                                        const std::string     &extra) const {
+  if (! params_->print_changeset) {
+    return;
+  }
+
+  const char *action_label = NULL;
+  switch (action) {
+    case kAdd:
+    case kAddCatalog:
+    case kAddHardlinks:
+      action_label = "[add]";
+      break;
+    case kRemove:
+    case kRemoveCatalog:
+      action_label = "[rem]";
+      break;
+    case kTouch:
+      action_label = "[tou]";
+      break;
+    default:
+      assert (false && "unknown sync mediator action");
+  }
+
+  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, extra.c_str());
+}
+
+
 void SyncMediator::AddFile(SyncItem &entry) {
-  if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
+  PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (entry.IsSymlink() && !params_->dry_run) {
   // Symlinks are completely stored in the catalog
@@ -541,8 +564,8 @@ void SyncMediator::AddFile(SyncItem &entry) {
 
 
 void SyncMediator::RemoveFile(SyncItem &entry) {
-  if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
+  PrintChangesetNotice(kRemove, entry.GetUnionPath());
+
   if (!params_->dry_run) {
     if (entry.GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
@@ -555,8 +578,8 @@ void SyncMediator::RemoveFile(SyncItem &entry) {
 
 
 void SyncMediator::AddDirectory(SyncItem &entry) {
-  if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogStdout, "[add] %s", entry.GetUnionPath().c_str());
+  PrintChangesetNotice(kAdd, entry.GetUnionPath());
+
   if (!params_->dry_run) {
     catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());
@@ -569,16 +592,16 @@ void SyncMediator::AddDirectory(SyncItem &entry) {
  * SyncMediator::RemoveDirectoryRecursively instead.
  */
 void SyncMediator::RemoveDirectory(SyncItem &entry) {
-  if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogStdout, "[rem] %s", entry.GetUnionPath().c_str());
+  PrintChangesetNotice(kRemove, entry.GetUnionPath());
+
   if (!params_->dry_run)
     catalog_manager_->RemoveDirectory(entry.GetRelativePath());
 }
 
 
 void SyncMediator::TouchDirectory(SyncItem &entry) {
-  if (params_->print_changeset)
-    LogCvmfs(kLogPublish, kLogStdout, "[tou] %s", entry.GetUnionPath().c_str());
+  PrintChangesetNotice(kTouch, entry.GetUnionPath());
+
   if (!params_->dry_run)
     catalog_manager_->TouchDirectory(entry.CreateBasicCatalogDirent(),
                                      entry.GetRelativePath());
@@ -601,16 +624,14 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     }
 
     if (params_->print_changeset) {
-      LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak,
-               "[add] hardlink group around: (%s)",
-               i->second.master.GetUnionPath().c_str());
+      std::string changeset_notice = "add hardlinks around ("
+                                   + i->second.master.GetUnionPath() + ")";
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
       {
-        LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, " %s",
-                 j->second.filename().c_str());
+        changeset_notice += " " + j->second.filename();
       }
-      LogCvmfs(kLogPublish, kLogStdout, "");
+      PrintChangesetNotice(kAddHardlinks, changeset_notice);
     }
 
     if (params_->dry_run)
