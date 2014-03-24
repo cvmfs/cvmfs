@@ -10,11 +10,18 @@ def print_error(msg):
   print >> sys.stderr , "[Error]" , msg
 
 
-def wait_for_instance(instance):
+def is_running(instance):
+  return instance != None and instance.state == "running"
+
+
+def wait_for_instance(instance, timeout = 900):
   start = time.time()
-  while instance.state == "pending":
+  counter = 0
+  polling_interval = 15
+  while instance.state == "pending" and counter < timeout:
     instance.update()
-    time.sleep(15)
+    time.sleep(polling_interval)
+    counter += polling_interval
   end = time.time()
   return end - start
 
@@ -31,7 +38,31 @@ def connect_to_openstack(access_key, secret_key, endpoint):
   return connection
 
 
-def spawn_instance(connection, ami, key_name, flavor):
+def spawn_instance(connection, ami, key_name, flavor, max_retries = 5):
+  instance     = None
+  time_backoff = 20
+  retries      = 0
+
+  while not is_running(instance) and retries < max_retries:
+    instance = spawn_instance_on_openstack(connection, ami, key_name, flavor)
+    retries += 1
+    if not is_running(instance):
+      instance_id    = "unknown"
+      instance_state = "unknown"
+      if instance != None:
+        instance_id    = str(instance.id)
+        instance_state = str(instance.state)
+        kill_instance(connection, instance_id)
+      print_error("Failed spawning instance " + instance_id +
+                  " (#: " + str(retries) + " | state: " + instance_state + ")")
+      time.sleep(time_backoff)
+
+  if not is_running(instance):
+    return None
+  return instance
+
+
+def spawn_instance_on_openstack(connection, ami, key_name, flavor):
   try:
     reservation = connection.run_instances(ami,
                                            key_name=key_name,
@@ -44,17 +75,17 @@ def spawn_instance(connection, ami, key_name, flavor):
     instance = reservation.instances[0]
     if instance.state != "pending":
       print_error("Instance failed at startup (State: " + instance.state + ")")
-      return None
+      return instance
 
     waiting_time = wait_for_instance(instance)
     if instance.state != "running":
       print_error("Failed to boot up instance (State: " + instance.state + ")")
-      return None
+      return instance
 
     return instance
 
   except Exception, e:
-    print_error("Exception: " + e)
+    print_error("Exception: " + str(e))
     return None
 
 
@@ -63,7 +94,7 @@ def kill_instance(connection, instance_id):
   try:
     terminated_instances = connection.terminate_instances(instance_id)
   except Exception, e:
-    print e
+    print_error("Exception: " + str(e))
   return len(terminated_instances) == 1
 
 
@@ -99,7 +130,7 @@ def create_instance(parent_parser, argv):
   connection = connect_to_openstack(access_key, secret_key, endpoint)
   instance   = spawn_instance(connection, ami, key_name, flavor)
 
-  if instance != None:
+  if is_running(instance):
     print instance.id , instance.private_ip_address
   else:
     print_error("Failed to start instance")
