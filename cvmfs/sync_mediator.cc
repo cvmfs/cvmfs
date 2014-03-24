@@ -29,7 +29,8 @@ namespace publish {
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
   catalog_manager_(catalog_manager),
-  params_(params)
+  params_(params),
+  changed_items_(0)
 {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
@@ -167,6 +168,11 @@ void SyncMediator::LeaveDirectory(SyncItem &entry)
  * To be called after change set traversal is finished.
  */
 manifest::Manifest *SyncMediator::Commit() {
+  if (! params_->print_changeset) {
+    // line break the 'progress bar', see SyncMediator::PrintChangesetNotice()
+    LogCvmfs(kLogPublish, kLogStdout, "");
+  }
+
   LogCvmfs(kLogPublish, kLogStdout,
            "Waiting for upload of files before committing...");
   params_->spooler->WaitForUpload();
@@ -520,6 +526,10 @@ void SyncMediator::RemoveNestedCatalog(SyncItem &requestFile) {
 void SyncMediator::PrintChangesetNotice(const ChangesetAction  action,
                                         const std::string     &extra) const {
   if (! params_->print_changeset) {
+    ++changed_items_;
+    if (changed_items_ % processing_dot_interval == 0) {
+      LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, ".");
+    }
     return;
   }
 

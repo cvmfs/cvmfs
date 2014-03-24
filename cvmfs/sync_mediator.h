@@ -90,6 +90,8 @@ class SyncMediator {
   };
 
  public:
+  static const unsigned int processing_dot_interval = 100;
+
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                const SyncParameters *params);
   virtual ~SyncMediator();
@@ -191,6 +193,7 @@ class SyncMediator {
   HardlinkGroupList hardlink_queue_;
 
   const SyncParameters *params_;
+  mutable unsigned int changed_items_;
 };  // class SyncMediator
 
 }  // namespace publish
