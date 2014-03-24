@@ -10,6 +10,10 @@ def print_error(msg):
   print >> sys.stderr , "[Error]" , msg
 
 
+def is_running(instance):
+  return instance != None and instance.state == "running"
+
+
 def wait_for_instance(instance, timeout = 900):
   start = time.time()
   counter = 0
@@ -102,7 +106,7 @@ def create_instance(parent_parser, argv):
   connection = connect_to_openstack(access_key, secret_key, endpoint)
   instance   = spawn_instance(connection, ami, key_name, flavor)
 
-  if instance != None:
+  if is_running(instance):
     print instance.id , instance.private_ip_address
   else:
     print_error("Failed to start instance")
