@@ -44,6 +44,6 @@ int main(int argc, char **argv) {
   if (hostname[hostname.length()-1] == '.')
     return 1;
 
-  printf("-fstype=cvmfs %s\n", hostname.c_str());
+  printf("-fstype=cvmfs :%s\n", hostname.c_str());
   return 0;
 }
