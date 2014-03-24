@@ -181,7 +181,7 @@ Supported Commands:
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
                 [-a tag name] [-c tag channel] [ -t tag description] [ -h hash]
-                [-r tag name]
+                [-r tag name] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -2366,10 +2366,11 @@ publish() {
   local add_tag=
   local remove_tag=
   local retcode=0
+  local verbosity=" "
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:h:c:t:r:" option
+  while getopts "dDpa:h:c:t:r:v" option
   do
     case $option in
       d)
@@ -2402,6 +2403,9 @@ publish() {
         if [ "x$OPTARG" = "xtrunk" -o "x$OPTARG" = "xtrunk-previous" ]; then
           echo "Warning: won't delete $OPTARG tag"
         fi
+      ;;
+      v)
+        verbosity="-x"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2490,7 +2494,7 @@ publish() {
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-    local sync_command="$swissknife sync -x -u /cvmfs/$name \
+    local sync_command="$swissknife sync $verbosity -u /cvmfs/$name \
       -s ${spool_dir}/scratch \
       -c ${spool_dir}/rdonly \
       -t ${spool_dir}/tmp \
