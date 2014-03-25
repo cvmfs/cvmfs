@@ -203,8 +203,9 @@ bool Database::Create(const string &filename,
   Database database(filename, kLatestSchema, kLatestSchemaRevision);
   if (!database.ready()) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "Cannot create and open catalog database file '%s'",
-             filename.c_str());
+             "Cannot create and open catalog database file '%s'\n"
+             "SQLite said: '%s'",
+             filename.c_str(), database.GetLastErrorMsg().c_str());
     return false;
   }
 
