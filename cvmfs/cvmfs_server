@@ -1253,7 +1253,7 @@ create_spool_area_for_new_repository() {
   local cache_dir="${spool_dir}/cache"
 
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
-  chown -R $CVMFS_USER /cvmfs/$name $spool_dir
+  chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
   if [ $create_skeleton -eq 1 ] && is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
     local repository_dir
     repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
