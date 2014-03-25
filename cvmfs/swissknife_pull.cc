@@ -450,7 +450,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   // Manifest available, now the spooler's hash algorithm can be determined
   // That doesn't actually matter because the replication does no re-hashing
-  {
+  if (!preload_cache) {
     const upload::SpoolerDefinition
       spooler_definition(spooler_definition_str,
                          ensemble.manifest->GetHashAlgorithm());
